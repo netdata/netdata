@@ -25,7 +25,8 @@ Module: PerflibStorage
 Detailed statistics for all disk devices and volumes.
 
 
-It queries 'LogicalDisk' and 'PhysicalDisk' objects from Perflib in order to gather the metrics.
+It uses Windows volume-space APIs for disk-space metrics, including folder-mounted and Cluster Shared
+Volumes, and queries the 'LogicalDisk' and 'PhysicalDisk' objects from Perflib for the remaining metrics.
 
 
 This collector is only supported on the following platforms:
@@ -115,7 +116,15 @@ Exclude logical-volume disk space metrics for mount points that contain `Assured
 
 ## Alerts
 
-There are no alerts configured by default for this integration.
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ disk_space_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.space | Total space utilization of disk ${label:mount_point} |
+| [ disk_fill_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.space | average rate the disk fills up (positive), or frees up (negative) space, for the last hour |
+| [ out_of_disk_space_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.space | Estimated time the disk ${label:mount_point} will run out of space, if the system continues to add data with the rate of the last hour |
+| [ 10min_disk_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.util | Average percentage of time ${label:device} disk was busy over the last 10 minutes |
 
 
 
@@ -143,17 +152,17 @@ Metrics:
 
 ### Per Logical Disk
 
-These metrics refer to Logical Disks.
+These metrics refer to Logical Disks. Volumes without a drive letter are included, addressed by the folder they are mounted on - this covers Cluster Shared Volumes on failover-cluster nodes, which Windows exposes only below the system drive, as '%SystemDrive%\ClusterStorage\VolumeN' (for example 'C:\ClusterStorage\Volume1').
 
 Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
-| mount_point | Drive letter or mount point path assigned by Windows (e.g., 'C:', 'D:'). |
-| drive_type | Classification of the disk device (e.g., norootdir, removable, cdrom, ramdisk). |
-| filesystem | File system format used on the volume (e.g., NTFS, FAT32). |
+| mount_point | Drive letter or mount point path assigned by Windows (e.g., 'C:', 'D:', 'C:\ClusterStorage\Volume1'). |
+| drive_type | Classification of the disk device (e.g., norootdir, removable, fixed, remote, cdrom, ramdisk). |
+| filesystem | File system format used on the volume (e.g., ntfs, refs, csvfs). |
 | rw_mode | Current read/write permissions status of the volume (read-only access, read and write access). |
-| serial_number | Volume serial number in hexadecimal format. |
+| serial_number | Volume serial number reported by Windows, in hexadecimal. |
 
 Metrics:
 

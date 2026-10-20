@@ -38,7 +38,7 @@ Specifically, it collects metrics from the following tables:
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -131,7 +131,7 @@ Configure the **clickhouse** collector from the Netdata web interface:
 4. In the Search box, type _clickhouse_ (or scroll the list) to locate the **clickhouse** collector.
 5. Click the **+** next to the **clickhouse** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -234,7 +234,7 @@ The following alerts are available:
 | [ clickhouse_rejected_inserts ](https://github.com/netdata/netdata/blob/master/src/health/health.d/clickhouse.conf) | clickhouse.rejected_inserts | ClickHouse has INSERT queries that are rejected due to high number of active data parts for partition in a MergeTree |
 | [ clickhouse_delayed_inserts ](https://github.com/netdata/netdata/blob/master/src/health/health.d/clickhouse.conf) | clickhouse.delayed_inserts | ClickHouse has INSERT queries that are throttled due to high number of active data parts for partition in a MergeTree |
 | [ clickhouse_replication_lag ](https://github.com/netdata/netdata/blob/master/src/health/health.d/clickhouse.conf) | clickhouse.replicas_max_absolute_delay | ClickHouse is experiencing replication lag greater than 5 minutes |
-| [ clickhouse_replicated_readonly_tables ](https://github.com/netdata/netdata/blob/master/src/health/health.d/clickhouse.conf) | clickhouse.replicated_readonly_tables | ClickHouse has replicated tables in readonly state due to ZooKeeper session loss/startup without ZooKeeper configured |
+| [ clickhouse_replicated_readonly_tables ](https://github.com/netdata/netdata/blob/master/src/health/health.d/clickhouse.conf) | clickhouse.replicated_readonly_tables | ClickHouse replicated tables are read-only due to startup without ZooKeeper configured or ZooKeeper session loss. |
 | [ clickhouse_max_part_count_for_partition ](https://github.com/netdata/netdata/blob/master/src/health/health.d/clickhouse.conf) | clickhouse.max_part_count_for_partition | ClickHouse high number of parts per partition |
 | [ clickhouse_distributed_connections_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/clickhouse.conf) | clickhouse.distributed_connections_fail_exhausted_retries | ClickHouse has failed distributed connections after exhausting all retry attempts |
 | [ clickhouse_distributed_files_to_insert ](https://github.com/netdata/netdata/blob/master/src/health/health.d/clickhouse.conf) | clickhouse.distributed_files_to_insert | ClickHouse high number of pending files to process for asynchronous insertion into Distributed tables |
@@ -305,16 +305,16 @@ Metrics:
 | clickhouse.mark_cache_requests | Mark cache requests | hits, misses | requests/s |
 | clickhouse.max_part_count_for_partition | Max part count for partition | max_parts_partition | parts |
 | clickhouse.parts_count | Parts | temporary, pre_active, active, deleting, delete_on_destroy, outdated, wide, compact | parts |
-| distributed_connections | Active distributed connection | active | connections |
-| distributed_connections_attempts | Distributed connection attempts | connection | attempts/s |
-| distributed_connections_fail_retries | Distributed connection fails with retry | connection_retry | fails/s |
-| distributed_connections_fail_exhausted_retries | Distributed connection fails after all retries finished | connection_retry_exhausted | fails/s |
-| distributed_files_to_insert | Pending files to process for asynchronous insertion into Distributed tables | pending_insertions | files |
-| distributed_rejected_inserts | Rejected INSERTs to a Distributed table | rejected | inserts/s |
-| distributed_delayed_inserts | Delayed INSERTs to a Distributed table | delayed | inserts/s |
-| distributed_delayed_inserts_latency | Time spent while the INSERT of a block to a Distributed table was throttled | delayed_time | milliseconds |
-| distributed_sync_insertion_timeout_exceeded | Distributed table sync insertions timeouts | sync_insertion | timeouts/s |
-| distributed_async_insertions_failures | Distributed table async insertion failures | async_insertions | failures/s |
+| clickhouse.distributed_connections | Active distributed connection | active | connections |
+| clickhouse.distributed_connections_attempts | Distributed connection attempts | connection | attempts/s |
+| clickhouse.distributed_connections_fail_retries | Distributed connection fails with retry | connection_retry | fails/s |
+| clickhouse.distributed_connections_fail_exhausted_retries | Distributed connection fails after all retries finished | connection_retry_exhausted | fails/s |
+| clickhouse.distributed_files_to_insert | Pending files to process for asynchronous insertion into Distributed tables | pending_insertions | files |
+| clickhouse.distributed_rejected_inserts | Rejected INSERTs to a Distributed table | rejected | inserts/s |
+| clickhouse.distributed_delayed_inserts | Delayed INSERTs to a Distributed table | delayed | inserts/s |
+| clickhouse.distributed_delayed_inserts_latency | Time spent while the INSERT of a block to a Distributed table was throttled | delayed_time | milliseconds |
+| clickhouse.distributed_sync_insertion_timeout_exceeded | Distributed table sync insertions timeouts | sync_insertion | timeouts/s |
+| clickhouse.distributed_async_insertions_failures | Distributed table async insertion failures | async_insertions | failures/s |
 | clickhouse.uptime | Uptime | uptime | seconds |
 
 

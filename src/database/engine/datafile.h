@@ -83,8 +83,20 @@ struct rrdengine_datafile {
         Pvoid_t epdl_per_extent;
     } extent_epdl;
 
+    // The stored slots (samples) charged to this datafile - the tier's samples
+    // counter is the sum of these. See rrdeng_datafile_samples_charge().
+    struct {
+        uint64_t charged;
+        bool estimated;             // part of the charge is an estimate (a journal v2 without a samples section)
+    } samples;
+
     uint32_t magic2;
 };
+
+// samples accounting of a datafile, see datafile.c
+void rrdeng_datafile_samples_charge(struct rrdengine_datafile *datafile, uint64_t samples);
+void rrdeng_datafile_samples_set(struct rrdengine_datafile *datafile, uint64_t samples, bool estimated);
+void rrdeng_datafile_samples_uncharge(struct rrdengine_datafile *datafile);
 
 bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason);
 void datafile_release_with_trace(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason, const char *func);

@@ -4,6 +4,7 @@ package joboutput
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
@@ -66,6 +67,7 @@ func (dcjc *DynCfgJobController) prepareAdd(
 		Payload: payload,
 	}
 	return dcjc.prepareMutation(
+		ctx,
 		scope,
 		current,
 		nil,
@@ -119,7 +121,7 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 		return dcjc.reject(scope, current, permit, failure.failure)
 	}
 	status := dyncfg.Status(record.Status)
-	if status == dyncfg.StatusAccepted && current == nil && !dcjc.scheduler.accepted.enabled(scope.ID) {
+	if status == dyncfg.StatusAccepted && current == nil && !dcjc.ActivationEnabled(scope.ID) {
 		return dcjc.rejectKeeping(scope, current, permit, jobFailure{
 			class:   failureForbidden,
 			message: "updating is not allowed in 'accepted' state.",
@@ -164,6 +166,7 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 			return dcjc.rejectKeeping(scope, current, permit, rejection, status)
 		}
 		return dcjc.prepareMutation(
+			ctx,
 			scope,
 			current,
 			nil,
@@ -194,45 +197,31 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 }
 
 func (dcjc *DynCfgJobController) prepareEnable(
-	ctx context.Context,
-	target dynCfgTarget,
-	record dyncfg.GraphRecord,
-	exists bool,
-	current lifecycle.ReadyResource,
-	scope lifecycle.ResourceTransactionScope,
-	permit lifecycle.LongLivedPermit,
+	ctx context.Context, target dynCfgTarget, record dyncfg.GraphRecord, exists bool,
+	current lifecycle.ReadyResource, scope lifecycle.ResourceTransactionScope, permit lifecycle.LongLivedPermit,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	if !exists {
-		return dcjc.reject(scope, current, permit, jobFailure{
-			class:   failureNotFound,
-			message: "config not found.",
-		})
+		return dcjc.reject(scope, current, permit, jobFailure{class: failureNotFound, message: "config not found."})
 	}
-	status := dyncfg.Status(record.Status)
-	if status == dyncfg.StatusRunning {
-		return dcjc.satisfy(scope, current, permit, status, nil)
+	if state := dcjc.candidates.view(scope.ID); state != nil && state.Enablement == candidateEnabled {
+		return dcjc.satisfyWithEnabledIntent(ctx, scope, current, permit, record, nil)
 	}
-	config, err := graphRecordConfig(record)
+	delta, err := dcjc.candidates.prepareEnable(scope.ID, dcjc.scheduler.retries.now())
 	if err != nil {
 		return nil, err
 	}
-	spec, err := dcjc.configModules.newAcceptedActivationSpec(config)
+	if delta.after.Binding == nil || !delta.after.Binding.Listed {
+		return nil, errors.New("job output: enabled config has no exposed binding")
+	}
+	postimage, err := candidateGraphBinding(scope.ID, delta.after.Binding)
 	if err != nil {
 		return nil, err
 	}
-	activate := func() { dcjc.scheduler.accepted.arm(spec) }
-	if status == dyncfg.StatusAccepted {
-		if current != nil {
-			activate = nil // The installed generation already owns startup.
-		}
-		return dcjc.satisfy(scope, current, permit, status, activate)
-	}
-	postimage := graphConfig(record, dyncfg.StatusAccepted)
-	return dcjc.prepareMutationWithRetryAfterApply(
-		scope, current, nil, permit, resourceRemovalDisposition(current), &postimage,
-		adoptedReply(dyncfg.CommandEnable, dyncfg.StatusAccepted, jobFailure{}),
-		dcjc.configStatusCleanup(scope.ID, dyncfg.StatusAccepted), autoDetectionRetryToken{}, activate,
-	)
+	reply := adoptedReply(dyncfg.CommandEnable, dyncfg.StatusAccepted, jobFailure{})
+	reply.candidate = delta
+	return dcjc.prepareMutationAfterApply(ctx, scope, current, nil, permit,
+		resourceRemovalDisposition(current), postimage, reply,
+		dcjc.candidateProjectionCleanup(scope.ID, postimage, delta), nil, jobConfigIntentEnable)
 }
 
 func (dcjc *DynCfgJobController) prepareRestart(
@@ -326,13 +315,40 @@ func (dcjc *DynCfgJobController) prepareCandidate(
 	current lifecycle.ReadyResource,
 	scope lifecycle.ResourceTransactionScope,
 	permit lifecycle.LongLivedPermit,
-) (lifecycle.PreparedResourceTransaction, error) {
+) (transaction lifecycle.PreparedResourceTransaction, resultErr error) {
+	token, interrupted := dcjc.scheduler.accepted.interruptExecution(scope.ID)
+	defer func() {
+		if !interrupted {
+			return
+		}
+		resume := func() { dcjc.retainCandidateResume(scope.ID, token) }
+		if resultErr != nil || transaction == nil {
+			resume()
+		} else {
+			transaction = &candidatePreflightTransaction{PreparedResourceTransaction: transaction, resume: resume}
+		}
+	}()
 	kept := dyncfg.Status(cmd.record.Status)
 	failedPostimage := cmd.postimage
 	failedPostimage.Status = dyncfg.StatusFailed.String()
 	failedCleanup := cmd.cleanup(failedPostimage, dyncfg.StatusFailed)
 
 	stage, probeFailure, activation := dcjc.prepareContainedCandidate(ctx, cmd.config)
+	if activation.err == nil && probeFailure == nil {
+		acceptedPostimage := cmd.postimage
+		acceptedPostimage.Status = dyncfg.StatusAccepted.String()
+		prepared, err := dcjc.prepareCandidateAdoption(
+			ctx,
+			scope, current, permit, stage, cmd.config, &acceptedPostimage,
+			adoptedReply(cmd.command, dyncfg.StatusAccepted, jobFailure{}),
+			cmd.cleanup(acceptedPostimage, dyncfg.StatusAccepted), nil,
+		)
+		var preflight *candidatePreflightError
+		if !errors.As(err, &preflight) {
+			return prepared, err
+		}
+		activation = classifyActivationError(err)
+	}
 	if err := activation.err; err != nil {
 		if ctx.Err() != nil || lifecycle.OwnershipRetained(err) {
 			return nil, err
@@ -358,13 +374,13 @@ func (dcjc *DynCfgJobController) prepareCandidate(
 			return dcjc.rejectKeeping(scope, current, permit, failure, kept)
 		}
 		return dcjc.prepareTransientConstructionFailure(
+			ctx,
 			scope,
 			current,
 			permit,
 			failedPostimage,
 			adoptedReply(cmd.command, dyncfg.StatusFailed, failure),
 			failedCleanup,
-			autoDetectionRetryToken{},
 			cmd.config,
 			err,
 		)
@@ -377,31 +393,22 @@ func (dcjc *DynCfgJobController) prepareCandidate(
 		failedCleanup:    failedCleanup,
 		removedCleanup:   cmd.removedCleanup,
 		reply:            reply,
-		afterApply:       dcjc.scheduleRetryAfterApply(cmd.config),
 		removePlainStock: cmd.config.SourceType() == confgroup.TypeStock,
 	}
-	if probeFailure != nil {
-		if !cmd.adoptsFailures || !adoptsFailure(probeFailure) {
-			return dcjc.rejectKeeping(
-				scope,
-				current,
-				permit,
-				collectorFailure(probeFailure, cmd.messages.failed),
-				kept,
-			)
-		}
-		return dcjc.prepareProbeFailure(scope, current, permit, autoDetectionRetryToken{}, probeFailure, failurePlan)
+	if !cmd.adoptsFailures || !adoptsFailure(probeFailure) {
+		return dcjc.rejectKeeping(
+			scope,
+			current,
+			permit,
+			collectorFailure(probeFailure, cmd.messages.failed),
+			kept,
+		)
 	}
-	acceptedPostimage := cmd.postimage
-	acceptedPostimage.Status = dyncfg.StatusAccepted.String()
-	return dcjc.prepareCandidateAdoption(
-		scope, current, permit, stage, cmd.config, &acceptedPostimage,
-		adoptedReply(cmd.command, dyncfg.StatusAccepted, jobFailure{}),
-		cmd.cleanup(acceptedPostimage, dyncfg.StatusAccepted), nil,
-	)
+	return dcjc.prepareProbeFailure(ctx, scope, current, permit, probeFailure, failurePlan)
 }
 
 func (dcjc *DynCfgJobController) prepareDisable(
+	ctx context.Context,
 	target dynCfgTarget,
 	record dyncfg.GraphRecord,
 	exists bool,
@@ -420,6 +427,7 @@ func (dcjc *DynCfgJobController) prepareDisable(
 	}
 	postimage := graphConfig(record, dyncfg.StatusDisabled)
 	return dcjc.prepareMutation(
+		ctx,
 		scope,
 		current,
 		nil,
@@ -432,6 +440,7 @@ func (dcjc *DynCfgJobController) prepareDisable(
 }
 
 func (dcjc *DynCfgJobController) prepareRemove(
+	ctx context.Context,
 	target dynCfgTarget,
 	record dyncfg.GraphRecord,
 	exists bool,
@@ -465,6 +474,7 @@ func (dcjc *DynCfgJobController) prepareRemove(
 		})
 	}
 	return dcjc.prepareMutation(
+		ctx,
 		scope,
 		current,
 		nil,

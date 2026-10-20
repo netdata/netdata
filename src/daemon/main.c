@@ -146,6 +146,9 @@ int help(int exitcode) {
             "  -W sqlite-compact        Reclaim metadata database unused space and exit.\n\n"
             "  -W sqlite-analyze        Run update statistics and exit.\n\n"
             "  -W sqlite-alert-cleanup  Perform maintenance on the alerts table.\n\n"
+            "  -W sqlite-lease-test     Test that a slow SQLite connection does not block unrelated\n"
+            "                           SQLite users and that teardown waits for running SQLite\n"
+            "                           operations, and exit.\n\n"
 #ifdef ENABLE_DBENGINE
             "  -W createdataset=N       Create a DB engine dataset of N seconds and exit.\n\n"
             "  -W stresstest=A,B,C,D,E,F,G\n"
@@ -218,6 +221,8 @@ int clocks_unittest(void);
 int ws_client_unittest(void);
 int mqtt_ng_unittest(void);
 int aclk_timeout_unittest(void);
+int aclk_backoff_unittest(void);
+int aclk_http_msg_unittest(void);
 int https_client_timeout_unittest(void);
 int mqtt_wss_client_timeout_unittest(void);
 int pgc_unittest(void);
@@ -512,14 +517,16 @@ int netdata_main(int argc, char **argv) {
                             if (exporting_opentsdb_telnet_unittest()) return 1;
                             if (ringbuffer_unittest()) return 1;
                             if (onewayalloc_unittest()) return 1;
+                            if (timezone_windows_mapping_unittest()) return 1;
                             if (log_stack_unittest()) return 1;
                             if (clocks_unittest()) return 1;
                             if (ws_client_unittest()) return 1;
                             if (mqtt_ng_unittest()) return 1;
+                            if (aclk_http_msg_unittest()) return 1;
                             // summed, not short-circuited: this is the path CI runs, so one
-                            // failing suite must not hide the other two
-                            if (aclk_timeout_unittest() + https_client_timeout_unittest() +
-                                mqtt_wss_client_timeout_unittest()) return 1;
+                            // failing suite must not hide the others
+                            if (aclk_timeout_unittest() + aclk_backoff_unittest() +
+                                https_client_timeout_unittest() + mqtt_wss_client_timeout_unittest()) return 1;
 #ifdef OS_WINDOWS
                             if (unit_test_windows_os_version()) return 1;
                             if (unit_test_windows_virt_normalize()) return 1;
@@ -542,6 +549,8 @@ int netdata_main(int argc, char **argv) {
                             if (aral_unittest(10000)) return 1;
                             if (rrdlabels_unittest()) return 1;
                             if (rrdhost_labels_unittest()) return 1;
+                            if (rrdhost_system_info_unittest()) return 1;
+                            if (build_info_system_info_unittest()) return 1;
                             if (ctx_unittest()) return 1;
                             if (query_plan_unittest()) return 1;
                             if (uuid_unittest()) return 1;
@@ -571,15 +580,16 @@ int netdata_main(int argc, char **argv) {
                             if (mrg_unittest()) return 1;
 #endif
                             if (paths_unittest()) return 1;
-#ifdef HAVE_LIBBACKTRACE
+#ifdef HAVE_STACKTRACE
                             if (stacktrace_unittest()) return 1;
 #endif
                             if (test_cmd_pool_fifo()) return 1;
 #ifdef OS_WINDOWS
                             if (perflibnamestest_main()) return 1;
 #endif
-                            sqlite_close_databases();
-                            sqlite_library_shutdown();
+                            // MUST stay last: it runs the real sqlite_close_databases() and
+                            // sqlite_library_shutdown(), after which no SQLite work is admitted
+                            if (sqlite_lease_teardown_unittest()) return 1;
                             rrdlabels_aral_destroy(false);
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
                             return 0;
@@ -647,6 +657,14 @@ int netdata_main(int argc, char **argv) {
                             rrdlabels_aral_destroy(true);
                             return rc;
                         }
+                        else if(strcmp(optarg, "systeminfotest") == 0) {
+                            unittest_running = true;
+                            rrdlabels_aral_init(true);
+                            int rc = rrdhost_system_info_unittest();
+                            rc += build_info_system_info_unittest();
+                            rrdlabels_aral_destroy(true);
+                            return rc;
+                        }
                         else if(strcmp(optarg, "rrdhostlabelstest") == 0) {
                             unittest_running = true;
                             rrdlabels_aral_init(true);
@@ -666,6 +684,10 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return onewayalloc_unittest();
                         }
+                        else if(strcmp(optarg, "timezonemaptest") == 0) {
+                            unittest_running = true;
+                            return timezone_windows_mapping_unittest();
+                        }
                         else if(strcmp(optarg, "wsclienttest") == 0) {
                             unittest_running = true;
                             return ws_client_unittest();
@@ -673,6 +695,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "mqttngtest") == 0) {
                             unittest_running = true;
                             return mqtt_ng_unittest();
+                        }
+                        else if(strcmp(optarg, "aclkhttpmsgtest") == 0) {
+                            unittest_running = true;
+                            return aclk_http_msg_unittest() ? 1 : 0;
                         }
                         else if(strcmp(optarg, "aclktimeouttest") == 0) {
                             unittest_running = true;
@@ -683,6 +709,10 @@ int netdata_main(int argc, char **argv) {
                             errors += mqtt_wss_client_timeout_unittest();
                             return errors ? 1 : 0;
                         }
+                        else if(strcmp(optarg, "aclkbackofftest") == 0) {
+                            unittest_running = true;
+                            return aclk_backoff_unittest() ? 1 : 0;
+                        }
                         else if(strcmp(optarg, "test_cmd_pool_fifo") == 0) {
                             unittest_running = true;
                             return test_cmd_pool_fifo();
@@ -691,7 +721,17 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return uuid_unittest();
                         }
-#ifdef HAVE_LIBBACKTRACE
+                        else if(strcmp(optarg, "sqlite-lease-test") == 0) {
+                            unittest_running = true;
+                            // the same SQLite setup as -W unittest; the teardown test runs the real teardown,
+                            // so it goes last, in this process only
+                            if (sqlite_library_init())
+                                return 1;
+                            int errors = sqlite_lease_unittest();
+                            errors += sqlite_lease_teardown_unittest();
+                            return errors ? 1 : 0;
+                        }
+#ifdef HAVE_STACKTRACE
                         else if(strcmp(optarg, "stacktracetest") == 0) {
                             unittest_running = true;
                             return stacktrace_unittest();

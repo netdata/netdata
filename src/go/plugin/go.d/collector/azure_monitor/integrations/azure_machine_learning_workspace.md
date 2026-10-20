@@ -46,7 +46,7 @@ It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The service principal or managed identity requires these Azure RBAC roles:
 
@@ -380,7 +380,7 @@ Configure the **azure_monitor** collector from the Netdata web interface:
 4. In the Search box, type _azure_monitor_ (or scroll the list) to locate the **azure_monitor** collector.
 5. Click the **+** next to the **azure_monitor** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -635,21 +635,22 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_ml_quota_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.quota_utilization | ML quota utilization on ${label:resource_name} |
-| [ am_ml_unusable_cores ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.cluster_cores | ML unusable cores on ${label:resource_name} |
-| [ am_ml_preempted_cores ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.cluster_cores | ML preempted cores on ${label:resource_name} |
-| [ am_ml_unusable_nodes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.cluster_nodes | ML unusable nodes on ${label:resource_name} |
-| [ am_ml_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.cpu_utilization | ML CPU utilization on ${label:resource_name} |
-| [ am_ml_cpu_memory_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.cpu_memory_utilization | ML CPU memory utilization on ${label:resource_name} |
-| [ am_ml_gpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.gpu_utilization | ML GPU utilization on ${label:resource_name} |
-| [ am_ml_gpu_memory_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.gpu_memory_utilization | ML GPU memory utilization on ${label:resource_name} |
-| [ am_ml_disk_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.disk_usage | ML disk utilization on ${label:resource_name} |
-| [ am_ml_model_deploy_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.model_deployments | ML model deployment failures on ${label:resource_name} |
-| [ am_ml_model_register_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.model_registrations | ML model registration failures on ${label:resource_name} |
-| [ am_ml_failed_runs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.run_completion | ML failed runs on ${label:resource_name} |
-| [ am_ml_not_responding_runs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.run_completion | ML not-responding runs on ${label:resource_name} |
-| [ am_ml_run_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.run_issues | ML run errors on ${label:resource_name} |
-| [ am_ml_storage_api_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.storage_api_calls | ML storage API failure rate on ${label:resource_name} |
+| [ am_ml_quota_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.quota_utilization | Average compute quota utilization on Azure ML workspace ${label:resource_name} in ${label:resource_group} (${label:region}). High quota utilization may prevent new jobs from starting. |
+| [ am_ml_unusable_cores ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.cluster_cores | Number of unusable compute cores on Azure ML workspace ${label:resource_name} in ${label:resource_group} (${label:region}). Unusable cores indicate hardware or configuration failures. |
+| [ am_ml_preempted_cores ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.cluster_cores | Number of preempted compute cores on Azure ML workspace ${label:resource_name} in ${label:resource_group} (${label:region}). Preempted cores may cause training job interruptions. |
+| [ am_ml_unusable_nodes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.cluster_nodes | Number of unusable compute nodes on Azure ML workspace ${label:resource_name} in ${label:resource_group} (${label:region}). Unusable nodes indicate hardware or configuration failures. |
+| [ am_ml_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.cpu_utilization | Average cluster CPU utilization on Azure ML workspace ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_ml_cpu_memory_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.cpu_memory_utilization | Average CPU memory utilization on Azure ML workspace ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_ml_gpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.gpu_utilization | Average cluster GPU utilization on Azure ML workspace ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_ml_gpu_memory_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.gpu_memory_utilization | Average cluster GPU memory utilization on Azure ML workspace ${label:resource_name} in ${label:resource_group} (${label:region}). High GPU memory usage may cause out-of-memory training failures. |
+| [ am_ml_disk_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.disk_usage | Disk utilization percentage on Azure ML workspace ${label:resource_name} in ${label:resource_group} (${label:region}). High disk usage can cause training job failures. |
+| [ am_ml_model_deploy_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.model_deployments | Number of failed model deployments over the last 5 minutes on Azure ML workspace ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_ml_model_register_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.model_registrations | Number of failed model registrations over the last 5 minutes on Azure ML workspace ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_ml_failed_runs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.run_completion | Number of failed training/experiment runs over the last 5 minutes on Azure ML workspace ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_ml_not_responding_runs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.run_completion | Number of runs that stopped responding over the last 5 minutes on Azure ML workspace ${label:resource_name} in ${label:resource_group} (${label:region}). Not-responding runs indicate compute or infrastructure issues. |
+| [ am_ml_run_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.run_issues | Number of run errors over the last 5 minutes on Azure ML workspace ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_ml_storage_api_total ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.storage_api_calls | Total storage API calls over the last 5 minutes on Azure ML workspace ${label:resource_name} |
+| [ am_ml_storage_api_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.storage_api_calls | Percentage of failed storage API calls over the last 5 minutes on Azure ML workspace ${label:resource_name} in ${label:resource_group} (${label:region}) |
 
 
 

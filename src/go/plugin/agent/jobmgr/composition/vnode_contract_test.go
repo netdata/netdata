@@ -134,182 +134,208 @@ func TestProcessVNodeNameRoundTrip(t *testing.T) {
 }
 
 func TestVNodeUpdatePreflightChecksLifetime(t *testing.T) {
-	for _, mutation := range []string{"remove", "replace", "replace identical", "update"} {
-		t.Run(mutation, func(t *testing.T) {
-			var inits, checks atomic.Int32
-			entered, release := make(chan struct{}), make(chan struct{})
-			var releaseOnce sync.Once
-			modules := collectorapi.Registry{"module": {
-				CreateV2: func() collectorapi.CollectorV2 {
-					c := &handoffCollector{
-						readinessIntegrationCollector: readinessIntegrationCollector{store: metrix.NewCollectorStore()},
-						inits:                         &inits, checks: &checks,
-					}
-					c.check = func() error {
-						if checks.Load() == 2 {
-							close(entered)
-							<-release
-						}
-						return nil
-					}
-					return c
-				},
-				Config: func() any { return &collectorapi.MockConfiguration{} },
-			}}
-			cfg := confgroup.Config{"module": "module", "name": "receiver", "update_every": 1}.
-				SetSourceType(confgroup.TypeUser).SetProvider(confgroup.TypeUser).SetSource("file=test")
-			output := newProcessSynchronizedBuffer()
-			frames, err := lifecycle.NewFrameOwner(output)
-			require.NoError(t, err)
-			uids := lifecycle.NewUIDLedger()
-			generation, err := newTestRunGeneration(t, runGenerationConfig{
-				Secrets:    testRunSecrets(t),
-				Generation: 1, ShutdownTimeout: time.Second, UIDs: uids, Frames: frames,
-				Modules: modules, Jobs: testRunJobServices(t), Discovery: testRunDiscoveryServices(t, cfg),
-			})
-			require.NoError(t, err)
-			t.Cleanup(func() {
-				releaseOnce.Do(func() { close(release) })
-				generation.Stop()
-				require.NoError(t, generation.Wait(context.Background()))
-				closeRunTestUIDs(t, uids)
-			})
-			require.NoError(t, generation.start(context.Background()))
-			require.Eventually(t, func() bool {
-				r, ok := generation.vnodes.graph.Lookup(cfg.FullName())
-				return ok && r.Status == dyncfg.StatusRunning.String()
-			}, time.Second, time.Millisecond)
-			before, _ := generation.vnodes.graph.Lookup(cfg.FullName())
-			submit := func(uid string, args []string, payload string) {
-				t.Helper()
-				require.NoError(t, generation.kernel.Submit(t.Context(), jobmgr.Request{
-					UID: uid, Source: lifecycle.SourceFunction, Route: "config", Args: args, CallerSource: "user=test",
-					Deadline: time.Now().Add(10 * time.Second), HasPayload: payload != "", Payload: []byte(payload), ContentType: "application/json",
-				}))
-			}
-			const original = `{"guid":"33333333-3333-3333-3333-333333333333"}`
-			submit("add", []string{"go.d:vnode", "add", "x"}, original)
-			output.waitContains(t, "FUNCTION_RESULT_BEGIN add 202 ")
-			submit("edit", []string{"go.d:collector:module:receiver", "update"}, `{"update_every":1,"vnode":"x"}`)
-			select {
-			case <-entered:
-			case <-time.After(3 * time.Second):
-				t.Fatal("update Check did not start")
-			}
-			if mutation == "update" {
-				submit("vnode-edit", []string{"go.d:vnode:x", "update"}, `{"hostname":"changed","guid":"44444444-4444-4444-4444-444444444444"}`)
-				output.waitContains(t, "FUNCTION_RESULT_BEGIN vnode-edit 202 ")
-			} else {
-				submit("remove", []string{"go.d:vnode:x", "remove"}, "")
-				output.waitContains(t, "FUNCTION_RESULT_BEGIN remove 200 ")
-				_, exists := generation.vnodeConfig.Lookup("x")
-				require.False(t, exists)
-				if mutation != "remove" {
-					payload := original
-					if mutation == "replace" {
-						payload = `{"guid":"44444444-4444-4444-4444-444444444444"}`
-					}
-					submit("readd", []string{"go.d:vnode", "add", "x"}, payload)
-					output.waitContains(t, "FUNCTION_RESULT_BEGIN readd 202 ")
+	for _, phase := range []string{"Check", "intent reservation"} {
+		for _, mutation := range []string{"remove", "replace", "replace identical", "update"} {
+			t.Run(phase+"/"+mutation, func(t *testing.T) {
+				var inits, checks, created atomic.Int32
+				var incumbentStopped atomic.Bool
+				entered, release := make(chan struct{}), make(chan struct{})
+				var releaseOnce sync.Once
+				owner := &preflightIntentOwner{blockAt: 2, entered: entered, release: release}
+				if phase == "Check" {
+					owner.blockAt = 0
 				}
-			}
-			releaseOnce.Do(func() { close(release) })
-			output.waitContains(t, "FUNCTION_RESULT_BEGIN edit ")
-			if mutation == "update" {
-				require.Contains(t, output.String(), "FUNCTION_RESULT_BEGIN edit 202 ")
-				require.Eventually(t, func() bool {
-					r, _ := generation.vnodes.graph.Lookup(cfg.FullName())
-					return r.Status == dyncfg.StatusRunning.String() && r.Payload() != before.Payload()
-				}, time.Second, time.Millisecond)
-			} else {
-				require.Contains(t, output.String(), "FUNCTION_RESULT_BEGIN edit 503 ")
-				after, _ := generation.vnodes.graph.Lookup(cfg.FullName())
-				require.Equal(t, before, after, "rejected preflight must preserve the incumbent")
-			}
-			require.EqualValues(t, 2, checks.Load(), "ordinary vnode updates must not cause another preflight")
-		})
-	}
-}
-
-func TestDiscoveredJobRebuildsAfterVNodeRemovalDuringPreflight(t *testing.T) {
-	for _, readdBeforeAdoption := range []bool{false, true} {
-		t.Run(fmt.Sprintf("readd-before-adoption=%t", readdBeforeAdoption), func(t *testing.T) {
-			var inits, checks atomic.Int32
-			entered, release := make(chan struct{}), make(chan struct{})
-			var releaseOnce sync.Once
-			modules := collectorapi.Registry{"module": {
-				CreateV2: func() collectorapi.CollectorV2 {
-					return &handoffCollector{
-						readinessIntegrationCollector: readinessIntegrationCollector{store: metrix.NewCollectorStore()},
-						inits:                         &inits, checks: &checks,
-						check: func() error {
-							if checks.Load() == 1 {
+				modules := collectorapi.Registry{"module": {
+					JobConfigIntent: owner,
+					CreateV2: func() collectorapi.CollectorV2 {
+						c := &handoffCollector{
+							readinessIntegrationCollector: readinessIntegrationCollector{store: metrix.NewCollectorStore()},
+							inits:                         &inits, checks: &checks,
+						}
+						c.check = func() error {
+							if phase == "Check" && checks.Load() == 2 {
 								close(entered)
 								<-release
 							}
 							return nil
-						},
+						}
+						if created.Add(1) == 1 {
+							c.stopped = &incumbentStopped
+						}
+						return c
+					},
+					Config: func() any { return &collectorapi.MockConfiguration{} },
+				}}
+				cfg := confgroup.Config{"module": "module", "name": "receiver", "update_every": 1}.
+					SetSourceType(confgroup.TypeUser).SetProvider(confgroup.TypeUser).SetSource("file=test")
+				output := newProcessSynchronizedBuffer()
+				frames, err := lifecycle.NewFrameOwner(output)
+				require.NoError(t, err)
+				uids := lifecycle.NewUIDLedger()
+				generation, err := newTestRunGeneration(t, runGenerationConfig{
+					Secrets:    testRunSecrets(t),
+					Generation: 1, ShutdownTimeout: time.Second, UIDs: uids, Frames: frames,
+					Modules: modules, Jobs: testRunJobServices(t), Discovery: testRunDiscoveryServices(t, cfg),
+				})
+				require.NoError(t, err)
+				t.Cleanup(func() {
+					releaseOnce.Do(func() { close(release) })
+					generation.Stop()
+					require.NoError(t, generation.Wait(context.Background()))
+					closeRunTestUIDs(t, uids)
+				})
+				require.NoError(t, generation.start(context.Background()))
+				require.Eventually(t, func() bool {
+					r, ok := generation.vnodes.graph.Lookup(cfg.FullName())
+					return ok && r.Status == dyncfg.StatusRunning.String()
+				}, time.Second, time.Millisecond)
+				before, _ := generation.vnodes.graph.Lookup(cfg.FullName())
+				submit := func(uid string, args []string, payload string) {
+					t.Helper()
+					require.NoError(t, generation.kernel.Submit(t.Context(), jobmgr.Request{
+						UID: uid, Source: lifecycle.SourceFunction, Route: "config", Args: args, CallerSource: "user=test",
+						Deadline: time.Now().Add(10 * time.Second), HasPayload: payload != "", Payload: []byte(payload), ContentType: "application/json",
+					}))
+				}
+				const original = `{"guid":"33333333-3333-3333-3333-333333333333"}`
+				submit("add", []string{"go.d:vnode", "add", "x"}, original)
+				output.waitContains(t, "FUNCTION_RESULT_BEGIN add 202 ")
+				submit("edit", []string{"go.d:collector:module:receiver", "update"}, `{"update_every":1,"vnode":"x"}`)
+				select {
+				case <-entered:
+				case <-time.After(3 * time.Second):
+					t.Fatal("update preparation did not start")
+				}
+				if mutation == "update" {
+					submit("vnode-edit", []string{"go.d:vnode:x", "update"}, `{"hostname":"changed","guid":"44444444-4444-4444-4444-444444444444"}`)
+					output.waitContains(t, "FUNCTION_RESULT_BEGIN vnode-edit 202 ")
+				} else {
+					submit("remove", []string{"go.d:vnode:x", "remove"}, "")
+					output.waitContains(t, "FUNCTION_RESULT_BEGIN remove 200 ")
+					_, exists := generation.vnodeConfig.Lookup("x")
+					require.False(t, exists)
+					if mutation != "remove" {
+						payload := original
+						if mutation == "replace" {
+							payload = `{"guid":"44444444-4444-4444-4444-444444444444"}`
+						}
+						submit("readd", []string{"go.d:vnode", "add", "x"}, payload)
+						output.waitContains(t, "FUNCTION_RESULT_BEGIN readd 202 ")
 					}
-				},
-				Config: func() any { return &collectorapi.MockConfiguration{} },
-			}}
-			cfg := confgroup.Config{"module": "module", "name": "receiver", "vnode": "x", "update_every": 1, "autodetection_retry": 0}.
-				SetSourceType(confgroup.TypeUser).SetProvider(confgroup.TypeUser).SetSource("file=test")
-			jobs := testRunJobServices(t)
-			secretConfig := testRunSecrets(t)
-			jobs.InitialVnodes = map[string]*vnodes.Config{
-				"x": {VirtualNode: vnodes.VirtualNode{Name: "x", Hostname: "x", GUID: testVNodeGUID, Source: "user=test", SourceType: confgroup.TypeDyncfg}},
-			}
-			output := newProcessSynchronizedBuffer()
-			frames, err := lifecycle.NewFrameOwner(output)
-			require.NoError(t, err)
-			generation, err := newTestRunGeneration(t, runGenerationConfig{
-				Secrets:    secretConfig,
-				Generation: 1, ShutdownTimeout: time.Second, UIDs: lifecycle.NewUIDLedger(), Frames: frames,
-				Modules: modules, Jobs: jobs, Discovery: testRunDiscoveryServices(t, cfg),
-			})
-			require.NoError(t, err)
-			t.Cleanup(func() {
+				}
 				releaseOnce.Do(func() { close(release) })
-				generation.Stop()
-				require.NoError(t, generation.Wait(context.Background()))
+				output.waitContains(t, "FUNCTION_RESULT_BEGIN edit ")
+				if mutation == "update" {
+					require.Contains(t, output.String(), "FUNCTION_RESULT_BEGIN edit 202 ")
+					require.Eventually(t, func() bool {
+						r, _ := generation.vnodes.graph.Lookup(cfg.FullName())
+						return r.Status == dyncfg.StatusRunning.String() && r.Payload() != before.Payload()
+					}, time.Second, time.Millisecond)
+				} else {
+					require.Contains(t, output.String(), "FUNCTION_RESULT_BEGIN edit 503 ")
+					after, _ := generation.vnodes.graph.Lookup(cfg.FullName())
+					require.Equal(t, before, after, "rejected preflight must preserve the incumbent")
+					require.False(t, incumbentStopped.Load(), "rejection must not stop the running monitor")
+					require.EqualValues(t, 1, owner.committed.Load(), "rejection must preserve original acquisition intent")
+					if phase == "intent reservation" {
+						require.EqualValues(t, 1, owner.aborted.Load())
+					}
+				}
+				require.EqualValues(t, 2, checks.Load(), "ordinary vnode updates must not cause another preflight")
 			})
-			require.NoError(t, generation.start(context.Background()))
-			select {
-			case <-entered:
-			case <-time.After(3 * time.Second):
-				t.Fatal("discovered Check did not start")
-			}
-			require.NoError(t, generation.kernel.Submit(t.Context(), jobmgr.Request{
-				UID: "remove", Source: lifecycle.SourceFunction, Route: "config", Args: []string{"go.d:vnode:x", "remove"},
-			}))
-			output.waitContains(t, "FUNCTION_RESULT_BEGIN remove 200 ")
-			readd := func() {
-				t.Helper()
+		}
+	}
+}
+
+func TestDiscoveredJobRebuildsAfterVNodeRemovalDuringPreflight(t *testing.T) {
+	for _, phase := range []string{"Check", "intent reservation"} {
+		for _, readdBeforeAdoption := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/readd-before-adoption=%t", phase, readdBeforeAdoption), func(t *testing.T) {
+				var inits, checks atomic.Int32
+				entered, release := make(chan struct{}), make(chan struct{})
+				var releaseOnce sync.Once
+				owner := &preflightIntentOwner{blockAt: 1, entered: entered, release: release}
+				if phase == "Check" {
+					owner.blockAt = 0
+				}
+				modules := collectorapi.Registry{"module": {
+					JobConfigIntent: owner,
+					CreateV2: func() collectorapi.CollectorV2 {
+						return &handoffCollector{
+							readinessIntegrationCollector: readinessIntegrationCollector{store: metrix.NewCollectorStore()},
+							inits:                         &inits, checks: &checks,
+							check: func() error {
+								if phase == "Check" && checks.Load() == 1 {
+									close(entered)
+									<-release
+								}
+								return nil
+							},
+						}
+					},
+					Config: func() any { return &collectorapi.MockConfiguration{} },
+				}}
+				cfg := confgroup.Config{"module": "module", "name": "receiver", "vnode": "x", "update_every": 1, "autodetection_retry": 0}.
+					SetSourceType(confgroup.TypeUser).SetProvider(confgroup.TypeUser).SetSource("file=test")
+				jobs := testRunJobServices(t)
+				secretConfig := testRunSecrets(t)
+				jobs.InitialVnodes = map[string]*vnodes.Config{
+					"x": {VirtualNode: vnodes.VirtualNode{Name: "x", Hostname: "x", GUID: testVNodeGUID, Source: "user=test", SourceType: confgroup.TypeDyncfg}},
+				}
+				output := newProcessSynchronizedBuffer()
+				frames, err := lifecycle.NewFrameOwner(output)
+				require.NoError(t, err)
+				generation, err := newTestRunGeneration(t, runGenerationConfig{
+					Secrets:    secretConfig,
+					Generation: 1, ShutdownTimeout: time.Second, UIDs: lifecycle.NewUIDLedger(), Frames: frames,
+					Modules: modules, Jobs: jobs, Discovery: testRunDiscoveryServices(t, cfg),
+				})
+				require.NoError(t, err)
+				t.Cleanup(func() {
+					releaseOnce.Do(func() { close(release) })
+					generation.Stop()
+					require.NoError(t, generation.Wait(context.Background()))
+				})
+				require.NoError(t, generation.start(context.Background()))
+				select {
+				case <-entered:
+				case <-time.After(3 * time.Second):
+					t.Fatal("discovered preparation did not start")
+				}
 				require.NoError(t, generation.kernel.Submit(t.Context(), jobmgr.Request{
-					UID: "readd", Source: lifecycle.SourceFunction, Route: "config", Args: []string{"go.d:vnode", "add", "x"},
-					HasPayload: true, Payload: []byte(`{"hostname":"x","guid":"` + testVNodeGUID + `"}`), ContentType: "application/json", CallerSource: "user=test",
+					UID: "remove", Source: lifecycle.SourceFunction, Route: "config", Args: []string{"go.d:vnode:x", "remove"},
 				}))
-				output.waitContains(t, "FUNCTION_RESULT_BEGIN readd 202 ")
-			}
-			if readdBeforeAdoption {
-				readd()
-			}
-			releaseOnce.Do(func() { close(release) })
-			if !readdBeforeAdoption {
+				output.waitContains(t, "FUNCTION_RESULT_BEGIN remove 200 ")
+				readd := func() {
+					t.Helper()
+					require.NoError(t, generation.kernel.Submit(t.Context(), jobmgr.Request{
+						UID: "readd", Source: lifecycle.SourceFunction, Route: "config", Args: []string{"go.d:vnode", "add", "x"},
+						HasPayload: true, Payload: []byte(`{"hostname":"x","guid":"` + testVNodeGUID + `"}`), ContentType: "application/json", CallerSource: "user=test",
+					}))
+					output.waitContains(t, "FUNCTION_RESULT_BEGIN readd 202 ")
+				}
+				if readdBeforeAdoption {
+					readd()
+				}
+				releaseOnce.Do(func() { close(release) })
+				if !readdBeforeAdoption {
+					require.Eventually(t, func() bool {
+						r, _ := generation.vnodes.graph.Lookup(cfg.FullName())
+						return r.Status == dyncfg.StatusAccepted.String()
+					}, time.Second, time.Millisecond)
+					require.EqualValues(t, 1, checks.Load())
+					readd()
+				}
 				require.Eventually(t, func() bool {
 					r, _ := generation.vnodes.graph.Lookup(cfg.FullName())
-					return r.Status == dyncfg.StatusAccepted.String()
+					return r.Status == dyncfg.StatusRunning.String()
 				}, time.Second, time.Millisecond)
-				require.EqualValues(t, 1, checks.Load())
-				readd()
-			}
-			require.Eventually(t, func() bool {
-				r, _ := generation.vnodes.graph.Lookup(cfg.FullName())
-				return r.Status == dyncfg.StatusRunning.String()
-			}, time.Second, time.Millisecond)
-			require.EqualValues(t, 2, checks.Load(), "discovery must discard the removed vnode's candidate and probe the recreated record")
-		})
+				if phase == "intent reservation" {
+					require.EqualValues(t, 1, owner.aborted.Load())
+				}
+				require.EqualValues(t, 2, checks.Load(), "discovery must discard the removed vnode's candidate and probe the recreated record")
+			})
+		}
 	}
 }
 
@@ -437,3 +463,22 @@ func TestVNodeUserConfigPreservesNamesAndFormattingFallback(t *testing.T) {
 		})
 	}
 }
+
+// Block only the selected enabled reservation, after the candidate's Check.
+type preflightIntentOwner struct {
+	blockAt                      int32
+	entered                      chan struct{}
+	release                      <-chan struct{}
+	prepared, committed, aborted atomic.Int32
+}
+type preflightIntentReservation struct{ owner *preflightIntentOwner }
+
+func (o *preflightIntentOwner) Prepare(_, next collectorapi.JobConfigIdentity, _ map[string]any) (collectorapi.PreparedJobConfigIntent, error) {
+	if next.Valid() && o.prepared.Add(1) == o.blockAt {
+		close(o.entered)
+		<-o.release
+	}
+	return &preflightIntentReservation{owner: o}, nil
+}
+func (r *preflightIntentReservation) Commit()      { r.owner.committed.Add(1) }
+func (r *preflightIntentReservation) Abort() error { r.owner.aborted.Add(1); return nil }

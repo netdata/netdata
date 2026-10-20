@@ -29,7 +29,7 @@ This collector monitors the state of Systemd units and unit files.
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -135,7 +135,7 @@ Configure the **systemdunits** collector from the Netdata web interface:
 4. In the Search box, type _systemdunits_ (or scroll the list) to locate the **systemdunits** collector.
 5. Click the **+** next to the **systemdunits** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -243,11 +243,11 @@ The following alerts are available:
 | [ systemd_target_unit_failed_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf) | systemd.target_unit_state | systemd target unit in the failed state |
 | [ systemd_path_unit_failed_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf) | systemd.path_unit_state | systemd path unit in the failed state |
 | [ systemd_device_unit_failed_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf) | systemd.device_unit_state | systemd device unit in the failed state |
-| [ systemd_mount_unit_failed_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf) | systemd.mount_unit_state | systemd mount unit in the failed state |
+| [ systemd_mount_unit_failed_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf) | systemd.mount_unit_state | systemd mount units in the failed state |
 | [ systemd_automount_unit_failed_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf) | systemd.automount_unit_state | systemd automount unit in the failed state |
-| [ systemd_swap_unit_failed_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf) | systemd.swap_unit_state | systemd swap unit in the failed state |
-| [ systemd_scope_unit_failed_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf) | systemd.scope_unit_state | systemd scope unit in the failed state |
-| [ systemd_slice_unit_failed_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf) | systemd.slice_unit_state | systemd slice unit in the failed state |
+| [ systemd_swap_unit_failed_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf) | systemd.swap_unit_state | systemd swap units in the failed state |
+| [ systemd_scope_unit_failed_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf) | systemd.scope_unit_state | systemd scope units in the failed state |
+| [ systemd_slice_unit_failed_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf) | systemd.slice_unit_state | systemd slice units in the failed state |
 | [ systemd_timer_unit_failed_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf) | systemd.timer_unit_state | systemd timer unit in the failed state |
 
 

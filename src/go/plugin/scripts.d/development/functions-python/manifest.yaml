@@ -2,6 +2,7 @@
 version: v1
 mode: oneshot
 command: [./inspect.py]
+collect: false
 functions:
   - id: items
     name: Synthetic Workers

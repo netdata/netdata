@@ -138,6 +138,41 @@ func TestCollector_Init(t *testing.T) {
 				FallbackType: promprofiles.FallbackType{Counter: []string{" app_requests "}},
 			},
 		},
+		"valid counter raw charts": {
+			wantFail: false,
+			config: Config{
+				HTTPConfig:       web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				CounterRawCharts: []string{"!app_internal_*", "app_*_total"},
+			},
+		},
+		"counter raw charts padded pattern": {
+			wantFail: true,
+			config: Config{
+				HTTPConfig:       web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				CounterRawCharts: []string{" app_*"},
+			},
+		},
+		"counter raw charts several patterns in one item": {
+			wantFail: true,
+			config: Config{
+				HTTPConfig:       web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				CounterRawCharts: []string{"app_* !app_internal_*"},
+			},
+		},
+		"counter raw charts invalid glob": {
+			wantFail: true,
+			config: Config{
+				HTTPConfig:       web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				CounterRawCharts: []string{"app_["},
+			},
+		},
+		"counter raw charts only negative patterns": {
+			wantFail: true,
+			config: Config{
+				HTTPConfig:       web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				CounterRawCharts: []string{"!app_*"},
+			},
+		},
 		"profiles mode none": {
 			wantFail: false,
 			config: Config{
@@ -692,7 +727,7 @@ func requireAutogenOnlyRuntime(t *testing.T, collr *Collector) {
 
 	require.NotNil(t, collr.runtime)
 	require.Empty(t, collr.runtime.profiles, "profiles.mode none must not retain a selected profile")
-	want, err := buildMergedChartTemplate(collr.resolveApp(nil), nil)
+	want, err := buildMergedChartTemplate(collr.resolveApp(nil), nil, nil)
 	require.NoError(t, err)
 	require.Equal(t, want, collr.runtime.chartTemplate, "profiles.mode none must use the pure autogen template")
 }
@@ -1924,37 +1959,13 @@ func TestCollector_CephS3CheckManifestMatchesCollectorArtifacts(t *testing.T) {
 	}
 	require.NotEmpty(t, expected)
 
-	var metadata struct {
-		Modules []struct {
-			Alerts []struct {
-				Name   string `yaml:"name"`
-				Metric string `yaml:"metric"`
-				Info   string `yaml:"info"`
-			} `yaml:"alerts"`
-		} `yaml:"modules"`
-	}
-	content, err := os.ReadFile(filepath.Join("..", "s3check", "metadata.yaml"))
-	require.NoError(t, err)
-	require.NoError(t, yaml.Unmarshal(content, &metadata))
-	require.Len(t, metadata.Modules, 1)
-
-	metadataMetrics := make(map[string]string)
-	info := make(map[string]string)
-	for _, alert := range metadata.Modules[0].Alerts {
-		metadataMetrics[alert.Name] = alert.Metric
-		info[alert.Name] = alert.Info
-	}
-	require.Len(t, metadataMetrics, len(expected))
-
 	templates := healthAlertTemplatesFromFile(t, filepath.Join("..", "..", "..", "..", "..",
 		"health", "health.d", "s3check.conf"))
 	for name, extension := range expected {
-		require.Equalf(t, extension.Context, metadataMetrics[name], "%s metadata context", name)
 		require.Equalf(t, extension.Context, templates[name]["on"], "%s health context", name)
 		require.Equalf(t, extension.Calc, templates[name]["calc"], "%s calculation", name)
 		require.Equalf(t, extension.Units, templates[name]["units"], "%s units", name)
 		require.Equalf(t, extension.Recipient, templates[name]["to"], "%s recipient", name)
-		require.Equalf(t, info[name], templates[name]["info"], "%s metadata info", name)
 	}
 }
 
@@ -2269,62 +2280,6 @@ func TestCollector_CephNVMeoFAlertsAreOwnedByLocalExporter(t *testing.T) {
 		assert.Equalf(t, "nvmeof_exporter", mapping.Netdata.Owner,
 			"%s must name its local gateway-exporter owner", mapping.SOWID)
 	}
-}
-
-func TestCollector_CephMetadataAlertsMatchMGRAlertTemplates(t *testing.T) {
-	manifest := loadCephAlertManifest(t)
-	var metadata struct {
-		Modules []struct {
-			Meta struct {
-				ID string `yaml:"id"`
-			} `yaml:"meta"`
-			Alerts []struct {
-				Name   string `yaml:"name"`
-				Metric string `yaml:"metric"`
-				Info   string `yaml:"info"`
-			} `yaml:"alerts"`
-		} `yaml:"modules"`
-	}
-	content, err := os.ReadFile("metadata.yaml")
-	require.NoError(t, err)
-	require.NoError(t, yaml.Unmarshal(content, &metadata))
-
-	actual := make(map[string]string)
-	for _, module := range metadata.Modules {
-		if module.Meta.ID != "collector-go.d.plugin-prometheus-ceph" {
-			continue
-		}
-		for _, alert := range module.Alerts {
-			actual[alert.Name] = alert.Metric
-		}
-		break
-	}
-	expected := make(map[string]string)
-	publicMapping := func(disposition string) bool {
-		return disposition != "reuse" && disposition != "reject" &&
-			disposition != "internal-helper" && disposition != "subsumed-helper"
-	}
-	for name, mapping := range manifest.Alerts {
-		if publicMapping(mapping.Netdata.Disposition) {
-			expected[name] = mapping.Netdata.Context
-		}
-	}
-	for name, extension := range manifest.NetdataExtensions {
-		if extension.Owner == "s3check" {
-			continue
-		}
-		if extension.Context != "" && extension.Condition != "" {
-			expected[name] = extension.Context
-		}
-	}
-	assert.Equal(t, expected, actual)
-	health, err := os.ReadFile("../../../../../health/health.d/ceph.conf")
-	require.NoError(t, err)
-	// ceph.conf also carries the go.d ceph collector's own alerts.
-	collecttest.AssertMetadataAlertsMatchHealthConfigWith(t, content, health, collecttest.MetadataAlertsCheck{
-		ModuleID:           "collector-go.d.plugin-prometheus-ceph",
-		SharedHealthConfig: true,
-	})
 }
 
 type cephAlertManifest struct {

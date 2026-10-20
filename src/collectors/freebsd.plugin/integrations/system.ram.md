@@ -27,7 +27,7 @@ The plugin calls `sysctl` function to collect necessary data.
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -105,10 +105,8 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ ram_in_use ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf) | system.ram | system memory utilization |
-| [ ram_in_use ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf) | system.ram | system memory utilization |
-| [ ram_available ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf) | mem.available | percentage of estimated amount of RAM available for userspace processes, without causing swapping |
-| [ ram_available ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf) | mem.available | percentage of estimated amount of RAM available for userspace processes, without causing swapping |
+| [ ram_in_use ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf) | system.ram | System memory utilization |
+| [ ram_available ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf) | mem.available | Percentage of estimated amount of RAM available for userspace processes, without causing swapping |
 
 
 

@@ -19,13 +19,13 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           submodules: recursive
       - name: Check source files
         id: check-source-files
-        uses: step-security/changed-files@v45
+        uses: step-security/changed-files@2e07db73e5ccdb319b9a6c7766bd46d39d304bad # v47.0.5
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
@@ -38,17 +38,17 @@ jobs:
             src/aclk/aclk-schemas/
             src/ml/dlib/
           files_ignore: |
-            netdata.spec.in
             src/go/otel-collector/release-config.yaml.in
             **/*.md
       - name: Check build files
         id: check-build-files
-        uses: step-security/changed-files@v45
+        uses: step-security/changed-files@2e07db73e5ccdb319b9a6c7766bd46d39d304bad # v47.0.5
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
             **/*.cmake
             CMakeLists.txt
+            **/CMakeLists.txt
             .gitignore
             .github/data/distros.yml
             .github/workflows/build.yml
@@ -88,7 +88,7 @@ jobs:
         run: echo "SKIPPED"
       - name: Checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
       - name: Build
@@ -113,7 +113,7 @@ jobs:
         run: echo "SKIPPED"
       - name: Checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
       - name: Build

@@ -1566,7 +1566,7 @@ fn cgroups_resp_decode_bad_dir_alignment() {
     let mut buf = [0u8; 128];
     buf[0..2].copy_from_slice(&1u16.to_ne_bytes()); // layout_version
     buf[4..8].copy_from_slice(&1u32.to_ne_bytes()); // item_count = 1
-                                                    // Dir entry at offset 24: offset=3 (unaligned), length=32
+    // Dir entry at offset 24: offset=3 (unaligned), length=32
     buf[24..28].copy_from_slice(&3u32.to_ne_bytes());
     buf[28..32].copy_from_slice(&32u32.to_ne_bytes());
     assert_eq!(

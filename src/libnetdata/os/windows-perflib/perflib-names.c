@@ -39,6 +39,7 @@ static struct {
     SPINLOCK spinlock;
     struct simple_hashtable_PERFLIB hashtable;
     FILETIME lastWriteTime;
+    bool performance_data_cache_refresh_pending;
     PERFLIB_ENTRIES_JudyLSet registry_entries;
     perfLibRetiredString *retired_strings;
 } names_globals = {
@@ -345,18 +346,29 @@ void PerflibNamesRegistryInitialize(void) {
     spinlock_unlock(&names_globals.spinlock);
 }
 
-void PerflibNamesRegistryUpdate(void) {
-    FILETIME lastWriteTime = { 0 };
-    RegistryKeyModification(&lastWriteTime);
+void PerflibNamesRegistryUpdate(void)
+{
+    FILETIME lastWriteTime = {0};
+    bool lastWriteTimeValid = RegistryKeyModification(&lastWriteTime);
 
-    if(CompareFileTime(&lastWriteTime, &names_globals.lastWriteTime) > 0) {
-        spinlock_lock(&names_globals.spinlock);
-        if(CompareFileTime(&lastWriteTime, &names_globals.lastWriteTime) > 0) {
-            names_globals.lastWriteTime = lastWriteTime;
-            RegistryFetchAll_unsafe();
-        }
-        spinlock_unlock(&names_globals.spinlock);
+    spinlock_lock(&names_globals.spinlock);
+    bool registryChanged = lastWriteTimeValid && CompareFileTime(&lastWriteTime, &names_globals.lastWriteTime) > 0;
+    bool cacheRefreshPending = names_globals.performance_data_cache_refresh_pending;
+    spinlock_unlock(&names_globals.spinlock);
+
+    if (!registryChanged && !cacheRefreshPending)
+        return;
+
+    // The cache reset waits for active collectors, so keep the names lock free.
+    bool cacheRefreshed = perflibRefreshPerformanceDataCache();
+
+    spinlock_lock(&names_globals.spinlock);
+    if (lastWriteTimeValid && CompareFileTime(&lastWriteTime, &names_globals.lastWriteTime) > 0) {
+        names_globals.lastWriteTime = lastWriteTime;
+        RegistryFetchAll_unsafe();
     }
+    names_globals.performance_data_cache_refresh_pending = !cacheRefreshed;
+    spinlock_unlock(&names_globals.spinlock);
 }
 
 // Helper to free registry entry memory when Judy array is freed

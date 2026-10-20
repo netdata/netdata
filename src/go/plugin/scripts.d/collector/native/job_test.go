@@ -28,11 +28,9 @@ func TestJob_CriticalStartupAndRecovery(t *testing.T) {
 	assert.Contains(t, first, "CLABEL 'region' 'east'")
 	depthID := chartID(first, "fixture.depth")
 	require.NotEmpty(t, depthID)
-	// Atomic file replacement avoids intentionally torn fixtures between ticks.
 	next := strings.Replace(snapshotJSON("ok"), `"east"`, `"west"`, 1)
-	require.NoError(t, os.WriteFile(file+".next", []byte(next), 0644))
-	require.NoError(t, os.Rename(file+".next", file))
 	out.Reset()
+	replaceResponse(t, file, next)
 	tickUntil(t, job, func() bool { return strings.Contains(out.String(), "SET 'ok' = 1") })
 	second := out.String()
 	assert.Contains(t, second, "SET 'critical' = 0")
@@ -64,8 +62,10 @@ nd_ready
 while nd_next; do
     if [[ -f $dir/fail ]]; then exit 7; fi
     nd_begin
-    nd_metric depth 17 queue mail
-    nd_check backlog critical queue mail
+    nd_metric depth gauge jobs
+    nd_sample "$ND_FAMILY" 17 queue mail
+    nd_check backlog "Queue Backlog" queue
+    nd_check_sample "$ND_FAMILY" critical queue mail
     nd_end
 done
 `)
@@ -97,8 +97,10 @@ done
 nd_ready
 while nd_next; do
     nd_begin
-    nd_metric depth 17 queue mail
-    nd_check backlog critical queue mail
+    nd_metric depth gauge jobs
+    nd_sample "$ND_FAMILY" 17 queue mail
+    nd_check backlog "Queue Backlog" queue
+    nd_check_sample "$ND_FAMILY" critical queue mail
     nd_end
 done
 `)

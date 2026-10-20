@@ -107,7 +107,7 @@ Configure the **megacli** collector from the Netdata web interface:
 4. In the Search box, type _megacli_ (or scroll the list) to locate the **megacli** collector.
 5. Click the **+** next to the **megacli** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -161,7 +161,7 @@ The following alerts are available:
 | [ megacli_phys_drive_media_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf) | megacli.phys_drive_media_errors | MegaCLI physical drive adapter ${label:adapter_number} slot ${label:slot_number} media errors |
 | [ megacli_phys_drive_predictive_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf) | megacli.phys_drive_predictive_failures | MegaCLI physical drive (adapter ${label:adapter_number} slot ${label:slot_number}) predictive failures |
 | [ megacli_bbu_charge ](https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf) | megacli.bbu_charge | MegaCLI Backup Battery Unit (adapter ${label:adapter_number}) average charge over the last minute |
-| [ megacli_bbu_recharge_cycles ](https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf) | megacli.bbu_recharge_cycles | MegaCLI Backup Battery Unit (adapter ${label:adapter_number}) average charge over the last minute |
+| [ megacli_bbu_recharge_cycles ](https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf) | megacli.bbu_recharge_cycles | MegaCLI Backup Battery Unit (adapter ${label:adapter_number}) recharge cycles |
 
 
 
@@ -209,8 +209,8 @@ Metrics:
 
 | Metric | Description | Dimensions | Unit |
 |:------|:------------|:----------|:----|
-| megacli.phys_drive_media_errors_rate | Physical Drive media errors rate | media_errors | errors/s |
-| megacli.phys_drive_predictive_failures_rate | Physical Drive predictive failures rate | predictive_failures | failures/s |
+| megacli.phys_drive_media_errors | Physical Drive media errors rate | media_errors | errors/s |
+| megacli.phys_drive_predictive_failures | Physical Drive predictive failures rate | predictive_failures | failures/s |
 
 
 ### Per backup battery unit

@@ -87,9 +87,9 @@ Child and Parent storage are independent:
 
 When Netdata is configured to stream its metrics to a Metrics Observability Centralization Point (a Netdata Parent), metric samples are forwarded in real-time to that Netdata Parent. The ring buffers available in these modes are used to cache the collected samples for some time, in case there are network issues, or the Netdata Parent is restarted for maintenance.
 
-The memory required per sample in these modes, is four bytes: `ram` mode uses `mmap()` behind the scene, and can be incremented in steps of 1024 samples (4KiB). Mode `ram` allows the use of the Linux kernel memory dedupper (Kernel-Same-Page or KSM) to deduplicate Netdata ring buffers and save memory.
+The memory required per sample is four bytes. RAM allocation is rounded to whole memory pages: on systems with 4 KiB pages, each dimension grows in steps of 1,024 samples. Mode `ram` allows the use of the Linux kernel memory dedupper (Kernel-Same-Page or KSM) to deduplicate Netdata ring buffers and save memory.
 
 **Configuring ram mode and retention**:
 
 - Enable ram mode: To use in-memory storage, set `[db].db` to ram in your `netdata.conf` file. Remember, this mode won't retain historical data after restarts.
-- Adjust retention (optional): While ram mode focuses on real-time data, you can optionally control the number of samples stored in memory. Set `[db].retention` in `netdata.conf` to the desired number in seconds. Note: If the value you choose isn't a multiple of 1024, Netdata will automatically round it up to the nearest multiple.
+- Adjust retention (optional): Set `[db].retention` in `netdata.conf` to the requested number of samples per dimension. Netdata rounds this up to whole memory pages—1,024 samples per page on 4 KiB-page systems. The retained time is the allocated sample count multiplied by each chart's collection interval.

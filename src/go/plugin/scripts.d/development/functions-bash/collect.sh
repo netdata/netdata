@@ -5,7 +5,8 @@ set -eu
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/native.sh"
 collect_snapshot() {
     nd_begin
-    nd_metric depth 17 queue mail
+    nd_metric depth gauge jobs
+    nd_sample "$ND_FAMILY" 17 queue mail
     nd_end
 }
 answer_request() {

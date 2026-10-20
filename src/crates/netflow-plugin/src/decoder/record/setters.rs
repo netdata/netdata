@@ -25,9 +25,9 @@ pub(crate) fn set_record_field(rec: &mut FlowRecord, key: &str, value: &str) {
     }
 }
 
-/// Like set_record_field but always overwrites (for override_canonical_field equivalent).
+/// Like set_record_field, but bypasses its first-non-zero-wins rule for IN_IF/OUT_IF:
+/// those always overwrite. Other keys delegate to set_record_field unchanged.
 pub(crate) fn override_record_field(rec: &mut FlowRecord, key: &str, value: &str) {
-    // IN_IF/OUT_IF always overwrite in the override path (unlike set_record_field)
     match key {
         "IN_IF" => {
             rec.in_if = value.parse().unwrap_or(0);
@@ -39,11 +39,9 @@ pub(crate) fn override_record_field(rec: &mut FlowRecord, key: &str, value: &str
     }
 }
 
+/// Copy bytes/packets into raw_bytes/raw_packets. The raw_* counters stay unscaled:
+/// finalize_record scales bytes/packets by the sampling rate but never scales raw_*.
 pub(crate) fn sync_raw_metrics_record(rec: &mut FlowRecord) {
     rec.raw_bytes = rec.bytes;
     rec.raw_packets = rec.packets;
 }
-
-// ---------------------------------------------------------------------------
-// FlowRecord-native packet parsing (mirrors FlowFields-based versions above)
-// ---------------------------------------------------------------------------

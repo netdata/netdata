@@ -55,7 +55,7 @@ func TestCollector_CollectInvalidSnapshotWritesNothing(t *testing.T) {
 	setupRunner(t)
 	c, _ := fixtureCollector(
 		t,
-		`printf '%s\n' '{"version":"v1","metrics":[{"name":"depth","value":123},{"name":"missing","value":1}]}'`+"\n",
+		`printf '%s\n' '{"version":"v1","metrics":[{"name":"depth","samples":[{"value":123}]},{"name":"invalid","samples":[{"value":null}]}]}'`+"\n",
 	)
 	// Commit deliberately to prove the parser staged nothing, even before the
 	// production runtime's additional AbortCycle protection.
@@ -65,8 +65,11 @@ func TestCollector_CollectInvalidSnapshotWritesNothing(t *testing.T) {
 
 func TestCollector_CollectCheckWithoutIdentityLabels(t *testing.T) {
 	setupRunner(t)
-	c, dir := fixtureCollector(t, `printf '%s' '{"version":"v1","checks":[{"id":"probe","state":"critical"}]}'`+"\n")
-	manifest := "version: v1\ncommand: [./collect.sh]\nchecks:\n  - {id: probe, title: Probe}\n"
+	c, dir := fixtureCollector(
+		t,
+		`printf '%s' '{"version":"v1","checks":[{"id":"probe","title":"Probe","samples":[{"state":"critical"}]}]}'`+"\n",
+	)
+	manifest := "version: v1\ncommand: [./collect.sh]\n"
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "manifest.yaml"), []byte(manifest), 0644))
 	require.NoError(t, c.Init(context.Background()))
 	_, err := collecttest.CollectScalarSeries(c, metrix.ReadFlatten())

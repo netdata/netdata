@@ -1,3 +1,56 @@
+//! The WAL reader: the consuming half of the crate (`writer.rs` is the
+//! producing half). Turns a `.wal` file back into frames — [`Reader`] in two
+//! modes, the header-only boundary walk [`scan_frame_boundaries`], and the
+//! [`FrameRange`] vocabulary that carries a read window.
+//!
+//! # Read modes
+//!
+//! [`Reader::open`] reads every frame from the first to end-of-file.
+//! [`Reader::open_range`] reads a half-open `[start, end)` window of frame
+//! boundaries: a query's read of an active file's durable prefix (`end` = the
+//! tracked file's `valid_up_to`, the last fsync boundary — carried by
+//! `registry.rs`), a chunk build over that prefix, or an intact prefix of an
+//! offline file. The modes differ only on a frame extending past the
+//! available bytes:
+//!
+//! - Bounded: a frame crossing `end` is an expected torn tail (bytes beyond
+//!   the last fsync may hold a partially flushed frame); the read stops
+//!   cleanly and stays stopped. Callers that must surface a shortfall
+//!   cross-check yielded counts against [`scan_frame_boundaries`] counts
+//!   first (the chunk builders do).
+//! - Unbounded: a payload shorter than its header promises is corruption and
+//!   errors — whole-file callers (seal-time indexing) have no entry-count
+//!   cross-check to catch a silently dropped final frame. A frame *header*
+//!   torn by EOF ends either mode cleanly.
+//!
+//! # Verification
+//!
+//! Open validates the whole 4 KiB header page (`FileHeader::from_bytes`,
+//! `format.rs`; a shorter file fails as I/O). Frames are then verified by the
+//! file's own header flags, never by writer config — files written under
+//! different settings coexist (see the documented `config.rs` copy): CRC32
+//! over the frame's 20 field bytes plus the stored payload when
+//! `FLAG_CRC_ENABLED`, LZ4 decode or raw passthrough per `COMPRESSION_MASK`.
+//! Payload and uncompressed sizes are capped at 64 MiB before any allocation.
+//!
+//! Synchronous blocking I/O, no internal synchronization; async callers wrap
+//! scans in `spawn_blocking` (otel-ledger does). A yielded [`Frame`] borrows
+//! the reader's reused buffers and is invalidated by the next `next_frame`
+//! call.
+//!
+//! # Consumers (grep-verified)
+//!
+//! `ng-index` (`sfst_build.rs`): whole-file SFST builds at seal time via
+//! `open`, in-memory query chunks via `open_range` (counts cross-checked).
+//! `sfsq` (`logs/wal_scan.rs`, `traces/wal_scan.rs`): tail row-scans via
+//! `open_range`, whole files via `open` in tests/tooling. `otel-ledger`
+//! (`rpc/logs/handler.rs`, `rpc/traces/sources.rs`): per-query chunk + tail
+//! planning with `scan_frame_boundaries` over `[HEADER_SIZE, valid_up_to)`.
+//! `sfsq-cli` (`discover.rs`, `traces.rs`): offline scans clamped to the
+//! intact prefix. `wal::prefix` folds scan output into chunk boundaries.
+//! Tests across the stack (`ng-ingest`, `ng-index`, `sfsq`, `otel-ingestor`).
+//! `drop_cache` has no callers today; file-lifecycle recovery reads header
+//! pages via `wal::Registry`, not this reader.
 use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::path::Path;
@@ -10,43 +63,55 @@ use crate::{Error, Result};
 /// Reject frames claiming to be larger than 64 MiB.
 const MAX_FRAME_PAYLOAD: usize = 64 * 1024 * 1024;
 
-/// A single frame read from the WAL file.
+/// A single frame read from the WAL file. `data` borrows the reader's reused
+/// decompressed buffer: valid until the reader is used again.
 pub struct Frame<'a> {
-    /// Ingestion timestamp in nanoseconds since the Unix epoch.
+    /// Ingestion timestamp in nanoseconds since the Unix epoch (the writer's
+    /// per-frame `FrameMeta::ingestion_ns` stamp).
     pub timestamp_ns: TimestampNs,
-    /// Number of log entries in this frame.
+    /// Number of log records packed in this frame's payload.
     pub entry_count: u32,
     /// Decompressed payload data.
     pub data: &'a [u8],
 }
 
-/// Reads WAL files produced by [`Writer`](crate::Writer).
+/// Reads the frames of one WAL file written by [`Writer`](crate::Writer).
+///
+/// Open with [`open`](Self::open) (whole file, to EOF) or
+/// [`open_range`](Self::open_range) (a frame-aligned window — the durable
+/// prefix of an active file). The header page is validated at open and
+/// available via [`header`](Self::header); its flags drive per-frame
+/// verification in [`next_frame`](Self::next_frame).
 pub struct Reader {
     reader: BufReader<File>,
+    /// Parsed and fully validated at open (`FileHeader::from_bytes`); its
+    /// flags drive per-frame verification.
     header: FileHeader,
     compressed_buf: Vec<u8>,
     data_buf: Vec<u8>,
-    /// Absolute byte offset of the next frame to read.
+    /// Absolute byte offset of the next frame to read, latched to `end` once
+    /// a torn tail is seen.
     position: u64,
-    /// The durable read bound, or `None` for an unbounded read.
-    ///
-    /// `Some(end)` ([`open_range`](Self::open_range)): frames are yielded
-    /// only while they fit fully below `end`; a frame crossing it is a
-    /// torn tail past the durable boundary and stops the read **cleanly**
-    /// (it is expected — the writer may have a partial frame there).
-    ///
-    /// `None` ([`open`](Self::open)): read to EOF. A frame whose payload
-    /// is short — a *truncated or corrupt* file, not an expected torn
-    /// tail — surfaces as an error from the payload read, never a silent
-    /// short read. This preserves the pre-bounded-reader behavior for
-    /// whole-file callers (the indexer), which have no entry-count
-    /// cross-check to catch a silently-dropped frame.
+    /// Read bound, or `None` for an unbounded (to-EOF) read. `Some(end)`
+    /// ([`open_range`](Self::open_range)) yields a frame only if it fits
+    /// fully below `end`; a frame crossing it is a torn tail past the
+    /// durable boundary and stops the read cleanly (latched, so a re-call
+    /// also stops). `None` ([`open`](Self::open)) reads to EOF, where a
+    /// short payload is a truncated or corrupt file and errors from the
+    /// payload read — never a silent stop — because whole-file callers (the
+    /// indexer) have no entry-count cross-check to catch a silently-dropped
+    /// frame. The mode contract is in the module docs.
     end_bound: Option<u64>,
 }
 
 impl Reader {
-    /// Open a WAL file and read every frame, from the first frame to
-    /// end-of-file.
+    /// Open a WAL file for an unbounded read: every frame, from the first
+    /// frame to end-of-file.
+    ///
+    /// With no durable bound there is no expected torn tail: a payload
+    /// shorter than its frame header promises is a truncated or corrupt file
+    /// and errors (the `end_bound` field doc has the full contract).
+    /// Whole-file callers: seal-time SFST builds in `ng-index`, test fixtures.
     pub fn open(path: &Path) -> Result<Self> {
         Self::open_inner(path, HEADER_SIZE as u64, None)
     }
@@ -55,14 +120,15 @@ impl Reader {
     /// `[start, end)`.
     ///
     /// This is how a query reads the durable, fully-written prefix of a
-    /// file another process is still appending to (`end =
-    /// File::valid_up_to`, the last fsync boundary), or a sub-range of a
-    /// sealed file (chunk building). Both `start` and `end` must be
+    /// file another process is still appending to (`end` = the tracked
+    /// file's `valid_up_to`, the last fsync boundary), how the ledger's
+    /// chunk builders read one chunk, or how an offline scan reads an
+    /// intact prefix (`sfsq-cli` scans boundaries first and clamps to the
+    /// last complete frame). Both `start` and `end` must be
     /// **frame boundaries** — `HEADER_SIZE` or a frame end offset
     /// recorded from a prior read / a `Synced` event's `valid_up_to`;
     /// the reader cannot detect a mid-frame offset and would decode
-    /// garbage. `start` defaults to the first frame when it equals
-    /// `HEADER_SIZE`.
+    /// garbage.
     ///
     /// Validations (the durable-prefix soundness checks): the file must
     /// physically contain `end` (`file_len >= end`), and `start` must
@@ -123,12 +189,17 @@ impl Reader {
         })
     }
 
+    /// The file's header page, parsed and fully validated at open. Its flags
+    /// drive per-frame verification ([`next_frame`](Self::next_frame)); the
+    /// content plane checks `payload_format` against it before decoding any
+    /// frame payload (e.g. `ng_index`'s `check_payload_format`).
     pub fn header(&self) -> &FileHeader {
         &self.header
     }
 
-    /// Advise the kernel to drop the file's pages from the page cache.
-    /// Call this after you're done reading the file.
+    /// Advise the kernel to drop the file's pages from the page cache
+    /// (`POSIX_FADV_DONTNEED` over the whole file). Advisory: failures are
+    /// ignored, and this is a no-op off Linux. No callers today.
     pub fn drop_cache(&self) {
         #[cfg(target_os = "linux")]
         {
@@ -142,6 +213,26 @@ impl Reader {
         }
     }
 
+    /// Read and verify the next frame, or `None` at the end of the window:
+    /// the durable bound — latched once a torn tail is seen — for
+    /// [`open_range`](Self::open_range), EOF for [`open`](Self::open). A
+    /// frame header torn by EOF (fewer than 24 bytes left) is a clean end in
+    /// both modes.
+    ///
+    /// Per frame: parse the 24-byte header (`format.rs` layout), reject
+    /// payload or uncompressed sizes above 64 MiB, read the payload and its
+    /// alignment padding, then verify by the file header's flags — CRC32
+    /// over the header's field bytes plus the stored payload when
+    /// `FLAG_CRC_ENABLED` (the same hash the writer computed), LZ4-block
+    /// decompression or raw passthrough per the compression flag.
+    /// [`Frame::data`] is always the decompressed bytes.
+    ///
+    /// Errors surface as [`Error`](crate::Error): I/O transparently
+    /// (`Error::Io` — unbounded reads meet it as a short payload; bounded
+    /// reads normally stop at the bound first), `Error::CrcMismatch`,
+    /// `Error::Decompression`, and oversize lengths as
+    /// `Error::Deserialization`. The returned `Frame` borrows this reader's
+    /// reused buffers; drop it before the next call.
     pub fn next_frame(&mut self) -> Result<Option<Frame<'_>>> {
         // Bounded read: stop cleanly when the next frame's header
         // wouldn't fit below the durable bound. `valid_up_to` is
@@ -184,11 +275,12 @@ impl Reader {
 
         // Bounded read: the header fit, but the whole frame would cross
         // the durable bound — a torn tail past `valid_up_to`. Don't read
-        // the partial payload; latch done (so a re-call also stops) and
-        // stop cleanly, leaving the resulting short read for the caller's
-        // entry-count cross-check. (For an unbounded read this branch is
-        // skipped, so a truncated payload reaches the `read_exact` below
-        // and errors — corruption is not silently dropped.)
+        // the partial payload; latch the reader at `end` (so a re-call
+        // also stops) and stop cleanly. Yielding short is observable to
+        // callers that cross-check entry counts (the chunk builders).
+        // (For an unbounded read this branch is skipped, so a truncated
+        // payload reaches the `read_exact` below and errors — corruption
+        // is not silently dropped.)
         if let Some(end) = self.end_bound {
             if self.position + total > end {
                 self.position = end;
@@ -225,11 +317,10 @@ impl Reader {
         let lz4 = self.header.compression() == COMPRESSION_LZ4;
         if lz4 {
             // `resize` zero-fills the buffer before lz4 overwrites it —
-            // a memset that is noise next to the decompression itself,
-            // and it keeps the buffer initialized without `unsafe`
-            // (the previous reserve + set_len tripped clippy's
-            // `uninit_vec` deny). The buffer is reused across frames,
-            // so the allocation amortizes either way.
+            // wasted work next to the decompression itself, but it keeps
+            // the buffer initialized without `unsafe` (a `set_len` past
+            // initialization is rejected). The buffer is reused across
+            // frames, so the allocation amortizes either way.
             self.data_buf.clear();
             self.data_buf.resize(uncompressed_len, 0);
             let n = lz4_flex::block::decompress_into(&self.compressed_buf, &mut self.data_buf)
@@ -264,8 +355,9 @@ pub struct FrameBoundary {
 /// event's `valid_up_to`). A mid-frame offset can't be detected and would
 /// decode garbage; this type names that contract so a range is passed as
 /// one value rather than two loose offsets that could be swapped. The
-/// frame-alignment itself is checked when the range is read (the reader
-/// walks from `start`).
+/// frame-alignment itself is only debug-asserted when the range is read
+/// (compiled out of release builds), so callers must pass offsets the
+/// writer or a scan recorded.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FrameRange {
     start: u64,
@@ -327,7 +419,8 @@ pub fn scan_frame_boundaries(path: &Path, range: FrameRange) -> Result<Vec<Frame
         "start offset {start} is not frame-aligned"
     );
 
-    // Validate the file header (magic / version), then walk from `start`.
+    // Validate the header page (the full `FileHeader` checks), then walk
+    // from `start`.
     let mut header_buf = [0u8; HEADER_SIZE];
     file.read_exact(&mut header_buf)?;
     FileHeader::from_bytes(&header_buf)?;

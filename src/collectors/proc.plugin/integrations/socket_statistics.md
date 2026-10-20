@@ -28,7 +28,7 @@ This integration provides socket statistics.
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -78,8 +78,8 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ tcp_orphans ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_orphans.conf) | ipv4.sockstat_tcp_sockets | orphan IPv4 TCP sockets utilization |
 | [ tcp_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_mem.conf) | ipv4.sockstat_tcp_mem | TCP memory utilization |
+| [ tcp_orphans ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_orphans.conf) | ipv4.sockstat_tcp_sockets | Orphan IPv4 TCP sockets utilization |
 
 
 

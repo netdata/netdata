@@ -27,7 +27,7 @@ The plugin calls `sysctl` function to collect necessary data.
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -112,10 +112,8 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ 1m_ipv4_tcp_resets_sent ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf) | ipv4.tcphandshake | average number of sent TCP RESETS over the last minute |
-| [ 10s_ipv4_tcp_resets_sent ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf) | ipv4.tcphandshake | average number of sent TCP RESETS over the last 10 seconds. This can indicate a port scan, or that a service running on this host has crashed. Netdata will not send a clear notification for this alarm. |
-| [ 1m_ipv4_tcp_resets_received ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf) | ipv4.tcphandshake | average number of received TCP RESETS over the last minute |
-| [ 10s_ipv4_tcp_resets_received ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf) | ipv4.tcphandshake | average number of received TCP RESETS over the last 10 seconds. This can be an indication that a service this host needs has crashed. Netdata will not send a clear notification for this alarm. |
+| [ 1m_ipv4_tcp_resets_received ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf) | ipv4.tcphandshake | average number of failed TCP connection attempts over the last minute |
+| [ 10s_ipv4_tcp_resets_received ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf) | ipv4.tcphandshake | average number of failed TCP connection attempts (reset or timed out before being established) over the last 10 seconds. This can be an indication that a service this host needs is down or unreachable. Netdata will not send a clear notification for this alarm. |
 
 
 

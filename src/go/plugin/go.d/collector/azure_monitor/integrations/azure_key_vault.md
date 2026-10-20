@@ -40,7 +40,7 @@ It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The service principal or managed identity requires these Azure RBAC roles:
 
@@ -374,7 +374,7 @@ Configure the **azure_monitor** collector from the Netdata web interface:
 4. In the Search box, type _azure_monitor_ (or scroll the list) to locate the **azure_monitor** collector.
 5. Click the **+** next to the **azure_monitor** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -629,9 +629,9 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_key_vault_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_key_vault.conf) | azure_monitor.key_vault.availability | Key Vault availability on ${label:resource_name} |
-| [ am_key_vault_api_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_key_vault.conf) | azure_monitor.key_vault.api_latency | Key Vault API latency on ${label:resource_name} |
-| [ am_key_vault_saturation ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_key_vault.conf) | azure_monitor.key_vault.saturation | Key Vault saturation on ${label:resource_name} |
+| [ am_key_vault_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_key_vault.conf) | azure_monitor.key_vault.availability | Overall vault availability of Azure Key Vault ${label:resource_name} in ${label:resource_group} (${label:region}). Azure SLA guarantees 99.99% availability |
+| [ am_key_vault_api_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_key_vault.conf) | azure_monitor.key_vault.api_latency | Average API latency of Azure Key Vault ${label:resource_name} in ${label:resource_group} (${label:region}). High latency may indicate throttling or service degradation |
+| [ am_key_vault_saturation ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_key_vault.conf) | azure_monitor.key_vault.saturation | Vault saturation of Azure Key Vault ${label:resource_name} in ${label:resource_group} (${label:region}). High saturation means the vault is approaching its transaction limits |
 
 
 

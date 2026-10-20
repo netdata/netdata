@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
@@ -41,12 +42,13 @@ type Config struct {
 	ServiceDiscoveryConfigDir []string
 	VarLibDir                 string
 
-	Services        []composition.ProcessService
-	ModuleRegistry  collectorapi.Registry
-	RunModule       string
-	RunJob          []string
-	MinUpdateEvery  int
-	ShutdownTimeout time.Duration
+	ProcessFunctions []funcapi.ProcessFunctionProvider
+	Services         []composition.ProcessService
+	ModuleRegistry   collectorapi.Registry
+	RunModule        string
+	RunJob           []string
+	MinUpdateEvery   int
+	ShutdownTimeout  time.Duration
 
 	DisableServiceDiscovery bool
 
@@ -86,10 +88,11 @@ type Agent struct {
 	DiscoveryProviders []discovery.ProviderFactory
 	Secrets            *secrets.Config // nil disables secret loading, resolution and SecretStore DynCfg
 
-	Services       []composition.ProcessService
-	ModuleRegistry collectorapi.Registry
-	In             io.Reader
-	Out            io.Writer
+	ProcessFunctions []funcapi.ProcessFunctionProvider
+	Services         []composition.ProcessService
+	ModuleRegistry   collectorapi.Registry
+	In               io.Reader
+	Out              io.Writer
 
 	loadSecretStores func([]string) ([]secretstore.Config, []error)
 
@@ -120,6 +123,7 @@ func New(cfg Config) *Agent {
 		runModePolicy:             cfg.RunModePolicy,
 		ModuleRegistry:            cfg.ModuleRegistry,
 		Services:                  cfg.Services,
+		ProcessFunctions:          cfg.ProcessFunctions,
 		DiscoveryProviders:        cfg.DiscoveryProviders,
 		Secrets:                   cfg.Secrets,
 		In:                        os.Stdin,
@@ -179,7 +183,7 @@ func (a *Agent) run(ctx context.Context) error {
 	}
 
 	enabledModules := a.loadEnabledModules(cfg)
-	if len(enabledModules) == 0 {
+	if len(enabledModules) == 0 && len(a.ProcessFunctions) == 0 {
 		a.Info("no modules to run")
 		netdataapi.New(a.Out).DISABLE()
 		return nil
@@ -206,6 +210,7 @@ func (a *Agent) run(ctx context.Context) error {
 		Output:                a.Out,
 		PluginName:            a.Name,
 		Modules:               enabledModules,
+		ProcessFunctions:      a.ProcessFunctions,
 		Defaults:              discCfg.Defaults,
 		DiscoveryBuildContext: discCfg.BuildContext,
 		DiscoveryProviders:    discCfg.Providers,

@@ -30,7 +30,7 @@ This collector is only supported on the following platforms:
 
 - Linux
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time.
 
@@ -158,8 +158,8 @@ Metrics:
 |:------|:------------|:----------|:----|
 | cgroup.swap_read | Calls to function swap_readpage. | read | calls/s |
 | cgroup.swap_write | Calls to function swap_writepage. | write | calls/s |
-| services.swap_read | Calls to swap_readpage. | a dimension per systemd service | calls/s |
-| services.swap_write | Calls to function swap_writepage. | a dimension per systemd service | calls/s |
+| systemd.service.swap_read | Calls to swap_readpage. | a dimension per systemd service | calls/s |
+| systemd.service.swap_write | Calls to function swap_writepage. | a dimension per systemd service | calls/s |
 
 
 ### Per apps

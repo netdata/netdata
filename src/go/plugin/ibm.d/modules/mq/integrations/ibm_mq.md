@@ -44,7 +44,7 @@ The collector connects to IBM MQ and collects metrics via its monitoring interfa
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -126,7 +126,14 @@ jobs:
 
 ## Alerts
 
-There are no alerts configured by default for this integration.
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ mq_queue_manager_down ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mq.conf) | mq.qmgr.status | Queue manager status value is ${value} (0=down, 1=running) |
+| [ mq_log_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mq.conf) | mq.qmgr.log_utilization | Queue manager log utilization is ${value}% |
+| [ mq_queue_depth_percentage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mq.conf) | mq.queue.depth_percentage | Queue ${label:queue} is at ${value}% of its configured depth |
 
 
 

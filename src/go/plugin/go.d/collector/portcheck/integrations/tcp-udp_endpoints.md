@@ -50,7 +50,7 @@ Possible UDP statuses:
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -123,7 +123,7 @@ Configure the **portcheck** collector from the Netdata web interface:
 4. In the Search box, type _portcheck_ (or scroll the list) to locate the **portcheck** collector.
 5. Click the **+** next to the **portcheck** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -254,8 +254,8 @@ The following alerts are available:
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
 | [ portcheck_service_reachable ](https://github.com/netdata/netdata/blob/master/src/health/health.d/portcheck.conf) | portcheck.status | TCP host ${label:host} port ${label:port} liveness status |
-| [ portcheck_connection_timeouts ](https://github.com/netdata/netdata/blob/master/src/health/health.d/portcheck.conf) | portcheck.status | percentage of timed-out TCP connections to host ${label:host} port ${label:port} in the last 5 minutes |
-| [ portcheck_connection_fails ](https://github.com/netdata/netdata/blob/master/src/health/health.d/portcheck.conf) | portcheck.status | percentage of failed TCP connections to host ${label:host} port ${label:port} in the last 5 minutes |
+| [ portcheck_connection_timeouts ](https://github.com/netdata/netdata/blob/master/src/health/health.d/portcheck.conf) | portcheck.status | Percentage of timed-out TCP connections to host ${label:host} port ${label:port} in the last 5 minutes |
+| [ portcheck_connection_fails ](https://github.com/netdata/netdata/blob/master/src/health/health.d/portcheck.conf) | portcheck.status | Percentage of failed TCP connections to host ${label:host} port ${label:port} in the last 5 minutes |
 
 
 

@@ -18,18 +18,19 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           submodules: recursive
       - name: Check files
         id: check-files
-        uses: step-security/changed-files@v45
+        uses: step-security/changed-files@2e07db73e5ccdb319b9a6c7766bd46d39d304bad # v47.0.5
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
             **/*.cmake
             CMakeLists.txt
+            **/CMakeLists.txt
             .github/workflows/go-tests.yml
             packaging/cmake/
             src/go/**
@@ -66,7 +67,7 @@ jobs:
       build_matrix: ${{ steps.get-version.outputs.build_matrix }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install dependencies
         run: |
           sudo apt-get update || true
@@ -91,12 +92,12 @@ jobs:
         if: needs.file-check.outputs.run != 'true'
         run: echo "SKIPPED"
       - name: Install Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ matrix.version }}
       - name: Checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
       - name: Go mod download
@@ -163,12 +164,12 @@ jobs:
         run: echo "SKIPPED"
       - name: Checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
       - name: Install Go
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: src/collectors/ebpf.plugin/ebpfgo.plugin/go.mod
       - name: Install libbpf
@@ -233,12 +234,12 @@ jobs:
         if: needs.file-check.outputs.run != 'true'
         run: echo "SKIPPED"
       - name: Install Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ matrix.version }}
       - name: Checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
       - name: Set GOOS and GOARCH

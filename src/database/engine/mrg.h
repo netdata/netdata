@@ -101,8 +101,7 @@ void mrg_update_metric_retention_and_granularity_by_uuid(
     time_t first_time_s,
     time_t last_time_s,
     uint32_t update_every_s,
-    time_t now_s,
-    uint64_t *journal_samples);
+    time_t now_s);
 
 bool mrg_save(MRG *mrg);
 bool mrg_load(MRG *mrg);

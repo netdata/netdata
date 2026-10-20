@@ -30,7 +30,7 @@ the [nvidia-smi](https://developer.nvidia.com/nvidia-system-management-interface
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 Nvidia GPU can be monitored further using the following other integrations:
@@ -87,9 +87,27 @@ The following options can be defined globally: update_every, autodetection_retry
 |:-----|:------------|:--------|:---------:|
 | update_every | Data collection frequency. | 10 | no |
 | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
-| binary_path | Path to nvidia_smi binary. The default is "nvidia_smi" and the executable is looked for in the directories specified in the PATH environment variable. | nvidia_smi | no |
-| timeout | The maximum duration, in seconds, to wait for an `nvidia-smi` command to complete. This setting applies differently based on the collector's mode. **Loop Mode:** In loop mode, the timeout primarily determines how long to wait for the initial `nvidia-smi` execution. If the initial query takes longer than the timeout, the collector may report an error. For systems with multiple GPUs, the initial load time can sometimes be significant (e.g., 5-10 seconds). **Regular Mode:** If the collector is in regular mode, the timeout specifies how long to wait for each individual `nvidia-smi` execution. | 10 | no |
-| loop_mode | When enabled, `nvidia-smi` is executed continuously in a separate thread using the `-l` option. | yes | no |
+| [binary_path](#option-binary-path) | Path to the `nvidia-smi` binary. | nvidia-smi | no |
+| [timeout](#option-timeout) | Command execution timeout, in seconds. In loop mode, it limits the wait for each `nvidia-smi` sample instead. | 10 | no |
+| [loop_mode](#option-loop-mode) | Keep `nvidia-smi` running and reading GPU data on a fixed interval (the `-l` option) instead of starting it for every collection. | yes | no |
+
+<a id="option-binary-path"></a>
+##### binary_path
+
+When it is empty or the file does not exist, the collector looks for `nvidia-smi` in the `PATH` directories and, on Windows, in the default NVIDIA install locations.
+
+
+<a id="option-timeout"></a>
+##### timeout
+
+In loop mode, the collector waits up to this timeout for the first sample after it starts. Afterwards, a sample that does not arrive within the loop interval plus this timeout leaves a gap in the charts, and `nvidia-smi` is restarted. On hosts with several GPUs, the first sample can take 5 to 10 seconds.
+
+
+<a id="option-loop-mode"></a>
+##### loop_mode
+
+The loop interval is the data collection interval (`update_every`), at most 5 seconds. Loop mode is not available on Windows: there, each collection runs `nvidia-smi` once.
+
 
 
 </details>
@@ -105,7 +123,7 @@ Configure the **nvidia_smi** collector from the Netdata web interface:
 4. In the Search box, type _nvidia_smi_ (or scroll the list) to locate the **nvidia_smi** collector.
 5. Click the **+** next to the **nvidia_smi** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 

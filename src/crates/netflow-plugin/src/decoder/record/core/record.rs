@@ -12,7 +12,7 @@ pub(crate) fn base_record(version: &'static str, source: SocketAddr) -> FlowReco
 }
 
 /// Finalize a FlowRecord: apply defaults, normalize values.
-/// Equivalent of `finalize_canonical_flow_fields` for FlowRecord.
+/// Equivalent of the test-only `finalize_canonical_flow_fields` for FlowRecord.
 pub(crate) fn finalize_record(rec: &mut FlowRecord) {
     if rec.raw_bytes == 0 {
         rec.raw_bytes = rec.bytes;
@@ -46,9 +46,9 @@ pub(crate) fn finalize_record(rec: &mut FlowRecord) {
     }
 }
 
-/// ICMP port fallback: when src_port is 0 and dst_port contains a combined
-/// ICMP type+code value, extract the individual type/code fields from it.
-/// Mirrors the original apply_icmp_port_fallback for FlowFields.
+/// ICMP port fallback: when src_port is absent or 0 and dst_port is present,
+/// decode its combined ICMP type+code value into the individual type/code
+/// fields. Mirrors the test-only `apply_icmp_port_fallback` for FlowFields.
 pub(crate) fn apply_icmp_port_fallback_record(rec: &mut FlowRecord) {
     if (rec.has_src_port() && rec.src_port != 0) || !rec.has_dst_port() {
         return;
@@ -78,7 +78,7 @@ pub(crate) fn apply_icmp_port_fallback_record(rec: &mut FlowRecord) {
     }
 }
 
-/// Swap src/dst fields in a FlowRecord for biflow reverse direction.
+/// Swap src/dst fields in a FlowRecord to produce a reverse-direction record.
 pub(crate) fn swap_directional_record_fields(rec: &mut FlowRecord) {
     std::mem::swap(&mut rec.src_addr, &mut rec.dst_addr);
     std::mem::swap(&mut rec.src_prefix, &mut rec.dst_prefix);

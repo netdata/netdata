@@ -30,7 +30,7 @@ This collector is only supported on the following platforms:
 
 - Linux
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time.
 
@@ -144,7 +144,7 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ sync_freq ](https://github.com/netdata/netdata/blob/master/src/health/health.d/synchronization.conf) | mem.sync | number of sync() system calls. Every call causes all pending modifications to filesystem metadata and cached file data to be written to the underlying filesystems. |
+| [ sync_freq ](https://github.com/netdata/netdata/blob/master/src/health/health.d/synchronization.conf) | mem.sync | Number of sync() system calls. Every call causes all pending modifications to filesystem metadata and cached file data to be written to the underlying filesystems. |
 
 
 

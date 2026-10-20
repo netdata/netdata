@@ -111,7 +111,7 @@ static bool cloud_status_matches(int64_t health_log_id, RRDCALC_STATUS status)
     bool send = false;
 
     int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, health_log_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, health_log_id));
 
     param = 0;
     int rc = sqlite3_step_monitored(res);
@@ -142,6 +142,8 @@ done:
 // - Cloud is already aware of the alert status
 // - The transition refers to a variable
 //
+// Returns 0 when queued, 1 or 2 when there is nothing to queue, -1 when the queue could not be written.
+//
 static int insert_alert_to_submit_queue(nd_uuid_t *host_id, int64_t health_log_id, uint32_t unique_id, RRDCALC_STATUS status)
 {
     static __thread sqlite3_stmt *compiled_res = NULL;
@@ -166,6 +168,7 @@ static int insert_alert_to_submit_queue(nd_uuid_t *host_id, int64_t health_log_i
             return -1;
     }
 
+    int ret = -1;
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_id, sizeof(*host_id), SQLITE_STATIC));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, health_log_id));
@@ -173,7 +176,9 @@ static int insert_alert_to_submit_queue(nd_uuid_t *host_id, int64_t health_log_i
 
     param = 0;
     int rc = sqlite3_step_monitored(res);
-    if (unlikely(rc != SQLITE_DONE))
+    if (likely(rc == SQLITE_DONE))
+        ret = 0;
+    else
         error_report("Failed to insert alert in the submit queue %"PRIu32", rc = %d", unique_id, rc);
 
 done:
@@ -182,7 +187,7 @@ done:
         SQLITE_RESET(res);
     else
         SQLITE_FINALIZE(res);
-    return 0;
+    return ret;
 }
 
 #define SQL_DELETE_QUEUE_ALERT_TO_CLOUD                                                                                \
@@ -198,9 +203,9 @@ done:
 // would destroy it unsent and leave the cloud on a status the agent has already left. Guarded this way, a
 // re-pointed row simply fails the predicate, survives, and goes out on the next pass.
 //
-// The caller owns the statement: this runs once per row sent, and re-preparing it each time would take
-// the global sqlite_spinlock in simple_prepare_statement() - and a full SQL parse - up to
-// ACLK_MAX_ALERT_UPDATES times per host per tick, on a lock every web, API and metadata thread contends on.
+// The caller owns the statement: this runs once per row sent, and re-preparing it each time would cost a
+// full SQL parse (and a lifetime-lease round trip in simple_prepare_statement()) up to
+// ACLK_MAX_ALERT_UPDATES times per host per tick.
 // Returns true when the row was actually removed. A false means the row was re-pointed after we read it - the
 // guard did its job and the newer transition is still queued, which the caller must not mistake for "done".
 static bool delete_alert_from_submit_queue(nd_uuid_t *host_id, int64_t sequence_id, int64_t unique_id, sqlite3_stmt **res)
@@ -588,7 +593,15 @@ static void aclk_push_alert_event(RRDHOST *host, sqlite3_stmt **res, sqlite3_stm
     struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
     while (sqlite3_step_monitored(*res) == SQLITE_ROW) {
         health_alarm_log_populate(&alarm_log, *res, host, &status);
-        aclk_send_alarm_log_entry(&alarm_log);
+
+        // A message the MQTT layer did not accept right now is not a delivery: leave this row and the ones after it
+        // queued, with their version untouched, and retry on the next pass. A message that can never be sent
+        // (cannot be built, too big for the server) is consumed as before, so one bad row cannot block the queue.
+        if (aclk_send_alarm_log_entry(&alarm_log) == ACLK_ALARM_LOG_SEND_FAILED) {
+            destroy_alarm_log_entry(&alarm_log);
+            rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
+            break;
+        }
 
         nd_uuid_t hash_id;
         if (alarm_log.config_hash && !uuid_parse(alarm_log.config_hash, hash_id))
@@ -691,95 +704,201 @@ done:
 #define SQL_DELETE_HOST_ALERT_VERSION_TABLE                                                                            \
     "DELETE FROM alert_version WHERE health_log_id IN (SELECT health_log_id FROM health_log WHERE host_id = @host_id)"
 
-void rebuild_host_alert_version_table(RRDHOST *host)
+// The DELETE and the INSERT must look like one step to the other threads using db_meta:
+// cloud_status_matches() and calculate_node_alert_version() read alert_version on the same connection, and seeing it
+// empty would re-queue transitions or schedule a needless snapshot. A transaction does not isolate threads that share
+// a connection, so hold the connection mutex across both statements; the savepoint makes them all-or-nothing.
+// When another transaction is already open on db_meta (metadata_scan_host), a savepoint would only nest inside it, so
+// the rebuild is deferred to the next pass.
+//
+// Returns true when the table was rebuilt.
+static bool rebuild_host_alert_version_table(RRDHOST *host)
 {
-    sqlite3_stmt *res = NULL;
-
-    if (!PREPARE_STATEMENT(db_meta, SQL_DELETE_HOST_ALERT_VERSION_TABLE, &res))
-        return;
-
+    sqlite3_stmt *res_delete = NULL;
+    sqlite3_stmt *res_insert = NULL;
+    bool rebuilt = false;
     int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
 
+    if (!PREPARE_STATEMENT(db_meta, SQL_DELETE_HOST_ALERT_VERSION_TABLE, &res_delete))
+        return false;
+
+    if (!PREPARE_STATEMENT(db_meta, SQL_REBUILD_HOST_ALERT_VERSION_TABLE, &res_insert))
+        goto done;
+
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res_delete, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
     param = 0;
-    int rc = execute_insert(res);
-    if (rc != SQLITE_DONE) {
-        netdata_log_error("Failed to delete the host alert version table");
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res_insert, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
+    param = 0;
+
+    sqlite3_mutex *db_mutex = sqlite3_db_mutex(db_meta);
+    sqlite3_mutex_enter(db_mutex);
+
+    if (!sqlite3_get_autocommit(db_meta)) {
+        sqlite3_mutex_leave(db_mutex);
         goto done;
     }
 
-    SQLITE_FINALIZE(res);
-    if (!PREPARE_STATEMENT(db_meta, SQL_REBUILD_HOST_ALERT_VERSION_TABLE, &res))
-        return;
+    if (sqlite3_exec(db_meta, "SAVEPOINT rebuild_alert_version", NULL, NULL, NULL) != SQLITE_OK) {
+        sqlite3_mutex_leave(db_mutex);
+        error_report("Failed to start rebuilding the host alert version table");
+        goto done;
+    }
 
-    param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
+    int rc = execute_insert(res_delete);
+    if (rc == SQLITE_DONE)
+        rc = execute_insert(res_insert);
 
-    param = 0;
-    rc = execute_insert(res);
-    if (rc != SQLITE_DONE)
-        netdata_log_error("Failed to rebuild the host alert version table");
+    if (rc == SQLITE_DONE && sqlite3_exec(db_meta, "RELEASE rebuild_alert_version", NULL, NULL, NULL) == SQLITE_OK)
+        rebuilt = true;
+    else {
+        (void)sqlite3_exec(db_meta, "ROLLBACK TO rebuild_alert_version", NULL, NULL, NULL);
+        (void)sqlite3_exec(db_meta, "RELEASE rebuild_alert_version", NULL, NULL, NULL);
+        error_report("Failed to rebuild the host alert version table, rc = %d", rc);
+    }
+
+    sqlite3_mutex_leave(db_mutex);
 
 done:
-    REPORT_BIND_FAIL(res, param);
-    SQLITE_FINALIZE(res);
+    REPORT_BIND_FAIL(res_delete, param);
+    SQLITE_FINALIZE(res_delete);
+    SQLITE_FINALIZE(res_insert);
+    return rebuilt;
 }
 
 #define SQL_PROCESS_ALERT_PENDING_QUEUE                                                                                \
     "SELECT health_log_id, unique_id, status, rowid"                                                                   \
     " FROM alert_queue WHERE host_id = @host_id AND date_scheduled <= UNIXEPOCH() ORDER BY rowid ASC"
 
-bool process_alert_pending_queue(RRDHOST *host)
-{
-    if (!REQUIRE_HEALTH_DB_OPEN())
-        return false;
+#define SQL_ALERT_PENDING_QUEUE_NEXT_DUE "SELECT MIN(date_scheduled) FROM alert_queue WHERE host_id = @host_id"
 
+// a drain that failed, or kept a row it could not submit, looks at the queue again after this many seconds
+#define ALERT_QUEUE_RETRY_S (10)
+
+// The pending queue is only read when something in it can be due: every writer lowers the host's next-due time
+// to the date_scheduled it wrote, and each drain sets it to the earliest date_scheduled still queued.
+void alert_queue_next_due_lower(RRDHOST *host, time_t when)
+{
+    time_t *next_due = &host->health.alert_queue_next_due_s;
+    time_t current = __atomic_load_n(next_due, __ATOMIC_RELAXED);
+    while (when < current &&
+           !__atomic_compare_exchange_n(next_due, &current, when, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED))
+        ;
+}
+
+// the earliest date_scheduled queued for the host, nd_time_t_max() when nothing is
+static bool alert_queue_get_next_due(RRDHOST *host, time_t *next_due)
+{
     static __thread sqlite3_stmt *compiled_res = NULL;
     sqlite3_stmt *res = NULL;
 
     if (is_health_thread) {
         if (!compiled_res) {
-            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_PROCESS_ALERT_PENDING_QUEUE, &compiled_res))
+            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_ALERT_PENDING_QUEUE_NEXT_DUE, &compiled_res))
                 return false;
         }
         res = compiled_res;
     } else {
-        if (!PREPARE_STATEMENT(db_meta, SQL_PROCESS_ALERT_PENDING_QUEUE, &res))
+        if (!PREPARE_STATEMENT(db_meta, SQL_ALERT_PENDING_QUEUE_NEXT_DUE, &res))
             return false;
     }
 
+    bool ok = false;
     int param = 0;
-    int added =0, count = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
 
     param = 0;
-    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
-
-        int64_t health_log_id = sqlite3_column_int64(res, 0);
-        uint32_t unique_id = sqlite3_column_int64(res, 1);
-        RRDCALC_STATUS new_status = sqlite3_column_int(res, 2);
-        int64_t row = sqlite3_column_int64(res, 3);
-
-        struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
-        if (aclk_host_config) {
-            int ret = insert_alert_to_submit_queue(&host->host_id.uuid, health_log_id, unique_id, new_status);
-            if (ret == 0)
-                added++;
-        }
-
-        delete_alert_from_pending_queue(&host->host_id.uuid, row, (int64_t)unique_id);
-
-        count++;
+    if (sqlite3_step_monitored(res) == SQLITE_ROW) {
+        *next_due = sqlite3_column_type(res, 0) == SQLITE_NULL ? nd_time_t_max() : (time_t)sqlite3_column_int64(res, 0);
+        ok = true;
     }
 
-    if(count)
-        nd_log(NDLS_ACCESS, NDLP_NOTICE, "ACLK STA [%s (N/A)]: Processed %d entries, queued %d", rrdhost_hostname(host), count, added);
 done:
     REPORT_BIND_FAIL(res, param);
     if (is_health_thread)
         SQLITE_RESET(res);
     else
         SQLITE_FINALIZE(res);
+    return ok;
+}
+
+bool process_alert_pending_queue(RRDHOST *host)
+{
+    if (!REQUIRE_HEALTH_DB_OPEN())
+        return false;
+
+    time_t now = now_realtime_sec();
+    if (now < __atomic_load_n(&host->health.alert_queue_next_due_s, __ATOMIC_ACQUIRE))
+        return false;
+
+    // Clear the gate before reading: a row inserted from here on lowers it again, so it cannot be missed.
+    (void)__atomic_exchange_n(&host->health.alert_queue_next_due_s, nd_time_t_max(), __ATOMIC_ACQ_REL);
+
+    static __thread sqlite3_stmt *compiled_res = NULL;
+    sqlite3_stmt *res = NULL;
+
+    if (is_health_thread) {
+        if (!compiled_res) {
+            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_PROCESS_ALERT_PENDING_QUEUE, &compiled_res)) {
+                alert_queue_next_due_lower(host, nd_time_t_add_saturating(now, ALERT_QUEUE_RETRY_S));
+                return false;
+            }
+        }
+        res = compiled_res;
+    } else {
+        if (!PREPARE_STATEMENT(db_meta, SQL_PROCESS_ALERT_PENDING_QUEUE, &res)) {
+            alert_queue_next_due_lower(host, nd_time_t_add_saturating(now, ALERT_QUEUE_RETRY_S));
+            return false;
+        }
+    }
+
+    int param = 0;
+    int added = 0, count = 0, kept = 0;
+    bool drained = false;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
+
+    param = 0;
+    int rc;
+    while ((rc = sqlite3_step_monitored(res)) == SQLITE_ROW) {
+
+        int64_t health_log_id = sqlite3_column_int64(res, 0);
+        uint32_t unique_id = sqlite3_column_int64(res, 1);
+        RRDCALC_STATUS new_status = sqlite3_column_int(res, 2);
+        int64_t row = sqlite3_column_int64(res, 3);
+        count++;
+
+        struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
+        if (aclk_host_config) {
+            int ret = insert_alert_to_submit_queue(&host->host_id.uuid, health_log_id, unique_id, new_status);
+            if (ret == 0)
+                added++;
+            else if (ret < 0) {
+                // not submitted: keep the row, it is retried
+                kept++;
+                continue;
+            }
+        }
+
+        delete_alert_from_pending_queue(&host->host_id.uuid, row, (int64_t)unique_id);
+    }
+    drained = (rc == SQLITE_DONE && !kept);
+
+    if(count)
+        nd_log(NDLS_ACCESS, NDLP_NOTICE, "ACLK STA [%s (N/A)]: Processed %d entries, queued %d, kept %d", rrdhost_hostname(host), count, added, kept);
+done:
+    REPORT_BIND_FAIL(res, param);
+    if (is_health_thread)
+        SQLITE_RESET(res);
+    else
+        SQLITE_FINALIZE(res);
+
+    // A row left behind (re-pointed during the drain, or a failed delete) is already due, so it brings the gate
+    // back to the past and the next call drains it.
+    time_t next_due;
+    if (drained && alert_queue_get_next_due(host, &next_due))
+        alert_queue_next_due_lower(host, next_due);
+    else
+        alert_queue_next_due_lower(host, nd_time_t_add_saturating(now, ALERT_QUEUE_RETRY_S));
+
     return added > 0;
 }
 
@@ -907,7 +1026,10 @@ void aclk_push_alert_events_for_all_hosts(void)
             // the snapshot itself is rebuilt from the health log, not from what is still queued, so a capped
             // drain cannot make it stale; the flag is already set on this path for the remainder
             (void)commit_alert_events(host);
-            rebuild_host_alert_version_table(host);
+            // the flag is already set on this path, so a deferred or failed rebuild is retried on the next pass,
+            // and the snapshot is only sent from a rebuilt table
+            if (!rebuild_host_alert_version_table(host))
+                continue;
             send_alert_snapshot_to_cloud(host);
             aclk_host_config->snapshot_count++;
             aclk_alert_snapshot_complete(aclk_host_config);
@@ -1205,37 +1327,11 @@ static void schedule_alert_snapshot_if_needed(struct aclk_sync_cfg_t *aclk_host_
     aclk_host_config->checkpoint_count++;
 }
 
-#define SQL_COUNT_SNAPSHOT_ENTRIES                                                                                     \
-    "SELECT COUNT(1) FROM alert_version av, health_log hl "                                                            \
-    "WHERE hl.host_id = @host_id AND hl.health_log_id = av.health_log_id AND av.status <> -2"
-
-static int calculate_alert_snapshot_entries(nd_uuid_t *host_uuid)
-{
-    int count = 0;
-
-    sqlite3_stmt *res = NULL;
-
-    if (!PREPARE_STATEMENT(db_meta, SQL_COUNT_SNAPSHOT_ENTRIES, &res))
-        return 0;
-
-    int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_uuid, sizeof(*host_uuid), SQLITE_STATIC));
-
-    param = 0;
-    int rc = sqlite3_step_monitored(res);
-    if (rc == SQLITE_ROW)
-        count = sqlite3_column_int(res, 0);
-    else
-        error_report("Failed to select snapshot count");
-
-done:
-    REPORT_BIND_FAIL(res, param);
-    SQLITE_FINALIZE(res);
-
-    return count;
-}
-
+// The snapshot rows and their count come from ONE statement: two statements on the shared db_meta connection are not
+// isolated from the other threads writing to it, so a separate COUNT could disagree with the rows sent, telling the
+// cloud to expect chunks it never receives (or sending a chunk number twice).
 #define SQL_GET_SNAPSHOT_ENTRIES                                                                                       \
+    " WITH snapshot AS MATERIALIZED ("                                                                                 \
     " SELECT 0, hld.unique_id, hld.alarm_id, hl.config_hash_id, hld.updated_by_id, hld.when_key, "                     \
     " hld.duration, hld.non_clear_duration, hld.flags, hld.exec_run_timestamp, hld.delay_up_to_timestamp, hl.name,  "  \
     " hl.chart, hl.exec, hl.recipient, ah.source, hl.units, hld.info, hld.exec_code, hld.new_status,  "                \
@@ -1244,7 +1340,10 @@ done:
     " FROM health_log hl, alert_hash ah, health_log_detail hld, alert_version av "                                     \
     " WHERE hl.config_hash_id = ah.hash_id"                                                                            \
     " AND hl.host_id = @host_id AND hl.health_log_id = hld.health_log_id "                                             \
-    " AND hld.health_log_id = av.health_log_id AND av.unique_id = hld.unique_id AND av.status <> -2"
+    " AND hld.health_log_id = av.health_log_id AND av.unique_id = hld.unique_id AND av.status <> -2)"                  \
+    " SELECT snapshot.*, COUNT(*) OVER () FROM snapshot"
+
+#define SNAPSHOT_ENTRIES_COUNT_COLUMN 32
 
 #define ALARM_EVENTS_PER_CHUNK 1000
 void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
@@ -1265,17 +1364,19 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
     char node_id[UUID_STR_LEN];
     aclk_node_id_copy(aclk_host_config, node_id);
 
-    // Check the database for this node to see how many alerts we will need to put in the snapshot
-    int cnt = calculate_alert_snapshot_entries(&host->host_id.uuid);
-    if (!cnt)
-        return;
-
     sqlite3_stmt *res = NULL;
     if (!PREPARE_STATEMENT(db_meta, SQL_GET_SNAPSHOT_ENTRIES, &res))
         return;
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
+
+    param = 0;
+    // the first row carries the number of alerts in the snapshot; no row means there is nothing to send
+    if (sqlite3_step_monitored(res) != SQLITE_ROW)
+        goto done;
+
+    int cnt = sqlite3_column_int(res, SNAPSHOT_ENTRIES_COUNT_COLUMN);
 
     nd_uuid_t local_snapshot_uuid;
     char snapshot_uuid_str[UUID_STR_LEN];
@@ -1305,10 +1406,9 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
     alarm_log.claim_id = claim_id.str;
 
     cnt = 0;
-    param = 0;
     uint64_t version = 0;
     int total_count = 0;
-    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+    do {
         cnt++;
         total_count++;
 
@@ -1333,8 +1433,9 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
             }
         }
         destroy_alarm_log_entry(&alarm_log);
-    }
-    if (cnt)
+    } while (sqlite3_step_monitored(res) == SQLITE_ROW);
+
+    if (cnt && aclk_online_for_alerts())
         aclk_send_alarm_snapshot(snapshot_proto);
     else
         destroy_alarm_snapshot_proto(snapshot_proto);
@@ -1386,6 +1487,56 @@ static int aq_test_queue(nd_uuid_t *host_id, int64_t *sequence_id, int64_t *uniq
         }
         count++;
     }
+
+done:
+    REPORT_BIND_FAIL(res, param);
+    SQLITE_FINALIZE(res);
+    return count;
+}
+
+// queue a pending transition the way SQL_INSERT_ALERT_PENDING_QUEUE does, due `due_in_s` from now, without
+// touching the host's next-due gate
+static bool aq_pending_seed(nd_uuid_t *host_id, int64_t health_log_id, int64_t unique_id, int64_t due_in_s)
+{
+    sqlite3_stmt *res = NULL;
+    bool ok = false;
+
+    if (!PREPARE_STATEMENT(
+            db_meta,
+            "INSERT INTO alert_queue (host_id, health_log_id, unique_id, alarm_id, status, date_scheduled)"
+            " VALUES (@host_id, @health_log_id, @unique_id, @health_log_id, 3, UNIXEPOCH() + @due_in_s)",
+            &res))
+        return false;
+
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_id, sizeof(*host_id), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, health_log_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, unique_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, due_in_s));
+
+    param = 0;
+    ok = (sqlite3_step_monitored(res) == SQLITE_DONE);
+
+done:
+    REPORT_BIND_FAIL(res, param);
+    SQLITE_FINALIZE(res);
+    return ok;
+}
+
+static int aq_pending_rows(nd_uuid_t *host_id)
+{
+    sqlite3_stmt *res = NULL;
+    int count = -1;
+
+    if (!PREPARE_STATEMENT(db_meta, "SELECT COUNT(*) FROM alert_queue WHERE host_id = @host_id", &res))
+        return -1;
+
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_id, sizeof(*host_id), SQLITE_STATIC));
+
+    param = 0;
+    if (sqlite3_step_monitored(res) == SQLITE_ROW)
+        count = sqlite3_column_int(res, 0);
 
 done:
     REPORT_BIND_FAIL(res, param);
@@ -1611,6 +1762,95 @@ int alert_queue_unittest(void)
             "the push SELECT returns exactly one batch of %d with %d queued (got %d)", limit, seed, returned);
 
         (void)db_execute(db_meta, "DELETE FROM aclk_queue", NULL);
+    }
+
+    // --- the pending queue is read only when something in it can be due (health.alert_queue_next_due_s).
+    // The health loop calls process_alert_pending_queue() for every host every second; an idle host must not
+    // reach SQLite, and no queued row may be stranded by that.
+    {
+        RRDHOST *h = callocz(1, sizeof(*h));
+        uuid_generate(h->host_id.uuid);
+        nd_uuid_t *hid = &h->host_id.uuid;
+        time_t *gate = &h->health.alert_queue_next_due_s;
+        time_t now = now_realtime_sec();
+
+        (void)db_execute(db_meta, "DELETE FROM alert_queue", NULL);
+        (void)db_execute(db_meta, "DELETE FROM aclk_queue", NULL);
+
+        // a row left by a previous run: a new host has never been checked, so the first call reads the queue
+        AQ_SQL(aq_pending_seed(hid, 11, 4001, 0) ? SQLITE_DONE : SQLITE_ERROR, "gate seed 11");
+        (void)process_alert_pending_queue(h);
+        rows = aq_pending_rows(hid);
+        AQ_CHECK(
+            rows == 0 && *gate == nd_time_t_max(),
+            "gate: a row persisted by a previous run is drained on the first call, then the gate parks (rows=%d)", rows);
+
+        // written behind the gate's back: an idle host does not read the queue
+        AQ_SQL(aq_pending_seed(hid, 12, 4002, 0) ? SQLITE_DONE : SQLITE_ERROR, "gate seed 12");
+        (void)process_alert_pending_queue(h);
+        rows = aq_pending_rows(hid);
+        AQ_CHECK(rows == 1, "gate: an idle host does not read the queue (rows=%d, expected 1)", rows);
+
+        // a writer lowers the gate: the due row drains, the future one stays and becomes the next due time
+        AQ_SQL(aq_pending_seed(hid, 13, 4003, 600) ? SQLITE_DONE : SQLITE_ERROR, "gate seed 13");
+        alert_queue_next_due_lower(h, now + 600);
+        alert_queue_next_due_lower(h, now);
+        (void)process_alert_pending_queue(h);
+        rows = aq_pending_rows(hid);
+        AQ_CHECK(
+            rows == 1 && *gate >= now + 600 && *gate != nd_time_t_max(),
+            "gate: due rows drain and the next due time is the earliest one still queued (rows=%d, due in %lld s)",
+            rows, (long long)(*gate - now));
+
+        // ... and is not read again before then
+        AQ_SQL(aq_pending_seed(hid, 14, 4004, 0) ? SQLITE_DONE : SQLITE_ERROR, "gate seed 14");
+        (void)process_alert_pending_queue(h);
+        rows = aq_pending_rows(hid);
+        AQ_CHECK(rows == 2, "gate: the queue is not read before its next due time (rows=%d, expected 2)", rows);
+
+        // a due row the drain could not remove (e.g. re-pointed while it was read) keeps the gate due
+        (void)db_execute(db_meta, "DELETE FROM alert_queue", NULL);
+        (void)db_execute(db_meta, "CREATE TRIGGER aq_keep BEFORE DELETE ON alert_queue BEGIN SELECT RAISE(IGNORE); END", NULL);
+        AQ_SQL(aq_pending_seed(hid, 15, 4005, 0) ? SQLITE_DONE : SQLITE_ERROR, "gate seed 15");
+        alert_queue_next_due_lower(h, now);
+        (void)process_alert_pending_queue(h);
+        rows = aq_pending_rows(hid);
+        AQ_CHECK(
+            rows == 1 && *gate <= now_realtime_sec(),
+            "gate: a row left behind by the drain keeps the gate due (rows=%d, due in %lld s)",
+            rows, (long long)(*gate - now_realtime_sec()));
+        (void)db_execute(db_meta, "DROP TRIGGER aq_keep", NULL);
+        (void)process_alert_pending_queue(h);
+        rows = aq_pending_rows(hid);
+        AQ_CHECK(
+            rows == 0 && *gate == nd_time_t_max(),
+            "gate: the row left behind is drained on the next call (rows=%d)", rows);
+
+        // a transition that could not be submitted is kept and retried after ALERT_QUEUE_RETRY_S
+        h->aclk_host_config = callocz(1, sizeof(*h->aclk_host_config));
+        (void)db_execute(db_meta, "CREATE TRIGGER aq_fail BEFORE INSERT ON aclk_queue BEGIN SELECT RAISE(ABORT, 'test'); END", NULL);
+        AQ_SQL(aq_pending_seed(hid, 16, 4006, 0) ? SQLITE_DONE : SQLITE_ERROR, "gate seed 16");
+        now = now_realtime_sec();
+        alert_queue_next_due_lower(h, now);
+        bool queued = process_alert_pending_queue(h);
+        rows = aq_pending_rows(hid);
+        AQ_CHECK(
+            !queued && rows == 1 && *gate > now && *gate <= now + ALERT_QUEUE_RETRY_S + 1,
+            "gate: a transition the submit queue refused is kept and retried later (rows=%d, due in %lld s)",
+            rows, (long long)(*gate - now));
+        (void)db_execute(db_meta, "DROP TRIGGER aq_fail", NULL);
+        *gate = 0; // the retry time has come
+        queued = process_alert_pending_queue(h);
+        rows = aq_pending_rows(hid);
+        int submitted = aq_test_queue(hid, NULL, NULL);
+        AQ_CHECK(
+            queued && rows == 0 && submitted == 1,
+            "gate: the kept transition is submitted on retry (pending=%d, submitted=%d)", rows, submitted);
+
+        (void)db_execute(db_meta, "DELETE FROM alert_queue", NULL);
+        (void)db_execute(db_meta, "DELETE FROM aclk_queue", NULL);
+        freez(h->aclk_host_config);
+        freez(h);
     }
 
     SQLITE_FINALIZE(res_delete);

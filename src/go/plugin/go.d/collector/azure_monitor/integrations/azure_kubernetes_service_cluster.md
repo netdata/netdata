@@ -41,7 +41,7 @@ It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The service principal or managed identity requires these Azure RBAC roles:
 
@@ -375,7 +375,7 @@ Configure the **azure_monitor** collector from the Netdata web interface:
 4. In the Search box, type _azure_monitor_ (or scroll the list) to locate the **azure_monitor** collector.
 5. Click the **+** next to the **azure_monitor** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -630,18 +630,18 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_aks_apiserver_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.apiserver_cpu | AKS API server CPU on ${label:resource_name} |
-| [ am_aks_apiserver_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.apiserver_memory | AKS API server memory on ${label:resource_name} |
-| [ am_aks_apiserver_inflight_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.apiserver_inflight_requests | AKS API server inflight requests on ${label:resource_name} |
-| [ am_aks_etcd_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.etcd_cpu | AKS etcd CPU on ${label:resource_name} |
-| [ am_aks_etcd_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.etcd_memory | AKS etcd memory on ${label:resource_name} |
-| [ am_aks_etcd_database ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.etcd_database | AKS etcd database usage on ${label:resource_name} |
-| [ am_aks_autoscaler_safe_to_autoscale ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.autoscaler_health | AKS autoscaler unsafe on ${label:resource_name} |
-| [ am_aks_autoscaler_unschedulable_pods ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.autoscaler_unschedulable_pods | AKS unschedulable pods on ${label:resource_name} |
-| [ am_aks_node_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.node_cpu_percentage | AKS node CPU on ${label:resource_name} |
-| [ am_aks_node_memory_working_set ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.node_memory_working_set_percentage | AKS node memory working set on ${label:resource_name} |
-| [ am_aks_node_memory_rss ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.node_memory_rss_percentage | AKS node memory RSS on ${label:resource_name} |
-| [ am_aks_node_disk ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.node_disk_percentage | AKS node disk usage on ${label:resource_name} |
+| [ am_aks_apiserver_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.apiserver_cpu | Average API server CPU utilization on AKS cluster ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_aks_apiserver_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.apiserver_memory | Average API server memory utilization on AKS cluster ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_aks_apiserver_inflight_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.apiserver_inflight_requests | Average number of inflight requests to the API server on AKS cluster ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_aks_etcd_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.etcd_cpu | Average etcd CPU utilization on AKS cluster ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_aks_etcd_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.etcd_memory | Average etcd memory utilization on AKS cluster ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_aks_etcd_database ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.etcd_database | Average etcd database utilization on AKS cluster ${label:resource_name} in ${label:resource_group} (${label:region}). High etcd database usage can lead to cluster instability. |
+| [ am_aks_autoscaler_safe_to_autoscale ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.autoscaler_health | Cluster autoscaler reports the cluster is not safe to autoscale on AKS cluster ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_aks_autoscaler_unschedulable_pods ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.autoscaler_unschedulable_pods | Number of pods that cannot be scheduled by the cluster autoscaler on AKS cluster ${label:resource_name} in ${label:resource_group} (${label:region}). Indicates insufficient cluster capacity. |
+| [ am_aks_node_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.node_cpu_percentage | Average node CPU utilization on AKS cluster ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_aks_node_memory_working_set ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.node_memory_working_set_percentage | Average node memory working set utilization on AKS cluster ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_aks_node_memory_rss ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.node_memory_rss_percentage | Average node memory RSS utilization on AKS cluster ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_aks_node_disk ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.node_disk_percentage | Average node disk utilization on AKS cluster ${label:resource_name} in ${label:resource_group} (${label:region}). High disk usage can cause pod evictions. |
 
 
 

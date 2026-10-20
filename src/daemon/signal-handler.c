@@ -190,7 +190,7 @@ void nd_initialize_signals(bool chain_existing) {
     signals_block_all_except_deadly();
     
     // Set the signal handler name for stack trace filtering
-#ifdef HAVE_LIBBACKTRACE
+#ifdef HAVE_STACKTRACE
     stacktrace_set_signal_handler_function("nd_signal_handler");
 #endif
 

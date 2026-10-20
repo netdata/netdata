@@ -44,7 +44,7 @@ It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The service principal or managed identity requires these Azure RBAC roles:
 
@@ -378,7 +378,7 @@ Configure the **azure_monitor** collector from the Netdata web interface:
 4. In the Search box, type _azure_monitor_ (or scroll the list) to locate the **azure_monitor** collector.
 5. Click the **+** next to the **azure_monitor** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -633,25 +633,25 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_sql_database_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.availability | SQL Database availability on ${label:resource_name} |
-| [ am_sql_database_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.cpu | SQL Database CPU on ${label:resource_name} |
-| [ am_sql_database_instance_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.instance_cpu | SQL Database instance CPU on ${label:resource_name} |
-| [ am_sql_database_instance_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.instance_memory | SQL Database instance memory on ${label:resource_name} |
-| [ am_sql_database_dtu_consumption ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.dtu_consumption | SQL Database DTU consumption on ${label:resource_name} |
-| [ am_sql_database_data_io ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.io_utilization | SQL Database data I/O on ${label:resource_name} |
-| [ am_sql_database_log_write ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.io_utilization | SQL Database log write I/O on ${label:resource_name} |
-| [ am_sql_database_workers ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.resource_utilization | SQL Database worker utilization on ${label:resource_name} |
-| [ am_sql_database_sessions ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.resource_utilization | SQL Database session utilization on ${label:resource_name} |
-| [ am_sql_database_connection_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.connections | SQL Database system connection failures on ${label:resource_name} |
-| [ am_sql_database_firewall_blocks ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.connections | SQL Database firewall blocks on ${label:resource_name} |
-| [ am_sql_database_deadlocks ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.deadlocks | SQL Database deadlocks on ${label:resource_name} |
-| [ am_sql_database_storage_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.storage_utilization | SQL Database storage utilization on ${label:resource_name} |
-| [ am_sql_database_xtp_storage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.xtp_storage | SQL Database In-Memory OLTP storage on ${label:resource_name} |
-| [ am_sql_database_tempdb_log_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.tempdb_log_utilization | SQL Database tempdb log utilization on ${label:resource_name} |
-| [ am_sql_database_replication_lag ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.replication_lag | SQL Database replication lag on ${label:resource_name} |
-| [ am_sql_database_serverless_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.serverless_utilization | SQL Database serverless CPU on ${label:resource_name} |
-| [ am_sql_database_serverless_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.serverless_utilization | SQL Database serverless memory on ${label:resource_name} |
-| [ am_sql_database_ledger_digest_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.ledger_digest | SQL Database ledger digest failures on ${label:resource_name} |
+| [ am_sql_database_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.availability | Database availability of Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_sql_database_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.cpu | Average CPU utilization of Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_sql_database_instance_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.instance_cpu | SQL process CPU utilization (including background tasks) on Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_sql_database_instance_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.instance_memory | SQL process memory utilization on Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_sql_database_dtu_consumption ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.dtu_consumption | DTU consumption on Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}). Only relevant for DTU-based service tiers |
+| [ am_sql_database_data_io ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.io_utilization | Physical data read I/O utilization on Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_sql_database_log_write ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.io_utilization | Transaction log write I/O utilization on Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_sql_database_workers ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.resource_utilization | Worker thread utilization on Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}). Exhausting workers causes query failures |
+| [ am_sql_database_sessions ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.resource_utilization | Session utilization on Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}). Exhausting sessions prevents new connections |
+| [ am_sql_database_connection_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.connections | Rate of system-caused connection failures on Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_sql_database_firewall_blocks ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.connections | Rate of connections blocked by firewall on Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}). May indicate misconfigured firewall rules or unauthorized access attempts |
+| [ am_sql_database_deadlocks ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.deadlocks | Deadlock rate on Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_sql_database_storage_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.storage_utilization | Data storage utilization on Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_sql_database_xtp_storage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.xtp_storage | In-Memory OLTP storage utilization on Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}). Only relevant when In-Memory OLTP is enabled |
+| [ am_sql_database_tempdb_log_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.tempdb_log_utilization | Tempdb transaction log utilization on Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}). High utilization may indicate long-running transactions or excessive version store usage |
+| [ am_sql_database_replication_lag ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.replication_lag | Geo-replication lag on Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}). Only relevant when geo-replication is configured |
+| [ am_sql_database_serverless_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.serverless_utilization | App-level CPU utilization on serverless Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}). Only relevant for serverless tier databases |
+| [ am_sql_database_serverless_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.serverless_utilization | App-level memory utilization on serverless Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}). Only relevant for serverless tier databases |
+| [ am_sql_database_ledger_digest_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.ledger_digest | Failed ledger digest uploads on Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}). Only relevant when database ledger is enabled |
 
 
 

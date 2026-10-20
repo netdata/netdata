@@ -66,7 +66,7 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStop(id string) (jobmgr.Work
 		NoResponse: true,
 		Transaction: &jobmgr.ResourceTransactionPlan{
 			ID: id,
-			Prepare: func(_ context.Context, current lifecycle.ReadyResource, scope lifecycle.ResourceTransactionScope, permit lifecycle.LongLivedPermit) (lifecycle.PreparedResourceTransaction, error) {
+			Prepare: func(ctx context.Context, current lifecycle.ReadyResource, scope lifecycle.ResourceTransactionScope, permit lifecycle.LongLivedPermit) (lifecycle.PreparedResourceTransaction, error) {
 				if permit.Valid() || scope.ID != id {
 					return nil, errors.New("job output: invalid dependent stop scope")
 				}
@@ -82,15 +82,23 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStop(id string) (jobmgr.Work
 				if err != nil {
 					return nil, err
 				}
-				spec, err := dcjc.configModules.newAcceptedActivationSpec(config)
+				delta, err := dcjc.candidates.prepareAdoptExact(config, true, dyncfg.StatusAccepted, true, 0, dcjc.scheduler.retries.now())
 				if err != nil {
 					return nil, err
 				}
 				postimage := graphConfig(record, dyncfg.StatusAccepted)
-				return dcjc.prepareMutationWithRetryAfterApply(
-					scope, current, nil, permit, resourceRemovalDisposition(current), &postimage,
-					internalReply(), dcjc.configStatusCleanup(id, dyncfg.StatusAccepted), autoDetectionRetryToken{},
-					composeAfterApply(func() { dcjc.scheduler.accepted.pause(spec) }, state.markStopped),
+				reply := internalReply()
+				reply.candidate = delta
+				reply.retainedCandidate = true // Store mutation owns permission to release this work.
+				pause := &restartPause{identity: scope.Current}
+				if before := delta.before; before != nil && before.Active != nil && before.Binding != nil &&
+					before.Active.Token.Candidate == before.Binding.Key {
+					pause.work = before.Active.Token
+				}
+				reply.restart.pause = pause
+				return dcjc.prepareMutationAfterApply(
+					ctx, scope, current, nil, permit, resourceRemovalDisposition(current), &postimage,
+					reply, dcjc.configStatusCleanup(id, dyncfg.StatusAccepted), state.markStopped, jobConfigIntentPreserve,
 				)
 			},
 		},
@@ -101,9 +109,12 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStart(id string) (jobmgr.Wor
 	if dcjc == nil || id == "" {
 		return jobmgr.WorkPlan{}, nil, errors.New("job output: invalid dependent start")
 	}
-	state := &SecretDependentStart{
-		resume: dcjc.scheduler.accepted.resumeFor(id),
+	state := &SecretDependentStart{}
+	var token candidateWorkToken
+	if record := dcjc.candidates.view(id); record != nil && record.Active != nil {
+		token = record.Active.Token
 	}
+	state.resume = func() { dcjc.retainCandidateResume(id, token) }
 	// The enclosing Store mutation retains the graph claim across stop, commit
 	// and resume. No collector construction or startup runs in this child.
 	return jobmgr.WorkPlan{
@@ -111,7 +122,7 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStart(id string) (jobmgr.Wor
 		NoResponse: true,
 		Transaction: &jobmgr.ResourceTransactionPlan{
 			ID: id,
-			Prepare: func(_ context.Context, current lifecycle.ReadyResource, scope lifecycle.ResourceTransactionScope, permit lifecycle.LongLivedPermit) (lifecycle.PreparedResourceTransaction, error) {
+			Prepare: func(ctx context.Context, current lifecycle.ReadyResource, scope lifecycle.ResourceTransactionScope, permit lifecycle.LongLivedPermit) (lifecycle.PreparedResourceTransaction, error) {
 				if permit.Valid() || scope.ID != id {
 					return nil, errors.New("job output: invalid dependent start scope")
 				}
@@ -123,7 +134,11 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStart(id string) (jobmgr.Wor
 					!dcjc.ActivationEnabled(id) {
 					return dcjc.noop(scope, current, permit, noResponseResult())
 				}
-				return dcjc.noopWithAfterApply(scope, nil, permit, noResponseResult(), state.RetainPending)
+				delta, err := dcjc.candidates.prepareResume(id, token, dcjc.scheduler.retries.now())
+				if err != nil {
+					return nil, err
+				}
+				return dcjc.prepareCandidateDecision(ctx, scope, nil, permit, delta)
 			},
 		},
 	}, state, nil

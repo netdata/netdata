@@ -71,7 +71,7 @@ configured producer cache period to avoid redundant samples, unless the MGR cach
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -145,6 +145,7 @@ The following options can be defined globally: update_every, autodetection_retry
 | **Customization** | [fallback_type](#option-customization-fallback-type) | Job-level fallback type overrides for untyped metrics. |  | no |
 |  | [relabeling](#option-customization-relabeling) | Job-owned Prometheus-compatible metric relabeling, applied before profile selection. |  | no |
 |  | [profiles](#option-customization-profiles) | Curated, exporter-specific chart profiles with optional untyped classification, profile-owned normalization, and scoped fallback-chart policy. User profiles may constrain unmatched fallback charts; stock profiles preserve unknown future families. Disable profiles with mode `none`. | auto | no |
+| **Raw counter charts** | [counter_raw_charts](#option-raw-counter-charts-counter-raw-charts) | Counters whose raw cumulative value is also charted, next to their per-second rate chart, under the `prometheus.<app>.<metric>.raw` context. Leave empty to chart counters as rates only. |  | no |
 | **HTTP Auth** | username | Username for Basic HTTP authentication. |  | no |
 |  | password | Password for Basic HTTP authentication. |  | no |
 |  | bearer_token_file | Path to a file containing a bearer token (used for `Authorization: Bearer`). |  | no |
@@ -194,6 +195,9 @@ Job gauge rules take precedence over job counter rules, and both job rule sets t
 every profile rule. Use them for deployment-specific overrides rather than exporter behavior that
 belongs in a profile. Keep patterns narrow: a broad job rule such as `gauge: ['*']` overrides profile
 counter classifications. Blank patterns and patterns with leading or trailing whitespace are rejected.
+To keep a counter's rate chart and also chart its raw value on generic autogen charts, list the metric
+in `counter_raw_charts` instead of adding a gauge rule; an untyped metric without the `_total` suffix
+also needs a `counter` rule. Metrics charted by a profile get no raw chart.
 
 - Metric name pattern syntax: [shell file name pattern](https://golang.org/pkg/path/filepath/#Match).
 - Option syntax:
@@ -279,6 +283,27 @@ profiles:
 ```
 
 
+<a id="option-raw-counter-charts-counter-raw-charts"></a>
+##### counter_raw_charts
+
+Use this option when you need a counter's total as well as its rate, for example to read the absolute
+number of requests served since the exporter started. Each item holds one metric name pattern with the
+same syntax as `fallback_type` (`*`, `?`, `[...]`); a leading `!` excludes, and the first matching item
+decides. Patterns match the final metric name after job and profile relabeling. Every matched counter
+series adds one chart.
+
+Only counters shown on generic autogen charts get a raw chart. Gauges, histogram and summary series,
+and metrics charted by a profile are not affected. An untyped metric qualifies once it is processed as
+a counter: through its `_total` suffix, `fallback_type.counter`, or a selected profile's
+`fallback_type`.
+
+```yaml
+counter_raw_charts:
+  - '!myapp_internal_*'
+  - 'myapp_*_total'
+```
+
+
 
 </details>
 
@@ -293,7 +318,7 @@ Configure the **prometheus** collector from the Netdata web interface:
 4. In the Search box, type _prometheus_ (or scroll the list) to locate the **prometheus** collector.
 5. Click the **+** next to the **prometheus** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -405,23 +430,6 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ ceph_nvmeof_subsystem_open_security ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.nvme_of.subsystems.state_metadata | Every available sample in the 5-minute observation window reports an NVMe-oF subsystem configured without host security. |
-| [ ceph_nvmeof_gateway_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.nvme_of.gateways.time_accumulation | The current lowest local reactor busy-rate sample in the 10-minute observation window is above 80 percent. |
-| [ ceph_nvmeof_high_read_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.nvme_of.block_devices.time_accumulation | The current local one-minute read service-time ratio exceeds 10 milliseconds per completed read. |
-| [ ceph_nvmeof_high_write_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.nvme_of.block_devices.time_accumulation | The current local one-minute write service-time ratio exceeds 20 milliseconds per completed write. |
-| [ ceph_nvmeof_host_keepalive_timeout ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.nvme_of.hosts.keepalive_timeout_state | The gateway exporter currently reports host ${label:host_nqn} disconnected from subsystem ${label:nqn}. Inspect the initiator link and reconnect behavior. Exporter refresh reads and clears this one-shot state. |
-| [ ceph_nvmeof_subsystem_namespace_limit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.nvme_of.subsystems.namespace_capacity | The current subsystem namespace count is at or above its configured limit. |
-| [ ceph_nvmeof_too_many_namespaces ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.nvme_of.gateways.namespace_count | The current local exporter namespace inventory is at or above the supported maximum of 4096. |
-| [ rgw_notification_event_lost ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway.notifications.events | One or more final notification-event losses occurred in the 1-minute observation window. Inspect the affected RGW instance and notification endpoint. |
-| [ rgw_notification_missing_configuration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway.notifications.missing_configurations | One or more notifications were rejected for missing configuration in the 1-minute observation window. Inspect the affected RGW instance and notification configuration. |
-| [ rgw_lua_script_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway.lua.script_executions | One or more configured Lua request scripts failed in the 1-minute observation window. Inspect the affected RGW instance and script error logs. |
-| [ rgw_failed_request_rate_fallback ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway.requests_and_queue.failed_requests | Every available sample in the 5-minute observation window reports a non-zero aborted-request rate. This is a fallback signal and does not identify HTTP 5xx responses. |
-| [ rgw_notification_push_or_store_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway.notifications.failure_outcomes | Every available sample in the 5-minute observation window reports non-zero retryable notification push or store failures. |
-| [ rgw_notification_inflight_pressure ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway.notifications.pending_events | Every available sample in the 5-minute observation window reports at least 1000 notification events pending endpoint reply. Tune this policy threshold for the endpoint. |
-| [ rgw_notification_store_backlog ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway.notifications.event_state | Every available sample in the 5-minute observation window reports at least 1000 events stored in the persistent notification store. Tune this policy threshold for the workload. |
-| [ rgw_request_queue_pressure ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway.requests_and_queue.current_requests | Every available sample in the 5-minute observation window reports at least 1000 queued requests. Tune this policy threshold for the RGW instance. |
-| [ rgw_multisite_fetch_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway_multisite.object_work | Every available sample in the 5-minute observation window reports a non-zero multisite data-fetch error rate. |
-| [ rgw_multisite_poll_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway_multisite.replication_log_request_errors | Every available sample in the 5-minute observation window reports a non-zero replication-log poll error rate. |
 | [ ceph_health_error ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.cluster_status.state | Every available Ceph MGR health sample in the 5-minute observation window is HEALTH_ERR. Review active cause-specific Ceph alerts and use `ceph health detail` for the current cause. |
 | [ ceph_health_warning ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.cluster_status.state | Every available Ceph MGR health sample in the 15-minute observation window is HEALTH_WARN. Use `ceph health detail` for the current cause. |
 | [ ceph_daemon_crash ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports a recent daemon crash. Use `ceph health detail` for the affected daemon and crash details. |
@@ -463,14 +471,40 @@ The following alerts are available:
 | [ ceph_filesystem_mds_ranks_low ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports fewer active MDS ranks than configured. |
 | [ ceph_filesystem_offline ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports all MDS ranks unavailable. |
 | [ ceph_filesystem_read_only ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports a Ceph filesystem forced read-only. |
+| [ ceph_nvmeof_subsystem_open_security ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.nvme_of.subsystems.state_metadata | Every available sample in the 5-minute observation window reports an NVMe-oF subsystem configured without host security. |
+| [ ceph_nvmeof_gateway_cpu_10m ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.nvme_of.gateways.time_accumulation | Holds the lowest local reactor busy-rate sample observed over ten minutes for the gateway CPU policy. |
+| [ ceph_nvmeof_gateway_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.nvme_of.gateways.time_accumulation | The current lowest local reactor busy-rate sample in the 10-minute observation window is above 80 percent. |
+| [ ceph_nvmeof_read_latency_1m ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.nvme_of.block_devices.time_accumulation | Holds the local one-minute per-block-device read service-time rate. |
+| [ ceph_nvmeof_read_operations_1m ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.nvme_of.block_devices.operations | Holds the local one-minute per-block-device completed-read rate. |
+| [ ceph_nvmeof_high_read_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.nvme_of.block_devices.time_accumulation | The current local one-minute read service-time ratio exceeds 10 milliseconds per completed read. |
+| [ ceph_nvmeof_write_latency_1m ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.nvme_of.block_devices.time_accumulation | Holds the local one-minute per-block-device write service-time rate. |
+| [ ceph_nvmeof_write_operations_1m ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.nvme_of.block_devices.operations | Holds the local one-minute per-block-device completed-write rate. |
+| [ ceph_nvmeof_high_write_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.nvme_of.block_devices.time_accumulation | The current local one-minute write service-time ratio exceeds 20 milliseconds per completed write. |
+| [ ceph_nvmeof_host_keepalive_timeout ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.nvme_of.hosts.keepalive_timeout_state | The gateway exporter currently reports host ${label:host_nqn} disconnected from subsystem ${label:nqn}. Inspect the initiator link and reconnect behavior. Exporter refresh reads and clears this one-shot state. |
+| [ ceph_nvmeof_subsystem_namespace_limit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.nvme_of.subsystems.namespace_capacity | The current subsystem namespace count is at or above its configured limit. |
+| [ ceph_nvmeof_gateway_namespaces ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.nvme_of.gateways.namespace_count | Sums subsystem namespace counts inside the local exporter endpoint. |
+| [ ceph_nvmeof_too_many_namespaces ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.nvme_of.gateways.namespace_count | The current local exporter namespace inventory is at or above the supported maximum of 4096. |
+| [ rgw_notification_event_lost ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway.notifications.events | One or more final notification-event losses occurred in the 1-minute observation window. Inspect the affected RGW instance and notification endpoint. |
+| [ rgw_notification_missing_configuration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway.notifications.missing_configurations | One or more notifications were rejected for missing configuration in the 1-minute observation window. Inspect the affected RGW instance and notification configuration. |
+| [ rgw_lua_script_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway.lua.script_executions | One or more configured Lua request scripts failed in the 1-minute observation window. Inspect the affected RGW instance and script error logs. |
+| [ rgw_failed_request_rate_fallback ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway.requests_and_queue.failed_requests | Every available sample in the 5-minute observation window reports a non-zero aborted-request rate. This is a fallback signal and does not identify HTTP 5xx responses. |
+| [ rgw_notification_push_or_store_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway.notifications.failure_outcomes | Every available sample in the 5-minute observation window reports non-zero retryable notification push or store failures. |
+| [ rgw_notification_inflight_pressure ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway.notifications.pending_events | Every available sample in the 5-minute observation window reports at least 1000 notification events pending endpoint reply. Tune this policy threshold for the endpoint. |
+| [ rgw_notification_store_backlog ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway.notifications.event_state | Every available sample in the 5-minute observation window reports at least 1000 events stored in the persistent notification store. Tune this policy threshold for the workload. |
+| [ rgw_request_queue_pressure ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway.requests_and_queue.current_requests | Every available sample in the 5-minute observation window reports at least 1000 queued requests. Tune this policy threshold for the RGW instance. |
+| [ rgw_multisite_fetch_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway_multisite.object_work | Every available sample in the 5-minute observation window reports a non-zero multisite data-fetch error rate. |
+| [ rgw_multisite_poll_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway_multisite.replication_log_request_errors | Every available sample in the 5-minute observation window reports a non-zero replication-log poll error rate. |
 | [ ceph_rbd_mirror_images_not_in_sync ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.rbd_mirror.snapshot_replication.timestamp | The current local and remote snapshot timestamps differ for this mirrored image. |
+| [ ceph_osd_all_up ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.osd_capacity_and_state.osd_state.cluster_summary | Holds the current all-configured-OSDs-up state. |
 | [ ceph_object_missing ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | The current unfound condition is active while every configured OSD is up; client I/O for affected objects can block. |
 | [ ceph_pg_backfill_at_risk ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports placement-group backfill blocked by fullness. |
 | [ ceph_pg_not_deep_scrubbed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 5-minute observation window reports placement groups overdue for deep scrub. |
 | [ ceph_pg_not_scrubbed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 5-minute observation window reports placement groups overdue for scrub. |
 | [ ceph_pg_recovery_at_risk ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports recovery blocked by OSD fullness. |
+| [ ceph_osd_down_current ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Holds the current OSD-down health state. |
 | [ ceph_pg_unavailable_blocking_io ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | The current PG-unavailable condition is active while the separate OSD-down condition is not. |
 | [ ceph_pgs_damaged ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 5-minute observation window reports damaged placement-group data. |
+| [ ceph_osd_scrub_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 5-minute observation window reports OSD scrub errors. `PG_DAMAGED` remains owned by the separate Ceph damaged-placement-group alert. |
 | [ ceph_pgs_high_per_osd ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports excessive placement groups per OSD. |
 | [ ceph_pgs_inactive ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.placement_groups_and_recovery.healthy_state.pg_state | The current per-pool count reports fewer active placement groups than the pool total. |
 | [ ceph_pgs_unclean ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.placement_groups_and_recovery.healthy_state.pg_state | The current per-pool count reports fewer clean placement groups than the pool total. |

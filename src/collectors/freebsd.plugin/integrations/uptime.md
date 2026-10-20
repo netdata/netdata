@@ -27,7 +27,7 @@ The plugin calls `clock_gettime` function to collect necessary data.
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -100,7 +100,12 @@ There are no configuration examples.
 
 ## Alerts
 
-There are no alerts configured by default for this integration.
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ system_reboot_detection ](https://github.com/netdata/netdata/blob/master/src/health/health.d/reboot.conf) | system.uptime | System has rebooted within the last 10 minutes |
 
 
 

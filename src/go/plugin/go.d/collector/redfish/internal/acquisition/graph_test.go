@@ -457,7 +457,7 @@ func TestEarlyGraphIntegrityFailureStillFinalizesRetainedState(t *testing.T) {
 	assert.Equal(t, "unknown", restored.AcquisitionState)
 }
 
-func TestGraphResourceRequiresExactTypeAndFinalIdentity(t *testing.T) {
+func TestGraphResourceRequiresExactTypeAndSafeIdentity(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.NotFoundHandler())
@@ -468,7 +468,7 @@ func TestGraphResourceRequiresExactTypeAndFinalIdentity(t *testing.T) {
 
 	for name, body := range map[string]string{
 		"missing identity": `{"@odata.type":"#Fan.v1_0_0.Fan"}`,
-		"wrong identity":   `{"@odata.id":"/redfish/v1/Chassis/1/Fans/2","@odata.type":"#Fan.v1_0_0.Fan"}`,
+		"unsafe identity":  `{"@odata.id":"https://other.example/redfish/v1/Chassis/1/Fans/1","@odata.type":"#Fan.v1_0_0.Fan"}`,
 		"wrong type":       `{"@odata.id":"/redfish/v1/Chassis/1/Fans/1","@odata.type":"#Sensor.v1_0_0.Sensor"}`,
 	} {
 		t.Run(name, func(t *testing.T) {

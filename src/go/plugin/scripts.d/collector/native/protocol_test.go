@@ -14,90 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDecodeSnapshot(t *testing.T) {
-	c, _ := fixtureCollector(t, "exit 0\n")
-	tests := map[string]struct {
-		data       string
-		wantLabels map[string]string // labels of the first metric
-		wantErr    bool
-	}{
-		"label keys are data": {
-			data:       `{"version":"v1","metrics":[{"name":"depth","value":0,"labels":{"Version":"x","metrics":"y","State":"z"}}]}`,
-			wantLabels: map[string]string{"Version": "x", "metrics": "y", "State": "z"},
-		},
-		"truncated":           {data: `{"version":"v1"`, wantErr: true},
-		"trailing":            {data: snapshotJSON("ok") + `{}`, wantErr: true},
-		"unsupported version": {data: `{"version":"v2"}`, wantErr: true},
-		"unknown field":       {data: `{"version":"v1","surprise":1}`, wantErr: true},
-		"case folded field":   {data: `{"version":"v1","Metrics":[]}`, wantErr: true},
-		"case folded check state": {
-			data:    `{"version":"v1","checks":[{"id":"backlog","state":"critical","State":"ok","labels":{"queue":"mail"}}]}`,
-			wantErr: true,
-		},
-		"null metric label": {
-			data:    `{"version":"v1","metrics":[{"name":"depth","value":1,"labels":{"queue":null}}]}`,
-			wantErr: true,
-		},
-		"null check metadata": {
-			data:    `{"version":"v1","checks":[{"id":"backlog","state":"ok","labels":{"queue":"mail","region":null}}]}`,
-			wantErr: true,
-		},
-		"null metrics": {data: `{"version":"v1","metrics":null}`, wantErr: true},
-		"null checks":  {data: `{"version":"v1","checks":null}`, wantErr: true},
-		"null labels": {
-			data:    `{"version":"v1","metrics":[{"name":"depth","value":1,"labels":null}]}`,
-			wantErr: true,
-		},
-		"missing value": {data: `{"version":"v1","metrics":[{"name":"depth"}]}`, wantErr: true},
-		"null value":    {data: `{"version":"v1","metrics":[{"name":"depth","value":null}]}`, wantErr: true},
-		"overflow":      {data: `{"version":"v1","metrics":[{"name":"depth","value":1e999}]}`, wantErr: true},
-		"negative counter": {
-			data:    `{"version":"v1","metrics":[{"name":"processed_total","value":-1}]}`,
-			wantErr: true,
-		},
-		"undeclared metric": {data: `{"version":"v1","metrics":[{"name":"new","value":0}]}`, wantErr: true},
-		"invalid label key": {
-			data:    `{"version":"v1","metrics":[{"name":"depth","value":0,"labels":{"bad-key":"x"}}]}`,
-			wantErr: true,
-		},
-		"duplicate empty labels": {
-			data:    `{"version":"v1","metrics":[{"name":"depth","value":0},{"name":"depth","value":1,"labels":{}}]}`,
-			wantErr: true,
-		},
-		"duplicate reordered labels": {
-			data:    `{"version":"v1","metrics":[{"name":"depth","value":0,"labels":{"a":"1","b":"2"}},{"name":"depth","value":1,"labels":{"b":"2","a":"1"}}]}`,
-			wantErr: true,
-		},
-		"duplicate key": {data: `{"version":"v1","version":"v1"}`, wantErr: true},
-		"duplicate label key": {
-			data:    `{"version":"v1","metrics":[{"name":"depth","value":0,"labels":{"queue":"first","queue":"second"}}]}`,
-			wantErr: true,
-		},
-		"missing identity": {data: `{"version":"v1","checks":[{"id":"backlog","state":"ok"}]}`, wantErr: true},
-		"invalid state": {
-			data:    strings.Replace(snapshotJSON("ok"), `"state":"ok"`, `"state":"bad"`, 1),
-			wantErr: true,
-		},
-		"duplicate check": {
-			data:    `{"version":"v1","checks":[{"id":"backlog","state":"ok","labels":{"queue":"a","region":"east"}},{"id":"backlog","state":"critical","labels":{"queue":"a","region":"west"}}]}`,
-			wantErr: true,
-		},
-		"invalid utf8": {data: "{\"version\":\"v1\",\"x\":\"\xff\"}", wantErr: true},
-	}
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			result, err := c.definition.decodeSnapshot([]byte(tc.data))
-			if tc.wantErr {
-				require.Error(t, err)
-				assert.NotContains(t, err.Error(), "1e999", "errors must not expose raw sample values")
-				return
-			}
-			require.NoError(t, err)
-			assert.Equal(t, tc.wantLabels, result.Metrics[0].Labels)
-		})
-	}
-}
-
 func TestDecodeReady(t *testing.T) {
 	tests := map[string]struct {
 		data    string
@@ -125,7 +41,6 @@ func TestDecodeReady(t *testing.T) {
 }
 
 func TestDecodeReply(t *testing.T) {
-	c, _ := fixtureCollector(t, "exit 0\n")
 	tests := map[string]struct {
 		data      string
 		wantErr   bool
@@ -150,7 +65,7 @@ func TestDecodeReply(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			_, err := c.definition.decodeReply([]byte(tc.data), "1")
+			_, err := decodeReply([]byte(tc.data), "1")
 			if !tc.wantErr {
 				require.NoError(t, err)
 				return

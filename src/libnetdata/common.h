@@ -24,26 +24,9 @@ extern "C" {
 // --------------------------------------------------------------------------------------------------------------------
 // memory allocators
 
-/* select the memory allocator, based on autoconf findings */
-#if defined(ENABLE_JEMALLOC)
-
-#if defined(HAVE_JEMALLOC_JEMALLOC_H)
-#include <jemalloc/jemalloc.h>
-#else // !defined(HAVE_JEMALLOC_JEMALLOC_H)
-#include <malloc.h>
-#endif // !defined(HAVE_JEMALLOC_JEMALLOC_H)
-
-#elif defined(ENABLE_TCMALLOC)
-
-#include <google/tcmalloc.h>
-
-#else /* !defined(ENABLE_JEMALLOC) && !defined(ENABLE_TCMALLOC) */
-
 #if !(defined(__FreeBSD__) || defined(__APPLE__))
 #include <malloc.h>
 #endif /* __FreeBSD__ || __APPLE__ */
-
-#endif /* !defined(ENABLE_JEMALLOC) && !defined(ENABLE_TCMALLOC) */
 
 // --------------------------------------------------------------------------------------------------------------------
 

@@ -32,7 +32,8 @@ pub(super) fn build_v9_restore_packet(
             } => {
                 options_templates.push(NetflowV9OptionsTemplate {
                     template_id: template.template_id,
-                    // RFC 3954 section 6.1 defines descriptor byte lengths.
+                    // Both lengths are in bytes per RFC 3954 section 6.1; each
+                    // field descriptor is 4 bytes (2-byte type + 2-byte length).
                     options_scope_length: (scope_fields.len() * 4) as u16,
                     options_length: (option_fields.len() * 4) as u16,
                     scope_fields: scope_fields

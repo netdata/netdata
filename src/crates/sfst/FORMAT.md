@@ -1,6 +1,6 @@
 # SFST File Format
 
-SFST is the on-disk format for one log-index file. Each file holds the
+SFST is the on-disk format for one index file. Each file holds the
 indexed contents of one content stream (the producer's partition,
 opaque to this crate) and is built from one WAL file via this crate's
 `IndexWriter`. The container is chunk-based with
@@ -11,6 +11,15 @@ This document defines the on-disk shape — the bytes, the chunk ids,
 and the schema of each chunk's payload. Producers (the indexer) and
 consumers (the query reader) sit on top of this format and are out of
 scope here.
+
+Normative sources (the code this document restates): the container
+`src/crates/chunk-file/src/{lib.rs,container.rs}`; the crate constants
+and chunk ids `src/crates/sfst/src/lib.rs`; the writer
+`src/crates/sfst/src/{writer.rs,build.rs}`; the readers
+`src/crates/sfst/src/{reader.rs,index_reader.rs,index_reader/session.rs}`;
+payload types `src/crates/sfst/src/schema.rs`; the trace chunks
+`src/crates/sfst/src/{trace_index.rs,trace_bloom.rs,span_extras.rs,trace_rollup.rs}`;
+the in-tree producer `src/crates/ng-index/src/sfst_build.rs`.
 
 ---
 
@@ -55,6 +64,8 @@ A reader rejects:
 - any other magic with `Error::InvalidMagic`,
 - any other version with `Error::UnsupportedVersion`,
 - a file shorter than 12 bytes with `Error::FileTooShort`,
+- a `num_chunks` of 0 with `Error::Toc` — both container writers
+  refuse to produce a chunkless file, so zero here is corruption,
 - a `num_chunks` value that exceeds the file body's plausible
   maximum (each TOC entry is at least 12 bytes) with `Error::Toc` —
   defense-in-depth against a corrupted header.
@@ -73,9 +84,16 @@ A `chunk_file::Toc`. Each entry is 12 bytes:
     0..4   chunk id ([u8; 4])
     4..12  body offset within file (u64 LE)
 
-The TOC has `num_chunks + 1` entries. The final entry is a sentinel
-(`id = [0; 4]`) whose offset is EOF; chunk sizes are computed as the
-delta between an entry's offset and the next entry's offset.
+Offsets are absolute within the file. The TOC has `num_chunks + 1`
+entries. The final entry is a sentinel (`id = [0; 4]`) whose offset is
+EOF; chunk sizes are computed as the delta between an entry's offset
+and the next entry's offset.
+
+TOC parse is validating, not blind: every offset must be in bounds and
+strictly increasing, the first chunk must start past the TOC itself,
+no chunk id may repeat, and the zero id is reserved for the sentinel.
+A TOC that survives parse is layout-sound; the CRC then guards each
+body.
 
 Chunk ids are 4 bytes. A producer must not emit the same id twice.
 
@@ -113,22 +131,32 @@ The per-row column chunks (`OBTS`/`TRCE`/`SPAN`/`FLAG`/`DRAC`/`PSPN`/`DURN`) are
 **independently optional** — a file carries any subset, or none — and live in
 the **cold region after `PRIM`**, so a query decodes a column only on demand.
 `PSPN` (parent span id, 8-byte arena like `SPAN`; all-zero = root) and `DURN`
-(span duration in ns) are the **traces** signal's columns; logs files carry
-neither, traces files carry neither `OBTS` (no observed time).
+(span duration in ns) are the **traces** signal's columns, and `OBTS` is
+logs-only (spans have no observed time); `trace_id`/`span_id`/`flags`/`DRAC`
+are written by both signals. In-tree, the logs seal supplies exactly the five
+log columns and the traces seal the six span columns.
 A column is present iff the `META` `ColumnsTable` lists it; readers consult the
 manifest (not the chunk table) for presence + type. Each holds exactly one
-value per row, in the same chronological order as `TIMS` and the stream batches.
+value per row, in the same chronological order as `TIMS` and the stream
+batches; a decoded column whose length disagrees with `SUMR.record_count`, or
+whose manifest entry is missing or mistyped, is rejected with
+`Error::ColumnMismatch`.
 
 The optional `TIDX` chunk is the **`trace_id` index**: a 256-entry first-byte
 fanout (`fanout[256]`, cumulative count of indexed positions whose `trace_id`
-first byte is `≤ b`) plus a `sort_perm` of row positions sorted by their 16-byte
-`trace_id` (a stable sort, so a trace's spans stay chronological; the all-zero
-"unset" id is skipped). It enables O(log) trace-by-id lookup over the
-chronological `TRCE` column without scanning — all spans of one trace are a
-contiguous run in `sort_perm`. It lives in the cold region after the per-row
-columns, requires the `TRCE` column it indexes, and is detected via the TOC
-(`IndexReader::has_trace_id_index`), not the `ColumnsTable`. Presence is independent
-of any per-row column except its required `TRCE`.
+first byte is `≤ b`) plus a `sort_perm` of row positions sorted by their
+16-byte `trace_id` — sorted by `(trace_id, position)`, so the position
+tiebreaker makes a trace's spans chronological *structurally*, not by sort
+stability. The all-zero "unset" id is skipped. It enables O(log)
+trace-by-id lookup over the chronological `TRCE` column without scanning —
+all spans of one trace are a contiguous run in `sort_perm`. It lives in the
+cold region after the per-row columns, requires the `TRCE` column it indexes,
+and is detected via the TOC (`IndexReader::has_trace_id_index`), not the
+`ColumnsTable`. Presence is independent of any per-row column except its
+required `TRCE`. Read-side validation is panic-safety only — fanout total vs
+`sort_perm` length and positions within `record_count`; sortedness itself is a
+trusted-producer invariant, so a crafted file could yield wrong lookups but
+never a panic.
 
 The optional `TBLM` chunk is the **per-file trace-id bloom**: a serialized
 [`fastbloom`] filter over the file's DISTINCT set trace ids, plus that distinct
@@ -146,7 +174,10 @@ Written only when the file has at least one set (non-zero) trace id, and only
 together with `TIDX` (the bloom is derived from the index's sorted
 permutation; the writer rejects TBLM-without-TIDX at declaration, and the
 reader symmetrically rejects a bloom in a file without the index). Detected
-via the TOC (`IndexReader::has_trace_id_bloom`).
+via the TOC (`IndexReader::has_trace_id_bloom`). The bloom is a skip hint,
+not authoritative: a corrupt one degrades to exact `TIDX` lookups (one
+warning per trace session), so it can never make a findable trace
+unfindable.
 
 [`fastbloom`]: https://crates.io/crates/fastbloom
 
@@ -181,6 +212,10 @@ Both chunks live after `TIDX`
 nonzero dropped count that must survive), and are detected via the TOC
 (`IndexReader::has_event_index` / `has_link_index`). Rows are chronological
 like every per-row column; items within a row keep their original OTLP order.
+An absent chunk means the file's spans carry no events/links — a correct
+empty (a span's `dropped_events_count` reads 0), not a failure; a present
+chunk is validated at decode (prefix-sum monotonicity, parallel arrays,
+token refs within the id space).
 
 The optional `TRSU` chunk is the **per-file trace rollup** (traces signal):
 one row per DISTINCT set trace id in the file — the trace-level aggregate
@@ -188,9 +223,10 @@ that lets a consumer fold trace counts/envelopes/roots across files WITHOUT
 assembling traces. A struct-of-arrays, index-parallel across every field,
 sorted ascending by trace id: `trace_ids` (16-byte arena), `root_span_ids`
 (8-byte arena; UNSET when the file holds no true root for the trace),
-`min_start_ns` / `max_end_ns` (`Vec<i64>`, the stored envelope — end is
-`start ⊕ duration`, saturating), `span_counts` / `error_counts` (`Vec<u32>`),
-`root_kinds` (`Vec<i32>`, raw OTLP kind; 0 when no true root),
+`min_start_ns` / `max_end_ns` (`Vec<i64>`, the stored envelope — start is the
+min stored span start, end the max `start ⊕ duration`, saturating, with
+negative durations clamped to 0), `span_counts` / `error_counts`
+(`Vec<u32>`), `root_kinds` (`Vec<i32>`, raw OTLP kind; 0 when no true root),
 `root_is_true_root` (`Vec<u8>`, the tri-state claim flag: `0` = no
 unset-parent span of the trace is stored in this file — PROOF of local
 root absence; `1` = the root columns carry the file's claim; `2` = the
@@ -219,22 +255,33 @@ Semantics are deliberate and part of the contract:
 It lives after the span structures (`LNKB`), requires the `TRCE` column its
 data derives from, is written only when the file holds at least one set
 trace id, and is detected via the TOC (`IndexReader::has_trace_rollup`).
-Readers validate index-parallelism across all ten arrays at decode
-(`IndexReader::trace_rollup`). Same additive TOC-indexed contract as
-`TIDX`: presence needs no format version bump, and pre-rollup readers
-ignore it.
+Readers validate at decode (`IndexReader::trace_rollup`): index-parallelism
+across all ten arrays, whole id arenas, root refs within the id space,
+tri-state flags, strictly increasing trace ids, sentinel-only non-claiming
+rows, a non-inverted envelope, and `span_count ≥ errors`. Same additive
+TOC-indexed contract as `TIDX`: presence needs no format version bump, and
+pre-rollup readers ignore it.
+
+The signal split is producer policy, not format law: the format only fixes
+what each id carries and that everything but `TIMS`/`PRIM`/one `SB{i}` is
+optional. In-tree, `TIDX`/`TBLM`/`EVNB`/`LNKB`/`TRSU` are written only by
+the traces seal (log trace ids are correlation ids, not a grouping key);
+the logs seal emits none of them.
 
 The rows are listed in the order the canonical producer emits chunk
 bodies. This order is **not** part of the format contract — readers
 resolve chunks through the TOC and must not assume positions (see
-above) — but the producer groups the chunks a query's statistics phase
-always reads (`SUMR`, `META`, `TIMS`, `PRIM`) into a hot prefix, ahead
-of the mid/high field chunks (read only when a field is filtered or
-faceted) and the stream batches (read only when materializing rows).
-`PRIM` sits last in the prefix, next to the structurally-identical
-mid/high field FSTs. This keeps the hot prefix resident in the page
-cache while the cold remainder can be advised away as a single
-contiguous span.
+above) — but the producer puts `SUMR`, `META`, `TIMS`, `PRIM` (the
+chunks a query open always needs: `SUMR` first so a recovery-only
+reader can stop after the summary; `IndexReader::open` decodes
+`SUMR`+`META`+`PRIM` eagerly) into a hot prefix, ahead of the cold
+region — the per-row columns and trace chunks, then the mid/high field
+chunks (read only when a field is filtered or faceted) and the stream
+batches (read only when materializing rows). `PRIM` closes the prefix;
+everything after it, fields and batches included, is one contiguous
+cold suffix (`ChunkReader::cold_region` = end of `PRIM`'s span to EOF)
+that can be advised away as a single span, keeping the hot prefix
+resident in the page cache.
 
 Indexed ids:
 
@@ -261,7 +308,11 @@ four named chunks plus the declared secondary counts, in order — and
 fails with `Error::WriterMisuse` / `Error::InvalidStreamBatchCount`
 on any deviation. SUMR/META are technically optional at the container
 level (a raw `chunk_file` container without them still parses), but
-every produced file carries all of them.
+every produced file carries all of them. The format's read-side floor
+is the **summary-only file** (a lone `SUMR` chunk): `read_summary`
+serves it — registry recovery needs identity + time range + count and
+nothing else — while `IndexReader::open` rejects it as having no
+queryable chunks.
 
 ---
 
@@ -296,7 +347,8 @@ Properties:
 The writer partitions chronologically-sorted log positions into
 `stream_batch_size(record_count)`-sized contiguous slices and emits one
 `SB{i}` chunk per slice. The reader, given a chronological position
-`p`, finds its batch as `p / stream_batch_size(record_count)`.
+`p`, finds its batch as `p / stream_batch_size(record_count)` (and its
+row within the batch as `p % stream_batch_size(record_count)`).
 
 ---
 
@@ -318,7 +370,8 @@ The cheap recovery summary. Decodes to `file_registry::FileSummary`
     }
 
 `min_timestamp_s` and `max_timestamp_s` are the earliest and latest
-record seconds (Unix epoch) in the file. `record_count` drives the
+record seconds (Unix epoch) in the file (both `0` for an empty file).
+`record_count` drives the
 stream-batch partitioning (see above). `content_meta` is an opaque
 content-plane identity blob, stored verbatim — the content plane (e.g.
 `otel-logs-identity`) is the sole encoder/decoder. The substrate is
@@ -394,10 +447,14 @@ Heavy query-time metadata:
         pub tier:        FieldTier,      // Low | Mid | High
     }
 
-`histogram` supports time-range narrowing: binary-search `timestamps`
-for the position bounds covering a window, then clip bitmaps to that
-range. `id_ranges` tells a reader which cardinality tier a `KvId`
-belongs to (see [§ Tier-Aligned IDs](#tier-aligned-ids)).
+`histogram` is a coarse per-second summary: one entry per second that
+has at least one record, with the cumulative count up to and including
+that second — an at-a-glance time-range profile of the file (the query
+plane itself narrows windows by binary-searching the chronological
+`TIMS` chunk, not the histogram; see
+[§ `TIMS`](#tims--per-log-timestamps)). `id_ranges` tells a reader
+which cardinality tier a `KvId` belongs to (see
+[§ Tier-Aligned IDs](#tier-aligned-ids)).
 
 `tree` is the typed field descriptor: each leaf node is a typed `(path, kind)`
 column (a path collapses array indices to `[]`); interior `Kvlist`/`Array` nodes
@@ -473,7 +530,9 @@ tighter under zstd than an interleaved form.
 
 The `offsets` array (`key_lens.len() + 1` prefix sums) is **not
 serialized** (`#[serde(skip)]`); the reader rebuilds it from `key_lens`
-on load (`HighField::rebuild_offsets`) for O(1) key access. The write
+on load (`HighField::rebuild_offsets`) for O(1) key access — a summed
+length that overflows or disagrees with `keys_blob` rejects the chunk
+as `CorruptIndex`. The write
 side (`HighField::for_write`) leaves it unbuilt — that value exists only
 to be packed, not read.
 
@@ -481,14 +540,18 @@ to be packed, not read.
 
 `Vec<i64>` of nanosecond timestamps in chronological order,
 parallel-indexed to the concatenation of every
-[`SB{i}`](#sbi--stream-batch-N) chunk:
+[`SB{i}`](#sbi--stream-batch-n) chunk:
 `timestamps[i]` is the nanosecond timestamp of the log whose attribute
 list lives at global position `i` in the concatenated stream.
 
-Per-log timestamps follow the OTel hierarchy: `time_unix_nano` →
-`observed_time_unix_nano` → `ingestion_ns + row_offset` (the indexer
-synthesizes a fallback if both OTel timestamps are absent so that
-every log has a well-defined timestamp).
+Per-log timestamps are resolved by the producer's ingest-time
+normalization, before the indexer sees the rows. Logs follow the OTel
+single-timestamp rule: `time_unix_nano` → `observed_time_unix_nano` →
+a synthesized `ingestion_ns + k` fallback for the k-th record with
+neither field set, so every log has a well-defined timestamp. Traces
+key each row on the span's `start_time_unix_nano`, zero starts
+synthesized the same way; there is no observed-time fallback for spans.
+Every log has a well-defined timestamp either way.
 
 Required: the writer's ordered API makes it impossible to omit this
 chunk. Downstream tooling (display, sub-second filtering,
@@ -517,7 +580,8 @@ with no per-id deserialization — the dominant decode cost — and it's
 *smaller* on disk than varint (high-card `KvId`s already cost ~4 bytes as
 varints, and the regular 4-byte stride compresses tighter under zstd). The
 column layout mirrors `HF{i}`: lengths and values each contiguous,
-`row_offsets` rebuilt on load.
+`row_offsets` rebuilt on load (a summed length that overflows or
+disagrees with `kv_bytes` rejects the batch as `CorruptIndex`).
 
 Each `KvId` references a `key=value` pair via the tier-aligned id space
 below. The reader walks an `SB{i}` chunk to materialize a log's attributes
@@ -533,9 +597,17 @@ A `KvId` is a `u32` identifying a `key=value` pair within the file:
 
 IDs are assigned during writing by walking the tiers in order:
 
-    KvId 0          .. low_end       Low-card pairs   (primary FST iteration order)
+    KvId 0          .. low_end       Low-card pairs   (fields by name, values sorted)
     KvId low_end    .. mid_end       Mid-card pairs   (per-field FST iteration order)
     KvId mid_end    .. high_end      High-card pairs  (per-field chunk order)
+
+Within every tier, fields are sorted by name and each field's values
+follow the same order that field's dictionary is serialized in (sorted
+by the resolved string). Note the low tier is **not** the primary FST's
+global lexicographic iteration order: ids are assigned per field, and
+the reader resolves low-card ids with per-field prefix scans for the
+same reason (a global FST walk would mislabel families where one field
+name dot-extends another).
 
 `low_end`, `mid_end`, `high_end` are carried in `Metadata::id_ranges`.
 
@@ -555,20 +627,21 @@ WAL produce identical id assignments.
 
 All chunk payloads go through:
 
-    serialized = bincode::serde::encode(value, bincode::config::standard())
-    payload    = zstd::encode(serialized, level)
+    serialized = bincode::serde::encode_to_vec(value, bincode::config::standard())
+    payload    = zstd::encode_all(serialized, level)
 
 The packing is internal to the crate: the build hands typed payloads
 to `ChunkWriter`, which packs FST chunks (PRIM, `MF{i}`) at an
-elevated zstd level and everything else at the default level. The
-format itself does not fix the level — zstd frames are
+elevated zstd level (3) and everything else at the default level (1).
+The format itself does not fix the level — zstd frames are
 self-describing, so readers decode any level.
 
 Container-level integrity is the per-chunk crc32 trailer (see
 [§ File Layout](#file-layout)): every chunk access verifies the
 stored bytes before they reach the zstd decoder. TOC corruption is
-caught indirectly — a corrupt offset resolves the wrong span, whose
-CRC then fails to match.
+caught at parse (see [§ Table of Contents](#table-of-contents)); a
+flip that still parses resolves the wrong span, whose CRC then fails
+to match.
 
 ---
 

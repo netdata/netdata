@@ -1,6 +1,15 @@
-//! Query API tests for [`IndexReader::matched_count`],
-//! [`IndexReader::matched_positions`], [`IndexReader::facets`], and
-//! [`IndexReader::timeline`].
+//! Query API tests for [`IndexReader`]: matched set + window clip
+//! ([`IndexReader::matched_count`], [`IndexReader::matched_positions`]),
+//! facets (self-exclusion, window clipping), timelines and totals
+//! (bucketing, `unset` accounting, absent-field routing), row/column
+//! materialization, [`Timestamps`] lookups, and [`Filter`] construction —
+//! plus the regex paths (full-value-anchored field patterns, unanchored
+//! full-text queries) across all three field tiers.
+//!
+//! Every fixture is synthetic SFST bytes written in memory by the
+//! production [`ChunkWriter`] — no on-disk fixtures; the small
+//! hand-built layouts pin KvId assignment, tier placement, and bucket
+//! arithmetic exactly.
 
 use crate::writer::{ChunkCounts, ChunkWriter, ColumnsPresent};
 use crate::*;
@@ -133,7 +142,9 @@ fn build_query_fixture() -> Vec<u8> {
     writer.finish().unwrap().into_inner()
 }
 
-/// Window covering the fixture's whole log range (all 6 logs).
+/// Window spanning every fixture's full log range: `FILE_MIN_NS` to
+/// `FILE_MIN_NS + 6 s`, strictly past the last log of each fixture
+/// (6-log ones end at +5 s, the 4-log tiered one at +3 s).
 const FULL_WINDOW: std::ops::Range<i64> = FILE_MIN_NS..(FILE_MIN_NS + 6 * 1_000_000_000);
 
 #[test]
@@ -193,7 +204,8 @@ fn matched_and_across_fields() {
 fn matched_unknown_field_yields_empty() {
     let data = build_query_fixture();
     let reader = IndexReader::open(&data).unwrap();
-    // Unknown field → no matches in this file (not an error).
+    // Unknown field → empty set, not an error. The filter-side half of
+    // the absent-field asymmetry: facets errors, timeline routes to unset.
     let positions = reader
         .matched_positions(
             &bf(&reader, Filter::new().select("nonexistent", "anything")),
@@ -219,15 +231,15 @@ fn facets_show_all_values_with_self_exclusion() {
         )
         .unwrap();
 
-    // `level` facet sees both values (filter excluding `level` is
-    // empty → full bitmap).
+    // `level` facet sees both values: removing its own selection empties
+    // the filter, so the scope is the full range.
     let level = results.iter().find(|f| f.field == "level").unwrap();
     let level_counts: std::collections::HashMap<_, _> = level.values.iter().cloned().collect();
     assert_eq!(level_counts.get("info"), Some(&3));
     assert_eq!(level_counts.get("error"), Some(&3));
 
-    // `service` facet sees both values under the filter `level=info`
-    // (positions 0, 2, 4): service=api at pos 0, 2; service=worker at pos 4.
+    // `service` facet is scoped by the rest of the filter (level=info →
+    // positions 0, 2, 4): api at 0, 2; worker at 4.
     let service = results.iter().find(|f| f.field == "service").unwrap();
     let svc_counts: std::collections::HashMap<_, _> = service.values.iter().cloned().collect();
     assert_eq!(svc_counts.get("api"), Some(&2));
@@ -284,7 +296,8 @@ fn facets_clip_to_window() {
     assert_eq!(service.get("worker"), Some(&1));
 }
 
-/// Fixture's file_min_ns — the first log's timestamp.
+/// Shared fixture time base — every fixture's first log sits here, one
+/// second apart.
 const FILE_MIN_NS: i64 = 1_700_000_000 * 1_000_000_000;
 
 #[test]
@@ -306,11 +319,9 @@ fn timeline_buckets_match_filter() {
     assert_eq!(timeline.buckets.len(), 3);
     // Dimensions are FST-iteration-order: "error", "info".
     assert_eq!(timeline.dimensions, vec!["error", "info"]);
-    // Bucket 0 (pos 0-1): info=1, error=1
+    // Every 2s bucket holds exactly one info + one error log.
     assert_eq!(timeline.buckets[0].counts, vec![1, 1]);
-    // Bucket 1 (pos 2-3): info=1, error=1
     assert_eq!(timeline.buckets[1].counts, vec![1, 1]);
-    // Bucket 2 (pos 4-5): info=1, error=1
     assert_eq!(timeline.buckets[2].counts, vec![1, 1]);
 }
 
@@ -403,8 +414,7 @@ fn timeline_grid_before_file_yields_leading_zero_buckets() {
         assert_eq!(timeline.buckets[i].unset, 0);
     }
     // Each subsequent bucket holds one log; FST order puts "error"
-    // first, then "info". Positions in the fixture: 0=info, 1=error,
-    // 2=info, 3=error, 4=info, 5=error.
+    // first, so info = [0, 1] and error = [1, 0] per bucket.
     let expected = [
         vec![0, 1], // pos 0: info
         vec![1, 0], // pos 1: error
@@ -577,8 +587,8 @@ fn materialize_rows_resolves_timestamp_and_attributes() {
     let data = build_query_fixture();
     let reader = IndexReader::open(&data).unwrap();
     // Fixture positions: 0 = (info, api), 3 = (error, worker); 1s apart
-    // starting at FILE_MIN_NS. Stream KvIds resolve via the reverse
-    // string table to "level=…"/"service=…" pairs.
+    // starting at FILE_MIN_NS. Stream KvIds resolve per-field via
+    // `resolve_kv_strings` to "level=…"/"service=…" pairs.
     let rows = reader.materialize_rows(&[0, 3]).unwrap();
     assert_eq!(rows.len(), 2);
 
@@ -746,8 +756,8 @@ fn timeline_absent_field_routes_all_logs_to_unset() {
 }
 
 /// Fixture with a value dense enough to be stored *complemented* (inverted
-/// treight bitmap), mirroring what the writer's `remap_one_bitmap` does for
-/// dense values. 6 logs:
+/// treight bitmap), mirroring what the index builder's `remap_one_bitmap`
+/// (`src/build.rs`) does for dense values. 6 logs:
 ///
 /// `lvl` (low-card): `hi` at positions 0..=4 (5/6 → stored as the
 /// complement `{5}`, inverted), `lo` at position 5.
@@ -972,7 +982,7 @@ fn filter_from_selections_map() {
     assert!(!filter.has_field("cleared"));
 }
 
-// ── Regex (pattern) matchers ─────────────────────────────────────────
+// ── Regex matchers: field patterns + full-text queries ───────────────
 
 /// A `BitmapValue` over `universe` positions from a sorted position list.
 fn bitmap_value(positions: &[u32], universe: u32) -> BitmapValue {
@@ -1225,6 +1235,8 @@ fn pattern_no_match_is_empty() {
 fn invalid_pattern_is_hard_error() {
     let data = build_query_fixture();
     let reader = IndexReader::open(&data).unwrap();
+    // A malformed regex is a hard error at compile time — not a
+    // match-nothing set like pattern_no_match_is_empty.
     let filter = Filter::new().select_pattern("level", "(unclosed");
     assert!(matches!(
         reader.compile_filter(&filter, None),
@@ -1458,8 +1470,9 @@ fn second_chunk_per_tier_resolves() {
         vec![0, 2]
     );
 
-    // materialize_rows → build_string_table walks all four secondary chunks; row 3
-    // carries the second value of every field (tier index 1 for region and trace).
+    // materialize_rows → resolve_kv_strings walks the field table, decoding
+    // all four secondary chunks; row 3 carries the second value of every
+    // field (tier index 1 for region and trace).
     let rows = reader.materialize_rows(&[3]).unwrap();
     let fields: std::collections::HashMap<String, String> =
         rows[0].fields.iter().cloned().collect();

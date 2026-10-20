@@ -165,7 +165,7 @@ The collector connects to IBM i (AS/400) and collects metrics via its monitoring
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -247,7 +247,15 @@ jobs:
 
 ## Alerts
 
-There are no alerts configured by default for this integration.
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ as400_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/as400.conf) | as400.cpu_utilization | CPU utilization is ${value}% on the AS/400 system |
+| [ as400_system_asp_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/as400.conf) | as400.system_asp_usage | System ASP usage is ${value}% on the AS/400 system |
+| [ as400_disk_busy_average ](https://github.com/netdata/netdata/blob/master/src/health/health.d/as400.conf) | as400.disk_busy_average | Average disk busy percentage is ${value}% on the AS/400 system |
+| [ as400_job_queue_waiting ](https://github.com/netdata/netdata/blob/master/src/health/health.d/as400.conf) | as400.job_queue_length | ${value} jobs are waiting in the system job queue on the AS/400 system |
 
 
 

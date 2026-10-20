@@ -41,7 +41,7 @@ It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The service principal or managed identity requires these Azure RBAC roles:
 
@@ -375,7 +375,7 @@ Configure the **azure_monitor** collector from the Netdata web interface:
 4. In the Search box, type _azure_monitor_ (or scroll the list) to locate the **azure_monitor** collector.
 5. Click the **+** next to the **azure_monitor** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -630,12 +630,12 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_event_grid_publish_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_grid.conf) | azure_monitor.event_grid.publish_rate | Event Grid publish failures on ${label:resource_name} |
-| [ am_event_grid_delivery_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_grid.conf) | azure_monitor.event_grid.delivery | Event Grid delivery failures on ${label:resource_name} |
-| [ am_event_grid_dropped_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_grid.conf) | azure_monitor.event_grid.delivery | Event Grid dropped events on ${label:resource_name} |
-| [ am_event_grid_dead_lettered_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_grid.conf) | azure_monitor.event_grid.delivery | Event Grid dead-lettered events on ${label:resource_name} |
-| [ am_event_grid_unmatched_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_grid.conf) | azure_monitor.event_grid.routing | Event Grid unmatched events on ${label:resource_name} |
-| [ am_event_grid_destination_processing_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_grid.conf) | azure_monitor.event_grid.destination_processing_duration | Event Grid destination processing duration on ${label:resource_name} |
+| [ am_event_grid_publish_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_grid.conf) | azure_monitor.event_grid.publish_rate | Rate of failed event publish operations on Event Grid topic ${label:resource_name} in ${label:resource_group} (${label:region}). Failed publishes indicate authentication, authorization, or schema validation errors |
+| [ am_event_grid_delivery_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_grid.conf) | azure_monitor.event_grid.delivery | Rate of failed event delivery attempts on Event Grid topic ${label:resource_name} in ${label:resource_group} (${label:region}). Persistent delivery failures indicate subscriber endpoint issues |
+| [ am_event_grid_dropped_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_grid.conf) | azure_monitor.event_grid.delivery | Rate of dropped events on Event Grid topic ${label:resource_name} in ${label:resource_group} (${label:region}). Dropped events are permanently lost and indicate exhausted retry attempts without a dead-letter destination configured |
+| [ am_event_grid_dead_lettered_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_grid.conf) | azure_monitor.event_grid.delivery | Rate of events sent to the dead-letter destination on Event Grid topic ${label:resource_name} in ${label:resource_group} (${label:region}). Dead-lettered events failed all delivery retries and require manual investigation |
+| [ am_event_grid_unmatched_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_grid.conf) | azure_monitor.event_grid.routing | Rate of events that did not match any subscription on Event Grid topic ${label:resource_name} in ${label:resource_group} (${label:region}). Unmatched events indicate missing or misconfigured event subscriptions |
+| [ am_event_grid_destination_processing_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_grid.conf) | azure_monitor.event_grid.destination_processing_duration | Average time taken by the subscriber endpoint to process events from Event Grid topic ${label:resource_name} in ${label:resource_group} (${label:region}). High processing duration indicates slow or overloaded event subscribers |
 
 
 

@@ -43,7 +43,7 @@ It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The service principal or managed identity requires these Azure RBAC roles:
 
@@ -377,7 +377,7 @@ Configure the **azure_monitor** collector from the Netdata web interface:
 4. In the Search box, type _azure_monitor_ (or scroll the list) to locate the **azure_monitor** collector.
 5. Click the **+** next to the **azure_monitor** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -632,16 +632,16 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_cosmos_db_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cosmos_db.conf) | azure_monitor.cosmos_db.availability | Cosmos DB availability on ${label:resource_name} |
-| [ am_cosmos_db_normalized_ru_consumption ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cosmos_db.conf) | azure_monitor.cosmos_db.normalized_ru_consumption | Cosmos DB RU consumption on ${label:resource_name} |
-| [ am_cosmos_db_storage_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cosmos_db.conf) | azure_monitor.cosmos_db.storage | Cosmos DB storage utilization on ${label:resource_name} |
-| [ am_cosmos_db_server_side_latency_direct ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cosmos_db.conf) | azure_monitor.cosmos_db.server_side_latency | Cosmos DB direct latency on ${label:resource_name} |
-| [ am_cosmos_db_server_side_latency_gateway ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cosmos_db.conf) | azure_monitor.cosmos_db.server_side_latency | Cosmos DB gateway latency on ${label:resource_name} |
-| [ am_cosmos_db_replication_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cosmos_db.conf) | azure_monitor.cosmos_db.replication_latency | Cosmos DB replication latency on ${label:resource_name} |
-| [ am_cosmos_db_dedicated_gateway_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cosmos_db.conf) | azure_monitor.cosmos_db.dedicated_gateway_cpu | Cosmos DB dedicated gateway CPU on ${label:resource_name} |
-| [ am_cosmos_db_integrated_cache_item_hit_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cosmos_db.conf) | azure_monitor.cosmos_db.integrated_cache_hit_rate | Cosmos DB cache item hit rate on ${label:resource_name} |
-| [ am_cosmos_db_integrated_cache_query_hit_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cosmos_db.conf) | azure_monitor.cosmos_db.integrated_cache_hit_rate | Cosmos DB cache query hit rate on ${label:resource_name} |
-| [ am_cosmos_db_cassandra_connection_closures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cosmos_db.conf) | azure_monitor.cosmos_db.cassandra_connections | Cosmos DB Cassandra connection closures on ${label:resource_name} |
+| [ am_cosmos_db_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cosmos_db.conf) | azure_monitor.cosmos_db.availability | Service availability of Cosmos DB account ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_cosmos_db_normalized_ru_consumption ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cosmos_db.conf) | azure_monitor.cosmos_db.normalized_ru_consumption | Normalized request unit consumption on Cosmos DB account ${label:resource_name} in ${label:resource_group} (${label:region}). High values indicate approaching provisioned throughput limit and risk of throttling |
+| [ am_cosmos_db_storage_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cosmos_db.conf) | azure_monitor.cosmos_db.storage | Data and index storage as a percentage of document quota on Cosmos DB account ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_cosmos_db_server_side_latency_direct ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cosmos_db.conf) | azure_monitor.cosmos_db.server_side_latency | Average server-side latency for direct connections on Cosmos DB account ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_cosmos_db_server_side_latency_gateway ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cosmos_db.conf) | azure_monitor.cosmos_db.server_side_latency | Average server-side latency for gateway connections on Cosmos DB account ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_cosmos_db_replication_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cosmos_db.conf) | azure_monitor.cosmos_db.replication_latency | Average geo-replication latency (P99) on Cosmos DB account ${label:resource_name} in ${label:resource_group} (${label:region}). Only relevant when multi-region writes are configured |
+| [ am_cosmos_db_dedicated_gateway_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cosmos_db.conf) | azure_monitor.cosmos_db.dedicated_gateway_cpu | CPU utilization of the dedicated gateway on Cosmos DB account ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_cosmos_db_integrated_cache_item_hit_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cosmos_db.conf) | azure_monitor.cosmos_db.integrated_cache_hit_rate | Integrated cache item hit rate on Cosmos DB account ${label:resource_name} in ${label:resource_group} (${label:region}). Low hit rates indicate cache is not effectively reducing RU consumption |
+| [ am_cosmos_db_integrated_cache_query_hit_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cosmos_db.conf) | azure_monitor.cosmos_db.integrated_cache_hit_rate | Integrated cache query hit rate on Cosmos DB account ${label:resource_name} in ${label:resource_group} (${label:region}). Low hit rates indicate cache is not effectively reducing RU consumption |
+| [ am_cosmos_db_cassandra_connection_closures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cosmos_db.conf) | azure_monitor.cosmos_db.cassandra_connections | Rate of Cassandra connection closures on Cosmos DB account ${label:resource_name} in ${label:resource_group} (${label:region}). Only relevant for accounts using the Cassandra API |
 
 
 

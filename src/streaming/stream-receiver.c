@@ -70,7 +70,7 @@ static void stream_receiver_remove_internal(struct stream_thread *sth, struct re
 // When a child disconnects this is the maximum we will wait
 // before we update the cloud that the child is offline
 #define MAX_CHILD_DISC_DELAY (30000)
-#define MAX_CHILD_DISC_TOLERANCE (125 / 100)
+#define MAX_CHILD_DISC_TOLERANCE_PERCENT (125)
 
 static uint32_t streaming_connected_receivers = 0;
 
@@ -709,15 +709,18 @@ static void stream_receiver_remove_internal(struct stream_thread *sth, struct re
     spinlock_unlock(&rpt->thread.send_to_child.spinlock);
 
     char iface[64] = "";
-    if(rpt->host && rpt->host->rrdlabels)
-        rrdlabels_get_value_strcpyz(rpt->host->rrdlabels, iface, sizeof(iface), "_net_default_iface");
+    if(rpt->host && rpt->host->rrdlabels) {
+        rrdlabels_get_value_strcpyz(rpt->host->rrdlabels, iface, sizeof(iface), "_stream_egress_iface");
+        if (!iface[0])
+            rrdlabels_get_value_strcpyz(rpt->host->rrdlabels, iface, sizeof(iface), "_net_default_iface");
+    }
 
     time_t connected_s = rpt->connected_since_s ?
         nd_time_t_elapsed_saturating(now_realtime_sec(), rpt->connected_since_s) : 0;
     usec_t idle_ut = rpt->thread.last_traffic_ut ?
         clocks_usec_delta_or_zero(now_monotonic_usec(), rpt->thread.last_traffic_ut) : 0;
     long long idle_s = (long long)(idle_ut / USEC_PER_SEC);
-    double repl_pct = rpt->host ? rpt->host->stream.rcv.status.replication.percent : 0.0;
+    double repl_pct = rpt->host ? (double)rrdhost_receiver_replication_completion(rpt->host, NULL) : 0.0;
 
     errno_clear();
     nd_log(NDLS_DAEMON, NDLP_ERR,
@@ -763,11 +766,6 @@ static void stream_receiver_remove_internal(struct stream_thread *sth, struct re
 
     // set a default exit reason, if not set
     receiver_set_exit_reason(rpt, reason, false);
-
-    // in case we are connected to netdata cloud,
-    // we inform cloud that a child got disconnected
-    uint64_t total_reboot = rrdhost_stream_path_total_reboot_time_ms(rpt->host);
-    schedule_node_state_update(rpt->host, MIN((total_reboot * MAX_CHILD_DISC_TOLERANCE), MAX_CHILD_DISC_DELAY));
 
     rrdhost_clear_receiver(rpt, reason);
     rrdhost_set_is_parent_label();
@@ -823,7 +821,7 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
                         // loop through all the complete lines found in the uncompressed buffer
 
                         while (buffered_reader_next_line(&rpt->thread.uncompressed, rpt->thread.line_buffer)) {
-                            if (unlikely(parser_action(parser, rpt->thread.line_buffer->buffer))) {
+                            if (unlikely(parser_action(parser, rpt->thread.line_buffer->buffer) != PARSER_RC_OK)) {
                                 stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_RCV_DISCONNECT_PARSER_FAILED);
                                 *removed = true;
                                 return -1;
@@ -864,7 +862,7 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
             return rc;
 
         while(buffered_reader_next_line(&rpt->thread.uncompressed, rpt->thread.line_buffer)) {
-            if(unlikely(parser_action(parser, rpt->thread.line_buffer->buffer))) {
+            if(unlikely(parser_action(parser, rpt->thread.line_buffer->buffer) != PARSER_RC_OK)) {
                 stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_RCV_DISCONNECT_PARSER_FAILED);
                 *removed = true;
                 return -1;
@@ -876,6 +874,17 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
     }
 
     return rc;
+}
+
+static void stream_receiver_set_wanted(struct stream_thread *sth, struct receiver_state *rpt, nd_poll_event_t wanted) {
+    if(rpt->thread.wanted == wanted)
+        return;
+
+    rpt->thread.wanted = wanted;
+    if(!nd_poll_upd(sth->run.ndpl, rpt->sock.fd, rpt->thread.wanted))
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "STREAM RCV[%zu] '%s' [from [%s]:%s]: failed to update nd_poll().",
+               sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port);
 }
 
 bool stream_receiver_send_data(struct stream_thread *sth, struct receiver_state *rpt, usec_t now_ut, bool process_opcodes_and_enable_removal) {
@@ -907,12 +916,7 @@ bool stream_receiver_send_data(struct stream_thread *sth, struct receiver_state 
             if(likely(rpt->host))
                 single_writer_atomic_add(&rpt->host->stream.rcv.status.bytes_out, (uint64_t)rc);
             if (!stats->bytes_outstanding) {
-                rpt->thread.wanted = ND_POLL_READ;
-                if (!nd_poll_upd(sth->run.ndpl, rpt->sock.fd, rpt->thread.wanted))
-                    nd_log(NDLS_DAEMON, NDLP_ERR,
-                           "STREAM RCV[%zu] '%s' [from [%s]:%s]: cannot update nd_poll()",
-                           sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port);
-
+                // we sent them all - ND_POLL_WRITE is removed after the loop
                 // recreate the circular buffer if we have to
                 stream_circular_buffer_recreate_timed_unsafe(rpt->thread.send_to_child.scb, now_ut, false);
                 status = EVLOOP_STATUS_NO_MORE_DATA;
@@ -976,6 +980,16 @@ bool stream_receiver_send_data(struct stream_thread *sth, struct receiver_state 
                  stream_thread_process_opcodes(sth, &rpt->thread.meta))
             status = EVLOOP_STATUS_OPCODE_ON_ME;
     }
+
+    // ND_POLL_WRITE only while there are data the socket did not take, or we could not lock them.
+    // After a failure in the opcode path, it lets the poll loop retry and remove the receiver.
+    // Do not touch the receiver in the other cases: it may have been removed.
+    if(status == EVLOOP_STATUS_NO_MORE_DATA)
+        stream_receiver_set_wanted(sth, rpt, ND_POLL_READ);
+    else if(status == EVLOOP_STATUS_SOCKET_FULL || status == EVLOOP_STATUS_CANT_GET_LOCK ||
+             (!process_opcodes_and_enable_removal &&
+              (status == EVLOOP_STATUS_SOCKET_ERROR || status == EVLOOP_STATUS_SOCKET_CLOSED)))
+        stream_receiver_set_wanted(sth, rpt, ND_POLL_READ | ND_POLL_WRITE);
 
     return EVLOOP_STATUS_STILL_ALIVE(status);
 }
@@ -1221,18 +1235,7 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
             continue;
         }
 
-        nd_poll_event_t wanted = ND_POLL_READ | (stats.bytes_outstanding ? ND_POLL_WRITE : 0);
-        if(unlikely(rpt->thread.wanted != wanted)) {
-//            nd_log(NDLS_DAEMON, NDLP_DEBUG,
-//                   "STREAM RCV[%zu] '%s' [from %s]: nd_poll() wanted events mismatch.",
-//                   sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip);
-
-            rpt->thread.wanted = wanted;
-            if(!nd_poll_upd(sth->run.ndpl, rpt->sock.fd, rpt->thread.wanted))
-                nd_log(NDLS_DAEMON, NDLP_ERR,
-                       "STREAM RCV[%zu] '%s' [from %s]: failed to update nd_poll().",
-                       sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip);
-        }
+        stream_receiver_set_wanted(sth, rpt, ND_POLL_READ | (stats.bytes_outstanding ? ND_POLL_WRITE : 0));
     }
 }
 
@@ -1342,9 +1345,7 @@ void stream_receiver_cleanup(struct stream_thread *sth) {
 static void stream_receiver_replication_reset(RRDHOST *host) {
     RRDSET *st;
     rrdset_foreach_read(st, host) {
-        RRDSET_FLAGS old = rrdset_flag_set_and_clear(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS);
-        if(!(old & RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED))
-            rrdhost_receiver_replicating_charts_minus_one(host);
+        rrdhost_receiver_replication_release_no_pulse(st, 0);
 
 #ifdef REPLICATION_TRACKING
         st->stream.rcv.who = REPLAY_WHO_UNKNOWN;
@@ -1352,14 +1353,22 @@ static void stream_receiver_replication_reset(RRDHOST *host) {
     }
     rrdset_foreach_done(st);
 
+    // Zero outside the walk. No new claim can arrive: the parser for this connection is gone, and the
+    // caller holds the receiver lock. Every chart still indexed was released above. rrdset_free()
+    // releases under this same lock before unlinking a chart, so its flag CAS and decrement land
+    // entirely before this reset or entirely after it, and a later delete callback for that chart
+    // finds IN_PROGRESS clear and decrements nothing. Replay-completion releases run on this
+    // connection's parser thread, which is this thread or already stopped. Obsolete marking releases
+    // nothing (see rrdset_is_obsolete___safe_from_collector_thread()).
     if(rrdhost_receiver_replicating_charts(host) != 0) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "STREAM REPLAY ERROR: receiver replication instances counter should be zero, but it is %u"
                " - resetting it to zero",
                rrdhost_receiver_replicating_charts(host));
-
-        rrdhost_receiver_replicating_charts_zero(host);
     }
+
+    // one store clears both halves: the outstanding charts and the cohort of the generation that ended
+    rrdhost_receiver_replicating_charts_zero(host);
 
     __atomic_store_n(&host->stream.rcv.status.replication.counter_in, 0, __ATOMIC_RELAXED);
     __atomic_store_n(&host->stream.rcv.status.replication.counter_out, 0, __ATOMIC_RELAXED);
@@ -1468,6 +1477,14 @@ void rrdhost_clear_receiver(struct receiver_state *rpt, STREAM_HANDSHAKE reason)
 
             rrdhost_receiver_unlock(host);
             {
+                // in case we are connected to netdata cloud, we inform cloud that a child got disconnected.
+                // This must happen after the online flag is cleared: scheduled earlier, the update could be
+                // evaluated while the child still looks online, report it live, and never be repeated.
+                // The delay is read here, before stream_path_child_disconnected() clears the stream path.
+                uint64_t total_reboot = MIN(rrdhost_stream_path_total_reboot_time_ms(host), MAX_CHILD_DISC_DELAY);
+                schedule_node_state_update(
+                    host, MIN(total_reboot * MAX_CHILD_DISC_TOLERANCE_PERCENT / 100, MAX_CHILD_DISC_DELAY));
+
                 // this will wait until all workers finish
                 object_state_deactivate(&host->state_id);
 

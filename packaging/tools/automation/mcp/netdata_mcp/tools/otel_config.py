@@ -9,6 +9,7 @@ deterministic corpora.
 
 from __future__ import annotations
 
+import ipaddress
 import re
 from typing import Annotated
 
@@ -17,28 +18,60 @@ import yaml
 from mcp.server.fastmcp import Context, FastMCP
 from pydantic import Field
 
-from ..runtime import OtelConfig
+from ..runtime import OtelConfig, web_port_clash
 from ._common import get_agents, get_runs
 from .models import RunInfo, agent_declared, agent_error, run_info, unknown_agent
 
 # Reject a malformed OTLP endpoint here so the caller gets a clean error now,
-# instead of an opaque agent-launch failure several tool calls later.
-_HOST_PORT_RE = re.compile(r"^[^\s:]+:(\d{1,5})$")
+# instead of an opaque agent-launch failure several tool calls later. The
+# plugin parses both listeners as a Rust SocketAddr: an IP literal (IPv6 in
+# brackets) and a port, never a hostname.
+_HOST_PORT_RE = re.compile(r"(?:\[([0-9A-Fa-f:.]+)\]|([0-9.]+)):([0-9]{1,5})", re.ASCII)
 
 
-def _endpoint_error(agent_id: str, value: str) -> RunInfo | None:
-    """Return an error RunInfo if ``value`` is not a valid host:port, else None."""
-    m = _HOST_PORT_RE.match(value)
-    if m is None:
-        return agent_error(agent_id, f"otlp_endpoint must be 'host:port', got {value!r}")
-    if not (1 <= int(m.group(1)) <= 65535):
-        return agent_error(agent_id, f"otlp_endpoint port out of range (1-65535): {value!r}")
+def _endpoint_error(agent_id: str, value: str, name: str = "otlp_endpoint") -> RunInfo | None:
+    """Return an error RunInfo if ``value`` is not a valid ip:port, else None."""
+    m = _HOST_PORT_RE.fullmatch(value)
+    if m is None or not _is_ip(m.group(1), 6) and not _is_ip(m.group(2), 4):
+        return agent_error(
+            agent_id,
+            f"{name} must be 'ip:port' with an IP address, not a hostname "
+            f"(e.g. '127.0.0.1:4317', '[::1]:4317'), got {value!r}",
+        )
+    if not (1 <= int(m.group(3)) <= 65535):
+        return agent_error(agent_id, f"{name} port out of range (1-65535): {value!r}")
     return None
+
+
+def _is_ip(text: str | None, version: int) -> bool:
+    try:
+        return text is not None and ipaddress.ip_address(text).version == version
+    except ValueError:
+        return False
+
 
 _AgentId = Annotated[str, Field(description="The declared agent to configure.")]
 _Endpoint = Annotated[
     str | None,
-    Field(description="OTLP/gRPC listen address 'host:port' (e.g. '127.0.0.1:4317'). Omit to auto-assign a free loopback port."),
+    Field(
+        description=(
+            "OTLP/gRPC listen address 'ip:port' (e.g. '127.0.0.1:4317'). Omit to auto-assign "
+            "a free loopback port. Refused on the agent's declared web port (127.0.0.1 or a "
+            "wildcard address)."
+        )
+    ),
+]
+_HttpEndpoint = Annotated[
+    str | None,
+    Field(
+        description=(
+            "OTLP/HTTP listen address 'ip:port' (e.g. '127.0.0.1:4318'). Omit to "
+            "auto-assign a free loopback port; pass the EMPTY STRING '' to disable "
+            "the HTTP listener (writes its enabled: false); any other value must be "
+            "'ip:port', and is refused on the agent's declared web port (127.0.0.1 "
+            "or a wildcard address)."
+        )
+    ),
 ]
 # Per-signal tuning knobs come in symmetric logs_*/traces_* pairs (one call sets
 # both signals; an omitted knob keeps that signal's stock default). Storage/auth
@@ -77,8 +110,8 @@ _ExtraYaml = Annotated[
             "per-tenant rotation/retention override blocks, remote_storage.startup_op_timeout, "
             "remote_storage.read_cache_max_size (the download cache both signals share) — "
             "and deliberately-unknown keys for strict-config refuse-to-start tests. "
-            "base_dir and endpoint.path stay pinned for per-agent isolation and "
-            "cannot be overridden. SHARP TOOL: a semantically invalid config keeps "
+            "base_dir, both listener endpoints, and the HTTP listener's enabled flag stay pinned for "
+            "per-agent isolation and cannot be overridden. SHARP TOOL: a semantically invalid config keeps "
             "the otel plugin down until reconfigured (check netdata_agent_logs "
             "component='supervisor'/'ledger' for the refusal) — that failure mode is "
             "itself the point of the refusal tests."
@@ -121,17 +154,21 @@ def register(mcp: FastMCP) -> None:
             "remote_storage_uri defaults to an isolated per-agent fs:// dir. Use the small "
             "rotation/retention knobs to force multi-file / eviction edge cases over a "
             "known corpus — set traces_* (e.g. traces_rotation_max_entries=10) so a "
-            "small trace corpus seals without a restart. For knobs without a "
+            "small trace corpus seals without a restart. otlp_http_endpoint sets the "
+            "OTLP/HTTP listener (receivers.otlp.protocols.http): omit to auto-assign a free "
+            "loopback port, '' to disable it, 'ip:port' to pin it. For knobs without a "
             "first-class param (auth, ingest windows, retention max_age/horizon, "
             "per-tenant overrides) or for strict-config refusal tests, pass a raw "
             "YAML mapping via extra_yaml — it deep-merges over the generated file "
-            "and wins on conflicts (base_dir/endpoint.path stay pinned)."
+            "and wins on conflicts (base_dir, both listener endpoints, and the HTTP "
+            "listener's enabled flag stay pinned)."
         ),
     )
     async def netdata_agent_otel_config(
         ctx: Context,
         agent_id: _AgentId,
         otlp_endpoint: _Endpoint = None,
+        otlp_http_endpoint: _HttpEndpoint = None,
         logs_rotation_max_file_size: _LogsRotationMaxFileSize = None,
         logs_rotation_max_entries: _LogsRotationMaxEntries = None,
         logs_rotation_max_file_duration: _LogsRotationMaxFileDuration = None,
@@ -159,6 +196,12 @@ def register(mcp: FastMCP) -> None:
             err = _endpoint_error(agent_id, otlp_endpoint)
             if err is not None:
                 return err
+        # "" is the disable sentinel (enabled: false), not a malformed address —
+        # everything else must be a valid ip:port.
+        if otlp_http_endpoint not in (None, ""):
+            err = _endpoint_error(agent_id, otlp_http_endpoint, name="otlp_http_endpoint")
+            if err is not None:
+                return err
         if remote_storage_uri is not None and "://" not in remote_storage_uri:
             return agent_error(
                 agent_id,
@@ -170,6 +213,7 @@ def register(mcp: FastMCP) -> None:
                 return err
         cfg = OtelConfig(
             otlp_endpoint=otlp_endpoint,
+            otlp_http_endpoint=otlp_http_endpoint,
             logs_rotation_max_file_size=logs_rotation_max_file_size,
             logs_rotation_max_entries=logs_rotation_max_entries,
             logs_rotation_max_file_duration=logs_rotation_max_file_duration,
@@ -191,6 +235,8 @@ def register(mcp: FastMCP) -> None:
             journal_dir=journal_dir,
             extra_yaml=extra_yaml,
         )
+        if (clash := web_port_clash(cfg, get_agents(ctx).get(agent_id).port)) is not None:
+            return agent_error(agent_id, clash)
         spec = get_agents(ctx).set_otel(agent_id, cfg)
         live = get_runs(ctx).get(agent_id)
         if live is not None and not live.done:

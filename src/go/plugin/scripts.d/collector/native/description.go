@@ -24,11 +24,9 @@ type packageDescription struct {
 
 // Description metadata may use null for any optional value, as YAML can.
 var descriptionShape = strictjson.Optional(strictjson.Fields{
-	"metrics":       strictjson.Optional(nil, "name", "type", "unit"),
-	"checks":        strictjson.Optional(nil, "id", "title", "by_labels"),
 	"functions":     nativefunc.DefinitionShape(),
 	"config_schema": strictjson.Any(),
-}, "version", "mode", "charts")
+}, "version", "mode", "snapshot_format", "collect", "charts")
 
 // loadDescribedPackage runs a self-contained package's describe operation once
 // and validates its output.

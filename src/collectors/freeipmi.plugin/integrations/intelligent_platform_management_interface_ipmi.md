@@ -30,7 +30,7 @@ The plugin uses open source library IPMImonitoring to communicate with sensors.
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The plugin needs setuid.
 
@@ -219,6 +219,7 @@ The following alerts are available:
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
 | [ ipmi_sensor_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipmi.conf) | ipmi.sensor_state | IPMI sensor ${label:sensor} (${label:component}) state |
+| [ ipmi_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipmi.conf) | ipmi.events | number of events in the IPMI System Event Log (SEL) |
 
 
 

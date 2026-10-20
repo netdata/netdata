@@ -28,7 +28,8 @@ type ResourceTransactionSpec struct {
 	ActivationQuarantinedFallback *ResourceActivationFallback              // postimage after incumbent removal + quarantine
 	Result                        lifecycle.SealedResult                   // sealed response when reply is unset
 	Cleanup                       lifecycle.TaskCleanup                    // protocol-frame cleanup emitted on success
-	reply                         *jobReply                                // DynCfg reply intent sealed from the Apply outcome
+	configIntent                  *preparedJobConfigIntent
+	reply                         *jobReply // DynCfg reply intent sealed from the Apply outcome
 }
 
 // ResourceActivationFallback is the graph/resource outcome used when a
@@ -39,6 +40,7 @@ type ResourceActivationFallback struct {
 	AfterGraphReconcile func()             // reconciles projections after commit or confirmed equality
 	AfterApply          func()             // records pending/retry state
 	Cleanup             lifecycle.TaskCleanup
+	configIntent        *preparedJobConfigIntent
 	failure             jobFailure // why the adopted change ended Failed; seals the reply
 }
 
@@ -267,6 +269,11 @@ func (prt *PreparedResourceTransaction) Apply(ctx context.Context) (
 			}
 			resultErr = errors.Join(resultErr, abortErr)
 		}
+		intentErr := spec.abortConfigIntents()
+		if intentErr != nil {
+			settlementProven = false
+		}
+		resultErr = errors.Join(resultErr, intentErr)
 		if resultErr != nil && !appliedSealed {
 			result, cleanup := spec.result(transactionOutcome{}), spec.Cleanup
 			if !graphCommitted {
@@ -376,6 +383,7 @@ func (prt *PreparedResourceTransaction) Apply(ctx context.Context) (
 						return lifecycle.AppliedResourceTransaction{}, commitErr
 					}
 					graphCommitted = true
+					fallback.configIntent.commit()
 					if fallback.AfterGraphReconcile != nil {
 						fallback.AfterGraphReconcile()
 					}
@@ -394,6 +402,10 @@ func (prt *PreparedResourceTransaction) Apply(ctx context.Context) (
 				)
 				if applyErr != nil {
 					return lifecycle.AppliedResourceTransaction{}, applyErr
+				}
+				if fallback.configIntent != nil {
+					graphCommitted = true
+					fallback.configIntent.commit()
 				}
 				appliedSealed = true
 				if reconcileAfterSeal != nil {
@@ -431,6 +443,7 @@ func (prt *PreparedResourceTransaction) Apply(ctx context.Context) (
 			return lifecycle.AppliedResourceTransaction{}, err
 		}
 		graphCommitted = true
+		spec.configIntent.commit()
 		if spec.AfterGraphCommit != nil {
 			spec.AfterGraphCommit()
 		}
@@ -445,6 +458,10 @@ func (prt *PreparedResourceTransaction) Apply(ctx context.Context) (
 	if err != nil {
 		return lifecycle.AppliedResourceTransaction{}, err
 	}
+	if spec.configIntent != nil {
+		graphCommitted = true
+		spec.configIntent.commit()
+	}
 	if installed, ok := current.(interface{ acknowledgeInstallation() error }); ok {
 		if err := installed.acknowledgeInstallation(); err != nil {
 			return lifecycle.AppliedResourceTransaction{}, err
@@ -456,6 +473,16 @@ func (prt *PreparedResourceTransaction) Apply(ctx context.Context) (
 		spec.AfterApply()
 	}
 	return applied, nil
+}
+
+func (spec ResourceTransactionSpec) abortConfigIntents() error {
+	err := spec.configIntent.abort()
+	for _, fallback := range []*ResourceActivationFallback{spec.ActivationBusyFallback, spec.ActivationQuarantinedFallback} {
+		if fallback != nil {
+			err = errors.Join(err, fallback.configIntent.abort())
+		}
+	}
+	return err
 }
 
 func activationFallback(spec ResourceTransactionSpec, err error) *ResourceActivationFallback {
@@ -486,16 +513,13 @@ func commitGraphMutation(graph *dyncfg.Graph, mutation dyncfg.GraphMutation) (re
 	return nil
 }
 
-func composeAfterApply(first, second func()) func() {
-	if first == nil {
-		return second
-	}
-	if second == nil {
-		return first
-	}
+func composeAfterApply(effects ...func()) func() {
 	return func() {
-		first()
-		second()
+		for _, effect := range effects {
+			if effect != nil {
+				effect()
+			}
+		}
 	}
 }
 
@@ -505,7 +529,7 @@ func (prt *PreparedResourceTransaction) Dispose(ctx context.Context) (lifecycle.
 		return nil, err
 	}
 	if ctx == nil {
-		return nil, errors.New("job output: nil transaction dispose context")
+		return nil, errors.Join(errors.New("job output: nil transaction dispose context"), spec.abortConfigIntents())
 	}
 	var abortErr error
 	if spec.Graph != nil && spec.MutationPrepared {
@@ -517,7 +541,7 @@ func (prt *PreparedResourceTransaction) Dispose(ctx context.Context) (lifecycle.
 	} else if spec.UnusedPermit.Valid() {
 		successorErr = spec.UnusedPermit.AbortUnused()
 	}
-	return spec.Current, errors.Join(abortErr, successorErr)
+	return spec.Current, errors.Join(abortErr, successorErr, spec.abortConfigIntents())
 }
 
 func (prt *PreparedResourceTransaction) take() (ResourceTransactionSpec, error) {

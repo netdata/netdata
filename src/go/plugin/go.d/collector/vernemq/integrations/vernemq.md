@@ -29,7 +29,7 @@ This collector monitors VerneMQ instances.
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -115,7 +115,7 @@ Configure the **vernemq** collector from the Netdata web interface:
 4. In the Search box, type _vernemq_ (or scroll the list) to locate the **vernemq** collector.
 5. Click the **+** next to the **vernemq** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -225,7 +225,7 @@ The following alerts are available:
 | [ vernemq_mqtt_pubrel_received_reason_unsuccessful ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.node_mqtt_pubrel_received_by_reason_code | Node ${label:node} mqtt v5 received unsuccessful PUBREL packets in the last minute |
 | [ vernemq_mqtt_pubrel_sent_reason_unsuccessful ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.node_mqtt_pubrel_sent_by_reason_code | Node ${label:node} mqtt v5 unsuccessful sent PUBREL packets in the last minute |
 | [ vernemq_mqtt_pubcomp_received_reason_unsuccessful ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.node_mqtt_pubcomp_received_by_reason_code | Node ${label:node} mqtt v5 received unsuccessful PUBCOMP packets in the last minute |
-| [ vernemq_mqtt_pubcomp_sent_reason_unsuccessful ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.node_mqtt_pubcomp_sent_by_reason_code | Node ${label:node} mqtt v5 unsuccessful sent  PUBCOMP packets in the last minute |
+| [ vernemq_mqtt_pubcomp_sent_reason_unsuccessful ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.node_mqtt_pubcomp_sent_by_reason_code | Node ${label:node} mqtt v5 unsuccessful sent PUBCOMP packets in the last minute |
 | [ vernemq_mqtt_pubcomp_unexpected ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.node_mqtt_pubcomp_invalid_error | Node ${label:node} mqtt v${label:mqtt_version} received unexpected PUBCOMP packets in the last minute |
 
 
@@ -253,7 +253,7 @@ Metrics:
 
 | Metric | Description | Dimensions | Unit |
 |:------|:------------|:----------|:----|
-| vernemq.node_socket | Open Sockets | open | sockets |
+| vernemq.node_sockets | Open Sockets | open | sockets |
 | vernemq.node_socket_operations | Socket Open and Close Events | open, close | sockets/s |
 | vernemq.node_client_keepalive_expired | Closed Sockets due to Keepalive Time Expired | closed | sockets/s |
 | vernemq.node_socket_close_timeout | Closed Sockets due to no CONNECT Frame On Time | closed | sockets/s |
@@ -309,7 +309,7 @@ Metrics:
 | vernemq.node_mqtt_connack_sent_by_reason_code | MQTT CONNACK Sent by Reason | success, unspecified_error, malformed_packet, protocol_error, impl_specific_error, unsupported_protocol_version, client_identifier_not_valid, bad_username_or_password, not_authorized, server_unavailable, server_busy, banned, bad_authentication_method, topic_name_invalid, packet_too_large, quota_exceeded, payload_format_invalid, retain_not_supported, qos_not_supported, use_another_server, server_moved, connection_rate_exceeded | packets/s |
 | vernemq.node_mqtt_disconnect | MQTT DISCONNECT Packets | received, sent | packets/s |
 | vernemq.node_mqtt_disconnect_received_by_reason_code | MQTT DISCONNECT Received by Reason | normal_disconnect, disconnect_with_will_msg, unspecified_error, malformed_packet, protocol_error, impl_specific_error, topic_name_invalid, receive_max_exceeded, topic_alias_invalid, packet_too_large, message_rate_too_high, quota_exceeded, administrative_action, payload_format_invalid | packets/s |
-| node_mqtt_disconnect_sent_by_reason_code | MQTT DISCONNECT Sent by Reason | normal_disconnect, unspecified_error, malformed_packet, protocol_error, impl_specific_error, not_authorized, server_busy, server_shutting_down, keep_alive_timeout, session_taken_over, topic_filter_invalid, topic_name_invalid, receive_max_exceeded, topic_alias_invalid, packet_too_large, message_rate_too_high, quota_exceeded, administrative_action, payload_format_invalid, retain_not_supported, qos_not_supported, use_another_server, server_moved, shared_subs_not_supported, connection_rate_exceeded, max_connect_time, subscription_ids_not_supported, wildcard_subs_not_supported | packets/s |
+| vernemq.node_mqtt_disconnect_sent_by_reason_code | MQTT DISCONNECT Sent by Reason | normal_disconnect, unspecified_error, malformed_packet, protocol_error, impl_specific_error, not_authorized, server_busy, server_shutting_down, keep_alive_timeout, session_taken_over, topic_filter_invalid, topic_name_invalid, receive_max_exceeded, topic_alias_invalid, packet_too_large, message_rate_too_high, quota_exceeded, administrative_action, payload_format_invalid, retain_not_supported, qos_not_supported, use_another_server, server_moved, shared_subs_not_supported, connection_rate_exceeded, max_connect_time, subscription_ids_not_supported, wildcard_subs_not_supported | packets/s |
 | vernemq.node_mqtt_subscribe | MQTT SUBSCRIBE and SUBACK Packets | subscribe, suback | packets/s |
 | vernemq.node_mqtt_subscribe_error | MQTT Failed SUBSCRIBE Operations due to a Netsplit | subscribe | errors/s |
 | vernemq.node_mqtt_subscribe_auth_error | MQTT Unauthorized SUBSCRIBE Attempts | subscribe_auth | errors/s |
@@ -331,7 +331,7 @@ Metrics:
 | vernemq.node_mqtt_pubrel_sent_by_reason_code | MQTT PUBREL QoS 2 Sent by Reason | success, packet_id_not_found | packets/s |
 | vernemq.node_mqtt_pubcomp | MQTT PUBCOMP QoS 2 Packets | received, sent | packets/s |
 | vernemq.node_mqtt_pubcomp_received_by_reason_code | MQTT PUBCOMP QoS 2 Received by Reason | success, packet_id_not_found | packets/s |
-| vernemq.node_mqtt_pubcomp_sent_by_reason_cod | MQTT PUBCOMP QoS 2 Sent by Reason | success, packet_id_not_found | packets/s |
+| vernemq.node_mqtt_pubcomp_sent_by_reason_code | MQTT PUBCOMP QoS 2 Sent by Reason | success, packet_id_not_found | packets/s |
 | vernemq.node_mqtt_pubcomp_invalid_error | MQTT PUBCOMP QoS 2 Received Unexpected Messages | unexpected | messages/s |
 | vernemq.node_mqtt_ping | MQTT PING Packets | pingreq, pingresp | packets/s |
 

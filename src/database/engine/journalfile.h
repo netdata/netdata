@@ -174,6 +174,31 @@ struct journal_v2_header {
 // Reserve the first 4 KiB for the journal v2 header
 #define JOURNAL_V2_HEADER_PADDING_SZ (RRDENG_BLOCK_SIZE - (sizeof(struct journal_v2_header)))
 
+// Optional samples section: the stored slots (points, empty ones included) of
+// every metric of this journal, as uint32_t samples[metric_count] in metric list
+// order, followed by a journal_v2_block_trailer with its CRC32. It sits between
+// the page section and the file trailer.
+//
+// Its descriptor lives at a FIXED offset inside the zeroed header padding: outside
+// struct journal_v2_header (so the header CRC is unchanged and agents that do not
+// know it ignore it), and not at sizeof(struct journal_v2_header), which is not
+// the same on every build (the struct holds a pointer, and alignment differs).
+// A zeroed descriptor means "no samples section".
+//
+// The descriptor also carries the total of samples[], so that the startup loader
+// charges the datafile from the header page it reads anyway and never faults in
+// the array at the end of the file; the array is for per-metric consumers.
+#define JOURNAL_V2_SAMPLES_DESCRIPTOR_OFFSET 2048
+#define JOURNAL_V2_SAMPLES_MAGIC 0x32534d53 // "SMS2" (SMS1: a 16-byte descriptor without the total, never shipped)
+
+struct journal_v2_samples_descriptor {
+    uint32_t magic;
+    uint32_t count;         // entries in samples[], equal to the metric count
+    uint64_t samples;       // the sum of samples[]
+    uint32_t offset;        // of samples[], from the start of the file
+    uint32_t crc;           // CRC32 of the fields above
+};
+
 // Extent section item (16 bytes)
 struct journal_extent_list {
     // Extent offset in datafile
@@ -275,6 +300,9 @@ int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengi
 int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile,
                      struct rrdengine_datafile *datafile);
 void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile);
+bool journalfile_v2_samples_descriptor(const uint8_t *data_start, size_t file_size, struct journal_v2_samples_descriptor *out);
+const uint32_t *journalfile_v2_samples_section(const uint8_t *data_start, size_t file_size);
+uint64_t journalfile_v2_metric_estimated_samples(const struct journal_metric_list *metric);
 
 bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno __maybe_unused, uint8_t type __maybe_unused,
                                         Pvoid_t JudyL_metrics, Pvoid_t JudyL_extents_pos,

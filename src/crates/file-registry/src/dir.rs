@@ -1,13 +1,58 @@
+//! Path derivation and directory scans over the flat per-tenant layout
+//! `{dir}/<stem>.<ext>`: [`FileDir`] pairs one directory with one data-file
+//! extension and owns the path-derivation, name-parsing, and scan contracts
+//! below; [`scan_max_sequence_recursive`] re-seeds the per-process seq
+//! counter from disk at startup. The date-partitioned variant of this
+//! layout is `crate::layout`'s contract.
+//!
+//! Scan contracts (the flat-layout half of the crate-root failure
+//! conventions; `layout.rs` documents the partition-walk half):
+//!
+//! - a missing directory scans as empty; any other directory-open failure
+//!   propagates, so the seq-seed callers cannot under-read silently;
+//! - per-entry failures are warn-and-skip inside [`FileDir::scan`] and
+//!   silent-skip at the recursive walk's own directory level;
+//! - a name is accepted only when it ends in `.{ext}` exactly, keeping
+//!   `durable`'s reserved `.tmp` temps out of every scan;
+//! - results arrive in `read_dir` order — no ordering guarantee.
+//!
+//! Everything here is synchronous blocking `std::fs` with no locks, run
+//! inline by today's callers as one-shot startup or offline work on their
+//! own thread — otel-ledger's pipeline startup recovery
+//! (`src/crates/otel-ledger/src/ledger/pipeline.rs` `build_pipeline`),
+//! otel-ingestor's seq seed (`src/crates/otel-ingestor/src/lib.rs`
+//! `create_shared_writer_state`), sfsq-cli's discovery
+//! (`src/crates/sfsq-cli/src/discover.rs` `discover`). The
+//! `spawn_blocking` sites the crate root cites (file-lifecycle's
+//! `catalog_builder.rs` `write_local_atomic`, `recovery/startup.rs`
+//! `download_and_install`) wrap `durable::write_atomic` writes, not
+//! these scans.
+//!
+//! Consumers (grep-verified): the wal and sfst registries (recovery scans
+//! and per-directory max seq; [`FileRegistry`](crate::FileRegistry) composes
+//! a `FileDir` for path derivation), the wal writer (path derivation for new
+//! files), file-lifecycle `remote_read` ([`FileDir::parse`] classifies SFST
+//! cache files during cache migration), otel-ingestor (the seq seed, via the
+//! `wal::`/`sfst::` `scan_max_sequence_recursive` wrappers). otel-catalog
+//! deliberately does not use [`scan_max_sequence_recursive`] — its
+//! date-partitioned layout gets its own filename-only scan
+//! (`src/crates/otel-catalog/src/registry.rs` `scan_max_sequence`).
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
 use crate::FileId;
 
-/// A directory handle for files with a specific extension.
+/// A directory handle for data files sharing one extension.
 ///
-/// Provides path derivation and directory scanning. The extension determines
-/// which files are recognized during scans (e.g. `"wal"`, `"sfst"`).
+/// The flat per-tenant layout's working handle: [`FileDir::file_path`]
+/// derives on-disk paths for new files, [`FileDir::parse`] and
+/// [`FileDir::scan`] read existing ones back (recovery, the startup seq
+/// seed), and `ext` decides which names are recognized (`"wal"`, `"sfst"`,
+/// ...). Construction is pure — no disk access and no existence
+/// requirement; a missing directory scans as empty.
+/// [`FileRegistry`](crate::FileRegistry) holds one for path derivation and
+/// the directory its consumer rebuilds from.
 #[derive(Clone)]
 pub struct FileDir {
     path: PathBuf,
@@ -30,22 +75,41 @@ impl FileDir {
         self.ext
     }
 
-    /// Derive the on-disk path for a file from its [`FileId`].
+    /// The on-disk path for `id`'s file: `<dir>/<stem>.<ext>` in this
+    /// handle's directory and extension.
     pub fn file_path(&self, id: FileId) -> PathBuf {
         self.path.join(id.to_filename(self.ext))
     }
 
-    /// Parse a path into a [`FileId`], if it matches the given extension.
+    /// Parse a path's file name into a [`FileId`] when the name ends in
+    /// `.{ext}` exactly.
+    ///
+    /// `None` for a non-UTF-8 name, a different extension, a `durable`
+    /// `.tmp` temp (never ends in the data extension — the scan-side half
+    /// of the reserved-suffix rule), or a stem that fails
+    /// [`FileId::parse_stem`] (malformed shape, nil identity). Only the
+    /// final path component is examined; unlike [`FileId::parse`], the
+    /// extension must match the given one.
     pub fn parse(path: &Path, ext: &str) -> Option<FileId> {
         let name = path.file_name()?.to_str()?;
         let stem = name.strip_suffix(&format!(".{ext}"))?;
         FileId::parse_stem(stem)
     }
 
-    /// Scan the directory for files matching this extension.
+    /// List the directory's `.{ext}` files as `(FileId, Metadata)` pairs.
     ///
-    /// Returns `(FileId, Metadata)` pairs for all parseable files.
-    /// Unparseable filenames are logged as warnings and skipped.
+    /// An entry is accepted when its name parses through
+    /// [`FileDir::parse`] (a name-only filter — no entry-type check) and
+    /// its `fs::metadata` succeeds (follows symlinks). Failure policy,
+    /// per the crate's scan conventions:
+    ///
+    /// - a missing directory is `Ok(empty)`; any other `read_dir` open
+    ///   failure is `Err`, so a caller can tell an empty directory from
+    ///   an unreadable one;
+    /// - a failed iteration step, an unparseable name, or a failed stat
+    ///   is warned and skipped — never aborts the remaining entries.
+    ///
+    /// Entries arrive in `read_dir` order; there is no ordering guarantee.
     pub fn scan(&self) -> io::Result<Vec<(FileId, fs::Metadata)>> {
         let entries = match fs::read_dir(&self.path) {
             Ok(entries) => entries,
@@ -98,26 +162,41 @@ impl FileDir {
         Ok(result)
     }
 
-    /// Scan the directory for the highest existing sequence number.
+    /// The highest [`FileId::seq`] among this directory's parseable files;
+    /// `0` when the directory is missing or holds none of them.
     ///
-    /// The sequence number is monotonically increasing across boots, so all
-    /// files in the directory are considered regardless of their origin.
+    /// Every parseable file counts, regardless of pipeline, `part_key`, or
+    /// which process instance wrote it: seqs restart on reseed, so the
+    /// startup seed must dominate the highest seq still on disk, from any
+    /// earlier instance. Directory-open errors propagate — a silently
+    /// short max would let a restart reissue a seq that still exists.
     pub fn scan_max_sequence(&self) -> io::Result<u64> {
         let entries = self.scan()?;
         Ok(entries.iter().map(|(id, _)| id.seq).max().unwrap_or(0))
     }
 }
 
-/// Scan all immediate subdirectories of `base` for files with the
-/// given extension and return the highest [`FileId::seq`] found.
+/// The highest [`FileId::seq`] in `base`'s immediate subdirectories —
+/// the startup seed for the per-process seq counter, built from the
+/// one-level `{base}/{tenant}/<files>` shape of the flat layout.
 ///
-/// Used at process startup to recover the seq counter from disk
-/// across restarts. Callers should walk every directory tree where
-/// seq-tagged files might live (WAL, SFST, …) and take the global
-/// max so the counter stays monotonic — even when one tree has been
-/// pruned but another still holds files with higher seqs.
+/// Structural contract: exactly one level deep — files directly in
+/// `base` are ignored (pinned by a test) and a symlinked subdirectory
+/// is skipped (its own type, not the target's, must be a directory).
+/// A missing `base` yields `0`; a subdirectory whose scan fails to
+/// open propagates the error (the seed must not under-read), while
+/// the walk's own entry steps (a failed iteration, a failed type
+/// lookup) skip silently.
 ///
-/// Returns `0` if `base` doesn't exist or contains no matching files.
+/// One tree per call: the consumer takes the global max across every
+/// tree where seq-tagged files can survive, so no restart reissues a
+/// seq that still exists — otel-ingestor's seq seed walks the wal and
+/// sfst trees here and folds in the date-partitioned catalog scan and
+/// the persisted high-water mark (`src/crates/otel-ingestor/src/lib.rs`
+/// `create_shared_writer_state`). The catalog layout cannot use this
+/// walk; `otel-catalog` scans it filename-only over
+/// `layout::date_tenant_dirs` instead
+/// (`src/crates/otel-catalog/src/registry.rs` `scan_max_sequence`).
 pub fn scan_max_sequence_recursive(base: &Path, ext: &'static str) -> io::Result<u64> {
     let mut max_seq: u64 = 0;
     let entries = match fs::read_dir(base) {
@@ -196,8 +275,9 @@ mod tests {
         assert_eq!(fd.scan_max_sequence().unwrap(), 0);
     }
 
-    /// Create an empty file named `<machine>-<instance>-<pipeline:05>-<seq:010>-<part_key:016x>.<ext>`
-    /// under `dir`. Sentinel for the recursive-scan tests below.
+    /// Create an empty data file named
+    /// `<machine>-<instance>-<pipeline:05>-<seq:010>-<part_key:016x>.<ext>`
+    /// under `dir` — the probe file the recursive-scan tests below rely on.
     fn touch_file(dir: &Path, seq: u64, ext: &str) {
         let id = FileId::new(ident(), 0, seq, 0);
         std::fs::File::create(dir.join(id.to_filename(ext))).unwrap();

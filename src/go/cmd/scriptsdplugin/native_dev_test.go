@@ -39,7 +39,7 @@ func TestPackageInventoryAndExplicitExecution(t *testing.T) {
 	manifest := filepath.Join(dir, "manifest.yaml")
 	require.NoError(
 		t,
-		os.WriteFile(manifest, []byte("version: v1\ncommand: [/bin/sh]\nchecks: [{id: probe, title: Probe}]\n"), 0644),
+		os.WriteFile(manifest, []byte("version: v1\ncommand: [/bin/sh]\n"), 0644),
 	)
 	inventory := filepath.Join(dir, "scripts.d.packages.yaml")
 	require.NoError(
@@ -125,7 +125,7 @@ func TestCommandPackageInventory(t *testing.T) {
 	require.NoError(t, os.WriteFile(script, []byte(`#!/bin/sh
 [ "$1" = describe ] || exit 2
 printf describe >> "$(dirname "$0")/described"
-printf '%s\n' 'version: v1' 'checks: [{id: ready, title: Ready}]'
+printf '%s\n' 'version: v1'
 `), 0755))
 	data, err := yaml.Marshal(
 		map[string]any{

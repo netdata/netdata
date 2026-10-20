@@ -1,25 +1,25 @@
 //! MSRV compatibility helpers.
 //!
-//! This module provides backports of newer Rust standard library features
-//! to maintain compatibility with our current MSRV (Minimum Supported Rust Version).
+//! The workspace MSRV is 1.91 (src/crates/Cargo.toml), above the 1.87.0 that
+//! stabilized std's `is_multiple_of`; this shim remains only because its two
+//! consumers (journal-core mmap.rs, journal-index histogram.rs) still use it.
 
-/// Returns `true` if `value` is an integer multiple of `divisor`, and `false` otherwise.
+/// Returns `true` if `value` is an integer multiple of `divisor`.
 ///
-/// This is a compatibility function for MSRV < 1.87.0 that provides the same functionality
-/// as the built-in `u32::is_multiple_of()` method.
+/// Equivalent to `value % divisor == 0`. std's inherent `is_multiple_of` is
+/// defined only on unsigned integer primitives, so this shim is generic over
+/// the bounds below (call sites use `u32` and `u64`).
+///
+/// # Panics
+///
+/// Panics if `divisor` is zero, like the `%` operator. std's method instead
+/// defines `x.is_multiple_of(0)` as `x == 0`, so a blind call-site migration
+/// changes behavior for a zero divisor.
 ///
 /// # Migration path
 ///
-/// When MSRV >= 1.87.0, replace calls to this function with the standard library's
-/// `is_multiple_of()` method:
-/// ```ignore
-/// // Old (MSRV < 1.87.0):
-/// use journal_common::compat::is_multiple_of;
-/// is_multiple_of(value, divisor)
-///
-/// // New (MSRV >= 1.87.0):
-/// value.is_multiple_of(divisor)
-/// ```
+/// Replace calls with the std method (`is_multiple_of(a, b)` becomes
+/// `a.is_multiple_of(b)`) and delete this module.
 ///
 /// # Examples
 ///
@@ -29,6 +29,7 @@
 /// assert!(is_multiple_of(100u32, 10));
 /// assert!(is_multiple_of(100u32, 20));
 /// assert!(!is_multiple_of(100u32, 7));
+/// assert!(is_multiple_of(1000u64, 10));
 /// ```
 #[inline]
 pub fn is_multiple_of<T>(value: T, divisor: T) -> bool

@@ -20,6 +20,7 @@ typedef enum {
     SERVICE_EXPORTERS             = (1 << 11),
     SERVICE_HTTPD                 = (1 << 12),
     SERVICE_SYSTEMD               = (1 << 13),
+    SERVICE_SYSTEM_INFO           = (1 << 14),
 } SERVICE_TYPE;
 
 typedef void (*force_quit_t)(void *data);

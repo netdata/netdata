@@ -40,7 +40,7 @@ Executed queries:
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 Percona MySQL can be monitored further using the following other integrations:
@@ -180,7 +180,7 @@ Configure the **mysql** collector from the Netdata web interface:
 4. In the Search box, type _mysql_ (or scroll the list) to locate the **mysql** collector.
 5. Click the **+** next to the **mysql** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -292,18 +292,18 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ mysql_10s_slow_queries ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf) | mysql.queries | number of slow queries in the last 10 seconds |
-| [ mysql_10s_table_locks_immediate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf) | mysql.table_locks | number of table immediate locks in the last 10 seconds |
-| [ mysql_10s_table_locks_waited ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf) | mysql.table_locks | number of table waited locks in the last 10 seconds |
-| [ mysql_10s_waited_locks_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf) | mysql.table_locks | ratio of waited table locks over the last 10 seconds |
-| [ mysql_connections ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf) | mysql.connections_active | client connections utilization |
-| [ mysql_replication ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf) | mysql.slave_status | replication status (0: stopped, 1: working) |
-| [ mysql_replication_lag ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf) | mysql.slave_behind | difference between the timestamp of the latest transaction processed by the SQL thread and the timestamp of the same transaction when it was processed on the master |
+| [ mysql_10s_slow_queries ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf) | mysql.queries | Number of slow queries in the last 10 seconds |
+| [ mysql_10s_table_locks_immediate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf) | mysql.table_locks | Number of table immediate locks in the last 10 seconds |
+| [ mysql_10s_table_locks_waited ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf) | mysql.table_locks | Number of table waited locks in the last 10 seconds |
+| [ mysql_10s_waited_locks_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf) | mysql.table_locks | Ratio of waited table locks over the last 10 seconds |
+| [ mysql_connections ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf) | mysql.connections_active | Client connections utilization |
+| [ mysql_replication ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf) | mysql.slave_status | Replication status (0: stopped, 1: working) |
+| [ mysql_replication_lag ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf) | mysql.slave_behind | Difference between the timestamp of the latest transaction processed by the SQL thread and the timestamp of the same transaction when it was processed on the master |
 | [ mysql_galera_cluster_size_max_2m ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf) | mysql.galera_cluster_size | maximum galera cluster size in the last 2 minutes starting one minute ago |
-| [ mysql_galera_cluster_size ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf) | mysql.galera_cluster_size | current galera cluster size, compared to the maximum size in the last 2 minutes |
-| [ mysql_galera_cluster_state_warn ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf) | mysql.galera_cluster_state | galera node state is either Donor/Desynced or Joined |
-| [ mysql_galera_cluster_state_crit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf) | mysql.galera_cluster_state | galera node state is either Undefined or Joining or Error |
-| [ mysql_galera_cluster_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf) | mysql.galera_cluster_status | galera node is part of a nonoperational component. This occurs in cases of multiple membership changes that result in a loss of Quorum or in cases of split-brain situations. |
+| [ mysql_galera_cluster_size ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf) | mysql.galera_cluster_size | Current galera cluster size, compared to the maximum size in the last 2 minutes |
+| [ mysql_galera_cluster_state_warn ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf) | mysql.galera_cluster_state | Galera node state is either Donor/Desynced or Joined. |
+| [ mysql_galera_cluster_state_crit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf) | mysql.galera_cluster_state | Galera node state is either Undefined or Joining or Error. |
+| [ mysql_galera_cluster_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf) | mysql.galera_cluster_status | Galera node is part of a nonoperational component. This occurs in cases of multiple membership changes that result in a loss of Quorum or in cases of split-brain situations. |
 
 
 
@@ -316,7 +316,7 @@ The scope defines the instance that the metric belongs to. An instance is unique
 
 
 
-### Per MariaDB instance
+### Per Percona MySQL instance
 
 These metrics refer to the entire monitored application.
 

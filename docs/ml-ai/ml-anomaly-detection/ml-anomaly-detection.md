@@ -231,12 +231,12 @@ This means you can enable ML without provisioning additional storage capacity. A
 
 ### Cold Start Behavior
 
-On a freshly installed agent, ML begins detecting anomalies within 10 minutes. However, early detection has important characteristics:
+On a freshly installed agent, ML begins detecting anomalies on a metric once its first model is trained, which needs at least 15 minutes of data with the default settings. However, early detection has important characteristics:
 
 **Timeline:**
 
-- **0-10 minutes**: Collecting initial data, no anomaly detection
-- **10+ minutes**: First models trained, anomaly detection begins with high sensitivity
+- **0-15 minutes**: Collecting initial data, no anomaly detection
+- **15+ minutes**: First models trained, anomaly detection begins with high sensitivity
 - **3 hours**: First model rotation, improved accuracy
 - **54 hours**: Full model set established, optimal detection accuracy
 

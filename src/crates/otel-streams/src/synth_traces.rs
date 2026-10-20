@@ -137,9 +137,8 @@ pub fn generate(p: &SynthTraceParams) -> Vec<Span> {
         );
         let events = (0..p.events_per_span as u64)
             .map(|k| {
-                let time = start.saturating_add(
-                    (k + 1).saturating_mul(p.duration_nanos / 4 + 1).min(extent),
-                );
+                let time = start
+                    .saturating_add((k + 1).saturating_mul(p.duration_nanos / 4 + 1).min(extent));
                 if k == 0 {
                     Event {
                         time_unix_nano: time,

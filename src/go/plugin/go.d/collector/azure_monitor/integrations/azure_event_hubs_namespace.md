@@ -44,7 +44,7 @@ It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The service principal or managed identity requires these Azure RBAC roles:
 
@@ -378,7 +378,7 @@ Configure the **azure_monitor** collector from the Netdata web interface:
 4. In the Search box, type _azure_monitor_ (or scroll the list) to locate the **azure_monitor** collector.
 5. Click the **+** next to the **azure_monitor** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -633,16 +633,17 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_event_hubs_server_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.errors | Event Hubs server errors on ${label:resource_name} |
-| [ am_event_hubs_throttled_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.errors | Event Hubs throttled requests on ${label:resource_name} |
-| [ am_event_hubs_quota_exceeded ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.errors | Event Hubs quota exceeded on ${label:resource_name} |
-| [ am_event_hubs_user_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.errors | Event Hubs user errors on ${label:resource_name} |
-| [ am_event_hubs_success_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.requests | Event Hubs request success rate on ${label:resource_name} |
-| [ am_event_hubs_namespace_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.namespace_resources | Event Hubs namespace CPU on ${label:resource_name} |
-| [ am_event_hubs_namespace_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.namespace_resources | Event Hubs namespace memory on ${label:resource_name} |
-| [ am_event_hubs_capture_backlog ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.capture_backlog | Event Hubs capture backlog on ${label:resource_name} |
-| [ am_event_hubs_replication_lag ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.replication_lag | Event Hubs replication lag on ${label:resource_name} |
-| [ am_event_hubs_replication_lag_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.replication_lag_duration | Event Hubs replication lag duration on ${label:resource_name} |
+| [ am_event_hubs_server_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.errors | Server-side errors on Event Hubs namespace ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_event_hubs_throttled_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.errors | Requests being throttled on Event Hubs namespace ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_event_hubs_quota_exceeded ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.errors | Quota exceeded errors on Event Hubs namespace ${label:resource_name} in ${label:resource_group} (${label:region}). Quota errors indicate the namespace has exceeded its throughput unit limits |
+| [ am_event_hubs_user_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.errors | Rate of user (client-side) errors on Event Hubs namespace ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_event_hubs_incoming_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.requests | Total incoming requests to Event Hubs namespace ${label:resource_name} |
+| [ am_event_hubs_success_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.requests | Percentage of successful requests on Event Hubs namespace ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_event_hubs_namespace_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.namespace_resources | CPU utilization of Event Hubs Premium namespace ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_event_hubs_namespace_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.namespace_resources | Memory utilization of Event Hubs Premium namespace ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_event_hubs_capture_backlog ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.capture_backlog | Messages waiting to be captured on Event Hubs namespace ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_event_hubs_replication_lag ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.replication_lag | Geo-replication message lag on Event Hubs namespace ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_event_hubs_replication_lag_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.replication_lag_duration | Geo-replication time lag on Event Hubs namespace ${label:resource_name} in ${label:resource_group} (${label:region}) |
 
 
 

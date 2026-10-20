@@ -29,7 +29,7 @@ This collector is only supported on the following platforms:
 
 - Linux
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The plugin needs to access command `tc` to get the necessary metrics. To achieve this netdata modifies permission of file `/usr/libexec/netdata/plugins.d/tc-qos-helper.sh`.
 
@@ -141,7 +141,12 @@ You can read more about setting up the tc rules in rc.local in this [GitHub issu
 
 ## Alerts
 
-There are no alerts configured by default for this integration.
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ 10min_qos_packet_drops ](https://github.com/netdata/netdata/blob/master/src/health/health.d/qos.conf) | tc.qos_dropped | Dropped packets in the last 5 minutes |
 
 
 

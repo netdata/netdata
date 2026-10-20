@@ -194,6 +194,11 @@ Keep a record of profile decisions in a project-local doc under
 
 ## Recurring tips
 
+- For Python CLI injection findings, trace the actual entrypoint and validator. An analyzer may label
+  `argparse.parse_args()` as HTTP input while overlooking `choices=` validation. Check enum-derived flags,
+  absolute file arguments and operator-selected executables separately. `shlex.join()` used only in a printed
+  diagnostic or exception message is display text, not execution. Verify each source/sink before classification;
+  this pattern does not justify marking a whole rule family false positive.
 - `api/issues/search` is paged at `ps=500` max. The `sq_paginate` helper
   in `_lib.sh` walks every page until `paging.total`; use it from any
   new script instead of re-implementing the loop.

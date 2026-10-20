@@ -14,8 +14,13 @@ renice 19 $$ >/dev/null 2>/dev/null
 NETDATA_PREFIX="/opt/netdata"
 NETDATA_USER_CONFIG_DIR="${NETDATA_PREFIX}/etc/netdata"
 NETDATA_LIB_DIR="${NETDATA_PREFIX}/var/lib/netdata"
+# Consumed by install_netdata_dirs in functions.sh.
+# shellcheck disable=SC2034
 NETDATA_CACHE_DIR="${NETDATA_PREFIX}/var/cache/netdata"
 NETDATA_LOG_DIR="${NETDATA_PREFIX}/var/log/netdata"
+# Consumed by install_netdata_dirs in functions.sh.
+# shellcheck disable=SC2034
+NETDATA_CLAIMING_DIR="${NETDATA_LIB_DIR}/cloud.d"
 
 # -----------------------------------------------------------------------------
 if [ -d /opt/netdata/etc/netdata.old ]; then
@@ -175,7 +180,23 @@ dir_should_be_link etc/netdata ../../usr/lib/netdata/conf.d orig
 progress "fix permissions"
 
 run chmod g+rx,o+rx /opt
-run find /opt/netdata -type d -exec chmod go+rx '{}' \+
+# Makeself creates implicit package parents with a private umask. Apply package
+# permissions only to shipped paths, never to discovered application state.
+if [ ! -s "${NETDATA_PREFIX}/system/package-manifest" ]; then
+  run_failed "Missing package path inventory"
+  exit 1
+fi
+while IFS= read -r package_path; do
+  path="${NETDATA_PREFIX}/${package_path}"
+  [ -e "${path}" ] || [ -L "${path}" ] || continue
+  if [ -d "${path}" ] && [ ! -L "${path}" ]; then
+    run chmod go+rx "${path}" || exit 1
+  fi
+  case "${package_path}" in
+    ./usr/libexec/netdata/plugins.d/ebpf.d | ./usr/libexec/netdata/plugins.d/ebpf.d/*)
+      run chown -h "root:${NETDATA_GROUP}" "${path}" || exit 1 ;;
+  esac
+done < "${NETDATA_PREFIX}/system/package-manifest"
 
 install_netdata_dirs
 
@@ -187,10 +208,6 @@ install_netdata_dirs
 # the log dir non-recursively, so nothing else fixes the subtree.
 if [ -d "${NETDATA_LOG_DIR}/otel" ]; then
   run chown -R ${NETDATA_USER}:${NETDATA_GROUP} "${NETDATA_LOG_DIR}/otel"
-fi
-
-if [ -d /opt/netdata/usr/libexec/netdata/plugins.d/ebpf.d ]; then
-  run chown -R root:${NETDATA_GROUP} /opt/netdata/usr/libexec/netdata/plugins.d/ebpf.d
 fi
 
 # The Go helper replaces the old Bash artifact. Remove leftovers from an
@@ -223,17 +240,25 @@ for x in ndsudo apps.plugin perf.plugin slabinfo.plugin debugfs.plugin freeipmi.
 done
 
 if command -v setcap >/dev/null 2>&1; then
-  if ! run setcap "cap_dac_read_search,cap_sys_ptrace=ep" "usr/libexec/netdata/plugins.d/apps.plugin"; then
-    run chmod 4750 "usr/libexec/netdata/plugins.d/apps.plugin"
+  if [ -f "usr/libexec/netdata/plugins.d/apps.plugin" ]; then
+    if ! run setcap "cap_dac_read_search,cap_sys_ptrace=ep" "usr/libexec/netdata/plugins.d/apps.plugin"; then
+      run chmod 4750 "usr/libexec/netdata/plugins.d/apps.plugin"
+    fi
   fi
-  if ! run setcap "cap_dac_read_search=ep" "usr/libexec/netdata/plugins.d/slabinfo.plugin"; then
-    run chmod 4750 "usr/libexec/netdata/plugins.d/slabinfo.plugin"
+  if [ -f "usr/libexec/netdata/plugins.d/slabinfo.plugin" ]; then
+    if ! run setcap "cap_dac_read_search=ep" "usr/libexec/netdata/plugins.d/slabinfo.plugin"; then
+      run chmod 4750 "usr/libexec/netdata/plugins.d/slabinfo.plugin"
+    fi
   fi
-  if ! run setcap "cap_dac_read_search,cap_audit_control=ep" "usr/libexec/netdata/plugins.d/debugfs.plugin"; then
-    run chmod 4750 "usr/libexec/netdata/plugins.d/debugfs.plugin"
+  if [ -f "usr/libexec/netdata/plugins.d/debugfs.plugin" ]; then
+    if ! run setcap "cap_dac_read_search,cap_audit_control=ep" "usr/libexec/netdata/plugins.d/debugfs.plugin"; then
+      run chmod 4750 "usr/libexec/netdata/plugins.d/debugfs.plugin"
+    fi
   fi
-  if ! run setcap "cap_dac_read_search+epi cap_net_admin+epi cap_net_raw=eip cap_net_bind_service=eip" "usr/libexec/netdata/plugins.d/go.d.plugin"; then
-    run chmod 4750 "usr/libexec/netdata/plugins.d/go.d.plugin"
+  if [ -f "usr/libexec/netdata/plugins.d/go.d.plugin" ]; then
+    if ! run setcap "cap_dac_read_search+epi cap_net_admin+epi cap_net_raw=eip cap_net_bind_service=eip" "usr/libexec/netdata/plugins.d/go.d.plugin"; then
+      run chmod 4750 "usr/libexec/netdata/plugins.d/go.d.plugin"
+    fi
   fi
 
   perf_caps="cap_sys_admin=ep"
@@ -241,8 +266,10 @@ if command -v setcap >/dev/null 2>&1; then
     perf_caps="cap_perfmon=ep"
   fi
 
-  if ! run setcap "${perf_caps}" "usr/libexec/netdata/plugins.d/perf.plugin"; then
-    run chmod 4750 "usr/libexec/netdata/plugins.d/perf.plugin"
+  if [ -f "usr/libexec/netdata/plugins.d/perf.plugin" ]; then
+    if ! run setcap "${perf_caps}" "usr/libexec/netdata/plugins.d/perf.plugin"; then
+      run chmod 4750 "usr/libexec/netdata/plugins.d/perf.plugin"
+    fi
   fi
   if [ -f "usr/libexec/netdata/plugins.d/systemd-journal.plugin" ]; then
     if ! run setcap "cap_dac_read_search=eip" "usr/libexec/netdata/plugins.d/systemd-journal.plugin"; then
@@ -255,7 +282,9 @@ if command -v setcap >/dev/null 2>&1; then
 else
   for x in apps.plugin perf.plugin slabinfo.plugin debugfs.plugin; do
     f="usr/libexec/netdata/plugins.d/${x}"
-    run chmod 4750 "${f}"
+    if [ -f "${f}" ]; then
+      run chmod 4750 "${f}"
+    fi
   done
   if [ -f "usr/libexec/netdata/plugins.d/systemd-journal.plugin" ]; then
     run chmod 4750 "usr/libexec/netdata/plugins.d/systemd-journal.plugin"

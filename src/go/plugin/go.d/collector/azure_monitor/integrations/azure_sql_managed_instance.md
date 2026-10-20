@@ -40,7 +40,7 @@ It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The service principal or managed identity requires these Azure RBAC roles:
 
@@ -374,7 +374,7 @@ Configure the **azure_monitor** collector from the Netdata web interface:
 4. In the Search box, type _azure_monitor_ (or scroll the list) to locate the **azure_monitor** collector.
 5. Click the **+** next to the **azure_monitor** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -629,9 +629,9 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_sql_managed_instance_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_managed_instance.conf) | azure_monitor.sql_managed_instance.cpu | SQL MI CPU utilization on ${label:resource_name} |
-| [ am_sql_managed_instance_storage_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_managed_instance.conf) | azure_monitor.sql_managed_instance.storage | SQL MI storage utilization on ${label:resource_name} |
-| [ am_sql_managed_instance_io_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_managed_instance.conf) | azure_monitor.sql_managed_instance.io_requests | SQL MI I/O requests on ${label:resource_name} |
+| [ am_sql_managed_instance_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_managed_instance.conf) | azure_monitor.sql_managed_instance.cpu | Average CPU utilization of SQL Managed Instance ${label:resource_name} in ${label:resource_group} (${label:region}). Sustained high CPU indicates insufficient compute tier or query optimization needed |
+| [ am_sql_managed_instance_storage_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_managed_instance.conf) | azure_monitor.sql_managed_instance.storage | Storage used as a percentage of reserved storage on SQL Managed Instance ${label:resource_name} in ${label:resource_group} (${label:region}). Approaching reserved storage limit may cause write failures |
+| [ am_sql_managed_instance_io_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_managed_instance.conf) | azure_monitor.sql_managed_instance.io_requests | Average I/O requests per second on SQL Managed Instance ${label:resource_name} in ${label:resource_group} (${label:region}). High I/O request rates may indicate I/O bottleneck or unoptimized queries |
 
 
 

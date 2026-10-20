@@ -33,7 +33,7 @@ It collects information and statistics about the server executing the following 
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -86,7 +86,7 @@ The following options can be defined globally: update_every, autodetection_retry
 |:------|:-----|:------------|:--------|:---------:|
 | **Collection** | update_every | Data collection frequency (seconds). | 5 | no |
 |  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
-| **Target** | address | Pika server address. | redis://@localhost:9221 | yes |
+| **Target** | [address](#option-target-address) | Pika server address. | redis://@localhost:9221 | yes |
 |  | timeout | Dial (establishing new connections), read (socket reads), and write (socket writes) timeout (seconds). | 1 | no |
 | **Auth** | username | Username for authentication. |  | no |
 |  | password | Password for authentication. |  | no |
@@ -95,6 +95,15 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | tls_cert | Client TLS certificate. |  | no |
 |  | tls_key | Client TLS key. |  | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
+
+<a id="option-target-address"></a>
+##### address
+
+There are two connection types: by TCP socket and by Unix socket.
+
+- TCP connection: `redis://<user>:<password>@<host>:<port>/<db_number>`
+- Unix connection: `unix://<user>:<password>@</path/to/redis.sock>?db=<db_number>`
+
 
 
 </details>
@@ -110,7 +119,7 @@ Configure the **pika** collector from the Netdata web interface:
 4. In the Search box, type _pika_ (or scroll the list) to locate the **pika** collector.
 5. Click the **+** next to the **pika** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 

@@ -1,3 +1,32 @@
+//! Tests for [`ChunkWriter`] (writer.rs), the low-level SFST format writer:
+//! the stage machine behind the canonical chunk order (SUMR → META → TIMS →
+//! PRIM, then the optional cold-region per-row columns / TIDX / TBLM, then
+//! mid fields → high fields → stream batches), the misuse guards behind it
+//! (`ChunkCounts` validation at `new`, out-of-order, over-count, and
+//! underfilled refusals), and pack round-trips for every chunk kind it
+//! streams.
+//!
+//! Fixtures are tiny in-memory files (`Cursor<Vec<u8>>`) built through the
+//! shared helpers below and verified by re-opening them with the crate's own
+//! `ChunkReader`, so writer and reader must agree on every payload.
+//!
+//! Pins:
+//!
+//! - a full logs-shaped file round-trips; the reader derives its mid/high
+//!   counts from META's field tiers (reader.rs);
+//! - a summary-only file — the format's minimal shape — stays readable;
+//! - misuse → `Error::WriterMisuse`; batch counts outside
+//!   `1..=MAX_STREAM_BATCHES` → `Error::InvalidStreamBatchCount`; duplicate
+//!   primary keys → `Error::PrefixMapBuild`;
+//! - per-row columns are independently optional, and the META manifest must
+//!   match the declared `ChunkCounts::columns` exactly;
+//! - [`ALL_COLUMNS`] stays wired into `ColumnsPresent::has`, the one
+//!   hand-written ordinal map.
+//!
+//! Not pinned here: event/link/rollup chunk writes, compression levels and
+//! wire encodings, exact misuse message strings, the container/TOC layer
+//! (chunk-file), and the higher-level seal path (index_writer.rs,
+//! src/tests/round_trip.rs).
 use std::io::Cursor;
 
 use treight::Bitmap;
@@ -10,6 +39,8 @@ use crate::{
     TraceIdIndex, TraceIds,
 };
 
+/// Logs-shaped section counts: `mid`/`high` field and batch sections, no
+/// optional chunks.
 fn counts(mid: u16, high: u16, batches: u8) -> ChunkCounts {
     ChunkCounts {
         columns: ColumnsPresent::default(),
@@ -35,9 +66,11 @@ fn summary() -> Summary {
 
 #[test]
 fn write_summary_only_round_trips_through_reader() {
-    // A content-light SFST (the traces-style seal): only the SUMR chunk, none of
-    // the logs-shaped chunks ChunkWriter mandates. The shared reader/registry
-    // must still recover its summary so the lifecycle tracks it like any file.
+    // The format's floor: a content-light file holding only the SUMR chunk,
+    // none of the logs-shaped chunks ChunkWriter mandates. write_summary_only
+    // is test-only now (writer.rs), but summary-only files remain valid on the
+    // read side: the shared ChunkReader must open the file and serve the
+    // summary back exactly as written.
     let s = Summary {
         min_timestamp_s: 100,
         max_timestamp_s: 200,
@@ -106,8 +139,10 @@ fn write_prefix(w: &mut ChunkWriter<Cursor<Vec<u8>>>) {
 
 #[test]
 fn full_file_in_canonical_order_round_trips() {
-    // The field table declares the same 2-mid/1-high shape the writer
-    // streams, since the reader derives chunk counts from it.
+    // The canonical order end to end, each section call returning its running
+    // index. META's field entries carry the same 2-mid/1-high tiers the writer
+    // streams: the reader counts the field sections by filtering those tiers
+    // (reader.rs), so the two must agree.
     let field = |name: &str, tier| FieldEntry {
         name: name.into(),
         cardinality: 1,
@@ -144,8 +179,8 @@ fn full_file_in_canonical_order_round_trips() {
 
 #[test]
 fn primary_rejects_duplicate_keys() {
-    // The writer builds the primary FST from entries; a duplicate key=value is
-    // a producer bug that surfaces as Error::PrefixMapBuild through the `?` chain.
+    // Duplicate key=value entries are a producer bug: PrefixMap::build fails
+    // and the writer's `?` chain surfaces it as Error::PrefixMapBuild.
     let mut w = writer(counts(0, 0, 1));
     w.summary(&summary()).unwrap();
     w.metadata(&metadata(Vec::new())).unwrap();
@@ -160,6 +195,8 @@ fn primary_rejects_duplicate_keys() {
 
 #[test]
 fn rejects_zero_and_excess_stream_batch_counts() {
+    // `new()` requires 1..=MAX_STREAM_BATCHES — the TOC is sized from the
+    // declared counts up front — so both bounds fail immediately.
     for n in [0u8, crate::MAX_STREAM_BATCHES + 1] {
         assert!(matches!(
             ChunkWriter::new(Cursor::new(Vec::new()), counts(0, 0, n)),
@@ -229,6 +266,8 @@ fn rejects_secondary_chunks_out_of_section_order() {
 
 #[test]
 fn rejects_chunks_beyond_declared_counts() {
+    // One more chunk than declared in a counted section is rejected: the
+    // declared counts reserve the file's chunks at `new()`.
     let mut w = writer(counts(1, 0, 1));
     write_prefix(&mut w);
     w.add_mid_field(entries()).unwrap();
@@ -265,8 +304,7 @@ fn finish_refuses_an_underfilled_file() {
     assert!(matches!(w.finish(), Err(Error::WriterMisuse(_))));
 }
 
-/// Build all five per-row columns for `n` rows, each value tagged by its row
-/// index so the round-trip / reorder is verifiable.
+/// The full per-row column set: all seven columns, in canonical ordinal order.
 type SampleColumns = (
     ObservedTimestamps,
     TraceIds,
@@ -277,6 +315,8 @@ type SampleColumns = (
     Durations,
 );
 
+/// Build every column for `n` rows, each value tagged with its row index so a
+/// round-trip is verifiable.
 fn sample_columns(n: usize) -> SampleColumns {
     let observed = ObservedTimestamps((0..n as i64).map(|i| 100 + i).collect());
     let mut trace = TraceIds::with_capacity(n);
@@ -293,6 +333,7 @@ fn sample_columns(n: usize) -> SampleColumns {
     (observed, trace, span, flags, drac, parent, durations)
 }
 
+/// Presence flags with every column on — the counterpart of [`columns_table`].
 fn present_all() -> ColumnsPresent {
     ColumnsPresent {
         observed_ts: true,
@@ -305,7 +346,7 @@ fn present_all() -> ColumnsPresent {
     }
 }
 
-/// The manifest matching `present_all()` / `sample_columns`.
+/// The META manifest matching `present_all()` / `sample_columns`.
 fn columns_table() -> ColumnsTable {
     ColumnsTable(vec![
         ColumnEntry {
@@ -339,6 +380,8 @@ fn columns_table() -> ColumnsTable {
     ])
 }
 
+/// Section counts for a columns-only fixture: the declared `columns` plus one
+/// stream batch, the minimum that lets `new()` and `finish()` succeed.
 fn col_counts(columns: ColumnsPresent) -> ChunkCounts {
     ChunkCounts {
         columns,
@@ -434,6 +477,8 @@ fn per_row_columns_are_independently_optional() {
 
 #[test]
 fn no_per_row_columns_is_the_default() {
+    // The empty subset is the default shape: no column region, no manifest,
+    // and any column query on the reader errors.
     let mut w = writer(counts(0, 0, 1));
     write_prefix(&mut w);
     w.add_stream_batch(&batch()).unwrap();
@@ -591,6 +636,9 @@ fn three_span_traces() -> (TraceIds, TraceId, TraceId) {
 
 #[test]
 fn trace_id_index_round_trips_and_resolves() {
+    // The TIDX round-trips as packed, and the decoded index resolves: queried
+    // against the file's own trace_id column, it returns each trace's row
+    // positions.
     let (trace, a, b) = three_span_traces();
     let index = TraceIdIndex::build(&trace);
 
@@ -716,11 +764,12 @@ fn trace_id_index_misuse_is_rejected() {
     ));
 }
 
-/// Guard the one remaining hand-written column map: `ColumnsPresent::has()` matches
-/// ordinals with a `_ => false` arm, so a column added to [`ALL_COLUMNS`] (and to
-/// `ColumnsPresent`) but NOT to `has()` would be silently treated as absent across
-/// presence count, the manifest, and the manifest-vs-counts check. This pins every
-/// registry entry to a real presence field and pins ordinals to array positions.
+/// Guard the one hand-written ordinal map: `ColumnsPresent::has()` matches
+/// ordinals against named presence fields with a `_ => false` arm, so a column
+/// added to [`ALL_COLUMNS`] but missed in `has()` would be silently treated as
+/// absent everywhere — presence count, META manifest, manifest-vs-counts
+/// check. Pins every column to a real presence field, and ordinals to array
+/// positions.
 #[test]
 fn all_columns_are_wired_into_columns_present_has() {
     for (i, spec) in ALL_COLUMNS.iter().enumerate() {
@@ -751,6 +800,9 @@ fn bloom_counts() -> ChunkCounts {
 
 #[test]
 fn trace_id_bloom_round_trips_and_answers() {
+    // The TBLM round-trips as packed and answers membership: both trace ids in
+    // the file pass might_contain, and distinct_ids — the bloom's own
+    // build-time count — reports 2.
     let (trace, a, b) = three_span_traces();
     let index = TraceIdIndex::build(&trace);
     let bloom = crate::TraceIdBloom::build(&index, &trace).expect("set ids");

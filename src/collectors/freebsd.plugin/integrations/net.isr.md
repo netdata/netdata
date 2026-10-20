@@ -27,7 +27,7 @@ The plugin calls `sysctl` function to collect necessary data.
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -106,9 +106,7 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ 1min_netdev_backlog_exceeded ](https://github.com/netdata/netdata/blob/master/src/health/health.d/softnet.conf) | system.softnet_stat | average number of dropped packets in the last minute due to exceeded net.core.netdev_max_backlog |
-| [ 1min_netdev_budget_ran_outs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/softnet.conf) | system.softnet_stat | average number of times ksoftirq ran out of sysctl net.core.netdev_budget or net.core.netdev_budget_usecs with work remaining over the last minute (this can be a cause for dropped packets) |
-| [ 10min_netisr_backlog_exceeded ](https://github.com/netdata/netdata/blob/master/src/health/health.d/softnet.conf) | system.softnet_stat | average number of drops in the last minute due to exceeded sysctl net.route.netisr_maxqlen (this can be a cause for dropped packets) |
+| [ 10min_netisr_backlog_exceeded ](https://github.com/netdata/netdata/blob/master/src/health/health.d/softnet.conf) | system.softnet_stat | Average number of drops in the last minute due to exceeded sysctl net.route.netisr_maxqlen (this can be a cause for dropped packets) |
 
 
 

@@ -123,9 +123,10 @@ Where:
 
 - `transaction_id` is the same ID received in the original command
 - `http_status_code` is the standard HTTP response code:
-    - `200`: Success (DYNCFG_RESP_RUNNING) - Configuration accepted and running
-    - `202`: Accepted (DYNCFG_RESP_ACCEPTED) - Configuration accepted but not running: still starting, or adopted
-      and failed (the status frame says which)
+    - `200`: Success (DYNCFG_RESP_RUNNING) - Configuration accepted and running, or already-enabled collector intent
+      satisfied with health other than Accepted; non-running health is reported in a following status frame
+    - `202`: Accepted (DYNCFG_RESP_ACCEPTED) - Configuration accepted but not running: still starting, including
+      repeated ENABLE while Accepted, or adopted and failed (the status frame says which)
     - `298`: Accepted but disabled (DYNCFG_RESP_ACCEPTED_DISABLED)
     - `299`: Accepted but restart required (DYNCFG_RESP_ACCEPTED_RESTART_REQUIRED)
     - `400`: Bad request - Invalid configuration
@@ -151,11 +152,21 @@ An error from that path is not proof that the plugin rejected the change. Netdat
 observing a successful reply; reading the plugin's current configuration does not prove that Netdata saved it.
 Clients MUST NOT turn an uncertain update result into an `add` attempt.
 
-For Go collector and service-discovery jobs, `update` that accepts a replacement for activation and non-running
-`enable` return `202`, without waiting for runtime readiness or physical cleanup. Disabled `update` and an identical running DynCfg-source
+For Go collector and service-discovery jobs, `update` that accepts a replacement for activation returns `202`,
+without waiting for runtime readiness or physical cleanup. Disabled `update` and an identical running DynCfg-source
 `update` return `200`. `CONFIG <id> STATUS` reports later health. `add` is passive until Netdata echoes enabledness;
-`add` and disabled `update` validate structure without acquiring external
-dependencies. Interactive `update` still rejects any failed preflight, irrespective of retry policy.
+`add` and disabled `update` validate structure without acquiring external dependencies. Interactive `update` still
+rejects any failed preflight, irrespective of retry policy.
+
+For Go collector jobs, `enable` that transitions a passive or disabled job to enabled returns `202`. Repeated
+`enable` on an already-enabled job preserves ongoing work and retry deadlines regardless of health. It returns `202`
+while health is Accepted and `200` otherwise, including Failed. After a `200` reply with non-Running health, the plugin
+follows with `CONFIG <id> STATUS <health>` to correct the daemon's Running status implied by `200`. Use `restart` for
+an immediate attempt on the stored configuration.
+
+For service-discovery jobs, `enable` returns `200` when already running and `202` otherwise. An already-enabled
+Accepted pipeline retains its pending activation; a Failed pipeline starts a new activation attempt. Use `enable`
+to recover a failed service-discovery job; these jobs do not support `restart`.
 
 The result data depends on the command:
 
@@ -370,11 +381,14 @@ Behavior an author must design around:
 - Validation: the UI validates live with ajv (types, `required`, `enum`, `minimum`/`maximum`, `pattern`, `format`
   including `uri`, `ipv4`, `hostname`) and blocks the save while the form is invalid. A schema stricter than the
   plugin blocks legitimate configs; a looser one offers configs the plugin rejects.
-- `dependencies` with `oneOf` on a `const` discriminator reveals the matching branch's properties inline (no selector
-  widget); the UI drops the form data of inactive branches for TOP-LEVEL dependencies only. A key that is both a
-  branch property and a plain sibling property renders unconditionally. Avoid property-level `oneOf`/`anyOf` (rendered
-  as a branch selector whose first option cannot be selected reliably) and avoid `0`, `false`, and `""` as `enum`
-  values in select-rendered fields.
+- `dependencies` with `oneOf` reveals the matching branch's properties inline (no selector widget). A branch matches
+  when its discriminator is a `const` equal to the value or an `enum` listing it, so one branch can serve several
+  values. For TOP-LEVEL dependencies only, the UI drops the form data of properties that no matching branch declares;
+  a property several branches declare survives a switch between them. A key that is both a branch property and a plain
+  sibling property renders unconditionally. Avoid `oneOf`/`anyOf` outside `dependencies`, on a property or on an object
+  (including inside `allOf`): it renders as a branch selector whose first option cannot be selected reliably, and on a
+  tabbed object it repeats the tab strip. Express cross-field rules with `if`/`then` instead. Avoid `0`, `false`, and
+  `""` as `enum` values in select-rendered fields.
 - Nullable fields: a two-member union such as `["string", "null"]` renders as the non-null type; any other union
   (three or more members, or two members without `null`) collapses to its first member.
 - Maps: `additionalProperties: {type: ...}` renders a key/value list with an add button; `patternProperties` alone

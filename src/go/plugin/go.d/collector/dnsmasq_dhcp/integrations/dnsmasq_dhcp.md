@@ -109,7 +109,7 @@ Configure the **dnsmasq_dhcp** collector from the Netdata web interface:
 4. In the Search box, type _dnsmasq_dhcp_ (or scroll the list) to locate the **dnsmasq_dhcp** collector.
 5. Click the **+** next to the **dnsmasq_dhcp** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -177,7 +177,7 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ dnsmasq_dhcp_dhcp_range_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/dnsmasq_dhcp.conf) | dnsmasq_dhcp.dhcp_range_utilization | DHCP range utilization |
+| [ dnsmasq_dhcp_dhcp_range_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/dnsmasq_dhcp.conf) | dnsmasq_dhcp.dhcp_range_utilization | DHCP range ${label:dhcp_range} utilization |
 
 
 

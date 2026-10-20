@@ -408,7 +408,7 @@ pub fn batch_item_get(
 //  Batch builder
 // ---------------------------------------------------------------------------
 
-/// Builds a batch payload: [directory] [align-pad] [packed items].
+/// Builds a batch payload: `directory` [align-pad] [packed items].
 pub struct BatchBuilder<'a> {
     buf: &'a mut [u8],
     item_count: u32,

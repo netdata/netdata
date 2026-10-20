@@ -2,15 +2,15 @@ use super::*;
 #[cfg(target_os = "linux")]
 use crate::protocol::PROFILE_SHM_FUTEX;
 use crate::protocol::{
-    increment_encode, AppsLookupBuilder, AppsLookupRequestView, AppsLookupResponseView,
-    BatchBuilder, CgroupsBuilder, CgroupsLookupBuilder, CgroupsLookupRequestView,
-    CgroupsLookupResponseView, APPS_CGROUP_HOST_ROOT, APPS_CGROUP_KNOWN, APPS_LOOKUP_RESP_HDR_SIZE,
-    CGROUPS_LOOKUP_RESP_HDR_SIZE, CGROUP_LOOKUP_KNOWN, CGROUP_LOOKUP_OVERSIZED_ITEM,
-    CGROUP_LOOKUP_PAYLOAD_EXCEEDED, CGROUP_LOOKUP_UNKNOWN_RETRY_LATER, KIND_RESPONSE,
+    APPS_CGROUP_HOST_ROOT, APPS_CGROUP_KNOWN, APPS_LOOKUP_RESP_HDR_SIZE, AppsLookupBuilder,
+    AppsLookupRequestView, AppsLookupResponseView, BatchBuilder, CGROUP_LOOKUP_KNOWN,
+    CGROUP_LOOKUP_OVERSIZED_ITEM, CGROUP_LOOKUP_PAYLOAD_EXCEEDED,
+    CGROUP_LOOKUP_UNKNOWN_RETRY_LATER, CGROUPS_LOOKUP_RESP_HDR_SIZE, CgroupsBuilder,
+    CgroupsLookupBuilder, CgroupsLookupRequestView, CgroupsLookupResponseView, KIND_RESPONSE,
     MAX_PAYLOAD_CAP, METHOD_APPS_LOOKUP, METHOD_CGROUPS_LOOKUP, NIPC_UID_UNSET,
     ORCHESTRATOR_DOCKER, ORCHESTRATOR_K8S, PID_LOOKUP_KNOWN, PID_LOOKUP_OVERSIZED_ITEM,
     PID_LOOKUP_PAYLOAD_EXCEEDED, PID_LOOKUP_UNKNOWN, PROFILE_BASELINE, STATUS_LIMIT_EXCEEDED,
-    STATUS_OK,
+    STATUS_OK, increment_encode,
 };
 use std::os::fd::RawFd;
 use std::os::unix::ffi::OsStrExt;
@@ -2492,9 +2492,11 @@ fn test_lookup_logical_limits() {
         max_subcalls: 0,
         max_response_bytes: 0,
     });
-    assert!(client
-        .call_cgroups_lookup(&[b"/a".as_slice(), b"/b".as_slice()])
-        .is_err());
+    assert!(
+        client
+            .call_cgroups_lookup(&[b"/a".as_slice(), b"/b".as_slice()])
+            .is_err()
+    );
 
     let svc = unique_service("rs_svc_apps_lookup_response_limit");
     let mut server = TestServer::start(&svc, METHOD_APPS_LOOKUP, Some(test_apps_lookup_dispatch()));
@@ -2617,9 +2619,11 @@ fn test_cgroups_lookup_rejects_mixed_generation_retry() {
     let mut client = cgroups_lookup_client(&svc, client_config());
     connect_ready(&mut client);
 
-    assert!(client
-        .call_cgroups_lookup(&[b"/a".as_slice(), b"/huge".as_slice(), b"/b".as_slice()])
-        .is_err());
+    assert!(
+        client
+            .call_cgroups_lookup(&[b"/a".as_slice(), b"/huge".as_slice(), b"/b".as_slice()])
+            .is_err()
+    );
     assert!(
         calls.load(Ordering::SeqCst) >= 2,
         "handler should be called for at least two subrequests"
@@ -2892,9 +2896,11 @@ fn test_lookup_endpoint_gone_after_partial_progress_unix() {
     });
     let mut client = apps_lookup_client(&svc, client_config());
     connect_ready(&mut client);
-    assert!(client
-        .call_apps_lookup_with_timeout(&[11, 22, 33], 1_000)
-        .is_err());
+    assert!(
+        client
+            .call_apps_lookup_with_timeout(&[11, 22, 33], 1_000)
+            .is_err()
+    );
     client.close();
     server.wait();
     cleanup_all(&svc);
@@ -2920,12 +2926,14 @@ fn test_lookup_endpoint_gone_after_partial_progress_unix() {
     });
     let mut client = cgroups_lookup_client(&svc, client_config());
     connect_ready(&mut client);
-    assert!(client
-        .call_cgroups_lookup_with_timeout(
-            &[b"/a".as_slice(), b"/b".as_slice(), b"/c".as_slice()],
-            1_000,
-        )
-        .is_err());
+    assert!(
+        client
+            .call_cgroups_lookup_with_timeout(
+                &[b"/a".as_slice(), b"/b".as_slice(), b"/c".as_slice()],
+                1_000,
+            )
+            .is_err()
+    );
     client.close();
     server.wait();
     cleanup_all(&svc);
@@ -2938,9 +2946,11 @@ fn test_lookup_endpoint_gone_before_first_subcall_unix() {
     let mut client = apps_lookup_client(&svc, client_config());
     connect_ready(&mut client);
     server.stop();
-    assert!(client
-        .call_apps_lookup_with_timeout(&[11, 22], 1_000)
-        .is_err());
+    assert!(
+        client
+            .call_apps_lookup_with_timeout(&[11, 22], 1_000)
+            .is_err()
+    );
     client.close();
     cleanup_all(&svc);
 
@@ -2953,9 +2963,11 @@ fn test_lookup_endpoint_gone_before_first_subcall_unix() {
     let mut client = cgroups_lookup_client(&svc, client_config());
     connect_ready(&mut client);
     server.stop();
-    assert!(client
-        .call_cgroups_lookup_with_timeout(&[b"/a".as_slice(), b"/b".as_slice()], 1_000)
-        .is_err());
+    assert!(
+        client
+            .call_cgroups_lookup_with_timeout(&[b"/a".as_slice(), b"/b".as_slice()], 1_000)
+            .is_err()
+    );
     client.close();
     cleanup_all(&svc);
 }

@@ -1,26 +1,35 @@
-//! Query primitives over an SFST index.
-//!
-//! This module defines the input and output types of the query API.
+//! Query primitives over an SFST index: the input and output types of the
+//! query API, plus the two regex compilers its matching runs on.
 //!
 //! - [`Filter`] — a selection set (`field → allowed values`) with **OR
 //!   within a field** and **AND across fields**.
+//! - [`Matcher`] — one value matcher inside a field's selection: an exact
+//!   literal or a regex source.
 //! - [`FacetResult`] — a per-field `(value, count)` breakdown: the
 //!   distribution of a field's values across the matched logs.
 //! - [`Grid`] / [`Timeline`] — a time-bucketed, per-value count grid for
 //!   plotting a stacked time series of the matched logs.
+//! - [`MaterializedRow`] — one decoded log row (timestamp + attributes).
 //!
-//! # Filter semantics
+//! # Where matching happens
 //!
-//! A `Filter` is a `field → values` map. A log matches iff, for every field
-//! present in the filter, the log's value for that field is one of the
-//! allowed values — disjunction within a field, conjunction across fields.
-//! An empty filter matches every log.
+//! This module holds the data and the regex entry points; the position
+//! bitmaps live in the reader. [`compile_filter`](crate::IndexReader::compile_filter)
+//! ORs each field's matchers into a value bitmap,
+//! ANDs the fields together, and folds in the field-less full-text
+//! [`compile_query`] term. The same [`Matcher`]s and compilers drive
+//! sfsq's WAL-scan path (`sfsq/src/logs/wal_scan.rs` `field_matches`), so
+//! on-disk and WAL queries share these semantics.
 //!
-//! When computing a facet *for* a field, that field's own selection is
-//! excluded from the filter, so selecting `level=error` doesn't collapse
-//! the `level` facet to a single value. A [`Timeline`] is different: the
-//! full filter applies — including the histogram field's own selection —
-//! so the chart shows exactly the matched logs (the legacy `facets.c`
+//! # Consumer-side filter scoping
+//!
+//! The reader scopes the filter differently per result kind: a facet
+//! *for* a field ([`IndexReader::facets`](crate::IndexReader::facets)) is
+//! computed with that field's own selection excluded — selecting
+//! `level=error` doesn't collapse the `level` facet to a single value —
+//! while a [`Timeline`] keeps the full filter, histogram field included
+//! ([`IndexReader::timeline`](crate::IndexReader::timeline)), so the
+//! chart shows exactly the matched logs (the legacy `facets.c`
 //! contract the consuming UI renders against).
 
 use std::collections::{BTreeMap, HashMap};
@@ -28,12 +37,13 @@ use std::ops::Range;
 
 /// A single value matcher within a field's selection.
 ///
-/// A field's matched set is the OR of its matchers. [`Exact`](Self::Exact)
-/// matches one literal value; [`Pattern`](Self::Pattern) carries a regex
-/// *source* string, compiled full-value-anchored at resolution time (the
-/// engine wraps it as `^(?:…)$`, so `err` matches `"err"` but not `"error"`
-/// — a substring search is the explicit `.*err.*`). The source is stored
-/// uncompiled so `Filter` stays plain, comparable, wire-neutral data.
+/// [`Exact`](Self::Exact) matches one literal value;
+/// [`Pattern`](Self::Pattern) carries a regex *source* string, compiled
+/// full-value-anchored at resolution time (the engine wraps it as
+/// `^(?:…)$`, so `err` matches `"err"` but not `"error"` — a substring
+/// search is the explicit `.*err.*`). The source is stored uncompiled
+/// because a compiled regex implements neither `PartialEq` nor `Eq`, and
+/// `Filter` (which holds matchers) derives both.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Matcher {
     /// Match this exact value.
@@ -47,9 +57,9 @@ pub enum Matcher {
 /// The single place the anchoring is applied. A bad source is a hard
 /// [`crate::Error::InvalidPattern`].
 pub fn compile_pattern(src: &str) -> Result<regex::bytes::Regex, crate::Error> {
-    // `bytes::Regex` matches directly against the `&[u8]` keys (sorted
-    // `field=value` blobs), skipping the `str::from_utf8` validation on every
-    // key — the keys are UTF-8 by construction. Unicode mode is on by default,
+    // `bytes::Regex` matches the index's `&[u8]` `field=value` keys
+    // directly, skipping the `str::from_utf8` validation on every key —
+    // the keys are UTF-8 by construction. Unicode mode is on by default,
     // so on valid UTF-8 this matches identically to `regex::Regex`.
     regex::bytes::Regex::new(&format!("^(?:{src})$"))
         .map_err(|e| crate::Error::InvalidPattern(e.to_string()))
@@ -85,22 +95,22 @@ pub struct Filter {
 }
 
 impl Filter {
+    /// An empty filter — matches every log.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Iterate the `(field, matchers)` selections — disjunction within a
-    /// field, conjunction across fields. Fields are yielded in sorted
-    /// order; within a field, matchers keep insertion order.
+    /// Iterate the `(field, matchers)` selections. Fields come out in
+    /// sorted order (`BTreeMap`); within a field, matchers keep insertion
+    /// order.
     pub fn iter(&self) -> impl Iterator<Item = (&String, &[Matcher])> {
         self.selections
             .iter()
             .map(|(field, ms)| (field, ms.as_slice()))
     }
 
-    /// Add an exact `value` to the allowed matchers for `field`. Multiple
-    /// matchers on the same field combine with OR; different fields combine
-    /// with AND.
+    /// Add an exact `value` to the allowed matchers for `field` (OR'd
+    /// with the field's other matchers).
     pub fn select(mut self, field: impl Into<String>, value: impl Into<String>) -> Self {
         self.selections
             .entry(field.into())
@@ -125,16 +135,18 @@ impl Filter {
         self.selections.contains_key(field)
     }
 
+    /// Whether no field has a selection — an empty filter matches every
+    /// log.
     pub fn is_empty(&self) -> bool {
         self.selections.is_empty()
     }
 
-    /// Compile every [`Matcher::Pattern`] once to surface a malformed regex
-    /// as a single [`crate::Error::InvalidPattern`], up front, before any
-    /// file is touched. A consumer parsing a user filter expression should
-    /// call this at the request boundary so a bad pattern is a clean error
-    /// rather than a per-file degrade (where some files would error and
-    /// others — lacking the field — would silently match nothing).
+    /// Compile every [`Matcher::Pattern`] once, surfacing a malformed
+    /// regex as a single [`crate::Error::InvalidPattern`] before any file
+    /// is touched. Callers parsing a user filter expression should do this
+    /// at the request boundary: otherwise the bad pattern degrades per file
+    /// (some files error, others — lacking the field — silently match
+    /// nothing).
     pub fn validate(&self) -> Result<(), crate::Error> {
         for matchers in self.selections.values() {
             for matcher in matchers {
@@ -148,13 +160,12 @@ impl Filter {
 }
 
 impl From<&HashMap<String, Vec<String>>> for Filter {
-    /// Build a filter from a `field -> values` map (OR within a field, AND
-    /// across fields).
+    /// Build a filter from a `field -> values` map (exact matchers).
     ///
-    /// A field whose value list is empty is **skipped** (it adds no
-    /// constraint), rather than being stored as an empty selection — an
-    /// empty list would otherwise mean "OR of no values", collapsing the
-    /// whole filter to match nothing. So a cleared field clears its filter.
+    /// A field whose value list is empty is **skipped** rather than stored
+    /// as an empty selection — an empty list would otherwise mean "OR of no
+    /// values", collapsing the whole filter to match nothing. So a cleared
+    /// field clears its filter.
     fn from(selections: &HashMap<String, Vec<String>>) -> Self {
         let mut filter = Filter::new();
         for (field, values) in selections {
@@ -166,8 +177,8 @@ impl From<&HashMap<String, Vec<String>>> for Filter {
     }
 }
 
-/// Per-field facet result. `values` is sorted by the order chunks
-/// surface entries (FST iteration for low/mid-card fields).
+/// Per-field facet result: `values` holds `(value, count)` pairs in the
+/// order chunks surface entries (FST iteration for low/mid-card fields).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FacetResult {
     pub field: String,
@@ -190,6 +201,8 @@ pub struct Grid {
 }
 
 impl Grid {
+    /// `num_buckets` buckets of `bucket_width_ns` ns starting at
+    /// `bucket_start_ns`.
     pub fn new(bucket_start_ns: i64, bucket_width_ns: i64, num_buckets: usize) -> Self {
         Self {
             bucket_start_ns,
@@ -208,14 +221,15 @@ impl Grid {
 /// Per-log timestamps for one file: ascending nanoseconds, parallel-indexed
 /// to log positions (position `p` has timestamp `at(p)`).
 ///
-/// A sorted position↔time index. The windowed query paths use it both ways:
-/// *time → position* ([`window`](Self::window), [`bucket_ranges`](Self::bucket_ranges))
+/// The windowed query paths use the sorted index both ways: *time →
+/// position* ([`window`](Self::window), [`bucket_ranges`](Self::bucket_ranges))
 /// and *position → time* ([`at`](Self::at)).
 pub struct Timestamps(Vec<i64>);
 
 impl Timestamps {
-    /// Wrap the decoded per-log timestamps. They must be ascending (the
-    /// on-disk TIMS chunk stores them in chronological order).
+    /// Wrap the decoded per-log timestamps. They must be ascending — the
+    /// on-disk TIMS chunk stores them in chronological order
+    /// ([`ChunkReader::timestamps`](crate::ChunkReader::timestamps)).
     pub(crate) fn new(timestamps: Vec<i64>) -> Self {
         Self(timestamps)
     }
@@ -285,11 +299,12 @@ pub struct Timeline {
 
 impl Timeline {
     /// An empty timeline aligned to `grid`: no dimensions, one all-zero
-    /// bucket per grid bucket. The well-formed zero-count timeline a query
-    /// over no sources falls back to (a merge over no per-file timelines
-    /// yields `None`, not this) — the chart contract still gets a full
-    /// grid of zero counts rather than a shapeless blank. A zero-bucket
-    /// grid is allowed and yields an empty bucket list.
+    /// bucket per grid bucket (a zero-bucket grid yields an empty bucket
+    /// list). This is the well-formed zero-count fallback a query over no
+    /// sources gets (`sfsq/src/logs/engine.rs` `LogSource::run`) — the
+    /// chart still receives a full grid of zero counts; merging no per-file
+    /// timelines yields `None` instead
+    /// (`sfsq/src/logs/merge.rs` `merge_timelines`).
     pub fn empty(grid: Grid) -> Self {
         Self {
             grid,
@@ -312,12 +327,14 @@ impl Timeline {
 /// logs in this bucket that don't have the field set at all.
 ///
 /// `unset` is `bucket_total − |logs having the field|`, computed from the
-/// union of the field's value bitmaps — **not** `bucket_total −
-/// sum(counts)`. The two differ for multi-valued fields (e.g. flattened
-/// scalar arrays): a log carrying two values of the field counts in two
-/// dimensions, so `sum(counts)` can exceed the number of logs that have
-/// the field. For the same reason, the stacked per-dimension sum may
-/// exceed `bucket_total`; `unset` stays exact regardless.
+/// union of the field's value bitmaps in
+/// [`IndexReader::timeline`](crate::IndexReader::timeline) — **not**
+/// `bucket_total − sum(counts)`. The two differ for multi-valued fields
+/// (e.g. flattened scalar arrays): a log carrying two values of the field
+/// counts in two dimensions, so `sum(counts)` can exceed the number of
+/// logs that have the field. For the same reason, the stacked
+/// per-dimension sum may exceed `bucket_total`; `unset` stays exact
+/// regardless.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Bucket {
     /// Per-dimension counts, parallel to [`Timeline::dimensions`].
@@ -332,7 +349,8 @@ pub struct Bucket {
 /// Produced by [`IndexReader::materialize_rows`](crate::IndexReader::materialize_rows).
 /// Pairs appear in the order the position's `KvId`s were stored; keys
 /// are not deduplicated (where attribute keys are unique per record, as in
-/// an OpenTelemetry `LogRecord`, duplicates don't arise in practice).
+/// an OpenTelemetry `LogRecord`, duplicates don't arise in practice). A
+/// stored blob with no `=` splits as `(whole, "")`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MaterializedRow {
     pub timestamp_ns: i64,

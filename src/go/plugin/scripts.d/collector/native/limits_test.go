@@ -28,7 +28,6 @@ func TestLimits_LargeSnapshot(t *testing.T) {
 	for i := range samples {
 		value := float64(i)
 		samples[i] = metricSample{
-			Name:  "depth",
 			Value: &value,
 			Labels: map[string]string{
 				"queue":       fmt.Sprintf("queue-%05d", i),
@@ -40,8 +39,8 @@ func TestLimits_LargeSnapshot(t *testing.T) {
 	}
 	data, err := json.Marshal(snapshot{
 		Version: "v1",
-		Metrics: samples,
-		Checks:  []checkSample{},
+		Metrics: []metricFamily{{Name: "depth", Samples: samples}},
+		Checks:  []checkFamily{},
 	})
 	require.NoError(t, err)
 	require.Greater(t, len(data), 1<<20)

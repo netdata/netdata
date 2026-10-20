@@ -178,6 +178,10 @@ void sqlite_library_shutdown(void);
 void sql_close_database(sqlite3 *database, const char *database_name);
 void sql_close_thread_db_safe(sqlite3 **database);
 void sqlite_close_databases(void);
+int sqlite_lease_unittest(void);
+// Runs the real sqlite_close_databases() and sqlite_library_shutdown(): it MUST be the last SQLite work of its
+// process (the end of -W unittest, or -W sqlite-lease-test).
+int sqlite_lease_teardown_unittest(void);
 uint64_t get_total_database_space(void);
 int sqlite_release_memory(int bytes);
 #endif //NETDATA_SQLITE_FUNCTIONS_H

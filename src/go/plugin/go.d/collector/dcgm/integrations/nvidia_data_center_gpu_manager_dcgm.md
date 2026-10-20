@@ -31,7 +31,7 @@ It collects metrics by periodically scraping the exporter Prometheus endpoint ov
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 Nvidia Data Center GPU Manager (DCGM) can be monitored further using the following other integrations:
@@ -85,7 +85,7 @@ Use the Netdata recommended profile:
 [`dcgm-exporter-netdata.csv`](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/dcgm/dcgm-exporter-netdata.csv)
 (raw download: `https://raw.githubusercontent.com/netdata/netdata/master/src/go/plugin/go.d/collector/dcgm/dcgm-exporter-netdata.csv`).
 
-The Netdata profile enables 123 fields by default and lists optional fields from its source dataset as commented entries.
+The Netdata profile enables 121 fields by default and lists optional fields from its source dataset as commented entries.
 To customize beyond the baseline, uncomment the field you need and comment one currently enabled field.
 
 Runtime validation artifact:
@@ -160,7 +160,7 @@ Configure the **dcgm** collector from the Netdata web interface:
 4. In the Search box, type _dcgm_ (or scroll the list) to locate the **dcgm** collector.
 5. Click the **+** next to the **dcgm** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 

@@ -24,6 +24,8 @@ otel-ledger = { workspace = true }
 otel-ingestor = { workspace = true }
 otel-legacy-logs = { workspace = true }
 rt = { workspace = true }
+# Process-level TLS crypto provider selection (see `main`).
+rustls = { workspace = true }
 sfsq-cli = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
@@ -35,3 +37,5 @@ file-registry = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+# Lets config tests capture the warnings that config resolution logs.
+tracing-subscriber = { workspace = true }

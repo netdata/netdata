@@ -39,6 +39,9 @@ pub struct Sender {
 }
 
 impl Sender {
+    /// Build the sender. Connection failures are retried forever with
+    /// exponential backoff (1s doubling to a 30s cap) — right for live
+    /// sources; one-shot callers (synth) wrap this in a timeout.
     pub async fn new(config: OtelConfig, rx: mpsc::Receiver<LogRecord>) -> anyhow::Result<Self> {
         let tenant_header = match config.tenant_id {
             Some(ref id) => Some(
@@ -127,7 +130,7 @@ impl Sender {
     }
 
     /// Export the current batch. Returns `true` on success, `false` on export
-    /// error (logged, not propagated — callers decide what to do with the count).
+    /// error (logged, not propagated).
     async fn flush(&mut self) -> bool {
         let records = std::mem::replace(&mut self.batch, Vec::with_capacity(self.batch_size));
         let count = records.len();

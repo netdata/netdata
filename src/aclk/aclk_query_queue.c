@@ -67,6 +67,7 @@ aclk_query_t *aclk_query_new(aclk_query_type_t type)
     aclk_query_t *query = get_query();
     query->type = type;
     now_monotonic_high_precision_timeval(&query->created_tv);
+    query->created = now_realtime_usec();
     return query;
 }
 
@@ -76,8 +77,6 @@ void aclk_query_free(aclk_query_t *query)
     switch (query->type) {
         case HTTP_API_V2:
             freez(query->data.http_api_v2.payload);
-            if (query->data.http_api_v2.query != query->dedup_id)
-                freez(query->data.http_api_v2.query);
             break;
         case ALERT_START_STREAMING:
             freez(query->data.node_id);
@@ -120,7 +119,6 @@ void aclk_query_free(aclk_query_t *query)
     if (query->type == UPDATE_NODE_MANIFEST)
         aclk_node_manifest_publish_result(&query->manifest);
 
-    freez(query->dedup_id);
     freez(query->callback_topic);
     freez(query->msg_id);
 

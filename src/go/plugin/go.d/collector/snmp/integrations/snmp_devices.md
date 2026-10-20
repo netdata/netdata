@@ -105,7 +105,7 @@ A **profile** defines:
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -292,7 +292,7 @@ Configure the **snmp** collector from the Netdata web interface:
 4. In the Search box, type _snmp_ (or scroll the list) to locate the **snmp** collector.
 5. Click the **+** next to the **snmp** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -495,13 +495,13 @@ The following alerts are available:
 | [ snmp_license_state_warning ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.state | One or more monitored licenses on this device are degraded, in grace, or otherwise in warning state. |
 | [ snmp_license_state_critical ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.state | One or more monitored licenses on this device are expired, invalid, unauthorized, or otherwise in critical state. |
 | [ snmp_license_usage_high ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.usage_percent | The most constrained monitored license pool on this device is nearing exhaustion. |
-| [ snmp_bgp_peer_down ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peers.availability | BGP peer is administratively enabled but remains out of Established |
-| [ snmp_bgp_peer_family_down ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peer_families.availability | BGP peer-family is administratively enabled but remains out of Established |
-| [ snmp_bgp_peer_transitions_anomaly ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peers.established_transitions | ML anomaly detection on per-peer established transition activity |
-| [ snmp_bgp_peer_family_transitions_anomaly ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peer_families.established_transitions | ML anomaly detection on per-peer-family established transition activity |
-| [ snmp_bgp_peer_updates_anomaly ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peers.update_traffic | ML anomaly detection on per-peer BGP UPDATE traffic |
-| [ snmp_bgp_peer_family_updates_anomaly ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peer_families.update_traffic | ML anomaly detection on per-peer-family BGP UPDATE traffic |
-| [ snmp_bgp_peer_family_prefixes_accepted_anomaly ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peer_families.route_counts.current | ML anomaly detection on accepted-prefix gauges where the vendor MIB exposes them |
+| [ snmp_bgp_peer_down ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peers.availability | SNMP BGP peer ${label:neighbor} (AS${label:remote_as}) is administratively enabled but has remained out of Established for the full 2-minute evaluation window |
+| [ snmp_bgp_peer_family_down ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peer_families.availability | SNMP BGP peer ${label:neighbor} (AS${label:remote_as}) for ${label:address_family}/${label:subsequent_address_family} has remained out of Established for the full 2-minute evaluation window |
+| [ snmp_bgp_peer_transitions_anomaly ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peers.established_transitions | Rolling ML anomaly rate for established-transition counts on SNMP BGP peer ${label:neighbor} (AS${label:remote_as}); sustained anomalies usually indicate flaps or unstable reachability |
+| [ snmp_bgp_peer_family_transitions_anomaly ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peer_families.established_transitions | Rolling ML anomaly rate for established-transition counts on SNMP BGP peer ${label:neighbor} (AS${label:remote_as}) for ${label:address_family}/${label:subsequent_address_family}; sustained anomalies usually indicate flaps or unstable reachability |
+| [ snmp_bgp_peer_updates_anomaly ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peers.update_traffic | Rolling ML anomaly rate for BGP UPDATE traffic on SNMP BGP peer ${label:neighbor} (AS${label:remote_as}); sustained anomalies usually indicate route churn or unstable adjacencies |
+| [ snmp_bgp_peer_family_updates_anomaly ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peer_families.update_traffic | Rolling ML anomaly rate for BGP UPDATE traffic on SNMP BGP peer ${label:neighbor} (AS${label:remote_as}) for ${label:address_family}/${label:subsequent_address_family}; sustained anomalies usually indicate route churn or unstable adjacencies |
+| [ snmp_bgp_peer_family_prefixes_accepted_anomaly ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peer_families.route_counts.current | Rolling ML anomaly rate for accepted prefix counts on SNMP BGP peer ${label:neighbor} (AS${label:remote_as}) for ${label:address_family}/${label:subsequent_address_family}; sustained anomalies usually mean unexpected route loss or route growth after policy |
 
 
 

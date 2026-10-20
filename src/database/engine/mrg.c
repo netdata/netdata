@@ -398,21 +398,6 @@ bool mrg_metric_has_zero_disk_retention(MRG *mrg __maybe_unused, METRIC *metric)
     return (first && last && first < last);
 }
 
-static inline bool mrg_metric_clean_samples_from_snapshot(
-    time_t first_time_s,
-    time_t latest_time_s_clean,
-    uint32_t update_every_s,
-    uint64_t *samples)
-{
-    *samples = 0;
-
-    if (!update_every_s || first_time_s <= 0 || latest_time_s_clean <= 0 || first_time_s >= latest_time_s_clean)
-        return false;
-
-    *samples = (uint64_t)(latest_time_s_clean - first_time_s) / update_every_s;
-    return *samples > 0;
-}
-
 ALWAYS_INLINE_HOT
 bool mrg_metric_set_hot_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric, time_t latest_time_s) {
     internal_fatal(latest_time_s < 0, "DBENGINE METRIC: timestamp is negative");
@@ -512,8 +497,7 @@ inline void mrg_update_metric_retention_and_granularity_by_uuid(
     time_t first_time_s,
     time_t last_time_s,
     uint32_t update_every_s,
-    time_t now_s,
-    uint64_t *journal_samples)
+    time_t now_s)
 {
     if(unlikely(last_time_s > now_s)) {
         nd_log_limit_static_global_var(erl, 1, 0);
@@ -555,43 +539,10 @@ inline void mrg_update_metric_retention_and_granularity_by_uuid(
         metric = mrg_metric_add_and_acquire(mrg, entry, &added);
     }
 
-    if (likely(!added)) {
-        uint64_t old_samples = 0;
-
-        uint32_t latest_update_every_s = __atomic_load_n(&metric->latest_update_every_s, __ATOMIC_RELAXED);
-        time_t latest_time_s_clean = __atomic_load_n(&metric->latest_time_s_clean, __ATOMIC_RELAXED);
-        time_t metric_first_time_s = __atomic_load_n(&metric->first_time_s, __ATOMIC_RELAXED);
-        if (update_every_s)
-            mrg_metric_clean_samples_from_snapshot(
-                metric_first_time_s,
-                latest_time_s_clean,
-                latest_update_every_s,
-                &old_samples);
-
+    // samples are not derived from retention: the journal v2 loader charges
+    // them to the datafile (see rrdeng_datafile_samples_charge())
+    if (likely(!added))
         mrg_metric_expand_retention(mrg, metric, first_time_s, last_time_s, update_every_s);
-
-        uint64_t new_samples = 0;
-        latest_update_every_s = __atomic_load_n(&metric->latest_update_every_s, __ATOMIC_RELAXED);
-        latest_time_s_clean = __atomic_load_n(&metric->latest_time_s_clean, __ATOMIC_RELAXED);
-        metric_first_time_s = __atomic_load_n(&metric->first_time_s, __ATOMIC_RELAXED);
-        if (update_every_s)
-            mrg_metric_clean_samples_from_snapshot(
-                metric_first_time_s,
-                latest_time_s_clean,
-                latest_update_every_s,
-                &new_samples);
-
-        if (journal_samples && new_samples > old_samples)
-            *journal_samples += (new_samples - old_samples);
-    }
-    else {
-        // Newly added
-        if (update_every_s) {
-            uint64_t samples = (last_time_s - first_time_s) / update_every_s;
-            if (journal_samples)
-                *journal_samples += samples;
-        }
-    }
 
     mrg_metric_release(mrg, metric);
 }

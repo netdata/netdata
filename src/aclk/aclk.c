@@ -1142,9 +1142,9 @@ void aclk_send_node_instances()
     dfe_done(host);
 }
 
-void aclk_send_bin_msg(char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname)
+int aclk_send_bin_msg(char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname)
 {
-    (void)aclk_send_bin_message_subtopic_pid(mqttwss_client, msg, msg_len, subtopic, msgname, NULL);
+    return aclk_send_bin_message_subtopic_pid(mqttwss_client, msg, msg_len, subtopic, msgname, NULL);
 }
 
 static void fill_alert_status_for_host(BUFFER *wb, RRDHOST *host)
@@ -1478,9 +1478,7 @@ char *aclk_state_json(void)
     return str;
 }
 
-void add_aclk_host_labels(void) {
-    RRDLABELS *labels = localhost->rrdlabels;
-
+void add_aclk_host_labels(RRDLABELS *labels) {
     rrdlabels_add(labels, "_aclk_available", "true", RRDLABEL_SRC_AUTO|RRDLABEL_SRC_ACLK);
     ACLK_PROXY_TYPE aclk_proxy;
     char *proxy_str;

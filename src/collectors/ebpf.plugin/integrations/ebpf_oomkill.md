@@ -30,7 +30,7 @@ This collector is only supported on the following platforms:
 
 - Linux
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time.
 
@@ -143,7 +143,7 @@ Metrics:
 | Metric | Description | Dimensions | Unit |
 |:------|:------------|:----------|:----|
 | cgroup.oomkills | OOM kills. This chart is provided by eBPF plugin. | cgroup name | kills |
-| services.oomkills | OOM kills. This chart is provided by eBPF plugin. | a dimension per systemd service | kills |
+| systemd.oomkills | OOM kills. This chart is provided by eBPF plugin. | a dimension per systemd service | kills |
 
 
 ### Per apps

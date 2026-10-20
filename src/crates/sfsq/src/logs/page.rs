@@ -13,7 +13,10 @@
 //! [`paginate`] is the local orchestration of all four; a distributed
 //! parent would run `merge`/`finalize_page` on candidate sets received
 //! from children and route `materialize` back to the file's owning node by
-//! `file_seq`.
+//! `file_seq`. Locally the only caller is [`run`](super::engine::run),
+//! which folds the returned [`Page`] into `LogsData`; otel-ledger's logs
+//! adapter turns its has-more flags into the wire's `before`/`after`
+//! (`src/crates/otel-ledger/src/ledger/rpc/logs/adapter.rs`).
 
 use std::collections::HashMap;
 
@@ -31,8 +34,8 @@ use super::wal_scan::WalScan;
 /// (which becomes the opposite direction's has-more flag).
 ///
 /// [`PageShard::evaluate`] produces one per file; [`PageShard::merge`] folds
-/// them. The candidate list may be bounded to the page size (a later
-/// step) — all a fan-out needs to ship — or unbounded.
+/// them. The candidate list may be bounded (callers pass roughly the page
+/// size — all a fan-out needs to ship) or unbounded.
 #[derive(Debug, Default)]
 pub struct PageShard {
     /// Candidate cursors, ordered closest-to-anchor first — the order
@@ -111,9 +114,7 @@ impl PageShard {
         // set to `[lo, hi)` with `hi <= timestamps.len()` (the window is
         // resolved against this same timestamps chunk via `range_positions`),
         // so every matched position is in range. Kept as a guard against a
-        // future `matched_positions` that stops clamping. (C-4 in
-        // docs/sfsq-readability-refactors.md: a negative test would need a
-        // mock reader, since no real/forged file can reach this branch.)
+        // future `matched_positions` that stops clamping.
         let ascending: Vec<Cursor> = matched
             .into_iter()
             .map(|position| {
@@ -235,9 +236,10 @@ fn finalize_page(merged: PageShard, direction: Direction, limit: usize) -> Selec
 }
 
 /// Which source (within one query) a cursor belongs to: its file plus the
-/// [`Part`] discriminator. An `Indexed` and a `Tail` cursor of the same
-/// `file_seq` route to different sources, so both fields are part of the
-/// key.
+/// [`Part`] discriminator. Both fields are needed: the in-memory chunks of
+/// one active WAL share a `file_seq` but each is its own reader, and an
+/// indexed part and the tail of the same `file_seq` route to different
+/// evaluators (SFST reader vs WAL row scanner).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct SourceKey {
     file_seq: u64,
@@ -359,18 +361,22 @@ pub(super) struct Page {
 /// `mapped` carries each source's bytes, resolved once per query by
 /// [`run`](super::engine::run) (parallel to `sources`; `None` = tail or
 /// failed map) — the same mappings the stats pass read, so an SFST
-/// unlinked by retention between the passes is still served here.
-/// Files that fail to parse/evaluate are
-/// logged and skipped. Each opened file's cold suffix is released from the
-/// page cache once the page is materialized.
+/// unlinked by retention between the passes is still served here. Files
+/// that fail to parse/evaluate are logged and skipped, and each opened
+/// file's cold suffix is released from the page cache once the page is
+/// materialized. `cancel` is polled before each SFST is opened (see
+/// [`open_and_evaluate_sfsts`]); the WAL-tail scans don't poll.
 ///
-/// The `anchor` (from a prior page's cursor) is only an exclusive
-/// comparison boundary — it is never itself materialized. So the source it
-/// once came from need not be in `sources`; only the *page rows'* sources
-/// must be, and they always are, since every page cursor is produced by a
-/// source evaluated in this same call. A stale anchor pointing at a now-
-/// absent source (e.g. a WAL since sealed) is therefore harmless here; the
-/// only cross-request artifact is the documented WAL→SFST cursor seam.
+/// The `anchor` (a prior page's cursor, or a timestamp resolved to a
+/// synthetic boundary cursor) is only an exclusive comparison boundary — it
+/// is never itself materialized. So the source it once came from need not
+/// be in `sources`; only the *page rows'* sources must be, and they always
+/// are, since every page cursor is produced by a source evaluated in this
+/// same call. A stale anchor pointing at a now-absent source (e.g. a WAL
+/// since sealed) is therefore harmless here; the only cross-request
+/// artifact is the WAL→SFST cursor seam — a tail cursor's `position` is an
+/// insertion index that stays meaningful only while the row remains in the
+/// tail.
 pub(super) fn paginate(
     sources: &[LogSource],
     mapped: &[Option<Mapped>],
@@ -387,9 +393,12 @@ pub(super) fn paginate(
 
     // Seed the merge with the WAL tails *before* the SFSTs: the early-
     // termination below samples `merged.cursors[limit - 1]` as its
-    // boundary, which must already include every tail cursor — adding tails
-    // later can only push the boundary older, letting `beyond_boundary`
-    // wrongly skip an SFST whose rows belong on the page.
+    // boundary, and the tails usually hold the cursors closest to the
+    // anchor, so folding them in first lets `beyond_boundary` skip later
+    // files as early as it validly can. (Skipping is safe in any fold
+    // order — the sampled boundary is never nearer the anchor than the
+    // final page boundary — so the ordering only decides how many files
+    // get opened.)
     let tail_scans = scan_tails(&wal_tails, query, anchor, page_bound, &mut merged);
 
     // SFSTs (on-disk + in-memory chunks): order the pre-resolved
@@ -592,9 +601,9 @@ fn build_page(
     }
 }
 
-/// Release each opened file's cold suffix (mid/high field chunks + stream
-/// batches) from the page cache, keeping the hot prefix resident. In-memory
-/// chunks have no file pages to drop.
+/// Release each opened file's cold suffix — the span
+/// [`IndexReader::cold_region`](sfst::IndexReader::cold_region) reports —
+/// from the page cache. In-memory chunks have no file pages to drop.
 fn release_cold(
     readers: Vec<(sfst::IndexReader<'_>, SourceKey)>,
     reader_mapping: &[usize],

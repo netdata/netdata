@@ -1,16 +1,18 @@
-//! Shared, content-agnostic test fixtures.
+//! Shared, content-agnostic test fixtures for the crate's test modules
+//! (`catalog_builder`, `registry`, `query`, and `recovery` tests).
 //!
 //! `file-lifecycle` is signal-neutral, so its tests fabricate opaque partition
 //! keys and `content_meta` blobs directly — with NO dependency on any
-//! content-plane identity codec (e.g. `otel-logs-identity`). A logical stream is
-//! named by a `(namespace, name)` pair purely for test readability; the
+//! content-plane identity codec (e.g. `otel-logs-identity`). A logical stream
+//! is named by a `(namespace, name)` pair purely for test readability; the
 //! substrate treats `part_key` as an opaque `u64` and `content_meta` as opaque
 //! bytes and never decodes either.
 
 /// Deterministic opaque partition key for a logical `(namespace, name)`.
 /// Same label → same key (`DefaultHasher`); the substrate ascribes it no
-/// meaning. Mirrors the per-crate `opaque_part_key` test helpers in the other
-/// substrate crates (intentionally duplicated — sharing would re-couple them).
+/// meaning. Mirrors the `opaque_part_key` test helpers in the `wal`, `sfst`,
+/// and `otel-catalog` crates (intentionally duplicated — sharing would
+/// re-couple them).
 pub(crate) fn opaque_part_key(namespace: &str, name: &str) -> u64 {
     use std::hash::{Hash, Hasher};
     let mut h = std::collections::hash_map::DefaultHasher::new();
@@ -19,10 +21,11 @@ pub(crate) fn opaque_part_key(namespace: &str, name: &str) -> u64 {
     h.finish()
 }
 
-/// Encode a `(namespace, name)` pair into opaque `content_meta` bytes. The
-/// substrate stores/forwards these verbatim; tests round-trip them via
-/// [`decode_opaque`] to assert identity survives the lifecycle. Length-prefixed
-/// and local to the tests — NOT the production content codec.
+/// Encode a `(namespace, name)` pair into opaque `content_meta` bytes:
+/// `u32`-LE length prefix + raw bytes for the namespace, then for the name.
+/// The substrate stores/forwards these verbatim; tests round-trip them via
+/// [`decode_opaque`] to assert identity survives the lifecycle. Local to the
+/// tests — NOT the production content codec.
 pub(crate) fn encode_opaque(namespace: &str, name: &str) -> Vec<u8> {
     let mut out = Vec::new();
     out.extend_from_slice(&(namespace.len() as u32).to_le_bytes());
@@ -32,11 +35,10 @@ pub(crate) fn encode_opaque(namespace: &str, name: &str) -> Vec<u8> {
     out
 }
 
-/// Inverse of [`encode_opaque`]. Tolerant: any input that is not a complete
-/// `encode_opaque` payload (empty, truncated, or non-UTF-8) decodes to the empty
-/// identity `("", "")` rather than panicking, so a future test author who hands
-/// it a crafted slice gets a clear result instead of a slice/UTF-8 panic. Real
-/// inputs come from [`encode_opaque`] and round-trip exactly.
+/// Inverse of [`encode_opaque`]. Tolerant: empty, truncated, or non-UTF-8
+/// input decodes to the empty identity `("", "")` rather than panicking;
+/// bytes beyond the name are ignored. Real inputs come from [`encode_opaque`]
+/// and round-trip exactly.
 pub(crate) fn decode_opaque(bytes: &[u8]) -> (String, String) {
     fn read_at(bytes: &[u8], at: usize) -> Option<(String, usize)> {
         let body = at.checked_add(4)?;
@@ -64,9 +66,9 @@ pub(crate) fn identity_for(namespace: &str, name: &str) -> (u64, Vec<u8>) {
 }
 
 /// A `Summary` for the logical stream with the given range and record count.
-/// The partition key is NOT in the summary — it lives in the file's `FileId`;
-/// tests that filter by partition pass the key via [`identity_for`] (or
-/// [`opaque_part_key`]) into the `FileId`.
+/// The partition key is NOT in the summary — partition matching keys off
+/// `id.part_key` in the file's `FileId` (`Query::matches_partition`), so tests
+/// pass the key there via [`identity_for`] or [`opaque_part_key`].
 pub(crate) fn summary_for(
     namespace: &str,
     name: &str,
@@ -83,7 +85,7 @@ pub(crate) fn summary_for(
 }
 
 /// A zero-valued `Summary` with an empty identity. Used by registry/recovery
-/// tests that call `Registry::track` without caring about the contents.
+/// tests that call `sfst::Registry::track` without caring about the contents.
 pub(crate) fn empty_summary() -> sfst::Summary {
     summary_for("", "", 0, 0, 0)
 }

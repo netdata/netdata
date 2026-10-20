@@ -8,6 +8,8 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
@@ -32,7 +34,7 @@ func (mpo *modulePlanOwner) Release() {
 }
 
 type modulePlanStage struct {
-	module  string
+	owner   functionOwner
 	attempt jobmgr.ProcessAttempt
 	result  chan modulePlanResult
 	settled chan error
@@ -95,9 +97,13 @@ func prepareContainedModulePlans(
 	epoch uint64,
 	attempts jobmgr.ProcessAttemptAuthority,
 	modules collectorapi.Registry,
-) (map[string]controllerModulePlan, error) {
+	providers []funcapi.ProcessFunctionProvider,
+) (map[functionOwner]controllerModulePlan, error) {
 	if ctx == nil || epoch == 0 || attempts == nil || modules == nil {
 		return nil, errors.New("jobmgr Function controller: invalid contained module preparation")
+	}
+	if err := ValidateProcessProviders(providers); err != nil {
+		return nil, err
 	}
 	names := make([]string, 0, len(modules))
 	for name := range modules {
@@ -106,7 +112,10 @@ func prepareContainedModulePlans(
 	slices.Sort(names)
 	stages := make([]modulePlanStage, 0, len(names))
 	for _, module := range names {
-		stage, err := startModulePlanStage(ctx, epoch, attempts, module, modules[module])
+		stage, err := startModulePlanStage(
+			ctx, epoch, attempts, functionOwner{name: module}, modulePlanAttemptIdentity(module),
+			func() (controllerModulePlan, error) { return buildControllerModulePlan(module, modules[module]) },
+		)
 		if err != nil {
 			releaseModulePlanStages(stages)
 			return nil, err
@@ -114,7 +123,21 @@ func prepareContainedModulePlans(
 		stages = append(stages, stage)
 	}
 
-	plans := make(map[string]controllerModulePlan, len(stages))
+	for _, provider := range providers {
+		owner := functionOwner{name: provider.ID, process: true}
+		identity := jobmgr.ProcessAttemptIdentity{
+			Namespace: jobmgr.ProcessAttemptFunctionBundle,
+			Key:       jobmgr.ProcessAttemptIdentityKey("process-function-provider", provider.ID),
+			Resource:  jobmgr.ProcessAttemptDiagnosticResource(provider.ID, "process Function provider"),
+		}
+		stage, err := startModulePlanStage(ctx, epoch, attempts, owner, identity, func() (controllerModulePlan, error) { return buildProcessProviderPlan(provider) })
+		if err != nil {
+			releaseModulePlanStages(stages)
+			return nil, err
+		}
+		stages = append(stages, stage)
+	}
+	plans := make(map[functionOwner]controllerModulePlan, len(stages))
 	for index := range stages {
 		stage := &stages[index]
 		var result modulePlanResult
@@ -136,7 +159,7 @@ func prepareContainedModulePlans(
 			releaseModulePlanStages(stages[index:])
 			return nil, errors.Join(result.err, cleanupErr)
 		}
-		plans[stage.module] = result.plan
+		plans[stage.owner] = result.plan
 	}
 	return plans, nil
 }
@@ -164,8 +187,9 @@ func startModulePlanStage(
 	ctx context.Context,
 	epoch uint64,
 	attempts jobmgr.ProcessAttemptAuthority,
-	module string,
-	creator collectorapi.Creator,
+	owner functionOwner,
+	identity jobmgr.ProcessAttemptIdentity,
+	build func() (controllerModulePlan, error),
 ) (modulePlanStage, error) {
 	if ctx == nil {
 		return modulePlanStage{}, errors.New("jobmgr Function controller: invalid module-plan context")
@@ -173,7 +197,6 @@ func startModulePlanStage(
 	if cause := context.Cause(ctx); cause != nil {
 		return modulePlanStage{}, cause
 	}
-	identity := modulePlanAttemptIdentity(module)
 	start := func() (modulePlanStage, error) {
 		result := make(chan modulePlanResult, 1)
 		settled := make(chan error, 1)
@@ -181,7 +204,7 @@ func startModulePlanStage(
 			Identity: identity,
 			Target:   epoch,
 			Work: func(ctx context.Context, admission jobmgr.ProcessAttemptAdmission) error {
-				plan, buildErr := buildControllerModulePlan(module, creator)
+				plan, buildErr := build()
 				if buildErr != nil {
 					result <- modulePlanResult{err: buildErr}
 					return buildErr
@@ -239,7 +262,7 @@ func startModulePlanStage(
 			settled <- attempt.Await(context.Background())
 		}()
 		return modulePlanStage{
-			module:  module,
+			owner:   owner,
 			attempt: attempt,
 			result:  result,
 			settled: settled,

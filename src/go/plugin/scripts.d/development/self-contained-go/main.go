@@ -44,7 +44,9 @@ func run() error {
 	}
 	snapshot := map[string]any{
 		"version": "v1",
-		"metrics": []any{map[string]any{"name": "depth", "value": config.Config.Count}},
+		"metrics": []any{map[string]any{
+			"name": "depth", "unit": "jobs", "samples": []any{map[string]any{"value": config.Config.Count}},
+		}},
 	}
 	if args[0] == "collect" {
 		return encoder.Encode(snapshot)

@@ -27,7 +27,7 @@ The plugin calls function `sysctl` to collect data.
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -107,7 +107,7 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ active_processes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/processes.conf) | system.active_processes | system process IDs (PID) space utilization |
+| [ active_processes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/processes.conf) | system.active_processes | System process IDs (PID) space utilization |
 
 
 

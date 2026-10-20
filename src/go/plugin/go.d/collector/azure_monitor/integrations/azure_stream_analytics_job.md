@@ -43,7 +43,7 @@ It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The service principal or managed identity requires these Azure RBAC roles:
 
@@ -377,7 +377,7 @@ Configure the **azure_monitor** collector from the Netdata web interface:
 4. In the Search box, type _azure_monitor_ (or scroll the list) to locate the **azure_monitor** collector.
 5. Click the **+** next to the **azure_monitor** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -632,16 +632,17 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_stream_analytics_su_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.resource_utilization | Stream Analytics SU utilization on ${label:resource_name} |
-| [ am_stream_analytics_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.resource_utilization | Stream Analytics CPU on ${label:resource_name} |
-| [ am_stream_analytics_watermark_delay ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.watermark_delay | Stream Analytics watermark delay on ${label:resource_name} |
-| [ am_stream_analytics_runtime_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.errors | Stream Analytics runtime errors on ${label:resource_name} |
-| [ am_stream_analytics_data_conversion_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.errors | Stream Analytics conversion errors on ${label:resource_name} |
-| [ am_stream_analytics_deserialization_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.errors | Stream Analytics deserialization errors on ${label:resource_name} |
-| [ am_stream_analytics_out_of_order_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.event_timing | Stream Analytics out-of-order events on ${label:resource_name} |
-| [ am_stream_analytics_late_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.event_timing | Stream Analytics late events on ${label:resource_name} |
-| [ am_stream_analytics_backlogged_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.backlogged_events | Stream Analytics backlog on ${label:resource_name} |
-| [ am_stream_analytics_function_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.function_requests | Stream Analytics ML function failures on ${label:resource_name} |
+| [ am_stream_analytics_su_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.resource_utilization | Average streaming unit (memory) utilization of Stream Analytics job ${label:resource_name} in ${label:resource_group} (${label:region}). Sustained high SU utilization indicates the job needs more streaming units. |
+| [ am_stream_analytics_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.resource_utilization | Average CPU utilization of Stream Analytics job ${label:resource_name} in ${label:resource_group} (${label:region}). High CPU indicates complex query processing or insufficient streaming units. |
+| [ am_stream_analytics_watermark_delay ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.watermark_delay | Output watermark delay of Stream Analytics job ${label:resource_name} in ${label:resource_group} (${label:region}). Growing delay means the job is falling behind processing input data. |
+| [ am_stream_analytics_runtime_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.errors | Runtime errors on Stream Analytics job ${label:resource_name} in ${label:resource_group} (${label:region}). Runtime errors indicate issues with query execution or resource constraints. |
+| [ am_stream_analytics_data_conversion_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.errors | Data conversion errors on Stream Analytics job ${label:resource_name} in ${label:resource_group} (${label:region}). These occur when output events cannot be converted to the expected output schema. |
+| [ am_stream_analytics_deserialization_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.errors | Input deserialization errors on Stream Analytics job ${label:resource_name} in ${label:resource_group} (${label:region}). These occur when input events cannot be parsed (malformed JSON, CSV, Avro). |
+| [ am_stream_analytics_out_of_order_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.event_timing | Rate of dropped or adjusted out-of-order events on Stream Analytics job ${label:resource_name} in ${label:resource_group} (${label:region}). High rates may indicate clock skew in event sources. |
+| [ am_stream_analytics_late_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.event_timing | Rate of late-arriving input events on Stream Analytics job ${label:resource_name} in ${label:resource_group} (${label:region}). Late events arrive after the late arrival tolerance window. |
+| [ am_stream_analytics_backlogged_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.backlogged_events | Number of backlogged input events on Stream Analytics job ${label:resource_name} in ${label:resource_group} (${label:region}). A growing backlog means the job cannot keep up with the input rate. |
+| [ am_stream_analytics_function_request_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.function_requests | Average Azure ML function call rate for Stream Analytics job ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_stream_analytics_function_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.function_requests | Percentage of failed Azure ML function requests for Stream Analytics job ${label:resource_name} in ${label:resource_group} (${label:region}) |
 
 
 

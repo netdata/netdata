@@ -1,7 +1,9 @@
 //! Regeneration check for vendored protobuf files.
 //!
 //! This test compiles the .proto definitions under `proto/` and compares the
-//! output against the committed files in `src/routing/proto/`.
+//! output against the committed files in `src/routing/proto/`. Those files
+//! are compiled in via `include!` by `src/routing/bioris.rs` so ordinary
+//! builds need no `protoc`; staleness in them changes the built agent.
 //!
 //! - Locally: if there is a diff, the test **overwrites** the committed files
 //!   and fails with instructions to re-run and commit.

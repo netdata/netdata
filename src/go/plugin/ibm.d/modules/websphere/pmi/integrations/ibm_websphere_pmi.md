@@ -31,7 +31,7 @@ The collector connects to IBM WebSphere PMI and collects metrics via its monitor
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -113,7 +113,16 @@ jobs:
 
 ## Alerts
 
-There are no alerts configured by default for this integration.
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ websphere_pmi_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/websphere_pmi.conf) | websphere_pmi.cpu_utilization | PMI-reported CPU utilization is ${value}% |
+| [ websphere_pmi_threadpool_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/websphere_pmi.conf) | websphere_pmi.threadpool_usage | Thread pool ${label:name} is using ${value}% of its configured capacity |
+| [ websphere_pmi_jdbc_pool_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/websphere_pmi.conf) | websphere_pmi.jdbc_pool_usage | JDBC pool ${label:pool} is ${value}% utilized |
+| [ websphere_pmi_jdbc_pool_wait_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/websphere_pmi.conf) | websphere_pmi.jdbc_pool_time | Average wait time in JDBC pool ${label:pool} is ${value}ms |
+| [ websphere_pmi_jms_queue_wait_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/websphere_pmi.conf) | websphere_pmi.jms_queue_wait_time | Aggregate JMS wait time for destination ${label:destination} is ${value}ms |
 
 
 

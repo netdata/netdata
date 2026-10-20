@@ -324,7 +324,7 @@ state and dimension actions; chart-level metadata retains the configured policy.
 
 ## Lifecycle Defaults and Policy
 
-Default lifecycle policy when template omits lifecycle:
+Default lifecycle policy when a template omits lifecycle fields:
 
 | Policy                           | Default        |
 |----------------------------------|----------------|
@@ -332,6 +332,10 @@ Default lifecycle policy when template omits lifecycle:
 | `expire_after_cycles`            | `5`            |
 | `dimensions.max_dims`            | `0` (disabled) |
 | `dimensions.expire_after_cycles` | `0`            |
+
+Authored chart expiry preserves presence: omission uses five successful cycles, explicit zero disables expiry, and a
+positive value overrides the default. The compiler resolves this into the existing integer runtime policy. Retaining
+a chart does not retain or replay its measurements; metric-store retention remains independent.
 
 Metric collection can advance while output plans are aborted, leaving published definitions past their expiry.
 When an identity returns after it was eligible for expiry in an intervening cycle, the planner recreates its staged
@@ -357,6 +361,7 @@ collector's lost counter baseline.
 | Trigger               | Unmatched series only when autogen is enabled                                                                                                  |
 | Authored precedence   | All authored routes are resolved first; conditional rules and fallback apply only when none matched                                             |
 | Conditional rules     | `AutogenPolicy.Rules` scope fallback selectors by source family; all applicable selectors must accept, so any rejection suppresses fallback     |
+| Counter raw charts    | `AutogenPolicy.CounterRawCharts` adds a second, `absolute` route (`<metric>.raw` chart ID and context) to accepted scalar counter routes; see the chart-template `engine` section |
 | Context namespace     | Autogen context = top-level `context_namespace` + the full metric name (which includes any `SnapshotMeter` prefix); empty namespace leaves the bare name. A non-empty meter prefix stacks after `context_namespace`, so pair `context_namespace` with `SnapshotMeter("")` to avoid a doubled prefix |
 | Structured families   | Histogram/summary components use the base family and retain structural labels; StateSet keeps its name; MeasureSet fields use the source before `_<field>` |
 | Metric metadata usage | Uses `metrix.MetricMeta` hints for title/family/unit where allowed                                                                             |

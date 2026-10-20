@@ -13,6 +13,7 @@ import shlex
 import shutil
 import socket
 import subprocess
+import sys
 import tempfile
 import time
 import urllib.request
@@ -48,20 +49,22 @@ def main():
     (root / "etc/scripts.d.conf").write_text(
         "enabled: yes\ndefault_run: yes\nmodules:\n  native: yes\n  nagios: no\n"
     )
-    (root / "manifest.yaml").write_text(
-        "version: v1\n"
-        f"mode: {args.mode}\n"
-        f"command: [/bin/bash, {root}/collect.sh]\n"
-        "checks:\n  - id: probe\n    title: Probe\n    by_labels: [queue]\n"
-    )
     helper = repo / "src/go/plugin/scripts.d/lib/native.sh"
+    failure_action = "nd_fail; return" if args.mode == "persistent" else "return 1"
     script = (
         "#!/bin/bash\nset -eu\n"
         f"source {shlex.quote(str(helper))}\n"
         "collect_snapshot() {\n"
         f"    state=$(cat {shlex.quote(str(root / 'state'))})\n"
+        "    if [[ $state == collection_failed ]]; then\n"
+        f"        printf '%s\\n' failed >> {shlex.quote(str(root / 'failed-attempts'))}\n"
+        f"        {failure_action}\n"
+        "    fi\n"
         "    nd_begin\n"
-        "    if [[ $state != omitted ]]; then nd_check probe \"$state\" queue 'mail\\'; fi\n"
+        "    if [[ $state != omitted ]]; then\n"
+        "        nd_check probe Probe queue\n"
+        "        nd_check_sample \"$ND_FAMILY\" \"$state\" queue 'mail\\'\n"
+        "    fi\n"
         "    nd_end\n"
         "}\n"
     )
@@ -79,7 +82,8 @@ def main():
     (root / "collect.sh").write_text(script)
     (root / "etc/scripts.d/native.conf").write_text(
         "jobs:\n  - name: health_probe\n"
-        f"    manifest: {root}/manifest.yaml\n"
+        f"    command: [/bin/bash, {root}/collect.sh]\n"
+        f"    mode: {args.mode}\n"
         "    update_every: 1\n    timeout: 3\n"
     )
     (root / "plugins/scripts.d.plugin").symlink_to(plugin)
@@ -135,7 +139,7 @@ def main():
     set_state("critical")
     print(f"artifacts={root}", flush=True)
     command = [str(agent), "-D", "-c", str(root / "netdata.conf"), "-P", str(root / "netdata.pid")]
-    print("+ " + shlex.join(command), flush=True)
+    print("+ " + shlex.join(command), file=sys.stderr, flush=True)
     with (root / "agent.log").open("w") as log:
         proc = subprocess.Popen(
             command, stdout=log, stderr=log,
@@ -172,6 +176,43 @@ def main():
                         initial_launches = launches
                     else:
                         assert launches == initial_launches, launches
+
+            failure_start = int(time.time())
+            set_state("collection_failed")
+            deadline = time.monotonic() + 45
+            while time.monotonic() < deadline:
+                if proc.poll() is not None:
+                    raise RuntimeError(f"Agent exited: {proc.returncode}")
+                checks = [a for a in api("alarms?all").get("alarms", {}).values()
+                          if a.get("name") == "native_script_check"]
+                states = [a.get("status") for a in checks]
+                assert not {"CLEAR", "OK"}.intersection(states), states
+                transitions = [e.get("status") for e in api("alarm_log?after=0")
+                               if e.get("name") == "native_script_check" and e.get("when", 0) >= failure_start]
+                assert not {"CLEAR", "OK"}.intersection(transitions), transitions
+                failures = root / "failed-attempts"
+                attempts = len(failures.read_text().splitlines()) if failures.exists() else 0
+                # Observe a real health evaluation after multiple failed attempts.
+                # Retained CRITICAL or stale/undefined health is acceptable.
+                if attempts >= 2 and any(a.get("last_updated", 0) > failure_start for a in checks):
+                    print(f"collection failed across health evaluation ({attempts} attempts): no false CLEAR", flush=True)
+                    break
+                time.sleep(1)
+            else:
+                raise AssertionError(f"no health evaluation during repeated failures: attempts={attempts}, states={states}")
+
+            resumed_at = int(time.time())
+            set_state("critical")
+            deadline = time.monotonic() + 45
+            while time.monotonic() < deadline:
+                checks = [a for a in api("alarms?all").get("alarms", {}).values()
+                          if a.get("name") == "native_script_check"]
+                if any(a.get("status") == "CRITICAL" and a.get("last_updated", 0) > resumed_at for a in checks):
+                    print("collection resumed -> CRITICAL", flush=True)
+                    break
+                time.sleep(1)
+            else:
+                raise AssertionError("no CRITICAL evaluation after collection resumed")
 
             charts = [v for v in api("charts")["charts"].values() if v.get("context") == "native_script.check_state"]
             assert len(charts) == 1, charts

@@ -32,18 +32,20 @@ type Controller struct {
 	mutations   jobmgr.FunctionMutationPort // kernel Function-mutation port
 	publication *Publication                // external FUNCTION/FUNCTION_DEL registration set
 
-	plans              map[string]controllerModulePlan     // per-module route plans
-	jobs               map[string]map[string]controllerJob // live jobs by module then job name
-	groups             map[string]*controllerGroup         // method-generation groups by signature key
-	routes             map[string]controllerRoute          // controller's view of published routes
-	initialNames       map[string]struct{}                 // immutable initial-route public names
-	initialGenerations []*HandlerGenerationDeclaration     // initial handler generations retained for cleanup
-	version            uint64                              // controller version
-	nextID             uint64                              // next controller-assigned id
-	activated          bool                                // Activate has published the external snapshot
-	draining           bool                                // shutdown draining has begun
-	terminated         bool                                // controller fully torn down
-	dirty              error                               // sticky poison error
+	processNames       map[string]functionOwner                // reserved public provider names
+	processOwners      []functionOwner                         // immutable provider census
+	plans              map[functionOwner]controllerModulePlan  // per-owner route plans
+	jobs               map[string]map[string]controllerJob     // live jobs by module then job name
+	groups             map[controllerGroupKey]*controllerGroup // method-generation groups by signature key
+	routes             map[string]controllerRoute              // controller's view of published routes
+	initialNames       map[string]struct{}                     // immutable initial-route public names
+	initialGenerations []*HandlerGenerationDeclaration         // initial handler generations retained for cleanup
+	version            uint64                                  // controller version
+	nextID             uint64                                  // next controller-assigned id
+	activated          bool                                    // Activate has published the external snapshot
+	draining           bool                                    // shutdown draining has begun
+	terminated         bool                                    // controller fully torn down
+	dirty              error                                   // sticky poison error
 }
 
 type controllerJob struct {
@@ -60,8 +62,8 @@ type controllerModulePlan struct {
 }
 
 type controllerGroup struct {
-	key        string                     // group key (module + content signature)
-	module     string                     // owning module
+	key        controllerGroupKey         // owner and scope
+	owner      functionOwner              // owning collector or process provider
 	signature  string                     // content signature of the grouped methods
 	generation *methodGeneration          // the method generation backing the group
 	routes     map[string]controllerRoute // routes published for this group
@@ -121,7 +123,7 @@ func (c *Controller) JobStager() (*JobStager, error) {
 	shared := make(map[string][]funcapi.FunctionConfig, len(c.plans))
 	for name, creator := range c.modules {
 		modules[name] = creator
-		shared[name] = slices.Clone(c.plans[name].shared)
+		shared[name] = slices.Clone(c.plans[functionOwner{name: name}].shared)
 	}
 	return &JobStager{
 		modules:  modules,
@@ -305,7 +307,21 @@ func NewContainedController(
 	modules collectorapi.Registry,
 	initial ...InitialRoute,
 ) (*Controller, *Catalog, error) {
-	plans, err := prepareContainedModulePlans(ctx, epoch, attempts, modules)
+	return NewContainedControllerWithProviders(ctx, epoch, attempts, diagnostics, modules, nil, initial...)
+}
+
+// NewContainedControllerWithProviders adds process-owned Functions to the same
+// catalog and generation lifecycle as collector Functions.
+func NewContainedControllerWithProviders(
+	ctx context.Context,
+	epoch uint64,
+	attempts jobmgr.ProcessAttemptAuthority,
+	diagnostics jobmgr.DiagnosticObserver,
+	modules collectorapi.Registry,
+	providers []funcapi.ProcessFunctionProvider,
+	initial ...InitialRoute,
+) (*Controller, *Catalog, error) {
+	plans, err := prepareContainedModulePlans(ctx, epoch, attempts, modules, providers)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -321,10 +337,10 @@ func newControllerWithPlans(
 	attempts jobmgr.ProcessAttemptAuthority,
 	diagnostics jobmgr.DiagnosticObserver,
 	modules collectorapi.Registry,
-	plans map[string]controllerModulePlan,
+	plans map[functionOwner]controllerModulePlan,
 	initial ...InitialRoute,
 ) (*Controller, *Catalog, error) {
-	if epoch == 0 || attempts == nil || modules == nil || len(plans) != len(modules) {
+	if epoch == 0 || attempts == nil || modules == nil {
 		return nil, nil, errors.Join(
 			errors.New("jobmgr Function controller: invalid staged construction"),
 			cleanupControllerModulePlans(plans),
@@ -337,14 +353,14 @@ func newControllerWithPlans(
 		modules:      make(collectorapi.Registry, len(modules)),
 		plans:        plans,
 		jobs:         make(map[string]map[string]controllerJob),
-		groups:       make(map[string]*controllerGroup),
+		groups:       make(map[controllerGroupKey]*controllerGroup),
 		routes:       make(map[string]controllerRoute),
 		initialNames: make(map[string]struct{}, len(initial)),
 		version:      1,
 	}
 	names := make([]string, 0, len(modules))
 	for name, creator := range modules {
-		if plans[name].agentBundle == nil {
+		if plans[functionOwner{name: name}].agentBundle == nil {
 			return nil, nil, errors.Join(
 				errors.New("jobmgr Function controller: missing staged module plan"),
 				cleanupControllerModulePlans(plans),
@@ -363,7 +379,20 @@ func newControllerWithPlans(
 	}
 	slices.Sort(names)
 	for _, module := range names {
-		group, err := controller.buildAgentGroup(module, controller.modules[module])
+		group, err := controller.buildAgentGroup(functionOwner{name: module})
+		if err != nil {
+			return nil, nil, cleanupConstruction(err)
+		}
+		if group != nil {
+			controller.groups[group.key] = group
+		}
+	}
+	if err := controller.validateProcessNames(initial); err != nil {
+		return nil, nil, cleanupConstruction(err)
+	}
+	controller.processOwners = sortedProcessOwners(plans)
+	for _, owner := range controller.processOwners {
+		group, err := controller.buildAgentGroup(owner)
 		if err != nil {
 			return nil, nil, cleanupConstruction(err)
 		}
@@ -405,7 +434,7 @@ func newControllerWithPlans(
 	return controller, catalog, nil
 }
 
-func cleanupControllerModulePlans(plans map[string]controllerModulePlan) (result error) {
+func cleanupControllerModulePlans(plans map[functionOwner]controllerModulePlan) (result error) {
 	for _, plan := range plans {
 		if plan.owner != nil {
 			plan.owner.Release()
@@ -509,7 +538,7 @@ func (c *Controller) publishJob(
 		return err
 	}
 	job := bundle.job
-	creator, ok := c.modules.Lookup(job.ModuleName())
+	_, ok := c.modules.Lookup(job.ModuleName())
 	if !ok {
 		return errors.New("jobmgr Function controller: job module is not registered")
 	}
@@ -526,7 +555,7 @@ func (c *Controller) publishJob(
 		bundle:   bundle,
 		methods:  slices.Clone(methods),
 	}
-	if err := c.reconcileModuleLocked(ctx, job.ModuleName(), creator); err != nil {
+	if err := c.reconcileModuleLocked(ctx, job.ModuleName()); err != nil {
 		if c.dirty == nil {
 			delete(moduleJobs, job.Name())
 			if len(moduleJobs) == 0 {
@@ -580,12 +609,11 @@ func (c *Controller) detachJob(
 		c.mu.Unlock()
 		return errors.New("jobmgr Function controller: stale job close")
 	}
-	creator := c.modules[job.ModuleName()]
 	delete(moduleJobs, job.Name())
 	if len(moduleJobs) == 0 {
 		delete(c.jobs, job.ModuleName())
 	}
-	err := c.reconcileModuleLocked(ctx, job.ModuleName(), creator)
+	err := c.reconcileModuleLocked(ctx, job.ModuleName())
 	if err != nil {
 		if c.dirty == nil {
 			moduleJobs = c.jobs[job.ModuleName()]
@@ -603,6 +631,11 @@ func (c *Controller) detachJob(
 }
 
 func (c *Controller) ReconcileModule(ctx context.Context, module string) error {
+	return c.reconcileOwner(ctx, functionOwner{name: module})
+}
+
+func (c *Controller) reconcileOwner(ctx context.Context, owner functionOwner) error {
+	module := owner.name
 	if c == nil || ctx == nil || module == "" {
 		return errors.New("jobmgr Function controller: invalid module reconcile")
 	}
@@ -611,27 +644,27 @@ func (c *Controller) ReconcileModule(ctx context.Context, module string) error {
 		c.mu.Unlock()
 		return err
 	}
-	creator, ok := c.modules.Lookup(module)
+	_, ok := c.plans[owner]
 	if !ok {
 		c.mu.Unlock()
 		return errors.New("jobmgr Function controller: module is not registered")
 	}
 	pollable := false
-	if bundle := c.plans[module].agentBundle; bundle != nil {
+	if bundle := c.plans[owner].agentBundle; bundle != nil {
 		pollable = pollable || bundle.pollable
 	}
-	for _, job := range c.jobs[module] {
+	for _, job := range c.ownerJobs(owner) {
 		pollable = pollable || job.bundle.pollable
 	}
 	if !pollable {
 		c.mu.Unlock()
 		return nil
 	}
-	bundles := make([]*functionBundle, 0, len(c.jobs[module])+1)
-	if bundle := c.plans[module].agentBundle; bundle != nil && bundle.pollable {
+	bundles := make([]*functionBundle, 0, len(c.ownerJobs(owner))+1)
+	if bundle := c.plans[owner].agentBundle; bundle != nil && bundle.pollable {
 		bundles = append(bundles, bundle)
 	}
-	for _, job := range c.jobs[module] {
+	for _, job := range c.ownerJobs(owner) {
 		if job.bundle.pollable {
 			bundles = append(bundles, job.bundle)
 		}
@@ -650,14 +683,13 @@ func (c *Controller) ReconcileModule(ctx context.Context, module string) error {
 		if poll.attempt == nil {
 			continue
 		}
-		go c.finishAvailabilityPoll(module, creator, poll)
+		go c.finishAvailabilityPoll(owner, poll)
 	}
 	return nil
 }
 
 func (c *Controller) finishAvailabilityPoll(
-	module string,
-	creator collectorapi.Creator,
+	owner functionOwner,
 	poll functionAvailabilityPoll,
 ) {
 	if err := poll.attempt.Await(context.Background()); err != nil {
@@ -685,7 +717,7 @@ func (c *Controller) finishAvailabilityPoll(
 		c.mu.Unlock()
 		return
 	}
-	err := c.reconcileModuleLocked(context.Background(), module, creator)
+	err := c.reconcileOwnerLocked(context.Background(), owner)
 	c.mu.Unlock()
 	c.observeAvailabilityFailure(DiagnosticAvailabilityReconciliationFailed, poll.bundle, err)
 }
@@ -748,24 +780,27 @@ func (c *Controller) usableLocked() error {
 func (c *Controller) reconcileModuleLocked(
 	ctx context.Context,
 	module string,
-	creator collectorapi.Creator,
 ) error {
-	unpublished := make(map[string]*controllerGroup)
+	return c.reconcileOwnerLocked(ctx, functionOwner{name: module})
+}
+
+func (c *Controller) reconcileOwnerLocked(ctx context.Context, owner functionOwner) error {
+	unpublished := make(map[controllerGroupKey]*controllerGroup)
 	cleanupUnpublished := true
 	defer func() {
 		if cleanupUnpublished {
 			_ = c.cleanupUnpublishedGroups(context.WithoutCancel(ctx), unpublished)
 		}
 	}()
-	desired, err := c.buildModuleGroups(module, creator, unpublished)
+	desired, err := c.buildOwnerGroups(owner, unpublished)
 	if err != nil {
 		cleanupUnpublished = false
 		return errors.Join(err, c.cleanupUnpublishedGroups(context.WithoutCancel(ctx), unpublished))
 	}
 
-	nextGroups := make(map[string]*controllerGroup, len(c.groups)+len(desired))
+	nextGroups := make(map[controllerGroupKey]*controllerGroup, len(c.groups)+len(desired))
 	for key, group := range c.groups {
-		if group.module != module {
+		if group.owner != owner {
 			nextGroups[key] = group
 		}
 	}
@@ -832,12 +867,11 @@ func (c *Controller) reconcileModuleLocked(
 	return nil
 }
 
-func (c *Controller) buildModuleGroups(
-	module string,
-	creator collectorapi.Creator,
-	unpublished map[string]*controllerGroup,
-) (map[string]*controllerGroup, error) {
-	desired := make(map[string]*controllerGroup)
+func (c *Controller) buildOwnerGroups(
+	owner functionOwner,
+	unpublished map[controllerGroupKey]*controllerGroup,
+) (map[controllerGroupKey]*controllerGroup, error) {
+	desired := make(map[controllerGroupKey]*controllerGroup)
 	add := func(group *controllerGroup, err error) error {
 		if err != nil {
 			return err
@@ -850,9 +884,14 @@ func (c *Controller) buildModuleGroups(
 		}
 		return nil
 	}
-	if err := add(c.buildAgentGroup(module, creator)); err != nil {
+	if err := add(c.buildAgentGroup(owner)); err != nil {
 		return nil, err
 	}
+	if owner.process {
+		return desired, nil
+	}
+	module := owner.name
+	creator := c.modules[module]
 	if err := add(c.buildSharedGroup(module, creator)); err != nil {
 		return nil, err
 	}
@@ -866,18 +905,18 @@ func (c *Controller) buildModuleGroups(
 	return desired, nil
 }
 
-func (c *Controller) buildAgentGroup(module string, creator collectorapi.Creator) (*controllerGroup, error) {
-	if creator.AgentFunctions == nil {
+func (c *Controller) buildAgentGroup(owner functionOwner) (*controllerGroup, error) {
+	if len(c.plans[owner].agent) == 0 {
 		return nil, nil
 	}
-	methods := c.availableAgentMethods(module)
+	methods := c.availableAgentMethods(owner)
 	return c.buildGroup(
-		module+"/agent",
-		module,
+		controllerGroupKey{owner: owner, scope: "agent"},
+		owner,
 		methodGenerationAgent,
-		creator,
+		collectorapi.InstancePolicyPerJob,
 		methods,
-		map[string]*functionBundle{"": c.plans[module].agentBundle},
+		map[string]*functionBundle{"": c.plans[owner].agentBundle},
 		true,
 	)
 }
@@ -891,11 +930,11 @@ func (c *Controller) buildSharedGroup(module string, creator collectorapi.Creato
 		bundles[name] = job.bundle
 	}
 	return c.buildGroup(
-		module+"/shared",
-		module,
+		controllerGroupKey{owner: functionOwner{name: module}, scope: "shared"},
+		functionOwner{name: module},
 		methodGenerationShared,
-		creator,
-		c.plans[module].shared,
+		creator.InstancePolicy,
+		c.plans[functionOwner{name: module}].shared,
 		bundles,
 		true,
 	)
@@ -910,10 +949,10 @@ func (c *Controller) buildInstanceGroup(
 		return nil, nil
 	}
 	return c.buildGroup(
-		module+"/instance/"+job.bundle.job.Name(),
-		module,
+		controllerGroupKey{owner: functionOwner{name: module}, scope: "instance/" + job.bundle.job.Name()},
+		functionOwner{name: module},
 		methodGenerationInstance,
-		creator,
+		creator.InstancePolicy,
 		job.methods,
 		map[string]*functionBundle{job.bundle.job.Name(): job.bundle},
 		false,
@@ -921,14 +960,15 @@ func (c *Controller) buildInstanceGroup(
 }
 
 func (c *Controller) buildGroup(
-	key string,
-	module string,
+	key controllerGroupKey,
+	owner functionOwner,
 	kind methodGenerationKind,
-	creator collectorapi.Creator,
+	policy collectorapi.InstancePolicy,
 	methods []funcapi.FunctionConfig,
 	bundles map[string]*functionBundle,
 	aliases bool,
 ) (*controllerGroup, error) {
+	module := owner.name
 	var err error
 	methods, err = validateConfiguredMethods(module, methods)
 	if err != nil {
@@ -949,14 +989,14 @@ func (c *Controller) buildGroup(
 		return nil, errors.New("jobmgr Function controller: generation wrapped")
 	}
 	id := module + "/" + strconv.FormatUint(c.nextID, 10)
-	generation, err := newMethodGeneration(id, module, kind, creator, methods, bundles)
+	generation, err := newMethodGeneration(id, module, kind, policy, methods, bundles)
 	if err != nil {
 		return nil, err
 	}
 	declaration := generation.declaration()
 	group := &controllerGroup{
 		key:        key,
-		module:     module,
+		owner:      owner,
 		signature:  signature,
 		generation: generation,
 		routes:     make(map[string]controllerRoute),
@@ -967,6 +1007,10 @@ func (c *Controller) buildGroup(
 			names = funcapi.FunctionNames(module, method)
 		}
 		for _, name := range names {
+			if reserved, ok := c.processNames[name]; ok && reserved != owner {
+				_ = generation.cleanup(context.Background())
+				return nil, errors.New("jobmgr Function controller: Function collides with process provider")
+			}
 			if !validFunctionName(name) {
 				_ = generation.cleanup(context.Background())
 				return nil, errors.New("jobmgr Function controller: invalid public name")
@@ -992,17 +1036,17 @@ func (c *Controller) buildGroup(
 	return group, nil
 }
 
-func (c *Controller) availableAgentMethods(module string) []funcapi.FunctionConfig {
-	current := c.groups[module+"/agent"]
-	methods := make([]funcapi.FunctionConfig, 0, len(c.plans[module].agent))
-	for _, method := range c.plans[module].agent {
+func (c *Controller) availableAgentMethods(owner functionOwner) []funcapi.FunctionConfig {
+	current := c.groups[controllerGroupKey{owner: owner, scope: "agent"}]
+	methods := make([]funcapi.FunctionConfig, 0, len(c.plans[owner].agent))
+	for _, method := range c.plans[owner].agent {
 		published := false
 		if current != nil && current.generation != nil {
 			_, published = current.generation.methods[method.ID]
 		}
 		if published ||
 			method.Available == nil ||
-			c.plans[module].agentBundle.available(method.ID) {
+			c.plans[owner].agentBundle.available(method.ID) {
 			methods = append(methods, method)
 		}
 	}
@@ -1151,9 +1195,21 @@ func methodPublicationRecord(
 	}
 }
 
-func indexControllerRoutes(groups map[string]*controllerGroup) (map[string]controllerRoute, error) {
+func indexControllerRoutes(groups map[controllerGroupKey]*controllerGroup) (map[string]controllerRoute, error) {
 	routes := make(map[string]controllerRoute)
-	keys := slices.Sorted(maps.Keys(groups))
+	keys := slices.Collect(maps.Keys(groups))
+	slices.SortFunc(keys, func(a, b controllerGroupKey) int {
+		if a.owner.process != b.owner.process {
+			if a.owner.process {
+				return 1
+			}
+			return -1
+		}
+		if n := cmp.Compare(a.owner.name, b.owner.name); n != 0 {
+			return n
+		}
+		return cmp.Compare(a.scope, b.scope)
+	})
 	for _, key := range keys {
 		group := groups[key]
 		for name, route := range group.routes {
@@ -1328,7 +1384,7 @@ func (c *Controller) cleanupModuleBundles(ctx context.Context) (result error) {
 	return result
 }
 
-func (c *Controller) cleanupUnpublishedGroups(ctx context.Context, groups map[string]*controllerGroup) (err error) {
+func (c *Controller) cleanupUnpublishedGroups(ctx context.Context, groups map[controllerGroupKey]*controllerGroup) (err error) {
 	seen := make(map[*methodGeneration]struct{})
 	for _, group := range groups {
 		if group == nil || group.generation == nil {

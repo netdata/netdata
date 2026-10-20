@@ -36,7 +36,9 @@ func TestAcceptedHandoffUpdateDuringStartupPreservesEnabledIntent(t *testing.T) 
 			retainedCleaned := make(chan struct{})
 			configureRuntimeTestCollector(controller, func() *runtimeTestCollector {
 				ordinal := constructions.Add(1)
-				collector := &runtimeTestCollector{factoryTestV2: &factoryTestV2{}}
+				collector := &runtimeTestCollector{
+					factoryTestV2: &factoryTestV2{},
+				}
 				collector.check = func(context.Context) error {
 					checks.Add(1)
 					return nil
@@ -59,18 +61,26 @@ func TestAcceptedHandoffUpdateDuringStartupPreservesEnabledIntent(t *testing.T) 
 				}
 				return collector
 			})
-			oldStore := &factoryTestAtomicScope{value: "old"}
-			newStore := &factoryTestAtomicScope{value: "new"}
+			oldStore := &factoryTestAtomicScope{
+				value: "old",
+			}
+			newStore := &factoryTestAtomicScope{
+				value: "new",
+			}
 			oldStore.current.Store(true)
 			newStore.current.Store(true)
 			var resolutions atomic.Int32
 			if test.staleStore {
-				controller.factory.config.ConfigModules.config.Configs = testConfigResolver(t, testAtomicResolver(t), func([]string) (secretresolver.AtomicScope, error) {
-					if resolutions.Add(1) == 1 {
-						return oldStore, nil
-					}
-					return newStore, nil
-				})
+				controller.factory.config.ConfigModules.config.Configs = testConfigResolver(
+					t,
+					testAtomicResolver(t),
+					func([]string) (secretresolver.AtomicScope, error) {
+						if resolutions.Add(1) == 1 {
+							return oldStore, nil
+						}
+						return newStore, nil
+					},
+				)
 			}
 			commands := bindHandoffTestWorkers(t, controller)
 			var current lifecycle.ReadyResource
@@ -87,7 +97,7 @@ func TestAcceptedHandoffUpdateDuringStartupPreservesEnabledIntent(t *testing.T) 
 			}
 			config, failure := controller.parseConfig(request, "module", "job")
 			require.False(t, failure.valid)
-			seedDynCfgJobGraphRecord(t, graph, config, dyncfg.StatusDisabled)
+			seedDynCfgJobGraphRecord(t, controller, graph, config, dyncfg.StatusDisabled)
 			applyAcceptedEnableForTest(t, controller, graph, config, 1)
 			current = applyActivationTestSubmission(t, commands.next(t, "internal/jobs/accepted-activation"), nil, 2)
 			require.NotNil(t, current)
@@ -98,9 +108,12 @@ func TestAcceptedHandoffUpdateDuringStartupPreservesEnabledIntent(t *testing.T) 
 
 			request.Payload = []byte(test.payload)
 			scope := lifecycle.ResourceTransactionScope{
-				ID:        config.FullName(),
-				Current:   current.Identity(),
-				Successor: lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 3},
+				ID:      config.FullName(),
+				Current: current.Identity(),
+				Successor: lifecycle.ResourceIdentity{
+					ID:         config.FullName(),
+					Generation: 3,
+				},
 			}
 			permit, _ := issueTestJobPermit(t, config.FullName(), 3)
 			prepared, err := controller.Prepare(t.Context(), request, current, scope, permit)
@@ -123,8 +136,21 @@ func TestAcceptedHandoffUpdateDuringStartupPreservesEnabledIntent(t *testing.T) 
 
 			// Repeated ENABLE must preserve the handed-off candidate and release wait.
 			permit, _ = issueTestJobPermit(t, config.FullName(), 4)
-			prepared, err = controller.Prepare(t.Context(), DynCfgJobRequest{Args: []string{request.Args[0], "enable"}}, nil,
-				lifecycle.ResourceTransactionScope{ID: config.FullName(), Successor: lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 4}}, permit)
+			prepared, err = controller.Prepare(
+				t.Context(),
+				DynCfgJobRequest{
+					Args: []string{request.Args[0], "enable"},
+				},
+				nil,
+				lifecycle.ResourceTransactionScope{
+					ID: config.FullName(),
+					Successor: lifecycle.ResourceIdentity{
+						ID:         config.FullName(),
+						Generation: 4,
+					},
+				},
+				permit,
+			)
 			require.NoError(t, err)
 			_, err = prepared.Apply(t.Context())
 			require.NoError(t, err)
@@ -160,42 +186,69 @@ func TestAcceptedHandoffUpdateDuringStartupPreservesEnabledIntent(t *testing.T) 
 				require.EqualValues(t, 2, constructions.Load(), "replacement must reuse its preflight candidate")
 				require.EqualValues(t, 2, checks.Load(), "replacement must not probe twice")
 			}
-			require.False(t, controller.ActivationEnabled(config.FullName()), "runtime settlement must retire activation authority")
+			require.False(
+				t,
+				controller.ActivationEnabled(config.FullName()),
+				"runtime settlement must retire activation authority",
+			)
 		})
 	}
 }
 
 func TestAcceptedHandoffReleasesCandidateWhenActivationRevoked(t *testing.T) {
 	for _, closed := range []bool{false, true} {
-		t.Run(map[bool]string{false: "disable while waiting", true: "registration after shutdown"}[closed], func(t *testing.T) {
-			controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
-			cleaned := make(chan struct{})
-			configureRuntimeTestCollector(controller, func() *runtimeTestCollector {
-				return &runtimeTestCollector{cleanup: func() { close(cleaned) }}
-			})
-			bindHandoffTestWorkers(t, controller)
-			config := factoryTestConfig(false).SetSourceType(confgroup.TypeDyncfg)
-			seedDynCfgJobGraphRecord(t, graph, config, dyncfg.StatusAccepted)
-			stage, err := controller.factory.newCandidate(config)
-			require.NoError(t, err)
-			require.NoError(t, controller.factory.awaitCandidate(t.Context(), stage))
-			spec, err := controller.configModules.newAcceptedActivationSpec(config)
-			require.NoError(t, err)
-			if closed {
-				controller.scheduler.StopBackgroundWorkers()
-			}
-			controller.scheduler.accepted.armWithGate(spec, make(chan struct{}), nil, stage)
-			if !closed {
-				prepared, err := controller.Prepare(t.Context(), DynCfgJobRequest{Args: []string{controller.externalID(config.FullName()), "disable"}}, nil,
-					lifecycle.ResourceTransactionScope{ID: config.FullName()}, lifecycle.LongLivedPermit{})
+		t.Run(
+			map[bool]string{false: "disable while waiting", true: "registration after shutdown"}[closed],
+			func(t *testing.T) {
+				controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
+				cleaned := make(chan struct{})
+				configureRuntimeTestCollector(controller, func() *runtimeTestCollector {
+					return &runtimeTestCollector{
+						cleanup: func() { close(cleaned) },
+					}
+				})
+				config := factoryTestConfig(false).SetSourceType(confgroup.TypeDyncfg)
+				seedSecretPausedTest(t, controller, graph, config)
+				bindHandoffTestWorkers(t, controller)
+				stage, err := controller.factory.newCandidate(config)
 				require.NoError(t, err)
-				_, err = prepared.Apply(t.Context())
+				require.NoError(t, controller.factory.awaitCandidate(t.Context(), stage))
+				spec, err := controller.configModules.newAcceptedActivationSpec(config)
 				require.NoError(t, err)
-			}
-			requireTestSignal(t, cleaned, "revoked candidate was not cleaned up")
-			requireFactoryAttemptsIdle(t, controller.factory)
-			require.False(t, controller.ActivationEnabled(config.FullName()))
-		})
+				spec.work = controller.candidates.snapshot(config.FullName()).Active
+				require.NotNil(t, spec.work)
+				if closed {
+					controller.scheduler.StopBackgroundWorkers()
+				}
+				controller.scheduler.accepted.startExecution(spec, make(chan struct{}), stage)
+				if !closed {
+					select {
+					case <-cleaned:
+						t.Fatal("live retained candidate released before revocation")
+					default:
+					}
+				}
+				if !closed {
+					prepared, err := controller.Prepare(
+						t.Context(),
+						DynCfgJobRequest{
+							Args: []string{controller.externalID(config.FullName()), "disable"},
+						},
+						nil,
+						lifecycle.ResourceTransactionScope{
+							ID: config.FullName(),
+						},
+						lifecycle.LongLivedPermit{},
+					)
+					require.NoError(t, err)
+					_, err = prepared.Apply(t.Context())
+					require.NoError(t, err)
+				}
+				requireTestSignal(t, cleaned, "revoked candidate was not cleaned up")
+				requireFactoryAttemptsIdle(t, controller.factory)
+				require.False(t, controller.ActivationEnabled(config.FullName()))
+			},
+		)
 	}
 }
 
@@ -203,11 +256,13 @@ func TestAcceptedHandoffDisposeReleasesPreflightCandidate(t *testing.T) {
 	controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
 	cleaned := make(chan struct{})
 	configureRuntimeTestCollector(controller, func() *runtimeTestCollector {
-		return &runtimeTestCollector{cleanup: func() { close(cleaned) }}
+		return &runtimeTestCollector{
+			cleanup: func() { close(cleaned) },
+		}
 	})
 	commands := bindHandoffTestWorkers(t, controller)
 	config := factoryTestConfig(false).SetSourceType(confgroup.TypeDyncfg)
-	seedDynCfgJobGraphRecord(t, graph, config, dyncfg.StatusFailed)
+	seedDynCfgJobGraphRecord(t, controller, graph, config, dyncfg.StatusFailed)
 	before, _ := graph.Lookup(config.FullName())
 	permit, tasks := issueTestJobPermit(t, config.FullName(), 1)
 	prepared, err := controller.Prepare(t.Context(), DynCfgJobRequest{
@@ -216,7 +271,13 @@ func TestAcceptedHandoffDisposeReleasesPreflightCandidate(t *testing.T) {
 		HasPayload:   true,
 		ContentType:  "application/json",
 		CallerSource: "user",
-	}, nil, lifecycle.ResourceTransactionScope{ID: config.FullName(), Successor: lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 1}}, permit)
+	}, nil, lifecycle.ResourceTransactionScope{
+		ID: config.FullName(),
+		Successor: lifecycle.ResourceIdentity{
+			ID:         config.FullName(),
+			Generation: 1,
+		},
+	}, permit)
 	require.NoError(t, err)
 	current, err := prepared.Dispose(t.Context())
 	require.NoError(t, err)
@@ -233,8 +294,18 @@ func TestAcceptedHandoffDisposeReleasesPreflightCandidate(t *testing.T) {
 
 func bindHandoffTestWorkers(t *testing.T, controller *DynCfgJobController) *activationTestCommands {
 	t.Helper()
-	commands := &activationTestCommands{queue: make(chan activationTestSubmission, 16), stop: make(chan struct{})}
-	require.NoError(t, controller.BindBackgroundWorkers(commands, 9, func(err error) { t.Errorf("activation worker failed: %v", err) }))
+	commands := &activationTestCommands{
+		queue: make(chan activationTestSubmission, 16),
+		stop:  make(chan struct{}),
+	}
+	require.NoError(
+		t,
+		controller.BindBackgroundWorkers(
+			commands,
+			9,
+			func(err error) { t.Errorf("activation worker failed: %v", err) },
+		),
+	)
 	t.Cleanup(func() {
 		close(commands.stop)
 		controller.scheduler.StopBackgroundWorkers()
@@ -252,12 +323,84 @@ func requireNoHandoffActivation(t *testing.T, commands *activationTestCommands) 
 	for {
 		select {
 		case call := <-commands.queue:
-			require.NotEqual(t, "internal/jobs/accepted-activation", call.request.Route, "revoked or paused intent must not activate")
+			require.NotEqual(
+				t,
+				"internal/jobs/accepted-activation",
+				call.request.Route,
+				"revoked or paused intent must not activate",
+			)
 			if call.ack != nil {
 				call.ack <- nil
 			}
 		case <-deadline.C:
 			return
 		}
+	}
+}
+
+func TestCandidateAdoptionRevalidatesAfterIntentReservation(t *testing.T) {
+	for _, invalidation := range []string{"Store generation", "candidate retirement"} {
+		t.Run(invalidation, func(t *testing.T) {
+			controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
+			cleaned := make(chan struct{})
+			var checks atomic.Int32
+			configureRuntimeTestCollector(controller, func() *runtimeTestCollector {
+				var checked atomic.Bool
+				return &runtimeTestCollector{
+					factoryTestV2: &factoryTestV2{check: func(context.Context) error { checked.Store(true); checks.Add(1); return nil }},
+					cleanup: func() {
+						if checked.Load() {
+							close(cleaned)
+						}
+					},
+				}
+			})
+			commands := bindHandoffTestWorkers(t, controller)
+			config := factoryTestConfig(false).SetSourceType(confgroup.TypeDyncfg)
+			seedDynCfgJobGraphRecord(t, controller, graph, config, dyncfg.StatusFailed)
+			before, _ := graph.Lookup(config.FullName())
+			snapshot := &factoryTestAtomicScope{value: "before"}
+			snapshot.current.Store(true)
+			controller.factory.config.ConfigModules.config.Configs = testConfigResolver(t, testAtomicResolver(t), func([]string) (secretresolver.AtomicScope, error) {
+				return snapshot, nil
+			})
+			var cut atomic.Bool
+			owner := &intentTestOwner{onPrepare: func() {
+				// Intent preparation runs after Check but before graph adoption.
+				if invalidation == "Store generation" {
+					snapshot.current.Store(false)
+				} else {
+					cut.Store(controller.factory.config.Attempts.CutProcessAttempt(
+						jobAttemptIdentity(jobmgr.ProcessAttemptJob, config.FullName()), jobmgr.ErrProcessAttemptSuperseded))
+				}
+			}}
+			installIntentTestOwner(controller, owner)
+			permit, tasks := issueTestJobPermit(t, config.FullName(), 1)
+			prepared, err := controller.Prepare(t.Context(), DynCfgJobRequest{
+				Args:       []string{controller.externalID(config.FullName()), "update"},
+				Payload:    []byte(`{"option_str":"${store:vault:test:key}"}`),
+				HasPayload: true, ContentType: "application/json", CallerSource: "user",
+			}, nil, lifecycle.ResourceTransactionScope{ID: config.FullName(), Successor: lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 1}}, permit)
+			require.NoError(t, err)
+			applied, err := prepared.Apply(t.Context())
+			require.NoError(t, err)
+			require.Equal(t, 503, applied.ResultStatus())
+			after, _ := graph.Lookup(config.FullName())
+			require.Equal(t, before, after)
+			preparedCount, committed, aborted, enabled := owner.snapshot()
+			require.Equal(t, 1, preparedCount)
+			require.Zero(t, committed)
+			require.Equal(t, 1, aborted)
+			require.Zero(t, enabled)
+			require.EqualValues(t, 1, checks.Load())
+			if invalidation == "candidate retirement" {
+				require.True(t, cut.Load())
+			}
+			requireTestSignal(t, cleaned, "rejected candidate was not cleaned")
+			requireNoHandoffActivation(t, commands)
+			requireFactoryAttemptsIdle(t, controller.factory)
+			require.Equal(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+			require.False(t, controller.ActivationEnabled(config.FullName()))
+		})
 	}
 }

@@ -53,6 +53,7 @@ typedef struct parser_user_object {
     bool cleanup_slots;
     RRDSET *st;
     RRDHOST *host;
+    RRDHOST *host_pin;                       // the host this parser holds a pin on, see pluginsd_select_host()
     void    *opaque;
     struct plugind *cd;
     int trust_durations;
@@ -160,6 +161,7 @@ PARSER *parser_init(struct parser_user_object *user, int fd_input, int fd_output
 void parser_init_repertoire(PARSER *parser, PARSER_REPERTOIRE repertoire);
 void parser_destroy(PARSER *working_parser);
 void pluginsd_cleanup_v2(PARSER *parser);
+void pluginsd_vnodes_index_destroy(PARSER *parser);
 void pluginsd_keywords_init(PARSER *parser, PARSER_REPERTOIRE repertoire);
 PARSER_RC parser_execute(PARSER *parser, const PARSER_KEYWORD *keyword, char **words, size_t num_words);
 
@@ -191,7 +193,7 @@ bool parser_reconstruct_node(BUFFER *wb, void *ptr);
 bool parser_reconstruct_instance(BUFFER *wb, void *ptr);
 bool parser_reconstruct_context(BUFFER *wb, void *ptr);
 
-static inline int parser_action(PARSER *parser, char *input) {
+static inline PARSER_RC parser_action(PARSER *parser, char *input) {
 #ifdef NETDATA_LOG_STREAM_RECEIVER
     char line[1024];
     strncpyz(line, input, sizeof(line) - 1);
@@ -218,10 +220,10 @@ static inline int parser_action(PARSER *parser, char *input) {
                            parser->defer.end_keyword ? parser->defer.end_keyword : "unknown",
                            parser->user.cd ? string2str(parser->user.cd->filename) : "unknown",
                            parser->defer.action_data ? string2str((STRING *)parser->defer.action_data) : "none");
-                    return 1;
+                    return PARSER_RC_ERROR;
                 }
             }
-            return 0;
+            return PARSER_RC_OK;
         }
         else {
             // call the action
@@ -234,7 +236,7 @@ static inline int parser_action(PARSER *parser, char *input) {
             parser->defer.response = NULL;
             parser->flags &= ~PARSER_DEFER_UNTIL_KEYWORD;
         }
-        return 0;
+        return PARSER_RC_OK;
     }
 
     parser->line.num_words = quoted_strings_splitter_pluginsd(input, parser->line.words, PLUGINSD_MAX_WORDS);
@@ -242,7 +244,7 @@ static inline int parser_action(PARSER *parser, char *input) {
 
     if(unlikely(!command)) {
         line_splitter_reset(&parser->line);
-        return 0;
+        return PARSER_RC_OK;
     }
 
     PARSER_RC rc;
@@ -270,7 +272,7 @@ static inline int parser_action(PARSER *parser, char *input) {
 #endif
 
     line_splitter_reset(&parser->line);
-    return (rc == PARSER_RC_ERROR || rc == PARSER_RC_STOP);
+    return rc;
 }
 
 #endif //NETDATA_PLUGINSD_PARSER_H

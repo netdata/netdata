@@ -41,7 +41,7 @@ The collector provides data for:
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -148,4 +148,4 @@ Metrics:
 
 | Metric | Description | Dimensions | Unit |
 |:------|:------------|:----------|:----|
-| mem.edac_mc_errors | DIMM Error Detection And Correction (EDAC) Errors | correctable, uncorrectable | errors |
+| mem.edac_mc_dimm_errors | DIMM Error Detection And Correction (EDAC) Errors | correctable, uncorrectable | errors |

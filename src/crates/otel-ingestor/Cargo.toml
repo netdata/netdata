@@ -27,13 +27,22 @@ serde = { workspace = true, features = ["rc"] }
 sfst = { workspace = true }
 wal = { workspace = true }
 
+# OTLP/HTTP receiver: axum router plus HTTP request plumbing, gzip
+# Content-Encoding handling, and the `with-serde` proto types that back the
+# OTLP/JSON codec. TLS for the HTTP listener terminates via tokio-rustls,
+# separate from tonic's gRPC TLS.
 anyhow = { workspace = true }
-opentelemetry-proto = { workspace = true }
+axum = { workspace = true }
+flate2 = { workspace = true }
+http = { workspace = true }
+http-body-util = { workspace = true }
+opentelemetry-proto = { workspace = true, features = ["with-serde"] }
 regex = { workspace = true }
 serde_json = { workspace = true, features = ["preserve_order"] }
 serde_regex = { workspace = true }
 serde_yaml = { workspace = true }
 tokio = { workspace = true }
+tokio-rustls = { workspace = true }
 tonic = { workspace = true, features = ["gzip", "tls-ring"] }
 tracing = { workspace = true }
 twox-hash = { workspace = true, features = ["xxhash64"] }
@@ -41,4 +50,10 @@ uuid = { workspace = true }
 
 [dev-dependencies]
 bytesize = { workspace = true }
+# TLS listener tests: certificates generated per run, the test client config,
+# and the process crypto provider the otel-plugin binary installs at startup.
+rcgen = { workspace = true }
+rustls = { workspace = true }
 tempfile = { workspace = true }
+# oneshot() request/response assertions against the OTLP/HTTP axum router.
+tower = { workspace = true, features = ["util"] }

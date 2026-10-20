@@ -38,9 +38,15 @@ func runtimeTestNotificationPlan(t *testing.T, commands *autoDetectionRetryTestC
 	return result
 }
 
-func runtimeTestApplyNotification(t *testing.T, plan jobmgr.WorkPlan, current lifecycle.ReadyResource) lifecycle.ReadyResource {
+func runtimeTestApplyNotification(
+	t *testing.T,
+	plan jobmgr.WorkPlan,
+	current lifecycle.ReadyResource,
+) lifecycle.ReadyResource {
 	t.Helper()
-	scope := lifecycle.ResourceTransactionScope{ID: plan.Transaction.ID}
+	scope := lifecycle.ResourceTransactionScope{
+		ID: plan.Transaction.ID,
+	}
 	if current != nil {
 		scope.Current = current.Identity()
 	}
@@ -49,7 +55,13 @@ func runtimeTestApplyNotification(t *testing.T, plan jobmgr.WorkPlan, current li
 	return runtimeTestApply(t, prepared)
 }
 
-func runtimeTestStartAndSettle(t *testing.T, controller *DynCfgJobController, cfg confgroup.Config, current lifecycle.ReadyResource, generation uint64) lifecycle.ReadyResource {
+func runtimeTestStartAndSettle(
+	t *testing.T,
+	controller *DynCfgJobController,
+	cfg confgroup.Config,
+	current lifecycle.ReadyResource,
+	generation uint64,
+) lifecycle.ReadyResource {
 	t.Helper()
 	commands := runtimeTestNotifications(t, controller)
 	current = runtimeTestApply(t, prepareRuntimeTestChange(t, controller, cfg, current, generation))
@@ -65,11 +77,13 @@ func TestRuntimeSettlementFailureWinsRegardlessOfNotificationOrder(t *testing.T)
 			commands := runtimeTestNotifications(t, controller)
 			release := make(chan struct{})
 			configureRuntimeTestCollector(controller, func() *runtimeTestCollector {
-				return &runtimeTestCollector{run: func(ctx context.Context, ready func()) error {
-					ready()
-					<-release
-					return errors.New("failed before publication")
-				}}
+				return &runtimeTestCollector{
+					run: func(ctx context.Context, ready func()) error {
+						ready()
+						<-release
+						return errors.New("failed before publication")
+					},
+				}
 			})
 			cfg := factoryTestConfig(false).Set("autodetection_retry", 7)
 			current := runtimeTestApply(t, prepareRuntimeTestChange(t, controller, cfg, nil, 1))
@@ -88,7 +102,11 @@ func TestRuntimeSettlementFailureWinsRegardlessOfNotificationOrder(t *testing.T)
 			record, exists := graph.Lookup(cfg.FullName())
 			require.True(t, exists)
 			require.Equal(t, dyncfg.StatusFailed.String(), record.Status)
-			require.False(t, runtimeTestHasRetry(controller, cfg.FullName()), "post-ready failure retains manual restart policy")
+			require.False(
+				t,
+				runtimeTestHasRetry(controller, cfg.FullName()),
+				"post-ready failure retains manual restart policy",
+			)
 			require.NotContains(t, output.String(), "status running")
 			requireFactoryAttemptsIdle(t, controller.factory)
 		})
@@ -99,7 +117,9 @@ func TestRuntimeSettlementRejectsStaleReadinessAfterReplacement(t *testing.T) {
 	controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
 	commands := runtimeTestNotifications(t, controller)
 	configureRuntimeTestCollector(controller, func() *runtimeTestCollector {
-		return &runtimeTestCollector{run: func(ctx context.Context, ready func()) error { ready(); <-ctx.Done(); return ctx.Err() }}
+		return &runtimeTestCollector{
+			run: func(ctx context.Context, ready func()) error { ready(); <-ctx.Done(); return ctx.Err() },
+		}
 	})
 	cfg := factoryTestConfig(false)
 	current := runtimeTestApply(t, prepareRuntimeTestChange(t, controller, cfg, nil, 1))
@@ -121,7 +141,9 @@ func TestRuntimeSettlementOnlyCurrentReadinessPublishes(t *testing.T) {
 	commands := runtimeTestNotifications(t, controller)
 	readyGate := make(chan struct{})
 	configureRuntimeTestCollector(controller, func() *runtimeTestCollector {
-		return &runtimeTestCollector{run: func(ctx context.Context, ready func()) error { <-readyGate; ready(); <-ctx.Done(); return ctx.Err() }}
+		return &runtimeTestCollector{
+			run: func(ctx context.Context, ready func()) error { <-readyGate; ready(); <-ctx.Done(); return ctx.Err() },
+		}
 	})
 	cfg := factoryTestConfig(false)
 	current := runtimeTestApply(t, prepareRuntimeTestChange(t, controller, cfg, nil, 1))
@@ -130,7 +152,12 @@ func TestRuntimeSettlementOnlyCurrentReadinessPublishes(t *testing.T) {
 	require.Empty(t, controller.scheduler.jobs)
 	controller.factory.notifyRunReady(current.Identity())
 	pending := runtimeTestNotificationPlan(t, commands, "internal/jobs/runtime-ready")
-	require.Same(t, current, runtimeTestApplyNotification(t, pending, current), "premature notification must remain a clean no-op")
+	require.Same(
+		t,
+		current,
+		runtimeTestApplyNotification(t, pending, current),
+		"premature notification must remain a clean no-op",
+	)
 	close(readyGate)
 	require.NoError(t, current.(*JobGeneration).AwaitReady(t.Context()))
 	plan := runtimeTestNotificationPlan(t, commands, "internal/jobs/runtime-ready")
@@ -140,7 +167,12 @@ func TestRuntimeSettlementOnlyCurrentReadinessPublishes(t *testing.T) {
 	require.Len(t, controller.scheduler.jobs, 1)
 	controller.factory.notifyRunFailure(current.Identity(), nil)
 	duplicate := runtimeTestNotificationPlan(t, commands, "internal/jobs/runtime-failure")
-	require.Same(t, current, runtimeTestApplyNotification(t, duplicate, current), "notification alone cannot fail a healthy run")
+	require.Same(
+		t,
+		current,
+		runtimeTestApplyNotification(t, duplicate, current),
+		"notification alone cannot fail a healthy run",
+	)
 	require.NotContains(t, output.String(), "status failed")
 	stopRuntimeTestResource(t, current)
 	requireFactoryAttemptsIdle(t, controller.factory)
@@ -149,10 +181,12 @@ func TestRuntimeSettlementOnlyCurrentReadinessPublishes(t *testing.T) {
 func TestDiscoveredReplayPreservesStartingStatus(t *testing.T) {
 	controller, graph, supervisor, output, _ := newDynCfgJobTestHarness(t)
 	configureRuntimeTestCollector(controller, func() *runtimeTestCollector {
-		return &runtimeTestCollector{run: func(ctx context.Context, _ func()) error {
-			<-ctx.Done()
-			return ctx.Err()
-		}}
+		return &runtimeTestCollector{
+			run: func(ctx context.Context, _ func()) error {
+				<-ctx.Done()
+				return ctx.Err()
+			},
+		}
 	})
 	cfg := factoryTestConfig(false)
 	current := runtimeTestApply(t, prepareRuntimeTestChange(t, controller, cfg, nil, 1))
@@ -161,12 +195,31 @@ func TestDiscoveredReplayPreservesStartingStatus(t *testing.T) {
 		stopRuntimeTestResource(t, current)
 		requireFactoryAttemptsIdle(t, controller.factory)
 	})
-	scope := lifecycle.ResourceTransactionScope{ID: cfg.FullName(), Current: current.Identity()}
+	scope := lifecycle.ResourceTransactionScope{
+		ID:      cfg.FullName(),
+		Current: current.Identity(),
+	}
 	plan, err := lifecycle.NewResourceTransactionTaskPlan(
-		lifecycle.SourceJobManager, time.Time{}, lifecycle.TransactionTaskPhases, current, scope,
+		lifecycle.SourceJobManager,
+		time.Time{},
+		lifecycle.TransactionTaskPhases,
+		current,
+		scope,
 		func(ctx context.Context, active lifecycle.ReadyResource, taskScope lifecycle.ResourceTransactionScope, permit lifecycle.LongLivedPermit) (lifecycle.PreparedResourceTransaction, error) {
-			return controller.prepareDiscovered(ctx, DiscoveredJobChange{Config: cfg, Status: dyncfg.StatusRunning}, active, taskScope, permit)
-		})
+			return prepareDiscoveryTestFixture(
+				t,
+				controller,
+				ctx,
+				discoveryTestFixture{
+					Config: cfg,
+					Status: dyncfg.StatusRunning,
+				},
+				active,
+				taskScope,
+				permit,
+			)
+		},
+	)
 	require.NoError(t, err)
 	disposition, replayed := applyAndEncodeDynCfgJobTestTask(t, supervisor, plan, scope, "replay")
 	require.Equal(t, lifecycle.ResourceTransactionUnchanged, disposition)

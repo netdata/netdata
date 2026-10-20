@@ -229,14 +229,6 @@ func canonicalHost(u *url.URL, scheme string) (string, error) {
 	return addressHost, nil
 }
 
-func sameResourceIdentity(left, right string) bool {
-	if left == right {
-		return true
-	}
-	return strings.TrimSuffix(left, "/") == strings.TrimSuffix(right, "/") &&
-		strings.TrimSuffix(left, "/") == "/redfish/v1"
-}
-
 func (c *Client) resolveURI(base *url.URL, raw string, allowQuery bool) (*url.URL, error) {
 	mode := uriResource
 	if allowQuery {

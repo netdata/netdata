@@ -27,7 +27,7 @@ The collector connects to IBM WebSphere JMX and collects metrics via its monitor
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -109,7 +109,17 @@ jobs:
 
 ## Alerts
 
-There are no alerts configured by default for this integration.
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ websphere_jmx_jvm_heap_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/websphere_jmx.conf) | websphere_jmx.jvm_heap_usage | JVM heap memory usage is ${value}% |
+| [ websphere_jmx_threadpool_capacity ](https://github.com/netdata/netdata/blob/master/src/health/health.d/websphere_jmx.conf) | websphere_jmx.threadpool_size | Thread pool ${label:pool} is using ${value}% of its configured maximum size |
+| [ websphere_jmx_jdbc_pool_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/websphere_jmx.conf) | websphere_jmx.jdbc_pool_usage | JDBC connection pool ${label:pool} is ${value}% utilized |
+| [ websphere_jmx_jdbc_pool_wait_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/websphere_jmx.conf) | websphere_jmx.jdbc_pool_wait_time | JDBC connection pool ${label:pool} average wait time is ${value}ms |
+| [ websphere_jmx_jms_queue_depth ](https://github.com/netdata/netdata/blob/master/src/health/health.d/websphere_jmx.conf) | websphere_jmx.jms_messages_current | JMS ${label:destination_type} ${label:destination} currently holds ${value} messages |
+| [ websphere_jmx_app_response_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/websphere_jmx.conf) | websphere_jmx.app_response_time | Application ${label:application} average response time is ${value}ms |
 
 
 

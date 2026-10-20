@@ -66,6 +66,7 @@ bool ml_model_received_from_child(RRDHOST *host, const char *json);
 void ml_host_disconnected(RRDHOST *host);
 
 int ml_unittest(void);
+int ml_queue_host_order_unittest(RRDHOST *host);
 
 #ifdef __cplusplus
 };

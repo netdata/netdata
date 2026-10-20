@@ -189,7 +189,7 @@ Configure intermediate parents as proxies to distribute load without storage ove
 The **Netdata Streaming** function (under the "Functions" tab) provides:
 
 - Comprehensive overview of all streaming connections
-- Status, replication completion time, and connection details
+- Status, replication progress, and connection details
 - Works on both parent and child nodes:
   - **On child**: Shows outgoing connections
   - **On parent**: Shows incoming connections (InHops = 1 for direct children, >1 for proxied connections)

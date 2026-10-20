@@ -48,8 +48,8 @@ a *leaf* is the innermost family that holds charts.
 
 - A template MUST NOT restate a framework default; readers take every key as a deliberate deviation. The defaults
   and their owners:
-  - `lifecycle`: `src/go/plugin/framework/chartengine/lifecycle_defaults.go`; deviate only for observed churn
-    (`./SKILL.md#chart-label-identity`).
+  - `lifecycle`: `src/go/plugin/framework/charttpl/README.md#lifecycle` owns omission versus disabled expiry;
+    deviate only for observed churn (`./SKILL.md#chart-label-identity`).
   - chart `type`: `defaultChartType` in `src/go/plugin/framework/charttpl/defaults.go`.
   - `algorithm`: resolved from the runtime metric kind (`./SKILL.md#metrics-and-charts`).
   - `id`: derived from the composed context.
@@ -148,19 +148,27 @@ a *leaf* is the innermost family that holds charts.
   then `charttpl.DecodeYAML` and `chartengine.Compile`. Native sets validate through `chartengine.NewTemplateSet`;
   follow `src/go/plugin/framework/chartengine/README.md#named-active-template-sets` for runtime membership changes.
 - **Cross-check artifacts.** `collecttest.AssertMetadataDocumentsChartTemplate`,
-  `collecttest.AssertHealthAlertsTargetChartTemplate`, `collecttest.AssertMetadataAlertsMatchHealthConfig` and
-  `collecttest.AssertHealthAlertsMatchMetadata` (`src/go/plugin/go.d/pkg/collecttest/artifacts.go`) compare
-  metadata.yaml, health.d and the template with each other. The `...With` variants take options: `HealthAlertsCheck`
-  narrows a shared health.d file by context prefix (and, for the metadata comparison, selects the module by `meta.id`);
-  `MetadataAlertsCheck` selects the module and accepts a shared health.d file whose other alerts this module does not
-  document. The metadata check compares stateset dimensions in declared order, not rendered order.
+  `collecttest.AssertHealthAlertsTargetChartTemplate` and `collecttest.AssertHealthAlertsMatchMetadata`
+  (`src/go/plugin/go.d/pkg/collecttest/artifacts.go`) compare metadata.yaml, health.d and the template with each other.
+  The `...With` variants take `HealthAlertsCheck`, which narrows a shared health.d file by context prefix (and, for the
+  metadata comparison, selects the module by `meta.id`). `AssertMetadataDocumentsChartTemplate` compares stateset
+  dimensions in declared order, not rendered order. `AssertHealthAlertsMatchMetadata` requires each alert's target,
+  unit and lookup dimensions to be documented, and the variables of `calc`, `warn` and `crit` to be documented
+  dimensions, built-ins, alert names or qualified references. Page alert tables are derived, not checked
+  (`.agents/skills/collectors-metadata-yaml/alerts-and-meta.md`, section 1).
 - **Never restate an artifact.** A test that names one of the template's own contexts, dimension lists or families, or
   pins an alert's thresholds, lookup, cadence or recipients, restates what the artifact said when it was written and
   MUST NOT exist; health.d owns alert policy. An independent oracle, such as a V1 parity manifest during a migration or
   upstream alert rules with a recorded mapping, is not a restatement.
+- **V1 collectors.** `collecttest.V1ChartsByContext` presents V1 charts (a static list or the templates the collector
+  instantiates) as the V1 renderer sends them, so the same metadata checks apply through
+  `collecttest.CheckMetadataMetricsMatchCharts` (the `elasticsearch` and `mssql` artifacts tests).
 - **Coverage.** `collecttest.AssertChartCoverage` (`src/go/plugin/go.d/pkg/collecttest/chart_coverage.go`) derives the
   expected charts and dimensions from the live static or native provider and store, per host scope; do not add
   `RequiredContexts` that repeat it.
+- **Lifecycle.** Chart coverage creates a fresh planner per call. Expiry/recovery tests MUST reuse a planner across
+  successful missing-data cycles beyond the configured expiry and metric-store retention, then verify retirement
+  or retained gaps and recovery through plan actions or emitted protocol.
 - **Refactor proof.** To show a template change alters nothing, a throwaway local test writes every metric definition
   once into a store, builds the plan with `chartengine.New`, `Engine.LoadYAML` and `Engine.PreparePlan`, and diffs the
   plan actions before and after, normalizing only the field the change was meant to affect. No shipped helper does

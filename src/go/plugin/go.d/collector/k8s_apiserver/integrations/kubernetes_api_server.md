@@ -40,7 +40,7 @@ Authentication is typically done using a ServiceAccount bearer token.
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The ServiceAccount used must have permissions to access the `/metrics` endpoint.
 In most clusters, this requires cluster-admin or a custom ClusterRole with metrics access.
@@ -144,7 +144,7 @@ Configure the **k8s_apiserver** collector from the Netdata web interface:
 4. In the Search box, type _k8s_apiserver_ (or scroll the list) to locate the **k8s_apiserver** collector.
 5. Click the **+** next to the **k8s_apiserver** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -224,8 +224,17 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ k8s_apiserver_request_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf) | k8s_apiserver.requests_by_code | high rate of API server request errors (5xx responses) |
-| [ k8s_apiserver_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf) | k8s_apiserver.request_latency | API server request latency is high |
+| [ k8s_apiserver_1m_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf) | k8s_apiserver.requests_total | number of API server requests in the last minute |
+| [ k8s_apiserver_dropped_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf) | k8s_apiserver.requests_dropped | API server dropped requests in the last minute due to overload |
+| [ k8s_apiserver_5xx_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf) | k8s_apiserver.requests_by_code | Percentage of 5xx server error responses over the last minute |
+| [ k8s_apiserver_4xx_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf) | k8s_apiserver.requests_by_code | Percentage of 4xx client error responses over the last minute (excluding 401/403) |
+| [ k8s_apiserver_latency_10m ](https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf) | k8s_apiserver.request_latency | average API server request latency (p99) over the last 10 minutes |
+| [ k8s_apiserver_latency_high ](https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf) | k8s_apiserver.request_latency | API server request latency (p99) over the last minute |
+| [ k8s_apiserver_inflight_mutating ](https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf) | k8s_apiserver.inflight_requests | Average number of mutating requests currently in flight over the last minute (default limit is 600) |
+| [ k8s_apiserver_inflight_readonly ](https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf) | k8s_apiserver.inflight_requests | Average number of read-only requests currently in flight over the last minute (default limit is 1000) |
+| [ k8s_apiserver_workqueue_depth ](https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf) | k8s_apiserver.workqueue_depth | Average depth of controller work queue over the last minute |
+| [ k8s_apiserver_goroutines ](https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf) | k8s_apiserver.goroutines | Average number of goroutines over the last 5 minutes |
+| [ k8s_apiserver_open_fds_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf) | k8s_apiserver.open_fds | Percentage of file descriptors used by the API server |
 
 
 

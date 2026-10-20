@@ -44,7 +44,7 @@ It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The service principal or managed identity requires these Azure RBAC roles:
 
@@ -378,7 +378,7 @@ Configure the **azure_monitor** collector from the Netdata web interface:
 4. In the Search box, type _azure_monitor_ (or scroll the list) to locate the **azure_monitor** collector.
 5. Click the **+** next to the **azure_monitor** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -633,17 +633,17 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_container_apps_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.cpu_percentage | Container Apps CPU on ${label:resource_name} |
-| [ am_container_apps_memory_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.memory_percentage | Container Apps memory on ${label:resource_name} |
-| [ am_container_apps_restarts ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.restart_count | Container Apps restarts on ${label:resource_name} |
-| [ am_container_apps_response_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.response_time | Container Apps response time on ${label:resource_name} |
-| [ am_container_apps_resiliency_timeouts ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.resiliency_timeouts | Container Apps resiliency timeouts on ${label:resource_name} |
-| [ am_container_apps_resiliency_retries ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.resiliency_retries | Container Apps resiliency retries on ${label:resource_name} |
-| [ am_container_apps_pending_connections ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.resiliency_pending_connections | Container Apps pending connections on ${label:resource_name} |
-| [ am_container_apps_host_ejections ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.resiliency_ejections | Container Apps host ejections on ${label:resource_name} |
-| [ am_container_apps_replica_count ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.replicas | Container Apps replicas on ${label:resource_name} |
-| [ am_container_apps_gpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.gpu_utilization | Container Apps GPU on ${label:resource_name} |
-| [ am_container_apps_jvm_gc_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.jvm_gc_duration | Container Apps JVM GC duration on ${label:resource_name} |
+| [ am_container_apps_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.cpu_percentage | Average CPU utilization of Container App ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_container_apps_memory_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.memory_percentage | Average memory utilization of Container App ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_container_apps_restarts ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.restart_count | Number of replica restarts in the last 5 minutes for Container App ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_container_apps_response_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.response_time | Average response time of Container App ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_container_apps_resiliency_timeouts ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.resiliency_timeouts | Connection and request timeouts in the last 5 minutes for Container App ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_container_apps_resiliency_retries ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.resiliency_retries | Request retries in the last 5 minutes for Container App ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_container_apps_pending_connections ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.resiliency_pending_connections | Requests pending in the connection pool in the last 5 minutes for Container App ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_container_apps_host_ejections ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.resiliency_ejections | Upstream hosts ejected from the load balancing pool in the last 5 minutes for Container App ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_container_apps_replica_count ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.replicas | Average replica count for Container App ${label:resource_name} in ${label:resource_group} (${label:region}). Zero replicas means the app is either scaled to zero or all replicas have crashed |
+| [ am_container_apps_gpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.gpu_utilization | Average GPU utilization of Container App ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_container_apps_jvm_gc_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.jvm_gc_duration | Time spent in JVM garbage collection in the last minute for Container App ${label:resource_name} in ${label:resource_group} (${label:region}) |
 
 
 

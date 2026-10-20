@@ -1,9 +1,9 @@
 use super::server::{ManagedServer, ServerConfig};
 use super::server_session_windows::handle_session_win_threaded;
-use crate::protocol::{NipcError, HEADER_SIZE};
+use crate::protocol::{HEADER_SIZE, NipcError};
 use crate::transport::win_shm::{
-    WinShmContext, PROFILE_BUSYWAIT as WIN_SHM_PROFILE_BUSYWAIT,
-    PROFILE_HYBRID as WIN_SHM_PROFILE_HYBRID,
+    PROFILE_BUSYWAIT as WIN_SHM_PROFILE_BUSYWAIT, PROFILE_HYBRID as WIN_SHM_PROFILE_HYBRID,
+    WinShmContext,
 };
 use crate::transport::windows::{NpListener, NpSession};
 use std::sync::atomic::Ordering;

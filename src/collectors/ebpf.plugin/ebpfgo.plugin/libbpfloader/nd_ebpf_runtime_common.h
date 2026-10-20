@@ -90,6 +90,156 @@ static inline uint64_t nd_ebpf_sum_percpu_u64(const uint64_t *values, int count)
     return total;
 }
 
+static inline const char *nd_ebpf_find_program_name(
+    struct bpf_object *obj, const char *const *candidates, size_t count)
+{
+    for (size_t i = 0; i < count; i++)
+        if (bpf_object__find_program_by_name(obj, candidates[i]))
+            return candidates[i];
+
+    return NULL;
+}
+
+static inline const char *nd_ebpf_find_program_name_preferring_buffer(
+    struct bpf_object *obj, const char *const *candidates, size_t count, bool prefer_buffer)
+{
+    static const char suffix[] = "_buffer";
+
+    if (prefer_buffer) {
+        for (size_t i = 0; i < count; i++) {
+            size_t name_len = strlen(candidates[i]);
+            if (name_len >= sizeof(suffix) - 1 &&
+                strcmp(candidates[i] + name_len - (sizeof(suffix) - 1), suffix) == 0 &&
+                bpf_object__find_program_by_name(obj, candidates[i]))
+                return candidates[i];
+        }
+    }
+
+    return nd_ebpf_find_program_name(obj, candidates, count);
+}
+
+static inline int nd_ebpf_prepare_autoload(
+    struct bpf_object *obj, const char *const *program_names, size_t count, const char *module)
+{
+    struct bpf_program *prog;
+    bpf_object__for_each_program(prog, obj) {
+        int ret = bpf_program__set_autoload(prog, false);
+        if (ret) {
+            fprintf(stderr, "%s: failed to disable program autoload: %s\n", module, strerror(-ret));
+            return ret;
+        }
+    }
+
+    for (size_t i = 0; i < count; i++) {
+        if (!program_names[i])
+            return -1;
+
+        prog = bpf_object__find_program_by_name(obj, program_names[i]);
+        if (!prog) {
+            fprintf(stderr, "%s: object does not contain required program %s\n", module, program_names[i]);
+            return -1;
+        }
+
+        int ret = bpf_program__set_autoload(prog, true);
+        if (ret) {
+            fprintf(stderr, "%s: failed to enable autoload for %s: %s\n",
+                    module, program_names[i], strerror(-ret));
+            return ret;
+        }
+    }
+
+    return 0;
+}
+
+static inline int nd_ebpf_validate_links(
+    struct bpf_link **links, const char *const *program_names,
+    const char *const *targets, size_t count, const char *module)
+{
+    for (size_t i = 0; i < count; i++) {
+        if (!links[i]) {
+            fprintf(stderr, "%s: failed to attach %s to %s: program not found\n",
+                    module, program_names[i], targets[i]);
+            return -1;
+        }
+
+        long error = libbpf_get_error(links[i]);
+        if (error) {
+            fprintf(stderr, "%s: failed to attach %s to %s: %s (%ld)\n",
+                    module, program_names[i], targets[i], strerror((int)-error), error);
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+#if defined(LIBBPF_MAJOR_VERSION) && (LIBBPF_MAJOR_VERSION >= 1)
+struct nd_ebpf_raw_arena {
+    struct bpf_object *obj;
+    struct bpf_map *map;
+    struct bpf_object_skeleton *skeleton;
+    void *state;
+};
+
+/* Transfer the object to a minimal skeleton so libbpf supplies its adjusted arena data pointer on load. */
+static inline struct nd_ebpf_raw_arena *nd_ebpf_raw_arena_create(
+    struct bpf_object *obj, const char *map_name)
+{
+    struct nd_ebpf_raw_arena *arena = calloc(1, sizeof(*arena));
+    if (!arena)
+        return NULL;
+
+    arena->skeleton = calloc(1, sizeof(*arena->skeleton));
+    if (!arena->skeleton)
+        goto fail;
+
+    arena->skeleton->maps = calloc(1, sizeof(*arena->skeleton->maps));
+    if (!arena->skeleton->maps)
+        goto fail;
+
+    arena->map = bpf_object__find_map_by_name(obj, map_name);
+    if (!arena->map) {
+        fprintf(stderr, "ebpf: arena map '%s' not found in object %s\n", map_name, bpf_object__name(obj));
+        goto fail;
+    }
+
+    arena->obj = obj;
+    arena->skeleton->sz = sizeof(*arena->skeleton);
+    arena->skeleton->name = bpf_object__name(obj);
+    arena->skeleton->obj = &arena->obj;
+    arena->skeleton->map_cnt = 1;
+    arena->skeleton->map_skel_sz = sizeof(*arena->skeleton->maps);
+    arena->skeleton->maps[0].name = map_name;
+    arena->skeleton->maps[0].map = &arena->map;
+    arena->skeleton->maps[0].mmaped = &arena->state;
+
+    return arena;
+
+fail:
+    if (arena->skeleton) {
+        free(arena->skeleton->maps);
+        free(arena->skeleton);
+    }
+    free(arena);
+    return NULL;
+}
+
+static inline int nd_ebpf_raw_arena_load(struct nd_ebpf_raw_arena *arena)
+{
+    return arena && arena->skeleton ? bpf_object__load_skeleton(arena->skeleton) : -EINVAL;
+}
+
+static inline void nd_ebpf_raw_arena_destroy(struct nd_ebpf_raw_arena *arena)
+{
+    if (!arena)
+        return;
+
+    if (arena->skeleton)
+        bpf_object__destroy_skeleton(arena->skeleton);
+    free(arena);
+}
+#endif
+
 /* qsort comparator for any per-PID snapshot struct whose first member is the
  * uint32_t pid.  Each runtime static-asserts that offset with
  * ND_EBPF_ASSERT_PID_FIRST() so this stays safe. */
@@ -284,7 +434,7 @@ static inline int nd_ebpf_alloc_percpu_buffers(
 {
     int ncpu = libbpf_num_possible_cpus();
     if (ncpu < 1)
-        ncpu = 1;
+        return -1;
 
     *percpu_u64 = callocz((size_t)ncpu, sizeof(**percpu_u64));
     *percpu_u64_cap = ncpu;
@@ -709,6 +859,22 @@ struct nd_ebpf_arena_state {
 };
 
 _Static_assert(sizeof(struct nd_ebpf_arena_state) == 49160, "nd_ebpf_arena_state does not match the BPF-side layout");
+
+#if defined(LIBBPF_MAJOR_VERSION) && (LIBBPF_MAJOR_VERSION >= 1)
+static inline int nd_ebpf_raw_arena_get_state(struct nd_ebpf_raw_arena *arena, void **state)
+{
+    if (!arena || !arena->state || !state)
+        return -EINVAL;
+
+    size_t data_size = 0;
+    void *mapped = bpf_map__initial_value(arena->map, &data_size);
+    if (!mapped || data_size < sizeof(struct nd_ebpf_arena_state))
+        return -EINVAL;
+
+    *state = arena->state;
+    return 0;
+}
+#endif
 
 typedef void (*nd_ebpf_event_fn)(void *ctx, const struct nd_ebpf_pid_event *ev);
 

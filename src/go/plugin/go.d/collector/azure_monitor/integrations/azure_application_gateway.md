@@ -44,7 +44,7 @@ It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The service principal or managed identity requires these Azure RBAC roles:
 
@@ -378,7 +378,7 @@ Configure the **azure_monitor** collector from the Netdata web interface:
 4. In the Search box, type _azure_monitor_ (or scroll the list) to locate the **azure_monitor** collector.
 5. Click the **+** next to the **azure_monitor** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -633,13 +633,15 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_appgw_failed_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf) | azure_monitor.application_gateway.requests | App Gateway failed requests on ${label:resource_name} |
-| [ am_appgw_unhealthy_hosts ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf) | azure_monitor.application_gateway.backend_health | App Gateway unhealthy backends on ${label:resource_name} |
-| [ am_appgw_backend_connect_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf) | azure_monitor.application_gateway.backend_latency | App Gateway backend connect time on ${label:resource_name} |
-| [ am_appgw_backend_first_byte ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf) | azure_monitor.application_gateway.backend_latency | App Gateway backend TTFB on ${label:resource_name} |
-| [ am_appgw_total_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf) | azure_monitor.application_gateway.client_latency | App Gateway total request time on ${label:resource_name} |
-| [ am_appgw_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf) | azure_monitor.application_gateway.cpu | App Gateway CPU utilization on ${label:resource_name} |
-| [ am_appgw_waf_blocked_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf) | azure_monitor.application_gateway.waf_requests | App Gateway WAF block ratio on ${label:resource_name} |
+| [ am_appgw_total_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf) | azure_monitor.application_gateway.requests | Total requests on Application Gateway ${label:resource_name} |
+| [ am_appgw_failed_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf) | azure_monitor.application_gateway.requests | Percentage of failed requests on Application Gateway ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_appgw_unhealthy_hosts ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf) | azure_monitor.application_gateway.backend_health | Unhealthy backend hosts on Application Gateway ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_appgw_backend_connect_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf) | azure_monitor.application_gateway.backend_latency | Average backend connection time on Application Gateway ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_appgw_backend_first_byte ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf) | azure_monitor.application_gateway.backend_latency | Average backend time to first byte on Application Gateway ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_appgw_total_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf) | azure_monitor.application_gateway.client_latency | Average total client request time on Application Gateway ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_appgw_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf) | azure_monitor.application_gateway.cpu | CPU utilization on Application Gateway ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_appgw_waf_total_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf) | azure_monitor.application_gateway.waf_requests | Total WAF requests on Application Gateway ${label:resource_name} |
+| [ am_appgw_waf_blocked_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf) | azure_monitor.application_gateway.waf_requests | Percentage of requests blocked by WAF on Application Gateway ${label:resource_name} in ${label:resource_group} (${label:region}). High values may indicate an attack or WAF misconfiguration |
 
 
 

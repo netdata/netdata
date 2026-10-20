@@ -18,7 +18,11 @@ Database query functions provide deep visibility into SQL and NoSQL database per
 | ClickHouse           |      ✅      |        -        |       -       |     -      | [ClickHouse](/src/go/plugin/go.d/collector/clickhouse/integrations/clickhouse.md)          |
 | CockroachDB          |      ✅      |        ✅        |       -       |     -      | [CockroachDB](/src/go/plugin/go.d/collector/cockroachdb/integrations/cockroachdb.md)       |
 | Couchbase            |      ✅      |        -        |       -       |     -      | [Couchbase](/src/go/plugin/go.d/collector/couchbase/integrations/couchbase.md)             |
+| Dragonfly            |      ✅      |        -        |       -       |     -      | [Dragonfly](/src/go/plugin/go.d/collector/redis/integrations/dragonfly.md)                 |
 | Elasticsearch        |      ✅      |        -        |       -       |     -      | [Elasticsearch](/src/go/plugin/go.d/collector/elasticsearch/integrations/elasticsearch.md) |
+| Garnet               |      ✅      |        -        |       -       |     -      | [Garnet](/src/go/plugin/go.d/collector/redis/integrations/garnet.md)                       |
+| KeyDB                |      ✅      |        -        |       -       |     -      | [KeyDB](/src/go/plugin/go.d/collector/redis/integrations/keydb.md)                         |
+| Kvrocks              |      ✅      |        -        |       -       |     -      | [Kvrocks](/src/go/plugin/go.d/collector/redis/integrations/kvrocks.md)                     |
 | MongoDB              |      ✅      |        -        |       -       |     -      | [MongoDB](/src/go/plugin/go.d/collector/mongodb/integrations/mongodb.md)                   |
 | Microsoft SQL Server |      ✅      |        -        |       ✅       |     ✅*     | [MSSQL](/src/go/plugin/go.d/collector/mssql/integrations/microsoft_sql_server.md)          |
 | MySQL                |      ✅      |        -        |       ✅       |     ✅*     | [MySQL](/src/go/plugin/go.d/collector/mysql/integrations/mysql.md)                         |
@@ -29,6 +33,7 @@ Database query functions provide deep visibility into SQL and NoSQL database per
 | ProxySQL             |      ✅      |        -        |       -       |     -      | [ProxySQL](/src/go/plugin/go.d/collector/proxysql/integrations/proxysql.md)                |
 | Redis                |      ✅      |        -        |       -       |     -      | [Redis](/src/go/plugin/go.d/collector/redis/integrations/redis.md)                         |
 | RethinkDB            |      -      |        ✅        |       -       |     -      | [RethinkDB](/src/go/plugin/go.d/collector/rethinkdb/integrations/rethinkdb.md)             |
+| Valkey               |      ✅      |        -        |       -       |     -      | [Valkey](/src/go/plugin/go.d/collector/redis/integrations/valkey.md)                       |
 | YugabyteDB           |      ✅      |        ✅        |       -       |     -      | [YugabyteDB](/src/go/plugin/go.d/collector/yugabytedb/integrations/yugabytedb.md)          |
 
 *\* Error Info is integrated directly into Top Queries results—each query row shows its associated errors.*
@@ -93,21 +98,26 @@ Attribution status values:
 
 Some databases normalize queries (replacing literals with placeholders), while others show actual values that may contain sensitive data:
 
-| Database              |                 Query Text                  |
-|-----------------------|:-------------------------------------------:|
-| ClickHouse            |                 Normalized                  |
-| CockroachDB           |                   ⚠️ Raw                    |
-| Couchbase             |                   ⚠️ Raw                    |
-| Elasticsearch         |                   ⚠️ Raw                    |
-| MongoDB               |                   ⚠️ Raw                    |
-| Microsoft SQL Server  |                   ⚠️ Raw                    |
-| MySQL/MariaDB/Percona | Normalized (Top Queries), ⚠️ Raw (Deadlock) |
-| Oracle                |                   ⚠️ Raw                    |
-| PostgreSQL            |                 Normalized                  |
-| ProxySQL              |                 Normalized                  |
-| Redis                 |                   ⚠️ Raw                    |
-| RethinkDB             |                   ⚠️ Raw                    |
-| YugabyteDB            |                   ⚠️ Raw                    |
+| Database              |                       Query Text                        |
+|-----------------------|:-------------------------------------------------------:|
+| ClickHouse            |                         ⚠️ Raw                          |
+| CockroachDB           |                         ⚠️ Raw                          |
+| Couchbase             |                         ⚠️ Raw                          |
+| Dragonfly             |                         ⚠️ Raw                          |
+| Elasticsearch         |                         ⚠️ Raw                          |
+| Garnet                |                         ⚠️ Raw                          |
+| KeyDB                 |                         ⚠️ Raw                          |
+| Kvrocks               |                         ⚠️ Raw                          |
+| MongoDB               |                         ⚠️ Raw                          |
+| Microsoft SQL Server  |                         ⚠️ Raw                          |
+| MySQL/MariaDB/Percona |     Normalized (Top Queries), ⚠️ Raw (Deadlock)         |
+| Oracle                |                         ⚠️ Raw                          |
+| PostgreSQL            |                       Normalized                        |
+| ProxySQL              |                       Normalized                        |
+| Redis                 |                         ⚠️ Raw                          |
+| RethinkDB             |                         ⚠️ Raw                          |
+| Valkey                |                         ⚠️ Raw                          |
+| YugabyteDB            | Normalized (Top Queries), ⚠️ Raw (Running Queries)      |
 
 **Legend**:
 

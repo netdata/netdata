@@ -81,6 +81,7 @@ The container then runs `packaging/makeself/run-all-jobs.sh`, which executes `pa
 | 89 | `buildinfo.install` | Writes `/opt/netdata/share/netdata/buildinfo.txt` |
 | 90 | `prepare-archive-source` | Copies post-installer scripts into the install tree |
 | 91 | `copy-ca-certificates` | Bundles a CA bundle |
+| 97 | `create-package-manifest` | Inventories shipped paths before archive creation |
 | 98 | `create-archive` | Runs `makeself.sh --gzip --complevel 9 --notemp --needroot` to build the `.gz.run` |
 | 99 | `copy-archives` | Renames the archive to `netdata-<arch>-<version>.gz.run` and copies aliases |
 
@@ -221,7 +222,7 @@ slower runtime useful for valgrind/gdb. The `README.md` in `packaging/makeself/`
 | `No cached copy of build directory for X found, fetching sources instead.` (every run) | any third-party | `artifacts/cache/` removed or arch dir missing | Normal on first build; persists for the next run |
 | `Could not find a usable OCI runtime` | n/a | Neither docker nor podman in `$PATH` | Install one |
 | Runtime check times out waiting for localhost:19999 | 81 | Agent did not become reachable within the bounded wait; cause is not yet established | Inspect the job log and `netdata.log`, then diagnose startup |
-| `not statically linked` warning | 80 (static check) | A new dep introduced a dynamic link | Audit `ldd` of the built binary; check `CMakeLists.txt` for `target_link_libraries` adding a shared lib |
+| `not statically linked` warning | 80 (static check) | A new dep introduced a dynamic link | Audit `ldd` of the built binary; `git grep target_link_libraries -- '*.cmake' '*CMakeLists.txt'` for a new shared lib -- links live in the root file, the modules, and the subdirectory CMakeLists (libnetdata, debugfs's vendored libsensors) |
 | OOM kill mid-Rust compile under QEMU | 70 | QEMU + Rust LTO is memory-hungry | Use a suitably provisioned native builder or investigate actual job parallelism; the launcher exposes no `PROCESSORS` knob |
 
 The build script exits with `Build failed.` on any job failure (`packaging/makeself/build.sh:44-52`). For an
@@ -265,10 +266,14 @@ scp artifacts/netdata-x86_64-latest.gz.run target-host:/tmp/
 
 # Install (on the target, as root)
 ssh target-host
-sudo sh /tmp/netdata-x86_64-latest.gz.run -- --auto-update
+sudo sh /tmp/netdata-x86_64-latest.gz.run
 # installer flags after the bare `--`; common: --dont-start-it, --disable-telemetry,
-# --claim-token <T> --claim-rooms <R>, --no-updates
+# --stable-channel, --nightly-channel, --certificates <mode>
 ```
+
+`packaging/makeself/install-or-update.sh` installs the updater without enabling it; `--auto-update` is ignored,
+and `--no-updates` is an unknown option. Check existing updater scheduling separately when testing updates.
+For state preservation and its regression suite, see `packaging/makeself/README.md#state-permissions-during-updates`.
 
 The installer always installs into `/opt/netdata` (hard-coded; `--target` would change it but the in-archive paths assume `/opt/netdata`, do not override).
 

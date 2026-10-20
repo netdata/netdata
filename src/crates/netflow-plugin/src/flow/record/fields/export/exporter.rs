@@ -15,7 +15,8 @@ pub(super) fn insert_exporter_fields(record: &FlowRecord, fields: &mut FlowField
     fields.insert("EXPORTER_REGION", record.exporter_region.clone());
     fields.insert("EXPORTER_TENANT", record.exporter_tenant.clone());
 
-    // Sampling
+    // Presence-tracked fields export as empty strings when absent, instead of their unset
+    // defaults (0, or "undefined" for direction).
     fields.insert(
         "SAMPLING_RATE",
         if record.has_sampling_rate() {
@@ -36,7 +37,7 @@ pub(super) fn insert_exporter_fields(record: &FlowRecord, fields: &mut FlowField
     );
     fields.insert("PROTOCOL", record.protocol.to_string());
 
-    // Counters
+    // Counters, forwarding status, direction
     fields.insert("BYTES", record.bytes.to_string());
     fields.insert("PACKETS", record.packets.to_string());
     fields.insert("FLOWS", record.flows.to_string());

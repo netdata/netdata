@@ -28,7 +28,7 @@ It reads the server's response to the `stats` command.
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -113,7 +113,7 @@ Configure the **memcached** collector from the Netdata web interface:
 4. In the Search box, type _memcached_ (or scroll the list) to locate the **memcached** collector.
 5. Click the **+** next to the **memcached** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -183,9 +183,9 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ memcached_cache_memory_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memcached.conf) | memcached.cache | cache memory utilization |
-| [ memcached_cache_fill_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memcached.conf) | memcached.cache | average rate the cache fills up (positive), or frees up (negative) space over the last hour |
-| [ memcached_out_of_cache_space_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memcached.conf) | memcached.cache | estimated time the cache will run out of space if the system continues to add data at the same rate as the past hour |
+| [ memcached_cache_memory_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memcached.conf) | memcached.cache | Cache memory utilization |
+| [ memcached_cache_fill_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memcached.conf) | memcached.cache | Average rate the cache fills up (positive), or frees up (negative) space over the last hour |
+| [ memcached_out_of_cache_space_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memcached.conf) | memcached.cache | Estimated time the cache will run out of space if the system continues to add data at the same rate as the past hour |
 
 
 

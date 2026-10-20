@@ -41,7 +41,7 @@ It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The service principal or managed identity requires these Azure RBAC roles:
 
@@ -375,7 +375,7 @@ Configure the **azure_monitor** collector from the Netdata web interface:
 4. In the Search box, type _azure_monitor_ (or scroll the list) to locate the **azure_monitor** collector.
 5. Click the **+** next to the **azure_monitor** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -630,10 +630,10 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_load_balancers_vip_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_load_balancers.conf) | azure_monitor.load_balancers.vip_availability | LB data path availability on ${label:resource_name} |
-| [ am_load_balancers_dip_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_load_balancers.conf) | azure_monitor.load_balancers.dip_availability | LB health probe status on ${label:resource_name} |
-| [ am_load_balancers_global_backend_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_load_balancers.conf) | azure_monitor.load_balancers.global_backend_availability | LB global backend availability on ${label:resource_name} |
-| [ am_load_balancers_snat_port_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_load_balancers.conf) | azure_monitor.load_balancers.snat_ports | LB SNAT port utilization on ${label:resource_name} |
+| [ am_load_balancers_vip_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_load_balancers.conf) | azure_monitor.load_balancers.vip_availability | Data path availability of Azure Load Balancer ${label:resource_name} in ${label:resource_group} (${label:region}). Low values indicate the load balancer is unable to forward traffic |
+| [ am_load_balancers_dip_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_load_balancers.conf) | azure_monitor.load_balancers.dip_availability | Health probe availability of Azure Load Balancer ${label:resource_name} in ${label:resource_group} (${label:region}). Low values indicate backend instances are failing health probes |
+| [ am_load_balancers_global_backend_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_load_balancers.conf) | azure_monitor.load_balancers.global_backend_availability | Global backend availability of Azure Load Balancer ${label:resource_name} in ${label:resource_group} (${label:region}). Applies to cross-region load balancers only |
+| [ am_load_balancers_snat_port_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_load_balancers.conf) | azure_monitor.load_balancers.snat_ports | Percentage of allocated SNAT ports in use on Azure Load Balancer ${label:resource_name} in ${label:resource_group} (${label:region}). SNAT port exhaustion causes outbound connection failures |
 
 
 

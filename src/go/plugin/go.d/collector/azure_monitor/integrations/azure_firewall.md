@@ -43,7 +43,7 @@ It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The service principal or managed identity requires these Azure RBAC roles:
 
@@ -377,7 +377,7 @@ Configure the **azure_monitor** collector from the Netdata web interface:
 4. In the Search box, type _azure_monitor_ (or scroll the list) to locate the **azure_monitor** collector.
 5. Click the **+** next to the **azure_monitor** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -632,9 +632,9 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_firewall_health ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_firewall.conf) | azure_monitor.firewall.health | Firewall health on ${label:resource_name} |
-| [ am_firewall_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_firewall.conf) | azure_monitor.firewall.latency | Firewall latency on ${label:resource_name} |
-| [ am_firewall_snat_port_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_firewall.conf) | azure_monitor.firewall.snat_port_utilization | Firewall SNAT port utilization on ${label:resource_name} |
+| [ am_firewall_health ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_firewall.conf) | azure_monitor.firewall.health | Health state of Azure Firewall ${label:resource_name} in ${label:resource_group} (${label:region}). AMBA threshold is 90%. Values below 100% indicate partial degradation |
+| [ am_firewall_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_firewall.conf) | azure_monitor.firewall.latency | Average latency probe of Azure Firewall ${label:resource_name} in ${label:resource_group} (${label:region}). High latency indicates firewall processing delays |
+| [ am_firewall_snat_port_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_firewall.conf) | azure_monitor.firewall.snat_port_utilization | SNAT port utilization of Azure Firewall ${label:resource_name} in ${label:resource_group} (${label:region}). AMBA threshold is 80%. Exhaustion causes outbound connection failures |
 
 
 

@@ -45,7 +45,7 @@ It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The service principal or managed identity requires these Azure RBAC roles:
 
@@ -379,7 +379,7 @@ Configure the **azure_monitor** collector from the Netdata web interface:
 4. In the Search box, type _azure_monitor_ (or scroll the list) to locate the **azure_monitor** collector.
 5. Click the **+** next to the **azure_monitor** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -634,18 +634,19 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_service_bus_server_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.errors | Service Bus server errors on ${label:resource_name} |
-| [ am_service_bus_throttled_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.errors | Service Bus throttled requests on ${label:resource_name} |
-| [ am_service_bus_user_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.errors | Service Bus user errors on ${label:resource_name} |
-| [ am_service_bus_namespace_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.namespace_resources | Service Bus namespace CPU on ${label:resource_name} |
-| [ am_service_bus_namespace_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.namespace_resources | Service Bus namespace memory on ${label:resource_name} |
-| [ am_service_bus_send_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.send_latency | Service Bus send latency on ${label:resource_name} |
-| [ am_service_bus_dead_lettered_messages ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.problem_messages | Service Bus dead-lettered messages on ${label:resource_name} |
-| [ am_service_bus_active_messages ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.queue_depth | Service Bus queue depth on ${label:resource_name} |
-| [ am_service_bus_request_success_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.requests | Service Bus request success rate on ${label:resource_name} |
-| [ am_service_bus_abandoned_messages ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.message_operations | Service Bus abandoned messages on ${label:resource_name} |
-| [ am_service_bus_replication_lag ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.replication_lag | Service Bus replication lag on ${label:resource_name} |
-| [ am_service_bus_replication_lag_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.replication_lag_duration | Service Bus replication lag duration on ${label:resource_name} |
+| [ am_service_bus_server_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.errors | Server-side error rate on Service Bus namespace ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_service_bus_throttled_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.errors | Rate of throttled requests on Service Bus namespace ${label:resource_name} in ${label:resource_group} (${label:region}). Indicates the namespace is exceeding its messaging unit quotas |
+| [ am_service_bus_user_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.errors | Rate of user (client-side) errors on Service Bus namespace ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_service_bus_namespace_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.namespace_resources | CPU utilization of Premium Service Bus namespace ${label:resource_name} in ${label:resource_group} (${label:region}). Only available on Premium tier namespaces |
+| [ am_service_bus_namespace_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.namespace_resources | Memory utilization of Premium Service Bus namespace ${label:resource_name} in ${label:resource_group} (${label:region}). Only available on Premium tier namespaces |
+| [ am_service_bus_send_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.send_latency | Average server send latency on Service Bus namespace ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_service_bus_dead_lettered_messages ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.problem_messages | Dead-lettered messages in Service Bus namespace ${label:resource_name} in ${label:resource_group} (${label:region}). Messages land in dead letter queue after exceeding max delivery attempts or expiring |
+| [ am_service_bus_active_messages ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.queue_depth | Active messages queued in Service Bus namespace ${label:resource_name} in ${label:resource_group} (${label:region}). Sustained growth means consumers are not keeping up with producers |
+| [ am_service_bus_incoming_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.requests | Total incoming requests on Service Bus namespace ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_service_bus_request_success_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.requests | Percentage of successful requests on Service Bus namespace ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_service_bus_abandoned_messages ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.message_operations | Rate of abandoned messages on Service Bus namespace ${label:resource_name} in ${label:resource_group} (${label:region}). Consumers are receiving but failing to process messages |
+| [ am_service_bus_replication_lag ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.replication_lag | Messages pending replication to secondary namespace on Service Bus ${label:resource_name} in ${label:resource_group} (${label:region}). Only relevant when Geo-DR is configured |
+| [ am_service_bus_replication_lag_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.replication_lag_duration | Replication lag duration to secondary namespace on Service Bus ${label:resource_name} in ${label:resource_group} (${label:region}). Only relevant when Geo-DR is configured |
 
 
 

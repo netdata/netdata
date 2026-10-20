@@ -2,8 +2,6 @@
 version: v1
 mode: persistent
 command: [./collect.sh]
-metrics:
-  - {name: depth, type: gauge, unit: jobs}
 functions:
   - id: items
     name: Queue Items

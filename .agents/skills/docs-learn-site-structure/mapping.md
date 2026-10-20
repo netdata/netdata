@@ -6,7 +6,7 @@ no routing effect: every published page is one `map.yaml` node, and the URL is c
 Owners: `docs/.map/README.md#1-edit-mapyaml`, `docs/.map/README.md#meta-fields`,
 `docs/.map/README.md#path-reconstruction`, and `docs/.map/README.md#integration-placeholder-node` (node shapes and
 field meanings); `docs/.map/map.schema.json` (required fields, the `edit_url` pattern, the `integration_kind` members);
-`docs/.map/validate_map_schema.py` (the two custom rules). Learn-side behaviour below is verified against
+`docs/.map/validate_map_schema.py` (the three custom rules). Learn-side behaviour below is verified against
 `netdata/learn @ c3a16edd5ee4dc819976ef162c9afaff4b9b968c`, `ingest/ingest.py`, at the named symbols.
 
 ## What is checked, and by what
@@ -16,13 +16,17 @@ field meanings); `docs/.map/map.schema.json` (required fields, the `edit_url` pa
   violation; `required` on a node's `meta` is only `label`.
 - The schema's `edit_url` pattern accepts any GitHub owner and repository; the `netdata` owner restriction comes from
   the join key below, not from validation.
-- `docs/.map/validate_map_schema.py` (hand-run, any working directory, with an interpreter that has `ruamel.yaml`
-  and `jsonschema`, the integrations `.venv` where present; exit 1 on failure; nothing in `.github/workflows/` or
-  `integrations/` invokes it) adds two rules the schema cannot express: no duplicate
-  `edit_url` (`check_duplicate_edit_urls`) and a node without `items` must carry an `edit_url`
-  (`check_integration_placeholder_rule`).
-- Nothing checks that an `edit_url` points at an existing file. A row whose URL matches no source file is not an
-  error; the page is silently absent (see the join key below).
+- `docs/.map/validate_map_schema.py` (any working directory, an interpreter with `ruamel.yaml` and `jsonschema`, the
+  integrations `.venv` where present; exit 1 on failure) adds three rules the schema cannot express: no duplicate
+  `edit_url` (`check_duplicate_edit_urls`); a node without `items` must carry an `edit_url`
+  (`check_integration_placeholder_rule`); a `netdata/netdata` `edit_url`, on any branch, must name a file inside this
+  checkout, symlinks followed (`check_edit_url_files_exist`; the error gives the row's label path and the file path).
+- `.github/workflows/check-markdown.yml` runs it after the generators, so a row that names a generated page by path
+  (`src/collectors/COLLECTORS.md`, the `src/crates/otel-plugin/README.md` symlink) is checked against the tree ingest
+  publishes; run by hand, a row whose generated page is not committed yet fails until its generator has run.
+  Integration placeholders carry no path and are not checked.
+- A row of another repository is not checked for a file; if its URL matches no source file, the page is silently
+  absent (see the join key below).
 
 ## Rows ingest reads from the map
 
@@ -112,12 +116,17 @@ published into its Learn URL. So a cross-reference is written as the repository-
 file with its `.md` extension, for example `/docs/npm/network-flows/configuration.md` or
 `/src/libnetdata/socket/README.md`; the `/docs/` prefix is not part of the rule. Details that bite:
 
-- A link already written as a `learn.netdata.cloud` URL is left untouched, so it is neither anchor-validated nor
-  rename-safe.
-- Anchors are validated against `extract_headers_from_file`, which slugifies heading text only: `<a id="...">` and
-  `## Heading {#custom-id}` are not honoured, so write the heading text to slugify to the anchor you link. Cross-file
-  `#anchor` links are checked; same-page ones are not. A miss is a hard failure under `--fail-links-netdata`, the mode
-  `.github/workflows/check-markdown.yml` runs.
+- Absolute `learn.netdata.cloud` links: not rewritten, so not rename-safe; after a move they reach the page only
+  through a redirect. Ingest checks each one against its final output (`ingest/learn_links.py`, netdata/learn#3110 @
+  `e47e89ec6`): on a published page the anchor must exist (Docusaurus heading slug, `{#id}`, `id`/`name` attribute),
+  except a `:~:` text fragment; under `--ignore-on-prem-repo`, the `netdata-cloud-onprem` pages already in Learn's
+  `docs/` count as published, with their anchors recorded before cleanup (`snapshot_pages`); a redirect source, a
+  static file, `/` and `/search` pass with the anchor unchecked; any other route fails. A miss is a hard failure under
+  `--fail-links-netdata`.
+- Repository-relative links: anchors are validated against `extract_headers_from_file`, which slugifies heading text
+  only: `<a id="...">` and `## Heading {#custom-id}` are not honoured, so write the heading text to slugify to the
+  anchor you link. Cross-file `#anchor` links are checked; same-page ones are not. A miss is a hard failure under
+  `--fail-links-netdata`, the mode `.github/workflows/check-markdown.yml` runs.
 - A GitHub link to an `.md` that exists in a cloned repository but is not published stays a GitHub link
   (`file_exists_in_repos`); an unmapped link under an `integrations/` path that also contains `collector` falls back to
   the parent `README.md` page; anything else is counted as uncorrelated and reported.

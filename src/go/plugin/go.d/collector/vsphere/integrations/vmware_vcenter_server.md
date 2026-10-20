@@ -42,7 +42,7 @@ Those surfaces are intentionally not duplicated here by default.
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -364,7 +364,7 @@ Configure the **vsphere** collector from the Netdata web interface:
 4. In the Search box, type _vsphere_ (or scroll the list) to locate the **vsphere** collector.
 5. Click the **+** next to the **vsphere** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -436,12 +436,12 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ vsphere_vm_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.vm_cpu_utilization | Virtual Machine CPU utilization |
-| [ vsphere_vm_mem_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.vm_mem_utilization | Virtual Machine memory utilization |
-| [ vsphere_vm_snapshot_chain_depth ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.vm_snapshot_max_chain_depth | Virtual Machine snapshot maximum chain depth |
-| [ vsphere_vm_snapshot_age ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.vm_snapshot_max_age | Virtual Machine oldest snapshot age |
-| [ vsphere_host_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.host_cpu_utilization | ESXi Host CPU utilization |
-| [ vsphere_host_mem_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.host_mem_utilization | ESXi Host memory utilization |
+| [ vsphere_vm_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.vm_cpu_utilization | CPU utilization VM ${label:vm} host ${label:host} cluster ${label:cluster} datacenter ${label:datacenter} |
+| [ vsphere_vm_mem_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.vm_mem_utilization | Memory utilization VM ${label:vm} host ${label:host} cluster ${label:cluster} datacenter ${label:datacenter} |
+| [ vsphere_vm_snapshot_chain_depth ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.vm_snapshot_max_chain_depth | Snapshot max chain depth for VM ${label:vm} host ${label:host} cluster ${label:cluster} datacenter ${label:datacenter}; zero means no snapshots |
+| [ vsphere_vm_snapshot_age ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.vm_snapshot_max_age | Oldest snapshot age for VM ${label:vm} host ${label:host} cluster ${label:cluster} datacenter ${label:datacenter}; zero means no snapshots |
+| [ vsphere_host_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.host_cpu_utilization | CPU utilization ESXi host ${label:host} cluster ${label:cluster} datacenter ${label:datacenter} |
+| [ vsphere_host_mem_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.host_mem_utilization | Memory utilization ESXi host ${label:host} cluster ${label:cluster} datacenter ${label:datacenter} |
 
 
 

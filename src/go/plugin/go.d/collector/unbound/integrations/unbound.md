@@ -29,7 +29,7 @@ This collector monitors Unbound servers.
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -131,7 +131,7 @@ Configure the **unbound** collector from the Netdata web interface:
 4. In the Search box, type _unbound_ (or scroll the list) to locate the **unbound** collector.
 5. Click the **+** next to the **unbound** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -210,7 +210,13 @@ jobs:
 
 ## Alerts
 
-There are no alerts configured by default for this integration.
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ unbound_request_list_overwritten ](https://github.com/netdata/netdata/blob/master/src/health/health.d/unbound.conf) | unbound.request_list_jostle_list | Number of overwritten queries in the request-list |
+| [ unbound_request_list_dropped ](https://github.com/netdata/netdata/blob/master/src/health/health.d/unbound.conf) | unbound.request_list_jostle_list | Number of dropped queries in the request-list |
 
 
 
@@ -244,7 +250,7 @@ Metrics:
 | unbound.recursive_replies | Replies That Needed Recursive Processing | recursive | replies |
 | unbound.recursion_time | Time Spent On Recursive Processing | avg, median | milliseconds |
 | unbound.request_list_usage | Request List Usage | avg, max | queries |
-| unbound.current_request_list_usage | Current Request List Usage | all, users | queries |
+| unbound.current_request_list_usage | Current Request List Usage | all, user | queries |
 | unbound.request_list_jostle_list | Request List Jostle List Events | overwritten, dropped | queries |
 | unbound.tcpusage | TCP Handler Buffers | usage | buffers |
 | unbound.uptime | Uptime | time | seconds |
@@ -255,7 +261,7 @@ Metrics:
 | unbound.type_queries | Queries By Type | a dimension per query type | queries |
 | unbound.class_queries | Queries By Class | a dimension per query class | queries |
 | unbound.opcode_queries | Queries By OpCode | a dimension per query opcode | queries |
-| unbound.flag_queries | Queries By Flag | qr, aa, tc, rd, ra, z, ad, cd | queries |
+| unbound.flag_queries | Queries By Flag | QR, AA, TC, RD, RA, Z, AD, CD | queries |
 | unbound.rcode_answers | Replies By RCode | a dimension per reply rcode | replies |
 
 
@@ -269,20 +275,20 @@ Metrics:
 
 | Metric | Description | Dimensions | Unit |
 |:------|:------------|:----------|:----|
-| unbound.thread_queries | Thread Received Queries | queries | queries |
-| unbound.thread_queries_ip_ratelimited | Thread Rate Limited Queries | ratelimited | queries |
-| unbound.thread_dnscrypt_queries | Thread DNSCrypt Queries | crypted, cert, cleartext, malformed | queries |
-| unbound.thread_cache | Cache Statistics | hits, miss | events |
-| unbound.thread_cache_percentage | Cache Statistics Percentage | hits, miss | percentage |
-| unbound.thread_prefetch | Cache Prefetches | prefetches | prefetches |
-| unbound.thread_expired | Replies Served From Expired Cache | expired | replies |
-| unbound.thread_zero_ttl_replies | Replies Served From Expired Cache | zero_ttl | replies |
-| unbound.thread_recursive_replies | Replies That Needed Recursive Processing | recursive | replies |
-| unbound.thread_recursion_time | Time Spent On Recursive Processing | avg, median | milliseconds |
-| unbound.thread_request_list_usage | Time Spent On Recursive Processing | avg, max | queries |
-| unbound.thread_current_request_list_usage | Current Request List Usage | all, users | queries |
-| unbound.thread_request_list_jostle_list | Request List Jostle List Events | overwritten, dropped | queries |
-| unbound.thread_tcpusage | TCP Handler Buffers | usage | buffers |
+| thread_unbound.queries | Thread Received Queries | queries | queries |
+| thread_unbound.queries_ip_ratelimited | Thread Rate Limited Queries | ratelimited | queries |
+| thread_unbound.dnscrypt_queries | Thread DNSCrypt Queries | crypted, cert, cleartext, malformed | queries |
+| thread_unbound.cache | Thread Cache Statistics | hits, miss | events |
+| thread_unbound.cache_percentage | Thread Cache Statistics Percentage | hits, miss | percentage |
+| thread_unbound.prefetch | Thread Cache Prefetches | prefetches | prefetches |
+| thread_unbound.expired | Thread Replies Served From Expired Cache | expired | replies |
+| thread_unbound.zero_ttl_replies | Thread Replies Served From Expired Cache | zero_ttl | replies |
+| thread_unbound.recursive_replies | Thread Replies That Needed Recursive Processing | recursive | replies |
+| thread_unbound.recursion_time | Thread Time Spent On Recursive Processing | avg, median | milliseconds |
+| thread_unbound.request_list_usage | Thread Request List Usage | avg, max | queries |
+| thread_unbound.current_request_list_usage | Thread Current Request List Usage | all, user | queries |
+| thread_unbound.request_list_jostle_list | Thread Request List Jostle List Events | overwritten, dropped | queries |
+| thread_unbound.tcpusage | Thread TCP Handler Buffers | usage | buffers |
 
 
 

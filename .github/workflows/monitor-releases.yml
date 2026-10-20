@@ -23,7 +23,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
       - name: Overwrite defaults
@@ -35,7 +35,7 @@ jobs:
             echo "RELEASE_CHANNEL=stable" >> "${GITHUB_ENV}"
           fi
       - name: Init Python environment
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         id: init-python
         with:
           python-version: "3.12"
@@ -50,7 +50,7 @@ jobs:
       - name: SSH setup
         id: ssh-setup
         if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && steps.check-newer-releases.outputs.versions_needs_update == 'true'
-        uses: shimataro/ssh-key-action@v2
+        uses: shimataro/ssh-key-action@87a8f067114a8ce263df83e9ed5c849953548bc3 # v2.8.1
         with:
           key: ${{ secrets.NETDATABOT_PACKAGES_SSH_KEY }}
           name: id_ecdsa
@@ -67,7 +67,7 @@ jobs:
         run: |
           .github/scripts/upload-new-version-tags.sh packages2.netdata.cloud
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''

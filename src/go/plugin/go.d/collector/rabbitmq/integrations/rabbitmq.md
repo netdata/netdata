@@ -38,7 +38,7 @@ The following endpoints are used:
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -130,7 +130,7 @@ Configure the **rabbitmq** collector from the Netdata web interface:
 4. In the Search box, type _rabbitmq_ (or scroll the list) to locate the **rabbitmq** collector.
 5. Click the **+** next to the **rabbitmq** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -220,7 +220,7 @@ The following alerts are available:
 | [ rabbitmq_node_network_partition_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.node_network_partition_status | RabbitMQ network partition detected (node ${label:node} cluster ${label:cluster_id}) |
 | [ rabbitmq_node_mem_alarm_status_triggered ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.node_mem_alarm_status | RabbitMQ mem alarm triggered (node ${label:node} cluster ${label:cluster_id}) |
 | [ rabbitmq.node_disk_free_alarm_status_triggered ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.node_disk_free_alarm_status | RabbitMQ disk free alarm triggered (node ${label:node} cluster ${label:cluster_id}) |
-| [ rabbitmq_vhost_status_unhealthy ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.vhost_status | RabbitMQ vhost is not healthy (vhost ${label:vhost} cluster ${label:cluster_id}) |
+| [ rabbitmq_vhost_status_unhealthy ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.vhost_status | RabbitMQ vhost is unhealthy (vhost ${label:vhost} cluster ${label:cluster_id}) |
 | [ rabbitmq_queue_status_minority ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.queue_status | RabbitMQ queue insufficient online members (queue ${label:queue} node ${label:node} cluster ${label:cluster_id}) |
 | [ rabbitmq_queue_status_unhealthy ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.queue_status | RabbitMQ queue is unhealthy (queue ${label:queue} node ${label:node} cluster ${label:cluster_id}) |
 

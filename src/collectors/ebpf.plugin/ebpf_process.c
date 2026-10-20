@@ -62,10 +62,8 @@ static ebpf_local_maps_t process_maps[] = {
 char *tracepoint_sched_type = "sched";
 char *tracepoint_sched_process_exit = "sched_process_exit";
 char *tracepoint_sched_process_exec = "sched_process_exec";
-char *tracepoint_sched_process_fork = "sched_process_fork";
 static int was_sched_process_exit_enabled = 0;
 static int was_sched_process_exec_enabled = 0;
-static int was_sched_process_fork_enabled = 0;
 
 static netdata_idx_t *process_hash_values = NULL;
 ebpf_process_stat_t *process_stat_vector = NULL;
@@ -76,6 +74,8 @@ static netdata_publish_syscall_t process_publish_aggregated[NETDATA_KEY_PUBLISH_
 struct config process_config = APPCONFIG_INITIALIZER;
 
 #ifdef LIBBPF_MAJOR_VERSION
+#include <bpf/btf.h>
+
 /**
  * Disable probe
  *
@@ -88,6 +88,7 @@ static void ebpf_process_disable_probe(struct process_bpf *obj)
     bpf_program__set_autoload(obj->progs.netdata_release_task_probe, false);
     bpf_program__set_autoload(obj->progs.netdata_do_fork_probe, false);
     bpf_program__set_autoload(obj->progs.netdata_kernel_clone_probe, false);
+    bpf_program__set_autoload(obj->progs.netdata_wake_up_new_task_probe, false);
 }
 
 static void ebpf_disable_tracepoints(struct process_bpf *obj)
@@ -128,47 +129,6 @@ static inline void ebpf_disable_clone3(struct process_bpf *obj)
     bpf_program__set_autoload(obj->progs.netdata_clone3_fexit, false);
 }
 
-static inline void ebpf_adjust_process_fork(struct process_bpf *obj)
-{
-    if (running_on_kernel <= NETDATA_EBPF_KERNEL_6_16) {
-        bpf_program__set_autoload(obj->progs.netdata_tracepoint_sched_process_fork, true);
-        bpf_program__set_autoload(obj->progs.netdata_tracepoint_sched_process_fork_v2, false);
-    } else {
-        bpf_program__set_autoload(obj->progs.netdata_tracepoint_sched_process_fork_v2, true);
-        bpf_program__set_autoload(obj->progs.netdata_tracepoint_sched_process_fork, false);
-    }
-}
-
-/**
- * Mount Attach Probe
- *
- * Attach probes to target
- *
- * @param obj is the main structure for bpf objects.
- *
- * @return It returns 0 on success and -1 otherwise.
- */
-static inline int process_attach_kprobe_target(struct process_bpf *obj)
-{
-    obj->links.netdata_release_task_probe = bpf_program__attach_kprobe(
-        obj->progs.netdata_release_task_probe, false, process_targets[PROCESS_RELEASE_TASK_NAME].name);
-    int ret = libbpf_get_error(obj->links.netdata_release_task_probe);
-    if (ret)
-        goto endakt;
-
-    if (running_on_kernel < NETDATA_EBPF_KERNEL_5_9_16) {
-        obj->links.netdata_do_fork_probe =
-            bpf_program__attach_kprobe(obj->progs.netdata_do_fork_probe, false, process_targets[PROCESS_SYS_FORK].name);
-        ret = libbpf_get_error(obj->links.netdata_do_fork_probe);
-    } else {
-        obj->links.netdata_kernel_clone_probe = bpf_program__attach_kprobe(
-            obj->progs.netdata_kernel_clone_probe, false, process_targets[PROCESS_KERNEL_CLONE].name);
-        ret = libbpf_get_error(obj->links.netdata_kernel_clone_probe);
-    }
-endakt:
-    return ret;
-}
-
 /**
  * Set hash tables
  *
@@ -204,6 +164,7 @@ static inline int ebpf_process_load_and_attach(struct process_bpf *obj, ebpf_mod
     } else if (mode == EBPF_LOAD_PROBE || mode == EBPF_LOAD_RETPROBE) {
         ebpf_disable_tracepoints(obj);
         ebpf_disable_trampoline(obj);
+        bpf_program__set_autoload(obj->progs.netdata_sched_process_fork_btf, false);
 
         bpf_program__set_autoload(
             (running_on_kernel <= NETDATA_EBPF_KERNEL_5_9_16) ? obj->progs.netdata_kernel_clone_probe :
@@ -212,20 +173,41 @@ static inline int ebpf_process_load_and_attach(struct process_bpf *obj, ebpf_mod
     } else { // Tracepoint
         ebpf_process_disable_probe(obj);
         ebpf_disable_trampoline(obj);
+
+        // Keep release accounting active; tracepoint-only exit counts otherwise
+        // make every unreaped exit appear to be a zombie.
+        bpf_program__set_autoload(obj->progs.netdata_release_task_probe, true);
+
+#if defined(__aarch64__)
+        // arm64 has no fork/vfork syscalls, so these syscall tracepoints cannot attach.
+        bpf_program__set_autoload(obj->progs.netdata_fork_exit, false);
+        bpf_program__set_autoload(obj->progs.netdata_vfork_exit, false);
+#endif
+
+        // tp_btf needs tracing support and its target in kernel BTF; otherwise count forks with the kprobe.
+        bool raw_tracepoint_available = false;
+        if (libbpf_probe_bpf_prog_type(BPF_PROG_TYPE_TRACING, NULL) > 0) {
+            raw_tracepoint_available =
+                ebpf_kernel_btf_find_by_name_kind("btf_trace_sched_process_fork", BTF_KIND_TYPEDEF) > 0;
+        }
+
+        if (!raw_tracepoint_available) {
+            bpf_program__set_autoload(obj->progs.netdata_sched_process_fork_btf, false);
+            bpf_program__set_autoload(obj->progs.netdata_wake_up_new_task_probe, true);
+        }
     }
 
     if (running_on_kernel < NETDATA_EBPF_KERNEL_5_3) {
         ebpf_disable_clone3(obj);
     }
 
-    ebpf_adjust_process_fork(obj);
-
     int ret = process_bpf__load(obj);
     if (ret) {
         return ret;
     }
 
-    ret = (mode == EBPF_LOAD_TRAMPOLINE) ? process_bpf__attach(obj) : process_attach_kprobe_target(obj);
+    // Section names carry each program's target and probe type, so auto-attach covers every mode.
+    ret = process_bpf__attach(obj);
     if (!ret) {
         ebpf_process_set_hash_tables(obj);
 
@@ -707,11 +689,6 @@ static void ebpf_process_disable_tracepoints()
     if (!was_sched_process_exec_enabled) {
         if (ebpf_disable_tracing_values(tracepoint_sched_type, tracepoint_sched_process_exec))
             netdata_log_error("%s %s/%s.", default_message, tracepoint_sched_type, tracepoint_sched_process_exec);
-    }
-
-    if (!was_sched_process_fork_enabled) {
-        if (ebpf_disable_tracing_values(tracepoint_sched_type, tracepoint_sched_process_fork))
-            netdata_log_error("%s %s/%s.", default_message, tracepoint_sched_type, tracepoint_sched_process_fork);
     }
 }
 
@@ -1521,9 +1498,6 @@ static int ebpf_process_enable_tracepoints()
         return -1;
 
     if (ebpf_enable_single_tracepoint(tracepoint_sched_process_exec, &was_sched_process_exec_enabled))
-        return -1;
-
-    if (ebpf_enable_single_tracepoint(tracepoint_sched_process_fork, &was_sched_process_fork_enabled))
         return -1;
 
     return 0;

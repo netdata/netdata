@@ -133,13 +133,24 @@ func (t *runtimeSettlementTransaction) Apply(ctx context.Context) (applied lifec
 	afterApply := func() {
 		dcjc.completeRestart(t.current.Identity(), adoptedResult(dyncfg.CommandRestart, status, replyFailure))
 	}
+	var delta *candidateDelta
+	var policyErr error
 	if failure != nil {
-		config, err := graphRecordConfig(record)
-		if err != nil {
-			return lifecycle.AppliedResourceTransaction{}, err
+		retryAfter := 0
+		if failure.retry {
+			retryAfter = failure.retryAfter
 		}
-		afterApply = composeAfterApply(afterApply, func() { dcjc.scheduleAutoDetectionRetry(config, failure) })
+		delta, policyErr = dcjc.candidates.prepareOutcome(t.scope.ID, t.current.continuation, candidateOutcome{
+			Kind: candidateFailed, RetryAfter: retryAfter, AfterReady: failure.afterReady, Listed: true,
+		}, dcjc.scheduler.retries.now())
+	} else {
+		delta, policyErr = dcjc.candidates.prepareReady(t.scope.ID, t.current.continuation)
 	}
+	if policyErr != nil {
+		return lifecycle.AppliedResourceTransaction{}, policyErr
+	}
+	reply := internalReply()
+	reply.candidate = delta
 	jobConfig := preparedJobConfigLifecycle{
 		identity: t.current.resources.jobConfigIdentity,
 		snapshot: t.current.resources.jobConfigSnapshot,
@@ -149,10 +160,10 @@ func (t *runtimeSettlementTransaction) Apply(ctx context.Context) (applied lifec
 	} else {
 		jobConfig.runtime = t.current.resources.candidateJob
 	}
-	prepared, err := dcjc.prepareMutationWithRetryAfterApplyAndFallback(
-		t.scope, t.current, nil, lifecycle.LongLivedPermit{}, disposition, &postimage, internalReply(),
-		dcjc.configStatusCleanup(t.scope.ID, status), autoDetectionRetryToken{}, afterApply,
-		jobConfig, nil, nil,
+	prepared, err := dcjc.prepareMutationAfterApplyAndFallback(
+		ctx, t.scope, t.current, nil, lifecycle.LongLivedPermit{}, disposition, &postimage, reply,
+		dcjc.configStatusCleanup(t.scope.ID, status), afterApply,
+		jobConfig, jobConfigIntentPreserve, nil, nil, nil,
 	)
 	if err != nil {
 		return lifecycle.AppliedResourceTransaction{}, err

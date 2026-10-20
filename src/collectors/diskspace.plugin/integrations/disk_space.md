@@ -28,7 +28,7 @@ Monitor Disk space metrics for proficient storage management. Keep track of usag
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 Disk space can be monitored further using the following other integrations:
@@ -117,8 +117,12 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ disk_space_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.space | disk ${label:mount_point} space utilization |
-| [ disk_inode_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.inodes | disk ${label:mount_point} inode utilization |
+| [ disk_space_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.space | Total space utilization of disk ${label:mount_point} |
+| [ disk_inode_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.inodes | Total inode utilization of disk ${label:mount_point} |
+| [ disk_fill_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.space | average rate the disk fills up (positive), or frees up (negative) space, for the last hour |
+| [ out_of_disk_space_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.space | Estimated time the disk ${label:mount_point} will run out of space, if the system continues to add data with the rate of the last hour |
+| [ disk_inode_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.inodes | average rate at which disk inodes are allocated (positive), or freed (negative), for the last hour |
+| [ out_of_disk_inodes_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.inodes | Estimated time the disk ${label:mount_point} will run out of inodes, if the system continues to allocate inodes with the rate of the last hour |
 
 
 

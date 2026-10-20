@@ -1,0 +1,149 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Default interpretation data derived from FreeIPMI 1.6.17:
+// https://ftp.gnu.org/gnu/freeipmi/freeipmi-1.6.17.tar.gz
+// libfreeipmi/interpret/ipmi-interpret-config-sensor.c and ipmi-interpret.c.
+// Copyright (C) 2003-2015 FreeIPMI Core Team
+// Copyright (C) 2007-2015 Lawrence Livermore National Security, LLC.
+// Copyright (C) 2006-2007 The Regents of the University of California.
+// Written by Albert Chu; produced at Lawrence Livermore National Laboratory.
+// This derived data is distributed under GPL version 3 or later, WITHOUT ANY
+// WARRANTY, including MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// See the repository LICENSE for the full license text.
+
+package bmc
+
+const (
+	eventTypeThreshold = 0x01
+	// thresholdCriticalMask selects the lower/upper critical and non-recoverable
+	// assertions. FreeIPMI defaults non-critical assertions to nominal.
+	thresholdCriticalMask = 0x36
+	// extendedStateMask selects offsets 8-14, which only the optional extended
+	// state byte carries. Offset 15 is reserved and ignored.
+	extendedStateMask = 0x7f00
+)
+
+// stateRule holds masks over the asserted state offsets of one event/reading
+// type and sensor type pair. An asserted offset outside known is unrecognized.
+type stateRule struct {
+	known    uint16
+	warning  uint16
+	critical uint16
+}
+
+type stateRuleKey struct {
+	eventType  uint8
+	sensorType uint8
+}
+
+// stateRules covers the default FreeIPMI interpretation of discrete sensors.
+// A pair without a rule, or any unrecognized asserted offset, is unknown.
+var stateRules = map[stateRuleKey]stateRule{
+	{0x02, 0x12}: {0x0007, 0x0000, 0x0000}, // system_event_transition_state
+	{0x03, 0x01}: {0x0003, 0x0002, 0x0000}, // temperature_state
+	{0x03, 0x02}: {0x0003, 0x0002, 0x0000}, // voltage_state
+	{0x03, 0x04}: {0x0003, 0x0002, 0x0000}, // fan_state
+	{0x03, 0x05}: {0x0003, 0x0000, 0x0002}, // physical_security_state
+	{0x03, 0x07}: {0x0003, 0x0000, 0x0002}, // processor_state
+	{0x03, 0x08}: {0x0003, 0x0002, 0x0000}, // power_supply_state
+	{0x03, 0x09}: {0x0003, 0x0002, 0x0000}, // power_unit_state
+	{0x03, 0x0c}: {0x0003, 0x0000, 0x0002}, // memory_state
+	{0x03, 0x0d}: {0x0003, 0x0001, 0x0000}, // drive_slot_state
+	{0x03, 0x0e}: {0x0003, 0x0002, 0x0000}, // post_memory_resize_state
+	{0x03, 0x0f}: {0x0003, 0x0002, 0x0000}, // system_firmware_progress_state
+	{0x03, 0x12}: {0x0003, 0x0002, 0x0000}, // system_event_state
+	{0x03, 0x14}: {0x0003, 0x0000, 0x0000}, // button_switch_state
+	{0x03, 0x15}: {0x0003, 0x0000, 0x0002}, // module_board_state
+	{0x03, 0x1e}: {0x0003, 0x0000, 0x0002}, // boot_error_state
+	{0x03, 0x20}: {0x0003, 0x0000, 0x0002}, // os_critical_stop_state
+	{0x03, 0x24}: {0x0003, 0x0000, 0x0002}, // platform_alert_state
+	{0x04, 0x0d}: {0x0003, 0x0000, 0x0002}, // drive_slot_predictive_failure
+	{0x05, 0x01}: {0x0003, 0x0000, 0x0002}, // temperature_limit
+	{0x05, 0x02}: {0x0003, 0x0000, 0x0002}, // voltage_limit
+	{0x06, 0x02}: {0x0003, 0x0000, 0x0002}, // voltage_performance
+	{0x07, 0x01}: {0x01ff, 0x0092, 0x006c}, // temperature_transition_severity
+	{0x07, 0x02}: {0x01ff, 0x0092, 0x006c}, // voltage_transition_severity
+	{0x07, 0x03}: {0x01ff, 0x0092, 0x006c}, // current_transition_severity
+	{0x07, 0x04}: {0x01ff, 0x0092, 0x006c}, // fan_transition_severity
+	{0x07, 0x08}: {0x01ff, 0x0092, 0x006c}, // power_supply_transition_severity
+	{0x07, 0x09}: {0x01ff, 0x0092, 0x006c}, // power_unit_transition_severity
+	{0x07, 0x0c}: {0x01ff, 0x0092, 0x006c}, // memory_transition_severity
+	{0x07, 0x0d}: {0x01ff, 0x0092, 0x006c}, // drive_slot_transition_severity
+	{0x07, 0x0f}: {0x01ff, 0x0092, 0x006c}, // system_firmware_progress_transition_severity
+	{0x07, 0x12}: {0x01ff, 0x0092, 0x006c}, // system_event_transition_severity
+	{0x07, 0x14}: {0x01ff, 0x0092, 0x006c}, // button_switch_transition_severity
+	{0x07, 0x18}: {0x01ff, 0x0092, 0x006c}, // chassis_transition_severity
+	{0x07, 0x19}: {0x01ff, 0x0092, 0x006c}, // chip_set_transition_severity
+	{0x07, 0x1b}: {0x01ff, 0x0092, 0x006c}, // cable_interconnect_transition_severity
+	{0x07, 0x1e}: {0x01ff, 0x0092, 0x006c}, // boot_error_transition_severity
+	{0x07, 0x21}: {0x01ff, 0x0092, 0x006c}, // slot_connector_transition_severity
+	{0x07, 0x28}: {0x01ff, 0x0092, 0x006c}, // management_subsystem_health_transition_severity
+	{0x08, 0x04}: {0x0003, 0x0000, 0x0001}, // fan_device_present
+	{0x08, 0x09}: {0x0003, 0x0000, 0x0001}, // power_unit_device_present
+	{0x08, 0x0d}: {0x0003, 0x0000, 0x0001}, // drive_slot_device_present
+	{0x08, 0x0f}: {0x0003, 0x0000, 0x0001}, // system_firmware_progress_device_present
+	{0x08, 0x15}: {0x0003, 0x0000, 0x0001}, // module_board_device_present
+	{0x08, 0x25}: {0x0003, 0x0000, 0x0001}, // entity_presence_device_present
+	{0x08, 0x28}: {0x0003, 0x0000, 0x0001}, // management_subsystem_health_device_present
+	{0x0a, 0x04}: {0x01ff, 0x00be, 0x0140}, // fan_transition_availability
+	{0x0b, 0x04}: {0x00ff, 0x00c4, 0x003a}, // fan_redundancy
+	{0x0b, 0x08}: {0x00ff, 0x00c4, 0x003a}, // power_supply_redundancy
+	{0x0b, 0x09}: {0x00ff, 0x00c4, 0x003a}, // power_unit_redundancy
+	{0x0b, 0x0a}: {0x00ff, 0x00c4, 0x003a}, // cooling_device_redundancy
+	{0x0b, 0x0c}: {0x00ff, 0x00c4, 0x003a}, // memory_redundancy
+	{0x6f, 0x05}: {0x007f, 0x0000, 0x007f}, // physical_security
+	{0x6f, 0x06}: {0x003f, 0x0000, 0x003f}, // platform_security_violation_attempt
+	{0x6f, 0x07}: {0x1fff, 0x1400, 0x0b7f}, // processor
+	{0x6f, 0x08}: {0x00ff, 0x0080, 0x007e}, // power_supply
+	{0x6f, 0x09}: {0x00ff, 0x000c, 0x00f0}, // power_unit
+	{0x6f, 0x0c}: {0x07ff, 0x0221, 0x049e}, // memory
+	{0x6f, 0x0d}: {0x01ff, 0x0000, 0x0166}, // drive_slot
+	{0x6f, 0x0f}: {0x0007, 0x0000, 0x0003}, // system_firmware_progress
+	{0x6f, 0x10}: {0x007f, 0x0020, 0x005b}, // event_logging_disabled
+	{0x6f, 0x12}: {0x003f, 0x0021, 0x0004}, // system_event
+	{0x6f, 0x13}: {0x0fff, 0x0888, 0x0777}, // critical_interrupt
+	{0x6f, 0x14}: {0x001f, 0x0018, 0x0000}, // button_switch
+	{0x6f, 0x1b}: {0x0003, 0x0000, 0x0002}, // cable_interconnect
+	{0x6f, 0x1e}: {0x001f, 0x0010, 0x000f}, // boot_error
+	{0x6f, 0x1f}: {0x07ff, 0x0240, 0x0400}, // os_boot
+	{0x6f, 0x21}: {0x03ff, 0x01c2, 0x0001}, // slot_connector
+	{0x6f, 0x22}: {0x7fff, 0x0000, 0x6000}, // system_acpi_power_state
+	{0x6f, 0x23}: {0x01ff, 0x0101, 0x000e}, // watchdog2
+	{0x6f, 0x25}: {0x0007, 0x0000, 0x0006}, // entity_presence
+	{0x6f, 0x28}: {0x003f, 0x0000, 0x003f}, // management_subsystem_health
+	{0x6f, 0x29}: {0x0007, 0x0001, 0x0002}, // battery
+	{0x6f, 0x2a}: {0x000f, 0x0004, 0x0008}, // session_audit
+	{0x6f, 0x2b}: {0x00ff, 0x0003, 0x003c}, // version_change
+	{0x6f, 0x2c}: {0x00ff, 0x006c, 0x0083}, // fru_state
+}
+
+// sensorState interprets a reading with the FreeIPMI default policy.
+func sensorState(eventType, sensorType uint8, reading readingResponse) string {
+	if reading.size < readingSizeWithState || reading.ReadingUnavailable || reading.SensorScanningDisabled {
+		return StateUnknown
+	}
+	if eventType == eventTypeThreshold {
+		if reading.OptionalData1&thresholdCriticalMask != 0 {
+			return StateCritical
+		}
+		return StateNominal
+	}
+
+	rule, ok := stateRules[stateRuleKey{eventType, sensorType}]
+	if !ok {
+		return StateUnknown
+	}
+	if reading.size < readingSizeWithExtendedState && rule.known&extendedStateMask != 0 {
+		return StateUnknown
+	}
+	asserted := uint16(reading.OptionalData1) | (uint16(reading.OptionalData2)<<8)&extendedStateMask
+	switch {
+	case asserted&^rule.known != 0:
+		return StateUnknown
+	case asserted&rule.critical != 0:
+		return StateCritical
+	case asserted&rule.warning != 0:
+		return StateWarning
+	default:
+		return StateNominal
+	}
+}

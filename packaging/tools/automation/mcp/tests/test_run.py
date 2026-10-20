@@ -1,4 +1,5 @@
 import asyncio
+import socket
 from pathlib import Path
 
 import pytest_asyncio
@@ -219,8 +220,33 @@ async def test_launch_unclaimed_without_token(reg, tmp_path, monkeypatch):
     run, _ = await reg.start("a", str(tmp_path), "debug", probe=_always_ready)
     await _wait(run, {"ready", "failed"})
     # token explicitly blanked so a stray inherited NETDATA_CLAIM_TOKEN can't claim
-    assert captured["env"] == {"NETDATA_CLAIM_TOKEN": ""}
+    assert captured["env"] == {
+        "NETDATA_CLAIM_TOKEN": "",
+        "NETDATA_RUN_DIR": str(tmp_path / "opt" / "netdata-mcp" / "run" / "a" / "run"),
+    }
     assert any("running unclaimed" in line for line in run.buffer.read(0).text.splitlines())
+
+
+async def test_launch_gives_each_agent_its_own_runtime_dir(reg, tmp_path, monkeypatch):
+    # An inherited NETDATA_RUN_DIR (or none, falling back to /tmp/netdata) would be
+    # shared by every agent; the launch must override it per agent.
+    monkeypatch.setenv("NETDATA_RUN_DIR", "/tmp/netdata")
+    monkeypatch.setattr(
+        runtime, "launch_command",
+        lambda b, port, conf: ["sh", "-c", 'echo "RUN_DIR=$NETDATA_RUN_DIR"; sleep 30'],
+    )
+    a, _ = await reg.start("a", str(tmp_path), "debug", probe=_always_ready)
+    b, _ = await reg.start("b", str(tmp_path), "debug", probe=_always_ready)
+    await _wait(a, {"ready", "failed"})
+    await _wait(b, {"ready", "failed"})
+    for run in (a, b):
+        expected = tmp_path / "opt" / "netdata-mcp" / "run" / run.agent_id / "run"
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + 5.0
+        while f"RUN_DIR={expected}" not in run.buffer.read(0).text and loop.time() < deadline:
+            await asyncio.sleep(0.02)
+        assert f"RUN_DIR={expected}" in run.buffer.read(0).text.splitlines()
+        assert expected.is_dir()
 
 
 async def test_run_returncode_is_negative_when_killed_by_signal(reg, tmp_path, monkeypatch):
@@ -271,3 +297,48 @@ async def test_run_wait_status_returns_terminal_immediately(reg, tmp_path, monke
     assert await _wait(run, {"failed", "stopped"}) == "failed"
     r = await reg.wait_status("a", timeout=5.0, poll=0.05)  # long timeout, but terminal -> immediate
     assert r is run and r.done
+
+
+async def test_pinned_port_is_used_and_kept_across_restart(reg, tmp_path):
+    pinned = runtime.free_port()
+    run, _ = await reg.start("a", str(tmp_path), "debug", port=pinned, probe=_always_ready)
+    assert await _wait(run, {"ready", "failed", "stopped"}) == "ready"
+    assert run.port == pinned and run.port_pinned
+    again, outcome = await reg.start("a", str(tmp_path), "debug", port=pinned, restart=True, probe=_always_ready)
+    assert outcome == "restarted"
+    assert await _wait(again, {"ready", "failed", "stopped"}) == "ready"
+    assert again.port == pinned
+
+
+async def test_unpinned_port_is_auto_assigned(reg, tmp_path):
+    run, _ = await reg.start("a", str(tmp_path), "debug", probe=_always_ready)
+    assert await _wait(run, {"ready", "failed", "stopped"}) == "ready"
+    assert run.port and not run.port_pinned
+    # both OTLP listeners are reported, on ports distinct from the web port
+    ports = {run.port, int(run.otlp_endpoint.rpartition(":")[2]), int(run.otlp_http_endpoint.rpartition(":")[2])}
+    assert len(ports) == 3
+
+
+async def test_auto_web_port_avoids_a_pinned_otlp_port(reg, tmp_path, monkeypatch):
+    picks = iter([4317, 9000, 9001])
+    monkeypatch.setattr(runtime, "free_port", lambda: next(picks))
+    otel = runtime.OtelConfig(otlp_endpoint="127.0.0.1:4317", otlp_http_endpoint="")
+    run, _ = await reg.start("a", str(tmp_path), "debug", otel=otel, probe=_always_ready)
+    assert run.port == 9000 and run.otlp_endpoint == "127.0.0.1:4317"
+    await reg.stop("a")
+
+
+async def test_pinned_port_in_use_fails_before_launch(reg, tmp_path, monkeypatch):
+    launched = []
+    monkeypatch.setattr(runtime, "launch_command", lambda b, port, conf: launched.append(port) or ["sh", "-c", "sleep 30"])
+    holder = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    holder.bind(("127.0.0.1", 0))
+    holder.listen()
+    try:
+        taken = holder.getsockname()[1]
+        run, _ = await reg.start("a", str(tmp_path), "debug", port=taken, probe=_always_ready)
+        assert await _wait(run, {"ready", "failed", "stopped"}) == "failed"
+        assert f"declared port {taken} is already in use" in (run.error or "")
+        assert launched == []  # netdata was never started on a taken port
+    finally:
+        holder.close()

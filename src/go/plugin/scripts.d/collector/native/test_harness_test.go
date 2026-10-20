@@ -46,6 +46,8 @@ func (b *wireOutput) String() string {
 	return b.buffer.String()
 }
 
+// Reset before changing a running job's response fixture: collection can emit
+// one-time chart definitions or retirement as soon as the new response is visible.
 func (b *wireOutput) Reset() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -63,7 +65,7 @@ func chartID(wire, contextName string) string {
 }
 
 // startTestJob drives the real job runtime: autodetection, Run readiness, ticks and emission.
-func startTestJob(t *testing.T, c *Collector, out *wireOutput) (*jobruntime.JobV2, *jobruntime.ManagedRun) {
+func startTestJob(t *testing.T, c collectorapi.CollectorV2, out io.Writer) (*jobruntime.JobV2, *jobruntime.ManagedRun) {
 	t.Helper()
 	job := jobruntime.NewJobV2(jobruntime.JobV2Config{
 		PluginName:  "scripts.d",
@@ -93,7 +95,13 @@ func startTestJob(t *testing.T, c *Collector, out *wireOutput) (*jobruntime.JobV
 
 func tickUntil(t *testing.T, job *jobruntime.JobV2, condition func() bool) {
 	t.Helper()
-	require.Eventually(t, func() bool { job.Tick(1); return condition() }, 3*time.Second, 100*time.Millisecond)
+	require.Eventually(t, func() bool {
+		if condition() {
+			return true
+		}
+		job.Tick(1)
+		return false
+	}, 3*time.Second, 100*time.Millisecond)
 }
 
 // testRuntime runs Collector.Run directly, without the job runtime.

@@ -1,4 +1,20 @@
-//! Configuration types and management for metric processing.
+//! Per-metric chart configuration for the metrics pipeline: which config entry
+//! applies to an OTLP metric, what its chart dimensions are named after, and
+//! the timing (interval / grace / expiry) its charts resolve to.
+//!
+//! Entries map an exact metric name (no wildcards) to one or more
+//! [`MetricConfig`]s, optionally narrowed by an [`InstrumentationScopePattern`]
+//! (regexes over the scope's name/version). Two layers feed the manager: the
+//! compiled-in stock file `configs/otel.d/v1/metrics/hostmetrics-receiver.yaml`
+//! and user files from otel.yaml's `metrics.chart_configs_dir`; the user layer
+//! wins. Global timing defaults come from otel.yaml's `metrics.interval_secs` /
+//! `grace_period_secs` / `expiry_duration_secs`.
+//!
+//! Consumers: `iter.rs` attaches the matching config to each metric during
+//! request iteration (`find_matching_config`), driving dimension naming and
+//! chart identity; `metrics_service.rs` resolves each chart's timing via
+//! [`ChartConfigManager::resolve_chart_config`]. The logs and traces services
+//! do not consult this module.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -12,7 +28,8 @@ use serde::{Deserialize, Serialize};
 use crate::chart::ChartConfig;
 use crate::iter::MetricRef;
 
-/// Pattern matching for instrumentation scope fields
+/// Pattern matched against a metric's OTel instrumentation scope. Each field
+/// is an optional regex; set fields must all match, unset fields are ignored.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct InstrumentationScopePattern {
     #[serde(with = "serde_regex", skip_serializing_if = "Option::is_none", default)]
@@ -23,7 +40,8 @@ pub struct InstrumentationScopePattern {
 }
 
 impl InstrumentationScopePattern {
-    /// Check if this pattern matches the given instrumentation scope
+    /// Check if this pattern matches the given instrumentation scope. A
+    /// scope-less metric matches only a pattern with no fields set.
     pub fn matches(&self, scope: Option<&InstrumentationScope>) -> bool {
         let scope = match scope {
             Some(s) => s,
@@ -46,13 +64,17 @@ impl InstrumentationScopePattern {
     }
 }
 
-/// Individual configuration for a metric under specific instrumentation scope
+/// One configuration entry for a single metric name; a metric may have several,
+/// tried in order until one's scope pattern matches (see
+/// [`ChartConfigManager::find_matching_config`]).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MetricConfig {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub instrumentation_scope: Option<InstrumentationScopePattern>,
 
-    /// The attribute key in DataPoint attributes whose value becomes the dimension name
+    /// Data point attribute whose value becomes the chart dimension name.
+    /// Unset, missing, or non-string values fall back to the literal
+    /// "value" (see `DataPointRef::dimension_name` in otel.rs).
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub dimension_attribute_key: Option<String>,
 
@@ -66,7 +88,7 @@ pub struct MetricConfig {
 }
 
 impl MetricConfig {
-    /// Check if this config matches the given instrumentation scope
+    /// Check if this config's scope pattern matches the given scope.
     pub fn matches_scope(&self, scope: Option<&InstrumentationScope>) -> bool {
         match &self.instrumentation_scope {
             Some(pattern) => pattern.matches(scope),
@@ -75,10 +97,12 @@ impl MetricConfig {
     }
 }
 
-/// Type alias for the config storage: metric name -> list of Arc-wrapped configs
+/// Config storage: exact metric name -> configs tried in order, first scope
+/// match wins. `Arc`-wrapped so resolved configs are cheap to share.
 pub type ConfigMap = HashMap<String, Vec<Arc<MetricConfig>>>;
 
-/// Root configuration structure for YAML deserialization of per-metric mapping files.
+/// Root of the YAML config file format; `deny_unknown_fields` turns unknown
+/// top-level keys (e.g. typos) into parse errors.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MetricConfigs {
@@ -87,13 +111,18 @@ pub struct MetricConfigs {
     pub metrics: ConfigMap,
 }
 
-/// Old-format configuration structure (for detection only).
+/// The pre-`metrics:` file format (a top-level `configs:` list), recognized
+/// only to log a migrate-the-file error; never parsed further.
 #[derive(Deserialize)]
 struct OldChartConfigs {
     #[allow(dead_code)]
     configs: Vec<serde_yaml::Value>,
 }
 
+/// Two-layer per-metric config store plus global chart timing defaults: the
+/// compiled-in `stock` layer is the fallback for `user` configs loaded from
+/// `metrics.chart_configs_dir`. `expiry_explicit` tracks whether an expiry was
+/// configured globally, which gates the grace-exceeds-expiry auto-bump.
 #[derive(Debug, Default, Clone)]
 pub struct ChartConfigManager {
     /// Stock configs wrapped in Arc for cheap cloning
@@ -116,7 +145,7 @@ impl ChartConfigManager {
     /// Set global timing defaults from plugin configuration (otel.yaml).
     ///
     /// When `interval_secs` is set but `grace_period_secs` is not, the grace
-    /// period auto-derives as `5 * interval`. When the resulting grace exceeds
+    /// period auto-derives as `5 * interval`. When the effective grace exceeds
     /// expiry and expiry was not explicitly set, expiry is bumped to match.
     pub fn set_defaults(
         &mut self,
@@ -148,13 +177,13 @@ impl ChartConfigManager {
     /// the grace period derives from the per-metric interval (`5 * interval`),
     /// not from the global grace default.
     ///
-    /// When the auto-derived grace exceeds expiry and expiry was not explicitly
+    /// When the resulting grace exceeds expiry and expiry was not explicitly
     /// set, expiry is bumped to match grace so that a simple `interval_secs`
     /// override doesn't silently fall back to defaults.
     ///
-    /// The resolved config must satisfy `0 < interval <= 3600` and
-    /// `interval < grace <= expiry`.  If violated, the hardcoded defaults
-    /// are used and a warning is logged.
+    /// The result must satisfy `0 < interval <= 3600` and
+    /// `interval < grace <= expiry`; on violation the hardcoded
+    /// `ChartConfig::default()` is returned and a warning logged.
     pub fn resolve_chart_config(&self, metric_config: Option<&MetricConfig>) -> ChartConfig {
         let mut cfg = self.defaults;
         let expiry_explicit = self.expiry_explicit;
@@ -174,7 +203,7 @@ impl ChartConfigManager {
             }
         }
 
-        // If grace was auto-derived and exceeds expiry, bump expiry to match
+        // If the layered grace (derived or explicit) exceeds expiry, bump it
         // — but only if expiry was never explicitly configured.
         if !expiry_explicit && cfg.grace_period > cfg.expiry_duration {
             cfg.expiry_duration = cfg.grace_period;
@@ -203,7 +232,9 @@ impl ChartConfigManager {
         cfg
     }
 
-    /// Find matching config for a metric. Returns Arc<MetricConfig> for zero-copy access.
+    /// Find the config for a metric: user layer first, then stock; within a
+    /// name's list the first scope-matching entry wins. Cloning the returned
+    /// `Arc` is the only cost of sharing it.
     pub fn find_matching_config(&self, m: &MetricRef<'_>) -> Option<Arc<MetricConfig>> {
         let scope = m.scope_metrics.scope.as_ref();
 
@@ -224,6 +255,8 @@ impl ChartConfigManager {
         None
     }
 
+    /// Parse the compiled-in stock YAML into the stock layer. On a parse error
+    /// the stock layer is left as-is (empty unless a previous load succeeded).
     fn load_stock_config(&mut self) {
         const DEFAULT_CONFIGS_YAML: &str =
             include_str!("../configs/otel.d/v1/metrics/hostmetrics-receiver.yaml");
@@ -238,6 +271,11 @@ impl ChartConfigManager {
         }
     }
 
+    /// Replace the user layer with the `*.yml` / `*.yaml` files in
+    /// `config_dir`, read in sorted path order for deterministic merging;
+    /// configs for the same metric accumulate in file order. Unreadable or
+    /// unparsable files are logged and skipped (old-format files get a
+    /// migration error). Errors if the path is missing or not a directory.
     pub fn load_user_configs<P: AsRef<std::path::Path>>(&mut self, config_dir: P) -> Result<()> {
         let config_path = config_dir.as_ref();
         if !config_path.exists() {
@@ -358,7 +396,7 @@ mod tests {
         fn valid_defaults_are_accepted() {
             let m = ChartConfigManager::default();
             let cfg = m.resolve_chart_config(None);
-            // Default: interval=10, grace=50, expiry=900
+            // Default: interval=10, grace=60, expiry=900
             assert_eq!(cfg.collection_interval, defaults().collection_interval);
             assert_eq!(cfg.grace_period, defaults().grace_period);
             assert_eq!(cfg.expiry_duration, defaults().expiry_duration);

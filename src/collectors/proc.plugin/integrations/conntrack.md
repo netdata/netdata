@@ -28,7 +28,7 @@ This integration monitors the connection tracking mechanism of Netfilter in the 
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -78,7 +78,7 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ netfilter_conntrack_full ](https://github.com/netdata/netdata/blob/master/src/health/health.d/netfilter.conf) | netfilter.conntrack_sockets | netfilter connection tracker table size utilization |
+| [ netfilter_conntrack_full ](https://github.com/netdata/netdata/blob/master/src/health/health.d/netfilter.conf) | netfilter.conntrack_sockets | Netfilter connection tracker table size utilization |
 
 
 

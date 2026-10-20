@@ -38,7 +38,7 @@ Used endpoints:
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -146,7 +146,7 @@ Configure the **consul** collector from the Netdata web interface:
 4. In the Search box, type _consul_ (or scroll the list) to locate the **consul** collector.
 5. Click the **+** next to the **consul** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -232,18 +232,18 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ consul_node_health_check_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf) | consul.node_health_check_status | node health check ${label:check_name} has failed on server ${label:node_name} datacenter ${label:datacenter} |
-| [ consul_service_health_check_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf) | consul.service_health_check_status | service health check ${label:check_name} for service ${label:service_name} has failed on server ${label:node_name} datacenter ${label:datacenter} |
-| [ consul_client_rpc_requests_exceeded ](https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf) | consul.client_rpc_requests_exceeded_rate | number of rate-limited RPC requests made by server ${label:node_name} datacenter ${label:datacenter} |
+| [ consul_license_expiration_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf) | consul.license_expiration_time | Consul Enterprise license expiration time on node ${label:node_name} datacenter ${label:datacenter} |
+| [ consul_autopilot_health_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf) | consul.autopilot_health_status | Datacenter ${label:datacenter} cluster is unhealthy as reported by server ${label:node_name} |
+| [ consul_autopilot_server_health_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf) | consul.autopilot_server_health_status | Server ${label:node_name} from datacenter ${label:datacenter} is unhealthy |
+| [ consul_raft_leader_last_contact_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf) | consul.raft_leader_last_contact_time | Median time elapsed since leader server ${label:node_name} datacenter ${label:datacenter} was last able to contact the follower nodes |
+| [ consul_raft_leadership_transitions ](https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf) | consul.raft_leadership_transitions_rate | There has been a leadership change and server ${label:node_name} datacenter ${label:datacenter} has become the leader |
+| [ consul_raft_thread_main_saturation ](https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf) | consul.raft_thread_main_saturation_perc | Average saturation of the main Raft goroutine on server ${label:node_name} datacenter ${label:datacenter} |
+| [ consul_raft_thread_fsm_saturation ](https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf) | consul.raft_thread_fsm_saturation_perc | Average saturation of the FSM Raft goroutine on server ${label:node_name} datacenter ${label:datacenter} |
+| [ consul_client_rpc_requests_exceeded ](https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf) | consul.client_rpc_requests_exceeded_rate | Number of rate-limited RPC requests made by server ${label:node_name} datacenter ${label:datacenter} |
 | [ consul_client_rpc_requests_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf) | consul.client_rpc_requests_failed_rate | number of failed RPC requests made by server ${label:node_name} datacenter ${label:datacenter} |
-| [ consul_gc_pause_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf) | consul.gc_pause_time | time spent in stop-the-world garbage collection pauses on server ${label:node_name} datacenter ${label:datacenter} |
-| [ consul_autopilot_health_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf) | consul.autopilot_health_status | datacenter ${label:datacenter} cluster is unhealthy as reported by server ${label:node_name} |
-| [ consul_autopilot_server_health_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf) | consul.autopilot_server_health_status | server ${label:node_name} from datacenter ${label:datacenter} is unhealthy |
-| [ consul_raft_leader_last_contact_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf) | consul.raft_leader_last_contact_time | median time elapsed since leader server ${label:node_name} datacenter ${label:datacenter} was last able to contact the follower nodes |
-| [ consul_raft_leadership_transitions ](https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf) | consul.raft_leadership_transitions_rate | there has been a leadership change and server ${label:node_name} datacenter ${label:datacenter} has become the leader |
-| [ consul_raft_thread_main_saturation ](https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf) | consul.raft_thread_main_saturation_perc | average saturation of the main Raft goroutine on server ${label:node_name} datacenter ${label:datacenter} |
-| [ consul_raft_thread_fsm_saturation ](https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf) | consul.raft_thread_fsm_saturation_perc | average saturation of the FSM Raft goroutine on server ${label:node_name} datacenter ${label:datacenter} |
-| [ consul_license_expiration_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf) | consul.license_expiration_time | Consul Enterprise licence expiration time on node ${label:node_name} datacenter ${label:datacenter} |
+| [ consul_node_health_check_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf) | consul.node_health_check_status | Node health check ${label:check_name} has failed on server ${label:node_name} datacenter ${label:datacenter} |
+| [ consul_service_health_check_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf) | consul.service_health_check_status | Service health check ${label:check_name} for service ${label:service_name} has failed on server ${label:node_name} datacenter ${label:datacenter} |
+| [ consul_gc_pause_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf) | consul.gc_pause_time | Time spent in stop-the-world garbage collection pauses on server ${label:node_name} datacenter ${label:datacenter} |
 
 
 

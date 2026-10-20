@@ -41,7 +41,7 @@ It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The service principal or managed identity requires these Azure RBAC roles:
 
@@ -375,7 +375,7 @@ Configure the **azure_monitor** collector from the Netdata web interface:
 4. In the Search box, type _azure_monitor_ (or scroll the list) to locate the **azure_monitor** collector.
 5. Click the **+** next to the **azure_monitor** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -630,10 +630,10 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_nat_gateway_datapath_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_nat_gateway.conf) | azure_monitor.nat_gateway.datapath_availability | NAT Gateway availability on ${label:resource_name} |
-| [ am_nat_gateway_dropped_packets ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_nat_gateway.conf) | azure_monitor.nat_gateway.dropped_packets | NAT Gateway packet drops on ${label:resource_name} |
-| [ am_nat_gateway_snat_connections ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_nat_gateway.conf) | azure_monitor.nat_gateway.snat_connections | NAT Gateway SNAT connections on ${label:resource_name} |
-| [ am_nat_gateway_total_connections ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_nat_gateway.conf) | azure_monitor.nat_gateway.total_connections | NAT Gateway total connections on ${label:resource_name} |
+| [ am_nat_gateway_datapath_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_nat_gateway.conf) | azure_monitor.nat_gateway.datapath_availability | Datapath availability of NAT Gateway ${label:resource_name} in ${label:resource_group} (${label:region}). Values below 100% indicate packet loss through the gateway. |
+| [ am_nat_gateway_dropped_packets ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_nat_gateway.conf) | azure_monitor.nat_gateway.dropped_packets | Packets being dropped by NAT Gateway ${label:resource_name} in ${label:resource_group} (${label:region}). Drops indicate SNAT port exhaustion or connection limit reached. |
+| [ am_nat_gateway_snat_connections ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_nat_gateway.conf) | azure_monitor.nat_gateway.snat_connections | SNAT connection count on NAT Gateway ${label:resource_name} in ${label:resource_group} (${label:region}). Azure limit is 2 million connections per gateway. |
+| [ am_nat_gateway_total_connections ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_nat_gateway.conf) | azure_monitor.nat_gateway.total_connections | Total SNAT connection count on NAT Gateway ${label:resource_name} in ${label:resource_group} (${label:region}). Azure limit is 2 million connections per gateway. |
 
 
 

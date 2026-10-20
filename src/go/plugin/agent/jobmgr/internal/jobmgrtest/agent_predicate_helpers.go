@@ -91,41 +91,71 @@ func runAgentStartReplacementOrderingVariant(ctx context.Context, v2 bool) error
 	case <-ctx.Done():
 		return ctx.Err()
 	}
-	const uid = "jobmgrtest-held-start-disable"
-	if err := writeFunctionCall(fixture.input, uid, "config jobmgrtest:collector:jobmgrtest disable"); err != nil {
+	const configID = "jobmgrtest:collector:jobmgrtest"
+	const initialUID = "jobmgrtest-held-start-disable"
+	if err := writeFunctionCall(fixture.input, initialUID, "config "+configID+" disable"); err != nil {
 		return err
 	}
-	time.Sleep(50 * time.Millisecond)
-	if _, completed, parseErr := fixture.output.functionResult(uid); parseErr != nil {
-		return parseErr
-	} else if completed {
-		return errors.New("disable completed before held Start acknowledgement")
+	initial, err := waitFunctionResult(ctx, fixture.output, initialUID)
+	if err != nil {
+		return fmt.Errorf("disable of tentative source did not settle: %w; output=%s", err, fixture.output.String())
 	}
-	if state.count("init") != 1 || state.count("cleanup") != 0 {
-		return fmt.Errorf("held Start ownership changed before acknowledgement: %v", state.snapshot())
+	// Automatic source preflight has no admitted binding yet. A command targeting
+	// a listed config cannot take ownership of that tentative candidate.
+	if initial.status != 404 {
+		return fmt.Errorf("disable of unexposed source status=%d, want 404; payload=%s", initial.status, initial.payload)
+	}
+	if fixture.output.contains("CONFIG "+configID+" create ") ||
+		fixture.output.contains("CONFIG "+configID+" status ") ||
+		fixture.output.contains(`FUNCTION GLOBAL "jobmgrtest:echo"`) {
+		return fmt.Errorf("tentative source published before Check acknowledgement: %s", fixture.output.String())
+	}
+	if state.count("init") != 1 || state.count("check") != 1 || state.count("cleanup") != 0 {
+		return fmt.Errorf("rejected disable changed held candidate ownership: %v", state.snapshot())
 	}
 	releaseGate()
-	result, err := waitFunctionResult(ctx, fixture.output, uid)
+	const running = "CONFIG " + configID + " status running"
+	if err := waitUntil(ctx, func() bool {
+		return fixture.output.contains("CONFIG "+configID+" create accepted single ") &&
+			fixture.output.contains(running) && fixture.output.contains(`FUNCTION GLOBAL "jobmgrtest:echo"`)
+	}); err != nil {
+		return fmt.Errorf(
+			"held candidate did not publish after Check acknowledgement: %w; events=%v; output=%s",
+			err, state.snapshot(), fixture.output.String(),
+		)
+	}
+	const admittedUID = "jobmgrtest-admitted-start-disable"
+	if err := writeFunctionCall(fixture.input, admittedUID, "config "+configID+" disable"); err != nil {
+		return err
+	}
+	result, err := waitFunctionResult(ctx, fixture.output, admittedUID)
 	if err != nil {
 		return fmt.Errorf(
-			"disable after held Start failed: %w; events=%v; output=%s",
-			err,
-			state.snapshot(),
-			fixture.output.String(),
+			"disable after admission failed: %w; events=%v; output=%s", err, state.snapshot(), fixture.output.String(),
 		)
 	}
 	if result.status != 200 {
 		return fmt.Errorf(
-			"disable after held Start status=%d, want 200; payload=%s; events=%v; output=%s",
-			result.status,
-			result.payload,
-			state.snapshot(),
-			fixture.output.String(),
+			"disable after admission status=%d, want 200; payload=%s; events=%v; output=%s",
+			result.status, result.payload, state.snapshot(), fixture.output.String(),
 		)
 	}
-	events := state.snapshot()
-	if indexOf(events, "cleanup", 0) < 0 || state.count("init") != 1 || state.count("check") != 1 {
-		return fmt.Errorf("disable did not join exactly one held Start and Cleanup: %v", events)
+	// DISABLE replies after logical retirement; process-owned cleanup may finish later.
+	const disabled = "CONFIG " + configID + " status disabled"
+	if err := waitUntil(ctx, func() bool {
+		return state.count("cleanup") == 1 && fixture.output.contains(disabled)
+	}); err != nil {
+		return fmt.Errorf(
+			"disable did not retire the admitted candidate: %w; events=%v; output=%s",
+			err, state.snapshot(), fixture.output.String(),
+		)
+	}
+	if state.count("init") != 1 || state.count("check") != 1 || state.count("cleanup") != 1 {
+		return fmt.Errorf("disable did not join exactly one checked runtime: %v", state.snapshot())
+	}
+	wire := fixture.output.String()
+	if strings.Count(wire, running) != 1 || strings.LastIndex(wire, running) > strings.LastIndex(wire, disabled) {
+		return fmt.Errorf("retired runtime republished Running: %s", wire)
 	}
 	return fixture.terminate(ctx)
 }
@@ -342,7 +372,6 @@ func runAgentFunctionReplacementOrdering(ctx context.Context) error {
 	}()
 	const functionPublication = `FUNCTION GLOBAL "jobmgrtest:echo"`
 	const initialPublication = "CONFIG jobmgrtest:collector:jobmgrtest create accepted single "
-	const runningPublication = "CONFIG jobmgrtest:collector:jobmgrtest status running"
 	if err := waitUntil(ctx, func() bool {
 		return fixture.output.contains(functionPublication) && fixture.output.contains(initialPublication) &&
 			fixture.output.contains(runningPublication)

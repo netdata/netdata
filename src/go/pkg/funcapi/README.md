@@ -1,8 +1,61 @@
-# Collector Function methods
+# Function methods
 
-`funcapi` defines collector Function declarations, handlers, selectors and responses.
+`funcapi` defines collector and process Function declarations, handlers, selectors and responses.
 Job Manager owns publication, job routing, execution and response framing. The
 [process boundary](../../plugin/framework/functions/README.md) owns protocol input.
+
+## Process Function providers
+
+Use `agent.Config.ProcessFunctions` (or `composition.Config.ProcessFunctions`) for
+Functions whose data belongs to the plugin process and must remain queryable when
+collection modules are disabled. Each `funcapi.ProcessFunctionProvider` has a stable
+`ID`, a `Functions func() []FunctionConfig` callback and a `NewHandler func() MethodHandler`
+factory. Providers require no collector, config schema, discovery provider or scheduled job.
+The default public name is `ID:method`; `FunctionName` and `Aliases` retain their normal meaning.
+
+For example, the command composition root can inject an existing history reader.
+In this schematic example, `historyfunc` represents your handler package and
+`historyReader` represents your process-owned history reader:
+
+```go
+agent.Config{
+    ProcessFunctions: []funcapi.ProcessFunctionProvider{{
+        ID: "history",
+        Functions: func() []funcapi.FunctionConfig {
+            return []funcapi.FunctionConfig{{ID: "events", RawRequest: true, ManagedInfo: true, HasHistory: true}}
+        },
+        NewHandler: func() funcapi.MethodHandler { return historyfunc.New(historyReader) },
+    }},
+}
+```
+
+The command MUST provide a fresh handler and declarations for each run generation.
+Callbacks run under the existing Function containment authority. Handler `Cleanup`
+MUST release only generation-owned resources; it MUST NOT close injected process stores.
+The command MUST wait for clean process termination before closing those stores.
+A shutdown error means physical callbacks or cleanup may remain; callers MUST retain their
+resources or exit the process rather than assume the error established a join barrier.
+Restart withdraws old routes and waits for the provider's physical ownership before
+constructing its replacement. Noncooperative work retains the existing quarantine and
+process-restart-required behavior.
+
+Providers share the existing catalog, dispatcher, publication, access flags, raw requests
+and managed metadata. They have no framework `__job` parameter. Duplicate provider IDs
+are invalid; providers and collectors MAY share an ID if their public names differ.
+Provider primary names and aliases are reserved even while initially unavailable;
+collisions with other providers, declared collector Functions or private routes fail
+before publication. Later instance declarations are checked against the same reservations.
+
+`Available` uses the existing process tick even without scheduled jobs. Like collector
+`AgentFunctions`, it delays the first publication only: after publication, false results
+neither withdraw the Function nor prevent dispatch. Handlers own current data availability.
+
+An enabled plugin with providers remains running with zero enabled collectors and skips
+collector discovery. Plugin `enabled: false` still disables everything. Omitting providers
+preserves the existing empty-module shutdown and collector selection behavior.
+`Creator.AgentFunctions` remains appropriate for intentionally module-bound APIs: it
+requires its collector module to be selected, but does not require a running job.
+`SharedFunctions` and `InstanceFunctions` remain job-backed.
 
 ## Input and response ownership
 

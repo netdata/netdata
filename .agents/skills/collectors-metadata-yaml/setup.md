@@ -69,7 +69,9 @@ Renders as a table with columns Option, Description, Default, Required, preceded
 - `required: true` only when the collector does not work without the option. Not "recommended", not "usually set".
 - `group` names the schema tab the option lives in, same spelling (or `Tab / Subgroup` when a nested concern needs
   its own doc group; the first segment is the tab). Rows of one group are contiguous so the table renders the group
-  once, and groups appear in the tab order of the form. A collector without tabs omits `group` everywhere.
+  once, and groups appear in the tab order of the form. A collector without tabs omits `group` everywhere, except a
+  `netdata.conf` plugin whose options span several sections: there `group` is each option's section name
+  (`plugin:macos:sysctl`).
 
 ## 5. `detailed_description`: Depth Per Option
 

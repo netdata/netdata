@@ -1,3 +1,32 @@
+//! The `Catalog` value type: one `(tenant, date, machine, instance)` scope's
+//! record of uploaded SFSTs, filling both of its roles — the catalog builder's
+//! in-memory accumulator (file-lifecycle `catalog_builder.rs`) and the parsed
+//! body of every durable catalog file — so what a rotation serializes is
+//! exactly what the readers parse back.
+//!
+//! The framing vocabulary (magic `NCAT`, container version, JSON schema
+//! version) lives in `lib.rs`; this module owns the round trip itself:
+//! `Catalog::to_container_bytes` is the only producer of durable catalog
+//! bytes and `Catalog::from_container_bytes` the only parser — one `JSON`
+//! chunk holding the `Envelope` JSON, version-checked against
+//! `FORMAT_VERSION` by a peek before the full parse. The builder's rotation
+//! write and every reader go through that pair: `read_entries` in the
+//! sibling `registry.rs` for the query path, and file-lifecycle recovery's
+//! `validate_catalog`, `seed_from_catalog_files` and `read_catalog_seqs`.
+//!
+//! `Catalog::fold` is the single source of the filename fields
+//! `(max_seq, min_ts, max_ts)`: the builder stamps them into the rotation
+//! filename and the remote catalog key, and
+//! `recovery::startup::validate_catalog` recomputes them from a downloaded
+//! body to check it against its key — two readers, one function, no drift.
+//! `Catalog::find` is the per-entry filter `read_entries` applies: the
+//! selected entries drive file-lifecycle's remote plans (`query.rs`) and,
+//! for locally evicted files, the fetch-back through `remote_read.rs`.
+//!
+//! Errors: `Error::Container` for framing problems (bad magic, wrong
+//! container version, corrupt TOC, chunk crc mismatch), then
+//! `Error::UnsupportedVersion` or `Error::Json` from the payload. No partial
+//! read, no fallback parse.
 use std::collections::BTreeMap;
 use std::ops::Range;
 
@@ -15,13 +44,16 @@ use crate::{CONTAINER_MAGIC, CONTAINER_VERSION, Error, FORMAT_VERSION};
 /// not a new file format.
 const CHUNK_JSON: ChunkId = *b"JSON";
 
-/// Per-tenant, per-date, per-machine, per-instance record of uploaded SFSTs.
-///
-/// The catalog file's identifying metadata (tenant, date, machine, instance)
-/// is encoded in the path; entries carry their own per-SFST timestamps,
-/// and the file's union `[min, max]` time range is encoded in the
-/// filename. No per-catalog "created_at" timestamp is stored — nothing
-/// in the planner reads it.
+/// One scope's catalog: this machine's instance's uploaded SFSTs for one
+/// tenant and date, keyed by [`FileId`]. The builder accumulates it in
+/// memory and serializes the whole scope on rotation. The catalog file's
+/// identifying metadata (tenant, date, machine, instance) is encoded in the
+/// path, and the serialized body carries the same four fields —
+/// `recovery::startup::validate_catalog` cross-checks body against key.
+/// Entries carry their own per-SFST timestamps, and the file's union
+/// `[min, max]` time range is stamped into the filename by
+/// [`fold`](Catalog::fold). No per-catalog "created_at" timestamp is
+/// stored — nothing in the planner reads it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Catalog {
     pub tenant_id: TenantId,
@@ -46,16 +78,23 @@ impl Catalog {
         self.entries.insert(entry.id, entry);
     }
 
+    /// Removes and returns one entry by id. Unused in production — the
+    /// builder only removes whole scopes on rotation — so tests are the
+    /// only callers.
     pub fn remove(&mut self, id: &FileId) -> Option<CatalogEntry> {
         self.entries.remove(id)
     }
 
-    /// Fold the entries down to the filename fields `(max_seq, min_ts, max_ts)`
-    /// in one pass. `(0, 0, 0)` for an empty catalog — structurally not
-    /// produced (an accumulator exists only while non-empty), matched by the
-    /// `unwrap_or(0)` fallbacks. This is the single source of the rotation
-    /// filename fields (`catalog_builder`) and of the download-time filename
-    /// check (`recovery::startup::validate_catalog`), so the two cannot drift.
+    /// Reduce the entries to the rotation filename fields
+    /// `(max_seq, min_ts, max_ts)` in one pass: highest `id.seq`, lowest
+    /// `min_timestamp_s`, highest `max_timestamp_s`. The single source of
+    /// those fields for both readers — the builder stamps them into the
+    /// rotation filename (file-lifecycle `catalog_builder.rs`) and
+    /// `recovery::startup::validate_catalog` recomputes them to check a
+    /// downloaded body against its remote key — so the two cannot drift.
+    /// An empty catalog folds to `(0, 0, 0)` through the `unwrap_or(0)`
+    /// fallbacks: unreachable in production (an accumulator exists only
+    /// while non-empty) but defined, never a panic.
     pub fn fold(&self) -> (u64, u32, u32) {
         let max_seq = self.entries.values().map(|e| e.id.seq).max().unwrap_or(0);
         let min_ts = self
@@ -77,10 +116,14 @@ impl Catalog {
     // filtering touches every entry. Fine at current scales (~hundreds of
     // entries per scope); revisit with an interval index or date-bucketed
     // key if query planner workloads show it matters.
-    /// Iterate entries whose `[min_timestamp_s, max_timestamp_s]` range
-    /// (inclusive on both ends) intersects the query's `[start, end)`
-    /// range (half-open) — matching the convention used by
-    /// `sfst::Registry::candidates` and `wal::Registry::candidates`.
+    /// Iterate the entries that can serve `q`: those whose
+    /// `[min_timestamp_s, max_timestamp_s]` range (inclusive on both ends)
+    /// intersects the query's `[start, end)` window (half-open) — the shared
+    /// [`file_registry::range_overlaps`] rule, the same convention as
+    /// `sfst::Registry::candidates` and `wal::Registry::candidates` — and
+    /// whose `id.part_key` passes the query's partition filter (an empty set
+    /// matches every partition). Yields in `FileId` (map) order; the query
+    /// path consumes it through `read_entries` (sibling `registry.rs`).
     pub fn find<'a>(&'a self, q: &Query) -> impl Iterator<Item = &'a CatalogEntry> + 'a {
         // Extract q's contents upfront so the filter closures don't borrow
         // q. Decouples the iterator's lifetime from q's, letting callers
@@ -107,15 +150,21 @@ impl Catalog {
     }
 
     /// Parse the on-disk container produced by
-    /// [`to_container_bytes`](Catalog::to_container_bytes), verifying
-    /// magic, framing version and the `JSON` chunk's crc32 before
-    /// deserializing.
+    /// [`to_container_bytes`](Catalog::to_container_bytes) — the single
+    /// entry point every catalog reader uses (`read_entries` in the sibling
+    /// `registry.rs`; file-lifecycle recovery's `validate_catalog`,
+    /// `seed_from_catalog_files` and `read_catalog_seqs`).
+    /// `Container::open` verifies magic, framing version and TOC, and the
+    /// `JSON` chunk's crc32 is checked before the payload is deserialized.
+    /// Errors: [`Error::Container`] for framing problems, then
+    /// [`Error::UnsupportedVersion`] or [`Error::Json`] from the payload.
     pub fn from_container_bytes(bytes: &[u8]) -> Result<Self, Error> {
         let container = Container::open(bytes, &CONTAINER_MAGIC, CONTAINER_VERSION)?;
         let json = container.chunk(CHUNK_JSON)?;
         Self::from_json(json)
     }
 
+    /// The JSON payload written into the `JSON` chunk (see `Envelope`).
     fn to_json(&self) -> Result<Vec<u8>, Error> {
         let env = Envelope {
             version: FORMAT_VERSION,
@@ -166,6 +215,10 @@ fn range_overlaps(entry: &CatalogEntry, q: &Range<u32>) -> bool {
     file_registry::range_overlaps(q, entry.min_timestamp_s, entry.max_timestamp_s)
 }
 
+/// The JSON schema inside the `JSON` chunk: `FORMAT_VERSION` plus the scope's
+/// four identifying fields and the entries. The `entries` array is serialized
+/// in the map's `FileId` order, so the same set of entries always produces
+/// identical bytes; `Catalog::from_json` rebuilds the map from it.
 #[derive(Serialize, Deserialize)]
 struct Envelope {
     version: u32,

@@ -21,8 +21,11 @@ static Pvoid_t JudyL_thread_stmt_pool = NULL;
 //     elsewhere, where a stale answer is harmless: REQUIRE_HEALTH_DB_OPEN() uses it as a hint,
 //     and sqlite_close_databases() stores it before taking the lock so that new work is
 //     refused as early as possible.
-//  2. Every find, mutate and free of a JudyL_thread_stmt_pool entry happens under
-//     JudyL_thread_stmt_lock.
+//  2. Every find and mutation of a JudyL_thread_stmt_pool entry happens under
+//     JudyL_thread_stmt_lock. The owner DETACHES its entry under that lock and then finalizes
+//     and frees the detached pool with no lock held, inside a lifetime lease (see SQLITE
+//     LIFETIME below): sqlite3_finalize() takes the connection mutex and must not run under a
+//     lock other threads spin on.
 //  3. THE JUDYL ARRAY IS THE AUTHORITY for pool lifetime, not thread_stmt_pool. Self cleanup
 //     frees only the entry the array maps for gettid_cached() and deletes that key. Nothing
 //     else frees a pool at all: finalize_all_prepared_sql_statements() only REPORTS the pools
@@ -65,8 +68,6 @@ __thread struct stmt_pool_s *thread_stmt_pool = NULL;
 
 long long def_journal_size_limit = 16777216;
 
-SPINLOCK sqlite_spinlock = SPINLOCK_INITIALIZER;
-
 bool sqlite_library_initialized;
 bool sqlite_databases_closed;
 
@@ -78,7 +79,8 @@ bool sqlite_databases_closed;
 // When it is set we deliberately leak: the METADATA, CONTEXT and ML handles stay open,
 // statements stay unfinalized and the library stays initialized until the process exits and the
 // OS reclaims everything. (Thread-local handles are the exception: sql_close_thread_db_safe()
-// still closes those, which is safe because they are private to a single thread.)
+// still closes those while the library is up, which is safe because they are private to a single
+// thread. Once sqlite_library_shutdown() has started, it leaks them instead and latches this flag.)
 // That is strictly safer than crashing inside pcache1 - the same reasoning that already
 // governs sql_close_thread_db_safe() below. sqlite_databases_closed is still set in that
 // case, so no NEW work is admitted; only the destruction is skipped.
@@ -100,11 +102,10 @@ static bool sqlite_zombie_connection_created = false;
 // from something that happened hours earlier at startup.
 //
 // Both are ATOMIC, and the ORDER matters: they are written BEFORE the flag is published, and
-// read AFTER it is observed. sqlite_note_zombie_connection() cannot take sqlite_spinlock (it
-// runs both with that lock held and without it), and the reader in sqlite_library_shutdown()
-// formats this message outside the lock - so a thread-local close noting the first zombie can
-// run concurrently with that formatting. Publishing the flag first would let the reader see
-// "a zombie exists" and then read an unwritten name and timestamp.
+// read AFTER it is observed. sqlite_note_zombie_connection() runs with no lock held, and the
+// reader in sqlite_library_shutdown() formats this message outside any lock - so a thread-local
+// close noting the first zombie can run concurrently with that formatting. Publishing the flag
+// first would let the reader see "a zombie exists" and then read an unwritten name and timestamp.
 //
 // KNOWN LIMITATION, deliberate: this latch is sticky for the life of the process even if the
 // deferred close later completes (the owning thread finalizes its statements and the connection
@@ -133,6 +134,117 @@ void sqlite_mark_teardown_unsafe(const char *reason)
 bool sqlite_teardown_is_unsafe(void)
 {
     return __atomic_load_n(&sqlite_teardown_unsafe, __ATOMIC_ACQUIRE);
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+// SQLITE LIFETIME
+//
+// No global lock is held across a SQLite call. SQLite is serialized (see sqlite_note_zombie_connection), so
+// every prepare, finalize and close waits for its connection's mutex; holding a process-wide lock across such
+// a call let one slow statement on METADATA stall every SQLite user in the agent - including exiting ML
+// threads, which turned into shutdown watchdog aborts, and 3600s spinlock deadlock fatals during normal
+// running. Instead, each operation that uses a shared handle or the library takes a LEASE:
+//
+//  - prepare_statement() / simple_prepare_statement(): a DATABASE lease, refused once the databases are
+//    closed or a teardown has started. A pooled statement is registered before the lease is released.
+//  - finalize_self_prepared_sql_statements(): a CLEANUP lease, refused once a teardown has started. A refused
+//    owner leaves its pool registered, and the teardown walk that runs after the gate reports it and
+//    suppresses the teardown.
+//  - sql_close_thread_db_safe(): a LIBRARY lease, refused once the library is shut down or shutting down. A
+//    refused close of a live handle latches sqlite_teardown_unsafe, so the library is not shut down under it.
+//
+// sqlite_close_databases() and sqlite_library_shutdown() set their gate, then drain the leases with a deadline.
+// On timeout they latch sqlite_teardown_unsafe and leak (the existing policy) instead of destroying anything
+// under an operation that is still inside SQLite. sqlite_lifetime_mutex guards only the flags and the counter
+// and is never held across a SQLite call, except sqlite3_initialize() and sqlite3_shutdown(), which take no
+// connection mutex. Lock order: sqlite_lifetime_mutex before JudyL_thread_stmt_lock.
+//
+// Scope: a slow statement still delays the other users of ITS connection, which share that connection's
+// mutex; it no longer delays anyone else.
+
+#define SQLITE_LEASE_DRAIN_TIMEOUT_UT (5 * USEC_PER_SEC)
+
+static netdata_mutex_t sqlite_lifetime_mutex;
+static netdata_cond_t sqlite_lifetime_cond;
+static size_t sqlite_leases = 0;
+static bool sqlite_teardown_gate = false;       // sqlite_close_databases() has started draining
+static bool sqlite_library_gate = false;        // sqlite_library_shutdown() has started draining
+
+static void __attribute__((constructor)) sqlite_lifetime_init(void) {
+    netdata_mutex_init(&sqlite_lifetime_mutex);
+    netdata_cond_init(&sqlite_lifetime_cond);
+}
+
+// Set only by sqlite_lease_unittest(): tells it that a thread now holds a database lease, i.e. that it is entering
+// sqlite3_prepare_v2(). NULL in production.
+static void (*sqlite_lease_acquired_test_hook)(void) = NULL;
+
+static bool sqlite_lease_acquire_database(void)
+{
+    netdata_mutex_lock(&sqlite_lifetime_mutex);
+    bool ok = !__atomic_load_n(&sqlite_databases_closed, __ATOMIC_ACQUIRE) &&
+              !sqlite_teardown_gate && !sqlite_library_gate;
+    if (ok)
+        sqlite_leases++;
+    netdata_mutex_unlock(&sqlite_lifetime_mutex);
+
+    void (*hook)(void) = __atomic_load_n(&sqlite_lease_acquired_test_hook, __ATOMIC_ACQUIRE);
+    if (unlikely(ok && hook))
+        hook();
+
+    return ok;
+}
+
+static bool sqlite_lease_acquire_cleanup(void)
+{
+    netdata_mutex_lock(&sqlite_lifetime_mutex);
+    bool ok = !sqlite_teardown_gate && !sqlite_library_gate;
+    if (ok)
+        sqlite_leases++;
+    netdata_mutex_unlock(&sqlite_lifetime_mutex);
+    return ok;
+}
+
+// Returns false when the caller must leak its handle instead of closing it.
+static bool sqlite_lease_acquire_library(void)
+{
+    netdata_mutex_lock(&sqlite_lifetime_mutex);
+    bool ok = sqlite_library_initialized && !sqlite_library_gate;
+    bool refused_live = sqlite_library_initialized && sqlite_library_gate;
+    if (ok)
+        sqlite_leases++;
+    else if (refused_live)
+        // Latch under the mutex: sqlite_library_shutdown() re-checks the latch under it after its drain,
+        // so it cannot miss a handle we are about to leave open.
+        __atomic_store_n(&sqlite_teardown_unsafe, true, __ATOMIC_RELEASE);
+    netdata_mutex_unlock(&sqlite_lifetime_mutex);
+
+    if (refused_live)
+        nd_log_daemon(NDLP_WARNING,
+                      "SQL: a thread-local database was left open because the SQLite library is shutting down; "
+                      "suppressing sqlite3_shutdown()");
+    return ok;
+}
+
+static void sqlite_lease_release(void)
+{
+    netdata_mutex_lock(&sqlite_lifetime_mutex);
+    if (--sqlite_leases == 0)
+        netdata_cond_broadcast(&sqlite_lifetime_cond);
+    netdata_mutex_unlock(&sqlite_lifetime_mutex);
+}
+
+// Must be called with sqlite_lifetime_mutex held, after a gate is set. Returns true when no lease is active.
+static bool sqlite_leases_drain_locked(usec_t timeout_ut)
+{
+    usec_t deadline = now_monotonic_usec() + timeout_ut;
+    while (sqlite_leases) {
+        usec_t now = now_monotonic_usec();
+        if (now >= deadline)
+            break;
+        (void) netdata_cond_timedwait(&sqlite_lifetime_cond, &sqlite_lifetime_mutex, (deadline - now) * NSEC_PER_USEC);
+    }
+    return sqlite_leases == 0;
 }
 
 SQLITE_API int sqlite3_exec_monitored(
@@ -302,10 +414,13 @@ static void finalize_and_free_stmt_list(struct stmt_pool_s *stmt_list)
 
 // This must be called when the thread terminates.
 //
-// There is deliberately NO sqlite_databases_closed check here, neither before the lock nor under
-// it - see rule 1 at the top of this file. The unlocked one used to be at the head of this
-// function and was the double free: this thread read "not closed", waited for the lock, and then
-// freed a pool that the teardown thread had already freed and removed.
+// There is deliberately NO sqlite_databases_closed check here - see rule 1 at the top of this file.
+// The only gate is the cleanup lease, which is refused once a teardown has started; that decides
+// whether we may FINALIZE, never who owns the pool (the JudyL lookup below decides that).
+//
+// An unlocked closed check used to be at the head of this function and was the double free: this
+// thread read "not closed", waited for the lock, and then freed a pool that the teardown thread had
+// already freed and removed.
 //
 // That teardown-side free no longer exists - finalize_all_prepared_sql_statements() now only
 // reports and latches - so today nothing else frees a pool and the double free is structurally
@@ -313,22 +428,29 @@ static void finalize_and_free_stmt_list(struct stmt_pool_s *stmt_list)
 // who might free one in future: the JudyL mapping, never the TLS pointer, decides what exists.
 void finalize_self_prepared_sql_statements()
 {
-    spinlock_lock(&sqlite_spinlock);
-    spinlock_lock(&JudyL_thread_stmt_lock);
+    // Once a teardown has started we must not finalize: the handles may be closing. Leave the pool
+    // registered - the teardown walk runs after the gate, sees it and suppresses the teardown.
+    if (!sqlite_lease_acquire_cleanup())
+        return;
 
     // Ask the authority, not our TLS cache. The JudyL mapping is what decides a pool exists;
     // the TLS pointer is only a same-thread cache and may be stale. (It is not that someone else
     // freed the pool - nothing else frees one any more - it is that the cache is not the record.)
+    struct stmt_pool_s *pool = NULL;
+    spinlock_lock(&JudyL_thread_stmt_lock);
     Word_t thread_id = (Word_t)gettid_cached();
     Pvoid_t *Pvalue = JudyLGet(JudyL_thread_stmt_pool, thread_id, PJE0);
     if (Pvalue && *Pvalue) {
-        finalize_and_free_stmt_list((struct stmt_pool_s *)*Pvalue);
+        pool = (struct stmt_pool_s *)*Pvalue;
         (void)JudyLDel(&JudyL_thread_stmt_pool, thread_id, PJE0);
     }
+    spinlock_unlock(&JudyL_thread_stmt_lock);
     thread_stmt_pool = NULL;
 
-    spinlock_unlock(&JudyL_thread_stmt_lock);
-    spinlock_unlock(&sqlite_spinlock);
+    // Detached, so only this thread can reach it; the lease keeps the handles open until we are done.
+    finalize_and_free_stmt_list(pool);
+
+    sqlite_lease_release();
 }
 
 // Report any statement pool whose owner did not clean up, and suppress the teardown if there
@@ -398,32 +520,26 @@ static void init_thread_stmt_pool(void) {
 
 int simple_prepare_statement(sqlite3 *database, const char *query, sqlite3_stmt **statement)
 {
-    spinlock_lock(&sqlite_spinlock);
-    if (__atomic_load_n(&sqlite_databases_closed, __ATOMIC_ACQUIRE)) {
-        spinlock_unlock(&sqlite_spinlock);
+    if (!sqlite_lease_acquire_database())
         return SQLITE_MISUSE;
-    }
 
     int rc = sqlite3_prepare_v2(database, query, -1, statement, 0);
-    spinlock_unlock(&sqlite_spinlock);
+    sqlite_lease_release();
     return rc;
 }
 
 int prepare_statement(sqlite3 *database, const char *query, sqlite3_stmt **statement)
 {
-    spinlock_lock(&sqlite_spinlock);
-    if (__atomic_load_n(&sqlite_databases_closed, __ATOMIC_ACQUIRE)) {
-        spinlock_unlock(&sqlite_spinlock);
+    if (!sqlite_lease_acquire_database())
         return SQLITE_MISUSE;
-    }
 
     int rc = sqlite3_prepare_v2(database, query, -1, statement, 0);
     if (rc == SQLITE_OK) {
         if (!thread_stmt_pool)
             init_thread_stmt_pool();
 
-        // Register the statement so shutdown can account for it. count is only ever
-        // touched under sqlite_spinlock, so no atomic is needed.
+        // Register the statement, before the lease is released, so shutdown can account for it.
+        // count is only touched by this thread, the pool's owner, so no atomic is needed.
         //
         // Do NOT increment past the limit: the old code incremented unconditionally and
         // dropped the statement silently once the array was full, so those statements were
@@ -433,9 +549,7 @@ int prepare_statement(sqlite3 *database, const char *query, sqlite3_stmt **state
         if (thread_stmt_pool->count < MAX_PREPARED_THREAD_STATEMENTS)
             thread_stmt_pool->stmt[thread_stmt_pool->count++] = *statement;
         else if (!thread_stmt_pool->overflow_reported) {
-            // Report ONCE per thread, not per call: this runs under sqlite_spinlock, which also
-            // serializes simple_prepare_statement() for every web, API and metadata thread, so an
-            // unconditional log here would turn a full pool into a global throughput problem.
+            // Report ONCE per thread, not per call: a full pool would otherwise log on every prepare.
             thread_stmt_pool->overflow_reported = true;
             error_report(
                 "SQL: thread %s exhausted its %d cached statement slots; further statements on this "
@@ -444,7 +558,7 @@ int prepare_statement(sqlite3 *database, const char *query, sqlite3_stmt **state
                 MAX_PREPARED_THREAD_STATEMENTS);
         }
     }
-    spinlock_unlock(&sqlite_spinlock);
+    sqlite_lease_release();
     return rc;
 }
 
@@ -617,7 +731,8 @@ uint64_t sqlite_get_db_space(sqlite3 *db)
 //    plain sqlite3_open(), and nothing in this tree overrides SQLITE_THREADSAFE or calls
 //    sqlite3_config(), so they are fully serialized - the deferred close cannot race a step.
 //  - Nobody can START new work afterwards: prepare_statement() and simple_prepare_statement()
-//    both re-check sqlite_databases_closed under sqlite_spinlock and return SQLITE_MISUSE.
+//    take a database lease, which is refused once the databases are closed or the teardown gate
+//    is set, and return SQLITE_MISUSE. sqlite_close_databases() drains the admitted ones first.
 //  - The caller NULLs db_meta / db_context_meta after this returns, so a late user gets
 //    SQLITE_MISUSE from a NULL handle rather than a dangling one.
 //  - What genuinely is unsafe afterwards is sqlite3_shutdown(), which would dismantle pcache1
@@ -626,9 +741,8 @@ uint64_t sqlite_get_db_space(sqlite3 *db)
 // Known gap, pre-existing and not introduced here: db_execute() / sqlite3_exec_monitored() do
 // not check the closed flag, so they are not covered by the third bullet.
 //
-// MUST NOT take sqlite_spinlock: it is non-recursive and this runs both WITH the lock held
-// (from sqlite_close_databases() via sql_close_database(), and from sql_close_thread_db_safe(),
-// which takes it itself) and WITHOUT it (from ml_fini(), which holds nothing).
+// Runs with no lifetime lock held: from sqlite_close_databases() via sql_close_database() after
+// the lease drain, from sql_close_thread_db_safe() inside a library lease, and from ml_fini().
 //
 // Thread-safety of sqlite3_next_stmt() here rests on the same assumption the sqlite3_close_v2()
 // one line later already makes: the caller is the sole owner of this handle at this point. That
@@ -707,12 +821,11 @@ void sql_close_thread_db_safe(sqlite3 **database)
     if (unlikely(!database || !*database))
         return;
 
-    spinlock_lock(&sqlite_spinlock);
-    if (sqlite_library_initialized) {
+    if (sqlite_lease_acquire_library()) {
         sqlite_note_zombie_connection(*database, "thread-local");
         (void) sqlite3_close_v2(*database);
+        sqlite_lease_release();
     }
-    spinlock_unlock(&sqlite_spinlock);
 
     *database = NULL;
 }
@@ -726,7 +839,20 @@ void sqlite_close_databases(void)
     // Refuse new work from this point, whether or not we go on to destroy anything.
     __atomic_store_n(&sqlite_databases_closed, true, __ATOMIC_RELEASE);
 
-    spinlock_lock(&sqlite_spinlock);
+    // Stop admitting leases and wait for the admitted ones (prepares, statement cleanups) to leave SQLite.
+    // When the teardown is already suppressed nothing below is destroyed, so waiting would only spend the
+    // shutdown watchdog's budget.
+    netdata_mutex_lock(&sqlite_lifetime_mutex);
+    sqlite_teardown_gate = true;
+    bool drained = sqlite_teardown_is_unsafe() || sqlite_leases_drain_locked(SQLITE_LEASE_DRAIN_TIMEOUT_UT);
+    size_t pending = sqlite_leases;
+    netdata_mutex_unlock(&sqlite_lifetime_mutex);
+
+    if (!drained) {
+        nd_log_daemon(NDLP_WARNING, "SQL: %zu SQLite operation(s) still running after %llu s", pending,
+                      (unsigned long long)(SQLITE_LEASE_DRAIN_TIMEOUT_UT / USEC_PER_SEC));
+        sqlite_mark_teardown_unsafe("a SQLite prepare or statement cleanup did not finish");
+    }
 
     // Always run the diagnostic walk, even when teardown is already suppressed. It is the only
     // thing that NAMES the thread that failed to clean up, and it is precisely when the
@@ -735,8 +861,6 @@ void sqlite_close_databases(void)
     finalize_all_prepared_sql_statements();
 
     if (sqlite_teardown_is_unsafe()) {
-        spinlock_unlock(&sqlite_spinlock);
-
         // Someone may still be inside SQLite with these handles. Finalizing their statements or
         // closing the connections underneath them is a use-after-free; leaking is not.
         //
@@ -754,7 +878,6 @@ void sqlite_close_databases(void)
     db_context_meta = NULL;
     sql_close_database(db_meta, "METADATA");
     db_meta = NULL;
-    spinlock_unlock(&sqlite_spinlock);
 }
 
 uint64_t get_total_database_space(void)
@@ -778,9 +901,11 @@ uint64_t get_total_database_space(void)
 
 int sqlite_library_init(void)
 {
-    spinlock_lock(&sqlite_spinlock);
-
+    netdata_mutex_lock(&sqlite_lifetime_mutex);
     int rc = sqlite3_initialize();
+    netdata_mutex_unlock(&sqlite_lifetime_mutex);
+
+    // Outside the lifetime mutex: it guards only flags and the lease counter.
     if (rc == SQLITE_OK) {
 
         (void )sqlite3_hard_heap_limit64(SQLITE_HEAP_HARD_LIMIT);
@@ -798,6 +923,8 @@ int sqlite_library_init(void)
         nd_log_daemon(
             NDLP_INFO, "SQLITE: heap memory hard limit %s, soft limit %s", sqlite_hard_limit_mb, sqlite_soft_limit_mb);
     }
+
+    netdata_mutex_lock(&sqlite_lifetime_mutex);
     __atomic_store_n(&sqlite_databases_closed, false, __ATOMIC_RELEASE);
     // Re-arm the LIVENESS latch only. It is about threads that were still running during a
     // previous shutdown, and those are gone by the time we re-initialize, so carrying it forward
@@ -810,8 +937,10 @@ int sqlite_library_init(void)
     // process, not of a library lifetime. The connection survives re-initialization, and calling
     // sqlite3_shutdown() with it outstanding is exactly the pcache1 teardown crash this flag
     // exists to prevent.
+    sqlite_teardown_gate = false;
+    sqlite_library_gate = false;
     sqlite_library_initialized = true;
-    spinlock_unlock(&sqlite_spinlock);
+    netdata_mutex_unlock(&sqlite_lifetime_mutex);
 
     return (SQLITE_OK != rc);
 }
@@ -849,8 +978,8 @@ void sqlite_library_shutdown(void)
         zombie_note[0] = '\0';
 
     if (sqlite_teardown_is_unsafe() || __atomic_load_n(&sqlite_zombie_connection_created, __ATOMIC_ACQUIRE)) {
-        // Fast path only - the authoritative re-check happens under sqlite_spinlock below,
-        // because a thread can close a handle (creating a zombie) after this point.
+        // Fast path only - the authoritative re-check happens under sqlite_lifetime_mutex below,
+        // after the lease drain, because a thread can close a handle (creating a zombie) after this point.
         nd_log_daemon(
             NDLP_WARNING,
             "SQL: skipping sqlite3_shutdown() (%s%s%s). The library stays initialized until the "
@@ -869,32 +998,465 @@ void sqlite_library_shutdown(void)
         netdata_log_info("SQLITE: Released %d bytes of memory", bytes);
     } while (bytes);
 #endif
-    spinlock_lock(&sqlite_spinlock);
+    netdata_mutex_lock(&sqlite_lifetime_mutex);
     if (!sqlite_library_initialized) {
-        spinlock_unlock(&sqlite_spinlock);
+        netdata_mutex_unlock(&sqlite_lifetime_mutex);
         return;
     }
 
-    // Re-check under the lock, and immediately before sqlite3_shutdown(). The check above is
-    // unlocked, so between it and here another thread could have closed a handle with statements
-    // attached, and tearing the library down over a fresh zombie is the crash we are avoiding.
+    // Stop admitting leases of any kind and wait for the admitted ones to leave SQLite. From here no leased
+    // prepare, statement cleanup or thread-local close can be inside the library when we shut it down; direct
+    // sqlite3_prepare_v2() callers, including health, migrations, and ML model load, take no lease and rely on
+    // shutdown ordering, as before.
+    sqlite_library_gate = true;
+    bool drained = sqlite_leases_drain_locked(SQLITE_LEASE_DRAIN_TIMEOUT_UT);
+
+    // A registered pool belongs to an owner that did not clean up and, with the gate set, never will:
+    // its statements are still attached to their connections. (sqlite_close_databases() latches this
+    // too, but the -W unittest drivers shut the library down without it.)
+    bool pools_registered;
+    spinlock_lock(&JudyL_thread_stmt_lock);
+    pools_registered = JudyL_thread_stmt_pool != NULL;
+    spinlock_unlock(&JudyL_thread_stmt_lock);
+
+    if (!drained || pools_registered)
+        __atomic_store_n(&sqlite_teardown_unsafe, true, __ATOMIC_RELEASE);
+
+    // Re-check under the lock, after the drain, and immediately before sqlite3_shutdown(). A thread-local
+    // close refused by the gate latches under this same mutex, so it cannot slip past this check.
     //
-    // SCOPE, so this is not read as a stronger guarantee than it is: holding the lock makes this
-    // authoritative against sql_close_thread_db_safe(), which takes this same lock around its
-    // note-and-close. It is NOT authoritative against ml_fini(), whose close runs with no lock
-    // held at all (see sqlite_note_zombie_connection). That is sufficient only because ml_fini()
-    // and this function are strictly ordered on the one shutdown thread - not because the lock
-    // excludes it.
+    // SCOPE, so this is not read as a stronger guarantee than it is: this is authoritative against every
+    // lease holder. It is NOT authoritative against ml_fini(), whose close takes no lease (see
+    // sqlite_note_zombie_connection). That is sufficient only because ml_fini() and this function are
+    // strictly ordered on the one shutdown thread.
     if (sqlite_teardown_is_unsafe() || __atomic_load_n(&sqlite_zombie_connection_created, __ATOMIC_ACQUIRE)) {
-        spinlock_unlock(&sqlite_spinlock);
+        // The library stays initialized, so re-admit thread-local closes instead of leaking every handle.
+        sqlite_library_gate = false;
+        netdata_mutex_unlock(&sqlite_lifetime_mutex);
         nd_log_daemon(
             NDLP_WARNING,
-            "SQL: skipping sqlite3_shutdown() - a SQLite user or a zombie connection appeared while "
-            "we were tearing down. The library stays initialized until the process exits.");
+            "SQL: skipping sqlite3_shutdown() - %s. The library stays initialized until the process exits.",
+            !drained ? "a SQLite operation was still running after the drain deadline" :
+            pools_registered ? "a thread left cached SQL statements registered" :
+                               "a SQLite user or a zombie connection appeared while we were tearing down");
         return;
     }
 
     sqlite_library_initialized = false;
     (void) sqlite3_shutdown();
-    spinlock_unlock(&sqlite_spinlock);
+    netdata_mutex_unlock(&sqlite_lifetime_mutex);
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+// Regression test for the global stall: a statement that holds one connection's mutex for a long time must delay
+// only that connection's users. Before the lifetime leases, a prepare waiting on that connection held a
+// process-wide spinlock, so prepares on every other database and the thread-exit statement cleanup (the ML
+// threads' path at shutdown) waited too - until the 3600s deadlock detector, or the shutdown watchdog, fired.
+
+// Only a hang guard for a broken implementation: the pass conditions compare against the holder's recorded
+// release, so this just has to outlast the handshake and the measurements on the slowest (sanitizer) runner.
+#define SQLITE_LEASE_TEST_MAX_HOLD_UT (60 * USEC_PER_SEC)
+
+struct sqlite_lease_test_op {
+    usec_t started_ut;
+    usec_t finished_ut;
+    int rc;
+    bool ok;
+};
+
+struct sqlite_lease_test {
+    pid_t blocked_tid;                     // the waiting worker, published before it prepares
+    bool blocked_leased;                   // set by the lease hook on the waiting worker's own acquisition
+    sqlite3 *busy_db;
+    sqlite3 *other_db;
+    bool holding;
+    bool release;                          // set by the test when it is done measuring
+    usec_t released_ut;                    // when the holder actually let go of the busy connection
+    struct sqlite_lease_test_op blocked;   // the prepare that waits for the busy connection
+    struct sqlite_lease_test_op cleanup;   // pooled prepare + thread-exit cleanup on the other database
+};
+
+static void sqlite_lease_test_holder(void *arg)
+{
+    struct sqlite_lease_test *t = arg;
+    // Stand-in for a slow statement: SQLite holds this mutex for the whole of a sqlite3_step(). It is held until
+    // the test has measured everything, so "finished before the release" is the pass condition, not a time limit.
+    // The cap only keeps a broken implementation from hanging the test.
+    sqlite3_mutex_enter(sqlite3_db_mutex(t->busy_db));
+    __atomic_store_n(&t->holding, true, __ATOMIC_RELEASE);
+    usec_t started = now_monotonic_usec();
+    while (!__atomic_load_n(&t->release, __ATOMIC_ACQUIRE) &&
+           now_monotonic_usec() - started < SQLITE_LEASE_TEST_MAX_HOLD_UT)
+        sleep_usec(1 * USEC_PER_MS);
+    __atomic_store_n(&t->released_ut, now_monotonic_usec(), __ATOMIC_RELEASE);
+    sqlite3_mutex_leave(sqlite3_db_mutex(t->busy_db));
+}
+
+static struct sqlite_lease_test *sqlite_lease_test_running = NULL;
+
+// Runs on whichever thread just took a database lease; only the waiting worker's own acquisition counts.
+static void sqlite_lease_test_hook(void)
+{
+    struct sqlite_lease_test *t = __atomic_load_n(&sqlite_lease_test_running, __ATOMIC_ACQUIRE);
+    if (t && gettid_cached() == __atomic_load_n(&t->blocked_tid, __ATOMIC_ACQUIRE))
+        __atomic_store_n(&t->blocked_leased, true, __ATOMIC_RELEASE);
+}
+
+static void sqlite_lease_test_blocked_prepare(void *arg)
+{
+    struct sqlite_lease_test *t = arg;
+    sqlite3_stmt *res = NULL;
+    // Waits for the busy connection, as the ACLK worker did behind the slow health query.
+    __atomic_store_n(&t->blocked_tid, gettid_cached(), __ATOMIC_RELEASE);
+    __atomic_store_n(&t->blocked.started_ut, now_monotonic_usec(), __ATOMIC_RELEASE);
+    t->blocked.rc = simple_prepare_statement(t->busy_db, "SELECT 1", &res);
+    __atomic_store_n(&t->blocked.finished_ut, now_monotonic_usec(), __ATOMIC_RELEASE);
+    t->blocked.ok = t->blocked.rc == SQLITE_OK;
+    if (res)
+        sqlite3_finalize(res);
+}
+
+static void sqlite_lease_test_pooled_cleanup(void *arg)
+{
+    struct sqlite_lease_test *t = arg;
+    sqlite3_stmt *res = NULL;
+    // A pooled prepare and the thread-exit cleanup, as an ML thread does when it stops.
+    t->cleanup.started_ut = now_monotonic_usec();
+    t->cleanup.rc = prepare_statement(t->other_db, "SELECT 2", &res);
+    bool registered = t->cleanup.rc == SQLITE_OK && thread_stmt_pool && thread_stmt_pool->count == 1;
+    finalize_self_prepared_sql_statements();
+    t->cleanup.finished_ut = now_monotonic_usec();
+
+    // The JudyL mapping, not the TLS cache, is the authority on whether the pool still exists.
+    spinlock_lock(&JudyL_thread_stmt_lock);
+    Pvoid_t *Pvalue = JudyLGet(JudyL_thread_stmt_pool, (Word_t)gettid_cached(), PJE0);
+    bool removed = !Pvalue || !*Pvalue;
+    spinlock_unlock(&JudyL_thread_stmt_lock);
+
+    t->cleanup.ok = registered && removed;
+}
+
+static size_t sqlite_lease_test_leases(void)
+{
+    netdata_mutex_lock(&sqlite_lifetime_mutex);
+    size_t leases = sqlite_leases;
+    netdata_mutex_unlock(&sqlite_lifetime_mutex);
+    return leases;
+}
+
+// Judged after the holder and the blocked worker are joined, so every timestamp is final: the operation must have
+// started while the blocked prepare was waiting and finished before the busy connection was released.
+static bool sqlite_lease_test_while_busy(struct sqlite_lease_test *t, usec_t started_ut, usec_t finished_ut)
+{
+    return t->blocked.started_ut && t->blocked.started_ut < started_ut && finished_ut < t->released_ut;
+}
+
+int sqlite_lease_unittest(void)
+{
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    int errors = 0;
+    size_t baseline_leases = sqlite_lease_test_leases();
+    struct sqlite_lease_test t = { 0 };
+    if (sqlite3_open(":memory:", &t.busy_db) != SQLITE_OK || sqlite3_open(":memory:", &t.other_db) != SQLITE_OK) {
+        fprintf(stderr, "SQLITE LEASE TEST: cannot open the test databases\n");
+        sqlite3_close_v2(t.busy_db);
+        sqlite3_close_v2(t.other_db);
+        return 1;
+    }
+
+    ND_THREAD *holder = nd_thread_create("SQLTEST_HOLD", NETDATA_THREAD_OPTION_DONT_LOG, sqlite_lease_test_holder, &t);
+    if (!holder) {
+        fprintf(stderr, "SQLITE LEASE TEST: cannot create the holder thread\n");
+        sqlite3_close_v2(t.busy_db);
+        sqlite3_close_v2(t.other_db);
+        return 1;
+    }
+    for (int i = 0; i < 5000 && !__atomic_load_n(&t.holding, __ATOMIC_ACQUIRE); i++)
+        sleep_usec(1 * USEC_PER_MS);
+    if (!__atomic_load_n(&t.holding, __ATOMIC_ACQUIRE)) {
+        fprintf(stderr, "SQLITE LEASE TEST: the holder thread did not take the busy connection within 5 s\n");
+        __atomic_store_n(&t.release, true, __ATOMIC_RELEASE);
+        nd_thread_join(holder);
+        sqlite3_close_v2(t.busy_db);
+        sqlite3_close_v2(t.other_db);
+        return 1;
+    }
+
+    __atomic_store_n(&sqlite_lease_test_running, &t, __ATOMIC_RELEASE);
+    __atomic_store_n(&sqlite_lease_acquired_test_hook, sqlite_lease_test_hook, __ATOMIC_RELEASE);
+    ND_THREAD *blocked =
+        nd_thread_create("SQLTEST_WAIT", NETDATA_THREAD_OPTION_DONT_LOG, sqlite_lease_test_blocked_prepare, &t);
+    if (!blocked) {
+        fprintf(stderr, "SQLITE LEASE TEST: cannot create the waiting thread\n");
+        __atomic_store_n(&sqlite_lease_acquired_test_hook, NULL, __ATOMIC_RELEASE);
+        __atomic_store_n(&sqlite_lease_test_running, NULL, __ATOMIC_RELEASE);
+        __atomic_store_n(&t.release, true, __ATOMIC_RELEASE);
+        nd_thread_join(holder);
+        sqlite3_close_v2(t.busy_db);
+        sqlite3_close_v2(t.other_db);
+        return 1;
+    }
+
+    // Handshake: wait until the waiting worker itself holds its database lease. The lease is taken immediately
+    // before sqlite3_prepare_v2(), so from here it is entering, or already waiting inside, the prepare. The margin
+    // makes it all but certain that it is waiting by the time we measure; it is not proof - SQLite exposes no
+    // "a thread is waiting on this mutex" signal. Check 3 proves that the prepare did wait for the release.
+    for (int i = 0; i < 5000 && !__atomic_load_n(&t.blocked_leased, __ATOMIC_ACQUIRE); i++)
+        sleep_usec(1 * USEC_PER_MS);
+    bool handshake = __atomic_load_n(&t.blocked_leased, __ATOMIC_ACQUIRE);
+    sleep_usec(200 * USEC_PER_MS);
+
+    // 1. A prepare on an unrelated database must not wait for the busy one.
+    sqlite3_stmt *res = NULL;
+    usec_t started = now_monotonic_usec();
+    int rc = simple_prepare_statement(t.other_db, "SELECT 1", &res);
+    usec_t finished = now_monotonic_usec();
+    if (res)
+        sqlite3_finalize(res);
+
+    // 2. A pooled prepare followed by the thread-exit statement cleanup must not wait for it either.
+    ND_THREAD *cleanup =
+        nd_thread_create("SQLTEST_CLEAN", NETDATA_THREAD_OPTION_DONT_LOG, sqlite_lease_test_pooled_cleanup, &t);
+    if (cleanup)
+        nd_thread_join(cleanup);
+
+    // Only now let the busy connection go.
+    __atomic_store_n(&t.release, true, __ATOMIC_RELEASE);
+    nd_thread_join(blocked);
+    nd_thread_join(holder);
+    __atomic_store_n(&sqlite_lease_acquired_test_hook, NULL, __ATOMIC_RELEASE);
+    __atomic_store_n(&sqlite_lease_test_running, NULL, __ATOMIC_RELEASE);
+
+    fprintf(stderr, "SQLITE LEASE TEST: the waiting worker held its database lease before the measurements: %s\n",
+            handshake ? "OK" : "FAILED");
+    errors += !handshake;
+
+    bool while_busy = sqlite_lease_test_while_busy(&t, started, finished);
+    bool ok = rc == SQLITE_OK && while_busy;
+    fprintf(stderr, "SQLITE LEASE TEST: prepare on another database while one is busy: rc %d, %llu ms%s: %s\n",
+            rc, (unsigned long long)((finished - started) / USEC_PER_MS),
+            while_busy ? "" : " (did not complete while the other database was busy)", ok ? "OK" : "FAILED");
+    errors += !ok;
+
+    while_busy = cleanup && sqlite_lease_test_while_busy(&t, t.cleanup.started_ut, t.cleanup.finished_ut);
+    ok = cleanup && t.cleanup.ok && while_busy;
+    fprintf(stderr, "SQLITE LEASE TEST: thread-exit statement cleanup while a database is busy: rc %d, %llu ms%s: %s\n",
+            t.cleanup.rc,
+            cleanup ? (unsigned long long)((t.cleanup.finished_ut - t.cleanup.started_ut) / USEC_PER_MS) : 0ULL,
+            !cleanup ? " (thread not created)" :
+            while_busy ? "" : " (did not complete while the other database was busy)",
+            ok ? "OK" : "FAILED");
+    errors += !ok;
+
+    // 3. The prepare that waited for the busy connection completes once it is released, and it really waited.
+    ok = t.blocked.ok && t.blocked.finished_ut >= t.released_ut;
+    fprintf(stderr, "SQLITE LEASE TEST: prepare on the busy database returned rc %d %s the release: %s\n",
+            t.blocked.rc, t.blocked.finished_ut >= t.released_ut ? "after" : "BEFORE", ok ? "OK" : "FAILED");
+    errors += !ok;
+
+    // 4. No lease is left behind.
+    size_t leases = sqlite_lease_test_leases();
+    ok = leases == baseline_leases;
+    fprintf(stderr, "SQLITE LEASE TEST: active leases after the test: %zu (before: %zu): %s\n",
+            leases, baseline_leases, ok ? "OK" : "FAILED");
+    errors += !ok;
+
+    sqlite3_close_v2(t.busy_db);
+    sqlite3_close_v2(t.other_db);
+    fprintf(stderr, "SQLITE LEASE TEST: %s\n", errors ? "FAILED" : "OK");
+    return errors ? 1 : 0;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+// Teardown gates: sqlite_close_databases() and sqlite_library_shutdown() must refuse new leases, wait for the
+// admitted ones, and suppress the teardown when a live handle was refused. This runs the real teardown, so it
+// MUST be the last SQLite work of its process: the end of -W unittest, or -W sqlite-lease-test.
+
+struct sqlite_teardown_test {
+    bool holding;
+    bool done;             // set by the test once the teardown call returned: stop waiting for the gate
+    bool refused;          // the leases tried once the gate was up were all refused
+    usec_t released_ut;    // when the holder let go of its lease
+};
+
+static bool sqlite_teardown_test_gate_is_set(bool *gate)
+{
+    netdata_mutex_lock(&sqlite_lifetime_mutex);
+    bool set = *gate;
+    netdata_mutex_unlock(&sqlite_lifetime_mutex);
+    return set;
+}
+
+// Waits until *gate is set by the teardown running on the main thread. Returns false when the teardown returned
+// without setting it, or on the hang guard.
+static bool sqlite_teardown_test_wait_gate(struct sqlite_teardown_test *t, bool *gate)
+{
+    usec_t started = now_monotonic_usec();
+    while (!sqlite_teardown_test_gate_is_set(gate)) {
+        if (__atomic_load_n(&t->done, __ATOMIC_ACQUIRE) ||
+            now_monotonic_usec() - started >= SQLITE_LEASE_TEST_MAX_HOLD_UT)
+            return false;
+        sleep_usec(1 * USEC_PER_MS);
+    }
+    return true;
+}
+
+// Lets go of the held lease a little after the gate went up, so the drain demonstrably waited for it.
+static void sqlite_teardown_test_release(struct sqlite_teardown_test *t)
+{
+    sleep_usec(100 * USEC_PER_MS);
+    __atomic_store_n(&t->released_ut, now_monotonic_usec(), __ATOMIC_RELEASE);
+    sqlite_lease_release();
+}
+
+// Holds a database lease across the start of sqlite_close_databases().
+static void sqlite_teardown_test_database_holder(void *arg)
+{
+    struct sqlite_teardown_test *t = arg;
+    if (!sqlite_lease_acquire_database())
+        return;
+    __atomic_store_n(&t->holding, true, __ATOMIC_RELEASE);
+
+    bool gate = sqlite_teardown_test_wait_gate(t, &sqlite_teardown_gate);
+    bool database = sqlite_lease_acquire_database();
+    if (database)
+        sqlite_lease_release();
+    bool cleanup = sqlite_lease_acquire_cleanup();
+    if (cleanup)
+        sqlite_lease_release();
+    __atomic_store_n(&t->refused, gate && !database && !cleanup, __ATOMIC_RELEASE);
+
+    sqlite_teardown_test_release(t);
+}
+
+// Holds a library lease across the start of sqlite_library_shutdown(), then tries to close a thread-local
+// handle while it drains: that close is refused and must suppress the shutdown.
+static void sqlite_teardown_test_library_holder(void *arg)
+{
+    struct sqlite_teardown_test *t = arg;
+    if (!sqlite_lease_acquire_library())
+        return;
+    __atomic_store_n(&t->holding, true, __ATOMIC_RELEASE);
+
+    bool gate = sqlite_teardown_test_wait_gate(t, &sqlite_library_gate);
+    bool library = sqlite_lease_acquire_library();
+    if (library)
+        sqlite_lease_release();
+    __atomic_store_n(&t->refused, gate && !library, __ATOMIC_RELEASE);
+
+    sqlite_teardown_test_release(t);
+}
+
+// Starts a holder thread and waits until it holds its lease. Returns NULL when it could not take one.
+static ND_THREAD *sqlite_teardown_test_start(const char *tag, void (*holder)(void *), struct sqlite_teardown_test *t)
+{
+    ND_THREAD *thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DONT_LOG, holder, t);
+    if (!thread)
+        return NULL;
+
+    usec_t started = now_monotonic_usec();
+    while (!__atomic_load_n(&t->holding, __ATOMIC_ACQUIRE) &&
+           now_monotonic_usec() - started < 5 * USEC_PER_SEC)
+        sleep_usec(1 * USEC_PER_MS);
+
+    if (!__atomic_load_n(&t->holding, __ATOMIC_ACQUIRE)) {
+        nd_thread_join(thread);
+        return NULL;
+    }
+    return thread;
+}
+
+int sqlite_lease_teardown_unittest(void)
+{
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+    int errors = 0;
+
+    // 1. sqlite_close_databases() refuses new leases and waits for the admitted one, then tears down.
+    {
+        struct sqlite_teardown_test t = { 0 };
+        ND_THREAD *holder = sqlite_teardown_test_start("SQLTEST_GATE", sqlite_teardown_test_database_holder, &t);
+        sqlite_close_databases();
+        usec_t returned_ut = now_monotonic_usec();
+        __atomic_store_n(&t.done, true, __ATOMIC_RELEASE);
+        if (holder)
+            nd_thread_join(holder);
+
+        bool waited = holder && returned_ut >= __atomic_load_n(&t.released_ut, __ATOMIC_ACQUIRE);
+        bool ok = holder && t.refused && waited && !sqlite_teardown_is_unsafe() && sqlite_lease_test_leases() == 0;
+        fprintf(stderr, "SQLITE TEARDOWN TEST: closing the databases while a lease is held: %s%s%s%s%s\n",
+                ok ? "OK" : "FAILED",
+                holder ? "" : " - no lease taken",
+                holder && !t.refused ? " - new leases admitted after the gate" : "",
+                holder && !waited ? " - did not wait for the lease" : "",
+                sqlite_teardown_is_unsafe() ? " - teardown suppressed" : "");
+        errors += !ok;
+    }
+
+    // 2. The drain gives up at its deadline while a lease is still held.
+    {
+        bool leased = sqlite_lease_acquire_library();
+        usec_t started = now_monotonic_usec();
+        netdata_mutex_lock(&sqlite_lifetime_mutex);
+        bool drained_held = sqlite_leases_drain_locked(50 * USEC_PER_MS);
+        netdata_mutex_unlock(&sqlite_lifetime_mutex);
+        usec_t waited_ut = now_monotonic_usec() - started;
+        if (leased)
+            sqlite_lease_release();
+
+        netdata_mutex_lock(&sqlite_lifetime_mutex);
+        bool drained_free = sqlite_leases_drain_locked(50 * USEC_PER_MS);
+        netdata_mutex_unlock(&sqlite_lifetime_mutex);
+
+        bool ok = leased && !drained_held && waited_ut >= 50 * USEC_PER_MS && drained_free;
+        fprintf(stderr, "SQLITE TEARDOWN TEST: drain deadline with a lease held: %s after %llu ms, "
+                        "then %s with none: %s\n",
+                drained_held ? "drained" : "timed out", (unsigned long long)(waited_ut / USEC_PER_MS),
+                drained_free ? "drained" : "timed out", ok ? "OK" : "FAILED");
+        errors += !ok;
+    }
+
+    // 3. sqlite_library_shutdown() waits for the admitted lease; a close refused by its gate suppresses it.
+    // When the teardown is already suppressed (-W unittest closes METADATA with statements still attached, which
+    // leaves a zombie connection), the shutdown returns before its gate: then only check that it stayed up.
+    if (sqlite_teardown_is_unsafe() || __atomic_load_n(&sqlite_zombie_connection_created, __ATOMIC_ACQUIRE)) {
+        sqlite_library_shutdown();
+
+        netdata_mutex_lock(&sqlite_lifetime_mutex);
+        bool still_initialized = sqlite_library_initialized;
+        netdata_mutex_unlock(&sqlite_lifetime_mutex);
+
+        fprintf(stderr, "SQLITE TEARDOWN TEST: library shutdown with the teardown already suppressed: %s%s\n",
+                still_initialized ? "OK" : "FAILED", still_initialized ? "" : " - library shut down anyway");
+        errors += !still_initialized;
+    }
+    else {
+        struct sqlite_teardown_test t = { 0 };
+        ND_THREAD *holder = sqlite_teardown_test_start("SQLTEST_LIB", sqlite_teardown_test_library_holder, &t);
+        sqlite_library_shutdown();
+        usec_t returned_ut = now_monotonic_usec();
+        __atomic_store_n(&t.done, true, __ATOMIC_RELEASE);
+        if (holder)
+            nd_thread_join(holder);
+
+        netdata_mutex_lock(&sqlite_lifetime_mutex);
+        bool still_initialized = sqlite_library_initialized;
+        bool gate_reopened = !sqlite_library_gate;
+        netdata_mutex_unlock(&sqlite_lifetime_mutex);
+
+        bool waited = holder && returned_ut >= __atomic_load_n(&t.released_ut, __ATOMIC_ACQUIRE);
+        bool ok = holder && t.refused && waited && sqlite_teardown_is_unsafe() && still_initialized &&
+                  gate_reopened && sqlite_lease_test_leases() == 0;
+        fprintf(stderr, "SQLITE TEARDOWN TEST: library shutdown with a refused thread-local close: %s%s%s%s%s%s\n",
+                ok ? "OK" : "FAILED",
+                holder ? "" : " - no lease taken",
+                holder && !t.refused ? " - a lease was admitted after the gate" : "",
+                holder && !waited ? " - did not wait for the lease" : "",
+                !sqlite_teardown_is_unsafe() ? " - refusal did not latch" : "",
+                !still_initialized ? " - library shut down anyway" : "");
+        errors += !ok;
+    }
+
+    fprintf(stderr, "SQLITE TEARDOWN TEST: %s\n", errors ? "FAILED" : "OK");
+    return errors ? 1 : 0;
 }

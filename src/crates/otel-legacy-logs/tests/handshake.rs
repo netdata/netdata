@@ -1,7 +1,30 @@
-//! Worker lifecycle handshake tests: the worker must report `Disabled` and
-//! exit when there is nothing to serve (absent journal dir, handler init
-//! failure), and must serve (then shut down gracefully) when the journal
-//! directory exists — even an empty one.
+//! The legacy-logs worker's startup handshake with the otel-plugin
+//! supervisor: the worker connects over IPC, receives one `Configure`,
+//! then answers `Disabled` and exits, or `Ready` and serves until
+//! `Shutdown`. Each test plays the supervisor side - a ferryboat
+//! `Listener` on an IPC endpoint accepting the real in-process
+//! `run_worker` future, no subprocess - and drives one handshake branch
+//! to its end state. Production counterpart: `configure_legacy`
+//! (`otel-plugin/src/supervisor.rs`).
+//!
+//! Pinned contracts (worker side: `src/lib.rs` `run_worker`):
+//!
+//! - Journal dir absent -> `Disabled`, then the worker future completes
+//!   cleanly: no idle process lingers for the plugin's lifetime.
+//! - Handler init failure -> `Disabled` and a clean exit too: the legacy
+//!   viewer is best-effort and must not take the plugin down. Init builds
+//!   the foyer disk cache (`src/handler.rs` `LegacyLogsHandler::new`).
+//! - An existing-but-empty journal dir still serves: `Ready` carrying
+//!   exactly one declaration, the `legacy-otel-logs` function
+//!   (`FUNCTION_NAME`), because the handler watches the directory and
+//!   journal files restored into it later are picked up.
+//! - `Shutdown` ends the event loop and the worker exits cleanly.
+//!
+//! Not pinned here: Call/Cancel/Progress traffic, the oversized-response
+//! degradation (`LegacyLogs::handle_outbound_resp`), late `Configure`
+//! (`LegacyLogs::handle_req`), and the supervisor's Disabled bookkeeping -
+//! the `legacy_alive` flip and child reap (`disable_legacy` +
+//! `reap_legacy`).
 
 use std::time::Duration;
 
@@ -10,8 +33,11 @@ use bridge::{LegacyLogsRequest, LegacyLogsResponse};
 use ferryboat::{Connection, Endpoint, Listener};
 use tokio::task::JoinHandle;
 
-/// Bind the supervisor side of the socket, spawn `run_worker` against it, and
-/// return the accepted connection plus the worker's join handle.
+/// Bind the supervisor end of the socket, spawn `run_worker` as the
+/// client, and return the accepted connection plus the worker's join
+/// handle. The 10 s accept timeout pins that the worker connects
+/// promptly; the message-size limit mirrors the worker's own
+/// `bridge::IPC_MAX_MESSAGE_SIZE`.
 async fn start(
     sock: &str,
 ) -> (
@@ -31,16 +57,17 @@ async fn start(
     (conn, worker)
 }
 
-async fn recv(
-    conn: &mut Connection<LegacyLogsRequest, LegacyLogsResponse>,
-) -> LegacyLogsResponse {
+/// Await one worker response; the 30 s bound is a test hang-guard, not
+/// a contract.
+async fn recv(conn: &mut Connection<LegacyLogsRequest, LegacyLogsResponse>) -> LegacyLogsResponse {
     tokio::time::timeout(Duration::from_secs(30), conn.recv())
         .await
         .expect("timed out waiting for worker response")
         .unwrap()
 }
 
-/// The worker future must complete cleanly within the timeout.
+/// The worker future must complete cleanly within the timeout: no hang,
+/// no panic, no `Err` return.
 async fn assert_exits(worker: JoinHandle<anyhow::Result<()>>) {
     tokio::time::timeout(Duration::from_secs(5), worker)
         .await
@@ -55,11 +82,10 @@ async fn reports_disabled_and_exits_when_journal_dir_absent() {
     let sock = dir.path().join("legacy.sock");
     let (mut conn, worker) = start(sock.to_str().unwrap()).await;
 
-    let config = LegacyLogsConfig::new(
-        dir.path().join("does-not-exist"),
-        dir.path().join("cache"),
-    );
-    conn.send(LegacyLogsRequest::Configure(config)).await.unwrap();
+    let config = LegacyLogsConfig::new(dir.path().join("does-not-exist"), dir.path().join("cache"));
+    conn.send(LegacyLogsRequest::Configure(config))
+        .await
+        .unwrap();
 
     match recv(&mut conn).await {
         LegacyLogsResponse::Disabled => {}
@@ -74,13 +100,18 @@ async fn reports_disabled_and_exits_when_handler_init_fails() {
     let sock = dir.path().join("legacy.sock");
     let journal_dir = dir.path().join("journal");
     std::fs::create_dir_all(&journal_dir).unwrap();
-    // A cache path nested under a regular file makes the disk-cache init fail.
+    // A cache path nested under a regular file makes handler init fail:
+    // the cache build runs `create_dir_all` on the cache path
+    // (`journal-engine/src/indexing.rs` `FileIndexCacheBuilder::build`, via
+    // `src/handler.rs` `LegacyLogsHandler::new`).
     let blocker = dir.path().join("blocker");
     std::fs::write(&blocker, b"not a directory").unwrap();
     let (mut conn, worker) = start(sock.to_str().unwrap()).await;
 
     let config = LegacyLogsConfig::new(journal_dir, blocker.join("cache"));
-    conn.send(LegacyLogsRequest::Configure(config)).await.unwrap();
+    conn.send(LegacyLogsRequest::Configure(config))
+        .await
+        .unwrap();
 
     match recv(&mut conn).await {
         LegacyLogsResponse::Disabled => {}
@@ -98,7 +129,9 @@ async fn serves_when_journal_dir_exists_even_empty() {
     let (mut conn, worker) = start(sock.to_str().unwrap()).await;
 
     let config = LegacyLogsConfig::new(journal_dir, dir.path().join("cache"));
-    conn.send(LegacyLogsRequest::Configure(config)).await.unwrap();
+    conn.send(LegacyLogsRequest::Configure(config))
+        .await
+        .unwrap();
 
     match recv(&mut conn).await {
         LegacyLogsResponse::Ready { declarations } => assert_eq!(declarations.len(), 1),

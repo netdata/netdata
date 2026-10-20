@@ -37,6 +37,9 @@ impl FlowDecoders {
         self.hydrated_namespace_sources.remove(&context.key);
         self.dirty_decoder_namespaces.insert(context.key.clone());
 
+        // Removing the v9 source above drops the parser's template state, so
+        // replay the surviving templates to rebuild it. Replay failure leaves
+        // the source unhydrated; the next datagram retries.
         let surviving = namespace.clone();
         if surviving.v9_templates.is_empty() {
             return;

@@ -30,9 +30,6 @@ packages for. For example, `centos7-v2` to build on CentOS 7, or `ubuntu20.04-v2
 to build on Ubuntu 20.04. Note that we use Rocky Linux for builds on CentOS/RHEL 8 or newer. See
 [netdata/package-builders](https://hub.docker.com/r/netdata/package-builders/tags) for all available tags.
 
-The `-v1` tags for RPM based distributions are still published, but they build from `netdata.spec.in` instead of
-CMake and CPack. They are retained only as a fallback and no longer match what CI builds.
-
 The value passed in the `VERSION` environment variable can be any version number accepted by the type of package
 being built. As a general rule, it needs to start with a digit, and must include a `.` somewhere.
 

@@ -44,7 +44,7 @@ It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The service principal or managed identity requires these Azure RBAC roles:
 
@@ -378,7 +378,7 @@ Configure the **azure_monitor** collector from the Netdata web interface:
 4. In the Search box, type _azure_monitor_ (or scroll the list) to locate the **azure_monitor** collector.
 5. Click the **+** next to the **azure_monitor** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -633,17 +633,17 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_api_management_capacity ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_api_management.conf) | azure_monitor.api_management.capacity | APIM capacity on ${label:resource_name} |
-| [ am_api_management_gateway_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_api_management.conf) | azure_monitor.api_management.gateway_cpu | APIM gateway CPU on ${label:resource_name} |
-| [ am_api_management_gateway_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_api_management.conf) | azure_monitor.api_management.gateway_memory | APIM gateway memory on ${label:resource_name} |
-| [ am_api_management_request_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_api_management.conf) | azure_monitor.api_management.request_duration | APIM request duration on ${label:resource_name} |
-| [ am_api_management_backend_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_api_management.conf) | azure_monitor.api_management.request_duration | APIM backend duration on ${label:resource_name} |
-| [ am_api_management_network_connectivity ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_api_management.conf) | azure_monitor.api_management.network_connectivity | APIM network connectivity on ${label:resource_name} |
-| [ am_api_management_eventhub_failed_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_api_management.conf) | azure_monitor.api_management.eventhub_events | APIM EventHub failed events on ${label:resource_name} |
-| [ am_api_management_eventhub_dropped_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_api_management.conf) | azure_monitor.api_management.eventhub_events | APIM EventHub dropped events on ${label:resource_name} |
-| [ am_api_management_eventhub_rejected_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_api_management.conf) | azure_monitor.api_management.eventhub_events | APIM EventHub rejected events on ${label:resource_name} |
-| [ am_api_management_eventhub_throttled_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_api_management.conf) | azure_monitor.api_management.eventhub_events | APIM EventHub throttled events on ${label:resource_name} |
-| [ am_api_management_eventhub_timedout_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_api_management.conf) | azure_monitor.api_management.eventhub_events | APIM EventHub timed out events on ${label:resource_name} |
+| [ am_api_management_capacity ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_api_management.conf) | azure_monitor.api_management.capacity | Average capacity utilization of API Management service ${label:resource_name} in ${label:resource_group} (${label:region}). High capacity indicates the service is approaching its scaling limits |
+| [ am_api_management_gateway_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_api_management.conf) | azure_monitor.api_management.gateway_cpu | Average gateway CPU utilization of API Management service ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_api_management_gateway_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_api_management.conf) | azure_monitor.api_management.gateway_memory | Average gateway memory utilization of API Management service ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_api_management_request_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_api_management.conf) | azure_monitor.api_management.request_duration | Average overall request duration of API Management service ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_api_management_backend_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_api_management.conf) | azure_monitor.api_management.request_duration | Average backend request duration of API Management service ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_api_management_network_connectivity ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_api_management.conf) | azure_monitor.api_management.network_connectivity | Network connectivity status of API Management service ${label:resource_name} in ${label:resource_group} (${label:region}). Values below 1 indicate connectivity problems to backend dependencies |
+| [ am_api_management_eventhub_failed_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_api_management.conf) | azure_monitor.api_management.eventhub_events | Rate of failed EventHub events for API Management service ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_api_management_eventhub_dropped_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_api_management.conf) | azure_monitor.api_management.eventhub_events | Rate of dropped EventHub events for API Management service ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_api_management_eventhub_rejected_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_api_management.conf) | azure_monitor.api_management.eventhub_events | Rate of rejected EventHub events for API Management service ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_api_management_eventhub_throttled_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_api_management.conf) | azure_monitor.api_management.eventhub_events | Rate of throttled EventHub events for API Management service ${label:resource_name} in ${label:resource_group} (${label:region}). Throttling indicates EventHub throughput limits are being reached |
+| [ am_api_management_eventhub_timedout_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_api_management.conf) | azure_monitor.api_management.eventhub_events | Rate of timed out EventHub events for API Management service ${label:resource_name} in ${label:resource_group} (${label:region}) |
 
 
 

@@ -406,7 +406,10 @@ Internally, the Linux kernel treats both processes and threads as `tasks`. To cr
 system calls: `fork(2)`, `vfork(2)`, and `clone(2)`. To generate this chart, the eBPF
 collector uses the following `tracepoints` and `kprobe`:
 
-- `sched/sched_process_fork`: Tracepoint called after a call for `fork (2)`, `vfork (2)` and `clone (2)`.
+- `sched/sched_process_fork`: Tracepoint called after a call for `fork (2)`, `vfork (2)` and `clone (2)`. It is
+     attached as a BTF raw tracepoint (`tp_btf`) when CO-RE code runs in `trampoline` or `tracepoint` mode.
+- `kprobe/wake_up_new_task`: called when a new task is started. Legacy code, CO-RE code in `probe` mode, and CO-RE
+     code in `tracepoint` mode on kernels without BTF raw tracepoint support use it instead of `sched/sched_process_fork`.
 - `sched/sched_process_exec`: Tracepoint called after a exec-family syscall.
 - `kprobe/kernel_clone`: This is the main [`fork()`](https://elixir.bootlin.com/linux/v5.10/source/kernel/fork.c#L2415)
      routine since kernel `5.10.0` was released.
@@ -597,12 +600,20 @@ The eBPF plugin also shows a chart in the Disk section when the `disk` thread is
 
 #### Disk Latency
 
-This will create the chart `disk_latency_io` for each disk on the host. The following tracepoints are used:
+This will create the chart `disk_latency_io` for each disk on the host. The following functions are monitored:
 
-- [`block/block_rq_issue`](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_block_rq_issue):
-    IO request operation to a device drive.
-- [`block/block_rq_complete`](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_block_rq_complete):
-    IO operation completed by device.
+- `kprobe/blk_mq_start_request`: IO request operation sent to a device driver.
+- `kprobe/blk_start_request`: IO request operation sent through the older single-queue path on kernels before 5.0.
+- `kprobe/blk_mq_end_request`: IO operation completed by the device.
+- `kprobe/__blk_mq_end_request`: IO operation completed by the SCSI layer (SCSI, SATA and SAS disks), which does not
+    call `blk_mq_end_request`. If this symbol cannot be probed, `kprobe/blk_mq_free_request` is used as a fallback.
+    A request seen by multiple completion probes is counted once.
+- `blk_complete_request`: IO completion on the older request path. It is attached only when the running kernel
+    provides this function (a `kprobe` with legacy code, `fentry` with CO-RE code).
+
+On generic kernels 6.8 and newer, disk latency is unavailable when the plugin must use legacy BPF objects. The
+plugin refuses the older 5.4 disk object because its compiled kernel structure offsets are not validated for these
+kernels. On builds with CO-RE support, kernel BTF allows the plugin to use the CO-RE object instead.
 
 Disk Latency is the single most important metric to focus on when it comes to storage performance, under most circumstances.
 For hard drives, an average latency somewhere between 10 to 20 ms can be considered acceptable. For SSD (Solid State Drives),

@@ -20,7 +20,8 @@ Referenced by most other schemas as `./shared.json#/$defs/<name>`, so an edit he
 - `short_setup` and `full_setup`: the two setup shapes; `setup-generic.md` renders both. In `full_setup`, an option's
   `detailed_description` turns the table cell into a link to an `h5` section below the table, `group` adds a Group
   column, and for collectors only `render_collectors` defaults a per-example `folding` to the parent
-  `examples.folding.enabled`.
+  `examples.folding.enabled`. The option entry is closed: any other key (`details`, a per-option `section_name`) fails
+  validation, because the template would drop it silently.
 - `troubleshooting`: `errors.list[]` (`error`, `cause`, `fix` required; `when`, `source` optional; the entry is closed
   with `additionalProperties: false`) rendered as `### Known Errors`, and the legacy `problems.list[]` (both fields
   optional) rendered as `### Other Problems`. The template adds `### Diagnostics` for `go.d.plugin`, `python.d.plugin`,
@@ -34,7 +35,7 @@ Referenced by most other schemas as `./shared.json#/$defs/<name>`, so an edit he
 
 Top level: `plugin_name`, optional `profile_coverage`, and `modules[]`, one module per integration. The top-level
 `plugin_name` is copied onto every `module.meta.plugin_name` by `load_collectors`, so the two agree by construction.
-Required at the module root: `meta`, `overview`, `setup`, `troubleshooting`, `alerts`, `metrics`; on `meta`:
+Required at the module root: `meta`, `overview`, `setup`, `troubleshooting`, `metrics`; on `meta`:
 `plugin_name`, `module_name`, `monitored_instance`, `keywords`, `related_resources`,
 `info_provided_to_referring_integrations`.
 
@@ -44,9 +45,13 @@ Behavior not visible in the schema:
   `monitored_instance_name` is set. It is the only `dependencies` use in the repository's schemas. Resolution is the
   cascading lookup in `pipeline.md`; an unresolvable reference is a fatal warning.
 - `info_provided_to_referring_integrations.description` is rendered on OTHER pages that reference this module.
-- `alerts[].metric` is not checked against `metrics.scopes[].metrics[].name`.
-- `metrics.dynamic_context_prefixes[]` and `metrics.dynamic_collect_plugins[]` are read only by the dormant taxonomy
-  tooling (`consistency.md`, "The dormant collector taxonomy"); nothing renders them.
+- `alerts[]` and `excluded_alerts[]` hold alert names only. Whether each `alerts` name is a stock alert that no
+  declared context derives, and each `excluded_alerts` name one that a declared context derives, is checked by
+  `integrations/tests/test_health_alerts.py`, not by the schema; the alert table itself is derived
+  (`.agents/skills/collectors-metadata-yaml/alerts-and-meta.md#1-alerts-derived-from-the-health-configuration`).
+- `metrics.dynamic_context_prefixes[]` feeds the catalogue's `contexts` export (`in-app-contract.md`) and the dormant
+  taxonomy tooling; `metrics.dynamic_collect_plugins[]` only the taxonomy tooling (`consistency.md`, "The dormant
+  collector taxonomy"). Nothing renders either.
 - `profile_coverage.modules.<meta.id>[]` is allowed only in the Prometheus collector's metadata file, and
   `metrics.profile_coverage` is a generated in-memory projection that must never be authored
   (`how-tos/prometheus-profile-metadata.md`).
@@ -56,8 +61,8 @@ Behavior not visible in the schema:
   by `templates/functions.md`; the `hidden` value does not suppress the column. Function display-name capitalization:
   `.agents/skills/collectors-metadata-yaml/alerts-and-meta.md#5-functions-live-data`.
 - `additionalProperties: false` is set only on `profile_coverage`, the two `metrics.dynamic_*` list entries, and (via
-  `shared.json`) `instance.variables` and the troubleshooting `errors.list[]` entry, so unknown module keys pass through
-  (`gotchas.md`, `alternative_monitored_instances`).
+  `shared.json`) `instance.variables`, the `full_setup` option entry and the troubleshooting `errors.list[]` entry, so
+  unknown module keys pass through (`gotchas.md`, `alternative_monitored_instances`).
 
 ### `flows.json` and `device.json`
 

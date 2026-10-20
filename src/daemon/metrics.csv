@@ -34,7 +34,7 @@ netdata.dbengine_extent_cache_pages,,"clean, hot, dirty, referenced",pages,Netda
 netdata.dbengine_extent_cache_workers,,"searchers, adders, evictors, flushers, hot2dirty, jv2 flushers",workers,Netdata extent Cache Workers,line,,netdata,stats
 netdata.dbengine_extent_target_memory,,"current, wanted, referenced, hot max, dirty max, hot, dirty",bytes,Netdata extent Target Cache Memory,line,,netdata,stats
 netdata.dbengine_extent_waste_events,,"evictions skipped, flushes cancelled, acquire spins, release spins, insert spins, delete spins, evict spins, flush spins",events/s,Netdata extent Waste Events,line,,netdata,stats
-netdata.dbengine_global_errors,,"io_errors, fs_errors, pg_cache_over_half_dirty_events",errors/s,Netdata DB engine errors,line,,netdata,stats
+netdata.dbengine_global_errors,,"io_errors, fs_errors",errors/s,Netdata DB engine errors,line,,netdata,stats
 netdata.dbengine_global_file_descriptors,,"current, max",descriptors,Netdata DB engine File Descriptors,line,,netdata,stats
 netdata.dbengine_io_operations,,"reads, writes",operations/s,Netdata DB engine I/O operations,line,,netdata,stats
 netdata.dbengine_io_throughput,,"reads, writes",MiB/s,Netdata DB engine I/O throughput,line,,netdata,stats
@@ -113,7 +113,7 @@ netdata.strings_ops,,"inserts, deletes, searches, duplications, releases",ops/s,
 netdata.tcp_connected,,connected,sockets,statsd server TCP connected sockets,line,,statsd.plugin,stats
 netdata.tcp_connects,,"connects, disconnects",events,statsd server TCP connects and disconnects,line,,statsd.plugin,stats
 netdata.training_results,,"ok, invalid-queries, not-enough-values, null-acquired-dimensions, chart-under-replication",events,Training results,line,,ml.plugin,training
-netdata.training_status,,"untrained, pending-without-model, trained, pending-with-model, silenced",dimensions,Training status of dimensions,line,,ml.plugin,training
+netdata.training_status,,"untrained, pending-without-model, trained, pending-with-model, silenced, with-model",dimensions,Training status of dimensions,line,,ml.plugin,training
 netdata.training_time_stats,,"allotted, consumed, remaining",milliseconds,Training time stats,line,,ml.plugin,training
 netdata.uptime,,uptime,seconds,Netdata uptime,line,,netdata,stats
 netdata.workers.aclkquery.cpu,,"min, max, average",%,Netdata Workers CPU Utilization,area,,netdata,stats

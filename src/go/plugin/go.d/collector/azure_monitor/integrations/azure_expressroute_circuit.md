@@ -42,7 +42,7 @@ It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The service principal or managed identity requires these Azure RBAC roles:
 
@@ -376,7 +376,7 @@ Configure the **azure_monitor** collector from the Netdata web interface:
 4. In the Search box, type _azure_monitor_ (or scroll the list) to locate the **azure_monitor** collector.
 5. Click the **+** next to the **azure_monitor** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -631,12 +631,12 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_express_route_circuit_arp_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_circuit.conf) | azure_monitor.express_route_circuit.arp_availability | ExpressRoute ARP availability on ${label:resource_name} |
-| [ am_express_route_circuit_bgp_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_circuit.conf) | azure_monitor.express_route_circuit.bgp_availability | ExpressRoute BGP availability on ${label:resource_name} |
-| [ am_express_route_circuit_ingress_bandwidth_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_circuit.conf) | azure_monitor.express_route_circuit.bandwidth_utilization | ExpressRoute ingress bandwidth on ${label:resource_name} |
-| [ am_express_route_circuit_egress_bandwidth_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_circuit.conf) | azure_monitor.express_route_circuit.bandwidth_utilization | ExpressRoute egress bandwidth on ${label:resource_name} |
-| [ am_express_route_circuit_qos_drop_in ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_circuit.conf) | azure_monitor.express_route_circuit.qos_dropped_bits | ExpressRoute QoS ingress drops on ${label:resource_name} |
-| [ am_express_route_circuit_qos_drop_out ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_circuit.conf) | azure_monitor.express_route_circuit.qos_dropped_bits | ExpressRoute QoS egress drops on ${label:resource_name} |
+| [ am_express_route_circuit_arp_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_circuit.conf) | azure_monitor.express_route_circuit.arp_availability | ARP availability of ExpressRoute circuit ${label:resource_name} in ${label:resource_group} (${label:region}). Low ARP availability indicates layer 2 connectivity problems between the Microsoft edge and the provider/customer edge |
+| [ am_express_route_circuit_bgp_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_circuit.conf) | azure_monitor.express_route_circuit.bgp_availability | BGP availability of ExpressRoute circuit ${label:resource_name} in ${label:resource_group} (${label:region}). Low BGP availability indicates routing session problems that can cause traffic disruption |
+| [ am_express_route_circuit_ingress_bandwidth_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_circuit.conf) | azure_monitor.express_route_circuit.bandwidth_utilization | Ingress bandwidth utilization of ExpressRoute circuit ${label:resource_name} in ${label:resource_group} (${label:region}). High utilization can cause packet drops and increased latency |
+| [ am_express_route_circuit_egress_bandwidth_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_circuit.conf) | azure_monitor.express_route_circuit.bandwidth_utilization | Egress bandwidth utilization of ExpressRoute circuit ${label:resource_name} in ${label:resource_group} (${label:region}). High utilization can cause packet drops and increased latency |
+| [ am_express_route_circuit_qos_drop_in ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_circuit.conf) | azure_monitor.express_route_circuit.qos_dropped_bits | Rate of QoS-dropped ingress bits on ExpressRoute circuit ${label:resource_name} in ${label:resource_group} (${label:region}). Non-zero QoS drops indicate traffic is exceeding configured QoS policies |
+| [ am_express_route_circuit_qos_drop_out ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_circuit.conf) | azure_monitor.express_route_circuit.qos_dropped_bits | Rate of QoS-dropped egress bits on ExpressRoute circuit ${label:resource_name} in ${label:resource_group} (${label:region}). Non-zero QoS drops indicate traffic is exceeding configured QoS policies |
 
 
 

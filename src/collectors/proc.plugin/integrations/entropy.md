@@ -111,7 +111,7 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ lowest_entropy ](https://github.com/netdata/netdata/blob/master/src/health/health.d/entropy.conf) | system.entropy | minimum number of bits of entropy available for the kernel’s random number generator |
+| [ lowest_entropy ](https://github.com/netdata/netdata/blob/master/src/health/health.d/entropy.conf) | system.entropy | Minimum number of entries in the random numbers pool in the last 5 minutes |
 
 
 

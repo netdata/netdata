@@ -44,11 +44,23 @@ The collector automatically detects all of the metrics, no further configuration
 
 #### Limits
 
-The default configuration for this integration does not impose any limits on data collection.
+Charts are keyed by raw Perflib instance names. Instances with the same name are combined into one chart
+series, so their gauges and rates represent the process group. Fraction counters use the ratio of summed
+numerators and bases. CLR Memory charts include a `process_id` label only while exactly one process has
+that name; the label is removed while the name is ambiguous. Different raw names remain separate series.
+Rate charts establish a new baseline for one collection after the number or process-ID set of same-name
+instances changes. They assume the group does not advance by 2^31 or more between samples; an implausibly
+large delta is discarded as one lost sample. A temporarily unreadable process ID removes its label
+without resetting unrelated rate charts.
+The security stack walk depth chart reports the largest depth reported by any process in the group.
+
 
 #### Performance Impact
 
-The default configuration for this integration is not expected to impose a significant performance impact on the system.
+Creates up to 49 charts per .NET Framework process name, up from 32 in the previous implementation. A
+chart is only created when its Perflib counter is available, so the actual number depends on the .NET
+runtime in use.
+
 
 ## Setup
 
@@ -133,30 +145,65 @@ Metrics:
 | netframework.clrexception_filters | Thrown exceptions filters | filters | filters/s |
 | netframework.clrexception_finallys | Executed finally blocks | finallys | finallys/s |
 | netframework.clrexception_throw_to_catch_depth | Traversed stack frames | traversed | stack_frames/s |
-| netframework.clrinterop_com_callable_wrappers | COM callable wrappers (CCW) | com_callable_wrappers | ccw/s |
+| netframework.clrinterop_com_callable_wrappers | COM callable wrappers (CCW) | com_callable_wrappers | ccw |
 | netframework.clrinterop_interop_marshallings | Arguments and return values marshallings | marshallings | marshallings/s |
-| netframework.clrinterop_interop_stubs_created | Created stubs | created | stubs/s |
+| netframework.clrinterop_interop_stubs_created | Created stubs | created | stubs |
 | netframework.clrjit_methods | JIT-compiled methods | jit-compiled | methods/s |
 | netframework.clrjit_time | Time spent in JIT compilation | time | percentage |
-| netframework.clrjit_standard_failures | JIT compiler failures | failures | failures/s |
+| netframework.clrjit_standard_failures | JIT compiler failures | failures | failures |
 | netframework.clrjit_il_bytes | Compiled Microsoft intermediate language (MSIL) bytes | compiled_msil | bytes/s |
 | netframework.clrloading_loader_heap_size | Memory committed by class loader | committed | bytes |
+| netframework.clrloading_current_appdomains | Current application domains | current | domains |
+| netframework.clrloading_current_assemblies | Current loaded assemblies | current | assemblies |
+| netframework.clrloading_current_classes_loaded | Current loaded classes | current | classes |
 | netframework.clrloading_appdomains_loaded | Loaded application domains | loaded | domain/s |
 | netframework.clrloading_appdomains_unloaded | Unloaded application domains | unloaded | domain/s |
 | netframework.clrloading_assemblies_loaded | Loaded assemblies | loaded | assemblies/s |
 | netframework.clrloading_classes_loaded | Loaded classes in all assemblies | loaded | classes/s |
-| netframework.clrloading_class_load_failures | Class load failures | class_load | failures/s |
+| netframework.clrloading_class_load_failures | Class load failures | class_load | failures |
 | netframework.clrremoting_channels | Registered channels | registered | channels/s |
 | netframework.clrremoting_context_bound_classes_loaded | Loaded context-bound classes | loaded | classes |
 | netframework.clrremoting_context_bound_objects | Allocated context-bound objects | allocated | objects/s |
 | netframework.clrremoting_context_proxies | Remoting proxy objects | objects | objects/s |
+| netframework.clrremoting_contexts | Total of remoting contexts | contexts | contexts |
 | netframework.clrremoting_remote_calls | Remote Procedure Calls (RPC) invoked | calls | calls/s |
 | netframework.clrsecurity_link_time_checks | Link-time code access security checks | linktime | checks/s |
 | netframework.clrsecurity_checks_time | Time spent performing runtime code access security checks | time | percentage |
 | netframework.clrsecurity_stack_walk_depth | Depth of the stack | stack | depth |
 | netframework.clrsecurity_runtime_checks | Runtime code access security checks performed | runtime | checks/s |
 | netframework.clrlocksandthreads_queue_length | Threads waited to acquire a managed lock | threads | threads/s |
+| netframework.clrlocksandthreads_current_queue_length | Current managed lock waiters | threads | threads |
 | netframework.clrlocksandthreads_current_logical_threads | Logical threads | logical | threads |
 | netframework.clrlocksandthreads_current_physical_threads | Physical threads | physical | threads |
+| netframework.clrlocksandthreads_current_recognized_threads | Current recognized threads | threads | threads |
 | netframework.clrlocksandthreads_recognized_threads | Threads recognized by the runtime | threads | threads/s |
 | netframework.clrlocksandthreads_contentions | Fails to acquire a managed lock | contentions | contentions/s |
+
+
+### Per .NET Framework CLR Memory processes
+
+These metrics refer to .NET Framework CLR Memory instances.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| process | The process name. |
+| process_id | The process ID when the process name identifies exactly one process; omitted for same-name groups. |
+
+Metrics:
+
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| netframework.clrmemory_allocated_bytes | Allocated bytes on the GC heap | allocated | bytes/s |
+| netframework.clrmemory_finalization_survivors | Finalization survivors | survivors | objects |
+| netframework.clrmemory_heap_size | Heap sizes by generation and Gen 0 allocation budget | gen0, gen1, gen2, loh | bytes |
+| netframework.clrmemory_promoted_bytes | Promoted bytes by generation | gen0, gen1 | bytes/s |
+| netframework.clrmemory_gc_handles | GC handles in use | handles | handles |
+| netframework.clrmemory_collections | Garbage collections by generation | gen0, gen1, gen2 | collections/s |
+| netframework.clrmemory_induced_gc | Induced garbage collections | induced | collections/s |
+| netframework.clrmemory_pinned_objects | Pinned objects | pinned | objects |
+| netframework.clrmemory_sink_blocks_in_use | Sink blocks in use | in_use | blocks |
+| netframework.clrmemory_committed_bytes | Committed GC virtual memory | committed | bytes |
+| netframework.clrmemory_reserved_bytes | Reserved GC virtual memory | reserved | bytes |
+| netframework.clrmemory_gc_time | Time spent in garbage collection | time | percentage |

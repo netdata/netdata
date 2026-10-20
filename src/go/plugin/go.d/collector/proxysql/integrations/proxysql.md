@@ -29,7 +29,7 @@ This collector monitors ProxySQL servers.
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -103,7 +103,7 @@ Configure the **proxysql** collector from the Netdata web interface:
 4. In the Search box, type _proxysql_ (or scroll the list) to locate the **proxysql** collector.
 5. Click the **+** next to the **proxysql** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -187,9 +187,9 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ proxysql_hostgroup_no_online_backends ](https://github.com/netdata/netdata/blob/master/src/health/health.d/proxysql.conf) | proxysql.hostgroup_backends_status | ProxySQL hostgroup ${label:hostgroup} has no ONLINE backends |
-| [ proxysql_backend_shunned ](https://github.com/netdata/netdata/blob/master/src/health/health.d/proxysql.conf) | proxysql.backend_status | ProxySQL backend SHUNNED (${label:host}:${label:port} hostgroup ${label:hostgroup}) |
-| [ proxysql_backend_offline_hard ](https://github.com/netdata/netdata/blob/master/src/health/health.d/proxysql.conf) | proxysql.backend_status | ProxySQL backend OFFLINE_HARD (${label:host}:${label:port} hostgroup ${label:hostgroup}) |
+| [ proxysql_hostgroup_no_online_backends ](https://github.com/netdata/netdata/blob/master/src/health/health.d/proxysql.conf) | proxysql.hostgroup_backends_status | ProxySQL hostgroup ${label:hostgroup} currently has zero ONLINE backends. This means no traffic can be served for this hostgroup. |
+| [ proxysql_backend_shunned ](https://github.com/netdata/netdata/blob/master/src/health/health.d/proxysql.conf) | proxysql.backend_status | ProxySQL backend ${label:host}:${label:port} in hostgroup ${label:hostgroup} is SHUNNED (temporarily out of use due to too many connection errors in a short time or replication lag exceeding the allowed threshold) |
+| [ proxysql_backend_offline_hard ](https://github.com/netdata/netdata/blob/master/src/health/health.d/proxysql.conf) | proxysql.backend_status | ProxySQL backend ${label:host}:${label:port} in hostgroup ${label:hostgroup} is in OFFLINE_HARD mode. Backend is effectively removed from the hostgroup and no longer serves traffic. |
 
 
 

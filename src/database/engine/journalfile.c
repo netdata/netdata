@@ -853,13 +853,11 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
             metric = mrg_metric_add_and_acquire(main_mrg, entry, &added);
             if(added)
                 update_metric_time = false;
-
-            if (vd.update_every_s) {
-                uint64_t samples = (vd.end_time_s - vd.start_time_s) / vd.update_every_s;
-                __atomic_add_fetch(&ctx->atomic.samples, samples, __ATOMIC_RELAXED);
-            }
         }
         Word_t metric_id = mrg_metric_id(main_mrg, metric);
+
+        // the page is on disk in this datafile: its slots are samples of it
+        rrdeng_datafile_samples_charge(journalfile->datafile, vd.entries);
 
         if (update_metric_time)
             mrg_metric_expand_retention(main_mrg, metric, vd.start_time_s, vd.end_time_s, vd.update_every_s);
@@ -1191,6 +1189,98 @@ static int journalfile_v2_validate(void *data_start, size_t journal_v2_file_size
     return 0;
 }
 
+_Static_assert(JOURNAL_V2_SAMPLES_DESCRIPTOR_OFFSET >= sizeof(struct journal_v2_header) + sizeof(struct journal_v2_block_trailer),
+               "journal v2 samples descriptor overlaps the journal v2 header");
+_Static_assert(JOURNAL_V2_SAMPLES_DESCRIPTOR_OFFSET + sizeof(struct journal_v2_samples_descriptor) <= RRDENG_BLOCK_SIZE,
+               "journal v2 samples descriptor does not fit in the journal v2 header padding");
+
+_Static_assert(sizeof(struct journal_v2_samples_descriptor) == 24, "journal v2 samples descriptor has padding");
+
+// The validated samples descriptor of a journal v2 file, or false when it has
+// none (older files) or an invalid one (then the caller estimates). Reads only
+// the header page: file_size must be the size of the mapping, and the caller
+// must be inside a protected region, since this reads the mmap.
+bool journalfile_v2_samples_descriptor(const uint8_t *data_start, size_t file_size, struct journal_v2_samples_descriptor *out) {
+    const struct journal_v2_header *j2_header = (const void *)data_start;
+
+    if (file_size < RRDENG_BLOCK_SIZE)
+        return false;
+
+    struct journal_v2_samples_descriptor descriptor;
+    memcpy(&descriptor, data_start + JOURNAL_V2_SAMPLES_DESCRIPTOR_OFFSET, sizeof(descriptor));
+    if (descriptor.magic != JOURNAL_V2_SAMPLES_MAGIC)
+        return false;
+
+    uLong crc = crc32(0L, Z_NULL, 0);
+    crc = crc32(crc, (void *)&descriptor, offsetof(struct journal_v2_samples_descriptor, crc));
+    if (descriptor.crc != (uint32_t)crc)
+        return false;
+
+    // one entry per metric, 4-byte aligned, after the metric list and its
+    // trailer, ending with its own trailer exactly where the file trailer
+    // starts - which is where the writer puts it
+    if (descriptor.count != j2_header->metric_count)
+        return false;
+
+    if ((descriptor.offset % sizeof(uint32_t)) ||
+        (size_t)descriptor.offset < (size_t)j2_header->metric_trailer_offset ||
+        (size_t)descriptor.offset - (size_t)j2_header->metric_trailer_offset < sizeof(struct journal_v2_block_trailer) ||
+        (size_t)descriptor.offset > file_size ||
+        file_size - (size_t)descriptor.offset < 2 * sizeof(struct journal_v2_block_trailer))
+        return false;
+
+    // the array fills the space between its offset and the two trailers;
+    // compare by division, since count * sizeof(uint32_t) wraps size_t on
+    // 32-bit builds
+    size_t samples_bytes = file_size - (size_t)descriptor.offset - 2 * sizeof(struct journal_v2_block_trailer);
+    if (samples_bytes % sizeof(uint32_t) || samples_bytes / sizeof(uint32_t) != descriptor.count)
+        return false;
+
+    // the total cannot exceed one uint32_t per metric
+    if (descriptor.samples > samples_bytes / sizeof(uint32_t) * (uint64_t)UINT32_MAX)
+        return false;
+
+    *out = descriptor;
+    return true;
+}
+
+// The per-metric samples of a journal v2 file, or NULL when it has no valid
+// samples section: no valid descriptor, a damaged array, or an array that does
+// not add up to the descriptor's total. This faults in the array; the startup
+// loader does not need it, only per-metric consumers do.
+const uint32_t *journalfile_v2_samples_section(const uint8_t *data_start, size_t file_size) {
+    struct journal_v2_samples_descriptor descriptor;
+    if (!journalfile_v2_samples_descriptor(data_start, file_size, &descriptor))
+        return NULL;
+
+    size_t samples_bytes = (size_t)descriptor.count * sizeof(uint32_t);
+    const uint8_t *samples = data_start + descriptor.offset;
+    const struct journal_v2_block_trailer *trailer = (const void *)(samples + samples_bytes);
+    uLong crc = crc32(0L, Z_NULL, 0);
+    crc = crc32(crc, samples, samples_bytes);
+    if (crc32cmp((void *)trailer->checksum, crc))
+        return NULL;
+
+    uint64_t total = 0;
+    for (size_t i = 0; i < descriptor.count; i++)
+        total += ((const uint32_t *)samples)[i];
+    if (total != descriptor.samples)
+        return NULL;
+
+    return (const uint32_t *)samples;
+}
+
+// The samples of a metric entry of a journal v2 file without a samples section:
+// the slots its time range would hold at its latest collection frequency, and
+// never fewer than its pages - every page holds at least one slot.
+uint64_t journalfile_v2_metric_estimated_samples(const struct journal_metric_list *metric) {
+    if (!metric->update_every_s || metric->delta_end_s < metric->delta_start_s)
+        return metric->entries;
+
+    uint64_t samples = page_entries_by_time(metric->delta_start_s, metric->delta_end_s, metric->update_every_s);
+    return samples > metric->entries ? samples : metric->entries;
+}
+
 void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile) {
     usec_t started_ut = now_monotonic_usec();
 
@@ -1207,8 +1297,9 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
     time_t global_first_time_s = 0;
     bool failed = false;
     uint32_t entries = 0;
-    // Calculate number of samples here and update once the file is loaded
+    // the samples of this file, charged to its datafile once it is loaded
     uint64_t journal_samples = 0;
+    bool samples_estimated = true;
 
     // Protect the whole walk -- both the optional CRC check and the mrg update
     // read into the mmap'd v2 journal. If a backing page cannot be paged in
@@ -1271,6 +1362,21 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
             time_t header_start_time_s  = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
             global_first_time_s = header_start_time_s;
             time_t now_s = max_acceptable_collected_time();
+            // the samples of this file come from its descriptor (in the header
+            // page, read anyway); the per-metric array at the end of the file is
+            // not touched, so it costs no page faults at startup
+            struct journal_v2_samples_descriptor samples_descriptor;
+            bool samples_known = journalfile_v2_samples_descriptor(data_start, mmap_size, &samples_descriptor);
+            samples_estimated = !samples_known;
+            if (samples_known)
+                journal_samples = samples_descriptor.samples;
+            if (!samples_known && mmap_size >= RRDENG_BLOCK_SIZE &&
+                ((const struct journal_v2_samples_descriptor *)(data_start + JOURNAL_V2_SAMPLES_DESCRIPTOR_OFFSET))->magic == JOURNAL_V2_SAMPLES_MAGIC) {
+                nd_log_limit_static_global_var(erl, 60, 0);
+                nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
+                             "DBENGINE: journal v2 \"%s\" has a samples section that failed validation; "
+                             "estimating its samples instead", path_v2);
+            }
             for (size_t i=0; i < entries; i++) {
                 // Copy uuid out of the mmap onto the stack BEFORE calling mrg.
                 // If a backing page is unreadable, uuid_copy SIGBUSes here and
@@ -1291,8 +1397,10 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
                     start_time_s,
                     end_time_s,
                     update_every_s,
-                    now_s,
-                    &journal_samples);
+                    now_s);
+
+                if (!samples_known)
+                    journal_samples += journalfile_v2_metric_estimated_samples(metric);
 
                 metric++;
             }
@@ -1322,11 +1430,16 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
     journalfile_v2_data_release(journalfile);
 
     if (unlikely(failed)) {
+        // its samples are unknown until the journal is rebuilt
+        rrdeng_datafile_samples_set(journalfile->datafile, 0, true);
         journalfile_v2_data_unmap_permanently_if_indexed(journalfile);
         return;
     }
 
-    __atomic_add_fetch(&ctx->atomic.samples, journal_samples, __ATOMIC_RELAXED);
+    // SET, not add: this file's samples are what its journal says, whatever was
+    // charged before (e.g. a startup migration that could not write a section) -
+    // every later startup reads the same value from this file
+    rrdeng_datafile_samples_set(journalfile->datafile, journal_samples, samples_estimated);
 
     usec_t ended_ut = now_monotonic_usec();
 
@@ -1606,15 +1719,21 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
                                         Pvoid_t JudyL_metrics, Pvoid_t JudyL_extents_pos,
                                         size_t number_of_extents, size_t number_of_metrics, size_t number_of_pages, void *user_data)
 {
-    // Nothing to migrate if no metrics
-    if (number_of_metrics == 0)
-        return true;
-
     char path[RRDENG_PATH_MAX];
     Pvoid_t *PValue;
     struct rrdengine_instance *ctx = (struct rrdengine_instance *) section;
     struct rrdengine_journalfile *journalfile = (struct rrdengine_journalfile *) user_data;
     struct rrdengine_datafile *datafile = journalfile->datafile;
+
+    // Nothing to migrate if no metrics. Every page may have been rejected (all
+    // of deleted metrics): they become unreachable, so the datafile holds no
+    // indexed samples - drop the flush-time charge, like the reset below does
+    if (number_of_metrics == 0) {
+        internal_fatal(datafile->writers.running || datafile->writers.flushed_to_open_running,
+                       "DBENGINE: resetting the samples of a datafile that has writers");
+        rrdeng_datafile_samples_set(datafile, 0, false);
+        return true;
+    }
     time_t min_time_s = LONG_MAX;
     time_t max_time_s = 0;
     struct jv2_metrics_info *metric_info;
@@ -1630,6 +1749,39 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
 #ifdef NETDATA_INTERNAL_CHECKS
     usec_t start_loading = now_monotonic_usec();
 #endif
+
+    // The slots of every metric, for the samples section, derived from the time
+    // ranges of its indexed pages: a page holds one slot per update_every from
+    // its start to its end (rrdeng_store_metric_next() fills in-page gaps with
+    // empty slots, validate_page() reconciles replayed v1 pages), and a page with
+    // no update_every (replayed from a v1 journal before its metric was known) is
+    // a single slot - what queries read from it. The section is written only when
+    // every metric fits in uint32_t; otherwise the file has no section and
+    // loaders estimate its samples.
+    bool samples_exact = true;
+    uint64_t file_samples = 0;
+    {
+        Word_t metric_index = 0;
+        bool metric_first = true;
+        while ((PValue = JudyLFirstThenNext(JudyL_metrics, &metric_index, &metric_first))) {
+            metric_info = *PValue;
+            metric_info->samples = 0;
+
+            Pvoid_t *PValue2;
+            Word_t start_time = 0;
+            bool page_first = true;
+            while ((PValue2 = JudyLFirstThenNext(metric_info->JudyL_pages_by_start_time, &start_time, &page_first))) {
+                struct jv2_page_info *page_info = *PValue2;
+                metric_info->samples += page_entries_by_time(
+                    page_info->start_time_s, page_info->end_time_s, page_info->update_every_s);
+            }
+
+            if (metric_info->samples > UINT32_MAX)
+                samples_exact = false;
+
+            file_samples += metric_info->samples;
+        }
+    }
 
     size_t total_file_size = 0;
     total_file_size  += (sizeof(struct journal_v2_header) + JOURNAL_V2_HEADER_PADDING_SZ);
@@ -1652,6 +1804,18 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
     // descr @ time will start here
     uint32_t pages_offset = total_file_size;
     total_file_size  += (number_of_pages * (sizeof(struct journal_page_list) + sizeof(struct journal_page_header) + sizeof(struct journal_v2_block_trailer)));
+
+    // samples section (optional), after the page section - never the reason
+    // a journal outgrows the uint32_t offsets of its header
+    uint32_t samples_offset = 0;
+    size_t samples_size = number_of_metrics * sizeof(uint32_t) + sizeof(struct journal_v2_block_trailer);
+    if (samples_exact && total_file_size + samples_size + sizeof(struct journal_v2_block_trailer) > UINT32_MAX)
+        samples_exact = false;
+
+    if (samples_exact) {
+        samples_offset = total_file_size;
+        total_file_size += samples_size;
+    }
 
     // File trailer
     uint32_t trailer_offset = total_file_size;
@@ -1758,6 +1922,10 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
             if (unlikely(!data))
                 break;
 
+            // its samples, in metric list order
+            if (samples_exact)
+                ((uint32_t *)(data_start + samples_offset))[Index] = (uint32_t)metric_info->samples;
+
             // Next we will write
             //   Header
             //   Detailed entries (descr @ time)
@@ -1803,6 +1971,25 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
             internal_error(
                 true, "DBENGINE: CALCULATE CRC FOR UUIDs  %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
 
+            if (samples_exact) {
+                size_t samples_bytes = number_of_metrics * sizeof(uint32_t);
+                journal_v2_trailer = (struct journal_v2_block_trailer *)(data_start + samples_offset + samples_bytes);
+                crc = crc32(0L, Z_NULL, 0);
+                crc = crc32(crc, data_start + samples_offset, samples_bytes);
+                crc32set(journal_v2_trailer->checksum, crc);
+
+                struct journal_v2_samples_descriptor samples_descriptor = {
+                    .magic = JOURNAL_V2_SAMPLES_MAGIC,
+                    .count = (uint32_t)number_of_metrics,
+                    .samples = file_samples,
+                    .offset = samples_offset,
+                };
+                crc = crc32(0L, Z_NULL, 0);
+                crc = crc32(crc, (void *)&samples_descriptor, offsetof(struct journal_v2_samples_descriptor, crc));
+                samples_descriptor.crc = (uint32_t)crc;
+                memcpy(data_start + JOURNAL_V2_SAMPLES_DESCRIPTOR_OFFSET, &samples_descriptor, sizeof(samples_descriptor));
+            }
+
             // Prepare to write checksum for the file
             j2_header.data = NULL;
             journal_v2_trailer = (struct journal_v2_block_trailer *)(data_start + trailer_offset);
@@ -1823,6 +2010,19 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
 
             // msync(data_start, total_file_size, MS_SYNC);
             journalfile_v2_data_set(journalfile, fd_v2, data_start, total_file_size);
+
+            // From now on this datafile is described by this journal: its samples
+            // are the indexed ones (duplicate pages and pages of deleted metrics
+            // were dropped). Without a section the next startup estimates them,
+            // so keep what was charged at flush time until then.
+            if (samples_exact) {
+                // the reset replaces the charge: a flush charging this datafile at
+                // the same time would be lost - the indexer only picks datafiles
+                // without writers (journal_v2_indexing_tp_worker), so there is none
+                internal_fatal(datafile->writers.running || datafile->writers.flushed_to_open_running,
+                               "DBENGINE: resetting the samples of a datafile that has writers");
+                rrdeng_datafile_samples_set(datafile, file_samples, false);
+            }
 
             internal_error(
                 true, "DBENGINE: ACTIVATING NEW INDEX JNL %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);

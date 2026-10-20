@@ -42,7 +42,7 @@ It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The service principal or managed identity requires these Azure RBAC roles:
 
@@ -376,7 +376,7 @@ Configure the **azure_monitor** collector from the Netdata web interface:
 4. In the Search box, type _azure_monitor_ (or scroll the list) to locate the **azure_monitor** collector.
 5. Click the **+** next to the **azure_monitor** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -631,11 +631,17 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_express_route_gateway_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.cpu_utilization | ExpressRoute GW CPU on ${label:resource_name} |
-| [ am_express_route_gateway_active_flows ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.active_flows | ExpressRoute GW active flows on ${label:resource_name} |
-| [ am_express_route_gateway_route_changes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.route_changes | ExpressRoute GW route churn on ${label:resource_name} |
-| [ am_express_route_gateway_routes_advertised ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.routes_advertised | ExpressRoute GW routes advertised on ${label:resource_name} |
-| [ am_express_route_gateway_routes_learned ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.routes_learned | ExpressRoute GW routes learned on ${label:resource_name} |
+| [ am_express_route_gateway_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.cpu_utilization | Average CPU utilization of ExpressRoute Gateway ${label:resource_name} in ${label:resource_group} (${label:region}). High CPU may cause degraded forwarding performance |
+| [ am_express_route_gateway_throughput ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.gateway_throughput | Average throughput of ExpressRoute Gateway ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_express_route_gateway_connection_in ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.connection_throughput | Average inbound connection throughput of ExpressRoute Gateway ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_express_route_gateway_connection_out ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.connection_throughput | Average outbound connection throughput of ExpressRoute Gateway ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_express_route_gateway_packets ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.packets | Average packet rate through ExpressRoute Gateway ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_express_route_gateway_active_flows ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.active_flows | Average number of active flows on ExpressRoute Gateway ${label:resource_name} in ${label:resource_group} (${label:region}). High flow counts may indicate approaching scalability limits |
+| [ am_express_route_gateway_route_changes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.route_changes | Rate of BGP route changes on ExpressRoute Gateway ${label:resource_name} in ${label:resource_group} (${label:region}). Frequent route changes may indicate BGP instability |
+| [ am_express_route_gateway_routes_advertised ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.routes_advertised | Number of routes advertised to peer by ExpressRoute Gateway ${label:resource_name} in ${label:resource_group} (${label:region}). Azure limits advertised routes to 1000 per peering |
+| [ am_express_route_gateway_routes_learned ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.routes_learned | Number of routes learned from peer by ExpressRoute Gateway ${label:resource_name} in ${label:resource_group} (${label:region}). Azure limits learned routes to 4000 per peering |
+| [ am_express_route_gateway_flow_creation_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.max_flows_creation_rate | Maximum flow creation rate on ExpressRoute Gateway ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_express_route_gateway_vm_count ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.vm_count | Number of VMs in the VNet behind ExpressRoute Gateway ${label:resource_name} in ${label:resource_group} (${label:region}) |
 
 
 

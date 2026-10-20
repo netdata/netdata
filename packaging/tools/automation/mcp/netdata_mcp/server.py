@@ -10,7 +10,7 @@ Surface (fire-and-poll; no synchronous tool):
     - netdata_job_logs(job_id, offset)           -> incremental output
     - netdata_job_cancel(job_id)
   run (by agent-id):
-    - netdata_agent_declare(agent_id, worktree, profile)
+    - netdata_agent_declare(agent_id, worktree, profile, port=None)
     - netdata_run_start(agent_id, restart=False) -> build+install if needed, then launch
                                                     (restart=True: stop + rebuild + relaunch)
     - netdata_run_status(agent_id)               -> building|starting|ready|stopped|failed
@@ -56,7 +56,8 @@ _INSTRUCTIONS = (
     "Build: *_start tools return a job_id immediately; poll netdata_job_status until "
     "it's no longer 'running'. Run: declare an agent (netdata_agent_declare), then "
     "netdata_run_start/_status/_logs/_stop by agent-id; netdata_run_start builds+installs "
-    "if needed and launches netdata on an auto-assigned port — poll until 'ready'. "
+    "if needed and launches netdata on an auto-assigned port (or the port pinned at "
+    "declare) — poll until 'ready'. "
     "Builds go in <worktree>/build/ (one per worktree; use a worktree dedicated to LLM runs); "
     "clangd finds build/compile_commands.json there natively, so editor/clangd errors that "
     "contradict a successful build are stale-database false positives — trust the build. "

@@ -270,8 +270,14 @@ struct rrdhost {
                     uint32_t counter_in;            // counts the number of replication statements we have received
                     uint32_t counter_out;           // counts the number of replication statements we have sent
                     uint32_t backfill_pending;      // the number of replication requests pending on us
-                    uint32_t charts;                // the number of charts currently being replicated from a child
-                    NETDATA_DOUBLE percent;         // the % of replication completion
+                    // High 32 bits: charts whose claim won the receiver-replication transition in this
+                    // connection generation. Low 32 bits: charts still outstanding. A duplicate
+                    // CHART_DEFINITION_END moves neither half. The ratio is therefore "completed charts
+                    // among the charts admitted in this connection generation", not a monotonic progress
+                    // clock: admitting new charts mid-generation legitimately moves it backwards.
+                    // Keep this naturally 8-byte aligned: misaligned 64-bit atomics on armv6l/armv7l
+                    // degrade to libatomic calls.
+                    uint64_t charts_started_and_remaining __attribute__((aligned(8)));
                 } replication;
 
                 // single-writer (the receiver thread), relaxed-atomic; read lock-free by the
@@ -362,6 +368,24 @@ struct rrdhost {
     // locks
 
     SPINLOCK rrdhost_update_lock;
+
+    // The host's lifetime lock: the admission protocol between the paths that make a host live and
+    // the paths that remove it.
+    // - Removers (remove-stale-node, the orphan/ephemeral reaper, the memory-mode replace in
+    //   rrdhost_find_or_create()) take the write side with trywrite, re-check that the host is still
+    //   eligible AFTER acquiring it, and hold it until the host is unlinked from the index.
+    // - Attachers (the stream receiver, a plugin defining or re-enabling a vnode, an un-archive in
+    //   rrdhost_update()) hold the read side - a "pin" - from the index lookup until the host is
+    //   marked live. The pin is acquired under rrd_rdlock() (or rrd_wrlock()), which is what keeps
+    //   the pointer valid between the lookup and the pin. rrdhost_find_or_create() returns hosts
+    //   pinned.
+    // - A plugin holds a pin on the non-local host it has selected (HOST, HOST_DEFINE_END) for as long
+    //   as it is selected, because it keeps using that pointer: see pluginsd_select_host(). Selecting
+    //   localhost takes no pin: localhost is never removed.
+    // Nobody ever waits for the write side, so holding a pin cannot block anyone; failing to take a
+    // pin means a removal is in progress, and the attacher refuses and retries later. Every pin MUST
+    // be released with rrdhost_pin_release() on the thread that took it: a leaked pin makes the host
+    // unremovable. The metadata sync scan and the CLI's mark-ephemeral path also take the read side.
     RW_SPINLOCK metadata_lifetime_lock;
 
     // ------------------------------------------------------------------------
@@ -431,6 +455,10 @@ extern RRDHOST *localhost;
 // the child reconnects via normal backoff. With cleanup off the lock, all
 // other readers (status, ACLK, capabilities, paths, event-driven sends)
 // keep blocking-lock semantics and stay truthful.
+//
+// Error logs are tolerated under it, as on the attach and replication-reset paths. rrdset_free()
+// releases a chart's receiver-replication claim under it, and a refused release logs an error; a
+// refusal means the accounting is already corrupt, which the ownership invariant makes unreachable.
 #define rrdhost_receiver_lock(host) spinlock_lock(&(host)->receiver_lock)
 #define rrdhost_receiver_unlock(host) spinlock_unlock(&(host)->receiver_lock)
 
@@ -444,10 +472,79 @@ extern RRDHOST *localhost;
 #define rrdhost_program_name(host) string2str((host)->program_name)
 #define rrdhost_program_version(host) string2str((host)->program_version)
 
-#define rrdhost_receiver_replicating_charts(host) (__atomic_load_n(&((host)->stream.rcv.status.replication.charts), __ATOMIC_RELAXED))
-#define rrdhost_receiver_replicating_charts_plus_one(host) (__atomic_add_fetch(&((host)->stream.rcv.status.replication.charts), 1, __ATOMIC_RELAXED))
-#define rrdhost_receiver_replicating_charts_minus_one(host) (__atomic_sub_fetch(&((host)->stream.rcv.status.replication.charts), 1, __ATOMIC_RELAXED))
-#define rrdhost_receiver_replicating_charts_zero(host) (__atomic_store_n(&((host)->stream.rcv.status.replication.charts), 0, __ATOMIC_RELAXED))
+static inline uint64_t rrdhost_receiver_replication_accounting(RRDHOST *host) {
+    return __atomic_load_n(&host->stream.rcv.status.replication.charts_started_and_remaining, __ATOMIC_RELAXED);
+}
+
+// One claim attempt: one unit of cohort in the high half, one outstanding chart in the low half. The
+// claim adds it and the duplicate-CHART_DEFINITION_END rollback subtracts it, both in one atomic op,
+// so the two halves can never be observed out of step and a duplicate moves neither.
+//
+// The add is deliberately unguarded, unlike the two subtracts. A carry out of the low half needs 2^32
+// charts outstanding on one host at once, which the address space rules out. A wrap of the high half
+// needs 2^32 won claims inside a single connection generation, and its consequence is a cohort of 0
+// with work outstanding, i.e. the NAN diagnostic - the same wrap and the same reading the separate
+// uint32_t cohort had before it was packed. Neither warrants a CAS retry loop on the claim path.
+#define RRDHOST_RCV_REPLICATION_UNIT (((uint64_t)1 << 32) | 1)
+
+static inline uint64_t rrdhost_receiver_replication_accounting_pack(uint32_t started, uint32_t remaining) {
+    return ((uint64_t)started << 32) | remaining;
+}
+
+static inline uint32_t rrdhost_receiver_replication_remaining_of(uint64_t accounting) {
+    return (uint32_t)accounting;
+}
+
+static inline uint32_t rrdhost_receiver_replication_started_of(uint64_t accounting) {
+    return (uint32_t)(accounting >> 32);
+}
+
+// Reinstall a word saved by rrdhost_receiver_replication_accounting(); the tests save and restore the
+// host's real accounting around the synthetic states they install.
+static inline void rrdhost_receiver_replication_accounting_restore(RRDHOST *host, uint64_t saved) {
+    __atomic_store_n(&host->stream.rcv.status.replication.charts_started_and_remaining, saved, __ATOMIC_RELAXED);
+}
+
+// Test-facing setter: install both halves together so tests cannot create a torn synthetic state.
+static inline void rrdhost_receiver_replication_accounting_set(RRDHOST *host, uint32_t started, uint32_t remaining) {
+    rrdhost_receiver_replication_accounting_restore(host, rrdhost_receiver_replication_accounting_pack(started, remaining));
+}
+
+static inline uint32_t rrdhost_receiver_replicating_charts(RRDHOST *host) {
+    return rrdhost_receiver_replication_remaining_of(rrdhost_receiver_replication_accounting(host));
+}
+
+static inline uint32_t rrdhost_receiver_replicating_charts_started(RRDHOST *host) {
+    return rrdhost_receiver_replication_started_of(rrdhost_receiver_replication_accounting(host));
+}
+
+static inline void rrdhost_receiver_replicating_charts_zero(RRDHOST *host) {
+    rrdhost_receiver_replication_accounting_restore(host, 0);
+}
+
+// Decrement the outstanding half by one, CHECKED - unlike the sender counterpart. `function` names the
+// release site for the refusal log. Callers MUST only decrement a contribution they own, i.e. one whose
+// RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS they observed in their own CAS old-value; the guard is
+// what stops an unowned one corrupting the word, and the refusal is how a test sees it happen. Reach it
+// through rrdhost_receiver_replication_release() (rrdset.h) unless you are a test driving the guard
+// itself: that function is what pairs the decrement with the flag transition that authorises it.
+//
+// Both decrements return the outstanding count: after the subtraction, or, when the guard refuses,
+// as observed in the word the refusal was decided on. Zero is a count, not a success indicator.
+uint32_t rrdhost_receiver_replicating_charts_decrement(RRDHOST *host, const char *function);
+
+// The duplicate-CHART_DEFINITION_END rollback: withdraw the speculative unit this same thread just
+// added, both halves together. Called by rrdhost_receiver_replication_claim() on a lost CAS, and by
+// the test that drives the guard directly. It is NOT a release - it does not clear the flag.
+uint32_t rrdhost_receiver_replication_withdraw(RRDHOST *host);
+#define rrdhost_receiver_replicating_charts_minus_one(host) rrdhost_receiver_replicating_charts_decrement(host, __FUNCTION__)
+
+// Receiver replication completion, as a percentage over the current connection generation's cohort.
+// Computed from the counters on every read - there is no stored value to go stale. Returns NAN (which
+// the JSON writers emit as `null`) only for a state the counters should make unreachable.
+NETDATA_DOUBLE rrdhost_receiver_replication_completion(RRDHOST *host, uint32_t *instances);
+
+// The receiver-replication claim/release pair is declared in rrdset.h, where RRDSET_FLAGS is visible.
 
 #define rrdhost_sender_replicating_charts(host) (__atomic_load_n(&((host)->stream.snd.status.replication.charts), __ATOMIC_RELAXED))
 #define rrdhost_sender_replicating_charts_plus_one(host) (__atomic_add_fetch(&((host)->stream.snd.status.replication.charts), 1, __ATOMIC_RELAXED))
@@ -497,6 +594,18 @@ RRDHOST *rrdhost_find_by_node_id(const char *node_id);
 // the lifetime argument, that constraint, and why this is not keyed on node_id
 bool rrdhost_apply_by_machine_guid(const char *machine_guid, void (*cb)(RRDHOST *host, void *data), void *data, bool may_block);
 
+// Pin a host found in the index (see metadata_lifetime_lock). The caller MUST hold rrd_rdlock() or
+// rrd_wrlock() from the lookup until this returns. False means a removal holds the write side or is
+// trying to take it (a failed trywrite sets the writer bit briefly), so it can also fail during a
+// removal attempt that does not succeed: the caller MUST NOT make the host live and SHOULD retry later.
+static inline bool rrdhost_pin_try(RRDHOST *host) {
+    return rw_spinlock_tryread_lock(&host->metadata_lifetime_lock);
+}
+
+static inline void rrdhost_pin_release(RRDHOST *host) {
+    rw_spinlock_read_unlock(&host->metadata_lifetime_lock);
+}
+
 // Copies a machine-guid into a GUID_LEN + 1 byte destination, truncating anything longer.
 // Exposed for rrdhost_machine_guid_unittest().
 void rrdhost_machine_guid_copy(char *dst, const char *guid);
@@ -528,7 +637,8 @@ RRDHOST *rrdhost_create(
     time_t replication_step,
     struct rrdhost_system_info *system_info,
     int is_localhost,
-    bool archived
+    bool archived,
+    bool pin
     );
 
 void rrdhost_init(void);
@@ -544,6 +654,9 @@ static inline RRDHOST *rrdhost_from_nrpc_owner(NRPC_OWNER id) { return (RRDHOST 
 // used by the nRPC unittests to re-init localhost's registry identically
 void rrdhost_nrpc_registry_owner(RRDHOST *host, struct nrpc_registry_owner *owner);
 
+// Returns the host PINNED (see metadata_lifetime_lock): the caller MUST call rrdhost_pin_release()
+// on every path, once the host is marked live or the caller gave up on it. NULL means the host is
+// being created or removed by someone else right now - retry later.
 RRDHOST *rrdhost_find_or_create(
     const char *hostname,
     const char *registry_hostname,

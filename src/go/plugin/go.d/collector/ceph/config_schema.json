@@ -168,19 +168,19 @@
     "required": [
       "url"
     ],
-    "anyOf": [
-      {
+    "if": {
+      "not": {
         "required": [
           "bearer_token_file"
         ]
-      },
-      {
-        "required": [
-          "username",
-          "password"
-        ]
       }
-    ]
+    },
+    "then": {
+      "required": [
+        "username",
+        "password"
+      ]
+    }
   },
   "uiSchema": {
     "bearer_token_file": {

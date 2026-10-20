@@ -2,6 +2,8 @@
 
 These practical examples will help you optimize Netdata for various real-world deployment scenarios.
 
+For constrained robots, signage players and other edge devices, see [Edge Device Monitoring](../fleet-management/README.md).
+
 ## Single Agent Configuration
 
 Single Agents work great out of the box with sensible defaults.
@@ -23,10 +25,10 @@ We don't recommend connecting Children to Cloud directly. This reduces the Netda
 
 **What this does:**
 
-- Stores metrics in RAM only (zero disk I/O)
+- Stores recent metric samples in RAM (metadata and logs can still write to disk)
 - Disables machine learning (Parent handles it)
 - Disables alerts (Parent handles them)
-- Keeps only 20 minutes of data locally
+- Retains recent samples in memory, with capacity rounded to allocation pages
 - Restricts dashboard to localhost only
 
 Edit `netdata.conf` on the Child using the [edit-config](/docs/netdata-agent/configuration/README.md#locate-your-config-directory) script:
@@ -36,9 +38,10 @@ Edit `netdata.conf` on the Child using the [edit-config](/docs/netdata-agent/con
     # https://github.com/netdata/netdata/blob/master/src/database/README.md
     # none = no retention, ram = some retention in ram
     db = ram
-    # The retention in seconds.
-    # This provides some tolerance to the time the child has to find a parent 
-    # to transfer the data. For IoT, this can be lowered to 120.
+    # Sample entries per dimension for RAM mode, rounded to allocation pages.
+    # On 4 KiB-page devices, 1200 rounds to 2048 entries (~34 minutes at 1s).
+    # The retained time depends on each chart's collection interval.
+    # See the fleet guide before reducing this or changing the cadence.
     retention = 1200
     # The granularity of metrics, in seconds.
     # You may increase this to lower CPU resources.

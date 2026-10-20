@@ -197,7 +197,7 @@ func (s *scriptSession) readFrames() {
 	defer close(s.readerDone)
 	scanner := bufio.NewScanner(s.stdout)
 	scanner.Buffer(make([]byte, 4096), maxMessageBytes+1)
-	scanner.Split(splitFrame)
+	scanner.Split(newFrameSplitter())
 	for scanner.Scan() {
 		frame := scriptFrame{
 			data: bytes.Clone(scanner.Bytes()),
@@ -222,21 +222,31 @@ func (s *scriptSession) readFrames() {
 	}
 }
 
-// splitFrame requires LF, including after the last frame. It keeps CR in the
-// token so every byte counts toward the limit (JSON whitespace is accepted by
-// the decoder).
-func splitFrame(data []byte, atEOF bool) (int, []byte, error) {
-	if i := bytes.IndexByte(data, '\n'); i >= 0 {
-		if i+1 > maxMessageBytes {
+// newFrameSplitter returns a split function for one scanner. It requires LF,
+// including after the last frame. It keeps CR in the token so every byte counts
+// toward the limit (JSON whitespace is accepted by the decoder).
+//
+// The scanner retries with the whole pending frame after every read, so the LF
+// search resumes after the bytes already checked: rescanning from the start
+// makes a frame delivered in pipe-sized reads cost quadratic time.
+func newFrameSplitter() bufio.SplitFunc {
+	var checked int // leading bytes of the pending frame known to hold no LF
+	return func(data []byte, atEOF bool) (int, []byte, error) {
+		if i := bytes.IndexByte(data[checked:], '\n'); i >= 0 {
+			i += checked
+			checked = 0
+			if i+1 > maxMessageBytes {
+				return 0, nil, errResponseTooLarge
+			}
+			return i + 1, data[:i], nil
+		}
+		checked = len(data)
+		if len(data) >= maxMessageBytes {
 			return 0, nil, errResponseTooLarge
 		}
-		return i + 1, data[:i], nil
+		if atEOF && len(data) != 0 {
+			return 0, nil, io.ErrUnexpectedEOF
+		}
+		return 0, nil, nil
 	}
-	if len(data) >= maxMessageBytes {
-		return 0, nil, errResponseTooLarge
-	}
-	if atEOF && len(data) != 0 {
-		return 0, nil, io.ErrUnexpectedEOF
-	}
-	return 0, nil, nil
 }

@@ -46,7 +46,7 @@ It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The service principal or managed identity requires these Azure RBAC roles:
 
@@ -380,7 +380,7 @@ Configure the **azure_monitor** collector from the Netdata web interface:
 4. In the Search box, type _azure_monitor_ (or scroll the list) to locate the **azure_monitor** collector.
 5. Click the **+** next to the **azure_monitor** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -635,17 +635,17 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_redis_cache_server_load ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.server_load | Redis server load on ${label:resource_name} |
-| [ am_redis_cache_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.cpu | Redis CPU on ${label:resource_name} |
-| [ am_redis_cache_memory_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.memory_utilization | Redis memory utilization on ${label:resource_name} |
-| [ am_redis_cache_miss_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.miss_rate | Redis cache miss rate on ${label:resource_name} |
-| [ am_redis_cache_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.errors | Redis errors on ${label:resource_name} |
-| [ am_redis_cache_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.latency | Redis average latency on ${label:resource_name} |
-| [ am_redis_cache_latency_p99 ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.latency_p99 | Redis P99 latency on ${label:resource_name} |
-| [ am_redis_cache_evicted_keys ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.key_events | Redis key evictions on ${label:resource_name} |
-| [ am_redis_cache_geo_replication_health ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.geo_replication_health | Redis geo-replication health on ${label:resource_name} |
-| [ am_redis_cache_geo_replication_lag ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.geo_replication_lag | Redis geo-replication lag on ${label:resource_name} |
-| [ am_redis_cache_geo_replication_sync_offset ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.geo_replication_sync_offset | Redis geo-replication sync offset on ${label:resource_name} |
+| [ am_redis_cache_server_load ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.server_load | Maximum server load on Azure Cache for Redis ${label:resource_name} in ${label:resource_group} (${label:region}). Sustained high server load causes timeouts and increased latency |
+| [ am_redis_cache_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.cpu | Maximum CPU utilization on Azure Cache for Redis ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_redis_cache_memory_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.memory_utilization | Maximum memory utilization on Azure Cache for Redis ${label:resource_name} in ${label:resource_group} (${label:region}). High memory causes evictions and potential data loss |
+| [ am_redis_cache_miss_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.miss_rate | Cache miss rate on Azure Cache for Redis ${label:resource_name} in ${label:resource_group} (${label:region}). High miss rates indicate the cache is not effectively serving requests |
+| [ am_redis_cache_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.errors | Errors on Azure Cache for Redis ${label:resource_name} in ${label:resource_group} (${label:region}). Includes authentication failures, maxmemory errors, and connection issues |
+| [ am_redis_cache_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.latency | Average cache latency on Azure Cache for Redis ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_redis_cache_latency_p99 ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.latency_p99 | P99 latency on Azure Cache for Redis ${label:resource_name} in ${label:resource_group} (${label:region}). Tail latency spikes indicate resource pressure or network issues |
+| [ am_redis_cache_evicted_keys ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.key_events | Rate of evicted keys on Azure Cache for Redis ${label:resource_name} in ${label:resource_group} (${label:region}). Key evictions indicate the cache is running out of memory |
+| [ am_redis_cache_geo_replication_health ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.geo_replication_health | Geo-replication link health on Azure Cache for Redis ${label:resource_name} in ${label:resource_group} (${label:region}). A value below 1 indicates the replication link is unhealthy |
+| [ am_redis_cache_geo_replication_lag ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.geo_replication_lag | Geo-replication connectivity lag on Azure Cache for Redis ${label:resource_name} in ${label:resource_group} (${label:region}). High lag indicates network issues between primary and secondary regions |
+| [ am_redis_cache_geo_replication_sync_offset ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.geo_replication_sync_offset | Geo-replication data sync offset on Azure Cache for Redis ${label:resource_name} in ${label:resource_group} (${label:region}). Large offset indicates the secondary is falling behind the primary |
 
 
 

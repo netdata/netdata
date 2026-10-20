@@ -44,7 +44,7 @@ It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The service principal or managed identity requires these Azure RBAC roles:
 
@@ -378,7 +378,7 @@ Configure the **azure_monitor** collector from the Netdata web interface:
 4. In the Search box, type _azure_monitor_ (or scroll the list) to locate the **azure_monitor** collector.
 5. Click the **+** next to the **azure_monitor** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -628,7 +628,19 @@ jobs:
 
 ## Alerts
 
-There are no alerts configured by default for this integration.
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ am_app_service_health_check ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.health | Health check status of App Service ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_app_service_http_5xx_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.http_status | HTTP 5xx server error rate on App Service ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_app_service_response_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.response_time | Average HTTP response time of App Service ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_app_service_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.cpu | CPU utilization of App Service ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_app_service_request_queue ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.request_queue | Requests queued in application queue of App Service ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_app_service_http_4xx_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.http_status | HTTP 4xx client error rate on App Service ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_app_service_http_403_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.http_error_detail | HTTP 403 Forbidden response rate on App Service ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_app_service_http_401_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.http_error_detail | HTTP 401 Unauthorized response rate on App Service ${label:resource_name} in ${label:resource_group} (${label:region}) |
 
 
 

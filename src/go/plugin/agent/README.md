@@ -47,6 +47,10 @@ Empty provider/catalog selections remain explicitly enabled. The go.d, ibm.d and
 existing defaults through `cmd/internal/secretproviders`. StatsD omits the capability. Shared Agent/job-manager
 packages do not select concrete backends. See [Job Manager secrets](jobmgr/ARCHITECTURE.md#secrets).
 
+`agent.Config.ProcessFunctions` opts into collector-independent process Functions, including operation with no
+enabled collectors. See [process Function providers](../../pkg/funcapi/README.md#process-function-providers) for
+provider declarations, generation ownership, shutdown and availability contracts.
+
 ## Custom plugin example
 
 [Yep! So easy!](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/examples/simple/main.go)

@@ -85,13 +85,6 @@ groups:
 const fixtureManifest = `version: v1
 command: [./collect.sh]
 charts: charts.yaml
-metrics:
-  - {name: depth, type: gauge, unit: jobs}
-  - {name: processed_total, type: counter, unit: jobs}
-checks:
-  - id: backlog
-    title: Queue Backlog
-    by_labels: [queue]
 `
 
 // fixtureCollector writes a one-shot package whose Bash command runs body, and
@@ -129,7 +122,7 @@ func appendFile(t *testing.T, path, data string) {
 // snapshotJSON matches the fixture package, with the backlog check in state.
 func snapshotJSON(state string) string {
 	return fmt.Sprintf(
-		`{"version":"v1","metrics":[{"name":"depth","value":17,"labels":{"queue":"mail","region":"east"}},{"name":"processed_total","value":100,"labels":{"queue":"mail"}}],"checks":[{"id":"backlog","state":%q,"labels":{"queue":"mail"}}]}`,
+		`{"version":"v1","metrics":[{"name":"depth","unit":"jobs","samples":[{"value":17,"labels":{"queue":"mail","region":"east"}}]},{"name":"processed_total","type":"counter","unit":"jobs","samples":[{"value":100,"labels":{"queue":"mail"}}]}],"checks":[{"id":"backlog","title":"Queue Backlog","by_labels":["queue"],"samples":[{"state":%q,"labels":{"queue":"mail"}}]}]}`,
 		state,
 	)
 }
@@ -233,7 +226,8 @@ count=$(printf '%%s' "$ND_CONFIG" | %q -er '.config.count')
 if [[ $1 == serve ]]; then nd_ready; fi
 collect_snapshot() {
     nd_begin
-    nd_metric depth "$count" queue mail
+    nd_metric depth gauge jobs
+    nd_sample "$ND_FAMILY" "$count" queue mail
     nd_end
 }
 if [[ $1 == serve ]]; then while nd_next; do collect_snapshot; done
@@ -254,7 +248,7 @@ def reply(req):
     with (root / "requests").open("a") as f:
         f.write(json.dumps(req) + "\n")
     if req["method"] == "collect":
-        return {"version":"v1", "metrics":[{"name":"depth","value":count,"labels":{"queue":"mail"}}]}
+        return {"version":"v1", "metrics":[{"name":"depth","unit":"jobs","samples":[{"value":count,"labels":{"queue":"mail"}}]}]}
     args = req["args"]
     if "wait" in args:
         (root / (str(count) + ".active")).touch()
@@ -292,7 +286,7 @@ const fixtureFunctions = `functions:
 `
 
 // functionFixture registers the configured fixture with an items Function
-// served by functionPeer. functionOnly drops metrics, checks and charts.
+// served by functionPeer. functionOnly disables collection and drops charts.
 func functionFixture(t *testing.T, mode string, functionOnly bool) (collectorapi.Registry, string) {
 	t.Helper()
 	python := requireTool(t, "python3")
@@ -304,8 +298,7 @@ func functionFixture(t *testing.T, mode string, functionOnly bool) (collectorapi
 	var doc map[string]any
 	require.NoError(t, yaml.Unmarshal(data, &doc))
 	if functionOnly {
-		delete(doc, "metrics")
-		delete(doc, "checks")
+		doc["collect"] = false
 		delete(doc, "charts")
 	}
 	data, err = yaml.Marshal(doc)

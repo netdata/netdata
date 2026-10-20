@@ -1,9 +1,11 @@
-//! Minimal, always-on perf tracking: named phase timers plus byte/frame/record
-//! counters, summarized at the end.
+//! Minimal, always-on perf tracking for the index build: named phase timers plus
+//! byte/frame/record counters ([`Metrics`]), summarized by [`Metrics::report`] at
+//! end of run, plus a Linux-only RSS reader ([`read_rss`]) for the peak-memory line.
 //!
-//! Add a phase by wrapping code in `metrics.scope("name")`; add counters as new
-//! stages appear. Timing is coarse (per phase/frame), never per record, so it
-//! does not perturb the work it measures.
+//! Stages time themselves with [`Metrics::scope`] and feed the counters as work
+//! happens — the `scope` names and `add_*` calls live in `sfst_build.rs`, and the
+//! `ng-index` binary prints the report. Timing is per phase/frame, never per
+//! record, so it does not perturb the work it measures.
 
 use std::cell::{Cell, RefCell};
 use std::time::{Duration, Instant};
@@ -43,8 +45,9 @@ pub fn read_rss() -> Option<Rss> {
 
 /// Per-run phase timings and throughput counters.
 ///
-/// Single-threaded; every method takes `&self` (interior mutability) so a live
-/// [`Scope`] guard and counter updates coexist without borrow conflicts.
+/// Single-threaded by construction (`Cell`/`RefCell` are not `Sync`). Every method
+/// takes `&self` (interior mutability) so a live `Scope` guard and counter
+/// updates coexist without borrow conflicts.
 pub struct Metrics {
     start: Instant,
     phases: RefCell<Vec<(&'static str, Duration)>>,
@@ -74,15 +77,18 @@ impl Metrics {
         }
     }
 
-    /// Bytes processed (decoded payload), for throughput.
+    /// WAL frame payload bytes read (decompressed), for the MiB/s throughput line.
     pub fn add_bytes(&self, n: u64) {
         self.bytes.set(self.bytes.get() + n);
     }
 
+    /// WAL frames read (one flattened request per frame).
     pub fn add_frames(&self, n: u64) {
         self.frames.set(self.frames.get() + n);
     }
 
+    /// Records indexed — log records in the logs path, spans in the traces path —
+    /// feeding the logs/s rates in [`Metrics::report`].
     pub fn add_records(&self, n: u64) {
         self.records.set(self.records.get() + n);
     }
@@ -116,8 +122,8 @@ impl Metrics {
             } else {
                 0.0
             };
-            // Per-phase logs/s — the key metric for tracking an optimization's
-            // effect on a single stage (records processed over that phase's time).
+            // Total records ÷ that phase's time — the key number when judging an
+            // optimization on a single stage; exact for the phase that counts records.
             let logs_per_s = if phase_secs > 0.0 {
                 records as f64 / phase_secs
             } else {
@@ -128,8 +134,8 @@ impl Metrics {
             ));
         }
         if secs > 0.0 {
-            // End-to-end headline: total records over total wall time. Stays the
-            // bottom-line figure as more phases are added (each lengthens `secs`).
+            // End-to-end headline: total records over total wall time. Adding
+            // phases only lengthens the denominator, so the figure stays comparable.
             out.push_str(&format!(
                 "throughput: {:.0} logs/s (end-to-end)  |  {:.1} MiB/s decoded\n",
                 records as f64 / secs,

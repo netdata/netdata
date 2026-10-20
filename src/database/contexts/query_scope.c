@@ -84,8 +84,16 @@ ssize_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN 
     return added;
 }
 
+// A plain context name (no separators, wildcards, negation or escapes) compiles to a pattern
+// that matches only that name, so a dictionary miss for it is final.
+static bool scope_contexts_is_plain_name(const char *scope_contexts, SIMPLE_PATTERN *scope_contexts_sp) {
+    return scope_contexts && *scope_contexts && scope_contexts_sp && !strchr(scope_contexts, '\\') &&
+           !simple_pattern_contains_wildcards(scope_contexts, SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS);
+}
+
 ssize_t query_scope_foreach_context(RRDHOST *host, const char *scope_contexts, SIMPLE_PATTERN *scope_contexts_sp,
-                                   SIMPLE_PATTERN *contexts_sp, foreach_context_cb_t cb, bool queryable_host, void *data) {
+                                   SIMPLE_PATTERN *contexts_sp, foreach_context_cb_t cb, bool queryable_host, void *data,
+                                   foreach_stop_cb_t stop_cb) {
     if(unlikely(!host->rrdctx.contexts))
         return 0;
 
@@ -108,10 +116,16 @@ ssize_t query_scope_foreach_context(RRDHOST *host, const char *scope_contexts, S
 
         rrdcontext_release(rca);
     }
-    else {
+    else if(!scope_contexts_is_plain_name(scope_contexts, scope_contexts_sp)) {
         // Probably it is a pattern, we need to search for it...
         RRDCONTEXT *rc;
         dfe_start_read(host->rrdctx.contexts, rc) {
+            // polled before the scope filter: a scan that rejects every context never reaches cb
+            if(stop_cb && stop_cb(data)) {
+                added = -1;
+                break;
+            }
+
             if(scope_contexts_sp && !simple_pattern_matches_string(scope_contexts_sp, rc->id))
                 continue;
 

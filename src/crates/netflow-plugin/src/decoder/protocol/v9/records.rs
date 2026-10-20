@@ -104,8 +104,9 @@ pub(crate) fn append_v9_records(
                             if should_skip_zero_ip(canonical, &value_str) {
                                 continue;
                             }
-                            // IpProtocolVersion is fully handled by special mappings
-                            // (raw "6" -> etype 34525). Skip to avoid overwriting.
+                            // IpProtocolVersion is fully handled by apply_v9_special_mappings_record
+                            // (raw "6" -> etype 34525); its canonical key is also ETYPE, so skip it
+                            // to keep set_record_field from overwriting that etype with the raw version.
                             if matches!(field, V9Field::IpProtocolVersion) {
                                 continue;
                             }

@@ -46,6 +46,7 @@ from gen_docs_integrations import (  # noqa: E402
     read_integrations_js,
 )
 from gen_doc_collector_page import get_integration_description  # noqa: E402
+from gen_integrations import attach_descriptions  # noqa: E402
 from gen_npm_catalog import (  # noqa: E402
     PAGE_DESCRIPTIONS,
     build_device_modules,
@@ -547,6 +548,11 @@ def top_level_heading_count(markdown):
     return len(re.findall(r"^# (?!#)", remove_fenced_code(markdown), flags=re.MULTILINE))
 
 
+def workflow_action(step):
+    """Return a workflow step's action without its ref; refs are SHA-pinned and bumped by Dependabot."""
+    return step.get("uses", "").split("@", 1)[0]
+
+
 def parse_description_with_learn_legacy_parser(description_line):
     """Apply the description-relevant behavior of Learn ingest's read_metadata()."""
     value = description_line.split(": ", 1)[1]
@@ -878,6 +884,23 @@ class GeneratedDocumentationDescriptionTest(unittest.TestCase):
             self.assertIsNotNone(description, integration_id)
             self.assertFalse(description.endswith("…"), integration_id)
             self.assertFalse(description.endswith("..."), integration_id)
+
+    def test_catalog_artifacts_carry_the_page_description(self):
+        with open(INTEGRATIONS_DIR / "integrations.json", encoding="utf-8") as file:
+            clean_by_id = {integration["id"]: integration for integration in json.load(file)["integrations"]}
+
+        mismatches = []
+        for integration in self.integrations:
+            if integration["integration_type"] in DOCUMENTATION_TYPES:
+                expected = get_integration_meta_description(integration)
+            else:
+                expected = None
+            actual = (integration.get("description"), clean_by_id[integration["id"]].get("description"))
+            if actual != (expected, expected):
+                mismatches.append(integration["id"])
+
+        self.assertEqual(mismatches, [])
+        self.assertEqual(len(clean_by_id), len(self.integrations))
 
     def test_scoped_generation_rejects_a_collision_outside_the_selection(self):
         description = (
@@ -1243,6 +1266,40 @@ class DescriptionSchemaGeneratorEquivalenceTest(unittest.TestCase):
                 self._assert_contract(value, False, f"seeded Unicode separator {iteration}")
 
 
+class CatalogArtifactDescriptionTest(unittest.TestCase):
+    def test_documentation_records_in_both_variants_get_the_page_description(self):
+        description = "Monitor example service latency and availability across production systems."
+        meta = {"monitored_instance": {"description": description}}
+        integrations = [
+            {"id": "one", "integration_type": "collector", "meta": meta},
+            {"id": "two", "integration_type": "deploy", "meta": {}},
+        ]
+        clean_integrations = copy.deepcopy(integrations)
+
+        attach_descriptions(integrations, clean_integrations)
+
+        expected = [
+            {"id": "one", "integration_type": "collector", "meta": meta, "description": description},
+            {"id": "two", "integration_type": "deploy", "meta": {}},
+        ]
+        self.assertEqual(integrations, expected)
+        self.assertEqual(clean_integrations, expected)
+
+    def test_invalid_corpus_fails_without_attaching_anything(self):
+        description = "Monitor duplicate service latency and availability across production systems."
+        integrations = [
+            {"id": "one", "integration_type": "logs", "meta": {"description": description}},
+            {"id": "two", "integration_type": "logs", "meta": {"description": description}},
+        ]
+        clean_integrations = copy.deepcopy(integrations)
+
+        with self.assertRaisesRegex(ValueError, "Duplicate generated descriptions"):
+            attach_descriptions(integrations, clean_integrations)
+
+        attached = [integration.get("description") for integration in integrations + clean_integrations]
+        self.assertEqual(attached, [None] * 4)
+
+
 class GeneratorInputFailureTest(unittest.TestCase):
     def run_generator(self, cwd, *args):
         # The command is a fixed local script plus controlled test fixtures.
@@ -1396,7 +1453,7 @@ class DocumentationSourceRegressionTest(unittest.TestCase):
                     names.index("Generate Integrations"),
                     names.index("Generate src/collectors/SERVICE-DISCOVERY.md"),
                 )
-                self.assertTrue(any(step.get("uses") == "actions/setup-go@v7" for step in steps))
+                self.assertTrue(any(workflow_action(step) == "actions/setup-go" for step in steps))
 
                 environment = "virtualenv" if workflow.name == "generate-integrations.yml" else "venv"
                 documentation_steps = {
@@ -1425,7 +1482,7 @@ class DocumentationSourceRegressionTest(unittest.TestCase):
         post_merge_by_name = {step["name"]: step for step in post_merge_steps}
         cleanup = post_merge_by_name["Clean Up Temporary Data"]["run"]
         self.assertIn("src/go/plugin/go.d/collector/snmp/npm-catalog/metrics-metadata-gaps.txt", cleanup)
-        self.assertEqual(post_merge_by_name["Create PR"]["uses"], "peter-evans/create-pull-request@v8")
+        self.assertEqual(workflow_action(post_merge_by_name["Create PR"]), "peter-evans/create-pull-request")
 
     def test_map_descriptions_are_present_valid_and_unique(self):
         map_data = yaml.load((REPO_ROOT / "docs/.map/map.yaml").read_text(encoding="utf-8"))

@@ -234,6 +234,9 @@ static RRDHOST *load_archived_host_from_row(sqlite3_stmt *res)
                    rrdhost_hostname(host), host->machine_guid, node_str, is_ephemeral);
 #endif
 
+    // the pin from rrdhost_find_or_create() covered the initialization above; from here on an
+    // archived host is kept by RRDHOST_FLAG_PENDING_CONTEXT_LOAD, which every remover skips
+    rrdhost_pin_release(host);
     return host;
 }
 
@@ -1501,11 +1504,15 @@ void aclk_mqtt_client_reset()
     completion_destroy(&compl);
 }
 
+// a 0 ms libuv timeout can cause high cpu usage in older versions of libuv
+#define NODE_STATE_UPDATE_MIN_DELAY_MS (10)
+
 void schedule_node_state_update(RRDHOST *host, uint64_t delay)
 {
     if (unlikely(!host))
         return;
 
+    delay = MAX(delay, NODE_STATE_UPDATE_MIN_DELAY_MS);
     (void) queue_aclk_sync_cmd(ACLK_DATABASE_NODE_STATE, host, (void *)(uintptr_t)delay);
 }
 

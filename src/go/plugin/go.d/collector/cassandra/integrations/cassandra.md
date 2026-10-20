@@ -30,7 +30,7 @@ The [JMX Exporter](https://github.com/prometheus/jmx_exporter) is used to fetch 
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -138,7 +138,7 @@ Configure the **cassandra** collector from the Netdata web interface:
 4. In the Search box, type _cassandra_ (or scroll the list) to locate the **cassandra** collector.
 5. Click the **+** next to the **cassandra** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 

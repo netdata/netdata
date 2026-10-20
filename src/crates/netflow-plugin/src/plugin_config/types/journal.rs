@@ -21,8 +21,8 @@ pub(crate) struct JournalConfig {
     #[serde(default)]
     pub(crate) tiers: JournalTierRetentionOverrides,
 
-    /// CLI-only compatibility alias for standalone runs. YAML config remains
-    /// per-tier only; this legacy flag applies the same size limit to all tiers.
+    /// CLI-only compatibility flag for standalone runs: overrides the
+    /// per-tier size limit for every tier. YAML config remains per-tier.
     #[arg(
         long = "netflow-retention-size-of-journal-files",
         value_parser = parse_bytesize
@@ -30,8 +30,8 @@ pub(crate) struct JournalConfig {
     #[serde(skip)]
     pub(crate) cli_retention_size_of_journal_files: Option<ByteSize>,
 
-    /// CLI-only compatibility alias for standalone runs. YAML config remains
-    /// per-tier only; this legacy flag applies the same time limit to all tiers.
+    /// CLI-only compatibility flag for standalone runs: overrides the
+    /// per-tier duration limit for every tier. YAML config remains per-tier.
     #[arg(
         long = "netflow-retention-duration-of-journal-files",
         value_parser = parse_duration
@@ -64,9 +64,8 @@ pub(crate) struct JournalTierRetentionConfig {
     )]
     pub(crate) size_of_journal_files: Option<ByteSize>,
 
-    /// Maximum age. Unset (`null`) disables the duration limit; the
-    /// tier is then bounded only by `size_of_journal_files`. Omitted
-    /// values use the built-in size-only default.
+    /// Maximum age. Unset (`null`) or omitted disables the duration limit;
+    /// the tier is then bounded only by `size_of_journal_files`.
     #[serde(
         default = "default_retention_duration_of_journal_files_opt",
         deserialize_with = "deserialize_opt_duration",

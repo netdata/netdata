@@ -43,7 +43,7 @@ It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The service principal or managed identity requires these Azure RBAC roles:
 
@@ -377,7 +377,7 @@ Configure the **azure_monitor** collector from the Netdata web interface:
 4. In the Search box, type _azure_monitor_ (or scroll the list) to locate the **azure_monitor** collector.
 5. Click the **+** next to the **azure_monitor** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -632,18 +632,18 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_logic_apps_run_failure_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.run_failure_rate | Logic Apps run failure rate on ${label:resource_name} |
-| [ am_logic_apps_runs_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.run_lifecycle | Logic Apps failed runs on ${label:resource_name} |
-| [ am_logic_apps_run_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.run_latency | Logic Apps run latency on ${label:resource_name} |
-| [ am_logic_apps_run_throttled ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.run_throttling | Logic Apps run throttling on ${label:resource_name} |
-| [ am_logic_apps_actions_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.action_lifecycle | Logic Apps failed actions on ${label:resource_name} |
-| [ am_logic_apps_action_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.action_latency | Logic Apps action latency on ${label:resource_name} |
-| [ am_logic_apps_action_throttled ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.action_throttling | Logic Apps action throttling on ${label:resource_name} |
-| [ am_logic_apps_triggers_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.trigger_lifecycle | Logic Apps failed triggers on ${label:resource_name} |
-| [ am_logic_apps_trigger_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.trigger_latency | Logic Apps trigger latency on ${label:resource_name} |
-| [ am_logic_apps_trigger_throttled ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.trigger_throttling | Logic Apps trigger throttling on ${label:resource_name} |
-| [ am_logic_apps_completion_token_overflow ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.agent | Logic Apps completion token overflow on ${label:resource_name} |
-| [ am_logic_apps_prompt_token_overflow ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.agent | Logic Apps prompt token overflow on ${label:resource_name} |
+| [ am_logic_apps_run_failure_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.run_failure_rate | Percentage of workflow runs failing on Logic App ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_logic_apps_runs_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.run_lifecycle | Rate of failed workflow runs on Logic App ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_logic_apps_run_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.run_latency | Average workflow run latency on Logic App ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_logic_apps_run_throttled ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.run_throttling | Rate of throttled run events on Logic App ${label:resource_name} in ${label:resource_group} (${label:region}). Throttling indicates Azure rate limits are being hit |
+| [ am_logic_apps_actions_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.action_lifecycle | Rate of failed actions on Logic App ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_logic_apps_action_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.action_latency | Average action latency on Logic App ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_logic_apps_action_throttled ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.action_throttling | Rate of throttled action events on Logic App ${label:resource_name} in ${label:resource_group} (${label:region}). Throttling indicates connector rate limits are being hit |
+| [ am_logic_apps_triggers_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.trigger_lifecycle | Rate of failed triggers on Logic App ${label:resource_name} in ${label:resource_group} (${label:region}). Failed triggers prevent workflows from executing |
+| [ am_logic_apps_trigger_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.trigger_latency | Average trigger latency on Logic App ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_logic_apps_trigger_throttled ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.trigger_throttling | Rate of throttled trigger events on Logic App ${label:resource_name} in ${label:resource_group} (${label:region}). Throttling indicates trigger rate limits are being hit |
+| [ am_logic_apps_completion_token_overflow ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.agent | Rate of completion token overflow events on Logic App ${label:resource_name} in ${label:resource_group} (${label:region}). Indicates AI agent responses are exceeding token limits |
+| [ am_logic_apps_prompt_token_overflow ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.agent | Rate of prompt token overflow events on Logic App ${label:resource_name} in ${label:resource_group} (${label:region}). Indicates AI agent prompts are exceeding token limits |
 
 
 

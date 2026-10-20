@@ -405,6 +405,8 @@ prepare_cmake_options() {
   enable_feature PLUGIN_IBM "${ENABLE_IBM:-0}"
   enable_feature PLUGIN_SCRIPTS "${ENABLE_SCRIPTS:-0}"
   enable_feature PLUGIN_STATSD "${ENABLE_STATSD:-0}"
+  enable_feature PLUGIN_IPMI "${ENABLE_IPMI:-0}"
+  enable_feature PLUGIN_DEM "${ENABLE_DEM:-0}"
 
   check_for_feature EXPORTER_PROMETHEUS_REMOTE_WRITE "${EXPORTER_PROMETHEUS}" snappy
   check_for_feature EXPORTER_MONGODB "${EXPORTER_MONGODB}" libmongoc-1.0
@@ -843,7 +845,8 @@ install_netdata_dirs() {
         fi
       fi
 
-      run chown -R "${NETDATA_USER}:${NETDATA_GROUP}" "${x}"
+      # Applications own descendants, including private files and directories.
+      run chown "${NETDATA_USER}:${NETDATA_GROUP}" "${x}"
     done
 
     run chmod 755 "${NETDATA_LOG_DIR}"
@@ -854,7 +857,7 @@ install_netdata_dirs() {
         warning "failed to create ${NETDATA_CLAIMING_DIR}, it will need to be created manually."
       fi
     fi
-    run chown -R "${NETDATA_USER}:${NETDATA_GROUP}" "${NETDATA_CLAIMING_DIR}"
+    run chown "${NETDATA_USER}:${NETDATA_GROUP}" "${NETDATA_CLAIMING_DIR}"
     run chmod 770 "${NETDATA_CLAIMING_DIR}"
   fi
 

@@ -7,6 +7,9 @@
 #include "ebpf.h"
 #include "ebpf_disk.h"
 #include "libbpf_api/ebpf_library.h"
+#ifdef LIBBPF_MAJOR_VERSION
+#include <bpf/btf.h>
+#endif
 
 struct config disk_config = APPCONFIG_INITIALIZER;
 
@@ -20,15 +23,8 @@ static ebpf_local_maps_t disk_maps[] = {
      .map_type = BPF_MAP_TYPE_PERCPU_HASH
 #endif
     },
-    {.name = "tmp_disk_tp_stat",
-     .internal_input = 8192,
-     .user_input = 8192,
-     .type = NETDATA_EBPF_MAP_STATIC,
-     .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
-#ifdef LIBBPF_MAJOR_VERSION
-     .map_type = BPF_MAP_TYPE_PERCPU_HASH
-#endif
-    },
+    // tmp_disk_tp_stat is intentionally absent: its type must stay as defined by the object, because
+    // issue and completion can run on different CPUs.
     {.name = NULL,
      .internal_input = 0,
      .user_input = 0,
@@ -41,12 +37,6 @@ static ebpf_local_maps_t disk_maps[] = {
 static avl_tree_lock disk_tree;
 netdata_ebpf_disks_t *disk_list = NULL;
 
-const char *tracepoint_block_type = "block";
-const char *tracepoint_block_issue = "block_rq_issue";
-const char *tracepoint_block_rq_complete = "block_rq_complete";
-
-static int was_block_issue_enabled = 0;
-static int was_block_rq_complete_enabled = 0;
 static bool disk_safe_clean = false;
 
 static char **dimensions = NULL;
@@ -57,7 +47,110 @@ static netdata_idx_t *disk_hash_values = NULL;
 
 netdata_mutex_t plot_mutex;
 
-static netdata_mutex_t tracepoint_mutex;
+// SCSI (and so SATA/SAS) can bypass blk_mq_end_request(). Attach the existing completion program
+// to the SCSI completion path, with blk_mq_free_request() as a fallback for kernels where the
+// lower-level __blk_mq_end_request() symbol cannot be probed.
+#define NETDATA_DISK_SCSI_COMPLETE_TARGET "__blk_mq_end_request"
+#define NETDATA_DISK_SCSI_COMPLETE_FALLBACK_TARGET "blk_mq_free_request"
+#define NETDATA_DISK_COMPLETE_PROGRAM "netdata_block_rq_complete"
+#define NETDATA_DISK_SINGLE_QUEUE_START_TARGET "blk_start_request"
+#define NETDATA_DISK_ISSUE_PROGRAM "netdata_block_rq_issue"
+#define NETDATA_DISK_INFLIGHT_MAP "tmp_disk_tp_stat"
+
+static struct bpf_link *disk_scsi_complete_link = NULL;
+static struct bpf_link *disk_single_queue_start_link = NULL;
+
+static ebpf_local_maps_t disk_inflight_map_stats[] = {
+    {.name = NETDATA_DISK_INFLIGHT_MAP, .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+    {.name = NULL, .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED}};
+
+static struct bpf_link *ebpf_disk_attach_kprobe(struct bpf_program *prog, const char *target)
+{
+    if (!prog || bpf_program__get_type(prog) != BPF_PROG_TYPE_KPROBE)
+        return NULL;
+
+    struct bpf_link *link = bpf_program__attach_kprobe(prog, false, target);
+    if (!link || libbpf_get_error(link))
+        return NULL;
+
+    return link;
+}
+
+/**
+ * Attach SCSI completion
+ *
+ * Attach the request completion program to the completion function used by the SCSI layer.
+ * The attach is optional: without it, disks completed through blk_mq_end_request() keep working.
+ *
+ * @param prog the loaded completion program.
+ */
+static void ebpf_disk_attach_scsi_completion(struct bpf_program *prog)
+{
+    if (!prog || bpf_program__get_type(prog) != BPF_PROG_TYPE_KPROBE)
+        return;
+
+    disk_scsi_complete_link = ebpf_disk_attach_kprobe(prog, NETDATA_DISK_SCSI_COMPLETE_TARGET);
+    if (!disk_scsi_complete_link) {
+        disk_scsi_complete_link = ebpf_disk_attach_kprobe(prog, NETDATA_DISK_SCSI_COMPLETE_FALLBACK_TARGET);
+        if (disk_scsi_complete_link) {
+            netdata_log_info("Using %s as the disk completion fallback.", NETDATA_DISK_SCSI_COMPLETE_FALLBACK_TARGET);
+        }
+    }
+
+    if (!disk_scsi_complete_link) {
+        netdata_log_info(
+            "Cannot attach disk completion to %s or %s; latency of SCSI, SATA and SAS disks will not be collected.",
+            NETDATA_DISK_SCSI_COMPLETE_TARGET,
+            NETDATA_DISK_SCSI_COMPLETE_FALLBACK_TARGET);
+    }
+}
+
+/**
+ * Attach the existing issue probe to the legacy single-queue request path.
+ *
+ * @param prog the loaded request issue program.
+ */
+static void ebpf_disk_attach_single_queue_start(struct bpf_program *prog)
+{
+    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_0 || !prog ||
+        bpf_program__get_type(prog) != BPF_PROG_TYPE_KPROBE)
+        return;
+
+    disk_single_queue_start_link = ebpf_disk_attach_kprobe(prog, NETDATA_DISK_SINGLE_QUEUE_START_TARGET);
+    if (!disk_single_queue_start_link) {
+        netdata_log_info(
+            "Cannot attach disk issue probe to %s; latency for non-multiqueue devices will not be collected.",
+            NETDATA_DISK_SINGLE_QUEUE_START_TARGET);
+    }
+}
+
+/**
+ * Detach SCSI completion
+ */
+static void ebpf_disk_detach_scsi_completion(void)
+{
+    if (!disk_scsi_complete_link)
+        return;
+
+    bpf_link__destroy(disk_scsi_complete_link);
+    disk_scsi_complete_link = NULL;
+}
+
+static void ebpf_disk_detach_single_queue_start(void)
+{
+    if (!disk_single_queue_start_link)
+        return;
+
+    bpf_link__destroy(disk_single_queue_start_link);
+    disk_single_queue_start_link = NULL;
+}
+
+static void ebpf_disk_set_inflight_map_fd(struct bpf_object *obj)
+{
+    struct bpf_map *map = bpf_object__find_map_by_name(obj, NETDATA_DISK_INFLIGHT_MAP);
+    if (map)
+        disk_inflight_map_stats[0].map_fd = bpf_map__fd(map);
+}
 
 #ifdef LIBBPF_MAJOR_VERSION
 /**
@@ -70,6 +163,7 @@ static netdata_mutex_t tracepoint_mutex;
 static inline void ebpf_disk_set_hash_table(struct disk_bpf *obj)
 {
     disk_maps[NETDATA_DISK_IO].map_fd = bpf_map__fd(obj->maps.tbl_disk_iocall);
+    ebpf_disk_set_inflight_map_fd(obj->obj);
 }
 
 /**
@@ -83,12 +177,27 @@ static inline void ebpf_disk_set_hash_table(struct disk_bpf *obj)
  */
 static inline int ebpf_disk_load_and_attach(struct disk_bpf *obj)
 {
+    const char *section = bpf_program__section_name(obj->progs.netdata_blk_complete_request);
+    if (section && strncmp(section, "fentry/", 7) == 0) {
+        int complete_id = ebpf_kernel_btf_find_by_name_kind("blk_complete_request", BTF_KIND_FUNC);
+        if (complete_id <= 0)
+            bpf_program__set_autoload(obj->progs.netdata_blk_complete_request, false);
+    }
+
+    ebpf_update_map_type(obj->maps.tbl_disk_iocall, &disk_maps[NETDATA_DISK_IO]);
+
     int ret = disk_bpf__load(obj);
     if (ret) {
         return ret;
     }
 
-    return disk_bpf__attach(obj);
+    ret = disk_bpf__attach(obj);
+    if (!ret) {
+        ebpf_disk_attach_single_queue_start(obj->progs.netdata_block_rq_issue);
+        ebpf_disk_attach_scsi_completion(obj->progs.netdata_block_rq_complete);
+    }
+
+    return ret;
 }
 #endif
 
@@ -391,33 +500,6 @@ void ebpf_update_disks(ebpf_module_t *em)
  *****************************************************************/
 
 /**
- * Disk disable tracepoints
- *
- * Disable tracepoints when the plugin was responsible to enable it.
- */
-static void ebpf_disk_disable_tracepoints(void)
-{
-    const char *default_message = "Cannot disable the tracepoint";
-    int block_issue_enabled;
-    int block_rq_complete_enabled;
-
-    netdata_mutex_lock(&tracepoint_mutex);
-    block_issue_enabled = was_block_issue_enabled;
-    block_rq_complete_enabled = was_block_rq_complete_enabled;
-    netdata_mutex_unlock(&tracepoint_mutex);
-
-    if (!block_issue_enabled) {
-        if (ebpf_disable_tracing_values(tracepoint_block_type, tracepoint_block_issue))
-            netdata_log_error("%s %s/%s.", default_message, tracepoint_block_type, tracepoint_block_issue);
-    }
-
-    if (!block_rq_complete_enabled) {
-        if (ebpf_disable_tracing_values(tracepoint_block_type, tracepoint_block_rq_complete))
-            netdata_log_error("%s %s/%s.", default_message, tracepoint_block_type, tracepoint_block_rq_complete);
-    }
-}
-
-/**
  * Cleanup Disk List
  */
 static void ebpf_cleanup_disk_list(void)
@@ -454,8 +536,6 @@ static void ebpf_disk_exit(void *pptr)
         return;
     }
 
-    ebpf_disk_disable_tracepoints();
-
     if (dimensions) {
         ebpf_histogram_dimension_cleanup(dimensions, NETDATA_EBPF_HIST_MAX_BINS);
         dimensions = NULL;
@@ -465,10 +545,12 @@ static void ebpf_disk_exit(void *pptr)
     disk_hash_values = NULL;
 
     netdata_mutex_destroy(&plot_mutex);
-    netdata_mutex_destroy(&tracepoint_mutex);
 
     if (disk_list)
         ebpf_cleanup_disk_list();
+
+    ebpf_disk_detach_scsi_completion();
+    ebpf_disk_detach_single_queue_start();
 
     if (!ebpf_plugin_stop() && em->functions.bpf_unload)
         em->functions.bpf_unload(em);
@@ -518,11 +600,10 @@ static void read_hard_disk_tables(int table, int maps_per_core)
         if (ebpf_plugin_stop())
             break;
 
+        key = next_key;
         int test = bpf_map_lookup_elem(table, &key, values);
-        if (test < 0) {
-            key = next_key;
+        if (test < 0)
             continue;
-        }
 
         netdata_ebpf_disks_t find;
         find.dev = key.dev;
@@ -532,22 +613,19 @@ static void read_hard_disk_tables(int table, int maps_per_core)
 
         // Disk was inserted after we parse /proc/partitions
         if (!ret) {
-            if (read_local_disks()) {
-                key = next_key;
+            if (read_local_disks())
                 continue;
-            }
 
             ret = (netdata_ebpf_disks_t *)avl_search_lock(&disk_tree, (avl_t *)&find);
             if (!ret) {
                 // We should never reach this point, but we are adding it to keep a safe code
-                key = next_key;
                 continue;
             }
         }
 
         uint64_t total = 0;
         int i;
-        int end = (maps_per_core) ? 1 : ebpf_nprocs;
+        int end = maps_per_core ? ebpf_nprocs : 1;
         for (i = 0; i < end; i++) {
             total += values[i];
         }
@@ -556,8 +634,6 @@ static void read_hard_disk_tables(int table, int maps_per_core)
 
         if (!(ret->flags & NETDATA_DISK_ADDED_TO_PLOT_LIST))
             ebpf_fill_plot_disks(ret);
-
-        key = next_key;
     }
 }
 
@@ -759,42 +835,6 @@ static void disk_collector(ebpf_module_t *em)
  *
  *****************************************************************/
 
-/**
- * Enable tracepoints
- *
- * Enable necessary tracepoints for thread.
- *
- * @return  It returns 0 on success and -1 otherwise
- */
-static int ebpf_disk_enable_tracepoints()
-{
-    int test = ebpf_is_tracepoint_enabled(tracepoint_block_type, tracepoint_block_issue);
-    if (test == -1)
-        return -1;
-    else if (!test) {
-        if (ebpf_enable_tracing_values(tracepoint_block_type, tracepoint_block_issue))
-            return -1;
-    }
-
-    netdata_mutex_lock(&tracepoint_mutex);
-    was_block_issue_enabled = test;
-    netdata_mutex_unlock(&tracepoint_mutex);
-
-    test = ebpf_is_tracepoint_enabled(tracepoint_block_type, tracepoint_block_rq_complete);
-    if (test == -1)
-        return -1;
-    else if (!test) {
-        if (ebpf_enable_tracing_values(tracepoint_block_type, tracepoint_block_rq_complete))
-            return -1;
-    }
-
-    netdata_mutex_lock(&tracepoint_mutex);
-    was_block_rq_complete_enabled = test;
-    netdata_mutex_unlock(&tracepoint_mutex);
-
-    return 0;
-}
-
 /*
  * Load BPF
  *
@@ -808,9 +848,28 @@ static int ebpf_disk_load_bpf(ebpf_module_t *em)
 {
     int ret = 0;
     if (em->load & EBPF_LOAD_LEGACY) {
+        // The generic disk object set has no validated artifact for this kernel range. Do not load its 5.4
+        // fallback with baked-in structure offsets, which can attach successfully but silently collect nothing.
+        if (isrh == -1 && running_on_kernel >= NETDATA_EBPF_KERNEL_6_8) {
+            unsigned int kernel_major = (unsigned int)running_on_kernel >> 16;
+            unsigned int kernel_minor = ((unsigned int)running_on_kernel >> 8) & 0xff;
+            netdata_log_error(
+                "Disk latency is unavailable: no compatible generic legacy BPF object for kernel %u.%u; refusing "
+                "the 5.4 fallback. Use kernel BTF with CO-RE or a compatible legacy object.",
+                kernel_major,
+                kernel_minor);
+            return -1;
+        }
+
         em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
         if (!em->probe_links) {
             ret = -1;
+        } else {
+            ebpf_disk_set_inflight_map_fd(em->objects);
+            ebpf_disk_attach_single_queue_start(
+                bpf_object__find_program_by_name(em->objects, NETDATA_DISK_ISSUE_PROGRAM));
+            ebpf_disk_attach_scsi_completion(
+                bpf_object__find_program_by_name(em->objects, NETDATA_DISK_COMPLETE_PROGRAM));
         }
     }
 #ifdef LIBBPF_MAJOR_VERSION
@@ -864,18 +923,8 @@ void ebpf_disk_thread(void *ptr)
         goto enddisk;
     }
 
-    if (netdata_mutex_init(&tracepoint_mutex)) {
-        netdata_log_error("Cannot initialize tracepoint mutex");
-        goto enddisk;
-    }
-
+    // From here on, the exit handler owns plot_mutex cleanup.
     disk_safe_clean = true;
-
-    if (ebpf_disk_enable_tracepoints()) {
-        goto enddisk;
-    }
-
-    // disk_safe_clean already true - mutexes will be cleaned up on exit
 
     avl_init_lock(&disk_tree, ebpf_compare_disks);
     if (read_local_disks()) {
@@ -905,6 +954,7 @@ void ebpf_disk_thread(void *ptr)
     netdata_mutex_lock(&lock);
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, disk_maps, EBPF_ACTION_STAT_ADD);
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, disk_inflight_map_stats, EBPF_ACTION_STAT_ADD);
     netdata_mutex_unlock(&lock);
 
     disk_collector(em);

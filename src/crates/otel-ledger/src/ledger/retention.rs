@@ -1,4 +1,15 @@
-//! Steady-state retention pass.
+//! Steady-state retention for one tenant: evicts SFST index files over the
+//! tenant's policy limits and catalog files past the archive horizon, handing
+//! the deletions to the shared cleaner.
+//!
+//! There is no timer: `evaluate_retention` runs on the ledger's indexer
+//! response path after every WAL rotation (both call sites in
+//! `Ledger::handle_indexer_resp`, `ledger/indexer.rs`). Each pass collects
+//! decisions under the tenant registry's write lock, then marks entries
+//! pending deletion and dispatches the `CleanerRequest`s after dropping the
+//! lock. The cleaner's response handler completes the flow — success removes
+//! the entry from the registry, failure un-marks it
+//! (`Ledger::handle_cleaner_resp`, `ledger/cleaner.rs`).
 
 use bridge::signals::Signal;
 use file_registry::{SeqKey, TenantId};
@@ -11,24 +22,27 @@ use file_lifecycle::helpers::{catalog_retention_days, sfst_retention_policy};
 
 impl Ledger {
     /// Cancel-safety invariant: the mark-then-send-then-clear-on-failure
-    /// pattern below is only safe because `self.cleaner.send` is
-    /// non-awaiting (synchronous mpsc send). If this ever becomes
-    /// awaiting (bounded channel with backpressure, RPC, etc.), a
-    /// dropped task between `mark_pending_deletion` and the matching
-    /// `clear_pending_deletion` would leave the file stuck with
-    /// `pending_deletion: true` and no in-flight cleaner request.
-    /// Restructure to do mark + send under one lock guard, or thread
-    /// a deferred-rollback helper.
+    /// pattern below is only safe because `self.cleaner.send` is non-awaiting
+    /// (`ComponentHandle::send`, an unbounded mpsc send —
+    /// `file-lifecycle/src/component.rs`).
+    /// If this ever becomes awaiting (bounded channel with backpressure, RPC,
+    /// etc.), a dropped task between `mark_pending_deletion` and the matching
+    /// `clear_pending_deletion` would leave the file marked — hidden from
+    /// queries and future retention scans — with no in-flight cleaner request
+    /// and no rollback path. A cancellation-safe rollback (e.g. a clear-on-drop
+    /// guard) would have to come first.
     pub(super) async fn evaluate_retention(&mut self, signal: Signal, tenant_id: &TenantId) {
-        // Resolve the owning pipeline's retention config + registries handle
-        // up front so the shared cleaner (a `&mut self` field) stays borrowable.
+        // Resolve the per-tenant retention config and clone the registries
+        // handle up front, so nothing borrows `self` across the awaits below
+        // and the `&mut self` fields (uploader, cleaner) stay reachable.
         let pipeline = self.pipelines.get(signal);
         let retention = pipeline
             .config()
             .index
             .retention
             .resolve(tenant_id.as_str());
-        // Remote storage is process-global: enabled iff the shell built an uploader.
+        // Remote storage is process-global: enabled iff the ledger shell built
+        // an uploader in `Ledger::new`.
         let storage_enabled = self.uploader.is_some();
         let registries = pipeline.registries().clone();
 
@@ -44,7 +58,10 @@ impl Ledger {
                 None => return,
             };
 
-            // Three-knob policy: max_files / max_total_size / max_age.
+            // The resolved config is lowered onto sfst's plain-data policy
+            // (`sfst_retention_policy`, `file-lifecycle/src/helpers.rs`); the
+            // registry walks eligible files oldest-first and returns the seqs
+            // to evict.
             let to_evict = registry
                 .sfst
                 .evaluate_retention(&sfst_retention_policy(&retention), now_ns());
@@ -56,11 +73,10 @@ impl Ledger {
                     continue;
                 };
                 // Don't evict the local SFST until its catalog entry is
-                // confirmed present on the remote. This covers "not yet
-                // uploaded", "uploaded but not yet cataloged", and "cataloged
-                // locally but the catalog upload hasn't landed" — in all of
-                // them the remote SFST would be orphaned (referenced by no
-                // remote catalog) if we deleted the local copy now.
+                // confirmed present on the remote — covers "not yet uploaded",
+                // "uploaded but not yet cataloged", and "cataloged locally but
+                // the catalog upload hasn't landed". Deleting earlier would
+                // orphan the remote SFST (referenced by no remote catalog).
                 if storage_enabled && !registry.is_remote_cataloged(key) {
                     tracing::warn!(
                         "retention: deferring eviction of seq={key} (catalog not yet confirmed on remote)"
@@ -82,6 +98,9 @@ impl Ledger {
             reqs
         };
 
+        // Send outside the lock. A failed send rolls back the mark here; a
+        // failed deletion is un-marked later by the cleaner's failure
+        // response (`Ledger::handle_cleaner_resp`).
         for req in sfst_reqs {
             let key = match &req {
                 CleanerRequest::DeleteIndexFile { sequence, .. } => *sequence,
@@ -96,10 +115,11 @@ impl Ledger {
             }
         }
 
-        // Catalog retention pass. Day-count driven by the tenant's
-        // remote-archive `horizon` (decoupled from SFST `max_age`); see
-        // `catalog_retention_days`. A catalog file is evicted when its date
-        // is strictly older than `today - max_days`.
+        // Catalog retention pass. Day count from the tenant's remote-archive
+        // `horizon` (decoupled from SFST `max_age`; config load enforces
+        // horizon > max_age in day units so a catalog file always outlives the
+        // SFSTs it gates) — see `catalog_retention_days`. A catalog file is
+        // evicted when its date is strictly older than `today - max_days`.
         let catalog_reqs: Vec<CleanerRequest> = {
             let mut registries = registries.write().await;
             let registry = match registries.get_mut(tenant_id) {
@@ -121,6 +141,8 @@ impl Ledger {
             reqs
         };
 
+        // Same dispatch pattern as the SFST pass, with the catalog failure
+        // rollback in `Ledger::handle_cleaner_resp`.
         for req in catalog_reqs {
             let path = match &req {
                 CleanerRequest::DeleteCatalogFile { path, .. } => path.clone(),

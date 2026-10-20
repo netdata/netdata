@@ -32,10 +32,10 @@ Sources of findings, in priority order:
 1. **Human review comments** -- maintainers / devs / community.
 2. **AI bot review comments** -- cubic-dev-ai, coderabbitai, etc.
 3. **SonarCloud PR findings** -- new code-smell / vulnerability /
-   security-hotspot issues introduced by this PR. SonarCloud does NOT
-   post these as inline GitHub review-comments; only a QualityGate
-   summary is posted to GitHub. The actual findings live behind the
-   SonarCloud API and must be pulled explicitly.
+   security-hotspot issues introduced by this PR. Some security findings
+   are mirrored into GitHub inline comments by `github-advanced-security`.
+   Fetch the SonarCloud API explicitly for the complete finding set;
+   GitHub comments and the QualityGate summary are not a complete inventory.
 4. **CI failures relevant to this PR** -- shellcheck, codeql, build /
    test failures caused by the PR's changes.
 5. **Anything else this repo configures** (Codacy, custom workflows, ...).
@@ -122,6 +122,9 @@ These are non-negotiable. Skipping any of them will cost the user time.
   variants): handle
   within the authorized path above. Verify every finding; fix, reply and resolve only when those actions are
   authorized. Inspection alone ends with a report.
+- **Code-scanning authors** (`github-advanced-security`): verify findings against the originating analyzer and
+  current source. Use the same authorized thread workflow; mirrored Sonar issues also need their Sonar disposition
+  under step 3b.
 - **Informational bots** (`sonarqubecloud[bot]`, `github-actions[bot]`,
   `netdata-bot[bot]`): read for signal (e.g. quality
   gate status). They don't usually require a reply.
@@ -178,7 +181,7 @@ without this fetch or credential setup; a comment-only scope skips this step.
 bash .agents/skills/repo-pr-reviews/scripts/fetch-sonar-findings.sh <PR_NUMBER>
 ```
 
-This script fetches SonarCloud findings that are not posted inline on GitHub:
+This script fetches the full SonarCloud finding set, including findings absent from GitHub inline comments:
 - `.local/audits/pr-reviews/pr-<N>/sonar-issues.json`
 - `.local/audits/pr-reviews/pr-<N>/sonar-hotspots.json`
 - a brief summary to stdout (counts by rule and severity).
@@ -282,9 +285,9 @@ For each issue in `sonar-issues.json` and each hotspot in
 5. Account for every finding. An open issue count alone is not the stopping condition; use `AGENTS.md#review` and
    report unmet required quality gates explicitly.
 
-For Sonar there is no "thread reply" -- you address the issue with
-either a code fix or a `sonar-mark.sh` action. There's nothing to
-resolve in GitHub for Sonar findings.
+When a Sonar finding is mirrored into a GitHub thread, handle that thread under step 3 as well as the Sonar
+classification above. Replying to or resolving the GitHub thread does not change the Sonar issue state; a Sonar
+transition does not replace an explanation in the GitHub thread. Both actions require their existing authorization.
 
 ### 4-pre. Before pushing -- refresh and triage findings
 
@@ -457,6 +460,7 @@ again. A request to review a human comment does not itself authorize a reply.
 | `coderabbitai[bot]`          | Line-level code review                     | `trigger-coderabbit.sh` (`@coderabbitai review`) -- NEVER `@coderabbit`, that is a different, unrelated GitHub user |
 | `copilot[bot]`               | Line-level code review                     | Not re-triggered -- no credits (see rule 8)      |
 | `sonarqubecloud[bot]`        | Quality-gate status                        | Auto, on each scan run -- read its issue comment |
+| `github-advanced-security`  | Mirrored code-scanning findings             | Auto, on each scan upload; inspect the originating analyzer |
 | `github-actions[bot]`        | CI status / labels                         | Auto, on each workflow run                        |
 | `netdata-bot[bot]`           | Repo automation (labels, etc.)             | Auto                                              |
 

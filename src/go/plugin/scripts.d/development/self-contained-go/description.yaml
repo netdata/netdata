@@ -1,7 +1,5 @@
 version: v1
 mode: oneshot
-metrics:
-  - {name: depth, type: gauge, unit: jobs}
 functions:
   - {id: items, name: Items, help: Show the synthetic queue.}
 charts: |

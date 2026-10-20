@@ -15,11 +15,14 @@ use transport::encode_transport_journal_fields;
 use writer::JournalBufWriter;
 
 impl FlowRecord {
-    /// Encode fields into a byte buffer for journal writing. Optional fields at
-    /// their default value (0, empty string, None) are skipped; required fields
-    /// such as `PROTOCOL` are retained even when zero. The reader (`from_fields`)
-    /// defaults missing optional fields to the same values, so the round-trip is
-    /// lossless. This reduces typical per-entry item counts from 91 to ~20-25.
+    /// Encode fields into a byte buffer for journal writing. Fields at their
+    /// default value (0, empty string, `None`) are skipped, and presence-tracked
+    /// fields are emitted only when their flag is set; ports are the exception,
+    /// emitted by value alone, so a present-but-zero port loses its presence
+    /// flag on the `from_fields` round trip. `PROTOCOL` is retained even when
+    /// zero, and missing fields are read back by `from_fields` at these same
+    /// defaults, so field values round-trip losslessly. This reduces typical
+    /// per-entry item counts from 91 to ~20-25.
     pub(crate) fn encode_to_journal_buf(
         &self,
         data: &mut Vec<u8>,

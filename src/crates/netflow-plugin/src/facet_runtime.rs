@@ -3368,10 +3368,10 @@ mod tests {
         let tmp = tempfile::tempdir().expect("create temp dir");
         let runtime = FacetRuntime::new(tmp.path());
 
-        // Two journals, each promoted to sidecar by exceeding the static-value limit.
-        // distinct values. Each sidecar has only 30 entries that match the
-        // search term, so neither alone can fill FACET_AUTOCOMPLETE_LIMIT (256)
-        // and the loop must reach both sidecars.
+        // Two journals, each promoted to sidecar by exceeding the static-value
+        // limit of 256 distinct values. Each sidecar has only 30 entries that
+        // match the search term, so neither alone can fill
+        // FACET_AUTOCOMPLETE_LIMIT (256) and the loop must reach both sidecars.
         let paths = [
             tmp.path().join("flows-multi-a.journal"),
             tmp.path().join("flows-multi-b.journal"),

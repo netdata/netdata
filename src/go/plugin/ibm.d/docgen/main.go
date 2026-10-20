@@ -662,7 +662,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics

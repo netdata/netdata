@@ -22,7 +22,7 @@ Older Windows and Windows Server releases are end-of-life and are more likely to
 
 ## Access and Limitations
 
-On Windows, whether you can view monitoring data on the local dashboard at <http://localhost:19999> depends on your Netdata Cloud plan and deployment mode. On the free Community tier, standalone Agents collect metrics but the local dashboard is locked — view your data in [Netdata Cloud](https://app.netdata.cloud) instead. For the full details by plan and deployment mode (including air-gapped and streaming setups), see [Access Control and Feature Availability](/docs/netdata-oss-limitations.md).
+The local dashboard at <http://localhost:19999> works on Windows as it does on Linux, on every plan, including the free Community tier. Sensitive Functions and the node limit follow the same rules on every operating system; see [Access Control and Feature Availability](/docs/netdata-oss-limitations.md).
 
 ## Download the Windows Installer (MSI)
 

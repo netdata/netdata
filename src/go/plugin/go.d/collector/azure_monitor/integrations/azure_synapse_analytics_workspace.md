@@ -42,7 +42,7 @@ It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The service principal or managed identity requires these Azure RBAC roles:
 
@@ -376,7 +376,7 @@ Configure the **azure_monitor** collector from the Netdata web interface:
 4. In the Search box, type _azure_monitor_ (or scroll the list) to locate the **azure_monitor** collector.
 5. Click the **+** next to the **azure_monitor** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -631,14 +631,14 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_synapse_streaming_resource_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf) | azure_monitor.synapse.streaming_resource_utilization | Synapse streaming SU utilization on ${label:resource_name} |
-| [ am_synapse_streaming_runtime_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf) | azure_monitor.synapse.streaming_errors | Synapse streaming runtime errors on ${label:resource_name} |
-| [ am_synapse_streaming_data_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf) | azure_monitor.synapse.streaming_errors | Synapse streaming data errors on ${label:resource_name} |
-| [ am_synapse_streaming_watermark_delay ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf) | azure_monitor.synapse.streaming_watermark_delay | Synapse streaming watermark delay on ${label:resource_name} |
-| [ am_synapse_streaming_late_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf) | azure_monitor.synapse.streaming_event_timing | Synapse streaming late events on ${label:resource_name} |
-| [ am_synapse_streaming_out_of_order_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf) | azure_monitor.synapse.streaming_event_timing | Synapse streaming out-of-order events on ${label:resource_name} |
-| [ am_synapse_streaming_backlogged_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf) | azure_monitor.synapse.streaming_event_timing | Synapse streaming backlogged events on ${label:resource_name} |
-| [ am_synapse_link_processing_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf) | azure_monitor.synapse.link_processing_latency | Synapse Link processing latency on ${label:resource_name} |
+| [ am_synapse_streaming_resource_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf) | azure_monitor.synapse.streaming_resource_utilization | Streaming job resource utilization on Azure Synapse workspace ${label:resource_name} in ${label:resource_group} (${label:region}). High values indicate the streaming job is approaching capacity |
+| [ am_synapse_streaming_runtime_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf) | azure_monitor.synapse.streaming_errors | Streaming job runtime errors on Azure Synapse workspace ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_synapse_streaming_data_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf) | azure_monitor.synapse.streaming_errors | Streaming job data conversion and deserialization errors on Azure Synapse workspace ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_synapse_streaming_watermark_delay ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf) | azure_monitor.synapse.streaming_watermark_delay | Output watermark delay of the streaming job on Azure Synapse workspace ${label:resource_name} in ${label:resource_group} (${label:region}). High delay indicates the streaming job is falling behind real-time processing |
+| [ am_synapse_streaming_late_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf) | azure_monitor.synapse.streaming_event_timing | Rate of late-arriving input events in the streaming job on Azure Synapse workspace ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_synapse_streaming_out_of_order_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf) | azure_monitor.synapse.streaming_event_timing | Rate of out-of-order input events in the streaming job on Azure Synapse workspace ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_synapse_streaming_backlogged_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf) | azure_monitor.synapse.streaming_event_timing | Rate of backlogged input event sources in the streaming job on Azure Synapse workspace ${label:resource_name} in ${label:resource_group} (${label:region}). Backlog growth indicates input rate exceeds processing capacity |
+| [ am_synapse_link_processing_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf) | azure_monitor.synapse.link_processing_latency | Average Synapse Link processing latency on Azure Synapse workspace ${label:resource_name} in ${label:resource_group} (${label:region}). Only relevant when Synapse Link connections are configured |
 
 
 

@@ -81,6 +81,7 @@ struct analytics_data {
 
 void set_late_analytics_variables(struct rrdhost_system_info *system_info);
 void analytics_free_data(void);
+void analytics_info_to_json(BUFFER *wb);
 void analytics_log_shell(void);
 void analytics_log_json(void);
 void analytics_log_prometheus(void);
@@ -91,6 +92,7 @@ void get_system_timezone(void);
 bool system_timezone_is_user_configured(void);
 bool system_timezone_is_tzdb_name(void);
 const char *detect_system_timezone_name(char *buffer, size_t buffer_size);
+int timezone_windows_mapping_unittest(void);
 bool timezone_name_is_safe_tzdb_path(const char *timezone);
 void refresh_system_timezone(const char *timezone, bool is_tzdb_name);
 void analytics_reset(void);

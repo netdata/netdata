@@ -5,7 +5,8 @@ fn jenkins_hash64(data: &[u8]) -> u64 {
     use hashers::jenkins::Lookup3Hasher;
 
     if data.is_empty() {
-        // systemd's jenkins_hashlittle2() starts both halves from 0xdeadbeef.
+        // systemd's jenkins_hashlittle2() returns its un-mixed
+        // 0xdeadbeef/0xdeadbeef start state for empty input.
         return 0xdead_beef_dead_beef;
     }
 
@@ -13,6 +14,8 @@ fn jenkins_hash64(data: &[u8]) -> u64 {
     hasher.write(data);
     let hash = hasher.finish();
 
+    // The `hashers` crate packs the halves opposite to systemd
+    // (finish() = pb << 32 | pc); swap so the result matches the format.
     let low = (hash & 0xFFFF_FFFF) as u32;
     let high = (hash >> 32) as u32;
     ((low as u64) << 32) | high as u64
@@ -27,12 +30,19 @@ fn siphash24(data: &[u8], key: &[u8; 16]) -> u64 {
     hasher.finish()
 }
 
+/// Hashes `data` the way systemd's `journal_file_hash_data` does: keyed files
+/// (`HEADER_INCOMPATIBLE_KEYED_HASH`) use SipHash-2-4 keyed by the header
+/// `file_id`; legacy files use jenkins lookup3.
 pub fn journal_hash_data(data: &[u8], is_keyed_hash: bool, file_id: Option<&[u8; 16]>) -> u64 {
     if is_keyed_hash {
         if let Some(file_id) = file_id {
             siphash24(data, file_id)
         } else {
-            // FIXME: verify fallback behaviour
+            // Keyed hash requested but no file_id to key with — writer.rs gets
+            // here when computing entry `xor_hash`. The jenkins fallback
+            // matches what systemd computes for keyed files: it too hashes the
+            // raw payload with jenkins_hash64, so entry identity and cursors
+            // do not depend on the per-file key.
             jenkins_hash64(data)
         }
     } else {

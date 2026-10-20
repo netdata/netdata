@@ -173,7 +173,7 @@ For logs collected from systemd journals, Netdata reads standard journal files (
 
 Netdata is an open platform.
 
-It can ingest metrics in commonly used open standards, including OpenMetrics, StatsD, JSON, and OpenTelemetry OTLP/gRPC. Netdata also receives OpenTelemetry logs and has approximately 800+ data collection modules and plugins to directly collect data from applications.
+It can ingest metrics in commonly used open standards, including OpenMetrics, StatsD, JSON, and OpenTelemetry (OTLP over gRPC or HTTP). Netdata also receives OpenTelemetry logs and traces, and has approximately 800+ data collection modules and plugins to directly collect data from applications.
 
 Netdata can export metrics to Prometheus, InfluxDB, Graphite, OpenTSDB, TimescaleDB, and more.
 

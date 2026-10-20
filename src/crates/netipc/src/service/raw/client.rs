@@ -1,7 +1,7 @@
-use super::common::{ensure_client_scratch, next_power_of_2_u32, LookupLogicalConfig};
-use crate::protocol::{self, NipcError, MAX_PAYLOAD_CAP};
-use std::sync::atomic::{AtomicBool, Ordering};
+use super::common::{LookupLogicalConfig, ensure_client_scratch, next_power_of_2_u32};
+use crate::protocol::{self, MAX_PAYLOAD_CAP, NipcError};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 #[cfg(unix)]

@@ -29,9 +29,12 @@ while nd_next; do
     count=$((count+1))
     if [[ $count == 2 ]]; then nd_fail; continue; fi
     nd_begin
-    nd_metric processed_total "$count" queue mail
-    nd_metric depth "$$" queue mail
-    nd_check backlog critical queue mail
+    nd_metric processed_total counter jobs
+    nd_sample "$ND_FAMILY" "$count" queue mail
+    nd_metric depth gauge jobs
+    nd_sample "$ND_FAMILY" "$$" queue mail
+    nd_check backlog "Queue Backlog" queue
+    nd_check_sample "$ND_FAMILY" critical queue mail
     nd_end
 done
 `)
@@ -109,7 +112,7 @@ func TestPersistent_TerminalReply(t *testing.T) {
 	}{
 		"wrong id": {reply: `printf '%s\n' '{"id":"2","result":{"version":"v1"}}'`},
 		"invalid batch": {
-			reply: `printf '%s\n' '{"id":"1","result":{"version":"v1","metrics":[{"name":"depth","value":17},{"name":"undeclared","value":0}]}}'`,
+			reply: `printf '%s\n' '{"id":"1","result":{"version":"v1","metrics":[{"name":"depth","samples":[{"value":17}]},{"name":"invalid","samples":[{"value":null}]}]}}'`,
 		},
 		"unknown error": {reply: `printf '%s\n' '{"id":"1","error":"secret diagnostic"}'`},
 		"partial":       {reply: `printf '%s' '{"id":"1","result":{"version":"v1"}}'`},
@@ -149,9 +152,10 @@ func TestPersistent_DuplicateReplyIsTerminal(t *testing.T) {
 nd_ready
 nd_next
 nd_begin
-nd_metric depth 1
+nd_metric depth gauge jobs
+nd_sample "$ND_FAMILY" 1
 nd_end
-printf '%s\n' '{"id":"1","result":{"version":"v1","metrics":[{"name":"depth","value":999}]}}'
+printf '%s\n' '{"id":"1","result":{"version":"v1","metrics":[{"name":"depth","samples":[{"value":999}]}]}}'
 sleep 30
 `)
 	r := startRuntime(t, c)

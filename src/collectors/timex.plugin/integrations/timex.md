@@ -27,7 +27,7 @@ It uses system call adjtimex on Linux and ntp_adjtime on FreeBSD or Mac to monit
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -121,7 +121,7 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ system_clock_sync_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/timex.conf) | system.clock_sync_state | when set to 0, the system kernel believes the system clock is not properly synchronized to a reliable server |
+| [ system_clock_sync_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/timex.conf) | system.clock_sync_state | When set to 0, the system kernel believes the system clock is not properly synchronized to a reliable server |
 
 
 

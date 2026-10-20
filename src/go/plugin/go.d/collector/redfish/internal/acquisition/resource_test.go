@@ -37,6 +37,47 @@ func TestResourceMapDecodePreservesTypedJSONPolicy(t *testing.T) {
 	}
 }
 
+func TestResourceIdentityAcceptsSafeAliasesAndPreservesRejectionReasons(t *testing.T) {
+	root, origin, err := NormalizeServiceRoot("https://bmc.example/redfish/v1/")
+	require.NoError(t, err)
+	client := &Client{connection: connection{root: root, origin: origin}}
+	target, err := url.Parse("https://bmc.example/redfish/v1/Chassis/1/NetworkAdapters/1/")
+	require.NoError(t, err)
+	for name, test := range map[string]struct {
+		id      any
+		wantErr string
+	}{
+		"same path":          {id: "/redfish/v1/Chassis/1/NetworkAdapters/1/"},
+		"slash alias":        {id: "/redfish/v1/Chassis/1/NetworkAdapters/1"},
+		"remapped path":      {id: "/redfish/v1/Systems/1/NetworkAdapters/1"},
+		"absolute alias":     {id: "https://BMC.EXAMPLE:443/redfish/v1/Systems/1/NetworkAdapters/1"},
+		"network path alias": {id: "//bmc.example/redfish/v1/Systems/1/NetworkAdapters/1"},
+		"missing":            {wantErr: "resource has no usable @odata.id"},
+		"empty":              {id: "", wantErr: "resource has no usable @odata.id"},
+		"non string":         {id: 42, wantErr: "resource has no usable @odata.id"},
+		"cross origin":       {id: "https://other.example/redfish/v1/secret", wantErr: "invalid resource @odata.id: Redfish URI crosses the configured origin"},
+		"downgrade":          {id: "http://bmc.example/redfish/v1/secret", wantErr: "invalid resource @odata.id: Redfish URI crosses the configured origin"},
+		"userinfo":           {id: "https://user:secret@bmc.example/redfish/v1/Systems/1", wantErr: "invalid resource @odata.id: Redfish URI contains user-info"},
+		"query":              {id: "/redfish/v1/Systems/1?secret=value", wantErr: "invalid resource @odata.id: unexpected query in Redfish URI"},
+		"fragment":           {id: "/redfish/v1/Systems/1#/secret", wantErr: "invalid resource @odata.id: unexpected fragment in Redfish resource URI"},
+		"outside Redfish":    {id: "/secret", wantErr: "invalid resource @odata.id: Redfish URI leaves the Redfish path"},
+		"relative path":      {id: "secret", wantErr: "invalid resource @odata.id: path-relative Redfish URI is unsupported"},
+		"escaped path":       {id: "/redfish/v1/%2e%2e/secret", wantErr: "invalid resource @odata.id: Redfish URI contains an ambiguous escaped path"},
+		"malformed URL":      {id: "https://bmc.example/%secret", wantErr: "invalid resource @odata.id: invalid Redfish URI"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			data := map[string]any{"@odata.type": "#NetworkAdapter.v1_0_0.NetworkAdapter", "@odata.id": test.id}
+			err := client.validateResourceIdentity("network_adapter", data, target)
+			if test.wantErr != "" {
+				require.EqualError(t, err, test.wantErr)
+				assert.NotContains(t, err.Error(), "secret")
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
 func TestResourceValidationPreservesPartialDescendantPolicy(t *testing.T) {
 	root, origin, err := NormalizeServiceRoot("https://bmc.example/redfish/v1/")
 	require.NoError(t, err)
