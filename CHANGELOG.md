@@ -213,6 +213,10 @@
 - Build(deps): bump github.com/ibm-messaging/mq-golang/v5 from 5.7.2 to 5.7.3 in /src/go ([#24361](https://github.com/netdata/netdata/issues/24361))
 - Build(deps): bump github.com/klauspost/compress from 1.20.1 to 1.20.3 in /src/go ([#24359](https://github.com/netdata/netdata/issues/24359))
 - Fix(go.d): keep candidate recovery private across enable and waits ([#24367](https://github.com/netdata/netdata/issues/24367))
+- Docs(dem): restructure the architecture guide as a top-down tour ([#24376](https://github.com/netdata/netdata/issues/24376))
+- Build(go.d): update Cato SDK to v1.1.0 ([#24362](https://github.com/netdata/netdata/issues/24362))
+- Aclk: restore the t-rx timestamp in HTTP replies ([#24252](https://github.com/netdata/netdata/issues/24252))
+- Query: stop building the query target on timeout or interrupt ([#24348](https://github.com/netdata/netdata/issues/24348))
 
 ## [2.12.0] - 2026-09-30
 
