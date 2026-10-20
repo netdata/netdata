@@ -75,6 +75,30 @@ impl fmt::Display for SanitizedQuote<'_> {
     }
 }
 
+/// Renders a chart or dimension ID as one unquoted word.
+///
+/// IDs are written bare, and the agent splits words on ASCII whitespace and
+/// `=` and treats `'`, `"` and `\` as quoting/escaping
+/// (src/libnetdata/line_splitter). The chart ID carries the OTLP metric name
+/// and a dimension ID can carry a data-point attribute value, both chosen by
+/// the sender, so a newline would start a new agent command and the other
+/// characters would shift the remaining fields. Each of them, and any other
+/// ASCII control character, is written as `_`.
+struct SanitizedId<'a>(&'a str);
+
+impl fmt::Display for SanitizedId<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for ch in self.0.chars() {
+            if ch.is_ascii_control() || matches!(ch, ' ' | '=' | '\'' | '"' | '\\') {
+                f.write_char('_')?;
+            } else {
+                f.write_char(ch)?;
+            }
+        }
+        Ok(())
+    }
+}
+
 /// A chart definition: renders as one CHART line, then optional CLABEL
 /// lines + CLABEL_COMMIT, then one DIMENSION line per entry in
 /// `dimensions`, in that order.
@@ -104,7 +128,7 @@ impl fmt::Display for ChartDefinition {
         writeln!(
             f,
             "CHART {} '' '{}' '{}' '{}' '{}' {} 1 {} 'store_first'",
-            self.chart_name,
+            SanitizedId(&self.chart_name),
             SanitizedQuote(&self.title),
             SanitizedQuote(&self.units),
             SanitizedQuote(&self.family),
@@ -136,7 +160,9 @@ impl fmt::Display for ChartDefinition {
             writeln!(
                 f,
                 "DIMENSION {} {} absolute 1 {}",
-                dim_name, dim_name, PRECISION_DIVISOR,
+                SanitizedId(dim_name),
+                SanitizedId(dim_name),
+                PRECISION_DIVISOR,
             )?;
         }
 
@@ -195,15 +221,20 @@ pub fn write_data_slot(
     slot_timestamp: u64,
     dimensions: &[DimensionValue],
 ) -> fmt::Result {
-    writeln!(f, "BEGIN {} {}", chart_name, update_every * 1_000_000)?;
+    writeln!(
+        f,
+        "BEGIN {} {}",
+        SanitizedId(chart_name),
+        update_every * 1_000_000
+    )?;
 
     for dim in dimensions {
         match dim.value {
             Some(v) => {
                 let scaled = (v * PRECISION_DIVISOR as f64) as i64;
-                writeln!(f, "SET {} = {}", dim.name, scaled)?;
+                writeln!(f, "SET {} = {}", SanitizedId(&dim.name), scaled)?;
             }
-            None => writeln!(f, "SET {} =", dim.name)?,
+            None => writeln!(f, "SET {} =", SanitizedId(&dim.name))?,
         }
     }
 
