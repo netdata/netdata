@@ -629,7 +629,7 @@ _safe_download() {
 
     case "${result}" in
       0) return 0 ;;
-      22|78)
+      22|56|78)
           [ "${dest}" != "/dev/null" ] && rm -f "${dest}"
           case "$(tail -n 1 "${dl_log}")" in
             404) return 1 ;;

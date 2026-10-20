@@ -726,6 +726,20 @@ handle_curl_result() {
       handle_http_status "${status}" "${url}" "${action}"
       return "$?"
       ;;
+    56)
+      status="$(tail -n 1 "${dl_log}")"
+      [ -n "${dest}" ] && rm -f "${dest}"
+      case "${status}" in
+        2*)
+          warning "Protocol error when ${action} ${url}"
+          return 4
+          ;;
+        *)
+          handle_http_status "${status}" "${url}" "${action}"
+          return "$?"
+          ;;
+      esac
+      ;;
     5|6|7)
       [ -n "${dest}" ] && rm -f "${dest}"
       warning "Failed to connect to remote host when ${action} ${url}"
