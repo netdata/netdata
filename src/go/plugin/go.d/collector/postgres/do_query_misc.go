@@ -123,30 +123,6 @@ func (c *Collector) doQueryQueryableDatabases() error {
 			continue
 		}
 
-		tables, err := c.doDBQueryUserTablesCount(db)
-		if err != nil {
-			c.Warning(err)
-			conn.connErrors++
-			closeDBAndUnregisterConnConfig(db, connStr)
-			continue
-		}
-
-		indexes, err := c.doDBQueryUserIndexesCount(db)
-		if err != nil {
-			c.Warning(err)
-			conn.connErrors++
-			closeDBAndUnregisterConnConfig(db, connStr)
-			continue
-		}
-
-		if (c.MaxDBTables != 0 && tables > c.MaxDBTables) || (c.MaxDBIndexes != 0 && indexes > c.MaxDBIndexes) {
-			c.Warningf("database '%s' has too many user tables(%d/%d)/indexes(%d/%d), skipping it",
-				dbname, tables, c.MaxDBTables, indexes, c.MaxDBIndexes)
-			conn.connErrors = connErrMax
-			closeDBAndUnregisterConnConfig(db, connStr)
-			continue
-		}
-
 		conn.db, conn.connStr = db, connStr
 	}
 
@@ -154,36 +130,10 @@ func (c *Collector) doQueryQueryableDatabases() error {
 		if seen[dbname] {
 			continue
 		}
+		c.retireDatabaseRelations(conn.db)
 		delete(c.dbConns, dbname)
-		if conn.connStr != "" {
-			stdlib.UnregisterConnConfig(conn.connStr)
-		}
-		if conn.db != nil {
-			_ = conn.db.Close()
-		}
+		closeDBAndUnregisterConnConfig(conn.db, conn.connStr)
 	}
 
 	return nil
-}
-
-func (c *Collector) doDBQueryUserTablesCount(db *sql.DB) (int64, error) {
-	q := queryUserTablesCount()
-
-	var v string
-	if err := c.doDBQueryRow(db, q, &v); err != nil {
-		return 0, err
-	}
-
-	return parseInt(v), nil
-}
-
-func (c *Collector) doDBQueryUserIndexesCount(db *sql.DB) (int64, error) {
-	q := queryUserIndexesCount()
-
-	var v string
-	if err := c.doDBQueryRow(db, q, &v); err != nil {
-		return 0, err
-	}
-
-	return parseInt(v), nil
 }

@@ -57,6 +57,14 @@ Mechanisms:
 - Avoid lifecycle churn when absence can be transient. Choose the source-appropriate successful-observation/expiry
   policy instead of a universal one-minute timer; do not delay a known permanent removal solely to satisfy that timer.
 
+For rotating V1 selections, keep chart identity tied to the source object, then verify actual runtime emission and
+stored Agent rates on re-entry. `src/go/plugin/framework/jobruntime/job_v1_render.go` emits a zero/omitted BEGIN
+interval for newly constructed or previously unmeasured charts, asking the Agent to measure elapsed time. Clearing obsolete alone does not reset
+incremental counters (`src/database/rrdset.c`); collection-gap handling lives in `src/database/rrdset-collection.c`.
+Seed collector-computed ratios from two complete observations, and keep chart references per selected entity so
+retirement is identity-exact and linear in that entity's charts. PostgreSQL's `relations_emission_test.go` demonstrates
+runtime retirement, pruning and stable-identity return; its captured frames can be replayed through an isolated Agent.
+
 ### 1.6 Verify The Supported Source Contract
 
 Before designing a collector or interpreting a changed payload, verify the relevant supported protocol/application
