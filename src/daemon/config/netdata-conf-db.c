@@ -358,7 +358,7 @@ void netdata_conf_section_db(void) {
     if(nd_profile.update_every > UPDATE_EVERY_MAX) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "Data collection frequency in netdata.conf ([" CONFIG_SECTION_DB "].update every), changed from %d to %d",
-               (int)nd_profile.update_every, UPDATE_EVERY_MIN);
+               (int)nd_profile.update_every, UPDATE_EVERY_MAX);
         nd_profile.update_every = UPDATE_EVERY_MAX;
         inicfg_set_duration_seconds(&netdata_config, CONFIG_SECTION_DB, "update every", nd_profile.update_every);
     }
