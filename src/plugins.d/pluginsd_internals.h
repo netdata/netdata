@@ -150,8 +150,8 @@ static inline void pluginsd_clear_scope_chart(PARSER *parser, const char *keywor
 //
 // pinned: the caller pinned host (under the rrd lock) and hands the pin over. It is false for
 // localhost, which is not removed while collectors run, and for NULL, which ends the selection.
-// The chart scope belongs to the previous host, so it is cleared before that host's pin is released.
-// Re-selecting the same host is fine: the new pin is held before the old one is released.
+// The chart scope and the chart references belong to the previous host, so they are cleared and released
+// before that host's pin is released: releasing a chart reference uses its host. Re-selecting the same host is fine: the new pin is held before the old one is released.
 static inline void pluginsd_select_host(PARSER *parser, RRDHOST *host, bool pinned, const char *keyword) {
     RRDHOST *old_pin = parser->user.host_pin;
 
@@ -161,6 +161,9 @@ static inline void pluginsd_select_host(PARSER *parser, RRDHOST *host, bool pinn
         stream_send_rrdset_metrics_finished(&parser->user.v2.stream_buffer, parser->user.st);
 
     pluginsd_clear_scope_chart(parser, keyword, NULL);
+
+    // the ended scope's reference would otherwise be released when the keyword returns, after the pin
+    pluginsd_keyword_chart_refs_release(parser);
 
     parser->user.host = host;
     parser->user.host_pin = pinned ? host : NULL;
