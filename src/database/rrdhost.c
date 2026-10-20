@@ -53,6 +53,9 @@ RRDHOST *rrdhost_find_by_node_id(const char *node_id) {
 // rrdhost_free___consume_metadata_lifetime_writelock() too, which frees with no lock held: by the
 // time it gets there the host is already out of the index, so it can no longer be found here.
 //
+// The same bridge is how a host is kept beyond the read lock: pinning it (rrdhost_pin_try(), the read
+// side of metadata_lifetime_lock) while the lock is still held stops every remover from taking it.
+//
 // `may_block` selects how the read lock is taken, and a caller that can run on more than one thread
 // MUST decide it per call rather than once:
 //   true  - wait for the lock. Correct for any thread nobody can be waiting on while holding
@@ -332,23 +335,16 @@ void rrdhost_metadata_identity_release(RRDHOST_METADATA_IDENTITY *identity) {
 //   address reuse harmless - a later RRDHOST allocated at the same address
 //   finds no entry to inherit.
 //
-// WHAT THIS HOST DOES NOT GUARANTEE, deliberately recorded so nobody builds on
-// the opposite: init and destroy CAN overlap for one host. The create-side
-// init runs under rrd_wrlock, but the un-archive init (rrdhost_update(), below)
-// does NOT - rrdhost_find_or_create() releases rrd_wrlock before calling it,
-// and rrdhost_update_lock is the only lock it takes. The orphan reaper in
-// svc_rrdhost_cleanup_orphan_hosts() holds rrd_wrlock and the host's
-// metadata_lifetime_lock, neither of which excludes that init. So a child
-// reconnecting to a long-archived host can un-archive it at the same moment
-// the reaper tears it down.
-//
-// The component tolerates this - every interleaving is memory-safe, and the
-// worst case is that the host comes out live with no function registry until
-// its next archive/un-archive cycle. It is also not new: the same window
-// existed when entries were keyed on the machine guid. Note that the same
-// interleaving has a larger, pre-existing problem that has nothing to do with
-// nRPC: rrdhost_update() writes into a host that rrdhost_free_unlinked() may be
-// freeing. Fixing that serialization is what would close this properly.
+// - init and destroy do not overlap for one host. The create-side init runs
+//   under rrd_wrlock. The un-archive init (rrdhost_update(), below) runs
+//   without the rrd lock, but with the host pinned (the read side of
+//   metadata_lifetime_lock, taken by rrdhost_find_or_create()), and every
+//   destroy - the orphan reaper in svc_rrdhost_cleanup_orphan_hosts(), the
+//   remove-stale-node CLI - holds the write side, so a child reconnecting to a
+//   long-archived host either un-archives it before the reaper can take it, or
+//   is refused (and retries) while the reaper holds it. rrdhost_free_all() at
+//   shutdown takes no lifetime lock; it runs after the streaming and collector
+//   threads were stopped.
 
 static void rrdhost_nrpc_changed(NRPC_OWNER id, bool arm_manifest) {
     RRDHOST *host = rrdhost_from_nrpc_owner(id);
@@ -509,7 +505,8 @@ RRDHOST *rrdhost_create(
         time_t replication_step,
         struct rrdhost_system_info *system_info,
         int is_localhost,
-        bool archived
+        bool archived,
+        bool pin
 ) {
     if(memory_mode == RRD_DB_MODE_DBENGINE && !dbengine_enabled) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
@@ -636,11 +633,19 @@ RRDHOST *rrdhost_create(
 
     rrd_wrlock();
 
+    // pin before the host becomes visible in the index, so no remover can take it before our caller
+    // has marked it live (see metadata_lifetime_lock); nobody else can hold this lock yet
+    if(pin)
+        rw_spinlock_read_lock(&host->metadata_lifetime_lock);
+
     RRDHOST *t = rrdhost_index_add_by_guid(host);
     if(t != host) {
         nd_log(NDLS_DAEMON, NDLP_NOTICE,
                "Host '%s': cannot add host with machine guid '%s' to index. It already exists as host '%s' with machine guid '%s'.",
                rrdhost_hostname(host), host->machine_guid, rrdhost_hostname(t), t->machine_guid);
+
+        if(pin)
+            rrdhost_pin_release(host);
 
         if (!is_localhost)
             rrdhost_free___while_having_rrd_wrlock(host);
@@ -858,6 +863,15 @@ static void rrdhost_update(RRDHOST *host
     spinlock_unlock(&host->rrdhost_update_lock);
 }
 
+// An archived host whose stored memory mode differs from the wanted one has its archived state
+// discarded (the host is freed and created again) - unless it is still loading its contexts and this
+// is not the archived-host load, in which case it is returned as it is.
+static inline bool rrdhost_archived_mode_mismatch(RRDHOST *host, RRD_DB_MODE mode, bool archived) {
+    return host->rrd_memory_mode != mode &&
+           rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED) &&
+           !(!archived && rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD));
+}
+
 RRDHOST *rrdhost_find_or_create(
       const char *hostname
     , const char *registry_hostname
@@ -883,20 +897,24 @@ RRDHOST *rrdhost_find_or_create(
     , struct rrdhost_system_info *system_info
     , bool archived
 ) {
+    // Every host returned is pinned (see metadata_lifetime_lock). The lookup and the pin happen under
+    // the rrd lock: a remover unlinks the host under rrd_wrlock() before freeing it, so a host found
+    // here is still allocated when we pin it, and once pinned no remover can take it.
+    rrd_rdlock();
     RRDHOST *host = rrdhost_find_by_guid(guid);
-    if (unlikely(host && host->rrd_memory_mode != mode && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))) {
+    bool replace = host && rrdhost_archived_mode_mismatch(host, mode, archived);
+    if (host && !replace && !rrdhost_pin_try(host)) {
+        rrd_rdunlock();
+        return NULL;
+    }
+    rrd_rdunlock();
 
-        if (likely(!archived && rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)))
-            return host;
-
+    // The memory-mode replace is a removal, so it runs with no pin of ours held: it needs the write
+    // side, and a pin can never be upgraded to it.
+    if (unlikely(replace)) {
         rrd_wrlock();
         host = rrdhost_find_by_guid(guid);
-        if (host && host->rrd_memory_mode != mode && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
-            if (likely(!archived && rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))) {
-                rrd_wrunlock();
-                return host;
-            }
-
+        if (host && rrdhost_archived_mode_mismatch(host, mode, archived)) {
             if (!rw_spinlock_trywrite_lock(&host->metadata_lifetime_lock)) {
                 rrd_wrunlock();
                 return NULL;
@@ -912,6 +930,10 @@ RRDHOST *rrdhost_find_or_create(
             rw_spinlock_write_unlock(&host->metadata_lifetime_lock);
             rrdhost_free___while_having_rrd_wrlock(host);
             host = NULL;
+        }
+        else if (host && !rrdhost_pin_try(host)) {
+            rrd_wrunlock();
+            return NULL;
         }
         rrd_wrunlock();
     }
@@ -941,6 +963,7 @@ RRDHOST *rrdhost_find_or_create(
                 , system_info
                 , 0
                 , archived
+                , true
          );
     }
     else {
