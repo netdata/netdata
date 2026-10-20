@@ -255,8 +255,10 @@ pub(crate) fn copy_subtree(reader: &mut NodeReader, level: u32, out: &mut Vec<u8
 }
 
 // The four set-op walkers below share one shape: both readers advance in
-// lockstep, one subtree per child position, and the operations differ in
-// the leaf byte op plus what a child present in only one operand does:
+// lockstep, one subtree per child present in either operand (visited by
+// iterating the set bits of `node_a | node_b`, lowest first), and the
+// operations differ in the leaf byte op plus what a child present in only
+// one operand does:
 //
 //   Operation | Leaf op | A-only child | B-only child
 //   ----------+---------+--------------+-------------
@@ -277,32 +279,24 @@ pub(crate) fn copy_subtree(reader: &mut NodeReader, level: u32, out: &mut Vec<u8
 /// pruned — the result is a canonical non-empty subtree whenever the
 /// inputs are.
 pub(crate) fn union_subtree(a: &mut NodeReader, b: &mut NodeReader, level: u32, out: &mut Vec<u8>) {
-    let node_a = a.next();
-    let node_b = b.next();
-    let child_level = level - 1;
-
-    if child_level == 0 {
-        out.push(node_a.bits() | node_b.bits());
+    let node_a = a.next().bits();
+    let node_b = b.next().bits();
+    out.push(node_a | node_b);
+    if level == 1 {
         return;
     }
 
-    out.push(node_a.bits() | node_b.bits());
-
-    for child in 0..8u8 {
-        let in_a = node_a.has_child(child);
-        let in_b = node_b.has_child(child);
-
-        match (in_a, in_b) {
-            (true, true) => {
-                union_subtree(a, b, child_level, out);
-            }
-            (true, false) => {
-                copy_subtree(a, child_level, out);
-            }
-            (false, true) => {
-                copy_subtree(b, child_level, out);
-            }
-            (false, false) => {}
+    let child_level = level - 1;
+    let mut children = node_a | node_b;
+    while children != 0 {
+        let child = children & children.wrapping_neg();
+        children &= children - 1;
+        if node_a & node_b & child != 0 {
+            union_subtree(a, b, child_level, out);
+        } else if node_a & child != 0 {
+            copy_subtree(a, child_level, out);
+        } else {
+            copy_subtree(b, child_level, out);
         }
     }
 }
@@ -317,13 +311,12 @@ pub(crate) fn intersect_subtree(
     level: u32,
     out: &mut Vec<u8>,
 ) -> bool {
-    let node_a = a.next();
-    let node_b = b.next();
-    let child_level = level - 1;
+    let node_a = a.next().bits();
+    let node_b = b.next().bits();
 
-    if child_level == 0 {
+    if level == 1 {
         // Leaf: AND the two bytes directly.
-        let result = node_a.bits() & node_b.bits();
+        let result = node_a & node_b;
         if result != 0 {
             out.push(result);
             return true;
@@ -332,28 +325,23 @@ pub(crate) fn intersect_subtree(
     }
 
     // Inner node: reserve a slot for the result node byte.
+    let child_level = level - 1;
     let node_pos = out.len();
     out.push(0);
 
     let mut result_bits: u8 = 0;
-
-    for child in 0..8u8 {
-        let in_a = node_a.has_child(child);
-        let in_b = node_b.has_child(child);
-
-        match (in_a, in_b) {
-            (true, true) => {
-                if intersect_subtree(a, b, child_level, out) {
-                    result_bits |= 1 << child;
-                }
+    let mut children = node_a | node_b;
+    while children != 0 {
+        let child = children & children.wrapping_neg();
+        children &= children - 1;
+        if node_a & node_b & child != 0 {
+            if intersect_subtree(a, b, child_level, out) {
+                result_bits |= child;
             }
-            (true, false) => {
-                a.skip(child_level);
-            }
-            (false, true) => {
-                b.skip(child_level);
-            }
-            (false, false) => {}
+        } else if node_a & child != 0 {
+            a.skip(child_level);
+        } else {
+            b.skip(child_level);
         }
     }
 
@@ -376,12 +364,11 @@ pub(crate) fn difference_subtree(
     level: u32,
     out: &mut Vec<u8>,
 ) -> bool {
-    let node_a = a.next();
-    let node_b = b.next();
-    let child_level = level - 1;
+    let node_a = a.next().bits();
+    let node_b = b.next().bits();
 
-    if child_level == 0 {
-        let result = node_a.bits() & !node_b.bits();
+    if level == 1 {
+        let result = node_a & !node_b;
         if result != 0 {
             out.push(result);
             return true;
@@ -389,29 +376,24 @@ pub(crate) fn difference_subtree(
         return false;
     }
 
+    let child_level = level - 1;
     let node_pos = out.len();
     out.push(0);
 
     let mut result_bits: u8 = 0;
-
-    for child in 0..8u8 {
-        let in_a = node_a.has_child(child);
-        let in_b = node_b.has_child(child);
-
-        match (in_a, in_b) {
-            (true, true) => {
-                if difference_subtree(a, b, child_level, out) {
-                    result_bits |= 1 << child;
-                }
+    let mut children = node_a | node_b;
+    while children != 0 {
+        let child = children & children.wrapping_neg();
+        children &= children - 1;
+        if node_a & node_b & child != 0 {
+            if difference_subtree(a, b, child_level, out) {
+                result_bits |= child;
             }
-            (true, false) => {
-                copy_subtree(a, child_level, out);
-                result_bits |= 1 << child;
-            }
-            (false, true) => {
-                b.skip(child_level);
-            }
-            (false, false) => {}
+        } else if node_a & child != 0 {
+            copy_subtree(a, child_level, out);
+            result_bits |= child;
+        } else {
+            b.skip(child_level);
         }
     }
 
@@ -435,12 +417,11 @@ pub(crate) fn symmetric_difference_subtree(
     level: u32,
     out: &mut Vec<u8>,
 ) -> bool {
-    let node_a = a.next();
-    let node_b = b.next();
-    let child_level = level - 1;
+    let node_a = a.next().bits();
+    let node_b = b.next().bits();
 
-    if child_level == 0 {
-        let result = node_a.bits() ^ node_b.bits();
+    if level == 1 {
+        let result = node_a ^ node_b;
         if result != 0 {
             out.push(result);
             return true;
@@ -448,30 +429,25 @@ pub(crate) fn symmetric_difference_subtree(
         return false;
     }
 
+    let child_level = level - 1;
     let node_pos = out.len();
     out.push(0);
 
     let mut result_bits: u8 = 0;
-
-    for child in 0..8u8 {
-        let in_a = node_a.has_child(child);
-        let in_b = node_b.has_child(child);
-
-        match (in_a, in_b) {
-            (true, true) => {
-                if symmetric_difference_subtree(a, b, child_level, out) {
-                    result_bits |= 1 << child;
-                }
+    let mut children = node_a | node_b;
+    while children != 0 {
+        let child = children & children.wrapping_neg();
+        children &= children - 1;
+        if node_a & node_b & child != 0 {
+            if symmetric_difference_subtree(a, b, child_level, out) {
+                result_bits |= child;
             }
-            (true, false) => {
-                copy_subtree(a, child_level, out);
-                result_bits |= 1 << child;
-            }
-            (false, true) => {
-                copy_subtree(b, child_level, out);
-                result_bits |= 1 << child;
-            }
-            (false, false) => {}
+        } else if node_a & child != 0 {
+            copy_subtree(a, child_level, out);
+            result_bits |= child;
+        } else {
+            copy_subtree(b, child_level, out);
+            result_bits |= child;
         }
     }
 
