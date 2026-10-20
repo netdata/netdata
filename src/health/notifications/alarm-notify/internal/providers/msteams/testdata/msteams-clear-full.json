@@ -1,0 +1,7 @@
+{
+  "@context": "http://schema.org/extensions",
+  "@type": "MessageCard",
+  "themeColor": "65A677",
+  "title": "💚 Alert CLEAR from Netdata on test-node",
+  "text": "Temperature is high  \nA quote: \"hot\"  \nUnicode: θερμοκρασία  \nNode: test\\-node  \nAlert: test\\_alert  \nStatus: CRITICAL → CLEAR  \nChart: test\\.chart  \nContext: test\\.context  \nValue: 42\\.5 C  \nPrevious value: 0 C  \nTime: 2026\\-09\\-14T12:00:00Z\n\n[View alert](https://example.com/alert?id=1&view=chart#details)"
+}

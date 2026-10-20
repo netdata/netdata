@@ -39,6 +39,7 @@ static struct {
     { .format = "video/mp4",                    CT_VIDEO_MP4, false },
     { .format = "application/pdf",              CT_APPLICATION_PDF, false },
     { .format = "application/zip",              CT_APPLICATION_ZIP, false },
+    { .format = "application/wasm",             CT_APPLICATION_WASM, false },
     { .format = "image/png",                    CT_IMAGE_PNG, false },
 
     // secondary - overlapping with primary

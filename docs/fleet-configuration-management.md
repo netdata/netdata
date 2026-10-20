@@ -22,7 +22,7 @@ As infrastructures grow from a handful of servers to thousands of nodes across m
 
 | Capability                         | Linux                                                                                                                   | Kubernetes                                                                       | FreeBSD        | macOS          | Windows                                                                                |
 | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | -------------- | -------------- | -------------------------------------------------------------------------------------- |
-| **Auto-deploy**                    | ✅ [kickstart.sh](https://learn.netdata.cloud/docs/netdata-agent/installation/one-line-installer-for-all-linux-systems)¹ | ✅ [Helm](https://learn.netdata.cloud/docs/netdata-agent/installation/kubernetes) | ✅ kickstart.sh | ✅ kickstart.sh | ✅ [MSI](https://learn.netdata.cloud/docs/netdata-agent/installation/windows)² (silent) |
+| **Auto-deploy**                    | ✅ [kickstart.sh](/packaging/installer/methods/kickstart.md)¹ | ✅ [Helm](https://learn.netdata.cloud/docs/netdata-agent/installation/kubernetes) | ✅ kickstart.sh | ✅ kickstart.sh | ✅ [MSI](https://learn.netdata.cloud/docs/netdata-agent/installation/windows)² (silent) |
 | **Auto-update**                    | ✅ Built-in                                                                                                              | ✅ Built-in                                                                       | ✅ Built-in     | ✅ Built-in     | ⚠️ Manual³                                                                              |
 | **Auto-discover system metrics**   | ✅ Yes                                                                                                                   | ✅ Yes                                                                            | ✅ Yes          | ✅ Yes          | ✅ Yes                                                                                  |
 | **Auto-discover all processes**    | ✅ Yes                                                                                                                   | ✅ Yes                                                                            | ✅ Yes          | ✅ Yes          | ✅ Yes                                                                                  |
@@ -36,7 +36,8 @@ As infrastructures grow from a handful of servers to thousands of nodes across m
 **Legend**: ✅ Full support | ⚠️ Partial support | ❌ Not available
 
 **Footnotes**:
-1. **kickstart.sh**: [Universal installer script](https://learn.netdata.cloud/docs/netdata-agent/installation/one-line-installer-for-all-linux-systems) that auto-detects the best installation method
+
+1. **kickstart.sh**: [Universal installer script](/packaging/installer/methods/kickstart.md) that auto-detects the best installation method
 2. **MSI**: Microsoft Software Installer package for Windows deployment
 3. **Manual**: Auto-updates coming Q3 2025; currently requires PowerShell/SCCM/GPO automation
 4. **Via k8s**: Uses Kubernetes API for service discovery instead of Docker API
@@ -144,7 +145,7 @@ Through [Netdata Cloud and the Dynamic Configuration Manager](https://learn.netd
 When multiple configuration sources exist for the same component, Netdata applies them in the following priority order (highest to lowest):
 
 1. **[Dynamic Configuration (DynCfg)](https://learn.netdata.cloud/docs/netdata-agent/configuration/dynamic-configuration-manager)** - Runtime configurations via Netdata Cloud UI or API
-2. **[User Configuration](https://learn.netdata.cloud/docs/netdata-agent/configuration/configuration)** - Files in `/etc/netdata` or `/opt/netdata/etc/netdata`
+2. **[User Configuration](https://learn.netdata.cloud/docs/netdata-agent/configuration)** - Files in `/etc/netdata` or `/opt/netdata/etc/netdata`
 3. **Auto-discovered Configuration** - Settings from service discovery mechanisms
 4. **Stock Configuration** - Default configuration files shipped with Netdata
 5. **Internal Defaults** - Built-in defaults in the code
@@ -159,7 +160,8 @@ On Linux, Netdata autodetect all kernel modules and technologies which have been
 
 Similarly for Windows, Netdata will autodetect everything exposed via Perflib.
 
-### [Process and Application Monitoring](https://learn.netdata.cloud/docs/collecting-metrics/processes-and-system-services/applications) (apps.plugin)
+### [Process and Application Monitoring](/src/collectors/apps.plugin/integrations/applications.md) (apps.plugin)
+
 The apps.plugin provides intelligent process tree aggregation and monitoring on all platforms (Linux, FreeBSD, macOS, Windows):
 
 **Intelligent Process Tree Aggregation**:
@@ -190,10 +192,13 @@ The go.d.plugin provides auto-discovery for 150+ applications through multiple m
 
 **Service discovery mechanisms**:
 - **Local network service discovery (netlistensd)** - Linux-only, uses `local-listeners` binary to detect listening services
-- **[Docker container discovery](https://learn.netdata.cloud/docs/collecting-metrics/container-services/docker) (dockersd)** - Discovers applications running in Docker containers
-- **[Kubernetes service discovery](https://learn.netdata.cloud/docs/netdata-agent/installation/kubernetes) (k8ssd)** - Discovers services running in Kubernetes pods
-- **[SNMP device discovery](https://learn.netdata.cloud/docs/collecting-metrics/network-devices/snmp) (snmpsd)** - Discovers and profiles SNMP-enabled network devices
+- **[Docker container discovery](https://learn.netdata.cloud/docs/collecting-metrics/service-discovery/discoverer/docker) (dockersd)** - Discovers applications running in Docker containers
+- **[Kubernetes service discovery](https://learn.netdata.cloud/docs/collecting-metrics/service-discovery/discoverer/kubernetes) (k8ssd)** - Discovers services running in Kubernetes pods
+- **[SNMP device discovery](https://learn.netdata.cloud/docs/collecting-metrics/service-discovery/discoverer/snmp) (snmpsd)** - Discovers and profiles SNMP-enabled network devices
+- **HTTP service discovery (http)** - Fetches JSON or YAML discovery items from an HTTP endpoint and creates collector jobs through service templates
 - **Configuration file scanning** - Detects applications based on their configuration files
+
+HTTP service discovery templates must generate job configs with `name` and `module`. The `module` is the collector name, such as `httpcheck` or `ping`; it can be omitted only in curated rules where the service rule ID is the intended collector module.
 
 **Platform-specific behavior**:
 
@@ -223,10 +228,9 @@ Supported applications include databases (MySQL, PostgreSQL, Redis, MongoDB), we
 **Installation**: Windows requires the MSI installer instead of kickstart.sh:
 ```powershell
 # Silent installation for fleet deployment
-msiexec /i netdata-installer.msi /qn /norestart `
-        CLAIMING_TOKEN="YOUR_TOKEN" `
-        CLAIMING_ROOMS="YOUR_ROOM_ID" `
-        CLAIMING_URL="https://app.netdata.cloud"
+msiexec /i netdata-x64.msi /qn /norestart `
+        TOKEN="<YOUR_TOKEN>" `
+        ROOMS="<YOUR_ROOMS>"
 
 # Via Group Policy or SCCM
 # Deploy MSI with TRANSFORMS for site-specific configuration
@@ -275,7 +279,7 @@ When Netdata runs inside a Kubernetes cluster, it provides comprehensive multi-l
 - **[Kubelet metrics](https://learn.netdata.cloud/docs/netdata-agent/installation/kubernetes) (k8s_kubelet)**: Container and pod resource usage, volume statistics
 - **[Control plane](https://learn.netdata.cloud/docs/netdata-agent/installation/kubernetes)** (kube-proxy, kube-scheduler, kube-controller-manager): When accessible
 
-**[Service Discovery](https://learn.netdata.cloud/docs/collecting-metrics/metrics-centralization-points/clustering-and-high-availability-of-netdata-parents)** (k8ssd):
+**[Service Discovery](/src/go/plugin/go.d/discovery/sdext/discoverer/k8ssd/README.md)** (k8ssd):
 - Automatically enabled, replacing traditional host-based discovery
 - Uses Kubernetes API to monitor all pods and services
 - Discovers applications by inspecting pod containers and their exposed ports

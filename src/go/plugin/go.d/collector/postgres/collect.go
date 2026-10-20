@@ -50,6 +50,15 @@ func (c *Collector) collect() (map[string]int64, error) {
 		c.Debugf("connected as super user: %v", *c.superUser)
 	}
 
+	if c.canExecutePgLsDir == nil && c.pgVersion >= pgVersion10 {
+		v, err := c.doQueryCanExecutePgLsDir()
+		if err != nil {
+			return nil, fmt.Errorf("querying can execute pg_ls_dir() error: %v", err)
+		}
+		c.canExecutePgLsDir = &v
+		c.Debugf("can execute pg_ls_dir(): %v", *c.canExecutePgLsDir)
+	}
+
 	if c.pgIsInRecovery == nil {
 		v, err := c.doQueryPGIsInRecovery()
 		if err != nil {
@@ -225,6 +234,10 @@ func (c *Collector) azureADBeforeConnect(ctx context.Context, cfg *pgx.ConnConfi
 
 func (c *Collector) isSuperUser() bool { return c.superUser != nil && *c.superUser }
 
+func (c *Collector) canQueryReplicationSlotFiles() bool {
+	return c.isSuperUser() || (c.canExecutePgLsDir != nil && *c.canExecutePgLsDir)
+}
+
 func (c *Collector) isPGInRecovery() bool { return c.pgIsInRecovery != nil && *c.pgIsInRecovery }
 
 func (c *Collector) getDBMetrics(name string) *dbMetrics {
@@ -296,8 +309,9 @@ func parseFloat(s string) int64 {
 	return int64(v)
 }
 
+//go:fix inline
 func newInt(v int64) *int64 {
-	return &v
+	return new(v)
 }
 
 func calcPercentage(value, total int64) (v int64) {

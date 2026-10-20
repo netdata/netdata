@@ -1,0 +1,55 @@
+# NX-OS system extension scalars for Cisco Nexus.
+# MIB: CISCO-SYSTEM-EXT-MIB (1.3.6.1.4.1.9.9.305)
+# Exposes active supervisor CPU/memory utilization, system uptime, and console status.
+
+metrics:
+  - MIB: CISCO-SYSTEM-EXT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.9.9.305.1.1.1.0
+      name: cseSysCPUUtilization
+      chart_meta:
+        description: Average CPU utilization on the active supervisor
+        family: 'System/NX-OS/CPU'
+        unit: "%"
+
+  - MIB: CISCO-SYSTEM-EXT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.9.9.305.1.1.2.0
+      name: cseSysMemoryUtilization
+      chart_meta:
+        description: Average memory utilization on the active supervisor
+        family: 'System/NX-OS/Memory'
+        unit: "%"
+
+  - MIB: CISCO-SYSTEM-EXT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.9.9.305.1.1.10.0
+      name: cseSysUpTime
+      chart_meta:
+        description: Elapsed time since the system last rebooted (survives supervisor switchover)
+        family: 'System/NX-OS/Uptime'
+        unit: "s"
+
+  - MIB: CISCO-SYSTEM-EXT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.9.9.305.1.1.7.0
+      name: cseSysConsolePortStatus
+      chart_meta:
+        description: Console port connection status
+        family: 'System/NX-OS/Console'
+        unit: "{status}"
+      mapping:
+        1: connected
+        2: not_connected
+
+  - MIB: CISCO-SYSTEM-EXT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.9.9.305.1.1.9.0
+      name: cseSysFIPSModeActivation
+      chart_meta:
+        description: FIPS 140-2 cryptographic mode activation state
+        family: 'System/NX-OS/FIPS'
+        unit: "{status}"
+      mapping:
+        1: enabled
+        2: disabled

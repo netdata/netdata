@@ -251,6 +251,22 @@ impl RealtimeClock {
         Microseconds::new(next)
     }
 
+    /// Observe an external timestamp and return a monotonic realtime value.
+    ///
+    /// If the provided value is not strictly greater than the last seen timestamp,
+    /// returns `last_seen + 1us` to preserve strict monotonicity.
+    pub fn observe(&self, candidate: Microseconds) -> Microseconds {
+        let max = self.max_seen.get();
+        let next = if candidate.get() > max {
+            candidate.get()
+        } else {
+            max.saturating_add(1)
+        };
+
+        self.max_seen.set(next);
+        Microseconds::new(next)
+    }
+
     /// Get the last seen timestamp without advancing the clock.
     pub fn last_seen(&self) -> Microseconds {
         Microseconds::new(self.max_seen.get())
@@ -542,5 +558,19 @@ mod tests {
         // When system time is ahead, it should use system time
         let t1 = clock.now();
         assert!(t1.get() > past.get());
+    }
+
+    #[test]
+    fn test_realtime_clock_observe_preserves_monotonicity() {
+        let clock = RealtimeClock::with_initial(Microseconds::new(1_000_000));
+
+        let t1 = clock.observe(Microseconds::new(900_000));
+        assert_eq!(t1.get(), 1_000_001);
+
+        let t2 = clock.observe(Microseconds::new(1_000_001));
+        assert_eq!(t2.get(), 1_000_002);
+
+        let t3 = clock.observe(Microseconds::new(1_500_000));
+        assert_eq!(t3.get(), 1_500_000);
     }
 }

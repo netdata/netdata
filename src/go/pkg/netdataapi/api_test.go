@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -279,6 +280,94 @@ func TestCONFIGCREATE(t *testing.T) {
 	require.Equal(t, expected, w.String())
 }
 
+func TestCONFIGCREATEAcceptsWindowsSourcePath(t *testing.T) {
+	w := &bytes.Buffer{}
+	api := New(w)
+
+	require.NoError(t, api.TryCONFIGCREATE(ConfigOpts{
+		ID:                "go.d:collector:module:job",
+		Status:            "running",
+		ConfigType:        "job",
+		Path:              "/collectors/go.d/Jobs",
+		SourceType:        "user",
+		Source:            `discoverer=file_reader,file=C:\Program Files\Netdata\go.d\job.conf`,
+		SupportedCommands: "schema get",
+	}))
+
+	require.Contains(
+		t,
+		w.String(),
+		`'discoverer=file_reader,file=C:\Program Files\Netdata\go.d\job.conf'`,
+	)
+}
+
+func TestCONFIGCREATERefusesUnsafeProtocolFields(t *testing.T) {
+	base := ConfigOpts{
+		ID:                "go.d:collector:module:job",
+		Status:            "running",
+		ConfigType:        "job",
+		Path:              "/collectors/go.d/Jobs",
+		SourceType:        "user",
+		Source:            "file=/etc/netdata/go.d/job.conf",
+		SupportedCommands: "schema get",
+	}
+	tests := map[string]ConfigOpts{
+		"ID separator": func() ConfigOpts {
+			opts := base
+			opts.ID = "go.d:collector:module job"
+			return opts
+		}(),
+		"status separator": func() ConfigOpts {
+			opts := base
+			opts.Status = "not running"
+			return opts
+		}(),
+		"config type delimiter": func() ConfigOpts {
+			opts := base
+			opts.ConfigType = "operator's"
+			return opts
+		}(),
+		"path separator": func() ConfigOpts {
+			opts := base
+			opts.Path = "/collectors/go.d/Service Discovery"
+			return opts
+		}(),
+		"source type delimiter": func() ConfigOpts {
+			opts := base
+			opts.SourceType = "source=user"
+			return opts
+		}(),
+		"quoted field delimiter": func() ConfigOpts {
+			opts := base
+			opts.Source = "file=/etc/netdata/go.d/operator's.conf"
+			return opts
+		}(),
+		"quoted field line break": func() ConfigOpts {
+			opts := base
+			opts.Source = "file=/etc/netdata/go.d/job.conf\nCONFIG injected delete"
+			return opts
+		}(),
+		"quoted field trailing escape": func() ConfigOpts {
+			opts := base
+			opts.Source = `file=C:\`
+			return opts
+		}(),
+		"supported commands delimiter": func() ConfigOpts {
+			opts := base
+			opts.SupportedCommands = "schema operator's"
+			return opts
+		}(),
+	}
+
+	for name, opts := range tests {
+		t.Run(name, func(t *testing.T) {
+			var output bytes.Buffer
+			require.Error(t, New(&output).TryCONFIGCREATE(opts))
+			require.Empty(t, output.String())
+		})
+	}
+}
+
 func TestCONFIGDELETE(t *testing.T) {
 	w := &bytes.Buffer{}
 	api := New(w)
@@ -290,6 +379,13 @@ func TestCONFIGDELETE(t *testing.T) {
 	require.Equal(t, expected, w.String())
 }
 
+func TestCONFIGDELETERefusesUnsafeID(t *testing.T) {
+	var output bytes.Buffer
+
+	require.Error(t, New(&output).TryCONFIGDELETE("test config"))
+	require.Empty(t, output.String())
+}
+
 func TestCONFIGSTATUS(t *testing.T) {
 	w := &bytes.Buffer{}
 	api := New(w)
@@ -299,4 +395,85 @@ func TestCONFIGSTATUS(t *testing.T) {
 	expected := "CONFIG test-config status inactive\n\n"
 
 	require.Equal(t, expected, w.String())
+}
+
+func TestCONFIGSTATUSRefusesUnsafeFields(t *testing.T) {
+	tests := map[string]struct {
+		id     string
+		status string
+	}{
+		"ID":     {id: "test config", status: "running"},
+		"status": {id: "test-config", status: "not running"},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			var output bytes.Buffer
+			require.Error(t, New(&output).TryCONFIGSTATUS(test.id, test.status))
+			require.Empty(t, output.String())
+		})
+	}
+}
+
+// plainWriter copies writes and exposes no AvailableBuffer, so the API formats into
+// its own scratch buffer.
+type plainWriter struct {
+	data []byte
+}
+
+func (w *plainWriter) Write(p []byte) (int, error) {
+	w.data = append(w.data, p...)
+	return len(p), nil
+}
+
+func TestHotCommandsFormatWithoutAllocating(t *testing.T) {
+	emit := func(api *API) {
+		api.CHART(ChartOpts{
+			TypeID:      "type",
+			ID:          "id",
+			Title:       "title",
+			Priority:    70000,
+			UpdateEvery: 1,
+		})
+		api.DIMENSION(DimensionOpts{
+			ID:         "dim",
+			Name:       "dim",
+			Algorithm:  "absolute",
+			Multiplier: -1,
+			Divisor:    1000,
+		})
+		api.CLABEL("key", "value", 1)
+		api.HOST("guid")
+		api.BEGIN("type", "id", 1000)
+		api.SET("int", -1234567890)
+		api.SETFLOAT("float", 0.25)
+		api.SETEMPTY("empty")
+		api.VARIABLE("var", 1.5)
+		api.END()
+	}
+
+	buffered := &bytes.Buffer{}
+	plain := &plainWriter{}
+	emit(New(buffered))
+	emit(New(plain))
+	require.Equal(t, buffered.String(), string(plain.data), "writer kind changed the emitted bytes")
+
+	for name, reset := range map[string]func() *API{
+		"available buffer": func() *API { buffered.Reset(); return New(buffered) },
+		"plain writer":     func() *API { plain.data = plain.data[:0]; return New(plain) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			api := reset()
+			emit(api)
+			allocs := testing.AllocsPerRun(100, func() {
+				if name == "available buffer" {
+					buffered.Reset()
+				} else {
+					plain.data = plain.data[:0]
+				}
+				emit(api)
+			})
+			assert.Zero(t, allocs)
+		})
+	}
 }

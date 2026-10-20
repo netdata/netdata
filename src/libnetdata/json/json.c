@@ -38,7 +38,7 @@ json_object *json_tokenise(char *js) {
 #else
 jsmntok_t *json_tokenise(char *js, size_t len, size_t *count)
 {
-    int n = json_tokens;
+    int n = __atomic_load_n(&json_tokens, __ATOMIC_RELAXED);
     if(!js || !len) {
         netdata_log_error("JSON: json string is empty.");
         return NULL;
@@ -52,6 +52,11 @@ jsmntok_t *json_tokenise(char *js, size_t len, size_t *count)
 
     int ret = jsmn_parse(&parser, js, len, tokens, n);
     while (ret == JSMN_ERROR_NOMEM) {
+        if(unlikely(n > INT_MAX / 2 || (size_t)n > SIZE_MAX / sizeof(*tokens) / 2)) {
+            freez(tokens);
+            return NULL;
+        }
+
         n *= 2;
         jsmntok_t *new = reallocz(tokens, sizeof(jsmntok_t) * n);
         if(!new) {
@@ -75,7 +80,11 @@ jsmntok_t *json_tokenise(char *js, size_t len, size_t *count)
 
     if(count) *count = (size_t)ret;
 
-    if(json_tokens < n) json_tokens = n;
+    int cached = __atomic_load_n(&json_tokens, __ATOMIC_RELAXED);
+    while(cached < n && !__atomic_compare_exchange_n(
+              &json_tokens, &cached, n, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED))
+        ;
+
     return tokens;
 }
 #endif
@@ -103,7 +112,7 @@ int json_callback_print(JSON_ENTRY *e)
 
         case JSON_ARRAY:
             e->callback_function = json_callback_print;
-            sprintf(txt,"ARRAY[%lu]", (long unsigned int) e->data.items);
+            snprintfz(txt, sizeof(txt), "ARRAY[%lu]", (long unsigned int) e->data.items);
             buffer_strcat(wb, txt);
             break;
 
@@ -112,9 +121,7 @@ int json_callback_print(JSON_ENTRY *e)
             break;
 
         case JSON_NUMBER:
-            sprintf(txt, NETDATA_DOUBLE_FORMAT_AUTO, e->data.number);
-            buffer_strcat(wb,txt);
-
+            buffer_print_netdata_double(wb, e->data.number);
             break;
 
         case JSON_BOOLEAN:
@@ -157,8 +164,12 @@ static inline void json_jsonc_set_string(JSON_ENTRY *e,char *key,const char *val
  * @param e the output structure
  * @param value the input value
  */
-static inline void json_jsonc_set_boolean(JSON_ENTRY *e,int value) {
+static inline void json_jsonc_set_boolean(JSON_ENTRY *e,char *key,int value) {
+    size_t len = key ? strnlen(key, JSON_NAME_LEN) : 0;
     e->type = JSON_BOOLEAN;
+    if(len)
+        memcpy(e->name,key,len);
+    e->name[len] = 0x00;
     e->data.boolean = value;
 }
 
@@ -182,19 +193,17 @@ static inline void json_jsonc_set_integer(JSON_ENTRY *e, char *key, int64_t valu
  * @param callback_function function used to create a silencer.
  */
 static inline void json_jsonc_parse_array(json_object *ptr, void *callback_data,int (*callback_function)(struct json_entry *)) {
-    int end = json_object_array_length(ptr);
-    JSON_ENTRY e;
+    size_t end = json_object_array_length(ptr);
 
     if(end) {
-        int i;
+        size_t i;
         i = 0;
 
         enum json_type type;
         do {
             json_object *jvalue =  json_object_array_get_idx(ptr, i);
             if(jvalue) {
-                e.callback_data = callback_data;
-                e.type = JSON_OBJECT;
+                JSON_ENTRY e = { .type = JSON_OBJECT, .callback_data = callback_data };
                 callback_function(&e);
                 json_object_object_foreach(jvalue, key, val) {
                     type = json_object_get_type(val);
@@ -207,7 +216,7 @@ static inline void json_jsonc_parse_array(json_object *ptr, void *callback_data,
                         json_jsonc_set_string(&e,key,json_object_get_string(val));
                         callback_function(&e);
                     } else if (type == json_type_boolean) {
-                        json_jsonc_set_boolean(&e,json_object_get_boolean(val));
+                        json_jsonc_set_boolean(&e,key,json_object_get_boolean(val));
                         callback_function(&e);
                     }
                 }
@@ -288,6 +297,26 @@ size_t json_walk_primitive(char *js, jsmntok_t *t, size_t start, JSON_ENTRY *e)
     return 1;
 }
 
+static size_t json_walk_token_span(jsmntok_t *t, size_t start)
+{
+    size_t span = 1;
+
+    switch(t[start].type) {
+        case JSMN_OBJECT:
+        case JSMN_ARRAY:
+            for(int i = 0; i < t[start].size; i++)
+                span += json_walk_token_span(t, start + span);
+            break;
+
+        case JSMN_PRIMITIVE:
+        case JSMN_STRING:
+        default:
+            break;
+    }
+
+    return span;
+}
+
 /**
  * Array
  *
@@ -325,6 +354,7 @@ size_t json_walk_array(char *js, jsmntok_t *t, size_t nest, size_t start, JSON_E
         ne.pos = i;
         if (strlen(e->name) > JSON_NAME_LEN  - 24 || strlen(e->fullname) > JSON_FULLNAME_LEN -24) {
             netdata_log_info("JSON: JSON walk_array ignoring element with name:%s fullname:%s",e->name, e->fullname);
+            start += json_walk_token_span(t, start);
             continue;
         }
         snprintfz(ne.name, JSON_NAME_LEN, "%s[%lu]", e->name, i);
@@ -415,6 +445,7 @@ size_t json_walk_object(char *js, jsmntok_t *t, size_t nest, size_t start, JSON_
                     sprintf(c,"%s%s%s", e->fullname, e->fullname[0]?".":"", ne.name);
                     if (unlikely(len>JSON_FULLNAME_LEN)) len=JSON_FULLNAME_LEN;
                     strncpy(ne.fullname, c, len);
+                    ne.fullname[len] = '\0';
                     freez(c);
                     start++;
                     key = 0;
@@ -443,22 +474,24 @@ size_t json_walk_object(char *js, jsmntok_t *t, size_t nest, size_t start, JSON_
  */
 #ifdef ENABLE_JSONC
 size_t json_walk(json_object *t, void *callback_data, int (*callback_function)(struct json_entry *)) {
-    JSON_ENTRY e;
+    if (!t || json_object_get_type(t) != json_type_object)
+        return 0;
 
+    JSON_ENTRY e = { 0 };
     e.callback_data = callback_data;
     enum json_type type;
     json_object_object_foreach(t, key, val) {
         type = json_object_get_type(val);
         if (type == json_type_array) {
             e.type = JSON_ARRAY;
-            json_jsonc_parse_array(val,NULL,callback_function);
+            json_jsonc_parse_array(val,callback_data,callback_function);
         } else if (type == json_type_object) {
             e.type = JSON_OBJECT;
         } else if (type == json_type_string) {
             json_jsonc_set_string(&e,key,json_object_get_string(val));
             callback_function(&e);
         } else if (type == json_type_boolean) {
-            json_jsonc_set_boolean(&e,json_object_get_boolean(val));
+            json_jsonc_set_boolean(&e,key,json_object_get_boolean(val));
             callback_function(&e);
         } else if (type == json_type_int) {
             json_jsonc_set_integer(&e,key,json_object_get_int64(val));

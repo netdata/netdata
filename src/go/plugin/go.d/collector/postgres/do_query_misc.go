@@ -31,6 +31,17 @@ func (c *Collector) doQueryIsSuperUser() (bool, error) {
 	return v, nil
 }
 
+func (c *Collector) doQueryCanExecutePgLsDir() (bool, error) {
+	q := queryCanExecutePgLsDir()
+
+	var v bool
+	if err := c.doQueryRow(q, &v); err != nil {
+		return false, err
+	}
+
+	return v, nil
+}
+
 func (c *Collector) doQueryPGIsInRecovery() (bool, error) {
 	q := queryPGIsInRecovery()
 

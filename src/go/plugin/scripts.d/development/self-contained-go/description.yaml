@@ -1,0 +1,33 @@
+version: v1
+mode: oneshot
+metrics:
+  - {name: depth, type: gauge, unit: jobs}
+functions:
+  - {id: items, name: Items, help: Show the synthetic queue.}
+charts: |
+  version: v1
+  context_namespace: selfcontained_go
+  groups:
+    - family: Queue
+      metrics: [depth]
+      charts:
+        - id: depth
+          title: Queue depth
+          context: depth
+          units: jobs
+          dimensions: [{selector: depth, name: depth}]
+config_schema:
+  jsonSchema:
+    $schema: http://json-schema.org/draft-07/schema#
+    title: Synthetic queue configuration.
+    description: Configure the synthetic queue.
+    type: object
+    additionalProperties: false
+    properties:
+      count:
+        title: Count
+        description: Synthetic queue depth in jobs.
+        type: integer
+        minimum: 0
+        default: 17
+  uiSchema: {}

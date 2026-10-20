@@ -24,29 +24,62 @@ extern char **environ;
 #endif
 
 static size_t spawn_server_id = 0;
-static volatile bool spawn_server_exit = false;
-static volatile bool spawn_server_sigchld = false;
+static volatile sig_atomic_t spawn_server_exit = false;
+static volatile sig_atomic_t spawn_server_sigchld = false;
 static SPAWN_REQUEST *spawn_server_requests = NULL;
+
+#define SPAWN_SERVER_IOV_MAX 10
+
+static size_t spawn_server_max_unix_socket_path_length(void) {
+    struct sockaddr_un server_addr = { 0 };
+    return sizeof(server_addr.sun_path) - 1;
+}
+
+static bool spawn_server_set_unix_socket_path(struct sockaddr_un *server_addr, const char *path, bool log, const char *action) {
+    const size_t max_path_length = sizeof(server_addr->sun_path) - 1;
+
+    if(strlen(path) > max_path_length) {
+        errno = ENAMETOOLONG;
+        if(log)
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "%s '%s': exceeds the %zu-byte AF_UNIX limit",
+                   action, path, max_path_length);
+        return false;
+    }
+
+    strncpyz(server_addr->sun_path, path, max_path_length);
+    return true;
+}
 
 // --------------------------------------------------------------------------------------------------------------------
 
 static int connect_to_spawn_server(const char *path, bool log) {
     int sock = -1;
-
-    if ((sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
-        if(log)
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: cannot create socket() to connect to spawn server.");
-        return -1;
-    }
-
     struct sockaddr_un server_addr = {
         .sun_family = AF_UNIX,
     };
-    strcpy(server_addr.sun_path, path);
+
+    if(!spawn_server_set_unix_socket_path(&server_addr, path, log,
+                                          "SPAWN PARENT: Cannot connect() to spawn server on path"))
+        return -1;
+
+    if ((sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+        if(log) {
+            int error = errno;
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN PARENT: cannot create socket() to connect to spawn server: %s (%d).",
+                   strerror(error), error);
+        }
+        return -1;
+    }
 
     if (connect(sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
-        if(log)
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: Cannot connect() to spawn server on path '%s'.", path);
+        if(log) {
+            int error = errno;
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN PARENT: cannot connect() to spawn server on path '%s': %s (%d).",
+                   path, strerror(error), error);
+        }
         close(sock);
         return -1;
     }
@@ -91,25 +124,46 @@ static void* argv_encode(const char **argv, size_t *out_size) {
     return buffer;
 }
 
+static const char *argv_find_next(const char *ptr, const char *end) {
+    return memchr(ptr, '\0', (size_t)(end - ptr));
+}
+
 // Function to decode argv or envp
 static const char** argv_decode(const char *buffer, size_t size) {
+    if(!buffer || !size || buffer[size - 1] != '\0')
+        return NULL;
+
     size_t count = 0;
     const char *ptr = buffer;
-    while (ptr < buffer + size) {
-        if(ptr && *ptr) {
+    const char *end = buffer + size;
+    bool found_final_empty_string = false;
+    while (ptr < end) {
+        if(*ptr) {
+            const char *next = argv_find_next(ptr, end);
+            if(!next)
+                return NULL;
+
             count++;
-            ptr += strlen(ptr) + 1;
+            ptr = next + 1;
         }
-        else
+        else {
+            if(ptr != end - 1)
+                return NULL;
+
+            found_final_empty_string = true;
             break;
+        }
     }
+
+    if(!found_final_empty_string)
+        return NULL;
 
     const char **argv = mallocz((count + 1) * sizeof(char *));
 
     ptr = buffer;
     for (size_t i = 0; i < count; i++) {
         argv[i] = ptr;
-        ptr += strlen(ptr) + 1;
+        ptr = argv_find_next(ptr, end) + 1;
     }
     argv[count] = NULL; // Null-terminate the array
 
@@ -261,17 +315,33 @@ static bool spawn_external_command(SPAWN_SERVER *server __maybe_unused, SPAWN_RE
     sigemptyset(&empty_mask);
     if (posix_spawnattr_setsigmask(&attr, &empty_mask) != 0) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawnattr_setsigmask() failed: %s", rq->cmdline);
-        posix_spawn_file_actions_destroy(&file_actions);
-        posix_spawnattr_destroy(&attr);
-        return false;
+        goto cleanup_attr;
+    }
+
+    // POSIX_SPAWN_SETSIGDEF only forces to default the signals that are MEMBERS of the
+    // spawn-sigdefault set, and posix_spawnattr_init() leaves that set empty - so the flag alone
+    // resets nothing. We must populate it explicitly.
+    //
+    // This matters because SIG_IGN dispositions survive execve(). netdata ignores SIGPIPE
+    // (NETDATA_SIGNAL_IGNORE in src/daemon/signal-handler.c), and without this the child inherits
+    // that ignore: closing the child's stdio then yields EPIPE instead of killing it, so a
+    // long-running child never exits when we stop reading it.
+    //
+    // SIGPIPE is the only signal netdata sets to SIG_IGN, so resetting just it is sufficient and
+    // keeps us from overriding dispositions we never set (e.g. ones inherited from the service
+    // manager). Keep this in sync with signals_waiting[] in src/daemon/signal-handler.c.
+    sigset_t default_signals;
+    sigemptyset(&default_signals);
+    sigaddset(&default_signals, SIGPIPE);
+    if (posix_spawnattr_setsigdefault(&attr, &default_signals) != 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawnattr_setsigdefault() failed: %s", rq->cmdline);
+        goto cleanup_attr;
     }
 
     short flags = POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF;
     if (posix_spawnattr_setflags(&attr, flags) != 0) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawnattr_setflags() failed: %s", rq->cmdline);
-        posix_spawn_file_actions_destroy(&file_actions);
-        posix_spawnattr_destroy(&attr);
-        return false;
+        goto cleanup_attr;
     }
 
     int fds_to_keep[] = {
@@ -302,6 +372,13 @@ static bool spawn_external_command(SPAWN_SERVER *server __maybe_unused, SPAWN_RE
 
     nd_log(NDLS_COLLECTORS, NDLP_DEBUG, "SPAWN SERVER: process created with pid %d: %s", rq->pid, rq->cmdline);
     return true;
+
+cleanup_attr:
+    // Shared by the attr-configuration failures above; they all own exactly the same two objects.
+    // The request's fds belong to the caller and are closed by request_free().
+    posix_spawn_file_actions_destroy(&file_actions);
+    posix_spawnattr_destroy(&attr);
+    return false;
 }
 
 static bool spawn_server_run_callback(SPAWN_SERVER *server __maybe_unused, SPAWN_REQUEST *rq) {
@@ -312,15 +389,76 @@ static bool spawn_server_run_callback(SPAWN_SERVER *server __maybe_unused, SPAWN
         return false;
     }
 
+    // Do not let the callback child run the spawn server's private signal handlers before it can reset them.
+    sigset_t callback_signals, previous_mask;
+    sigemptyset(&callback_signals);
+    sigaddset(&callback_signals, SIGTERM);
+    sigaddset(&callback_signals, SIGCHLD);
+
+    int mask_rc = pthread_sigmask(SIG_BLOCK, &callback_signals, &previous_mask);
+    if(mask_rc != 0) {
+        errno = mask_rc;
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to block callback child signals before fork().");
+        return false;
+    }
+
     pid_t pid = fork();
+    int fork_errno = errno;
+
+    if(pid != 0) {
+        mask_rc = pthread_sigmask(SIG_SETMASK, &previous_mask, NULL);
+        if(mask_rc != 0) {
+            if(pid > 0) {
+                kill(pid, SIGKILL);
+
+                while(waitpid(pid, NULL, 0) == -1 && errno == EINTR) { }
+            }
+
+            spawn_server_exit = true;
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to restore signal mask after callback fork().");
+            errno = mask_rc;
+            return false;
+        }
+    }
+
     if (pid < 0) {
         // fork failed
 
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to fork() child for callback.");
+        errno = fork_errno;
         return false;
     }
     else if (pid == 0) {
         // the child
+
+        struct sigaction sa = {
+            .sa_handler = SIG_DFL,
+        };
+        sigemptyset(&sa.sa_mask);
+
+        // SIGPIPE is reset too: netdata ignores it, fork() inherits the ignore, and a callback
+        // child that keeps running on EPIPE instead of dying cannot be stopped by closing its pipes.
+        if(sigaction(SIGTERM, &sa, NULL) == -1 || sigaction(SIGCHLD, &sa, NULL) == -1 ||
+           sigaction(SIGPIPE, &sa, NULL) == -1) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to reset callback child signal handlers.");
+            _exit(EXIT_FAILURE);
+        }
+
+        // The disposition alone is not enough: SIGPIPE is also BLOCKED here. The block is ours, not
+        // inherited - spawn_server_event_loop() calls signals_block_all() and unblocks only SIGTERM
+        // and SIGCHLD, so previous_mask always carries SIGPIPE blocked, whatever the daemon's mask
+        // was. A blocked SIGPIPE makes write() return EPIPE with the signal left pending, so the
+        // child would survive a closed pipe exactly as if the disposition were still SIG_IGN.
+        // Restore the inherited mask minus SIGPIPE.
+        sigset_t child_mask = previous_mask;
+        sigdelset(&child_mask, SIGPIPE);
+
+        mask_rc = pthread_sigmask(SIG_SETMASK, &child_mask, NULL);
+        if(mask_rc != 0) {
+            errno = mask_rc;
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to restore callback child signal mask.");
+            _exit(EXIT_FAILURE);
+        }
 
         // close the server sockets;
         close(server->sock); server->sock = -1;
@@ -436,14 +574,239 @@ typedef enum __attribute__((packed)) {
     SPAWN_SERVER_MSG_PING,
 } SPAWN_SERVER_MSG;
 
+static void spawn_server_close_received_fds(void *control, size_t controllen) {
+    const size_t header_len = CMSG_LEN(0);
+
+    if(!control || controllen < header_len)
+        return;
+
+    unsigned char *current = control;
+    size_t remaining = controllen;
+
+    while(remaining >= header_len) {
+        struct cmsghdr *cmsg = (struct cmsghdr *)current;
+        if(cmsg->cmsg_len < header_len)
+            break;
+
+        if(cmsg->cmsg_level != SOL_SOCKET || cmsg->cmsg_type != SCM_RIGHTS ||
+           cmsg->cmsg_len < CMSG_LEN(sizeof(int)))
+            goto next_cmsg;
+
+        uintptr_t data_start = (uintptr_t)CMSG_DATA(cmsg);
+        uintptr_t control_end = (uintptr_t)current + remaining;
+        if(data_start < (uintptr_t)current || data_start >= control_end)
+            goto next_cmsg;
+
+        size_t fd_bytes = cmsg->cmsg_len - CMSG_LEN(0);
+        size_t available_bytes = control_end - data_start;
+        if(fd_bytes > available_bytes)
+            fd_bytes = available_bytes;
+
+        int *fds = (int *)(void *)data_start;
+        for(size_t i = 0; i < fd_bytes / sizeof(int); i++)
+            close(fds[i]);
+
+next_cmsg:
+        if(cmsg->cmsg_len > remaining)
+            break;
+
+        size_t next_cmsg_len = CMSG_SPACE(cmsg->cmsg_len - header_len);
+        if(!next_cmsg_len || next_cmsg_len > remaining)
+            break;
+
+        current += next_cmsg_len;
+        remaining -= next_cmsg_len;
+    }
+}
+
+static bool spawn_server_iov_total_size(const struct iovec *iov, size_t iovlen, size_t *total) {
+    size_t bytes = 0;
+
+    for(size_t i = 0; i < iovlen; i++) {
+        if(unlikely(iov[i].iov_len > SIZE_MAX - bytes))
+            return false;
+
+        bytes += iov[i].iov_len;
+    }
+
+    *total = bytes;
+    return true;
+}
+
+static void spawn_server_iov_advance(struct iovec *iov, size_t iovlen, size_t *first, size_t bytes) {
+    while(bytes && *first < iovlen) {
+        if(bytes < iov[*first].iov_len) {
+            iov[*first].iov_base = (char *)iov[*first].iov_base + bytes;
+            iov[*first].iov_len -= bytes;
+            return;
+        }
+
+        bytes -= iov[*first].iov_len;
+        (*first)++;
+    }
+}
+
+static bool spawn_server_recvmsg_fully(int sock, const struct iovec *iov, size_t iovlen,
+                                       void *control, size_t controllen, size_t *received_controllen,
+                                       const char *description) {
+    if(received_controllen)
+        *received_controllen = 0;
+
+    if(unlikely(iovlen > SPAWN_SERVER_IOV_MAX)) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN SERVER: cannot recvmsg() %s: too many iovecs (%zu)",
+               description, iovlen);
+        return false;
+    }
+
+    struct iovec pending[SPAWN_SERVER_IOV_MAX];
+    memcpy(pending, iov, sizeof(*iov) * iovlen);
+
+    size_t remaining;
+    if(unlikely(!spawn_server_iov_total_size(pending, iovlen, &remaining))) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN SERVER: cannot recvmsg() %s: iovec byte count overflows",
+               description);
+        return false;
+    }
+
+    size_t first = 0;
+    size_t control_received = 0;
+
+    while(remaining) {
+        struct msghdr msg = {
+            .msg_iov = &pending[first],
+            .msg_iovlen = iovlen - first,
+        };
+
+        if(control && !control_received) {
+            msg.msg_control = control;
+            msg.msg_controllen = controllen;
+        }
+
+        ssize_t bytes = recvmsg(sock, &msg, 0);
+        if(bytes < 0) {
+            if(errno == EINTR)
+                continue;
+
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN SERVER: failed to recvmsg() %s.",
+                   description);
+            spawn_server_close_received_fds(control, control_received);
+            return false;
+        }
+
+        if(bytes == 0) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN SERVER: peer closed socket while receiving %s.",
+                   description);
+            spawn_server_close_received_fds(control, control_received);
+            return false;
+        }
+
+        if(msg.msg_flags & MSG_CTRUNC) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN SERVER: received truncated control message while receiving %s.",
+                   description);
+            spawn_server_close_received_fds(control, msg.msg_controllen);
+            return false;
+        }
+
+        if(control && !control_received && msg.msg_controllen)
+            control_received = msg.msg_controllen;
+
+        if(unlikely((size_t)bytes > remaining)) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN SERVER: recvmsg() returned more bytes than requested while receiving %s.",
+                   description);
+            spawn_server_close_received_fds(control, control_received);
+            return false;
+        }
+
+        spawn_server_iov_advance(pending, iovlen, &first, (size_t)bytes);
+        remaining -= (size_t)bytes;
+    }
+
+    if(received_controllen)
+        *received_controllen = control_received;
+
+    return true;
+}
+
+static bool spawn_server_sendmsg_fully(int sock, const struct iovec *iov, size_t iovlen,
+                                       void *control, size_t controllen, const char *description) {
+    if(unlikely(iovlen > SPAWN_SERVER_IOV_MAX)) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: cannot sendmsg() %s: too many iovecs (%zu)",
+               description, iovlen);
+        return false;
+    }
+
+    struct iovec pending[SPAWN_SERVER_IOV_MAX];
+    memcpy(pending, iov, sizeof(*iov) * iovlen);
+
+    size_t remaining;
+    if(unlikely(!spawn_server_iov_total_size(pending, iovlen, &remaining))) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: cannot sendmsg() %s: iovec byte count overflows",
+               description);
+        return false;
+    }
+
+    size_t first = 0;
+    bool control_sent = !control || !controllen;
+
+    while(remaining) {
+        struct msghdr msg = {
+            .msg_iov = &pending[first],
+            .msg_iovlen = iovlen - first,
+        };
+
+        if(!control_sent) {
+            msg.msg_control = control;
+            msg.msg_controllen = controllen;
+        }
+
+        ssize_t bytes = sendmsg(sock, &msg, 0);
+        if(bytes < 0) {
+            if(errno == EINTR)
+                continue;
+
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN PARENT: failed to sendmsg() %s.",
+                   description);
+            return false;
+        }
+
+        if(bytes == 0) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN PARENT: sendmsg() made no progress while sending %s.",
+                   description);
+            return false;
+        }
+
+        control_sent = true;
+
+        if(unlikely((size_t)bytes > remaining)) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN PARENT: sendmsg() returned more bytes than requested while sending %s.",
+                   description);
+            return false;
+        }
+
+        spawn_server_iov_advance(pending, iovlen, &first, (size_t)bytes);
+        remaining -= (size_t)bytes;
+    }
+
+    return true;
+}
+
 static bool spawn_server_is_running(const char *path) {
-    struct msghdr msg = {0};
     struct iovec iov[7];
     SPAWN_SERVER_MSG msg_type = SPAWN_SERVER_MSG_PING;
     size_t dummy_size = 0;
     SPAWN_INSTANCE_TYPE dummy_type = 0;
     ND_UUID magic = UUID_ZERO;
-    char cmsgbuf[CMSG_SPACE(sizeof(int))] __attribute__((aligned(sizeof(size_t))));
 
     iov[0].iov_base = &msg_type;
     iov[0].iov_len = sizeof(msg_type);
@@ -466,18 +829,11 @@ static bool spawn_server_is_running(const char *path) {
     iov[6].iov_base = &dummy_type;
     iov[6].iov_len = sizeof(dummy_type);
 
-    msg.msg_iov = iov;
-    msg.msg_iovlen = 7;
-    msg.msg_control = cmsgbuf;
-    msg.msg_controllen = sizeof(cmsgbuf);
-
     int sock = connect_to_spawn_server(path, false);
     if(sock == -1)
         return false;
 
-    int rc = sendmsg(sock, &msg, 0);
-    if (rc < 0) {
-        // cannot send the message
+    if(!spawn_server_sendmsg_fully(sock, iov, 7, NULL, 0, "spawn server ping")) {
         close(sock);
         return false;
     }
@@ -507,7 +863,7 @@ static bool spawn_server_send_request(ND_UUID *magic, SPAWN_REQUEST *request) {
     struct cmsghdr *cmsg;
     SPAWN_SERVER_MSG msg_type = SPAWN_SERVER_MSG_REQUEST;
     char cmsgbuf[CMSG_SPACE(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS)] __attribute__((aligned(sizeof(size_t))));
-    struct iovec iov[11];
+    struct iovec iov[SPAWN_SERVER_IOV_MAX];
 
     // We send 1 request with 10 iovec in it
     // The request will be received in 2 parts
@@ -544,11 +900,6 @@ static bool spawn_server_send_request(ND_UUID *magic, SPAWN_REQUEST *request) {
     iov[9].iov_base = (char *)request->data;
     iov[9].iov_len = request->data_size;
 
-    iov[10].iov_base = NULL;
-    iov[10].iov_len = 0;
-
-    msg.msg_iov = iov;
-    msg.msg_iovlen = 11;
     msg.msg_control = cmsgbuf;
     msg.msg_controllen = CMSG_SPACE(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS);
 
@@ -559,17 +910,13 @@ static bool spawn_server_send_request(ND_UUID *magic, SPAWN_REQUEST *request) {
 
     memcpy(CMSG_DATA(cmsg), request->fds, sizeof(int) * SPAWN_SERVER_TRANSFER_FDS);
 
-    int rc = sendmsg(request->sock, &msg, 0);
-
-    if (rc < 0) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: Failed to sendmsg() request to spawn server using socket %d.", request->sock);
+    if(!spawn_server_sendmsg_fully(request->sock, iov, 10, cmsgbuf, CMSG_SPACE(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS),
+                                   "request to spawn server"))
         goto cleanup;
-    }
-    else {
-        ret = true;
-        // fprintf(stderr, "PARENT: sent request %zu on socket %d (fds: %d, %d, %d, %d) from tid %d\n",
-        //     request->request_id, request->socket, request->fds[0], request->fds[1], request->fds[2], request->fds[3], os_gettid());
-    }
+
+    ret = true;
+    // fprintf(stderr, "PARENT: sent request %zu on socket %d (fds: %d, %d, %d, %d) from tid %d\n",
+    //     request->request_id, request->socket, request->fds[0], request->fds[1], request->fds[2], request->fds[3], os_gettid());
 
 cleanup:
     freez(encoded_env);
@@ -589,6 +936,7 @@ static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
     SPAWN_INSTANCE_TYPE type;
     char cmsgbuf[CMSG_SPACE(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS)] __attribute__((aligned(sizeof(size_t))));
     char *envp_encoded = NULL, *argv_encoded = NULL, *data = NULL;
+    const char **envp_decoded = NULL, **argv_decoded = NULL;
     int stdin_fd = -1, stdout_fd = -1, stderr_fd = -1, custom_fd = -1;
 
     // First recvmsg() to read sizes and control message
@@ -618,45 +966,31 @@ static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
     msg.msg_control = cmsgbuf;
     msg.msg_controllen = sizeof(cmsgbuf);
 
-    if (recvmsg(sock, &msg, 0) < 0) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-            "SPAWN SERVER: failed to recvmsg() the first part of the request.");
+    memset(cmsgbuf, 0, sizeof(cmsgbuf));
+    size_t received_controllen = 0;
+    if(!spawn_server_recvmsg_fully(sock, iov, 7, cmsgbuf, sizeof(cmsgbuf), &received_controllen,
+                                   "the first part of the request")) {
         close(sock);
         return;
     }
 
     if(msg_type == SPAWN_SERVER_MSG_PING) {
+        spawn_server_close_received_fds(cmsgbuf, received_controllen);
         spawn_server_send_status_ping(sock);
         close(sock);
         return;
     }
 
-    if(!UUIDeq(magic, server->magic)) {
+    if(msg_type != SPAWN_SERVER_MSG_REQUEST) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
-            "SPAWN SERVER: Invalid authorization key for request %zu. "
-            "Rejecting request.",
-            request_id);
+               "SPAWN SERVER: invalid request message type %u. Rejecting request.",
+               (unsigned)msg_type);
+        spawn_server_close_received_fds(cmsgbuf, received_controllen);
         close(sock);
         return;
     }
 
-    if(type == SPAWN_INSTANCE_TYPE_EXEC && !(server->options & SPAWN_SERVER_OPTION_EXEC)) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-            "SPAWN SERVER: Request %zu wants to exec, but exec is not allowed for this spawn server. "
-            "Rejecting request.",
-            request_id);
-        close(sock);
-        return;
-    }
-
-    if(type == SPAWN_INSTANCE_TYPE_CALLBACK && !(server->options & SPAWN_SERVER_OPTION_CALLBACK)) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-            "SPAWN SERVER: Request %zu wants to run a callback, but callbacks are not allowed for this spawn server. "
-            "Rejecting request.",
-            request_id);
-        close(sock);
-        return;
-    }
+    msg.msg_controllen = received_controllen;
 
     // Extract file descriptors from control message
     struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
@@ -664,12 +998,14 @@ static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "SPAWN SERVER: Received invalid control message (expected %zu bytes, received %zu bytes)",
                (size_t)(CMSG_LEN(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS)), (size_t)(cmsg?cmsg->cmsg_len:0));
+        spawn_server_close_received_fds(cmsgbuf, received_controllen);
         close(sock);
         return;
     }
 
     if (cmsg->cmsg_level != SOL_SOCKET || cmsg->cmsg_type != SCM_RIGHTS) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Received unexpected control message type.");
+        spawn_server_close_received_fds(cmsgbuf, received_controllen);
         close(sock);
         return;
     }
@@ -687,22 +1023,60 @@ static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
         goto cleanup;
     }
 
+    if(!UUIDeq(magic, server->magic)) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+            "SPAWN SERVER: Invalid authorization key for request %zu. "
+            "Rejecting request.",
+            request_id);
+        goto cleanup;
+    }
+
+    if(type == SPAWN_INSTANCE_TYPE_EXEC && !(server->options & SPAWN_SERVER_OPTION_EXEC)) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+            "SPAWN SERVER: Request %zu wants to exec, but exec is not allowed for this spawn server. "
+            "Rejecting request.",
+            request_id);
+        goto cleanup;
+    }
+
+    if(type == SPAWN_INSTANCE_TYPE_CALLBACK && !(server->options & SPAWN_SERVER_OPTION_CALLBACK)) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+            "SPAWN SERVER: Request %zu wants to run a callback, but callbacks are not allowed for this spawn server. "
+            "Rejecting request.",
+            request_id);
+        goto cleanup;
+    }
+
+    if(env_size == 0 || argv_size == 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN SERVER: invalid encoded request sizes, env = %zu, argv = %zu",
+               env_size, argv_size);
+        goto cleanup;
+    }
+
     // Second recvmsg() to read buffer contents
     iov[0].iov_base = envp_encoded = mallocz(env_size);
     iov[0].iov_len = env_size;
     iov[1].iov_base = argv_encoded = mallocz(argv_size);
     iov[1].iov_len = argv_size;
-    iov[2].iov_base = data = mallocz(data_size);
+    iov[2].iov_base = data = data_size ? mallocz(data_size) : NULL;
     iov[2].iov_len = data_size;
 
     msg.msg_iov = iov;
-    msg.msg_iovlen = 3;
+    msg.msg_iovlen = data_size ? 3 : 2;
     msg.msg_control = NULL;
     msg.msg_controllen = 0;
 
-    ssize_t total_bytes_received = recvmsg(sock, &msg, 0);
-    if (total_bytes_received < 0) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: failed to recvmsg() the second part of the request.");
+    if(!spawn_server_recvmsg_fully(sock, iov, msg.msg_iovlen, NULL, 0, NULL,
+                                   "the second part of the request"))
+        goto cleanup;
+
+    envp_decoded = argv_decode(envp_encoded, env_size);
+    argv_decoded = argv_decode(argv_encoded, argv_size);
+    if(!envp_decoded || !argv_decoded) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN SERVER: received malformed encoded argv/envp buffers for request %zu",
+               request_id);
         goto cleanup;
     }
 
@@ -720,12 +1094,14 @@ static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
             [2] = stderr_fd,
             [3] = custom_fd,
         },
-        .envp = argv_decode(envp_encoded, env_size),
-        .argv = argv_decode(argv_encoded, argv_size),
+        .envp = envp_decoded,
+        .argv = argv_decoded,
         .data = data,
         .data_size = data_size,
         .type = type
     };
+    envp_decoded = NULL;
+    argv_decoded = NULL;
 
     // all allocations given to the request are now handled by this
     spawn_server_execute_request(server, rq);
@@ -742,6 +1118,8 @@ cleanup:
     if(stdout_fd != -1) close(stdout_fd);
     if(stderr_fd != -1) close(stderr_fd);
     if(custom_fd != -1) close(custom_fd);
+    freez((void *)envp_decoded);
+    freez((void *)argv_decoded);
     freez(envp_encoded);
     freez(argv_encoded);
     freez(data);
@@ -793,14 +1171,21 @@ static void spawn_server_process_sigchld(void) {
             send_report_remove_request = true;
         }
         else if(WIFSIGNALED(status)) {
+            // SIGPIPE and SIGTERM are how we stop children on purpose: we close their pipes, or we
+            // signal them. spawn_popen_status_rc() already reports both as a clean exit (rc 0), so
+            // they are not warnings here either - otherwise every recycled plugin logs one.
+            int sig = WTERMSIG(status);
+            ND_LOG_FIELD_PRIORITY prio =
+                (sig == SIGPIPE || sig == SIGTERM) ? NDLP_DEBUG : NDLP_WARNING;
+
             if(WCOREDUMP(status))
                 nd_log(NDLS_COLLECTORS, NDLP_WARNING,
                     "SPAWN SERVER: child with pid %d (request %zu) coredump'd due to signal %d: %s",
-                    pid, request_id, WTERMSIG(status), rq ? rq->cmdline : "[request not found]");
+                    pid, request_id, sig, rq ? rq->cmdline : "[request not found]");
             else
-                nd_log(NDLS_COLLECTORS, NDLP_WARNING,
+                nd_log(NDLS_COLLECTORS, prio,
                     "SPAWN SERVER: child with pid %d (request %zu) killed by signal %d: %s",
-                    pid, request_id, WTERMSIG(status), rq ? rq->cmdline : "[request not found]");
+                    pid, request_id, sig, rq ? rq->cmdline : "[request not found]");
             send_report_remove_request = true;
         }
         else if(WIFSTOPPED(status)) {
@@ -828,6 +1213,32 @@ static void spawn_server_process_sigchld(void) {
             request_free(rq);
         }
     }
+}
+
+static void spawn_server_signal_all_children(int signo) {
+    for(SPAWN_REQUEST *rq = spawn_server_requests; rq ; rq = rq->next) {
+        if(kill(rq->pid, signo) != 0)
+            nd_log(NDLS_COLLECTORS, signo == SIGKILL ? NDLP_ERR : NDLP_WARNING,
+                   "SPAWN SERVER: failed to send signal %d to child pid %d (request %zu): %s",
+                   signo, rq->pid, rq->request_id, strerror(errno));
+    }
+}
+
+static bool spawn_server_wait_for_children_to_exit(usec_t timeout_ut) {
+    usec_t deadline_ut = now_monotonic_usec() + timeout_ut;
+
+    while(spawn_server_requests) {
+        spawn_server_process_sigchld();
+        if(!spawn_server_requests)
+            return true;
+
+        if(now_monotonic_usec() >= deadline_ut)
+            return false;
+
+        sleep_usec(10 * USEC_PER_MS);
+    }
+
+    return true;
 }
 
 static int spawn_server_event_loop(SPAWN_SERVER *server) {
@@ -912,17 +1323,18 @@ static int spawn_server_event_loop(SPAWN_SERVER *server) {
 
     // stop all children
     if(spawn_server_requests) {
-        // nd_log(NDLS_COLLECTORS, NDLP_INFO, "SPAWN SERVER: killing all children...");
-        size_t killed = 0;
-        for(SPAWN_REQUEST *rq = spawn_server_requests; rq ; rq = rq->next) {
-            kill(rq->pid, SIGTERM);
-            killed++;
+        spawn_server_signal_all_children(SIGTERM);
+
+        if(!spawn_server_wait_for_children_to_exit((usec_t)SPAWN_KILL_DEFAULT_GRACE_MS * USEC_PER_MS)) {
+            nd_log(NDLS_COLLECTORS, NDLP_WARNING,
+                   "SPAWN SERVER: children did not exit after SIGTERM; sending SIGKILL");
+
+            spawn_server_signal_all_children(SIGKILL);
+
+            if(!spawn_server_wait_for_children_to_exit((usec_t)SPAWN_KILL_DEFAULT_GRACE_MS * USEC_PER_MS))
+                nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                       "SPAWN SERVER: giving up waiting for children after SIGKILL");
         }
-        while(spawn_server_requests) {
-            spawn_server_process_sigchld();
-            tinysleep();
-        }
-        // nd_log(NDLS_COLLECTORS, NDLP_INFO, "SPAWN SERVER: all %zu children finished", killed);
     }
 
     return 0;
@@ -956,25 +1368,32 @@ static bool spawn_server_create_listening_socket(SPAWN_SERVER *server) {
         return false;
     }
 
-    if ((server->sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to create socket()");
-        return false;
-    }
-
     struct sockaddr_un server_addr = {
         .sun_family = AF_UNIX,
     };
-    strcpy(server_addr.sun_path, server->path);
+
+    if(!spawn_server_set_unix_socket_path(&server_addr, server->path, true,
+                                          "SPAWN SERVER: Cannot listen on path"))
+        return false;
+
+    if ((server->sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+        int error = errno;
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to create socket(): %s (%d)", strerror(error), error);
+        return false;
+    }
+
     unlink(server->path);
     errno = 0;
 
     if (bind(server->sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to bind()");
+        int error = errno;
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to bind(): %s (%d)", strerror(error), error);
         return false;
     }
 
-    if (listen(server->sock, 5) == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to listen()");
+    if (listen(server->sock, SOMAXCONN) == -1) {
+        int error = errno;
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to listen(): %s (%d)", strerror(error), error);
         return false;
     }
 
@@ -1053,13 +1472,38 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name
         runtime_directory = "/tmp";
 
     char path[1024];
+    int path_length;
+    const size_t max_path_length = spawn_server_max_unix_socket_path_length();
     if(name && *name) {
         server->name = strdupz(name);
-        snprintf(path, sizeof(path), "%s/netdata-spawn-%s.sock", runtime_directory, name);
+        path_length = snprintf(path, sizeof(path), "%s/netdata-spawn-%s.sock", runtime_directory, name);
     }
     else {
         server->name = strdupz("unnamed");
-        snprintf(path, sizeof(path), "%s/netdata-spawn-%d-%zu.sock", runtime_directory, getpid(), server->id);
+        path_length = snprintf(path, sizeof(path), "%s/netdata-spawn-%d-%zu.sock", runtime_directory, getpid(), server->id);
+    }
+
+    if(path_length < 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN SERVER: failed to generate socket path for '%s'",
+               server->name);
+        goto cleanup;
+    }
+
+    if((size_t)path_length >= sizeof(path)) {
+        errno = ENAMETOOLONG;
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN SERVER: socket path for '%s' in runtime directory '%s' was truncated (needed %d chars plus NUL, buffer is %zu bytes)",
+               server->name, runtime_directory, path_length, sizeof(path));
+        goto cleanup;
+    }
+
+    if((size_t)path_length > max_path_length) {
+        errno = ENAMETOOLONG;
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN SERVER: socket path for '%s' in runtime directory '%s' exceeds the %zu-byte AF_UNIX limit",
+               server->name, runtime_directory, max_path_length);
+        goto cleanup;
     }
 
     server->path = strdupz(path);
@@ -1131,11 +1575,29 @@ cleanup:
 // --------------------------------------------------------------------------------------------------------------------
 // creating spawn server instances
 
+// Report a child we could not signal. This is not a cosmetic log: a child that cannot be signalled
+// is never terminated by us, and if it also does not exit on its own it leaks for the lifetime of
+// the machine. EPERM here means the child is running with a uid we cannot signal - the usual cause
+// is a setuid-root helper (e.g. ndsudo) that execve()d the target, which puts the child's real uid
+// at 0 while netdata and its spawn server run unprivileged.
+static void spawn_server_log_kill_failure(SPAWN_INSTANCE *instance, int signo) {
+    int e = errno;
+    nd_log(NDLS_COLLECTORS, e == ESRCH ? NDLP_DEBUG : NDLP_ERR,
+           "SPAWN PARENT: cannot send signal %d to child pid %d (request %zu): %s%s: %s",
+           signo, instance->child_pid, instance->request_id, strerror(e),
+           e == EPERM ? " - the child runs with a uid we cannot signal, so it will not be terminated"
+                      : "",
+           instance->cmdline ? instance->cmdline : "[no command line]");
+    errno = e;
+}
+
 void spawn_server_exec_destroy(SPAWN_INSTANCE *instance) {
-    if(instance->child_pid) kill(instance->child_pid, SIGTERM);
+    if(instance->child_pid && kill(instance->child_pid, SIGTERM) != 0)
+        spawn_server_log_kill_failure(instance, SIGTERM);
     if(instance->write_fd != -1) close(instance->write_fd);
     if(instance->read_fd != -1) close(instance->read_fd);
     if(instance->sock != -1) close(instance->sock);
+    freez((void *)instance->cmdline);
     freez(instance);
 }
 
@@ -1152,6 +1614,46 @@ static void log_invalid_magic(SPAWN_INSTANCE *instance, struct status_report *sr
     nd_log(NDLS_COLLECTORS, NDLP_ERR,
            "SPAWN PARENT: invalid final status report for child %d, request %zu (invalid magic %#x in response, reads like '%s')",
            instance->child_pid, instance->request_id, sr->magic, buf);
+}
+
+SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int timeout_ms, int *status) {
+    if(!instance) { if(status) *status = -1; return SPAWN_TIMEDWAIT_EXITED; }
+
+    // close the child pipes, to make it exit (same as spawn_server_exec_wait)
+    if(instance->write_fd != -1) { close(instance->write_fd); instance->write_fd = -1; }
+    if(instance->read_fd != -1) { close(instance->read_fd); instance->read_fd = -1; }
+
+    // a non-positive timeout means "wait forever" to wait_on_socket_or_cancel_with_timeout();
+    // this primitive must always be bounded, so clamp to a minimal positive slice.
+    if(timeout_ms <= 0) timeout_ms = 1;
+
+    // the spawn server sends the final status report on instance->sock when the child exits
+    short revents = 0;
+    NETDATA_SSL ssl = { 0 };
+    int rc = wait_on_socket_or_cancel_with_timeout(&ssl, instance->sock, timeout_ms, POLLIN, &revents);
+    if(rc == -1 /* thread cancelled */ || rc == 1 /* timeout */)
+        // Nothing was observed - the poll expired, or the wait was cancelled before observing
+        // anything at all. Usually the child is still running, but this is not proof of it; see the
+        // RUNNING note on spawn_server_exec_timedwait() in spawn_server.h.
+        return SPAWN_TIMEDWAIT_RUNNING;
+
+    if(rc == 2 /* error on the socket */) {
+        // the status channel to the spawn server is broken (the spawn server itself died). We
+        // cannot confirm the child exited, so we must NOT resolve as EXITED and free the instance
+        // (that could leak a still-alive child). But this is terminal, not a transient "still
+        // running" state, so we must NOT report RUNNING either (a caller looping on RUNNING with a
+        // 0/"wait forever" timeout would spin forever). Report ERROR: the caller keeps the instance
+        // and reclaims it by killing it.
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: status socket error for request No %zu, pid %d",
+               instance->request_id, instance->child_pid);
+        return SPAWN_TIMEDWAIT_ERROR;
+    }
+
+    // rc == 0: the status report is ready to read; the blocking wait returns immediately now.
+    int st = spawn_server_exec_wait(server, instance);
+    if(status) *status = st;
+    return SPAWN_TIMEDWAIT_EXITED;
 }
 
 int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *instance) {
@@ -1193,6 +1695,12 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
     return rc;
 }
 
+// NOTE on pid safety: every kill below can in principle hit a recycled pid. Our spawn server reaps
+// the child and only then writes the status report, and it writes none at all if the pid is not in
+// its request list - so "no report yet" (SPAWN_TIMEDWAIT_RUNNING) does not mean the pid is still
+// ours. The pre-kill grace makes this worse by discarding its poll result and signalling regardless.
+// Closing the window needs the signalling to move into the spawn server, keyed by request id, so the
+// process that reaps is the one that signals; until then this is a known, accepted race.
 int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int timeout_ms) {
     if(instance->write_fd != -1) { close(instance->write_fd); instance->write_fd = -1; }
     if(instance->read_fd != -1) { close(instance->read_fd); instance->read_fd = -1; }
@@ -1203,9 +1711,40 @@ int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int t
         wait_on_socket_or_cancel_with_timeout(&ssl, instance->sock, timeout_ms, POLLIN, &revents);
     }
 
-    // kill the child, if it is still running
-    if(instance->child_pid)
-        kill(instance->child_pid, SIGTERM);
+    // we still have a pid recorded for this child - not a liveness check (see the note above)
+    if(instance->child_pid) {
+        if(kill(instance->child_pid, SIGTERM) != 0)
+            spawn_server_log_kill_failure(instance, SIGTERM);
+
+        // wait a bounded grace for the child to exit after SIGTERM. NOTE: timeout_ms is already
+        // consumed above as the pre-kill grace (voluntary exit before SIGTERM); the post-SIGTERM
+        // grace uses the fixed default so the caller's grace is not applied twice.
+        // EXITED here is authoritative (the server reaps before it reports); RUNNING is not - see
+        // the pid-safety note above this function.
+        int status;
+        if(spawn_server_exec_timedwait(server, instance, SPAWN_KILL_DEFAULT_GRACE_MS, &status) == SPAWN_TIMEDWAIT_EXITED)
+            return status;
+
+        // still not gone: force-kill, then wait another bounded grace. We must NOT fall through to
+        // an unbounded blocking wait here - a child we cannot signal (e.g. SIGKILL returns EPERM)
+        // would otherwise hang the caller (and shutdown) forever, the very thing this path prevents.
+        if(kill(instance->child_pid, SIGKILL) != 0)
+            spawn_server_log_kill_failure(instance, SIGKILL);
+
+        if(spawn_server_exec_timedwait(server, instance, SPAWN_KILL_DEFAULT_GRACE_MS, &status) == SPAWN_TIMEDWAIT_EXITED)
+            return status;
+
+        // could not confirm the child exited within the bounded waits; reclaim the instance so we
+        // neither leak it nor block. The spawn server reaps the child if/when it actually dies.
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: giving up waiting for pid %d after SIGKILL (request No %zu) - reclaiming, "
+               "the child is left running: %s",
+               instance->child_pid, instance->request_id,
+               instance->cmdline ? instance->cmdline : "[no command line]");
+        instance->child_pid = 0; // already signalled; skip the SIGTERM in destroy
+        spawn_server_exec_destroy(instance);
+        return -1;
+    }
 
     return spawn_server_exec_wait(server, instance);
 }
@@ -1218,6 +1757,11 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     SPAWN_INSTANCE *instance = callocz(1, sizeof(SPAWN_INSTANCE));
     instance->read_fd = -1;
     instance->write_fd = -1;
+
+    if(argv) {
+        CLEAN_BUFFER *wb = argv_to_cmdline_buffer(argv);
+        instance->cmdline = strdupz(buffer_tostring(wb));
+    }
 
     instance->sock = connect_to_spawn_server(server->path, true);
     if(instance->sock == -1)

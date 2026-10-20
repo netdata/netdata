@@ -37,7 +37,7 @@ pub fn install_handler() -> Result<()> {
         let mut sa: libc::sigaction = std::mem::zeroed();
 
         sa.sa_flags = libc::SA_SIGINFO;
-        sa.sa_sigaction = sigbus_handler as usize;
+        sa.sa_sigaction = sigbus_handler as *const () as usize;
 
         libc::sigaction(libc::SIGBUS, &sa, std::ptr::null_mut())
     });

@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+version: v1
+mode: oneshot
+command: [./inspect.py]
+functions:
+  - id: items
+    name: Synthetic Workers
+    help: Inspect synthetic workers without periodic collection.

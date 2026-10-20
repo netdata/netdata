@@ -41,10 +41,22 @@ Each of the external plugins is expected to run forever.
 Netdata will start it when it starts and stop it when it exits.
 
 If the external plugin exits or crashes, Netdata will log an error.
-If the external plugin exits or crashes without pushing metrics to Netdata, Netdata will not start it again.
+Whether Netdata starts it again depends on its exit status and on whether it has produced useful output since Netdata started.
 
--   Plugins that exit with any value other than zero, will be disabled. Plugins that exit with zero, will be restarted after some time.
+Netdata counts these lines as useful output (collected data): `END`, `END2`, `REND`, `FUNCTION`, `FUNCTION_DEL`,
+`FUNCTION_RESULT_END` and `CONFIG`. A declared function counts even though no metric has been collected yet.
+`TRUST_DURATIONS`, `PLUGIN_KEEPALIVE`, `CHART` and `DIMENSION` do not count.
+
+-   A plugin that exits with a non-zero value without having produced useful output since Netdata started is disabled until Netdata restarts.
+-   A plugin that exits with a non-zero value after it has produced useful output since Netdata started, in this run or an earlier one, is restarted after `10 * update_every` seconds.
+    It is disabled only after more than 10 consecutive runs without useful output, so a plugin that produces useful output on every run before failing is restarted forever.
+-   A plugin that exits with zero after it has produced useful output since Netdata started is restarted after `update_every` seconds, always.
+    One that exits with zero and has never produced useful output is restarted after `10 * update_every` seconds, and disabled after more than 10 such runs.
+-   A plugin killed by a signal other than `SIGTERM` or `SIGPIPE` is disabled.
+-   When Netdata ends the connection itself because it could not create or take ownership of a virtual node the plugin defined, the plugin is restarted after `update_every` seconds, unless it was killed by a signal other than `SIGTERM` or `SIGPIPE`, and a run without useful output does not add to the consecutive-run count.
 -   Plugins may also be disabled by Netdata if they output things that Netdata does not understand.
+
+So a plugin that cannot start (for example, its listening port is already in use) should finish every fallible startup step before it declares functions or sends data, and exit with a non-zero value if any of them fails.
 
 The `stdout` of external plugins is connected to Netdata to receive metrics,
 with the API defined below.
@@ -105,7 +117,7 @@ Keep in mind, that the user may use Netdata configuration to overwrite chart and
 
 Plugins should attempt to autoconfigure themselves when possible.
 
-For example, if your plugin wants to monitor `squid`, you can search for it on port `3128` or `8080`. If any succeeds, you can proceed. If it fails you can output an error (on stderr) saying that you cannot find `squid` running and giving instructions about the plugin configuration. Then you can stop (exit with non-zero value), so that Netdata will not attempt to start the plugin again.
+For example, if your plugin wants to monitor `squid`, you can search for it on port `3128` or `8080`. If any succeeds, you can proceed. If it fails you can output an error (on stderr) saying that you cannot find `squid` running and giving instructions about the plugin configuration. Then you can stop (exit with non-zero value) before sending any data or function declarations, so that Netdata will not attempt to start the plugin again.
 
 ## External Plugins API
 
@@ -119,12 +131,12 @@ Netdata parses lines starting with:
 -    `CLABEL` - add a label to a chart
 -    `CLABEL_COMMIT` - commit added labels to the chart
 -    `FUNCTION` - define a function that can be called later to execute it
+- `FUNCTION_DEL` - unregister a function
 -    `BEGIN` - initialize data collection for a chart
 -    `SET` - set the value of a dimension for the initialized chart
 -    `END` - complete data collection for the initialized chart
 -    `FLUSH` - ignore the last collected values
 -    `DISABLE` - disable this plugin
--    `FUNCTION` - define functions
 -    `FUNCTION_PROGRESS` - report the progress of a function execution
 -    `FUNCTION_RESULT_BEGIN` - to initiate the transmission of function results
 -    `FUNCTION_RESULT_END` - to end the transmission of function result
@@ -162,6 +174,7 @@ available for the plugin to use.
 |:--------------------------------:|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 |    `NETDATA_USER_CONFIG_DIR`     | The directory where all Netdata-related user configuration should be stored. If the plugin requires custom user configuration, this is the place the user has saved it (normally under `/etc/netdata`).                                                |
 |    `NETDATA_STOCK_CONFIG_DIR`    | The directory where all Netdata -related stock configuration should be stored. If the plugin is shipped with configuration files, this is the place they can be found (normally under `/usr/lib/netdata/conf.d`).                                      |
+|     `NETDATA_STOCK_DATA_DIR`     | The directory where immutable Netdata stock data files are stored. Plugins can use this for packaged data assets such as MMDB files (normally under `/usr/share/netdata`).                                                                            |
 |      `NETDATA_PLUGINS_DIR`       | The directory where all Netdata plugins are stored.                                                                                                                                                                                                    |
 |   `NETDATA_USER_PLUGINS_DIRS`    | The list of directories where custom plugins are stored.                                                                                                                                                                                               |
 |        `NETDATA_WEB_DIR`         | The directory where the web files of Netdata are saved.                                                                                                                                                                                                |
@@ -185,7 +198,7 @@ The plugin should output instructions for Netdata to its output (`stdout`). Sinc
 
 #### DISABLE
 
-`DISABLE` will disable this plugin. This will prevent Netdata from restarting the plugin. You can also exit with the value `1` to have the same effect.
+`DISABLE` will disable this plugin. This will prevent Netdata from restarting the plugin. Exiting with the value `1` has the same effect only if the plugin has not produced useful output yet (see [Operation](#operation)).
 
 #### HOST_DEFINE
 
@@ -230,6 +243,11 @@ There are a few special keys that are used to define the system information of t
 - `_cloud_instance_region`
 - `_os_name`
 - `_os_version`
+- `_os_marketing_version`
+- `_os_release`
+- `_os_codename`
+- `_os_edition`
+- `_os_build`
 - `_kernel_version`
 - `_system_cores`
 - `_system_cpu_freq`
@@ -480,14 +498,22 @@ The plugin can register functions to Netdata, like this:
 - Priority defines the position of the function relative to the other functions (default is 100).
 - Version defines the version of the function (default is 0).
 
-Users can use a function to ask for more information from the collector. Netdata maintains a registry of functions in 2 levels:
-
-- per node
-- per chart
-
-Both node and chart functions are exactly the same, but chart functions allow Netdata to relate functions with charts and therefore present a context-sensitive menu of functions related to the chart the user is using.
+Users can use a function to ask for more information from the collector. Netdata maintains a per-node registry of
+functions; every function is registered host-wide. The `GLOBAL` word is accepted and optional: a `FUNCTION` line
+without it registers the function host-wide all the same (chart-scoped functions no longer exist - a line sent while a
+chart definition is open is coerced to host-wide, with a notice in the logs).
 
 Users can get a list of all the registered functions using the `/api/v1/functions` endpoint of Netdata and call functions using the `/api/v1/function` API call of Netdata.
+
+#### FUNCTION_DEL
+
+The plugin can unregister a previously registered function while continuing to run:
+
+> FUNCTION_DEL [GLOBAL] "name of the function"
+
+- The delete is keyed on the function name alone; the optional `GLOBAL` word is accepted and ignored.
+- Unregistered functions disappear from `/api/v1/functions` and return 503 on calls.
+- Functions can be re-registered later with a new `FUNCTION` line.
 
 Once a function is called, the plugin will receive at its standard input a command that looks like this:
 

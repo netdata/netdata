@@ -207,7 +207,7 @@ static int sp_strncmp(const char *s1, const char *s2, size_t n, bool case_sensit
 }
 
 ALWAYS_INLINE
-static char *sp_strstr(const char *haystack, const char *needle, bool case_sensitive) {
+static const char *sp_strstr(const char *haystack, const char *needle, bool case_sensitive) {
     if(case_sensitive)
         return strstr(haystack, needle);
 
@@ -216,7 +216,7 @@ static char *sp_strstr(const char *haystack, const char *needle, bool case_sensi
 
 ALWAYS_INLINE
 static bool match_pattern(struct simple_pattern *m, const char *str, size_t len, char *wildcarded, size_t *wildcarded_size) {
-    char *s;
+    const char *s;
 
     bool loop = true;
     while(loop && m->len <= len) {
@@ -288,7 +288,10 @@ static SIMPLE_PATTERN_RESULT simple_pattern_matches_extract_with_length(SIMPLE_P
     for(m = root; m ; m = m->next) {
         char *ws = wildcarded;
         size_t wss = wildcarded_size;
-        if(unlikely(ws)) *ws = '\0';
+        if(unlikely(wss)) {
+            if(unlikely(ws))
+                *ws = '\0';
+        }
 
         if (match_pattern(m, str, len, ws, &wss)) {
             if (m->negative) return SP_MATCHED_NEGATIVE;
@@ -300,7 +303,7 @@ static SIMPLE_PATTERN_RESULT simple_pattern_matches_extract_with_length(SIMPLE_P
 }
 
 SIMPLE_PATTERN_RESULT simple_pattern_matches_buffer_extract(SIMPLE_PATTERN *list, BUFFER *str, char *wildcarded, size_t wildcarded_size) {
-    if(!list || !str || buffer_strlen(str)) return SP_NOT_MATCHED;
+    if(!list || !str || !buffer_strlen(str)) return SP_NOT_MATCHED;
     return simple_pattern_matches_extract_with_length(list, buffer_tostring(str), buffer_strlen(str), wildcarded, wildcarded_size);
 }
 
@@ -320,12 +323,15 @@ SIMPLE_PATTERN_RESULT simple_pattern_matches_length_extract(SIMPLE_PATTERN *list
 }
 
 static inline void free_pattern(struct simple_pattern *m) {
-    if(!m) return;
+    while(m) {
+        struct simple_pattern *next = m->next;
 
-    free_pattern(m->child);
-    free_pattern(m->next);
-    freez((void *)m->match);
-    freez(m);
+        free_pattern(m->child);
+        freez((void *)m->match);
+        freez(m);
+
+        m = next;
+    }
 }
 
 void simple_pattern_free(SIMPLE_PATTERN *list) {
@@ -385,8 +391,8 @@ static void scan_is_potential_name(struct simple_pattern *p, int *alpha, int *co
             }
             if (p->mode != SIMPLE_PATTERN_EXACT)
                 *wildcards = 1;
-            p = p->child;
         }
+        p = p->child;
     }
 }
 

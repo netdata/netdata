@@ -3,6 +3,7 @@
 package prometheus
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -15,11 +16,17 @@ func (c *Collector) validateConfig() error {
 	if c.URL == "" {
 		return errors.New("'url' can not be empty")
 	}
+	if err := c.FallbackType.Validate(); err != nil {
+		return err
+	}
+	if err := c.Profiles.validate(); err != nil {
+		return err
+	}
 	return nil
 }
 
-func (c *Collector) initPrometheusClient() (prometheus.Prometheus, error) {
-	httpClient, err := web.NewHTTPClient(c.ClientConfig)
+func (c *Collector) initPrometheusClient(ctx context.Context) (prometheus.Prometheus, error) {
+	httpClient, err := web.NewHTTPClient(ctx, c.ClientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("init HTTP client: %v", err)
 	}
@@ -32,14 +39,17 @@ func (c *Collector) initPrometheusClient() (prometheus.Prometheus, error) {
 	}
 
 	if sr != nil {
+		if c.pipelineObserver != nil {
+			sr = pipelineObservingSelector{next: sr, collector: c}
+		}
 		return prometheus.NewWithSelector(httpClient, req, sr), nil
 	}
 	return prometheus.New(httpClient, req), nil
 }
 
-func (c *Collector) initFallbackTypeMatcher(expr []string) (matcher.Matcher, error) {
+func compileFallbackTypeMatcher(expr []string) (matcher.Matcher, error) {
 	if len(expr) == 0 {
-		return nil, nil
+		return matcher.FALSE(), nil
 	}
 
 	m := matcher.FALSE()

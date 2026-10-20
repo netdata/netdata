@@ -440,35 +440,6 @@ static void ebpf_cleanup_disk_list(void)
     disk_list = NULL;
 }
 
-/**
- * Obsolete global
- *
- * Obsolete global charts created by thread.
- *
- * @param em a pointer to `struct ebpf_module`
- */
-static void ebpf_obsolete_disk_global(ebpf_module_t *em)
-{
-    netdata_ebpf_disks_t *move = disk_list;
-    while (move) {
-        uint32_t flags = move->flags;
-        if (flags & NETDATA_DISK_CHART_CREATED) {
-            ebpf_write_chart_obsolete(
-                move->histogram.name,
-                move->family,
-                "",
-                "Disk latency",
-                EBPF_COMMON_UNITS_CALLS_PER_SEC,
-                move->family,
-                NETDATA_EBPF_CHART_TYPE_STACKED,
-                NETDATA_EBPF_DISK_LATENCY_CONTEXT,
-                move->histogram.order,
-                em->update_every);
-        }
-
-        move = move->next;
-    }
-}
 
 static void ebpf_disk_exit(void *pptr)
 {
@@ -478,16 +449,9 @@ static void ebpf_disk_exit(void *pptr)
 
     if (!disk_safe_clean) {
         netdata_mutex_lock(&ebpf_exit_cleanup);
-        em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+        ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_STOPPED);
         netdata_mutex_unlock(&ebpf_exit_cleanup);
         return;
-    }
-
-    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
-        netdata_mutex_lock(&lock);
-        ebpf_obsolete_disk_global(em);
-        netdata_mutex_unlock(&lock);
-        fflush(stdout);
     }
 
     ebpf_disk_disable_tracepoints();
@@ -510,7 +474,7 @@ static void ebpf_disk_exit(void *pptr)
         em->functions.bpf_unload(em);
 
     netdata_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_STOPPED);
     netdata_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -925,6 +889,7 @@ void ebpf_disk_thread(void *ptr)
     if (ebpf_disk_load_bpf(em)) {
         goto enddisk;
     }
+    ebpf_mark_program_loaded();
 
     int algorithms[NETDATA_EBPF_HIST_MAX_BINS];
     ebpf_fill_algorithms(algorithms, NETDATA_EBPF_HIST_MAX_BINS, NETDATA_EBPF_INCREMENTAL_IDX);

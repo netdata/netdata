@@ -3,6 +3,7 @@
 package confgroup
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -23,9 +24,11 @@ const (
 	keyVnode        = "vnode"
 	keyFunctionOnly = "function_only"
 
-	ikeySource     = "__source__"
-	ikeySourceType = "__source_type__"
-	ikeyProvider   = "__provider__"
+	ikeySource                 = "__source__"
+	ikeySourceType             = "__source_type__"
+	ikeyProvider               = "__provider__"
+	ikeyTrustDiscoveredTargets = "__trust_discovered_targets__"
+	ikeyDiscoveryPipelineID    = "__discovery_pipeline_id__"
 )
 
 const (
@@ -39,6 +42,14 @@ type Config map[string]any
 
 func (c Config) HashIncludeMap(_ string, k, _ any) (bool, error) {
 	s := k.(string)
+	if s == ikeyTrustDiscoveredTargets {
+		// Opt-in changes effective configuration; absent/false retain the default hash.
+		return c.SourceType() == TypeDiscovered && c.TrustDiscoveredTargets(), nil
+	}
+	if s == ikeyDiscoveryPipelineID {
+		// Reconcile ownership changes too, so later trust revocation uses the current owner.
+		return c.SourceType() == TypeDiscovered && c.TrustDiscoveredTargets() && c.DiscoveryPipelineID() != "", nil
+	}
 	return !strings.HasPrefix(s, "__") && !strings.HasSuffix(s, "__"), nil
 }
 
@@ -71,8 +82,28 @@ func (c Config) SetSource(v string) Config     { return c.Set(ikeySource, v) }
 func (c Config) SetSourceType(v string) Config { return c.Set(ikeySourceType, v) }
 func (c Config) SetProvider(v string) Config   { return c.Set(ikeyProvider, v) }
 
-func (c Config) SourceTypePriority() int {
-	switch c.SourceType() {
+// TrustDiscoveredTargets reads authority stamped by the discovery pipeline after rendering.
+func (c Config) TrustDiscoveredTargets() bool {
+	v, _ := c.Get(ikeyTrustDiscoveredTargets).(bool)
+	return v
+}
+
+func (c Config) SetTrustDiscoveredTargets(v bool) Config {
+	return c.Set(ikeyTrustDiscoveredTargets, v)
+}
+
+// DiscoveryPipelineID identifies the producing pipeline, independently of target source text.
+func (c Config) DiscoveryPipelineID() string {
+	v, _ := c.Get(ikeyDiscoveryPipelineID).(string)
+	return v
+}
+
+func (c Config) SetDiscoveryPipelineID(v string) Config {
+	return c.Set(ikeyDiscoveryPipelineID, v)
+}
+
+func SourceTypePriority(sourceType string) int {
+	switch sourceType {
 	default:
 		return 0
 	case TypeStock:
@@ -86,17 +117,26 @@ func (c Config) SourceTypePriority() int {
 	}
 }
 
-func (c Config) Clone() (Config, error) {
+func (c Config) SourceTypePriority() int {
+	return SourceTypePriority(c.SourceType())
+}
+
+func (c Config) Clone() (cloned Config, err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			cloned = nil
+			err = errors.New("confgroup: clone config: YAML marshal panic")
+		}
+	}()
 	type plain Config
 	bytes, err := yaml.Marshal((plain)(c))
 	if err != nil {
 		return nil, err
 	}
-	var newConfig Config
-	if err := yaml.Unmarshal(bytes, &newConfig); err != nil {
+	if err := yaml.Unmarshal(bytes, &cloned); err != nil {
 		return nil, err
 	}
-	return newConfig, nil
+	return cloned, nil
 }
 
 func (c Config) ApplyDefaults(def Default) {

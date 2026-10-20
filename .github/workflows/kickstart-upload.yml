@@ -20,7 +20,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 1
       - name: SSH setup
@@ -48,7 +48,7 @@ jobs:
               ${{ github.repository }}: Failed to upload updated kickstart script to repo server.
               Checkout: ${{ steps.checkout.outcome }}
               Import SSH Key: ${{ steps.ssh-setup.outcome }}
-              Upload to packages.netdata.cloud: ${{ steps.upload-packages.outcome }}
+              Upload to packages.netdata.cloud: ${{ steps.upload-primary.outcome }}
               Upload to packages2.netdata.cloud: ${{ steps.upload-packages2.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-

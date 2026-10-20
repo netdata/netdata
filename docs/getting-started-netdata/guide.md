@@ -42,7 +42,6 @@ This guide will show you how simple it is to get started with Netdata and experi
   />
 </div>
 
-
 unhideme-->
 
 ## [1. Sign in & Access Your Space](/src/claim/README.md)
@@ -63,52 +62,18 @@ Getting started is as simple as visiting [app.netdata.cloud](https://app.netdata
 
 ## [2. Connect a Node & See Instant Results](/src/claim/README.md)
 
-**Connect Your First Agent**
-Once logged into Netdata Cloud, you'll see connection instructions. There are three easy ways to connect:
-
-<details>
-<summary><strong>Method 1: Through the Cloud Interface</strong></summary><br/>
-
-1. Navigate to **Space Settings** (⚙️) on the left sidebar below the spaces list
-2. Select **Nodes** tab
-3. Click the **"+"** button to add a new node
-4. Copy and run the generated connection command
-
-</details>
-
-<details>
-<summary><strong>Method 2: From the Nodes Tab</strong></summary><br/>
-
-1. Go to the **Nodes** tab in your Room
-2. Click **Add nodes** button
-3. Follow the step-by-step instructions
-
-</details>
-
-<details>
-<summary><strong>Method 3: Via Integrations Page</strong></summary><br/>
-
-1. Visit the **Integrations** page
-2. Select your OS or container environment
-3. Execute the provided connection command
-
-</details>
+Connect your Agent to your Space to start streaming live metrics within seconds. Whether you're installing Netdata for the first time or connecting an Agent that's already running, the [connect documentation](/src/claim/README.md) covers every method — from the one-command installer for new nodes to the [UI, configuration file, and environment variable options for existing Agents](/src/claim/README.md#connect-existing-agent).
 
 :::tip
 
-**The One-Command Solution:**
-All methods will show you a command like this:
+**For new installations**, Netdata Cloud generates a personalized version of this command for you:
 
 ```bash
 bash <(curl -Ss https://get.netdata.cloud/kickstart.sh) --claim-token YOUR_TOKEN --claim-rooms YOUR_ROOMS --claim-url https://app.netdata.cloud
 ```
 
-:::
-
-:::info
-
 <details>
-<summary><strong>What this single command does:</strong></summary><br/>
+<summary><strong>What this single command does</strong></summary><br/>
 
 - Automatically detects your operating system
 - Installs the latest Netdata Agent
@@ -125,7 +90,7 @@ Within seconds of connection, you'll experience the power of real-time observabi
 
 - **Your node appears live in your Space**
 - **Charts immediately start streaming real-time data**
-- **System Overview dashboard populates automatically**
+- **Overview charts populate automatically for every section**
 - **All metrics update with 1-second granularity**
 - **Zero additional configuration required**
 
@@ -133,7 +98,7 @@ Within seconds of connection, you'll experience the power of real-time observabi
 
 **Automatic Dashboards:**
 
-- **System Overview** - Fully automated dashboard showing all your nodes
+- **[Overview charts](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md#how-the-dashboard-is-organized)** - Automatically arranged at the start of every dashboard section to summarize its metrics
 - **Nodes Tab** - Unified view of all infrastructure with key metrics
 - **Composite Charts** - Data from multiple nodes combined intelligently
 - **Real-Time Updates** - Every metric updates with 1-second granularity
@@ -191,7 +156,7 @@ Configure alerts to reach you through:
 **Quick Silence Options:**
 
 - **Individual alerts** - Change `to: silent` in alert configuration
-- **Specific alerts** - Edit `netdata.conf` with `enabled alarms = !alert_name *`
+- **Specific alerts** - Edit `netdata.conf` with `enabled alarms = !alert_name *` (single) or `enabled alarms = !alert1 !alert2 *` (multiple — all exclusions before the wildcard), then restart the Agent
 - **All alerts** - Set `enabled = no` in `[health]` section
 
 **Temporary Control:** Use the Health Management API for dynamic control without config changes - perfect for maintenance windows.
@@ -212,23 +177,18 @@ Configure alerts to reach you through:
 - **Example**: Create rooms for "Production", "Development", "Database Servers"
 
 **Team Collaboration:**
-Click "Invite Users" in your Space sidebar to add team members. Set appropriate access levels:
-
-- **Admins** - Full control over Spaces, Rooms, and billing
-- **Managers** - Room and user management
-- **Troubleshooters** - Monitoring and analysis access
-- **Observers** - View-only access to specific rooms
+Click "Invite Users" in your Space sidebar to add team members and assign each one a role (Admin, Manager, Troubleshooter, Observer, or Billing). See [Set Up Team Access](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#set-up-team-access) for what each role can do.
 
 :::tip
 
-**Role-Based Access Control (RBAC):** Business plan subscribers get fine-grained control over who can access what data, execute functions, and modify configurations - perfect for teams with different responsibilities.
+**Role-Based Access Control (RBAC):** Paid plan subscribers get fine-grained control over who can access what data, execute functions, and modify configurations - perfect for teams with different responsibilities.
 
 :::
 
 **Organize by Your Needs:**
 
 | **Category**       | **Examples**                         |
-| ------------------ | ------------------------------------ |
+|--------------------|--------------------------------------|
 | **By Service**     | Web servers, databases, applications |
 | **By Location**    | Data centers, cloud regions          |
 | **By Team**        | DevOps, SRE, development teams       |
@@ -236,19 +196,19 @@ Click "Invite Users" in your Space sidebar to add team members. Set appropriate 
 
 ## What's the Value for You
 
-### Experience the Difference with Business Plan
+### Experience the Difference with a Paid Plan
 
-**[Start Your Free Business Trial](https://netdata.cloud/pricing):** Experience the full power of Netdata Business with our free trial:
+**[Start Your Free Trial](https://netdata.cloud/pricing):** Experience the full power of Netdata with our free trial:
 
 - **No credit card required** - Start immediately
 - **Full access to all features** - Nothing held back
 - **Cancel anytime** - No commitments
 - **[Expert support](https://www.netdata.cloud/support/)** - Get help when you need it
 
-### Traditional Monitoring vs Netdata Business
+### Traditional Monitoring vs Netdata
 
-| **Traditional Monitoring**                       |        | **Netdata Business**                               |
-| ------------------------------------------------ | :----: | -------------------------------------------------- |
+| **Traditional Monitoring**                       |        | **Netdata**                                        |
+|--------------------------------------------------|:------:|----------------------------------------------------|
 | **Navigate complex interfaces** during incidents |        | **Get instant analysis** with natural language     |
 | **Build dashboards** during incidents            | **VS** | **Automatic dashboards** with zero configuration   |
 | **Manually correlate data** across systems       |        | **AI-powered correlation** and root cause analysis |
@@ -261,13 +221,13 @@ Experience the future of infrastructure monitoring with AI that actually works. 
 
 **AI Features Overview:**
 
-| **Capability**           | **What It Does**                    | **Access**                           |
-| ------------------------ | ----------------------------------- | ------------------------------------ |
-| **AI Chat with Netdata** | Ask questions in natural language   | Available now for all deployments    |
-| **AI DevOps Copilot**    | CLI-based AI automation             | Available now with MCP tools         |
-| **AI Insights**          | Professional reports in 2-3 minutes | Business plans get unlimited reports |
-| **Anomaly Advisor**      | Find root causes in minutes         | Available to all users               |
-| **ML Anomaly Detection** | Continuous anomaly detection        | Free for everyone                    |
+| **Capability**           | **What It Does**                    | **Access**                        |
+|--------------------------|-------------------------------------|-----------------------------------|
+| **AI Chat with Netdata** | Ask questions in natural language   | Available now for all deployments |
+| **AI DevOps Copilot**    | CLI-based AI automation             | Available now with MCP tools      |
+| **AI Insights**          | Professional reports in 2-3 minutes | Paid plans get unlimited reports  |
+| **Anomaly Advisor**      | Find root causes in minutes         | Available to all users            |
+| **ML Anomaly Detection** | Continuous anomaly detection        | Free for everyone                 |
 
 #### Ask Questions & Get Answers
 
@@ -278,18 +238,18 @@ Transform troubleshooting from complex queries to natural conversation. Ask ques
 
 **Why this matters:** No more complex queries or dashboard hunting - get instant answers about performance, find specific logs, identify top resource consumers, or investigate issues through simple conversation.
 
-**How it works:** Multi-node visibility through Netdata Parents, flexible AI options including Claude, GPT-4, and Gemini, with real-time access to metrics, logs, processes, network connections, and system state.
+**How it works:** Multi-node visibility through Netdata Parents, flexible AI options including cloud providers (Claude, GPT-4, Gemini, DeepSeek) and self-hosted providers (Ollama), with real-time access to metrics, logs, processes, network connections, and system state.
 
 </details>
 
 <details>
 <summary><strong>Model Context Protocol (MCP) Integration</strong></summary><br/>
 
-MCP is available via Netdata Cloud for infrastructure-wide access (Business/Homelab plan) and on every Agent/Parent for direct local access (free, open-source), enabling seamless integration with AI assistants for natural language queries and automated analysis.
+MCP is available via Netdata Cloud for infrastructure-wide access (Paid plan) and on every Agent/Parent for direct local access (free, open-source), enabling seamless integration with AI assistants for natural language queries and automated analysis.
 
-**Why this matters:** Use your existing AI tools or our standalone web chat with choice of AI providers. Query live metrics, logs, processes, network connections, and system state securely.
+**Why this matters:** Use your existing AI tools or our standalone web chat with your choice of cloud or self-hosted LLM provider. Query live metrics, logs, processes, network connections, and system state securely.
 
-**Technical details:** MCP integration via WebSocket/HTTP, choice of Claude, GPT-4, Gemini and others, multiple deployment options (Cloud MCP, Agent MCP, Parent MCP), real-time data access, secure connection where LLM has access to your data via the LLM client.
+**Technical details:** MCP integration via WebSocket/HTTP, choice of cloud providers (Claude, GPT-4, Gemini, DeepSeek) or self-hosted providers such as Ollama (a separately running instance you configure), multiple deployment options (Cloud MCP, Agent MCP, Parent MCP), real-time data access, secure connection where LLM has access to your data via the LLM client.
 
 </details>
 
@@ -322,7 +282,7 @@ Generate comprehensive reports in 2-3 minutes that explain what happened, why it
 - **Performance Optimization** - Bottleneck identification and tuning suggestions
 - **Anomaly Analysis** - Deep dive into unusual patterns and their impacts
 
-**Access:** Business subscriptions get unlimited reports, free trial users get full access during trial, Community users get 10 free reports.
+**Access:** Paid plans get unlimited reports, free trial users get full access during trial, Community users get 10 free reports.
 
 </details>
 
@@ -365,6 +325,6 @@ The foundation of Netdata's AI capabilities. Machine learning models run locally
 
 **Transform your infrastructure monitoring today. Your future self and your team will thank you.**
 
-**[Start Free Business Trial](https://netdata.cloud/pricing)**
+**[Start Free Trial](https://netdata.cloud/pricing)**
 
 :::

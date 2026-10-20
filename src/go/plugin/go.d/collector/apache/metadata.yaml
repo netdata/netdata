@@ -7,6 +7,7 @@ modules:
       module_name: apache
       monitored_instance:
         name: Apache
+        description: "Monitor Apache HTTP Server connections, workers, requests, traffic, and uptime through server-status."
         link: https://httpd.apache.org/
         icon_filename: apache.svg
         categories:
@@ -29,7 +30,7 @@ modules:
         metrics_description: |
           This collector monitors the activity and performance of Apache servers, and collects metrics such as the number of connections, workers, requests and more.
         method_description: |
-          It sends HTTP requests to the Apache location [server-status](https://httpd.apache.org/docs/2.4/mod/mod_status.html), 
+          It sends HTTP requests to the Apache location [server-status](https://httpd.apache.org/docs/2.4/mod/mod_status.html),
           which is a built-in location that provides metrics about the Apache server.
       supported_platforms:
         include: []
@@ -42,7 +43,7 @@ modules:
           description: |
             By default, it detects Apache instances running on localhost that are listening on port 80.
             On startup, it tries to collect metrics from:
-            
+
             - http://localhost/server-status?auto
             - http://127.0.0.1/server-status?auto
         limits:
@@ -203,13 +204,13 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Collecting metrics from local and remote instances.
               config: |
                 jobs:
                   - name: local
                     url: http://127.0.0.1/server-status?auto
-                
+
                   - name: remote
                     url: http://192.0.2.1/server-status?auto
     troubleshooting:
@@ -333,6 +334,7 @@ modules:
       id: collector-go.d.plugin-httpd
       monitored_instance:
         name: HTTPD
+        description: "Monitor HTTPD connections, workers, requests, traffic, and uptime through the server-status endpoint."
         link: https://httpd.apache.org/
         icon_filename: apache.svg
         categories:

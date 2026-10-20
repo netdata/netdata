@@ -1,0 +1,37 @@
+[package]
+name = "otel-plugin"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "otel-plugin"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+bridge = { workspace = true }
+clap = { workspace = true }
+bytesize = { workspace = true }
+ferryboat = { workspace = true }
+humantime = { workspace = true }
+netdata-plugin-protocol = { workspace = true }
+netdata-plugin-types = { workspace = true }
+otel-ledger = { workspace = true }
+otel-ingestor = { workspace = true }
+otel-legacy-logs = { workspace = true }
+rt = { workspace = true }
+sfsq-cli = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
+file-registry = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

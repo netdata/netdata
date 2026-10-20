@@ -7,6 +7,7 @@
 int default_rrd_history_entries = RRD_DEFAULT_HISTORY_ENTRIES;
 
 bool dbengine_enabled = false; // will become true if and when dbengine is initialized
+bool dbengine_datafiles_present = false; // detected at startup, regardless of the configured memory mode
 bool dbengine_use_direct_io = true;
 static size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS] = {1, 60, 60, 60, 60};
 static time_t storage_tiers_retention_time_s[RRD_STORAGE_TIERS] = {14 * DAYS, 90 * DAYS, 2 * 365 * DAYS, 2 * 365 * DAYS, 2 * 365 * DAYS};
@@ -373,6 +374,53 @@ void netdata_conf_section_db(void) {
             inicfg_set(&netdata_config, CONFIG_SECTION_DB, "db", rrd_memory_mode_name(default_rrd_memory_mode));
         }
     }
+
+#ifdef ENABLE_DBENGINE
+    // Detect an actual dbengine datafile (".ndf") in ANY tier directory. Two
+    // reasons to scan datafiles across every tier rather than test one directory:
+    //   - an empty dbengine dir left by a failed/aborted init is NOT persisted
+    //     data and must not disable RAM-mode metadata cleanup;
+    //   - tier 0 (<cache>/dbengine) can have no datafiles while a higher tier
+    //     (<cache>/dbengine-tierN) still retains history, so a tier-0-only check
+    //     could wrongly report "no data" and delete metadata still backing
+    //     tier-N data (data loss).
+    // Iterate the compile-time maximum RRD_STORAGE_TIERS, not the configured
+    // nd_profile.storage_tiers: in a non-dbengine mode the configured count is
+    // forced to 1, but the on-disk data was written by a previous dbengine run
+    // that may have created up to RRD_STORAGE_TIERS tier directories. Tier dirs
+    // that do not exist are simply skipped.
+    // A datafile in any tier means this agent has dbengine data on disk even when
+    // currently running a non-dbengine mode, so RAM cleanup keeps dimension rows
+    // that still back that data (agent temporarily switched dbengine -> ram/alloc).
+    // Only meaningful in a dbengine-capable build; without dbengine the data can
+    // never be read back, so the flag stays false and RAM cleanup proceeds.
+    for (size_t tier = 0; tier < RRD_STORAGE_TIERS && !dbengine_datafiles_present; tier++) {
+        char dbenginepath[FILENAME_MAX + 1];
+        if (tier == 0)
+            snprintfz(dbenginepath, sizeof(dbenginepath) - 1, "%s/dbengine", netdata_configured_cache_dir);
+        else
+            snprintfz(dbenginepath, sizeof(dbenginepath) - 1, "%s/dbengine-tier%zu", netdata_configured_cache_dir, tier);
+
+        DIR *dir = opendir(dbenginepath);
+        if (!dir)
+            continue;
+
+        struct dirent *de;
+        while ((de = readdir(dir))) {
+            // Validate the name exactly as dbengine generates and scans it
+            // ("datafile-<tier>-<fileno>.ndf"), using the same sscanf template as
+            // scan_data_files(). Requiring both numeric fields to parse means an
+            // unrelated *.ndf entry is not mistaken for persisted data.
+            unsigned int df_tier, df_fileno;
+            if (sscanf(de->d_name, DATAFILE_PREFIX RRDENG_FILE_NUMBER_SCAN_TMPL DATAFILE_EXTENSION,
+                       &df_tier, &df_fileno) == 2) {
+                dbengine_datafiles_present = true;
+                break;
+            }
+        }
+        closedir(dir);
+    }
+#endif
 
     // ------------------------------------------------------------------------
     // get default database size

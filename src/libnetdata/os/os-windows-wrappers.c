@@ -5,7 +5,7 @@
 #if defined(OS_WINDOWS)
 long netdata_registry_get_dword_from_open_key(unsigned int *out, void *lKey, char *name)
 {
-    DWORD length = 260;
+    DWORD length = sizeof(*out);
     return RegQueryValueEx(lKey, name, NULL, NULL, (LPBYTE) out, &length);
 }
 
@@ -54,6 +54,16 @@ bool netdata_registry_get_string(char *out, unsigned int length, void *hKey, cha
     RegCloseKey(lKey);
 
     return status;
+}
+
+bool netdata_registry_key_exists(void *hKey, const char *subKey) {
+    HKEY lKey;
+    long ret = RegOpenKeyEx(hKey, subKey, 0, KEY_READ, &lKey);
+    if (ret != ERROR_SUCCESS)
+        return false;
+
+    RegCloseKey(lKey);
+    return true;
 }
 
 bool EnableWindowsPrivilege(const char *privilegeName) {

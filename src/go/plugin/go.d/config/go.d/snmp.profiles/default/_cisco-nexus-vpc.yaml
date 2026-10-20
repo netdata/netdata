@@ -1,0 +1,151 @@
+# Virtual Port Channel (vPC) metrics for Cisco Nexus (NX-OS).
+# MIB: CISCO-VPC-MIB (1.3.6.1.4.1.9.9.807)
+# Monitors vPC domain role, peer-keepalive health, peer-link status, and per-vPC member state.
+
+metrics:
+  # ---- vPC peer-keepalive operational status (per domain) ----
+  - MIB: CISCO-VPC-MIB
+    table:
+      OID: 1.3.6.1.4.1.9.9.807.1.1.2
+      name: cVpcPeerKeepAliveTable
+    symbols:
+      - OID: 1.3.6.1.4.1.9.9.807.1.1.2.1.2
+        name: cVpcPeerKeepAliveStatus
+        chart_meta:
+          description: VPC peer-keepalive link operational status
+          family: 'Network/VPC/PeerKeepAlive/Status'
+          unit: "{status}"
+        mapping:
+          1: disabled
+          2: alive
+          3: peer_unreachable
+          4: alive_but_domain_id_mismatch
+          5: suspended_as_issu
+          6: suspended_as_dest_ip_unreachable
+          7: suspended_as_vrf_unusable
+          8: misconfigured
+      - OID: 1.3.6.1.4.1.9.9.807.1.1.2.1.4
+        name: cVpcPeerKeepAliveMsgSendStatus
+        chart_meta:
+          description: Status of the most recent peer-keepalive message transmission
+          family: 'Network/VPC/PeerKeepAlive/SendStatus'
+          unit: "{status}"
+        mapping:
+          1: success
+          2: failure
+      - OID: 1.3.6.1.4.1.9.9.807.1.1.2.1.7
+        name: cVpcPeerKeepAliveMsgRcvrStatus
+        chart_meta:
+          description: Status of the most recent peer-keepalive message reception
+          family: 'Network/VPC/PeerKeepAlive/ReceiveStatus'
+          unit: "{status}"
+        mapping:
+          1: success
+          2: failure
+    metric_tags:
+      - tag: vpc_domain_id
+        index: 1
+
+  # ---- vPC domain role and dual-active detection (per domain) ----
+  - MIB: CISCO-VPC-MIB
+    table:
+      OID: 1.3.6.1.4.1.9.9.807.1.2.1
+      name: cVpcRoleTable
+    symbols:
+      - OID: 1.3.6.1.4.1.9.9.807.1.2.1.1.2
+        name: cVpcRoleStatus
+        chart_meta:
+          description: VPC role status of this device in the domain
+          family: 'Network/VPC/Domain/Role'
+          unit: "{status}"
+        mapping:
+          1: primary_secondary
+          2: primary
+          3: secondary_primary
+          4: secondary
+          5: none_established
+      - OID: 1.3.6.1.4.1.9.9.807.1.2.1.1.3
+        name: cVpcDualActiveDetectionStatus
+        chart_meta:
+          description: Whether a dual-active (split-brain) condition is detected
+          family: 'Network/VPC/Domain/DualActive'
+          unit: "{status}"
+        mapping:
+          1: detected
+          2: not_detected
+    metric_tags:
+      - tag: vpc_domain_id
+        index: 1
+      - tag: _vpc_system_oper_mac
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.807.1.2.1.1.5
+          name: cVpcSystemOperMacAddress
+          format: mac_address
+
+  # ---- vPC peer-keepalive statistics (per domain) ----
+  - MIB: CISCO-VPC-MIB
+    table:
+      OID: 1.3.6.1.4.1.9.9.807.1.3.1
+      name: cVpcStatsPeerKeepAliveTable
+    symbols:
+      - OID: 1.3.6.1.4.1.9.9.807.1.3.1.1.2
+        name: cVpcStatsPeerKeepAliveMsgsSent
+        chart_meta:
+          description: Number of peer-keepalive messages sent
+          family: 'Network/VPC/PeerKeepAlive/Messages/Sent'
+          unit: "{message}/s"
+      - OID: 1.3.6.1.4.1.9.9.807.1.3.1.1.3
+        name: cVpcStatsPeerKeepAliveMsgsRcved
+        chart_meta:
+          description: Number of peer-keepalive messages received from peer
+          family: 'Network/VPC/PeerKeepAlive/Messages/Received'
+          unit: "{message}/s"
+      - OID: 1.3.6.1.4.1.9.9.807.1.3.1.1.5
+        name: cVpcStatsPeerStatusChangeCount
+        chart_meta:
+          description: Number of times the peer status changed (peer flaps)
+          family: 'Network/VPC/PeerKeepAlive/StatusChanges'
+          unit: "{change}/s"
+    metric_tags:
+      - tag: vpc_domain_id
+        index: 1
+
+  # ---- vPC host-link (member) status (per domain + vPC ID) ----
+  - MIB: CISCO-VPC-MIB
+    table:
+      OID: 1.3.6.1.4.1.9.9.807.1.4.2
+      name: cVpcStatusHostLinkTable
+    symbols:
+      - OID: 1.3.6.1.4.1.9.9.807.1.4.2.1.4
+        name: cVpcStatusHostLinkStatus
+        chart_meta:
+          description: Current status of this vPC member link
+          family: 'Network/VPC/Member/Status'
+          unit: "{status}"
+        mapping:
+          1: down
+          2: down_star
+          3: up
+      - OID: 1.3.6.1.4.1.9.9.807.1.4.2.1.5
+        name: cVpcStatusHostLinkConsistencyStatus
+        chart_meta:
+          description: Configuration consistency check result for this vPC member
+          family: 'Network/VPC/Member/Consistency'
+          unit: "{status}"
+        mapping:
+          1: success
+          2: failed
+          3: not_applicable
+    metric_tags:
+      - tag: vpc_domain_id
+        index: 1
+      - tag: vpc_id
+        index: 2
+      - tag: _vpc_member_ifindex
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.807.1.4.2.1.3
+          name: cVpcStatusHostLinkIfIndex
+      - tag: _vpc_consistency_detail
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.807.1.4.2.1.6
+          name: cVpcStatusHostLinkConsistencyDetail

@@ -15,50 +15,65 @@ metadata:
 
 metric_tags:
   - tag: mcafee_mwg_k_product_name
-    OID: 1.3.6.1.4.1.1230.2.7.1.1.0
-    symbol: kProductName
+    symbol:
+      OID: 1.3.6.1.4.1.1230.2.7.1.1.0
+      name: kProductName
   - tag: mcafee_mwg_k_company_name
-    OID: 1.3.6.1.4.1.1230.2.7.1.2.0
-    symbol: kCompanyName
+    symbol:
+      OID: 1.3.6.1.4.1.1230.2.7.1.2.0
+      name: kCompanyName
   - tag: mcafee_mwg_k_product_version
-    OID: 1.3.6.1.4.1.1230.2.7.1.3.0
-    symbol: kProductVersion
+    symbol:
+      OID: 1.3.6.1.4.1.1230.2.7.1.3.0
+      name: kProductVersion
   - tag: mcafee_mwg_k_major_version
-    OID: 1.3.6.1.4.1.1230.2.7.1.4.0
-    symbol: kMajorVersion
+    symbol:
+      OID: 1.3.6.1.4.1.1230.2.7.1.4.0
+      name: kMajorVersion
   - tag: mcafee_mwg_k_minor_version
-    OID: 1.3.6.1.4.1.1230.2.7.1.5.0
-    symbol: kMinorVersion
+    symbol:
+      OID: 1.3.6.1.4.1.1230.2.7.1.5.0
+      name: kMinorVersion
   - tag: mcafee_mwg_k_micro_version
-    OID: 1.3.6.1.4.1.1230.2.7.1.6.0
-    symbol: kMicroVersion
+    symbol:
+      OID: 1.3.6.1.4.1.1230.2.7.1.6.0
+      name: kMicroVersion
   - tag: mcafee_mwg_k_hotfix_version
-    OID: 1.3.6.1.4.1.1230.2.7.1.7.0
-    symbol: kHotfixVersion
+    symbol:
+      OID: 1.3.6.1.4.1.1230.2.7.1.7.0
+      name: kHotfixVersion
   - tag: mcafee_mwg_k_custom_version
-    OID: 1.3.6.1.4.1.1230.2.7.1.8.0
-    symbol: kCustomVersion
+    symbol:
+      OID: 1.3.6.1.4.1.1230.2.7.1.8.0
+      name: kCustomVersion
   - tag: mcafee_mwg_k_revision
-    OID: 1.3.6.1.4.1.1230.2.7.1.9.0
-    symbol: kRevision
+    symbol:
+      OID: 1.3.6.1.4.1.1230.2.7.1.9.0
+      name: kRevision
   - tag: mcafee_mwg_k_build_number
-    OID: 1.3.6.1.4.1.1230.2.7.1.10.0
-    symbol: kBuildNumber
+    symbol:
+      OID: 1.3.6.1.4.1.1230.2.7.1.10.0
+      name: kBuildNumber
   - tag: mcafee_mwg_p_am_engine_version
-    OID: 1.3.6.1.4.1.1230.2.7.1.20.1.0
-    symbol: pAMEngineVersion
+    symbol:
+      OID: 1.3.6.1.4.1.1230.2.7.1.20.1.0
+      name: pAMEngineVersion
   - tag: mcafee_mwg_p_mfe_engine_version
-    OID: 1.3.6.1.4.1.1230.2.7.1.20.3.0
-    symbol: pMFEEngineVersion
+    symbol:
+      OID: 1.3.6.1.4.1.1230.2.7.1.20.3.0
+      name: pMFEEngineVersion
   - tag: mcafee_mwg_p_mfedat_version
-    OID: 1.3.6.1.4.1.1230.2.7.1.20.4.0
-    symbol: pMFEDATVersion
+    symbol:
+      OID: 1.3.6.1.4.1.1230.2.7.1.20.4.0
+      name: pMFEDATVersion
   - tag: mcafee_mwg_p_am_proactive_version
-    OID: 1.3.6.1.4.1.1230.2.7.1.20.5.0
-    symbol: pAMProactiveVersion
+    symbol:
+      OID: 1.3.6.1.4.1.1230.2.7.1.20.5.0
+      name: pAMProactiveVersion
   - tag: mcafee_mwg_p_tsdb_version
-    OID: 1.3.6.1.4.1.1230.2.7.1.20.6.0
-    symbol: pTSDBVersion
+    symbol:
+      OID: 1.3.6.1.4.1.1230.2.7.1.20.6.0
+      name: pTSDBVersion
 
 # 1. MCAFEE-MWG-MIB
 #    https://mibbrowser.online/mibdb_search.php?mib=MCAFEE-MWG-MIB

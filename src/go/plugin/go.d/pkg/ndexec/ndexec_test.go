@@ -3,8 +3,11 @@
 package ndexec
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -14,6 +17,56 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestUnprivilegedCommandContext(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses a Unix helper script")
+	}
+	helper := filepath.Join(t.TempDir(), "nd-run")
+	require.NoError(t, os.WriteFile(helper, []byte(`#!/bin/sh
+if [ "$1" = "--preserve-env" ]; then
+    [ "$2" = "--" ] || exit 64
+    shift 2
+fi
+exec "$@"
+`), 0o700))
+	t.Cleanup(SetRunnerPathsForTests(helper, ""))
+
+	for name, tc := range map[string]struct {
+		construct func(context.Context, string, ...string) *exec.Cmd
+		prefix    []string
+	}{
+		"minimal environment": {
+			construct: UnprivilegedCommandContext,
+		},
+		"preserved environment": {
+			construct: UnprivilegedCommandContextWithPreservedEnv,
+			prefix:    []string{"--preserve-env", "--"},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			for name, ctx := range map[string]context.Context{
+				"caller context": t.Context(),
+				"nil context":    nil,
+			} {
+				t.Run(name, func(t *testing.T) {
+					args := []string{"%s|", "a b", "$(exit 73)", "--preserve-env", "--", ""}
+					cmd := tc.construct(ctx, "/usr/bin/printf", args...)
+					require.Nil(t, cmd.Process, "construction must not start a process")
+					assert.Equal(t, helper, cmd.Path)
+					wantArgs := append([]string{helper}, tc.prefix...)
+					wantArgs = append(wantArgs, "/usr/bin/printf")
+					assert.Equal(t, append(wantArgs, args...), cmd.Args)
+					assert.Nil(t, cmd.Env, "inherit the caller environment for the helper")
+					var out bytes.Buffer
+					cmd.Stdout = &out
+					require.NoError(t, cmd.Run())
+					assert.Equal(t, "a b|$(exit 73)|--preserve-env|--||", out.String())
+				})
+			}
+		})
+	}
+}
 
 func TestRunner_run(t *testing.T) {
 	if runtime.GOOS == "windows" {
@@ -339,4 +392,66 @@ func TestRunUnprivilegedWithOptionsUsage(t *testing.T) {
 	assert.Equal(t, "foo", string(out))
 	assert.True(t, usage.User >= 0)
 	assert.True(t, usage.System >= 0)
+}
+
+func TestRunUnprivilegedWithOptionsUsageContextCancellation(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses Unix process-group cancellation")
+	}
+
+	tmp := t.TempDir()
+	ready := filepath.Join(tmp, "ready")
+	leaked := filepath.Join(tmp, "leaked")
+
+	target := filepath.Join(tmp, "target.sh")
+	require.NoError(t, os.WriteFile(target, []byte(`#!/bin/sh
+(
+	touch "$1"
+	sleep 0.4
+	touch "$2"
+) &
+wait
+`), 0o755))
+
+	helper := filepath.Join(tmp, "helper.sh")
+	require.NoError(t, os.WriteFile(helper, []byte("#!/bin/sh\nexec \"$@\"\n"), 0o755))
+	t.Cleanup(SetRunnerPathsForTests(helper, ""))
+
+	cancelCause := errors.New("execution owner stopped")
+	ctx, cancel := context.WithCancelCause(t.Context())
+	result := make(chan error, 1)
+	go func() {
+		_, _, _, err := RunUnprivilegedWithOptionsUsageContext(
+			ctx,
+			nil,
+			3*time.Second,
+			RunOptions{},
+			target,
+			ready,
+			leaked,
+		)
+		result <- err
+	}()
+
+	waitUntil := time.Now().Add(10 * time.Second)
+	for {
+		if _, err := os.Stat(ready); err == nil {
+			break
+		}
+		if time.Now().After(waitUntil) {
+			require.FailNow(t, "target did not start")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	cancel(cancelCause)
+	select {
+	case err := <-result:
+		require.ErrorIs(t, err, cancelCause)
+	case <-time.After(2 * time.Second):
+		require.FailNow(t, "canceled execution did not return")
+	}
+
+	time.Sleep(2 * time.Second)
+	require.NoFileExists(t, leaked)
 }

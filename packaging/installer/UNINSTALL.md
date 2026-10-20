@@ -27,7 +27,7 @@ Similarly, with our documentation on updating Netdata, you need to [determine yo
 
 **Native Package Users**
 
-If your installation type indicates a [native package](https://learn.netdata.cloud/docs/netdata-agent/installation/linux/native-linux-distribution-packages), then proceed to uninstall Netdata using your package manager.
+If your installation type indicates a [native package](https://learn.netdata.cloud/docs/netdata-agent/installation/linux/native-linux-distribution-packages), then proceed to uninstall Netdata using your package manager. If you want to switch to a different install type afterward, see the "Switching From a Vendor-Packaged Native Install" section under [Switching Install Types](/docs/learn/switching-install-types.md#switching-install-types).
 
 :::
 
@@ -126,6 +126,33 @@ You can also use PowerShell:
 
 ```powershell
 msiexec /qn /x netdata-x64.msi
+```
+
+### What the MSI uninstall removes
+
+The standard MSI uninstall removes the Netdata binaries and stops and removes the Netdata Windows service. It does **not** remove your metric database, the local cache, or the configuration files you have edited. Those files stay on disk so that reinstalling Netdata keeps your history and settings.
+
+### Completely remove Netdata data from Windows
+
+:::note
+
+The directories below contain your historical monitoring data and your custom configuration.
+
+:::
+
+To delete the data the MSI uninstall leaves behind, run the following commands in an elevated (Administrator) PowerShell session **after** uninstalling Netdata through the MSI. The paths below assume Netdata is installed in the default location; if you chose a different install directory, adjust the path accordingly.
+
+```powershell
+# Remove the auto-updater scheduled task, if you set one up. The task name is whatever
+# you chose when creating it in Task Scheduler - adjust the pattern below if it doesn't
+# contain "Netdata".
+Get-ScheduledTask -TaskName *Netdata* -ErrorAction SilentlyContinue | Unregister-ScheduledTask -Confirm:$false
+
+# Remove the install directory, including the metric database, cache, and edited configuration
+Remove-Item "C:\Program Files\Netdata" -Recurse -Force -ErrorAction SilentlyContinue
+
+# Remove the auto-updater directory (present only if you configured automatic updates)
+Remove-Item "$env:PROGRAMDATA\Netdata" -Recurse -Force -ErrorAction SilentlyContinue
 ```
 
 <br/>

@@ -15,6 +15,8 @@ import (
 //go:embed config_schema.json
 var configSchema string
 
+const responseBodyLimit = 1 << 20
+
 var defaultTimeout = confopt.Duration(3 * time.Second)
 
 type Config struct {
@@ -36,6 +38,7 @@ type ModeTokenFileConfig struct {
 }
 
 type runtime struct {
+	readFile           func(context.Context, string) ([]byte, error)
 	httpClient         *http.Client
 	httpClientInsecure *http.Client
 }
@@ -58,9 +61,8 @@ type publishedStore struct {
 
 func New() secretstore.Creator {
 	return secretstore.Creator{
-		Kind:        secretstore.KindVault,
-		DisplayName: "Vault",
-		Schema:      configSchema,
+		Kind:   secretstore.KindVault,
+		Schema: configSchema,
 		Create: func() secretstore.Store {
 			return &store{
 				Config: Config{

@@ -1,0 +1,22 @@
+{
+  "routing_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "event_action": "trigger",
+  "dedup_key": "1532eea2c9f6a386140992fc18e52fbde95854d42a4bfa2e46d1c0c5d280c456",
+  "payload": {
+    "summary": "node WARNING: summary",
+    "source": "node",
+    "severity": "warning",
+    "timestamp": "2026-09-14T12:00:00Z",
+    "custom_details": {
+      "version": 1,
+      "incident_id": "test-incident",
+      "timestamp": "2026-09-14T12:00:00Z",
+      "node": "node",
+      "alert": "alert",
+      "status": "WARNING",
+      "summary": "summary",
+      "value": null,
+      "previous_value": null
+    }
+  }
+}

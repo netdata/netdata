@@ -18,6 +18,7 @@ src/crates/ @vkalintiris
 src/exporting/ @thiagoftsm
 src/daemon/ @thiagoftsm @vkalintiris
 src/database/ @thiagoftsm @vkalintiris
+src/nrpc/ @thiagoftsm @vkalintiris
 docs/ @Ancairon @kanelatechnical
 src/go/ @ilyam8
 src/health/ @thiagoftsm @vkalintiris
@@ -37,6 +38,9 @@ src/web/ @thiagoftsm @vkalintiris
 *.md @Ancairon @kanelatechnical
 *.mdx @Ancairon @kanelatechnical
 Dockerfile* @netdata/agent-sre
+
+# Ownership by directory (overwrites ownership by filetype; must come after *.md/*.mdx)
+.agents/ @ilyam8 @ktsaou
 
 # Ownership of specific files
 .gitignore @netdata/agent-sre @vkalintiris

@@ -33,6 +33,14 @@ func newGlobalTagsCollector(snmpClient gosnmp.Handler, missingOIDs map[string]bo
 
 // Collect gathers all global tags from the profile
 func (gc *globalTagsCollector) collect(prof *ddsnmp.Profile) (map[string]string, error) {
+	return gc.collectObserved(prof, &ddsnmp.CollectionStats{}, nil)
+}
+
+func (gc *globalTagsCollector) collectObserved(
+	prof *ddsnmp.Profile,
+	stats *ddsnmp.CollectionStats,
+	acquisition *acquisitionProfileCollection,
+) (map[string]string, error) {
 	if len(prof.Definition.MetricTags) == 0 && len(prof.Definition.StaticTags) == 0 {
 		return nil, nil
 	}
@@ -41,7 +49,8 @@ func (gc *globalTagsCollector) collect(prof *ddsnmp.Profile) (map[string]string,
 
 	gc.processStaticTags(prof.Definition.StaticTags, tags)
 
-	if err := gc.processDynamicTags(prof.Definition.MetricTags, tags); err != nil {
+	observer := acquisition.globalTagObserver(prof.Definition.MetricTags)
+	if err := gc.processDynamicTagsObserved(prof.Definition.MetricTags, tags, stats, observer); err != nil {
 		return ternary(len(tags) > 0, tags, nil), err
 	}
 
@@ -54,9 +63,20 @@ func (gc *globalTagsCollector) processStaticTags(staticTags []ddprofiledefinitio
 }
 
 // processDynamicTags processes tags that require SNMP fetching
-func (gc *globalTagsCollector) processDynamicTags(metricTags []ddprofiledefinition.MetricTagConfig, globalTags map[string]string) error {
+func (gc *globalTagsCollector) processDynamicTags(metricTags []ddprofiledefinition.GlobalMetricTagConfig, globalTags map[string]string) error {
+	return gc.processDynamicTagsObserved(metricTags, globalTags, &ddsnmp.CollectionStats{}, nil)
+}
+
+func (gc *globalTagsCollector) processDynamicTagsObserved(
+	metricTags []ddprofiledefinition.GlobalMetricTagConfig,
+	globalTags map[string]string,
+	stats *ddsnmp.CollectionStats,
+	observer *acquisitionGlobalTagObserver,
+) error {
 	// Identify OIDs to collect
 	oids, missingOIDs := gc.identifyTagOIDs(metricTags)
+	stats.Errors.MissingOIDs += int64(len(missingOIDs))
+	observer.start(gc.missingOIDs)
 
 	if len(missingOIDs) > 0 {
 		gc.log.Debugf("global tags missing OIDs: %v", missingOIDs)
@@ -66,24 +86,47 @@ func (gc *globalTagsCollector) processDynamicTags(metricTags []ddprofiledefiniti
 		return nil
 	}
 
-	pdus, err := gc.fetchTagValues(oids)
+	source := sourceRecorder(gc.snmpClient)
+	cursor := source.Cursor()
+	pdus, err := gc.fetchTagValues(oids, stats)
+	if source != nil {
+		requests := source.requestsSince(cursor)
+		observer.bindSource(requests)
+	}
 	if err != nil {
+		observer.failUnfinished(AcquisitionFailureClassTransport)
 		return fmt.Errorf("failed to fetch global tag values: %w", err)
 	}
+	observer.start(gc.missingOIDs)
 
 	// Collect each tag configuration
 	var errs []error
-	for _, tagCfg := range metricTags {
-		if tagCfg.Symbol.OID == "" {
+	for i, tagCfg := range metricTags {
+		cfg := tagCfg.MetricTagConfig
+		if cfg.Symbol.OID == "" {
 			continue
 		}
 
-		ta := tagAdder{tags: globalTags}
+		ta := tagAdder{tags: globalTags, processing: observer.processing(i)}
 
-		if err := gc.tagProc.processTag(tagCfg, pdus, ta); err != nil {
-			errs = append(errs, fmt.Errorf("failed to process tag value for '%s/%s': %w",
-				tagCfg.Tag, tagCfg.Symbol.Name, err))
+		var observed bool
+		var err error
+		if observer == nil {
+			err = gc.tagProc.processTag(cfg, pdus, ta)
+		} else {
+			observed, err = gc.tagProc.processTagObserved(cfg, pdus, ta)
+		}
+		if err != nil {
+			stats.Errors.Processing.Preparation++
+			observer.rejected(i)
+			errs = append(errs, fmt.Errorf("failed to process tag value for %q: %w",
+				metricTagDisplayName(cfg), err))
 			continue
+		}
+		if observed {
+			observer.value(i)
+		} else {
+			observer.empty(i)
 		}
 	}
 
@@ -94,22 +137,23 @@ func (gc *globalTagsCollector) processDynamicTags(metricTags []ddprofiledefiniti
 	return nil
 }
 
-func (gc *globalTagsCollector) identifyTagOIDs(metricTags []ddprofiledefinition.MetricTagConfig) ([]string, []string) {
+func (gc *globalTagsCollector) identifyTagOIDs(metricTags []ddprofiledefinition.GlobalMetricTagConfig) ([]string, []string) {
 	var oids []string
 	var missingOIDs []string
 
 	for _, tagCfg := range metricTags {
-		if tagCfg.Symbol.OID == "" {
+		cfg := tagCfg.MetricTagConfig
+		if cfg.Symbol.OID == "" {
 			continue
 		}
 
-		oid := trimOID(tagCfg.Symbol.OID)
-		if gc.missingOIDs[oid] {
-			missingOIDs = append(missingOIDs, tagCfg.Symbol.OID)
+		oid := trimOID(cfg.Symbol.OID)
+		if isMissingOID(gc.snmpClient, gc.missingOIDs, oid) {
+			missingOIDs = append(missingOIDs, cfg.Symbol.OID)
 			continue
 		}
 
-		oids = append(oids, tagCfg.Symbol.OID)
+		oids = append(oids, cfg.Symbol.OID)
 	}
 
 	// Sort and deduplicate
@@ -119,24 +163,6 @@ func (gc *globalTagsCollector) identifyTagOIDs(metricTags []ddprofiledefinition.
 	return oids, missingOIDs
 }
 
-func (gc *globalTagsCollector) fetchTagValues(oids []string) (map[string]gosnmp.SnmpPDU, error) {
-	pdus := make(map[string]gosnmp.SnmpPDU)
-	maxOids := gc.snmpClient.MaxOids()
-
-	for chunk := range slices.Chunk(oids, maxOids) {
-		result, err := gc.snmpClient.Get(chunk)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, pdu := range result.Variables {
-			if !isPduWithData(pdu) {
-				gc.missingOIDs[trimOID(pdu.Name)] = true
-				continue
-			}
-			pdus[trimOID(pdu.Name)] = pdu
-		}
-	}
-
-	return pdus, nil
+func (gc *globalTagsCollector) fetchTagValues(oids []string, stats *ddsnmp.CollectionStats) (map[string]gosnmp.SnmpPDU, error) {
+	return getSNMPValues(gc.snmpClient, oids, gc.missingOIDs, stats)
 }

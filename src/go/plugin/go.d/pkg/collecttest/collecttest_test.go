@@ -120,7 +120,7 @@ groups:
             name: z
 `
 
-			coverage, err := buildChartCoverage(templateYAML, 1, store.Read(metrix.ReadRaw()), tc.excludePatterns)
+			coverage, err := buildChartCoverage(testCoverageSet(t, templateYAML), store.Read(metrix.ReadRaw()), tc.excludePatterns)
 			if tc.wantErr {
 				require.Error(t, err)
 				return
@@ -215,6 +215,50 @@ groups:
 	}
 }
 
+func TestBuildChartCoveragesFromStoreKeepsHostScopesSeparate(t *testing.T) {
+	scopeA := metrix.HostScope{ScopeKey: "scope-a", GUID: "guid-a", Hostname: "host-a"}
+	scopeB := metrix.HostScope{ScopeKey: "scope-b", GUID: "guid-b", Hostname: "host-b"}
+	store := newTestCollectorStore(t, func(m metrix.SnapshotMeter) {
+		m.WithHostScope(scopeA).Gauge("metric_a").Observe(1)
+		m.WithHostScope(scopeB).Gauge("metric_b").Observe(2)
+	})
+
+	templateYAML := `
+version: v1
+context_namespace: test
+groups:
+  - family: Root
+    metrics: [metric_a, metric_b]
+    charts:
+      - title: A
+        context: a
+        units: "1"
+        dimensions:
+          - selector: metric_a
+            name: x
+      - title: B
+        context: b
+        units: "1"
+        dimensions:
+          - selector: metric_b
+            name: y
+`
+
+	coverages, err := buildChartCoveragesFromStore(testCoverageSet(t, templateYAML), store, nil)
+	require.NoError(t, err)
+	require.Len(t, coverages, 2)
+
+	byScope := make(map[string]chartCoverage, len(coverages))
+	for _, scoped := range coverages {
+		byScope[scoped.ScopeKey] = scoped.Coverage
+	}
+
+	require.Equal(t, map[string][]string{"test.a": {"x"}}, normalizeCoverageDimsList(byScope[scopeA.ScopeKey].ExpectedByContext))
+	require.Equal(t, map[string][]string{"test.a": {"x"}}, normalizeCoverageDims(byScope[scopeA.ScopeKey].ActualByContext))
+	require.Equal(t, map[string][]string{"test.b": {"y"}}, normalizeCoverageDimsList(byScope[scopeB.ScopeKey].ExpectedByContext))
+	require.Equal(t, map[string][]string{"test.b": {"y"}}, normalizeCoverageDims(byScope[scopeB.ScopeKey].ActualByContext))
+}
+
 func TestCollectOnceAbortsCycleOnPanic(t *testing.T) {
 	store := metrix.NewCollectorStore()
 
@@ -292,8 +336,7 @@ groups:
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			coverage, err := buildChartCoverage(
-				tc.template,
-				1,
+				testCoverageSet(t, tc.template),
 				tc.store.Read(metrix.ReadRaw(), metrix.ReadFlatten()),
 				nil,
 			)
@@ -302,6 +345,49 @@ groups:
 			require.Equal(t, normalizeCoverageDimsList(tc.want), normalizeCoverageDims(coverage.ActualByContext))
 		})
 	}
+}
+
+func TestBuildChartCoverage_ExcludesRetainedSeriesNotSeenInLatestSuccess(t *testing.T) {
+	store := metrix.NewCollectorStore()
+	managed, ok := metrix.AsCycleManagedStore(store)
+	require.True(t, ok)
+
+	cc := managed.CycleController()
+	cc.BeginCycle()
+	meter := store.Write().SnapshotMeter("")
+	meter.Gauge("metric_current").Observe(1)
+	meter.Gauge("metric_stale").Observe(2)
+	require.NoError(t, cc.CommitCycleSuccess())
+
+	cc.BeginCycle()
+	meter.Gauge("metric_current").Observe(3)
+	require.NoError(t, cc.CommitCycleSuccess())
+
+	templateYAML := `
+version: v1
+context_namespace: test
+groups:
+  - family: Root
+    metrics: [metric_current, metric_stale]
+    charts:
+      - title: Current
+        context: current
+        units: "1"
+        dimensions:
+          - selector: metric_current
+            name: current
+      - title: Stale
+        context: stale
+        units: "1"
+        dimensions:
+          - selector: metric_stale
+            name: stale
+`
+
+	coverage, err := buildChartCoverage(testCoverageSet(t, templateYAML), store.Read(metrix.ReadRaw()), nil)
+	require.NoError(t, err)
+	require.Equal(t, map[string][]string{"test.current": {"current"}}, normalizeCoverageDimsList(coverage.ExpectedByContext))
+	require.Equal(t, map[string][]string{"test.current": {"current"}}, normalizeCoverageDims(coverage.ActualByContext))
 }
 
 func TestCollectScalarSeries(t *testing.T) {
@@ -406,4 +492,11 @@ func normalizeCoverageDimsList(in map[string][]string) map[string][]string {
 		out[contextName] = clone
 	}
 	return out
+}
+
+func testCoverageSet(t *testing.T, data string) *chartengine.TemplateSet {
+	t.Helper()
+	set, err := chartengine.NewTemplateSetYAML([]byte(data))
+	require.NoError(t, err)
+	return set
 }

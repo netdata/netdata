@@ -3,6 +3,7 @@
 - id: "notify-cloud-mobile-app"
   meta:
     name: "Netdata Mobile App"
+    description: "Receive Netdata Cloud alert notifications on linked Android and iOS devices through the Netdata Mobile App."
     link: "https://netdata.cloud"
     categories:
       - notify.cloud
@@ -34,6 +35,7 @@
 - id: "notify-cloud-discord"
   meta:
     name: "Discord"
+    description: "Send Netdata Cloud alert notifications to Discord channels through an incoming webhook."
     link: "https://discord.com/"
     categories:
       - notify.cloud
@@ -73,6 +75,7 @@
 - id: "notify-cloud-pagerduty"
   meta:
     name: "PagerDuty"
+    description: "Send Netdata Cloud alert notifications to PagerDuty services through the Events API v2 integration."
     link: "https://www.pagerduty.com/"
     categories:
       - notify.cloud
@@ -112,6 +115,7 @@
 - id: "notify-cloud-slack"
   meta:
     name: "Slack"
+    description: "Send Netdata Cloud alert notifications to selected Slack channels through incoming webhooks."
     link: "https://slack.com/"
     categories:
       - notify.cloud
@@ -156,6 +160,7 @@
 - id: "notify-cloud-opsgenie"
   meta:
     name: "Opsgenie"
+    description: "Send Netdata Cloud alert notifications to an Opsgenie team through its API integration."
     link: "https://www.atlassian.com/software/opsgenie"
     categories:
       - notify.cloud
@@ -194,6 +199,7 @@
 - id: "notify-cloud-mattermost"
   meta:
     name: "Mattermost"
+    description: "Send Netdata Cloud alert notifications to a Mattermost channel through an incoming webhook."
     link: "https://mattermost.com/"
     categories:
       - notify.cloud
@@ -236,6 +242,7 @@
 - id: "notify-cloud-rocketchat"
   meta:
     name: "RocketChat"
+    description: "Send Netdata Cloud alert notifications to Rocket.Chat channels through an incoming webhook."
     link: "https://www.rocket.chat/"
     categories:
       - notify.cloud
@@ -257,10 +264,10 @@
 
       1. In RocketChat, Navigate to Administration > Workspace > Integrations
       2. Click **+New** at the top right corner
-      3. For more details about each parameter, check [Create a new incoming webhook](https://docs.rocket.chat/use-rocket.chat/workspace-administration/integrations#create-a-new-incoming-webhook)
+      3. For more details about each parameter, check [Create a new incoming webhook](https://docs.rocket.chat/docs/integrations#create-an-incoming-integration)
       4. You will end up with a webhook endpoint that looks like `https://your-server.rocket.chat/hooks/YYYYYYYYYYYYYYYYYYYYYYYY/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX`, copy it in order to add it to your integration configuration in the Netdata Cloud UI
 
-      For more details please check [Incoming webhooks for RocketChat](https://docs.rocket.chat/use-rocket.chat/workspace-administration/integrations/).
+      For more details please check [Incoming webhooks for RocketChat](https://docs.rocket.chat/docs/integrations).
 
       ### Netdata Configuration
 
@@ -279,6 +286,7 @@
 - id: "notify-cloud-awssns"
   meta:
     name: "Amazon SNS"
+    description: "Publish Netdata Cloud alert notifications to an Amazon SNS topic for downstream delivery and processing."
     link: "https://aws.amazon.com/sns/"
     categories:
       - notify.cloud
@@ -320,6 +328,7 @@
 - id: "notify-cloud-microsoftteams"
   meta:
     name: "Microsoft Teams"
+    description: "Send Netdata Cloud alert notifications to Microsoft Teams channels through webhook workflows."
     link: "https://www.microsoft.com/en-us/microsoft-teams"
     categories:
       - notify.cloud
@@ -363,6 +372,7 @@
 - id: "notify-cloud-telegram"
   meta:
     name: "Telegram"
+    description: "Send Netdata Cloud alert notifications to Telegram chats and topics through a configured bot."
     link: "https://telegram.org/"
     categories:
       - notify.cloud
@@ -405,6 +415,7 @@
 - id: "notify-cloud-splunk"
   meta:
     name: "Splunk"
+    description: "Send Netdata Cloud alert notifications to Splunk through its HTTP Event Collector endpoint."
     link: "https://splunk.com/"
     categories:
       - notify.cloud
@@ -438,6 +449,7 @@
 - id: "notify-cloud-victorops"
   meta:
     name: "Splunk VictorOps"
+    description: "Send Netdata Cloud alert notifications to Splunk VictorOps through a REST endpoint integration."
     link: "https://www.splunk.com/en_us/about-splunk/acquisitions/splunk-on-call.html"
     categories:
       - notify.cloud
@@ -453,7 +465,7 @@
       - A Netdata Cloud account
       - Access to the Space as an **Admin**
       - The Space needs to be on a paid plan
-      - The Destination URL for your Splunk VictorOps REST Endpoint Integration. Refer to the [VictorOps documentation](https://help.victorops.com/knowledge-base/rest-endpoint-integration-guide) for detailed instructions.
+      - The Destination URL for your Splunk VictorOps REST Endpoint Integration. Refer to the [Splunk On-Call documentation](https://help.splunk.com/en/splunk-cloud-platform/alert-and-respond/splunk-on-call/integrations-with-splunk-on-call/rest-endpoint-integration-for-splunk-on-call) for detailed instructions.
 
       ### Netdata Configuration
 
@@ -472,6 +484,7 @@
 - id: "notify-cloud-webhook"
   meta:
     name: "Webhook"
+    description: "Send Netdata Cloud alert notifications to a custom HTTPS webhook with configurable authentication."
     link: "https://en.wikipedia.org/wiki/Webhook"
     categories:
       - notify.cloud
@@ -552,6 +565,17 @@
       | status.reachable | boolean | `true` if host is reachable, `false` otherwise                                                                                |
       | status.text      | string  | Can be `reachable` or `unreachable`                                                                                           |
 
+      #### Source IP addresses
+
+      Netdata Cloud connects to your webhook URL from the currently published set of IP addresses. The set can change, so
+      refresh your allowlist periodically. If your endpoint sits behind a firewall,
+      a WAF, or an IP allowlist, see
+      [Netdata Cloud Outbound IP Addresses](/docs/netdata-cloud/netdata-cloud-outbound-ips.md) for the published list and
+      how to consume it.
+
+      An IP allowlist is a network control, not an identity control — keep one of the authentication mechanisms below in
+      place as well.
+
       #### Extra headers
 
       When setting up a webhook service, the user can specify a set of headers to be included in the HTTP requests sent to the webhook URL.
@@ -566,13 +590,13 @@
 
       Netdata webhook integration supports 3 different authentication mechanisms:
 
-      ##### Mutual TLS authentication (recommended)
+      ##### Mutual TLS authentication
 
-      In mutual Transport Layer Security (mTLS) authentication, the client and the server authenticate each other using X.509 certificates. This ensures that the client is connecting to the intended server, and that the server is only accepting connections from authorized clients.
+      Netdata always sends a client certificate with every webhook request, regardless of which authentication method is selected in the UI. This means mTLS is available on all webhook integrations by default — no additional configuration is needed on the Netdata side to enable it.
 
-      This is the default authentication mechanism used if no other method is selected.
+      The authentication method you select (no auth, basic, or bearer) controls only whether an Authorization header is included in the request. It does not affect the client certificate behavior.
 
-      To take advantage of mutual TLS, you can configure your server to verify Netdata's client certificate. In order to achieve this, the Netdata client sending the notification supports mutual TLS (mTLS) to identify itself with a client certificate that your server can validate.
+      If you want to verify Netdata's client certificate on your end, configure your server to validate it using the Netdata CA certificate below.
 
       The steps to perform this validation are as follows:
 
@@ -667,6 +691,7 @@
 - id: "notify-cloud-ilert"
   meta:
     name: "ilert"
+    description: "Send Netdata Cloud alert notifications to an ilert alert source through its API integration."
     link: "https://www.ilert.com/"
     categories:
       - notify.cloud
@@ -711,6 +736,7 @@
 - id: "notify-cloud-servicenow"
   meta:
     name: "ServiceNow"
+    description: "Send Netdata Cloud alert notifications to ServiceNow Event Management through its event API."
     link: "https://www.servicenow.com/"
     categories:
       - notify.cloud
@@ -748,3 +774,43 @@
             - Instance URL: The base URL of your ServiceNow instance (for example, `https://my-instance.service-now.com/`).
             - Username: The username of the ServiceNow integration user you created.
             - Password: The password of the ServiceNow integration user you created.
+
+- id: "notify-cloud-groupemail"
+  meta:
+    name: "Group Email"
+    link: "https://netdata.cloud"
+    categories:
+      - notify.cloud
+    icon_filename: "group_email.svg"
+    description: "Group Email sends Space-wide alert notifications to a shared group or mailing-list address, independently of each member's notification settings."
+  keywords:
+    - group email
+    - mailing list
+    - email
+  setup:
+    description: |
+      Group Email sends Space-wide alert notifications to a shared group or mailing-list email address, independently of each member's personal email notification settings.
+
+      ### Prerequisites
+
+      - A Netdata Cloud account
+      - Access to the Space as an **Admin**
+      - The Space needs to be on a paid plan
+      - Access to the mailbox of the group or mailing-list address, in order to retrieve the verification token
+
+      ### Netdata Configuration
+
+      1. Click on the **Space settings** cog (located above your profile icon)
+      2. Click on the **Alerts & Notifications** tab
+      3. Click on the **+ Add configuration** button
+      4. Add the Group Email Integration
+      5. A modal will be presented to you to enter the required details to enable the integration:
+          - **Notification settings**
+            - Configuration name (optional): A name for your configuration to easily refer to it
+            - Rooms: A list of Rooms for which you want to be notified
+            - Notifications: The notification types you want to receive
+          - **Integration configuration**
+            - Email address: The group or mailing-list address that will receive the notifications
+          - **Verification**
+            - Token: The token from the latest **Test notification** email received on the group email address.
+              - Click on the **Test** button to send a test email to the address you entered. The verification token is embedded in that email; copy it back into the modal to verify the address.

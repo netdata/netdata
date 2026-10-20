@@ -1,0 +1,221 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package cloudwatch
+
+import (
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsregion"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwquery"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/awsauth"
+)
+
+const (
+	defaultUpdateEvery        = 60
+	defaultAutoDetectRetry    = 0
+	defaultDiscoveryRefresh   = 300
+	defaultMaxInstances       = 1000
+	defaultMaxDiscoveryGroups = 64
+	defaultTimeout            = confopt.Duration(30 * time.Second)
+)
+
+// apiConcurrency bounds concurrent AWS API calls (ListMetrics discovery,
+// resource-tag lookup, and GetMetricData query chunks). maxQueriesPerRequest is
+// the AWS ceiling; the datapoint budget may reduce the actual batch width.
+// Neither is an operator decision, so both are fixed constants rather than config.
+const (
+	apiConcurrency       = 5
+	maxQueriesPerRequest = 500
+)
+
+type Config struct {
+	UpdateEvery        int                      `yaml:"update_every,omitempty" json:"update_every,omitempty"`
+	AutoDetectionRetry int                      `yaml:"autodetection_retry,omitempty" json:"autodetection_retry,omitempty"`
+	Vnode              string                   `yaml:"vnode,omitempty" json:"vnode"`
+	Credentials        []CredentialSourceConfig `yaml:"credentials" json:"credentials"`
+	Targets            []TargetConfig           `yaml:"targets" json:"targets"`
+	Rules              []RuleConfig             `yaml:"rules" json:"rules"`
+	RuleDefaults       RuleDefaultsConfig       `yaml:"rule_defaults,omitempty" json:"rule_defaults"`
+	Labels             LabelsConfig             `yaml:"labels,omitempty" json:"labels"`
+	Limits             LimitsConfig             `yaml:"limits,omitempty" json:"limits"`
+	Discovery          DiscoveryConfig          `yaml:"discovery" json:"discovery"`
+	Timeout            confopt.Duration         `yaml:"timeout,omitempty" json:"timeout"`
+}
+
+// CredentialSourceConfig names one reusable base-credential configuration.
+type CredentialSourceConfig struct {
+	Name                     string `yaml:"name" json:"name"`
+	awsauth.CredentialConfig `yaml:",inline"`
+}
+
+type TargetConfig struct {
+	Name        string                    `yaml:"name" json:"name"`
+	Credentials string                    `yaml:"credentials" json:"credentials"`
+	AssumeRole  *awsauth.AssumeRoleConfig `yaml:"assume_role,omitempty" json:"assume_role,omitempty"`
+}
+
+type RuleConfig struct {
+	Name     string                        `yaml:"name" json:"name"`
+	Targets  []string                      `yaml:"targets" json:"targets"`
+	Profiles *ProfileSelectorConfig        `yaml:"profiles,omitempty" json:"profiles,omitempty"`
+	Metrics  []ProfileMetricSelectorConfig `yaml:"metrics,omitempty" json:"metrics,omitempty"`
+	Regions  []string                      `yaml:"regions" json:"regions"`
+	Filters  *RuleFiltersConfig            `yaml:"filters,omitempty" json:"filters,omitempty"`
+	Query    *cwquery.Config               `yaml:"query,omitempty" json:"query,omitempty"`
+}
+
+type ProfileSelectorConfig struct {
+	Defaults *bool    `yaml:"defaults,omitempty" json:"defaults,omitempty"`
+	Include  []string `yaml:"include,omitempty" json:"include,omitempty"`
+	Exclude  []string `yaml:"exclude,omitempty" json:"exclude,omitempty"`
+}
+
+func (c *ProfileSelectorConfig) includesDefaults() bool {
+	return c == nil || c.Defaults == nil || *c.Defaults
+}
+
+type ProfileMetricSelectorConfig struct {
+	Profile    string                  `yaml:"profile" json:"profile"`
+	Defaults   *bool                   `yaml:"defaults,omitempty" json:"defaults,omitempty"`
+	Statistics []string                `yaml:"statistics,omitempty" json:"statistics,omitempty"`
+	Query      *cwquery.Config         `yaml:"query,omitempty" json:"query,omitempty"`
+	Include    []MetricSelectionConfig `yaml:"include" json:"include"`
+}
+
+func (c ProfileMetricSelectorConfig) includesDefaults() bool {
+	return c.Defaults == nil || *c.Defaults
+}
+
+type MetricSelectionConfig struct {
+	Name       string          `yaml:"name" json:"name"`
+	Statistics []string        `yaml:"statistics,omitempty" json:"statistics,omitempty"`
+	Query      *cwquery.Config `yaml:"query,omitempty" json:"query,omitempty"`
+}
+
+type RuleDefaultsConfig struct {
+	Filters RuleDefaultFiltersConfig `yaml:"filters,omitempty" json:"filters"`
+	Query   *cwquery.Config          `yaml:"query,omitempty" json:"query,omitempty"`
+}
+
+type RuleDefaultFiltersConfig struct {
+	ResourceTags []ResourceTagFilterConfig `yaml:"resource_tags,omitempty" json:"resource_tags,omitempty"`
+}
+
+// RuleFiltersConfig distinguishes an omitted resource_tags field (inherit the
+// per-job default) from an explicitly empty list (disable it for this rule).
+type RuleFiltersConfig struct {
+	ResourceTags *[]ResourceTagFilterConfig `yaml:"resource_tags,omitempty" json:"resource_tags,omitempty"`
+}
+
+type ResourceTagFilterConfig struct {
+	Key    string   `yaml:"key" json:"key"`
+	Values []string `yaml:"values" json:"values"`
+}
+
+type LabelsConfig struct {
+	ResourceTags []ResourceTagLabelConfig `yaml:"resource_tags,omitempty" json:"resource_tags,omitempty"`
+}
+
+// ResourceTagLabelConfig maps one exact AWS tag key to a Netdata label. Label
+// defaults to the sanitized AWS key when omitted.
+type ResourceTagLabelConfig struct {
+	Key   string `yaml:"key" json:"key"`
+	Label string `yaml:"label,omitempty" json:"label,omitempty"`
+}
+
+type LimitsConfig struct {
+	MaxInstances       int `yaml:"max_instances,omitempty" json:"max_instances"`
+	MaxDiscoveryGroups int `yaml:"max_discovery_groups,omitempty" json:"max_discovery_groups"`
+}
+
+type DiscoveryConfig struct {
+	RefreshEvery int `yaml:"refresh_every,omitempty" json:"refresh_every"`
+	// RecentlyActiveOnly is horizon-aware: when enabled, ListMetrics uses
+	// RecentlyActive=PT3H only when every selected series has publication delay,
+	// lookback, and period totaling no more than 3h. It is a pointer so the true default can be
+	// distinguished from an explicit false.
+	RecentlyActiveOnly *bool `yaml:"recently_active_only,omitempty" json:"recently_active_only,omitempty"`
+}
+
+// applyDefaults fills unset options. New() already presets every default, so these branches fire only
+// for an explicit zero: writing 0 selects the default rather than "unlimited" or "never".
+func (c *Config) applyDefaults() {
+	if c.UpdateEvery <= 0 {
+		c.UpdateEvery = defaultUpdateEvery
+	}
+	if c.AutoDetectionRetry < 0 {
+		c.AutoDetectionRetry = defaultAutoDetectRetry
+	}
+	if c.Discovery.RefreshEvery <= 0 {
+		c.Discovery.RefreshEvery = defaultDiscoveryRefresh
+	}
+	if c.Discovery.RecentlyActiveOnly == nil {
+		c.Discovery.RecentlyActiveOnly = new(true)
+	}
+	if c.Limits.MaxInstances == 0 {
+		c.Limits.MaxInstances = defaultMaxInstances
+	}
+	if c.Limits.MaxDiscoveryGroups == 0 {
+		c.Limits.MaxDiscoveryGroups = defaultMaxDiscoveryGroups
+	}
+	if c.Timeout.Duration() == 0 {
+		c.Timeout = defaultTimeout
+	}
+}
+
+func (c Config) validate() error {
+	var errs []error
+
+	if c.UpdateEvery < 60 {
+		errs = append(errs, errors.New("'update_every' must be >= 60 seconds (CloudWatch minimum period)"))
+	}
+	if c.Discovery.RefreshEvery < 60 {
+		errs = append(errs, errors.New("'discovery.refresh_every' must be >= 60 seconds"))
+	}
+	if c.Timeout.Duration() < 0 {
+		errs = append(errs, errors.New("'timeout' cannot be negative"))
+	}
+	// An explicit 0 already became the default in applyDefaults, so only a negative value reaches here.
+	if c.Limits.MaxInstances < 0 {
+		errs = append(errs, errors.New("'limits.max_instances' cannot be negative"))
+	}
+	if value := c.Limits.MaxDiscoveryGroups; value < 1 || value > maxDiscoveryGroupsPerJob {
+		errs = append(errs, fmt.Errorf("'limits.max_discovery_groups' must be between 1 and %d", maxDiscoveryGroupsPerJob))
+	}
+	if err := validateConfigStructure(c); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
+}
+
+func (r RuleConfig) effectiveResourceTagFilters(defaults []ResourceTagFilterConfig) []ResourceTagFilterConfig {
+	if r.Filters == nil || r.Filters.ResourceTags == nil {
+		return defaults
+	}
+	return *r.Filters.ResourceTags
+}
+
+func normalizeRegions(regions []string) []string {
+	out := make([]string, 0, len(regions))
+	seen := make(map[string]struct{}, len(regions))
+	for _, r := range regions {
+		v := awsregion.Normalize(r)
+		if v == "" {
+			continue
+		}
+		if _, dup := seen[v]; dup {
+			continue // a duplicate region would double discovery/query cost
+		}
+		seen[v] = struct{}{}
+		out = append(out, v)
+	}
+	return out
+}
+
+func (c Config) recentlyActiveOnly() bool {
+	return c.Discovery.RecentlyActiveOnly == nil || *c.Discovery.RecentlyActiveOnly
+}

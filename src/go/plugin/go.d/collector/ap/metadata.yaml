@@ -9,6 +9,7 @@ modules:
         categories:
           - data-collection.networking
         icon_filename: "network-wired.svg"
+        description: 'Monitor connected clients, bandwidth, packets, transmit issues, signal strength, and bitrate for each wireless access point and associated SSID.'
       related_resources:
         integrations:
           list: []

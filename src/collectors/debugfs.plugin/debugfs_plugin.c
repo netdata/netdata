@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "debugfs_plugin.h"
-#include "libnetdata/required_dummies.h"
 
 static char *user_config_dir = CONFIG_DIR;
 static char *stock_config_dir = LIBCONFIG_DIR;
@@ -44,6 +43,12 @@ static struct debugfs_module {
      .name = "libsensors",
      .enabled = CONFIG_BOOLEAN_YES,
      .func = do_module_libsensors
+    },
+    {
+        // Linux audit subsystem status via netlink
+        .name = "audit",
+        .enabled = CONFIG_BOOLEAN_YES,
+        .func = do_module_audit
     },
 
     // The terminator
@@ -96,7 +101,7 @@ static int debugfs_am_i_running_as_root()
 void debugfs2lower(char *name)
 {
     while (*name) {
-        *name = tolower(*name);
+        *name = tolower((uint8_t)*name);
         name++;
     }
 }
@@ -207,8 +212,8 @@ int main(int argc, char **argv)
 #ifdef HAVE_CAPABILITY
         netdata_log_error(
             "debugfs.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities. "
-            "Without these, debugfs.plugin cannot access /sys/kernel/debug. "
-            "To enable capabilities run: sudo setcap cap_dac_read_search,cap_sys_ptrace+ep %s; "
+            "cap_dac_read_search is needed for /sys/kernel/debug access, cap_audit_control for audit subsystem monitoring. "
+            "To enable capabilities run: sudo setcap cap_dac_read_search,cap_audit_control+ep %s; "
             "To enable setuid to root run: sudo chown root:netdata %s; sudo chmod 4750 %s; ",
             uid,
             euid,
@@ -231,11 +236,20 @@ int main(int argc, char **argv)
 
     debugfs_parse_args(argc, argv);
 
+    // the event loop for functions served by the modules
+    static bool debugfs_plugin_exit = false;
+    static int debugfs_exit_status = 0;
+    struct functions_evloop_globals *wg =
+        functions_evloop_init(1, "DEBUGFS", &stdout_mutex, &debugfs_plugin_exit, &debugfs_exit_status);
+
+    module_libsensors_register_functions(wg);
+
     size_t iteration;
     heartbeat_t hb;
     heartbeat_init(&hb, update_every * USEC_PER_SEC);
 
-    for (iteration = 0; iteration < 86400; iteration++) {
+    int rc = 0;
+    for (iteration = 0; iteration < 86400 && !__atomic_load_n(&debugfs_plugin_exit, __ATOMIC_ACQUIRE); iteration++) {
         heartbeat_next(&hb);
         int enabled = 0;
 
@@ -251,7 +265,8 @@ int main(int argc, char **argv)
 
         if (!enabled) {
             netdata_log_info("all modules are disabled, exiting...");
-            return 1;
+            rc = 1;
+            break;
         }
 
         netdata_mutex_lock(&stdout_mutex);
@@ -261,9 +276,21 @@ int main(int argc, char **argv)
 
         if (ferror(stdout) && errno == EPIPE) {
             netdata_log_error("error writing to stdout: EPIPE. Exiting...");
-            return 1;
+            rc = 1;
+            break;
         }
     }
+
+    // whether the functions evloop reader (QUIT / stdin error) requested this
+    // exit - latched before cancelling the threads, because cancellation also
+    // makes the reader set the exit flag on its way out
+    bool evloop_requested_exit = __atomic_load_n(&debugfs_plugin_exit, __ATOMIC_ACQUIRE);
+
+    // stop serving functions before tearing down the modules' state: a
+    // worker running concurrently with shutdown could otherwise write a
+    // function result after the terminal EXIT marker, or use freed state
+    functions_evloop_cancel_threads(wg);
+    functions_evloop_join_threads(wg);
 
     module_libsensors_cleanup();
 
@@ -271,5 +298,12 @@ int main(int argc, char **argv)
     fprintf(stdout, "EXIT\n");
     fflush(stdout);
     netdata_mutex_unlock(&stdout_mutex);
-    return 0;
+
+    // when the functions evloop reader requested the exit (QUIT / stdin
+    // error), propagate the exit status it recorded; on our own exit paths
+    // (daily restart, all modules disabled, EPIPE) keep our own status
+    if (evloop_requested_exit)
+        return debugfs_exit_status;
+
+    return rc;
 }

@@ -51,6 +51,7 @@
 // plugins.d accepts these for functions (from external plugins or streaming children)
 // related to STREAM_CAP_FUNCTIONS, STREAM_CAP_PROGRESS
 #define PLUGINSD_KEYWORD_FUNCTION               "FUNCTION"                  // define a function
+#define PLUGINSD_KEYWORD_FUNCTION_DEL           "FUNCTION_DEL"              // unregister a function
 #define PLUGINSD_KEYWORD_FUNCTION_PROGRESS      "FUNCTION_PROGRESS"         // send updates about function progress
 #define PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN  "FUNCTION_RESULT_BEGIN"     // the result of a function transaction
 #define PLUGINSD_KEYWORD_FUNCTION_RESULT_END    "FUNCTION_RESULT_END"       // the end of the result of a func. trans.
@@ -93,6 +94,7 @@ struct functions_evloop_worker_job;
 struct functions_evloop_globals *functions_evloop_init(size_t worker_threads, const char *tag, netdata_mutex_t *stdout_mutex, bool *plugin_should_exit, int *status);
 void functions_evloop_add_function(struct functions_evloop_globals *wg, const char *function, functions_evloop_worker_execute_t cb, time_t default_timeout, void *data);
 void functions_evloop_cancel_threads(struct functions_evloop_globals *wg);
+void functions_evloop_join_threads(struct functions_evloop_globals *wg);
 
 #define FUNCTIONS_EXTENDED_TIME_ON_PROGRESS_UT (10 * USEC_PER_SEC)
 static inline void functions_stop_monotonic_update_on_progress(usec_t *stop_monotonic_ut) {
@@ -117,6 +119,11 @@ static inline void functions_stop_monotonic_update_on_progress(usec_t *stop_mono
 #define pluginsd_function_result_end_to_buffer(wb) \
     buffer_strcat(wb, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n")
 
+// The *_to_stdout() helpers below do not lock and emit one response with several
+// stdio calls. Callers MUST hold the stdout mutex given to functions_evloop_init(),
+// the same one the plugin holds while writing chart data: the agent reads every line
+// up to FUNCTION_RESULT_END as the response, so interleaved chart lines are swallowed,
+// the next SET lands on the wrong chart, and the agent disables the plugin.
 #define pluginsd_function_result_begin_to_stdout(transaction, code, content_type, expires)          \
     fprintf(stdout                                                                                  \
                     , PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " \"%s\" %d \"%s\" %ld\n"              \

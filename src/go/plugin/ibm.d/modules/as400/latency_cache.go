@@ -1,6 +1,7 @@
 package as400
 
 import (
+	"maps"
 	"sync"
 	"time"
 )
@@ -39,8 +40,6 @@ func (l *latencyCache) snapshot() (map[string]int64, time.Time) {
 		return nil, l.last
 	}
 	out := make(map[string]int64, len(l.values))
-	for k, v := range l.values {
-		out[k] = v
-	}
+	maps.Copy(out, l.values)
 	return out, l.last
 }

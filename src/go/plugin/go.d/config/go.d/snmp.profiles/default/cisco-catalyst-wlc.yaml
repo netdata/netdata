@@ -6,6 +6,9 @@ extends:
   - _cisco-base.yaml
   - _cisco-catalyst.yaml
   - _cisco-wlc.yaml
+  - _std-topology-interface-mib.yaml
+  - _std-topology-arp-mib.yaml
+  - _std-topology-cisco-vtp-mib.yaml
 
 metadata:
   device:

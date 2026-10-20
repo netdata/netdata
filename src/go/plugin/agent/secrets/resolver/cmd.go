@@ -13,7 +13,9 @@ import (
 	"time"
 )
 
-func (r *Resolver) resolveCmd(ctx context.Context, cmdLine, original string) (string, error) {
+const defaultCommandTimeout = 10 * time.Second
+
+func resolveCmd(ctx context.Context, cmdLine, original string, timeout time.Duration) (string, error) {
 	parts := strings.Fields(cmdLine)
 	if len(parts) == 0 {
 		return "", fmt.Errorf("resolving secret '%s': empty command", original)
@@ -25,18 +27,16 @@ func (r *Resolver) resolveCmd(ctx context.Context, cmdLine, original string) (st
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	timeout := r.cmdTimeout
 	if timeout <= 0 {
-		timeout = 10 * time.Second
+		timeout = defaultCommandTimeout
 	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, parts[0], parts[1:]...)
-	cmd.Stderr = io.Discard
-	out, err := cmd.Output()
+	cmd := secretCommandContext(ctx, parts[0], parts[1:]...)
+	out, err := runSecretCommand(cmd)
 	if err != nil {
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		if cmd.Process != nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return "", fmt.Errorf("resolving secret '%s': command timed out after %s", original, timeout)
 		}
 		return "", fmt.Errorf("resolving secret '%s': command failed: %w", original, err)
@@ -45,4 +45,25 @@ func (r *Resolver) resolveCmd(ctx context.Context, cmdLine, original string) (st
 	value := strings.TrimSpace(string(out))
 	logResolved(ctx, "resolved secret via command '%s'", parts[0])
 	return value, nil
+}
+
+// Keep secret output bounded and stderr out of errors, including failures in nd-run.
+func runSecretCommand(cmd *exec.Cmd) ([]byte, error) {
+	cmd.Stderr = io.Discard
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, err
+	}
+	if err := cmd.Start(); err != nil {
+		return nil, err
+	}
+	out, readErr := readBoundedSecret(stdout, MaximumAtomicResolvedBytes)
+	if readErr != nil && cmd.Cancel != nil {
+		_ = cmd.Cancel()
+	}
+	waitErr := cmd.Wait()
+	if readErr != nil || waitErr != nil {
+		return nil, errors.Join(readErr, waitErr)
+	}
+	return out, nil
 }

@@ -6,6 +6,7 @@ modules:
       module_name: pulsar
       monitored_instance:
         name: Apache Pulsar
+        description: "Monitor Apache Pulsar brokers, topics, subscriptions, messages, throughput, storage, and replication."
         link: https://pulsar.apache.org/
         icon_filename: pulsar.svg
         categories:
@@ -190,13 +191,13 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Collecting metrics from local and remote instances.
               config: |
                 jobs:
                   - name: local
                     url: http://127.0.0.1:8080/metrics
-                
+
                   - name: remote
                     url: http://192.0.2.1:8080/metrics
     troubleshooting:

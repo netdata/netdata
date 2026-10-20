@@ -2,10 +2,20 @@ use siphasher::sip::SipHasher24;
 use std::hash::Hasher;
 
 fn jenkins_hash64(data: &[u8]) -> u64 {
-    // FIXME: user real jenkins hasher
-    let mut hasher = twox_hash::XxHash64::default();
+    use hashers::jenkins::Lookup3Hasher;
+
+    if data.is_empty() {
+        // systemd's jenkins_hashlittle2() starts both halves from 0xdeadbeef.
+        return 0xdead_beef_dead_beef;
+    }
+
+    let mut hasher = Lookup3Hasher::default();
     hasher.write(data);
-    hasher.finish()
+    let hash = hasher.finish();
+
+    let low = (hash & 0xFFFF_FFFF) as u32;
+    let high = (hash >> 32) as u32;
+    ((low as u64) << 32) | high as u64
 }
 
 fn siphash24(data: &[u8], key: &[u8; 16]) -> u64 {
@@ -27,5 +37,25 @@ pub fn journal_hash_data(data: &[u8], is_keyed_hash: bool, file_id: Option<&[u8;
         }
     } else {
         jenkins_hash64(data)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn jenkins_hash64_matches_systemd_lookup3_values() {
+        let cases: &[(&[u8], u64)] = &[
+            (b"", 0xdead_beef_dead_beef),
+            (b"SYSLOG_IDENTIFIER=netdata", 0x45cc_d0e9_ed13_614a),
+            (b"_SYSTEMD_UNIT=netdata.service", 0x1013_c5df_11a9_83f0),
+            (b"PRIORITY=6", 0x80f0_9f19_808d_26a3),
+            (b"MESSAGE=Test message", 0x8ed5_3fb5_2aa5_c55d),
+        ];
+
+        for (payload, expected) in cases {
+            assert_eq!(jenkins_hash64(payload), *expected);
+        }
     }
 }

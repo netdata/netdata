@@ -7,7 +7,12 @@ import (
 	"testing"
 )
 
-// Baseline results (to be updated before/after hot-path refactors):
+// Hot-path benchmarks for the collector store commit/record path. Every number in this
+// file - this header's history and the "Latest" comment above each benchmark - was
+// measured on a developer laptop, NOT CI. Treat them as relative/trend indicators for
+// before/after comparisons, not absolute gates.
+//
+// Baseline results (historical; each benchmark's latest numbers are inline above its func):
 // Command:
 //
 //	go test ./pkg/metrix -run '^$' -bench 'RuntimeStoreSingleWriteAtCardinality|CollectorCommitSparseAtCardinality' -benchmem
@@ -34,6 +39,8 @@ import (
 //
 // BenchmarkCollectorCommitSparseAtCardinality/series_50000_touched_10-14  978680      2471 ns/op     5697 B/op  45 allocs/op
 // BenchmarkCollectorCommitSparseAtCardinality/series_100000_touched_20-14 511872      4346 ns/op    11316 B/op  77 allocs/op
+// Latest (developer laptop, -benchtime=200x): series_1 625ns/5allocs, series_10 990ns/5,
+// series_100 1.0us/5, series_1000 2.0us/5. Per-write cost is ~flat across cardinality.
 func BenchmarkRuntimeStoreSingleWriteAtCardinality(b *testing.B) {
 	tests := map[string]struct {
 		totalSeries int
@@ -71,6 +78,21 @@ func BenchmarkRuntimeStoreSingleWriteAtCardinality(b *testing.B) {
 	}
 }
 
+// This guards the sparse-commit envelope at retained cardinality. Commit time and bytes are
+// intentionally O(live-series + touched + distinct-authorities): every commit copies the
+// series map and scans live series for retention, host-scope refresh, canonicalization, and
+// the descriptor-universe sweep. With the same retained population, refactors must not add
+// extra work or allocation counts.
+// Latest corrected parent/current check (developer laptop, -benchtime=20x):
+// s100/t5 ~24us/40allocs, s1000/t5 ~180us/42allocs, s5000/t10 ~660us/72allocs,
+// s50000/t10 ~6.0ms/184allocs, s100000/t20 ~15.5ms/344allocs.
+// The benchmark sets expiry beyond b.N and asserts retained raw cardinality after the timed
+// loop so calibrated runs cannot silently measure an expired, shrunken store.
+//
+// Earlier benchmark comments using default retention were invalid for calibrated runs because
+// untouched series aged out after the default ten successful commits.
+// Before the canonicalization-clone fix the s100000/t20 case cloned every retained descriptor:
+// 43.7ms / 100340 allocs.
 func BenchmarkCollectorCommitSparseAtCardinality(b *testing.B) {
 	tests := map[string]struct {
 		totalSeries int
@@ -85,7 +107,7 @@ func BenchmarkCollectorCommitSparseAtCardinality(b *testing.B) {
 
 	for name, tc := range tests {
 		b.Run(name, func(b *testing.B) {
-			s := NewCollectorStore()
+			s := NewCollectorStore(WithExpireAfterSuccessCycles(uint64(b.N) + 2))
 			cc := benchmarkCycleController(b, s)
 			gv := s.Write().SnapshotMeter("collect.hotpath").Vec("id").Gauge("value")
 
@@ -114,6 +136,176 @@ func BenchmarkCollectorCommitSparseAtCardinality(b *testing.B) {
 					h.Observe(SampleValue(i + j))
 				}
 				cc.CommitCycleSuccess()
+			}
+			b.StopTimer()
+
+			got := countRawScalarSeries(s.Read(ReadRaw()))
+			if got != tc.totalSeries {
+				b.Fatalf("retained raw series = %d, want %d", got, tc.totalSeries)
+			}
+		})
+	}
+}
+
+func countRawScalarSeries(r Reader) int {
+	var count int
+	r.ForEachSeries(func(_ string, _ LabelView, _ SampleValue) {
+		count++
+	})
+	return count
+}
+
+// BenchmarkCollectorCommitManySuperseded exercises commit when many distinct names each
+// change kind (supersede) in one cycle. Must be O(live), not O(superseded*live).
+// Round-8 set-based supersede, before -> after (developer laptop): names_100 304us -> 91us;
+// names_1000 4.87ms -> 1.10ms; names_5000 91.1ms -> 5.68ms. O(N^2) -> O(N).
+func BenchmarkCollectorCommitManySuperseded(b *testing.B) {
+	for _, n := range []int{100, 1000, 5000} {
+		b.Run(fmt.Sprintf("names_%d", n), func(b *testing.B) {
+			s := NewCollectorStore()
+			cc := benchmarkCycleController(b, s)
+			b.ReportAllocs()
+			b.ResetTimer()
+			for iter := 0; iter < b.N; iter++ {
+				// Alternate each name's kind every cycle so each name supersedes the other.
+				cc.BeginCycle()
+				meter := s.Write().SnapshotMeter("svc")
+				for i := range n {
+					name := fmt.Sprintf("m%d", i)
+					if iter%2 == 0 {
+						meter.Counter(name).ObserveTotal(1)
+					} else {
+						meter.Gauge(name).Observe(1)
+					}
+				}
+				cc.CommitCycleSuccess()
+			}
+		})
+	}
+}
+
+// BenchmarkCollectorCommitManyDropped exercises commit when many distinct names are
+// ambiguous (two incompatible kinds, no committed authority) and dropped. Must be
+// O(touched), not O(dropped*touched).
+// Round-8 set-based drop, before -> after (developer laptop): names_100 177us -> 96us;
+// names_1000 8.58ms -> 1.15ms; names_5000 196ms -> 6.03ms. O(N^2) -> O(N).
+func BenchmarkCollectorCommitManyDropped(b *testing.B) {
+	for _, n := range []int{100, 1000, 5000} {
+		b.Run(fmt.Sprintf("names_%d", n), func(b *testing.B) {
+			s := NewCollectorStore()
+			cc := benchmarkCycleController(b, s)
+			b.ReportAllocs()
+			b.ResetTimer()
+			for iter := 0; iter < b.N; iter++ {
+				cc.BeginCycle()
+				meter := s.Write().SnapshotMeter("svc")
+				for i := range n {
+					name := fmt.Sprintf("m%d", i)
+					meter.Gauge(name).Observe(1)
+					meter.Counter(name).ObserveTotal(1)
+				}
+				cc.CommitCycleSuccess()
+			}
+		})
+	}
+}
+
+// BenchmarkCollectorSameKeyRepeatedWrites exercises repeated same-key writes whose observed
+// schema differs from the staged entry but is otherwise identical (the same conflicting bounds
+// every time). They share one authority fingerprint, so the conflict is recorded once and every
+// later repeat is dropped by a no-clone identity check - both the descriptor evidence AND the
+// effective-descriptor clones stay O(1), not O(samples) (the residual per-sample cost is inherent
+// point normalization).
+// Fingerprint dedup with no-clone repeat check, before -> after (developer laptop): samples_10000
+// 1.81ms / 100045 allocs -> 0.97ms / 20044 allocs (the residual allocs are inherent point
+// normalization; the per-sample effective clone and evidence growth are gone once the conflicting
+// authority is recorded). This is the pathological conflict-flood path; a healthy same-schema
+// repeat never enters here.
+func BenchmarkCollectorSameKeyRepeatedWrites(b *testing.B) {
+	pt := func(uppers ...float64) HistogramPoint {
+		buckets := make([]BucketPoint, len(uppers))
+		for i, ub := range uppers {
+			buckets[i] = BucketPoint{UpperBound: ub, CumulativeCount: 1}
+		}
+		return HistogramPoint{Count: 1, Sum: 1, Buckets: buckets}
+	}
+	for _, k := range []int{100, 1000, 10000} {
+		b.Run(fmt.Sprintf("samples_%d", k), func(b *testing.B) {
+			s := NewCollectorStore()
+			cc := benchmarkCycleController(b, s)
+			pt12, pt56 := pt(1, 2), pt(5, 6)
+			b.ReportAllocs()
+			b.ResetTimer()
+			for iter := 0; iter < b.N; iter++ {
+				cc.BeginCycle()
+				h := s.Write().SnapshotMeter("svc").Histogram("h")
+				h.ObservePoint(pt12)
+				for range k {
+					h.ObservePoint(pt56) // differs from the staged entry every time
+				}
+				cc.CommitCycleSuccess()
+			}
+		})
+	}
+}
+
+// BenchmarkCollectorCommitManySchemasPerName exercises one histogram name whose labels
+// carry many distinct bucket schemas (distinct authorities). Authority grouping is
+// fingerprint-indexed, so it is O(distinct) time, not O(distinct^2).
+// History (developer laptop): pre-hardening O(N^2) (schemas_1000 29.8ms / 1.52M allocs); a
+// cap-at-2 made it O(N) time / O(1) memory but LOSSILY hid declaration conflicts past the cap; the
+// fingerprint index restores losslessness at O(distinct) memory - schemas_1000 ~688us / ~25k allocs
+// (every distinct authority is kept so any declaration conflict is caught). This is the pathological
+// many-schema-per-name case (a broken collector); a healthy 1-authority name is unaffected.
+func BenchmarkCollectorCommitManySchemasPerName(b *testing.B) {
+	for _, n := range []int{100, 500, 1000} {
+		b.Run(fmt.Sprintf("schemas_%d", n), func(b *testing.B) {
+			s := NewCollectorStore()
+			cc := benchmarkCycleController(b, s)
+			b.ReportAllocs()
+			b.ResetTimer()
+			for iter := 0; iter < b.N; iter++ {
+				cc.BeginCycle()
+				meter := s.Write().SnapshotMeter("svc")
+				for i := range n {
+					pt := HistogramPoint{Count: 1, Sum: 1, Buckets: []BucketPoint{{UpperBound: float64(i + 1), CumulativeCount: 1}}}
+					meter.WithLabels(Label{Key: "id", Value: fmt.Sprintf("s%d", i)}).Histogram("h").ObservePoint(pt)
+				}
+				cc.CommitCycleSuccess()
+			}
+		})
+	}
+}
+
+// BenchmarkCollectorSameKeyManyDeclarations exercises one series key written by many handles that
+// share an authority but declare DISTINCT metadata (unique units). Conflict evidence is keyed by
+// full descriptor identity (authority fingerprint + declaration fingerprint), so recording each
+// distinct declaration is O(1) and the total stays O(distinct), not O(distinct^2) (a per-authority
+// bucket rescanned before every append).
+// Full-descriptor conflict key, before -> after (developer laptop): declarations_1000 2.76ms ->
+// 0.39ms (allocs stay O(N): 6.1k -> 7.1k). The win is TIME: the per-append bucket scan (O(N^2)) is
+// replaced by an O(1) keyed lookup.
+func BenchmarkCollectorSameKeyManyDeclarations(b *testing.B) {
+	for _, n := range []int{100, 1000} {
+		b.Run(fmt.Sprintf("declarations_%d", n), func(b *testing.B) {
+			s := NewCollectorStore()
+			cc := benchmarkCycleController(b, s)
+			// N stale same-key gauge handles, same authority, distinct units (each from its own
+			// aborted cycle so registration does not reject the declaration conflict).
+			handles := make([]SnapshotGauge, n)
+			for i := range handles {
+				cc.BeginCycle()
+				handles[i] = s.Write().SnapshotMeter("svc").Gauge("m", WithUnit(fmt.Sprintf("u%d", i)))
+				cc.AbortCycle()
+			}
+			b.ReportAllocs()
+			b.ResetTimer()
+			for iter := 0; iter < b.N; iter++ {
+				cc.BeginCycle()
+				for _, h := range handles {
+					h.Observe(1)
+				}
+				cc.CommitCycleSuccess() // fails on the declaration conflicts; measures conflict recording + resolution
 			}
 		})
 	}

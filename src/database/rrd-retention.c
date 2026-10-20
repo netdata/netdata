@@ -5,6 +5,14 @@
 #include "rrd-retention.h"
 #include "libnetdata/parsers/duration.h"
 
+// The expected retention is an extrapolation of the current disk usage
+// (elapsed * 100 / disk_percent). On a mostly empty quota it grows without
+// bound: a 20 GiB tier with a few KiB used extrapolates to centuries. Cap it,
+// so the published value stays a plausible duration. The ceiling is set high
+// enough not to truncate realistic long estimates - a 20 GiB tier ingesting
+// ~1 GiB/year legitimately extrapolates to ~21 years.
+#define MAX_EXPECTED_RETENTION_S (25 * 365 * 86400)
+
 // Round retention time to more human-readable values (days/hours/minutes)
 static time_t round_retention(time_t retention_seconds) {
     if(retention_seconds > 60 * 86400)
@@ -75,12 +83,16 @@ RRDSTATS_RETENTION rrdstats_retention_collect(void) {
         tier_info->first_time_s = storage_engine_global_first_time_s(eng->seb, localhost->db[tier].si);
         tier_info->last_time_s = now_s;
         
-        if(tier_info->first_time_s < tier_info->last_time_s) {
+        // first_time_s zero means the storage engine does not know the start of
+        // the retention - rrdeng_global_first_time_s() normalizes both LONG_MAX
+        // (nothing loaded yet) and negatives to zero. It is not 1970: treating
+        // it as a timestamp reports the whole unix epoch as retention.
+        if(tier_info->first_time_s > 0 && tier_info->first_time_s < tier_info->last_time_s) {
             tier_info->retention = tier_info->last_time_s - tier_info->first_time_s;
-            
+
             // Format human-readable retention
-            duration_snprintf(tier_info->retention_human, sizeof(tier_info->retention_human),
-                             round_retention(tier_info->retention), "s", false);
+            duration_snprintf_time_t(tier_info->retention_human, sizeof(tier_info->retention_human),
+                                     round_retention(tier_info->retention));
 
             if(tier_info->disk_used || tier_info->disk_max) {
                 // Get requested retention time
@@ -91,21 +103,36 @@ RRDSTATS_RETENTION rrdstats_retention_collect(void) {
 #endif
 
                 // Format human-readable requested retention
-                duration_snprintf(tier_info->requested_retention_human, sizeof(tier_info->requested_retention_human),
-                                 (int)tier_info->requested_retention, "s", false);
+                duration_snprintf_time_t(tier_info->requested_retention_human, sizeof(tier_info->requested_retention_human),
+                                         tier_info->requested_retention);
 
-                // Calculate expected retention based on current usage
+                // Calculate expected retention based on current usage.
+                // Clamp in double space, BEFORE converting: a very small
+                // disk_percent (a nearly empty database on a huge disk_max) can
+                // push the product past time_t's range, and an out-of-range
+                // floating-point to integer conversion is undefined - it can
+                // itself yield a negative value that a later clamp cannot fix.
+                // The clamp bound never goes below requested_retention, so a tier
+                // configured for a longer retention than MAX_EXPECTED_RETENTION_S never
+                // publishes an expected retention lower than the requested one.
+                time_t max_retention = MAX(MAX_EXPECTED_RETENTION_S, tier_info->requested_retention);
                 time_t space_retention = 0;
-                if(tier_info->disk_percent > 0)
-                    space_retention = (time_t)((double)(now_s - tier_info->first_time_s) * 100.0 / tier_info->disk_percent);
-                
-                tier_info->expected_retention = (tier_info->requested_retention && tier_info->requested_retention < space_retention) 
-                                              ? tier_info->requested_retention 
+                if(tier_info->disk_percent > 0) {
+                    double extrapolated =
+                        (double)(now_s - tier_info->first_time_s) * 100.0 / tier_info->disk_percent;
+
+                    space_retention = (extrapolated >= (double)max_retention)
+                                          ? max_retention
+                                          : (time_t)extrapolated;
+                }
+
+                tier_info->expected_retention = (tier_info->requested_retention && tier_info->requested_retention < space_retention)
+                                              ? tier_info->requested_retention
                                               : space_retention;
 
                 // Format human-readable expected retention
-                duration_snprintf(tier_info->expected_retention_human, sizeof(tier_info->expected_retention_human),
-                                 (int)round_retention(tier_info->expected_retention), "s", false);
+                duration_snprintf_time_t(tier_info->expected_retention_human, sizeof(tier_info->expected_retention_human),
+                                         round_retention(tier_info->expected_retention));
             }
         }
         else {

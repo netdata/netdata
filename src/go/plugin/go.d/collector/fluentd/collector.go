@@ -43,11 +43,11 @@ func New() *Collector {
 }
 
 type Config struct {
-	Vnode              string `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery        int    `yaml:"update_every,omitempty" json:"update_every"`
+	Vnode              string `yaml:"vnode,omitempty"               json:"vnode"`
+	UpdateEvery        int    `yaml:"update_every,omitempty"        json:"update_every"`
 	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	web.HTTPConfig     `yaml:",inline" json:""`
-	PermitPlugin       string `yaml:"permit_plugin_id,omitempty" json:"permit_plugin_id"`
+	web.HTTPConfig     `       yaml:",inline"                       json:""`
+	PermitPlugin       string `yaml:"permit_plugin_id,omitempty"    json:"permit_plugin_id"`
 }
 
 type Collector struct {
@@ -66,7 +66,7 @@ func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *Collector) Init(context.Context) error {
+func (c *Collector) Init(ctx context.Context) error {
 	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("invalid config: %v", err)
 	}
@@ -77,7 +77,7 @@ func (c *Collector) Init(context.Context) error {
 	}
 	c.permitPlugin = pm
 
-	client, err := c.initApiClient()
+	client, err := c.initApiClient(ctx)
 	if err != nil {
 		return fmt.Errorf("init api client: %v", err)
 	}
@@ -89,8 +89,8 @@ func (c *Collector) Init(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Check(context.Context) error {
-	mx, err := c.collect()
+func (c *Collector) Check(ctx context.Context) error {
+	mx, err := c.collect(ctx)
 	if err != nil {
 		return err
 	}
@@ -105,8 +105,8 @@ func (c *Collector) Charts() *Charts {
 	return c.charts
 }
 
-func (c *Collector) Collect(context.Context) map[string]int64 {
-	mx, err := c.collect()
+func (c *Collector) Collect(ctx context.Context) map[string]int64 {
+	mx, err := c.collect(ctx)
 
 	if err != nil {
 		c.Error(err)

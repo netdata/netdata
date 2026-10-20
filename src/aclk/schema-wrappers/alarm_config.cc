@@ -2,7 +2,7 @@
 
 #include "alarm_config.h"
 
-#include "proto/alarm/v1/config.pb.h"
+#include "alarm/v1/config.pb.h"
 
 #include "libnetdata/libnetdata.h"
 
@@ -122,8 +122,10 @@ char *generate_provide_alarm_configuration(size_t *len, struct provide_alarm_con
 
     *len = PROTO_COMPAT_MSG_SIZE(msg);
     char *bin = (char*)mallocz(*len);
-    if (!msg.SerializeToArray(bin, *len))
+    if (!msg.SerializeToArray(bin, *len)) {
+        freez(bin);
         return NULL;
+    }
 
     return bin;
 }

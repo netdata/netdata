@@ -159,7 +159,7 @@ void query_target_summary_labels_v12(BUFFER *wb, QUERY_TARGET *qt, const char *k
         rrdlabels_walkthrough_read(rrdinstance_acquired_labels(ria), rrdlabels_formatting_v2, &t);
     }
 
-    size_t cardinality_limit = qt->request.cardinality_limit;
+    size_t cardinality_limit = query_target_summary_cardinality_limit(qt);
 
     struct rrdlabels_keys_dict_entry *d;
     dfe_start_read(t.keys, d) {

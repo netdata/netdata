@@ -16,7 +16,7 @@ struct capability {
 #ifdef __cplusplus
 }
 
-#include "proto/aclk/v1/lib.pb.h"
+#include "aclk/v1/lib.pb.h"
 
 void capability_set(aclk_lib::v1::Capability *proto_capa, const struct capability *c_capa);
 #endif

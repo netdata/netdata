@@ -22,6 +22,32 @@
   "tls_skip_verify": true,
   "force_http2": true,
   "discovery_interval": 123.123,
+  "tag_categories": [
+    "Environment",
+    "Business*"
+  ],
+  "custom_attributes": [
+    "Owner",
+    "Cost Center"
+  ],
+  "collect_datastore_clusters": true,
+  "datastore_cluster_include": [
+    "/*"
+  ],
+  "collect_vsan": true,
+  "vsan_cluster_include": [
+    "/DC1/Cluster*",
+    "vsan_uuid:cluster-uuid"
+  ],
+  "vsan_host_include": [
+    "/DC1/Cluster*/Host*",
+    "vsan_node_uuid:host-uuid"
+  ],
+  "vsan_vm_include": [
+    "/DC1/Cluster*/Host*/VM*",
+    "instance_uuid:vm-uuid"
+  ],
+  "collect_network_topology": true,
   "host_include": [
     "ok"
   ],

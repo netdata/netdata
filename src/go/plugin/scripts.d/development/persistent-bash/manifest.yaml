@@ -1,0 +1,9 @@
+version: v1
+mode: persistent
+command: [./collect.sh]
+metrics:
+  - {name: processed_total, type: counter, unit: jobs}
+checks:
+  - id: backlog
+    title: Queue Backlog
+    by_labels: [queue]

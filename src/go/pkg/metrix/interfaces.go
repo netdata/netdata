@@ -16,11 +16,41 @@ type RuntimeStore interface {
 	Write() RuntimeWriter
 }
 
+// RuntimeBatchWriter is an OPTIONAL RuntimeStore capability (type assertion; not part of
+// RuntimeStore, so existing implementations and fakes keep compiling). Writes made while
+// fn runs are published together as one snapshot when fn returns (or panics); readers do
+// not see any of them earlier. A store has one batch at a time and it belongs to the
+// goroutine that opened it: writes from anywhere join it while it is open, and a
+// WriteBatch that starts meanwhile (nested, or from another goroutine) just runs its fn,
+// so that fn's writes after the open batch ends commit immediately. Outside a batch,
+// writes still commit immediately.
+type RuntimeBatchWriter interface {
+	WriteBatch(fn func())
+}
+
+// DescriptorRetention is an OPTIONAL interface a CollectorStore may implement to expose how
+// long it keeps a descriptor and the clock that lifetime is measured in. A consumer that
+// caches per-name state keyed off metrix descriptors (e.g. the prometheus writer) obtains it
+// via a type assertion and keeps its state alive at least DescriptorRetentionWindow successful
+// commits, so it never re-registers a name while metrix still holds the descriptor. It is
+// deliberately NOT part of CollectorStore so existing implementations and test fakes keep
+// compiling.
+type DescriptorRetention interface {
+	// DescriptorRetentionWindow is the number of successful commits a descriptor can outlive
+	// its last series: expireAfterSuccessCycles + descriptorGraceCycles. It is
+	// DescriptorRetentionUnbounded when series age-expiry is disabled (the descriptor can then
+	// live indefinitely); a consumer MUST treat that as "never age out my cached state".
+	DescriptorRetentionWindow() uint64
+	// SuccessfulCommits is the number of successful commits so far - the clock the retention
+	// window is measured against.
+	SuccessfulCommits() uint64
+}
+
 // CycleController owns collect-cycle transitions for a cycle-managed store.
 // Collector code does not call these methods directly.
 type CycleController interface {
 	BeginCycle()
-	CommitCycleSuccess()
+	CommitCycleSuccess() error
 	AbortCycle()
 }
 
@@ -38,13 +68,21 @@ type Reader interface {
 	Histogram(name string, labels Labels) (HistogramPoint, bool)
 	Summary(name string, labels Labels) (SummaryPoint, bool)
 	StateSet(name string, labels Labels) (StateSetPoint, bool)
+	// MeasureSet returns the full declared point. For snapshot gauges, NaN marks
+	// unavailable fields; the bool reports family presence, including all-NaN points.
 	MeasureSet(name string, labels Labels) (MeasureSetPoint, bool)
 	SeriesMeta(name string, labels Labels) (SeriesMeta, bool)
-	// MetricMeta resolves metadata by metric name in the active reader view.
+	// MetricMeta resolves metadata by metric name in the active reader view and
+	// host scope. A freshness-filtered reader may fall back to stale metadata in
+	// that same scope, never to metadata from another scope.
 	// With Read(ReadFlatten()), lookups use flattened scalar series names.
 	// Example: histogram families resolve via *_bucket/*_count/*_sum names.
 	MetricMeta(name string) (MetricMeta, bool)
 	CollectMeta() CollectMeta
+	// HostScopes returns all host scopes present in the snapshot, including the
+	// default scope when it has series. The result is not filtered by the
+	// reader's active scope.
+	HostScopes() []HostScope
 	// Family returns a scalar-only view. For non-scalar families use Histogram/Summary/StateSet,
 	// or use Read(ReadFlatten()) at reader acquisition time.
 	Family(name string) (FamilyView, bool)
@@ -72,6 +110,14 @@ type SeriesIdentityRawIterator interface {
 	ForEachSeriesIdentityRaw(fn func(identity SeriesIdentity, meta SeriesMeta, name string, labels []Label, v SampleValue))
 }
 
+// FreshVisibleHostScopesReader is an optional CollectorStore reader capability
+// that returns the host scopes containing at least one series visible under
+// freshness-filtered Read() semantics. The result is deterministic and is not
+// affected by ReadRaw(). Returned scope metadata is defensively cloned.
+type FreshVisibleHostScopesReader interface {
+	FreshVisibleHostScopes() []HostScope
+}
+
 // Writer is the declaration/write entrypoint for collection stores.
 // Metric mode is selected via SnapshotMeter or StatefulMeter.
 type Writer interface {
@@ -86,6 +132,7 @@ type RuntimeWriter interface {
 
 // SnapshotMeter declares snapshot-mode instruments under a metric-name prefix.
 type SnapshotMeter interface {
+	WithHostScope(scope HostScope) SnapshotMeter
 	WithLabels(labels ...Label) SnapshotMeter
 	WithLabelSet(labels ...LabelSet) SnapshotMeter
 	// Vec binds a reusable vec label-key schema for multiple vector instruments.
@@ -102,6 +149,7 @@ type SnapshotMeter interface {
 
 // SnapshotVecMeter declares snapshot vec instruments sharing one label-key schema.
 type SnapshotVecMeter interface {
+	WithHostScope(scope HostScope) SnapshotVecMeter
 	Gauge(name string, opts ...InstrumentOption) SnapshotGaugeVec
 	Counter(name string, opts ...InstrumentOption) SnapshotCounterVec
 	Histogram(name string, opts ...InstrumentOption) SnapshotHistogramVec
@@ -113,6 +161,7 @@ type SnapshotVecMeter interface {
 
 // StatefulMeter declares stateful-mode instruments under a metric-name prefix.
 type StatefulMeter interface {
+	WithHostScope(scope HostScope) StatefulMeter
 	WithLabels(labels ...Label) StatefulMeter
 	WithLabelSet(labels ...LabelSet) StatefulMeter
 	// Vec binds a reusable vec label-key schema for multiple vector instruments.
@@ -129,6 +178,7 @@ type StatefulMeter interface {
 
 // StatefulVecMeter declares stateful vec instruments sharing one label-key schema.
 type StatefulVecMeter interface {
+	WithHostScope(scope HostScope) StatefulVecMeter
 	Gauge(name string, opts ...InstrumentOption) StatefulGaugeVec
 	Counter(name string, opts ...InstrumentOption) StatefulCounterVec
 	Histogram(name string, opts ...InstrumentOption) StatefulHistogramVec
@@ -148,6 +198,7 @@ type SnapshotGauge interface {
 // - GetWithLabelValues returns (metric, error)
 // - WithLabelValues panics on invalid label values
 type SnapshotGaugeVec interface {
+	WithHostScope(scope HostScope) SnapshotGaugeVec
 	GetWithLabelValues(labelValues ...string) (SnapshotGauge, error)
 	WithLabelValues(labelValues ...string) SnapshotGauge
 }
@@ -161,6 +212,7 @@ type StatefulGauge interface {
 
 // StatefulGaugeVec provides labeled series handles for stateful gauges.
 type StatefulGaugeVec interface {
+	WithHostScope(scope HostScope) StatefulGaugeVec
 	GetWithLabelValues(labelValues ...string) (StatefulGauge, error)
 	WithLabelValues(labelValues ...string) StatefulGauge
 }
@@ -171,6 +223,7 @@ type SnapshotCounter interface {
 
 // SnapshotCounterVec provides labeled series handles for snapshot counters.
 type SnapshotCounterVec interface {
+	WithHostScope(scope HostScope) SnapshotCounterVec
 	GetWithLabelValues(labelValues ...string) (SnapshotCounter, error)
 	WithLabelValues(labelValues ...string) SnapshotCounter
 }
@@ -181,6 +234,7 @@ type StatefulCounter interface {
 
 // StatefulCounterVec provides labeled series handles for stateful counters.
 type StatefulCounterVec interface {
+	WithHostScope(scope HostScope) StatefulCounterVec
 	GetWithLabelValues(labelValues ...string) (StatefulCounter, error)
 	WithLabelValues(labelValues ...string) StatefulCounter
 }
@@ -191,6 +245,7 @@ type SnapshotHistogram interface {
 
 // SnapshotHistogramVec provides labeled series handles for snapshot histograms.
 type SnapshotHistogramVec interface {
+	WithHostScope(scope HostScope) SnapshotHistogramVec
 	GetWithLabelValues(labelValues ...string) (SnapshotHistogram, error)
 	WithLabelValues(labelValues ...string) SnapshotHistogram
 }
@@ -201,6 +256,7 @@ type StatefulHistogram interface {
 
 // StatefulHistogramVec provides labeled series handles for stateful histograms.
 type StatefulHistogramVec interface {
+	WithHostScope(scope HostScope) StatefulHistogramVec
 	GetWithLabelValues(labelValues ...string) (StatefulHistogram, error)
 	WithLabelValues(labelValues ...string) StatefulHistogram
 }
@@ -211,6 +267,7 @@ type SnapshotSummary interface {
 
 // SnapshotSummaryVec provides labeled series handles for snapshot summaries.
 type SnapshotSummaryVec interface {
+	WithHostScope(scope HostScope) SnapshotSummaryVec
 	GetWithLabelValues(labelValues ...string) (SnapshotSummary, error)
 	WithLabelValues(labelValues ...string) SnapshotSummary
 }
@@ -221,6 +278,7 @@ type StatefulSummary interface {
 
 // StatefulSummaryVec provides labeled series handles for stateful summaries.
 type StatefulSummaryVec interface {
+	WithHostScope(scope HostScope) StatefulSummaryVec
 	GetWithLabelValues(labelValues ...string) (StatefulSummary, error)
 	WithLabelValues(labelValues ...string) StatefulSummary
 }
@@ -231,11 +289,16 @@ type StateSetInstrument interface {
 }
 
 type SnapshotMeasureSetGauge interface {
+	// ObservePoint replaces the full snapshot in declared field order. NaN means
+	// unavailable; infinity and a mismatched field count panic.
 	ObservePoint(p MeasureSetPoint, labels ...LabelSet)
+	// ObserveFields requires exactly the declared keys, including unavailable
+	// fields with NaN values. Missing/unknown keys and infinity panic.
 	ObserveFields(fields map[string]SampleValue, labels ...LabelSet)
 }
 
 type SnapshotMeasureSetGaugeVec interface {
+	WithHostScope(scope HostScope) SnapshotMeasureSetGaugeVec
 	GetWithLabelValues(labelValues ...string) (SnapshotMeasureSetGauge, error)
 	WithLabelValues(labelValues ...string) SnapshotMeasureSetGauge
 }
@@ -246,6 +309,7 @@ type SnapshotMeasureSetCounter interface {
 }
 
 type SnapshotMeasureSetCounterVec interface {
+	WithHostScope(scope HostScope) SnapshotMeasureSetCounterVec
 	GetWithLabelValues(labelValues ...string) (SnapshotMeasureSetCounter, error)
 	WithLabelValues(labelValues ...string) SnapshotMeasureSetCounter
 }
@@ -260,6 +324,7 @@ type StatefulMeasureSetGauge interface {
 }
 
 type StatefulMeasureSetGaugeVec interface {
+	WithHostScope(scope HostScope) StatefulMeasureSetGaugeVec
 	GetWithLabelValues(labelValues ...string) (StatefulMeasureSetGauge, error)
 	WithLabelValues(labelValues ...string) StatefulMeasureSetGauge
 }
@@ -271,18 +336,21 @@ type StatefulMeasureSetCounter interface {
 }
 
 type StatefulMeasureSetCounterVec interface {
+	WithHostScope(scope HostScope) StatefulMeasureSetCounterVec
 	GetWithLabelValues(labelValues ...string) (StatefulMeasureSetCounter, error)
 	WithLabelValues(labelValues ...string) StatefulMeasureSetCounter
 }
 
 // SnapshotStateSetVec provides labeled series handles for snapshot statesets.
 type SnapshotStateSetVec interface {
+	WithHostScope(scope HostScope) SnapshotStateSetVec
 	GetWithLabelValues(labelValues ...string) (StateSetInstrument, error)
 	WithLabelValues(labelValues ...string) StateSetInstrument
 }
 
 // StatefulStateSetVec provides labeled series handles for stateful statesets.
 type StatefulStateSetVec interface {
+	WithHostScope(scope HostScope) StatefulStateSetVec
 	GetWithLabelValues(labelValues ...string) (StateSetInstrument, error)
 	WithLabelValues(labelValues ...string) StateSetInstrument
 }

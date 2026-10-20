@@ -12,8 +12,39 @@ import (
 
 // API implements Netdata external plugins API.
 // See: https://learn.netdata.cloud/docs/agent/plugins.d#the-output-of-the-plugin
+//
+// Hot-path commands append into the writer's available buffer when it has one
+// (bytes.Buffer, bufio.Writer), otherwise into a scratch buffer reused across
+// commands, so formatting does not allocate per command. That state makes an API
+// unsafe for concurrent use; give each goroutine its own.
 type API struct {
 	io.Writer
+	scratch []byte
+	// direct reports whether the command being formatted uses the writer's buffer.
+	direct bool
+}
+
+// availableBufferWriter is implemented by writers that expose their spare capacity.
+type availableBufferWriter interface {
+	AvailableBuffer() []byte
+}
+
+// line returns an empty buffer to append one command into.
+func (a *API) line() []byte {
+	if w, ok := a.Writer.(availableBufferWriter); ok {
+		a.direct = true
+		return w.AvailableBuffer()
+	}
+	a.direct = false
+	return a.scratch[:0]
+}
+
+// send writes one appended command and keeps a grown scratch buffer.
+func (a *API) send(line []byte) {
+	_, _ = a.Write(line)
+	if !a.direct {
+		a.scratch = line[:0]
+	}
 }
 
 const quotes = "' '"
@@ -30,43 +61,71 @@ func New(w io.Writer) *API {
 	if w == nil {
 		panic("writer cannot be nil")
 	}
-	return &API{w}
+	return &API{
+		Writer: w,
+	}
 }
 
 // CHART creates or updates a chart.
 func (a *API) CHART(opts ChartOpts) {
-	_, _ = a.Write([]byte("CHART " + "'" +
-		opts.TypeID + "." + opts.ID + quotes +
-		opts.Name + quotes +
-		opts.Title + quotes +
-		opts.Units + quotes +
-		opts.Family + quotes +
-		opts.Context + quotes +
-		opts.ChartType + quotes +
-		strconv.Itoa(opts.Priority) + quotes +
-		strconv.Itoa(opts.UpdateEvery) + quotes +
-		opts.Options + quotes +
-		opts.Plugin + quotes +
-		opts.Module + "'\n"))
+	b := append(a.line(), "CHART '"...)
+	b = append(b, opts.TypeID...)
+	b = append(b, '.')
+	b = append(b, opts.ID...)
+	b = append(b, quotes...)
+	b = append(b, opts.Name...)
+	b = append(b, quotes...)
+	b = append(b, opts.Title...)
+	b = append(b, quotes...)
+	b = append(b, opts.Units...)
+	b = append(b, quotes...)
+	b = append(b, opts.Family...)
+	b = append(b, quotes...)
+	b = append(b, opts.Context...)
+	b = append(b, quotes...)
+	b = append(b, opts.ChartType...)
+	b = append(b, quotes...)
+	b = strconv.AppendInt(b, int64(opts.Priority), 10)
+	b = append(b, quotes...)
+	b = strconv.AppendInt(b, int64(opts.UpdateEvery), 10)
+	b = append(b, quotes...)
+	b = append(b, opts.Options...)
+	b = append(b, quotes...)
+	b = append(b, opts.Plugin...)
+	b = append(b, quotes...)
+	b = append(b, opts.Module...)
+	b = append(b, "'\n"...)
+	a.send(b)
 }
 
 // DIMENSION adds or updates a dimension to the most recently created chart.
 func (a *API) DIMENSION(opts DimensionOpts) {
-	_, _ = a.Write([]byte("DIMENSION '" +
-		opts.ID + quotes +
-		opts.Name + quotes +
-		opts.Algorithm + quotes +
-		strconv.Itoa(opts.Multiplier) + quotes +
-		strconv.Itoa(opts.Divisor) + quotes +
-		opts.Options + "'\n"))
+	b := append(a.line(), "DIMENSION '"...)
+	b = append(b, opts.ID...)
+	b = append(b, quotes...)
+	b = append(b, opts.Name...)
+	b = append(b, quotes...)
+	b = append(b, opts.Algorithm...)
+	b = append(b, quotes...)
+	b = strconv.AppendInt(b, int64(opts.Multiplier), 10)
+	b = append(b, quotes...)
+	b = strconv.AppendInt(b, int64(opts.Divisor), 10)
+	b = append(b, quotes...)
+	b = append(b, opts.Options...)
+	b = append(b, "'\n"...)
+	a.send(b)
 }
 
 // CLABEL adds or updates a label to the most recently created chart.
 func (a *API) CLABEL(key, value string, source int) {
-	_, _ = a.Write([]byte("CLABEL '" +
-		key + quotes +
-		value + quotes +
-		strconv.Itoa(source) + "'\n"))
+	b := append(a.line(), "CLABEL '"...)
+	b = append(b, key...)
+	b = append(b, quotes...)
+	b = append(b, value...)
+	b = append(b, quotes...)
+	b = strconv.AppendInt(b, int64(source), 10)
+	b = append(b, "'\n"...)
+	a.send(b)
 }
 
 // CLABELCOMMIT adds labels to the chart. Should be called after one or more CLABEL.
@@ -76,33 +135,51 @@ func (a *API) CLABELCOMMIT() {
 
 // BEGIN initializes data collection for a chart.
 func (a *API) BEGIN(typeID string, id string, msSince int) {
+	b := append(a.line(), "BEGIN '"...)
+	b = append(b, typeID...)
+	b = append(b, '.')
+	b = append(b, id...)
+	b = append(b, '\'')
 	if msSince > 0 {
-		_, _ = a.Write([]byte("BEGIN " + "'" + typeID + "." + id + "' " + strconv.Itoa(msSince) + "\n"))
-	} else {
-		_, _ = a.Write([]byte("BEGIN " + "'" + typeID + "." + id + "'\n"))
+		b = append(b, ' ')
+		b = strconv.AppendInt(b, int64(msSince), 10)
 	}
+	b = append(b, '\n')
+	a.send(b)
 }
 
 // SET sets the value of a dimension for the initialized chart.
 func (a *API) SET(id string, value int64) {
-	_, _ = a.Write([]byte("SET '" + id + "' = " + strconv.FormatInt(value, 10) + "\n"))
+	b := a.setPrefix(id)
+	b = strconv.AppendInt(b, value, 10)
+	a.send(append(b, '\n'))
 }
 
 // SETFLOAT sets the value of a dimension for the initialized chart.
 func (a *API) SETFLOAT(id string, value float64) {
-	v := strconv.FormatFloat(value, 'f', -1, 64)
-	_, _ = a.Write([]byte("SET '" + id + "' = " + v + "\n"))
+	b := a.setPrefix(id)
+	b = strconv.AppendFloat(b, value, 'f', -1, 64)
+	a.send(append(b, '\n'))
 }
 
 // SETEMPTY sets an empty value for a dimension in the initialized chart.
 func (a *API) SETEMPTY(id string) {
-	_, _ = a.Write([]byte("SET '" + id + "' = \n"))
+	a.send(append(a.setPrefix(id), '\n'))
+}
+
+func (a *API) setPrefix(id string) []byte {
+	b := append(a.line(), "SET '"...)
+	b = append(b, id...)
+	return append(b, "' = "...)
 }
 
 // VARIABLE sets the value of a CHART scope variable for the initialized chart.
 func (a *API) VARIABLE(ID string, value float64) {
-	v := strconv.FormatFloat(value, 'f', -1, 64)
-	_, _ = a.Write([]byte("VARIABLE CHART '" + ID + "' = " + v + "\n"))
+	b := append(a.line(), "VARIABLE CHART '"...)
+	b = append(b, ID...)
+	b = append(b, "' = "...)
+	b = strconv.AppendFloat(b, value, 'f', -1, 64)
+	a.send(append(b, '\n'))
 }
 
 // END completes data collection for the initialized chart.
@@ -144,7 +221,9 @@ func (a *API) HOSTINFO(info HostInfo) {
 
 // HOST switches the current context to a specific host.
 func (a *API) HOST(guid string) {
-	_, _ = a.Write([]byte("HOST " + "'" + guid + "'\n\n"))
+	b := append(a.line(), "HOST '"...)
+	b = append(b, guid...)
+	a.send(append(b, "'\n\n"...))
 }
 
 // FUNCRESULT writes a function result to Netdata.
@@ -167,10 +246,19 @@ func (a *API) FUNCRESULT(result FunctionResult) {
 	_, _ = buf.WriteTo(a)
 }
 
-// CONFIGCREATE creates a new configuration
+// CONFIGCREATE creates a new configuration. Invalid fields are ignored; use
+// TryCONFIGCREATE when the caller must observe an encoding rejection.
 func (a *API) CONFIGCREATE(opts ConfigOpts) {
+	_ = a.TryCONFIGCREATE(opts)
+}
+
+// TryCONFIGCREATE creates a new configuration or returns an encoding error.
+func (a *API) TryCONFIGCREATE(opts ConfigOpts) error {
 	// https://learn.netdata.cloud/docs/contributing/external-plugins/#config
 
+	if err := opts.Validate(); err != nil {
+		return err
+	}
 	_, _ = a.Write([]byte("CONFIG " +
 		opts.ID + " " +
 		"create" + " " +
@@ -181,16 +269,40 @@ func (a *API) CONFIGCREATE(opts ConfigOpts) {
 		opts.Source + "' '" +
 		opts.SupportedCommands + "' 0x0000 0x0000\n\n",
 	))
+	return nil
 }
 
-// CONFIGDELETE deletes a configuration
+// CONFIGDELETE deletes a configuration. Invalid IDs are ignored; use
+// TryCONFIGDELETE when the caller must observe an encoding rejection.
 func (a *API) CONFIGDELETE(id string) {
-	_, _ = a.Write([]byte("CONFIG " + id + " delete\n\n"))
+	_ = a.TryCONFIGDELETE(id)
 }
 
-// CONFIGSTATUS updates a configuration status
+// TryCONFIGDELETE deletes a configuration or returns an encoding error.
+func (a *API) TryCONFIGDELETE(id string) error {
+	if !ValidBareProtocolField(id) {
+		return fmt.Errorf("netdataapi: invalid CONFIG id")
+	}
+	_, _ = a.Write([]byte("CONFIG " + id + " delete\n\n"))
+	return nil
+}
+
+// CONFIGSTATUS updates a configuration status. Invalid fields are ignored; use
+// TryCONFIGSTATUS when the caller must observe an encoding rejection.
 func (a *API) CONFIGSTATUS(id, status string) {
+	_ = a.TryCONFIGSTATUS(id, status)
+}
+
+// TryCONFIGSTATUS updates a configuration status or returns an encoding error.
+func (a *API) TryCONFIGSTATUS(id, status string) error {
+	if !ValidBareProtocolField(id) {
+		return fmt.Errorf("netdataapi: invalid CONFIG id")
+	}
+	if !ValidBareProtocolField(status) {
+		return fmt.Errorf("netdataapi: invalid CONFIG status")
+	}
 	_, _ = a.Write([]byte("CONFIG " + id + " status " + status + "\n\n"))
+	return nil
 }
 
 // FUNCTIONGLOBAL registers a global function with Netdata.
@@ -207,9 +319,6 @@ func (a *API) FUNCTIONGLOBAL(opts FunctionGlobalOpts) {
 }
 
 // FUNCTIONREMOVE removes a function from Netdata.
-// NOTE: This is a no-op placeholder - Netdata core does not yet support function removal.
-// When Netdata implements this, the protocol format will be added here.
 func (a *API) FUNCTIONREMOVE(name string) {
-	// TODO: Implement when Netdata core supports function removal
-	// For now, this is intentionally a no-op
+	_, _ = a.Write([]byte("FUNCTION_DEL GLOBAL \"" + name + "\"\n\n"))
 }

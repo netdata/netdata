@@ -299,8 +299,8 @@ var pgLabelColumnIDs = map[string]bool{
 
 const pgPrimaryLabelID = "database"
 
-func topQueriesMethodConfig() funcapi.MethodConfig {
-	return funcapi.MethodConfig{
+func topQueriesFunctionConfig() funcapi.FunctionConfig {
+	return funcapi.FunctionConfig{
 		ID:           topQueriesMethodID,
 		Name:         "Top Queries",
 		UpdateEvery:  10,

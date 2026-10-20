@@ -3,12 +3,14 @@
 package nginxvts
 
 import (
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
-	ms, err := c.scapeVTS()
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
+	ms, err := c.scapeVTS(ctx)
 	if err != nil {
 		return nil, nil
 	}
@@ -39,8 +41,8 @@ func (c *Collector) collectServerZones(collected map[string]any, ms *vtsMetrics)
 	collected["total"] = ms.ServerZones["*"]
 }
 
-func (c *Collector) scapeVTS() (*vtsMetrics, error) {
-	req, err := web.NewHTTPRequest(c.RequestConfig)
+func (c *Collector) scapeVTS(ctx context.Context) (*vtsMetrics, error) {
+	req, err := web.NewHTTPRequest(ctx, c.RequestConfig)
 	if err != nil {
 		return nil, err
 	}

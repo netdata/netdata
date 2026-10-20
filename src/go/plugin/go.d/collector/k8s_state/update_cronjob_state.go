@@ -36,9 +36,9 @@ func (c *Collector) updateCronJobState(r resource) {
 	st.lastSuccessfulTime = nil
 
 	if cj.Status.LastScheduleTime != nil {
-		st.lastScheduleTime = ptr(cj.Status.LastScheduleTime.Time)
+		st.lastScheduleTime = new(cj.Status.LastScheduleTime.Time)
 	}
 	if cj.Status.LastSuccessfulTime != nil {
-		st.lastSuccessfulTime = ptr(cj.Status.LastSuccessfulTime.Time)
+		st.lastSuccessfulTime = new(cj.Status.LastSuccessfulTime.Time)
 	}
 }

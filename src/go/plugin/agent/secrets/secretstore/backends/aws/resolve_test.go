@@ -5,12 +5,15 @@ package aws
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/internal/httpx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -79,6 +82,78 @@ func TestSecretValue_UsesSignedHostHeader(t *testing.T) {
 			}, tc.region, "db/password", "${store:aws-sm:aws_prod:db/password}")
 			require.NoError(t, err)
 			assert.Equal(t, "value", value)
+		})
+	}
+}
+
+func TestSecretValueResponseHandling(t *testing.T) {
+	readErr := errors.New("response read failed")
+	exactValue := strings.Repeat("x", responseBodyLimit-len(`{"SecretString":""}`))
+	tests := map[string]struct {
+		status          int
+		body            string
+		reader          io.Reader
+		wantValueLen    int
+		wantErrContains string
+		wantTooLarge    bool
+	}{
+		"response at limit succeeds": {
+			status:       http.StatusOK,
+			body:         `{"SecretString":"` + exactValue + `"}`,
+			wantValueLen: len(exactValue),
+		},
+		"response above limit fails": {
+			status:          http.StatusOK,
+			body:            strings.Repeat("x", responseBodyLimit+1),
+			wantErrContains: "reading AWS Secrets Manager response",
+			wantTooLarge:    true,
+		},
+		"HTTP status wins over oversized diagnostic body": {
+			status:          http.StatusForbidden,
+			body:            strings.Repeat("x", responseBodyLimit+1),
+			wantErrContains: "AWS Secrets Manager returned HTTP 403",
+		},
+		"read failure fails": {
+			status:          http.StatusOK,
+			reader:          errorReader{err: readErr},
+			wantErrContains: "reading AWS Secrets Manager response",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			reader := tc.reader
+			if reader == nil {
+				reader = strings.NewReader(tc.body)
+			}
+			store := &publishedStore{
+				runtime: &runtime{
+					apiClient: &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+						return &http.Response{
+							StatusCode: tc.status,
+							Body:       io.NopCloser(reader),
+							Header:     make(http.Header),
+						}, nil
+					})},
+				},
+			}
+
+			value, err := store.secretValue(context.Background(), &credentials{
+				accessKeyID:     "AKID",
+				secretAccessKey: "SECRET",
+			}, "us-east-1", "db/password", "${store:aws-sm:aws_prod:db/password}")
+
+			if tc.wantErrContains == "" {
+				require.NoError(t, err)
+				assert.Len(t, value, tc.wantValueLen)
+				return
+			}
+			require.ErrorContains(t, err, tc.wantErrContains)
+			if tc.wantTooLarge {
+				require.ErrorIs(t, err, httpx.ErrResponseTooLarge)
+				return
+			}
+			require.NotErrorIs(t, err, httpx.ErrResponseTooLarge)
 		})
 	}
 }

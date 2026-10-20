@@ -19,8 +19,9 @@ metadata:
 
 metric_tags:
   - tag: avaya_cmg_hw_type
-    OID: 1.3.6.1.4.1.6889.2.9.1.1.1.0
-    symbol: cmgHWType
+    symbol:
+      OID: 1.3.6.1.4.1.6889.2.9.1.1.1.0
+      name: cmgHWType
     mapping:
       1: media-gateway
       2: g350
@@ -42,14 +43,17 @@ metric_tags:
       37: avaya_communication_manager_branch_edition_g430
       41: avaya_g430
   - tag: avaya_cmg_model_number
-    OID: 1.3.6.1.4.1.6889.2.9.1.1.2.0
-    symbol: cmgModelNumber
+    symbol:
+      OID: 1.3.6.1.4.1.6889.2.9.1.1.2.0
+      name: cmgModelNumber
   - tag: avaya_cmg_serial_number
-    OID: 1.3.6.1.4.1.6889.2.9.1.1.4.0
-    symbol: cmgSerialNumber
+    symbol:
+      OID: 1.3.6.1.4.1.6889.2.9.1.1.4.0
+      name: cmgSerialNumber
   - tag: avaya_cmg_active_controller_address
-    OID: 1.3.6.1.4.1.6889.2.9.1.3.2.0
-    symbol: cmgActiveControllerAddress
+    symbol:
+      OID: 1.3.6.1.4.1.6889.2.9.1.3.2.0
+      name: cmgActiveControllerAddress
 
 metrics:
   - MIB: AVAYA-ENTITY-MIB

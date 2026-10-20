@@ -1,0 +1,238 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Redfish collector configuration.",
+    "type": "object",
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    },
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 60
+      },
+      "autodetection_retry": {
+        "title": "Detection retry",
+        "description": "How often to retry the initial connection when the job fails to start, in seconds. Zero disables retries.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 0
+      },
+      "vnode": {
+        "title": "Virtual Node",
+        "description": "Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "type": "string"
+      },
+      "url": {
+        "title": "ServiceRoot URL",
+        "description": "URL of the Redfish service. Accepts the origin or the full ServiceRoot path, over HTTP or HTTPS. Use HTTPS when the job sends credentials; over HTTP they travel in clear text, and the job logs a warning.",
+        "type": "string",
+        "format": "uri"
+      },
+      "auth_method": {
+        "title": "Authentication method",
+        "description": "How to authenticate with the BMC: `auto`, `session`, `basic`, or `none`. `auto` prefers a Redfish session and falls back to HTTP Basic.",
+        "type": "string",
+        "enum": [
+          "auto",
+          "session",
+          "basic",
+          "none"
+        ],
+        "default": "auto"
+      },
+      "username": {
+        "title": "Username",
+        "description": "Username of the BMC account. Required unless the authentication method is `none`.",
+        "type": "string"
+      },
+      "password": {
+        "title": "Password",
+        "description": "Password of the BMC account. Required unless the authentication method is `none`.",
+        "type": "string"
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "HTTP request timeout, in seconds.",
+        "type": "number",
+        "exclusiveMinimum": 0,
+        "default": 15
+      },
+      "max_concurrent_requests": {
+        "title": "Maximum concurrent requests",
+        "description": "Maximum number of requests sent to this BMC at the same time. Lower it for controllers that rate-limit or respond slowly.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 3
+      },
+      "proxy_url": {
+        "title": "Proxy URL",
+        "description": "Proxy to use for the BMC requests. Leave empty to use the proxy settings from the environment.",
+        "type": "string"
+      },
+      "tls_ca": {
+        "title": "TLS CA",
+        "description": "Path to a CA bundle file used to verify the BMC certificate. Leave empty to use the system trust store.",
+        "type": "string"
+      },
+      "tls_cert": {
+        "title": "TLS client certificate",
+        "description": "Path to a client certificate file for mutual TLS. Requires a client key.",
+        "type": "string"
+      },
+      "tls_key": {
+        "title": "TLS client key",
+        "description": "Path to the client key file for mutual TLS. Requires a client certificate.",
+        "type": "string"
+      },
+      "tls_skip_verify": {
+        "title": "Skip TLS verification",
+        "description": "Accept any certificate the BMC presents, including self-signed and expired ones.",
+        "type": "boolean",
+        "default": false
+      },
+      "collect": {
+        "title": "Collection families",
+        "description": "Simple pattern selecting which component areas to collect: `base`, `compute`, `memory`, `thermal`, `power`, `storage`, `network`, `pcie`, `sensors`, `firmware`. Base is always collected.",
+        "type": "string",
+        "default": "*"
+      }
+    },
+    "required": [
+      "url"
+    ],
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "auth_method": {
+              "const": "none"
+            }
+          },
+          "required": [
+            "auth_method"
+          ]
+        },
+        "then": {
+          "properties": {
+            "username": {
+              "pattern": "^[\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*$"
+            },
+            "password": {
+              "maxLength": 0
+            }
+          }
+        },
+        "else": {
+          "properties": {
+            "username": {
+              "pattern": "[^\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+            },
+            "password": {
+              "minLength": 1
+            }
+          },
+          "required": [
+            "username",
+            "password"
+          ]
+        }
+      },
+      {
+        "oneOf": [
+          {
+            "properties": {
+              "tls_cert": {
+                "pattern": "^[\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*$"
+              },
+              "tls_key": {
+                "pattern": "^[\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*$"
+              }
+            }
+          },
+          {
+            "properties": {
+              "tls_cert": {
+                "pattern": "[^\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+              },
+              "tls_key": {
+                "pattern": "[^\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+              }
+            },
+            "required": [
+              "tls_cert",
+              "tls_key"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "uiSchema": {
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Collection",
+          "fields": [
+            "update_every",
+            "autodetection_retry",
+            "collect"
+          ]
+        },
+        {
+          "title": "Target",
+          "fields": [
+            "url"
+          ]
+        },
+        {
+          "title": "Virtual Node",
+          "fields": [
+            "vnode"
+          ]
+        },
+        {
+          "title": "Authentication",
+          "fields": [
+            "auth_method",
+            "username",
+            "password"
+          ]
+        },
+        {
+          "title": "HTTP",
+          "fields": [
+            "timeout",
+            "max_concurrent_requests",
+            "proxy_url"
+          ]
+        },
+        {
+          "title": "TLS",
+          "fields": [
+            "tls_ca",
+            "tls_cert",
+            "tls_key",
+            "tls_skip_verify"
+          ]
+        }
+      ]
+    },
+    "url": {
+      "ui:placeholder": "https://192.0.2.10/redfish/v1/"
+    },
+    "vnode": {
+      "ui:placeholder": "<example-vnode-name>",
+      "ui:help": "Charts of this job appear under the Virtual Node instead of this host. Define the Virtual Node in `vnodes.conf` first, then enter its name here."
+    },
+    "password": {
+      "ui:widget": "password",
+      "ui:placeholder": "${env:REDFISH_PASSWORD}"
+    }
+  }
+}

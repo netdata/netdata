@@ -45,17 +45,17 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
 #define BITS_IN_A_KILOBIT     1000
 #define KILOBITS_IN_A_MEGABIT 1000
 
-#include "bitmap/bitmap64.h"
-
 #define COMPRESSION_MAX_CHUNK 0x4000
 #define COMPRESSION_MAX_OVERHEAD 128
 #define COMPRESSION_MAX_MSG_SIZE (COMPRESSION_MAX_CHUNK - COMPRESSION_MAX_OVERHEAD - 1)
 #define PLUGINSD_LINE_MAX (COMPRESSION_MAX_MSG_SIZE - 768)
+// This controls the max response size of a deferred function payload.
+#define PLUGINSD_MAX_DEFERRED_SIZE (100 * 1024 * 1024)
 
 bool run_command_and_copy_output_to_stdout(const char *command, int max_line_length);
 struct web_buffer *run_command_and_get_output_to_buffer(const char *command, int max_line_length);
 
-extern const char *netdata_configured_host_prefix;
+#include "runtime-paths/runtime-paths.h"
 
 // safe includes before O/S specific functions
 #include "template-enum.h"
@@ -64,6 +64,11 @@ extern const char *netdata_configured_host_prefix;
 
 #include "string/string.h"
 #include "buffer/buffer.h"
+
+#include "socket/security.h"    // must be before windows.h
+
+// this may include windows.h
+#include "os/os.h"
 
 #include "uuid/uuid.h"
 #include "uuid/uuidmap.h"
@@ -88,6 +93,7 @@ extern const char *netdata_configured_host_prefix;
 
 // this may include windows.h
 #include "os/os.h"
+#include "os/ci.h"
 
 #include "socket/socket.h"
 #include "socket/nd-sock.h"
@@ -269,7 +275,14 @@ int hash256_string(const unsigned char *string, size_t size, char *hash);
 
 extern bool unittest_running;
 
+static inline bool rrdr_relative_window_value_is_relative(time_t value) {
+    return value >= -API_RELATIVE_TIME_MAX && value <= API_RELATIVE_TIME_MAX;
+}
+
+// Returns true if either endpoint was relative.
 bool rrdr_relative_window_to_absolute(time_t *after, time_t *before, time_t now);
+
+// Returns true if both endpoints were absolute.
 bool rrdr_relative_window_to_absolute_query(time_t *after, time_t *before, time_t *now_ptr, bool unittest);
 
 int netdata_base64_decode(unsigned char *out, const unsigned char *in, int in_len);

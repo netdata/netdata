@@ -3,6 +3,8 @@
 #ifndef NETDATA_UUID_H
 #define NETDATA_UUID_H
 
+#include <string.h>
+
 // for compatibility with libuuid
 typedef unsigned char nd_uuid_t[16];
 

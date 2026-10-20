@@ -1,0 +1,17 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "SMBIOS memory collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Interval in seconds between reads of the boot-time firmware inventory. Reading more frequently does not refresh the firmware's hardware information.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 60
+      }
+    }
+  },
+  "uiSchema": {}
+}

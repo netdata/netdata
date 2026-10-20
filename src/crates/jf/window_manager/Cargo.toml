@@ -5,5 +5,5 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-error = { path = "../error" }
+error = { workspace = true }
 memmap2 = { workspace = true }

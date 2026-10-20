@@ -42,15 +42,16 @@ type ClientConfig struct {
 	ForceHTTP2 bool `yaml:"force_http2,omitempty" json:"force_http2"`
 }
 
-// NewHTTPClient returns a new *http.Client given a ClientConfig configuration and an error if any.
-func NewHTTPClient(cfg ClientConfig) (*http.Client, error) {
+// NewHTTPClient returns a configured standard client. TLS credential reads are
+// scoped to construction and require no caller-owned file reader.
+func NewHTTPClient(ctx context.Context, cfg ClientConfig) (*http.Client, error) {
 	var transport http.RoundTripper
 	var err error
 
 	if cfg.ForceHTTP2 {
-		transport, err = newHTTP2Transport(cfg)
+		transport, err = newHTTP2Transport(ctx, cfg)
 	} else {
-		transport, err = newHTTPTransport(cfg)
+		transport, err = newHTTPTransport(ctx, cfg)
 	}
 	if err != nil {
 		return nil, err
@@ -65,8 +66,8 @@ func NewHTTPClient(cfg ClientConfig) (*http.Client, error) {
 	return client, nil
 }
 
-func newHTTPTransport(cfg ClientConfig) (*http.Transport, error) {
-	tlsConfig, err := tlscfg.NewTLSConfig(cfg.TLSConfig)
+func newHTTPTransport(ctx context.Context, cfg ClientConfig) (*http.Transport, error) {
+	tlsConfig, err := tlscfg.NewTLSConfig(ctx, cfg.TLSConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error on creating TLS config: %w", err)
 	}
@@ -89,8 +90,8 @@ func newHTTPTransport(cfg ClientConfig) (*http.Transport, error) {
 	return transport, nil
 }
 
-func newHTTP2Transport(cfg ClientConfig) (*http2Transport, error) {
-	tlsConfig, err := tlscfg.NewTLSConfig(cfg.TLSConfig)
+func newHTTP2Transport(ctx context.Context, cfg ClientConfig) (*http2Transport, error) {
+	tlsConfig, err := tlscfg.NewTLSConfig(ctx, cfg.TLSConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error on creating TLS config: %w", err)
 	}

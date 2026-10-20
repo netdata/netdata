@@ -3,6 +3,7 @@
 package dockerhub
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -29,8 +30,8 @@ type apiClient struct {
 	request    web.RequestConfig
 }
 
-func (a apiClient) getRepository(repoName string) (*repository, error) {
-	req, err := a.createRequest(repoName)
+func (a apiClient) getRepository(ctx context.Context, repoName string) (*repository, error) {
+	req, err := a.createRequest(ctx, repoName)
 	if err != nil {
 		return nil, fmt.Errorf("error on creating http request : %v", err)
 	}
@@ -43,7 +44,7 @@ func (a apiClient) getRepository(repoName string) (*repository, error) {
 	return &repo, nil
 }
 
-func (a apiClient) createRequest(urlPath string) (*http.Request, error) {
+func (a apiClient) createRequest(ctx context.Context, urlPath string) (*http.Request, error) {
 	req := a.request.Copy()
 
 	u, err := url.Parse(req.URL)
@@ -54,5 +55,5 @@ func (a apiClient) createRequest(urlPath string) (*http.Request, error) {
 	u.Path = path.Join(u.Path, urlPath)
 	req.URL = u.String()
 
-	return web.NewHTTPRequest(req)
+	return web.NewHTTPRequest(ctx, req)
 }

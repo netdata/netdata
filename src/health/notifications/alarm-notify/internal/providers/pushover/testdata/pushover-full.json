@@ -1,0 +1,11 @@
+{
+  "token": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+  "user": "UUUUUUUUUUUUUUUUUUUUUUUUUUUUUU",
+  "title": "test-node WARNING: Temperature is high",
+  "message": "<b>Temperature is high</b>\n<i>A quote: &#34;hot&#34;\nUnicode: θερμοκρασία</i>\nNode: test-node\nAlert: test_alert\nStatus: CLEAR → WARNING\nChart: test.chart\nContext: test.context\nValue: 42.5 C\nPrevious value: 0 C",
+  "html": 1,
+  "priority": 0,
+  "timestamp": 1789387200,
+  "url": "https://example.com/alert?id=1&view=chart#details",
+  "url_title": "View Netdata"
+}

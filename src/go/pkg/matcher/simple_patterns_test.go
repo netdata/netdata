@@ -46,6 +46,101 @@ func TestNewSimplePatternsMatcher(t *testing.T) {
 	}
 }
 
+func TestNewSimplePatternListMatcher(t *testing.T) {
+	tests := map[string]struct {
+		patterns []string
+		want     Matcher
+		wantErr  string
+	}{
+		"empty list returns false": {
+			want: FALSE(),
+		},
+		"blank entries return false": {
+			patterns: []string{"", " ", "\t"},
+			want:     FALSE(),
+		},
+		"single glob": {
+			patterns: []string{"foo*"},
+			want: simplePatternsMatcher{
+				{stringPrefixMatcher("foo"), true},
+			},
+		},
+		"preserves whitespace inside pattern": {
+			patterns: []string{"Business Unit"},
+			want: simplePatternsMatcher{
+				{stringFullMatcher("Business Unit"), true},
+			},
+		},
+		"bare negative marker is invalid": {
+			patterns: []string{"!"},
+			wantErr:  "invalid empty negative pattern",
+		},
+		"blank negative pattern is invalid": {
+			patterns: []string{"!   "},
+			wantErr:  "invalid empty negative pattern",
+		},
+		"invalid glob is wrapped": {
+			patterns: []string{"["},
+			wantErr:  "invalid pattern",
+		},
+		"all negative patterns are invalid": {
+			patterns: []string{"!Business Secret"},
+			wantErr:  "must include at least one positive pattern",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			matcher, err := NewSimplePatternListMatcher(test.patterns)
+			if test.wantErr != "" {
+				require.ErrorContains(t, err, test.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, test.want, matcher)
+		})
+	}
+}
+
+func TestSimplePatternList_Match(t *testing.T) {
+	tests := map[string]struct {
+		patterns []string
+		value    string
+		want     bool
+	}{
+		"positive before negative wins": {
+			patterns: []string{"Business*", "!Business Secret"},
+			value:    "Business Secret",
+			want:     true,
+		},
+		"negative before positive wins": {
+			patterns: []string{"!Business Secret", "Business*"},
+			value:    "Business Secret",
+			want:     false,
+		},
+		"later positive matches": {
+			patterns: []string{"!Business Secret", "Cost Center", "Business*"},
+			value:    "Cost Center",
+			want:     true,
+		},
+		"no matching pattern": {
+			patterns: []string{"!Business Secret", "Cost Center", "Business*"},
+			value:    "Cost",
+			want:     false,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			m, err := NewSimplePatternListMatcher(test.patterns)
+			require.NoError(t, err)
+
+			assert.Equal(t, test.want, m.MatchString(test.value))
+			assert.Equal(t, test.want, m.Match([]byte(test.value)))
+		})
+	}
+}
+
 func TestSimplePatterns_Match(t *testing.T) {
 	m, err := NewSimplePatternsMatcher("*foobar* !foo* !*bar *")
 

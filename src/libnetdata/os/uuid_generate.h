@@ -3,8 +3,10 @@
 #ifndef NETDATA_UUID_GENERATE_H
 #define NETDATA_UUID_GENERATE_H
 
-void os_uuid_generate(void *out);
-void os_uuid_generate_random(void *out);
-void os_uuid_generate_time(void *out);
+#include "libnetdata/uuid/uuid.h"
+
+void os_uuid_generate(nd_uuid_t out);
+void os_uuid_generate_random(nd_uuid_t out);
+void os_uuid_generate_time(nd_uuid_t out);
 
 #endif //NETDATA_UUID_GENERATE_H

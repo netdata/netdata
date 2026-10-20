@@ -7,6 +7,7 @@
 #define PFWORDS_INCREASE_STEP 2000
 #define PFLINES_INCREASE_STEP 200
 #define PROCFILE_INCREMENT_BUFFER 4096
+#define PROCFILE_MAX_SOURCE_SIZE ((size_t)128 * 1024 * 1024)
 
 int procfile_open_flags = O_RDONLY | O_CLOEXEC;
 
@@ -17,15 +18,45 @@ static size_t procfile_max_lines = PFLINES_INCREASE_STEP;
 static size_t procfile_max_words = PFWORDS_INCREASE_STEP;
 static size_t procfile_max_allocation = PROCFILE_INCREMENT_BUFFER;
 
-void procfile_set_adaptive_allocation(bool enable, size_t bytes, size_t lines, size_t words) {
-    procfile_adaptive_initial_allocation = enable;
+struct procfile_adaptive_allocation {
+    size_t bytes;
+    size_t lines;
+    size_t words;
+};
 
-    if(bytes > procfile_max_allocation)
-        procfile_max_allocation = bytes;
-    if(lines > procfile_max_lines)
-        procfile_max_lines = lines;
-    if(words > procfile_max_words)
-        procfile_max_words = words;
+static inline bool procfile_adaptive_allocation_enabled(void) {
+    return __atomic_load_n(&procfile_adaptive_initial_allocation, __ATOMIC_ACQUIRE);
+}
+
+static inline struct procfile_adaptive_allocation procfile_adaptive_allocation_snapshot(void) {
+    if(!procfile_adaptive_allocation_enabled())
+        return (struct procfile_adaptive_allocation) {
+            .bytes = PROCFILE_INCREMENT_BUFFER,
+            .lines = PFLINES_INCREASE_STEP,
+            .words = PFWORDS_INCREASE_STEP,
+        };
+
+    return (struct procfile_adaptive_allocation) {
+        .bytes = __atomic_load_n(&procfile_max_allocation, __ATOMIC_RELAXED),
+        .lines = __atomic_load_n(&procfile_max_lines, __ATOMIC_RELAXED),
+        .words = __atomic_load_n(&procfile_max_words, __ATOMIC_RELAXED),
+    };
+}
+
+static inline void procfile_adaptive_allocation_update_max(size_t *max, size_t value) {
+    size_t current = __atomic_load_n(max, __ATOMIC_RELAXED);
+
+    while(value > current &&
+          !__atomic_compare_exchange_n(max, &current, value, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED))
+        ;
+}
+
+void procfile_set_adaptive_allocation(bool enable, size_t bytes, size_t lines, size_t words) {
+    procfile_adaptive_allocation_update_max(&procfile_max_allocation, bytes);
+    procfile_adaptive_allocation_update_max(&procfile_max_lines, lines);
+    procfile_adaptive_allocation_update_max(&procfile_max_words, words);
+
+    __atomic_store_n(&procfile_adaptive_initial_allocation, enable, __ATOMIC_RELEASE);
 }
 
 // ----------------------------------------------------------------------------
@@ -76,10 +107,8 @@ static inline void procfile_words_add(procfile *ff, char *str) {
 }
 
 NEVERNULL
-static inline pfwords *procfile_words_create(void) {
+static inline pfwords *procfile_words_create(size_t size) {
     // netdata_log_debug(D_PROCFILE, PF_PREFIX ":   initializing words");
-
-    size_t size = (procfile_adaptive_initial_allocation) ? procfile_max_words : PFWORDS_INCREASE_STEP;
 
     pfwords *new = mallocz(sizeof(pfwords) + size * sizeof(char *));
     new->len = 0;
@@ -103,7 +132,7 @@ static inline void procfile_words_free(pfwords *fw) {
 // An array of lines
 
 NEVERNULL
-static inline uint32_t *procfile_lines_add(procfile *ff) {
+static inline size_t *procfile_lines_add(procfile *ff) {
     // netdata_log_debug(D_PROCFILE, PF_PREFIX ":   adding line %d at word %d", fl->len, first_word);
 
     pflines *fl = ff->lines;
@@ -127,10 +156,8 @@ static inline uint32_t *procfile_lines_add(procfile *ff) {
 }
 
 NEVERNULL
-static inline pflines *procfile_lines_create(void) {
+static inline pflines *procfile_lines_create(size_t size) {
     // netdata_log_debug(D_PROCFILE, PF_PREFIX ":   initializing lines");
-
-    size_t size = (unlikely(procfile_adaptive_initial_allocation)) ? procfile_max_words : PFLINES_INCREASE_STEP;
 
     pflines *new = mallocz(sizeof(pflines) + size * sizeof(ffline));
     new->len = 0;
@@ -148,6 +175,19 @@ static inline void procfile_lines_free(pflines *fl) {
     // netdata_log_debug(D_PROCFILE, PF_PREFIX ":   freeing lines");
 
     freez(fl);
+}
+
+static procfile *procfile_readall_file_too_large(procfile *ff) {
+    if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO)))
+        collector_error(PF_PREFIX ": Refusing to read more than %zu bytes from file '%s' on fd %d.",
+                        (size_t)PROCFILE_MAX_SOURCE_SIZE, procfile_filename(ff), ff->fd);
+    else if(unlikely(ff->flags & PROCFILE_FLAG_ERROR_ON_ERROR_LOG))
+        netdata_log_error(PF_PREFIX ": Refusing to read more than %zu bytes from file '%s' on fd %d.",
+                          (size_t)PROCFILE_MAX_SOURCE_SIZE, procfile_filename(ff), ff->fd);
+
+    procfile_close(ff);
+    errno = EFBIG;
+    return NULL;
 }
 
 
@@ -181,7 +221,7 @@ static void procfile_parser(procfile *ff) {
     char quote = 0;                     // the quote character - only when in quoted string
     size_t opened = 0;                  // counts the number of open parenthesis
 
-    uint32_t *line_words = procfile_lines_add(ff);
+    size_t *line_words = procfile_lines_add(ff);
 
     while(s < e) {
         PF_CHAR_TYPE ct = separators[(unsigned char)(*s)];
@@ -299,24 +339,67 @@ procfile *procfile_readall(procfile *ff) {
     ff->len = 0;    // zero the used size
     ssize_t r = 1;  // read at least once
     while(r > 0) {
-        ssize_t s = ff->len;
-        ssize_t x = ff->size - s;
+        size_t s = ff->len;
+        size_t x = ff->size - s;
+
+        if(unlikely(s > PROCFILE_MAX_SOURCE_SIZE))
+            return procfile_readall_file_too_large(ff);
+
+        if(unlikely(s == PROCFILE_MAX_SOURCE_SIZE)) {
+            char extra;
+            ff->stats.reads++;
+            r = read(ff->fd, &extra, 1);
+            if(unlikely(r == -1)) {
+                if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) collector_error(PF_PREFIX ": Cannot read from file '%s' on fd %d", procfile_filename(ff), ff->fd);
+                else if(unlikely(ff->flags & PROCFILE_FLAG_ERROR_ON_ERROR_LOG))
+                    netdata_log_error(PF_PREFIX ": Cannot read from file '%s' on fd %d", procfile_filename(ff), ff->fd);
+                procfile_close(ff);
+                return NULL;
+            }
+
+            if(likely(!r)) {
+                // the buffer is full to the last byte; procfile_parser() needs
+                // one spare byte to '\0'-terminate the last word without
+                // overwriting the last data byte
+                if(unlikely(ff->len >= ff->size)) {
+                    ff = reallocz(ff, sizeof(procfile) + ff->size + 1);
+                    ff->size++;
+                    ff->stats.memory++;
+                    ff->stats.resizes++;
+                }
+                break;
+            }
+
+            return procfile_readall_file_too_large(ff);
+        }
 
         if(unlikely(!x)) {
+            if(unlikely(ff->size >= PROCFILE_MAX_SOURCE_SIZE))
+                return procfile_readall_file_too_large(ff);
+
             size_t minimum = PROCFILE_INCREMENT_BUFFER;
             size_t optimal = ff->size / 2;
             size_t wanted = (optimal > minimum)?optimal:minimum;
+            size_t available = PROCFILE_MAX_SOURCE_SIZE - ff->size;
+            if(unlikely(wanted > available))
+                wanted = available;
 
             netdata_log_debug(D_PROCFILE, PF_PREFIX ": Expanding data buffer for file '%s' by %zu bytes.", procfile_filename(ff), wanted);
             ff = reallocz(ff, sizeof(procfile) + ff->size + wanted);
             ff->size += wanted;
             ff->stats.memory += wanted;
             ff->stats.resizes++;
+
+            x = ff->size - s;
         }
+
+        size_t remaining = PROCFILE_MAX_SOURCE_SIZE - s;
+        if(unlikely(x > remaining))
+            x = remaining;
 
         // netdata_log_info("Reading file '%s', from position %zd with length %zd", procfile_filename(ff), s, (ssize_t)(ff->size - s));
         ff->stats.reads++;
-        r = read(ff->fd, &ff->data[s], ff->size - s);
+        r = read(ff->fd, &ff->data[s], x);
         if(unlikely(r == -1)) {
             if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) collector_error(PF_PREFIX ": Cannot read from file '%s' on fd %d", procfile_filename(ff), ff->fd);
             else if(unlikely(ff->flags & PROCFILE_FLAG_ERROR_ON_ERROR_LOG))
@@ -359,10 +442,10 @@ procfile *procfile_readall(procfile *ff) {
     procfile_words_reset(ff->words);
     procfile_parser(ff);
 
-    if(unlikely(procfile_adaptive_initial_allocation)) {
-        if(unlikely(ff->len > procfile_max_allocation)) procfile_max_allocation = ff->len;
-        if(unlikely(ff->lines->len > procfile_max_lines)) procfile_max_lines = ff->lines->len;
-        if(unlikely(ff->words->len > procfile_max_words)) procfile_max_words = ff->words->len;
+    if(unlikely(procfile_adaptive_allocation_enabled())) {
+        procfile_adaptive_allocation_update_max(&procfile_max_allocation, ff->len);
+        procfile_adaptive_allocation_update_max(&procfile_max_lines, ff->lines->len);
+        procfile_adaptive_allocation_update_max(&procfile_max_words, ff->words->len);
     }
 
     if(ff->stats.max_source_bytes < ff->len)
@@ -407,7 +490,7 @@ static void procfile_set_separators(procfile *ff, const char *separators) {
     PF_CHAR_TYPE *ffs = ff->separators;
     const char *s = separators;
     while(*s)
-        ffs[(int)*s++] = PF_CHAR_IS_SEPARATOR;
+        ffs[(unsigned char)*s++] = PF_CHAR_IS_SEPARATOR;
 }
 
 void procfile_set_quotes(procfile *ff, const char *quotes) {
@@ -426,7 +509,7 @@ void procfile_set_quotes(procfile *ff, const char *quotes) {
     // set the quotes
     const char *s = quotes;
     while(*s)
-        ffs[(int)*s++] = PF_CHAR_IS_QUOTE;
+        ffs[(unsigned char)*s++] = PF_CHAR_IS_QUOTE;
 }
 
 void procfile_set_open_close(procfile *ff, const char *open, const char *close) {
@@ -445,12 +528,12 @@ void procfile_set_open_close(procfile *ff, const char *open, const char *close) 
     // set the openings
     const char *s = open;
     while(*s)
-        ffs[(int)*s++] = PF_CHAR_IS_OPEN;
+        ffs[(unsigned char)*s++] = PF_CHAR_IS_OPEN;
 
     // set the closings
     s = close;
     while(*s)
-        ffs[(int)*s++] = PF_CHAR_IS_CLOSE;
+        ffs[(unsigned char)*s++] = PF_CHAR_IS_CLOSE;
 }
 
 procfile *procfile_open(const char *filename, const char *separators, uint32_t flags) {
@@ -471,7 +554,8 @@ procfile *procfile_open(const char *filename, const char *separators, uint32_t f
 
     // netdata_log_info("PROCFILE: opened '%s' on fd %d", filename, fd);
 
-    size_t size = (unlikely(procfile_adaptive_initial_allocation)) ? procfile_max_allocation : PROCFILE_INCREMENT_BUFFER;
+    struct procfile_adaptive_allocation adaptive = procfile_adaptive_allocation_snapshot();
+    size_t size = adaptive.bytes;
     procfile *ff = mallocz(sizeof(procfile) + size);
 
     //strncpyz(ff->filename, filename, FILENAME_MAX);
@@ -485,8 +569,8 @@ procfile *procfile_open(const char *filename, const char *separators, uint32_t f
     ff->stats.max_lines = ff->stats.max_words = ff->stats.max_source_bytes = 0;
     ff->stats.total_read_bytes = ff->stats.max_read_size = 0;
 
-    ff->lines = procfile_lines_create();
-    ff->words = procfile_words_create();
+    ff->lines = procfile_lines_create(adaptive.lines);
+    ff->words = procfile_words_create(adaptive.words);
 
     ff->stats.memory = sizeof(procfile) + size +
                        (sizeof(pflines) + ff->lines->size * sizeof(ffline)) +

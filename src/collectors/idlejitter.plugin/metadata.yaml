@@ -9,6 +9,7 @@ modules:
         categories:
           - data-collection.synthetic-testing
         icon_filename: 'syslog.png'
+        description: 'Monitor OS scheduling delays that affect latency-sensitive applications, helping identify jitter and inconsistent process wake-up timing.'
       related_resources:
         integrations:
           list: []

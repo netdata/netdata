@@ -97,8 +97,21 @@ option(ENABLE_ADDRESS_SANITIZER "Build with address sanitizer enabled" False)
 mark_as_advanced(ENABLE_ADDRESS_SANITIZER)
 
 if(ENABLE_ADDRESS_SANITIZER)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address -fno-omit-frame-pointer")
+
+  # Instrumentation alone is not enough. Large parts of libnetdata allocate from
+  # pools (ARAL, the dictionary allocators, STRING, onewayalloc), so a freed
+  # object stays inside a page that is still allocated and AddressSanitizer sees
+  # nothing. Those subsystems fall back to plain malloc/free only when
+  # FSANITIZE_ADDRESS is defined, which nothing set until now - so an
+  # ENABLE_ADDRESS_SANITIZER build was blind to use-after-free in every pooled
+  # allocator. Define it here so the option means what its name implies.
+  add_compile_definitions(FSANITIZE_ADDRESS)
 endif()
+
+# CMAKE_CXX_FLAGS picks the above up further down this file, and CMake uses
+# CMAKE_CXX_FLAGS on the link line too, so no separate CXX or linker flag is
+# needed here.
 
 if(STATIC_BUILD)
   add_required_compiler_flag("-static")

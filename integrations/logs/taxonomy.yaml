@@ -1,0 +1,5 @@
+taxonomy_version: 1
+plugin_name: logs
+module_name: logs
+taxonomy_optout:
+  reason: These log collectors expose live log-viewing Functions only and do not provide static metric contexts for dashboard taxonomy placement.

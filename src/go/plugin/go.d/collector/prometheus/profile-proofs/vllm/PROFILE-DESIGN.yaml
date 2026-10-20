@@ -1,0 +1,2569 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+version: v1
+profile: vllm
+match: vllm:* ray_vllm_*
+app: vllm
+namespace: vllm
+documentation:
+  title: vLLM
+  summary: Curated inference, scheduling, latency, token, cache, connector, engine, HTTP, and runtime metrics from vLLM and Ray.
+composition:
+  supports:
+    fastapi:
+      when: native_transport
+      activation: Included when the endpoint exposes vLLM's native HTTP transport metrics; Ray-only metrics do not activate it.
+    process_runtime:
+      when: native_transport
+      activation: Included when the endpoint exposes vLLM's native process metrics; Ray-only metrics do not activate it.
+    python_gc:
+      when: native_transport
+      activation: Included when the endpoint exposes vLLM's native Python garbage-collection metrics; Ray-only metrics do not activate it.
+entities:
+  model_engine_ray:
+    grain: model_name and engine
+    identity:
+      required:
+      - model_name
+      - engine
+      optional:
+      - ReplicaId
+      - WorkerId
+    high_cardinality_acceptance:
+      operator_value: Preserving this finest useful source entity lets operators diagnose it directly and aggregate broader
+        service views in Netdata.
+  finished_request_ray:
+    grain: model_name and engine and finished_reason
+    identity:
+      required:
+      - model_name
+      - engine
+      - finished_reason
+      optional:
+      - ReplicaId
+      - WorkerId
+    high_cardinality_acceptance:
+      operator_value: Preserving this finest useful source entity lets operators diagnose it directly and aggregate broader
+        service views in Netdata.
+  connector_operation_status_ray:
+    grain: model_name and engine and operation and status
+    identity:
+      required:
+      - model_name
+      - engine
+      - operation
+      - status
+      optional:
+      - ReplicaId
+      - WorkerId
+    high_cardinality_acceptance:
+      operator_value: Preserving this finest useful source entity lets operators diagnose it directly and aggregate broader
+        service views in Netdata.
+  service:
+    grain: collector job service
+    identity:
+      required: []
+      optional: []
+  parser_request:
+    grain: model_name and request_type and mode and outcome
+    identity:
+      required:
+      - model_name
+      - request_type
+      - mode
+      - outcome
+      optional: []
+    high_cardinality_acceptance:
+      operator_value: Preserving this finest useful source entity lets operators diagnose it directly and aggregate broader
+        service views in Netdata.
+label_policies: {}
+reduction_policies: {}
+normalizations:
+  ray_transport_namespace:
+    kind: namespace_alias
+    registry_group: ray_canonical
+    source_prefix: ray_vllm_
+    target_prefix: 'vllm:'
+    evidence:
+    - ray_namespace_relationship
+  generated_registration_epochs:
+    kind: generated_component_exclusion
+    source:
+      namespace_prefix: 'vllm:'
+      terminal_suffix: _created
+      component: scalar
+    outcome: drop_before_writer
+    evidence:
+    - created_registration
+    - component_lifecycle
+    - source_units
+exclusions:
+  duplicate_e2e_request_latency_seconds_count:
+    source:
+      signal: e2e_request_latency_seconds
+      components:
+      - count
+    reason: equivalent_duplicate
+    covering_view: request_lifecycle.outcomes
+    evidence:
+    - source_relationships
+    outcome: retain_writable_unrendered
+  duplicate_kv_block_idle_before_evict_seconds_count:
+    source:
+      signal: kv_block_idle_before_evict_seconds
+      components:
+      - count
+    reason: equivalent_duplicate
+    covering_view: kv_cache_residency.events
+    evidence:
+    - source_relationships
+    outcome: retain_writable_unrendered
+  duplicate_kv_offload_load_size_sum:
+    source:
+      signal: kv_offload_load_size
+      components:
+      - sum
+    reason: equivalent_duplicate
+    covering_view: kv_offloading.transfer_bytes
+    evidence:
+    - source_relationships
+    outcome: retain_writable_unrendered
+  duplicate_kv_offload_store_size_sum:
+    source:
+      signal: kv_offload_store_size
+      components:
+      - sum
+    reason: equivalent_duplicate
+    covering_view: kv_offloading.transfer_bytes
+    evidence:
+    - source_relationships
+    outcome: retain_writable_unrendered
+  duplicate_mooncake_store_operation_time_seconds_count:
+    source:
+      signal: mooncake_store_operation_time_seconds
+      components:
+      - count
+    reason: equivalent_duplicate
+    covering_view: mooncake_connector.timing.operations
+    evidence:
+    - source_relationships
+    outcome: retain_writable_unrendered
+  duplicate_nixl_bytes_transferred_count:
+    source:
+      signal: nixl_bytes_transferred
+      components:
+      - count
+    reason: equivalent_duplicate
+    covering_view: nixl_connector.successful_transfers
+    evidence:
+    - source_relationships
+    outcome: retain_writable_unrendered
+  duplicate_nixl_num_descriptors_count:
+    source:
+      signal: nixl_num_descriptors
+      components:
+      - count
+    reason: equivalent_duplicate
+    covering_view: nixl_connector.successful_transfers
+    evidence:
+    - source_relationships
+    outcome: retain_writable_unrendered
+  duplicate_nixl_post_time_seconds_count:
+    source:
+      signal: nixl_post_time_seconds
+      components:
+      - count
+    reason: equivalent_duplicate
+    covering_view: nixl_connector.successful_transfers
+    evidence:
+    - source_relationships
+    outcome: retain_writable_unrendered
+  duplicate_num_requests_waiting:
+    source:
+      signal: num_requests_waiting
+      components:
+      - value
+    reason: equivalent_duplicate
+    covering_view: scheduler.request_state
+    evidence:
+    - source_relationships
+    outcome: retain_writable_unrendered
+  duplicate_prompt_tokens_cached_total:
+    source:
+      signal: prompt_tokens_cached_total
+      components:
+      - value
+    reason: equivalent_duplicate
+    covering_view: prefill.prompt_tokens_by_source
+    evidence:
+    - source_relationships
+    outcome: retain_writable_unrendered
+  duplicate_prompt_tokens_total:
+    source:
+      signal: prompt_tokens_total
+      components:
+      - value
+    reason: equivalent_duplicate
+    covering_view: prefill.prompt_tokens_by_source
+    evidence:
+    - source_relationships
+    outcome: retain_writable_unrendered
+  duplicate_request_decode_time_seconds_count:
+    source:
+      signal: request_decode_time_seconds
+      components:
+      - count
+    reason: equivalent_duplicate
+    covering_view: request_lifecycle.outcomes
+    evidence:
+    - source_relationships
+    outcome: retain_writable_unrendered
+  duplicate_request_generation_tokens_count:
+    source:
+      signal: request_generation_tokens
+      components:
+      - count
+    reason: equivalent_duplicate
+    covering_view: request_lifecycle.outcomes
+    evidence:
+    - source_relationships
+    outcome: retain_writable_unrendered
+  duplicate_request_inference_time_seconds_count:
+    source:
+      signal: request_inference_time_seconds
+      components:
+      - count
+    reason: equivalent_duplicate
+    covering_view: request_lifecycle.outcomes
+    evidence:
+    - source_relationships
+    outcome: retain_writable_unrendered
+  duplicate_request_max_num_generation_tokens_count:
+    source:
+      signal: request_max_num_generation_tokens
+      components:
+      - count
+    reason: equivalent_duplicate
+    covering_view: request_lifecycle.parent_requests
+    evidence:
+    - source_relationships
+    outcome: retain_writable_unrendered
+  duplicate_request_prefill_kv_computed_tokens_count:
+    source:
+      signal: request_prefill_kv_computed_tokens
+      components:
+      - count
+    reason: equivalent_duplicate
+    covering_view: request_lifecycle.outcomes
+    evidence:
+    - source_relationships
+    outcome: retain_writable_unrendered
+  duplicate_request_prefill_time_seconds_count:
+    source:
+      signal: request_prefill_time_seconds
+      components:
+      - count
+    reason: equivalent_duplicate
+    covering_view: request_lifecycle.outcomes
+    evidence:
+    - source_relationships
+    outcome: retain_writable_unrendered
+  duplicate_request_prompt_tokens_count:
+    source:
+      signal: request_prompt_tokens
+      components:
+      - count
+    reason: equivalent_duplicate
+    covering_view: request_lifecycle.outcomes
+    evidence:
+    - source_relationships
+    outcome: retain_writable_unrendered
+  duplicate_request_queue_time_seconds_count:
+    source:
+      signal: request_queue_time_seconds
+      components:
+      - count
+    reason: equivalent_duplicate
+    covering_view: request_lifecycle.outcomes
+    evidence:
+    - source_relationships
+    outcome: retain_writable_unrendered
+  duplicate_request_time_per_output_token_seconds_count:
+    source:
+      signal: request_time_per_output_token_seconds
+      components:
+      - count
+    reason: equivalent_duplicate
+    covering_view: request_lifecycle.outcomes
+    evidence:
+    - source_relationships
+    outcome: retain_writable_unrendered
+  deprecated_offload_bytes_cpu_to_gpu:
+    source:
+      signal: deprecated_offload_bytes_total
+      components:
+      - value
+      where:
+        any:
+        - all:
+          - label: transfer_type
+            op: eq
+            value: CPU_to_GPU
+    reason: source_superseded
+    replacement: kv_offload_load_bytes_total
+    evidence:
+    - deprecated_sources
+    outcome: drop_before_writer
+  deprecated_offload_bytes_gpu_to_cpu:
+    source:
+      signal: deprecated_offload_bytes_total
+      components:
+      - value
+      where:
+        any:
+        - all:
+          - label: transfer_type
+            op: eq
+            value: GPU_to_CPU
+    reason: source_superseded
+    replacement: kv_offload_store_bytes_total
+    evidence:
+    - deprecated_sources
+    outcome: drop_before_writer
+  deprecated_offload_time_cpu_to_gpu:
+    source:
+      signal: deprecated_offload_time_total
+      components:
+      - value
+      where:
+        any:
+        - all:
+          - label: transfer_type
+            op: eq
+            value: CPU_to_GPU
+    reason: source_superseded
+    replacement: kv_offload_load_time_total
+    evidence:
+    - deprecated_sources
+    outcome: drop_before_writer
+  deprecated_offload_time_gpu_to_cpu:
+    source:
+      signal: deprecated_offload_time_total
+      components:
+      - value
+      where:
+        any:
+        - all:
+          - label: transfer_type
+            op: eq
+            value: GPU_to_CPU
+    reason: source_superseded
+    replacement: kv_offload_store_time_total
+    evidence:
+    - deprecated_sources
+    outcome: drop_before_writer
+  deprecated_offload_size_cpu_to_gpu:
+    source:
+      signal: deprecated_offload_size
+      components:
+      - bucket
+      where:
+        any:
+        - all:
+          - label: transfer_type
+            op: eq
+            value: CPU_to_GPU
+    reason: source_superseded
+    replacement: kv_offload_load_size
+    evidence:
+    - deprecated_sources
+    outcome: drop_before_writer
+  deprecated_offload_size_gpu_to_cpu:
+    source:
+      signal: deprecated_offload_size
+      components:
+      - bucket
+      where:
+        any:
+        - all:
+          - label: transfer_type
+            op: eq
+            value: GPU_to_CPU
+    reason: source_superseded
+    replacement: kv_offload_store_size
+    evidence:
+    - deprecated_sources
+    outcome: drop_before_writer
+  deprecated_offload_size_count_cpu_to_gpu:
+    source:
+      signal: deprecated_offload_size
+      components:
+      - count
+      where:
+        any:
+        - all:
+          - label: transfer_type
+            op: eq
+            value: CPU_to_GPU
+    reason: source_superseded
+    replacement: kv_offload_load_size
+    evidence:
+    - deprecated_sources
+    outcome: drop_before_writer
+  deprecated_offload_size_count_gpu_to_cpu:
+    source:
+      signal: deprecated_offload_size
+      components:
+      - count
+      where:
+        any:
+        - all:
+          - label: transfer_type
+            op: eq
+            value: GPU_to_CPU
+    reason: source_superseded
+    replacement: kv_offload_store_size
+    evidence:
+    - deprecated_sources
+    outcome: drop_before_writer
+  deprecated_offload_size_sum_cpu_to_gpu:
+    source:
+      signal: deprecated_offload_size
+      components:
+      - sum
+      where:
+        any:
+        - all:
+          - label: transfer_type
+            op: eq
+            value: CPU_to_GPU
+    reason: source_superseded
+    replacement: kv_offload_load_size
+    evidence:
+    - deprecated_sources
+    outcome: drop_before_writer
+  deprecated_offload_size_sum_gpu_to_cpu:
+    source:
+      signal: deprecated_offload_size
+      components:
+      - sum
+      where:
+        any:
+        - all:
+          - label: transfer_type
+            op: eq
+            value: GPU_to_CPU
+    reason: source_superseded
+    replacement: kv_offload_store_size
+    evidence:
+    - deprecated_sources
+    outcome: drop_before_writer
+  ray_alias_corrupted_requests_total:
+    source:
+      signal: ray_alias_corrupted_requests_total
+      components:
+      - value
+    reason: source_superseded
+    replacement: corrupted_requests_total
+    evidence:
+    - ray_compatibility_deprecation
+    outcome: drop_before_writer
+  ray_alias_deprecated_offload_bytes_total:
+    source:
+      signal: ray_alias_deprecated_offload_bytes_total
+      components:
+      - value
+    reason: source_superseded
+    replacement: deprecated_offload_bytes_total
+    evidence:
+    - ray_compatibility_deprecation
+    outcome: drop_before_writer
+  ray_alias_deprecated_offload_time_total:
+    source:
+      signal: ray_alias_deprecated_offload_time_total
+      components:
+      - value
+    reason: source_superseded
+    replacement: deprecated_offload_time_total
+    evidence:
+    - ray_compatibility_deprecation
+    outcome: drop_before_writer
+  ray_alias_diffusion_num_canvas_positions_total:
+    source:
+      signal: ray_alias_diffusion_num_canvas_positions_total
+      components:
+      - value
+    reason: source_superseded
+    replacement: diffusion_num_canvas_positions_total
+    evidence:
+    - ray_compatibility_deprecation
+    outcome: drop_before_writer
+  ray_alias_diffusion_num_committed_tokens_total:
+    source:
+      signal: ray_alias_diffusion_num_committed_tokens_total
+      components:
+      - value
+    reason: source_superseded
+    replacement: diffusion_num_committed_tokens_total
+    evidence:
+    - ray_compatibility_deprecation
+    outcome: drop_before_writer
+  ray_alias_diffusion_num_denoising_steps_total:
+    source:
+      signal: ray_alias_diffusion_num_denoising_steps_total
+      components:
+      - value
+    reason: source_superseded
+    replacement: diffusion_num_denoising_steps_total
+    evidence:
+    - ray_compatibility_deprecation
+    outcome: drop_before_writer
+  ray_alias_external_prefix_cache_hits_total:
+    source:
+      signal: ray_alias_external_prefix_cache_hits_total
+      components:
+      - value
+    reason: source_superseded
+    replacement: external_prefix_cache_hits_total
+    evidence:
+    - ray_compatibility_deprecation
+    outcome: drop_before_writer
+  ray_alias_external_prefix_cache_queries_total:
+    source:
+      signal: ray_alias_external_prefix_cache_queries_total
+      components:
+      - value
+    reason: source_superseded
+    replacement: external_prefix_cache_queries_total
+    evidence:
+    - ray_compatibility_deprecation
+    outcome: drop_before_writer
+  ray_alias_generation_tokens_total:
+    source:
+      signal: ray_alias_generation_tokens_total
+      components:
+      - value
+    reason: source_superseded
+    replacement: generation_tokens_total
+    evidence:
+    - ray_compatibility_deprecation
+    outcome: drop_before_writer
+  ray_alias_hf3fs_num_failed_load_total:
+    source:
+      signal: ray_alias_hf3fs_num_failed_load_total
+      components:
+      - value
+    reason: source_superseded
+    replacement: hf3fs_num_failed_load_total
+    evidence:
+    - ray_compatibility_deprecation
+    outcome: drop_before_writer
+  ray_alias_hf3fs_num_failed_save_total:
+    source:
+      signal: ray_alias_hf3fs_num_failed_save_total
+      components:
+      - value
+    reason: source_superseded
+    replacement: hf3fs_num_failed_save_total
+    evidence:
+    - ray_compatibility_deprecation
+    outcome: drop_before_writer
+  ray_alias_kv_offload_allocation_failure_total:
+    source:
+      signal: ray_alias_kv_offload_allocation_failure_total
+      components:
+      - value
+    reason: source_superseded
+    replacement: kv_offload_allocation_failure_total
+    evidence:
+    - ray_compatibility_deprecation
+    outcome: drop_before_writer
+  ray_alias_kv_offload_load_bytes_total:
+    source:
+      signal: ray_alias_kv_offload_load_bytes_total
+      components:
+      - value
+    reason: source_superseded
+    replacement: kv_offload_load_bytes_total
+    evidence:
+    - ray_compatibility_deprecation
+    outcome: drop_before_writer
+  ray_alias_kv_offload_load_time_total:
+    source:
+      signal: ray_alias_kv_offload_load_time_total
+      components:
+      - value
+    reason: source_superseded
+    replacement: kv_offload_load_time_total
+    evidence:
+    - ray_compatibility_deprecation
+    outcome: drop_before_writer
+  ray_alias_kv_offload_store_bytes_total:
+    source:
+      signal: ray_alias_kv_offload_store_bytes_total
+      components:
+      - value
+    reason: source_superseded
+    replacement: kv_offload_store_bytes_total
+    evidence:
+    - ray_compatibility_deprecation
+    outcome: drop_before_writer
+  ray_alias_kv_offload_store_time_total:
+    source:
+      signal: ray_alias_kv_offload_store_time_total
+      components:
+      - value
+    reason: source_superseded
+    replacement: kv_offload_store_time_total
+    evidence:
+    - ray_compatibility_deprecation
+    outcome: drop_before_writer
+  ray_alias_kv_offload_stores_skipped_total:
+    source:
+      signal: ray_alias_kv_offload_stores_skipped_total
+      components:
+      - value
+    reason: source_superseded
+    replacement: kv_offload_stores_skipped_total
+    evidence:
+    - ray_compatibility_deprecation
+    outcome: drop_before_writer
+  ray_alias_mm_cache_hits_total:
+    source:
+      signal: ray_alias_mm_cache_hits_total
+      components:
+      - value
+    reason: source_superseded
+    replacement: mm_cache_hits_total
+    evidence:
+    - ray_compatibility_deprecation
+    outcome: drop_before_writer
+  ray_alias_mm_cache_queries_total:
+    source:
+      signal: ray_alias_mm_cache_queries_total
+      components:
+      - value
+    reason: source_superseded
+    replacement: mm_cache_queries_total
+    evidence:
+    - ray_compatibility_deprecation
+    outcome: drop_before_writer
+  ray_alias_nixl_num_failed_notifications_total:
+    source:
+      signal: ray_alias_nixl_num_failed_notifications_total
+      components:
+      - value
+    reason: source_superseded
+    replacement: nixl_num_failed_notifications_total
+    evidence:
+    - ray_compatibility_deprecation
+    outcome: drop_before_writer
+  ray_alias_nixl_num_failed_transfers_total:
+    source:
+      signal: ray_alias_nixl_num_failed_transfers_total
+      components:
+      - value
+    reason: source_superseded
+    replacement: nixl_num_failed_transfers_total
+    evidence:
+    - ray_compatibility_deprecation
+    outcome: drop_before_writer
+  ray_alias_nixl_num_kv_expired_reqs_total:
+    source:
+      signal: ray_alias_nixl_num_kv_expired_reqs_total
+      components:
+      - value
+    reason: source_superseded
+    replacement: nixl_num_kv_expired_reqs_total
+    evidence:
+    - ray_compatibility_deprecation
+    outcome: drop_before_writer
+  ray_alias_num_preemptions_total:
+    source:
+      signal: ray_alias_num_preemptions_total
+      components:
+      - value
+    reason: source_superseded
+    replacement: num_preemptions_total
+    evidence:
+    - ray_compatibility_deprecation
+    outcome: drop_before_writer
+  ray_alias_prefix_cache_hits_total:
+    source:
+      signal: ray_alias_prefix_cache_hits_total
+      components:
+      - value
+    reason: source_superseded
+    replacement: prefix_cache_hits_total
+    evidence:
+    - ray_compatibility_deprecation
+    outcome: drop_before_writer
+  ray_alias_prefix_cache_queries_total:
+    source:
+      signal: ray_alias_prefix_cache_queries_total
+      components:
+      - value
+    reason: source_superseded
+    replacement: prefix_cache_queries_total
+    evidence:
+    - ray_compatibility_deprecation
+    outcome: drop_before_writer
+  ray_alias_prompt_tokens_by_source_total:
+    source:
+      signal: ray_alias_prompt_tokens_by_source_total
+      components:
+      - value
+    reason: source_superseded
+    replacement: prompt_tokens_by_source_total
+    evidence:
+    - ray_compatibility_deprecation
+    outcome: drop_before_writer
+  ray_alias_prompt_tokens_cached_total:
+    source:
+      signal: ray_alias_prompt_tokens_cached_total
+      components:
+      - value
+    reason: source_superseded
+    replacement: prompt_tokens_cached_total
+    evidence:
+    - ray_compatibility_deprecation
+    outcome: drop_before_writer
+  ray_alias_prompt_tokens_total:
+    source:
+      signal: ray_alias_prompt_tokens_total
+      components:
+      - value
+    reason: source_superseded
+    replacement: prompt_tokens_total
+    evidence:
+    - ray_compatibility_deprecation
+    outcome: drop_before_writer
+  ray_alias_request_success_total:
+    source:
+      signal: ray_alias_request_success_total
+      components:
+      - value
+    reason: source_superseded
+    replacement: request_success_total
+    evidence:
+    - ray_compatibility_deprecation
+    outcome: drop_before_writer
+  ray_alias_spec_decode_num_accepted_tokens_per_pos_total:
+    source:
+      signal: ray_alias_spec_decode_num_accepted_tokens_per_pos_total
+      components:
+      - value
+    reason: source_superseded
+    replacement: spec_decode_num_accepted_tokens_per_pos_total
+    evidence:
+    - ray_compatibility_deprecation
+    outcome: drop_before_writer
+  ray_alias_spec_decode_num_accepted_tokens_total:
+    source:
+      signal: ray_alias_spec_decode_num_accepted_tokens_total
+      components:
+      - value
+    reason: source_superseded
+    replacement: spec_decode_num_accepted_tokens_total
+    evidence:
+    - ray_compatibility_deprecation
+    outcome: drop_before_writer
+  ray_alias_spec_decode_num_draft_tokens_total:
+    source:
+      signal: ray_alias_spec_decode_num_draft_tokens_total
+      components:
+      - value
+    reason: source_superseded
+    replacement: spec_decode_num_draft_tokens_total
+    evidence:
+    - ray_compatibility_deprecation
+    outcome: drop_before_writer
+  ray_alias_spec_decode_num_drafts_total:
+    source:
+      signal: ray_alias_spec_decode_num_drafts_total
+      components:
+      - value
+    reason: source_superseded
+    replacement: spec_decode_num_drafts_total
+    evidence:
+    - ray_compatibility_deprecation
+    outcome: drop_before_writer
+limitations: {}
+views:
+  request_lifecycle.corrupted_requests:
+    family: Request Lifecycle
+    question: What is the rate of change for corrupted requests?
+    entity: model_engine_ray
+    inputs:
+      corrupted:
+        signal: corrupted_requests_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  request_lifecycle.time_to_first_token:
+    family: Request Lifecycle
+    question: What is the distribution of time to first token?
+    entity: model_engine_ray
+    inputs:
+      time_to_first_token:
+        signal: time_to_first_token_seconds
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  request_lifecycle.end_to_end_latency:
+    family: Request Lifecycle
+    question: What is the distribution of end-to-end request latency?
+    entity: model_engine_ray
+    inputs:
+      end_to_end_latency:
+        signal: e2e_request_latency_seconds
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  request_lifecycle.first_token_requests:
+    family: Request Lifecycle
+    question: What is the rate of change for requests reaching first token?
+    entity: model_engine_ray
+    inputs:
+      requests:
+        signal: time_to_first_token_seconds
+        components:
+        - count
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  request_lifecycle.completed_pre_response_time:
+    family: Request Lifecycle
+    question: At what rate is pre-response time attributed when requests reach their first token?
+    entity: model_engine_ray
+    inputs:
+      time:
+        signal: time_to_first_token_seconds
+        components:
+        - sum
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  request_lifecycle.completed_end_to_end_time:
+    family: Request Lifecycle
+    question: At what rate is end-to-end time attributed when requests complete?
+    entity: model_engine_ray
+    inputs:
+      time:
+        signal: e2e_request_latency_seconds
+        components:
+        - sum
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  request_lifecycle.requested_sequences:
+    family: Request Lifecycle
+    question: What is the distribution of requested sequences?
+    entity: model_engine_ray
+    inputs:
+      requested_sequences:
+        signal: request_params_n
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  request_lifecycle.requested_sequence_volume:
+    family: Request Lifecycle
+    question: What is the rate of change for requested sequence volume?
+    entity: model_engine_ray
+    inputs:
+      sequences:
+        signal: request_params_n
+        components:
+        - sum
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  request_lifecycle.requested_token_limit:
+    family: Request Lifecycle
+    question: What is the distribution of requested token limit?
+    entity: model_engine_ray
+    inputs:
+      requested_token_limit:
+        signal: request_params_max_tokens
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  request_lifecycle.requested_token_limits_sum:
+    family: Request Lifecycle
+    question: What is the rate of change for requested token limits sum?
+    entity: model_engine_ray
+    inputs:
+      token_limits:
+        signal: request_params_max_tokens
+        components:
+        - sum
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  request_lifecycle.requests_with_explicit_token_limit:
+    family: Request Lifecycle
+    question: What is the rate of change for requests with explicit token limit?
+    entity: model_engine_ray
+    inputs:
+      requests:
+        signal: request_params_max_tokens
+        components:
+        - count
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  request_lifecycle.maximum_generated_tokens:
+    family: Request Lifecycle
+    question: What is the distribution of maximum generated tokens?
+    entity: model_engine_ray
+    inputs:
+      maximum_generated_tokens:
+        signal: request_max_num_generation_tokens
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  request_lifecycle.maximum_generated_tokens_sum:
+    family: Request Lifecycle
+    question: What is the rate of change for maximum generated tokens sum?
+    entity: model_engine_ray
+    inputs:
+      maximums:
+        signal: request_max_num_generation_tokens
+        components:
+        - sum
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  request_lifecycle.parent_requests:
+    family: Request Lifecycle
+    question: What is the rate of change for parent requests?
+    entity: model_engine_ray
+    inputs:
+      requests:
+        signal: request_params_n
+        components:
+        - count
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  request_lifecycle.outcomes:
+    family: Request Lifecycle/Outcomes
+    question: What is the rate of change for request outcomes?
+    entity: finished_request_ray
+    inputs:
+      requests:
+        signal: request_success_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  scheduler.request_state:
+    family: Scheduler
+    question: What is the current request state?
+    entity: model_engine_ray
+    inputs:
+      running:
+        signal: num_requests_running
+        components:
+        - value
+      waiting_capacity:
+        signal: num_requests_waiting_by_reason
+        components:
+        - value
+        where:
+          any:
+          - all:
+            - label: reason
+              op: eq
+              value: capacity
+      waiting_deferred:
+        signal: num_requests_waiting_by_reason
+        components:
+        - value
+        where:
+          any:
+          - all:
+            - label: reason
+              op: eq
+              value: deferred
+    labels:
+      dimensions:
+        reason:
+          render: input_role
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  scheduler.preemptions:
+    family: Scheduler
+    question: What is the rate of change for request preemptions?
+    entity: model_engine_ray
+    inputs:
+      preemptions:
+        signal: num_preemptions_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  scheduler.sleep_state:
+    family: Scheduler
+    question: What is the current engine sleep state?
+    entity: model_engine_ray
+    inputs:
+      sleep_state:
+        signal: engine_sleep_state
+        components:
+        - value
+    labels:
+      dimensions:
+        sleep_state:
+          render: label_value
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  scheduler.queue_time:
+    family: Scheduler
+    question: What is the distribution of request queue time?
+    entity: model_engine_ray
+    inputs:
+      queue_time:
+        signal: request_queue_time_seconds
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  scheduler.completed_queue_time:
+    family: Scheduler
+    question: At what rate is queue time attributed when whole requests complete?
+    entity: model_engine_ray
+    inputs:
+      time:
+        signal: request_queue_time_seconds
+        components:
+        - sum
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  prefill.prompt_tokens_by_source:
+    family: Prefill
+    question: What is the rate of change for prompt tokens by source?
+    entity: model_engine_ray
+    inputs:
+      source:
+        signal: prompt_tokens_by_source_total
+        components:
+        - value
+    labels:
+      dimensions:
+        source:
+          render: label_value
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  prefill.prompt_size:
+    family: Prefill
+    question: What is the distribution of prompt size?
+    entity: model_engine_ray
+    inputs:
+      prompt_size:
+        signal: request_prompt_tokens
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  prefill.prefill_time:
+    family: Prefill
+    question: What is the distribution of prefill time?
+    entity: model_engine_ray
+    inputs:
+      prefill_time:
+        signal: request_prefill_time_seconds
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  prefill.computed_kv_tokens:
+    family: Prefill
+    question: What is the distribution of computed kv tokens?
+    entity: model_engine_ray
+    inputs:
+      computed_kv_tokens:
+        signal: request_prefill_kv_computed_tokens
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  prefill.completed_request_prompt_volume:
+    family: Prefill
+    question: What is the rate of change for completed request prompt volume?
+    entity: model_engine_ray
+    inputs:
+      prompt_tokens:
+        signal: request_prompt_tokens
+        components:
+        - sum
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  prefill.computed_kv_token_volume:
+    family: Prefill
+    question: What is the rate of change for computed kv token volume?
+    entity: model_engine_ray
+    inputs:
+      computed_tokens:
+        signal: request_prefill_kv_computed_tokens
+        components:
+        - sum
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  prefill.completed_time:
+    family: Prefill
+    question: At what rate is prefill time attributed when whole requests complete?
+    entity: model_engine_ray
+    inputs:
+      time:
+        signal: request_prefill_time_seconds
+        components:
+        - sum
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  decode.generation_throughput:
+    family: Decode
+    question: What is the rate of change for generated tokens?
+    entity: model_engine_ray
+    inputs:
+      generated:
+        signal: generation_tokens_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  decode.output_size:
+    family: Decode
+    question: What is the distribution of output size?
+    entity: model_engine_ray
+    inputs:
+      output_size:
+        signal: request_generation_tokens
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  decode.decode_time:
+    family: Decode
+    question: What is the distribution of decode time?
+    entity: model_engine_ray
+    inputs:
+      decode_time:
+        signal: request_decode_time_seconds
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  decode.inter_token_latency:
+    family: Decode
+    question: What is the distribution of inter-token latency?
+    entity: model_engine_ray
+    inputs:
+      inter_token_latency:
+        signal: inter_token_latency_seconds
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  decode.mean_output_token_time:
+    family: Decode
+    question: What is the distribution of mean output-token time?
+    entity: model_engine_ray
+    inputs:
+      mean_output_token_time:
+        signal: request_time_per_output_token_seconds
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  decode.output_token_volume:
+    family: Decode
+    question: What is the rate of change for output token volume?
+    entity: model_engine_ray
+    inputs:
+      output_tokens:
+        signal: request_generation_tokens
+        components:
+        - sum
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  decode.completed_time:
+    family: Decode
+    question: At what rate is decode time attributed when whole requests complete?
+    entity: model_engine_ray
+    inputs:
+      time:
+        signal: request_decode_time_seconds
+        components:
+        - sum
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  decode.inter_token_intervals:
+    family: Decode
+    question: What is the rate of change for inter-token intervals?
+    entity: model_engine_ray
+    inputs:
+      intervals:
+        signal: inter_token_latency_seconds
+        components:
+        - count
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  decode.inter_token_interval_time:
+    family: Decode
+    question: What is the rate of change for inter-token interval time?
+    entity: model_engine_ray
+    inputs:
+      intervals:
+        signal: inter_token_latency_seconds
+        components:
+        - sum
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  decode.accumulated_mean_output_token_time:
+    family: Decode
+    question: What is the rate of change for accumulated mean output-token time?
+    entity: model_engine_ray
+    inputs:
+      request_means:
+        signal: request_time_per_output_token_seconds
+        components:
+        - sum
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  engine_execution.inference_time:
+    family: Engine Execution
+    question: What is the distribution of inference time?
+    entity: model_engine_ray
+    inputs:
+      inference_time:
+        signal: request_inference_time_seconds
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  engine_execution.completed_time:
+    family: Engine Execution
+    question: At what rate is inference time attributed when whole requests complete?
+    entity: model_engine_ray
+    inputs:
+      time:
+        signal: request_inference_time_seconds
+        components:
+        - sum
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  engine_execution.tokens_per_step:
+    family: Engine Execution
+    question: What is the distribution of tokens per engine step?
+    entity: model_engine_ray
+    inputs:
+      tokens_per_step:
+        signal: iteration_tokens_total
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  engine_execution.engine_steps:
+    family: Engine Execution
+    question: What is the rate of change for engine steps?
+    entity: model_engine_ray
+    inputs:
+      steps:
+        signal: iteration_tokens_total
+        components:
+        - count
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  engine_execution.step_token_volume:
+    family: Engine Execution
+    question: What is the rate of change for engine step token volume?
+    entity: model_engine_ray
+    inputs:
+      tokens:
+        signal: iteration_tokens_total
+        components:
+        - sum
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  engine_execution.estimated_compute:
+    family: Engine Execution
+    question: What is the rate of change for estimated compute per gpu?
+    entity: model_engine_ray
+    inputs:
+      compute:
+        signal: estimated_flops_per_gpu_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+    display:
+      convention: gflops_per_second_per_gpu
+      reason: Operators compare accelerator work in billions of floating-point operations per second per GPU.
+      evidence:
+      - display_conventions
+  engine_execution.estimated_memory_bandwidth:
+    family: Engine Execution
+    question: What is the rate of change for estimated memory bandwidth per gpu?
+    entity: model_engine_ray
+    inputs:
+      read:
+        signal: estimated_read_bytes_per_gpu_total
+        components:
+        - value
+      write:
+        signal: estimated_write_bytes_per_gpu_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+    display:
+      convention: gigabytes_per_second_per_gpu
+      reason: Operators compare accelerator memory traffic in gigabytes per second per GPU.
+      evidence:
+      - display_conventions
+  kv_cache.usage:
+    family: KV Cache
+    question: What is the current kv cache usage?
+    entity: model_engine_ray
+    inputs:
+      used:
+        signal: kv_cache_usage_perc
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+    display:
+      convention: percentage
+      reason: Operators interpret the exported ratio as a percentage.
+      evidence:
+      - display_conventions
+  kv_cache.local_prefix:
+    family: KV Cache
+    question: What is the rate of change for local prefix cache?
+    entity: model_engine_ray
+    inputs:
+      queries:
+        signal: prefix_cache_queries_total
+        components:
+        - value
+      hits:
+        signal: prefix_cache_hits_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  kv_cache.external_prefix:
+    family: KV Cache
+    question: What is the rate of change for external prefix cache?
+    entity: model_engine_ray
+    inputs:
+      queries:
+        signal: external_prefix_cache_queries_total
+        components:
+        - value
+      hits:
+        signal: external_prefix_cache_hits_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  kv_cache.multimodal:
+    family: KV Cache
+    question: What is the rate of change for multimodal cache?
+    entity: model_engine_ray
+    inputs:
+      queries:
+        signal: mm_cache_queries_total
+        components:
+        - value
+      hits:
+        signal: mm_cache_hits_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  kv_cache_residency.block_lifetime:
+    family: KV Cache Residency
+    question: What is the distribution of kv block lifetime?
+    entity: model_engine_ray
+    inputs:
+      block_lifetime:
+        signal: kv_block_lifetime_seconds
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  kv_cache_residency.idle_before_eviction:
+    family: KV Cache Residency
+    question: What is the distribution of kv block idle time before eviction?
+    entity: model_engine_ray
+    inputs:
+      idle_before_eviction:
+        signal: kv_block_idle_before_evict_seconds
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  kv_cache_residency.reuse_gap:
+    family: KV Cache Residency
+    question: What is the distribution of kv block reuse gap?
+    entity: model_engine_ray
+    inputs:
+      reuse_gap:
+        signal: kv_block_reuse_gap_seconds
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  kv_cache_residency.events:
+    family: KV Cache Residency
+    question: What is the rate of change for kv cache events?
+    entity: model_engine_ray
+    inputs:
+      evictions:
+        signal: kv_block_lifetime_seconds
+        components:
+        - count
+      reuse_gaps:
+        signal: kv_block_reuse_gap_seconds
+        components:
+        - count
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  kv_cache_residency.accumulated_time:
+    family: KV Cache Residency
+    question: What is the rate of change for accumulated kv residency time?
+    entity: model_engine_ray
+    inputs:
+      lifetime:
+        signal: kv_block_lifetime_seconds
+        components:
+        - sum
+      idle_before_eviction:
+        signal: kv_block_idle_before_evict_seconds
+        components:
+        - sum
+      reuse_gap:
+        signal: kv_block_reuse_gap_seconds
+        components:
+        - sum
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  kv_offloading.load_size:
+    family: KV Offloading
+    question: What is the distribution of kv offload load size?
+    entity: model_engine_ray
+    inputs:
+      load_size:
+        signal: kv_offload_load_size
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  kv_offloading.store_size:
+    family: KV Offloading
+    question: What is the distribution of kv offload store size?
+    entity: model_engine_ray
+    inputs:
+      store_size:
+        signal: kv_offload_store_size
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  kv_offloading.transfer_operations:
+    family: KV Offloading
+    question: What is the rate of change for kv offload transfer operations?
+    entity: model_engine_ray
+    inputs:
+      loads:
+        signal: kv_offload_load_size
+        components:
+        - count
+      stores:
+        signal: kv_offload_store_size
+        components:
+        - count
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  kv_offloading.transfer_bytes:
+    family: KV Offloading
+    question: What is the rate of change for kv offload transfer throughput?
+    entity: model_engine_ray
+    inputs:
+      loaded:
+        signal: kv_offload_load_bytes_total
+        components:
+        - value
+      stored:
+        signal: kv_offload_store_bytes_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  kv_offloading.completed_transfer_time:
+    family: KV Offloading
+    question: At what rate is completed kv offload transfer time attributed by direction?
+    entity: model_engine_ray
+    inputs:
+      load:
+        signal: kv_offload_load_time_total
+        components:
+        - value
+      store:
+        signal: kv_offload_store_time_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  kv_offloading.lookup_sync_delay:
+    family: KV Offloading
+    question: What is the distribution of kv offload synchronous lookup delay?
+    entity: model_engine_ray
+    inputs:
+      lookup_sync_delay:
+        signal: kv_offload_lookup_sync_delay_seconds
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  kv_offloading.lookup_async_delay:
+    family: KV Offloading
+    question: What is the distribution of kv offload asynchronous lookup delay?
+    entity: model_engine_ray
+    inputs:
+      lookup_async_delay:
+        signal: kv_offload_lookup_async_delay_seconds
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  kv_offloading.lookup_measurements:
+    family: KV Offloading
+    question: What is the rate of change for kv offload lookup measurements?
+    entity: model_engine_ray
+    inputs:
+      synchronous:
+        signal: kv_offload_lookup_sync_delay_seconds
+        components:
+        - count
+      asynchronous:
+        signal: kv_offload_lookup_async_delay_seconds
+        components:
+        - count
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  kv_offloading.lookup_delay_accumulation:
+    family: KV Offloading
+    question: What is the rate of change for kv offload lookup delay accumulation?
+    entity: model_engine_ray
+    inputs:
+      synchronous:
+        signal: kv_offload_lookup_sync_delay_seconds
+        components:
+        - sum
+      asynchronous:
+        signal: kv_offload_lookup_async_delay_seconds
+        components:
+        - sum
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  kv_offloading.cpu_cache_usage:
+    family: KV Offloading
+    question: What is the current cpu kv cache usage?
+    entity: model_engine_ray
+    inputs:
+      total:
+        signal: kv_offload_cpu_cache_usage_perc
+        components:
+        - value
+      writes:
+        signal: kv_offload_cpu_cache_write_usage_perc
+        components:
+        - value
+      reads:
+        signal: kv_offload_cpu_cache_read_usage_perc
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+    display:
+      convention: percentage
+      reason: Operators interpret the exported ratio as a percentage.
+      evidence:
+      - display_conventions
+  kv_offloading.cpu_allocation_size:
+    family: KV Offloading
+    question: What is the distribution of cpu kv allocation size?
+    entity: model_engine_ray
+    inputs:
+      cpu_allocation_size:
+        signal: kv_offload_cpu_allocation_size
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  kv_offloading.cpu_allocation_measurements:
+    family: KV Offloading
+    question: What is the rate of change for cpu kv allocation measurements?
+    entity: model_engine_ray
+    inputs:
+      allocations:
+        signal: kv_offload_cpu_allocation_size
+        components:
+        - count
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  kv_offloading.cpu_allocation_volume:
+    family: KV Offloading
+    question: What is the rate of change for cpu kv allocation volume?
+    entity: model_engine_ray
+    inputs:
+      blocks:
+        signal: kv_offload_cpu_allocation_size
+        components:
+        - sum
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  kv_offloading.admission_outcomes:
+    family: KV Offloading
+    question: What is the rate of change for kv offload admission outcomes?
+    entity: model_engine_ray
+    inputs:
+      allocation_failures:
+        signal: kv_offload_allocation_failure_total
+        components:
+        - value
+      stores_skipped:
+        signal: kv_offload_stores_skipped_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  kv_offloading.tiering_lookup_sync_delay:
+    family: KV Offloading
+    question: What is the distribution of tiered kv offload synchronous lookup delay?
+    entity: model_engine_ray
+    inputs:
+      tiering_lookup_sync_delay:
+        signal: kv_offload_tiering_lookup_sync_delay_seconds
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  kv_offloading.tiering_lookup_async_delay:
+    family: KV Offloading
+    question: What is the distribution of tiered kv offload asynchronous lookup delay?
+    entity: model_engine_ray
+    inputs:
+      tiering_lookup_async_delay:
+        signal: kv_offload_tiering_lookup_async_delay_seconds
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  kv_offloading.tiering_lookup_measurements:
+    family: KV Offloading
+    question: What is the rate of change for tiered kv offload lookup measurements?
+    entity: model_engine_ray
+    inputs:
+      synchronous:
+        signal: kv_offload_tiering_lookup_sync_delay_seconds
+        components:
+        - count
+      asynchronous:
+        signal: kv_offload_tiering_lookup_async_delay_seconds
+        components:
+        - count
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  kv_offloading.tiering_lookup_delay_accumulation:
+    family: KV Offloading
+    question: What is the rate of change for tiered kv offload lookup delay accumulation?
+    entity: model_engine_ray
+    inputs:
+      synchronous:
+        signal: kv_offload_tiering_lookup_sync_delay_seconds
+        components:
+        - sum
+      asynchronous:
+        signal: kv_offload_tiering_lookup_async_delay_seconds
+        components:
+        - sum
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  nixl_connector.transfer_duration:
+    family: NIXL Connector
+    question: What is the distribution of nixl transfer duration?
+    entity: model_engine_ray
+    inputs:
+      transfer_duration:
+        signal: nixl_xfer_time_seconds
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  nixl_connector.post_time:
+    family: NIXL Connector
+    question: What is the distribution of nixl transfer post time?
+    entity: model_engine_ray
+    inputs:
+      post_time:
+        signal: nixl_post_time_seconds
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  nixl_connector.transfer_size:
+    family: NIXL Connector
+    question: What is the distribution of nixl transfer size?
+    entity: model_engine_ray
+    inputs:
+      transfer_size:
+        signal: nixl_bytes_transferred
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  nixl_connector.transfer_descriptors:
+    family: NIXL Connector
+    question: What is the distribution of nixl transfer descriptors?
+    entity: model_engine_ray
+    inputs:
+      transfer_descriptors:
+        signal: nixl_num_descriptors
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  nixl_connector.successful_transfers:
+    family: NIXL Connector
+    question: What is the rate of change for successful nixl transfers?
+    entity: model_engine_ray
+    inputs:
+      transfers:
+        signal: nixl_xfer_time_seconds
+        components:
+        - count
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  nixl_connector.completed_transfer_time:
+    family: NIXL Connector
+    question: At what rate is completed nixl transfer and post-processing time attributed?
+    entity: model_engine_ray
+    inputs:
+      transfer:
+        signal: nixl_xfer_time_seconds
+        components:
+        - sum
+      post:
+        signal: nixl_post_time_seconds
+        components:
+        - sum
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  nixl_connector.transfer_throughput:
+    family: NIXL Connector
+    question: What is the rate of change for nixl transfer throughput?
+    entity: model_engine_ray
+    inputs:
+      transferred:
+        signal: nixl_bytes_transferred
+        components:
+        - sum
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  nixl_connector.descriptor_throughput:
+    family: NIXL Connector
+    question: What is the rate of change for nixl descriptor throughput?
+    entity: model_engine_ray
+    inputs:
+      descriptors:
+        signal: nixl_num_descriptors
+        components:
+        - sum
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  nixl_connector.failures:
+    family: NIXL Connector
+    question: What is the rate of change for nixl failures?
+    entity: model_engine_ray
+    inputs:
+      transfers:
+        signal: nixl_num_failed_transfers_total
+        components:
+        - value
+      notifications:
+        signal: nixl_num_failed_notifications_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  nixl_connector.expired_requests:
+    family: NIXL Connector
+    question: What is the rate of change for nixl requests with expired kv?
+    entity: model_engine_ray
+    inputs:
+      expired:
+        signal: nixl_num_kv_expired_reqs_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  hf3fs_connector.save_duration:
+    family: HF3FS Connector
+    question: What is the distribution of hf3fs save duration?
+    entity: model_engine_ray
+    inputs:
+      save_duration:
+        signal: hf3fs_save_duration_seconds
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  hf3fs_connector.load_duration:
+    family: HF3FS Connector
+    question: What is the distribution of hf3fs load duration?
+    entity: model_engine_ray
+    inputs:
+      load_duration:
+        signal: hf3fs_load_duration_seconds
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  hf3fs_connector.transfer_measurements:
+    family: HF3FS Connector
+    question: What is the rate of change for hf3fs transfer measurements?
+    entity: model_engine_ray
+    inputs:
+      saves:
+        signal: hf3fs_save_duration_seconds
+        components:
+        - count
+      loads:
+        signal: hf3fs_load_duration_seconds
+        components:
+        - count
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  hf3fs_connector.completed_transfer_time:
+    family: HF3FS Connector
+    question: At what rate is completed hf3fs transfer time attributed by direction?
+    entity: model_engine_ray
+    inputs:
+      saves:
+        signal: hf3fs_save_duration_seconds
+        components:
+        - sum
+      loads:
+        signal: hf3fs_load_duration_seconds
+        components:
+        - sum
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  hf3fs_connector.failures:
+    family: HF3FS Connector
+    question: What is the rate of change for hf3fs transfer failures?
+    entity: model_engine_ray
+    inputs:
+      saves:
+        signal: hf3fs_num_failed_save_total
+        components:
+        - value
+      loads:
+        signal: hf3fs_num_failed_load_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  mooncake_connector.timing.duration:
+    family: Mooncake Connector/Operation Timing
+    question: What is the distribution of mooncake store operation time?
+    entity: connector_operation_status_ray
+    inputs:
+      duration:
+        signal: mooncake_store_operation_time_seconds
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  mooncake_connector.timing.operations:
+    family: Mooncake Connector/Operation Timing
+    question: What is the rate of change for mooncake store operations?
+    entity: connector_operation_status_ray
+    inputs:
+      operations:
+        signal: mooncake_store_operation_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  mooncake_connector.timing.completed_time:
+    family: Mooncake Connector/Operation Timing
+    question: At what rate is completed mooncake store operation time attributed?
+    entity: connector_operation_status_ray
+    inputs:
+      time:
+        signal: mooncake_store_operation_time_seconds
+        components:
+        - sum
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  mooncake_connector.volume.keys:
+    family: Mooncake Connector/Operation Volume
+    question: What is the rate of change for mooncake store key throughput?
+    entity: connector_operation_status_ray
+    inputs:
+      keys:
+        signal: mooncake_store_operation_keys_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  mooncake_connector.volume.bytes:
+    family: Mooncake Connector/Operation Volume
+    question: What is the rate of change for mooncake store byte throughput?
+    entity: connector_operation_status_ray
+    inputs:
+      bytes:
+        signal: mooncake_store_operation_bytes_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  mooncake_connector.volume.failed_keys:
+    family: Mooncake Connector/Operation Volume
+    question: What is the rate of change for mooncake store failed keys?
+    entity: connector_operation_status_ray
+    inputs:
+      failed:
+        signal: mooncake_store_operation_failed_keys_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  speculative_decoding.drafts:
+    family: Speculative Decoding
+    question: What is the rate of change for drafts?
+    entity: model_engine_ray
+    inputs:
+      drafts:
+        signal: spec_decode_num_drafts_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  speculative_decoding.token_outcomes:
+    family: Speculative Decoding
+    question: What is the rate of change for draft token outcomes?
+    entity: model_engine_ray
+    inputs:
+      proposed:
+        signal: spec_decode_num_draft_tokens_total
+        components:
+        - value
+      accepted:
+        signal: spec_decode_num_accepted_tokens_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  speculative_decoding.accepted_by_position:
+    family: Speculative Decoding
+    question: What is the rate of change for accepted tokens by position?
+    entity: model_engine_ray
+    inputs:
+      position:
+        signal: spec_decode_num_accepted_tokens_per_pos_total
+        components:
+        - value
+    labels:
+      dimensions:
+        position:
+          render: label_value
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  diffusion_decoding.denoising_steps:
+    family: Diffusion Decoding
+    question: What is the rate of change for diffusion denoising steps?
+    entity: model_engine_ray
+    inputs:
+      steps:
+        signal: diffusion_num_denoising_steps_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  diffusion_decoding.canvas_positions:
+    family: Diffusion Decoding
+    question: What is the rate of change for diffusion canvas positions?
+    entity: model_engine_ray
+    inputs:
+      positions:
+        signal: diffusion_num_canvas_positions_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  diffusion_decoding.committed_tokens:
+    family: Diffusion Decoding
+    question: What is the rate of change for diffusion committed tokens?
+    entity: model_engine_ray
+    inputs:
+      committed:
+        signal: diffusion_num_committed_tokens_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - Component
+      - SessionName
+      - Version
+      omit: {}
+  websocket_service.active_connections:
+    family: WebSocket Service
+    question: What is the current active websocket connections?
+    entity: service
+    inputs:
+      active:
+        signal: websocket_connections_active
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  websocket_service.connection_lifecycle:
+    family: WebSocket Service
+    question: What is the rate of change for websocket connection lifecycle?
+    entity: service
+    inputs:
+      opened:
+        signal: websocket_connections_total
+        components:
+        - value
+      closed:
+        signal: websocket_connection_duration_seconds
+        components:
+        - count
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  websocket_service.connection_duration:
+    family: WebSocket Service
+    question: What is the distribution of websocket connection duration?
+    entity: service
+    inputs:
+      connection_duration:
+        signal: websocket_connection_duration_seconds
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  websocket_service.completed_connection_time:
+    family: WebSocket Service
+    question: At what rate is connection time attributed when websocket connections close?
+    entity: service
+    inputs:
+      time:
+        signal: websocket_connection_duration_seconds
+        components:
+        - sum
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  tool_parsing.invocations:
+    family: Tool Parsing
+    question: What is the rate of change for tool parser invocations?
+    entity: parser_request
+    inputs:
+      invocations:
+        signal: tool_call_parser_invocations_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}

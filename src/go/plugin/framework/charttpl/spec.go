@@ -2,44 +2,65 @@
 
 package charttpl
 
-import metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
+import (
+	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
+)
 
 // VersionV1 is the supported chart-template schema version.
 const VersionV1 = "v1"
 
+// Aggregation defines how source series that map to one chart dimension combine.
+type Aggregation string
+
+const (
+	AggregationSum Aggregation = "sum"
+	AggregationMin Aggregation = "min"
+	AggregationMax Aggregation = "max"
+	AggregationAvg Aggregation = "avg"
+)
+
 // Spec is the user-facing chart template file.
 type Spec struct {
-	Version          string  `yaml:"version" json:"version"`
+	Version          string  `yaml:"version"                     json:"version"`
 	ContextNamespace string  `yaml:"context_namespace,omitempty" json:"context_namespace,omitempty"`
-	Engine           *Engine `yaml:"engine,omitempty" json:"engine,omitempty"`
-	Groups           []Group `yaml:"groups" json:"groups"`
+	Engine           *Engine `yaml:"engine,omitempty"            json:"engine,omitempty"`
+	Groups           []Group `yaml:"groups"                      json:"groups"`
 }
 
 // Engine declares template-level chartengine policy.
 type Engine struct {
 	Selector *metrixselector.Expr `yaml:"selector,omitempty" json:"selector,omitempty"`
-	Autogen  *EngineAutogen       `yaml:"autogen,omitempty" json:"autogen,omitempty"`
+	Autogen  *EngineAutogen       `yaml:"autogen,omitempty"  json:"autogen,omitempty"`
 }
 
 // EngineAutogen controls unmatched-series fallback behavior.
 type EngineAutogen struct {
 	Enabled bool `yaml:"enabled,omitempty" json:"enabled,omitempty"`
 
+	// Rules constrain autogen fallback for matching unmatched metric families.
+	Rules []EngineAutogenRule `yaml:"rules,omitempty" json:"rules,omitempty"`
+
 	// MaxTypeIDLen is the max allowed full `type.id` length.
 	// Zero means default (1200).
-	MaxTypeIDLen int `yaml:"max_type_id_len,omitempty" json:"max_type_id_len,omitempty"`
+	MaxTypeIDLen int `yaml:"max_type_id_len,omitempty"             json:"max_type_id_len,omitempty"`
 	// ExpireAfterSuccessCycles controls autogen chart/dimension expiry on
 	// successful collection cycles where the series is not seen.
 	// Zero disables expiry.
 	ExpireAfterSuccessCycles uint64 `yaml:"expire_after_success_cycles,omitempty" json:"expire_after_success_cycles,omitempty"`
 }
 
+// EngineAutogenRule conditionally constrains unmatched-series fallback.
+type EngineAutogenRule struct {
+	Scope    string              `yaml:"scope"    json:"scope"`
+	Selector metrixselector.Expr `yaml:"selector" json:"selector"`
+}
+
 // Group is a recursive chart-group container.
 type Group struct {
-	Family           string         `yaml:"family" json:"family"`
+	Family           string         `yaml:"family,omitempty"            json:"family,omitempty"`
 	ContextNamespace string         `yaml:"context_namespace,omitempty" json:"context_namespace,omitempty"`
-	Metrics          []string       `yaml:"metrics,omitempty" json:"metrics,omitempty"`
-	ChartDefaults    *ChartDefaults `yaml:"chart_defaults,omitempty" json:"chart_defaults,omitempty"`
+	Metrics          []string       `yaml:"metrics,omitempty"           json:"metrics,omitempty"`
+	ChartDefaults    *ChartDefaults `yaml:"chart_defaults,omitempty"    json:"chart_defaults,omitempty"`
 
 	Groups []Group `yaml:"groups,omitempty" json:"groups,omitempty"`
 	Charts []Chart `yaml:"charts,omitempty" json:"charts,omitempty"`
@@ -47,21 +68,23 @@ type Group struct {
 
 // ChartDefaults defines inheritable chart fields on a group.
 type ChartDefaults struct {
+	Priority      int        `yaml:"priority,omitempty"        json:"priority,omitempty"`
 	LabelPromoted []string   `yaml:"label_promotion,omitempty" json:"label_promotion,omitempty"`
-	Instances     *Instances `yaml:"instances,omitempty" json:"instances,omitempty"`
+	Instances     *Instances `yaml:"instances,omitempty"       json:"instances,omitempty"`
 }
 
 // Chart describes one chart template in compact DSL form.
 type Chart struct {
-	ID            string   `yaml:"id,omitempty" json:"id,omitempty"`
-	Title         string   `yaml:"title" json:"title"`
-	Family        string   `yaml:"family,omitempty" json:"family,omitempty"`
-	Context       string   `yaml:"context" json:"context"`
-	Units         string   `yaml:"units" json:"units"`
-	Algorithm     string   `yaml:"algorithm,omitempty" json:"algorithm,omitempty"`
-	Type          string   `yaml:"type,omitempty" json:"type,omitempty"`
-	Priority      int      `yaml:"priority,omitempty" json:"priority,omitempty"`
-	LabelPromoted []string `yaml:"label_promotion,omitempty" json:"label_promotion,omitempty"`
+	ID            string      `yaml:"id,omitempty"              json:"id,omitempty"`
+	Title         string      `yaml:"title"                     json:"title"`
+	Family        string      `yaml:"family,omitempty"          json:"family,omitempty"`
+	Context       string      `yaml:"context"                   json:"context"`
+	Units         string      `yaml:"units"                     json:"units"`
+	Algorithm     string      `yaml:"algorithm,omitempty"       json:"algorithm,omitempty"`
+	Aggregation   Aggregation `yaml:"aggregation,omitempty"     json:"aggregation,omitempty"`
+	Type          string      `yaml:"type,omitempty"            json:"type,omitempty"`
+	Priority      int         `yaml:"priority,omitempty"        json:"priority,omitempty"`
+	LabelPromoted []string    `yaml:"label_promotion,omitempty" json:"label_promotion,omitempty"`
 
 	Instances *Instances `yaml:"instances,omitempty" json:"instances,omitempty"`
 
@@ -72,36 +95,37 @@ type Chart struct {
 
 // Instances defines chart instance identity labels.
 type Instances struct {
-	ByLabels []string `yaml:"by_labels" json:"by_labels"`
+	ByLabels         []string `yaml:"by_labels,omitempty"          json:"by_labels,omitempty"`
+	OptionalByLabels []string `yaml:"optional_by_labels,omitempty" json:"optional_by_labels,omitempty"`
 }
 
 // Lifecycle controls chart and dimension cardinality/expiry limits.
 type Lifecycle struct {
 	// MaxInstances is best-effort per chart template.
 	// Active instances in the current successful cycle are not evicted.
-	MaxInstances      int                 `yaml:"max_instances,omitempty" json:"max_instances,omitempty"`
+	MaxInstances      int                 `yaml:"max_instances,omitempty"       json:"max_instances,omitempty"`
 	ExpireAfterCycles int                 `yaml:"expire_after_cycles,omitempty" json:"expire_after_cycles,omitempty"`
-	Dimensions        *DimensionLifecycle `yaml:"dimensions,omitempty" json:"dimensions,omitempty"`
+	Dimensions        *DimensionLifecycle `yaml:"dimensions,omitempty"          json:"dimensions,omitempty"`
 }
 
 // DimensionLifecycle controls materialized dimension lifecycle limits.
 type DimensionLifecycle struct {
-	MaxDims           int `yaml:"max_dims,omitempty" json:"max_dims,omitempty"`
+	MaxDims           int `yaml:"max_dims,omitempty"            json:"max_dims,omitempty"`
 	ExpireAfterCycles int `yaml:"expire_after_cycles,omitempty" json:"expire_after_cycles,omitempty"`
 }
 
 // Dimension describes one dimension template.
 type Dimension struct {
-	Selector      string            `yaml:"selector" json:"selector"`
-	Name          string            `yaml:"name,omitempty" json:"name,omitempty"`
+	Selector      string            `yaml:"selector"                  json:"selector"`
+	Name          string            `yaml:"name,omitempty"            json:"name,omitempty"`
 	NameFromLabel string            `yaml:"name_from_label,omitempty" json:"name_from_label,omitempty"`
-	Options       *DimensionOptions `yaml:"options,omitempty" json:"options,omitempty"`
+	Options       *DimensionOptions `yaml:"options,omitempty"         json:"options,omitempty"`
 }
 
 // DimensionOptions controls DIMENSION options and update emission mode.
 type DimensionOptions struct {
 	Multiplier int  `yaml:"multiplier,omitempty" json:"multiplier,omitempty"`
-	Divisor    int  `yaml:"divisor,omitempty" json:"divisor,omitempty"`
-	Hidden     bool `yaml:"hidden,omitempty" json:"hidden,omitempty"`
-	Float      bool `yaml:"float,omitempty" json:"float,omitempty"`
+	Divisor    int  `yaml:"divisor,omitempty"    json:"divisor,omitempty"`
+	Hidden     bool `yaml:"hidden,omitempty"     json:"hidden,omitempty"`
+	Float      bool `yaml:"float,omitempty"      json:"float,omitempty"`
 }

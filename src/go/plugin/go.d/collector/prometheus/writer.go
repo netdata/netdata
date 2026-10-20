@@ -1,0 +1,559 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package prometheus
+
+import (
+	"math"
+	"slices"
+	"strconv"
+	"strings"
+
+	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/matcher"
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
+	commonmodel "github.com/prometheus/common/model"
+)
+
+// seriesCacheRetentionCycles bounds the per-series instrument cache: a cached handle not observed for
+// this many successful cycles is evicted. This value mirrors two other retention windows that are NOT
+// compiler-linked and MUST be kept in agreement: metrix's default store retention (so a cached handle
+// lives as long as the series it writes) and the chart template's expiry (chartExpireAfterCycles, so a
+// chart is not removed before the series feeding it). The cache also stays bounded under label churn.
+const seriesCacheRetentionCycles = 10
+
+type metricFamilyWriterPolicy struct {
+	maxTSPerMetric        int
+	isFallbackTypeGauge   matcher.Matcher
+	isFallbackTypeCounter matcher.Matcher
+	observePipeline       PipelineDiagnosticObserver
+}
+
+type metricFamilyWriter struct {
+	store   metrix.CollectorStore
+	policy  metricFamilyWriterPolicy
+	handles map[string]*metricFamilyHandle
+	cycle   uint64
+
+	// Family-handle lifetime is coupled to the metrix descriptor lifetime (see metricFamilyHandle):
+	// retention is the store's descriptor-retention accessor, nil only if the store does not expose
+	// it (then handles are kept, the pre-coupling behavior); window is the descriptor retention
+	// window (expire+grace), MaxUint64 meaning unbounded; lastReconcileSuccess is the successful-commit
+	// count observed at the previous scrape, used to detect whether the previous cycle committed.
+	retention            metrix.DescriptorRetention
+	window               uint64
+	lastReconcileSuccess uint64
+
+	*logger.Logger
+}
+
+// cachedInstrument is a per-series instrument handle plus the last cycle it was observed, so handles
+// for series that stop appearing in scrapes can be evicted.
+type cachedInstrument[T any] struct {
+	inst     T
+	lastSeen uint64
+}
+
+// metricFamilyHandle caches, per metric name, the canonical distribution schema, instrument options,
+// and the per-series instrument handles. The handle exists for as long as metrix keeps the name's
+// descriptor: while the descriptor is live, keeping the handle lets ensureHandle detect a changed
+// contract (kind, summary quantiles, or histogram bounds) and skip it rather than write a conflicting
+// kind; once the name is idle past the metrix descriptor window (expire+grace) metrix evicts the
+// descriptor and reconcileHandles evicts this handle in lockstep, so a name that later reappears with
+// a changed contract re-registers cleanly instead of being drift-skipped forever. staged marks the
+// handle as touched this scrape (awaiting the framework commit); accepted/acceptedSuccess record the
+// last successful commit that accepted it, the clock reconcileHandles ages it by.
+//
+// The per-series instrument handles inside ARE evicted separately: they are reused across cycles
+// (skipping per-series instrument re-resolution) and dropped once a series goes unobserved for
+// seriesCacheRetentionCycles, so the cache stays bounded under label-value churn — unlike a metrix
+// vec, whose internal handle cache is unbounded. A family may mix label-key sets; each series is
+// cached and written by its own full label tuple. Per-name state (this handle plus the metrix
+// descriptor) is bounded by metric-name cardinality; metric-NAME churn (a Prometheus anti-pattern)
+// grows it only within the retention window — a now-bounded limit.
+type metricFamilyHandle struct {
+	name             string
+	typ              commonmodel.MetricType
+	summaryQuantiles []float64
+	histogramBounds  []float64
+	opts             []metrix.InstrumentOption
+
+	staged          bool
+	accepted        bool
+	acceptedSuccess uint64
+
+	gauges     map[string]*cachedInstrument[metrix.SnapshotGauge]
+	counters   map[string]*cachedInstrument[metrix.SnapshotCounter]
+	summaries  map[string]*cachedInstrument[metrix.SnapshotSummary]
+	histograms map[string]*cachedInstrument[metrix.SnapshotHistogram]
+}
+
+func newMetricFamilyWriter(store metrix.CollectorStore, policy metricFamilyWriterPolicy, log *logger.Logger) *metricFamilyWriter {
+	// A family with no configured fallback matcher uses a never-matching matcher, so
+	// resolveFamilyType can call MatchString unconditionally (no per-cycle nil check).
+	if policy.isFallbackTypeGauge == nil {
+		policy.isFallbackTypeGauge = matcher.FALSE()
+	}
+	if policy.isFallbackTypeCounter == nil {
+		policy.isFallbackTypeCounter = matcher.FALSE()
+	}
+	w := &metricFamilyWriter{
+		store:   store,
+		policy:  policy,
+		handles: make(map[string]*metricFamilyHandle),
+		window:  math.MaxUint64, // no accessor -> keep family handles (pre-coupling behavior)
+		Logger:  log,
+	}
+	// Couple family-handle lifetime to the metrix descriptor window when the store exposes it.
+	if dr, ok := store.(metrix.DescriptorRetention); ok {
+		w.retention = dr
+		w.window = dr.DescriptorRetentionWindow()
+	}
+	return w
+}
+
+// countWritable reports how many series across all families could be written. Used at Check to
+// confirm the endpoint exposes usable metrics, before any cycle has run.
+func (w *metricFamilyWriter) countWritable(mfs prompkg.MetricFamilies) int {
+	return w.countWritableWithFallback(mfs, true)
+}
+
+func (w *metricFamilyWriter) countBoundWritable(mfs prompkg.MetricFamilies) int {
+	return w.countWritableWithFallback(mfs, false)
+}
+
+func (w *metricFamilyWriter) countWritableWithFallback(mfs prompkg.MetricFamilies, allowFallback bool) int {
+	count := 0
+	for _, mf := range mfs {
+		if w.skipMetricFamily(mf) {
+			continue
+		}
+
+		typ, ok := w.resolveType(mf.Name(), mf.Type(), nil, allowFallback)
+		if !ok {
+			continue
+		}
+
+		schema, reason := deriveMetricFamilySchema(mf, typ, allowFallback)
+		if reason != "" {
+			continue
+		}
+
+		for _, metric := range mf.Metrics() {
+			if metricIsWritable(metric, typ, schema, allowFallback) {
+				count++
+			}
+		}
+	}
+	return count
+}
+
+func (w *metricFamilyWriter) writeMetricFamilies(mfs prompkg.MetricFamilies) int {
+	return w.writeMetricFamiliesWithFallback(mfs, true)
+}
+
+func (w *metricFamilyWriter) writeBoundMetricFamilies(mfs prompkg.MetricFamilies) int {
+	return w.writeMetricFamiliesWithFallback(mfs, false)
+}
+
+func (w *metricFamilyWriter) writeMetricFamiliesWithFallback(mfs prompkg.MetricFamilies, allowFallback bool) int {
+	w.cycle++
+	w.reconcileHandles()
+
+	written := 0
+	for _, mf := range mfs {
+		if reason := w.metricFamilySkipReason(mf); reason != "" {
+			if w.policy.observePipeline != nil {
+				w.observePipeline(PipelineDiagnostic{
+					Decision:   PipelineWriterFamilyRejected,
+					Reason:     reason,
+					MetricName: mf.Name(),
+				})
+			}
+			continue
+		}
+
+		typ, ok := w.resolveType(mf.Name(), mf.Type(), nil, allowFallback)
+		if !ok {
+			if w.policy.observePipeline != nil {
+				w.observePipeline(PipelineDiagnostic{
+					Decision:   PipelineWriterFamilyRejected,
+					Reason:     PipelineReasonUnsupportedType,
+					MetricName: mf.Name(),
+				})
+			}
+			continue
+		}
+
+		handle, reason := w.ensureHandle(mf, typ, allowFallback)
+		if reason != "" {
+			if w.policy.observePipeline != nil {
+				w.observePipeline(PipelineDiagnostic{
+					Decision:   PipelineWriterFamilyRejected,
+					Reason:     reason,
+					MetricName: mf.Name(),
+				})
+			}
+			continue
+		}
+
+		// Stage the handle only when at least one compatible series actually writes. A family whose
+		// type matches but whose series all drift (changed summary quantiles / histogram bounds)
+		// writes nothing, so it must NOT refresh its lifetime - otherwise it would never age out to
+		// re-adopt the new schema after metrix evicts the descriptor. Partial drift (some canonical
+		// series still write) does refresh, keeping the live family.
+		for _, metric := range mf.Metrics() {
+			var valueIdentity PipelineValueIdentity
+			scalarValue := false
+			if w.policy.observePipeline != nil {
+				if value, ok := metricScalarRawValue(metric, typ, allowFallback); ok {
+					valueIdentity = pipelineScalarValueIdentity(value)
+					scalarValue = true
+				}
+			}
+			if reason := w.observeMetric(handle, metric, allowFallback); reason == "" {
+				written++
+				handle.staged = true
+				if w.policy.observePipeline != nil {
+					w.observePipeline(PipelineDiagnostic{
+						Decision:      PipelineWriterSeriesAccepted,
+						RawIdentity:   prompkg.IdentifyRawSample(mf.Name(), metric.Labels()),
+						Destination:   prompkg.IdentifySeries(mf.Name(), metric.Labels(), ""),
+						ValueIdentity: valueIdentity,
+						ScalarValue:   scalarValue,
+						MetricName:    mf.Name(),
+					})
+				}
+			} else if w.policy.observePipeline != nil {
+				w.observePipeline(PipelineDiagnostic{
+					Decision:      PipelineWriterSeriesRejected,
+					Reason:        reason,
+					RawIdentity:   prompkg.IdentifyRawSample(mf.Name(), metric.Labels()),
+					Destination:   prompkg.IdentifySeries(mf.Name(), metric.Labels(), ""),
+					ValueIdentity: valueIdentity,
+					ScalarValue:   scalarValue,
+					MetricName:    mf.Name(),
+				})
+			}
+		}
+	}
+
+	w.evictStaleSeries()
+	return written
+}
+
+// reconcileHandles couples the family-handle cache to the metrix descriptor lifetime. It runs at the
+// start of each scrape, before handles are (re)touched, on the metrix successful-commit clock:
+//   - a handle staged in the previous scrape is PROMOTED to accepted if that scrape's cycle committed;
+//     if it did not commit (aborted) and the handle had never been accepted, it is dropped so a bogus
+//     handle from a failed commit cannot drift-skip this scrape;
+//   - an accepted handle idle for the descriptor window (expire+grace) is evicted, matching metrix's
+//     own descriptor eviction, so a name that reappears with a changed contract re-registers cleanly.
+//
+// Both clocks advance only on successful commits, so writer and store stay in lockstep across endpoint
+// downtime (aborted cycles advance neither). With no accessor (window == MaxUint64) handles are kept,
+// the pre-coupling behavior.
+func (w *metricFamilyWriter) reconcileHandles() {
+	if w.retention == nil {
+		return
+	}
+	success := w.retention.SuccessfulCommits()
+	committed := success > w.lastReconcileSuccess
+	for name, h := range w.handles {
+		if h.staged {
+			h.staged = false
+			switch {
+			case committed:
+				h.accepted = true
+				h.acceptedSuccess = success
+			case !h.accepted:
+				delete(w.handles, name) // never accepted and the staging cycle aborted -> bogus
+				continue
+			}
+		}
+		// Age out an accepted handle once idle for the descriptor window. Skip when the window is
+		// unbounded (series expiry disabled), and guard the subtraction against a non-monotonic
+		// clock so it can never underflow-wrap into a spurious eviction.
+		if h.accepted && w.window != metrix.DescriptorRetentionUnbounded &&
+			success >= h.acceptedSuccess && success-h.acceptedSuccess >= w.window {
+			delete(w.handles, name) // metrix has evicted the descriptor; drop the handle in step
+		}
+	}
+	w.lastReconcileSuccess = success
+}
+
+func (w *metricFamilyWriter) skipMetricFamily(mf *prompkg.MetricFamily) bool {
+	return w.metricFamilySkipReason(mf) != ""
+}
+
+func (w *metricFamilyWriter) metricFamilySkipReason(mf *prompkg.MetricFamily) PipelineReason {
+	// Info exposition is gauge-valued; preserve an explicit non-gauge type when an exporter reuses the suffix.
+	if mf.Type() == commonmodel.MetricTypeGauge && strings.HasSuffix(mf.Name(), "_info") {
+		return PipelineReasonInfoFamily
+	}
+	if w.policy.maxTSPerMetric > 0 && len(mf.Metrics()) > w.policy.maxTSPerMetric {
+		w.Debugf("metric '%s' num of time series (%d) > limit (%d), skipping it",
+			mf.Name(), len(mf.Metrics()), w.policy.maxTSPerMetric)
+		return PipelineReasonSeriesLimit
+	}
+	return ""
+}
+
+func (w *metricFamilyWriter) bindFallbackTypes(batch *prompkg.SampleBatch, profiles []profileFallback) {
+	var (
+		lastName     string
+		lastDeclared commonmodel.MetricType
+		lastType     commonmodel.MetricType
+		lastOK       bool
+		lastValid    bool
+	)
+	for i := range batch.Samples {
+		sample := &batch.Samples[i]
+		declared := sample.FamilyType
+		var typ commonmodel.MetricType
+		var ok bool
+		if lastValid && sample.Name == lastName && sample.FamilyType == lastDeclared {
+			typ, ok = lastType, lastOK
+		} else {
+			typ, ok = w.resolveType(sample.Name, declared, profiles, true)
+			lastName = sample.Name
+			lastDeclared = declared
+			lastType = typ
+			lastOK = ok
+			lastValid = true
+		}
+		if ok {
+			sample.FamilyType = typ
+		}
+	}
+}
+
+func (w *metricFamilyWriter) resolveFamilyType(mf *prompkg.MetricFamily, allowFallback bool) (commonmodel.MetricType, bool) {
+	return w.resolveType(mf.Name(), mf.Type(), nil, allowFallback)
+}
+
+func (w *metricFamilyWriter) resolveType(
+	name string,
+	declared commonmodel.MetricType,
+	profiles []profileFallback,
+	allowFallback bool,
+) (commonmodel.MetricType, bool) {
+	switch declared {
+	case commonmodel.MetricTypeGauge,
+		commonmodel.MetricTypeCounter,
+		commonmodel.MetricTypeSummary,
+		commonmodel.MetricTypeHistogram:
+		return declared, true
+	case commonmodel.MetricTypeUnknown:
+		if !allowFallback {
+			return "", false
+		}
+		if w.policy.isFallbackTypeGauge.MatchString(name) {
+			return commonmodel.MetricTypeGauge, true
+		}
+		if w.policy.isFallbackTypeCounter.MatchString(name) {
+			return commonmodel.MetricTypeCounter, true
+		}
+		for _, profile := range profiles {
+			if typ, ok := profile.resolve(name); ok {
+				return typ, true
+			}
+		}
+		if strings.HasSuffix(name, "_total") {
+			return commonmodel.MetricTypeCounter, true
+		}
+		return "", false
+	default:
+		return "", false
+	}
+}
+
+func (w *metricFamilyWriter) ensureHandle(
+	mf *prompkg.MetricFamily,
+	typ commonmodel.MetricType,
+	allowFallback bool,
+) (*metricFamilyHandle, PipelineReason) {
+	if handle, ok := w.handles[mf.Name()]; ok {
+		if handle.typ != typ {
+			w.Debugf("skip metric family '%s': metric type drift (%s -> %s)", mf.Name(), handle.typ, typ)
+			return nil, PipelineReasonFamilyTypeDrift
+		}
+		return handle, ""
+	}
+
+	schema, reason := deriveMetricFamilySchema(mf, typ, allowFallback)
+	if reason != "" {
+		return nil, reason
+	}
+
+	opts := []metrix.InstrumentOption{
+		metrix.WithChartFamily(getChartFamily(mf.Name())),
+		metrix.WithChartPriority(getChartPriority(mf.Name())),
+		metrix.WithUnit(instrumentUnit(mf.Name(), typ)),
+		metrix.WithFloat(true),
+		metrix.WithDescription(getChartTitle(mf.Name(), mf.Help())),
+	}
+
+	handle := &metricFamilyHandle{
+		name:             mf.Name(),
+		typ:              typ,
+		summaryQuantiles: slices.Clone(schema.summaryQuantiles),
+		histogramBounds:  slices.Clone(schema.histogramBounds),
+		opts:             opts,
+	}
+
+	switch typ {
+	case commonmodel.MetricTypeGauge:
+		handle.gauges = make(map[string]*cachedInstrument[metrix.SnapshotGauge])
+	case commonmodel.MetricTypeCounter:
+		handle.counters = make(map[string]*cachedInstrument[metrix.SnapshotCounter])
+	case commonmodel.MetricTypeSummary:
+		handle.opts = append(handle.opts, metrix.WithSummaryQuantiles(schema.summaryQuantiles...))
+		handle.summaries = make(map[string]*cachedInstrument[metrix.SnapshotSummary])
+	case commonmodel.MetricTypeHistogram:
+		handle.opts = append(handle.opts, metrix.WithHistogramBounds(schema.histogramBounds...))
+		handle.histograms = make(map[string]*cachedInstrument[metrix.SnapshotHistogram])
+	}
+
+	w.handles[mf.Name()] = handle
+	return handle, ""
+}
+
+func (w *metricFamilyWriter) observeMetric(
+	handle *metricFamilyHandle,
+	metric prompkg.Metric,
+	allowFallback bool,
+) PipelineReason {
+	if reason := metricSchemaRejectionReason(metric, handle.typ, metricFamilySchema{
+		summaryQuantiles: handle.summaryQuantiles,
+		histogramBounds:  handle.histogramBounds,
+	}, allowFallback); reason != "" {
+		if reason != PipelineReasonDistributionSchemaDrift {
+			return reason
+		}
+		w.Debugf("skip a series of metric '%s': distribution schema drift", handle.name)
+		return reason
+	}
+
+	sig := w.seriesSig(metric)
+
+	switch handle.typ {
+	case commonmodel.MetricTypeGauge:
+		value, ok := metricScalarValue(metric, commonmodel.MetricTypeGauge, allowFallback)
+		if !ok {
+			return PipelineReasonInvalidSeriesValue
+		}
+		inst := getOrCreateInstrument(handle.gauges, sig, w.cycle, func() metrix.SnapshotGauge {
+			return w.store.Write().SnapshotMeter("").WithLabels(w.seriesLabels(metric)...).Gauge(handle.name, handle.opts...)
+		})
+		inst.Observe(value)
+		return ""
+	case commonmodel.MetricTypeCounter:
+		value, ok := metricScalarValue(metric, commonmodel.MetricTypeCounter, allowFallback)
+		if !ok {
+			return PipelineReasonInvalidSeriesValue
+		}
+		inst := getOrCreateInstrument(handle.counters, sig, w.cycle, func() metrix.SnapshotCounter {
+			return w.store.Write().SnapshotMeter("").WithLabels(w.seriesLabels(metric)...).Counter(handle.name, handle.opts...)
+		})
+		inst.ObserveTotal(value)
+		return ""
+	case commonmodel.MetricTypeSummary:
+		point, ok := toSummaryPoint(metric.Summary())
+		if !ok {
+			return PipelineReasonInvalidSeriesValue
+		}
+		inst := getOrCreateInstrument(handle.summaries, sig, w.cycle, func() metrix.SnapshotSummary {
+			return w.store.Write().SnapshotMeter("").WithLabels(w.seriesLabels(metric)...).Summary(handle.name, handle.opts...)
+		})
+		inst.ObservePoint(point)
+		return ""
+	case commonmodel.MetricTypeHistogram:
+		point, ok := toHistogramPoint(metric.Histogram())
+		if !ok {
+			return PipelineReasonInvalidSeriesValue
+		}
+		inst := getOrCreateInstrument(handle.histograms, sig, w.cycle, func() metrix.SnapshotHistogram {
+			return w.store.Write().SnapshotMeter("").WithLabels(w.seriesLabels(metric)...).Histogram(handle.name, handle.opts...)
+		})
+		inst.ObservePoint(point)
+		return ""
+	default:
+		return PipelineReasonUnsupportedType
+	}
+}
+
+func (w *metricFamilyWriter) observePipeline(fact PipelineDiagnostic) {
+	if w == nil || w.policy.observePipeline == nil {
+		return
+	}
+	w.policy.observePipeline(fact)
+}
+
+// getOrCreateInstrument returns the cached instrument handle for a series signature, creating and
+// caching it on first use, and stamps it as observed in the current cycle.
+func getOrCreateInstrument[T any](m map[string]*cachedInstrument[T], sig string, cycle uint64, create func() T) T {
+	e, ok := m[sig]
+	if !ok {
+		e = &cachedInstrument[T]{inst: create()}
+		m[sig] = e
+	}
+	e.lastSeen = cycle
+	return e.inst
+}
+
+// evictStaleSeries drops cached instrument handles for series not observed within the retention
+// window, keeping the cache bounded under label-value churn.
+func (w *metricFamilyWriter) evictStaleSeries() {
+	for _, h := range w.handles {
+		switch h.typ {
+		case commonmodel.MetricTypeGauge:
+			evictStaleInstruments(h.gauges, w.cycle)
+		case commonmodel.MetricTypeCounter:
+			evictStaleInstruments(h.counters, w.cycle)
+		case commonmodel.MetricTypeSummary:
+			evictStaleInstruments(h.summaries, w.cycle)
+		case commonmodel.MetricTypeHistogram:
+			evictStaleInstruments(h.histograms, w.cycle)
+		}
+	}
+}
+
+func evictStaleInstruments[T any](m map[string]*cachedInstrument[T], cycle uint64) {
+	for sig, e := range m {
+		if e.lastSeen+seriesCacheRetentionCycles <= cycle {
+			delete(m, sig)
+		}
+	}
+}
+
+// seriesSig builds a collision-safe key identifying a scraped series by its label tuple.
+// Prometheus labels are sorted by name, so the key is stable for a given series.
+func (w *metricFamilyWriter) seriesSig(metric prompkg.Metric) string {
+	lbs := metric.Labels()
+	if len(lbs) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	for _, l := range lbs {
+		b.WriteString(strconv.Itoa(len(l.Name)))
+		b.WriteByte(':')
+		b.WriteString(l.Name)
+		b.WriteByte('=')
+		b.WriteString(strconv.Itoa(len(l.Value)))
+		b.WriteByte(':')
+		b.WriteString(l.Value)
+		b.WriteByte('\xff')
+	}
+	return b.String()
+}
+
+// seriesLabels converts a scraped series' labels into metrix labels.
+func (w *metricFamilyWriter) seriesLabels(metric prompkg.Metric) []metrix.Label {
+	lbs := metric.Labels()
+	out := make([]metrix.Label, 0, len(lbs))
+	for _, l := range lbs {
+		out = append(out, metrix.Label{Key: l.Name, Value: l.Value})
+	}
+	return out
+}

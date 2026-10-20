@@ -28,6 +28,8 @@ extern SIMPLE_PATTERN *web_allow_badges_from;
 extern int             web_allow_badges_dns;
 extern SIMPLE_PATTERN *web_allow_streaming_from;
 extern int             web_allow_streaming_dns;
+extern SIMPLE_PATTERN *web_allow_mcp_from;
+extern int             web_allow_mcp_dns;
 extern SIMPLE_PATTERN *web_allow_netdataconf_from;
 extern int             web_allow_netdataconf_dns;
 extern SIMPLE_PATTERN *web_allow_mgmt_from;

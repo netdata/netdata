@@ -112,6 +112,7 @@ void apps_managers_and_aggregators_init(void) {
     managed_list_add(&tree.managers, "init");
 #elif defined(OS_MACOS)
     managed_list_add(&tree.managers, "launchd");
+    managed_list_add(&tree.managers, "sshd-session");   // per-connection ssh session managers
 #endif
 
 #if defined(OS_WINDOWS)
@@ -135,6 +136,14 @@ void apps_managers_and_aggregators_init(void) {
     managed_list_add(&tree.interpreters, "python3");
     managed_list_add(&tree.interpreters, "sh");
     managed_list_add(&tree.interpreters, "bash");
+    // the remaining login shells shipped with macOS (/etc/shells) - a shell
+    // that is a tree root (e.g. an SSH session) must group by its comm, not
+    // by the path-derived Apple system bucket
+    managed_list_add(&tree.interpreters, "zsh");
+    managed_list_add(&tree.interpreters, "dash");
+    managed_list_add(&tree.interpreters, "csh");
+    managed_list_add(&tree.interpreters, "tcsh");
+    managed_list_add(&tree.interpreters, "ksh");
     managed_list_add(&tree.interpreters, "node");
     managed_list_add(&tree.interpreters, "perl");
 }
@@ -184,11 +193,16 @@ struct target *get_tree_target(struct pid_stat *p) {
         search_for = string_dup(KernelAggregator);
     }
     else {
+        // OS-specific naming (macOS: derived from the executable path)
+        search_for = apps_os_tree_target_name(p);
+
+        if(!search_for) {
 #if (PROCESSES_HAVE_COMM_AND_NAME == 1)
-        search_for = string_dup(p->name ? p->name : p->comm);
+            search_for = string_dup(p->name ? p->name : p->comm);
 #else
-        search_for = string_dup(p->comm);
+            search_for = string_dup(p->comm);
 #endif
+        }
     }
 
     // find an existing target with the required name

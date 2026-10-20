@@ -69,16 +69,16 @@ func (c *Collector) collectReport(mx map[string]int64, filename string) error {
 			line = strings.TrimPrefix(line, "REQ_RATE []:")
 		}
 
-		parts := strings.Split(line, ",")
+		parts := strings.SplitSeq(line, ",")
 
-		for _, part := range parts {
-			i := strings.IndexByte(part, ':')
-			if i == -1 {
+		for part := range parts {
+			before, after, ok := strings.Cut(part, ":")
+			if !ok {
 				c.Debugf("Skipping metric '%s': missing colon separator", part)
 				continue
 			}
 
-			metric, sVal := strings.TrimSpace(part[:i]), strings.TrimSpace(part[i+1:])
+			metric, sVal := strings.TrimSpace(before), strings.TrimSpace(after)
 
 			val, err := strconv.ParseFloat(sVal, 64)
 			if err != nil {

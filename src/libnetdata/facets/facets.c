@@ -2,13 +2,14 @@
 #include "facets.h"
 
 #define FACETS_HISTOGRAM_COLUMNS 150        // the target number of points in a histogram
-#define FACETS_KEYS_WITH_VALUES_MAX 200     // the max number of keys that can be facets
+#define FACETS_KEYS_WITH_VALUES_INITIAL 200 // embedded capacity for keys that can be facets
 #define FACETS_KEYS_IN_ROW_MAX 500          // the max number of keys in a row
 
 #define FACETS_KEYS_HASHTABLE_ENTRIES 15
 #define FACETS_VALUES_HASHTABLE_ENTRIES 15
 
 static inline void facets_reset_key(FACET_KEY *k);
+static inline void facets_track_key_in_current_row(FACETS *facets, FACET_KEY *k);
 
 // ----------------------------------------------------------------------------
 
@@ -55,6 +56,12 @@ static inline void facets_hash_to_str(FACETS_HASH num, char *out) {
 }
 
 static inline FACETS_HASH str_to_facets_hash(const char *str) {
+    if(unlikely(!str))
+        return FACETS_HASH_ZERO;
+
+    if(unlikely(strnlen(str, FACET_STRING_HASH_SIZE) != FACET_STRING_HASH_SIZE - 1))
+        return FACETS_HASH_ZERO;
+
     FACETS_HASH num = 0;
     int shifts = 6 * (FACET_STRING_HASH_SIZE - 2);
 
@@ -80,6 +87,11 @@ static const char *hash_to_static_string(FACETS_HASH hash) {
 }
 
 static inline bool is_valid_string_hash(const char *s) {
+    if(!s) {
+        netdata_log_error("The user supplied key is NULL for a facets hash.");
+        return false;
+    }
+
     if(strlen(s) != FACET_STRING_HASH_SIZE - 1) {
         netdata_log_error("The user supplied key '%s' does not have the right length for a facets hash.", s);
         return false;
@@ -139,8 +151,8 @@ typedef struct facet_value {
     uint32_t final_facet_value_counter;
     uint32_t order;
 
-    uint32_t *histogram;
-    uint32_t min, max, sum;
+    uint64_t *histogram;
+    uint64_t min, max, sum;
 
     struct facet_value *prev, *next;
 } FACET_VALUE;
@@ -246,12 +258,15 @@ struct facets {
     struct {
         // this is like a stack, of the keys that are used as facets
         size_t used;
-        FACET_KEY *array[FACETS_KEYS_WITH_VALUES_MAX];
+        size_t size;
+        FACET_KEY **array;
+        FACET_KEY *initial_array[FACETS_KEYS_WITH_VALUES_INITIAL];
     } keys_with_values;
 
     struct {
         // this is like a stack, of the keys that need to clean up between each row
         size_t used;
+        bool overflowed;
         FACET_KEY *array[FACETS_KEYS_IN_ROW_MAX];
     } keys_in_row;
 
@@ -622,8 +637,32 @@ static inline void facet_key_late_init(FACETS *facets, FACET_KEY *k) {
     if(facets_key_is_facet(facets, k)) {
         FACETS_VALUES_INDEX_CREATE(k);
         k->values.enabled = true;
-        if(facets->keys_with_values.used < FACETS_KEYS_WITH_VALUES_MAX)
-            facets->keys_with_values.array[facets->keys_with_values.used++] = k;
+
+        if(unlikely(facets->keys_with_values.used == facets->keys_with_values.size)) {
+            size_t new_size = facets->keys_with_values.size ?
+                              facets->keys_with_values.size * 2 :
+                              FACETS_KEYS_WITH_VALUES_INITIAL;
+
+            if(unlikely(new_size < facets->keys_with_values.size ||
+                        new_size > SIZE_MAX / sizeof(*facets->keys_with_values.array)))
+                fatal("Cannot grow facets keys_with_values array beyond %zu entries",
+                      facets->keys_with_values.size);
+
+            FACET_KEY **new_array;
+            if(facets->keys_with_values.array == facets->keys_with_values.initial_array) {
+                new_array = mallocz(new_size * sizeof(*new_array));
+                memcpy(new_array,
+                       facets->keys_with_values.initial_array,
+                       facets->keys_with_values.used * sizeof(*new_array));
+            }
+            else
+                new_array = reallocz(facets->keys_with_values.array, new_size * sizeof(*new_array));
+
+            facets->keys_with_values.array = new_array;
+            facets->keys_with_values.size = new_size;
+        }
+
+        facets->keys_with_values.array[facets->keys_with_values.used++] = k;
     }
 }
 
@@ -631,6 +670,8 @@ static inline void FACETS_KEYS_INDEX_CREATE(FACETS *facets) {
     facets->keys.ll = NULL;
     facets->keys.count = 0;
     facets->keys_with_values.used = 0;
+    facets->keys_with_values.size = FACETS_KEYS_WITH_VALUES_INITIAL;
+    facets->keys_with_values.array = facets->keys_with_values.initial_array;
 
     simple_hashtable_init_KEY(&facets->keys.ht, FACETS_KEYS_HASHTABLE_ENTRIES);
 }
@@ -650,6 +691,10 @@ static inline void FACETS_KEYS_INDEX_DESTROY(FACETS *facets) {
     facets->keys.ll = NULL;
     facets->keys.count = 0;
     facets->keys_with_values.used = 0;
+    facets->keys_with_values.size = 0;
+    if(facets->keys_with_values.array != facets->keys_with_values.initial_array)
+        freez(facets->keys_with_values.array);
+    facets->keys_with_values.array = NULL;
 
     simple_hashtable_destroy_KEY(&facets->keys.ht);
 }
@@ -726,13 +771,12 @@ static void facet_key_set_name(FACET_KEY *k, const char *name, size_t name_lengt
 
     // an actual value, not a filter
 
-    char buf[name_length + 1];
-    memcpy(buf, name, name_length);
-    buf[name_length] = '\0';
+    char *name_copy = callocz(name_length + 1, sizeof(char));
+    memcpy(name_copy, name, name_length);
 
-    internal_fatal(strchr(buf, '='), "found = in key");
+    internal_fatal(strchr(name_copy, '='), "found = in key");
 
-    k->name = strdupz(buf);
+    k->name = name_copy;
     facet_key_late_init(k->facets, k);
 }
 
@@ -881,6 +925,13 @@ void facets_set_timeframe_and_histogram_by_name(FACETS *facets, const char *key_
     facets_set_timeframe_and_histogram_by_id(facets, hash_str, after_ut, before_ut);
 }
 
+static inline uint64_t facets_u64_saturating_add(uint64_t current, uint64_t add) {
+    if(unlikely(add > UINT64_MAX - current))
+        return UINT64_MAX;
+
+    return current + add;
+}
+
 static inline uint32_t facets_histogram_slot_at_time_ut(FACETS *facets, usec_t usec, FACET_VALUE *v) {
     if(unlikely(!v->histogram))
         v->histogram = callocz(facets->histogram.slots, sizeof(*v->histogram));
@@ -903,7 +954,7 @@ static inline uint32_t facets_histogram_slot_at_time_ut(FACETS *facets, usec_t u
 
 static inline void facets_histogram_update_value_slot(FACETS *facets, usec_t usec, FACET_VALUE *v) {
     uint32_t slot = facets_histogram_slot_at_time_ut(facets, usec, v);
-    v->histogram[slot]++;
+    v->histogram[slot] = facets_u64_saturating_add(v->histogram[slot], 1);
 }
 
 static inline void facets_histogram_update_value(FACETS *facets, usec_t usec) {
@@ -927,6 +978,46 @@ static usec_t overlap_duration_ut(usec_t start1, usec_t end1, usec_t start2, use
         return overlap_end - overlap_start;
     else
         return 0; // No overlap
+}
+
+static size_t facets_estimated_entries_for_overlap(usec_t overlap_ut, size_t entries, usec_t total_ut) {
+    if(!overlap_ut || !entries)
+        return 0;
+
+    if(overlap_ut == total_ut)
+        return entries;
+
+#if defined(__SIZEOF_INT128__)
+    return (size_t)(((__uint128_t)overlap_ut * (__uint128_t)entries) / (__uint128_t)total_ut);
+#else
+    if(entries <= UINT64_MAX / overlap_ut)
+        return (size_t)((overlap_ut * (uint64_t)entries) / total_ut);
+
+    size_t quotient = 0;
+    usec_t remainder = 0;
+
+    for(size_t bit = sizeof(entries) * CHAR_BIT; bit > 0; bit--) {
+        // The quotient cannot exceed the already processed prefix of entries.
+        quotient *= 2;
+        if(remainder >= total_ut - remainder) {
+            remainder -= total_ut - remainder;
+            quotient++;
+        }
+        else
+            remainder += remainder;
+
+        if(entries & ((size_t)1 << (bit - 1))) {
+            if(remainder >= total_ut - overlap_ut) {
+                remainder -= total_ut - overlap_ut;
+                quotient++;
+            }
+            else
+                remainder += overlap_ut;
+        }
+    }
+
+    return quotient;
+#endif
 }
 
 void facets_update_estimations(FACETS *facets, usec_t from_ut, usec_t to_ut, size_t entries) {
@@ -956,9 +1047,11 @@ void facets_update_estimations(FACETS *facets, usec_t from_ut, usec_t to_ut, siz
 
     FACET_VALUE *v = facets->histogram.key->estimated_value.v;
 
+#ifdef NETDATA_INTERNAL_CHECKS
     size_t slots = 0;
-    size_t total_ut = to_ut - from_ut;
-    ssize_t remaining_entries = (ssize_t)entries;
+    size_t remaining_entries = entries;
+#endif
+    usec_t total_ut = to_ut - from_ut;
     size_t slot = facets_histogram_slot_at_time_ut(facets, from_ut, v);
     for(; slot < facets->histogram.slots ;slot++) {
         usec_t slot_start_ut = facets->histogram.after_ut + slot * facets->histogram.slot_width_ut;
@@ -969,17 +1062,23 @@ void facets_update_estimations(FACETS *facets, usec_t from_ut, usec_t to_ut, siz
 
         usec_t overlap_ut = overlap_duration_ut(from_ut, to_ut, slot_start_ut, slot_end_ut);
 
-        size_t slot_entries = (overlap_ut * entries) / total_ut;
-        v->histogram[slot] += slot_entries;
-        remaining_entries -= (ssize_t)slot_entries;
+        size_t slot_entries = facets_estimated_entries_for_overlap(overlap_ut, entries, total_ut);
+        v->histogram[slot] = facets_u64_saturating_add(v->histogram[slot], slot_entries);
+#ifdef NETDATA_INTERNAL_CHECKS
+        internal_fatal(slot_entries > remaining_entries,
+                       "distribution of estimations assigned more entries than available");
+        remaining_entries -= slot_entries;
         slots++;
+#endif
     }
 
+#ifdef NETDATA_INTERNAL_CHECKS
     // Check if all entries are assigned
     // This should always be true if the distribution is correct
-    internal_fatal(remaining_entries < 0 || remaining_entries >= (ssize_t)(slots),
-                   "distribution of estimations is not accurate - there are %zd remaining entries",
+    internal_fatal(remaining_entries >= slots,
+                   "distribution of estimations is not accurate - there are %zu remaining entries",
                    remaining_entries);
+#endif
 }
 
 void facets_row_finished_unsampled(FACETS *facets, usec_t usec) {
@@ -1190,7 +1289,7 @@ static inline void facets_histogram_value_arp(BUFFER *wb, FACETS *facets __maybe
     buffer_json_array_close(wb); // key
 }
 
-static inline void facets_histogram_value_con(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key, uint32_t sum) {
+static inline void facets_histogram_value_con(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key, uint64_t sum) {
     buffer_json_member_add_array(wb, key);
     {
         if(k && k->values.enabled) {
@@ -1211,7 +1310,7 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
     CLEAN_BUFFER *tmp = buffer_create(0, NULL);
 
     size_t dimensions = 0;
-    uint32_t min = UINT32_MAX, max = 0, sum = 0, count = 0;
+    uint64_t min = UINT64_MAX, max = 0, sum = 0, count = 0;
 
     if(k && k->values.enabled) {
         FACET_VALUE *v;
@@ -1223,12 +1322,12 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
 
             dimensions++;
 
-            v->min = UINT32_MAX;
+            v->min = UINT64_MAX;
             v->max = 0;
             v->sum = 0;
 
             for(uint32_t i = 0; i < facets->histogram.slots ;i++) {
-                uint32_t n = v->histogram[i];
+                uint64_t n = v->histogram[i];
 
                 if(n < min)
                     min = n;
@@ -1236,7 +1335,7 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
                 if(n > max)
                     max = n;
 
-                sum += n;
+                sum = facets_u64_saturating_add(sum, n);
                 count++;
 
                 if(n < v->min)
@@ -1245,7 +1344,7 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
                 if(n > v->max)
                     v->max = n;
 
-                v->sum += n;
+                v->sum = facets_u64_saturating_add(v->sum, n);
             }
         }
         foreach_value_in_key_done(v);
@@ -1728,6 +1827,7 @@ void facets_destroy(FACETS *facets) {
     simple_pattern_free(facets->visible_keys);
     simple_pattern_free(facets->included_keys);
     simple_pattern_free(facets->excluded_keys);
+    simple_pattern_free(facets->query);
 
     while(facets->base) {
         FACET_ROW *r = facets->base;
@@ -1895,8 +1995,7 @@ void facets_set_additional_options(FACETS *facets, FACETS_OPTIONS options) {
 // ----------------------------------------------------------------------------
 
 static inline void facets_key_set_unsampled_value(FACETS *facets, FACET_KEY *k) {
-    if(likely(!facet_key_value_updated(k) && facets->keys_in_row.used < FACETS_KEYS_IN_ROW_MAX))
-        facets->keys_in_row.array[facets->keys_in_row.used++] = k;
+    facets_track_key_in_current_row(facets, k);
 
     k->current_value.flags |= FACET_KEY_VALUE_UPDATED | FACET_KEY_VALUE_UNSAMPLED;
 
@@ -1919,8 +2018,7 @@ static inline void facets_key_set_unsampled_value(FACETS *facets, FACET_KEY *k) 
 }
 
 static inline void facets_key_set_empty_value(FACETS *facets, FACET_KEY *k) {
-    if(likely(!facet_key_value_updated(k) && facets->keys_in_row.used < FACETS_KEYS_IN_ROW_MAX))
-        facets->keys_in_row.array[facets->keys_in_row.used++] = k;
+    facets_track_key_in_current_row(facets, k);
 
     k->current_value.flags |= FACET_KEY_VALUE_UPDATED | FACET_KEY_VALUE_EMPTY;
 
@@ -1943,8 +2041,7 @@ static inline void facets_key_set_empty_value(FACETS *facets, FACET_KEY *k) {
 }
 
 static inline void facets_key_check_value(FACETS *facets, FACET_KEY *k) {
-    if(likely(!facet_key_value_updated(k) && facets->keys_in_row.used < FACETS_KEYS_IN_ROW_MAX))
-        facets->keys_in_row.array[facets->keys_in_row.used++] = k;
+    facets_track_key_in_current_row(facets, k);
 
     k->current_value.flags |= FACET_KEY_VALUE_UPDATED;
     k->current_value.flags &= ~(FACET_KEY_VALUE_EMPTY|FACET_KEY_VALUE_UNSAMPLED|FACET_KEY_VALUE_ESTIMATED);
@@ -2242,20 +2339,44 @@ static inline void facets_reset_key(FACET_KEY *k) {
     k->key_values_selected_in_row = 0;
     k->current_value.flags = FACET_KEY_VALUE_NONE;
     k->current_value.hash = FACETS_HASH_ZERO;
+    k->current_value.raw = NULL;
+    k->current_value.raw_len = 0;
+    k->current_value.b->len = 0;
+    k->current_value.v = NULL;
+}
+
+static inline void facets_track_key_in_current_row(FACETS *facets, FACET_KEY *k) {
+    if(unlikely(facet_key_value_updated(k)))
+        return;
+
+    if(likely(facets->keys_in_row.used < FACETS_KEYS_IN_ROW_MAX))
+        facets->keys_in_row.array[facets->keys_in_row.used++] = k;
+    else
+        facets->keys_in_row.overflowed = true;
 }
 
 static void facets_reset_keys_with_value_and_row(FACETS *facets) {
-    size_t entries = facets->keys_in_row.used;
+    if(unlikely(facets->keys_in_row.overflowed)) {
+        FACET_KEY *k;
+        foreach_key_in_facets(facets, k) {
+            facets_reset_key(k);
+        }
+        foreach_key_in_facets_done(k);
+    }
+    else {
+        size_t entries = facets->keys_in_row.used;
 
-    for(size_t p = 0; p < entries ;p++) {
-        FACET_KEY *k = facets->keys_in_row.array[p];
-        facets_reset_key(k);
+        for(size_t p = 0; p < entries ;p++) {
+            FACET_KEY *k = facets->keys_in_row.array[p];
+            facets_reset_key(k);
+        }
     }
 
     facets->current_row.severity = FACET_ROW_SEVERITY_NORMAL;
     facets->current_row.keys_matched_by_query_positive = 0;
     facets->current_row.keys_matched_by_query_negative = 0;
     facets->keys_in_row.used = 0;
+    facets->keys_in_row.overflowed = false;
 
     facets_row_bin_data_cleanup(facets, &facets->bin_data);
 }
@@ -2268,6 +2389,7 @@ void facets_rows_begin(FACETS *facets) {
     foreach_key_in_facets_done(k);
 
     facets->keys_in_row.used = 0;
+    facets->keys_in_row.overflowed = false;
     facets_reset_keys_with_value_and_row(facets);
 }
 
@@ -2418,13 +2540,15 @@ void facets_sort_and_reorder_keys(FACETS *facets) {
     if(!entries)
         return;
 
-    FACET_KEY *keys[entries];
-    memcpy(keys, facets->keys_with_values.array, sizeof(FACET_KEY *) * entries);
+    FACET_KEY **keys = mallocz(entries * sizeof(*keys));
+    memcpy(keys, facets->keys_with_values.array, entries * sizeof(*keys));
 
     qsort(keys, entries, sizeof(FACET_KEY *), facets_keys_reorder_compar);
 
     for(size_t i = 0; i < entries ;i++)
         keys[i]->order = i + 1;
+
+    freez(keys);
 }
 
 static int facets_key_values_reorder_by_name_compar(const void *a, const void *b) {
@@ -2479,7 +2603,8 @@ static int facets_key_values_reorder_by_name_numeric_compar(const void *a, const
 static uint32_t facets_sort_and_reorder_values_internal(FACET_KEY *k) {
     bool all_values_numeric = true;
     size_t entries = k->values.used;
-    FACET_VALUE *values[entries], *v;
+    FACET_VALUE **values = mallocz(entries * sizeof(*values));
+    FACET_VALUE *v;
     uint32_t used = 0;
     foreach_value_in_key(k, v) {
         if((k->facets->options & FACETS_OPTION_DONT_SEND_EMPTY_VALUE_FACETS) && v->empty)
@@ -2499,8 +2624,10 @@ static uint32_t facets_sort_and_reorder_values_internal(FACET_KEY *k) {
     }
     foreach_value_in_key_done(v);
 
-    if(!used)
+    if(!used) {
+        freez(values);
         return 0;
+    }
 
     if(k->facets->options & FACETS_OPTION_SORT_FACETS_ALPHABETICALLY) {
         if(all_values_numeric)
@@ -2514,6 +2641,7 @@ static uint32_t facets_sort_and_reorder_values_internal(FACET_KEY *k) {
     for(size_t i = 0; i < used; i++)
         values[i]->order = i + 1;
 
+    freez(values);
     return used;
 }
 
@@ -2530,10 +2658,11 @@ static uint32_t facets_sort_and_reorder_values(FACET_KEY *k) {
     uint32_t ret = 0;
 
     size_t entries = k->values.used;
-    struct {
+    struct facet_value_restore {
+        FACET_VALUE *v;
         const char *name;
         uint32_t name_len;
-    } values[entries];
+    } *values = mallocz(entries * sizeof(*values));
     FACET_VALUE *v;
     uint32_t used = 0;
 
@@ -2541,6 +2670,7 @@ static uint32_t facets_sort_and_reorder_values(FACET_KEY *k) {
         if(used >= entries)
             break;
 
+        values[used].v = v;
         values[used].name = v->name;
         values[used].name_len = v->name_len;
         used++;
@@ -2553,19 +2683,15 @@ static uint32_t facets_sort_and_reorder_values(FACET_KEY *k) {
 
     ret = facets_sort_and_reorder_values_internal(k);
 
-    used = 0;
-    foreach_value_in_key(k, v) {
-        if(used >= entries)
-            break;
-
+    for(uint32_t i = 0; i < used; i++) {
+        v = values[i].v;
         freez((void *)v->name);
-        v->name = values[used].name;
-        v->name_len = values[used].name_len;
-        used++;
+        v->name = values[i].name;
+        v->name_len = values[i].name_len;
     }
-    foreach_value_in_key_done(v);
 
     buffer_free(tb);
+    freez(values);
     return ret;
 }
 
@@ -2680,7 +2806,9 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
                 RRDF_FIELD_SORT_DESCENDING|RRDF_FIELD_SORT_FIXED,
                 NULL,
                 RRDF_FIELD_SUMMARY_COUNT,
-                RRDF_FIELD_FILTER_RANGE,
+                // no column filter: the time range is controlled by has_history (after/before)
+                // and the anchor-based pagination, which both key on this column
+                RRDF_FIELD_FILTER_NONE,
                 RRDF_FIELD_OPTS_WRAP | RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY,
                 NULL);
 

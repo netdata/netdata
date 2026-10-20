@@ -6,6 +6,7 @@ modules:
       module_name: pgbouncer
       monitored_instance:
         name: PgBouncer
+        description: "Monitor PgBouncer client and server pools, transactions, queries, wait times, and database traffic."
         link: https://www.pgbouncer.org/
         icon_filename: postgres.svg
         categories:
@@ -21,15 +22,15 @@ modules:
       data_collection:
         metrics_description: |
           This collector monitors PgBouncer servers.
-          
+
           Executed queries:
-          
+
           - `SHOW VERSION;`
           - `SHOW CONFIG;`
           - `SHOW DATABASES;`
           - `SHOW STATS;`
           - `SHOW POOLS;`
-          
+
           Information about the queries can be found in the [PgBouncer Documentation](https://www.pgbouncer.org/usage.html).
         method_description: ""
       supported_platforms:
@@ -51,27 +52,27 @@ modules:
           - title: Create netdata user
             description: |
               Create a user with `stats_users` permissions to query your PgBouncer instance.
-              
+
               To create the `netdata` user:
-              
+
               - Add `netdata` user to the `pgbouncer.ini` file:
-              
+
                 ```text
                 stats_users = netdata
                 ```
-              
+
               - Add a password for the `netdata` user to the `userlist.txt` file:
-              
+
                 ```text
                 "netdata" "<PASSWORD>"
                 ```
-              
+
               - To verify the credentials, run the following command
-              
+
                 ```bash
                 psql -h localhost -U netdata -p 6432 pgbouncer -c "SHOW VERSION;" >/dev/null 2>&1 && echo OK || echo FAIL
                 ```
-              
+
                 When it prompts for a password, enter the password you added to `userlist.txt`.
       configuration:
         file:
@@ -130,13 +131,13 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Local and remote instances.
               config: |
                 jobs:
                   - name: local
                     dsn: 'postgres://postgres:postgres@127.0.0.1:6432/pgbouncer'
-                
+
                   - name: remote
                     dsn: 'postgres://postgres:postgres@203.0.113.10:6432/pgbouncer'
     troubleshooting:

@@ -6,18 +6,20 @@ import (
 	"sync"
 	"time"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/powervault/client"
 )
 
 const discoveryEvery = 10
 
-func (c *Collector) collect() error {
+func (c *Collector) collect(ctx context.Context) error {
 	c.runs++
 	needsDiscovery := !c.lastDiscoveryOK || c.runs%discoveryEvery == 0
 	wasOK := c.lastDiscoveryOK
 
 	if needsDiscovery {
-		if err := c.discovery(); err != nil {
+		if err := c.discovery(ctx); err != nil {
 			// Initial discovery must succeed.
 			if !wasOK {
 				return err
@@ -28,16 +30,16 @@ func (c *Collector) collect() error {
 	}
 
 	var wg sync.WaitGroup
-	for _, fn := range []func(){
+	for _, fn := range []func(context.Context){
 		c.collectControllerStats,
 		c.collectVolumeStats,
 		c.collectPortStats,
 		c.collectPhyStats,
 	} {
 		wg.Add(1)
-		go func(f func()) {
+		go func(f func(context.Context)) {
 			defer wg.Done()
-			f()
+			f(ctx)
 		}(fn)
 	}
 	wg.Wait()
@@ -52,62 +54,62 @@ func (c *Collector) collect() error {
 	return nil
 }
 
-func (c *Collector) discovery() error {
+func (c *Collector) discovery(ctx context.Context) error {
 	start := time.Now()
 	c.Debugf("starting discovery")
 
 	var d discovered
 
-	sys, err := c.client.System()
+	sys, err := c.client.System(ctx)
 	if err != nil {
 		c.lastDiscoveryOK = false
 		return err
 	}
 	d.system = sys
 
-	controllers, err := c.client.Controllers()
+	controllers, err := c.client.Controllers(ctx)
 	if err != nil {
 		c.lastDiscoveryOK = false
 		return err
 	}
 	d.controllers = controllers
 
-	drives, err := c.client.Drives()
+	drives, err := c.client.Drives(ctx)
 	if err != nil {
 		c.lastDiscoveryOK = false
 		return err
 	}
 	d.drives = drives
 
-	fans, err := c.client.Fans()
+	fans, err := c.client.Fans(ctx)
 	if err != nil {
 		c.lastDiscoveryOK = false
 		return err
 	}
 	d.fans = fans
 
-	psus, err := c.client.PowerSupplies()
+	psus, err := c.client.PowerSupplies(ctx)
 	if err != nil {
 		c.lastDiscoveryOK = false
 		return err
 	}
 	d.psus = psus
 
-	sensors, err := c.client.Sensors()
+	sensors, err := c.client.Sensors(ctx)
 	if err != nil {
 		c.lastDiscoveryOK = false
 		return err
 	}
 	d.sensors = sensors
 
-	frus, err := c.client.FRUs()
+	frus, err := c.client.FRUs(ctx)
 	if err != nil {
 		c.lastDiscoveryOK = false
 		return err
 	}
 	d.frus = frus
 
-	volumes, err := c.client.Volumes()
+	volumes, err := c.client.Volumes(ctx)
 	if err != nil {
 		c.lastDiscoveryOK = false
 		return err
@@ -119,14 +121,14 @@ func (c *Collector) discovery() error {
 		}
 	}
 
-	pools, err := c.client.Pools()
+	pools, err := c.client.Pools(ctx)
 	if err != nil {
 		c.lastDiscoveryOK = false
 		return err
 	}
 	d.pools = pools
 
-	ports, err := c.client.Ports()
+	ports, err := c.client.Ports(ctx)
 	if err != nil {
 		c.lastDiscoveryOK = false
 		return err

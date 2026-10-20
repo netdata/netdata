@@ -1,0 +1,213 @@
+{
+  "status": 200,
+  "type": "topology",
+  "has_history": false,
+  "update_every": 10,
+  "data": {
+    "schema_version": "netdata.topology.v1",
+    "producer": {
+      "source": "snmp-l2",
+      "instance": "sample-fabric",
+      "node_id": "poller-node",
+      "machine_guid": "poller-machine",
+      "agent_version": "test",
+      "plugin": "go.d.plugin",
+      "capabilities": ["topology-v1"]
+    },
+    "collected_at": "2026-05-09T00:00:00Z",
+    "view": {
+      "id": "l2-fabric",
+      "scope": "snmp_device",
+      "mode": "detailed",
+      "group_by": ["snmp_device"]
+    },
+    "dictionaries": {
+      "strings": [
+        "snmp_device",
+        "snmp_interface",
+        "switch-a",
+        "switch-b",
+        "if-a-1",
+        "if-b-1",
+        "l2_adjacency",
+        "lldp",
+        "observed_bidirectional",
+        "up",
+        "if_inventory",
+        "if_traffic"
+      ]
+    },
+    "types": {
+      "actor_types": {
+        "snmp_device": {
+          "layer": "network",
+          "identity": ["device_id"],
+          "merge_identity": ["device_id"],
+          "aggregation_scopes": ["snmp_device"]
+        },
+        "snmp_interface": {
+          "layer": "network",
+          "identity": ["device_id", "if_index"],
+          "merge_identity": ["device_id", "if_index"],
+          "parent_identity": ["device_id"],
+          "aggregation_scopes": ["snmp_interface"]
+        }
+      },
+      "link_types": {
+        "l2_adjacency": {
+          "orientation": "observed_bidirectional",
+          "direction_role": "observation",
+          "aggregation": {
+            "direction": "canonicalize_unordered",
+            "evidence": "append"
+          },
+          "evidence_types": ["snmp_l2_observation"],
+          "overlay_templates": ["if_traffic"]
+        }
+      },
+      "evidence_types": {
+        "snmp_l2_observation": {
+          "link_type": "l2_adjacency",
+          "role": "observation_evidence",
+          "match_columns": ["local_if", "remote_if", "protocol"],
+          "columns": [
+            {"id": "link", "type": "link_ref", "role": "reference"},
+            {"id": "local_if", "type": "actor_ref", "role": "reference"},
+            {"id": "remote_if", "type": "actor_ref", "role": "reference"},
+            {"id": "protocol", "type": "string_ref", "dictionary": "strings", "role": "group_key"},
+            {"id": "observation", "type": "string_ref", "dictionary": "strings"}
+          ]
+        }
+      },
+      "table_types": {
+        "if_inventory": {
+          "role": "actor_inventory",
+          "owner": "actor",
+          "aggregation": "set",
+          "columns": [
+            {"id": "actor", "type": "actor_ref", "role": "reference"},
+            {"id": "if_name", "type": "string_ref", "dictionary": "strings"},
+            {"id": "if_index", "type": "uint"},
+            {"id": "oper_status", "type": "string_ref", "dictionary": "strings"},
+            {"id": "speed_bps", "type": "uint", "unit": "bit/s", "aggregation": "max"}
+          ]
+        }
+      },
+      "overlay_templates": {
+        "if_traffic": {
+          "provider": "netdata.metrics",
+          "contexts": ["net.net"],
+          "dimensions": ["received", "sent"],
+          "selector_params": ["node_id", "if_name"],
+          "merge": {
+            "refs": "set",
+            "values": "sum"
+          }
+        }
+      },
+      "aggregation_scopes": {
+        "snmp_device": {"columns": ["device_id"], "evidence_policy": "preserve"},
+        "snmp_interface": {"columns": ["device_id", "if_index"], "evidence_policy": "preserve"}
+      }
+    },
+    "actors": {
+      "rows": 4,
+      "columns": [
+        {"id": "type", "type": "string_ref", "dictionary": "strings"},
+        {"id": "device_id", "type": "string_ref", "dictionary": "strings", "role": "identity"},
+        {"id": "if_index", "type": "uint", "nullable": true, "role": "identity"},
+        {"id": "if_name", "type": "string_ref", "dictionary": "strings", "nullable": true}
+      ],
+      "values": [
+        {"codec": "dict", "values": [0, 1], "indexes": [0, 0, 1, 1]},
+        {"codec": "values", "values": [2, 3, 2, 3]},
+        {"codec": "values", "values": [null, null, 1, 1]},
+        {"codec": "values", "values": [null, null, 4, 5]}
+      ]
+    },
+    "links": {
+      "rows": 1,
+      "columns": [
+        {"id": "src_actor", "type": "actor_ref", "role": "reference"},
+        {"id": "dst_actor", "type": "actor_ref", "role": "reference"},
+        {"id": "type", "type": "string_ref", "dictionary": "strings"},
+        {"id": "evidence_count", "type": "uint", "role": "metric", "aggregation": "sum"}
+      ],
+      "values": [
+        {"codec": "const", "value": 0},
+        {"codec": "const", "value": 1},
+        {"codec": "const", "value": 6},
+        {"codec": "const", "value": 1}
+      ]
+    },
+    "evidence": {
+      "snmp_l2_observation": {
+        "type": "snmp_l2_observation",
+        "table": {
+          "rows": 1,
+          "columns": [
+            {"id": "link", "type": "link_ref", "role": "reference"},
+            {"id": "local_if", "type": "actor_ref", "role": "reference"},
+            {"id": "remote_if", "type": "actor_ref", "role": "reference"},
+            {"id": "protocol", "type": "string_ref", "dictionary": "strings", "role": "group_key"},
+            {"id": "observation", "type": "string_ref", "dictionary": "strings"}
+          ],
+          "values": [
+            {"codec": "const", "value": 0},
+            {"codec": "const", "value": 2},
+            {"codec": "const", "value": 3},
+            {"codec": "const", "value": 7},
+            {"codec": "const", "value": 8}
+          ]
+        }
+      }
+    },
+    "tables": {
+      "actor": {
+        "if_inventory": {
+          "type": "if_inventory",
+          "table": {
+            "rows": 2,
+            "columns": [
+              {"id": "actor", "type": "actor_ref", "role": "reference"},
+              {"id": "if_name", "type": "string_ref", "dictionary": "strings"},
+              {"id": "if_index", "type": "uint"},
+              {"id": "oper_status", "type": "string_ref", "dictionary": "strings"},
+              {"id": "speed_bps", "type": "uint", "unit": "bit/s", "aggregation": "max"}
+            ],
+            "values": [
+              {"codec": "values", "values": [2, 3]},
+              {"codec": "values", "values": [4, 5]},
+              {"codec": "const", "value": 1},
+              {"codec": "const", "value": 9},
+              {"codec": "const", "value": 1000000000}
+            ]
+          }
+        }
+      }
+    },
+    "overlays": {
+      "refs": {
+        "rows": 2,
+        "columns": [
+          {"id": "template", "type": "string_ref", "dictionary": "strings"},
+          {"id": "link", "type": "link_ref", "role": "reference"},
+          {"id": "node_id", "type": "string_ref", "dictionary": "strings"},
+          {"id": "if_name", "type": "string_ref", "dictionary": "strings"}
+        ],
+        "values": [
+          {"codec": "const", "value": 11},
+          {"codec": "const", "value": 0},
+          {"codec": "values", "values": [2, 3]},
+          {"codec": "values", "values": [4, 5]}
+        ]
+      }
+    },
+    "stats": {
+      "actors": 4,
+      "links": 1,
+      "evidence_rows": 1,
+      "overlay_refs": 2
+    }
+  }
+}

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../common.h"
+#include "../libnetdata-base.h"
 
 #ifndef NETDATA_LOG_SYSTEMD_JOURNAL_HELPERS_H
 #define NETDATA_LOG_SYSTEMD_JOURNAL_HELPERS_H

@@ -269,7 +269,7 @@ struct per_core_cpuidle_chart {
 static void* wake_cpu_thread(void* core) {
     pthread_t thread;
     cpu_set_t cpu_set;
-    static size_t cpu_wakeups = 0;
+    static size_t cpu_wakeups __maybe_unused = 0;
     static int errors = 0;
 
     CPU_ZERO(&cpu_set);
@@ -996,7 +996,7 @@ int do_proc_stat(int update_every, usec_t dt) {
                         for(state = 0; state < cpuidle_charts[core].cpuidle_state_len; state++) {
                             strncpyz(cpuidle_dim_id, cpuidle_charts[core].cpuidle_state[state].name, RRD_ID_LENGTH_MAX);
                             for(int i = 0; cpuidle_dim_id[i]; i++)
-                                cpuidle_dim_id[i] = tolower(cpuidle_dim_id[i]);
+                                cpuidle_dim_id[i] = tolower((uint8_t)cpuidle_dim_id[i]);
                             cpuidle_charts[core].cpuidle_state[state].rd = rrddim_add(cpuidle_charts[core].st, cpuidle_dim_id,
                                                                                       cpuidle_charts[core].cpuidle_state[state].name,
                                                                                       1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);

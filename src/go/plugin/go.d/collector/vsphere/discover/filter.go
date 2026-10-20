@@ -25,13 +25,14 @@ func (d Discoverer) matchVM(vm *rs.VM) bool {
 func (d Discoverer) removeUnmatched(res *rs.Resources) (removed int) {
 	d.Debug("discovering : filtering : starting filtering resources process")
 	t := time.Now()
-	numC, numH, numV, numD := len(res.Clusters), len(res.Hosts), len(res.VMs), len(res.Datastores)
+	numC, numH, numV, numD, numSP := len(res.Clusters), len(res.Hosts), len(res.VMs), len(res.Datastores), len(res.StoragePods)
 	removed += d.removeUnmatchedClusters(res.Clusters)
 	d.removeOrphanedResourcePools(res.ResourcePools, res.Clusters)
 	removed += d.removeUnmatchedHosts(res.Hosts)
 	removed += d.removeUnmatchedVMs(res.VMs)
 	removed += d.removeUnmatchedDatastores(res.Datastores)
-	d.Infof("discovering : filtering : filtered %d/%d clusters, %d/%d hosts, %d/%d vms, %d/%d datastores, %d resource pools remaining, process took %s",
+	removed += d.removeUnmatchedStoragePods(res.StoragePods)
+	d.Infof("discovering : filtering : filtered %d/%d clusters, %d/%d hosts, %d/%d vms, %d/%d datastores, %d/%d datastore clusters, %d resource pools remaining, process took %s",
 		numC-len(res.Clusters),
 		numC,
 		numH-len(res.Hosts),
@@ -40,6 +41,8 @@ func (d Discoverer) removeUnmatched(res *rs.Resources) (removed int) {
 		numV,
 		numD-len(res.Datastores),
 		numD,
+		numSP-len(res.StoragePods),
+		numSP,
 		len(res.ResourcePools),
 		time.Since(t))
 	return
@@ -82,6 +85,24 @@ func (d Discoverer) removeUnmatchedDatastores(datastores rs.Datastores) (removed
 		}
 	}
 	d.Debugf("discovering : filtering : removed %d unmatched datastores", removed)
+	return removed
+}
+
+func (d Discoverer) matchStoragePod(pod *rs.StoragePod) bool {
+	if d.DatastoreClusterMatcher == nil {
+		return true
+	}
+	return d.DatastoreClusterMatcher.Match(pod)
+}
+
+func (d Discoverer) removeUnmatchedStoragePods(pods rs.StoragePods) (removed int) {
+	for _, pod := range pods {
+		if !d.matchStoragePod(pod) {
+			removed++
+			pods.Remove(pod.ID)
+		}
+	}
+	d.Debugf("discovering : filtering : removed %d unmatched datastore clusters", removed)
 	return removed
 }
 

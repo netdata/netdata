@@ -1,0 +1,49 @@
+---
+name: nd-run Tests
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/nd-run-tests.yml'
+      - 'src/collectors/utils/nd-run.c'
+      - 'src/collectors/utils/nd-file-reader.*'
+      - 'CMakeLists.txt'
+      - 'src/collectors/utils/exec-signals.h'
+      - 'tests/nd-run/**'
+  push:
+    branches:
+      - master
+    paths:
+      - '.github/workflows/nd-run-tests.yml'
+      - 'src/collectors/utils/nd-run.c'
+      - 'src/collectors/utils/nd-file-reader.*'
+      - 'CMakeLists.txt'
+      - 'src/collectors/utils/exec-signals.h'
+      - 'tests/nd-run/**'
+permissions:
+  contents: read
+concurrency:
+  group: nd-run-tests-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  native:
+    timeout-minutes: 20
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Unprivileged command and file-reader tests
+        run: python3 tests/nd-run/test_nd_run.py -v
+      - name: Address and undefined behavior sanitizers
+        if: runner.os == 'Linux'
+        run: python3 tests/nd-run/test_nd_run.py --cc clang --cflags='-fsanitize=address,undefined' -v
+      - name: macOS undefined behavior sanitizer
+        if: runner.os == 'macOS'
+        run: python3 tests/nd-run/test_nd_run.py --cc clang --cflags='-fsanitize=undefined' -v
+      - name: Linux root and capability tests
+        if: runner.os == 'Linux'
+        run: |
+          sudo useradd --system --user-group nd-run-test
+          sudo python3 tests/nd-run/test_nd_run.py --user nd-run-test -v
+          sudo python3 tests/nd-run/test_nd_run.py --user nd-run-test --no-setres -v

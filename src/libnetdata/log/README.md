@@ -176,13 +176,14 @@ Example logrotate configuration:
 ```
 /var/log/netdata/*.log {
     daily
-    rotate 7
+    missingok
+    rotate 14
     compress
     delaycompress
-    missingok
     notifempty
+    sharedscripts
     postrotate
-        killall -USR2 netdata 2>/dev/null || true
+        /bin/kill -HUP `cat /run/netdata/netdata.pid 2>/dev/null` 2>/dev/null || true
     endscript
 }
 ```
@@ -304,6 +305,17 @@ journalctl MESSAGE_ID=9ce0cb58-ab8b-44df-82c4-bf1ad9ee22de --since "1 hour ago"
 ### Linux: Using journalctl to query Netdata logs
 
 The Netdata service's processes execute within the `netdata` journal namespace. Common queries:
+
+:::note
+If `journalctl` reports insufficient permissions for the `netdata` namespace, run the query with `sudo`.
+For persistent access without `sudo`, add the user to the `systemd-journal` group, then log out and back in.
+Membership grants read access to all local journal files, not only Netdata logs.
+
+```bash
+sudo usermod -aG systemd-journal "$USER"
+```
+
+:::
 
 ```bash
 # Real-time log monitoring

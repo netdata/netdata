@@ -1,0 +1,465 @@
+# Go Helper Packages For go.d Collectors
+
+Use existing helper packages before adding collector-local plumbing. A helper is not better because it is shared; it is
+better when it gives users the same configuration shape, the same safety behavior, or the same testable parsing path as
+other collectors.
+
+This guide covers helper surfaces used by go.d collectors across:
+
+- `src/go/pkg/*` for shared Go packages used beyond go.d;
+- `src/go/plugin/go.d/pkg/*` for go.d-specific helpers;
+- `src/go/logger` for the logger embedded through `collectorapi.Base`.
+
+It is not an exhaustive API reference. Before adding a local helper, search these roots for an existing package that
+already owns the behavior.
+
+## Helper Roots
+
+| Need | Start with |
+|---|---|
+| V2 metrics, metric stores, host scopes | `src/go/pkg/metrix` |
+| Duration, tri-state and enum config option types | `src/go/pkg/confopt` |
+| HTTP request/client config | `src/go/pkg/web` |
+| TLS config outside HTTP | `src/go/pkg/tlscfg` |
+| Configured credential-file reads | `src/go/pkg/credentialfile` |
+| Prometheus exposition parsing | `src/go/pkg/prometheus` |
+| Metric name/label replacement and filtering | [`src/go/pkg/relabel`](/src/go/pkg/relabel/README.md) |
+| User selector/matcher grammar | `src/go/pkg/matcher` |
+| Collector logging and log limiting | `src/go/logger` |
+| Function request/response helpers | `src/go/pkg/funcapi` |
+| Topology payloads | `src/go/pkg/topology/v1` |
+| Agent API / chart emission payloads | `src/go/pkg/netdataapi` |
+| TCP/UDP/Unix line-protocol clients | `src/go/plugin/go.d/pkg/socket` |
+| Command execution | `src/go/plugin/go.d/pkg/ndexec` |
+| Log-file readers/parsers | `src/go/plugin/go.d/pkg/logs` |
+| IP range parsing | `src/go/plugin/go.d/pkg/iprange` |
+| Shared reverse-DNS lookup/cache | `src/go/plugin/go.d/pkg/reversedns` |
+| SQL query/scan helpers | `src/go/plugin/go.d/pkg/sqlquery` |
+| Cloud auth config/credentials | `src/go/plugin/go.d/pkg/cloudauth` |
+| Profile-catalog loading (YAML profiles, stock/user dirs) | `src/go/plugin/go.d/pkg/profilecatalog` |
+| Ping probing | `src/go/plugin/go.d/pkg/pinger` |
+| SNMP utilities | `src/go/plugin/go.d/pkg/snmputils` |
+| SNMP device identity and profile metadata | `src/go/plugin/go.d/collector/snmp/ddsnmp` |
+| Kubernetes client helpers | `src/go/plugin/go.d/pkg/k8sclient` |
+| Docker host helpers | `src/go/plugin/go.d/pkg/dockerhost` |
+| Test helpers for collectors | `src/go/plugin/go.d/pkg/collecttest` |
+| Legacy V1 metric helpers | `src/go/pkg/stm`, `src/go/plugin/go.d/pkg/oldmetrix` |
+
+## Config Option Types
+
+Use `src/go/pkg/confopt` for common configuration value types.
+
+When:
+
+- users configure durations that should accept strings such as `5s`, `30m`, or numeric seconds;
+- users need explicit `auto` / `enabled` / `disabled` behavior instead of a plain boolean;
+- an option takes one of a fixed set of string values, with a default that an empty or omitted value means;
+- a migration needs to preserve legacy pointer-boolean semantics without keeping pointer plumbing in new code.
+
+Why:
+
+- `confopt.Duration` and `confopt.LongDuration` centralize YAML/JSON duration parsing and formatting;
+- `confopt.AutoBool` makes tri-state behavior explicit and schema-friendly;
+- `confopt.Enum` decodes and encodes an empty value as its default, and `Validate` reports the allowed values;
+- collectors avoid ad hoc parsers and inconsistent boolean defaults.
+
+## HTTP Collectors
+
+Use `src/go/pkg/web` for HTTP-based collectors.
+
+When:
+
+- the collector talks to an HTTP or HTTPS endpoint;
+- users need the normal Netdata HTTP options: `url`, timeout, redirects, proxy, basic auth, bearer token file, headers,
+  body, method, and TLS fields;
+- the collector builds repeated requests against the same endpoint.
+
+Why:
+
+- `web.HTTPConfig` embeds `web.RequestConfig` and `web.ClientConfig` so HTTP collectors expose the same option surface;
+- `web.NewHTTPClient(ctx, c.ClientConfig)` applies timeout, TLS, proxy, redirect, and HTTP/2
+  behavior consistently;
+- `web.NewHTTPRequest(ctx, c.RequestConfig)` and
+  `web.NewHTTPRequestWithPath(ctx, c.RequestConfig, path)` apply user agent,
+  authentication, headers, body, and safe path joining.
+
+Pattern:
+
+```go
+type Config struct {
+    web.HTTPConfig `yaml:",inline" json:""`
+}
+```
+
+Use `src/go/pkg/tlscfg` directly only when the collector is not HTTP-based but still needs TLS, such as Redis or
+x509-style checks. HTTP collectors should get TLS behavior through `web.HTTPConfig`.
+
+### Configured credential and TLS files
+
+HTTP helpers handle credential files internally. `web.NewHTTPClient(ctx, cfg)` returns a standard `*http.Client`;
+`web.NewHTTPRequest(ctx, cfg)` and `web.NewHTTPRequestWithPath(ctx, cfg, path)` return standard requests. Callers do not
+pass or own a reader. Ordinary test/custom transports can be passed directly to clients and `web.DoHTTP`.
+Keep `web.DoHTTP(client)` response/parsing helpers per use; their `OnNokCode` callback is mutable.
+
+Each configured file operation uses its own reduced-authority helper on Unix. Requests without a bearer file start no
+helper process. `tlscfg.NewTLSConfig(ctx, cfg)` reads each configured CA/cert/key file independently. SDK/RPC HTTP consumers
+use the same `web.NewHTTPClient` constructor. Cookie collection calls `Stat` and conditionally `Open`/parse; it closes the
+stream before returning. No helper process is retained between operations.
+
+On Unix the operation uses a reduced-authority helper. Windows retains the service account's file authority. Helpers
+fail closed and never fall back to elevated local reads. Pass the current Init, collection or Function context before
+reading a file. Do not retain reader state in a job, HTTP client, configuration or context, or cache bearer contents.
+
+Bearer tokens are read on every request. CA files, and certificate/key files when both are configured, retain the
+`safefile` contract: validate the opened object as regular, accept symlinks to regular files and read at most 1 MiB.
+`ReadAll` and streaming `Open` support existing unbounded input policies; they do not implicitly adopt that limit. Cookie
+files retain per-collection `Stat`, reload on mtime changes and streaming parsing. Errors must not contain file contents
+or parser fragments derived from credential input.
+
+Use `credentialfile.Read`/`ReadAll` for new configurable credential paths. `safefile` is descriptor validation, not a
+privilege boundary. Do not add preflight checks followed by `os.ReadFile`. Unit tests may use private stateless
+read seams and `testutil.New()` from `pkg/credentialfile/testutil` for synthetic fixtures; public APIs use the real
+credential-file boundary.
+
+This boundary covers explicit native credential-file options. SDK default credential chains and database DSN processing
+retain their existing behavior.
+
+## Prometheus Endpoints
+
+Use `src/go/pkg/prometheus` when the upstream endpoint exposes Prometheus text format.
+
+When:
+
+- the collector scrapes `/metrics` or another Prometheus exposition endpoint;
+- the collector needs to parse metric families or sorted series;
+- the collector needs a bounded selector for metric names.
+
+Why:
+
+- it reuses `web.RequestConfig` and `*http.Client`;
+- it handles Prometheus text parsing and gzip responses;
+- selectors avoid parsing or processing metric families the collector will not use.
+
+Pass the HTTP client to `prometheus.New(client, request)` or
+`prometheus.NewWithSelector(client, request, selector)`. Use `ScrapeContext(ctx)`, `ScrapeSeries(ctx)` or
+`ScrapeSamples(ctx)` so cancellation reaches the bearer read as well as the HTTP request.
+
+Do not hand-roll text exposition parsing in a collector.
+
+## Metric Relabeling
+
+Use `pkg/relabel` for Prometheus-compatible transformations of metric names and labels. Its `Record` excludes
+values and types, which remain owned by the caller. Reuse a compiled `Processor` or name-matched `Pipeline`
+serially; retain collector-specific validation and typed-family integrity checks at the caller boundary.
+See the [shared relabel contract](/src/go/pkg/relabel/README.md) for ownership, drop behavior, and rule syntax.
+
+## Selectors And Matchers
+
+Use `src/go/pkg/matcher` for user-facing include/exclude or selector fields.
+
+When:
+
+- users select entities by name, ID, interface, queue, topic, or similar labels;
+- the selector syntax can be glob, regexp, string, or simple patterns;
+- negative matches such as `!*test* *` are sufficient.
+
+Why:
+
+- users get one matcher grammar across collectors;
+- tests can cover selector behavior without custom parser logic;
+- existing logical matchers can combine conditions when needed.
+
+Do not invent a selector language unless the upstream API requires one. Prefer a single simple-pattern field for simple
+cases; add separate include/exclude fields only when the user problem needs that shape.
+
+Do not use `src/go/pkg/selectorcore` for user-facing collector selectors. It is the lower-level selector metadata/parser
+surface used by template and selector engines, not the normal collector selector helper.
+
+## Limited Logging
+
+Collectors embed `collectorapi.Base`, which embeds `*logger.Logger`. Use the logger's built-in limiting before adding
+collector-local rate-limit state.
+
+When:
+
+- an error can repeat every collection cycle;
+- a partial failure is useful to report but would spam logs;
+- a one-time notice or warning is enough.
+
+Why:
+
+- in go.d jobs, `c.Once(key).Warningf(...)` is cycle-local because the runtime resets `Once` state each `runOnce`; it is
+  useful for suppressing duplicate messages inside one cycle only;
+- `c.Limit(key, n, window).Warningf(...)` logs at most `n` messages per key per window and is the right default for
+  cross-cycle spam control;
+- the limiter is shared through the collector logger and already used by modern collectors such as Cato Networks,
+  PAN-OS, and vSphere.
+
+Pattern:
+
+```go
+c.Limit("mycollector:operation:error", 1, time.Hour).
+    Warningf("operation failed: %v", err)
+```
+
+Use stable keys. Include the operation and bounded error class when needed, but do not put unbounded IDs, URLs, query
+strings, customer names, or raw provider messages in the key.
+
+Custom warning gates are justified only when the built-in count-per-window semantics are not the right behavior, for
+example when logging only on state transitions. Document that reason in the PR description or design note so reviewers
+can see why the built-in limiter was not enough.
+
+## Socket Clients
+
+Use `src/go/plugin/go.d/pkg/socket` for simple TCP, UDP, or Unix-socket line-protocol collectors.
+
+When:
+
+- the collector connects to a local or remote socket and sends text commands;
+- the response is processed line by line;
+- the collector needs shared timeout, TLS, and max-read-line behavior.
+
+Why:
+
+- socket address parsing is shared across collectors;
+- connect, command, read, disconnect, deadline, and line-limit behavior stay consistent;
+- tests can use the helper's fake TCP/UDP/Unix servers instead of custom socket harnesses.
+
+Do not hand-roll socket dial/read loops for common line-oriented protocols.
+
+## External Commands
+
+Use `src/go/plugin/go.d/pkg/ndexec` for collectors that execute binaries.
+
+When:
+
+- the collector needs a local command output;
+- the command should run through Netdata's helper wrappers;
+- the command may need privilege through `ndsudo`;
+- tests need to stub helper paths.
+
+Why:
+
+- arguments are passed without a shell;
+- timeouts and context cancellation are handled;
+- stderr snippets are bounded;
+- helpers integrate with Netdata's execution model.
+
+Use:
+
+- `RunUnprivileged` / `RunUnprivilegedWithOptions...` for unprivileged commands;
+- `UnprivilegedCommandContext` when callers need to own stdio and output limits, such as secret file reads;
+- `RunNDSudo` for commands exposed through `ndsudo`;
+- `RunDirect` only when direct execution is intentionally required;
+- `FindBinary` for PATH/default-path discovery.
+
+Do not call `exec.Command` directly unless the helper cannot support the case and the reason is documented.
+
+`UnprivilegedCommandContext` returns an unstarted `*exec.Cmd` using the same helper discovery and cancellation
+as the Run APIs. The caller MUST configure stdio and call Start/Wait (or Run), and MUST supply a context deadline
+when execution needs a timeout. Construction does not log arguments or output. Secret consumers MUST bound stdout
+and discard stderr: the Run APIs buffer stdout and include stderr snippets in errors, so they are unsuitable for
+secret output without caller-owned handling.
+
+For a command that must own descendant cleanup, one-shot or persistent, use `StartUnprivilegedProcess` with
+`ProcessOptions` file descriptors. Nil stdio uses the null device. The caller owns its pipe ends; the returned
+`Process` exclusively owns cancellation, termination and reaping. Call `Wait` to join it or `Close` to terminate
+and join; both permit repeated/concurrent calls. Completion joins the leader and termination requests, not each
+descendant independently. Leader exit also requests termination of contained descendants. Do not build
+this contract by calling a raw command's `Cancel` after `Wait`: a reaped Unix PID/process-group ID can be reused.
+
+The owned API supports Linux, macOS, FreeBSD and Windows 10 or later. Unix exit observation keeps the group leader
+unreaped until group termination is permanently disarmed. Descendants MUST remain in that process group; this is
+lifecycle containment, not a sandbox against a script deliberately creating another session/group. Windows uses a
+Job Object assigned during process creation, with no breakaway permission. Containment/setup failures fail startup
+without an uncontained fallback. File stdio avoids copier goroutines waiting on a descendant's inherited stream.
+The existing `exec.Cmd` constructors retain their existing behavior; they do not provide this ownership guarantee.
+
+On Unix, `nd-run` uses a minimal environment by default. Passing `Env` to a Run API changes the helper's input
+but does not enable preservation. Use `UnprivilegedCommandContextWithPreservedEnv` when the target requires inherited
+application variables, such as authentication tokens or explicit tool configuration. It invokes
+`nd-run --preserve-env -- command [args...]`; a missing helper or one without this option fails without direct fallback.
+Both constructors leave `Cmd.Env` unset to inherit the caller's environment; callers may set it explicitly before Start.
+
+Both modes replace USER, LOGNAME and HOME with the selected account's values, SHELL with `/bin/sh`, and LC_ALL with `C`.
+The helper selects the configured Netdata user (fallback `nobody`); an unprivileged caller that cannot switch users
+retains its current identity. Capability clearing is performed by the helper when built with capability support.
+Windows callers need an explicit platform path when this Unix privilege-drop behavior does not apply.
+
+The Unix file secret provider uses the default constructor; the command secret provider uses the preserving constructor.
+Both keep their own bounded output and secret-safe error handling. Windows providers retain direct execution.
+
+## Log File Collectors
+
+Use `src/go/plugin/go.d/pkg/logs` for collectors that parse application log files.
+
+When:
+
+- the collector tails files that can rotate;
+- the log format is CSV, LTSV, regexp, or JSON;
+- parser errors should be distinguishable from I/O errors.
+
+Why:
+
+- `logs.Reader` is log-rotation aware;
+- `logs.NewParser` centralizes supported parser types;
+- `logs.IsParseError` lets collection logic treat malformed rows differently from source failures.
+
+Do not open and seek log files manually unless the collector's source is not a normal file-tail workflow.
+
+## IP Ranges
+
+Use `src/go/plugin/go.d/pkg/iprange` when users configure address ranges.
+
+When:
+
+- the collector filters IPs, networks, peers, or hosts by ranges;
+- the config accepts CIDR, range, or other supported range syntax.
+
+Why:
+
+- range parsing and membership checks are shared;
+- invalid syntax handling is consistent;
+- collectors avoid slightly different IP matching semantics.
+
+## SQL Helpers
+
+Use `src/go/plugin/go.d/pkg/sqlquery` for repeated SQL row-scanning patterns.
+
+When:
+
+- the collector or Function scans rows into strings, integers, floats, or discard columns;
+- the collector needs table-column discovery with `?` or `$1` placeholders;
+- the row-to-value assignment is generic across queries.
+
+Why:
+
+- scan holders and null handling are centralized;
+- query duration measurement and row iteration behavior stay testable;
+- Function code can avoid custom one-off scanners.
+
+## Cloud Auth Helpers
+
+Use `src/go/plugin/go.d/pkg/cloudauth` when a cloud collector needs supported cloud-provider credentials.
+
+When:
+
+- the collector supports `cloud_auth` configuration;
+- Azure AD credential construction is needed.
+
+Why:
+
+- provider names normalize consistently;
+- validation is centralized;
+- unsupported providers fail with consistent errors.
+
+## Ping Helpers
+
+Use `src/go/plugin/go.d/pkg/pinger` for ping/latency probing.
+
+When:
+
+- a collector needs ICMP-style probing;
+- it needs shared latency/jitter derivation.
+
+Why:
+
+- probe config validation and derived metrics are shared;
+- collectors avoid reimplementing packet sampling and jitter math.
+
+## Profile Catalog Helpers
+
+Use `src/go/plugin/go.d/pkg/profilecatalog` when a collector ships curated per-target profile files and loads them from
+stock plus user directories. By default a profile's identity is its YAML filename without the extension; collectors with
+compound encodings can supply their own filename-to-identity parser. Used by the `prometheus`, `azure_monitor`,
+`cloudwatch`, and `snmp_traps` collectors.
+
+When:
+
+- the collector reads profiles from `config/go.d/<name>.profiles/` (stock) and the user config dirs;
+- it needs stock/user override precedence (user overrides stock by logical identity), stock-fatal errors, and either
+  skip-invalid-user or fail-invalid-user behavior;
+- it may need the optional process-wide cache, or may own a shorter catalog lifecycle itself.
+
+Why:
+
+- one shared `Load[P]` + `Catalog[P]` + `Cached[T]` replaces per-collector copies of the directory walk, override
+  precedence, and singleton caching;
+- it is generic over the collector's profile type `P` and oblivious to matching (matching stays in the collector);
+- loading depth is the collector's choice: `Options.Decode` receives file bytes, while `Options.LoadFile` lets the caller
+  own compression, size limits, or path-based lazy state;
+- `Options.ParseFileName` can derive one logical identity from compound suffixes while preserving the default YAML
+  behavior for existing callers.
+
+Do NOT put matching logic in this package; it is a catalog + loader, not a matcher. Keep the profile schema, its
+decode/validate, the `defaultDirSpecs` directory resolution (location-specific), and specialized queries in the
+collector's own profile package. A collector may wrap `profilecatalog.Catalog[P]` when it needs specialized queries.
+
+## Reverse DNS
+
+Use `src/go/plugin/go.d/pkg/reversedns` when multiple collectors or jobs need PTR data from one bounded process-owned
+cache.
+
+Choose the API by caller behavior:
+
+- `Lookup` is cache-only and performs no DNS I/O.
+- `Schedule` is best-effort and non-blocking; use it from per-item hot paths.
+- `Resolve` waits for a cached or coalesced lookup; use it from background warmers and other blocking paths.
+
+The resolver canonicalizes mapped IPv4 addresses, normalizes PTR names deterministically, caches positive and negative
+results with separate TTLs, coalesces work by address, and bounds both active lookups and retained entries. Blocking
+`Resolve` work receives admission priority over new `Schedule` work. Its segmented retention policy protects repeatedly
+used positive entries from one-pass source scans.
+
+Create the resolver at the composition root and inject the same pointer into its consumers. Collectors borrow it: they
+MUST NOT close, sweep, or replace it during per-job lifecycle. Keep collector-specific address eligibility, candidate
+selection, display precedence, and audit mapping in collector-owned adapters rather than adding those policies to the
+generic package.
+
+## SNMP Device Identity
+
+Use `ddsnmp.AcquireDeviceIdentity` in `src/go/plugin/go.d/collector/snmp/ddsnmp` to obtain a device's GUID,
+hostname, and labels independently of an SNMP metrics job. The result does not publish a vnode or register a device.
+
+The caller composes the existing acquisition steps:
+
+1. Obtain system information with `snmputils.GetSysInfo` using a connected `snmputils.ScalarClient`. An unusable
+   `sysObjectID` value (not a valid numeric OID) does not fail acquisition; it leaves `SysObjectID` empty.
+2. Resolve profiles with `ddsnmp.Catalog.Resolve`. Choose the appropriate profile projection and no-profile policy
+   for the consumer; those decisions do not belong to identity assembly.
+3. Construct `ddsnmpcollector.New` with the selected profiles, system object ID, client, and logger, or reuse the
+   caller's existing engine. Pass it to `AcquireDeviceIdentity` together with the system information and options.
+   A nil metadata source obtains identity from system information alone.
+
+`ddsnmpcollector` is a library engine. Construction creates its metric and metadata helpers, but does not start a
+metrics job or background work. Identity acquisition calls only `CollectDeviceMetadata`, once per invocation. It
+returns acquisition errors unchanged and does not return a partial identity on error. The caller owns connection
+lifetime, timeout/retry settings, attempt diagnostics, and any subsequent refresh or publication. Engine state is
+mutable; the caller must serialize its use.
+
+Identity defaults preserve the SNMP collector's existing behavior:
+
+- GUID is the SHA1 UUID in the DNS namespace derived from the raw configured address, unless overridden. Address
+  normalization, DNS resolution, port, credentials, and descriptive metadata do not participate in that calculation.
+- Hostname uses the configured override, then system name, then `snmp-device`.
+- System labels include the SNMP vnode marker, address, and system information. Policy defaults supplied through
+  `BaseLabels` precede system labels. Profile metadata fills empty labels or replaces them on an exact match,
+  except `sys_object_id`, which keeps the system value used for profile selection; configured `Labels` override all
+  previous values, including with empty values.
+- Input maps and system information remain unchanged; the returned labels belong to the caller.
+
+The SNMP metrics collector keeps its availability timeout calculation and device publication locally. It passes its
+existing engine so acquisition retains missing-OID and diagnostic state. Initial identity acquisition does not seed
+the engine's metric preparation cache: the first metrics collection still reads metadata again. Keep that behavior
+when extracting or changing callers unless a separate change explicitly revises the request/cache contract.
+
+## Legacy V1 Helpers
+
+`src/go/pkg/stm` converts structs into `map[string]int64`. `src/go/plugin/go.d/pkg/oldmetrix` provides V1 metric vector
+helper types such as counters, summaries, histograms, and boolean conversions used by existing V1 collectors. Both
+helpers are V1-shaped. New V2 collectors MUST NOT use them as their metric path.
+
+Acceptable uses:
+
+- maintaining an existing V1 collector;
+- temporary parity tests during V1-to-V2 migration, provided the helper is not reachable from the final runtime path.

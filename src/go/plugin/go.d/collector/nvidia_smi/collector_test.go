@@ -19,23 +19,25 @@ var (
 	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
 	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
 
-	dataXMLRTX2080Win, _       = os.ReadFile("testdata/rtx-2080-win.xml")
-	dataXMLRTX4090Driver535, _ = os.ReadFile("testdata/rtx-4090-driver-535.xml")
-	dataXMLRTX3060, _          = os.ReadFile("testdata/rtx-3060.xml")
-	dataXMLTeslaP100, _        = os.ReadFile("testdata/tesla-p100.xml")
+	dataXMLRTX2080Win, _          = os.ReadFile("testdata/rtx-2080-win.xml")
+	dataXMLRTX4090Driver535, _    = os.ReadFile("testdata/rtx-4090-driver-535.xml")
+	dataXMLRTXPRO6000Driver580, _ = os.ReadFile("testdata/rtx-pro-6000-driver-580.xml")
+	dataXMLRTX3060, _             = os.ReadFile("testdata/rtx-3060.xml")
+	dataXMLTeslaP100, _           = os.ReadFile("testdata/tesla-p100.xml")
 
 	dataXMLA100SXM4MIG, _ = os.ReadFile("testdata/a100-sxm4-mig.xml")
 )
 
 func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
-		"dataConfigJSON":          dataConfigJSON,
-		"dataConfigYAML":          dataConfigYAML,
-		"dataXMLRTX2080Win":       dataXMLRTX2080Win,
-		"dataXMLRTX4090Driver535": dataXMLRTX4090Driver535,
-		"dataXMLRTX3060":          dataXMLRTX3060,
-		"dataXMLTeslaP100":        dataXMLTeslaP100,
-		"dataXMLA100SXM4MIG":      dataXMLA100SXM4MIG,
+		"dataConfigJSON":             dataConfigJSON,
+		"dataConfigYAML":             dataConfigYAML,
+		"dataXMLRTX2080Win":          dataXMLRTX2080Win,
+		"dataXMLRTX4090Driver535":    dataXMLRTX4090Driver535,
+		"dataXMLRTXPRO6000Driver580": dataXMLRTXPRO6000Driver580,
+		"dataXMLRTX3060":             dataXMLRTX3060,
+		"dataXMLTeslaP100":           dataXMLTeslaP100,
+		"dataXMLA100SXM4MIG":         dataXMLA100SXM4MIG,
 	} {
 		require.NotNil(t, data, name)
 	}
@@ -97,6 +99,10 @@ func TestCollector_Check(t *testing.T) {
 		"success RTX 2080 Win": {
 			wantFail: false,
 			prepare:  prepareCaseRTX2080Win,
+		},
+		"success RTX PRO 6000 Driver 580": {
+			wantFail: false,
+			prepare:  prepareCaseRTXPRO6000Driver580,
 		},
 		"fail on queryGPUInfo error": {
 			wantFail: true,
@@ -381,6 +387,38 @@ func TestCollector_Collect(t *testing.T) {
 				},
 			},
 		},
+		"success RTX PRO 6000 Driver 580": {
+			{
+				prepare: prepareCaseRTXPRO6000Driver580,
+				check: func(t *testing.T, collr *Collector) {
+					mx := collr.Collect(context.Background())
+
+					expected := map[string]int64{
+						"gpu_GPU-11111111-2222-3333-4444-555555555555_fan_speed_perc":        40,
+						"gpu_GPU-11111111-2222-3333-4444-555555555555_performance_state_P0":  0,
+						"gpu_GPU-11111111-2222-3333-4444-555555555555_performance_state_P1":  0,
+						"gpu_GPU-11111111-2222-3333-4444-555555555555_performance_state_P10": 0,
+						"gpu_GPU-11111111-2222-3333-4444-555555555555_performance_state_P11": 0,
+						"gpu_GPU-11111111-2222-3333-4444-555555555555_performance_state_P12": 0,
+						"gpu_GPU-11111111-2222-3333-4444-555555555555_performance_state_P13": 0,
+						"gpu_GPU-11111111-2222-3333-4444-555555555555_performance_state_P14": 0,
+						"gpu_GPU-11111111-2222-3333-4444-555555555555_performance_state_P15": 0,
+						"gpu_GPU-11111111-2222-3333-4444-555555555555_performance_state_P2":  0,
+						"gpu_GPU-11111111-2222-3333-4444-555555555555_performance_state_P3":  0,
+						"gpu_GPU-11111111-2222-3333-4444-555555555555_performance_state_P4":  0,
+						"gpu_GPU-11111111-2222-3333-4444-555555555555_performance_state_P5":  0,
+						"gpu_GPU-11111111-2222-3333-4444-555555555555_performance_state_P6":  0,
+						"gpu_GPU-11111111-2222-3333-4444-555555555555_performance_state_P7":  0,
+						"gpu_GPU-11111111-2222-3333-4444-555555555555_performance_state_P8":  1,
+						"gpu_GPU-11111111-2222-3333-4444-555555555555_performance_state_P9":  0,
+						"gpu_GPU-11111111-2222-3333-4444-555555555555_power_draw":            66,
+						"gpu_GPU-11111111-2222-3333-4444-555555555555_temperature":           37,
+					}
+
+					assert.Equal(t, expected, mx)
+				},
+			},
+		},
 		"fails on queryGPUInfo error": {
 			{
 				prepare: prepareCaseErrOnQueryGPUInfo,
@@ -441,6 +479,10 @@ func prepareCaseTeslaP100(collr *Collector) {
 
 func prepareCaseRTX2080Win(collr *Collector) {
 	collr.exec = &mockNvidiaSmi{gpuInfo: dataXMLRTX2080Win}
+}
+
+func prepareCaseRTXPRO6000Driver580(collr *Collector) {
+	collr.exec = &mockNvidiaSmi{gpuInfo: dataXMLRTXPRO6000Driver580}
 }
 
 func prepareCaseErrOnQueryGPUInfo(collr *Collector) {

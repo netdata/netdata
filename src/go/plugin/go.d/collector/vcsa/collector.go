@@ -42,10 +42,10 @@ func New() *Collector {
 }
 
 type Config struct {
-	Vnode              string `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery        int    `yaml:"update_every,omitempty" json:"update_every"`
+	Vnode              string `yaml:"vnode,omitempty"               json:"vnode"`
+	UpdateEvery        int    `yaml:"update_every,omitempty"        json:"update_every"`
 	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	web.HTTPConfig     `yaml:",inline" json:""`
+	web.HTTPConfig     `       yaml:",inline"                       json:""`
 }
 
 type (
@@ -59,17 +59,17 @@ type (
 	}
 
 	healthClient interface {
-		Login() error
-		Logout() error
-		Ping() error
-		ApplMgmt() (string, error)
-		DatabaseStorage() (string, error)
-		Load() (string, error)
-		Mem() (string, error)
-		SoftwarePackages() (string, error)
-		Storage() (string, error)
-		Swap() (string, error)
-		System() (string, error)
+		Login(context.Context) error
+		Logout(context.Context) error
+		Ping(context.Context) error
+		ApplMgmt(context.Context) (string, error)
+		DatabaseStorage(context.Context) (string, error)
+		Load(context.Context) (string, error)
+		Mem(context.Context) (string, error)
+		SoftwarePackages(context.Context) (string, error)
+		Storage(context.Context) (string, error)
+		Swap(context.Context) (string, error)
+		System(context.Context) (string, error)
 	}
 )
 
@@ -77,12 +77,12 @@ func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *Collector) Init(context.Context) error {
+func (c *Collector) Init(ctx context.Context) error {
 	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("invalid config: %v", err)
 	}
 
-	cli, err := c.initHealthClient()
+	cli, err := c.initHealthClient(ctx)
 	if err != nil {
 		return fmt.Errorf("error on creating health client : %vc", err)
 	}
@@ -94,13 +94,13 @@ func (c *Collector) Init(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Check(context.Context) error {
-	err := c.client.Login()
+func (c *Collector) Check(ctx context.Context) error {
+	err := c.client.Login(ctx)
 	if err != nil {
 		return err
 	}
 
-	mx, err := c.collect()
+	mx, err := c.collect(ctx)
 	if err != nil {
 		return err
 	}
@@ -116,8 +116,8 @@ func (c *Collector) Charts() *collectorapi.Charts {
 	return c.charts
 }
 
-func (c *Collector) Collect(context.Context) map[string]int64 {
-	mx, err := c.collect()
+func (c *Collector) Collect(ctx context.Context) map[string]int64 {
+	mx, err := c.collect(ctx)
 	if err != nil {
 		c.Error(err)
 	}
@@ -128,11 +128,11 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 	return mx
 }
 
-func (c *Collector) Cleanup(context.Context) {
+func (c *Collector) Cleanup(ctx context.Context) {
 	if c.client == nil {
 		return
 	}
-	err := c.client.Logout()
+	err := c.client.Logout(ctx)
 	if err != nil {
 		c.Errorf("error on logout : %v", err)
 	}

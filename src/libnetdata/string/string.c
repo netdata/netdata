@@ -25,6 +25,8 @@ struct netdata_string {
     const char str[];   // the string itself, is appended to this structure
 };
 
+#define STRING_MAX_LENGTH (MIN((size_t)UINT32_MAX, (size_t)LONG_MAX - sizeof(STRING)) - 1)
+
 static struct string_partition {
     RW_SPINLOCK spinlock;       // the R/W spinlock to protect the Judy array
 
@@ -81,17 +83,34 @@ void string_statistics(size_t *inserts, size_t *deletes, size_t *searches, size_
     if (releases) *releases = 0;
 
     for(size_t i = 0; i < STRING_PARTITIONS ;i++) {
-        if (inserts)        *inserts        += string_base[i].inserts;
-        if (deletes)        *deletes        += string_base[i].deletes;
-        if (entries)        *entries        += (size_t) string_base[i].entries;
-        if (memory)         *memory         += (size_t) string_base[i].memory;
-        if (memory_index)   *memory_index   += (string_base[i].memory_index > 0) ? string_base[i].memory_index : 0;
+        rw_spinlock_read_lock(&string_base[i].spinlock);
+
+        size_t partition_inserts = string_base[i].inserts;
+        size_t partition_deletes = string_base[i].deletes;
+        long int partition_entries = string_base[i].entries;
+        long int partition_memory = string_base[i].memory;
+        long int partition_memory_index = string_base[i].memory_index;
 
 #ifdef NETDATA_INTERNAL_CHECKS
-        if (searches)       *searches       += string_base[i].atomic.searches;
-        if (references)     *references     += (size_t) string_base[i].atomic.active_references;
-        if (duplications)   *duplications   += string_base[i].atomic.duplications;
-        if (releases)       *releases       += string_base[i].atomic.releases;
+        size_t partition_searches = __atomic_load_n(&string_base[i].atomic.searches, __ATOMIC_RELAXED);
+        long int partition_references = __atomic_load_n(&string_base[i].atomic.active_references, __ATOMIC_RELAXED);
+        size_t partition_duplications = __atomic_load_n(&string_base[i].atomic.duplications, __ATOMIC_RELAXED);
+        size_t partition_releases = __atomic_load_n(&string_base[i].atomic.releases, __ATOMIC_RELAXED);
+#endif
+
+        rw_spinlock_read_unlock(&string_base[i].spinlock);
+
+        if (inserts)        *inserts        += partition_inserts;
+        if (deletes)        *deletes        += partition_deletes;
+        if (entries)        *entries        += (size_t) partition_entries;
+        if (memory)         *memory         += (size_t) partition_memory;
+        if (memory_index)   *memory_index   += (partition_memory_index > 0) ? (size_t) partition_memory_index : 0;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        if (searches)       *searches       += partition_searches;
+        if (references)     *references     += (size_t) partition_references;
+        if (duplications)   *duplications   += partition_duplications;
+        if (releases)       *releases       += partition_releases;
 #endif
     }
 }
@@ -134,10 +153,8 @@ STRING *string_dup(STRING *string) {
 }
 
 // Search the index and return an ACQUIRED string entry, or NULL
-static STRING *string_index_search(const char *str, size_t length) {
+static STRING *string_index_search(const char *str, size_t length, uint8_t partition) {
     STRING *string;
-
-    uint8_t partition = string_partition_str(str);
 
     // Find the string in the index
     // With a read-lock so that multiple readers can use the index concurrently.
@@ -177,10 +194,8 @@ static STRING *string_index_search(const char *str, size_t length) {
 // The returned entry is ACQUIRED, and it can either be:
 //   1. a new item inserted, or
 //   2. an item found in the index that is not currently deleted
-static STRING *string_index_insert(const char *str, size_t length) {
+static STRING *string_index_insert(const char *str, size_t length, uint8_t partition) {
     STRING *string;
-
-    uint8_t partition = string_partition_str(str);
 
     rw_spinlock_write_lock(&string_base[partition].spinlock);
 
@@ -198,8 +213,7 @@ static STRING *string_index_insert(const char *str, size_t length) {
 
         if (unlikely(Rc == PJERR)) {
             fatal(
-                "STRING: Cannot insert entry with name '%s' to JudyHS, JU_ERRNO_* == %u, ID == %d",
-                str,
+                "STRING: Cannot insert entry to JudyHS, JU_ERRNO_* == %u, ID == %d",
                 JU_ERRNO(&J_Error),
                 JU_ERRID(&J_Error));
         }
@@ -210,7 +224,8 @@ static STRING *string_index_insert(const char *str, size_t length) {
         // a new item added to the index
         long mem_size = (long)sizeof(STRING) + (long)length;
         string = mallocz(mem_size);
-        strcpy((char *)string->str, str);
+        memcpy((char *)string->str, str, length - 1);
+        ((char *)string->str)[length - 1] = '\0';
         string->length = length;
         string->refcount = 1;
         
@@ -304,21 +319,25 @@ static void string_index_delete(STRING *string) {
 
 ALWAYS_INLINE
 STRING *string_strdupz(const char *str) {
-    if(unlikely(!str || !*str)) return NULL;
+    size_t length = 0;
+    if(likely(str))
+        length = strlen(str);
 
-#ifdef NETDATA_INTERNAL_CHECKS
+    if(unlikely(!length)) return NULL;
+
+    if(unlikely(length > STRING_MAX_LENGTH))
+        fatal("STRING: cannot index string length %zu, maximum is %zu", length, STRING_MAX_LENGTH);
+
+    length++;
     uint8_t partition = string_partition_str(str);
-#endif
-
-    size_t length = strlen(str) + 1;
-    STRING *string = string_index_search(str, length);
+    STRING *string = string_index_search(str, length, partition);
 
     while(!string) {
         // The search above did not find anything,
         // We loop here, because during insert we may find an entry that is being deleted by another thread.
         // So, we have to let it go and retry to insert it again.
 
-        string = string_index_insert(str, length);
+        string = string_index_insert(str, length, partition);
     }
 
     // statistics
@@ -336,17 +355,17 @@ ALWAYS_INLINE
 STRING *string_strndupz(const char *str, size_t len) {
     if(unlikely(!str || !*str || !len)) return NULL;
 
-#ifdef NETDATA_INTERNAL_CHECKS
+    if(unlikely(len > STRING_MAX_LENGTH))
+        fatal("STRING: cannot index string length %zu, maximum is %zu", len, STRING_MAX_LENGTH);
+
+    size_t length = strnlen(str, len);
+    if(unlikely(!length)) return NULL;
+
     uint8_t partition = string_partition_str(str);
-#endif
 
-    char buf[len + 1];
-    memcpy(buf, str, len);
-    buf[len] = '\0';
-
-    STRING *string = string_index_search(buf, len + 1);
+    STRING *string = string_index_search(str, length + 1, partition);
     while(!string)
-        string = string_index_insert(buf, len + 1);
+        string = string_index_insert(str, length + 1, partition);
 
     string_stats_atomic_increment(partition, active_references);
 
@@ -438,9 +457,6 @@ bool string_equals_string_nocase(const STRING *a, const STRING *b) {
 static STRING *string_2way_merge_X = NULL;
 
 STRING *string_2way_merge(STRING *a, STRING *b) {
-    if(unlikely(!string_2way_merge_X))
-        string_2way_merge_X = string_strdupz("[x]");
-
     if(unlikely(a == b)) return string_dup(a);
     if(unlikely(a == string_2way_merge_X)) return string_dup(a);
     if(unlikely(b == string_2way_merge_X)) return string_dup(b);
@@ -450,7 +466,9 @@ STRING *string_2way_merge(STRING *a, STRING *b) {
     size_t alen = string_strlen(a);
     size_t blen = string_strlen(b);
     size_t length = alen + blen + string_strlen(string_2way_merge_X) + 1;
-    char buf1[length + 1], buf2[length + 1], *dst1;
+    CLEAN_CHAR_P *buf1 = mallocz(length + 1);
+    CLEAN_CHAR_P *buf2 = mallocz(length + 1);
+    char *dst1;
     const char *s1, *s2;
 
     s1 = string2str(a);
@@ -460,18 +478,19 @@ STRING *string_2way_merge(STRING *a, STRING *b) {
         *dst1++ = *s1;
 
     *dst1 = '\0';
+    const char *prefix_end1 = s1, *prefix_end2 = s2;
 
     if(*s1 != '\0' || *s2 != '\0') {
         *dst1++ = '[';
         *dst1++ = 'x';
         *dst1++ = ']';
 
-        s1 = &(string2str(a))[alen - 1];
-        s2 = &(string2str(b))[blen - 1];
+        s1 = string2str(a) + alen;
+        s2 = string2str(b) + blen;
         char *dst2 = &buf2[length];
         *dst2 = '\0';
-        for (; *s1 && *s2 && *s1 == *s2; s1--, s2--)
-            *(--dst2) = *s1;
+        for (; s1 > prefix_end1 && s2 > prefix_end2 && s1[-1] == s2[-1]; s1--, s2--)
+            *(--dst2) = s1[-1];
 
         strcpy(dst1, dst2);
     }
@@ -752,6 +771,25 @@ int string_unittest(size_t entries) {
 
     // check string
     {
+        char short_bound[100] = "short";
+        STRING *s_short_bound = string_strndupz(short_bound, sizeof(short_bound));
+        if(!s_short_bound || string_strlen(s_short_bound) != 5 || strcmp(string2str(s_short_bound), "short") != 0) {
+            errors++;
+            fprintf(stderr, "ERROR: strndup string input should stop at NUL before the bound\n");
+        }
+        else
+            fprintf(stderr, "OK: strndup string input stops at NUL before the bound\n");
+        string_freez(s_short_bound);
+
+        STRING *s_substring = string_strndupz("prefix:suffix", 6);
+        if(!s_substring || string_strlen(s_substring) != 6 || strcmp(string2str(s_substring), "prefix") != 0) {
+            errors++;
+            fprintf(stderr, "ERROR: strndup string input should preserve bounded substrings\n");
+        }
+        else
+            fprintf(stderr, "OK: strndup string input preserves bounded substrings\n");
+        string_freez(s_substring);
+
         long entries_starting = unittest_string_entries();
 
         fprintf(stderr, "\nChecking strings...\n");
@@ -787,6 +825,22 @@ int string_unittest(size_t entries) {
         }
         else
             fprintf(stderr, "OK: string is properly handling different strings\n");
+
+        STRING *s_null = string_strdupz(NULL);
+        if(s_null != NULL) {
+            errors++;
+            fprintf(stderr, "ERROR: NULL string input should return NULL\n");
+        }
+        else
+            fprintf(stderr, "OK: NULL string input returns NULL\n");
+
+        STRING *s_empty = string_strdupz("");
+        if(s_empty != NULL) {
+            errors++;
+            fprintf(stderr, "ERROR: empty string input should return NULL\n");
+        }
+        else
+            fprintf(stderr, "OK: empty string input returns NULL\n");
 
         usec_t start_ut, end_ut;
         STRING **strings = mallocz(entries * sizeof(STRING *));
@@ -902,16 +956,16 @@ int string_unittest(size_t entries) {
         string_statistics(&oinserts, &odeletes, &osearches, &oentries, &oreferences, &omemory, &omemory_index, &oduplications, &oreleases);
 
         time_t seconds_to_run = 5;
-        int threads_to_create = 2;
+        enum { STRING_UNITTEST_THREADS = 2 };
         fprintf(
             stderr,
             "Checking string concurrency with %d threads for %lld seconds...\n",
-            threads_to_create,
+            STRING_UNITTEST_THREADS,
             (long long)seconds_to_run);
         // check string concurrency
-        ND_THREAD *threads[threads_to_create];
+        ND_THREAD *threads[STRING_UNITTEST_THREADS];
         tu.join = 0;
-        for (int i = 0; i < threads_to_create; i++) {
+        for (int i = 0; i < STRING_UNITTEST_THREADS; i++) {
             char buf[100 + 1];
             snprintf(buf, 100, "string%d", i);
             threads[i] = nd_thread_create(buf, NETDATA_THREAD_OPTION_DONT_LOG, string_thread, &tu);
@@ -919,7 +973,7 @@ int string_unittest(size_t entries) {
         sleep_usec(seconds_to_run * USEC_PER_SEC);
 
         __atomic_store_n(&tu.join, 1, __ATOMIC_RELAXED);
-        for (int i = 0; i < threads_to_create; i++)
+        for (int i = 0; i < STRING_UNITTEST_THREADS; i++)
             nd_thread_join(threads[i]);
 
         size_t inserts, deletes, searches, sentries, references, memory, memory_index, duplications, releases;
@@ -960,4 +1014,6 @@ void string_init(void) {
         string_base[i].JudyLPointers = NULL;
 #endif
     }
+
+    string_2way_merge_X = string_strdupz("[x]");
 }

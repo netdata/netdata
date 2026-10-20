@@ -95,12 +95,12 @@ modules:
               group: Limits
 
             - name: queues_filter
-              description: Queue selector. Uses [simple patterns](/src/libnetdata/simple_pattern/README.md#simple-patterns).
+              description: Queue selector. Uses [simple patterns](/src/libnetdata/simple_pattern/README.md).
               default_value: ""
               required: false
               group: Filters
             - name: topics_filter
-              description: Topic selector. Uses [simple patterns](/src/libnetdata/simple_pattern/README.md#simple-patterns).
+              description: Topic selector. Uses [simple patterns](/src/libnetdata/simple_pattern/README.md).
               default_value: ""
               required: false
               group: Filters

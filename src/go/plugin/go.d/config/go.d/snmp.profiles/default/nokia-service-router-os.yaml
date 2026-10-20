@@ -1,0 +1,17 @@
+extends:
+  - _system-base.yaml
+  - _std-if-mib.yaml
+  - _nokia-timetra-bgp.yaml
+
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.6527.*
+
+metadata:
+  device:
+    fields:
+      vendor:
+        value: "Nokia"
+      type:
+        value: "Router"

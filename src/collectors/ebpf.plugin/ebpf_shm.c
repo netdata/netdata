@@ -271,178 +271,6 @@ static inline int ebpf_shm_load_and_attach(struct shm_bpf *obj, ebpf_module_t *e
 
 static void ebpf_obsolete_specific_shm_charts(char *type, int update_every);
 
-/**
- * Obsolete services
- *
- * Obsolete all service charts created
- *
- * @param em a pointer to `struct ebpf_module`
- */
-static void ebpf_obsolete_shm_services(ebpf_module_t *em, char *id)
-{
-    ebpf_write_chart_obsolete(
-        id,
-        NETDATA_SHMGET_CHART,
-        "",
-        "Calls to syscall shmget(2).",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_APPS_IPC_SHM_GROUP,
-        NETDATA_EBPF_CHART_TYPE_STACKED,
-        NETDATA_SYSTEMD_SHM_GET_CONTEXT,
-        20191,
-        em->update_every);
-
-    ebpf_write_chart_obsolete(
-        id,
-        NETDATA_SHMAT_CHART,
-        "",
-        "Calls to syscall shmat(2).",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_APPS_IPC_SHM_GROUP,
-        NETDATA_EBPF_CHART_TYPE_STACKED,
-        NETDATA_SYSTEMD_SHM_AT_CONTEXT,
-        20192,
-        em->update_every);
-
-    ebpf_write_chart_obsolete(
-        id,
-        NETDATA_SHMDT_CHART,
-        "",
-        "Calls to syscall shmdt(2).",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_APPS_IPC_SHM_GROUP,
-        NETDATA_EBPF_CHART_TYPE_STACKED,
-        NETDATA_SYSTEMD_SHM_DT_CONTEXT,
-        20193,
-        em->update_every);
-
-    ebpf_write_chart_obsolete(
-        id,
-        NETDATA_SHMCTL_CHART,
-        "",
-        "Calls to syscall shmctl(2).",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_APPS_IPC_SHM_GROUP,
-        NETDATA_EBPF_CHART_TYPE_STACKED,
-        NETDATA_SYSTEMD_SHM_CTL_CONTEXT,
-        20194,
-        em->update_every);
-}
-
-/**
- * Obsolete cgroup chart
- *
- * Send obsolete for all charts created before to close.
- *
- * @param em a pointer to `struct ebpf_module`
- */
-static inline void ebpf_obsolete_shm_cgroup_charts(ebpf_module_t *em)
-{
-    netdata_mutex_lock(&mutex_cgroup_shm);
-
-    ebpf_cgroup_target_t *ect;
-    for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
-        if (ect->systemd) {
-            ebpf_obsolete_shm_services(em, ect->name);
-
-            continue;
-        }
-
-        ebpf_obsolete_specific_shm_charts(ect->name, em->update_every);
-    }
-    netdata_mutex_unlock(&mutex_cgroup_shm);
-}
-
-/**
- * Obsolette apps charts
- *
- * Obsolete apps charts.
- *
- * @param em a pointer to the structure with the default values.
- */
-void ebpf_obsolete_shm_apps_charts(struct ebpf_module *em)
-{
-    struct ebpf_target *w;
-    int update_every = em->update_every;
-    netdata_mutex_lock(&collect_data_mutex);
-    for (w = apps_groups_root_target; w; w = w->next) {
-        if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_SHM_IDX))))
-            continue;
-
-        ebpf_write_chart_obsolete(
-            NETDATA_APP_FAMILY,
-            w->clean_name,
-            "_ebpf_shmget_call",
-            "Calls to syscall shmget(2).",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_APPS_IPC_SHM_GROUP,
-            NETDATA_EBPF_CHART_TYPE_STACKED,
-            "app.ebpf_shmget_call",
-            20191,
-            update_every);
-
-        ebpf_write_chart_obsolete(
-            NETDATA_APP_FAMILY,
-            w->clean_name,
-            "_ebpf_shmat_call",
-            "Calls to syscall shmat(2).",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_APPS_IPC_SHM_GROUP,
-            NETDATA_EBPF_CHART_TYPE_STACKED,
-            "app.ebpf_shmat_call",
-            20192,
-            update_every);
-
-        ebpf_write_chart_obsolete(
-            NETDATA_APP_FAMILY,
-            w->clean_name,
-            "_ebpf_shmdt_call",
-            "Calls to syscall shmdt(2).",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_APPS_IPC_SHM_GROUP,
-            NETDATA_EBPF_CHART_TYPE_STACKED,
-            "app.ebpf_shmdt_call",
-            20193,
-            update_every);
-
-        ebpf_write_chart_obsolete(
-            NETDATA_APP_FAMILY,
-            w->clean_name,
-            "_ebpf_shmctl_call",
-            "Calls to syscall shmctl(2).",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_APPS_IPC_SHM_GROUP,
-            NETDATA_EBPF_CHART_TYPE_STACKED,
-            "app.ebpf_shmctl_call",
-            20194,
-            update_every);
-
-        w->charts_created &= ~(1 << EBPF_MODULE_SHM_IDX);
-    }
-    netdata_mutex_unlock(&collect_data_mutex);
-}
-
-/**
- * Obsolete global
- *
- * Obsolete global charts created by thread.
- *
- * @param em a pointer to `struct ebpf_module`
- */
-static void ebpf_obsolete_shm_global(ebpf_module_t *em)
-{
-    ebpf_write_chart_obsolete(
-        NETDATA_EBPF_SYSTEM_GROUP,
-        NETDATA_SHM_GLOBAL_CHART,
-        "",
-        "Calls to shared memory system calls",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_SYSTEM_IPC_SHM_SUBMENU,
-        NETDATA_EBPF_CHART_TYPE_LINE,
-        "system.shared_memory_calls",
-        NETDATA_CHART_PRIO_SYSTEM_IPC_SHARED_MEM_CALLS,
-        em->update_every);
-}
 
 /**
  * SHM Exit
@@ -481,28 +309,18 @@ static void ebpf_shm_exit(void *pptr)
         nd_thread_join(ebpf_read_shm.thread);
     }
 
-    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
-        netdata_mutex_lock(&lock);
-        if (em->cgroup_charts) {
-            ebpf_obsolete_shm_cgroup_charts(em);
-            fflush(stdout);
-        }
-
-        if (em->apps_charts & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
-            ebpf_obsolete_shm_apps_charts(em);
-        }
-
-        ebpf_obsolete_shm_global(em);
-
-        fflush(stdout);
-        netdata_mutex_unlock(&lock);
+    // Drop this module's bits from the shared PID pool so its slots don't
+    // stay pinned if the plugin keeps running after the module stops.
+    if (integration_shm && ebpf_shm_sem_wait_or_stop(shm_mutex_ebpf_integration)) {
+        netdata_ebpf_sweep_shm_for_module_unsafe(NETDATA_EBPF_PIDS_SHM_IDX);
+        sem_post(shm_mutex_ebpf_integration);
     }
 
     if (!ebpf_plugin_stop() && em->functions.bpf_unload)
         em->functions.bpf_unload(em);
 
     netdata_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_STOPPED);
     netdata_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -559,8 +377,8 @@ static void ebpf_update_shm_cgroup(void)
         for (pids = ect->pids; pids; pids = pids->next) {
             uint32_t pid = pids->pid;
             netdata_publish_shm_t *out = &pids->shm;
-            netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_SHM_IDX);
-            if (!local_pid)
+            netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_lookup_shm_pointer_unsafe(pid);
+            if (!local_pid || !(local_pid->threads & (1U << (NETDATA_EBPF_PIDS_SHM_IDX << 1))))
                 continue;
 
             netdata_publish_shm_t *in = &local_pid->shm;
@@ -599,13 +417,13 @@ static void ebpf_read_shm_apps_table(int maps_per_core)
 
         netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(key, NETDATA_EBPF_PIDS_SHM_IDX);
         if (!local_pid)
-            continue;
+            goto end_shm_loop;
         netdata_publish_shm_t *publish = &local_pid->shm;
 
         if (!publish->ct || publish->ct != cv->ct) {
             memcpy(publish, &cv[0], sizeof(netdata_publish_shm_t));
         } else {
-            if (kill((pid_t)key, 0)) { // No PID found
+            if (kill((pid_t)key, 0) == -1 && errno == ESRCH) {
                 if (netdata_ebpf_reset_shm_pointer_unsafe(fd, key, NETDATA_EBPF_PIDS_SHM_IDX))
                     memset(publish, 0, sizeof(*publish));
             }
@@ -672,8 +490,8 @@ static void ebpf_shm_sum_pids(netdata_publish_shm_t *shm, struct ebpf_pid_on_tar
     memset(shm, 0, sizeof(netdata_publish_shm_t));
     for (; root; root = root->next) {
         uint32_t pid = root->pid;
-        netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_SHM_IDX);
-        if (!local_pid)
+        netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_lookup_shm_pointer_unsafe(pid);
+        if (!local_pid || !(local_pid->threads & (1U << (NETDATA_EBPF_PIDS_SHM_IDX << 1))))
             continue;
 
         netdata_publish_shm_t *w = &local_pid->shm;
@@ -1051,8 +869,8 @@ void ebpf_shm_send_cgroup_data(int update_every)
         return;
     }
 
-    if (shm_ebpf_cgroup.header->systemd_enabled) {
-        if (send_cgroup_chart) {
+    if (ebpf_cgroup_systemd_enabled_get()) {
+        if (ebpf_send_cgroup_chart_get()) {
             ebpf_create_systemd_shm_charts(update_every);
         }
 
@@ -1104,9 +922,9 @@ void ebpf_shm_resume_apps_data()
 }
 
 /**
- * DCstat thread
+ * SHM thread
  *
- * Thread used to generate dcstat charts.
+ * Thread used to generate shm charts.
  *
  * @param ptr a pointer to `struct ebpf_module`
  *
@@ -1154,7 +972,7 @@ void ebpf_read_shm_thread(void *ptr)
             break;
         }
 
-        if (cgroups && shm_ebpf_cgroup.header)
+        if (cgroups && ebpf_cgroup_integration_active_get())
             ebpf_update_shm_cgroup();
 
         if (sem_post(shm_mutex_ebpf_integration)) {
@@ -1217,7 +1035,7 @@ static void shm_collector(ebpf_module_t *em)
             break;
         }
 
-        if (cgroups && shm_ebpf_cgroup.header) {
+        if (cgroups && ebpf_cgroup_integration_active_get()) {
             ebpf_shm_send_cgroup_data(update_every);
         }
 
@@ -1440,6 +1258,7 @@ void ebpf_shm_thread(void *ptr)
     if (ebpf_shm_load_bpf(em)) {
         goto endshm;
     }
+    ebpf_mark_program_loaded();
 
     ebpf_shm_allocate_global_vectors();
 

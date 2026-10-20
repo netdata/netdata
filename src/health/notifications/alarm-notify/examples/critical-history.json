@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "incident_id": "example-incident-1",
+  "timestamp": "2026-09-17T12:00:00Z",
+  "node": "example-node",
+  "alert": "example_temperature",
+  "status": "WARNING",
+  "previous_status": "CRITICAL",
+  "summary": "Temperature is falling but remains high",
+  "critical_seen_since_clear": true
+}

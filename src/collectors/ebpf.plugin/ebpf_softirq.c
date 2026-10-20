@@ -45,27 +45,6 @@ static softirq_val_t softirq_vals[] = {
 static softirq_ebpf_val_t *softirq_ebpf_vals = NULL;
 static bool softirq_safe_clean = false;
 
-/**
- * Obsolete global
- *
- * Obsolete global charts created by thread.
- *
- * @param em a pointer to `struct ebpf_module`
- */
-static void ebpf_obsolete_softirq_global(ebpf_module_t *em)
-{
-    ebpf_write_chart_obsolete(
-        NETDATA_EBPF_SYSTEM_GROUP,
-        "softirq_latency",
-        "",
-        "Software IRQ latency",
-        EBPF_COMMON_UNITS_MILLISECONDS,
-        "softirqs",
-        NETDATA_EBPF_CHART_TYPE_STACKED,
-        "system.softirq_latency",
-        NETDATA_CHART_PRIO_SYSTEM_SOFTIRQS + 1,
-        em->update_every);
-}
 
 static void softirq_cleanup(void *pptr)
 {
@@ -75,18 +54,9 @@ static void softirq_cleanup(void *pptr)
 
     if (!softirq_safe_clean) {
         netdata_mutex_lock(&ebpf_exit_cleanup);
-        em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+        ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_STOPPED);
         netdata_mutex_unlock(&ebpf_exit_cleanup);
         return;
-    }
-
-    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
-        netdata_mutex_lock(&lock);
-
-        ebpf_obsolete_softirq_global(em);
-
-        netdata_mutex_unlock(&lock);
-        fflush(stdout);
     }
 
     for (int i = 0; softirq_tracepoints[i].class != NULL; i++) {
@@ -99,7 +69,7 @@ static void softirq_cleanup(void *pptr)
         em->functions.bpf_unload(em);
 
     netdata_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_STOPPED);
     netdata_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -263,6 +233,7 @@ void ebpf_softirq_thread(void *ptr)
     if (!em->probe_links) {
         goto endsoftirq;
     }
+    ebpf_mark_program_loaded();
 
     softirq_safe_clean = true;
     softirq_collector(em);

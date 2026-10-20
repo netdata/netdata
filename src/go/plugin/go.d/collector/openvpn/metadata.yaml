@@ -6,6 +6,7 @@ modules:
       module_name: openvpn
       monitored_instance:
         name: OpenVPN
+        description: "Monitor OpenVPN client connections, traffic, and session duration through the management interface."
         link: https://openvpn.net/
         icon_filename: openvpn.svg
         categories:
@@ -22,7 +23,7 @@ modules:
       data_collection:
         metrics_description: |
           This collector monitors OpenVPN servers.
-          
+
           It uses OpenVPN [Management Interface](https://openvpn.net/community-resources/management-interface/) to collect metrics.
         method_description: ""
       supported_platforms:
@@ -44,10 +45,10 @@ modules:
           - title: Enable in go.d.conf.
             description: |
               This collector is disabled by default. You need to explicitly enable it in [go.d.conf](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d.conf).
-              
+
               From the documentation for the OpenVPN Management Interface:
               > Currently, the OpenVPN daemon can at most support a single management client any one time.
-              
+
               It is disabled to not break other tools which use `Management Interface`.
       configuration:
         file:
@@ -131,13 +132,13 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Collecting metrics from local and remote instances.
               config: |
                 jobs:
                   - name: local
                     address: 127.0.0.1:7505
-                
+
                   - name: remote
                     address: 203.0.113.0:7505
     troubleshooting:

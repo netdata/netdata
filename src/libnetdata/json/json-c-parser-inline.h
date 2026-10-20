@@ -14,6 +14,34 @@
 // helper: convert a bool to JSONC_REQUIRED / JSONC_OPTIONAL
 #define JSONC_REQUIRE_IF(cond) ((cond) ? JSONC_REQUIRED : JSONC_OPTIONAL)
 
+#define JSONC_INTEGER_DESTINATION_IS_UNSIGNED(dst) _Generic((dst), \
+    unsigned char: true,                                             \
+    unsigned short: true,                                            \
+    unsigned int: true,                                              \
+    unsigned long: true,                                             \
+    unsigned long long: true,                                        \
+    default: false)
+
+static inline bool jsonc_double_fits_integer_destination(double value, size_t size, bool is_unsigned) {
+    if(!size || size > sizeof(uint64_t))
+        return false;
+
+    unsigned bits = (unsigned)(size * CHAR_BIT);
+    double limit = (double)(UINT64_C(1) << (bits - 1)) * (is_unsigned ? 2.0 : 1.0);
+
+    if(!netdata_double_isnumber(value) || value >= limit)
+        return false;
+
+    if(is_unsigned)
+        return value > -1.0;
+
+    double minimum = -limit;
+    double below_minimum = minimum - 1.0;
+
+    // At 64 bits, double rounds minimum - 1 back to minimum.
+    return below_minimum == minimum ? value >= minimum : value > below_minimum;
+}
+
 #define JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, member, dst, error, flags) do {                     \
     json_object *_j;                                                                                            \
     if (json_object_object_get_ex(jobj, member, &_j)) {                                                         \
@@ -135,7 +163,16 @@
         if (json_object_is_type(_j, json_type_string)) {                                                        \
             char _datetime[RFC3339_MAX_LENGTH]; _datetime[0] = '\0';                                            \
             strncpyz(_datetime, json_object_get_string(_j), sizeof(_datetime) - 1);                             \
-            dst = rfc3339_parse_ut(_datetime, NULL);                                                            \
+            usec_t _timestamp_ut = 0;                                                                           \
+            if (rfc3339_parse_ut(_datetime, &_timestamp_ut, NULL))                                               \
+                dst = _timestamp_ut;                                                                            \
+            else {                                                                                              \
+                dst = 0;                                                                                        \
+                if ((flags) & (JSONC_REQUIRED | JSONC_STRICT)) {                                                \
+                    buffer_sprintf(error, "invalid RFC3339 datetime for '%s.%s'", path, member);                \
+                    return false;                                                                               \
+                }                                                                                               \
+            }                                                                                                   \
         }                                                                                                       \
         else {                                                                                                  \
             dst = 0;                                                                                            \
@@ -413,7 +450,13 @@
             dst = json_object_get_int64(_j);                                                                    \
         }                                                                                                       \
         else if (json_object_is_type(_j, json_type_double)) {                                                   \
-            dst = (typeof(dst))json_object_get_double(_j);                                                      \
+            double _val = json_object_get_double(_j);                                                           \
+            if (!jsonc_double_fits_integer_destination(                                                         \
+                    _val, sizeof(dst), JSONC_INTEGER_DESTINATION_IS_UNSIGNED(dst))) {                            \
+                buffer_sprintf(error, "cannot convert to int64 for '%s.%s'", path, member);                     \
+                return false;                                                                                   \
+            }                                                                                                   \
+            dst = (typeof(dst))_val;                                                                            \
         }                                                                                                       \
         else if (json_object_is_type(_j, json_type_boolean)) {                                                  \
             dst = json_object_get_boolean(_j) ? 1 : 0;                                                          \
@@ -449,7 +492,14 @@
             dst = json_object_get_uint64(_j);                                                                   \
         }                                                                                                       \
         else if (json_object_is_type(_j, json_type_double)) {                                                   \
-            dst = (typeof(dst))json_object_get_double(_j);                                                      \
+            double _val = json_object_get_double(_j);                                                           \
+            const double _limit = (double)(UINT64_C(1) << 63) * 2.0;                                            \
+            if (!netdata_double_isnumber(_val) || _val < 0.0 || _val >= _limit) {                              \
+                buffer_sprintf(error, "cannot convert to uint64 for '%s.%s'", path, member);                    \
+                return false;                                                                                   \
+            }                                                                                                   \
+            uint64_t _converted = (uint64_t)_val;                                                               \
+            dst = (typeof(dst))_converted;                                                                      \
         }                                                                                                       \
         else if (json_object_is_type(_j, json_type_boolean)) {                                                  \
             dst = json_object_get_boolean(_j) ? 1 : 0;                                                          \
@@ -525,11 +575,14 @@
             }                                                                                                   \
         }                                                                                                       \
         else {                                                                                                  \
-            char _new_path[strlen(path) + strlen(member) + 2];                                                  \
-            snprintfz(_new_path, sizeof(_new_path), "%s%s%s", path, *path?".":"", member);                      \
+            size_t _new_path_size = strlen(path) + strlen(member) + 2;                                          \
+            char *_new_path = mallocz(_new_path_size);                                                          \
+            snprintfz(_new_path, _new_path_size, "%s%s%s", path, *path?".":"", member);                        \
             if (!callback(_j, _new_path, dst, error, flags)) {                                                  \
+                freez(_new_path);                                                                               \
                 return false;                                                                                   \
             }                                                                                                   \
+            freez(_new_path);                                                                                   \
         }                                                                                                       \
     } else if((flags) & JSONC_REQUIRED) {                                                                       \
         buffer_sprintf(error, "missing '%s.%s' object", path, member);                                          \
@@ -587,7 +640,7 @@
         else {                                                                                                  \
             json_object *JSONC_TEMP_VAR(saved_jobj, __LINE__) = jobj;                                           \
             jobj = JSONC_TEMP_VAR(_j, __LINE__);                                                                \
-            char JSONC_TEMP_VAR(saved_path, __LINE__)[strlen(path) + 1];                                        \
+            char JSONC_TEMP_VAR(saved_path, __LINE__)[sizeof(path)];                                            \
             strncpyz(JSONC_TEMP_VAR(saved_path, __LINE__), path, sizeof(JSONC_TEMP_VAR(saved_path, __LINE__))); \
             JSONC_PATH_CONCAT(path, sizeof(path), path, member, error);                                         \
             /* Run the user's code block */                                                                     \
@@ -618,7 +671,7 @@
         else {                                                                                                  \
             json_object *JSONC_TEMP_VAR(saved_jobj, __LINE__) = jobj;                                           \
             jobj = JSONC_TEMP_VAR(_jarray, __LINE__);                                                           \
-            char JSONC_TEMP_VAR(saved_path, __LINE__)[strlen(path) + 1];                                        \
+            char JSONC_TEMP_VAR(saved_path, __LINE__)[sizeof(path)];                                            \
             strncpyz(JSONC_TEMP_VAR(saved_path, __LINE__), path, sizeof(JSONC_TEMP_VAR(saved_path, __LINE__))); \
             JSONC_PATH_CONCAT(path, sizeof(path), path, member, error);                                         \
             /* Run the user's code block */                                                                     \
@@ -643,7 +696,7 @@
         else {                                                                                                  \
             json_object *JSONC_TEMP_VAR(saved_jobj, __LINE__) = jobj;                                           \
             jobj = JSONC_TEMP_VAR(_jitem, __LINE__);                                                            \
-            char JSONC_TEMP_VAR(saved_path, __LINE__)[strlen(path) + 1];                                        \
+            char JSONC_TEMP_VAR(saved_path, __LINE__)[sizeof(path)];                                            \
             strncpyz(JSONC_TEMP_VAR(saved_path, __LINE__), path, sizeof(JSONC_TEMP_VAR(saved_path, __LINE__))); \
             JSONC_PATH_CONCAT_INDEX(path, sizeof(path), index, error);                                          \
             /* Run the user's code block */                                                                     \
@@ -656,7 +709,7 @@
 } while(0)
 
 typedef bool (*json_parse_function_payload_t)(json_object *jobj, void *data, BUFFER *error);
-int rrd_call_function_error(BUFFER *wb, const char *msg, int code);
+int nrpc_call_error(BUFFER *wb, const char *msg, int code);
 struct json_object *json_parse_function_payload_or_error(BUFFER *output, BUFFER *payload, int *code, json_parse_function_payload_t cb, void *cb_data);
 
 // return HTTP response code

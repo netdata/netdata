@@ -7,9 +7,13 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/credentialfile/testutil"
+	"github.com/netdata/netdata/go/plugins/pkg/safefile"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -82,6 +86,7 @@ func TestParseResponse(t *testing.T) {
 func TestPublishedStoreResolve_LogsDetailedResolution(t *testing.T) {
 	s := &publishedStore{
 		runtime: &runtime{
+			readFile: testutil.New().Read,
 			httpClient: &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 				return &http.Response{
 					StatusCode: http.StatusOK,
@@ -117,10 +122,180 @@ func TestPublishedStoreResolve_LogsDetailedResolution(t *testing.T) {
 	assert.NotContains(t, out, "secret-value")
 }
 
+func TestPublishedStoreResolveUsesConfiguredRequestPath(t *testing.T) {
+	tests := map[string]struct {
+		skipVerify bool
+		namespace  string
+	}{
+		"secure client without namespace": {},
+		"insecure client with namespace": {
+			skipVerify: true,
+			namespace:  "team-a",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			var request *http.Request
+			selected := roundTripFunc(func(req *http.Request) (*http.Response, error) {
+				request = req.Clone(req.Context())
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(bytes.NewBufferString(`{"data":{"password":"secret-value"}}`)),
+					Header:     make(http.Header),
+				}, nil
+			})
+			unexpected := roundTripFunc(func(*http.Request) (*http.Response, error) {
+				require.FailNow(t, "test failed", "unexpected Vault HTTP client was selected")
+				return nil, nil
+			})
+			secure, insecure := http.RoundTripper(selected), http.RoundTripper(unexpected)
+			if tc.skipVerify {
+				secure, insecure = insecure, secure
+			}
+			s := &publishedStore{
+				runtime: &runtime{
+					readFile:           testutil.New().Read,
+					httpClient:         &http.Client{Transport: secure},
+					httpClientInsecure: &http.Client{Transport: insecure},
+				},
+				mode:           "token",
+				tokenValue:     "synthetic-token",
+				addr:           "https://vault.example/",
+				namespaceValue: tc.namespace,
+				tlsSkipVerify:  tc.skipVerify,
+			}
+
+			value, err := s.Resolve(t.Context(), secretstore.ResolveRequest{
+				StoreKey: "vault:vault_prod",
+				Operand:  "secret/data/mysql#password",
+				Original: "${store:vault:vault_prod:secret/data/mysql#password}",
+			})
+
+			require.NoError(t, err)
+			assert.Equal(t, "secret-value", value)
+			require.NotNil(t, request)
+			assert.Equal(t, http.MethodGet, request.Method)
+			assert.Equal(t, "https://vault.example/v1/secret/data/mysql", request.URL.String())
+			assert.Equal(t, "synthetic-token", request.Header.Get("X-Vault-Token"))
+			assert.Equal(t, tc.namespace, request.Header.Get("X-Vault-Namespace"))
+		})
+	}
+}
+
+func TestPublishedStoreResolveUsesSafeTokenFile(t *testing.T) {
+	tests := map[string]struct {
+		write       func(t *testing.T, path string)
+		wantToken   string
+		wantErr     error
+		wantRequest bool
+	}{
+		"reads regular token file": {
+			write: func(t *testing.T, path string) {
+				require.NoError(t, os.WriteFile(path, []byte("  file-token\n"), 0o600))
+			},
+			wantToken:   "file-token",
+			wantRequest: true,
+		},
+		"rejects oversized token file": {
+			write: func(t *testing.T, path string) {
+				require.NoError(t, os.WriteFile(path, bytes.Repeat([]byte("x"), int(safefile.MaxSize)+1), 0o600))
+			},
+			wantErr: safefile.ErrTooLarge,
+		},
+		"rejects non-regular token path": {
+			write: func(t *testing.T, path string) {
+				require.NoError(t, os.Mkdir(path, 0o700))
+			},
+			wantErr: safefile.ErrNotRegular,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "vault.token")
+			tc.write(t, path)
+			var gotToken string
+			var requested bool
+			s := &publishedStore{
+				runtime: &runtime{
+					readFile: testutil.New().Read,
+					httpClient: &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+						requested = true
+						gotToken = req.Header.Get("X-Vault-Token")
+						return &http.Response{
+							StatusCode: http.StatusOK,
+							Body: io.NopCloser(
+								bytes.NewBufferString(`{"data":{"password":"secret-value"}}`),
+							),
+							Header: make(http.Header),
+						}, nil
+					})},
+					httpClientInsecure: &http.Client{},
+				},
+				mode:          "token_file",
+				tokenFilePath: path,
+				addr:          "https://vault.example",
+			}
+
+			_, err := s.Resolve(t.Context(), secretstore.ResolveRequest{
+				StoreKey: "vault:vault_prod",
+				Operand:  "secret/data/mysql#password",
+				Original: "${store:vault:vault_prod:secret/data/mysql#password}",
+			})
+
+			assert.Equal(t, tc.wantRequest, requested)
+			assert.Equal(t, tc.wantToken, gotToken)
+			if tc.wantErr == nil {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, tc.wantErr)
+				require.ErrorIs(t, err, safefile.ErrFile)
+			}
+		})
+	}
+}
+
 func captureLoggerOutput(t *testing.T, fn func(log *logger.Logger)) string {
 	t.Helper()
 
 	var buf bytes.Buffer
 	fn(logger.NewWithWriter(&buf))
 	return buf.String()
+}
+
+func TestPublishedStoreResolveRereadsTokenFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "token")
+	var tokens []string
+	s := &publishedStore{runtime: &runtime{
+		readFile: testutil.New().Read,
+		httpClient: &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			tokens = append(tokens, req.Header.Get("X-Vault-Token"))
+			return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(bytes.NewBufferString(`{"data":{"password":"value"}}`))}, nil
+		})},
+	}, mode: "token_file", tokenFilePath: path, addr: "https://vault.example"}
+	for _, token := range []string{"first", "second"} {
+		require.NoError(t, os.WriteFile(path, []byte(" "+token+"\n"), 0o600))
+		value, err := s.Resolve(t.Context(), secretstore.ResolveRequest{Operand: "secret/data/mysql#password"})
+		require.NoError(t, err)
+		assert.Equal(t, "value", value)
+	}
+	assert.Equal(t, []string{"first", "second"}, tokens)
+}
+
+func TestTokenFileReadUsesCallerContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	s := newOperationalStore(t, Config{Mode: "token_file", ModeTokenFile: &ModeTokenFileConfig{Path: "token"}, Addr: "https://vault.example"})
+	calls := 0
+	s.runtime.readFile = func(got context.Context, path string) ([]byte, error) {
+		calls++
+		assert.Equal(t, ctx, got)
+		assert.Equal(t, "token", path)
+		return nil, got.Err()
+	}
+	require.ErrorIs(t, s.Test(ctx), context.Canceled)
+	_, err := s.published.Resolve(ctx, secretstore.ResolveRequest{Operand: "secret/data/mysql#password"})
+	require.ErrorIs(t, err, context.Canceled)
+	assert.Equal(t, 2, calls)
 }

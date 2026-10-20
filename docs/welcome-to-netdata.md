@@ -14,6 +14,39 @@ The system consists of three components:
 - [**Netdata Parents**](/docs/deployment-guides/deployment-with-centralization-points.md): Optional centralization points for aggregating data from multiple agents (Netdata Parents are the same software component as Netdata Agents, configured as Parents)
 - [**Netdata Cloud**](/docs/netdata-cloud/README.md): A smart control plane for unifying multiple independent Netdata Agents and Parents, providing horizontal scalability, role based access control, access from anywhere, centralized alerts notifications, team collaboration, AI insights, and more.
 
+The following diagram shows how Netdata components connect:
+
+```mermaid
+flowchart TB
+    C1("Child Agent 1")
+    C2("Child Agent 2")
+    C3("Child Agent 3")
+
+    P1("**Parent 1**")
+    P2("**Parent 2**")
+
+    NC("**Netdata Cloud**<br/>Dashboards, Alerts, AI")
+
+    C1 -->|streaming| P1
+    C2 -->|streaming| P1
+    C3 -->|streaming| P2
+    C2 -.->|failover| P2
+    P1 <-->|replication| P2
+    P1 <-->|ACLK| NC
+    P2 <-->|ACLK| NC
+
+    classDef child fill: #e8f5e8, stroke: #27ae60, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
+    classDef parent fill: #f3e8ff, stroke: #9b59b6, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
+    classDef cloud fill: #e8f4fd, stroke: #4a90e2, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
+
+    class C1 child
+    class C2 child
+    class C3 child
+    class P1 parent
+    class P2 parent
+    class NC cloud
+```
+
 ## Performance at a Glance
 
 |                      Aspect |                 Netdata                  |     Industry Standard     |
@@ -215,16 +248,16 @@ For Netdata, scalability is inherent to the architecture, not an add-on. Designe
 - **Consistent performance**: Query response times remain the same whether you have 10 or 10,000 nodes.
 - **Resource predictability**: Resource usage scales linearly with infrastructure size.
 - **High availability**: Streaming and replication provide high-availability to Netdata deployments.
-- **Clustering**: Netdata Parents can be clustered to replicate all their data localy, or cross region for disaster recovery.
+- **Clustering**: Netdata Parents can be clustered to replicate all their data locally, or cross region for disaster recovery.
 - **Fail-over**: Netdata Cloud dynamically routes queries to Netdata Parents and Agents based on their availability.
 
 ### Open Ecosystem
 
 Netdata thrives as part of a vibrant open-source community with 1.5 million downloads per day. The platform integrates seamlessly with existing tools and standards:
 
-- **Metrics collection**: Ingests metrics via all open standards (OpenTelemetry in final release stage)
+- **Metrics collection**: Ingests metrics through open standards, including OpenTelemetry OTLP/gRPC
 - **Metrics export**: Exports metrics to all open standards and commonly used time-series databases (Prometheus, Graphite, InfluxDB, OpenTSDB, and more)
-- **Logs**: Uses battle tested systemd journal files for storing logs, providing maximum interoperability
+- **Logs**: Explores systemd journal sources and indexed OpenTelemetry logs through the same Logs interface
 - **Alert routing**: Delivers notifications to PagerDuty, Slack, email, webhooks, and 20+ platforms
 - **AI integration**: Supports AI assistants via Model Context Protocol (MCP) — available via Netdata Cloud (infrastructure-wide) and on every Agent/Parent (local access)
 - **Visualization**: Works with Grafana through native datasource plugin
@@ -280,7 +313,8 @@ Based on extensive real-world deployments and independent academic validation, N
 
 - Parent resources include both ingestion and query workload
 - Storage rates are for all tiers combined; actual disk usage depends on retention configuration
-- The recommended topology is having a cluster of Netdata Parents every 500 monitored nodes (2M metrics/s)
+- The recommended topology is having a cluster of Netdata Parents every 500 monitored nodes (2M metrics/s) — see [Parent Sizing Guidelines](/docs/scalability.md#parent-sizing-guidelines) for the full breakdown
+- For default-settings sizing guidance per Agent (CPU, RAM, disk, and bandwidth), see [Resource utilization](/docs/netdata-agent/sizing-netdata-agents/README.md)
 
 :::
 
@@ -294,7 +328,7 @@ For more information, see [Netdata's impact on resources](/docs/netdata-agent/si
 
 ## Practical Implications
 
-Please also see [Netdata Enterprise Evaluation Guide](/docs/netdata-enterprise-evaluation-corrected.md) and [Netdata's Security and Privacy Design](/docs/security-and-privacy-design/README.md).
+Please also see [Netdata Enterprise Evaluation Guide](/docs/netdata-enterprise-evaluation.md) and [Netdata's Security and Privacy Design](/docs/security-and-privacy-design/README.md).
 
 ### For Small Teams
 

@@ -138,17 +138,17 @@ modules:
             enabled: true
           list:
             - name: update_every
-              description: Data collection interval (seconds). Must be at least 60.
+              description: "Data collection interval, in seconds. Must be at least 60."
               default_value: 60
               required: false
               group: Collection
             - name: autodetection_retry
-              description: Autodetection retry interval (seconds). Set 0 to disable.
+              description: "How often to retry the initial connection when the job fails to start, in seconds. Zero disables retries."
               default_value: 0
               required: false
               group: Collection
             - name: subscription_ids
-              description: List of Azure subscription IDs to monitor. Used as the scope for resource discovery.
+              description: "Azure subscription IDs to monitor. They scope resource discovery."
               default_value: ""
               required: true
               group: Collection
@@ -158,7 +158,7 @@ modules:
               required: false
               group: Collection
             - name: query_offset
-              description: Minimum offset (seconds) subtracted from metric query windows. Increase if metrics appear incomplete.
+              description: "Minimum offset subtracted from metric query windows, in seconds. Increase it if metrics appear incomplete."
               default_value: 180
               required: false
               group: Collection
@@ -172,12 +172,12 @@ modules:
                 - **Increase to 240-300s** if you still see gaps or missing data points.
                 - **Do not set below 60s** -- metrics will likely be incomplete.
             - name: timeout
-              description: Timeout for Azure Resource Graph and Azure Monitor API requests, in seconds.
+              description: "Timeout for Azure Resource Graph and Azure Monitor API requests, in seconds."
               default_value: 30
               required: false
               group: Collection
             - name: auth.mode
-              description: "Authentication method: `service_principal`, `managed_identity`, or `default`."
+              description: "How Netdata authenticates to Azure: `service_principal`, `managed_identity`, or `default`."
               default_value: ""
               required: true
               group: Authentication
@@ -190,32 +190,32 @@ modules:
                 | `managed_identity` | Running on Azure VMs, VMSS, or AKS with a managed identity | Optionally `client_id` for user-assigned identity |
                 | `default` | Uses the Azure SDK default credential chain (environment variables, managed identity, Azure CLI, etc.) | None |
             - name: auth.mode_service_principal.tenant_id
-              description: Entra ID tenant ID (required for `service_principal` mode).
+              description: "Entra ID tenant ID. Required for `service_principal` mode."
               default_value: ""
               required: false
               group: Authentication
             - name: auth.mode_service_principal.client_id
-              description: Entra ID application (client) ID (required for `service_principal` mode).
+              description: "Entra ID application (client) ID. Required for `service_principal` mode."
               default_value: ""
               required: false
               group: Authentication
             - name: auth.mode_service_principal.client_secret
-              description: Entra ID client secret (required for `service_principal` mode).
+              description: "Entra ID client secret. Required for `service_principal` mode."
               default_value: ""
               required: false
               group: Authentication
             - name: auth.mode_managed_identity.client_id
-              description: Client ID for user-assigned managed identity. Leave empty for system-assigned.
+              description: "Client ID of a user-assigned managed identity. Leave empty for a system-assigned identity."
               default_value: ""
               required: false
               group: Authentication
             - name: discovery.refresh_every
-              description: Interval (seconds) for refreshing discovered resources. Set `0` to disable runtime re-discovery after bootstrap.
+              description: "How often to refresh the discovered resources, in seconds. Zero disables rediscovery after startup."
               default_value: 300
               required: false
               group: Discovery
             - name: discovery.mode
-              description: "Resource discovery method: `filters` (structured filters) or `query` (custom KQL)."
+              description: "How resources are selected: `filters` (structured filters) or `query` (custom KQL)."
               default_value: filters
               required: false
               group: Discovery
@@ -225,24 +225,24 @@ modules:
                 | Mode | Behavior |
                 |:-----|:---------|
                 | `filters` | Builds an Azure Resource Graph query from the structured `mode_filters.*` options (resource groups, regions, tags). This is the default. |
-                | `query` | Uses the raw KQL you provide in `discovery.mode_query.kql`. The query must project `id`, `name`, `type`, `resourceGroup`, and `location`. |
+                | `query` | Uses the raw KQL you provide in `discovery.mode_query.kql`. The query must project `id`, `name`, `type`, `resourceGroup`, and `location`. Project `tags` too when using `virtual_nodes.by_resource_tag`. |
             - name: discovery.mode_filters.resource_groups
-              description: Optional list of Azure resource groups to include in `filters` mode.
+              description: "Azure resource groups to include. Leave empty for all."
               default_value: "[]"
               required: false
               group: Discovery
             - name: discovery.mode_filters.regions
-              description: Optional list of Azure regions to include in `filters` mode.
+              description: "Azure regions to include. Leave empty for all."
               default_value: "[]"
               required: false
               group: Discovery
             - name: discovery.mode_filters.tags
-              description: Optional exact-match tag filters for `filters` mode. Keys are matched case-insensitively and values case-sensitively.
+              description: "Exact-match tag filters. Keys match case-insensitively, values case-sensitively."
               default_value: "{}"
               required: false
               group: Discovery
             - name: discovery.mode_query.kql
-              description: Custom Azure Resource Graph KQL for `query` mode. Must project `id`, `name`, `type`, `resourceGroup`, `location`.
+              description: "Azure Resource Graph query selecting the resources. It must project `id`, `name`, `type`, `resourceGroup`, and `location`, plus `tags` for tag-based virtual nodes."
               default_value: ""
               required: false
               group: Discovery
@@ -260,10 +260,12 @@ modules:
                 | `resourceGroup` | Resource group name |
                 | `location` | Azure region |
 
+                If `virtual_nodes.by_resource_tag` is set, also project `tags`. Missing `tags` or non-object-shaped `tags` do not fail discovery; affected resources fall back to the default job host scope and the collector logs a warning once per successful discovery refresh.
+
                 :::info
 
-                - Returned resource `type` values should match the Azure resource types expected by the active profiles. 
-                - Resources with unsupported or non-matching types are ignored and do not activate profiles. 
+                - Returned resource `type` values should match the Azure resource types expected by the active profiles.
+                - Resources with unsupported or non-matching types are ignored and do not activate profiles.
                 - For the stock catalog, see [built-in profiles](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/azure_monitor.profiles/default).
 
                 :::
@@ -273,10 +275,10 @@ modules:
                 ```
                 resources
                 | where tags.env =~ "prod"
-                | project id, name, type, resourceGroup, location
+                | project id, name, type, resourceGroup, location, tags
                 ```
             - name: profiles.mode
-              description: "How profiles are selected: `auto` (discover from resources), `exact` (explicit list), or `combined` (both)."
+              description: "How profiles are selected: `auto` (from discovered resources), `exact` (explicit list), or `combined` (both)."
               default_value: auto
               required: false
               group: Profiles
@@ -299,7 +301,7 @@ modules:
                 - Per-profile filters never widen or bypass the global discovery scope.
                 - In `discovery.mode: query`, per-profile filters can use only `resource_groups` and `regions`. If you need per-profile tag filtering there, encode it in the KQL.
             - name: profiles.mode_auto.entries
-              description: Optional per-profile overrides applied only to profiles that auto-activate at bootstrap.
+              description: "Per-profile overrides applied only to profiles that activate automatically at startup."
               default_value: "[]"
               required: false
               group: Profiles
@@ -316,7 +318,7 @@ modules:
                 Auto-mode entries do not activate profiles on their own. They only override filtering for profiles that were auto-selected at bootstrap.
                 In `discovery.mode: query`, only `filters.resource_groups` and `filters.regions` apply.
             - name: profiles.mode_exact.entries
-              description: Explicit profile entries used by `exact` mode.
+              description: "Explicit profile entries used by `exact` mode."
               default_value: "[]"
               required: false
               group: Profiles
@@ -333,7 +335,7 @@ modules:
                 Per-profile filters only narrow the globally discovered resource set. They never widen it.
                 In `discovery.mode: query`, only `filters.resource_groups` and `filters.regions` apply.
             - name: profiles.mode_combined.entries
-              description: Explicit profile entries merged with auto-discovered profiles in `combined` mode.
+              description: "Explicit profile entries merged with auto-discovered profiles in `combined` mode."
               default_value: "[]"
               required: false
               group: Profiles
@@ -350,25 +352,43 @@ modules:
                 If an explicit `combined` entry matches an auto-selected profile, the collector keeps one runtime profile and overlays the explicit entry filters onto it.
                 In `discovery.mode: query`, only `filters.resource_groups` and `filters.regions` apply.
             - name: limits.max_concurrency
-              description: Maximum concurrent batch queries to Azure Monitor.
+              description: "Maximum concurrent batch requests to Azure Monitor."
               default_value: 4
               required: false
               group: Limits
             - name: limits.max_batch_resources
-              description: Maximum resources per Azure Monitor batch request.
+              description: "Maximum resources per Azure Monitor batch request."
               default_value: 50
               required: false
               group: Limits
             - name: limits.max_metrics_per_query
-              description: Maximum metrics per Azure Monitor batch request.
+              description: "Maximum metric names per Azure Monitor batch request."
               default_value: 20
               required: false
               group: Limits
             - name: vnode
-              description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+              description: "Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes)."
               default_value: ""
               required: false
               group: Virtual Node
+              detailed_description: |
+                This job-level virtual node is used for metrics written to the default host scope.
+                If `virtual_nodes.by_resource_tag` is also set, resources that have a safe value for the configured tag are routed to workload virtual nodes instead. Resources without that tag, with an empty value, or with an unsafe hostname value continue to use the job-level `vnode` when configured.
+            - name: virtual_nodes.by_resource_tag
+              description: "Azure resource tag whose value becomes the virtual node for the resources carrying it. Leave empty to keep everything on this host."
+              default_value: ""
+              required: false
+              group: Virtual Node
+              detailed_description: |
+                Set this to an Azure resource tag key, for example `workload`, to route resource metrics under virtual nodes named after that tag value.
+
+                - Tag keys are matched case-insensitively; tag values keep their Azure case and are trimmed.
+                - Empty or missing tag values use the default job host scope.
+                - Unsafe hostname values use the default job host scope and are summarized in a warning once per successful discovery refresh.
+                - The virtual node GUID is deterministic from `azure_monitor:` plus the trimmed tag value, so the same Azure workload value maps to the same Azure Monitor virtual node across jobs and subscriptions.
+                - Virtual node metadata includes `_vnode_type=azure_workload`. Netdata also adds `_hostname` when emitting the virtual node definition.
+                - Workload virtual nodes increase host and alert cardinality. Health alerts defined for Azure Monitor charts attach per workload virtual node.
+                - The metrix scoped vec cache grows with observed workload scope and label cardinality during the collector runtime; keep the configured tag's cardinality bounded by operator policy.
         examples:
           folding:
             title: Config
@@ -402,6 +422,61 @@ modules:
                         tenant_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                         client_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                         client_secret: "your-client-secret"
+            - name: Workload virtual nodes from resource tags
+              description: Route resources with `tags.workload` to virtual nodes named after the workload value. Resources without the tag stay on the default job host scope.
+              config: |
+                jobs:
+                  - name: prod-workloads
+                    subscription_ids:
+                      - "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    virtual_nodes:
+                      by_resource_tag: workload
+                    discovery:
+                      mode: filters
+                    profiles:
+                      mode: auto
+                    auth:
+                      mode: service_principal
+                      mode_service_principal:
+                        tenant_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                        client_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                        client_secret: "your-client-secret"
+            - name: Custom KQL with workload virtual nodes
+              description: In `query` discovery mode, project `tags` so `virtual_nodes.by_resource_tag` can derive workload virtual nodes.
+              config: |
+                jobs:
+                  - name: prod-query-workloads
+                    subscription_ids:
+                      - "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    virtual_nodes:
+                      by_resource_tag: workload
+                    discovery:
+                      mode: query
+                      mode_query:
+                        kql: |
+                          resources
+                          | where tags.env =~ "prod"
+                          | project id, name, type, resourceGroup, location, tags
+                    profiles:
+                      mode: auto
+                    auth:
+                      mode: default
+            - name: Job virtual node plus workload virtual nodes
+              description: Use a job-level `vnode` as the default host scope while tagged resources route to workload virtual nodes.
+              config: |
+                jobs:
+                  - name: prod-with-fallback-node
+                    vnode: azure-fallback-node
+                    subscription_ids:
+                      - "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    virtual_nodes:
+                      by_resource_tag: workload
+                    discovery:
+                      mode: filters
+                    profiles:
+                      mode: auto
+                    auth:
+                      mode: managed_identity
             - name: Managed identity with exact profiles
               description: Use a managed identity (on an Azure VM, VMSS, or AKS) and monitor only SQL Database and PostgreSQL Flexible Server resources -- skip auto-discovery of other services.
               config: |
@@ -461,7 +536,7 @@ modules:
                         kql: |
                           resources
                           | where tags.env =~ "prod"
-                          | project id, name, type, resourceGroup, location
+                          | project id, name, type, resourceGroup, location, tags
                     profiles:
                       mode: auto
                     auth:
@@ -515,6 +590,18 @@ modules:
               - The collector uses `query_offset` (default: **180 seconds**) as the minimum offset for metric query windows.
               - Slower time-grain batches automatically use a larger effective offset when needed.
               - If metrics are still missing or incomplete, increase `query_offset` to **240** or **300** seconds.
+          - name: Workload virtual nodes are not created
+            description: |
+              When `virtual_nodes.by_resource_tag` is set, check the discovered resource tags:
+
+              - The configured tag key is matched case-insensitively, but the value must be non-empty after trimming.
+              - In `discovery.mode: query`, the KQL must project `tags`. If the `tags` column is missing or not an object, the collector logs a warning and affected resources use the default job host scope.
+              - Tag values must be safe Netdata hostnames. Unsafe values are summarized in a warning once per successful discovery refresh and affected resources use the default job host scope.
+              - The same Azure workload value intentionally maps to the same Azure Monitor virtual node across subscriptions and jobs. Use distinct tag values when tenants should remain separate.
+              - Azure Monitor namespaces workload GUID input with `azure_monitor:` to avoid accidental collisions with other collectors that derive virtual node GUIDs from hostnames.
+          - name: More alerts appear after enabling workload virtual nodes
+            description: |
+              Workload virtual nodes multiply the host scope of Azure Monitor charts. Health alerts attached to those charts evaluate per workload virtual node, so alert volume can increase with the number of distinct workload tag values.
           - name: Authentication errors in sovereign clouds
             description: |
               For Azure Government or Azure China clouds, set the `cloud` parameter:
@@ -542,6 +629,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-sql_managed_instance
       monitored_instance:
         name: Azure SQL Managed Instance
+        description: Monitor CPU, storage, and input and output performance for Azure SQL Managed Instance resources through Azure Monitor.
         link: https://learn.microsoft.com/azure/azure-sql/managed-instance/
         icon_filename: azure.svg
         categories:
@@ -646,6 +734,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-sql_database
       monitored_instance:
         name: Azure SQL Database
+        description: Monitor operational and performance metrics for Azure SQL Database resources through Azure Monitor.
         link: https://learn.microsoft.com/azure/azure-sql/database/
         icon_filename: azure.svg
         categories:
@@ -930,6 +1019,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-postgres_flexible
       monitored_instance:
         name: Azure PostgreSQL Flexible Server
+        description: Monitor compute, storage, connections, database activity, replication, and availability for Azure PostgreSQL Flexible Server.
         link: https://learn.microsoft.com/azure/postgresql/flexible-server/
         icon_filename: azure.svg
         categories:
@@ -1356,6 +1446,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-cosmos_db
       monitored_instance:
         name: Azure Cosmos DB Account
+        description: Monitor operational and performance metrics for Azure Cosmos DB accounts through Azure Monitor.
         link: https://learn.microsoft.com/azure/cosmos-db/
         icon_filename: azure.svg
         categories:
@@ -1588,6 +1679,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-logic_apps
       monitored_instance:
         name: Azure Logic Apps Workflow
+        description: Monitor operational and performance metrics for Azure Logic Apps workflows through Azure Monitor.
         link: https://learn.microsoft.com/azure/logic-apps/
         icon_filename: azure.svg
         categories:
@@ -1800,6 +1892,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-virtual_machines
       monitored_instance:
         name: Azure Virtual Machine
+        description: Monitor compute, memory, disk, network, throttling, and availability metrics for Azure Virtual Machine resources.
         link: https://learn.microsoft.com/azure/virtual-machines/
         icon_filename: azure.svg
         categories:
@@ -2202,6 +2295,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-aks
       monitored_instance:
         name: Azure Kubernetes Service Cluster
+        description: Monitor control plane, node, pod, and autoscaler health for Azure Kubernetes Service clusters through Azure Monitor.
         link: https://learn.microsoft.com/azure/aks/
         icon_filename: azure.svg
         categories:
@@ -2463,6 +2557,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-storage_accounts
       monitored_instance:
         name: Azure Storage Account
+        description: Monitor transactions, latency, throughput, availability, and storage capacity for Azure Storage Account resources.
         link: https://learn.microsoft.com/azure/storage/common/storage-account-overview
         icon_filename: azure.svg
         categories:
@@ -2584,6 +2679,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-load_balancers
       monitored_instance:
         name: Azure Load Balancer
+        description: Monitor availability, throughput, connections, and source network address translation ports for Azure Load Balancer resources.
         link: https://learn.microsoft.com/azure/load-balancer/
         icon_filename: azure.svg
         categories:
@@ -2708,6 +2804,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-app_service
       monitored_instance:
         name: Azure App Service
+        description: Monitor operational and performance metrics for Azure App Service resources through Azure Monitor.
         link: https://learn.microsoft.com/azure/app-service/
         icon_filename: azure.svg
         categories:
@@ -2978,6 +3075,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-azure_functions
       monitored_instance:
         name: Azure Functions
+        description: Monitor operational and performance metrics for Azure Functions resources through Azure Monitor.
         link: https://learn.microsoft.com/azure/azure-functions/
         icon_filename: azure.svg
         categories:
@@ -3212,6 +3310,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-redis_cache
       monitored_instance:
         name: Azure Cache for Redis
+        description: Monitor performance, latency, memory, connections, keys, throughput, and replication for Azure Cache for Redis resources.
         link: https://learn.microsoft.com/azure/azure-cache-for-redis/
         icon_filename: azure.svg
         categories:
@@ -3526,6 +3625,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-event_hubs
       monitored_instance:
         name: Azure Event Hubs Namespace
+        description: Monitor operational and performance metrics for Azure Event Hubs namespaces through Azure Monitor.
         link: https://learn.microsoft.com/azure/event-hubs/
         icon_filename: azure.svg
         categories:
@@ -3715,6 +3815,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-service_bus
       monitored_instance:
         name: Azure Service Bus Namespace
+        description: Monitor operational and performance metrics for Azure Service Bus namespaces through Azure Monitor.
         link: https://learn.microsoft.com/azure/service-bus-messaging/
         icon_filename: azure.svg
         categories:
@@ -3932,6 +4033,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-application_gateway
       monitored_instance:
         name: Azure Application Gateway
+        description: Monitor traffic, responses, backend health, latency, connections, capacity, and firewall activity for Azure Application Gateway.
         link: https://learn.microsoft.com/azure/application-gateway/
         icon_filename: azure.svg
         categories:
@@ -4158,6 +4260,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-key_vault
       monitored_instance:
         name: Azure Key Vault
+        description: Monitor operational and performance metrics for Azure Key Vault resources through Azure Monitor.
         link: https://learn.microsoft.com/azure/key-vault/
         icon_filename: azure.svg
         categories:
@@ -4254,6 +4357,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-api_management
       monitored_instance:
         name: Azure API Management
+        description: Monitor requests, latency, compute, capacity, events, WebSockets, and network connectivity for Azure API Management resources.
         link: https://learn.microsoft.com/azure/api-management/
         icon_filename: azure.svg
         categories:
@@ -4427,6 +4531,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-front_door
       monitored_instance:
         name: Azure Front Door
+        description: Monitor operational and performance metrics for Azure Front Door resources through Azure Monitor.
         link: https://learn.microsoft.com/azure/frontdoor/
         icon_filename: azure.svg
         categories:
@@ -4598,6 +4703,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-vmss
       monitored_instance:
         name: Azure Virtual Machine Scale Set
+        description: Monitor compute, memory, disk, network, throttling, and availability metrics across Azure Virtual Machine Scale Sets.
         link: https://learn.microsoft.com/azure/virtual-machine-scale-sets/
         icon_filename: azure.svg
         categories:
@@ -5011,6 +5117,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-sql_elastic_pool
       monitored_instance:
         name: Azure SQL Elastic Pool
+        description: Monitor compute, memory, storage, input and output, sessions, and billing metrics for Azure SQL Elastic Pool resources.
         link: https://learn.microsoft.com/azure/azure-sql/database/elastic-pool-overview
         icon_filename: azure.svg
         categories:
@@ -5237,6 +5344,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-mysql_flexible
       monitored_instance:
         name: Azure MySQL Flexible Server
+        description: Monitor compute, memory, storage, connections, queries, replication, network, and health for Azure MySQL Flexible Server.
         link: https://learn.microsoft.com/azure/mysql/flexible-server/
         icon_filename: azure.svg
         categories:
@@ -5596,6 +5704,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-container_apps
       monitored_instance:
         name: Azure Container Apps
+        description: Monitor compute, memory, requests, network, replicas, Java runtime, and resiliency metrics for Azure Container Apps.
         link: https://learn.microsoft.com/azure/container-apps/
         icon_filename: azure.svg
         categories:
@@ -5848,6 +5957,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-firewall
       monitored_instance:
         name: Azure Firewall
+        description: Monitor operational and performance metrics for Azure Firewall resources through Azure Monitor.
         link: https://learn.microsoft.com/azure/firewall/
         icon_filename: azure.svg
         categories:
@@ -5964,6 +6074,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-cognitive_services
       monitored_instance:
         name: Azure Cognitive Services
+        description: Monitor calls, errors, latency, tokens, availability, content safety, and model activity for Azure Cognitive Services.
         link: https://learn.microsoft.com/azure/ai-services/
         icon_filename: azure.svg
         categories:
@@ -6601,6 +6712,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-vpn_gateway
       monitored_instance:
         name: Azure VPN Gateway
+        description: Monitor operational and performance metrics for Azure VPN Gateway resources through Azure Monitor.
         link: https://learn.microsoft.com/azure/vpn-gateway/
         icon_filename: azure.svg
         categories:
@@ -6965,6 +7077,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-event_grid
       monitored_instance:
         name: Azure Event Grid Topic
+        description: Monitor operational and performance metrics for Azure Event Grid topics through Azure Monitor.
         link: https://learn.microsoft.com/azure/event-grid/
         icon_filename: azure.svg
         categories:
@@ -7090,6 +7203,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-iot_hub
       monitored_instance:
         name: Azure IoT Hub
+        description: Monitor operational and performance metrics for Azure IoT Hub resources through Azure Monitor.
         link: https://learn.microsoft.com/azure/iot-hub/
         icon_filename: azure.svg
         categories:
@@ -7485,6 +7599,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-data_factory
       monitored_instance:
         name: Azure Data Factory
+        description: Monitor operational and performance metrics for Azure Data Factory resources through Azure Monitor.
         link: https://learn.microsoft.com/azure/data-factory/
         icon_filename: azure.svg
         categories:
@@ -7987,6 +8102,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-nat_gateway
       monitored_instance:
         name: Azure NAT Gateway
+        description: Monitor operational and performance metrics for Azure NAT Gateway resources through Azure Monitor.
         link: https://learn.microsoft.com/azure/nat-gateway/
         icon_filename: azure.svg
         categories:
@@ -8097,6 +8213,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-container_instances
       monitored_instance:
         name: Azure Container Instances
+        description: Monitor CPU, memory, and network traffic for Azure Container Instances through Azure Monitor.
         link: https://learn.microsoft.com/azure/container-instances/
         icon_filename: azure.svg
         categories:
@@ -8192,6 +8309,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-container_registry
       monitored_instance:
         name: Azure Container Registry
+        description: Monitor image pull and push operations, storage use, and task execution for Azure Container Registry resources.
         link: https://learn.microsoft.com/azure/container-registry/
         icon_filename: azure.svg
         categories:
@@ -8291,6 +8409,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-application_insights
       monitored_instance:
         name: Azure Application Insights
+        description: Monitor availability, requests, dependencies, exceptions, browser timing, process health, and traces for Azure Application Insights.
         link: https://learn.microsoft.com/azure/azure-monitor/app/app-insights-overview
         icon_filename: azure.svg
         categories:
@@ -8546,6 +8665,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-express_route_circuit
       monitored_instance:
         name: Azure ExpressRoute Circuit
+        description: Monitor throughput, availability, bandwidth utilization, dropped traffic, and routes for Azure ExpressRoute Circuit resources.
         link: https://learn.microsoft.com/azure/expressroute/
         icon_filename: azure.svg
         categories:
@@ -8676,6 +8796,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-machine_learning
       monitored_instance:
         name: Azure Machine Learning Workspace
+        description: Monitor compute, GPU, cluster, run, model, quota, storage, network, and agent activity for Azure Machine Learning workspaces.
         link: https://learn.microsoft.com/azure/machine-learning/
         icon_filename: azure.svg
         categories:
@@ -9016,6 +9137,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-data_explorer
       monitored_instance:
         name: Azure Data Explorer Cluster
+        description: Monitor ingestion, queries, streaming, cache, compute, exports, views, events, and cluster health for Azure Data Explorer.
         link: https://learn.microsoft.com/azure/data-explorer/
         icon_filename: azure.svg
         categories:
@@ -9439,6 +9561,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-stream_analytics
       monitored_instance:
         name: Azure Stream Analytics Job
+        description: Monitor event flow, processing errors, timing, resource utilization, inputs, and functions for Azure Stream Analytics jobs.
         link: https://learn.microsoft.com/azure/stream-analytics/
         icon_filename: azure.svg
         categories:
@@ -9607,6 +9730,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-synapse
       monitored_instance:
         name: Azure Synapse Analytics Workspace
+        description: Monitor pipeline runs, SQL pool activity, streaming events, input throughput, and link processing for Azure Synapse Analytics workspaces.
         link: https://learn.microsoft.com/azure/synapse-analytics/
         icon_filename: azure.svg
         categories:
@@ -9814,6 +9938,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-log_analytics
       monitored_instance:
         name: Azure Log Analytics Workspace
+        description: Monitor ingestion, queries, exports, and legacy agent system health for Azure Log Analytics workspaces.
         link: https://learn.microsoft.com/azure/azure-monitor/logs/
         icon_filename: azure.svg
         categories:
@@ -10188,6 +10313,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-express_route_gateway
       monitored_instance:
         name: Azure ExpressRoute Gateway
+        description: Monitor throughput, CPU, active flows, route changes, and virtual network scale for Azure ExpressRoute Gateway resources.
         link: https://learn.microsoft.com/azure/expressroute/expressroute-about-virtual-network-gateways
         icon_filename: azure.svg
         categories:

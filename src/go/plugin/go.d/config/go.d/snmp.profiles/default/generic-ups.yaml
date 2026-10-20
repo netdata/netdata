@@ -1,6 +1,7 @@
 extends:
   - _system-base.yaml
   - _std-ups-mib.yaml
+  - _std-topology-ip-mib.yaml
 
 selector:
   - sysobjectid:

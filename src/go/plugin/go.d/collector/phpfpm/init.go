@@ -3,6 +3,7 @@
 package phpfpm
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -10,7 +11,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
-func (c *Collector) initClient() (client, error) {
+func (c *Collector) initClient(ctx context.Context) (client, error) {
 	if c.Socket != "" {
 		return c.initSocketClient()
 	}
@@ -18,14 +19,14 @@ func (c *Collector) initClient() (client, error) {
 		return c.initTcpClient()
 	}
 	if c.URL != "" {
-		return c.initHTTPClient()
+		return c.initHTTPClient(ctx)
 	}
 
 	return nil, errors.New("neither 'socket' nor 'url' set")
 }
 
-func (c *Collector) initHTTPClient() (*httpClient, error) {
-	cli, err := web.NewHTTPClient(c.ClientConfig)
+func (c *Collector) initHTTPClient(ctx context.Context) (*httpClient, error) {
+	cli, err := web.NewHTTPClient(ctx, c.ClientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("create HTTP client: %v", err)
 	}

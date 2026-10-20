@@ -1,0 +1,25 @@
+[package]
+name = "treight-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = { version = "0.4", features = ["arbitrary-derive"] }
+treight = { path = "..", features = ["roaring"] }
+# Must match the main workspace's roaring source (same git+branch) so cargo
+# unifies it with treight's `roaring` feature dep. Standalone fuzz workspace,
+# so `workspace = true` inheritance is unavailable here.
+roaring = { git = "https://github.com/netdata/roaring-rs.git", branch = "allocative" }
+
+[[bin]]
+name = "against_roaring"
+path = "fuzz_targets/against_roaring.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]

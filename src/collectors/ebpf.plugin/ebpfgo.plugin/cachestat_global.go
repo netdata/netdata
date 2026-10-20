@@ -1,0 +1,316 @@
+package main
+
+import (
+	"sync"
+	"time"
+
+	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
+	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
+)
+
+const (
+	cachestatGlobalGroup  = "mem"
+	cachestatGlobalFamily = "page_cache"
+	cachestatGlobalModule = "cachestat"
+	cachestatGlobalPlugin = "ebpf-go.plugin"
+)
+
+type cachestatGlobalCounters struct {
+	MarkPageAccessed   uint64
+	MarkBufferDirty    uint64
+	AddToPageCacheLru  uint64
+	AccountPageDirtied uint64
+}
+
+type cachestatGlobalPublish struct {
+	Ratio int64
+	Dirty int64
+	Hit   int64
+	Miss  int64
+}
+
+type cachestatGlobalState struct {
+	prev      cachestatGlobalCounters
+	cumDirty  int64
+	cumHits   int64
+	cumMisses int64
+}
+
+type cachestatGlobalChart struct {
+	id        string
+	title     string
+	units     string
+	context   string
+	order     int
+	dimension string
+	algorithm string
+}
+
+var cachestatGlobalCharts = []cachestatGlobalChart{
+	{
+		id:        "cachestat_ratio",
+		title:     "Hit ratio",
+		units:     "%",
+		context:   "mem.cachestat_ratio",
+		order:     21100,
+		dimension: "ratio",
+		algorithm: "absolute",
+	},
+	{
+		id:        "cachestat_dirties",
+		title:     "Number of dirty pages",
+		units:     "page/s",
+		context:   "mem.cachestat_dirties",
+		order:     21101,
+		dimension: "dirty",
+		algorithm: "incremental",
+	},
+	{
+		id:        "cachestat_hits",
+		title:     "Number of accessed files",
+		units:     "hits/s",
+		context:   "mem.cachestat_hits",
+		order:     21102,
+		dimension: "hit",
+		algorithm: "incremental",
+	},
+	{
+		id:        "cachestat_misses",
+		title:     "Files out of page cache",
+		units:     "misses/s",
+		context:   "mem.cachestat_misses",
+		order:     21103,
+		dimension: "miss",
+		algorithm: "incremental",
+	},
+}
+
+var cachestatGlobalChartsOnce sync.Once
+
+// pluginOutputMu serializes all writes to the pluginsd stdout stream.
+// Cachestat's multi-call sequences (BEGIN/SET/END) and the socket
+// function handler's FUNCRESULT writes share a single api; without
+// this lock they can interleave and corrupt the protocol stream.
+var pluginOutputMu sync.Mutex
+
+func (s *cachestatGlobalState) Update(current cachestatGlobalCounters) (cachestatGlobalPublish, bool) {
+	mpa := diffCounters(current.MarkPageAccessed, s.prev.MarkPageAccessed)
+	mbd := diffCounters(current.MarkBufferDirty, s.prev.MarkBufferDirty)
+	apcl := diffCounters(current.AddToPageCacheLru, s.prev.AddToPageCacheLru)
+	apd := diffCounters(current.AccountPageDirtied, s.prev.AccountPageDirtied)
+
+	publish := cachestatGlobalPublish{}
+
+	total := max(mpa-mbd, 0)
+
+	misses := max(apcl-apd, 0)
+
+	hits := total - misses
+	if hits < 0 {
+		misses = total
+		hits = 0
+	}
+
+	if total > 0 {
+		publish.Ratio = int64((float64(hits) / float64(total)) * 100)
+	} else {
+		// No page-cache activity this interval; 100 = full hit rate (nothing missed).
+		// Matches the idle-path convention in cachestat_shared_memory.go,
+		// apps_ebpf_shared_memory.c, and cgroup_ebpfgo_cachestat.c.
+		publish.Ratio = 100
+	}
+
+	s.cumDirty += mbd
+	s.cumHits += hits
+	s.cumMisses += misses
+
+	publish.Dirty = s.cumDirty
+	publish.Hit = s.cumHits
+	publish.Miss = s.cumMisses
+	s.prev = current
+
+	return publish, true
+}
+
+func diffCounters(current, previous uint64) int64 {
+	if current < previous {
+		return 0
+	}
+
+	return int64(current - previous)
+}
+
+func createCachestatGlobalCharts(api *netdataapi.API, updateEvery int) {
+	cachestatGlobalChartsOnce.Do(func() {
+		pluginOutputMu.Lock()
+		defer pluginOutputMu.Unlock()
+
+		if api != nil {
+			api.HOST("")
+		}
+		for _, chart := range cachestatGlobalCharts {
+			emitCachestatGlobalChart(api, chart, updateEvery)
+		}
+	})
+}
+
+func emitCachestatGlobalChart(api *netdataapi.API, chart cachestatGlobalChart, updateEvery int) {
+	if api == nil {
+		return
+	}
+
+	api.CHART(netdataapi.ChartOpts{
+		TypeID:      cachestatGlobalGroup,
+		ID:          chart.id,
+		Title:       chart.title,
+		Units:       chart.units,
+		Family:      cachestatGlobalFamily,
+		Context:     chart.context,
+		ChartType:   "line",
+		Priority:    chart.order,
+		UpdateEvery: updateEvery,
+		Plugin:      cachestatGlobalPlugin,
+		Module:      cachestatGlobalModule,
+	})
+	api.DIMENSION(netdataapi.DimensionOpts{
+		ID:         chart.dimension,
+		Name:       chart.dimension,
+		Algorithm:  chart.algorithm,
+		Multiplier: 1,
+		Divisor:    1,
+	})
+}
+
+func (p cachestatGlobalPublish) write(api *netdataapi.API, usecSince int) {
+	if api == nil {
+		return
+	}
+
+	pluginOutputMu.Lock()
+	defer pluginOutputMu.Unlock()
+
+	for _, item := range []struct {
+		chart string
+		dim   string
+		value int64
+	}{
+		{chart: "cachestat_ratio", dim: "ratio", value: p.Ratio},
+		{chart: "cachestat_dirties", dim: "dirty", value: p.Dirty},
+		{chart: "cachestat_hits", dim: "hit", value: p.Hit},
+		{chart: "cachestat_misses", dim: "miss", value: p.Miss},
+	} {
+		api.BEGIN(cachestatGlobalGroup, item.chart, usecSince)
+		api.SET(item.dim, item.value)
+		api.END()
+	}
+}
+
+// runCachestatGlobalCollector is the single collection loop for the plugin.
+// Both the global metric snapshot and the per-PID SHM publish run here
+// sequentially so that only one OS thread is needed for CGO calls.
+// store may be nil when apps/cgroups integration is disabled.
+func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHandle, stop <-chan struct{}, store *ebpfSharedMemoryStore, updateEvery int) {
+	if handle == nil || handle.Runtime == nil {
+		return
+	}
+
+	if updateEvery <= 0 {
+		updateEvery = cachestatDefaultUpdateEvery
+	}
+
+	createCachestatGlobalCharts(api, updateEvery)
+
+	state := &cachestatGlobalState{}
+	lastCollection := time.Now()
+	collectAndPublish := func(usecSince int) {
+		// Global snapshot — one CGO call.
+		snapshot, err := handle.Runtime.Snapshot(handle.MapsPerCore)
+		if err != nil {
+			logPluginErr("cachestat.snapshot", "cachestat", "snapshot", err)
+		} else {
+			publish, ok := state.Update(cachestatGlobalCounters{
+				MarkPageAccessed:   snapshot.MarkPageAccessed,
+				MarkBufferDirty:    snapshot.MarkBufferDirty,
+				AddToPageCacheLru:  snapshot.AddToPageCacheLru,
+				AccountPageDirtied: snapshot.AccountPageDirtied,
+			})
+			if ok {
+				publish.write(api, usecSince)
+			}
+		}
+
+		// Per-PID snapshot — second CGO call, same goroutine, no extra thread.
+		if store != nil {
+			publishSharedStore := func() {
+				// Cachestat is the elected publisher when it has apps/cgroup
+				// integration. Open its segment even when its own snapshot fails:
+				// dcstat/socket may still have healthy rows to publish.
+				if handle.SharedMemory == nil {
+					publisher, perr := NewSharedPidMemoryPublisher(productionSHMName, productionSEMName, handle.PidTableSize, uint32(updateEvery))
+					if perr != nil {
+						logPluginErr("cachestat.shm_open", "cachestat", "shared memory open", perr)
+					} else {
+						handle.SharedMemory = publisher
+					}
+				}
+				if handle.SharedMemory != nil {
+					if perr := store.Publish(handle.SharedMemory, ebpfgoSHMFlagCachestat); perr != nil {
+						logPluginErr("cachestat.publish", "cachestat", "shared memory publish", perr)
+					}
+				}
+			}
+
+			apps, err := handle.Runtime.SnapshotApps(handle.MapsPerCore)
+			if err != nil {
+				logPluginErr("cachestat.snapshot_apps", "cachestat", "snapshot-apps", err)
+				store.ClearCachestatApps()
+				publishSharedStore()
+			} else {
+				staleCandidates := store.UpdateApps(apps)
+				if len(staleCandidates) > 0 {
+					// Authoritative liveness check matching the C-version
+					// behavior: a process is alive iff kill(pid, 0) succeeds.
+					// Idle-but-alive PIDs are kept in the BPF map so their
+					// next BPF event is still attributable to the process.
+					// We reset the debouncer by going through the store once
+					// more only for the dead candidates (see filter below).
+					deadPIDs := staleCandidates[:0]
+					for _, pid := range staleCandidates {
+						if !libbpfloader.PidIsAlive(pid) {
+							deadPIDs = append(deadPIDs, pid)
+						}
+					}
+					if len(deadPIDs) > 0 {
+						if err := handle.Runtime.DeletePids(deadPIDs); err != nil {
+							rateLimitedStderr("cachestat.delete_pids",
+								"ebpf-go.plugin: failed to delete %d stale PIDs from cstat_pid: %v\n",
+								len(deadPIDs), err)
+						} else {
+							store.RemoveCachestatPIDs(deadPIDs)
+						}
+					}
+				}
+				publishSharedStore()
+			}
+		}
+	}
+
+	collectAndPublish(0)
+	lastCollection = time.Now()
+
+	ticker := time.NewTicker(time.Duration(updateEvery) * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-stop:
+			return
+		case <-ticker.C:
+		}
+
+		now := time.Now()
+		usecSince := max(int(now.Sub(lastCollection).Microseconds()), 0)
+		lastCollection = now
+		collectAndPublish(usecSince)
+	}
+}

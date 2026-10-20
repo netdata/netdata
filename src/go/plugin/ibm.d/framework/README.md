@@ -148,6 +148,6 @@ go generate ./...
 
 - [`../README.md`](../README.md) – project overview, build instructions, and directory map
 - [`../AGENTS.md`](../AGENTS.md) – authoring checklist and best practices for AI assistants
-- [`../BEST-PRACTICES.md`](../BEST-PRACTICES.md) – in-depth guidance on go.d/ibm.d collector development
+- [`../../../AGENTS.md`](../../../AGENTS.md) – Go-area rules and routing
 
 Contributions are welcome! Keep documentation, schemas, metadata, and health alerts synchronized to guarantee a smooth user experience.

@@ -1,0 +1,92 @@
+[
+  {
+    "context": "prometheus.ifHighSpeed",
+    "labels": {
+      "ifDescr": "eth0"
+    },
+    "dims": [
+      {
+        "name": "ifHighSpeed",
+        "algo": "absolute",
+        "value": 1000
+      }
+    ],
+    "soft": {
+      "units": "bits",
+      "family": "ifHighSpeed",
+      "type": "line"
+    }
+  },
+  {
+    "context": "prometheus.ifMtu",
+    "labels": {
+      "ifDescr": "eth0"
+    },
+    "dims": [
+      {
+        "name": "ifMtu",
+        "algo": "absolute",
+        "value": 1500
+      }
+    ],
+    "soft": {
+      "units": "octets",
+      "family": "ifMtu",
+      "type": "line"
+    }
+  },
+  {
+    "context": "prometheus.ifOutOctets",
+    "labels": {
+      "ifDescr": "eth0"
+    },
+    "dims": [
+      {
+        "name": "ifOutOctets",
+        "algo": "absolute",
+        "value": 12345
+      }
+    ],
+    "soft": {
+      "units": "bytes",
+      "family": "ifOutOctets",
+      "type": "area"
+    }
+  },
+  {
+    "context": "prometheus.ifOutUcastPkts",
+    "labels": {
+      "ifDescr": "eth0"
+    },
+    "dims": [
+      {
+        "name": "ifOutUcastPkts",
+        "algo": "absolute",
+        "value": 678
+      }
+    ],
+    "soft": {
+      "units": "packets",
+      "family": "ifOutUcastPkts",
+      "type": "line"
+    }
+  },
+  {
+    "context": "prometheus.test_clock_hertz",
+    "labels": {
+      "cpu": "0"
+    },
+    "dims": [
+      {
+        "name": "test_clock_hertz",
+        "algo": "absolute",
+        "value": 2400
+      }
+    ],
+    "soft": {
+      "units": "Hz",
+      "family": "test_clock",
+      "type": "line"
+    }
+  }
+]

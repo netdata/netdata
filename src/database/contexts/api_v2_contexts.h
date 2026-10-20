@@ -82,7 +82,6 @@ struct rrdcontext_to_json_v2_data {
 
     struct {
         bool enabled;
-        bool relative;
         time_t after;
         time_t before;
     } window;

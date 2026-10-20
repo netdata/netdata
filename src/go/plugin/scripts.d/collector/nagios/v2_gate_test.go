@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const gatePluginPath = "/opt/nagios-scripts/check_gate.pl"
+const gateCheckName = "check_gate"
 
 func TestV2Gate_G1_TemplateCompileProof(t *testing.T) {
 	templateYAML := New().ChartTemplateYAML()
@@ -36,7 +36,7 @@ func TestV2Gate_G2_PerfdataRouting(t *testing.T) {
 	warnHigh := 500.0
 	critLow := 200.0
 	critHigh := 900.0
-	samples := router.route(gatePluginPath, []output.PerfDatum{
+	samples := router.route(gateCheckName, []output.PerfDatum{
 		{
 			Label: "latency", Unit: "ms", Value: 120,
 			Warn: &output.ThresholdRange{Inclusive: true, Low: &warnLow, High: &warnHigh},
@@ -79,7 +79,7 @@ func TestV2Gate_G2_PerfdataRouting(t *testing.T) {
 	store := metrix.NewCollectorStore()
 	cc := gateCycleController(t, store)
 	cc.BeginCycle()
-	sm := store.Write().SnapshotMeter("nagios")
+	sm := store.Write().SnapshotMeter("")
 	labels := sm.LabelSet(
 		metrix.Label{Key: "nagios_job", Value: "gate_job"},
 	)
@@ -89,7 +89,7 @@ func TestV2Gate_G2_PerfdataRouting(t *testing.T) {
 			sm.MeasureSetCounter(
 				measureSet.name,
 				metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs()...),
-				metrix.WithChartFamily(perfdataFamily(measureSet.scriptName)),
+				metrix.WithChartFamily(perfdataFamily(measureSet.checkName)),
 				metrix.WithUnit(measureSet.unit),
 			).ObserveTotalFields(fields, labels)
 			continue
@@ -97,7 +97,7 @@ func TestV2Gate_G2_PerfdataRouting(t *testing.T) {
 		sm.MeasureSetGauge(
 			measureSet.name,
 			metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs()...),
-			metrix.WithChartFamily(perfdataFamily(measureSet.scriptName)),
+			metrix.WithChartFamily(perfdataFamily(measureSet.checkName)),
 			metrix.WithUnit(measureSet.unit),
 		).ObserveFields(fields, labels)
 	}
@@ -106,7 +106,7 @@ func TestV2Gate_G2_PerfdataRouting(t *testing.T) {
 			thresholdState.name,
 			metrix.WithStateSetMode(metrix.ModeBitSet),
 			metrix.WithStateSetStates(perfThresholdStateNames...),
-			metrix.WithChartFamily(perfdataFamily(thresholdState.scriptName)),
+			metrix.WithChartFamily(perfdataFamily(thresholdState.checkName)),
 			metrix.WithUnit("state"),
 		).Enable(thresholdState.state)
 		sm.WithLabelSet(labels).WithLabels(
@@ -121,40 +121,40 @@ func TestV2Gate_G2_PerfdataRouting(t *testing.T) {
 	cc.CommitCycleSuccess()
 
 	reader := store.Read(metrix.ReadFlatten())
-	assertMetricMeta(t, reader, "nagios.perfdata.check_gate.time_latency_value", "seconds", true)
-	assertMetricMeta(t, reader, "nagios.perfdata.check_gate.bytes_throughput_value", "bytes", true)
-	assertMetricMeta(t, reader, "nagios.perfdata.check_gate.bits_wire_rate_value", "bits", true)
-	assertMetricMeta(t, reader, "nagios.perfdata.check_gate.percent_free_pct_value", "%", true)
-	assertMetricMeta(t, reader, "nagios.perfdata.check_gate.counter_requests_value", "c", true)
-	assertMetricMeta(t, reader, "nagios.perfdata.check_gate.generic_custom_value", "generic", true)
-	assertMetricMeta(t, reader, "nagios.perfdata.check_gate.time_latency_threshold_state", "state", false)
-	assertMetricMeta(t, reader, "nagios.job.perfdata.threshold_state", "state", false)
-	assertMetricChartFamily(t, reader, "nagios.perfdata.check_gate.time_latency_value", "Perfdata/check_gate")
-	assertMetricChartFamily(t, reader, "nagios.perfdata.check_gate.time_latency_threshold_state", "Perfdata/check_gate")
-	assertMetricValue(t, reader, "nagios.perfdata.check_gate.time_latency_threshold_state", metrix.Labels{
+	assertMetricMeta(t, reader, "perfdata.check_gate.time_latency_value", "seconds", true)
+	assertMetricMeta(t, reader, "perfdata.check_gate.bytes_throughput_value", "bytes", true)
+	assertMetricMeta(t, reader, "perfdata.check_gate.bits_wire_rate_value", "bits", true)
+	assertMetricMeta(t, reader, "perfdata.check_gate.percent_free_pct_value", "%", true)
+	assertMetricMeta(t, reader, "perfdata.check_gate.counter_requests_value", "c", true)
+	assertMetricMeta(t, reader, "perfdata.check_gate.generic_custom_value", "generic", true)
+	assertMetricMeta(t, reader, "perfdata.check_gate.time_latency_threshold_state", "state", false)
+	assertMetricMeta(t, reader, "job.perfdata.threshold_state", "state", false)
+	assertMetricChartFamily(t, reader, "perfdata.check_gate.time_latency_value", "Perfdata/check_gate")
+	assertMetricChartFamily(t, reader, "perfdata.check_gate.time_latency_threshold_state", "Perfdata/check_gate")
+	assertMetricValue(t, reader, "perfdata.check_gate.time_latency_threshold_state", metrix.Labels{
 		"nagios_job": "gate_job",
-		"nagios.perfdata.check_gate.time_latency_threshold_state": perfThresholdStateWarning,
+		"perfdata.check_gate.time_latency_threshold_state": perfThresholdStateWarning,
 	}, 1)
-	assertMetricValue(t, reader, "nagios.job.perfdata.threshold_state", metrix.Labels{
-		"nagios_job":                          "gate_job",
-		perfdataValueLabelKey:                 "time_latency",
-		"nagios.job.perfdata.threshold_state": perfThresholdStateWarning,
+	assertMetricValue(t, reader, "job.perfdata.threshold_state", metrix.Labels{
+		"nagios_job":                   "gate_job",
+		perfdataValueLabelKey:          "time_latency",
+		"job.perfdata.threshold_state": perfThresholdStateWarning,
 	}, 1)
-	assertMetricValue(t, reader, "nagios.job.perfdata.threshold_state", metrix.Labels{
-		"nagios_job":                          "gate_job",
-		perfdataValueLabelKey:                 "time_latency",
-		"nagios.job.perfdata.threshold_state": perfThresholdStateRetry,
+	assertMetricValue(t, reader, "job.perfdata.threshold_state", metrix.Labels{
+		"nagios_job":                   "gate_job",
+		perfdataValueLabelKey:          "time_latency",
+		"job.perfdata.threshold_state": perfThresholdStateRetry,
 	}, 0)
-	assertSeriesKind(t, reader, "nagios.perfdata.check_gate.time_latency_value", metrix.Labels{
+	assertSeriesKind(t, reader, "perfdata.check_gate.time_latency_value", metrix.Labels{
 		"nagios_job":                "gate_job",
 		metrix.MeasureSetFieldLabel: perfFieldValue,
 	}, metrix.MetricKindGauge)
-	assertSeriesKind(t, reader, "nagios.perfdata.check_gate.counter_requests_value", metrix.Labels{
+	assertSeriesKind(t, reader, "perfdata.check_gate.counter_requests_value", metrix.Labels{
 		"nagios_job":                "gate_job",
 		metrix.MeasureSetFieldLabel: perfFieldValue,
 	}, metrix.MetricKindCounter)
 
-	changedClass := router.route(gatePluginPath, []output.PerfDatum{
+	changedClass := router.route(gateCheckName, []output.PerfDatum{
 		{Label: "latency", Unit: "%", Value: 1}, // same label, different class => new identity
 	})
 	changedSamples := valueSampleMap(changedClass.values)
@@ -172,7 +172,7 @@ func TestV2Gate_G3_ChartLifecycleChurn(t *testing.T) {
 		emit := func(includeB bool) chartengine.Plan {
 			cc := gateCycleController(t, store)
 			cc.BeginCycle()
-			sm := store.Write().SnapshotMeter("nagios")
+			sm := store.Write().SnapshotMeter("")
 			ls := sm.LabelSet(
 				metrix.Label{Key: "nagios_job", Value: "gate_job"},
 			)
@@ -211,7 +211,7 @@ func TestV2Gate_G3_ChartLifecycleChurn(t *testing.T) {
 
 		cc := gateCycleController(t, store)
 		cc.BeginCycle()
-		sm := store.Write().SnapshotMeter("nagios")
+		sm := store.Write().SnapshotMeter("")
 		ls := sm.LabelSet(
 			metrix.Label{Key: "nagios_job", Value: "gate_job"},
 		)
@@ -238,12 +238,12 @@ func TestV2Gate_G3_ChartLifecycleChurn(t *testing.T) {
 		assert.NotZero(t, countActions[chartengine.CreateChartAction](plan1.Actions))
 		plan2 := emit(false)
 		assert.Zero(t, removeActionsCount(plan2.Actions))
-		assertPlanHasUpdateForTarget(t, plan2, "nagios.perfdata.check_gate.bytes_a")
-		assertPlanHasNoRemoveForTarget(t, plan2, "nagios.perfdata.check_gate.bytes_b")
+		assertPlanHasUpdateForTarget(t, plan2, "perfdata.check_gate.bytes_a")
+		assertPlanHasNoRemoveForTarget(t, plan2, "perfdata.check_gate.bytes_b")
 
 		cc := gateCycleController(t, store)
 		cc.BeginCycle()
-		sm := store.Write().SnapshotMeter("nagios")
+		sm := store.Write().SnapshotMeter("")
 		ls := sm.LabelSet(
 			metrix.Label{Key: "nagios_job", Value: "gate_job"},
 		)
@@ -260,8 +260,8 @@ func TestV2Gate_G3_ChartLifecycleChurn(t *testing.T) {
 
 		plan3 := emit(false)
 		assert.Zero(t, removeActionsCount(plan3.Actions))
-		assertPlanHasUpdateForTarget(t, plan3, "nagios.perfdata.check_gate.bytes_a")
-		assertPlanHasNoRemoveForTarget(t, plan3, "nagios.perfdata.check_gate.bytes_b")
+		assertPlanHasUpdateForTarget(t, plan3, "perfdata.check_gate.bytes_a")
+		assertPlanHasNoRemoveForTarget(t, plan3, "perfdata.check_gate.bytes_b")
 		plan4 := emit(false)
 		assert.Zero(t, removeActionsCount(plan4.Actions))
 	})
@@ -286,7 +286,7 @@ func TestV2Gate_G5_ScalingPrecisionEquivalence(t *testing.T) {
 			router := newPerfdataRouter(64)
 			displayV1 := legacyDisplayValue(tc.unit, tc.raw)
 
-			samples := router.route(gatePluginPath, []output.PerfDatum{
+			samples := router.route(gateCheckName, []output.PerfDatum{
 				{Label: "sample", Unit: tc.unit, Value: tc.raw},
 			})
 			var (
@@ -318,14 +318,14 @@ func TestV2Gate_G5_ScalingPrecisionEquivalence(t *testing.T) {
 			store := metrix.NewCollectorStore()
 			cc := gateCycleController(t, store)
 			cc.BeginCycle()
-			sm := store.Write().SnapshotMeter("nagios")
+			sm := store.Write().SnapshotMeter("")
 			for _, measureSet := range samples.values {
 				fields := perfMeasureSetValues(measureSet.value)
 				if measureSet.counter {
 					sm.MeasureSetCounter(
 						measureSet.name,
 						metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs()...),
-						metrix.WithChartFamily(perfdataFamily(measureSet.scriptName)),
+						metrix.WithChartFamily(perfdataFamily(measureSet.checkName)),
 						metrix.WithUnit(measureSet.unit),
 					).ObserveTotalFields(fields, sm.LabelSet())
 					continue
@@ -333,16 +333,90 @@ func TestV2Gate_G5_ScalingPrecisionEquivalence(t *testing.T) {
 				sm.MeasureSetGauge(
 					measureSet.name,
 					metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs()...),
-					metrix.WithChartFamily(perfdataFamily(measureSet.scriptName)),
+					metrix.WithChartFamily(perfdataFamily(measureSet.checkName)),
 					metrix.WithUnit(measureSet.unit),
 				).ObserveFields(fields, sm.LabelSet())
 			}
 			cc.CommitCycleSuccess()
 			flat := store.Read(metrix.ReadFlatten())
-			assertMetricMeta(t, flat, "nagios."+candidateKey, tc.expectedUnit, true)
-			assertMetricChartFamily(t, flat, "nagios."+candidateKey, "Perfdata/check_gate")
+			assertMetricMeta(t, flat, candidateKey, tc.expectedUnit, true)
+			assertMetricChartFamily(t, flat, candidateKey, "Perfdata/check_gate")
 		})
 	}
+}
+
+// With an empty meter prefix and context_namespace: nagios, an autogen perfdata chart's context
+// is single-namespaced (nagios.perfdata.*) — never doubled (nagios.nagios.*) and never bare
+// (perfdata.*). The chart ID intentionally drops the redundant nagios. prefix; the collector
+// identity is already in the chart type (the job full name).
+func TestV2Gate_AutogenPerfdataContextSingleNamespaced(t *testing.T) {
+	engine, err := chartengine.New()
+	require.NoError(t, err)
+	require.NoError(t, engine.LoadYAML([]byte(New().ChartTemplateYAML()), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := gateCycleController(t, store)
+	cc.BeginCycle()
+	sm := store.Write().SnapshotMeter("")
+	ls := sm.LabelSet(metrix.Label{Key: "nagios_job", Value: "check_mem"})
+	fields := defaultPerfMeasureSetValues()
+	fields[perfFieldValue] = 30000
+	sm.MeasureSetGauge(
+		"perfdata.check_memory.bytes_used",
+		metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs()...),
+		metrix.WithChartFamily(perfdataFamily("check_memory")),
+		metrix.WithUnit("bytes"),
+	).ObserveFields(fields, ls)
+	cc.CommitCycleSuccess()
+
+	plan, err := prepareCommittedPlan(engine, store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+
+	var found bool
+	for _, action := range plan.Actions {
+		create, ok := action.(chartengine.CreateChartAction)
+		if !ok || !strings.Contains(create.ChartID, "perfdata.check_memory") {
+			continue
+		}
+		found = true
+		assert.Equal(t, "nagios.perfdata.check_memory.bytes_used", create.Meta.Context,
+			"autogen perfdata context must be single-namespaced via context_namespace")
+		assert.NotContains(t, create.Meta.Context, "nagios.nagios.",
+			"autogen context must not double-prefix the namespace")
+		assert.Falsef(t, strings.HasPrefix(create.ChartID, "nagios."),
+			"autogen chart ID should drop the redundant nagios. prefix, got %q", create.ChartID)
+	}
+	require.True(t, found, "expected an autogen create-chart action for the perfdata measureset")
+}
+
+func TestV2Gate_ExecutionCPUUsesGaugeAlgorithm(t *testing.T) {
+	engine, err := chartengine.New()
+	require.NoError(t, err)
+	require.NoError(t, engine.LoadYAML([]byte(New().ChartTemplateYAML()), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := gateCycleController(t, store)
+	cc.BeginCycle()
+	meter := store.Write().SnapshotMeter("")
+	labels := meter.LabelSet(metrix.Label{Key: "nagios_job", Value: "check_disk"})
+	meter.Gauge("job.execution_cpu_total", metrix.WithFloat(true)).Observe(0.5, labels)
+	require.NoError(t, cc.CommitCycleSuccess())
+
+	reader := store.Read(metrix.ReadFlatten())
+	assertSeriesKind(t, reader, "job.execution_cpu_total", metrix.Labels{"nagios_job": "check_disk"}, metrix.MetricKindGauge)
+	plan, err := prepareCommittedPlan(engine, reader)
+	require.NoError(t, err)
+
+	var found bool
+	for _, action := range plan.Actions {
+		dim, ok := action.(chartengine.CreateDimensionAction)
+		if !ok || dim.ChartMeta.Context != "nagios.job.execution_cpu" {
+			continue
+		}
+		found = true
+		assert.Equal(t, chartengine.AlgorithmAbsolute, dim.Algorithm)
+	}
+	require.True(t, found, "expected the authored execution CPU dimension")
 }
 
 func countActions[T any](actions []chartengine.EngineAction) int {
@@ -433,9 +507,9 @@ func assertPlanHasNoRemoveForTarget(t *testing.T, plan chartengine.Plan, removeM
 }
 
 func TestV2Gate_SmokeCollect(t *testing.T) {
-	coll := New()
+	coll := newTestCollector()
 	coll.runner = &fakeRunner{}
-	coll.Config.JobConfig.Plugin = "/bin/true"
+	coll.Config.JobConfig.Plugin = writeTestPluginFile(t, "true")
 	coll.Config.JobConfig.Name = "smoke"
 	require.NoError(t, coll.Check(context.Background()))
 }

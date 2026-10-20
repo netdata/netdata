@@ -8,7 +8,8 @@
 
 /* Converts a hex character to its integer value */
 char from_hex(char ch) {
-    return (char)(isdigit(ch) ? ch - '0' : tolower(ch) - 'a' + 10);
+    uint8_t uch = (uint8_t)ch;
+    return (char)(isdigit(uch) ? uch - '0' : tolower(uch) - 'a' + 10);
 }
 
 /* Converts an integer value to its hex character*/
@@ -21,8 +22,13 @@ char to_hex(char code) {
 /* IMPORTANT: be sure to free() the returned string after use */
 char *url_encode(const char *str) {
     char *buf, *pbuf;
+    size_t max_len = (SIZE_MAX - 1) / 3;
+    size_t len = strnlen(str, max_len + 1);
 
-    pbuf = buf = mallocz(strlen(str) * 3 + 1);
+    if(unlikely(len > (SIZE_MAX - 1) / 3))
+        fatal("url_encode() cannot allocate encoded string for %zu bytes.", len);
+
+    pbuf = buf = mallocz(len * 3 + 1);
 
     while (*str) {
         if (isalnum((uint8_t)*str) || *str == '-' || *str == '_' || *str == '.' || *str == '~')
@@ -56,8 +62,8 @@ char *url_encode(const char *str) {
  *  @return The character decoded on success and 0 otherwise
  */
 char url_percent_escape_decode(const char *s) {
-    if(likely(s[1] && s[2]))
-        return (char)(from_hex(s[1]) << 4 | from_hex(s[2]));
+    if(likely(s[0] && s[1] && s[2]))
+        return (char)(((uint8_t)from_hex(s[1]) << 4) | (uint8_t)from_hex(s[2]));
     return 0;
 }
 
@@ -71,13 +77,15 @@ char url_percent_escape_decode(const char *s) {
  * @return It returns the length of the specific character.
  */
 char url_utf8_get_byte_length(char c) {
-    if(!IS_UTF8_BYTE(c))
+    uint8_t byte = (uint8_t)c;
+
+    if(!IS_UTF8_BYTE(byte))
         return 1;
 
     char length = 0;
-    while(likely(c & 0x80)) {
+    while(likely(byte & 0x80)) {
         length++;
-        c <<= 1;
+        byte <<= 1;
     }
     //4 byte is max size for UTF-8 char
     //10XX XXXX is not valid character -> check length == 1
@@ -190,6 +198,9 @@ unsigned char *utf8_check(unsigned char *s)
 }
 
 char *url_decode_r(char *to, const char *url, size_t size) {
+    if(unlikely(!size))
+        return NULL;
+
     const char *s = url;     // source
     char *d = to,            // destination
          *e = &to[size - 1]; // destination end
@@ -237,19 +248,94 @@ fail_cleanup:
 }
 
 inline bool
-url_is_request_complete_and_extract_payload(const char *begin, const char *end, size_t length, BUFFER **post_payload) {
-    if (begin == end || length < 4)
+url_is_request_complete_and_extract_payload(
+    const char *begin, const char *end, size_t length, BUFFER **post_payload, size_t *expected_size) {
+    if (length < 4)
         return false;
+
+    // The caller rewinds the incremental cursor by up to 4 bytes.
+    // After a previous receive of 4 to 7 bytes, end is begin through begin + 3,
+    // so searches starting at end - 4 would start before the buffer.
+    // Clamp end to begin + 4 so those searches start at begin; larger cursors
+    // keep the incremental rescan.
+    if (end < begin + 4)
+        end = begin + 4;
 
     if(likely(strncmp(begin, "GET ", 4)) == 0) {
         return strstr(end - 4, "\r\n\r\n");
     }
     else if(unlikely(strncmp(begin, "POST ", 5) == 0 || strncmp(begin, "PUT ", 4) == 0)) {
+        if(*expected_size == SIZE_MAX)
+            return false;
+
+        if(!*expected_size) {
+            // The first call may contain the whole request; later calls begin before newly received bytes.
+            const char *headers_search_from = (end == begin + length) ? begin : end;
+            if(!strstr(headers_search_from, "\r\n\r\n"))
+                return false;
+
+            const char *cl = strcasestr(begin, "Content-Length: ");
+            if(!cl)
+                goto invalid_content_length;
+            cl = &cl[16];
+
+            while(*cl == ' ' || *cl == '\t')
+                cl++;
+
+            if(!isdigit((uint8_t)*cl))
+                goto invalid_content_length;
+
+            char *content_length_end;
+            errno_clear();
+            unsigned long long parsed_content_length = strtoull(cl, &content_length_end, 10);
+            if(errno != 0 || parsed_content_length > SIZE_MAX)
+                goto invalid_content_length;
+
+            while(*content_length_end == ' ' || *content_length_end == '\t')
+                content_length_end++;
+
+            if(content_length_end[0] != '\r' || content_length_end[1] != '\n')
+                goto invalid_content_length;
+
+            const char *payload = strstr(cl, "\r\n\r\n");
+            if(!payload)
+                goto invalid_content_length;
+            payload += 4;
+
+            size_t payload_offset = payload - begin;
+            size_t content_length = (size_t)parsed_content_length;
+            if(content_length > SIZE_MAX - payload_offset)
+                goto invalid_content_length;
+
+            *expected_size = payload_offset + content_length;
+        }
+
+        if(length != *expected_size)
+            return false;
+
         const char *cl = strcasestr(begin, "Content-Length: ");
         if(!cl) return false;
         cl = &cl[16];
 
-        size_t content_length = str2ul(cl);
+        while(*cl == ' ' || *cl == '\t')
+            cl++;
+
+        if(!isdigit((uint8_t)*cl))
+            return false;
+
+        char *content_length_end;
+        errno_clear();
+        unsigned long long parsed_content_length = strtoull(cl, &content_length_end, 10);
+        if(errno != 0 || parsed_content_length > SIZE_MAX)
+            return false;
+
+        while(*content_length_end == ' ' || *content_length_end == '\t')
+            content_length_end++;
+
+        if(content_length_end[0] != '\r' || content_length_end[1] != '\n')
+            return false;
+
+        size_t content_length = (size_t)parsed_content_length;
 
         const char *payload = strstr(cl, "\r\n\r\n");
         if(!payload) return false;
@@ -272,7 +358,7 @@ url_is_request_complete_and_extract_payload(const char *begin, const char *end, 
                 while (*space && !isspace((uint8_t)*space) && *space != ';') space++;
                 size_t ct_len = space - ct;
 
-                char ct_copy[ct_len + 1];
+                CLEAN_CHAR_P *ct_copy = mallocz(ct_len + 1);
                 memcpy(ct_copy, ct, ct_len);
                 ct_copy[ct_len] = '\0';
 
@@ -284,6 +370,10 @@ url_is_request_complete_and_extract_payload(const char *begin, const char *end, 
             return true;
         }
 
+        return false;
+
+invalid_content_length:
+        *expected_size = SIZE_MAX;
         return false;
     }
     else {
@@ -299,14 +389,16 @@ url_is_request_complete_and_extract_payload(const char *begin, const char *end, 
  * @param s is the start of the user request.
  * @return
  */
-inline char *url_find_protocol(char *s) {
-    while(*s) {
+inline char *url_find_protocol(char *s, const char *end) {
+    while(s < end && *s) {
         // find the next space
-        while (*s && *s != ' ') s++;
+        while (s < end && *s && *s != ' ') s++;
+
+        if(s >= end || !*s) break;
 
         // is it SPACE + "HTTP/" ?
-        if(*s && !strncmp(s, " HTTP/", 6)) break;
-        else s++;
+        if((size_t)(end - s) >= 6 && !strncmp(s, " HTTP/", 6)) break;
+        s++;
     }
 
     return s;

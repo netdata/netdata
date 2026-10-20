@@ -21,8 +21,8 @@ const (
 	topQueriesMaxTextLength = 4096
 )
 
-func topQueriesMethodConfig() funcapi.MethodConfig {
-	return funcapi.MethodConfig{
+func topQueriesFunctionConfig() funcapi.FunctionConfig {
+	return funcapi.FunctionConfig{
 		ID:             topQueriesMethodID,
 		Name:           "Top Queries",
 		UpdateEvery:    10,
@@ -139,11 +139,10 @@ func (f *funcTopQueries) Handle(ctx context.Context, method string, params funca
 func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *funcapi.FunctionResponse {
 	limit := f.router.collector.topQueriesLimit()
 
-	req, err := web.NewHTTPRequestWithPath(f.router.collector.RequestConfig, "/_tasks")
+	req, err := web.NewHTTPRequestWithPath(ctx, f.router.collector.RequestConfig, "/_tasks")
 	if err != nil {
 		return &funcapi.FunctionResponse{Status: 500, Message: err.Error()}
 	}
-	req = req.WithContext(ctx)
 	q := url.Values{}
 	q.Set("actions", "*search")
 	q.Set("detailed", "true")

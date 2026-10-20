@@ -1,0 +1,1661 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-cloudwatch
+      plugin_name: go.d.plugin
+      module_name: cloudwatch
+      monitored_instance:
+        name: Amazon CloudWatch
+        link: https://aws.amazon.com/cloudwatch/
+        icon_filename: aws.svg
+        categories:
+          - data-collection.cloud-and-devops
+      keywords:
+        - aws
+        - amazon
+        - amazon web services
+        - cloudwatch
+        - ec2
+        - rds
+        - elb
+        - alb
+        - nlb
+        - network load balancer
+        - s3
+        - lambda
+        - sqs
+        - dynamodb
+        - api gateway
+        - step functions
+        - nat gateway
+        - privatelink
+        - private link
+        - vpc endpoint
+        - kinesis
+        - firehose
+        - sns
+        - ebs
+        - efs
+        - ecs
+        - elasticache
+        - opensearch
+        - documentdb
+        - redshift
+        - msk
+        - kafka
+        - cloudfront
+        - cdn
+        - content delivery network
+        - auto scaling
+        - autoscaling
+        - bedrock
+        - generative ai
+        - eventbridge
+        - vpn
+        - eks
+        - kubernetes
+        - k8s
+        - billing
+        - estimated charges
+        - costs
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+    overview:
+      data_collection:
+        metrics_description: |
+          Monitor AWS infrastructure through Amazon CloudWatch. The collector discovers your AWS resources and turns their
+          CloudWatch metrics into Netdata charts, one chart instance per resource, for a curated set of AWS services and with
+          minimal configuration.
+
+          Out of the box it covers:
+
+          | Area | Services |
+          |:-----|:---------|
+          | Compute and containers | Amazon EC2, AWS Lambda, Amazon ECS, Amazon EKS (Kubernetes control plane), AWS Auto Scaling |
+          | Databases and analytics | Amazon RDS, Amazon DynamoDB, Amazon ElastiCache, Amazon DocumentDB, Amazon Redshift, Amazon OpenSearch Service |
+          | Storage | Amazon S3, Amazon EBS, Amazon EFS |
+          | Networking and content delivery | Classic (ELB), Application (ALB), and Network (NLB) load balancers, NAT Gateway, AWS PrivateLink endpoints and endpoint services, Amazon CloudFront, AWS Site-to-Site VPN |
+          | Messaging, streaming, and events | Amazon SQS, Amazon SNS, Amazon Kinesis Data Streams, Amazon Data Firehose, Amazon MSK, Amazon EventBridge |
+          | Application services and AI | Amazon API Gateway, AWS Step Functions, Amazon Bedrock |
+          | Cost | AWS Billing estimated month-to-date charges (opt-in) |
+
+          - Every resource becomes a chart instance labeled with its AWS account, region, and identifying dimensions (for
+            example the EC2 `instance_id`).
+          - Several AWS accounts can be monitored from one job by assuming roles.
+          - Resources can be selected and labeled by their AWS tags.
+          - Four collector-activity charts show the AWS API work the job performs, so its cost stays visible.
+
+          Coverage is defined by [profiles](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default):
+          one YAML file per service and level of detail, 34 enabled by default and 13 opt-in. A service can be added or a
+          chart changed without a code change; see the [AWS CloudWatch profile format](/src/go/plugin/go.d/collector/cloudwatch/profile-format.md).
+
+          This collector reads runtime metrics. The [AWS EC2 Compute instances](/src/go/plugin/go.d/collector/prometheus/integrations/aws_ec2_compute_instances.md)
+          integration (EC2 inventory and capacity) and the [AWS Quota](/src/go/plugin/go.d/collector/prometheus/integrations/aws_quota.md)
+          integration (AWS Service Quotas) use different AWS data sources and complement it.
+        method_description: |
+          The collector runs on the Netdata Agent and reads CloudWatch through the AWS API. It installs nothing in AWS and
+          writes nothing there.
+
+          - Authentication: each named credential source uses the AWS SDK default chain (environment variables, shared
+            config and credentials files, instance profile, EKS IRSA) or static access keys, optionally assuming one IAM
+            role per target. The AWS account behind a target is resolved once with `sts:GetCallerIdentity`.
+          - Discovery: every `discovery.refresh_every` seconds (default 300) the collector lists the metrics of each
+            selected service with `cloudwatch:ListMetrics`, once per target, region, and CloudWatch namespace, and matches
+            them against the profile's dimensions to find the resources. Resource tag filters and labels are resolved
+            with `tag:GetResources` (Resource Groups Tagging API).
+          - Collection: every `update_every` seconds (default 60) it reads the newest complete datapoint of every selected
+            metric and statistic with `cloudwatch:GetMetricData`, batched, and only for series whose CloudWatch period has
+            moved on since the last read. Between reads the last value is repeated at no AWS cost.
+
+          Terms used on this page and in the options:
+
+          | Term | Meaning |
+          |:-----|:--------|
+          | Profile | A YAML file that maps one CloudWatch namespace and one dimension set to charts. Stock profiles ship with Netdata; user profiles extend or override them. |
+          | Grain | The exact dimension set a profile matches, such as one PrivateLink endpoint versus one endpoint per subnet. |
+          | Target | A named AWS identity to monitor: a credential source, used directly or through one assumed role. |
+          | Rule | An ordered configuration entry selecting targets, regions, profiles, and optionally exact metrics. The first rule that selects a series owns it. |
+          | Series | One metric and statistic for one resource: the unit the collector's limits count. |
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: |
+          | Permission | Needed when |
+          |:-----------|:------------|
+          | `cloudwatch:GetMetricData` | Always, for every target. |
+          | `cloudwatch:ListMetrics` | Any selected profile has an identifying dimension and therefore needs discovery. An all-constant profile such as `billing_total` is queried directly and does not need it. |
+          | `sts:AssumeRole` | A target sets `assume_role`; grant it on the credential source's identity for that role ARN. |
+          | `tag:GetResources` | Resource tag filters (`rule_defaults.filters.resource_tags`, `rules[].filters.resource_tags`) or resource tag labels (`labels.resource_tags`) are configured. |
+
+          The collector also calls `sts:GetCallerIdentity` for account attribution, but [AWS does not require an explicit
+          permission grant for that operation](https://docs.aws.amazon.com/STS/latest/APIReference/API_GetCallerIdentity.html).
+          The collector only reads; it never writes to CloudWatch or changes a resource.
+      default_behavior:
+        auto_detection:
+          description: |
+            No job runs until you write one: a job needs at least one credential source, one target, and one rule. There
+            is no service discovery for this collector.
+
+            With a minimal rule (targets and regions only) the collector collects every default-enabled profile, 34 of
+            them minus any your regions do not support (CloudFront exists only in `us-east-1`), with each profile's
+            default metrics and statistics, and discovers the resources itself every
+            `discovery.refresh_every` seconds (default 300). A chart appears once a resource reports data. Opt-in profiles
+            and opt-in metrics are collected only when a rule names them.
+        limits:
+          description: |
+            - The collection interval is at least 60 seconds. The CloudWatch period of a series (1 minute to 24 hours)
+              decides how often it has new data; a shorter `update_every` does not make AWS publish more often.
+            - `limits.max_instances` (default 1000): more distinct resources than this, after tag filtering, rejects the
+              query plan instead of collecting a subset; the log names the bound. Raise it deliberately or narrow the rules.
+            - `limits.max_discovery_groups` (default 64, at most 100): more unique target, region, and namespace
+              combinations than this stops the job at start; split the collection across jobs.
+            - The whole plan, evaluated as if every series were due at once, is refused above 20,000 series, 600,000
+              datapoints, or 40 `GetMetricData` requests, and a rule set is refused above 16,384 candidate or 4,096
+              compiled target, profile, and region combinations. Only very broad rules reach these bounds.
+            - A job holds at most 64 credential sources, 64 targets, and 256 rules; each rule list (targets, regions,
+              profiles, metrics) holds at most 256 entries; a tag filter holds at most 50 keys with 20 values each.
+            - Query timing per series: `period` from 1 minute to 24 hours in whole minutes; `lookback` at least one period
+              and at most 1,440 periods; `publication_delay + lookback + period` at most 14 days.
+            - A discovery refresh that exceeds its internal bounds or the shared `timeout` is discarded as a whole: the
+              previously discovered resources stay, and discovery retries after `discovery.refresh_every`. Recurring
+              warnings of this kind are logged at most once per hour.
+        performance_impact:
+          description: |
+            The impact on the Agent host is negligible. The cost is on your AWS bill.
+
+            :::caution AWS bills every CloudWatch API request this collector makes
+
+            `GetMetricData` is billed per metric requested, about $0.01 per 1,000 in most regions; check
+            [CloudWatch pricing](https://aws.amazon.com/cloudwatch/pricing/) for yours. Up to five statistics of one
+            metric in one request count as one metric requested, and the collector keeps them together as long as they
+            share the same query timing. `ListMetrics`
+            discovery is within the AWS free tier for most accounts and inexpensive beyond it. Broad rules across many
+            regions and services cost real money; read this section before enabling a wide selection.
+
+            :::
+
+            **What drives the cost**
+
+            | Driver | Effect |
+            |:-------|:-------|
+            | Resources | Every discovered resource adds its profile's metrics. Tag filters and `limits.max_instances` bound it. |
+            | Metrics and statistics | Each selected metric and statistic of each resource is one series. Most default profiles select one statistic per metric, a few select two or three; up to five statistics of one metric stay one metric request when they share the same query timing, and giving one statistic its own `period` or `lookback` splits the request and bills separately. |
+            | Request frequency | A series is read once per CloudWatch period, and at most once per `update_every`. A 1-minute period read every minute costs five times a 5-minute period. |
+            | Lookback | A longer window requests more datapoints per read and can turn off the 3-hour recently-active discovery filter, which makes `ListMetrics` scans larger. |
+            | Retries | A read that fails transiently is retried after `update_every`, then with a doubling delay up to one period. Retries are billed. |
+
+            **Estimating before you run**
+
+            ```text
+            metric requests per day = resources × metrics requested per resource × 86,400 / max(period, update_every) in seconds
+            ```
+
+            Sum it over the groups of series that share a period. For example, one series at a 10-minute period read on
+            every collection is 86,400 / 600 = 144 metric requests per day; 200 such series are 28,800 per day, about
+            $0.29 per day at $0.01 per 1,000.
+
+            **Watching the cost while running**
+
+            Four collector-activity charts count the work as it happens: *CloudWatch SDK Invocations* (`ListMetrics` and
+            `GetMetricData` calls, including failed calls and every result page), *GetMetricData Calculated Metric Requests*
+            (the billable unit, per account and region), *GetMetricData Profile Metric Request Estimates* (the same split
+            per profile for ranking; estimates are computed per profile and do not add up to the total), and
+            *GetMetricData Query Items* (submitted queries, for plan tuning). They count only `ListMetrics` and
+            `GetMetricData`, not STS or tag lookups, and they are inputs for cost visibility, not an invoice.
+
+            **Reducing the cost**
+
+            | Option | Effect |
+            |:-------|:-------|
+            | `rules[].profiles`, `rules[].metrics`, `rules[].regions`, `rules[].targets` | Collect only the services, metrics, regions, and accounts you need. |
+            | `rule_defaults.filters.resource_tags`, `rules[].filters.resource_tags` | Collect only tagged resources. |
+            | `rule_defaults.query.period` with `update_every` | Read less often. A 5-minute period with `update_every: 300` cuts a 1-minute selection by five. |
+            | `discovery.refresh_every` | Scan for new resources less often. |
+            | `discovery.recently_active_only` (default on) | Keep `ListMetrics` scans to resources active in the last 3 hours where the query horizon allows it. |
+
+            The opt-in Billing profiles use a 10-minute period, so each selected Billing series costs 144 metric requests
+            per day before retries; their cardinality grows with services and linked accounts, so select only the grains
+            you need.
+    setup:
+      prerequisites:
+        list:
+          - title: Create an AWS IAM identity with CloudWatch read access
+            description: |
+              The collector authenticates as an IAM user or role that can read CloudWatch. Attach this policy to it:
+
+              ```json
+              {
+                "Version": "2012-10-17",
+                "Statement": [
+                  {
+                    "Effect": "Allow",
+                    "Action": [
+                      "cloudwatch:ListMetrics",
+                      "cloudwatch:GetMetricData"
+                    ],
+                    "Resource": "*"
+                  }
+                ]
+              }
+              ```
+
+              - `cloudwatch:ListMetrics` and `cloudwatch:GetMetricData` do not support resource-level permissions, so
+                `"Resource": "*"` is already the least privilege for these read actions
+                ([AWS reference](https://docs.aws.amazon.com/service-authorization/latest/reference/list_amazoncloudwatch.html)).
+              - Add `tag:GetResources` (also `"Resource": "*"`) when you use resource tag filters or labels.
+              - Add `sts:AssumeRole` on each role ARN a target assumes, and let the role's trust policy allow this identity.
+              - A job that selects only the `billing_total` profile can omit `cloudwatch:ListMetrics`.
+
+              Verify as that identity: `aws cloudwatch list-metrics --namespace AWS/EC2 --region <region> --max-items 1`
+              should return without an access error.
+          - title: Enable Billing metrics before selecting a Billing profile
+            description: |
+              The four Billing profiles are opt-in and collect nothing until AWS publishes estimated-charge metrics for
+              your account.
+
+              1. In the AWS Billing console open **Billing preferences** and enable **Receive CloudWatch Billing Alerts**
+                 ([AWS documentation](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/monitor_estimated_charges_with_cloudwatch.html)).
+                 For consolidated billing, do it in the management (payer) account.
+              2. Wait about 15 minutes for the first data. AWS then publishes new estimates several times a day.
+
+              Enabling the preference needs the root user or an IAM principal allowed to view billing; the collector
+              identity needs only the read policy above. AWS states that once enabled, Billing metric collection cannot
+              be turned off; if the management (payer) account changes, enable it again in the new account. AWS
+              publishes Billing metrics only in `us-east-1`, in USD, and not for APN accounts.
+          - title: Add or override a profile (optional)
+            description: |
+              Stock profiles live under `/usr/lib/netdata/conf.d/go.d/cloudwatch.profiles/default/`. To add a service or
+              change a chart, put a profile under `/etc/netdata/go.d/cloudwatch.profiles/`; a file with the same basename
+              as a stock profile overrides it. Profiles are read once at startup, so restart Netdata after changing one.
+              Format and rules: [AWS CloudWatch profile format](/src/go/plugin/go.d/collector/cloudwatch/profile-format.md).
+      configuration:
+        file:
+          name: go.d/cloudwatch.conf
+        options:
+          description: |
+            All options are set per job. `update_every` and `autodetection_retry` can also be set globally for the collector.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: "Data collection interval, in seconds, at least 60. All CloudWatch series are collected on this interval; a shorter metric period does not make Netdata query more often."
+              default_value: 60
+              required: false
+              group: Collection
+            - name: autodetection_retry
+              description: "How often to retry the initial connection when the job fails to start, in seconds. Zero disables retries."
+              default_value: 0
+              required: false
+              group: Collection
+            - name: timeout
+              description: "Timeout in seconds for AWS API calls; a whole discovery refresh and a whole resource-tag lookup each share one timeout."
+              default_value: 30
+              required: false
+              group: Collection
+            - name: credentials
+              description: "Named credential sources that targets reference. Each uses the AWS SDK default chain or explicit static credentials."
+              detailed_description: |
+                Up to 64 credential sources. Several targets can share one source.
+              default_value: ""
+              required: true
+              group: Credentials
+            - name: credentials[].name
+              description: "Name that targets use to reference this credential source."
+              detailed_description: |
+                Names are lowercase, start with a letter, use only letters, digits, `_`, and `-`, and are at most 64 characters. Target and rule names follow the same format.
+              default_value: ""
+              required: true
+              group: Credentials
+            - name: credentials[].type
+              description: "How this source obtains AWS credentials: the SDK default chain or explicit static credentials."
+              detailed_description: |
+                | Type | Behavior | Use when |
+                |:-----|:---------|:---------|
+                | `default` | AWS SDK default credential chain: environment variables, shared config and credentials files, EC2 instance profile, or EKS IRSA | Netdata runs inside AWS or the host already has an AWS identity |
+                | `static` | Explicit access key ID and secret access key, plus an optional session token, in `type_static` | Keys are provisioned externally; reference them as `${env:NAME}` rather than writing them in the file |
+              default_value: ""
+              required: true
+              group: Credentials
+            - name: credentials[].type_static
+              description: "Explicit AWS credentials, used only when the type is `static`. Prefer secret references over plaintext values."
+              detailed_description: |
+                Required when the type is `static` and not allowed otherwise. Inside it, `access_key_id` and
+                `secret_access_key` are required; `session_token` only for temporary credentials.
+              default_value: ""
+              required: false
+              group: Credentials
+            - name: credentials[].type_static.access_key_id
+              description: "AWS access key ID. Use a secret reference such as `${env:AWS_ACCESS_KEY_ID}`."
+              default_value: ""
+              required: false
+              group: Credentials
+            - name: credentials[].type_static.secret_access_key
+              description: "AWS secret access key. Use a secret reference instead of a plaintext value."
+              default_value: ""
+              required: false
+              group: Credentials
+            - name: credentials[].type_static.session_token
+              description: "AWS session token, only for temporary credentials. Use a secret reference."
+              default_value: ""
+              required: false
+              group: Credentials
+            - name: targets
+              description: "Named AWS identities to monitor. A target uses one credential source directly or assumes one role with it."
+              detailed_description: |
+                Up to 64 targets. Targets stay distinct even when they resolve to the same AWS account. Every target must be
+                selected by at least one rule and every credential source used by at least one target; an unused entry
+                stops the job with `target "<name>" is not referenced by any rule`.
+              default_value: ""
+              required: true
+              group: Targets
+            - name: targets[].name
+              description: "Name that collection rules use to reference this target."
+              default_value: ""
+              required: true
+              group: Targets
+            - name: targets[].credentials
+              description: "Name of a credential source defined on the Credentials tab."
+              default_value: ""
+              required: true
+              group: Targets
+            - name: targets[].assume_role.role_arn
+              description: "ARN of the IAM role to assume with the target's credential source."
+              default_value: ""
+              required: false
+              group: Targets
+            - name: targets[].assume_role.external_id
+              description: "External ID the role's trust policy expects, if it requires one. This is not a password or access key."
+              detailed_description: |
+                The role owner supplies the value; see
+                [AWS guidance for third-party access](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_common-scenarios_third-party.html).
+              default_value: ""
+              required: false
+              group: Targets
+            - name: rules
+              description: "Ordered collection rules. Each selects targets, profiles, regions, and optional metric overrides and resource filters; the first matching rule owns a series."
+              detailed_description: |
+                Up to 256 rules. Explicit metric selections expand to at most 256 metric/statistic pairs per rule.
+              default_value: ""
+              required: true
+              group: Rules
+            - name: rules[].name
+              description: "Unique rule name, shown in logs and diagnostics."
+              default_value: ""
+              required: true
+              group: Rules
+            - name: rules[].targets
+              description: "Names of the targets this rule collects from, in order. Order breaks ties when rules overlap."
+              default_value: ""
+              required: true
+              group: Rules
+            - name: rules[].profiles.defaults
+              description: "Start from every default-enabled profile before applying the include and exclude lists."
+              default_value: true
+              required: false
+              group: Rules
+            - name: rules[].profiles.include
+              description: "Profile basenames to add. With `defaults` off, only this list is collected, including profiles disabled by default."
+              detailed_description: |
+                PrivateLink detail choices are `privatelink_endpoint_subnet`, `privatelink_service_az`, `privatelink_service_load_balancer`, `privatelink_service_az_load_balancer`, and `privatelink_service_vpc_endpoint`. Billing choices are `billing_total`, `billing_service`, `billing_linked_account`, and `billing_linked_account_service`.
+
+                A profile that supports fewer regions than the rule (CloudFront and the Billing profiles exist only in
+                `us-east-1`) is skipped silently when selected by defaults, but stops the job when named here with only
+                unsupported regions.
+              default_value: ""
+              required: false
+              group: Rules
+            - name: rules[].profiles.exclude
+              description: "Profile basenames to remove from the selection. A profile cannot be both included and excluded."
+              default_value: ""
+              required: false
+              group: Rules
+            - name: rules[].metrics
+              description: "Per-profile metric overrides. Leave empty to collect each selected profile's default-enabled metrics."
+              default_value: ""
+              required: false
+              group: Rules
+            - name: rules[].metrics[].profile
+              description: "Profile basename to override. It must be selected by this rule's profiles and may appear in one metrics group only."
+              default_value: ""
+              required: true
+              group: Rules
+            - name: rules[].metrics[].defaults
+              description: "Keep the profile's default-enabled metrics and add the included ones. Turn off for an exact-only selection."
+              default_value: true
+              required: false
+              group: Rules
+            - name: rules[].metrics[].statistics
+              description: "Statistics for included metrics that do not list their own. Leave empty to use the profile's statistics."
+              detailed_description: |
+                Spell statistics as AWS does, case-insensitively: `Average`, `Minimum`, `Maximum`, `Sum`, `SampleCount`, or a
+                percentile such as `p90` or `p99.9`. The profile-file spelling `sample_count` is not accepted in a job.
+              default_value: ""
+              required: false
+              group: Rules
+            - name: rules[].metrics[].query
+              description: "Query timing for the series this group includes explicitly. Fields left empty inherit from the rule."
+              default_value: ""
+              required: false
+              group: Rules / Query Policy
+            - name: rules[].metrics[].query.period
+              description: "CloudWatch aggregation period for these series, from `1m` to `24h` in whole minutes."
+              default_value: ""
+              required: false
+              group: Rules / Query Policy
+            - name: rules[].metrics[].query.lookback
+              description: "Window searched for the newest datapoint. At least one period, a whole multiple of it, and at most 1,440 periods."
+              default_value: ""
+              required: false
+              group: Rules / Query Policy
+            - name: rules[].metrics[].query.publication_delay
+              description: "How long to wait after a period closes before querying it. A scheduling policy, not an AWS guarantee."
+              default_value: ""
+              required: false
+              group: Rules / Query Policy
+            - name: rules[].metrics[].include
+              description: "Exact, case-sensitive CloudWatch metric names this group adds. A name may repeat only with disjoint statistics."
+              default_value: ""
+              required: true
+              group: Rules
+            - name: rules[].metrics[].include[].name
+              description: "Exact, case-sensitive CloudWatch MetricName exported by the profile."
+              default_value: ""
+              required: true
+              group: Rules
+            - name: rules[].metrics[].include[].statistics
+              description: "Statistics for this metric, replacing the group list. Leave empty to inherit."
+              detailed_description: |
+                Same spelling as the group list: `Average`, `Minimum`, `Maximum`, `Sum`, `SampleCount`, or `p<N>`. Each
+                statistic must be one the profile declares for that metric.
+              default_value: ""
+              required: false
+              group: Rules
+            - name: rules[].metrics[].include[].query
+              description: "Query timing for this metric's series, overriding the group's. Fields left empty inherit."
+              default_value: ""
+              required: false
+              group: Rules / Query Policy
+            - name: rules[].metrics[].include[].query.period
+              description: "CloudWatch aggregation period for these series, from `1m` to `24h` in whole minutes."
+              default_value: ""
+              required: false
+              group: Rules / Query Policy
+            - name: rules[].metrics[].include[].query.lookback
+              description: "Window searched for the newest datapoint. At least one period, a whole multiple of it, and at most 1,440 periods."
+              default_value: ""
+              required: false
+              group: Rules / Query Policy
+            - name: rules[].metrics[].include[].query.publication_delay
+              description: "How long to wait after a period closes before querying it. A scheduling policy, not an AWS guarantee."
+              default_value: ""
+              required: false
+              group: Rules / Query Policy
+            - name: rules[].regions
+              description: "AWS region codes this rule collects from. Profiles that support fewer regions are restricted automatically."
+              detailed_description: |
+                Use canonical lowercase region codes. CloudFront and the Billing profiles support only `us-east-1`.
+              default_value: ""
+              required: true
+              group: Rules
+            - name: rule_defaults.query
+              description: "Query timing inherited by every rule, field by field. Fields left empty fall back to profile or built-in values."
+              detailed_description: |
+                The resolved `publication_delay + lookback + period` horizon cannot exceed 14 days.
+              default_value: ""
+              required: false
+              group: Rules / Query Policy
+            - name: rule_defaults.query.period
+              description: "Default CloudWatch aggregation period, from `1m` to `24h` in whole minutes. Rules, groups, and metrics may override it."
+              detailed_description: |
+                The period that wins for a series (metric item, then group, then rule, then this default, then the
+                profile's metric-level query, then the profile's query) is also the one used to normalize rate metrics
+                to per-second values.
+              default_value: ""
+              required: false
+              group: Rules / Query Policy
+            - name: rule_defaults.query.lookback
+              description: "Default window searched for the newest datapoint. At least one period, a whole multiple of it, and at most 1,440 periods."
+              default_value: ""
+              required: false
+              group: Rules / Query Policy
+            - name: rule_defaults.query.publication_delay
+              description: "Default wait after a period closes before querying it. A scheduling policy, not an AWS guarantee."
+              detailed_description: |
+                Leaving it unset falls through to the profile value and then the built-in `10m` fallback. Setting it overrides profile-specific delays for every inheriting rule, including the stock S3 storage profile's conservative `24h`; AWS documents only that S3 storage metrics are reported once per day, so use a shorter default only after verifying each workload's publication timing.
+              default_value: ""
+              required: false
+              group: Rules / Query Policy
+            - name: rules[].query
+              description: "Query timing overrides for this rule. Fields left empty inherit the rule defaults; group and metric values take precedence."
+              default_value: ""
+              required: false
+              group: Rules / Query Policy
+            - name: rules[].query.period
+              description: "CloudWatch aggregation period for these series, from `1m` to `24h` in whole minutes."
+              default_value: ""
+              required: false
+              group: Rules / Query Policy
+            - name: rules[].query.lookback
+              description: "Window searched for the newest datapoint. At least one period, a whole multiple of it, and at most 1,440 periods."
+              default_value: ""
+              required: false
+              group: Rules / Query Policy
+            - name: rules[].query.publication_delay
+              description: "How long to wait after a period closes before querying it. A scheduling policy, not an AWS guarantee."
+              default_value: ""
+              required: false
+              group: Rules / Query Policy
+            - name: rule_defaults.filters.resource_tags
+              description: "Resource tag filters inherited by rules that define none. A resource must match every key, with any listed value per key."
+              detailed_description: |
+                The Resource Groups Tagging API performs the lookup and requires the `tag:GetResources` permission.
+              default_value: ""
+              required: false
+              group: Rules / Resource Filters
+            - name: rule_defaults.filters.resource_tags[].key
+              description: "Exact, case-sensitive AWS tag key. A filter list supports at most 50 keys."
+              default_value: ""
+              required: true
+              group: Rules / Resource Filters
+            - name: rule_defaults.filters.resource_tags[].values
+              description: "Accepted values for this key, 1 to 20, exact and case-sensitive. Any of them matches."
+              default_value: ""
+              required: true
+              group: Rules / Resource Filters
+            - name: rules[].filters.resource_tags
+              description: "Resource tag filters replacing the job defaults for this rule. Leave unset to inherit, or set an empty list to disable filtering."
+              default_value: ""
+              required: false
+              group: Rules / Resource Filters
+            - name: rules[].filters.resource_tags[].key
+              description: "Exact, case-sensitive AWS tag key. A filter list supports at most 50 keys."
+              default_value: ""
+              required: true
+              group: Rules / Resource Filters
+            - name: rules[].filters.resource_tags[].values
+              description: "Accepted values for this key, 1 to 20, exact and case-sensitive. Any of them matches."
+              default_value: ""
+              required: true
+              group: Rules / Resource Filters
+            - name: labels.resource_tags
+              description: "AWS resource tags copied to charts as labels. Presentation only; they never select resources."
+              detailed_description: |
+                Tag values may contain personal data, so expose only keys intended for Netdata. Requires the `tag:GetResources` permission.
+              default_value: ""
+              required: false
+              group: Resource Labels
+            - name: labels.resource_tags[].key
+              description: "Exact, case-sensitive AWS tag key to copy."
+              default_value: ""
+              required: true
+              group: Resource Labels
+            - name: labels.resource_tags[].label
+              description: "Netdata label key to use. Leave empty to derive it from the AWS key (`Name` becomes `name`)."
+              default_value: ""
+              required: false
+              group: Resource Labels
+            - name: limits.max_instances
+              description: "Maximum distinct resource instances that emit metrics. Exceeding it rejects the plan instead of collecting a subset."
+              detailed_description: |
+                Overflow rejects the refreshed plan; collection never truncates to the first N instances. In the
+                configuration file `0` selects the default; the form does not accept `0`.
+              default_value: 1000
+              required: false
+              group: Limits
+            - name: limits.max_discovery_groups
+              description: "Maximum target, region, and namespace combinations discovered per job, 1 to 100. Split larger collection across jobs."
+              detailed_description: |
+                Compatible rules and profiles share groups. One refresh can admit at most 100 groups that reach `ListMetrics`.
+                In the configuration file `0` selects the default; the form does not accept `0`.
+              default_value: 64
+              required: false
+              group: Limits
+            - name: discovery.refresh_every
+              description: "How often to rediscover matching metrics and resources, in seconds, at least 60."
+              detailed_description: |
+                Also the lifetime of resolved resource tags. In the configuration file `0` selects the default; the form
+                does not accept `0`.
+              default_value: 300
+              required: false
+              group: Discovery
+            - name: discovery.recently_active_only
+              description: "Restrict discovery to metrics active in the last three hours where possible, which keeps scans smaller and cheaper."
+              detailed_description: |
+                Profiles sharing one target, region, and namespace share one scan; the filter applies only while every participating series has `publication_delay + lookback + period` of three hours or less.
+              default_value: true
+              required: false
+              group: Discovery
+            - name: vnode
+              description: "Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes)."
+              default_value: ""
+              required: false
+              group: Virtual Node
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Default credentials, single region
+              description: The minimal job. The Agent host already has an AWS identity (environment, shared config, instance profile, or IRSA), and every default-enabled profile is collected in one region.
+              config: |
+                jobs:
+                  - name: default_credentials
+                    credentials:
+                      - name: sdk_default
+                        type: default
+                    targets:
+                      - name: base
+                        credentials: sdk_default
+                    rules:
+                      - name: base-defaults
+                        targets: [base]
+                        regions: [us-east-1]
+            - name: Static access keys
+              description: The Agent host has no AWS identity of its own. Use an access key pair from your AWS administrator, referenced from the environment rather than written in the file.
+              config: |
+                jobs:
+                  - name: static_keys
+                    credentials:
+                      - name: keys
+                        type: static
+                        type_static:
+                          access_key_id: ${env:AWS_ACCESS_KEY_ID}
+                          secret_access_key: ${env:AWS_SECRET_ACCESS_KEY}
+                    targets:
+                      - name: base
+                        credentials: keys
+                    rules:
+                      - name: base-defaults
+                        targets: [base]
+                        regions: [us-east-1, eu-west-1]
+            - name: Monitor several AWS accounts by assuming roles
+              description: One credential source assumes a different IAM role in each account you monitor. Each role needs the read policy from Prerequisites and a trust policy that allows this identity, with an external ID when the role owner requires one.
+              config: |
+                jobs:
+                  - name: cross_account
+                    credentials:
+                      - name: sdk_default
+                        type: default
+                    targets:
+                      - name: production
+                        credentials: sdk_default
+                        assume_role:
+                          role_arn: "arn:aws:iam::111111111111:role/netdata-cloudwatch-readonly"
+                          external_id: ${env:AWS_EXTERNAL_ID}
+                      - name: staging
+                        credentials: sdk_default
+                        assume_role:
+                          role_arn: "arn:aws:iam::222222222222:role/netdata-cloudwatch-readonly"
+                    rules:
+                      - name: both-defaults
+                        targets: [production, staging]
+                        regions: [us-east-1, eu-west-1]
+            - name: Collect a metric a profile leaves off by default
+              description: The EC2 profile declares CPU credit balance for burstable instances but does not collect it by default. Naming it adds it to the default EC2 metrics with the profile's statistic.
+              config: |
+                jobs:
+                  - name: ec2_with_cpu_credits
+                    credentials:
+                      - name: sdk_default
+                        type: default
+                    targets:
+                      - name: base
+                        credentials: sdk_default
+                    rules:
+                      - name: ec2
+                        targets: [base]
+                        profiles:
+                          defaults: false
+                          include: [ec2]
+                        metrics:
+                          - profile: ec2
+                            include:
+                              - name: CPUCreditBalance
+                        regions: [us-east-1]
+            - name: Read one metric at two resolutions
+              description: Lambda `Duration` as a five-minute average and as a one-minute p90. Each statistic is its own series with its own timing; the same metric and statistic cannot be listed twice.
+              config: |
+                jobs:
+                  - name: lambda_split_policy
+                    credentials:
+                      - name: sdk_default
+                        type: default
+                    targets:
+                      - name: base
+                        credentials: sdk_default
+                    rules:
+                      - name: lambda-duration
+                        targets: [base]
+                        profiles:
+                          defaults: false
+                          include: [lambda]
+                        metrics:
+                          - profile: lambda
+                            defaults: false
+                            query:
+                              period: 5m
+                              lookback: 30m
+                              publication_delay: 10m
+                            include:
+                              - name: Duration
+                                statistics: [Average]
+                              - name: Duration
+                                statistics: [p90]
+                                query:
+                                  period: 1m
+                                  lookback: 5m
+                                  publication_delay: 5m
+                        regions: [us-east-1]
+            - name: Lower resolution to reduce cost
+              description: Everything at five-minute resolution with discovery every 15 minutes, for accounts where cost matters more than freshness. The daily S3 storage profile is excluded because a five-minute period with a fifteen-minute lookback can never find its once-a-day datapoint.
+              config: |
+                jobs:
+                  - name: low_resolution
+                    update_every: 300
+                    credentials:
+                      - name: sdk_default
+                        type: default
+                    targets:
+                      - name: base
+                        credentials: sdk_default
+                    rule_defaults:
+                      query:
+                        period: 5m
+                        lookback: 15m
+                    rules:
+                      - name: five-minute-defaults
+                        targets: [base]
+                        profiles:
+                          exclude: [s3]
+                        regions: [us-east-1]
+                    discovery:
+                      refresh_every: 900
+            - name: AWS Billing estimated charges
+              description: Month-to-date estimated charges, in total and split by service and linked account. Enable Billing metrics first (Prerequisites); they exist only in `us-east-1` and have no resource tags, so any inherited tag filter is disabled for this rule.
+              config: |
+                jobs:
+                  - name: billing_estimated_charges
+                    credentials:
+                      - name: sdk_default
+                        type: default
+                    targets:
+                      - name: billing
+                        credentials: sdk_default
+                    rules:
+                      - name: billing-grains
+                        targets: [billing]
+                        profiles:
+                          defaults: false
+                          include:
+                            - billing_total
+                            - billing_service
+                            - billing_linked_account
+                            - billing_linked_account_service
+                        regions: [us-east-1]
+                        filters:
+                          # Billing is not an RGTA resource. This explicitly
+                          # disables any inherited resource-tag filter.
+                          resource_tags: []
+            - name: AWS PrivateLink endpoints with split timing
+              description: PrivateLink endpoints tagged `environment=production`, with per-minute connection metrics and six-hour byte totals for the same endpoints.
+              config: |
+                jobs:
+                  - name: privatelink_endpoints
+                    credentials:
+                      - name: sdk_default
+                        type: default
+                    targets:
+                      - name: base
+                        credentials: sdk_default
+                    rule_defaults:
+                      filters:
+                        resource_tags:
+                          - key: environment
+                            values: [production]
+                    rules:
+                      - name: endpoint-split-timing
+                        targets: [base]
+                        profiles:
+                          defaults: false
+                          include: [privatelink_endpoint]
+                        metrics:
+                          - profile: privatelink_endpoint
+                            defaults: false
+                            query:
+                              period: 1m
+                              lookback: 5m
+                              publication_delay: 5m
+                            include:
+                              - name: ActiveConnections
+                                statistics: [Average]
+                              - name: BytesProcessed
+                                statistics: [Average]
+                              - name: NewConnections
+                                statistics: [Average]
+                              - name: BytesProcessed
+                                statistics: [Sum]
+                                query:
+                                  period: 6h
+                                  lookback: 6h
+                                  publication_delay: 5m
+                        regions: [us-east-1]
+                    labels:
+                      resource_tags:
+                        - key: Name
+            - name: AWS PrivateLink endpoints by subnet
+              description: The per-subnet detail grain for PrivateLink endpoints tagged `environment=production`. One endpoint produces one chart instance per subnet, and the subnet charts inherit the endpoint's tags.
+              config: |
+                jobs:
+                  - name: privatelink_endpoint_subnets
+                    credentials:
+                      - name: sdk_default
+                        type: default
+                    targets:
+                      - name: base
+                        credentials: sdk_default
+                    rule_defaults:
+                      filters:
+                        resource_tags:
+                          - key: environment
+                            values: [production]
+                    rules:
+                      - name: endpoint-subnets
+                        targets: [base]
+                        profiles:
+                          defaults: false
+                          include: [privatelink_endpoint_subnet]
+                        regions: [us-east-1]
+                    labels:
+                      resource_tags:
+                        - key: Name
+            - name: AWS PrivateLink services with split timing
+              description: The provider side of PrivateLink, for services tagged `environment=production`. Per-minute traffic, a five-minute connected-endpoint count, and six-hour byte totals.
+              config: |
+                jobs:
+                  - name: privatelink_services
+                    credentials:
+                      - name: sdk_default
+                        type: default
+                    targets:
+                      - name: base
+                        credentials: sdk_default
+                    rule_defaults:
+                      filters:
+                        resource_tags:
+                          - key: environment
+                            values: [production]
+                    rules:
+                      - name: service-split-timing
+                        targets: [base]
+                        profiles:
+                          defaults: false
+                          include: [privatelink_service]
+                        metrics:
+                          - profile: privatelink_service
+                            defaults: false
+                            query:
+                              period: 1m
+                              lookback: 5m
+                              publication_delay: 5m
+                            include:
+                              - name: ActiveConnections
+                                statistics: [Average]
+                              - name: BytesProcessed
+                                statistics: [Average]
+                              - name: NewConnections
+                                statistics: [Average]
+                              - name: RstPacketsSent
+                                statistics: [Average]
+                              - name: EndpointsCount
+                                statistics: [Average]
+                                query:
+                                  period: 5m
+                                  lookback: 5m
+                                  publication_delay: 5m
+                              - name: BytesProcessed
+                                statistics: [Sum]
+                                query:
+                                  period: 6h
+                                  lookback: 6h
+                                  publication_delay: 5m
+                        regions: [us-east-1]
+                    labels:
+                      resource_tags:
+                        - key: Name
+            - name: Everything, including opt-in profiles
+              description: Every default profile plus every opt-in grain in one region. Read the cardinality and cost notes under Metrics and Performance Impact before using this on a large account.
+              config: |
+                jobs:
+                  - name: defaults_and_opt_in
+                    credentials:
+                      - name: sdk_default
+                        type: default
+                    targets:
+                      - name: base
+                        credentials: sdk_default
+                    rules:
+                      - name: expanded-services
+                        targets: [base]
+                        profiles:
+                          defaults: true
+                          include:
+                            - alb_target
+                            - dynamodb_operation
+                            - s3_requests
+                            - ebs_stalled_io
+                            - privatelink_endpoint_subnet
+                            - privatelink_service_az
+                            - privatelink_service_load_balancer
+                            - privatelink_service_az_load_balancer
+                            - privatelink_service_vpc_endpoint
+                            - billing_total
+                            - billing_service
+                            - billing_linked_account
+                            - billing_linked_account_service
+                        regions: [us-east-1]
+            - name: Filter resources by tag and add tag labels
+              description: Only resources tagged `managed-by=platform`, with the `Name` and `owner` tags shown as chart labels. Profiles Netdata ships no resource-tag association for (CloudFront, API Gateway, ElastiCache, MSK, Auto Scaling, Bedrock, the ALB and NLB target-health grains) cannot be tag-filtered and are skipped by a filtered rule; collect them from a second rule that disables the inherited filter, as the CloudFront rule does.
+              config: |
+                jobs:
+                  - name: tagged_resources
+                    credentials:
+                      - name: sdk_default
+                        type: default
+                    targets:
+                      - name: base
+                        credentials: sdk_default
+                    rule_defaults:
+                      filters:
+                        resource_tags:
+                          - key: managed-by
+                            values: [platform]
+                    rules:
+                      - name: filtered-defaults
+                        targets: [base]
+                        regions: [us-east-1]
+                      - name: unfiltered-cloudfront
+                        targets: [base]
+                        profiles:
+                          defaults: false
+                          include: [cloudfront]
+                        regions: [us-east-1]
+                        filters:
+                          resource_tags: []
+                    labels:
+                      resource_tags:
+                        - key: Name
+                        - key: owner
+                          label: resource_owner
+            - name: Present AWS metrics on a virtual node
+              description: Show the AWS charts as their own Netdata node instead of on the host running the collector. The virtual node must already exist in the Agent's vnodes configuration.
+              config: |
+                jobs:
+                  - name: aws_production
+                    vnode: aws-production
+                    credentials:
+                      - name: sdk_default
+                        type: default
+                    targets:
+                      - name: base
+                        credentials: sdk_default
+                    rules:
+                      - name: base-defaults
+                        targets: [base]
+                        regions: [us-east-1]
+    troubleshooting:
+      errors:
+        list:
+          - error: "`AWS request failed (code=AccessDeniedException, status=403, request_id=...)`"
+            when: |
+              Logged as part of a `CloudWatch <operation> failed for N target/region operation(s)` warning, where the
+              operation is `account resolution`, `discovery`, `GetMetricData`, `query client creation`, or
+              `resource tag lookup`. The codes `AccessDenied`, `NotAuthorized`, and `Forbidden` mean the same.
+            cause: |
+              The IAM identity behind the named target is not allowed the AWS action that operation uses:
+              `cloudwatch:ListMetrics` for discovery, `cloudwatch:GetMetricData` for reads, `tag:GetResources` for tag
+              lookups, or `sts:AssumeRole` when the target assumes a role. The collector never prints the AWS message
+              itself, only the code, HTTP status, and request id.
+            fix: |
+              Attach the policy from Prerequisites to that identity, adding `tag:GetResources` if the job uses tag
+              filters or labels. For a target with `assume_role`, allow `sts:AssumeRole` on the role ARN for the source
+              identity and let the role's trust policy accept it. The next discovery refresh or collection cycle retries
+              automatically.
+          - error: "`AWS request failed (code=ExpiredToken, status=403, request_id=...)`"
+            when: |
+              Also `ExpiredTokenException`, `InvalidClientTokenId`, `UnrecognizedClientException`, or
+              `SignatureDoesNotMatch`.
+            cause: |
+              The credential source is expired, revoked, mistyped, or belongs to a different AWS partition than the
+              regions it is used for.
+            fix: |
+              Renew or correct the credentials. For a `static` source, check the `access_key_id` and `secret_access_key`
+              values and, for temporary keys, the `session_token`; prefer `${env:NAME}` references so a rotated key is
+              picked up without editing the file. For the `default` source, check what the AWS SDK finds on the Agent
+              host (`aws sts get-caller-identity` as the `netdata` user).
+          - error: "`AWS request failed`"
+            when: |
+              The message carries no `code=` and no `status=`.
+            cause: |
+              The request never reached AWS or got no AWS answer: DNS resolution, an outbound firewall or proxy, or TLS
+              interception on the Agent host. Provider-side detail is deliberately not logged.
+            fix: |
+              From the Agent host, as the `netdata` user, run `aws sts get-caller-identity --region <region>` and
+              `aws cloudwatch list-metrics --region <region> --max-items 1`; the AWS CLI shows the underlying network or
+              TLS error. Allow outbound HTTPS to the CloudWatch, STS, and Tagging endpoints of every selected region, or
+              configure the proxy through the standard `HTTPS_PROXY` environment of the Netdata service.
+          - error: "`AWS request timed out`"
+            cause: |
+              An AWS call exceeded `timeout` (default 30 seconds). A whole discovery refresh and a whole resource tag
+              lookup share one timeout; each `GetMetricData` and STS call has its own.
+            fix: |
+              Raise `timeout`, or make the work smaller: fewer `regions` and `profiles` per rule, resource tag filters,
+              or split the job. A timed-out discovery refresh is discarded and retried after `discovery.refresh_every`;
+              a timed-out read is retried on the next collection.
+          - error: "`AWS request failed (code=Throttling, status=400, request_id=...)`"
+            when: |
+              Also `ThrottlingException` or `RequestLimitExceeded`.
+            cause: |
+              The account exceeded the CloudWatch API request rate. The AWS SDK already attempts each call up to five
+              times with a short backoff before this is logged, so the job is well above the rate.
+            fix: |
+              Reduce request volume: a longer `period` in `rule_defaults.query`, a longer `update_every`, fewer metrics
+              or regions, or split targets across jobs that do not run at the same second. Retried reads are billed.
+          - error: "`no AWS target could be resolved (N failed); last failure for target \"<name>\" region \"<region>\": ...`"
+            cause: |
+              `sts:GetCallerIdentity` failed for every target, so the job has no AWS account to attribute metrics to.
+              The trailing text is one of the `AWS request ...` messages above and names the actual reason.
+            fix: |
+              Fix the credentials or network problem named in the trailing message. Targets that fail while others
+              succeed are retried every cycle without failing the job; only total failure stops collection.
+          - error: "`target \"<name>\" is not referenced by any rule`"
+            when: |
+              Also `credential "<name>" is not referenced by any target`. The job does not start.
+            cause: |
+              Every target must be selected by at least one rule and every credential source used by at least one
+              target; an unused entry is treated as a configuration mistake rather than ignored.
+            fix: |
+              Reference the entry from a rule (or target), or remove it.
+          - error: "`'credentials' must contain at least one entry`"
+            when: |
+              Together with `'targets' must contain at least one entry` and `'rules' must contain at least one entry`
+              when the job has no configuration at all.
+            cause: |
+              The job is missing one of the three required blocks. Nothing is collected by default.
+            fix: |
+              Add at least one credential source, one target that references it, and one rule with `targets` and
+              `regions`; see the first example under Setup.
+          - error: "`rules[N].name \"<name>\" must match \"^[a-z][a-z0-9_-]{0,63}$\"`"
+            when: |
+              The same for `credentials[N].name` and `targets[N].name`.
+            cause: |
+              Names are lowercase, start with a letter, use only letters, digits, `_` and `-`, and are at most 64
+              characters. Duplicate names produce `duplicate rule name "<name>"` (or target, credential).
+            fix: |
+              Rename the entry and update the places that reference it (`targets[].credentials`, `rules[].targets`).
+          - error: "`rules[N].regions[M] \"US-EAST-1\" is not canonical; use \"us-east-1\"`"
+            when: |
+              Also `rules[N].regions[M] "<value>" is not a valid AWS region`.
+            cause: |
+              Regions must be the lowercase AWS region code such as `us-east-1` or `eu-west-1`.
+            fix: |
+              Correct the region code.
+          - error: "`target \"<name>\" spans multiple AWS partitions across regions [...]`"
+            when: |
+              Also `target "<name>" role partition "aws" does not match selected region partition "aws-us-gov"`.
+            cause: |
+              All regions collected for one target must belong to one AWS partition (standard `aws`, GovCloud
+              `aws-us-gov`, China `aws-cn`), and an assumed role's ARN must belong to the same partition.
+            fix: |
+              Give each partition its own target (and rule), or split the job per partition, and use a role ARN of the
+              matching partition.
+          - error: "`rules[N] explicitly includes profile \"cloudfront\", but none of regions [...] are supported`"
+            cause: |
+              Some profiles exist only in `us-east-1` (CloudFront and the four Billing profiles). When such a profile is
+              selected by defaults it is silently skipped for other regions; when it is named in `profiles.include` or in
+              a `rules[].metrics[]` group with only unsupported regions the job refuses to start.
+            fix: |
+              Add `us-east-1` to the rule's `regions`, or collect that profile from a separate rule limited to
+              `us-east-1`.
+          - error: "`rules[N].profiles.include references unknown profile \"<name>\"`"
+            cause: |
+              No loaded profile has that basename: a typo, or a user profile that was added after the plugin started.
+              Profiles are read once at startup.
+            fix: |
+              Use the basename of a file under `/usr/lib/netdata/conf.d/go.d/cloudwatch.profiles/default/` or
+              `/etc/netdata/go.d/cloudwatch.profiles/`; after adding a profile, restart Netdata.
+          - error: "`rules[N].metrics[M].include[K].name references unknown MetricName \"<name>\" in profile \"<profile>\"`"
+            when: |
+              Also `... "<statistic>" is not exported for MetricName "<name>" in profile "<profile>"`.
+            cause: |
+              An explicit metric selection must name a metric the profile declares, spelled exactly as AWS does
+              (`CPUUtilization`, not `cpu_utilization`), with a statistic the profile declares for it.
+            fix: |
+              Open the profile file and copy the `metric_name` and statistics from its `metrics` list.
+          - error: "`rules[N].metrics[M].statistics[K] is not valid (use Average|Minimum|Maximum|Sum|SampleCount|p<N>)`"
+            cause: |
+              In job configuration statistics use the AWS spelling, case-insensitively: `Average`, `Minimum`,
+              `Maximum`, `Sum`, `SampleCount`, or a percentile such as `p90` or `p99.9`. The message does not echo the
+              value that failed; the common case is the profile-file spelling `sample_count`, which a job does not
+              accept.
+            fix: |
+              Write `SampleCount`.
+          - error: "`rules[N] derives N discovery groups (unique target, region, namespace combinations); exceeds limits.max_discovery_groups=64; ...`"
+            cause: |
+              Every unique combination of target, region, and CloudWatch namespace is one `ListMetrics` discovery
+              group. Many targets times many regions times many services exceeds the safeguard, which defaults to 64
+              and cannot exceed 100.
+            fix: |
+              Check that the rule does not select more targets, regions, or profiles than intended. For intentional
+              scale, raise `limits.max_discovery_groups` up to 100; beyond that, split the collection across jobs (for
+              example one job per target or per region group).
+          - error: "`CloudWatch query plan contains more than limits.max_instances=1000 final instances`"
+            cause: |
+              After discovery and tag filtering the job would collect more resources than `limits.max_instances`. The
+              collector refuses the plan rather than collecting a subset, so no metrics are collected until it fits.
+            fix: |
+              Narrow the selection (`rules[].regions`, `rules[].profiles`, resource tag filters) or raise
+              `limits.max_instances` deliberately, knowing that every resource adds to the AWS bill.
+          - error: "`CloudWatch query plan would exceed maximum 20000 queries`"
+            when: |
+              Also `CloudWatch query plan requires more than 600000 datapoints per all-due pass` or
+              `... more than 40 GetMetricData batches per all-due pass`.
+            cause: |
+              The whole plan, evaluated as if every series were due at once, is larger than the collector will query
+              safely. Only very broad rules across many regions, services, and resources reach these bounds.
+            fix: |
+              Narrow `regions`, `profiles`, or `metrics`, use resource tag filters, or split the collection across jobs.
+          - error: "`CloudWatch discovery refresh was discarded atomically: ...`"
+            when: |
+              Also `CloudWatch discovery stage timed out`, or a
+              `CloudWatch discovery failed for N target/region operation(s)` warning. Logged at most once per hour.
+            cause: |
+              A discovery refresh exceeded `timeout` or one of its internal size bounds. The previous set of
+              resources stays in use and discovery retries after `discovery.refresh_every`; on a job's first refresh
+              only profiles with constant dimensions (`billing_total`) can collect until discovery succeeds.
+            fix: |
+              Raise `timeout`, narrow the rule's `regions` and `profiles`, or split the job. If the failure names a
+              specific target and region, check that identity's `cloudwatch:ListMetrics` permission.
+          - error: "`CloudWatch GetMetricData returned Forbidden for N metric result(s): ...; verify each target identity is allowed cloudwatch:GetMetricData`"
+            cause: |
+              AWS accepted the request but refused some of the metrics in it, which happens when a target's identity
+              lacks `cloudwatch:GetMetricData` or a policy condition excludes the namespace.
+            fix: |
+              Grant `cloudwatch:GetMetricData` without namespace conditions to the identity of the target named in the
+              message.
+          - error: "`CloudWatch GetMetricData left N metric result(s) unresolved: ...; retained values are replayed and retries use per-query exponential backoff`"
+            cause: |
+              AWS returned `PartialData` or `InternalError` for some metrics, or a result did not come back. The
+              collector keeps showing the last value it has and retries with a doubling delay up to one period.
+            fix: |
+              Nothing, unless it persists across many collections; then check the AWS Health Dashboard for the
+              region and reduce the request volume (fewer metrics, longer `period`).
+          - error: "`all due CloudWatch queries failed transiently and no retained observations are available`"
+            cause: |
+              Every read due in this collection failed and the job has no earlier values to repeat, so the collection
+              cycle fails. On a new job this usually means AWS is unreachable or throttling; on a running job it follows
+              a long outage.
+            fix: |
+              Look for the `AWS request ...` warning logged just before it and follow its entry above.
+          - error: "`CloudWatch discovered N instances; this scales GetMetricData cost — narrow collection rules if this is unexpected`"
+            cause: |
+              Discovery found 1,000 or more resources. Collection is not truncated; the warning exists because every
+              resource multiplies the AWS bill.
+            fix: |
+              If the count is expected, ignore it. Otherwise narrow `regions`, `profiles`, or add resource tag filters,
+              and read the Performance Impact section.
+          - error: "`CloudWatch collection plan: rule \"<name>\" has N metric selection(s) shadowed by earlier rules; example: ...`"
+            when: |
+              Also
+              `CloudWatch collection rules shadowed N duplicate exported series; earliest matching rule/target order owns each series`.
+            cause: |
+              Two rules select the same series for the same target and region. The earlier rule (and, within it, the
+              earlier target) owns the series; the later selection is ignored, including its query timing.
+            fix: |
+              Make the rules disjoint (different profiles, regions, or targets), or move the selection you want to win
+              into the earlier rule.
+          - error: "`CloudWatch collection plan: rule \"<name>\" skips default profiles unsupported in its regions: ...`"
+            cause: |
+              A default-enabled profile that exists only in `us-east-1` (CloudFront, Billing) was selected by defaults
+              for a rule whose regions do not include it. It is skipped there; no error.
+            fix: |
+              Nothing, or add a rule for `us-east-1` if you want that service.
+          - error: "`CloudWatch tags (profile \"<profile>\"): skipped tag \"<tag>\": label \"<label>\" collides with a dimension label (rename it)`"
+            cause: |
+              A tag selected in `labels.resource_tags` would become a label that the profile already uses for a
+              dimension (or one of the reserved `account_id` and `region` labels). The tag is not attached.
+            fix: |
+              Set `labels.resource_tags[].label` to another name for that key.
+          - error: "`load CloudWatch profiles: validate profile \"<name>\": ...`"
+            when: |
+              Also `unmarshal profile "<name>": ...` (invalid YAML) or `normalize profile "<name>": ...`. Every
+              CloudWatch job on the Agent fails, not only the one that uses the profile.
+            cause: |
+              A profile under `/etc/netdata/go.d/cloudwatch.profiles/` does not parse or breaks a profile rule; the
+              trailing text names the field. Profiles are loaded once for the whole plugin, so one bad file stops all
+              jobs.
+            fix: |
+              Fix or remove the file following the
+              [profile format](/src/go/plugin/go.d/collector/cloudwatch/profile-format.md) and restart Netdata.
+          - error: "`rules[N] explicitly includes profile \"<name>\" with resource tag filtering, but it has no safe tag association: profile is not registered`"
+            when: |
+              The non-fatal sibling for profiles selected by defaults is
+              `CloudWatch collection plan: rule "<name>" skips default profiles without a safe resource-tag association: ...`.
+            cause: |
+              Resource tag filters need a mapping from the profile's CloudWatch dimensions to a taggable AWS resource,
+              and Netdata ships none for this profile (CloudFront and the Billing profiles, among others). A profile
+              named explicitly under a tag filter cannot be filtered, so the job refuses to start; a default-selected one
+              is skipped with a warning.
+            fix: |
+              Give that profile its own rule with `filters: {resource_tags: []}` to collect it unfiltered, or drop it from
+              the filtered rule.
+          - error: "`credentials[N].type_static is required`"
+            when: |
+              Also `credentials[N].type_static is not allowed when credentials[N].type is "default"`,
+              `credentials[N].type "<value>" is invalid: expected one of "default", "static"`,
+              `credentials[N].type_static.access_key_id is required`, or `... must not contain surrounding whitespace`.
+            cause: |
+              The credential block does not match its `type`: `static` needs `type_static` with `access_key_id` and
+              `secret_access_key`; `default` takes no `type_static`; values must not be padded with spaces.
+            fix: |
+              Shape the block as the two examples under Setup show (`type: default` alone, or `type: static` with
+              `type_static`).
+          - error: "`rules[N].profiles.include must not be empty when defaults is false`"
+            when: |
+              Also `rules[N].profiles selects no profiles` (exclusions removed everything) or
+              `rules[N] compiles to no collection scopes` (every selected profile was filtered away by regions or tag
+              associations).
+            cause: |
+              The rule ends up selecting nothing. Narrowing with `defaults: false`, `exclude`, region-restricted
+              profiles, or tag filters went one step too far.
+            fix: |
+              Name at least one profile in `include`, remove the exclusion that empties the set, or add a region the
+              selected profiles support.
+          - error: "`targets[N].assume_role.role_arn is invalid: expected an IAM role ARN`"
+            when: |
+              Also `... is invalid: invalid ARN syntax`.
+            cause: |
+              The value is not a role ARN of the form `arn:<partition>:iam::<12-digit-account>:role/<name>`.
+            fix: |
+              Copy the role ARN from the IAM console; it must name the `iam` service, have no region, a 12-digit
+              account id, and a `role/` resource.
+          - error: "`candidate collection scopes exceed maximum 16384`"
+            when: |
+              Also `compiled collection scopes exceed maximum 4096`.
+            cause: |
+              Targets times profiles times regions, before or after filtering, is larger than the collector will
+              compile. Only rules that combine many targets, all profiles, and many regions reach this.
+            fix: |
+              Split the collection across jobs, for example one job per target or per region group.
+          - error: "`CloudWatch resource tag filtering reserved N exported series from lower-priority rules while membership was unknown`"
+            when: |
+              Preceded by
+              `CloudWatch resource tag lookup failed for N target/region operation(s): ... (retaining fail-closed membership and last-known labels)`.
+            cause: |
+              The tag lookup (`tag:GetResources`) failed, so the collector does not know which resources match the
+              filter. It keeps the last known membership and labels, and resources whose membership is unknown stay
+              uncollected rather than being collected unfiltered.
+            fix: |
+              Follow the `AWS request ...` message inside the lookup failure (usually a missing `tag:GetResources`
+              permission or a timeout on a large tagged estate; raise `timeout` for the latter). Collection resumes on
+              the next successful lookup.
+          - error: No charts appear although the job runs without errors
+            cause: |
+              CloudWatch has nothing for the selection yet. Typical reasons: the resources are idle (several services,
+              such as EventBridge and Bedrock, publish a metric only when its value is non-zero); the metric is not
+              enabled on the AWS side (Auto Scaling group metrics need `enable-metrics-collection`; EKS control-plane
+              metrics exist only for Kubernetes 1.28 or later; S3 request metrics need per-bucket request-metrics
+              configuration; Billing needs the preference from Prerequisites); or the first datapoint has not been
+              published yet, which takes a few minutes and up to a day for the daily S3 storage metrics.
+            fix: |
+              Confirm in the AWS CloudWatch console that the resource publishes the metric in that region, enable the
+              AWS-side feature if needed, and give a new job a few minutes. If the console shows data but Netdata does
+              not, read the Diagnostics output for one of the `AWS request ...` messages above.
+          - error: Charts have gaps or show a stale value
+            cause: |
+              CloudWatch publishes each period late and irregularly; the collector reads a series only when a new
+              period is complete and repeats the newest value in between. A gap means no datapoint existed within the
+              `lookback` window; a value that seems old is the newest one AWS has, and during an AWS outage the last
+              good value stays until a read succeeds.
+            fix: |
+              Keep `period` at or above the metric's real publication cadence (a shorter period cannot make AWS publish
+              more often). If a workload publishes later than the profile expects, raise `publication_delay` at the
+              rule or metric level; if datapoints are sparse, widen `lookback` (a whole multiple of the period). Do not
+              lower `rule_defaults.query.publication_delay` below a profile's own value unless you have verified the
+              publication timing; the S3 storage profile uses one day for a reason.
+          - error: A user profile does not take effect
+            cause: |
+              Profiles are read once when the plugin starts and cached for its lifetime, so a file added or edited
+              under `/etc/netdata/go.d/cloudwatch.profiles/` is not seen by a running plugin. A user profile whose chart
+              id collides with another profile's is loaded but the colliding chart is dropped, with a warning logged
+              under the `cloudwatch/cwprofiles` component rather than the job.
+            fix: |
+              Restart Netdata after changing profiles. Give every chart in a user profile an id that no other loaded
+              profile uses.
+          - error: A service I use has no profile
+            cause: |
+              Coverage is defined by the profiles shipped with Netdata, one per service and grain. A missing service
+              means nobody has authored its profile yet; no code change is needed to add one.
+            fix: |
+              [Open a feature request](https://github.com/netdata/netdata/issues/new/choose) and attach the service's
+              CloudWatch metric schema, captured with this read-only command, which prints only metric and dimension
+              names (no resource ids, ARNs, or values):
+
+              ```bash
+              aws cloudwatch list-metrics --namespace "AWS/<Service>" --region <your-region> --output json \
+                | jq -c '[.Metrics[] | {metric: .MetricName, dimensions: ([.Dimensions[].Name] | sort)}] | unique'
+              ```
+
+              Replace `AWS/<Service>` with the namespace (for example `AWS/AmazonMQ`) and `<your-region>` with a region
+              where the service runs. Or author the profile yourself following the
+              [profile format](/src/go/plugin/go.d/collector/cloudwatch/profile-format.md).
+          - error: The AWS bill is higher than expected
+            cause: |
+              Cost scales with resources, selected metrics and statistics, request frequency, and lookback; see the
+              drivers table under Performance Impact. The most common causes are a 1-minute period on many resources,
+              opt-in detail grains (PrivateLink, DynamoDB operations, Billing by linked account and service), and broad
+              rules that select every default profile in many regions.
+            fix: |
+              Read the *GetMetricData Profile Metric Request Estimates* chart to see which profiles drive the requests,
+              then narrow `rules[].profiles`, `rules[].metrics`, and `rules[].regions`, add resource tag filters, or
+              raise `rule_defaults.query.period` together with `update_every`.
+    alerts:
+      - name: aws_cloudwatch_ec2_status_check_failed
+        metric: cloudwatch.ec2.status_check_failed
+        info: "EC2 instance ${label:instance_id} in ${label:region} has failed AWS status checks."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: aws_cloudwatch_ec2_attached_ebs_status_check_failed
+        metric: cloudwatch.ec2.status_check_failed
+        info: "EC2 instance ${label:instance_id} in ${label:region} has an attached EBS volume failing AWS status checks."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: aws_cloudwatch_alb_target_group_unhealthy_hosts
+        metric: cloudwatch.alb_target_health.unhealthy_hosts
+        info: "ALB target group ${label:target_group} on load balancer ${label:load_balancer} in ${label:region} has sustained unhealthy registered targets."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: aws_cloudwatch_nlb_target_group_unhealthy_hosts
+        metric: cloudwatch.nlb_target_health.unhealthy_hosts
+        info: "NLB target group ${label:target_group} on load balancer ${label:load_balancer} in ${label:region} has sustained unhealthy registered targets."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: aws_cloudwatch_ebs_stalled_io_check_failed
+        metric: cloudwatch.ebs_stalled_io.stalled_io_check
+        info: "EBS volume ${label:volume_id} in ${label:region} has failed AWS stalled I/O checks."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: aws_cloudwatch_nat_gateway_port_allocation_errors
+        metric: cloudwatch.nat_gateway.errors
+        info: "NAT Gateway ${label:nat_gateway_id} in ${label:region} is reporting source-port allocation failures."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: aws_cloudwatch_efs_io_limit_reached
+        metric: cloudwatch.efs.io_limit
+        info: "EFS file system ${label:file_system_id} in ${label:region} is at its AWS PercentIOLimit threshold."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: aws_cloudwatch_efs_burst_credits_exhausted
+        metric: cloudwatch.efs.burst_credit
+        info: "EFS file system ${label:file_system_id} in ${label:region} has exhausted burst credits."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: aws_cloudwatch_ecs_cpu_utilization
+        metric: cloudwatch.ecs.utilization
+        info: "ECS service ${label:service_name} in cluster ${label:cluster_name} (${label:region}) has sustained CPU utilization above the AWS recommended alarm threshold."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: aws_cloudwatch_ecs_memory_utilization
+        metric: cloudwatch.ecs.utilization
+        info: "ECS service ${label:service_name} in cluster ${label:cluster_name} (${label:region}) has sustained memory utilization above the AWS recommended alarm threshold."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: aws_cloudwatch_ecs_ebs_filesystem_utilization
+        metric: cloudwatch.ecs.ebs_filesystem_utilization
+        info: "ECS service ${label:service_name} in cluster ${label:cluster_name} (${label:region}) has sustained EBS filesystem utilization above the AWS recommended alarm threshold."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: aws_cloudwatch_opensearch_cluster_status_red
+        metric: cloudwatch.opensearch.cluster_status
+        info: "OpenSearch domain ${label:domain_name} in ${label:region} is reporting red cluster status."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: aws_cloudwatch_opensearch_cluster_status_yellow
+        metric: cloudwatch.opensearch.cluster_status
+        info: "OpenSearch domain ${label:domain_name} in ${label:region} is reporting yellow cluster status."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: aws_cloudwatch_opensearch_index_writes_blocked
+        metric: cloudwatch.opensearch.index_writes_blocked
+        info: "OpenSearch domain ${label:domain_name} in ${label:region} is blocking index write requests."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: aws_cloudwatch_opensearch_jvm_memory_pressure
+        metric: cloudwatch.opensearch.jvm_memory_pressure
+        info: "OpenSearch domain ${label:domain_name} in ${label:region} has sustained JVM memory pressure above the AWS recommended alarm threshold."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: aws_cloudwatch_opensearch_cpu_utilization
+        metric: cloudwatch.opensearch.cpu
+        info: "OpenSearch domain ${label:domain_name} in ${label:region} has sustained maximum CPU utilization above the AWS recommended alarm threshold."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: aws_cloudwatch_opensearch_automated_snapshot_failure
+        metric: cloudwatch.opensearch.automated_snapshot_failure
+        info: "OpenSearch domain ${label:domain_name} in ${label:region} has a failed automated snapshot."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: aws_cloudwatch_opensearch_old_gen_jvm_memory_pressure
+        metric: cloudwatch.opensearch.old_gen_jvm_memory_pressure
+        info: "OpenSearch domain ${label:domain_name} in ${label:region} has sustained old-generation JVM memory pressure above the AWS recommended alarm threshold."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: aws_cloudwatch_elasticache_engine_cpu_utilization
+        metric: cloudwatch.elasticache.cpu
+        info: "ElastiCache node ${label:cache_cluster_id}/${label:cache_node_id} in ${label:region} has sustained engine CPU utilization above the AWS recommended alarm threshold."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: aws_cloudwatch_msk_active_controller_missing
+        metric: cloudwatch.msk_cluster.active_controllers
+        info: "MSK cluster ${label:cluster_name} in ${label:region} has had no active controller for a sustained period."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: aws_cloudwatch_msk_multiple_active_controllers
+        metric: cloudwatch.msk_cluster.active_controllers
+        info: "MSK cluster ${label:cluster_name} in ${label:region} has had more than one active controller for a sustained period."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: aws_cloudwatch_msk_offline_partitions
+        metric: cloudwatch.msk_cluster.offline_partitions
+        info: "MSK cluster ${label:cluster_name} in ${label:region} has had offline partitions for a sustained period."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: aws_cloudwatch_msk_cpu_utilization
+        metric: cloudwatch.msk.cpu
+        info: "MSK broker ${label:broker_id} in cluster ${label:cluster_name} (${label:region}) has sustained CpuUser plus CpuSystem above the AWS best-practice threshold."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: aws_cloudwatch_msk_data_logs_disk_used
+        metric: cloudwatch.msk.disk_used
+        info: "MSK broker ${label:broker_id} in cluster ${label:cluster_name} (${label:region}) has sustained data-log disk utilization above the AWS best-practice threshold."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: aws_cloudwatch_msk_heap_memory_after_gc
+        metric: cloudwatch.msk.heap_memory_after_gc
+        info: "MSK broker ${label:broker_id} in cluster ${label:cluster_name} (${label:region}) has sustained heap memory after GC above the AWS best-practice threshold."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: aws_cloudwatch_msk_under_replicated_partitions
+        metric: cloudwatch.msk.partitions
+        info: "MSK broker ${label:broker_id} in cluster ${label:cluster_name} (${label:region}) has had under-replicated partitions for a sustained period. This can happen during planned MSK rolling maintenance, but outside expected maintenance it means replicas are not fully caught up."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: aws_cloudwatch_msk_under_min_isr_partitions
+        metric: cloudwatch.msk.under_min_isr
+        info: "MSK broker ${label:broker_id} in cluster ${label:cluster_name} (${label:region}) has had partitions below the configured minimum in-sync replica count for a sustained period."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: aws_cloudwatch_rds_replica_lag
+        metric: cloudwatch.rds.replica_lag
+        info: "RDS instance ${label:db_instance_identifier} in ${label:region} has sustained replica lag above the AWS recommended alarm threshold."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: aws_cloudwatch_rds_maximum_used_transaction_ids
+        metric: cloudwatch.rds.maximum_used_transaction_ids
+        info: "RDS instance ${label:db_instance_identifier} in ${label:region} is above the AWS recommended transaction ID alarm threshold."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: aws_cloudwatch_rds_ebs_byte_balance
+        metric: cloudwatch.rds.ebs_balance
+        info: "RDS instance ${label:db_instance_identifier} in ${label:region} has sustained EBS byte balance below the AWS recommended alarm threshold."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: aws_cloudwatch_rds_ebs_io_balance
+        metric: cloudwatch.rds.ebs_balance
+        info: "RDS instance ${label:db_instance_identifier} in ${label:region} has sustained EBS I/O balance below the AWS recommended alarm threshold."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: aws_cloudwatch_vpn_tunnel_down
+        metric: cloudwatch.vpn.tunnel_state
+        info: "Site-to-Site VPN ${label:vpn_id} in ${label:region} has one or more tunnels down."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: aws_cloudwatch_sns_invalid_notification_attributes
+        metric: cloudwatch.sns.invalid_notifications
+        info: "SNS topic ${label:topic_name} in ${label:region} has sustained notifications filtered out because of invalid attributes."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: aws_cloudwatch_sns_invalid_notification_body
+        metric: cloudwatch.sns.invalid_notifications
+        info: "SNS topic ${label:topic_name} in ${label:region} has sustained notifications filtered out because of invalid message bodies."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: aws_cloudwatch_sns_notifications_redriven_to_dlq
+        metric: cloudwatch.sns.dlq_redrive
+        info: "SNS topic ${label:topic_name} in ${label:region} has sustained notifications moved to a dead-letter queue."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: aws_cloudwatch_sns_notifications_failed_to_redrive_to_dlq
+        metric: cloudwatch.sns.dlq_redrive
+        info: "SNS topic ${label:topic_name} in ${label:region} has sustained notifications that could not be moved to a dead-letter queue."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: |
+        Charts come from the selected profiles. Each stock profile is linked below and is the authoritative list of its
+        metrics, statistics, dimensions, and charts; to see exactly what one job collects, open the Metrics tab of its
+        dashboard.
+
+        Every chart instance is one AWS resource, identified by `account_id`, `region`, and the profile's identifying
+        dimensions (for example EC2 `instance_id`, or S3 `bucket_name` and `storage_type`). A dimension that is the same
+        for every resource of a profile (CloudFront's `Region=Global`) is matched but not shown as a label. Tags selected
+        with `labels.resource_tags` are added as labels that are not part of the chart identity, so a changed tag changes
+        the label, not the chart. Charts land on the job's `vnode` when one is set, otherwise on the node running the
+        collector; AWS resources never become separate Netdata nodes. CloudWatch publishes with a delay, so allow a few
+        minutes for the first datapoints.
+
+        The four collector-activity charts in the scopes below are fixed and present in every job. They count the
+        collector's own AWS API work for cost visibility (see Performance Impact).
+
+        **Default profiles**, collected by any rule that does not restrict `profiles`:
+
+        | Profile | Metric prefix | Description |
+        |:--------|:--------------|:------------|
+        | [Amazon EC2](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/ec2.yaml) | `cloudwatch.ec2.*` | CPU utilization, network traffic, disk operations, status-check failures, attached-EBS status-check failures |
+        | [Amazon RDS](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/rds.yaml) | `cloudwatch.rds.*` | CPU utilization, database connections, freeable memory, swap usage, free storage space, disk queue depth, disk and network throughput, IOPS, latency, replica lag, PostgreSQL transaction ID usage, EBS credit balance |
+        | [Classic Load Balancer (ELB)](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/elb.yaml) | `cloudwatch.elb.*` | request count, backend and load-balancer response codes, backend connection errors, latency, host count, spillover count |
+        | [Application Load Balancer (ALB)](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/alb.yaml) | `cloudwatch.alb.*` | request count, target and load-balancer response codes, connection rate, active connections, processed traffic, target response time, consumed LCUs |
+        | [ALB Target Health](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/alb_target_health.yaml) | `cloudwatch.alb_target_health.*` | per-target-group unhealthy host count |
+        | [Network Load Balancer (NLB)](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/nlb.yaml) | `cloudwatch.nlb.*` | active and new flow counts, processed bytes and packets, consumed LCUs, TCP resets |
+        | [NLB Target Health](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/nlb_target_health.yaml) | `cloudwatch.nlb_target_health.*` | per-target-group unhealthy host count |
+        | [Amazon S3](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/s3.yaml) | `cloudwatch.s3.*` | bucket size, number of objects (daily storage metrics) |
+        | [AWS Lambda](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/lambda.yaml) | `cloudwatch.lambda.*` | invocations, errors and throttles, duration |
+        | [Amazon SQS](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/sqs.yaml) | `cloudwatch.sqs.*` | message throughput, empty receives, queue depth, maximum age of oldest message, sent message size |
+        | [Amazon DynamoDB](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/dynamodb.yaml) | `cloudwatch.dynamodb.*` | consumed and provisioned capacity, throttle events |
+        | [Amazon API Gateway](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/api_gateway.yaml) | `cloudwatch.api_gateway.*` | requests, errors, latency |
+        | [AWS Step Functions](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/step_functions.yaml) | `cloudwatch.step_functions.*` | executions, throttled events, execution time |
+        | [NAT Gateway](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/nat_gateway.yaml) | `cloudwatch.nat_gateway.*` | traffic, active connections, connection rate, errors, idle timeouts |
+        | [AWS PrivateLink endpoints](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/privatelink_endpoint.yaml) | `cloudwatch.privatelink_endpoint.*` | endpoint-level active and new connections, processed bytes, dropped packets, and received reset packets |
+        | [AWS PrivateLink endpoint services](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/privatelink_service.yaml) | `cloudwatch.privatelink_service.*` | provider-side active and new connections, connected endpoints, processed bytes, and sent reset packets |
+        | [Amazon Kinesis Data Streams](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/kinesis.yaml) | `cloudwatch.kinesis.*` | data throughput, records, GetRecords iterator age, operation latency, throughput exceeded, PutRecords rejected |
+        | [Amazon Data Firehose](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/firehose.yaml) | `cloudwatch.firehose.*` | records, throughput, put requests, throttled records, S3 delivery freshness and success |
+        | [Amazon SNS](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/sns.yaml) | `cloudwatch.sns.*` | messages published, notifications, invalid notification filters, DLQ redrive, published message size |
+        | [Amazon EBS](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/ebs.yaml) | `cloudwatch.ebs.*` | volume throughput, IOPS, queue length, idle time, burst balance |
+        | [Amazon EFS](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/efs.yaml) | `cloudwatch.efs.*` | I/O throughput, metered vs permitted throughput, percent I/O limit, burst credit balance, client connections |
+        | [Amazon ECS](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/ecs.yaml) | `cloudwatch.ecs.*` | service utilization, EBS filesystem utilization, live task count |
+        | [Amazon ElastiCache](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/elasticache.yaml) | `cloudwatch.elasticache.*` | CPU utilization, memory, database memory usage, current and new connections, cache hits and misses, evictions, network traffic |
+        | [Amazon OpenSearch Service](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/opensearch.yaml) | `cloudwatch.opensearch.*` | cluster status, index writes blocked, automated snapshot failures, nodes, CPU utilization, JVM memory pressure, old-gen JVM memory pressure, free storage space, search and indexing rate, search and indexing latency |
+        | [Amazon DocumentDB](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/docdb.yaml) | `cloudwatch.docdb.*` | CPU utilization, freeable memory, connections, buffer cache hit ratio, disk IOPS, latency, throughput, replica lag, cursors timed out |
+        | [Amazon Redshift](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/redshift.yaml) | `cloudwatch.redshift.*` | health, CPU utilization, disk space used, database connections, disk IOPS, throughput, network throughput |
+        | [Amazon MSK](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/msk.yaml) | `cloudwatch.msk.*` | broker throughput, messages in, CPU, disk used, memory, heap memory after GC, partitions, under-min-ISR partitions, connections |
+        | [Amazon MSK Cluster](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/msk_cluster.yaml) | `cloudwatch.msk_cluster.*` | active controllers and offline partitions |
+        | [Amazon CloudFront](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/cloudfront.yaml) | `cloudwatch.cloudfront.*` | requests, downloaded and uploaded traffic, total/4xx/5xx error rates (`us-east-1` only) |
+        | [AWS Auto Scaling](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/auto_scaling.yaml) | `cloudwatch.auto_scaling.*` | group sizing (min/max/desired/total) and instances by state (in-service, pending, standby, terminating) |
+        | [Amazon Bedrock](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/bedrock.yaml) | `cloudwatch.bedrock.*` | invocations, invocation errors, token throughput, invocation and time-to-first-token latency |
+        | [Amazon EventBridge](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/eventbridge.yaml) | `cloudwatch.eventbridge.*` | target invocations, rule activity (matched events, triggered rules), ingestion-to-invocation latency |
+        | [AWS Site-to-Site VPN](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/vpn.yaml) | `cloudwatch.vpn.*` | tunnel traffic (in/out) and tunnel state (fraction of tunnels up) |
+        | [Amazon EKS](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/eks.yaml) | `cloudwatch.eks.*` | control-plane health: API server request rate, errors, p99 latency, and in-flight requests; etcd database size; scheduler pending pods and scheduling attempts |
+
+        **Opt-in profiles**, collected when a rule names them in `profiles.include`:
+
+        | Profile | Metric prefix | Description |
+        |:--------|:--------------|:------------|
+        | [ALB Target Groups](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/alb_target.yaml) | `cloudwatch.alb_target.*` | per-target-group host count, requests per target, response time, response codes, connection errors |
+        | [DynamoDB Operations](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/dynamodb_operation.yaml) | `cloudwatch.dynamodb_operation.*` | per-operation successful request latency, system errors, throttled requests, returned items |
+        | [EBS Stalled I/O](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/ebs_stalled_io.yaml) | `cloudwatch.ebs_stalled_io.*` | per-volume stalled I/O health check; the EBS stalled I/O alert fires only when a rule opts into this profile |
+        | [S3 Request Metrics](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/s3_requests.yaml) | `cloudwatch.s3_requests.*` | requests, request errors, request latency, request data transfer; needs per-bucket request metrics enabled in AWS |
+        | [AWS PrivateLink endpoints by subnet](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/privatelink_endpoint_subnet.yaml) | `cloudwatch.privatelink_endpoint_subnet.*` | the endpoint metrics split by `subnet_id`; one endpoint can produce several chart instances, which inherit the endpoint's tags |
+        | [AWS PrivateLink services by Availability Zone](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/privatelink_service_az.yaml) | `cloudwatch.privatelink_service_az.*` | provider-side traffic split by `availability_zone` and `service_id` |
+        | [AWS PrivateLink services by load balancer](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/privatelink_service_load_balancer.yaml) | `cloudwatch.privatelink_service_load_balancer.*` | provider-side traffic split by `load_balancer_arn` and `service_id` |
+        | [AWS PrivateLink services by Availability Zone and load balancer](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/privatelink_service_az_load_balancer.yaml) | `cloudwatch.privatelink_service_az_load_balancer.*` | provider-side traffic split by `availability_zone`, `load_balancer_arn`, and `service_id` |
+        | [AWS PrivateLink services by VPC endpoint](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/privatelink_service_vpc_endpoint.yaml) | `cloudwatch.privatelink_service_vpc_endpoint.*` | provider-side traffic split by `service_id` and consumer `vpc_endpoint_id`; tags come from the parent endpoint service, never from the consumer endpoint |
+        | [AWS Billing total](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/billing_total.yaml) | `cloudwatch.billing_total.*` | latest worldwide estimated month-to-date charge |
+        | [AWS Billing by service](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/billing_service.yaml) | `cloudwatch.billing_service.*` | estimated charges by `service_name` |
+        | [AWS Billing by linked account](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/billing_linked_account.yaml) | `cloudwatch.billing_linked_account.*` | estimated charges by `linked_account_id`, when the payer account publishes this grain |
+        | [AWS Billing by linked account and service](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/billing_linked_account_service.yaml) | `cloudwatch.billing_linked_account_service.*` | estimated charges by `linked_account_id` and `service_name`, when available |
+
+        :::caution Opt-in profiles can be high-cardinality or metered by AWS
+
+        S3 Request Metrics are billed by AWS at custom-metric rates once enabled on a bucket. The PrivateLink detail grains
+        multiply chart instances by subnets, Availability Zones, load balancers, and consumer endpoints. The Billing
+        service and linked-account grains grow with the payer's services and accounts. Select only the grains you need.
+
+        :::
+
+        A stock profile can also declare opt-in metrics (`disabled: true` on the metric); enable one through
+        `rules[].metrics[].include` without copying the profile. Billing charts show the latest published month-to-date
+        estimate in USD for the whole account; `region=us-east-1` is where AWS publishes them, not where the charge
+        occurred, and around the UTC month boundary the previous month's value stays until AWS publishes the new one.
+      availability: []
+      dynamic_context_prefixes:
+        - prefix: cloudwatch.
+          reason: Service-profile chart contexts are generated at runtime under the cloudwatch namespace; the fixed collector-activity contexts sharing this prefix are listed below.
+      scopes:
+        - name: AWS account, region, and operation
+          description: Collector-issued CloudWatch SDK work attributed to one resolved AWS account, region, and SDK operation.
+          labels:
+            - name: account_id
+              description: Resolved AWS account ID.
+            - name: region
+              description: AWS region where the collector attempted the SDK invocation.
+            - name: operation
+              description: Collector-issued CloudWatch SDK operation (`list_metrics` or `get_metric_data`).
+          metrics:
+            - name: cloudwatch.collector_sdk_invocations
+              description: CloudWatch SDK Invocations
+              unit: invocations
+              chart_type: line
+              dimensions:
+                - name: invocations
+                  description: SDK method invocations attempted during the interval.
+        - name: AWS account and region
+          description: Calculated CloudWatch metric requests attributed to one resolved AWS account and region.
+          labels:
+            - name: account_id
+              description: Resolved AWS account ID.
+            - name: region
+              description: AWS region where the collector submitted the metric requests.
+          metrics:
+            - name: cloudwatch.collector_get_metric_data_calculated_metric_requests
+              description: GetMetricData Calculated Metric Requests
+              unit: metric requests
+              chart_type: line
+              dimensions:
+                - name: calculated_metric_requests
+                  description: Calculated metric requests submitted during the interval.
+        - name: AWS account, region, and profile
+          description: CloudWatch metric-data request estimates and query items attributed to their source profile for cost ranking and collection-plan tuning.
+          labels:
+            - name: account_id
+              description: Resolved AWS account ID.
+            - name: region
+              description: AWS region where the collector submitted the requests.
+            - name: profile
+              description: CloudWatch profile that produced the submitted query items.
+          metrics:
+            - name: cloudwatch.collector_get_metric_data_profile_metric_request_estimates
+              description: GetMetricData Profile Metric Request Estimates
+              unit: metric requests
+              chart_type: line
+              dimensions:
+                - name: estimated_metric_requests
+                  description: Independently estimated metric requests driven by the profile during the interval.
+            - name: cloudwatch.collector_get_metric_data_query_items
+              description: GetMetricData Query Items
+              unit: query items
+              chart_type: line
+              dimensions:
+                - name: query_items
+                  description: Metric-data query items submitted during the interval.

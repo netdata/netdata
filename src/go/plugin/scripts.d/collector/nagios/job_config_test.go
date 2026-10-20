@@ -58,3 +58,31 @@ func TestJobConfigValidate(t *testing.T) {
 		})
 	}
 }
+
+func TestJobConfigNormalizedCheckName(t *testing.T) {
+	tests := map[string]struct {
+		cfg           JobConfig
+		wantCheckName string
+	}{
+		"derives from plugin basename when omitted": {
+			cfg:           JobConfig{Name: "sample", Plugin: "/usr/lib/nagios/plugins/check_ping.pl"},
+			wantCheckName: "check_ping",
+		},
+		"sanitizes explicit check name": {
+			cfg:           JobConfig{Name: "sample", Plugin: "/bin/bash", CheckName: "Database Health Check"},
+			wantCheckName: "database_health_check",
+		},
+		"explicit check name does not strip suffixes as file extensions": {
+			cfg:           JobConfig{Name: "sample", Plugin: "/bin/bash", CheckName: "check_service.ps1"},
+			wantCheckName: "check_service_ps1",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, err := tc.cfg.normalized()
+			assert.NoError(t, err)
+			assert.Equal(t, tc.wantCheckName, got.CheckName)
+		})
+	}
+}
