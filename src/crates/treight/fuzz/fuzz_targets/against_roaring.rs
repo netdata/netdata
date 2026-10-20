@@ -11,7 +11,11 @@
 //
 // Run with `cargo fuzz run against_roaring` from src/crates/treight/fuzz
 // (nightly pinned by src/crates/treight/fuzz/rust-toolchain.toml
-// `channel`). The fuzz workspace pins the same netdata/roaring-rs fork as
+// `channel`); a time-boxed run appends `-- -max_total_time=600`. One-time
+// setup: `rustup toolchain install nightly` and `cargo install cargo-fuzz`.
+// Corpus, crash artifacts and Cargo.lock stay local (fuzz/.gitignore).
+// Ops that leave large sets behind slow every later op in a sequence, so
+// keep op payloads small (see `FromRange`). The fuzz workspace pins the same netdata/roaring-rs fork as
 // the main workspace so both sides test one roaring implementation
 // (src/crates/treight/fuzz/Cargo.toml, the `roaring` dependency); the
 // in-crate proptest twin of this file is
