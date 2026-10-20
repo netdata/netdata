@@ -251,7 +251,7 @@ proptest! {
     /// whose two pieces hold up to 20,000 values together.
     #[test]
     fn bitmap_from_range_matches_reference(
-        universe in prop_oneof![1u32..=4096, 4097u32..=u32::MAX],
+        universe in crate::tests_raw::arb_universe(),
         start_frac in 0.0f64..=1.0,
         len in 0u32..=20_000,
         complement in any::<bool>(),

@@ -204,12 +204,12 @@ fuzz_target!(|input: FuzzInput| {
             Operation::FromRange(Num(a), Num(b)) => {
                 // Replace LHS with a freshly built lo..hi range; later ops
                 // and the closing size check then run on a range-built
-                // blob. The length is capped at 65,536 values so every
+                // blob. The length is capped at 4,096 values so every
                 // iteration stays fast; ranges of millions of values are
                 // pinned by the unit tests (src/crates/treight/src/
                 // tests_raw.rs `test_from_range_bytes_large_universes`).
                 let lo = a % universe;
-                let hi = lo.saturating_add(b % 65_536 + 1).min(universe);
+                let hi = lo.saturating_add(b % 4_096 + 1).min(universe);
                 let mut data = Vec::new();
                 lhs_t = treight::RawBitmap::from_range(lo..hi, universe, &mut data);
                 lhs_d = data;

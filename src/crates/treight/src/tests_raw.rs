@@ -1100,12 +1100,28 @@ pub(crate) fn build_by_insert(universe_size: u32, values: &[u32]) -> Vec<u8> {
     data
 }
 
-/// Strategy for the byte-level builder pins: a universe anywhere up to
-/// `u32::MAX` (tree depths 1-11) and up to 512 ascending values, half
-/// scattered and half clustered around a random base, so leaves are
-/// both shared and lone.
+/// Strategy for a universe at a uniformly drawn tree depth: anywhere in
+/// `(8^(levels-1), 8^levels]` for `levels` in 1-11, capped at `u32::MAX`.
+/// A universe drawn uniformly up to `u32::MAX` would be 10 or 11 levels
+/// deep in almost every case.
+pub(crate) fn arb_universe() -> impl Strategy<Value = u32> {
+    (1u32..=11).prop_flat_map(|levels| {
+        let lo = if levels == 1 {
+            1
+        } else {
+            (1u64 << (3 * (levels - 1))) + 1
+        };
+        let hi = (1u64 << (3 * levels)).min(u32::MAX as u64);
+        (lo as u32)..=(hi as u32)
+    })
+}
+
+/// Strategy for the byte-level builder pins: a universe at any tree depth
+/// (`arb_universe`) and up to 512 ascending values, half scattered and
+/// half clustered around a random base, so leaves are both shared and
+/// lone.
 fn arb_values_any_universe() -> impl Strategy<Value = (u32, Vec<u32>)> {
-    prop_oneof![1u32..=4096, 4097u32..=u32::MAX].prop_flat_map(|universe| {
+    arb_universe().prop_flat_map(|universe| {
         (
             proptest::collection::vec(0..universe, 0..=256usize),
             0..universe,
@@ -1178,7 +1194,7 @@ proptest! {
     /// of up to 20,000 values anywhere in universes of every depth.
     #[test]
     fn from_range_matches_from_sorted_iter(
-        universe in prop_oneof![1u32..=4096, 4097u32..=u32::MAX],
+        universe in arb_universe(),
         start_frac in 0.0f64..=1.0,
         len in 0u32..=20_000,
     ) {
@@ -1294,7 +1310,7 @@ fn test_from_range_bytes_exhaustive() {
 
 // The same pin at large universes and the 11-level u32::MAX tree, whose
 // root spans 8^11 = 2^33 values, past u32; ranges of millions of values
-// cover tall full subtrees (the fuzz target caps its ranges at 65,536).
+// cover tall full subtrees (the fuzz target caps its ranges at 4,096).
 #[test]
 fn test_from_range_bytes_large_universes() {
     let cases: [(u32, u32, u32); 10] = [

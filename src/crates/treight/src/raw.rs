@@ -60,7 +60,7 @@ impl RawBitmap {
     /// tree bytes to `out` and returning the descriptor. The values **must**
     /// arrive in ascending order — a descending one appends a node byte for
     /// an index already emitted and corrupts the pre-order layout — while
-    /// duplicates are tolerated (they re-OR a set bit). Values at or past
+    /// duplicates are tolerated (they are skipped). Values at or past
     /// the universe are not checked either.
     ///
     /// Single pass over the pre-order serialization, one node byte open per
@@ -95,10 +95,11 @@ impl RawBitmap {
                         continue;
                     }
                     let shared = (31 - diff.leading_zeros()) / 3;
-                    // A value past 8^levels shares no node, not even the
-                    // root: it opens a new root, as the per-level loop
-                    // this replaced did (the orphan subtrees roaring.rs
-                    // describes).
+                    // A value in a different 8^levels block than the
+                    // previous one (possible only past the universe)
+                    // shares no node, not even the root: it opens a new
+                    // root, as the per-level loop this replaced did (the
+                    // orphan subtrees roaring.rs describes).
                     if shared >= levels {
                         levels
                     } else {

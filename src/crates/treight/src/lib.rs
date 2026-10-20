@@ -125,8 +125,8 @@ pub fn estimate_data_size(universe_size: u32, sorted_values: impl Iterator<Item 
     };
 
     // The first value opens one node byte per level. Each later value
-    // opens one below the deepest node it shares with the previous one —
-    // the highest 3-bit group where they differ, as in
+    // opens one node byte per level below the deepest node it shares with
+    // the previous one — the highest 3-bit group where they differ, as in
     // `RawBitmap::from_sorted_iter` (raw.rs). The root byte is counted
     // once, so the per-value count is capped at the levels below it.
     let mut total = levels as usize;
