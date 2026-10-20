@@ -1706,3 +1706,40 @@ fn test_range_cardinality_ends_at_child_edges() {
         }
     }
 }
+
+// `iter` yields exactly the stored values in order at every depth 1-11:
+// one value at either end of the universe, strided, clustered and dense
+// sets, so leaves under height-2 nodes and height-2 nodes under taller
+// ones open and close in every position.
+#[test]
+fn test_iter_matches_values_every_depth() {
+    for levels in 1..=11u32 {
+        let top = (1u64 << (3 * levels)).min(u32::MAX as u64) as u32;
+        for universe in [top, top / 2 + 1] {
+            let span = universe.min(1 << 15);
+            for values in [
+                vec![0],
+                vec![universe - 1],
+                (0..span).step_by(7).collect::<Vec<u32>>(),
+                (universe - span..universe).collect::<Vec<u32>>(),
+                (0..span).filter(|v| v % 64 < 3).collect::<Vec<u32>>(),
+            ] {
+                let (bm, data) = make_bitmap(universe, &values);
+                assert!(
+                    bm.iter(&data).eq(values.iter().copied()),
+                    "universe={universe}"
+                );
+            }
+        }
+    }
+}
+
+proptest! {
+    /// The same over generated sets at every tree depth.
+    #[test]
+    fn iter_matches_values((universe, vals) in arb_values_any_universe()) {
+        let mut data = Vec::new();
+        let bm = RawBitmap::from_sorted_iter(vals.iter().copied(), universe, &mut data);
+        prop_assert!(bm.iter(&data).eq(vals.iter().copied()));
+    }
+}

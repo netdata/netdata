@@ -225,23 +225,21 @@ impl RawBitmap {
 
         let mut iter = Iter::empty();
         iter.data = data;
+        iter.pos = 1;
 
-        let levels = self.levels();
-        let child_level = levels - 1;
-        if child_level == 0 {
-            iter.leaf_bits = data[0];
-            iter.pos = 1;
-        } else {
-            let root = data[0];
-            iter.pos = 1;
-            iter.stack[0] = IterFrame {
-                node_bits: root,
-                next_child: 0,
-                base: 0,
-                child_level,
-            };
-            iter.stack_len = 1;
-            iter.advance_to_next_leaf();
+        // The root goes where its height says: a leaf, a height-2 node, or
+        // the first stack frame.
+        match self.levels() {
+            1 => iter.leaf_bits = data[0],
+            2 => iter.l2_children = data[0],
+            levels => {
+                iter.stack[0] = IterFrame {
+                    children: data[0],
+                    base: 0,
+                    child_level: levels - 1,
+                };
+                iter.stack_len = 1;
+            }
         }
 
         iter
@@ -677,33 +675,39 @@ impl RawBitmap {
 }
 
 /// Iterator over a `RawBitmap`'s set values in ascending order, built by
-/// `RawBitmap::iter`. A stack-based left-to-right DFS over the stored
-/// tree: leaf bytes are consumed bit by bit in place, so cost tracks the
-/// tree nodes visited, never the universe size, and nothing is
-/// materialized.
+/// `RawBitmap::iter`. A left-to-right DFS over the stored tree: leaf bytes
+/// are consumed bit by bit in place, so cost tracks the tree nodes
+/// visited, never the universe size, and nothing is materialized. Only
+/// nodes of height 3 and above sit on the stack; the current height-2
+/// node is held in two fields, so moving to the next leaf is a bit scan
+/// and one byte load with no stack push or pop.
 pub struct Iter<'a> {
     /// The tree bytes being walked; empty for the do-nothing iterator.
     data: &'a [u8],
     /// Position of the next unread node byte in `data`.
     pos: usize,
-    /// One frame per open node on the descent path, root first; at most
-    /// `levels - 1` deep (10 for a u32 universe), which is the array's size.
+    /// One frame per open node of height >= 3, root first; at most
+    /// `levels - 2` deep (9 for a u32 universe), within the array's size.
     stack: [IterFrame; 10],
     /// Frames in use.
     stack_len: usize,
+    /// Unvisited children of the current height-2 node; their leaf bytes
+    /// are the next bytes in `data`, in order.
+    l2_children: u8,
+    /// Base value of the current height-2 node.
+    l2_base: u32,
     /// Remaining set bits in the current leaf byte.
     leaf_bits: u8,
     /// Base value for the current leaf (value = leaf_base + bit index).
     leaf_base: u32,
 }
 
-/// One open node on the DFS stack: its node byte, the next child index to
-/// scan, the base value of its subtree, and the height (in node bytes) of
+/// One open node of height >= 3 on the DFS stack: its unvisited child
+/// bits, the base value of its subtree, and the height (in node bytes) of
 /// its children's subtrees.
 #[derive(Default, Clone, Copy)]
 struct IterFrame {
-    node_bits: u8,
-    next_child: u8,
+    children: u8,
     base: u32,
     child_level: u32,
 }
@@ -717,52 +721,43 @@ impl<'a> Iter<'a> {
             pos: 0,
             stack: [IterFrame::default(); 10],
             stack_len: 0,
+            l2_children: 0,
+            l2_base: 0,
             leaf_bits: 0,
             leaf_base: 0,
         }
     }
 
-    /// Consume the next leaf byte: pop exhausted frames, scan each frame's
-    /// node byte for its next set child (trailing-zeros skip), descend
-    /// inner children by pushing a frame, and stop at the first leaf, whose
-    /// bits move to `leaf_bits`. `false` when the tree is exhausted.
-    fn advance_to_next_leaf(&mut self) -> bool {
+    /// Open the next height-2 node: pop exhausted frames, take each frame's
+    /// lowest unvisited child, push it while it is taller than 2, and stop
+    /// at the first height-2 node, whose children move to `l2_children`.
+    /// `false` when the tree is exhausted.
+    fn advance_to_next_l2(&mut self) -> bool {
         while self.stack_len > 0 {
             let frame = &mut self.stack[self.stack_len - 1];
-
-            if frame.next_child >= 8 {
-                self.stack_len -= 1;
-                continue;
-            }
-            let remaining = frame.node_bits >> frame.next_child;
-            if remaining == 0 {
+            if frame.children == 0 {
                 self.stack_len -= 1;
                 continue;
             }
 
-            let skip = remaining.trailing_zeros() as u8;
-            let child = frame.next_child + skip;
-            frame.next_child = child + 1;
-
-            let new_base = frame.base + child_offset(frame.child_level, child);
+            let child = frame.children.trailing_zeros() as u8;
+            frame.children &= frame.children - 1;
+            let base = frame.base + child_offset(frame.child_level, child);
             let child_level = frame.child_level;
 
-            if child_level == 1 {
-                self.leaf_bits = self.data[self.pos];
-                self.pos += 1;
-                self.leaf_base = new_base;
+            let node = self.data[self.pos];
+            self.pos += 1;
+            if child_level == 2 {
+                self.l2_children = node;
+                self.l2_base = base;
                 return true;
-            } else {
-                let node_byte = self.data[self.pos];
-                self.pos += 1;
-                self.stack[self.stack_len] = IterFrame {
-                    node_bits: node_byte,
-                    next_child: 0,
-                    base: new_base,
-                    child_level: child_level - 1,
-                };
-                self.stack_len += 1;
             }
+            self.stack[self.stack_len] = IterFrame {
+                children: node,
+                base,
+                child_level: child_level - 1,
+            };
+            self.stack_len += 1;
         }
         false
     }
@@ -772,7 +767,9 @@ impl Iterator for Iter<'_> {
     type Item = u32;
 
     /// Pop the lowest set bit of the current leaf byte (`leaf_base` plus
-    /// its index), refilling from the DFS when the byte is exhausted.
+    /// its index); when it is exhausted, load the current height-2 node's
+    /// next leaf, and when that node is exhausted, open the next one.
+    #[inline]
     fn next(&mut self) -> Option<u32> {
         loop {
             if self.leaf_bits != 0 {
@@ -780,7 +777,15 @@ impl Iterator for Iter<'_> {
                 self.leaf_bits &= self.leaf_bits - 1;
                 return Some(self.leaf_base + bit);
             }
-            if !self.advance_to_next_leaf() {
+            if self.l2_children != 0 {
+                let child = self.l2_children.trailing_zeros() as u8;
+                self.l2_children &= self.l2_children - 1;
+                self.leaf_bits = self.data[self.pos];
+                self.pos += 1;
+                self.leaf_base = self.l2_base + child_offset(1, child);
+                continue;
+            }
+            if !self.advance_to_next_l2() {
                 return None;
             }
         }
