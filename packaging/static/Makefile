@@ -315,7 +315,7 @@ $(OPENSSL_DIR):
 	rm -rf $(TARGET_WORKDIR)/openssl
 	if [ -d $(OPENSSL_CACHE_PATH)/openssl ]; then \
 		echo "Found cached copy of build directory for openssl, using it." ; \
-		cp -a $(OPENSSL_CACHE_PATH)/openssl $(TARGET_WORKDIR) ; \
+		cp -a --reflink=auto $(OPENSSL_CACHE_PATH)/openssl $(TARGET_WORKDIR) ; \
 		touch $(OPENSSL_CACHE_HIT) ; \
 	else \
 		rm -f $(OPENSSL_CACHE_HIT) ; \
@@ -371,7 +371,7 @@ $(OPENSSL_STAGING): $(OPENSSL_BUILD)
 	if [ ! -f $(OPENSSL_CACHE_HIT) ]; then \
 		rm -rf $(OPENSSL_CACHE_PATH) ; \
 		mkdir -p $(OPENSSL_CACHE_PATH) ; \
-		cp -a $(TARGET_WORKDIR)/openssl $(OPENSSL_CACHE_PATH) ; \
+		cp -a --reflink=auto $(TARGET_WORKDIR)/openssl $(OPENSSL_CACHE_PATH) ; \
 	fi
 	touch $@
 
@@ -384,7 +384,7 @@ $(LIBNFACCT_DIR):
 	rm -rf $(TARGET_WORKDIR)/libnfacct
 	if [ -d $(LIBNFACCT_CACHE_PATH)/libnetfilter_acct ]; then \
 		echo "Found cached copy of build directory for libnetfilter_acct, using it." ; \
-		cp -a $(LIBNFACCT_CACHE_PATH)/libnetfilter_acct $(TARGET_WORKDIR) ; \
+		cp -a --reflink=auto $(LIBNFACCT_CACHE_PATH)/libnetfilter_acct $(TARGET_WORKDIR) ; \
 		touch $(LIBNFACCT_CACHE_HIT) ; \
 	else \
 		rm -f $(LIBNFACCT_CACHE_HIT) ; \
@@ -455,7 +455,7 @@ $(LIBNFACCT_STAGING): $(TARGET_PREP) $(LIBNFACCT_BUILD)
 	if [ ! -f $(LIBNFACCT_CACHE_HIT) ]; then \
 		rm -rf $(LIBNFACCT_CACHE_PATH) ; \
 		mkdir -p $(LIBNFACCT_CACHE_PATH) ; \
-		cp -a $(TARGET_WORKDIR)/libnetfilter_acct $(LIBNFACCT_CACHE_PATH) ; \
+		cp -a --reflink=auto $(TARGET_WORKDIR)/libnetfilter_acct $(LIBNFACCT_CACHE_PATH) ; \
 	fi
 	touch $@
 
@@ -468,7 +468,7 @@ $(CURL_DIR):
 	rm -rf $(TARGET_WORKDIR)/curl
 	if [ -d $(CURL_CACHE_PATH)/curl ]; then \
 		echo "Found cached copy of build directory for curl, using it." ; \
-		cp -a $(CURL_CACHE_PATH)/curl $(TARGET_WORKDIR) ; \
+		cp -a --reflink=auto $(CURL_CACHE_PATH)/curl $(TARGET_WORKDIR) ; \
 		touch $(CURL_CACHE_HIT) ; \
 	else \
 		rm -f $(CURL_CACHE_HIT) ; \
@@ -559,14 +559,14 @@ $(CURL_STAGING): $(TARGET_PREP) $(CURL_BUILD)
 	if [ ! -f $(CURL_CACHE_HIT) ]; then \
 		rm -rf $(CURL_CACHE_PATH) ; \
 		mkdir -p $(CURL_CACHE_PATH) ; \
-		cp -a $(TARGET_WORKDIR)/curl $(CURL_CACHE_PATH) ; \
+		cp -a --reflink=auto $(TARGET_WORKDIR)/curl $(CURL_CACHE_PATH) ; \
 	fi
 	touch $@
 
 $(TARGET_INSTALL)/bin/curl: $(TARGET_PREP) $(CURL_STAGING)
 	mkdir -p $(TARGET_INSTALL)/bin
 	$(DOCKER) run $(DOCKER_ARGS) $(BUILDER) \
-		cp -a $(DOCKER_STAGING)/curl/bin/curl $(DOCKER_INSTALL)/bin/curl
+		cp -a --reflink=auto $(DOCKER_STAGING)/curl/bin/curl $(DOCKER_INSTALL)/bin/curl
 
 curl: $(TARGET_INSTALL)/bin/curl
 
@@ -577,7 +577,7 @@ $(BASH_DIR):
 	rm -rf $(TARGET_WORKDIR)/bash
 	if [ -d $(BASH_CACHE_PATH)/bash ]; then \
 		echo "Found cached copy of build directory for bash, using it." ; \
-		cp -a $(BASH_CACHE_PATH)/bash $(TARGET_WORKDIR) ; \
+		cp -a --reflink=auto $(BASH_CACHE_PATH)/bash $(TARGET_WORKDIR) ; \
 		touch $(BASH_CACHE_HIT) ; \
 	else \
 		rm -f $(BASH_CACHE_HIT) ; \
@@ -657,7 +657,7 @@ $(TARGET_INSTALL)/bin/bash: $(TARGET_PREP) $(BASH_BUILD)
 	if [ ! -f $(BASH_CACHE_HIT) ]; then \
 		rm -rf $(BASH_CACHE_PATH) ; \
 		mkdir -p $(BASH_CACHE_PATH) ; \
-		cp -a $(TARGET_WORKDIR)/bash $(BASH_CACHE_PATH) ; \
+		cp -a --reflink=auto $(TARGET_WORKDIR)/bash $(BASH_CACHE_PATH) ; \
 	fi
 
 bash: $(TARGET_INSTALL)/bin/bash
@@ -669,7 +669,7 @@ $(IOPING_DIR):
 	rm -rf $(TARGET_WORKDIR)/ioping
 	if [ -d $(IOPING_CACHE_PATH)/ioping ]; then \
 		echo "Found cached copy of build directory for ioping, using it." ; \
-		cp -a $(IOPING_CACHE_PATH)/ioping $(TARGET_WORKDIR) ; \
+		cp -a --reflink=auto $(IOPING_CACHE_PATH)/ioping $(TARGET_WORKDIR) ; \
 		touch $(IOPING_CACHE_HIT) ; \
 	else \
 		rm -f $(IOPING_CACHE_HIT) ; \
@@ -705,7 +705,7 @@ $(TARGET_INSTALL)/usr/libexec/netdata/plugins.d/ioping: $(TARGET_PREP) $(IOPING_
 	if [ ! -f $(IOPING_CACHE_HIT) ]; then \
 		rm -rf $(IOPING_CACHE_PATH) ; \
 		mkdir -p $(IOPING_CACHE_PATH) ; \
-		cp -a $(TARGET_WORKDIR)/ioping $(IOPING_CACHE_PATH) ; \
+		cp -a --reflink=auto $(TARGET_WORKDIR)/ioping $(IOPING_CACHE_PATH) ; \
 	fi
 
 ioping: $(TARGET_INSTALL)/usr/libexec/netdata/plugins.d/ioping
@@ -765,7 +765,7 @@ $(NETDATA_INSTALL): $(NETDATA_BUILD)
 		$(BUILDER) \
 		/bin/sh $(NETDATA_SOURCE_DIR)/packaging/static/scripts/install-staging-tree.sh $(NETDATA_BUILD_DIR) /$(NETDATA_PREFIX) $(DOCKER_INSTALL)
 	mv $(TARGET_INSTALL)/bin/netdata $(TARGET_INSTALL)/bin/srv/netdata
-	cp -a $(MAKEFILE_DIR)/wrapper.sh $(TARGET_INSTALL)/bin/netdata
+	cp -a --reflink=auto $(MAKEFILE_DIR)/wrapper.sh $(TARGET_INSTALL)/bin/netdata
 	rm -f $(TARGET_INSTALL)/etc/.install-type
 	rm -f $(TARGET_INSTALL)/etc/netdata/netdata.conf
 	touch $@
@@ -803,7 +803,7 @@ $(TARGET_STAMPS)/ca-certs.stamp: $(NETDATA_INSTALL)
 	rm -f $@ $(DOCKER_INSTALL)/usr/share/ssl
 	$(DOCKER) run $(DOCKER_ARGS) \
 		$(BUILDER) \
-		cp -a /etc/ssl $(DOCKER_INSTALL)/usr/share/ssl
+		cp -a --reflink=auto /etc/ssl $(DOCKER_INSTALL)/usr/share/ssl
 	touch $@
 
 $(TARGET_INSTALL)/var/cache/netdata/.keep:
@@ -820,15 +820,15 @@ $(TARGET_INSTALL)/var/log/netdata/.keep:
 
 $(TARGET_INSTALL)/system/functions.sh: $(SRCDIR)/packaging/installer/functions.sh
 	mkdir -p $(TARGET_INSTALL)/system
-	cp -a $< $@
+	cp -a --reflink=auto $< $@
 
 $(TARGET_INSTALL)/system/post-installer.sh: $(SRCDIR)/packaging/static/installer/post-installer.sh
 	mkdir -p $(TARGET_INSTALL)/system
-	cp -a $< $@
+	cp -a --reflink=auto $< $@
 
 $(TARGET_INSTALL)/system/install-or-update.sh: $(SRCDIR)/packaging/static/installer/install-or-update.sh
 	mkdir -p $(TARGET_INSTALL)/system
-	cp -a $< $@
+	cp -a --reflink=auto $< $@
 
 makeself.lsm: makeself.lsm.in
 	sed -e 's|NETDATA_VERSION|$(VERSION)|' < $< > $@
@@ -854,7 +854,7 @@ archives/netdata-$(BUILDARCH)-$(VERSION).gz.run: archive-prep
 		./system/post-installer.sh
 
 archives/netdata-$(BUILDARCH)-latest.gz.run: archives/netdata-$(BUILDARCH)-$(VERSION).gz.run
-	cp -a $< $@
+	cp -a --reflink=auto $< $@
 
 archive-gz: archives/netdata-$(BUILDARCH)-latest.gz.run
 
@@ -877,6 +877,6 @@ archives/netdata-$(BUILDARCH)-$(VERSION).zstd.run: archive-prep
 		./system/post-installer.sh
 
 archives/netdata-$(BUILDARCH)-latest.zstd.run: archives/netdata-$(BUILDARCH)-$(VERSION).zstd.run
-	cp -a $< $@
+	cp -a --reflink=auto $< $@
 
 archive-zstd: archives/netdata-$(BUILDARCH)-latest.zstd.run
