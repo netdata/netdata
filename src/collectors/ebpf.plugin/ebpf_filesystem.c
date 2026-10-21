@@ -161,6 +161,8 @@ ebpf_local_maps_t btrfs_maps[] = {
 
 static netdata_syscall_stat_t filesystem_aggregated_data[NETDATA_EBPF_HIST_MAX_BINS];
 static netdata_publish_syscall_t filesystem_publish_aggregated[NETDATA_EBPF_HIST_MAX_BINS];
+static bool filesystem_stats_legacy;
+static bool filesystem_stats_started;
 
 char **dimensions = NULL;
 static netdata_idx_t *filesystem_hash_values = NULL;
@@ -693,6 +695,18 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
         efp->flags &= ~NETDATA_FILESYSTEM_LOAD_EBPF_PROGRAM;
     }
     em->info.thread_name = saved_name;
+    if (!filesystem_stats_legacy) {
+        for (i = 0; localfs[i].filesystem; i++) {
+            if (localfs[i].probe_links) {
+                filesystem_stats_legacy = true;
+                if (filesystem_stats_started && (em->load & EBPF_LOAD_CORE) && !(em->load & EBPF_LOAD_LEGACY)) {
+                    plugin_statistics.core--;
+                    plugin_statistics.legacy++;
+                }
+                break;
+            }
+        }
+    }
     netdata_mutex_unlock(&lock);
     em->kernels = kernels;
     em->rhel10_kernels = rhel10_kernels;
@@ -1133,6 +1147,8 @@ static void ebpf_set_maps(void)
 void ebpf_filesystem_thread(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    filesystem_stats_legacy = false;
+    filesystem_stats_started = false;
 
     CLEANUP_FUNCTION_REGISTER(ebpf_filesystem_exit) cleanup_ptr = em;
 
@@ -1169,17 +1185,19 @@ void ebpf_filesystem_thread(void *ptr)
     netdata_mutex_lock(&lock);
     ebpf_create_fs_charts(em->update_every);
     ebpf_module_t stats_em = *em;
-    for (int i = 0; localfs[i].filesystem; i++) {
-        if (localfs[i].probe_links) {
-            stats_em.load |= EBPF_LOAD_LEGACY;
-            break;
-        }
-    }
+    if (filesystem_stats_legacy)
+        stats_em.load |= EBPF_LOAD_LEGACY;
     ebpf_update_stats(&plugin_statistics, &stats_em);
+    filesystem_stats_started = true;
     netdata_mutex_unlock(&lock);
 
     filesystem_collector(em);
 
-endfilesystem:
-    ebpf_update_disabled_plugin_stats(em);
+endfilesystem: {
+    ebpf_module_t exit_stats_em = *em;
+    if (filesystem_stats_legacy)
+        exit_stats_em.load |= EBPF_LOAD_LEGACY;
+    ebpf_update_disabled_plugin_stats(&exit_stats_em);
+    filesystem_stats_started = false;
+}
 }

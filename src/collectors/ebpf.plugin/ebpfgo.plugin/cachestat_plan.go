@@ -19,24 +19,25 @@ const cachestatDefaultBTFFile = "vmlinux"
 const cachestatMaxBaseSelector = 9 // 5.16
 
 type CachestatLegacyConfig struct {
-	PluginsDir      string
-	Kernels         uint32
-	IsRHF           int
-	KernelVersion   uint32
-	IsDebian        bool
-	HasBTF          bool
-	ConfigFound     bool
-	Enabled         bool
-	AppsEnabled     bool
-	CgroupsEnabled  bool
-	BTFPath         string
-	UpdateEvery     int
-	PidTableSize    uint32
-	MapsPerCore     bool
-	ObjectFlavor    string
-	AccountFunction string
-	AppsLevel       int // BPF apps collection level: 0=real parent, 1=parent, 2=all
-	Targets         CachestatTargets
+	PluginsDir          string
+	Kernels             uint32
+	IsRHF               int
+	KernelVersion       uint32
+	IsDebian            bool
+	HasBTF              bool
+	ConfigFound         bool
+	Enabled             bool
+	AppsEnabled         bool
+	CgroupsEnabled      bool
+	BTFPath             string
+	UpdateEvery         int
+	PidTableSize        uint32
+	MapsPerCore         bool
+	ObjectFlavor        string
+	AccountFunction     string
+	AppsLevel           int // BPF apps collection level: 0=real parent, 1=parent, 2=all
+	Targets             CachestatTargets
+	TargetResolutionErr error
 }
 
 type CachestatLegacyHandle struct {
@@ -152,10 +153,10 @@ func resolveCachestatLegacyConfig() (CachestatLegacyConfig, error) {
 func resolveOptionalCachestatTargets(cfg *CachestatLegacyConfig, resolve func() (CachestatTargets, error)) {
 	targets, err := resolve()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "ebpf-go.plugin: cachestat disabled: %v\n", err)
-		cfg.Enabled = false
+		cfg.TargetResolutionErr = fmt.Errorf("resolve cachestat targets: %w", err)
 		return
 	}
+	cfg.TargetResolutionErr = nil
 	cfg.Targets = targets
 	cfg.AccountFunction = targets.AccountPageDirtied.Name
 }

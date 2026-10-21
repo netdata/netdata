@@ -5,13 +5,20 @@ import (
 	"testing"
 )
 
-func TestCachestatTargetResolutionFailureDisablesOnlyCachestat(t *testing.T) {
+func TestCachestatTargetResolutionFailureRemainsALoadFailure(t *testing.T) {
 	cfg := CachestatLegacyConfig{Enabled: true}
+	targetErr := errors.New("kallsyms unavailable")
 	resolveOptionalCachestatTargets(&cfg, func() (CachestatTargets, error) {
-		return CachestatTargets{}, errors.New("kallsyms unavailable")
+		return CachestatTargets{}, targetErr
 	})
-	if cfg.Enabled {
-		t.Fatal("cachestat remained enabled after target resolution failed")
+	if !cfg.Enabled || !anyProgramEnabled(cfg, DCStatLegacyConfig{}, FDLegacyConfig{}, SocketLegacyConfig{}, DNSLegacyConfig{}) {
+		t.Fatal("target lookup failure was mistaken for disabled configuration")
+	}
+	if !errors.Is(cfg.TargetResolutionErr, targetErr) {
+		t.Fatalf("target resolution error = %v, want %v", cfg.TargetResolutionErr, targetErr)
+	}
+	if _, err := LoadCachestatLegacy(cfg); !errors.Is(err, targetErr) {
+		t.Fatalf("LoadCachestatLegacy() error = %v, want %v", err, targetErr)
 	}
 }
 

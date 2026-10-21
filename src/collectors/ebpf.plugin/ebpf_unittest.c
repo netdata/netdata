@@ -49,13 +49,15 @@ static uint32_t ebpf_ut_map_value_size(const struct bpf_map *map)
         }                                                                                                              \
     } while (0)
 
+_Static_assert(NETDATA_V5_16 == (1u << NETDATA_IDX_V5_16), "5.16 selector mismatch");
+_Static_assert(NETDATA_V5_17 == (1u << NETDATA_IDX_V5_17), "5.17 selector mismatch");
+_Static_assert(NETDATA_V6_8 == (1u << NETDATA_IDX_V6_8), "6.8 selector mismatch");
+_Static_assert(NETDATA_V6_12 == (1u << NETDATA_IDX_V6_12), "6.12 selector mismatch");
+_Static_assert(NETDATA_V7_0 == (1u << NETDATA_IDX_V7_0), "7.0 selector mismatch");
+_Static_assert(NETDATA_V6_16_2 == (1u << NETDATA_IDX_V6_16_2), "6.16.2 selector mismatch");
+
 static int test_disk_kernel_variants(void)
 {
-    if (NETDATA_V5_16 != (1u << NETDATA_IDX_V5_16) || NETDATA_V5_17 != (1u << NETDATA_IDX_V5_17) ||
-        NETDATA_V6_8 != (1u << NETDATA_IDX_V6_8) || NETDATA_V6_12 != (1u << NETDATA_IDX_V6_12) ||
-        NETDATA_V7_0 != (1u << NETDATA_IDX_V7_0) || NETDATA_V6_16_2 != (1u << NETDATA_IDX_V6_16_2))
-        return 0;
-
     for (size_t i = 0; ebpf_modules[i].info.thread_name; i++) {
         if (!strcmp(ebpf_modules[i].info.thread_name, "disk")) {
             const uint32_t expected = NETDATA_V5_11 | NETDATA_V5_16 | NETDATA_V5_17 | NETDATA_V6_8 | NETDATA_V6_12;

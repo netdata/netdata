@@ -224,7 +224,7 @@ int ebpf_parse_redhat_release_from_os_release(const char *contents)
         const char *line_end = memchr(line, '\n', (size_t)(contents_end - line));
         size_t length = line_end ? (size_t)(line_end - line) : (size_t)(contents_end - line);
         const char *value = NULL;
-        size_t value_length = 0;
+        size_t value_length;
         if (length >= 3 && !memcmp(line, "ID=", 3)) {
             value = line + 3;
             value_length = length - 3;
@@ -366,9 +366,9 @@ static int ebpf_confirm_redhat_kernel_lineage(int rhf)
 
 int get_redhat_release()
 {
-    char buffer[VERSION_STRING_LEN + 1];
     FILE *fp = fopen("/etc/redhat-release", "r");
     if (fp) {
+        char buffer[VERSION_STRING_LEN + 1];
         size_t length = fread(buffer, sizeof(char), VERSION_STRING_LEN, fp);
         fclose(fp);
         if (length) {
@@ -1100,6 +1100,8 @@ static ebpf_specify_name_t *ebpf_find_names(ebpf_specify_name_t *names, const ch
     return NULL;
 }
 
+static char *ebpf_find_symbol_matching(const char *search, bool exact, bool log_open_error);
+
 static bool ebpf_optional_legacy_target(const char *section_name)
 {
     static const char *const optional_targets[] = {
@@ -1117,27 +1119,11 @@ static bool ebpf_optional_legacy_target(const char *section_name)
 
     for (size_t i = 0; optional_targets[i]; i++) {
         if (!strcmp(target, optional_targets[i])) {
-            char filename[FILENAME_MAX + 1];
-            snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, NETDATA_KALLSYMS);
-            procfile *ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
-            if (!ff)
-                return true; // Unknown symbol availability keeps this compatibility probe optional.
-
-            ff = procfile_readall(ff);
-            if (!ff)
-                return true;
-
-            bool found = false;
-            unsigned long lines = procfile_lines(ff);
-            for (unsigned long line = 0; line < lines; line++) {
-                char *symbol = procfile_lineword(ff, line, 2);
-                if (symbol && !strcmp(symbol, target)) {
-                    found = true;
-                    break;
-                }
-            }
-            procfile_close(ff);
-            return !found;
+            char *found = ebpf_find_symbol_matching(target, true, false);
+            bool matched = found != NULL;
+            if (found)
+                freez(found);
+            return !matched; // Unknown symbol availability keeps this compatibility probe optional.
         }
     }
 
@@ -1372,34 +1358,39 @@ int ebpf_load_legacy_fallback(ebpf_module_t *em, int kver, int is_rhf)
     return 0;
 }
 
-char *ebpf_find_symbol(char *search)
+static char *ebpf_find_symbol_matching(const char *search, bool exact, bool log_open_error)
 {
     char filename[FILENAME_MAX + 1];
     char *ret = NULL;
     snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, NETDATA_KALLSYMS);
     procfile *ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
-    if (unlikely(!ff)) {
-        netdata_log_error("Cannot open %s%s", netdata_configured_host_prefix, NETDATA_KALLSYMS);
-        return ret;
+    if (!ff) {
+        if (log_open_error)
+            netdata_log_error("Cannot open %s%s", netdata_configured_host_prefix, NETDATA_KALLSYMS);
+        return NULL;
     }
 
     ff = procfile_readall(ff);
-    if (unlikely(!ff))
-        return ret;
+    if (!ff)
+        return NULL;
 
-    unsigned long i, lines = procfile_lines(ff);
     size_t length = strlen(search);
-    for (i = 0; i < lines; i++) {
-        char *cmp = procfile_lineword(ff, i, 2);
-        if (!strncmp(search, cmp, length)) {
-            ret = strdupz(cmp);
+    unsigned long lines = procfile_lines(ff);
+    for (unsigned long i = 0; i < lines; i++) {
+        char *symbol = procfile_lineword(ff, i, 2);
+        if (symbol && (exact ? !strcmp(search, symbol) : !strncmp(search, symbol, length))) {
+            ret = strdupz(symbol);
             break;
         }
     }
 
     procfile_close(ff);
-
     return ret;
+}
+
+char *ebpf_find_symbol(char *search)
+{
+    return ebpf_find_symbol_matching(search, false, true);
 }
 
 void ebpf_update_names(ebpf_specify_name_t *opt, ebpf_module_t *em)

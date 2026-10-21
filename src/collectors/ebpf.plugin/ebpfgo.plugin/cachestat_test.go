@@ -147,7 +147,7 @@ func TestCachestat6162PlansUseShippedFlavors(t *testing.T) {
 	}
 }
 
-func TestCachestatLegacyLoadFallsBackAcrossFlavors(t *testing.T) {
+func TestCachestatFallbackPlanOrderAcrossFlavors(t *testing.T) {
 	cfg := CachestatLegacyConfig{
 		PluginsDir:    defaultPluginsDir(),
 		Kernels:       cachestatKernelMask,

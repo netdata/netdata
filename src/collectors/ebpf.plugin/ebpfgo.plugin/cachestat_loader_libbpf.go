@@ -63,6 +63,9 @@ func tryLoadCachestatPlan(cfg CachestatLegacyConfig, plan LoadPlan) (*CachestatL
 }
 
 func LoadCachestatLegacy(cfg CachestatLegacyConfig) (*CachestatLegacyHandle, error) {
+	if cfg.TargetResolutionErr != nil {
+		return nil, cfg.TargetResolutionErr
+	}
 	versionStr, err := KernelVersionString()
 	if err != nil {
 		return nil, fmt.Errorf("kernel version string: %w", err)
