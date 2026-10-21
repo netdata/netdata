@@ -681,8 +681,9 @@ pub struct ExploreHistogramWire {
     /// The stack key, echoed.
     pub stack: String,
     /// Its values with the most spans, most first (at most
-    /// `sfsq::traces::STACK_DIMENSIONS_MAX`); each cut to
-    /// [`REQUEST_TEXT_MAX_BYTES`].
+    /// `sfsq::traces::STACK_DIMENSIONS_MAX`), each whole and sendable
+    /// back as a chip value: a value longer than
+    /// [`REQUEST_TEXT_MAX_BYTES`] counts under `other` instead.
     pub dimensions: Vec<String>,
     /// One per bucket, in time order.
     pub buckets: Vec<ExploreBucketWire>,
@@ -705,8 +706,9 @@ pub struct ExploreBucketWire {
     /// Spans per dimension, index-parallel to `dimensions`. A span with
     /// several values of the key counts under each.
     pub counts: Vec<u64>,
-    /// Spans with another value, or from a file where the key has too
-    /// many values to stack (then the status says `stack_field_high_card`).
+    /// Spans with another value (one past the named ones, or one too long
+    /// to name), or from a file where the key has too many values to stack
+    /// (then the status says `stack_field_high_card`).
     pub other: u64,
     /// Spans without the key.
     pub unset: u64,
@@ -747,6 +749,10 @@ pub struct ExploreSpanWire {
     /// key repeats for each of several values and is left out when the
     /// span lacks it. Values are cut to the list's display length.
     pub fields: Vec<(String, String)>,
+    /// Present (`true`) only when a value in `fields` was cut: an equality
+    /// condition does not match a cut value.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub truncated: bool,
 }
 
 /// Suggestions, best first: match class, then bytes. Bounded by

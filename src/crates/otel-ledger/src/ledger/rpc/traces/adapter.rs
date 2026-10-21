@@ -1248,34 +1248,53 @@ pub(crate) fn to_explore_result(
             .iter()
             .all(|reason| *reason == sfsq::traces::PartialReason::StackFieldHighCard),
     };
-    let histogram = data.histogram.map(|h| ExploreHistogramWire {
-        stack: request.stack.clone().unwrap_or_default(),
-        dimensions: h
+    let histogram = data.histogram.map(|h| {
+        // A value longer than a request may carry could not come back as
+        // an equality chip, and two cut ones could share a name: it counts
+        // under `other`.
+        let named: Vec<bool> = h
             .dimensions
-            .into_iter()
-            .map(|mut d| {
-                truncate_value(&mut d, REQUEST_TEXT_MAX_BYTES);
-                d
-            })
-            .collect(),
-        buckets: h
-            .buckets
-            .into_iter()
-            .map(|b| ExploreBucketWire {
-                counts: b.counts,
-                other: b.other,
-                unset: b.unset,
-                durations: b.durations.to_vec(),
-            })
-            .collect(),
-        total: h.total,
-        errors: h.errors,
-        percentiles: h.percentiles.map(|p| ExplorePercentilesWire {
-            p50_ns: p.p50,
-            p95_ns: p.p95,
-            p99_ns: p.p99,
-        }),
-        duration_rows: heatmap_row_bounds().to_vec(),
+            .iter()
+            .map(|d| d.len() <= REQUEST_TEXT_MAX_BYTES)
+            .collect();
+        ExploreHistogramWire {
+            stack: request.stack.clone().unwrap_or_default(),
+            dimensions: h
+                .dimensions
+                .into_iter()
+                .zip(&named)
+                .filter_map(|(d, &named)| named.then_some(d))
+                .collect(),
+            buckets: h
+                .buckets
+                .into_iter()
+                .map(|b| {
+                    let mut counts = Vec::with_capacity(b.counts.len());
+                    let mut other = b.other;
+                    for (count, &named) in b.counts.into_iter().zip(&named) {
+                        if named {
+                            counts.push(count);
+                        } else {
+                            other += count;
+                        }
+                    }
+                    ExploreBucketWire {
+                        counts,
+                        other,
+                        unset: b.unset,
+                        durations: b.durations.to_vec(),
+                    }
+                })
+                .collect(),
+            total: h.total,
+            errors: h.errors,
+            percentiles: h.percentiles.map(|p| ExplorePercentilesWire {
+                p50_ns: p.p50,
+                p95_ns: p.p95,
+                p99_ns: p.p99,
+            }),
+            duration_rows: heatmap_row_bounds().to_vec(),
+        }
     });
     let rows = data.rows.map(|rows| {
         let anchor = match rows.items.last() {
@@ -1293,9 +1312,10 @@ pub(crate) fn to_explore_result(
             .into_iter()
             .map(|item| {
                 let mut fields = Vec::new();
+                let mut truncated = false;
                 for (key, values) in request.columns.iter().zip(item.columns) {
                     for mut value in values {
-                        truncate_value(&mut value, LIST_VALUE_MAX_BYTES);
+                        truncated |= truncate_value(&mut value, LIST_VALUE_MAX_BYTES);
                         fields.push((key.clone(), value));
                     }
                 }
@@ -1305,6 +1325,7 @@ pub(crate) fn to_explore_result(
                     trace_id: item.key.trace_id.to_string(),
                     span_id: item.key.span_id.to_string(),
                     fields,
+                    truncated,
                 }
             })
             .collect();

@@ -1753,3 +1753,74 @@ fn an_explore_walk_continues_only_from_complete_rows() {
         );
     }
 }
+
+#[test]
+fn an_explore_stack_value_too_long_to_send_back_counts_as_other() {
+    let params: ExploreParams =
+        serde_json::from_value(json!({"histogram": {"stack": "attributes.q"}})).unwrap();
+    let grid = sfst::Grid::new(0, 1_000_000_000, 1);
+    let request = explore_request(&params, grid, None).unwrap();
+    let long = "q".repeat(REQUEST_TEXT_MAX_BYTES + 1);
+    let data = ExploreData {
+        status: QueryStatus::Complete,
+        histogram: Some(sfsq::traces::HistogramData {
+            dimensions: vec![long.clone(), "short".to_string(), format!("{long}2")],
+            buckets: vec![sfsq::traces::HistogramBucket {
+                counts: vec![5, 3, 2],
+                other: 1,
+                unset: 4,
+                durations: [0; sfsq::traces::HEATMAP_ROWS],
+            }],
+            total: 15,
+            errors: 0,
+            percentiles: None,
+        }),
+        rows: None,
+    };
+    let page =
+        serde_json::to_value(to_explore_result(data, &request, grid, (0, 1), (0, 1))).unwrap();
+    assert_eq!(page["histogram"]["dimensions"], json!(["short"]));
+    let bucket = &page["histogram"]["buckets"][0];
+    assert_eq!(
+        (&bucket["counts"], &bucket["other"], &bucket["unset"]),
+        (&json!([3]), &json!(8), &json!(4))
+    );
+}
+
+#[test]
+fn an_explore_row_flags_a_cut_value() {
+    let params: ExploreParams =
+        serde_json::from_value(json!({"rows": {"limit": 2, "columns": ["name"]}})).unwrap();
+    let grid = sfst::Grid::new(0, 1_000_000_000, 10);
+    let request = explore_request(&params, grid, None).unwrap();
+    let row = |start_ns: i64, name: String| sfsq::traces::SpanRow {
+        key: RowKey {
+            start_ns,
+            trace_id: sfst::TraceId::from([1; 16]),
+            span_id: sfst::SpanId::from([2; 8]),
+        },
+        duration_ns: 1,
+        columns: vec![vec![name]],
+    };
+    let data = ExploreData {
+        status: QueryStatus::Complete,
+        histogram: None,
+        rows: Some(sfsq::traces::RowsData {
+            matched: 2,
+            items: vec![
+                row(2, "n".repeat(LIST_VALUE_MAX_BYTES + 1)),
+                row(1, "short".to_string()),
+            ],
+            more: false,
+        }),
+    };
+    let page =
+        serde_json::to_value(to_explore_result(data, &request, grid, (0, 10), (0, 10))).unwrap();
+    let items = page["rows"]["items"].as_array().unwrap();
+    assert_eq!(items[0]["truncated"], json!(true));
+    assert_eq!(
+        items[0]["fields"][0][1].as_str().unwrap().len(),
+        LIST_VALUE_MAX_BYTES
+    );
+    assert!(items[1].get("truncated").is_none());
+}
