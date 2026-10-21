@@ -71,18 +71,108 @@ static inline int timeval_to_poll_timeout_ms(const struct timeval *timeout) {
     if(timeout_ms > INT_MAX)
         return INT_MAX;
 
+    // a positive timeout below 1ms must not become 0, which means "wait forever"
+    if(!timeout_ms)
+        return 1;
+
     return (int)timeout_ms;
+}
+
+// connect a socket to one address, waiting up to timeout_ms (0 = until the kernel gives up)
+// the socket is non-blocking while connecting and blocking again when this returns ND_SOCK_ERR_NONE
+static ND_SOCK_ERROR connect_socket_to_address(int fd, const struct addrinfo *ai, int timeout_ms, const char *ip, const char *port) {
+    if(sock_setnonblock(fd, true) != 1) {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "Failed to set the socket to ip '%s' port '%s' to non-blocking mode",
+               ip, port);
+
+        return ND_SOCK_ERR_FAILED_TO_CREATE_SOCKET;
+    }
+
+    errno_clear();
+    if(connect(fd, ai->ai_addr, ai->ai_addrlen) < 0) {
+        if(errno != EINPROGRESS && errno != EALREADY && errno != EINTR) {
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "Failed to connect to '%s', port '%s': %s",
+                   ip, port, strerror(errno));
+
+            return ND_SOCK_ERR_CONNECTION_REFUSED;
+        }
+
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "Waiting for connection to ip %s port %s to be established",
+               ip, port);
+
+        int rc = wait_on_socket_or_cancel_with_timeout(NULL, fd, timeout_ms, POLLOUT, NULL);
+        if(rc == -1) {
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "Thread is cancelled while connecting to '%s', port '%s'.",
+                   ip, port);
+
+            return ND_SOCK_ERR_THREAD_CANCELLED;
+        }
+
+        if(rc == 1) {
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "Timed out while connecting to '%s', port '%s'.",
+                   ip, port);
+
+            return ND_SOCK_ERR_TIMEOUT;
+        }
+
+        // the socket is ready or reported an error - SO_ERROR says if the connection was established
+        int so_error = 0;
+        socklen_t so_error_len = sizeof(so_error);
+        if(getsockopt(fd, SOL_SOCKET, SO_ERROR, (void *)&so_error, &so_error_len) != 0)
+            so_error = errno;
+
+        if(so_error) {
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "Failed to connect to '%s', port '%s': %s",
+                   ip, port, strerror(so_error));
+
+            return ND_SOCK_ERR_CONNECTION_REFUSED;
+        }
+
+        if(rc != 0) {
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "Failed to connect to '%s', port '%s'.",
+                   ip, port);
+
+            return ND_SOCK_ERR_POLL_ERROR;
+        }
+    }
+
+    if(sock_setnonblock(fd, false) != 0) {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "Failed to restore blocking mode on the socket to ip '%s' port '%s'",
+               ip, port);
+
+        return ND_SOCK_ERR_FAILED_TO_CREATE_SOCKET;
+    }
+
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "connect() to ip %s port %s completed successfully",
+           ip, port);
+
+    return ND_SOCK_ERR_NONE;
 }
 
 // connect_to_this_ip46()
 // protocol    IPPROTO_TCP, IPPROTO_UDP
 // socktype    SOCK_STREAM, SOCK_DGRAM
 // host        the destination hostname or IP address (IPv4 or IPv6) to connect to
-//             if it resolves to many IPs, all are tried (IPv4 and IPv6)
+//             if it resolves to many IPs, all are tried (IPv4 and IPv6), in the order getaddrinfo() returns them,
+//             until one connects - whatever the reason the previous ones failed - or the thread is cancelled
 // scope_id    the if_index id of the interface to use for connecting (0 = any)
 //             (used only under IPv6)
 // service     the service name or port to connect to
-// timeout     the timeout for establishing a connection
+// timeout     the timeout for establishing a connection to each IP; trying all of them stops once twice this
+//             time has passed, so a host with many unreachable IPs costs at most 2 x timeout
+//             (zero = no limit, each IP waits until the kernel gives up)
+// fallback_ipv4  when not NULL, set to true after an IPv6 address times out; once true, IPv6 addresses are skipped
+//
+// returns the connected socket (blocking, with SO_SNDTIMEO set to timeout), or -ND_SOCK_ERROR of the last failure
 
 int connect_to_this_ip46(
     int protocol,
@@ -121,11 +211,18 @@ int connect_to_this_ip46(
     };
     ND_LOG_STACK_PUSH(lgs);
 
+    const int timeout_ms = timeval_to_poll_timeout_ms(timeout);
+    const usec_t deadline_ut = timeout_ms ? now_monotonic_usec() + 2 * (usec_t)timeout_ms * USEC_PER_MS : 0;
+
     int fd = -1;
-    for (ai = ai_head; ai != NULL && fd == -1; ai = ai->ai_next) {
+    ND_SOCK_ERROR err = ND_SOCK_ERR_CONNECTION_REFUSED;
+    for (ai = ai_head; ai != NULL; ai = ai->ai_next) {
         if(nd_thread_signaled_to_cancel()) break;
 
         if (fallback_ipv4 && *fallback_ipv4 && ai->ai_family == PF_INET6)
+            continue;
+
+        if (ai->ai_family != PF_INET && ai->ai_family != PF_INET6)
             continue;
 
         if (ai->ai_family == PF_INET6) {
@@ -143,102 +240,53 @@ int connect_to_this_ip46(
                     sizeof(servBfr),
                     NI_NUMERICHOST | NI_NUMERICSERV);
 
-        switch (ai->ai_addr->sa_family) {
-            case PF_INET: {
-                struct sockaddr_in *pSadrIn = (struct sockaddr_in *)ai->ai_addr;
-                (void)pSadrIn;
+        int wait_ms = timeout_ms;
+        if(deadline_ut) {
+            usec_t now_ut = now_monotonic_usec();
+            if(now_ut >= deadline_ut) {
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "Not trying ip '%s' port '%s' of host '%s': the %llu ms allowed for trying its ips have passed",
+                       hostBfr, servBfr, host, (unsigned long long)(2 * (usec_t)timeout_ms));
                 break;
             }
 
-            case PF_INET6: {
-                struct sockaddr_in6 *pSadrIn6 = (struct sockaddr_in6 *) ai->ai_addr;
-                (void)pSadrIn6;
-                break;
-            }
-
-            default: {
-                // Unknown protocol family
-                continue;
-            }
+            usec_t left_ms = (deadline_ut - now_ut) / USEC_PER_MS;
+            if(left_ms < (usec_t)wait_ms)
+                wait_ms = left_ms ? (int)left_ms : 1;
         }
 
         fd = socket(ai->ai_family, ai->ai_socktype | DEFAULT_SOCKET_FLAGS, ai->ai_protocol);
-        if(fd != -1) {
-            if(timeout) {
-                if(setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (char *) timeout, sizeof(struct timeval)) < 0)
-                    nd_log(NDLS_DAEMON, NDLP_ERR,
-                           "Failed to set timeout on the socket to ip '%s' port '%s'",
-                           hostBfr, servBfr);
-            }
-            sock_setcloexec(fd, true);
-
-            errno_clear();
-            if(connect(fd, ai->ai_addr, ai->ai_addrlen) < 0) {
-                if(errno == EALREADY || errno == EINPROGRESS) {
-                    nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                           "Waiting for connection to ip %s port %s to be established",
-                           hostBfr, servBfr);
-
-                    int timeout_ms = timeval_to_poll_timeout_ms(timeout);
-
-                    switch(wait_on_socket_or_cancel_with_timeout(NULL, fd, timeout_ms, POLLOUT, NULL)) {
-                        case  0: // proceed
-                            nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                                   "connect() to ip %s port %s completed successfully",
-                                   hostBfr, servBfr);
-                            break;
-
-                        case -1: // thread cancelled
-                            nd_log(NDLS_DAEMON, NDLP_ERR,
-                                   "Thread is cancelled while connecting to '%s', port '%s'.",
-                                   hostBfr, servBfr);
-
-                            close(fd);
-                            fd = -ND_SOCK_ERR_THREAD_CANCELLED;
-                            break;
-
-                        case  1: // timeout
-                            nd_log(NDLS_DAEMON, NDLP_ERR,
-                                   "Timed out while connecting to '%s', port '%s'.",
-                                   hostBfr, servBfr);
-
-                            close(fd);
-                            fd = -ND_SOCK_ERR_TIMEOUT;
-
-                            if (fallback_ipv4 && ai->ai_family == PF_INET6)
-                                *fallback_ipv4 = true;
-                            break;
-
-                        default:
-                        case  2: // poll error
-                            nd_log(NDLS_DAEMON, NDLP_ERR,
-                                   "Failed to connect to '%s', port '%s'.",
-                                   hostBfr, servBfr);
-
-                            close(fd);
-                            fd = -ND_SOCK_ERR_POLL_ERROR;
-                            break;
-                    }
-                }
-                else {
-                    nd_log(NDLS_DAEMON, NDLP_ERR,
-                           "Failed to connect to '%s', port '%s'",
-                           hostBfr, servBfr);
-
-                    close(fd);
-                    fd = -ND_SOCK_ERR_CONNECTION_REFUSED;
-                }
-            }
-        }
-        else {
+        if(fd == -1) {
             nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to socket() to '%s', port '%s'", hostBfr, servBfr);
-            fd = -ND_SOCK_ERR_FAILED_TO_CREATE_SOCKET;
+            err = ND_SOCK_ERR_FAILED_TO_CREATE_SOCKET;
+            continue;
         }
+
+        if(timeout) {
+            if(setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (char *) timeout, sizeof(struct timeval)) < 0)
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "Failed to set timeout on the socket to ip '%s' port '%s'",
+                       hostBfr, servBfr);
+        }
+        sock_setcloexec(fd, true);
+
+        err = connect_socket_to_address(fd, ai, wait_ms, hostBfr, servBfr);
+        if(err == ND_SOCK_ERR_NONE)
+            break;
+
+        close(fd);
+        fd = -1;
+
+        if (err == ND_SOCK_ERR_TIMEOUT && fallback_ipv4 && ai->ai_family == PF_INET6)
+            *fallback_ipv4 = true;
+
+        if (err == ND_SOCK_ERR_THREAD_CANCELLED)
+            break;
     }
 
     freeaddrinfo(ai_head);
 
-    return fd;
+    return fd != -1 ? fd : -(int)err;
 }
 
 static int parse_connection_definition(
@@ -451,7 +499,7 @@ static bool connect_to_one_of_callback(char *entry, void *data) {
         (*t->reconnects_counter)++;
 
     t->sock = connect_to_this(entry, t->default_port, t->timeout);
-    if(t->sock != -1) {
+    if(t->sock >= 0) {
         if(t->connected_to && t->connected_to_size) {
             strncpyz(t->connected_to, entry, t->connected_to_size - 1);
             t->connected_to[t->connected_to_size - 1] = '\0';

@@ -60,12 +60,10 @@ struct mqtt_wss_proxy;
  *   - hostname resolution is synchronous and NOT covered by any timeout here (getaddrinfo() inside
  *     connect_to_this_ip46(), and again for the target host under SOCKS5 - SOCKS5H delegates that
  *     to the proxy), so a stalled resolver blocks for as long as it takes.
- *   - TCP connect requests a 10s send timeout. An address whose connect() fails immediately is
- *     skipped and the next resolved address is tried; an address that times out ends the attempt.
- *     On Linux the socket is still blocking across connect(), so one silent address can cost about
- *     10s there and about 10s more in the wait that follows - other platforms may bound a blocking
- *     connect differently. That wait DOES observe a thread cancel, which is what stopping
- *     SERVICE_ACLK signals, so a shutdown ends it promptly.
+ *   - TCP connect waits up to 10s per resolved address, connecting non-blocking and polling. Any
+ *     failed or silent address is skipped and the next one is tried, until 20s have passed in total.
+ *     That wait DOES observe a thread cancel, which is what stopping SERVICE_ACLK signals, so a
+ *     shutdown ends it promptly.
  *   - proxy negotiation, when configured, carries its own 10s timeout and observes no shutdown.
  *   - the first SSL_connect() runs on the non-blocking socket, so it starts the handshake without
  *     waiting on the peer.
@@ -74,8 +72,8 @@ struct mqtt_wss_proxy;
  *     completes the TCP connection and then goes quiet fails the attempt instead of hanging. It
  *     re-tests SERVICE_ACLK between polls, so a shutdown ends it within one poll slice (see
  *     MQTT_WSS_CONNECT_POLL_SLICE_MS) rather than waking the thread immediately.
- * So a shutdown arriving here is not immediate: it still waits out the resolver, the blocking
- * connect() under SO_SNDTIMEO, and any proxy negotiation.
+ * So a shutdown arriving here is not immediate: it still waits out the resolver and any proxy
+ * negotiation.
  * @param client mqtt_wss_client which should connect
  * @param host to connect to (where MQTT over WSS server is listening)
  * @param port to connect to (where MQTT over WSS server is listening)
