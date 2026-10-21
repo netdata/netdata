@@ -665,10 +665,11 @@ static int journalfile_v1_close(struct rrdengine_journalfile *journalfile, struc
 // startup, or written while running, stays open next to its v2.
 int journalfile_close(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)
 {
-    if(journalfile_v2_data_available(journalfile)) {
+    // the time filter can outlive its journal v2 mapping (a permanent unmap of an indexed journal)
+    njtf_release(journalfile);
+
+    if(journalfile_v2_data_available(journalfile))
         journalfile_v2_data_unmap_permanently(journalfile);
-        njtf_release(journalfile);
-    }
 
     return journalfile_v1_close(journalfile, datafile);
 }
@@ -1631,6 +1632,8 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
     journalfile_v2_data_set(journalfile, fd, data_start, journal_v2_file_size);
 
     ctx_current_disk_space_increase(ctx, journal_v2_file_size);
+    if (ctx->config.tier == 0)
+        njtf_charge_existing(datafile);
 
     // File is OK load it
     return 0;
@@ -2069,7 +2072,7 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
 
             // tier 0 journals get a time filter for query planning, built from what was just written
             // and verified now, so that queries never pay for it
-            if (ctx->config.tier == 0 && njtf_build(datafile, data_start, total_file_size) &&
+            if (ctx->config.tier == 0 && dbengine_journal_time_filters && njtf_build(datafile, data_start, total_file_size) &&
                 njtf_verify_and_map(journalfile, data_start, total_file_size))
                 __atomic_store_n(&journalfile->njtf.state, NJTF_STATE_VALID, __ATOMIC_RELEASE);
 

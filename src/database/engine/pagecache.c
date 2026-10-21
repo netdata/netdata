@@ -493,6 +493,11 @@ static ALWAYS_INLINE_HOT size_t list_has_time_gaps(
 
 typedef void (*page_found_callback_t)(PGC_PAGE *page, void *data);
 
+static inline void lookups_counter_add(size_t *counter, size_t value) {
+    if (value)
+        __atomic_add_fetch(counter, value, __ATOMIC_RELAXED);
+}
+
 static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METRIC *metric,
                                                            usec_t start_time_ut, usec_t end_time_ut,
                                                            page_found_callback_t callback, void *callback_data)
@@ -508,6 +513,11 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_inst
 
     // Recovery may return a partial result after a later mmap access faults.
     volatile size_t pages_found = 0;
+
+    // how the journal lookups ended, added to the global counters once per call
+    volatile struct {
+        size_t searched, not_found, range_skipped, filter_skipped, filter_passed, filter_bypassed;
+    } lookups = { 0 };
 
     NJFV2IDX_FIND_STATE state = {
             .init = false,
@@ -525,6 +535,21 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_inst
         if (unlikely(!j2_header)) {
             datafile_release(datafile, DATAFILE_ACQUIRE_PAGE_DETAILS);
             continue;
+        }
+
+        if (ctx->config.tier == 0) {
+            NJTF_CHECK verdict = njtf_check(datafile->journalfile, uuid, wanted_start_time_s, wanted_end_time_s);
+            if (verdict == NJTF_CHECK_SKIP) {
+                lookups.filter_skipped++;
+                journalfile_v2_data_release(datafile->journalfile);
+                datafile_release(datafile, DATAFILE_ACQUIRE_PAGE_DETAILS);
+                continue;
+            }
+
+            if (verdict == NJTF_CHECK_SEARCH)
+                lookups.filter_passed++;
+            else
+                lookups.filter_bypassed++;
         }
 
         char file_path[RRDENG_PATH_MAX];
@@ -552,29 +577,12 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_inst
                 goto release_journal;
             }
 
-            if (ctx->config.tier == 0) {
-                switch (njtf_check(datafile->journalfile, j2_header, journal_v2_file_size, uuid,
-                                   wanted_start_time_s, wanted_end_time_s)) {
-                    case NJTF_CHECK_SKIP:
-                        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.journal_v2_lookups_filter_skipped, 1, __ATOMIC_RELAXED);
-                        goto release_journal;
-
-                    case NJTF_CHECK_BYPASS:
-                        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.journal_v2_lookups_filter_bypassed, 1, __ATOMIC_RELAXED);
-                        break;
-
-                    case NJTF_CHECK_SEARCH:
-                        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.journal_v2_lookups_filter_passed, 1, __ATOMIC_RELAXED);
-                        break;
-                }
-            }
-
             struct journal_metric_list *uuid_entry =
                 bsearch(uuid, uuid_list, journal_metric_count, sizeof(*uuid_list), journal_metric_uuid_compare);
 
             if (unlikely(!uuid_entry)) {
                 // our UUID is not in this datafile
-                __atomic_add_fetch(&rrdeng_cache_efficiency_stats.journal_v2_lookups_not_found, 1, __ATOMIC_RELAXED);
+                lookups.not_found++;
                 goto release_journal;
             }
 
@@ -584,11 +592,11 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_inst
                 is_page_in_time_range(journal_start_time_s + uuid_entry->delta_start_s,
                                       journal_start_time_s + uuid_entry->delta_end_s,
                                       wanted_start_time_s, wanted_end_time_s) != PAGE_IS_IN_RANGE) {
-                __atomic_add_fetch(&rrdeng_cache_efficiency_stats.journal_v2_lookups_range_skipped, 1, __ATOMIC_RELAXED);
+                lookups.range_skipped++;
                 goto release_journal;
             }
 
-            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.journal_v2_lookups_searched, 1, __ATOMIC_RELAXED);
+            lookups.searched++;
 
             struct journal_page_header *page_list_header =
                 (struct journal_page_header *)((uint8_t *)j2_header + uuid_entry->page_offset);
@@ -695,6 +703,13 @@ release_journal:
         journalfile_v2_data_release(datafile->journalfile);
         datafile_release(datafile, DATAFILE_ACQUIRE_PAGE_DETAILS);
     }
+
+    lookups_counter_add(&rrdeng_cache_efficiency_stats.journal_v2_lookups_searched, lookups.searched);
+    lookups_counter_add(&rrdeng_cache_efficiency_stats.journal_v2_lookups_not_found, lookups.not_found);
+    lookups_counter_add(&rrdeng_cache_efficiency_stats.journal_v2_lookups_range_skipped, lookups.range_skipped);
+    lookups_counter_add(&rrdeng_cache_efficiency_stats.journal_v2_lookups_filter_skipped, lookups.filter_skipped);
+    lookups_counter_add(&rrdeng_cache_efficiency_stats.journal_v2_lookups_filter_passed, lookups.filter_passed);
+    lookups_counter_add(&rrdeng_cache_efficiency_stats.journal_v2_lookups_filter_bypassed, lookups.filter_bypassed);
 
     return pages_found;
 }

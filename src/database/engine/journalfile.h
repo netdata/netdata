@@ -25,6 +25,9 @@ typedef enum __attribute__ ((__packed__)) {
 
 #include "journalfile-filter.h"
 
+// unit tests: create a temporary directory for journal files (mrg-unittest.c); false if none is usable
+bool jv2_make_tmpdir(char *dst, size_t dst_size);
+
 typedef enum __attribute__ ((__packed__)) {
     JOURNALFILE_V2_ACCESS_AUTO = 0,
     JOURNALFILE_V2_ACCESS_RANDOM,
@@ -56,6 +59,7 @@ struct rrdengine_journalfile {
         NJTF_STATE state;               // atomic; see journalfile-filter.h
         uint8_t *map;                   // the mapped .njtf file, while state is NJTF_STATE_VALID
         size_t map_size;
+        uint64_t disk_bytes;            // atomic; the filter file size charged to the tier's disk space
     } njtf;
 
     struct {
