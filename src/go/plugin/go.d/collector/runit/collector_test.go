@@ -5,10 +5,12 @@
 package runit
 
 import (
+	"bytes"
 	"errors"
 	"os"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
@@ -350,6 +352,7 @@ func TestServicesCli(t *testing.T) {
 		data     []byte
 		wantKeys []string
 		wantNil  []string
+		wantLog  []string // Expected parts of the logged warning; nothing is logged if empty.
 	}{
 		"fail: lines are skipped": {
 			data: []byte("" +
@@ -381,11 +384,56 @@ func TestServicesCli(t *testing.T) {
 			),
 			wantKeys: []string{"socklog", "socklog/log"},
 		},
+		// Outputs of `sv status` (runit 2.1.2) for a service with a symlink loop as its `down` file.
+		"unreadable down file": {
+			data: []byte("" +
+				"run: /service/sshd: (pid 39) 2s\n" +
+				"\n",
+			),
+			wantKeys: []string{"sshd"},
+			wantLog:  []string{"sv could not stat the 'down' file of a service, its status is unknown: "},
+		},
+		"unreadable down file of service with log": {
+			data: []byte("" +
+				"run: /service/sshd: (pid 39) 2s\n" +
+				"; run: log: (pid 38) 2s\n",
+			),
+			wantKeys: []string{"sshd"},
+			wantLog:  []string{"sv could not stat the 'down' file of a service, its status is unknown: ", "; run: log: (pid 38) 2s"},
+		},
+		"unreadable down file of log service": {
+			data: []byte("" +
+				"run: /service/sshd: (pid 39) 2s\n" +
+				"run: /service/socklog: (pid 40) 2s; \n",
+			),
+			wantKeys: []string{"sshd", "socklog"},
+			wantNil:  []string{"socklog/log"},
+			wantLog:  []string{"sv could not stat the 'log/down' file of service 'socklog', its log status is unknown"},
+		},
+		"unreadable down files of service and its log service": {
+			data: []byte("" +
+				"run: /service/sshd: (pid 39) 2s\n" +
+				"; \n",
+			),
+			wantKeys: []string{"sshd"},
+			wantLog:  []string{"sv could not stat the 'down' file of a service, its status is unknown: "},
+		},
+		"unknown line": {
+			data: []byte("" +
+				"run: /service/sshd: (pid 39) 2s\n" +
+				"unknown: /service/socklog\n",
+			),
+			wantKeys: []string{"sshd"},
+			wantNil:  []string{"socklog"},
+			wantLog:  []string{"failed to parse sv status: ", "unknown: /service/socklog"},
+		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			var logs bytes.Buffer
 			collr := prepareMockCollector(&mockSvCli{data: test.data})
+			collr.Logger = logger.NewWithWriter(&logs)
 			services, err := collr.servicesCli()
 			require.NoError(t, err)
 			for _, k := range test.wantKeys {
@@ -393,6 +441,14 @@ func TestServicesCli(t *testing.T) {
 			}
 			for _, k := range test.wantNil {
 				assert.NotContains(t, services, k)
+			}
+			if len(test.wantLog) == 0 {
+				assert.Empty(t, logs.String())
+			} else {
+				assert.Contains(t, logs.String(), "level=warn")
+			}
+			for _, want := range test.wantLog {
+				assert.Contains(t, logs.String(), want)
 			}
 		})
 	}
@@ -411,6 +467,15 @@ func TestParseServiceStatus(t *testing.T) {
 				State:         ServiceStateRun,
 				StateDuration: 5 * 1e9, // 5s as time.Duration
 				Enabled:       false,
+			},
+		},
+		"running, log status unknown (unreadable log/down)": {
+			data: []byte("run: /service/socklog: (pid 40) 2s; \n"),
+			name: "socklog",
+			want: ServiceStatus{
+				State:         ServiceStateRun,
+				StateDuration: 2 * 1e9,
+				Enabled:       true,
 			},
 		},
 		"running with got TERM": {

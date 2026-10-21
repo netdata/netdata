@@ -51,6 +51,13 @@ var (
 		`\n$`)
 )
 
+// Leftovers of a status line when sv cannot stat a `down` file (see servicesCli).
+var (
+	lineSvNoStatus   = []byte("\n")
+	pfxSvNoStatus    = []byte("; ")
+	sfxSvNoLogStatus = []byte("; \n")
+)
+
 const (
 	idxState = iota
 	idxName
@@ -73,6 +80,17 @@ func (c *Collector) servicesCli() (map[string]*ServiceStatus, error) {
 	buf := bytes.NewBuffer(out)
 	for {
 		line, err := buf.ReadBytes('\n')
+		// When sv cannot stat the `down` file of a service (e.g. a symlink loop),
+		// it warns on stderr only, does not count it in its exit code,
+		// and prints the status line without the status of that service.
+		// The leftover is the only reliable trace of the problem:
+		// an empty line, or the "; <log status>" tail when the service has a log service.
+		// For the `log/down` file the line ends with "; " instead of the log service status,
+		// while the status of the service itself is valid.
+		noLogStatus := bytes.HasSuffix(line, sfxSvNoLogStatus)
+		if noLogStatus {
+			line = append(bytes.TrimSuffix(line, sfxSvNoLogStatus), '\n')
+		}
 		match := reSvStatus.FindSubmatch(line)
 
 		switch {
@@ -85,8 +103,13 @@ func (c *Collector) servicesCli() (map[string]*ServiceStatus, error) {
 			if string(matchLog[idxName]) == "log" {
 				ms[name+"/log"] = parseServiceStatus(matchLog)
 			}
+			if noLogStatus {
+				c.Warningf("sv could not stat the 'log/down' file of service '%s', its log status is unknown", name)
+			}
 		case bytes.HasPrefix(line, pfxSvFail):
 		case bytes.HasPrefix(line, pfxSvWarn):
+		case bytes.Equal(line, lineSvNoStatus) || bytes.HasPrefix(line, pfxSvNoStatus):
+			c.Warningf("sv could not stat the 'down' file of a service, its status is unknown: %q", string(line))
 		case len(line) > 0:
 			c.Warningf("failed to parse sv status: %q", string(line))
 		}
