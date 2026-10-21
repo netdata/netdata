@@ -44,6 +44,8 @@
 //!   assembly only when the rollup evidence proves a non-match.
 //! - overview — [`overview()`]: the trace-density grid (time bucket ×
 //!   duration bin) over stored-row statistics.
+//! - duration_hist — the log-linear duration histogram behind the
+//!   overview's per-bucket percentiles ([`DurationPercentiles`]).
 //! - fold / rollup — the aggregate machinery behind overview (rollup's
 //!   parts also build search's rows):
 //!   per-trace shapes from both source kinds
@@ -63,6 +65,7 @@
 //!   every operation that takes one.
 
 mod by_id;
+mod duration_hist;
 mod fold;
 mod gate;
 mod order;
@@ -80,9 +83,10 @@ mod window;
 pub use by_id::{
     DEFAULT_SPAN_CAP, FieldKinds, TraceData, TraceQuery, TraceRequestError, trace_by_id,
 };
+pub use duration_hist::DurationPercentiles;
 pub use overview::{
-    DURATION_BIN_COUNT, DURATION_BIN_LABELS, DurationPercentiles, OverviewData, OverviewQuery,
-    OverviewRequestError, overview,
+    DURATION_BIN_COUNT, DURATION_BIN_LABELS, OverviewData, OverviewQuery, OverviewRequestError,
+    overview,
 };
 pub use predicate::{
     CompareOp, Condition, Predicate, PredicateError, PredicateTarget, PredicateValue,
