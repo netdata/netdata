@@ -124,13 +124,15 @@ pub(crate) const LIST_VALUE_MAX_BYTES: usize = 256;
 /// Cut `s` at a character boundary so that it takes at most `max` bytes
 /// as a JSON string body (escapes counted, quotes not); `true` when it
 /// was cut. Counting the escaped form bounds what is sent: a control
-/// character takes six bytes on the wire.
+/// character takes six bytes on the wire. A cut value gives the rest of
+/// its allocation back, so a kept span holds what is sent.
 fn truncate_value(s: &mut String, max: usize) -> bool {
     let mut used = 0;
     for (i, c) in s.char_indices() {
         used += json_escaped_len(c);
         if used > max {
             s.truncate(i);
+            s.shrink_to_fit();
             return true;
         }
     }
@@ -225,11 +227,9 @@ pub(crate) fn to_trace_result(
     for (i, (s, c)) in t.spans.iter_mut().zip(cut).enumerate() {
         let resource = numbers.get(i).copied().flatten();
         if resource.is_some_and(|number| number as usize == resources.len()) {
-            let attributes = s
-                .fields
-                .extract_if(.., |(name, _)| is_resource_key(name))
-                .collect();
-            resources.push(ResourceWire { attributes });
+            resources.push(ResourceWire {
+                attributes: take_resource_pairs(&mut s.fields),
+            });
         }
         spans.push(span_wire(s, resource, c));
     }
@@ -264,13 +264,29 @@ fn is_resource_key(name: &str) -> bool {
         .is_some_and(|rest| !rest.is_empty())
 }
 
+/// Take a span's resource attribute pairs out of its `fields`, in stored
+/// order. The slots they took are given back: sources build `fields` at
+/// exact capacity, and a span that gives its resource up must not keep
+/// room for it.
+fn take_resource_pairs(fields: &mut Vec<(String, String)>) -> Vec<(String, String)> {
+    let mut pairs: Vec<(String, String)> = fields
+        .extract_if(.., |(name, _)| is_resource_key(name))
+        .collect();
+    if !pairs.is_empty() {
+        fields.shrink_to_fit();
+        pairs.shrink_to_fit();
+    }
+    pairs
+}
+
 /// How [`WireShaper`] numbered the resources of the spans it shaped: each
 /// distinct resource once, in first-use order, and each shaped span's
 /// number, in shaping order. Two resources are one when their pair lists
 /// (stored order, capped values) are equal.
 #[derive(Debug, Default)]
 pub(crate) struct ShapedResources {
-    /// The distinct resources' pairs, by number (lookup copies).
+    /// Each distinct resource's number, keyed by its pairs (the shaper's
+    /// lookup copies).
     numbers: HashMap<Vec<(String, String)>, u32>,
     /// Each shaped span's resource number; `None` without resource
     /// attributes.
@@ -532,10 +548,7 @@ impl sfst::trace_combine::SpanShaper for WireShaper {
     fn shape(&mut self, span: &mut sfst::TraceSpan) -> sfst::trace_combine::Shaped {
         let cut = cap_span_values(span);
         let mut weight = std::mem::take(&mut self.fixed);
-        let pairs: Vec<(String, String)> = span
-            .fields
-            .extract_if(.., |(name, _)| is_resource_key(name))
-            .collect();
+        let pairs = take_resource_pairs(&mut span.fields);
         let mut first_use = None;
         let mut shaped = self.resources.lock();
         let resource = if pairs.is_empty() {
@@ -591,7 +604,9 @@ impl sfst::trace_combine::SpanShaper for WireShaper {
 
 /// One assembled span → the wire shape (events and links ride along).
 /// `resource` is the span's index into the trace's resources, whose pairs
-/// [`WireShaper`] already took out of the span; `truncated` says whether
+/// are already out of the span (the shaper took them, or the result took
+/// them from the resource's first span); a span the shaper never saw has
+/// no index and keeps them in its fields. `truncated` says whether
 /// [`cap_span_values`] cut any of its values. Emits keys and the trace
 /// state only: internal raw-int copies and names outside the key
 /// vocabulary stay out, and event and link attributes carry their full

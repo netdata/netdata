@@ -1294,6 +1294,50 @@ fn resource_pairs_out_of_front_still_share_by_their_order() {
     );
 }
 
+/// Merge `spans` as the trace handler does: the engine with the wire
+/// shaper and its budget.
+fn merged(spans: Vec<sfst::TraceSpan>) -> sfst::trace_combine::CombineOutcome {
+    let trace_id = parse_trace_id("11111111111111111111111111111111").unwrap();
+    let mut source = VecSource(spans);
+    let mut shaper = WireShaper::default();
+    sfst::trace_combine::combine(
+        &mut [&mut source as &mut dyn sfst::trace_combine::SpanSource],
+        trace_id,
+        Some(10_000),
+        None,
+        Some(&mut shaper),
+        &|| false,
+    )
+}
+
+/// What kept spans' fields hold in memory: their pair slots and their
+/// strings' allocations.
+fn held_bytes(spans: &[sfst::TraceSpan]) -> usize {
+    spans
+        .iter()
+        .map(|s| {
+            s.fields.capacity() * std::mem::size_of::<(String, String)>()
+                + s.fields
+                    .iter()
+                    .map(|(k, v)| k.capacity() + v.capacity())
+                    .sum::<usize>()
+        })
+        .sum()
+}
+
+/// `n` spans of one trace, in start order, each with `fields`.
+fn spans_with(n: usize, fields: &[(String, String)]) -> Vec<sfst::TraceSpan> {
+    let id = |i: usize| sfst::SpanId::from((i as u64 + 1).to_be_bytes());
+    (0..n)
+        .map(|i| {
+            let mut s = span(1, None, 1_000 + i as i64);
+            s.span_id = id(i);
+            s.fields = fields.to_vec();
+            s
+        })
+        .collect()
+}
+
 /// The merge holds what the answer sends: a kept span gives its resource
 /// pairs up when it is shaped, so a resource shared by every span is held
 /// once, not once per span, and the kept spans stay within the budget.
@@ -1308,41 +1352,64 @@ fn kept_spans_hold_no_resource_copies() {
         })
         .collect();
     let n = 500;
-    let id = |i: usize| sfst::SpanId::from((i as u64 + 1).to_be_bytes());
-    let spans: Vec<sfst::TraceSpan> = (0..n)
-        .map(|i| {
-            let mut s = span(1, None, 1_000 + i as i64);
-            s.span_id = id(i);
-            s.fields = [resource.clone(), pairs(&[("name", "op")])].concat();
-            s
-        })
-        .collect();
-    let trace_id = parse_trace_id("11111111111111111111111111111111").unwrap();
-    let mut source = VecSource(spans);
-    let mut shaper = WireShaper::default();
-    let out = sfst::trace_combine::combine(
-        &mut [&mut source as &mut dyn sfst::trace_combine::SpanSource],
-        trace_id,
-        Some(10_000),
-        None,
-        Some(&mut shaper),
-        &|| false,
-    );
+    let out = merged(spans_with(
+        n,
+        &[resource, pairs(&[("name", "op")])].concat(),
+    ));
     assert_eq!(
         out.trace.spans.len(),
         n,
         "the shared resource is charged once"
     );
-    let held: usize = out
-        .trace
-        .spans
-        .iter()
-        .flat_map(|s| &s.fields)
-        .map(|(k, v)| k.len() + v.len())
-        .sum();
+    let held = held_bytes(&out.trace.spans);
     assert!(
         held <= TRACE_SPANS_MAX_BYTES,
-        "kept spans hold {held} bytes of fields"
+        "kept spans hold {held} bytes"
+    );
+}
+
+/// A resource of many small pairs leaves nothing behind in the spans that
+/// give it up: not even the slots its pairs took.
+#[test]
+fn many_small_resource_pairs_leave_no_slots_behind() {
+    let resource: Vec<(String, String)> = (0..1_000)
+        .map(|k| (format!("resource.attributes.k{k}"), "v".to_string()))
+        .collect();
+    let n = 300;
+    let out = merged(spans_with(
+        n,
+        &[resource, pairs(&[("name", "op")])].concat(),
+    ));
+    assert_eq!(
+        out.trace.spans.len(),
+        n,
+        "the shared resource is charged once"
+    );
+    let held = held_bytes(&out.trace.spans);
+    assert!(
+        held <= TRACE_SPANS_MAX_BYTES,
+        "kept spans hold {held} bytes"
+    );
+}
+
+/// A value cut to the cap gives the rest of its allocation back: a kept
+/// span holds the cut value, not the stored one.
+#[test]
+fn a_cut_value_gives_its_memory_back() {
+    let n = 20;
+    let fields = pairs(&[("name", "op")]);
+    let mut spans = spans_with(n, &fields);
+    for s in &mut spans {
+        s.fields
+            .push(("attributes.blob".into(), "x".repeat(256 * 1024)));
+    }
+    let out = merged(spans);
+    assert_eq!(out.trace.spans.len(), n);
+    assert!(out.cut.iter().all(|&cut| cut));
+    let held = held_bytes(&out.trace.spans);
+    assert!(
+        held <= TRACE_SPANS_MAX_BYTES,
+        "kept spans hold {held} bytes"
     );
 }
 

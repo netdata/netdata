@@ -1166,10 +1166,9 @@ fn highlight_without_tokens_is_empty() {
 }
 
 /// A span's resource attributes lead its fields, in the request's order,
-/// from a sealed file and from the WAL tail alike (resource, then scope,
-/// then span entries). The `otel-traces` answer sends each resource once
-/// and a client rebuilds a span's fields by putting its resource's pairs
-/// first, so this order is what makes that rebuild exact.
+/// from a sealed file and from the WAL tail alike, and none follows the
+/// span's other fields. A caller that takes a span's resource attributes
+/// out and later puts them back first rebuilds the span exactly.
 #[test]
 fn resource_pairs_lead_a_spans_fields_on_every_source() {
     let dir = tempfile::tempdir().unwrap();
