@@ -118,6 +118,7 @@ CHART_VARIABLES = {
     },
     'postgres.table_bloat_size_perc': {'table_size': ('src/go/plugin/go.d/collector/postgres/charts.go',)},
     'postgres.index_bloat_size_perc': {'index_size': ('src/go/plugin/go.d/collector/postgres/charts.go',)},
+    'runit.service_state': {'enabled': ('src/go/plugin/go.d/collector/runit/charts.go',)},
     'whoisquery.time_until_expiration': {
         'days_until_expiration_warning': ('src/go/plugin/go.d/collector/whoisquery/charts.go',),
         'days_until_expiration_critical': ('src/go/plugin/go.d/collector/whoisquery/charts.go',),

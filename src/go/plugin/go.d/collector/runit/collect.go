@@ -31,7 +31,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 		}
 		mx[serviceDimID(chartID, state)] = 1
 
-		// Hidden dimension for alerts: 1 if service should be running.
+		// Chart variable for alerts: 1 if service should be running.
 		mx[serviceDimID(chartID, stateEnabled)] = boolToInt64(status.Enabled)
 
 		if state == stateRunning {

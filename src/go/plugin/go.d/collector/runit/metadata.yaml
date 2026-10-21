@@ -123,23 +123,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: runit_service_failed_state
-        metric: runit.service_state
-        info: runit service in the failed state (should be running but is not)
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/runit.conf
-      - name: runit_service_undesired_running
-        metric: runit.service_state
-        info: runit service is running but should be down (normally down)
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/runit.conf
-      - name: runit_service_paused_state
-        metric: runit.service_state
-        info: runit service is paused
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/runit.conf
-      - name: runit_service_stuck_transitioning
-        metric: runit.service_state
-        info: runit service stuck in transitioning state (starting or stopping)
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/runit.conf
     metrics:
       folding:
         title: Metrics

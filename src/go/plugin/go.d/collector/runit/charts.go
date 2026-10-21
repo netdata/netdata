@@ -39,7 +39,7 @@ const (
 	stateStarting = "starting"
 	stateStopping = "stopping"
 	statePaused   = "paused"
-	stateEnabled  = "enabled" // hidden, for alerts
+	stateEnabled  = "enabled" // chart variable, for alerts
 )
 
 var serviceStates = []string{
@@ -82,10 +82,9 @@ func (c *Collector) addServiceCharts(service string) {
 			Name: s,
 		})
 	}
-	stateChart.Dims = append(stateChart.Dims, &collectorapi.Dim{
-		ID:      serviceDimID(chartID, stateEnabled),
-		Name:    stateEnabled,
-		DimOpts: collectorapi.DimOpts{Hidden: true},
+	stateChart.Vars = append(stateChart.Vars, &collectorapi.Var{
+		ID:   serviceDimID(chartID, stateEnabled),
+		Name: stateEnabled,
 	})
 
 	durationChart := &collectorapi.Chart{
