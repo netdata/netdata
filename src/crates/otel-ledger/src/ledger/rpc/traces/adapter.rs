@@ -1177,8 +1177,9 @@ pub(crate) fn explore_request(
     })
 }
 
-/// A rows walk's position: the aligned window its first page answered
-/// over and the last listed span's key.
+/// A rows walk's position: the window its first page was asked for,
+/// before alignment (re-aligning it gives that page's grid again), and
+/// the last listed span's key.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct ExploreAnchor {
     pub after_s: u32,
@@ -1228,12 +1229,13 @@ pub(crate) fn parse_explore_anchor(s: &str) -> Result<ExploreAnchor, String> {
 
 /// Shape an `explore` answer over `grid` (aligned to `[after_s,
 /// before_s)`). A page with older spans carries the anchor of its last
-/// span.
+/// span, with `asked`, the window before alignment.
 pub(crate) fn to_explore_result(
     data: ExploreData,
     request: &ExploreRequest,
     grid: sfst::Grid,
     (after_s, before_s): (u32, u32),
+    asked: (u32, u32),
 ) -> ExploreResult {
     const NS_PER_S: i64 = 1_000_000_000;
     let histogram = data.histogram.map(|h| ExploreHistogramWire {
@@ -1269,8 +1271,8 @@ pub(crate) fn to_explore_result(
         let anchor = match rows.items.last() {
             Some(last) if rows.more => Some(AnchorWire {
                 next: encode_explore_anchor(&ExploreAnchor {
-                    after_s,
-                    before_s,
+                    after_s: asked.0,
+                    before_s: asked.1,
                     key: last.key,
                 }),
             }),

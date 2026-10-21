@@ -1050,6 +1050,37 @@ async fn explore_rows_walk_by_anchor() {
     assert_eq!(sorted.len(), 8, "no span listed twice");
 }
 
+/// A window whose span sits just under a bucket-width threshold widens
+/// when aligned; every page of its walk still answers over the first
+/// page's window and grid.
+#[tokio::test]
+async fn explore_pages_keep_the_first_page_window() {
+    let h = handler_with_search_corpus().await;
+    // 3590 s from an odd multiple of 30: 30 s buckets, aligned to 3600 s.
+    let after = T_S / 60 * 60 - 30;
+    let mut windows = Vec::new();
+    let mut listed = 0;
+    let mut anchor: Option<String> = None;
+    loop {
+        let mut params =
+            json!({"after": after, "before": after + 3590, "rows": {"limit": 3, "columns": []}});
+        if let Some(a) = &anchor {
+            merge(&mut params, json!({"anchor": a}));
+        }
+        let v = explore_on(&h, params).await.unwrap();
+        windows.push(v["window"].clone());
+        listed += v["rows"]["items"].as_array().unwrap().len();
+        match v["rows"]["anchor"]["next"].as_str() {
+            Some(next) => anchor = Some(next.to_string()),
+            None => break,
+        }
+    }
+    assert_eq!(listed, 8);
+    assert_eq!(windows[0]["bucket_width_s"], 30);
+    assert!(windows.len() > 1);
+    assert!(windows.iter().all(|w| *w == windows[0]), "{windows:?}");
+}
+
 #[tokio::test]
 async fn explore_chips_select_spans() {
     let h = handler_with_search_corpus().await;

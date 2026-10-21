@@ -688,7 +688,10 @@ impl OtelTracesHandler {
             .map(parse_explore_anchor)
             .transpose()
             .map_err(client_err)?;
-        let (after, before) = match &anchor {
+        // The window as asked, before alignment: an anchored page re-derives
+        // its grid from the same pair, so every page of a walk answers over
+        // the first page's window and grid.
+        let asked = match &anchor {
             Some(a) => (a.after_s, a.before_s),
             None => {
                 let now_s = unix_now_s();
@@ -698,7 +701,7 @@ impl OtelTracesHandler {
                 (window.capture.start, window.capture.end)
             }
         };
-        let (grid, after, before) = super::super::grid::grid_for_window_s(after, before);
+        let (grid, after, before) = super::super::grid::grid_for_window_s(asked.0, asked.1);
         // Validated before admission: a bad request is a client error,
         // not `busy`.
         let request = explore_request(params, grid, anchor.map(|a| a.key)).map_err(client_err)?;
@@ -713,6 +716,7 @@ impl OtelTracesHandler {
                 &request,
                 grid,
                 (after, before),
+                asked,
             ))));
         };
         let Capture {
@@ -759,6 +763,7 @@ impl OtelTracesHandler {
             &request,
             grid,
             (after, before),
+            asked,
         ))))
     }
 }
