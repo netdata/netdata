@@ -26,7 +26,8 @@ TARGET_WORKDIR := $(WORKDIR)/$(BUILDARCH)
 TARGET_STAMPS := $(WORKDIR)/$(BUILDARCH)/stamps
 TARGET_INSTALL_BASE := $(TARGET_STAGING)/install
 TARGET_INSTALL := $(TARGET_INSTALL_BASE)/$(NETDATA_PREFIX)
-TARGET_CACHE := $(CACHE)/$(BUILDARCH)/$(shell $(MAKEFILE_DIR)/scripts/cache-key.sh)
+TARGET_CACHE_ROOT := $(CACHE)/$(BUILDARCH)
+TARGET_CACHE := $(TARGET_CACHE_ROOT)/$(shell $(MAKEFILE_DIR)/scripts/cache-key.sh $(MAKEFILE_DIR))
 TARGET_PREP := $(TARGET_STAMPS)/prepare.stamp
 
 DOCKER_STAGING := /staging
@@ -74,21 +75,6 @@ OPENSSL_SOURCE := https://github.com/openssl/openssl
 $(eval $(call set_paths,OPENSSL,openssl))
 OPENSSL_CFLAGS := $(TUNING_FLAGS) -fno-lto -pipe
 OPENSSL_LDFLAGS := -static
-
-LIBUCONTEXT_VERSION := libucontext-1.3.3
-LIBUCONTEXT_SOURCE := https://github.com/kaniini/libucontext
-$(eval $(call set_paths,LIBUCONTEXT,libucontext))
-LIBUCONTEXT_LIBS := $(LIBUCONTEXT_DOCKER_STAGING)/usr/lib
-LIBUCONTEXT_INCLUDE := $(LIBUCONTEXT_DOCKER_STAGING)/usr/include
-LIBUCONTEXT_CFLAGS := $(TUNING_FLAGS) -pipe
-LIBUCONTEXT_LDFLAGS := -static
-LIBUCONTEXT_ARCH := $(BUILDARCH)
-
-LIBUNWIND_VERSION := v1.8.3
-LIBUNWIND_SOURCE := https://github.com/libunwind/libunwind
-$(eval $(call set_paths,LIBUNWIND,libunwind))
-LIBUNWIND_CFLAGS := $(TUNING_FLAGS) -I$(LIBUCONTEXT_INCLUDE) -fno-lto -pipe
-LIBUNWIND_LDFLAGS := -static -L$(LIBUCONTEXT_LIBS) -lucontext
 
 LIBNFACCT_VERSION := 1.0.3
 LIBNFACCT_SOURCE := https://www.netfilter.org/projects/libnetfilter_acct/files/libnetfilter_acct-$(LIBNFACCT_VERSION).tar.bz2
@@ -145,6 +131,7 @@ NETDATA_CMAKE_OPTS := -DSTATIC_BUILD=On \
                       -DENABLE_PLUGIN_XENSTAT=Off \
                       $(NULL)
 
+# archive build options
 ARCHIVE_DEPS := $(NETDATA_INSTALL) \
                 curl \
                 bash \
@@ -282,7 +269,7 @@ clean-install:
 	rm -f $(NETDATA_INSTALL)
 
 clear-cache:
-	rm -rf $(TARGET_CACHE)
+	rm -rf $(TARGET_CACHE_ROOT)
 
 clear-full-cache:
 	rm -rf $(CACHE)
@@ -293,7 +280,7 @@ $(CACHE) $(CACHE)/CACHEDIR.TAG:
 	mkdir -p $@
 	touch $@/CACHEDIR.TAG
 
-$(TARGET_CACHE): $(CACHE)/CACHEDIR.TAG
+$(TARGET_CACHE): | $(CACHE)
 	mkdir -p $@
 
 /proc/sys/fs/binfmt_misc/qemu-$(QEMU_ARCH): /proc/sys/fs/binfmt_misc
@@ -327,7 +314,7 @@ $(OPENSSL_DIR):
 		touch $(OPENSSL_CACHE_HIT) ; \
 	else \
 		rm -f $(OPENSSL_CACHE_HIT) ; \
-		git clone --branch "$(OPENSSL_VERSION)" --single-branch --depth 1 "$(OPENSSL_SOURCE)" "$(TARGET_WORKDIR)/openssl" ; \
+		git clone --quiet --branch "$(OPENSSL_VERSION)" --single-branch --depth 1 "$(OPENSSL_SOURCE)" "$(TARGET_WORKDIR)/openssl" ; \
 	fi
 	touch $@
 
@@ -349,7 +336,7 @@ $(OPENSSL_CONFIG): $(TARGET_PREP) $(OPENSSL_DIR)
 	fi
 	touch $@
 
-$(OPENSSL_BUILD): $(OPENSSL_CONFIG)
+$(OPENSSL_BUILD): $(TARGET_PREP) $(OPENSSL_CONFIG)
 	+if [ ! -f $(OPENSSL_CACHE_HIT) ]; then \
 		$(DOCKER) run $(DOCKER_ARGS) \
 			$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
@@ -363,7 +350,7 @@ $(OPENSSL_BUILD): $(OPENSSL_CONFIG)
 	fi
 	touch $@
 
-$(OPENSSL_STAGING): $(OPENSSL_BUILD)
+$(OPENSSL_STAGING): $(TARGET_PREP) $(OPENSSL_BUILD)
 	+$(DOCKER) run $(DOCKER_ARGS) \
 		$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
 		-e CFLAGS="$(OPENSSL_CFLAGS)" \
@@ -396,7 +383,7 @@ $(LIBNFACCT_DIR):
 		touch $(LIBNFACCT_CACHE_HIT) ; \
 	else \
 		rm -f $(LIBNFACCT_CACHE_HIT) ; \
-		wget -O $(LIBNFACCT_ARCHIVE) $(LIBNFACCT_SOURCE) ; \
+		wget --no-verbose -O $(LIBNFACCT_ARCHIVE) $(LIBNFACCT_SOURCE) ; \
 		echo "$(LIBNFACCT_HASH)  $(LIBNFACCT_ARCHIVE)" | sha256sum -c ; \
 		mkdir -p $(TARGET_WORKDIR)/libnetfilter_acct ; \
 		tar -xapf $(LIBNFACCT_ARCHIVE) -C $(TARGET_WORKDIR)/libnetfilter_acct/ --strip-components=1 ; \
@@ -480,11 +467,11 @@ $(CURL_DIR):
 		touch $(CURL_CACHE_HIT) ; \
 	else \
 		rm -f $(CURL_CACHE_HIT) ; \
-		git clone --branch "$(CURL_VERSION)" --single-branch --depth 1 "$(CURL_SOURCE)" "$(TARGET_WORKDIR)/curl" ; \
+		git clone --quiet --branch "$(CURL_VERSION)" --single-branch --depth 1 "$(CURL_SOURCE)" "$(TARGET_WORKDIR)/curl" ; \
 	fi
 	touch $@
 
-$(CURL_CONFIG): $(TARGET_PREP) $(CURL_DIR) $(OPENSSL_STAGING)
+$(CURL_CONFIG): $(TARGET_PREP) $(CURL_DIR) | $(OPENSSL_STAGING)
 	+if [ ! -f $(CURL_CACHE_HIT) ]; then \
 		$(DOCKER) run $(DOCKER_ARGS) \
 			$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
@@ -589,14 +576,14 @@ $(BASH_DIR):
 		touch $(BASH_CACHE_HIT) ; \
 	else \
 		rm -f $(BASH_CACHE_HIT) ; \
-		wget -O $(BASH_ARCHIVE) $(BASH_SOURCE) ; \
+		wget --no-verbose -O $(BASH_ARCHIVE) $(BASH_SOURCE) ; \
 		echo "$(BASH_HASH)  $(BASH_ARCHIVE)" | sha256sum -c ; \
 		mkdir -p $(TARGET_WORKDIR)/bash ; \
 		tar -xapf $(BASH_ARCHIVE) -C $(TARGET_WORKDIR)/bash/ --strip-components=1 ; \
 	fi
 	touch $@
 
-$(BASH_CONFIG): $(TARGET_PREP) $(BASH_DIR) $(OPENSSL_STAGING)
+$(BASH_CONFIG): $(TARGET_PREP) $(BASH_DIR) | $(OPENSSL_STAGING)
 	+if [ ! -f $(BASH_CACHE_HIT) ]; then \
 		$(DOCKER) run $(DOCKER_ARGS) \
 			$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
@@ -681,7 +668,7 @@ $(IOPING_DIR):
 		touch $(IOPING_CACHE_HIT) ; \
 	else \
 		rm -f $(IOPING_CACHE_HIT) ; \
-		wget -O $(IOPING_ARCHIVE) $(IOPING_SOURCE) ; \
+		wget --no-verbose -O $(IOPING_ARCHIVE) $(IOPING_SOURCE) ; \
 		echo "$(IOPING_HASH)  $(IOPING_ARCHIVE)" | sha256sum -c ; \
 		mkdir -p $(TARGET_WORKDIR)/ioping ; \
 		tar -xapf $(IOPING_ARCHIVE) -C $(TARGET_WORKDIR)/ioping/ --strip-components=1 ; \
@@ -791,6 +778,9 @@ check-static-linking: $(NETDATA_INSTALL)
 		$(BUILDER) \
 		/bin/sh $(NETDATA_SOURCE_DIR)/packaging/static/scripts/check-static-linking.sh $(DOCKER_INSTALL)
 
+check-systemd-caps: $(NETDATA_INSTALL)
+	$(MAKEFILE_DIR)/scripts/systemd-caps-check.sh $(MAKEFILE_DIR) $(TARGET_INSTALL)
+
 runtime-check: $(NETDATA_INSTALL)
 	$(DOCKER) run $(DOCKER_ARGS) \
 		$(BUILDER) \
@@ -803,7 +793,7 @@ netdata-elf-check: $(NETDATA_INSTALL)
 go-elf-check: $(NETDATA_INSTALL)
 	$(MAKEFILE_DIR)/scripts/elf-check.sh $(TARGET_INSTALL)/usr/libexec/netdata/plugins.d/go.d.plugin $(ELF_MACHINE) $(ELF_CLASS)
 
-tests: check-static-linking runtime-check netdata-elf-check go-elf-check
+tests: check-static-linking runtime-check netdata-elf-check go-elf-check check-systemd-caps
 
 # Archive rules
 
