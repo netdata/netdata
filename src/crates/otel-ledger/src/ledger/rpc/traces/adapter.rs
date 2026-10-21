@@ -13,6 +13,7 @@
 //! mode dispatch and the sealed-SFST + live-WAL source capture
 //! ([`super::sources`]) — the adapter never touches registry state.
 
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use sfsq::traces::{
@@ -25,8 +26,9 @@ use sfsq::traces::{
 use super::wire::{
     AnchorWire, CONDITION_VALUES_MAX, ConditionParams, ConditionValue, CoverageWire, EventWire,
     FieldKindsWire, LinkWire, OverviewGridWire, OverviewPercentilesWire, OverviewSection,
-    OverviewTotals, SearchItems, SearchResult, ServiceBreakdownWire, ServiceSpansWire, SpanWire,
-    StatusWire, SuggestResult, SuggestionWire, TraceItems, TraceResult, TraceSummaryWire,
+    OverviewTotals, ResourceWire, SearchItems, SearchResult, ServiceBreakdownWire,
+    ServiceSpansWire, SpanWire, StatusWire, SuggestResult, SuggestionWire, TraceItems, TraceResult,
+    TraceSummaryWire,
 };
 
 /// Parse a W3C text-form trace id: exactly 32 hex chars (16 bytes),
@@ -103,9 +105,9 @@ pub(crate) fn completion_capture_range(window: &std::ops::Range<u32>) -> std::op
 /// stops a pathological value from dominating the response.
 pub(crate) const TRACE_VALUE_MAX_BYTES: usize = 8 * 1024;
 
-/// Budget for a trace's spans and their field kinds, in compact JSON
-/// bytes ([`WireShaper`]). Past it the engine keeps the earliest spans
-/// and reports `byte_budget`.
+/// Budget for a trace's spans, their resources and their field kinds, in
+/// compact JSON bytes ([`WireShaper`]). Past it the engine keeps the
+/// earliest spans and reports `byte_budget`.
 pub(crate) const TRACE_SPANS_MAX_BYTES: usize = 2 * 1024 * 1024;
 
 /// Per-value cap, in JSON bytes (see [`truncate_value`]), on the
@@ -193,7 +195,9 @@ fn json_len(value: &impl serde::Serialize) -> usize {
 /// its earliest spans with their own graph and field kinds and reports
 /// `byte_budget`. This maps it, leaving out the names [`span_wire`] does
 /// not emit; names outside the key vocabulary add `dropped_fields` and
-/// one warning for the whole response.
+/// one warning for the whole response. Each distinct resource goes out
+/// once, numbered in first-use order over the kept spans: the order the
+/// shaper weighed them in, so both number every resource alike.
 pub(crate) fn to_trace_result(
     trace_id: &sfst::TraceId,
     data: TraceData,
@@ -211,12 +215,16 @@ pub(crate) fn to_trace_result(
         .iter()
         .copied()
         .chain(std::iter::repeat(false));
-    let spans: Vec<SpanWire> = t
-        .spans
-        .iter()
-        .zip(cut)
-        .map(|(s, c)| span_wire(s, c))
-        .collect();
+    let mut table = ResourceTable::default();
+    let mut resources = Vec::new();
+    let mut spans = Vec::with_capacity(t.spans.len());
+    for (s, c) in t.spans.iter().zip(cut) {
+        let resource = table.number(&s.fields).map(|(index, new)| {
+            resources.extend(new);
+            index
+        });
+        spans.push(span_wire(s, resource, c));
+    }
     let summary_root = t.summary_root();
     TraceResult {
         mode: "trace",
@@ -231,8 +239,74 @@ pub(crate) fn to_trace_result(
         roots: t.roots,
         children: t.children,
         spans,
+        resources,
         field_kinds: field_kinds_wire(data.field_kinds),
         matched: data.matched,
+    }
+}
+
+/// Whether a stored name is a resource attribute key: the resource
+/// prefix and a non-empty attribute name, i.e. `Key(Resource,
+/// Attribute(_))` in the vocabulary, decided without allocating. The bare
+/// prefix is outside the vocabulary.
+fn is_resource_key(name: &str) -> bool {
+    let prefix = AttributeOwner::Resource
+        .attribute_prefix()
+        .expect("an attribute owner");
+    name.strip_prefix(prefix)
+        .is_some_and(|rest| !rest.is_empty())
+}
+
+/// A span's resource attribute pairs, in stored order. Both span sources
+/// (sealed files and the WAL tail) store them as one run at the front of
+/// `fields` (resource, then scope, then span entries); that run is
+/// borrowed, any other layout copied.
+fn resource_pairs(fields: &[(String, String)]) -> Cow<'_, [(String, String)]> {
+    let mut run: Option<(usize, usize)> = None;
+    let mut count = 0;
+    for (i, (name, _)) in fields.iter().enumerate() {
+        if is_resource_key(name) {
+            let first = run.map_or(i, |(first, _)| first);
+            run = Some((first, i));
+            count += 1;
+        }
+    }
+    match run {
+        None => Cow::Borrowed(&[]),
+        Some((first, last)) if last - first + 1 == count => Cow::Borrowed(&fields[first..=last]),
+        Some(_) => Cow::Owned(
+            fields
+                .iter()
+                .filter(|(name, _)| is_resource_key(name))
+                .cloned()
+                .collect(),
+        ),
+    }
+}
+
+/// A trace's distinct resources, numbered in first-use order. Two
+/// resources are one when their pair lists are equal, in order.
+#[derive(Default)]
+struct ResourceTable(HashMap<Vec<(String, String)>, u32>);
+
+impl ResourceTable {
+    /// The resource of a span with these `fields`: its number and, when
+    /// this call numbered it, its entry. `None` for a span without
+    /// resource attributes.
+    fn number(&mut self, fields: &[(String, String)]) -> Option<(u32, Option<ResourceWire>)> {
+        let pairs = resource_pairs(fields);
+        if pairs.is_empty() {
+            return None;
+        }
+        if let Some(&index) = self.0.get(pairs.as_ref()) {
+            return Some((index, None));
+        }
+        let index = u32::try_from(self.0.len()).expect("fewer resources than spans");
+        self.0.insert(pairs.to_vec(), index);
+        let entry = ResourceWire {
+            attributes: pairs.into_owned(),
+        };
+        Some((index, Some(entry)))
     }
 }
 
@@ -389,20 +463,29 @@ fn kind_entry_bound() -> usize {
 /// Shapes a trace's spans for the wire while the engine merges them (the
 /// trace handler passes it to `TraceQuery::shaper`): caps each span's
 /// values at [`TRACE_VALUE_MAX_BYTES`], flags the span when it cut one,
-/// and weighs it as its compact JSON and the comma after it, plus, for
+/// and weighs it as its compact JSON (with its resource index, without
+/// its resource pairs) and the comma after it, plus its resource's entry
+/// and comma when it is the first span to use that resource, plus, for
 /// each attribute key it is the first to expose (the keys of
 /// `field_kinds`), an upper bound of that key's entry (kinds are known
-/// only once the merge is done). The first span also carries the list's
-/// brackets and the empty field-kind map. The engine keeps spans while
-/// they fit [`TRACE_SPANS_MAX_BYTES`], so `spans` and `field_kinds`
-/// together never exceed it.
+/// only once the merge is done). The first span also carries the spans
+/// and resources lists' brackets and the empty field-kind map. The engine
+/// keeps spans while they fit [`TRACE_SPANS_MAX_BYTES`], so `spans`,
+/// `resources` and `field_kinds` together never exceed it.
+///
+/// The engine shapes exactly the spans it keeps, in their final order,
+/// and stops at the first span that does not fit, so this numbers the
+/// resources as [`to_trace_result`] does; the refused span's resource,
+/// if new, is charged here but never kept.
 pub(crate) struct WireShaper {
     /// Attribute keys already charged.
     names: HashSet<String>,
+    /// Resources already charged, numbered as the result numbers them.
+    resources: ResourceTable,
     /// [`kind_entry_bound`], computed once.
     entry: usize,
-    /// The fixed cost still to charge, on the first span: the spans
-    /// list's brackets and the empty field-kind map.
+    /// The fixed cost still to charge, on the first span: the spans and
+    /// resources lists' brackets and the empty field-kind map.
     fixed: usize,
 }
 
@@ -410,8 +493,9 @@ impl Default for WireShaper {
     fn default() -> Self {
         Self {
             names: Default::default(),
+            resources: Default::default(),
             entry: kind_entry_bound(),
-            fixed: 2 + json_len(&field_kinds_wire(FieldKinds::default())),
+            fixed: 2 + 2 + json_len(&field_kinds_wire(FieldKinds::default())),
         }
     }
 }
@@ -419,7 +503,14 @@ impl Default for WireShaper {
 impl sfst::trace_combine::SpanShaper for WireShaper {
     fn shape(&mut self, span: &mut sfst::TraceSpan) -> sfst::trace_combine::Shaped {
         let cut = cap_span_values(span);
-        let mut weight = json_len(&span_wire(span, cut)) + 1 + std::mem::take(&mut self.fixed);
+        let mut weight = std::mem::take(&mut self.fixed);
+        let resource = self.resources.number(&span.fields).map(|(index, new)| {
+            if let Some(entry) = new {
+                weight += json_len(&entry) + 1;
+            }
+            index
+        });
+        weight += json_len(&span_wire(span, resource, cut)) + 1;
         let entry = self.entry;
         let seen = &mut self.names;
         let mut charge = |key: &str| {
@@ -458,11 +549,13 @@ impl sfst::trace_combine::SpanShaper for WireShaper {
 }
 
 /// One assembled span → the wire shape (events and links ride along).
-/// `truncated` says whether [`cap_span_values`] cut any of its values.
-/// Emits keys and the trace state only: internal raw-int copies and
-/// names outside the key vocabulary stay out, and event and link
-/// attributes carry their full keys.
-fn span_wire(s: &sfst::TraceSpan, truncated: bool) -> SpanWire {
+/// `resource` is the span's index into the trace's resources, whose
+/// pairs stay out of `fields`; `truncated` says whether
+/// [`cap_span_values`] cut any of its values. Emits keys and the trace
+/// state only: internal raw-int copies and names outside the key
+/// vocabulary stay out, and event and link attributes carry their full
+/// keys.
+fn span_wire(s: &sfst::TraceSpan, resource: Option<u32>, truncated: bool) -> SpanWire {
     SpanWire {
         span_id: s.span_id.to_string(),
         // OTel semantics: an unset parent means "root", rendered as an
@@ -474,10 +567,14 @@ fn span_wire(s: &sfst::TraceSpan, truncated: bool) -> SpanWire {
         dropped_attributes_count: s.dropped_attributes_count,
         dropped_events_count: s.dropped_events_count,
         dropped_links_count: s.dropped_links_count,
+        resource,
         fields: s
             .fields
             .iter()
-            .filter(|(name, _)| matches!(field_use(name), FieldUse::Attribute | FieldUse::Plain))
+            .filter(|(name, _)| {
+                !is_resource_key(name)
+                    && matches!(field_use(name), FieldUse::Attribute | FieldUse::Plain)
+            })
             .cloned()
             .collect(),
         events: s.events.iter().map(event_wire).collect(),

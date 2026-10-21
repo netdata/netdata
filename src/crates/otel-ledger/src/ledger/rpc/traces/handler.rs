@@ -129,7 +129,8 @@ const SUGGEST_DEADLINE: std::time::Duration = std::time::Duration::from_millis(2
 
 /// The engine's span cap for one trace lookup: the item bound beside the
 /// byte budget the wire shaper enforces (`TRACE_SPANS_MAX_BYTES`, about
-/// a thousand typical spans), for traces of tiny spans. The engine's own
+/// two thousand spans of a typical multi-service trace, whose resources
+/// go out once each), for traces of tiny spans. The engine's own
 /// default (65,536) is a runaway-merge guard, not a response size.
 const TRACE_SPAN_CAP: usize = 10_000;
 

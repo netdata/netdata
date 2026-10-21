@@ -245,6 +245,7 @@ async fn bounded_trace_fetch_echoes_coverage_and_assembles_identically() {
     .unwrap();
     assert_eq!(bounded["coverage"], json!({"after": 0, "before": 100}));
     assert_eq!(bounded["spans"], unbounded["spans"]);
+    assert_eq!(bounded["resources"], unbounded["resources"]);
     assert_eq!(bounded["status"], json!({"complete": true}));
 }
 
@@ -385,10 +386,14 @@ fn pair_keys(list: &serde_json::Value) -> Vec<String> {
         .collect()
 }
 
-/// Every attribute key a trace answer's spans expose (fields, event and
-/// link attributes), sorted and distinct.
+/// Every attribute key a trace answer's spans expose (fields, their
+/// resources' attributes, event and link attributes), sorted and
+/// distinct.
 fn attribute_keys_exposed(v: &serde_json::Value) -> Vec<String> {
     let mut keys = Vec::new();
+    for r in v["resources"].as_array().unwrap() {
+        keys.extend(pair_keys(&r["attributes"]));
+    }
     for s in v["spans"].as_array().unwrap() {
         keys.extend(pair_keys(&s["fields"]));
         for e in s["events"].as_array().unwrap() {
@@ -407,6 +412,30 @@ fn attribute_keys_exposed(v: &serde_json::Value) -> Vec<String> {
     keys.sort();
     keys.dedup();
     keys
+}
+
+/// Span `i`'s full pair list: its resource's attributes, then its
+/// fields.
+fn expanded_pairs(v: &serde_json::Value, i: usize) -> Vec<(String, String)> {
+    let s = &v["spans"][i];
+    let mut list = Vec::new();
+    if let Some(r) = s.get("resource") {
+        list.extend(
+            v["resources"][r.as_u64().unwrap() as usize]["attributes"]
+                .as_array()
+                .unwrap()
+                .iter(),
+        );
+    }
+    list.extend(s["fields"].as_array().unwrap().iter());
+    list.into_iter()
+        .map(|kv| {
+            (
+                kv[0].as_str().unwrap().into(),
+                kv[1].as_str().unwrap().into(),
+            )
+        })
+        .collect()
 }
 
 /// The keys of a trace answer's `field_kinds`, sorted.
@@ -466,11 +495,158 @@ fn rich_request() -> opentelemetry_proto::tonic::collector::trace::v1::ExportTra
     req
 }
 
+/// One trace split across a sealed file and the live WAL tail: each
+/// resource goes out once however its spans were stored, with its pairs
+/// in stored order (several keys, an array, characters JSON escapes, a
+/// value over the cap), every span names its own, and the spans that
+/// carry the cut value are flagged.
+#[tokio::test]
+async fn a_resource_goes_out_once_across_a_sealed_file_and_the_tail() {
+    use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
+    use opentelemetry_proto::tonic::common::v1::{
+        AnyValue, ArrayValue, KeyValue, any_value::Value as Av,
+    };
+    use opentelemetry_proto::tonic::resource::v1::Resource;
+    use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span};
+    let text = |v: &str| AnyValue {
+        value: Some(Av::StringValue(v.into())),
+    };
+    let attr = |key: &str, value: AnyValue| KeyValue {
+        key: key.into(),
+        value: Some(value),
+        key_strindex: 0,
+    };
+    let long = "x".repeat(crate::ledger::rpc::traces::adapter::TRACE_VALUE_MAX_BYTES + 10);
+    let front = vec![
+        attr("service.name", text("front")),
+        attr("host.name", text("h\"1\\")),
+        attr(
+            "tags",
+            AnyValue {
+                value: Some(Av::ArrayValue(ArrayValue {
+                    values: vec![text("a"), text("b")],
+                })),
+            },
+        ),
+        attr("note", text("tab\there\u{1}")),
+        attr("blob", text(&long)),
+    ];
+    let back = vec![attr("service.name", text("back"))];
+    // A resource and its spans as (span id, parent id); parent 0 = root.
+    type Group<'a> = (&'a [KeyValue], &'a [(u8, u8)]);
+    let req = |groups: &[Group]| ExportTraceServiceRequest {
+        resource_spans: groups
+            .iter()
+            .map(|&(attributes, spans)| ResourceSpans {
+                resource: Some(Resource {
+                    attributes: attributes.to_vec(),
+                    ..Default::default()
+                }),
+                scope_spans: vec![ScopeSpans {
+                    spans: spans
+                        .iter()
+                        .map(|&(id, parent)| Span {
+                            trace_id: vec![0x11; 16],
+                            span_id: vec![id; 8],
+                            parent_span_id: if parent == 0 {
+                                Vec::new()
+                            } else {
+                                vec![parent; 8]
+                            },
+                            name: format!("span-{id}"),
+                            start_time_unix_nano: 1_000_000_000 + u64::from(id) * 1_000,
+                            end_time_unix_nano: 1_000_000_000 + u64::from(id) * 1_000 + 500,
+                            ..Default::default()
+                        })
+                        .collect(),
+                    ..Default::default()
+                }],
+                ..Default::default()
+            })
+            .collect(),
+    };
+    let registries = make_registries();
+    install_sealed(
+        &registries,
+        "default",
+        1,
+        vec![req(&[(&front, &[(1, 0), (2, 1)]), (&back, &[(3, 1)])])],
+    )
+    .await;
+    // Two spans: below the handler's chunk threshold, so a WAL tail.
+    install_wal(
+        &registries,
+        "default",
+        2,
+        vec![req(&[(&front, &[(4, 1)]), (&back, &[(5, 3)])])],
+    )
+    .await;
+    let h = make_handler_over(registries);
+    let v = serde_json::to_value(
+        call_on(&h, json!({"trace": {"id": FIXTURE_TRACE_ID}}))
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(v["status"], json!({"complete": true}));
+    assert_eq!(v["items"]["returned"], 5);
+    let ids: Vec<&str> = v["spans"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| s["span_id"].as_str().unwrap())
+        .collect();
+    let id = |b: u8| format!("{b:02x}").repeat(8);
+    assert_eq!(ids, [id(1), id(2), id(3), id(4), id(5)]);
+    let indices: Vec<&serde_json::Value> = v["spans"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| &s["resource"])
+        .collect();
+    assert_eq!(
+        indices,
+        [&json!(0), &json!(0), &json!(1), &json!(0), &json!(1)]
+    );
+    let cut = &long[..crate::ledger::rpc::traces::adapter::TRACE_VALUE_MAX_BYTES];
+    assert_eq!(
+        v["resources"],
+        json!([
+            {"attributes": [
+                ["resource.attributes.service.name", "front"],
+                ["resource.attributes.host.name", "h\"1\\"],
+                ["resource.attributes.tags[]", "a"],
+                ["resource.attributes.tags[]", "b"],
+                ["resource.attributes.note", "tab\there\u{1}"],
+                ["resource.attributes.blob", cut],
+            ]},
+            {"attributes": [["resource.attributes.service.name", "back"]]},
+        ])
+    );
+    let flagged: Vec<bool> = v["spans"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| s.get("truncated") == Some(&json!(true)))
+        .collect();
+    assert_eq!(flagged, [true, true, false, true, false]);
+    for s in v["spans"].as_array().unwrap() {
+        assert!(
+            !pair_keys(&s["fields"])
+                .iter()
+                .any(|k| k.starts_with("resource.")),
+            "resource pairs stay out of fields: {}",
+            s["fields"]
+        );
+    }
+    assert_eq!(attribute_keys_exposed(&v), kinds_keys(&v));
+}
+
 /// The same span answers alike from a sealed file and from a live WAL:
 /// every key is a search key, the status sits under `status.code` /
-/// `status.message`, event and link attributes carry their full keys,
-/// internal copies stay in, and `field_kinds` covers exactly the
-/// attribute keys.
+/// `status.message`, the resource goes out in the resource table, event
+/// and link attributes carry their full keys, internal copies stay in,
+/// and `field_kinds` covers exactly the attribute keys.
 #[tokio::test]
 async fn a_rich_span_answers_with_keys_sealed_and_tail() {
     let mut answers = Vec::new();
@@ -490,17 +666,13 @@ async fn a_rich_span_answers_with_keys_sealed_and_tail() {
         .unwrap();
         assert_eq!(v["status"], json!({"complete": true}), "sealed={sealed}");
         let s = &v["spans"][0];
-        let mut fields: Vec<(String, String)> = s["fields"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|kv| {
-                (
-                    kv[0].as_str().unwrap().into(),
-                    kv[1].as_str().unwrap().into(),
-                )
-            })
-            .collect();
+        assert_eq!(s["resource"], 0, "sealed={sealed}");
+        assert_eq!(
+            v["resources"],
+            json!([{"attributes": [["resource.attributes.service.name", "svc"]]}]),
+            "sealed={sealed}"
+        );
+        let mut fields = expanded_pairs(&v, 0);
         fields.sort();
         let want: Vec<(String, String)> = [
             ("attributes.http.request.method", "GET"),

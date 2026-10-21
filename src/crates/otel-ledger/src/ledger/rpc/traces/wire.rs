@@ -885,6 +885,10 @@ pub struct TraceResult {
     /// whose resolved parent is span `i`.
     pub children: Vec<Vec<usize>>,
     pub spans: Vec<SpanWire>,
+    /// The distinct resources of the returned spans, each once, in the
+    /// order the spans first use them; a span names its own by index
+    /// ([`SpanWire::resource`]).
+    pub resources: Vec<ResourceWire>,
     /// The value kinds of every attribute key the returned spans expose.
     pub field_kinds: FieldKindsWire,
     /// Ascending indices into `spans` of the spans matching the
@@ -896,7 +900,8 @@ pub struct TraceResult {
 }
 
 /// The value kinds of every attribute key the returned spans expose
-/// (span `fields`, event and link `attributes`), keyed by the key itself
+/// (span `fields`, their resources' `attributes`, event and link
+/// `attributes`), keyed by the key itself
 /// — the same key string a chip and a key suggestion use. Builtin keys
 /// (`name`, `kind`, `status.code`, ...) and `trace_state` have no entry,
 /// as on key suggestions. Each key maps to the kinds of value stored
@@ -931,11 +936,14 @@ pub struct TraceItems {
 /// One span, ids in W3C lowercase hex. `fields` are the span's resolved
 /// facets as `[key, value]` string pairs (order preserved): every key is
 /// a search key (`name`, `kind`, `status.code`, `status.message`,
-/// `scope.name`, `scope.version`, `resource.attributes.<key>`,
-/// `scope.attributes.<key>`, `attributes.<key>`), plus `trace_state`,
-/// shown but not a search key. `field_kinds` gives the kinds of value
-/// each attribute key holds. A stored name outside the key vocabulary is
-/// left out, and `status` then carries `dropped_fields`.
+/// `scope.name`, `scope.version`, `scope.attributes.<key>`,
+/// `attributes.<key>`), plus `trace_state`, shown but not a search key.
+/// The span's resource attributes (`resource.attributes.<key>`) are not
+/// in `fields`: `resource` points to them. The span's full pair list is
+/// its resource's `attributes` followed by `fields`, as storage holds
+/// them. `field_kinds` gives the kinds of value each attribute key
+/// holds. A stored name outside the key vocabulary is left out, and
+/// `status` then carries `dropped_fields`.
 #[derive(Debug, Serialize)]
 pub struct SpanWire {
     pub span_id: String,
@@ -949,15 +957,29 @@ pub struct SpanWire {
     pub dropped_attributes_count: u32,
     pub dropped_events_count: u32,
     pub dropped_links_count: u32,
+    /// The span's resource: an index into the trace's `resources`.
+    /// Absent when the span has no resource attributes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resource: Option<u32>,
     pub fields: Vec<(String, String)>,
     pub events: Vec<EventWire>,
     pub links: Vec<LinkWire>,
     /// Present (`true`) only when one or more of this span's values —
-    /// a field value, an event name or attribute value, a link's
-    /// `trace_state` or attribute value — was cut to the per-value cap
-    /// (the adapter's `TRACE_VALUE_MAX_BYTES`, at a character boundary).
+    /// a field or resource attribute value, an event name or attribute
+    /// value, a link's `trace_state` or attribute value — was cut to the
+    /// per-value cap (the adapter's `TRACE_VALUE_MAX_BYTES`, at a
+    /// character boundary).
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub truncated: bool,
+}
+
+/// One distinct resource of a trace: its attributes as `[key, value]`
+/// pairs with full search keys (`resource.attributes.<key>`), in stored
+/// order. Spans share an entry only when their pair lists are equal, in
+/// order, after the per-value cap.
+#[derive(Debug, Serialize)]
+pub struct ResourceWire {
+    pub attributes: Vec<(String, String)>,
 }
 
 /// One span event; attribute keys are full search keys

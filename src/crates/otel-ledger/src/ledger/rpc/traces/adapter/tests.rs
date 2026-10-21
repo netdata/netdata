@@ -18,7 +18,8 @@
 //!   with each set in canonical order — plus the empty-trace degenerate;
 //!   the emission rule (keys and `trace_state` only; internal copies
 //!   never; names outside the vocabulary dropped with `dropped_fields`);
-//!   the byte budget's accounting;
+//!   the resource table (each resource once, by index, in first-use
+//!   order, lossless); the byte budget's accounting;
 //! - the keys: every key the wire takes, pinned literally (the UI
 //!   spells exactly these), and the rejections with their messages;
 //! - the cursor codec: encode/parse round-trip, malformed
@@ -210,9 +211,10 @@ fn result_of(spans: Vec<sfst::TraceSpan>, field_kinds: FieldKinds) -> serde_json
 }
 
 /// Every owner's names go out as keys, with `trace_state`; the internal
-/// copies never do. Null, empty-map and empty-array values travel as
-/// stored, and a flat event facet (the defensive path for a file
-/// without event structures) is a key like any other.
+/// copies never do; resource attributes go out in the trace's resource
+/// table, the span pointing to its entry. Null, empty-map and empty-array
+/// values travel as stored, and a flat event facet (the defensive path
+/// for a file without event structures) is a key like any other.
 #[test]
 fn span_fields_are_keys_and_the_trace_state() {
     use sfst::ValueKind::{EmptyArray, EmptyKvlist, Null, Str};
@@ -268,8 +270,8 @@ fn span_fields_are_keys_and_the_trace_state() {
             "dropped_attributes_count": 0,
             "dropped_events_count": 0,
             "dropped_links_count": 0,
+            "resource": 0,
             "fields": [
-                ["resource.attributes.service.name", "svc"],
                 ["scope.name", "lib"],
                 ["scope.version", "1.0"],
                 ["scope.attributes.tier", "web"],
@@ -301,6 +303,14 @@ fn span_fields_are_keys_and_the_trace_state() {
         })
     );
     assert_eq!(v["spans"][1]["fields"], json!([["name", "no-state"]]));
+    assert!(
+        v["spans"][1].get("resource").is_none(),
+        "absent without resource attributes"
+    );
+    assert_eq!(
+        v["resources"],
+        json!([{"attributes": [["resource.attributes.service.name", "svc"]]}])
+    );
     assert_eq!(
         v["field_kinds"],
         json!({
@@ -331,6 +341,7 @@ fn names_outside_the_vocabulary_are_dropped_and_reported() {
             ("status_code", "ERROR"),
             ("status_message", "boom"),
             ("attributes.", "x"),
+            ("resource.attributes.", "x"),
             ("span.http.method", "GET"),
             ("", ""),
         ]
@@ -347,6 +358,7 @@ fn names_outside_the_vocabulary_are_dropped_and_reported() {
             "attributes.",
             "events.attributes.",
             "links.attributes.",
+            "resource.attributes.",
             "span.http.method",
             "status_code",
             "status_message",
@@ -354,8 +366,10 @@ fn names_outside_the_vocabulary_are_dropped_and_reported() {
     );
     let v = result_of(spans, FieldKinds::default());
     assert_eq!(v["status"], json!({"partial": ["dropped_fields"]}));
+    assert_eq!(v["resources"], json!([]), "a bare prefix is no resource");
     for s in v["spans"].as_array().unwrap() {
         assert_eq!(s["fields"], json!([["name", "op"]]));
+        assert!(s.get("resource").is_none());
         assert_eq!(
             s["events"][0]["attributes"],
             json!([["events.attributes.k", "v"]])
@@ -1116,6 +1130,173 @@ fn a_trace_over_the_byte_budget_keeps_its_earliest_spans() {
     assert_eq!(v["status"], json!({"partial": ["byte_budget"]}));
 }
 
+/// A cut trace carries only the resources of the spans it keeps: with a
+/// resource of its own on every span, the table holds one entry per kept
+/// span, in span order, so the refused span's resource is not in it, and
+/// `spans` and `resources` together stay within the budget.
+#[test]
+fn a_cut_trace_carries_only_the_resources_of_its_kept_spans() {
+    let n = TRACE_SPANS_MAX_BYTES / TRACE_VALUE_MAX_BYTES + 50;
+    let id = |i: usize| sfst::SpanId::from((i as u64 + 1).to_be_bytes());
+    let spans: Vec<sfst::TraceSpan> = (0..n)
+        .map(|i| {
+            let mut s = span(1, None, 1_000 + i as i64);
+            s.span_id = id(i);
+            s.fields = vec![
+                (
+                    "resource.attributes.host".into(),
+                    format!("{i}-{}", "h".repeat(TRACE_VALUE_MAX_BYTES - 16)),
+                ),
+                ("name".into(), "op".into()),
+            ];
+            s
+        })
+        .collect();
+    let r = shaped_trace(spans);
+    let kept = r.spans.len();
+    assert!(kept > 0 && kept < n, "kept {kept} of {n}");
+    assert_eq!(r.resources.len(), kept);
+    for (i, s) in r.spans.iter().enumerate() {
+        assert_eq!(s.resource, Some(i as u32));
+        assert!(r.resources[i].attributes[0].1.starts_with(&format!("{i}-")));
+    }
+    assert!(json_len(&r.spans) + json_len(&r.resources) <= TRACE_SPANS_MAX_BYTES);
+    let v = serde_json::to_value(&r).unwrap();
+    assert_eq!(v["status"], json!({"partial": ["byte_budget"]}));
+}
+
+/// The pairs of `list`, owned.
+fn pairs(list: &[(&str, &str)]) -> Vec<(String, String)> {
+    list.iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect()
+}
+
+/// Each distinct resource goes out once, numbered in first-use order.
+/// Spans share an entry only when their resource pairs are equal in
+/// order: one more pair, or the same pairs in another order, is another
+/// entry. A span without resource attributes names none. Expanding a span
+/// (its entry's pairs, then its fields) gives back exactly the pairs the
+/// emission rule left on it before resources were shared, since every
+/// source stores a span's resource pairs first.
+#[test]
+fn each_resource_goes_out_once_and_expands_losslessly() {
+    let front = pairs(&[
+        ("resource.attributes.service.name", "front"),
+        ("resource.attributes.tags[]", "a"),
+        ("resource.attributes.tags[]", "b"),
+    ]);
+    let back = pairs(&[("resource.attributes.service.name", "back")]);
+    let back_v2 = pairs(&[
+        ("resource.attributes.service.name", "back"),
+        ("resource.attributes.service.version", "2"),
+    ]);
+    let reordered = pairs(&[
+        ("resource.attributes.tags[]", "b"),
+        ("resource.attributes.tags[]", "a"),
+        ("resource.attributes.service.name", "front"),
+    ]);
+    let own = pairs(&[
+        ("scope.name", "lib"),
+        ("name", "op"),
+        ("_kind", "2"),
+        ("attributes.k", "v"),
+    ]);
+    let layouts = [
+        [front.clone(), own.clone()].concat(),
+        [back.clone(), own.clone()].concat(),
+        own.clone(),
+        [front.clone(), own.clone()].concat(),
+        [back_v2.clone(), own.clone()].concat(),
+        [reordered.clone(), own.clone()].concat(),
+        [back.clone(), own.clone()].concat(),
+    ];
+    let spans: Vec<sfst::TraceSpan> = layouts
+        .iter()
+        .enumerate()
+        .map(|(i, fields)| {
+            let mut s = span(i as u8 + 1, None, 1_000 + i as i64);
+            s.fields = fields.clone();
+            s
+        })
+        .collect();
+    let input = spans.clone();
+    let r = shaped_trace(spans);
+    let indices: Vec<Option<u32>> = r.spans.iter().map(|s| s.resource).collect();
+    assert_eq!(
+        indices,
+        [Some(0), Some(1), None, Some(0), Some(2), Some(3), Some(1)]
+    );
+    let entries: Vec<&Vec<(String, String)>> = r.resources.iter().map(|e| &e.attributes).collect();
+    assert_eq!(entries, [&front, &back, &back_v2, &reordered]);
+    for (got, want) in r.spans.iter().zip(&input) {
+        let mut expanded = got
+            .resource
+            .map(|i| r.resources[i as usize].attributes.clone())
+            .unwrap_or_default();
+        expanded.extend(got.fields.iter().cloned());
+        let emitted: Vec<(String, String)> = want
+            .fields
+            .iter()
+            .filter(|(name, _)| matches!(field_use(name), FieldUse::Attribute | FieldUse::Plain))
+            .cloned()
+            .collect();
+        assert_eq!(expanded, emitted, "span {}", got.span_id);
+    }
+}
+
+/// A layout no source writes, resource pairs after other pairs, still
+/// shares by the pairs in order and expands with its resource pairs
+/// first.
+#[test]
+fn resource_pairs_out_of_front_still_share_by_their_order() {
+    let mut first = span(1, None, 1_000);
+    first.fields = pairs(&[
+        ("resource.attributes.service.name", "svc"),
+        ("resource.attributes.host", "h"),
+        ("name", "a"),
+    ]);
+    let mut scattered = span(2, None, 2_000);
+    scattered.fields = pairs(&[
+        ("scope.name", "lib"),
+        ("resource.attributes.service.name", "svc"),
+        ("name", "b"),
+        ("resource.attributes.host", "h"),
+    ]);
+    let r = shaped_trace(vec![first, scattered]);
+    assert_eq!(r.resources.len(), 1);
+    assert_eq!(r.spans[1].resource, Some(0));
+    assert_eq!(
+        r.spans[1].fields,
+        pairs(&[("scope.name", "lib"), ("name", "b")])
+    );
+}
+
+/// A resource value over the cap is cut once, in the shared entry, and
+/// flags the spans that carried it, as the cut flagged them before
+/// resources were shared.
+#[test]
+fn a_cut_resource_value_is_cut_once_and_flags_its_spans() {
+    let long = "x".repeat(TRACE_VALUE_MAX_BYTES + 10);
+    let spans = (1..=2u8)
+        .map(|i| {
+            let mut s = span(i, None, 1_000 * i64::from(i));
+            s.fields = vec![
+                ("resource.attributes.blob".into(), long.clone()),
+                ("name".into(), "op".into()),
+            ];
+            s
+        })
+        .collect();
+    let r = shaped_trace(spans);
+    assert_eq!(r.resources.len(), 1);
+    assert_eq!(r.resources[0].attributes[0].1.len(), TRACE_VALUE_MAX_BYTES);
+    assert!(
+        r.spans.iter().all(|s| s.resource == Some(0) && s.truncated),
+        "both spans carried the cut value"
+    );
+}
+
 /// The engine's field kinds for `spans` as storage names (span fields)
 /// and bare names (event and link attributes), every name holding `of`.
 fn kinds_of_input(spans: &[sfst::TraceSpan], of: sfst::ValueKinds) -> FieldKinds {
@@ -1135,15 +1316,16 @@ fn kinds_of_input(spans: &[sfst::TraceSpan], of: sfst::ValueKinds) -> FieldKinds
     k
 }
 
-/// The field kinds count against the byte budget, and the shaper charges
-/// exactly the keys `field_kinds` holds. A budget-bound trace whose names
-/// need escaping still fits. With every key holding every leaf kind (the
-/// entry the shaper charges), the charge is exact up to the two commas
-/// the last span and the last entry do not take; with ordinary kind sets
-/// it is an upper bound. Builtins, `trace_state` and internal copies are
-/// charged nothing.
+/// The field kinds and the resource table count against the byte budget,
+/// and the shaper charges exactly the keys `field_kinds` holds and the
+/// resources the spans share, each once. A budget-bound trace whose names
+/// and values need escaping still fits. With every key holding every leaf
+/// kind (the entry the shaper charges), the charge is exact up to the
+/// three commas the last span, the last resource and the last entry do
+/// not take; with ordinary kind sets it is an upper bound. Builtins,
+/// `trace_state` and internal copies are charged nothing.
 #[test]
-fn field_kinds_count_against_the_byte_budget() {
+fn field_kinds_and_resources_count_against_the_byte_budget() {
     use sfst::ValueKind::{Int, Str};
     let n = TRACE_SPANS_MAX_BYTES / 512;
     let id = |i: usize| sfst::SpanId::from((i as u64 + 1).to_be_bytes());
@@ -1152,6 +1334,10 @@ fn field_kinds_count_against_the_byte_budget() {
             let mut s = span(1, None, 1_000 + i as i64);
             s.span_id = id(i);
             s.fields = vec![
+                (
+                    format!("resource.attributes.r\"{}", i % 3),
+                    format!("v\u{1}{}", i % 3),
+                ),
                 (format!("attributes.f\"{i}\u{1}"), "x".repeat(100)),
                 ("name".into(), "op".into()),
                 ("status.code".into(), "OK".into()),
@@ -1175,7 +1361,8 @@ fn field_kinds_count_against_the_byte_budget() {
             shaper.shape(&mut s.clone()).weight
         })
         .sum();
-    let spans_bytes = json_len(&r.spans);
+    assert_eq!(r.resources.len(), 3, "three resources, shared");
+    let spans_bytes = json_len(&r.spans) + json_len(&r.resources);
     let every: sfst::ValueKinds = sfst::ValueKinds::LEAF_ORDER.into_iter().collect();
     let real = spans_bytes + json_len(&field_kinds_wire(kinds_of_input(&input[..kept], every)));
     assert!(
@@ -1183,7 +1370,7 @@ fn field_kinds_count_against_the_byte_budget() {
         "{real} > {TRACE_SPANS_MAX_BYTES}"
     );
     assert!(
-        (0..=2).contains(&(charged - real)),
+        (0..=3).contains(&(charged - real)),
         "charged {charged}, real {real}"
     );
     for of in [kinds(&[Str]), kinds(&[Int, Str])] {
