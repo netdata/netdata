@@ -5,7 +5,10 @@
 package runit
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"os/exec"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -50,5 +53,31 @@ func (e *svCliExec) StatusAll(dir string) ([]byte, error) {
 		return nil, fmt.Errorf("sv-status-all error: %w", err)
 	}
 
+	if err != nil {
+		e.logPartialOutput(err)
+	}
+
 	return bs, nil
+}
+
+// logPartialOutput reports why sv-status-all failed although its output is used.
+// Errors of ndsudo and sh never get here: they leave stdout empty,
+// so StatusAll returns them, and Collect logs them.
+func (e *svCliExec) logPartialOutput(err error) {
+	var exitErr *exec.ExitError
+
+	switch {
+	case errors.Is(err, context.DeadlineExceeded):
+		e.log.Warningf("sv-status-all timed out, statuses of some services may be missing: %v", err)
+	case !errors.As(err, &exitErr):
+		e.log.Warningf("sv-status-all unknown error, statuses of some services may be missing: %v", err)
+	case exitErr.ExitCode() == -1:
+		e.log.Warningf("sv-status-all was killed, statuses of some services may be missing: %v", err)
+	case exitErr.ExitCode() >= 1 && exitErr.ExitCode() <= 99:
+		// An expected state: sv names the services it could not report in `fail:` and `warning:` lines.
+	case exitErr.ExitCode() == 100:
+		e.log.Warningf("sv-status-all fatal error, statuses of some services may be missing: %v", err)
+	default:
+		e.log.Warningf("sv-status-all unknown exit code, statuses of some services may be missing: %v", err)
+	}
 }

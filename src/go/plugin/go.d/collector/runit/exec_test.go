@@ -5,7 +5,7 @@
 package runit
 
 import (
-	"io"
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
@@ -39,6 +39,7 @@ func TestSvCliExec_StatusAll(t *testing.T) {
 		finish   string // Shell code that ends the fake ndsudo.
 		wantData string
 		wantErr  bool
+		wantLog  []string // Expected parts of the logged warning; nothing is logged if empty.
 	}{
 		"all services reported": {
 			stdout:   svOutOK1 + svOutOK2,
@@ -72,21 +73,25 @@ func TestSvCliExec_StatusAll(t *testing.T) {
 			stderr:   "fatal: unable to change to original directory: permission denied\n",
 			finish:   "exit 100",
 			wantData: svOutOK1,
+			wantLog:  []string{"sv-status-all fatal error, statuses of some services may be missing: "},
 		},
 		"unexpected exit code after partial output": {
 			stdout:   svOutOK1,
 			finish:   "exit 150",
 			wantData: svOutOK1,
+			wantLog:  []string{"sv-status-all unknown exit code, statuses of some services may be missing: "},
 		},
 		"timeout after partial output": {
 			stdout:   svOutOK1,
 			finish:   "exec sleep 10",
 			wantData: svOutOK1,
+			wantLog:  []string{"sv-status-all timed out, statuses of some services may be missing: "},
 		},
 		"killed after partial output": {
 			stdout:   svOutOK1,
 			finish:   "kill -KILL $$",
 			wantData: svOutOK1,
+			wantLog:  []string{"sv-status-all was killed, statuses of some services may be missing: "},
 		},
 		"ndsudo error": {
 			stderr:  "ndsudo: failed to acquire root privileges (is the binary setuid-root?): Operation not permitted\n",
@@ -121,9 +126,10 @@ func TestSvCliExec_StatusAll(t *testing.T) {
 			t.Cleanup(func() {
 				ndexec.SetRunnerPathsForTests("", filepath.Join(buildinfo.PluginsDir, "ndsudo"))
 			})
+			var logs bytes.Buffer
 			cli := &svCliExec{
 				timeout: time.Second,
-				log:     logger.NewWithWriter(io.Discard),
+				log:     logger.NewWithWriter(&logs),
 			}
 
 			bs, err := cli.StatusAll(t.TempDir())
@@ -134,6 +140,14 @@ func TestSvCliExec_StatusAll(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, test.wantData, string(bs))
+			}
+			if len(test.wantLog) == 0 {
+				assert.Empty(t, logs.String())
+			} else {
+				assert.Contains(t, logs.String(), "level=warn")
+			}
+			for _, want := range test.wantLog {
+				assert.Contains(t, logs.String(), want)
 			}
 		})
 	}
