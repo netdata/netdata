@@ -593,13 +593,43 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_inst
                 goto release_journal;
             }
 
+            if (ctx->config.tier == 0) {
+                switch (njtf_check(datafile->journalfile, j2_header, journal_v2_file_size, uuid,
+                                   wanted_start_time_s, wanted_end_time_s)) {
+                    case NJTF_CHECK_SKIP:
+                        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.journal_v2_lookups_filter_skipped, 1, __ATOMIC_RELAXED);
+                        goto release_journal;
+
+                    case NJTF_CHECK_BYPASS:
+                        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.journal_v2_lookups_filter_bypassed, 1, __ATOMIC_RELAXED);
+                        break;
+
+                    case NJTF_CHECK_SEARCH:
+                        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.journal_v2_lookups_filter_passed, 1, __ATOMIC_RELAXED);
+                        break;
+                }
+            }
+
             struct journal_metric_list *uuid_entry =
                 bsearch(uuid, uuid_list, journal_metric_count, sizeof(*uuid_list), journal_metric_uuid_compare);
 
             if (unlikely(!uuid_entry)) {
                 // our UUID is not in this datafile
+                __atomic_add_fetch(&rrdeng_cache_efficiency_stats.journal_v2_lookups_not_found, 1, __ATOMIC_RELAXED);
                 goto release_journal;
             }
+
+            // The metric's range in this journal covers all of its pages here (the indexer widens it to every
+            // indexed page), so a window outside it cannot match any of them: skip reading the page list.
+            if (uuid_entry->delta_end_s >= uuid_entry->delta_start_s &&
+                is_page_in_time_range(journal_start_time_s + uuid_entry->delta_start_s,
+                                      journal_start_time_s + uuid_entry->delta_end_s,
+                                      wanted_start_time_s, wanted_end_time_s) != PAGE_IS_IN_RANGE) {
+                __atomic_add_fetch(&rrdeng_cache_efficiency_stats.journal_v2_lookups_range_skipped, 1, __ATOMIC_RELAXED);
+                goto release_journal;
+            }
+
+            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.journal_v2_lookups_searched, 1, __ATOMIC_RELAXED);
 
             struct journal_page_header *page_list_header =
                 (struct journal_page_header *)((uint8_t *)j2_header + uuid_entry->page_offset);
