@@ -608,6 +608,54 @@ fn a_high_cardinality_stack_counts_as_other() {
     assert_eq!(h.total, 1_201);
 }
 
+/// A file where the stack key is high-cardinality but the filter selects
+/// none of its spans adds nothing, so the answer stays complete.
+#[test]
+fn a_high_cardinality_file_without_selected_spans_does_not_count() {
+    let dir = tempfile::tempdir().unwrap();
+    let wide: Vec<SpanSpec> = (0..1_200u64)
+        .map(|i| SpanSpec {
+            trace: trace_bytes((i / 250) as usize),
+            attrs: vec![kv_str("user", &format!("u{i}"))],
+            ..sp(((i % 250) + 1) as u8, 0, BASE + i * 1000, "op")
+        })
+        .collect();
+    let narrow = vec![SpanSpec {
+        attrs: vec![kv_str("user", "u-narrow")],
+        ..sp(1, 0, BASE + 5 * NS, "other-op")
+    }];
+    let wide = write_wal(
+        dir.path(),
+        vec![req_with(vec![kv_str("service.name", "svc")], None, &wide)],
+        "wide",
+    );
+    let narrow = write_wal(
+        dir.path(),
+        vec![req_with(vec![kv_str("service.name", "svc")], None, &narrow)],
+        "narrow",
+    );
+    let data = run(
+        vec![
+            sealed_source(dir.path(), &wide, "wide"),
+            sealed_source(dir.path(), &narrow, "narrow"),
+        ],
+        ExploreQuery::new(grid())
+            .tokens(TokenQuery {
+                tokens: vec![positive(vec![builtin(
+                    BuiltinField::Name,
+                    CompareOp::Eq,
+                    "other-op",
+                )])],
+            })
+            .histogram("attributes.user"),
+    );
+    assert_eq!(data.status, QueryStatus::Complete);
+    let h = data.histogram.unwrap();
+    assert_eq!(h.dimensions, ["u-narrow"]);
+    assert_eq!(h.buckets.iter().map(|b| b.other).sum::<u64>(), 0);
+    assert_eq!(h.total, 1);
+}
+
 #[test]
 fn bad_requests_are_refused() {
     let query = || ExploreQuery::new(grid());

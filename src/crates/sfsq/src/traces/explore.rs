@@ -610,6 +610,12 @@ fn evaluate(
     errors.and_assign(&set);
     shard.matched = set.count_in_range(lo, hi);
     shard.errors = errors.count_in_range(lo, hi);
+    // Nothing selected here adds nothing: no stack (a key that is
+    // high-cardinality in this file is then no reason to be partial), no
+    // durations, no row candidates.
+    if shard.matched == 0 {
+        return Ok(Some(shard));
+    }
 
     if let Some(field) = request.stack {
         let filter = set.to_filter();
