@@ -10,9 +10,12 @@
 //!
 //! API shape: every bitmap is a `Copy` descriptor (universe size + level
 //! count) whose tree bytes live in an external `&[u8]` / `&mut Vec<u8>`
-//! blob passed to each method. Values are `u32` indexes below the universe
-//! size; a zero-byte blob is valid — the empty set for [`RawBitmap`], the
-//! full set for an inverted [`Bitmap`].
+//! blob passed to each method. The blob is exactly the tree's bytes, as a
+//! builder or `deserialize_from` produced them: `len`, `is_empty` and the
+//! set ops' tail copies read to its end, so no trailing bytes may follow.
+//! Values are `u32` indexes below the universe size; a zero-byte blob is
+//! valid — the empty set for [`RawBitmap`], the full set for an inverted
+//! [`Bitmap`].
 //!
 //! Modules:
 //! - `raw` — [`RawBitmap`] and [`Iter`]: build from a sorted iterator or a
@@ -108,7 +111,8 @@ pub fn ceil_log8(universe_size: u32) -> u32 {
 /// ```
 ///
 /// Pinned exact by the `estimate_data_size_is_exact` proptest
-/// (`tests_roaring.rs`) and by the fuzz target's closing size check
+/// (`tests_roaring.rs`), by `estimate_data_size_matches_builder` at every
+/// tree depth (`tests_raw.rs`), and by the fuzz target's closing size check
 /// (`fuzz/fuzz_targets/against_roaring.rs`), which
 /// asserts a blob stays exactly this size after arbitrary mutation
 /// sequences.
@@ -118,32 +122,24 @@ pub fn estimate_data_size(universe_size: u32, sorted_values: impl Iterator<Item 
         return 0;
     }
 
-    // Last-seen node index per non-root level; the root's index is always 0.
+    let mut values = sorted_values;
+    let Some(mut prev) = values.next() else {
+        return 0;
+    };
 
-    // 11 levels is the u32 maximum (32 bits / 3 bits per level, rounded up);
-    // raw.rs sizes its per-level arrays with the same bound.
-    const MAX_INNER_LEVELS: usize = 11;
-    let mut prev_node = [u32::MAX; MAX_INNER_LEVELS];
-    let inner_levels = levels as usize - 1;
-
-    let mut total: usize = 0;
-    let mut any = false;
-
-    for v in sorted_values {
-        any = true;
-
-        for (k, prev) in prev_node[..inner_levels].iter_mut().enumerate() {
-            let node = v >> (3 * (k + 1));
-
-            if node != *prev {
-                total += 1;
-                *prev = node;
-            }
+    // The first value opens one node byte per level. Each later value
+    // opens one node byte per level below the deepest node it shares with
+    // the previous one — the highest 3-bit group where they differ, as in
+    // `RawBitmap::from_sorted_iter` (raw.rs). The root byte is counted
+    // once, so the per-value count is capped at the levels below it.
+    let mut total = levels as usize;
+    for v in values {
+        let diff = v ^ prev;
+        if diff != 0 {
+            let shared = (31 - diff.leading_zeros()) / 3;
+            total += shared.min(levels - 1) as usize;
+            prev = v;
         }
-    }
-
-    if any {
-        total += 1; // root byte
     }
 
     total

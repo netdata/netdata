@@ -179,7 +179,7 @@ func TestProcessOwnedJobAttachmentPreservesTargetRetirementAfterCandidateFinaliz
 }
 
 func TestStagedJobPromotionDoesNotStartAfterCallerCancellation(t *testing.T) {
-	attempts := &unexpectedPendingJobAuthority{}
+	attempts := &unexpectedProcessAttemptAuthority{}
 	owner := newStagedJobOwner(
 		context.Background(),
 		ConstructedJob{},

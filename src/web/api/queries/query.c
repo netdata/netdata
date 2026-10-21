@@ -117,6 +117,17 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     if(!qt || !owa)
         return NULL;
 
+    if(unlikely(qt->internal.cancelled)) {
+        // the target build stopped early: never execute an incomplete target
+        RRDR *r = rrdr_create(owa, qt, 0, 0);
+        r->view.after = r->view.before = 0;
+        r->view.flags |= RRDR_RESULT_FLAG_CANCEL;
+        if(qt->internal.cancelled == QUERY_TARGET_CANCEL_TIMEOUT)
+            r->view.flags |= RRDR_RESULT_FLAG_TIMEOUT;
+        qt->timings.executed_ut = now_monotonic_usec();
+        return r;
+    }
+
     // qt.window members are the WANTED ones.
     // qt.request members are the REQUESTED ones.
 
@@ -312,6 +323,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
 
         if (qt->request.timeout_ms && ((NETDATA_DOUBLE)(now_ut - qt->timings.received_ut) / 1000.0) > (NETDATA_DOUBLE)qt->request.timeout_ms) {
             cancel = true;
+            r->view.flags |= RRDR_RESULT_FLAG_TIMEOUT;
             nd_log(NDLS_ACCESS, NDLP_WARNING, "QUERY CANCELED RUNTIME EXCEEDED %0.2f ms (LIMIT %lld ms)",
                        (NETDATA_DOUBLE)(now_ut - qt->timings.received_ut) / 1000.0, (long long)qt->request.timeout_ms);
         }

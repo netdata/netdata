@@ -8,6 +8,125 @@ void host_labels2json(RRDHOST *host, BUFFER *wb, const char *key) {
     buffer_json_object_close(wb);
 }
 
+void data_query_jsonp_parse_tqx(DATA_QUERY_JSONP *jp, char *value, DATASOURCE_FORMAT *format) {
+    // parse Google Visualization API options
+    // https://developers.google.com/chart/interactive/docs/dev/implementing_data_source
+    char *tqx_name, *tqx_value;
+
+    while(value) {
+        tqx_value = strsep_skip_consecutive_separators(&value, ";");
+        if(!tqx_value || !*tqx_value) continue;
+
+        tqx_name = strsep_skip_consecutive_separators(&tqx_value, ":");
+        if(!tqx_name || !*tqx_name) continue;
+        if(!tqx_value || !*tqx_value) continue;
+
+        if(!strcmp(tqx_name, "version"))
+            jp->google_version = tqx_value;
+        else if(!strcmp(tqx_name, "reqId"))
+            jp->google_reqId = tqx_value;
+        else if(!strcmp(tqx_name, "sig")) {
+            jp->google_sig = tqx_value;
+            jp->google_timestamp = strtoul(jp->google_sig, NULL, 0);
+        }
+        else if(!strcmp(tqx_name, "out")) {
+            jp->google_out = tqx_value;
+            *format = google_data_format_str_to_id(jp->google_out);
+        }
+        else if(!strcmp(tqx_name, "responseHandler"))
+            jp->responseHandler = tqx_value;
+        else if(!strcmp(tqx_name, "outFileName"))
+            jp->outFileName = tqx_value;
+    }
+}
+
+static void fix_google_param(char *s) {
+    if(unlikely(!s || !*s)) return;
+
+    for( ; *s ;s++) {
+        if(!isalnum((uint8_t)*s) && *s != '.' && *s != '_' && *s != '-')
+            *s = '_';
+    }
+}
+
+void data_query_jsonp_sanitize(DATA_QUERY_JSONP *jp) {
+    fix_google_param(jp->google_out);
+    fix_google_param(jp->google_sig);
+    fix_google_param(jp->google_reqId);
+    fix_google_param(jp->google_version);
+    fix_google_param(jp->responseHandler);
+    fix_google_param(jp->outFileName);
+}
+
+// checks the request deadline, then writes the attachment header and the JSONP preamble
+// returns 0 to continue, or the HTTP code to respond with
+int data_query_response_begin(struct web_client *w, DATA_QUERY_JSONP *jp, DATASOURCE_FORMAT format, int timeout, time_t sig) {
+    web_client_timeout_checkpoint_set(w, timeout);
+    if(web_client_timeout_checkpoint_and_check(w, NULL))
+        return w->response.code;
+
+    if(jp->outFileName && *jp->outFileName) {
+        buffer_sprintf(w->response.header, "Content-Disposition: attachment; filename=\"%s\"\r\n", jp->outFileName);
+        netdata_log_debug(D_WEB_CLIENT, "%llu: generating outfilename header: '%s'", w->id, jp->outFileName);
+    }
+
+    if(format == DATASOURCE_DATATABLE_JSONP) {
+        if(jp->responseHandler == NULL)
+            jp->responseHandler = "google.visualization.Query.setResponse";
+
+        netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: GOOGLE JSON/JSONP: version = '%s', reqId = '%s', sig = '%s', out = '%s', responseHandler = '%s', outFileName = '%s'",
+                          w->id, jp->google_version, jp->google_reqId, jp->google_sig, jp->google_out, jp->responseHandler, jp->outFileName
+        );
+
+        buffer_sprintf(
+            w->response.data,
+            "%s({version:'%s',reqId:'%s',status:'ok',sig:'%"PRId64"',table:",
+            jp->responseHandler,
+            jp->google_version,
+            jp->google_reqId,
+            (int64_t)sig);
+    }
+    else if(format == DATASOURCE_JSONP) {
+        if(jp->responseHandler == NULL)
+            jp->responseHandler = "callback";
+
+        buffer_strcat(w->response.data, jp->responseHandler);
+        buffer_strcat(w->response.data, "(");
+    }
+
+    return 0;
+}
+
+// executes the query and closes the JSONP wrapper opened by data_query_response_begin()
+int data_query_response_execute(ONEWAYALLOC *owa, struct web_client *w, QUERY_TARGET *qt, DATA_QUERY_JSONP *jp, DATASOURCE_FORMAT format) {
+    time_t last_timestamp_in_data = 0;
+    int ret = data_query_execute(owa, w->response.data, qt, &last_timestamp_in_data);
+    if(ret == HTTP_RESP_GATEWAY_TIMEOUT || ret == HTTP_RESP_CLIENT_CLOSED_REQUEST)
+        return ret; // a cancelled query has a plain-text error body: do not wrap it or mark it cacheable
+
+    if(format == DATASOURCE_DATATABLE_JSONP) {
+        if(jp->google_timestamp < last_timestamp_in_data)
+            buffer_strcat(w->response.data, "});");
+
+        else {
+            // the client already has the latest data
+            buffer_flush(w->response.data);
+            buffer_sprintf(w->response.data,
+                           "%s({version:'%s',reqId:'%s',status:'error',errors:[{reason:'not_modified',message:'Data not modified'}]});",
+                           jp->responseHandler, jp->google_version, jp->google_reqId);
+        }
+    }
+    else if(format == DATASOURCE_JSONP)
+        buffer_strcat(w->response.data, ");");
+
+    if(qt->internal.relative)
+        buffer_no_cacheable(w->response.data);
+    else
+        buffer_cacheable(w->response.data);
+
+    return ret;
+}
+
 void web_client_ensure_proper_authorization(struct web_client *w) {
     internal_fatal(w->user_auth.method != USER_AUTH_METHOD_NONE && !(w->user_auth.access & HTTP_ACCESS_SIGNED_ID),
                    "signed-in permission should be set, but is missing");

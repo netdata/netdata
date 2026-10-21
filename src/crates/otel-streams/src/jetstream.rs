@@ -82,13 +82,19 @@ pub struct Account {
     pub status: Option<AccountStatus>,
 }
 
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "snake_case")]
+/// The `knownValues` of `com.atproto.sync.subscribeRepos#account.status`.
+/// A value missing here fails the whole event, so keep it in sync with the
+/// lexicon.
+#[derive(Deserialize, Debug, PartialEq)]
+#[serde(rename_all = "lowercase")]
 pub enum AccountStatus {
     Deactivated,
     Deleted,
+    Desynchronized,
     Suspended,
+    #[serde(alias = "taken_down")]
     TakenDown,
+    Throttled,
 }
 
 impl std::fmt::Display for AccountStatus {
@@ -96,8 +102,10 @@ impl std::fmt::Display for AccountStatus {
         match self {
             AccountStatus::Deactivated => f.write_str("deactivated"),
             AccountStatus::Deleted => f.write_str("deleted"),
+            AccountStatus::Desynchronized => f.write_str("desynchronized"),
             AccountStatus::Suspended => f.write_str("suspended"),
-            AccountStatus::TakenDown => f.write_str("taken_down"),
+            AccountStatus::TakenDown => f.write_str("takendown"),
+            AccountStatus::Throttled => f.write_str("throttled"),
         }
     }
 }
@@ -237,6 +245,43 @@ impl Source for Jetstream {
             attributes,
             event_name: event.kind.to_string(),
             ..Default::default()
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn account_status_accepts_lexicon_values() {
+        let cases = [
+            ("deactivated", AccountStatus::Deactivated),
+            ("deleted", AccountStatus::Deleted),
+            ("desynchronized", AccountStatus::Desynchronized),
+            ("suspended", AccountStatus::Suspended),
+            ("takendown", AccountStatus::TakenDown),
+            ("taken_down", AccountStatus::TakenDown),
+            ("throttled", AccountStatus::Throttled),
+        ];
+        for (wire, expected) in cases {
+            let status: AccountStatus = serde_json::from_value(serde_json::json!(wire)).unwrap();
+            assert_eq!(status, expected, "{wire}");
+        }
+    }
+
+    #[test]
+    fn account_status_displays_wire_spelling() {
+        for wire in [
+            "deactivated",
+            "deleted",
+            "desynchronized",
+            "suspended",
+            "takendown",
+            "throttled",
+        ] {
+            let status: AccountStatus = serde_json::from_value(serde_json::json!(wire)).unwrap();
+            assert_eq!(status.to_string(), wire);
         }
     }
 }

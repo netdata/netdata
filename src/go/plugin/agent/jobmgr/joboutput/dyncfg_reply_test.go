@@ -61,7 +61,10 @@ func TestDynCfgJobResultsHaveOneOwner(t *testing.T) {
 func TestAdoptedUpdateWithBusyRuntimeStartsOnceTheRuntimeReleases(t *testing.T) {
 	controller, graph, _, _, state := newDynCfgJobTestHarness(t)
 	useV2CheckFailureCollector(controller, state, nil)
-	commands := &activationTestCommands{queue: make(chan activationTestSubmission, 8), stop: make(chan struct{})}
+	commands := &activationTestCommands{
+		queue: make(chan activationTestSubmission, 8),
+		stop:  make(chan struct{}),
+	}
 	require.NoError(t, controller.BindBackgroundWorkers(commands, 9, func(err error) {
 		t.Errorf("background worker failed: %v", err)
 	}))
@@ -80,20 +83,26 @@ func TestAdoptedUpdateWithBusyRuntimeStartsOnceTheRuntimeReleases(t *testing.T) 
 	config.SetSourceType(confgroup.TypeDyncfg)
 	config.SetSource("user=test")
 	config.SetProvider(confgroup.TypeDyncfg)
-	seedDynCfgJobGraphRecord(t, graph, config, dyncfg.StatusRunning)
+	seedDynCfgJobGraphRecord(t, controller, graph, config, dyncfg.StatusRunning)
 	record, exists := graph.Lookup(config.FullName())
 	require.True(t, exists)
 	var events []string
 	current := &transactionTestReadyResource{
-		identity: lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 1},
-		prefix:   "current",
-		events:   &events,
+		identity: lifecycle.ResourceIdentity{
+			ID:         config.FullName(),
+			Generation: 1,
+		},
+		prefix: "current",
+		events: &events,
 	}
 	permit, _ := issueTestJobPermit(t, config.FullName(), 2)
 	scope := lifecycle.ResourceTransactionScope{
-		ID:        config.FullName(),
-		Current:   current.identity,
-		Successor: lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 2},
+		ID:      config.FullName(),
+		Current: current.identity,
+		Successor: lifecycle.ResourceIdentity{
+			ID:         config.FullName(),
+			Generation: 2,
+		},
 	}
 	transaction, err := controller.prepareUpdate(
 		context.Background(),
@@ -154,15 +163,26 @@ func TestRolledBackTransactionAnswersUnavailable(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			identity := lifecycle.ResourceIdentity{ID: "job", Generation: 1}
+			identity := lifecycle.ResourceIdentity{
+				ID:         "job",
+				Generation: 1,
+			}
 			graph, err := dyncfg.NewGraph(nil)
 			require.NoError(t, err)
-			postimage := dyncfg.GraphConfig{ID: identity.ID, Module: "module", Name: "job", Status: dyncfg.StatusRunning.String()}
+			postimage := dyncfg.GraphConfig{
+				ID:     identity.ID,
+				Module: "module",
+				Name:   "job",
+				Status: dyncfg.StatusRunning.String(),
+			}
 			mutation, err := graph.PrepareMutation([]dyncfg.GraphChange{{ID: identity.ID, Config: &postimage}})
 			require.NoError(t, err)
 			var events []string
 			transaction, err := PrepareResourceTransaction(ResourceTransactionSpec{
-				Scope:       lifecycle.ResourceTransactionScope{ID: identity.ID, Successor: identity},
+				Scope: lifecycle.ResourceTransactionScope{
+					ID:        identity.ID,
+					Successor: identity,
+				},
 				Disposition: lifecycle.ResourceTransactionInstalled,
 				Successor: &transactionTestPreparedResource{
 					identity:  identity,
@@ -190,20 +210,32 @@ func TestRolledBackTransactionAnswersUnavailable(t *testing.T) {
 func TestAdoptedUpdateAnswersWithinTheRequestDeadline(t *testing.T) {
 	controller, graph, supervisor, output, state := newDynCfgJobTestHarness(t)
 	useV2CheckFailureCollector(controller, state, nil)
-	controller.factory.config.Attempts = blockingRuntimeTestAuthority{delegate: controller.factory.config.Attempts}
+	controller.factory.config.Attempts = blockingRuntimeTestAuthority{
+		delegate: controller.factory.config.Attempts,
+	}
 
 	config := factoryTestConfig(false)
 	config.SetSourceType(confgroup.TypeDyncfg)
 	config.SetSource("user=test")
 	config.SetProvider(confgroup.TypeDyncfg)
-	seedDynCfgJobGraphRecord(t, graph, config, dyncfg.StatusRunning)
+	seedDynCfgJobGraphRecord(t, controller, graph, config, dyncfg.StatusRunning)
 	var events []string
 	scope := lifecycle.ResourceTransactionScope{
-		ID:        config.FullName(),
-		Current:   lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 1},
-		Successor: lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 2},
+		ID: config.FullName(),
+		Current: lifecycle.ResourceIdentity{
+			ID:         config.FullName(),
+			Generation: 1,
+		},
+		Successor: lifecycle.ResourceIdentity{
+			ID:         config.FullName(),
+			Generation: 2,
+		},
 	}
-	current := &transactionTestReadyResource{identity: scope.Current, prefix: "current", events: &events}
+	current := &transactionTestReadyResource{
+		identity: scope.Current,
+		prefix:   "current",
+		events:   &events,
+	}
 	request := DynCfgJobRequest{
 		Args:         []string{"go.d:collector:module:job", string(dyncfg.CommandUpdate)},
 		Payload:      []byte(`{"option_str":"replacement"}`),
@@ -282,7 +314,10 @@ type releaseBusyRuntimeAuthority struct {
 	release <-chan struct{}
 }
 
-func (a releaseBusyRuntimeAuthority) StartProcessAttempt(ctx context.Context, plan jobmgr.ProcessAttemptPlan) (jobmgr.ProcessAttempt, error) {
+func (a releaseBusyRuntimeAuthority) StartProcessAttempt(
+	ctx context.Context,
+	plan jobmgr.ProcessAttemptPlan,
+) (jobmgr.ProcessAttempt, error) {
 	if plan.Identity.Namespace == jobmgr.ProcessAttemptJobRuntime {
 		select {
 		case <-a.release:
@@ -292,7 +327,10 @@ func (a releaseBusyRuntimeAuthority) StartProcessAttempt(ctx context.Context, pl
 	}
 	return a.ProcessAttemptAuthority.StartProcessAttempt(ctx, plan)
 }
-func (a releaseBusyRuntimeAuthority) ProcessAttemptReleased(identity jobmgr.ProcessAttemptIdentity) (<-chan struct{}, bool) {
+
+func (a releaseBusyRuntimeAuthority) ProcessAttemptReleased(
+	identity jobmgr.ProcessAttemptIdentity,
+) (<-chan struct{}, bool) {
 	if identity.Namespace == jobmgr.ProcessAttemptJobRuntime {
 		select {
 		case <-a.release:
