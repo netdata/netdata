@@ -217,6 +217,13 @@
 - Build(go.d): update Cato SDK to v1.1.0 ([#24362](https://github.com/netdata/netdata/issues/24362))
 - Aclk: restore the t-rx timestamp in HTTP replies ([#24252](https://github.com/netdata/netdata/issues/24252))
 - Query: stop building the query target on timeout or interrupt ([#24348](https://github.com/netdata/netdata/issues/24348))
+- Handle curl exit status 56 as a protocol failure in installer/updater. ([#24276](https://github.com/netdata/netdata/issues/24276))
+- Upload updater into a subdirectory instead of the root. ([#24377](https://github.com/netdata/netdata/issues/24377))
+- Fix(config): log the clamped value when update every exceeds the maximum ([#24378](https://github.com/netdata/netdata/issues/24378))
+- Streaming: keep a host alive while remove-stale-node removes it ([#24353](https://github.com/netdata/netdata/issues/24353))
+- Fix rclone upload for netdata-updater.sh ([#24379](https://github.com/netdata/netdata/issues/24379))
+- Update kickstart.sh to use new artifact hosting. ([#24279](https://github.com/netdata/netdata/issues/24279))
+- Treight: faster builders, lookups, counts and set operations ([#24381](https://github.com/netdata/netdata/issues/24381))
 
 ## [2.12.0] - 2026-09-30
 
