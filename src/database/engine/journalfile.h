@@ -23,6 +23,8 @@ typedef enum __attribute__ ((__packed__)) {
     JOURNALFILE_FLAG_METRIC_CRC_CHECK      = (1 << 3),
 } JOURNALFILE_FLAGS;
 
+#include "journalfile-filter.h"
+
 typedef enum __attribute__ ((__packed__)) {
     JOURNALFILE_V2_ACCESS_AUTO = 0,
     JOURNALFILE_V2_ACCESS_RANDOM,
@@ -49,6 +51,12 @@ struct rrdengine_journalfile {
     struct {
         Word_t indexed_as;
     } njfv2idx;
+
+    struct {
+        NJTF_STATE state;               // atomic; see journalfile-filter.h
+        uint8_t *map;                   // the mapped .njtf file, while state is NJTF_STATE_VALID
+        size_t map_size;
+    } njtf;
 
     struct {
         SPINLOCK spinlock;

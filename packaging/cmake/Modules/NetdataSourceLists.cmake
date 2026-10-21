@@ -984,6 +984,8 @@ set(RRD_DBENGINE_FILES
         src/database/engine/datafile.h
         src/database/engine/journalfile.c
         src/database/engine/journalfile.h
+        src/database/engine/journalfile-filter.c
+        src/database/engine/journalfile-filter.h
         src/database/engine/rrdenginelib.c
         src/database/engine/rrdenginelib.h
         src/database/engine/rrdengineapi.c

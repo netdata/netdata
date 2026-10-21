@@ -659,6 +659,7 @@ static int journalfile_v1_close(struct rrdengine_journalfile *journalfile, struc
 int journalfile_close(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)
 {
     journalfile_v2_data_unmap_permanently(journalfile);
+    njtf_release(journalfile);
 
     return journalfile_v1_close(journalfile, datafile);
 }
@@ -722,6 +723,10 @@ uint8_t journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, st
     // Wait for all references to be released and unmap before deleting files.
     // This prevents SIGBUS when threads are still accessing the mmap'd data.
     journalfile_v2_data_unmap_permanently(journalfile);
+
+    // nobody can be using the journal's time filter either
+    njtf_release(journalfile);
+    njtf_unlink(datafile);
 
     // Now safe to delete the files - no threads are accessing them
     uint8_t deleted = 0;
@@ -2061,6 +2066,12 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
             size_snprintf(size_for_humans, sizeof(size_for_humans), total_file_size, "B", false);
             netdata_log_info("DBENGINE: tier %d: migrated " WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION_V2 ", %s",
                            ctx->config.tier, datafile->tier, datafile->fileno, size_for_humans);
+
+            // tier 0 journals get a time filter for query planning, built from what was just written
+            // and verified now, so that queries never pay for it
+            if (ctx->config.tier == 0 && njtf_build(datafile, data_start, total_file_size) &&
+                njtf_verify_and_map(journalfile, data_start, total_file_size))
+                __atomic_store_n(&journalfile->njtf.state, NJTF_STATE_VALID, __ATOMIC_RELEASE);
 
             // msync(data_start, total_file_size, MS_SYNC);
             journalfile_v2_data_set(journalfile, fd_v2, data_start, total_file_size);

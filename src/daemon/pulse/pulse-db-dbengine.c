@@ -1301,6 +1301,79 @@ void pulse_dbengine_do(bool extended) {
     }
 
     {
+        // every journal v2 lookup of query planning ends in exactly one of these
+        static RRDSET *st_jv2_lookups = NULL;
+        static RRDDIM *rd_searched = NULL;
+        static RRDDIM *rd_not_found = NULL;
+        static RRDDIM *rd_range_skipped = NULL;
+        static RRDDIM *rd_filter_skipped = NULL;
+
+        if (unlikely(!st_jv2_lookups)) {
+            st_jv2_lookups = rrdset_create_localhost(
+                "netdata",
+                "dbengine_journal_lookups",
+                NULL,
+                "dbengine query router",
+                NULL,
+                "Netdata Database Journal Lookups of Query Planning",
+                "lookups/s",
+                "netdata",
+                "pulse",
+                priority,
+                localhost->rrd_update_every,
+                RRDSET_TYPE_STACKED);
+
+            rd_searched = rrddim_add(st_jv2_lookups, "searched", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_not_found = rrddim_add(st_jv2_lookups, "not in journal", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_range_skipped = rrddim_add(st_jv2_lookups, "outside metric range", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_filter_skipped = rrddim_add(st_jv2_lookups, "filter skipped", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        priority++;
+
+        rrddim_set_by_pointer(st_jv2_lookups, rd_searched, (collected_number)cache_efficiency_stats.journal_v2_lookups_searched);
+        rrddim_set_by_pointer(st_jv2_lookups, rd_not_found, (collected_number)cache_efficiency_stats.journal_v2_lookups_not_found);
+        rrddim_set_by_pointer(st_jv2_lookups, rd_range_skipped, (collected_number)cache_efficiency_stats.journal_v2_lookups_range_skipped);
+        rrddim_set_by_pointer(st_jv2_lookups, rd_filter_skipped, (collected_number)cache_efficiency_stats.journal_v2_lookups_filter_skipped);
+
+        rrdset_done(st_jv2_lookups);
+    }
+
+    {
+        // the time filter's verdict on every tier-0 journal lookup, exactly one each
+        static RRDSET *st_jv2_filter = NULL;
+        static RRDDIM *rd_skipped = NULL;
+        static RRDDIM *rd_passed = NULL;
+        static RRDDIM *rd_bypassed = NULL;
+
+        if (unlikely(!st_jv2_filter)) {
+            st_jv2_filter = rrdset_create_localhost(
+                "netdata",
+                "dbengine_journal_time_filter",
+                NULL,
+                "dbengine query router",
+                NULL,
+                "Netdata Database Journal Time Filter Verdicts",
+                "lookups/s",
+                "netdata",
+                "pulse",
+                priority,
+                localhost->rrd_update_every,
+                RRDSET_TYPE_STACKED);
+
+            rd_skipped = rrddim_add(st_jv2_filter, "skipped", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_passed = rrddim_add(st_jv2_filter, "passed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_bypassed = rrddim_add(st_jv2_filter, "bypassed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        priority++;
+
+        rrddim_set_by_pointer(st_jv2_filter, rd_skipped, (collected_number)cache_efficiency_stats.journal_v2_lookups_filter_skipped);
+        rrddim_set_by_pointer(st_jv2_filter, rd_passed, (collected_number)cache_efficiency_stats.journal_v2_lookups_filter_passed);
+        rrddim_set_by_pointer(st_jv2_filter, rd_bypassed, (collected_number)cache_efficiency_stats.journal_v2_lookups_filter_bypassed);
+
+        rrdset_done(st_jv2_filter);
+    }
+
+    {
         static RRDSET *st_prep_timings = NULL;
         static RRDDIM *rd_routing_sync = NULL;
         static RRDDIM *rd_routing_syncfirst = NULL;

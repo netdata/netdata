@@ -222,6 +222,17 @@ struct rrdeng_cache_efficiency_stats {
     PAD64(size_t) datafile_deletion_spin;
     PAD64(size_t) journal_v2_indexing_started;
     PAD64(size_t) metrics_retention_started;
+
+    // journal v2 lookups of query planning (one per metric per overlapping journal); every lookup ends in
+    // exactly one of: filter skipped, not found, range skipped, searched
+    PAD64(size_t) journal_v2_lookups_searched;         // the metric's page list was read
+    PAD64(size_t) journal_v2_lookups_not_found;        // the metric is not in the journal
+    PAD64(size_t) journal_v2_lookups_range_skipped;    // the metric is there, but its range misses the window
+    PAD64(size_t) journal_v2_lookups_filter_skipped;   // the time filter rules the journal out
+
+    // the time filter's verdict on tier-0 lookups; each tier-0 lookup gets exactly one
+    PAD64(size_t) journal_v2_lookups_filter_passed;    // the filter says the metric may be there: searched
+    PAD64(size_t) journal_v2_lookups_filter_bypassed;  // no usable time filter, or too many hours to check
 };
 
 typedef enum rrdeng_mem {
