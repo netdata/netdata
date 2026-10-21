@@ -16,6 +16,7 @@ SRCDIR := $(abspath $(MAKEFILE_DIR)../..)
 STAGING ?= staging
 CACHE ?= cache
 WORKDIR ?= work
+
 VERSION ?= $(shell cat $(SRCDIR)/packaging/version)
 
 NETDATA_SOURCE_DIR := /netdata
@@ -27,8 +28,13 @@ TARGET_STAMPS := $(WORKDIR)/$(BUILDARCH)/stamps
 TARGET_INSTALL_BASE := $(TARGET_STAGING)/install
 TARGET_INSTALL := $(TARGET_INSTALL_BASE)/$(NETDATA_PREFIX)
 TARGET_CACHE_ROOT := $(CACHE)/$(BUILDARCH)
-TARGET_CACHE := $(TARGET_CACHE_ROOT)/$(shell $(MAKEFILE_DIR)/scripts/cache-key.sh $(MAKEFILE_DIR))
 TARGET_PREP := $(TARGET_STAMPS)/prepare.stamp
+
+ifdef DEVTEST
+    TARGET_CACHE := $(TARGET_CACHE_ROOT)/DEVTEST
+else
+    TARGET_CACHE := $(TARGET_CACHE_ROOT)/$(shell $(MAKEFILE_DIR)/scripts/cache-key.sh $(MAKEFILE_DIR))
+endif
 
 DOCKER_STAGING := /staging
 DOCKER_WORKDIR := /work
@@ -120,9 +126,9 @@ NETDATA_RUSTFLAGS := -C target-feature=+crt-static
 NETDATA_PKGCONFIG_PATH := $(OPENSSL_PKGCONFIG_PATH):$(LIBNFACCT_PKGCONFIG_PATH):$(CURL_PKGCONFIG_PATH)
 NETDATA_CMAKE_OPTS := -DSTATIC_BUILD=On \
                       -DCMAKE_INSTALL_PREFIX=/$(NETDATA_PREFIX) \
-                      -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=On \
-                      -DUSE_LTO=On \
-                      -DENABLE_LIBBACKTRACE=On \
+                      -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=$(if $(DEVTEST),Off,On) \
+                      -DUSE_LTO=$(if $(DEVTEST),Off,On) \
+                      -DENABLE_LIBBACKTRACE=$(if $(DEVTEST),Off,On) \
                       -DENABLE_BUNDLED_PROTOBUF=On \
                       -DENABLE_EXPORTER_MONGODB=Off \
                       -DENABLE_PLUGIN_CUPS=Off \
@@ -149,6 +155,18 @@ ARCHIVE_DEPS := $(NETDATA_INSTALL) \
                 $(TARGET_INSTALL)/system/functions.sh \
                 $(TARGET_INSTALL)/system/post-installer.sh \
                 $(TARGET_INSTALL)/system/install-or-update.sh \
+                $(NULL)
+MAKESELF_OPTS = --notemp \
+                --needroot \
+                --sha256 \
+                --lsm $(MAKEFILE_DIR)/makeself.lsm \
+                --license $(MAKEFILE_DIR)/license.txt \
+                --help-header $(MAKEFILE_DIR)/help.txt \
+                --target /$(NETDATA_PREFIX) \
+                $(TARGET_INSTALL) \
+                $@ \
+                "Netdata, X-Ray Vision for your infrastructure" \
+                ./system/post-installer.sh \
                 $(NULL)
 
 ifneq ($(strip $(TOPOLOGY_STOCK_DIR)),)
@@ -494,7 +512,7 @@ $(CURL_CONFIG): $(TARGET_PREP) $(CURL_DIR) | $(OPENSSL_STAGING)
 			$(BUILDER) \
 			/bin/bash ./configure \
 				--prefix=$(CURL_DOCKER_STAGING) \
-				--enable-optimize \
+				$(if $(DEVTEST),--disable-optimize,--enable-optimize) \
 				--disable-docs \
 				--disable-shared \
 				--enable-static \
@@ -558,10 +576,9 @@ $(CURL_STAGING): $(TARGET_PREP) $(CURL_BUILD)
 	fi
 	touch $@
 
-$(TARGET_INSTALL)/bin/curl: $(TARGET_PREP) $(CURL_STAGING)
+$(TARGET_INSTALL)/bin/curl: $(CURL_STAGING)
 	mkdir -p $(TARGET_INSTALL)/bin
-	$(DOCKER) run $(DOCKER_ARGS) $(BUILDER) \
-		cp -a --reflink=auto $(DOCKER_STAGING)/curl/bin/curl $(DOCKER_INSTALL)/bin/curl
+	cp -a --reflink=auto $(TARGET_STAGING)/curl/bin/curl $@
 
 curl: $(TARGET_INSTALL)/bin/curl
 
@@ -638,7 +655,7 @@ $(BASH_BUILD): $(TARGET_PREP) $(BASH_CONFIG)
 	touch $@
 
 $(TARGET_INSTALL)/bin/bash: $(TARGET_PREP) $(BASH_BUILD)
-	mkdir -p $(TARGET_INSTALL)/bin
+	mkdir -p $(@D)
 	+$(DOCKER) run $(DOCKER_ARGS) \
 		$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
 		-e CFLAGS="$(BASH_CFLAGS)" \
@@ -694,7 +711,7 @@ $(IOPING_BUILD): $(TARGET_PREP) $(IOPING_CONFIG)
 	touch $@
 
 $(TARGET_INSTALL)/usr/libexec/netdata/plugins.d/ioping: $(TARGET_PREP) $(IOPING_BUILD)
-	mkdir -p $(TARGET_INSTALL)/usr/libexec/netdata/plugins.d
+	mkdir -p $(@D)
 	$(DOCKER) run $(DOCKER_ARGS) $(BUILDER) \
 		/usr/bin/install -o root -g root -m 4750 $(DOCKER_WORKDIR)/ioping/ioping $(DOCKER_INSTALL)/usr/libexec/netdata/plugins.d/
 	if [ ! -f $(IOPING_CACHE_HIT) ]; then \
@@ -767,13 +784,9 @@ $(NETDATA_INSTALL): $(NETDATA_BUILD)
 
 netdata: $(NETDATA_INSTALL)
 
-$(TARGET_INSTALL)/etc/.install-type: $(NETDATA_INSTALL)
-	echo INSTALL_TYPE='manual-static' >> $@
-	echo PREBUILT_ARCH='$(BUILDARCH)' >> $@
-
 # Testing rules
 
-check-static-linking: $(NETDATA_INSTALL)
+check-static-linking: $(TARGET_PREP) $(NETDATA_INSTALL)
 	$(DOCKER) run $(DOCKER_ARGS) \
 		$(BUILDER) \
 		/bin/sh $(NETDATA_SOURCE_DIR)/packaging/static/scripts/check-static-linking.sh $(DOCKER_INSTALL)
@@ -781,7 +794,7 @@ check-static-linking: $(NETDATA_INSTALL)
 check-systemd-caps: $(NETDATA_INSTALL)
 	$(MAKEFILE_DIR)/scripts/systemd-caps-check.sh $(MAKEFILE_DIR) $(TARGET_INSTALL)
 
-runtime-check: $(NETDATA_INSTALL)
+runtime-check: $(TARGET_PREP) $(NETDATA_INSTALL)
 	$(DOCKER) run $(DOCKER_ARGS) \
 		$(BUILDER) \
 		/bin/sh $(NETDATA_SOURCE_DIR)/packaging/static/scripts/runtime-check.sh $(DOCKER_INSTALL) $(NETDATA_SOURCE_DIR) $(BUILDARCH)
@@ -804,75 +817,48 @@ $(TARGET_STAMPS)/ca-certs.stamp: $(NETDATA_INSTALL)
 		cp -a --reflink=auto /etc/ssl $(DOCKER_INSTALL)/usr/share/ssl
 	touch $@
 
-$(TARGET_INSTALL)/var/cache/netdata/.keep:
-	mkdir -p $(TARGET_INSTALL)/var/cache/netdata
-	touch $@
+$(TARGET_INSTALL)/etc/.install-type: $(NETDATA_INSTALL)
+	echo INSTALL_TYPE='manual-static' >> $@
+	echo PREBUILT_ARCH='$(BUILDARCH)' >> $@
 
-$(TARGET_INSTALL)/var/lib/netdata/.keep:
-	mkdir -p $(TARGET_INSTALL)/var/lib/netdata
-	touch $@
-
-$(TARGET_INSTALL)/var/log/netdata/.keep:
-	mkdir -p $(TARGET_INSTALL)/var/log/netdata
+%/.keep:
+	mkdir -p $(@D)
 	touch $@
 
 $(TARGET_INSTALL)/system/functions.sh: $(SRCDIR)/packaging/installer/functions.sh
-	mkdir -p $(TARGET_INSTALL)/system
+	mkdir -p $(@D)
 	cp -a --reflink=auto $< $@
 
 $(TARGET_INSTALL)/system/post-installer.sh: $(SRCDIR)/packaging/static/installer/post-installer.sh
-	mkdir -p $(TARGET_INSTALL)/system
+	mkdir -p $(@D)
 	cp -a --reflink=auto $< $@
 
 $(TARGET_INSTALL)/system/install-or-update.sh: $(SRCDIR)/packaging/static/installer/install-or-update.sh
-	mkdir -p $(TARGET_INSTALL)/system
+	mkdir -p $(@D)
 	cp -a --reflink=auto $< $@
 
 makeself.lsm: makeself.lsm.in
 	sed -e 's|NETDATA_VERSION|$(VERSION)|' < $< > $@
 
 archives/netdata-$(BUILDARCH)-$(VERSION).gz.run: $(ARCHIVE_DEPS)
-	mkdir -p archives
+	mkdir -p $(@D)
 	rm -f $@
 	$(MAKEFILE_DIR)/makeself/makeself.sh \
-		--gzip \
-		--complevel 9 \
-		--notemp \
-		--needroot \
-		--sha256 \
-		--lsm $(MAKEFILE_DIR)/makeself.lsm \
-		--license $(MAKEFILE_DIR)/license.txt \
-		--help-header $(MAKEFILE_DIR)/help.txt \
-		--target /$(NETDATA_PREFIX) \
-		$(TARGET_INSTALL) \
-		$@ \
-		"Netdata, X-Ray Vision for your infrastructure" \
-		./system/post-installer.sh
+		--gzip --complevel 9 \
+		$(MAKESELF_OPTS)
+
+archives/netdata-$(BUILDARCH)-$(VERSION).zstd.run: $(ARCHIVE_DEPS)
+	mkdir -p $(@D)
+	rm -f $@
+	$(MAKEFILE_DIR)/makeself/makeself.sh \
+		--zstd --complevel 19 \
+		$(MAKESELF_OPTS)
 
 archives/netdata-$(BUILDARCH)-latest.gz.run: archives/netdata-$(BUILDARCH)-$(VERSION).gz.run
 	cp -a --reflink=auto $< $@
 
-archive-gz: archives/netdata-$(BUILDARCH)-latest.gz.run
-
-archives/netdata-$(BUILDARCH)-$(VERSION).zstd.run: $(ARCHIVE_DEPS)
-	mkdir -p archives
-	rm -f $@
-	$(MAKEFILE_DIR)/makeself/makeself.sh \
-		--zstd \
-		--complevel 19 \
-		--notemp \
-		--needroot \
-		--sha256 \
-		--lsm $(MAKEFILE_DIR)/makeself.lsm \
-		--license $(MAKEFILE_DIR)/license.txt \
-		--help-header $(MAKEFILE_DIR)/help.txt \
-		--target /$(NETDATA_PREFIX) \
-		$(TARGET_INSTALL) \
-		$@ \
-		"Netdata, X-Ray Vision for your infrastructure" \
-		./system/post-installer.sh
-
 archives/netdata-$(BUILDARCH)-latest.zstd.run: archives/netdata-$(BUILDARCH)-$(VERSION).zstd.run
 	cp -a --reflink=auto $< $@
 
+archive-gz: archives/netdata-$(BUILDARCH)-latest.gz.run
 archive-zstd: archives/netdata-$(BUILDARCH)-latest.zstd.run
