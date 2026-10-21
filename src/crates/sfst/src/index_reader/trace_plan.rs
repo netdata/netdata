@@ -104,7 +104,7 @@
 //! each side re-deriving the same file-vs-bounds agreement. Budget
 //! exhaustion is not an error: it is the `Ok(None)` above.
 
-use super::{FieldLocation, IndexReader, KvId, KvIdSet, PosSet};
+use super::{BitmapFilter, FieldLocation, IndexReader, KvId, KvIdSet, PosSet};
 
 /// How a [`PlanTerm::Fields`] term selects dictionary tokens.
 #[derive(Debug, Clone, PartialEq)]
@@ -655,6 +655,39 @@ impl IndexReader<'_> {
             });
         }
         Ok(Some(out))
+    }
+
+    /// The positions within `[lo, hi)` whose trace id is one of `ids`: a
+    /// fixed-width TRCE column read over the range, excluded from the
+    /// work units (like DURN). An unset id never matches. This is the
+    /// span-level trace-id filter; the trace-level lookup of every span
+    /// of one trace is `TraceFileSession`. Errors if the file carries no
+    /// TRCE column (not a traces file).
+    pub fn compile_trace_ids(
+        &self,
+        ids: &[crate::TraceId],
+        range: (u32, u32),
+    ) -> Result<CompiledTracePlan, crate::Error> {
+        let total = self.summary().record_count;
+        let (lo, hi) = (range.0.min(total), range.1.min(total));
+        let column = self.trace_ids()?;
+        if (column.len() as u32) < hi {
+            return Err(crate::Error::CorruptIndex(format!(
+                "trace ids: column length {} < range end {hi}",
+                column.len()
+            )));
+        }
+        let positions: Vec<u32> = (lo..hi)
+            .filter(|&pos| {
+                let id = column.get(pos as usize);
+                !id.is_unset() && ids.contains(&id)
+            })
+            .collect();
+        Ok(CompiledTracePlan {
+            set: PosSet::from_sorted(positions, total),
+            universe: total,
+            range: (lo, hi),
+        })
     }
 
     /// [`Self::compile_trace_plans`] for one plan.
@@ -1260,6 +1293,47 @@ impl IndexReader<'_> {
 }
 
 impl CompiledTracePlan {
+    /// Keep only the positions `other` matched too: the AND of two
+    /// plans on the same row, e.g. two search tokens required of one
+    /// span. Both plans must come from the same file and compile range.
+    pub fn and_assign(&mut self, other: &CompiledTracePlan) {
+        self.assert_same_scope(other);
+        self.set.and_assign(&other.set);
+    }
+
+    /// Drop the positions `other` matched: a row that must not match
+    /// `other`, e.g. a negated search token read per span. Both plans
+    /// must come from the same file and compile range.
+    pub fn and_not_assign(&mut self, other: &CompiledTracePlan) {
+        self.assert_same_scope(other);
+        self.set.and_not_assign(&other.set);
+    }
+
+    fn assert_same_scope(&self, other: &CompiledTracePlan) {
+        assert_eq!(
+            (self.universe, self.range),
+            (other.universe, other.range),
+            "plans compiled for different files or ranges"
+        );
+    }
+
+    /// The matched positions within the compile range as a
+    /// [`BitmapFilter`], so the per-bucket statistics
+    /// ([`IndexReader::timeline`], [`IndexReader::timeline_totals`],
+    /// [`IndexReader::matched_count`]) count exactly these rows. The set
+    /// acts as a global constraint, as a full-text query does, so those
+    /// methods never take their unfiltered fast path.
+    pub fn to_filter(&self) -> BitmapFilter {
+        let mut full = PosSet::range(self.range.0, self.range.1, self.universe);
+        full.and_assign(&self.set);
+        BitmapFilter {
+            universe: self.universe,
+            per_field: Vec::new(),
+            query: Some(full.clone()),
+            full,
+        }
+    }
+
     /// Whether position `pos` matched — a bitmap-tree probe, no row
     /// visit. Its cost grows with the tree bytes before `pos` (the
     /// serialized tree has no skip index), so many probes against one

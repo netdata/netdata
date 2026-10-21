@@ -1410,3 +1410,141 @@ fn big_integer_terms_select_exact_rows() {
         );
     }
 }
+
+/// Which fixture rows a case expects.
+type RowPredicate = Box<dyn Fn(&FixtureRow) -> bool>;
+
+/// Every matched position of `p` within `[lo, hi)`.
+fn matched(idx: &IndexReader<'_>, p: &TracePlan, (lo, hi): (u32, u32)) -> CompiledTracePlan {
+    idx.compile_trace_plan(p, (lo, hi), UNLIMITED, &mut ScanWork::default())
+        .unwrap()
+        .expect("an unbounded compile cannot run out of budget")
+}
+
+/// AND and AND-NOT of two compiled plans equal the per-row conjunction
+/// and difference inside the compile range, across tiers.
+#[test]
+fn plans_combine_per_row() {
+    let (buf, rows) = fixture();
+    let idx = IndexReader::open(&buf).unwrap();
+    let a = plan(vec![tokens("l", &["a"], &[])]);
+    let b = plan(vec![tokens("h", &["w000", "w003", "w050", "w100"], &[])]);
+    let in_a = |r: &FixtureRow| r.l == "a";
+    let in_b = |r: &FixtureRow| ["w000", "w003", "w050", "w100"].contains(&r.h.as_str());
+    for range in [(0, N as u32), (37, 201)] {
+        let mut both = matched(&idx, &a, range);
+        both.and_assign(&matched(&idx, &b, range));
+        let mut a_not_b = matched(&idx, &a, range);
+        a_not_b.and_not_assign(&matched(&idx, &b, range));
+        let mut w = ScanWork::default();
+        assert_eq!(
+            both.matched_in_range(range.0, range.1, &mut w),
+            oracle(&rows, |r| in_a(r) && in_b(r), range.0, range.1, N),
+            "{range:?}"
+        );
+        assert_eq!(
+            a_not_b.matched_in_range(range.0, range.1, &mut w),
+            oracle(&rows, |r| in_a(r) && !in_b(r), range.0, range.1, N),
+            "{range:?}"
+        );
+    }
+}
+
+#[test]
+#[should_panic(expected = "plans compiled for different files or ranges")]
+fn plans_of_different_ranges_do_not_combine() {
+    let (buf, _) = fixture();
+    let idx = IndexReader::open(&buf).unwrap();
+    let mut a = matched(&idx, &plan(Vec::new()), (0, 10));
+    a.and_assign(&matched(&idx, &plan(Vec::new()), (0, 11)));
+}
+
+/// A plan as a filter: the timeline, its totals and the matched count
+/// count exactly the plan's rows inside the compile range — an empty
+/// plan included, which must not widen to the whole file.
+#[test]
+fn a_plan_filters_the_per_bucket_statistics() {
+    let (buf, rows) = fixture();
+    let idx = IndexReader::open(&buf).unwrap();
+    // Four buckets of 64 positions: row i has timestamp 1_000 + i.
+    let grid = crate::Grid::new(1_000, 64, 4);
+    let cases: Vec<(TracePlan, RowPredicate)> = vec![
+        (plan(Vec::new()), Box::new(|_| true)),
+        (
+            plan(vec![tokens("m", &["v00", "v01", "v02"], &[])]),
+            Box::new(|r| ["v00", "v01", "v02"].contains(&r.m.as_str())),
+        ),
+    ];
+    for (p, want) in cases {
+        for range in [(0, N as u32), (37, 201)] {
+            let filter = matched(&idx, &p, range).to_filter();
+            let in_scope =
+                |i: usize| (range.0 as usize..range.1 as usize).contains(&i) && want(&rows[i]);
+            let per_bucket: Vec<u64> = (0..4)
+                .map(|b| (b * 64..(b + 1) * 64).filter(|&i| in_scope(i)).count() as u64)
+                .collect();
+            assert_eq!(idx.timeline_totals(&filter, grid).unwrap(), per_bucket);
+            assert_eq!(
+                idx.matched_count(&filter, 1_000..1_000 + N as i64).unwrap(),
+                per_bucket.iter().sum::<u64>()
+            );
+            let timeline = idx.timeline("l", &filter, grid).unwrap();
+            for (b, bucket) in timeline.buckets.iter().enumerate() {
+                for (dim, count) in timeline.dimensions.iter().zip(&bucket.counts) {
+                    let expected = (b * 64..(b + 1) * 64)
+                        .filter(|&i| in_scope(i) && &rows[i].l == dim)
+                        .count() as u64;
+                    assert_eq!(*count, expected, "bucket {b}, l={dim}, {range:?}");
+                }
+                assert_eq!(bucket.unset, 0);
+            }
+        }
+    }
+}
+
+/// The span-level trace-id filter: rows of the given traces inside the
+/// range; an unset id never matches; a file without TRCE errors.
+#[test]
+fn trace_ids_select_rows_inside_the_range() {
+    let tid = |b: u8| crate::TraceId::from([b; 16]);
+    let ids = [
+        tid(1),
+        tid(2),
+        tid(1),
+        crate::TraceId::from([0; 16]),
+        tid(3),
+        tid(1),
+        tid(2),
+        tid(1),
+    ];
+    let arena = Bump::new();
+    let mut ri = RowIndex::new(&arena, 10);
+    let mut trace_ids = crate::TraceIds::with_capacity(ids.len());
+    let mut span_ids = crate::SpanIds::with_capacity(ids.len());
+    let mut parents = crate::ParentSpanIds::with_capacity(ids.len());
+    for (i, &id) in ids.iter().enumerate() {
+        let token = ri.intern(None, "k=v");
+        ri.row(1_000 + i as i64, &[token]);
+        trace_ids.push(id);
+        span_ids.push(crate::SpanId::from([i as u8 + 1; 8]));
+        parents.push(crate::SpanId::UNSET);
+    }
+    ri.trace_ids = Some(trace_ids);
+    ri.span_ids = Some(span_ids);
+    ri.parent_span_ids = Some(parents);
+    ri.durations = Some(Durations(vec![5; ids.len()]));
+    ri.flags = Some(crate::Flags(vec![0; ids.len()]));
+    ri.dropped_attribute_counts = Some(crate::DroppedAttributeCounts(vec![0; ids.len()]));
+    let (buf, _s, _m) = IndexWriter::write_into(&ri, Cursor::new(Vec::new()), Vec::new()).unwrap();
+    let buf = buf.into_inner();
+    let idx = IndexReader::open(&buf).unwrap();
+    let got = idx
+        .compile_trace_ids(&[tid(1), tid(3), crate::TraceId::from([0; 16])], (1, 7))
+        .unwrap();
+    let mut w = ScanWork::default();
+    assert_eq!(got.matched_in_range(0, 8, &mut w), vec![2, 4, 5]);
+
+    let (plain, _) = fixture();
+    let plain = IndexReader::open(&plain).unwrap();
+    assert!(plain.compile_trace_ids(&[tid(1)], (0, 8)).is_err());
+}
