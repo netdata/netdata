@@ -158,6 +158,7 @@ modules:
                 - name: starting
                 - name: stopping
                 - name: paused
+                - name: enabled
             - name: runit.service_state_duration
               description: Service State Duration
               unit: seconds

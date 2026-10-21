@@ -1,0 +1,66 @@
+version: v1
+context_namespace: runit
+groups:
+  - family: summary
+    chart_defaults:
+      priority: 70000
+    metrics:
+      - running_services
+      - not_running_services
+    charts:
+      - id: services
+        title: Services
+        context: services
+        units: services
+        type: stacked
+        dimensions:
+          - selector: running_services
+            name: running
+          - selector: not_running_services
+            name: not_running
+  - family: state
+    chart_defaults:
+      priority: 70001
+      instances:
+        by_labels: [service_name]
+    metrics:
+      - service_state
+      - service_enabled
+    charts:
+      - title: Service State
+        context: service_state
+        units: state
+        dimensions:
+          - selector: service_state{service_state="running"}
+            name: running
+          - selector: service_state{service_state="down"}
+            name: down
+          - selector: service_state{service_state="failed"}
+            name: failed
+          - selector: service_state{service_state="starting"}
+            name: starting
+          - selector: service_state{service_state="stopping"}
+            name: stopping
+          - selector: service_state{service_state="paused"}
+            name: paused
+          - selector: service_enabled
+            name: enabled
+            options:
+              hidden: true
+  - family: uptime
+    chart_defaults:
+      priority: 70002
+      instances:
+        by_labels: [service_name]
+    metrics:
+      - service_state_duration_down
+      - service_state_duration_running
+    charts:
+      - title: Service State Duration
+        context: service_state_duration
+        units: seconds
+        dimensions:
+          - selector: service_state_duration_down
+            name: down
+          - selector: service_state_duration_running
+            name: running

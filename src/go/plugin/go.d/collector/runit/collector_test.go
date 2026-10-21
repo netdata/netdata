@@ -7,11 +7,14 @@ package runit
 import (
 	"bytes"
 	"errors"
+	"maps"
 	"os"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
 	"github.com/stretchr/testify/assert"
@@ -40,8 +43,8 @@ func TestNew(t *testing.T) {
 	collr := New()
 
 	assert.IsType(t, (*Collector)(nil), collr)
-	assert.NotNil(t, collr.charts)
-	assert.NotNil(t, collr.seen)
+	assert.NotNil(t, collr.MetricStore())
+	assert.NotNil(t, collr.metrics)
 }
 
 func TestCollector_Init(t *testing.T) {
@@ -55,19 +58,27 @@ func TestCollector_Init(t *testing.T) {
 			config: New().Config,
 		},
 		"success when 'dir' is existing directory": {
-			config: Config{Dir: "testdata"},
+			config: Config{
+				Dir: "testdata",
+			},
 		},
 		"fails when 'dir' is empty": {
 			wantFail: true,
-			config:   Config{Dir: ""},
+			config: Config{
+				Dir: "",
+			},
 		},
 		"fails when 'dir' is not a directory": {
 			wantFail: true,
-			config:   Config{Dir: "collector_test.go"},
+			config: Config{
+				Dir: "collector_test.go",
+			},
 		},
 		"fails when 'dir' is not exist": {
 			wantFail: true,
-			config:   Config{Dir: "nosuch"},
+			config: Config{
+				Dir: "nosuch",
+			},
 		},
 	}
 
@@ -85,11 +96,23 @@ func TestCollector_Init(t *testing.T) {
 	}
 }
 
-func TestCollector_Charts(t *testing.T) {
-	collr := New()
+func TestCollector_ChartTemplateYAML(t *testing.T) {
+	collecttest.AssertChartTemplateSchema(t, chartTemplateYAML)
 
-	assert.NotNil(t, collr.Charts())
-	assert.Len(t, *collr.Charts(), 1) // summary chart
+	spec, err := charttpl.DecodeYAML([]byte(chartTemplateYAML))
+	require.NoError(t, err)
+	_, err = chartengine.Compile(spec, 1)
+	require.NoError(t, err)
+}
+
+func TestArtifacts(t *testing.T) {
+	metadata, err := os.ReadFile("metadata.yaml")
+	require.NoError(t, err)
+	health, err := os.ReadFile("../../../../../health/health.d/runit.conf")
+	require.NoError(t, err)
+
+	collecttest.AssertMetadataDocumentsChartTemplate(t, metadata, chartTemplateYAML, nil)
+	collecttest.AssertHealthAlertsTargetChartTemplate(t, health, chartTemplateYAML)
 }
 
 func TestCollector_Check(t *testing.T) {
@@ -99,18 +122,24 @@ func TestCollector_Check(t *testing.T) {
 	}{
 		"success on valid response": {
 			prepare: func() *Collector {
-				return prepareMockCollector(&mockSvCli{data: dataSvStatusMultipleServices})
+				return prepareMockCollector(&mockSvCli{
+					data: dataSvStatusMultipleServices,
+				})
 			},
 		},
 		"fails on error": {
 			wantFail: true,
 			prepare: func() *Collector {
-				return prepareMockCollector(&mockSvCli{err: errors.New("mock error")})
+				return prepareMockCollector(&mockSvCli{
+					err: errors.New("mock error"),
+				})
 			},
 		},
 		"success on empty response": {
 			prepare: func() *Collector {
-				return prepareMockCollector(&mockSvCli{data: []byte{}})
+				return prepareMockCollector(&mockSvCli{
+					data: []byte{},
+				})
 			},
 		},
 	}
@@ -130,164 +159,104 @@ func TestCollector_Check(t *testing.T) {
 
 func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare       func() *Collector
-		wantCollected map[string]int64
-		wantCharts    int
+		prepare    func(t *testing.T) *Collector
+		wantSeries map[string]metrix.SampleValue
+		wantFail   bool
 	}{
 		"multiple services in various states": {
-			prepare: func() *Collector {
-				return prepareMockCollector(&mockSvCli{data: dataSvStatusMultipleServices})
+			prepare: func(*testing.T) *Collector {
+				return prepareMockCollector(&mockSvCli{
+					data: dataSvStatusMultipleServices,
+				})
 			},
-			wantCollected: map[string]int64{
-				// Summary: sshd=running, rest are not.
-				"running_services":     1,
-				"not_running_services": 5,
+			wantSeries: mergeSeries(
+				summarySeries(1, 5),
 				// sshd: run, 12345s — running, enabled (no "normally down").
-				"service_sshd_state_running":          1,
-				"service_sshd_state_down":             0,
-				"service_sshd_state_failed":           0,
-				"service_sshd_state_starting":         0,
-				"service_sshd_state_stopping":         0,
-				"service_sshd_state_paused":           0,
-				"service_sshd_state_enabled":          1,
-				"service_sshd_state_duration_running": 12345,
-				"service_sshd_state_duration_down":    0,
+				serviceSeries("sshd", stateRunning, true, 0, 12345),
 				// cron: run, (pid 123) 999s, paused — paused, enabled.
-				"service_cron_state_running":          0,
-				"service_cron_state_down":             0,
-				"service_cron_state_failed":           0,
-				"service_cron_state_starting":         0,
-				"service_cron_state_stopping":         0,
-				"service_cron_state_paused":           1,
-				"service_cron_state_enabled":          1,
-				"service_cron_state_duration_running": 999,
-				"service_cron_state_duration_down":    0,
+				serviceSeries("cron", statePaused, true, 0, 999),
 				// getty-5: down, 60s, normally up — failed, enabled.
-				"service_getty-5_state_running":          0,
-				"service_getty-5_state_down":             0,
-				"service_getty-5_state_failed":           1,
-				"service_getty-5_state_starting":         0,
-				"service_getty-5_state_stopping":         0,
-				"service_getty-5_state_paused":           0,
-				"service_getty-5_state_enabled":          1,
-				"service_getty-5_state_duration_running": 0,
-				"service_getty-5_state_duration_down":    60,
+				serviceSeries("getty-5", stateFailed, true, 60, 0),
 				// socklog: down, 5s, normally up, want up — starting, enabled.
-				"service_socklog_state_running":          0,
-				"service_socklog_state_down":             0,
-				"service_socklog_state_failed":           0,
-				"service_socklog_state_starting":         1,
-				"service_socklog_state_stopping":         0,
-				"service_socklog_state_paused":           0,
-				"service_socklog_state_enabled":          1,
-				"service_socklog_state_duration_running": 0,
-				"service_socklog_state_duration_down":    5,
+				serviceSeries("socklog", stateStarting, true, 5, 0),
 				// ntpd: down, 100s — down, not enabled.
-				"service_ntpd_state_running":          0,
-				"service_ntpd_state_down":             1,
-				"service_ntpd_state_failed":           0,
-				"service_ntpd_state_starting":         0,
-				"service_ntpd_state_stopping":         0,
-				"service_ntpd_state_paused":           0,
-				"service_ntpd_state_enabled":          0,
-				"service_ntpd_state_duration_running": 0,
-				"service_ntpd_state_duration_down":    100,
-				// dhclient: finish, 3s — stopping, enabled (no "normally down").
-				"service_dhclient_state_running":          0,
-				"service_dhclient_state_down":             0,
-				"service_dhclient_state_failed":           0,
-				"service_dhclient_state_starting":         0,
-				"service_dhclient_state_stopping":         1,
-				"service_dhclient_state_paused":           0,
-				"service_dhclient_state_enabled":          1,
-				"service_dhclient_state_duration_running": 0,
-				"service_dhclient_state_duration_down":    0,
-			},
-			wantCharts: 1 + 6*2, // summary + 6 services * 2 charts each
+				serviceSeries("ntpd", stateDown, false, 100, 0),
+				// dhclient: finish, 3s — stopping, enabled (no "normally down"),
+				// a transitional state with neither down nor running duration.
+				serviceSeries("dhclient", stateStopping, true, 0, 0),
+			),
 		},
 		"service with log subprocess": {
-			prepare: func() *Collector {
-				return prepareMockCollector(&mockSvCli{data: dataSvStatusWithLog})
+			prepare: func(*testing.T) *Collector {
+				return prepareMockCollector(&mockSvCli{
+					data: dataSvStatusWithLog,
+				})
 			},
-			wantCollected: map[string]int64{
-				"running_services":     2,
-				"not_running_services": 0,
+			wantSeries: mergeSeries(
+				summarySeries(2, 0),
 				// socklog: run, 500s; log subprocess also running. Both enabled.
-				"service_socklog_state_running":              1,
-				"service_socklog_state_down":                 0,
-				"service_socklog_state_failed":               0,
-				"service_socklog_state_starting":             0,
-				"service_socklog_state_stopping":             0,
-				"service_socklog_state_paused":               0,
-				"service_socklog_state_enabled":              1,
-				"service_socklog_state_duration_running":     500,
-				"service_socklog_state_duration_down":        0,
-				"service_socklog/log_state_running":          1,
-				"service_socklog/log_state_down":             0,
-				"service_socklog/log_state_failed":           0,
-				"service_socklog/log_state_starting":         0,
-				"service_socklog/log_state_stopping":         0,
-				"service_socklog/log_state_paused":           0,
-				"service_socklog/log_state_enabled":          1,
-				"service_socklog/log_state_duration_running": 500,
-				"service_socklog/log_state_duration_down":    0,
+				serviceSeries("socklog", stateRunning, true, 0, 500),
+				serviceSeries("socklog/log", stateRunning, true, 0, 500),
+			),
+		},
+		"running but normally down": {
+			prepare: func(*testing.T) *Collector {
+				return prepareMockCollector(&mockSvCli{
+					data: []byte("run: /service/oneshot: (pid 99) 5s, normally down\n"),
+				})
 			},
-			wantCharts: 1 + 2*2, // summary + 2 services (main + log) * 2 charts
+			wantSeries: mergeSeries(
+				summarySeries(1, 0),
+				serviceSeries("oneshot", stateRunning, false, 0, 5),
+			),
 		},
 		"service disappears on second collect": {
-			prepare: func() *Collector {
-				mock := &mockSvCli{data: dataSvStatusMultipleServices}
+			prepare: func(t *testing.T) *Collector {
+				mock := &mockSvCli{
+					data: dataSvStatusMultipleServices,
+				}
 				collr := prepareMockCollector(mock)
-				// First collect — all services appear.
-				collr.Collect(t.Context())
-				// Second collect — only sshd remains.
+				_, err := collectSeries(t, collr)
+				require.NoError(t, err)
 				mock.data = dataSvStatusSingleService
 				return collr
 			},
-			wantCollected: map[string]int64{
-				"running_services":                    1,
-				"not_running_services":                0,
-				"service_sshd_state_running":          1,
-				"service_sshd_state_down":             0,
-				"service_sshd_state_failed":           0,
-				"service_sshd_state_starting":         0,
-				"service_sshd_state_stopping":         0,
-				"service_sshd_state_paused":           0,
-				"service_sshd_state_enabled":          1,
-				"service_sshd_state_duration_running": 12345,
-				"service_sshd_state_duration_down":    0,
-			},
-			wantCharts: 1 + 1*2, // summary + 1 service * 2 charts (others removed)
+			wantSeries: mergeSeries(
+				summarySeries(1, 0),
+				serviceSeries("sshd", stateRunning, true, 0, 12345),
+			),
 		},
 		"empty response": {
-			prepare: func() *Collector {
-				return prepareMockCollector(&mockSvCli{data: []byte{}})
+			prepare: func(*testing.T) *Collector {
+				return prepareMockCollector(&mockSvCli{
+					data: []byte{},
+				})
 			},
-			wantCollected: map[string]int64{
-				"running_services":     0,
-				"not_running_services": 0,
-			},
-			wantCharts: 1, // only summary
+			wantSeries: summarySeries(0, 0),
 		},
 		"error response": {
-			prepare: func() *Collector {
-				return prepareMockCollector(&mockSvCli{err: errors.New("mock error")})
+			prepare: func(*testing.T) *Collector {
+				return prepareMockCollector(&mockSvCli{
+					err: errors.New("mock error"),
+				})
 			},
-			wantCollected: nil,
+			wantFail: true,
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			collr := test.prepare()
+			collr := test.prepare(t)
 
-			mx := collr.Collect(t.Context())
+			series, err := collectSeries(t, collr)
 
-			assert.Equal(t, test.wantCollected, mx)
-			if test.wantCharts > 0 {
-				assert.Equal(t, test.wantCharts, calcActiveCharts(collr.Charts()))
-				collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+			if test.wantFail {
+				assert.Error(t, err)
+				return
 			}
+			require.NoError(t, err)
+			assert.Equal(t, test.wantSeries, series)
+			collecttest.AssertChartCoverage(t, collr, collecttest.ChartCoverageExpectation{})
 		})
 	}
 }
@@ -297,46 +266,107 @@ func TestCollector_Cleanup(t *testing.T) {
 	assert.NotPanics(t, func() { collr.Cleanup(t.Context()) })
 }
 
+func summarySeries(running, notRunning metrix.SampleValue) map[string]metrix.SampleValue {
+	return map[string]metrix.SampleValue{
+		"running_services":     running,
+		"not_running_services": notRunning,
+	}
+}
+
+func serviceSeries(name, state string, enabled bool, down, running metrix.SampleValue) map[string]metrix.SampleValue {
+	label := `{service_name="` + name + `"}`
+	series := map[string]metrix.SampleValue{
+		"service_enabled" + label:                0,
+		"service_state_duration_down" + label:    down,
+		"service_state_duration_running" + label: running,
+	}
+	if enabled {
+		series["service_enabled"+label] = 1
+	}
+	for _, s := range serviceStates {
+		var v metrix.SampleValue
+		if s == state {
+			v = 1
+		}
+		series[`service_state{service_name="`+name+`",service_state="`+s+`"}`] = v
+	}
+	return series
+}
+
+func mergeSeries(parts ...map[string]metrix.SampleValue) map[string]metrix.SampleValue {
+	out := make(map[string]metrix.SampleValue)
+	for _, part := range parts {
+		maps.Copy(out, part)
+	}
+	return out
+}
+
 func TestClassifyState(t *testing.T) {
 	tests := map[string]struct {
 		status *ServiceStatus
 		want   string
 	}{
 		"run state": {
-			status: &ServiceStatus{State: ServiceStateRun},
-			want:   stateRunning,
+			status: &ServiceStatus{
+				State: ServiceStateRun,
+			},
+			want: stateRunning,
 		},
 		"run but paused": {
-			status: &ServiceStatus{State: ServiceStateRun, Paused: true},
-			want:   statePaused,
+			status: &ServiceStatus{
+				State:  ServiceStateRun,
+				Paused: true,
+			},
+			want: statePaused,
 		},
 		"finish state": {
-			status: &ServiceStatus{State: ServiceStateFinish},
-			want:   stateStopping,
+			status: &ServiceStatus{
+				State: ServiceStateFinish,
+			},
+			want: stateStopping,
 		},
 		"finish but paused": {
-			status: &ServiceStatus{State: ServiceStateFinish, Paused: true},
-			want:   statePaused,
+			status: &ServiceStatus{
+				State:  ServiceStateFinish,
+				Paused: true,
+			},
+			want: statePaused,
 		},
 		"down, not enabled": {
-			status: &ServiceStatus{State: ServiceStateDown, Enabled: false},
-			want:   stateDown,
+			status: &ServiceStatus{
+				State:   ServiceStateDown,
+				Enabled: false,
+			},
+			want: stateDown,
 		},
 		"down, enabled (failed)": {
-			status: &ServiceStatus{State: ServiceStateDown, Enabled: true},
-			want:   stateFailed,
+			status: &ServiceStatus{
+				State:   ServiceStateDown,
+				Enabled: true,
+			},
+			want: stateFailed,
 		},
 		"down, want up (starting)": {
-			status: &ServiceStatus{State: ServiceStateDown, WantUp: true},
-			want:   stateStarting,
+			status: &ServiceStatus{
+				State:  ServiceStateDown,
+				WantUp: true,
+			},
+			want: stateStarting,
 		},
 		"down, enabled, want up (starting wins)": {
-			status: &ServiceStatus{State: ServiceStateDown, Enabled: true, WantUp: true},
-			want:   stateStarting,
+			status: &ServiceStatus{
+				State:   ServiceStateDown,
+				Enabled: true,
+				WantUp:  true,
+			},
+			want: stateStarting,
 		},
 		"down, paused": {
-			status: &ServiceStatus{State: ServiceStateDown, Paused: true},
-			want:   statePaused,
+			status: &ServiceStatus{
+				State:  ServiceStateDown,
+				Paused: true,
+			},
+			want: statePaused,
 		},
 	}
 
@@ -432,7 +462,9 @@ func TestServicesCli(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			var logs bytes.Buffer
-			collr := prepareMockCollector(&mockSvCli{data: test.data})
+			collr := prepareMockCollector(&mockSvCli{
+				data: test.data,
+			})
 			collr.Logger = logger.NewWithWriter(&logs)
 			services, err := collr.servicesCli()
 			require.NoError(t, err)
@@ -491,7 +523,9 @@ func TestParseServiceStatus(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			collr := prepareMockCollector(&mockSvCli{data: test.data})
+			collr := prepareMockCollector(&mockSvCli{
+				data: test.data,
+			})
 			services, err := collr.servicesCli()
 			require.NoError(t, err)
 			require.Contains(t, services, test.name)
@@ -505,31 +539,6 @@ func TestParseServiceStatus(t *testing.T) {
 	}
 }
 
-func TestCollector_Collect_FinishStateDuration(t *testing.T) {
-	collr := prepareMockCollector(&mockSvCli{
-		data: []byte("finish: /service/dhclient: 3s\n"),
-	})
-
-	mx := collr.Collect(t.Context())
-
-	// finish is a transitional state — neither down nor running duration is set.
-	assert.Equal(t, int64(0), mx["service_dhclient_state_duration_down"])
-	assert.Equal(t, int64(0), mx["service_dhclient_state_duration_running"])
-	assert.Equal(t, int64(1), mx["service_dhclient_state_stopping"])
-}
-
-func TestCollector_Collect_NormallyDownRunning(t *testing.T) {
-	collr := prepareMockCollector(&mockSvCli{
-		data: []byte("run: /service/oneshot: (pid 99) 5s, normally down\n"),
-	})
-
-	mx := collr.Collect(t.Context())
-
-	// Running but normally down: enabled=false (should not be running).
-	assert.Equal(t, int64(1), mx["service_oneshot_state_running"])
-	assert.Equal(t, int64(0), mx["service_oneshot_state_enabled"])
-}
-
 // --- helpers ---
 
 func prepareMockCollector(mock svCli) *Collector {
@@ -539,14 +548,9 @@ func prepareMockCollector(mock svCli) *Collector {
 	return collr
 }
 
-func calcActiveCharts(charts *collectorapi.Charts) int {
-	n := 0
-	for _, c := range *charts {
-		if !c.Obsolete {
-			n++
-		}
-	}
-	return n
+func collectSeries(t *testing.T, collr *Collector) (map[string]metrix.SampleValue, error) {
+	t.Helper()
+	return collecttest.CollectScalarSeries(collr, metrix.ReadFlatten())
 }
 
 type mockSvCli struct {

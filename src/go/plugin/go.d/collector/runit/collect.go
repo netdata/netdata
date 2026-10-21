@@ -4,35 +4,30 @@
 
 package runit
 
-func (c *Collector) collect() (map[string]int64, error) {
+import (
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+)
+
+func (c *Collector) collect() error {
 	services, err := c.servicesCli()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	mx := make(map[string]int64, 2+len(services)*9)
-	seen := make(map[string]bool)
-
+	meter := c.store.Write().SnapshotMeter("")
 	var running, notRunning int64
 
 	for name, status := range services {
-		seen[name] = true
-		if !c.seen[name] {
-			c.seen[name] = true
-			c.addServiceCharts(name)
-		}
-
+		labels := meter.LabelSet(metrix.Label{
+			Key:   labelServiceName,
+			Value: name,
+		})
 		state := classifyState(status)
 
-		// State chart: exactly one state dimension is 1, rest are 0.
-		chartID := serviceStateChartID(name)
-		for _, s := range serviceStates {
-			mx[serviceDimID(chartID, s)] = 0
-		}
-		mx[serviceDimID(chartID, state)] = 1
-
-		// Chart variable for alerts: 1 if service should be running.
-		mx[serviceDimID(chartID, stateEnabled)] = boolToInt64(status.Enabled)
+		c.metrics.state.ObserveStateSet(metrix.StateSetPoint{
+			States: map[string]bool{state: true},
+		}, labels)
+		c.metrics.enabled.Observe(boolToFloat(status.Enabled), labels)
 
 		if state == stateRunning {
 			running++
@@ -40,32 +35,24 @@ func (c *Collector) collect() (map[string]int64, error) {
 			notRunning++
 		}
 
-		// Duration chart: down and running durations.
-		durationChartID := serviceStateDurationChartID(name)
-		mx[serviceDimID(durationChartID, stateDown)] = 0
-		mx[serviceDimID(durationChartID, stateRunning)] = 0
+		var down, run float64
 		switch status.State {
 		case ServiceStateDown:
-			mx[serviceDimID(durationChartID, stateDown)] = int64(status.StateDuration.Seconds())
+			down = status.StateDuration.Seconds()
 		case ServiceStateRun:
-			mx[serviceDimID(durationChartID, stateRunning)] = int64(status.StateDuration.Seconds())
+			run = status.StateDuration.Seconds()
 		}
+		c.metrics.durationDown.Observe(down, labels)
+		c.metrics.durationRunning.Observe(run, labels)
 	}
 
-	mx["running_services"] = running
-	mx["not_running_services"] = notRunning
+	c.metrics.runningServices.Observe(float64(running))
+	c.metrics.notRunningServices.Observe(float64(notRunning))
 
-	for name := range c.seen {
-		if !seen[name] {
-			delete(c.seen, name)
-			c.removeServiceCharts(name)
-		}
-	}
-
-	return mx, nil
+	return nil
 }
 
-func boolToInt64(v bool) int64 {
+func boolToFloat(v bool) float64 {
 	if v {
 		return 1
 	}
