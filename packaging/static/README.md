@@ -11,6 +11,7 @@ Building requires the following tools:
 - GNU Make 4.4 or newer
 - A recent version of either Docker or Podman
 - A recent version of Git
+- A recent version of GNU Coreutils
 - GNU wget or Busybox wget
 - Zopfli for creation of the gzip compressed archive
 - Zstd for creation of the zstd compressed archive
