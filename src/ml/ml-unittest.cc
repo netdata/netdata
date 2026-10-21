@@ -522,6 +522,62 @@ static void test_kmeans_flat_spread_abstains()
     ML_TEST_ASSERT(std::isnan(score), "min_dist -inf, max_dist +inf should stay NaN (skipped by predict)");
 }
 
+// Test: a model whose training distances are all 0 must abstain (score NaN).
+// A series repeating every 3 samples is not constant, but with diff_n=1 and
+// smooth_n=3 each smoothed difference is x[i+3] - x[i] = 0, so every feature
+// is 0. Training used to leave max_dist at its DBL_MIN start value, which the
+// flat check missed, so any later change scored 100.
+static void test_kmeans_zero_distance_model_abstains()
+{
+    fprintf(stderr, "  test_kmeans_zero_distance_model_abstains...\n");
+
+    const size_t diff_n = 1;
+    const size_t smooth_n = 3;
+    const size_t lag_n = 5;
+    const size_t n = 60;
+
+    calculated_number_t src[n], dst[n];
+    for (size_t i = 0; i < n; i++)
+        src[i] = (i % 3 == 1) ? 1.0 : 0.0;
+    memcpy(dst, src, sizeof(src));
+
+    std::vector<DSample> training;
+    ml_features_t features = {
+        diff_n, smooth_n, lag_n,
+        dst, n, src, n
+    };
+    ml_features_preprocess(&features, training, 1.0);
+    ML_TEST_ASSERT(training.size() >= 2, "period-3 series should produce training vectors");
+
+    bool all_zero = true;
+    for (const auto &s : training)
+        for (long i = 0; i < s.size(); i++)
+            all_zero = all_zero && s(i) == 0.0;
+    ML_TEST_ASSERT(all_zero, "period-3 series should produce all-zero features");
+
+    ml_kmeans_t trained;
+    ml_kmeans_init(&trained);
+    ml_kmeans_train(&trained, training, 1000, 0, 100);
+    ML_TEST_ASSERT(trained.min_dist == 0.0 && trained.max_dist == 0.0,
+                   "all-zero distances should train equal (0, 0) bounds");
+
+    // A later change in the series.
+    DSample change;
+    change.set_size(lag_n + 1);
+    for (size_t i = 0; i < lag_n + 1; i++)
+        change(i) = 0.0;
+    change(0) = 1.0;
+
+    ml_kmeans_inlined_t trained_inlined(trained);
+    calculated_number_t score = ml_kmeans_anomaly_score(&trained_inlined, change);
+    ML_TEST_ASSERT(std::isnan(score), "zero-distance model should abstain for a change");
+
+    // The same model as stored by older agents: (0, DBL_MIN).
+    trained_inlined.max_dist = std::numeric_limits<calculated_number_t>::min();
+    score = ml_kmeans_anomaly_score(&trained_inlined, change);
+    ML_TEST_ASSERT(std::isnan(score), "legacy (0, DBL_MIN) model should abstain for a change");
+}
+
 // Test: converting an empty ml_kmeans_t must produce deterministic zeroed centers.
 static void test_kmeans_inlined_empty_source_is_zero_initialized()
 {
@@ -1502,6 +1558,7 @@ extern "C" int ml_unittest()
     test_features_unused_rows_are_zero();
     test_kmeans_scoring();
     test_kmeans_flat_spread_abstains();
+    test_kmeans_zero_distance_model_abstains();
     test_full_pipeline();
     test_kmeans_inlined_empty_source_is_zero_initialized();
     test_features_preprocess_below_min_for_kmeans();

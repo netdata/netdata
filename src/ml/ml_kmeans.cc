@@ -39,7 +39,7 @@ ml_kmeans_init(ml_kmeans_t *kmeans)
     kmeans->cluster_centers.reserve(2);
     kmeans->cluster_centers.clear();
     kmeans->min_dist = std::numeric_limits<calculated_number_t>::max();
-    kmeans->max_dist = std::numeric_limits<calculated_number_t>::min();
+    kmeans->max_dist = 0.0;
 }
 
 void
@@ -48,8 +48,10 @@ ml_kmeans_train(ml_kmeans_t *kmeans, const std::vector<DSample> &preprocessed_fe
     kmeans->after = after;
     kmeans->before = before;
 
+    // Distances are never negative, so max_dist starts at 0: when every
+    // distance is 0 the bounds end up equal and the model is flat.
     kmeans->min_dist = std::numeric_limits<calculated_number_t>::max();
-    kmeans->max_dist  = std::numeric_limits<calculated_number_t>::min();
+    kmeans->max_dist = 0.0;
 
     kmeans->cluster_centers.clear();
 
@@ -103,6 +105,12 @@ ml_kmeans_anomaly_score(const ml_kmeans_inlined_t *inlined_km, const DSample &DS
     calculated_number_t spread = inlined_km->max_dist - inlined_km->min_dist;
     if (inlined_km->max_dist == inlined_km->min_dist ||
         (spread > 0.0 && spread < ML_KMEANS_FLAT_RELATIVE_SPREAD * std::abs(inlined_km->max_dist)))
+        return std::numeric_limits<calculated_number_t>::quiet_NaN();
+
+    // Training used to start max_dist at DBL_MIN, so a model whose distances
+    // were all 0 was stored as (0, DBL_MIN) instead of (0, 0). Such models
+    // still come from ml.db and from children: treat them as flat too.
+    if (inlined_km->min_dist == 0.0 && inlined_km->max_dist == std::numeric_limits<calculated_number_t>::min())
         return std::numeric_limits<calculated_number_t>::quiet_NaN();
 
     calculated_number_t mean_dist = 0.0;
