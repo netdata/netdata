@@ -224,7 +224,7 @@ struct rrdeng_cache_efficiency_stats {
     PAD64(size_t) metrics_retention_started;
 
     // journal v2 lookups of query planning (one per metric per overlapping journal); every lookup ends in
-    // exactly one of: filter skipped, not found, range skipped, searched
+    // exactly one of: filter skipped, not found, range skipped, searched (lookups of malformed journals in none)
     PAD64(size_t) journal_v2_lookups_searched;         // the metric's page list was read
     PAD64(size_t) journal_v2_lookups_not_found;        // the metric is not in the journal
     PAD64(size_t) journal_v2_lookups_range_skipped;    // the metric is there, but its range misses the window

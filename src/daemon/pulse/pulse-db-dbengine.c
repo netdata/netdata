@@ -1301,7 +1301,7 @@ void pulse_dbengine_do(bool extended) {
     }
 
     {
-        // every journal v2 lookup of query planning ends in exactly one of these
+        // every journal v2 lookup of query planning ends in exactly one of these (except those of malformed journals)
         static RRDSET *st_jv2_lookups = NULL;
         static RRDDIM *rd_searched = NULL;
         static RRDDIM *rd_not_found = NULL;
