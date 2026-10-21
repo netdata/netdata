@@ -209,6 +209,8 @@ sfsq-cli overview (--sfst FILE | --wal FILE)… --start-ns N --end-ns N
 
 `overview` builds the grid of the list's heatmap: time buckets by trace
 duration bins. `--buckets` sets the number of time buckets (default 60).
+The time from `--start-ns` to `--end-ns` must divide equally into the
+buckets. If it does not, the command stops with an error.
 The token flags filter the traces that it counts. A token on
 `trace-duration` is an error, because the duration is the grid's own axis.
 The command is for measurements and does not print the grid. It prints one
@@ -225,6 +227,8 @@ sfsq-cli explore (--sfst FILE | --wal FILE)… --start-ns N --end-ns N
 `explore` counts the spans of the window, one row per stored span, as the
 Traces tab's span view does. The token flags select the spans (see
 *Search tokens*). `--buckets` sets the number of time buckets (default 60).
+The time from `--start-ns` to `--end-ns` must divide equally into the
+buckets. If it does not, the command stops with an error.
 `--stack` sets the key whose values divide the count (default
 `status.code`). `--limit` sets how many of the newest spans it lists
 (default 100, at most 200; 0 lists none). Each `--column` adds a key to

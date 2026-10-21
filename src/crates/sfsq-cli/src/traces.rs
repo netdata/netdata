@@ -551,15 +551,30 @@ pub struct OverviewArgs {
     pub tokens: TokenArgs,
 }
 
-pub fn run_overview(args: &OverviewArgs, out: &mut dyn std::io::Write) -> Result<()> {
-    let started = std::time::Instant::now();
-    if args.buckets == 0 || args.end_ns <= args.start_ns {
+/// `buckets` equal buckets over `[start_ns, end_ns)`. The window must
+/// split evenly: a rounded-up width would count past `end_ns`, and the
+/// commands are the engine's offline oracle.
+fn exact_grid(start_ns: i64, end_ns: i64, buckets: usize) -> Result<sfst::Grid> {
+    if buckets == 0 || end_ns <= start_ns {
         bail!("--buckets must be positive and --end-ns after --start-ns");
     }
-    let buckets = args.buckets as i64;
-    let width = (args.end_ns - args.start_ns + buckets - 1) / buckets;
-    let query = OverviewQuery::new(sfst::Grid::new(args.start_ns, width, args.buckets))
-        .tokens(args.tokens.tokens(Vec::new())?);
+    let Some(span) = end_ns.checked_sub(start_ns) else {
+        bail!("--end-ns minus --start-ns overflows");
+    };
+    let count = i64::try_from(buckets)?;
+    if span % count != 0 {
+        bail!(
+            "--end-ns minus --start-ns ({span} ns) does not split into {buckets} equal buckets; \
+             a rounded width would count past --end-ns"
+        );
+    }
+    Ok(sfst::Grid::new(start_ns, span / count, buckets))
+}
+
+pub fn run_overview(args: &OverviewArgs, out: &mut dyn std::io::Write) -> Result<()> {
+    let started = std::time::Instant::now();
+    let grid = exact_grid(args.start_ns, args.end_ns, args.buckets)?;
+    let query = OverviewQuery::new(grid).tokens(args.tokens.tokens(Vec::new())?);
     let sources = build_sources(&args.sfsts, &args.wals)?;
     let data = overview(
         sources,
@@ -624,12 +639,8 @@ pub struct ExploreArgs {
 
 pub fn run_explore(args: &ExploreArgs, out: &mut dyn std::io::Write) -> Result<()> {
     let started = std::time::Instant::now();
-    if args.buckets == 0 || args.end_ns <= args.start_ns {
-        bail!("--buckets must be positive and --end-ns after --start-ns");
-    }
-    let buckets = args.buckets as i64;
-    let width = (args.end_ns - args.start_ns + buckets - 1) / buckets;
-    let mut query = ExploreQuery::new(sfst::Grid::new(args.start_ns, width, args.buckets))
+    let grid = exact_grid(args.start_ns, args.end_ns, args.buckets)?;
+    let mut query = ExploreQuery::new(grid)
         .tokens(args.tokens.tokens(Vec::new())?)
         .histogram(args.stack.clone());
     if args.limit > 0 {
@@ -1102,6 +1113,39 @@ mod tests {
             "3 span(s), 1 error(s); by status.code: UNSET=2 ERROR=1 other=0 unset=0"
         );
         assert!(lines[3].starts_with("status complete"), "{text}");
+    }
+
+    /// A window that does not split into equal buckets is refused: a
+    /// rounded width would count past `--end-ns`.
+    #[test]
+    fn a_window_must_split_into_equal_buckets() {
+        assert_eq!(
+            exact_grid(0, 4_000_000_000, 4).unwrap(),
+            sfst::Grid::new(0, 1_000_000_000, 4)
+        );
+        let err = exact_grid(0, 10, 3).unwrap_err().to_string();
+        assert!(err.contains("does not split into 3 equal buckets"), "{err}");
+        let explore = ExploreArgs {
+            sfsts: Vec::new(),
+            wals: Vec::new(),
+            start_ns: 0,
+            end_ns: 10,
+            buckets: 3,
+            stack: "status.code".to_string(),
+            limit: 0,
+            columns: Vec::new(),
+            tokens: TokenArgs::default(),
+        };
+        assert!(run_explore(&explore, &mut Vec::new()).is_err());
+        let overview = OverviewArgs {
+            sfsts: Vec::new(),
+            wals: Vec::new(),
+            start_ns: 0,
+            end_ns: 10,
+            buckets: 3,
+            tokens: TokenArgs::default(),
+        };
+        assert!(run_overview(&overview, &mut Vec::new()).is_err());
     }
 
     /// The torn-tail clamp: a WAL truncated mid-frame serves only the
