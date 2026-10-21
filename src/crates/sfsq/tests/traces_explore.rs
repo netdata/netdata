@@ -727,24 +727,28 @@ fn unavailable_and_failed_sources_are_reported() {
     assert_eq!(data.histogram.unwrap().total, SPANS as u64);
 }
 
+/// With sources or without any (a cancelled capture hands the engine
+/// none), a cancelled request answers nothing and says so.
 #[test]
 fn a_cancelled_request_answers_nothing() {
     let dir = tempfile::tempdir().unwrap();
-    let cancel = CancellationToken::new();
-    cancel.cancel();
-    let data = explore(
-        layout(dir.path(), "two-sealed"),
-        ExploreQuery::new(grid()).histogram("status.code"),
-        cancel,
-        Arc::new(AtomicUsize::new(0)),
-    )
-    .unwrap();
-    assert_eq!(
-        data,
-        ExploreData {
-            status: QueryStatus::Complete.with(PartialReason::Cancelled),
-            histogram: None,
-            rows: None,
-        }
-    );
+    for sources in [layout(dir.path(), "two-sealed"), Vec::new()] {
+        let cancel = CancellationToken::new();
+        cancel.cancel();
+        let data = explore(
+            sources,
+            ExploreQuery::new(grid()).histogram("status.code"),
+            cancel,
+            Arc::new(AtomicUsize::new(0)),
+        )
+        .unwrap();
+        assert_eq!(
+            data,
+            ExploreData {
+                status: QueryStatus::Complete.with(PartialReason::Cancelled),
+                histogram: None,
+                rows: None,
+            }
+        );
+    }
 }

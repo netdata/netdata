@@ -287,6 +287,12 @@ pub fn explore(
     validate_sources(&sources)?;
     let scope = Scope::new(&query.tokens)?;
     let stack = query.stack.as_deref().map(stored_key).transpose()?;
+    // The up-front poll exists for the empty-source-list case: the
+    // per-source polls never run, so without it a cancelled call with no
+    // sources would report Complete.
+    if cancel.is_cancelled() {
+        return Ok(ExploreData::cancelled());
+    }
 
     newest_first(&mut sources);
     let request = Request {
