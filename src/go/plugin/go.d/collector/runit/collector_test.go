@@ -210,6 +210,18 @@ func TestCollector_Collect(t *testing.T) {
 				serviceSeries("oneshot", stateRunning, false, 0, 5),
 			),
 		},
+		"running but asked to go down": {
+			prepare: func(*testing.T) *Collector {
+				return prepareMockCollector(&mockSvCli{
+					data: []byte("run: /service/nginx: (pid 42) 10s, want down, got TERM\n"),
+				})
+			},
+			// The process got TERM after `sv down` and has not exited yet.
+			wantSeries: mergeSeries(
+				summarySeries(0, 1),
+				serviceSeries("nginx", stateStopping, true, 0, 10),
+			),
+		},
 		"service disappears on second collect": {
 			prepare: func(t *testing.T) *Collector {
 				mock := &mockSvCli{
@@ -311,6 +323,14 @@ func TestClassifyState(t *testing.T) {
 				State: ServiceStateRun,
 			},
 			want: stateRunning,
+		},
+		"run, want down (stopping)": {
+			status: &ServiceStatus{State: ServiceStateRun, WantDown: true},
+			want:   stateStopping,
+		},
+		"run, want down, paused": {
+			status: &ServiceStatus{State: ServiceStateRun, WantDown: true, Paused: true},
+			want:   statePaused,
 		},
 		"run but paused": {
 			status: &ServiceStatus{
@@ -517,6 +537,7 @@ func TestParseServiceStatus(t *testing.T) {
 				State:         ServiceStateRun,
 				StateDuration: 10 * 1e9,
 				Enabled:       true,
+				WantDown:      true,
 			},
 		},
 	}
@@ -535,6 +556,7 @@ func TestParseServiceStatus(t *testing.T) {
 			assert.Equal(t, test.want.Enabled, got.Enabled)
 			assert.Equal(t, test.want.Paused, got.Paused)
 			assert.Equal(t, test.want.WantUp, got.WantUp)
+			assert.Equal(t, test.want.WantDown, got.WantDown)
 		})
 	}
 }

@@ -64,9 +64,10 @@ func boolToFloat(v bool) float64 {
 // runit sv(8) reports: state (down/run/finish) + flags (normally up/down, want up/down, paused, got TERM).
 // We collapse these into states meaningful for monitoring:
 //
-//   - running:  state=run, not paused
+//   - running:  state=run, not paused, not want down
 //   - paused:   paused flag set (any underlying state)
-//   - stopping: state=finish (transitional)
+//   - stopping: state=run, want down (the process has not exited after `sv down` yet),
+//     or state=finish (transitional)
 //   - starting: state=down, want up (transitional — trying to come up)
 //   - failed:   state=down, normally up, not want up (should be running but isn't)
 //   - down:     state=down, not normally up (intentionally stopped)
@@ -76,6 +77,9 @@ func classifyState(s *ServiceStatus) string {
 	}
 	switch s.State {
 	case ServiceStateRun:
+		if s.WantDown {
+			return stateStopping
+		}
 		return stateRunning
 	case ServiceStateFinish:
 		return stateStopping

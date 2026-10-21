@@ -18,6 +18,7 @@ type ServiceStatus struct {
 	StateDuration time.Duration
 	Paused        bool
 	WantUp        bool
+	WantDown      bool
 	State         ServiceState
 	Enabled       bool
 }
@@ -127,6 +128,7 @@ func parseServiceStatus(match [][]byte) *ServiceStatus {
 		StateDuration: parseServiceDuration(match[idxDuration]),
 		Paused:        len(match[idxPaused]) != 0,
 		WantUp:        bytes.Equal(match[idxWant], tokenUp),
+		WantDown:      bytes.Equal(match[idxWant], tokenDown),
 		State:         parseServiceState(match[idxState]),
 	}
 	if status.State == ServiceStateDown {
