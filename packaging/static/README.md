@@ -12,8 +12,8 @@ Building requires the following tools:
 - A recent version of either Docker or Podman
 - A recent version of Git
 - A recent version of GNU Coreutils
-- GNU wget or Busybox wget
-- Zopfli for creation of the gzip compressed archive
+- GNU wget
+- Gzip for creation of the gzip compressed archive
 - Zstd for creation of the zstd compressed archive
 - When cross-compiling, a Linux kernel that supports binfmt\_misc
 
