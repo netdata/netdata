@@ -135,6 +135,8 @@ modules:
           labels:
             - name: service_name
               description: runit service name
+            - name: service_type
+              description: "`service` for a service, `log` for the log service of a service (its `service_name` ends with `/log`)"
           metrics:
             - name: runit.service_state
               description: Service State

@@ -17,10 +17,16 @@ func (c *Collector) collect() error {
 	meter := c.store.Write().SnapshotMeter("")
 	runs := make(map[string]serviceRun, len(services))
 	for name, status := range services {
-		labels := meter.LabelSet(metrix.Label{
-			Key:   labelServiceName,
-			Value: name,
-		})
+		labels := meter.LabelSet(
+			metrix.Label{
+				Key:   labelServiceName,
+				Value: name,
+			},
+			metrix.Label{
+				Key:   labelServiceType,
+				Value: serviceType(status),
+			},
+		)
 		state := classifyState(status)
 
 		c.metrics.state.ObserveStateSet(metrix.StateSetPoint{
@@ -59,6 +65,13 @@ func (r *serviceRun) observe(s *ServiceStatus, seen bool) {
 		r.restarts++
 	}
 	r.pid = s.PID
+}
+
+func serviceType(s *ServiceStatus) string {
+	if s.Log {
+		return serviceTypeLog
+	}
+	return serviceTypeService
 }
 
 func boolToFloat(v bool) float64 {

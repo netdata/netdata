@@ -8,7 +8,15 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 )
 
-const labelServiceName = "service_name"
+const (
+	labelServiceName = "service_name"
+	labelServiceType = "service_type"
+)
+
+const (
+	serviceTypeService = "service"
+	serviceTypeLog     = "log"
+)
 
 const (
 	stateRunning  = "running"

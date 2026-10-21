@@ -20,6 +20,7 @@ type ServiceStatus struct {
 	Paused        bool
 	WantUp        bool
 	WantDown      bool
+	Log           bool // The log service of another service.
 	State         ServiceState
 	Enabled       bool
 }
@@ -104,7 +105,9 @@ func (c *Collector) servicesCli() (map[string]*ServiceStatus, error) {
 			name := strings.TrimPrefix(string(matchSv[idxName]), c.Dir+"/")
 			ms[name] = parseServiceStatus(matchSv)
 			if string(matchLog[idxName]) == "log" {
-				ms[name+"/log"] = parseServiceStatus(matchLog)
+				log := parseServiceStatus(matchLog)
+				log.Log = true
+				ms[name+"/log"] = log
 			}
 			if noLogStatus {
 				c.Warningf("sv could not stat the 'log/down' file of service '%s', its log status is unknown", name)

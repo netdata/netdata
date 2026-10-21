@@ -171,17 +171,17 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			wantSeries: mergeSeries(
 				// sshd: run, 12345s — running, enabled (no "normally down").
-				serviceSeries("sshd", stateRunning, true, 12345),
+				serviceSeries("sshd", serviceTypeService, stateRunning, true, 12345),
 				// cron: run, (pid 123) 999s, paused — paused, enabled.
-				serviceSeries("cron", statePaused, true, 999),
+				serviceSeries("cron", serviceTypeService, statePaused, true, 999),
 				// getty-5: down, 60s, normally up — failed, enabled.
-				serviceSeries("getty-5", stateFailed, true, 60),
+				serviceSeries("getty-5", serviceTypeService, stateFailed, true, 60),
 				// socklog: down, 5s, normally up, want up — starting, enabled.
-				serviceSeries("socklog", stateStarting, true, 5),
+				serviceSeries("socklog", serviceTypeService, stateStarting, true, 5),
 				// ntpd: down, 100s — down, not enabled.
-				serviceSeries("ntpd", stateDown, false, 100),
+				serviceSeries("ntpd", serviceTypeService, stateDown, false, 100),
 				// dhclient: finish, 3s — stopping, enabled (no "normally down").
-				serviceSeries("dhclient", stateStopping, true, 3),
+				serviceSeries("dhclient", serviceTypeService, stateStopping, true, 3),
 			),
 		},
 		"service with log subprocess": {
@@ -192,8 +192,8 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			wantSeries: mergeSeries(
 				// socklog: run, 500s; log subprocess also running. Both enabled.
-				serviceSeries("socklog", stateRunning, true, 500),
-				serviceSeries("socklog/log", stateRunning, true, 500),
+				serviceSeries("socklog", serviceTypeService, stateRunning, true, 500),
+				serviceSeries("socklog/log", serviceTypeLog, stateRunning, true, 500),
 			),
 		},
 		"running but normally down": {
@@ -203,7 +203,7 @@ func TestCollector_Collect(t *testing.T) {
 				})
 			},
 			wantSeries: mergeSeries(
-				serviceSeries("oneshot", stateRunning, false, 5),
+				serviceSeries("oneshot", serviceTypeService, stateRunning, false, 5),
 			),
 		},
 		"running but asked to go down": {
@@ -214,7 +214,7 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			// The process got TERM after `sv down` and has not exited yet.
 			wantSeries: mergeSeries(
-				serviceSeries("nginx", stateStopping, true, 10),
+				serviceSeries("nginx", serviceTypeService, stateStopping, true, 10),
 			),
 		},
 		"service disappears on second collect": {
@@ -229,7 +229,7 @@ func TestCollector_Collect(t *testing.T) {
 				return collr
 			},
 			wantSeries: mergeSeries(
-				serviceSeries("sshd", stateRunning, true, 12345),
+				serviceSeries("sshd", serviceTypeService, stateRunning, true, 12345),
 			),
 		},
 		"empty response": {
@@ -340,7 +340,7 @@ func TestCollector_Collect_Restarts(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			assert.Equal(t, test.wantRestarts, series[`service_restarts{service_name="x"}`])
+			assert.Equal(t, test.wantRestarts, series[`service_restarts{service_name="x",service_type="service"}`])
 		})
 	}
 }
@@ -350,8 +350,8 @@ func TestCollector_Cleanup(t *testing.T) {
 	assert.NotPanics(t, func() { collr.Cleanup(t.Context()) })
 }
 
-func serviceSeries(name, state string, enabled bool, duration metrix.SampleValue) map[string]metrix.SampleValue {
-	label := `{service_name="` + name + `"}`
+func serviceSeries(name, typ, state string, enabled bool, duration metrix.SampleValue) map[string]metrix.SampleValue {
+	label := `{service_name="` + name + `",service_type="` + typ + `"}`
 	series := map[string]metrix.SampleValue{
 		"service_enabled" + label:        0,
 		"service_restarts" + label:       0,
@@ -365,7 +365,7 @@ func serviceSeries(name, state string, enabled bool, duration metrix.SampleValue
 		if s == state {
 			v = 1
 		}
-		series[`service_state{service_name="`+name+`",service_state="`+s+`"}`] = v
+		series[`service_state{service_name="`+name+`",service_state="`+s+`",service_type="`+typ+`"}`] = v
 	}
 	return series
 }
