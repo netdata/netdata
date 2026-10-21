@@ -12,7 +12,9 @@ Spans received over OpenTelemetry are stored by the receiving Netdata Agent unde
 write-ahead log. When it reaches `traces.rotation.default.max_file_size` (25MB) or `traces.rotation.default.max_entries` (50000 spans), or about
 15 minutes after its first span, it is sealed into an indexed file and the write-ahead log is deleted. Each indexed file
 indexes the span names, kinds, and statuses and the span, resource, scope, event, and link attributes, and keeps an
-index of trace IDs so that a whole trace can be looked up by its ID. A span sent without a kind or a status is indexed
+index of trace IDs so that a whole trace can be looked up by its ID. Queries also read the write-ahead log, so new
+spans are visible before they are sealed. If a query cannot read the write-ahead log, the answer is partial with the
+reason `source_failure`. A span sent without a kind or a status is indexed
 with the OpenTelemetry defaults, `UNSPECIFIED` and `UNSET`, so those values can be filtered on like any other. Spans
 stored by an earlier version keep no kind or status for those defaults, so until their files leave retention a filter
 on `UNSET`, `UNSPECIFIED`, or a negation such as a status other than `ERROR` does not match them.

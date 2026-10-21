@@ -240,7 +240,7 @@ async fn wal_below_min_entries_is_all_tail() {
     )
     .await;
 
-    let mut sets = supplier
+    let capture = supplier
         .capture(
             &TenantId::from("default"),
             0..u32::MAX,
@@ -250,8 +250,9 @@ async fn wal_below_min_entries_is_all_tail() {
             &ProgressState::new(),
         )
         .await
-        .unwrap()
-        .sets;
+        .unwrap();
+    assert_eq!(capture.refused, [false], "the WAL resolved");
+    let mut sets = capture.sets;
     let sources = sets.pop().unwrap();
     assert_eq!(sources.len(), 1);
     let TraceSource::Tail(tail) = &sources[0] else {
@@ -290,19 +291,21 @@ async fn corrupt_wal_is_refused_whole_but_sealed_files_still_serve() {
         f.write_all(&garbage).unwrap();
     }
 
-    let mut sets = supplier
+    // Every copy that selected the WAL is told of the refusal (an active
+    // WAL is selected for any range: its time bounds are still open).
+    let capture = supplier
         .capture(
             &TenantId::from("default"),
             0..u32::MAX,
-            1,
+            2,
             RemotePolicy::Download,
             &CancellationToken::new(),
             &ProgressState::new(),
         )
         .await
-        .unwrap()
-        .sets;
-    let sources = sets.pop().unwrap();
+        .unwrap();
+    assert_eq!(capture.refused, [true, true]);
+    let sources = &capture.sets[0];
     assert_eq!(sources.len(), 1, "only the sealed file survives");
     assert!(matches!(&sources[0], TraceSource::Sfst(c) if c.coverage.is_none()));
 }

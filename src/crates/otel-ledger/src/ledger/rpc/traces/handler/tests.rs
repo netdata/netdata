@@ -885,6 +885,55 @@ fn ids(v: &serde_json::Value) -> Vec<String> {
         .collect()
 }
 
+/// A WAL whose chunks will not build is refused for the request: every
+/// mode's answer says a source failed, instead of looking complete.
+#[tokio::test]
+async fn a_refused_wal_is_a_failed_source_in_every_mode() {
+    let registries = make_registries();
+    let path = install_wal(
+        &registries,
+        "default",
+        1,
+        vec![
+            otlp_req_svc(0x0A, 3, base_ns(10), "svc-a"),
+            otlp_req_svc(0x0B, 3, base_ns(20), "svc-b"),
+        ],
+    )
+    .await;
+    let len = std::fs::metadata(&path).unwrap().len();
+    {
+        use std::io::{Seek, Write};
+        let mut f = std::fs::OpenOptions::new().write(true).open(&path).unwrap();
+        f.seek(std::io::SeekFrom::Start(wal::HEADER_SIZE as u64))
+            .unwrap();
+        f.write_all(&vec![0xFFu8; (len - wal::HEADER_SIZE as u64) as usize])
+            .unwrap();
+    }
+    let h = make_handler_over(registries);
+    let failed = json!({"partial": ["source_failure"]});
+
+    let page = list(&h, window_body()).await.unwrap();
+    assert_eq!(page["status"], failed, "list");
+    assert_eq!(page["overview"]["status"], failed, "list aggregate");
+    let suggest = serde_json::to_value(
+        call_on(
+            &h,
+            as_mode("suggest", json!({"after": T_S, "before": T_S + 100})),
+        )
+        .await
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(suggest["status"], failed, "suggest");
+    let trace = serde_json::to_value(
+        call_on(&h, as_mode("trace", json!({"id": "0a".repeat(16)})))
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(trace["status"], failed, "trace");
+}
+
 #[tokio::test]
 async fn search_completion_captures_slack_files_and_skips_beyond_slack() {
     let registries = make_registries();

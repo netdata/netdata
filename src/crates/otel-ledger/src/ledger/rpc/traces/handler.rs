@@ -107,6 +107,16 @@ fn capture_error(e: CaptureError) -> netdata_plugin_error::NetdataPluginError {
     }
 }
 
+/// A WAL the capture refused ([`Capture::refused`]) leaves its spans out
+/// of the answer: a failed source, never a silent gap.
+fn reported(refused: bool, status: QueryStatus) -> QueryStatus {
+    if refused {
+        status.with(PartialReason::SourceFailure)
+    } else {
+        status
+    }
+}
+
 /// How many suggestion requests may run at once (the keystroke class).
 /// They arrive per keystroke; beyond this a request answers `busy` at
 /// once instead of queueing CPU and memory behind the others.
@@ -257,7 +267,11 @@ impl OtelTracesHandler {
         // reports the Cancelled partial — one consistent cancel path.
         // The capture sets the progress total; the engine ticks the done
         // counter once per source and the bridge's ticker renders it.
-        let Capture { mut sets, pins } = self
+        let Capture {
+            mut sets,
+            pins,
+            refused,
+        } = self
             .supplier
             .capture(
                 &tenant,
@@ -270,6 +284,7 @@ impl OtelTracesHandler {
             .await
             .map_err(capture_error)?;
         let sources = sets.pop().unwrap_or_default();
+        let refused = refused.first().copied().unwrap_or(false);
         let done = ctx.progress.done_counter();
         let cancel = ctx.cancellation.clone();
 
@@ -279,7 +294,7 @@ impl OtelTracesHandler {
         // the supplier's inconsistency (duplicate ids / overlapping WAL
         // coverage), framed as internal so a debugger looks at the right
         // side. A panicked task is a handler failure.
-        let data = match tokio::task::spawn_blocking(move || {
+        let mut data = match tokio::task::spawn_blocking(move || {
             let _permit = permit;
             let _pins = pins;
             trace_by_id(sources, query, cancel, done)
@@ -302,6 +317,7 @@ impl OtelTracesHandler {
             }
         };
 
+        data.status = reported(refused, data.status);
         Ok(OtelTracesResponse::Trace(Box::new(to_trace_result(
             &trace_id,
             data,
@@ -413,7 +429,11 @@ impl OtelTracesHandler {
         // The capture sets the progress total: the completion range's
         // sources plus the aggregate's (the window role shares the
         // completion range and does not tick).
-        let Capture { mut sets, pins } = self
+        let Capture {
+            mut sets,
+            pins,
+            refused,
+        } = self
             .supplier
             .capture_ranges(
                 &tenant,
@@ -463,7 +483,7 @@ impl OtelTracesHandler {
             }
         };
 
-        let data = match page {
+        let mut data = match page {
             Ok(data) => data,
             // These two are structurally impossible from one capture —
             // an occurrence means the supplier broke its contract.
@@ -480,6 +500,8 @@ impl OtelTracesHandler {
             ) => return Err(engine_rejected(e)),
         };
 
+        // Set 0 is the window role, set 2 the aggregate's (`ranges`).
+        data.status = reported(refused.first().copied().unwrap_or(false), data.status);
         let mut result: SearchResult = to_search_result(
             data,
             params.limit,
@@ -489,7 +511,7 @@ impl OtelTracesHandler {
         if let (Some(section), Some((grid, aligned_after, aligned_before))) =
             (section, aggregate_grid)
         {
-            let section = match section {
+            let mut section = match section {
                 Ok(section) => section,
                 Err(OverviewRequestError::SourceSet(e)) => {
                     return Err(handler_err(format!(
@@ -504,6 +526,7 @@ impl OtelTracesHandler {
                     )));
                 }
             };
+            section.status = reported(refused.get(2).copied().unwrap_or(false), section.status);
             result.overview = Some(to_overview_section(
                 section,
                 grid,
@@ -595,7 +618,11 @@ impl OtelTracesHandler {
             .max_items(max)
             .window(engine_window)
             .deadline(deadline);
-        let Capture { mut sets, pins } = self
+        let Capture {
+            mut sets,
+            pins,
+            refused,
+        } = self
             .supplier
             .capture(
                 &TenantId::resolve_query(tenant),
@@ -621,7 +648,10 @@ impl OtelTracesHandler {
         })
         .await
         {
-            Ok(Ok(data)) => Ok(OtelTracesResponse::Suggest(to_suggest_result(data, key))),
+            Ok(Ok(mut data)) => {
+                data.status = reported(refused.first().copied().unwrap_or(false), data.status);
+                Ok(OtelTracesResponse::Suggest(to_suggest_result(data, key)))
+            }
             Ok(Err(e)) => Err(map_suggest_error(e)),
             Err(e) => Err(handler_err(format!("otel-traces suggest task failed: {e}"))),
         }

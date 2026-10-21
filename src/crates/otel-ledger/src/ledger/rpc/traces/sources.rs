@@ -20,7 +20,10 @@
 //! query sees one consistent durable prefix), and the logs failure
 //! policy: a WAL whose chunks won't build is refused WHOLE for
 //! this snapshot (logged; its data returns via the sealed SFST after
-//! rotation, or on a later query — build errors aren't cached).
+//! rotation, or on a later query — build errors aren't cached). Unlike
+//! the logs handler, the capture says so ([`Capture::refused`]) and every
+//! traces answer that lacks it is partial `source_failure`: spans quietly
+//! missing would read as data that does not exist.
 //!
 //! Source identity per `sfsq::traces::sources` (the engine rejects
 //! duplicate ids and overlapping WAL byte ranges): always the file's
@@ -92,6 +95,9 @@ struct ResolvedChunk {
 pub(crate) struct Capture {
     pub(crate) sets: Vec<Vec<TraceSource>>,
     pub(crate) pins: Vec<file_cache::CachedFile>,
+    /// Parallel to `sets`: whether `ranges[i]` selected a WAL that was
+    /// refused (its chunks would not build), so `sets[i]` lacks its data.
+    pub(crate) refused: Vec<bool>,
 }
 
 /// What a capture does with the offloaded files a range selects.
@@ -231,6 +237,7 @@ impl TracesSourceSupplier {
         let cancelled = || Capture {
             sets: Vec::new(),
             pins: Vec::new(),
+            refused: Vec::new(),
         };
         if ranges.is_empty() {
             return Ok(cancelled());
@@ -314,6 +321,12 @@ impl TracesSourceSupplier {
         if cancel.is_cancelled() {
             return Ok(cancelled());
         }
+        // `resolve_wal` returns `None` for a cancel too, but a cancelled
+        // capture has returned above: what is missing now was refused.
+        let refused_distinct: Vec<bool> = snapshots
+            .iter()
+            .map(|(_, wals)| wals.iter().any(|wal| !resolved.contains_key(&wal.id)))
+            .collect();
 
         let mut distinct_sources: Vec<Vec<TraceSource>> = snapshots
             .iter()
@@ -402,10 +415,15 @@ impl TracesSourceSupplier {
             }
         }
         let sets = per_copy
-            .into_iter()
-            .map(|at| distinct_sources[at].clone())
+            .iter()
+            .map(|&at| distinct_sources[at].clone())
             .collect();
-        Ok(Capture { sets, pins })
+        let refused = per_copy.iter().map(|&at| refused_distinct[at]).collect();
+        Ok(Capture {
+            sets,
+            pins,
+            refused,
+        })
     }
 
     /// Resolve one active WAL into chunk images + the tail range, or
