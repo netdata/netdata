@@ -254,7 +254,7 @@ modules:
             - name: remote_storage.enabled
               description: Upload retained OpenTelemetry logs and traces to configured remote object storage.
               detailed_description: |
-                Sealed indexed files are uploaded in addition to being kept under local retention. When a query needs a remotely cataloged file that is no longer local, the plugin downloads it into the bounded download cache shared by logs and traces. Each download may take 30 seconds plus one second per MiB, at most 5 minutes; a file that takes longer or cannot be served is left out (traces report the answer as partial). A query needing more data than the cache holds fails with a message to narrow its time range.
+                The plugin uploads the stored log and trace files, and also keeps them on local disk under the retention limits. When a query needs a file that retention has deleted from local disk, the plugin downloads it from remote storage into a download cache shared by logs and traces. The plugin waits at most 30 seconds plus one second per MiB for each download, and never more than 5 minutes. A file that takes longer, or that the plugin cannot download, is left out of the answer (traces mark the answer as partial). A query that needs more data than the cache can hold fails with a message to narrow its time range.
               default_value: false
               required: false
             - name: remote_storage.uri
