@@ -171,18 +171,17 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			wantSeries: mergeSeries(
 				// sshd: run, 12345s — running, enabled (no "normally down").
-				serviceSeries("sshd", stateRunning, true, 0, 12345),
+				serviceSeries("sshd", stateRunning, true, 12345),
 				// cron: run, (pid 123) 999s, paused — paused, enabled.
-				serviceSeries("cron", statePaused, true, 0, 999),
+				serviceSeries("cron", statePaused, true, 999),
 				// getty-5: down, 60s, normally up — failed, enabled.
-				serviceSeries("getty-5", stateFailed, true, 60, 0),
+				serviceSeries("getty-5", stateFailed, true, 60),
 				// socklog: down, 5s, normally up, want up — starting, enabled.
-				serviceSeries("socklog", stateStarting, true, 5, 0),
+				serviceSeries("socklog", stateStarting, true, 5),
 				// ntpd: down, 100s — down, not enabled.
-				serviceSeries("ntpd", stateDown, false, 100, 0),
-				// dhclient: finish, 3s — stopping, enabled (no "normally down"),
-				// a transitional state with neither down nor running duration.
-				serviceSeries("dhclient", stateStopping, true, 0, 0),
+				serviceSeries("ntpd", stateDown, false, 100),
+				// dhclient: finish, 3s — stopping, enabled (no "normally down").
+				serviceSeries("dhclient", stateStopping, true, 3),
 			),
 		},
 		"service with log subprocess": {
@@ -193,8 +192,8 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			wantSeries: mergeSeries(
 				// socklog: run, 500s; log subprocess also running. Both enabled.
-				serviceSeries("socklog", stateRunning, true, 0, 500),
-				serviceSeries("socklog/log", stateRunning, true, 0, 500),
+				serviceSeries("socklog", stateRunning, true, 500),
+				serviceSeries("socklog/log", stateRunning, true, 500),
 			),
 		},
 		"running but normally down": {
@@ -204,7 +203,7 @@ func TestCollector_Collect(t *testing.T) {
 				})
 			},
 			wantSeries: mergeSeries(
-				serviceSeries("oneshot", stateRunning, false, 0, 5),
+				serviceSeries("oneshot", stateRunning, false, 5),
 			),
 		},
 		"running but asked to go down": {
@@ -215,7 +214,7 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			// The process got TERM after `sv down` and has not exited yet.
 			wantSeries: mergeSeries(
-				serviceSeries("nginx", stateStopping, true, 0, 10),
+				serviceSeries("nginx", stateStopping, true, 10),
 			),
 		},
 		"service disappears on second collect": {
@@ -230,7 +229,7 @@ func TestCollector_Collect(t *testing.T) {
 				return collr
 			},
 			wantSeries: mergeSeries(
-				serviceSeries("sshd", stateRunning, true, 0, 12345),
+				serviceSeries("sshd", stateRunning, true, 12345),
 			),
 		},
 		"empty response": {
@@ -268,17 +267,95 @@ func TestCollector_Collect(t *testing.T) {
 	}
 }
 
+func TestCollector_Collect_Restarts(t *testing.T) {
+	tests := map[string]struct {
+		statuses     []string // sv status output of consecutive collections.
+		wantRestarts metrix.SampleValue
+	}{
+		"first observation is not a restart": {
+			statuses:     []string{"run: /service/x: (pid 10) 100s\n"},
+			wantRestarts: 0,
+		},
+		"same process": {
+			statuses: []string{
+				"run: /service/x: (pid 10) 100s\n",
+				"run: /service/x: (pid 10) 101s\n",
+			},
+			wantRestarts: 0,
+		},
+		"new process between collections": {
+			statuses: []string{
+				"run: /service/x: (pid 10) 100s\n",
+				"run: /service/x: (pid 11) 1s\n",
+			},
+			wantRestarts: 1,
+		},
+		"new process after finish and down": {
+			statuses: []string{
+				"run: /service/x: (pid 10) 100s\n",
+				"finish: /service/x: (pid 12) 0s\n",
+				"down: /service/x: 0s, normally up, want up\n",
+				"run: /service/x: (pid 13) 1s\n",
+			},
+			wantRestarts: 1,
+		},
+		"stopped service started": {
+			statuses: []string{
+				"down: /service/x: 100s\n",
+				"run: /service/x: (pid 10) 1s, normally down\n",
+			},
+			wantRestarts: 1,
+		},
+		"crash loop": {
+			statuses: []string{
+				"run: /service/x: (pid 10) 1s\n",
+				"run: /service/x: (pid 11) 0s\n",
+				"down: /service/x: 0s, normally up, want up\n",
+				"run: /service/x: (pid 12) 1s\n",
+				"run: /service/x: (pid 13) 0s\n",
+			},
+			wantRestarts: 3,
+		},
+		"counting starts over when a service reappears": {
+			statuses: []string{
+				"run: /service/x: (pid 10) 100s\n",
+				"run: /service/x: (pid 11) 1s\n",
+				"",
+				"run: /service/x: (pid 12) 1s\n",
+			},
+			wantRestarts: 0,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			mock := &mockSvCli{}
+			collr := prepareMockCollector(mock)
+
+			var series map[string]metrix.SampleValue
+			for _, status := range test.statuses {
+				mock.data = []byte(status)
+				var err error
+				series, err = collectSeries(t, collr)
+				require.NoError(t, err)
+			}
+
+			assert.Equal(t, test.wantRestarts, series[`service_restarts{service_name="x"}`])
+		})
+	}
+}
+
 func TestCollector_Cleanup(t *testing.T) {
 	collr := New()
 	assert.NotPanics(t, func() { collr.Cleanup(t.Context()) })
 }
 
-func serviceSeries(name, state string, enabled bool, down, running metrix.SampleValue) map[string]metrix.SampleValue {
+func serviceSeries(name, state string, enabled bool, duration metrix.SampleValue) map[string]metrix.SampleValue {
 	label := `{service_name="` + name + `"}`
 	series := map[string]metrix.SampleValue{
-		"service_enabled" + label:                0,
-		"service_state_duration_down" + label:    down,
-		"service_state_duration_running" + label: running,
+		"service_enabled" + label:        0,
+		"service_restarts" + label:       0,
+		"service_state_duration" + label: duration,
 	}
 	if enabled {
 		series["service_enabled"+label] = 1
@@ -505,6 +582,7 @@ func TestParseServiceStatus(t *testing.T) {
 			name: "oneshot",
 			want: ServiceStatus{
 				State:         ServiceStateRun,
+				PID:           99,
 				StateDuration: 5 * 1e9, // 5s as time.Duration
 				Enabled:       false,
 			},
@@ -514,6 +592,7 @@ func TestParseServiceStatus(t *testing.T) {
 			name: "socklog",
 			want: ServiceStatus{
 				State:         ServiceStateRun,
+				PID:           40,
 				StateDuration: 2 * 1e9,
 				Enabled:       true,
 			},
@@ -523,9 +602,20 @@ func TestParseServiceStatus(t *testing.T) {
 			name: "nginx",
 			want: ServiceStatus{
 				State:         ServiceStateRun,
+				PID:           42,
 				StateDuration: 10 * 1e9,
 				Enabled:       true,
 				WantDown:      true,
+			},
+		},
+		"log service of a running service": {
+			data: []byte("run: /service/socklog: (pid 456) 500s; run: log: (pid 789) 400s\n"),
+			name: "socklog/log",
+			want: ServiceStatus{
+				State:         ServiceStateRun,
+				PID:           789,
+				StateDuration: 400 * 1e9,
+				Enabled:       true,
 			},
 		},
 	}
@@ -540,6 +630,7 @@ func TestParseServiceStatus(t *testing.T) {
 			require.Contains(t, services, test.name)
 			got := services[test.name]
 			assert.Equal(t, test.want.State, got.State)
+			assert.Equal(t, test.want.PID, got.PID)
 			assert.Equal(t, test.want.StateDuration, got.StateDuration)
 			assert.Equal(t, test.want.Enabled, got.Enabled)
 			assert.Equal(t, test.want.Paused, got.Paused)

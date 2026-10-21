@@ -15,6 +15,7 @@ func (c *Collector) collect() error {
 	}
 
 	meter := c.store.Write().SnapshotMeter("")
+	runs := make(map[string]serviceRun, len(services))
 	for name, status := range services {
 		labels := meter.LabelSet(metrix.Label{
 			Key:   labelServiceName,
@@ -27,18 +28,37 @@ func (c *Collector) collect() error {
 		}, labels)
 		c.metrics.enabled.Observe(boolToFloat(status.Enabled), labels)
 
-		var down, run float64
-		switch status.State {
-		case ServiceStateDown:
-			down = status.StateDuration.Seconds()
-		case ServiceStateRun:
-			run = status.StateDuration.Seconds()
-		}
-		c.metrics.durationDown.Observe(down, labels)
-		c.metrics.durationRunning.Observe(run, labels)
+		run, seen := c.runs[name]
+		run.observe(status, seen)
+		runs[name] = run
+		c.metrics.restarts.ObserveTotal(float64(run.restarts), labels)
+
+		c.metrics.stateDuration.Observe(status.StateDuration.Seconds(), labels)
 	}
+	c.runs = runs
 
 	return nil
+}
+
+// serviceRun is what restart detection remembers about a service between collections.
+type serviceRun struct {
+	pid      int // PID of the last observed run process, 0 if none was observed.
+	restarts int64
+}
+
+// observe counts a restart when a service seen in a previous collection
+// runs a process other than the last one observed.
+// sv reports no restart counter, so restarts are detected by polling:
+// several restarts between two collections count as one,
+// and starting a stopped service counts as a restart.
+func (r *serviceRun) observe(s *ServiceStatus, seen bool) {
+	if s.State != ServiceStateRun || s.PID == 0 {
+		return
+	}
+	if seen && s.PID != r.pid {
+		r.restarts++
+	}
+	r.pid = s.PID
 }
 
 func boolToFloat(v bool) float64 {

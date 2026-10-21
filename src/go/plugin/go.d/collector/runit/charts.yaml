@@ -31,20 +31,31 @@ groups:
             name: enabled
             options:
               hidden: true
-  - family: uptime
+  - family: restarts
+    chart_defaults:
+      priority: 70100
+      instances:
+        by_labels: [service_name]
+    metrics:
+      - service_restarts
+    charts:
+      - title: Service Restarts
+        context: service_restarts
+        units: restarts/s
+        dimensions:
+          - selector: service_restarts
+            name: restarts
+  - family: duration
     chart_defaults:
       priority: 70200
       instances:
         by_labels: [service_name]
     metrics:
-      - service_state_duration_down
-      - service_state_duration_running
+      - service_state_duration
     charts:
-      - title: Service State Duration
+      - title: Service State Duration (single-service view)
         context: service_state_duration
         units: seconds
         dimensions:
-          - selector: service_state_duration_down
-            name: down
-          - selector: service_state_duration_running
-            name: running
+          - selector: service_state_duration
+            name: duration

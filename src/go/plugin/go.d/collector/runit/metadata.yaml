@@ -148,10 +148,15 @@ modules:
                 - name: stopping
                 - name: paused
                 - name: enabled
+            - name: runit.service_restarts
+              description: Service Restarts
+              unit: restarts/s
+              chart_type: line
+              dimensions:
+                - name: restarts
             - name: runit.service_state_duration
-              description: Service State Duration
+              description: Service State Duration (single-service view)
               unit: seconds
               chart_type: line
               dimensions:
-                - name: down
-                - name: running
+                - name: duration

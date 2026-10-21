@@ -39,6 +39,7 @@ func New() *Collector {
 		},
 		store:   store,
 		metrics: newCollectorMetrics(store),
+		runs:    make(map[string]serviceRun),
 	}
 }
 
@@ -56,6 +57,8 @@ type (
 		metrics *collectorMetrics
 
 		exec svCli
+
+		runs map[string]serviceRun // Key: service name.
 	}
 
 	svCli interface {

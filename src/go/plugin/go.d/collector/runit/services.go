@@ -16,6 +16,7 @@ const hintServices = 64 // Large enough amount of services for most service dire
 
 type ServiceStatus struct {
 	StateDuration time.Duration
+	PID           int // 0 when sv reports no process.
 	Paused        bool
 	WantUp        bool
 	WantDown      bool
@@ -38,7 +39,7 @@ var (
 	tokenDown  = []byte("down")
 	pfxSvFail  = []byte("fail:")
 	pfxSvWarn  = []byte("warning:")
-	elemSvInfo = `(?:\(pid \d+\) )?` +
+	elemSvInfo = `(?:\(pid (\d+)\) )?` +
 		`(\d+)s` + // uptime/downtime
 		`(?:, normally (up|down))?` +
 		`(, paused)?` +
@@ -62,6 +63,7 @@ var (
 const (
 	idxState = iota
 	idxName
+	idxPID
 	idxDuration
 	idxNormally
 	idxPaused
@@ -126,6 +128,7 @@ func (c *Collector) servicesCli() (map[string]*ServiceStatus, error) {
 func parseServiceStatus(match [][]byte) *ServiceStatus {
 	status := &ServiceStatus{
 		StateDuration: parseServiceDuration(match[idxDuration]),
+		PID:           parsePID(match[idxPID]),
 		Paused:        len(match[idxPaused]) != 0,
 		WantUp:        bytes.Equal(match[idxWant], tokenUp),
 		WantDown:      bytes.Equal(match[idxWant], tokenDown),
@@ -148,6 +151,11 @@ func parseServiceState(state []byte) ServiceState {
 	default:
 		return ServiceStateFinish
 	}
+}
+
+func parsePID(pid []byte) int {
+	n, _ := strconv.Atoi(string(pid))
+	return n
 }
 
 func parseServiceDuration(seconds []byte) time.Duration {
