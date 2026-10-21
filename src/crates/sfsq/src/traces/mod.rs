@@ -1,5 +1,6 @@
 //! Multi-source trace-query subsystem: cross-source trace-by-id, search,
-//! the trace-level overview aggregate, and the search bar's suggestions.
+//! the trace-level overview aggregate, the span explorer, and the search
+//! bar's suggestions.
 //!
 //! Same philosophy as [`logs`](crate::logs): neutral, transport-free —
 //! plain Rust data in and out, no wire concerns; each consumer (the CLI,
@@ -22,12 +23,12 @@
 //!   rejected up front by [`validate_sources`].
 //!
 //! Flow: every operation validates its source set, then evaluates one
-//! of three ways — span assembly through the shared combiner
+//! of four ways — span assembly through the shared combiner
 //! `sfst::trace_combine` ([`trace_by_id`]; [`search()`]'s fallback,
 //! which the gate pre-filters), assembly-free trace-level shapes
 //! (`rollup`'s per-trace parts: [`search()`]'s rows, and
-//! [`overview()`] folded by `fold`), or dictionary reads
-//! ([`suggest()`]).
+//! [`overview()`] folded by `fold`), per-span index statistics
+//! ([`explore()`]), or dictionary reads ([`suggest()`]).
 //!
 //! # Module map
 //!
@@ -44,8 +45,12 @@
 //!   assembly only when the rollup evidence proves a non-match.
 //! - overview — [`overview()`]: the trace-density grid (time bucket ×
 //!   duration bin) over stored-row statistics.
+//! - explore — [`explore()`]: the span explorer's histogram (spans per
+//!   bucket stacked by a key, duration heatmap rows, percentiles) and
+//!   newest-first span rows, one row per stored span.
 //! - duration_hist — the log-linear duration histogram behind the
-//!   overview's per-bucket percentiles ([`DurationPercentiles`]).
+//!   overview's per-bucket percentiles and the explorer's heatmap rows and
+//!   percentiles ([`DurationPercentiles`], [`heatmap_row_bounds`]).
 //! - fold / rollup — the aggregate machinery behind overview (rollup's
 //!   parts also build search's rows):
 //!   per-trace shapes from both source kinds
@@ -66,6 +71,7 @@
 
 mod by_id;
 mod duration_hist;
+mod explore;
 mod fold;
 mod gate;
 mod order;
@@ -83,7 +89,12 @@ mod window;
 pub use by_id::{
     DEFAULT_SPAN_CAP, FieldKinds, TraceData, TraceQuery, TraceRequestError, trace_by_id,
 };
-pub use duration_hist::DurationPercentiles;
+pub use duration_hist::{DurationPercentiles, HEATMAP_ROWS, heatmap_row_bounds};
+pub use explore::{
+    DEFAULT_ROWS_LIMIT, ExploreData, ExploreQuery, ExploreRequestError, HistogramBucket,
+    HistogramData, ROW_COLUMNS_MAX, ROWS_LIMIT_MAX, RowKey, RowsData, RowsSpec,
+    STACK_DIMENSIONS_MAX, SpanRow, explore,
+};
 pub use overview::{
     DURATION_BIN_COUNT, DURATION_BIN_LABELS, OverviewData, OverviewQuery, OverviewRequestError,
     overview,

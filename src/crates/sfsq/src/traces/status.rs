@@ -32,11 +32,12 @@ pub enum PartialReason {
     /// A source failed (map/open, TIDX, column or EVNB/LNKB decode,
     /// tail scan): spans that may live there are absent from the result.
     SourceFailure,
-    /// Search's work ceiling was hit before the candidate space was
-    /// exhausted (the assembled-candidate ceiling, or the visited-rows
-    /// ceiling that gates a grow-K refill). Window files are discovered
-    /// newest first, so what the ceiling left out is the older files'. Search-only: trace-by-id
-    /// never adds it — the span cap is that mode's runaway-work guard.
+    /// A work ceiling was hit before every source was visited: search's
+    /// (the assembled-candidate ceiling, or the visited-rows ceiling that
+    /// gates a grow-K refill) or the explorer's rows budget. Window files
+    /// are visited newest first, so what the ceiling left out is the
+    /// older files'. Never from trace-by-id — the span cap is that
+    /// mode's runaway-work guard.
     WorkCeiling,
     /// The caller cancelled. Trace-by-id returns EMPTY before all
     /// source heads are resolved, and the deterministic merged prefix
@@ -106,6 +107,10 @@ pub enum PartialReason {
     /// Raised by a consumer that shapes trace-by-id results, never by an
     /// engine operation.
     DroppedFields,
+    /// The explorer's stack key is high-cardinality in at least one
+    /// file, which cannot be stacked: that file's spans count as `other`.
+    /// Explore-only.
+    StackFieldHighCard,
 }
 
 /// The status of one query's result.

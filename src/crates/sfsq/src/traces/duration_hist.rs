@@ -1,7 +1,8 @@
 //! A fixed-size log-linear histogram of durations: 16 linear sub-bins per
 //! power of two, so a bin's midpoint is within 1/32 of every value in it.
 //! Memory is per histogram, not per recorded duration. Used for the
-//! overview's per-bucket trace-duration percentiles.
+//! overview's per-bucket trace-duration percentiles, and for the
+//! explorer's span-duration percentiles and heatmap rows.
 
 /// One time bucket's duration percentiles, nanoseconds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -17,6 +18,21 @@ const SUB_BINS: usize = 16;
 /// Durations 0..16 get a bin each; each power of two from 2^4 to 2^62
 /// then gets [`SUB_BINS`] (durations are non-negative `i64`).
 const BINS: usize = SUB_BINS * (1 + 62 - 4 + 1);
+
+/// Rows of the explorer's duration heatmap: row 0 holds everything under
+/// 2^10 ns (about 1 µs), row `k` then `[2^(9+k), 2^(10+k))` ns, and the
+/// last row everything from 2^40 ns (about 18 minutes). Every edge is a
+/// power of two of at least 2^4, so no bin straddles one.
+pub const HEATMAP_ROWS: usize = 32;
+const HEATMAP_FIRST_BIT: u32 = 10;
+
+/// Each heatmap row's exclusive upper bound in nanoseconds; `None` for the
+/// last, unbounded row.
+pub fn heatmap_row_bounds() -> [Option<i64>; HEATMAP_ROWS] {
+    std::array::from_fn(|row| {
+        (row + 1 < HEATMAP_ROWS).then(|| 1i64 << (HEATMAP_FIRST_BIT + row as u32))
+    })
+}
 
 /// Durations counted per log-linear bin, plus the observed extremes.
 #[derive(Debug, Clone)]
@@ -67,6 +83,37 @@ impl DurationHistogram {
             None => (duration_ns, duration_ns),
             Some((min, max)) => (min.min(duration_ns), max.max(duration_ns)),
         });
+    }
+
+    /// Add `other`'s durations to these.
+    pub(crate) fn merge(&mut self, other: &DurationHistogram) {
+        for (bin, &count) in self.counts.iter_mut().zip(&other.counts) {
+            *bin = bin.saturating_add(count);
+        }
+        self.n += other.n;
+        self.range = match (self.range, other.range) {
+            (None, range) | (range, None) => range,
+            (Some((a, b)), Some((c, d))) => Some((a.min(c), b.max(d))),
+        };
+    }
+
+    /// The recorded durations per heatmap row ([`HEATMAP_ROWS`]).
+    pub(crate) fn heatmap_rows(&self) -> [u64; HEATMAP_ROWS] {
+        let mut rows = [0u64; HEATMAP_ROWS];
+        for (bin, &count) in self.counts.iter().enumerate() {
+            if count == 0 {
+                continue;
+            }
+            let (lo, _) = Self::bounds(bin);
+            let row = if lo < 1 << HEATMAP_FIRST_BIT {
+                0
+            } else {
+                let bit = 63 - (lo as u64).leading_zeros();
+                ((bit - HEATMAP_FIRST_BIT + 1) as usize).min(HEATMAP_ROWS - 1)
+            };
+            rows[row] += u64::from(count);
+        }
+        rows
     }
 
     /// Nearest-rank percentile `p`: rank `ceil(p/100 x n)`, 1-based. The
@@ -162,6 +209,55 @@ mod tests {
                 assert!(sorted[0] <= got && got <= sorted[sorted.len() - 1]);
             }
         }
+    }
+
+    /// Each row holds exactly the durations between its bounds.
+    #[test]
+    fn heatmap_rows_follow_their_bounds() {
+        let bounds = heatmap_row_bounds();
+        assert_eq!(bounds[0], Some(1 << 10));
+        assert_eq!(bounds[HEATMAP_ROWS - 2], Some(1 << 40));
+        assert_eq!(bounds[HEATMAP_ROWS - 1], None);
+        let row_of = |d: i64| bounds.iter().position(|b| b.is_none_or(|b| d < b)).unwrap();
+        let durations = [
+            0,
+            1,
+            1023,
+            1024,
+            2047,
+            2048,
+            1_000_000,
+            (1 << 40) - 1,
+            1 << 40,
+            i64::MAX,
+        ];
+        let mut h = DurationHistogram::new();
+        let mut expected = [0u64; HEATMAP_ROWS];
+        for d in durations {
+            h.record(d);
+            expected[row_of(d)] += 1;
+        }
+        assert_eq!(h.heatmap_rows(), expected);
+    }
+
+    /// Merging equals recording both populations into one histogram.
+    #[test]
+    fn merge_equals_recording_everything_once() {
+        let (a, b) = ([5, 900, 70_000], [3, 1 << 33, 12]);
+        let (mut left, mut right, mut both) = (
+            DurationHistogram::new(),
+            DurationHistogram::new(),
+            DurationHistogram::new(),
+        );
+        a.iter().for_each(|&d| left.record(d));
+        b.iter().for_each(|&d| right.record(d));
+        a.iter().chain(&b).for_each(|&d| both.record(d));
+        left.merge(&right);
+        assert_eq!(left.heatmap_rows(), both.heatmap_rows());
+        assert_eq!(left.percentiles(), both.percentiles());
+        let mut empty = DurationHistogram::new();
+        empty.merge(&DurationHistogram::new());
+        assert_eq!(empty.percentiles(), None);
     }
 
     #[test]

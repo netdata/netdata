@@ -812,7 +812,8 @@
                   "deadline",
                   "no_new_matches",
                   "trace_fragments",
-                  "dropped_fields"
+                  "dropped_fields",
+                  "stack_field_high_card"
                 ]
               }
             }

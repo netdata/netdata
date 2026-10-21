@@ -1115,6 +1115,7 @@ pub enum PartialReasonWire {
     NoNewMatches,
     TraceFragments,
     DroppedFields,
+    StackFieldHighCard,
 }
 
 impl From<PartialReason> for PartialReasonWire {
@@ -1134,6 +1135,7 @@ impl From<PartialReason> for PartialReasonWire {
             PartialReason::NoNewMatches => PartialReasonWire::NoNewMatches,
             PartialReason::TraceFragments => PartialReasonWire::TraceFragments,
             PartialReason::DroppedFields => PartialReasonWire::DroppedFields,
+            PartialReason::StackFieldHighCard => PartialReasonWire::StackFieldHighCard,
         }
     }
 }

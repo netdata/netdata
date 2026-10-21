@@ -412,6 +412,7 @@ fn every_partial_reason() -> Vec<PartialReason> {
         PartialReason::NoNewMatches,
         PartialReason::TraceFragments,
         PartialReason::DroppedFields,
+        PartialReason::StackFieldHighCard,
     ];
     for reason in &all {
         match reason {
@@ -428,7 +429,8 @@ fn every_partial_reason() -> Vec<PartialReason> {
             | PartialReason::Deadline
             | PartialReason::NoNewMatches
             | PartialReason::TraceFragments
-            | PartialReason::DroppedFields => {}
+            | PartialReason::DroppedFields
+            | PartialReason::StackFieldHighCard => {}
         }
     }
     all
@@ -446,7 +448,8 @@ fn every_partial_reason_wire_name_is_pinned() {
         json!({"partial": [
             "size_cap", "source_failure", "work_ceiling", "cancelled",
             "overview_ceiling", "rollup_absent", "remote_unavailable", "byte_budget", "busy",
-            "file_budget", "deadline", "no_new_matches", "trace_fragments", "dropped_fields"
+            "file_budget", "deadline", "no_new_matches", "trace_fragments", "dropped_fields",
+            "stack_field_high_card"
         ]})
     );
 }
