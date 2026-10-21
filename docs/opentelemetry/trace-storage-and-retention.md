@@ -16,6 +16,9 @@ index of trace IDs so that a whole trace can be looked up by its ID. A span sent
 with the OpenTelemetry defaults, `UNSPECIFIED` and `UNSET`, so those values can be filtered on like any other. Spans
 stored by an earlier version keep no kind or status for those defaults, so until their files leave retention a filter
 on `UNSET`, `UNSPECIFIED`, or a negation such as a status other than `ERROR` does not match them.
+Each span is also indexed with its role in its trace: `ROOT` when it has no parent, `INBOUND` for a server or consumer
+span, `OUTBOUND` for a client or producer span, and `INTERNAL` for all other spans. Spans stored by an earlier version
+have no role, so a filter on the role does not match them until their files leave retention.
 Spans stored by an earlier version also keep their status under an older name: the trace view shows no status for
 them and does not count them as errors, and a status filter does not match them. The trace list can still count their
 errors when the earlier version indexed their files. This stays true until their files leave retention; offloaded files

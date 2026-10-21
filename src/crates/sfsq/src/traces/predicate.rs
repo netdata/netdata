@@ -329,7 +329,7 @@ pub enum PredicateError {
 /// are structurally valid on it (full grammar, both stages).
 enum BuiltinClass {
     /// String-valued (free-form names/messages AND the closed kind/
-    /// status label sets — regex over labels is valid grammar, pin 26A):
+    /// role/status label sets — regex over labels is valid grammar, pin 26A):
     /// `= != =~ !~` with text values.
     Text,
     /// Nanosecond quantity: `= != > < >= <=` with integer values.
@@ -343,6 +343,7 @@ fn builtin_class(i: BuiltinField) -> BuiltinClass {
     match i {
         Name
         | Kind
+        | Role
         | Status
         | StatusMessage
         | InstrumentationName
@@ -568,6 +569,7 @@ impl Condition {
                 PredicateTarget::Builtin(
                     Name
                     | Kind
+                    | Role
                     | Status
                     | StatusMessage
                     | InstrumentationName
@@ -1935,6 +1937,7 @@ mod tests {
         for i in [
             BuiltinField::Name,
             BuiltinField::Kind,
+            BuiltinField::Role,
             BuiltinField::Status,
             BuiltinField::StatusMessage,
             BuiltinField::InstrumentationName,

@@ -126,7 +126,7 @@ data. These are the same keys that the search of the Netdata Agent uses:
   `attributes.NAME` (a span attribute), `events.attributes.NAME` or
   `links.attributes.NAME`. `NAME` is the attribute name, with its dots:
   `resource.attributes.service.name`.
-- A field: `name`, `kind`, `status.code`, `status.message`, `scope.name`,
+- A field: `name`, `kind`, `role`, `status.code`, `status.message`, `scope.name`,
   `scope.version`, `events.name`, `duration`, `span_id`, `parent_span_id`,
   `trace_id`, `links.span_id`, `links.trace_id`, `events.time_since_start`,
   `root_name`, `root_service_name`, `trace_duration`.
@@ -173,7 +173,7 @@ sfsq-cli suggest (--sfst FILE | --wal FILE)… [--key KEY]
 
 Without `--key`, `suggest` gives keys. With it, it gives the values of that
 key. `KEY` is a key as in `COND` above. Only these fields have stored values:
-`name`, `kind`, `status.code`, `status.message`, `scope.name`,
+`name`, `kind`, `role`, `status.code`, `status.message`, `scope.name`,
 `scope.version` and `events.name`. If you give another field as `--key`, the
 command fails. `suggest` reads the newest
 files first. A key or a value matches `--term` when it is equal to the

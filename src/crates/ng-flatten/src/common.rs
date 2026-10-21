@@ -577,7 +577,7 @@ impl Flattener {
     }
 
     /// Flatten a span's own fields — the queryable scalar facets (`name`, `kind`,
-    /// `status.code`, `status.message`, `trace_state`), `attributes.*`, and the
+    /// `role`, `status.code`, `status.message`, `trace_state`), `attributes.*`, and the
     /// structured `events[]` / `links[]` lists. Facet names are OTLP field paths
     /// (the status lives under a `status` node, as in OTLP). Identifier/timing
     /// fields (`trace_id`, `span_id`, `parent_span_id`, start/duration, `flags`,
@@ -597,7 +597,15 @@ impl Flattener {
     /// an absent status object means), so they stay filterable and enumerable.
     /// This dual form is span-specific: `SpanKind`/`StatusCode` are closed enums
     /// whose labels are worth indexing, unlike the open numeric
-    /// `severity_number`. `trace_state` is carried **verbatim** (it can carry the
+    /// `severity_number`.
+    ///
+    /// `role` is derived from the span alone, so every reader sees the same
+    /// value (WAL entries, chunk images, sealed files): `ROOT` when the span has
+    /// no parent, else `INBOUND` (SERVER/CONSUMER: work received from a caller),
+    /// `OUTBOUND` (CLIENT/PRODUCER: work sent to another service) or `INTERNAL`
+    /// (everything else, UNSPECIFIED and unknown kinds included).
+    ///
+    /// `trace_state` is carried **verbatim** (it can carry the
     /// OpenTelemetry sampling threshold, `ot=th:`); `status.message` is emitted
     /// whenever non-empty, independent of the status code.
     pub fn flatten_span(&mut self, span: Span) -> FlattenedSpan {
@@ -610,6 +618,10 @@ impl Flattener {
         // UNSPECIFIED (0) is stored as itself, never rewritten to INTERNAL.
         self.scalar("kind", Value::Str(span_kind_label(span.kind)), &mut out);
         self.scalar("_kind", Value::Int(span.kind as i64), &mut out);
+        // Normalization already cleared a wrong-length parent id to empty.
+        let has_parent = span.parent_span_id.iter().any(|&b| b != 0);
+        let role = span_role_label(span.kind, has_parent);
+        self.scalar("role", Value::Str(role.to_string()), &mut out);
 
         if !span.trace_state.is_empty() {
             self.scalar("trace_state", Value::Str(span.trace_state), &mut out);
@@ -718,6 +730,18 @@ fn span_kind_label(kind: i32) -> String {
         4 => "PRODUCER".to_string(),
         5 => "CONSUMER".to_string(),
         other => other.to_string(),
+    }
+}
+
+/// A span's role in its trace: `ROOT` without a parent, else by kind.
+fn span_role_label(kind: i32, has_parent: bool) -> &'static str {
+    if !has_parent {
+        return "ROOT";
+    }
+    match kind {
+        2 | 5 => "INBOUND",
+        3 | 4 => "OUTBOUND",
+        _ => "INTERNAL",
     }
 }
 

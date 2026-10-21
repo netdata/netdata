@@ -688,6 +688,8 @@ fn builtin_values_are_storage_labels_and_virtual_builtins_have_none() {
     };
     assert_eq!(texts(BuiltinField::Name), ["op-a", "op-b"]);
     assert_eq!(texts(BuiltinField::Kind), ["SERVER", "UNSPECIFIED"]);
+    // a has no parent, b's kind is UNSPECIFIED.
+    assert_eq!(texts(BuiltinField::Role), ["INTERNAL", "ROOT"]);
     assert_eq!(texts(BuiltinField::Status), ["ERROR", "UNSET"]);
     assert_eq!(texts(BuiltinField::StatusMessage), ["boom"]);
     assert_eq!(texts(BuiltinField::InstrumentationName), ["mylib"]);

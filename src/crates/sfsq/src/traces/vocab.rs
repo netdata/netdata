@@ -85,6 +85,7 @@ pub enum BuiltinField {
     // ── Dictionary-backed ───────────────────────────────────────────
     Name,
     Kind,
+    Role,
     Status,
     StatusMessage,
     InstrumentationName,
@@ -105,9 +106,10 @@ pub enum BuiltinField {
 
 impl BuiltinField {
     /// Every builtin field, in declaration order (dictionary-backed first).
-    pub const ALL: [BuiltinField; 17] = [
+    pub const ALL: [BuiltinField; 18] = [
         BuiltinField::Name,
         BuiltinField::Kind,
+        BuiltinField::Role,
         BuiltinField::Status,
         BuiltinField::StatusMessage,
         BuiltinField::InstrumentationName,
@@ -133,6 +135,7 @@ impl BuiltinField {
         match self {
             BuiltinField::Name => "name",
             BuiltinField::Kind => "kind",
+            BuiltinField::Role => "role",
             BuiltinField::Status => "status.code",
             BuiltinField::StatusMessage => "status.message",
             BuiltinField::InstrumentationName => "scope.name",
@@ -159,11 +162,13 @@ impl BuiltinField {
     /// Values come back as the STORAGE labels (`kind` ∈
     /// `UNSPECIFIED/INTERNAL/SERVER/CLIENT/PRODUCER/CONSUMER`, `status.code` ∈
     /// `UNSET/OK/ERROR`, or the decimal number of a variant the writer did
-    /// not know).
+    /// not know; `role` ∈ `ROOT/INBOUND/OUTBOUND/INTERNAL`, absent from files
+    /// written before the writer stored it).
     pub fn dictionary_field(self) -> Option<&'static str> {
         match self {
             BuiltinField::Name
             | BuiltinField::Kind
+            | BuiltinField::Role
             | BuiltinField::Status
             | BuiltinField::StatusMessage
             | BuiltinField::InstrumentationName
@@ -376,6 +381,7 @@ mod tests {
             ("links.attributes.rel", attr(AttributeOwner::Link, "rel")),
             ("name", builtin(BuiltinField::Name)),
             ("kind", builtin(BuiltinField::Kind)),
+            ("role", builtin(BuiltinField::Role)),
             ("status.code", builtin(BuiltinField::Status)),
             ("status.message", builtin(BuiltinField::StatusMessage)),
             ("scope.name", builtin(BuiltinField::InstrumentationName)),
@@ -519,6 +525,7 @@ mod tests {
             vec![
                 Name,
                 Kind,
+                Role,
                 Status,
                 StatusMessage,
                 InstrumentationName,

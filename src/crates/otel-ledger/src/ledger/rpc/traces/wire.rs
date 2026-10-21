@@ -935,7 +935,7 @@ pub struct TraceItems {
 
 /// One span, ids in W3C lowercase hex. `fields` are the span's resolved
 /// facets as `[key, value]` string pairs (order preserved): every key is
-/// a search key (`name`, `kind`, `status.code`, `status.message`,
+/// a search key (`name`, `kind`, `role`, `status.code`, `status.message`,
 /// `scope.name`, `scope.version`, `scope.attributes.<key>`,
 /// `attributes.<key>`), plus `trace_state`, shown but not a search key.
 /// The span's resource attributes (`resource.attributes.<key>`) are not

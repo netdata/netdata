@@ -433,6 +433,7 @@ fn the_wire_keys_are_pinned() {
     let builtins = [
         ("name", Name),
         ("kind", Kind),
+        ("role", Role),
         ("status.code", Status),
         ("status.message", StatusMessage),
         ("scope.name", InstrumentationName),
@@ -1689,6 +1690,7 @@ fn every_stored_name_is_a_key() {
             "Link attribute",
             "Name",
             "Resource attribute",
+            "Role",
             "Span attribute",
             "Status",
             "StatusMessage",

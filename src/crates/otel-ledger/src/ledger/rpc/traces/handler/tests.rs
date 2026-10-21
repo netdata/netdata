@@ -679,6 +679,7 @@ async fn a_rich_span_answers_with_keys_sealed_and_tail() {
             ("kind", "SERVER"),
             ("name", "span-1"),
             ("resource.attributes.service.name", "svc"),
+            ("role", "ROOT"),
             ("scope.attributes.tier", "web"),
             ("scope.name", "lib"),
             ("scope.version", "1.2"),

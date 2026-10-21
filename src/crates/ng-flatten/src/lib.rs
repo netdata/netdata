@@ -298,6 +298,36 @@ mod tests {
         assert_eq!(at(&l, "_status_code"), [&Value::Int(42)]);
     }
 
+    #[test]
+    fn span_role_follows_parent_then_kind() {
+        let cases = [
+            // (kind, parent_span_id, role)
+            (2, vec![], "ROOT"),
+            (3, vec![0; 8], "ROOT"),
+            (2, vec![0x01; 8], "INBOUND"),
+            (5, vec![0x01; 8], "INBOUND"),
+            (3, vec![0x01; 8], "OUTBOUND"),
+            (4, vec![0x01; 8], "OUTBOUND"),
+            (1, vec![0x01; 8], "INTERNAL"),
+            (0, vec![0x01; 8], "INTERNAL"),
+            (99, vec![0x01; 8], "INTERNAL"),
+        ];
+        for (kind, parent_span_id, role) in cases {
+            let mut f = Flattener::new();
+            let e = f.flatten_span(Span {
+                kind,
+                parent_span_id: parent_span_id.clone(),
+                ..Default::default()
+            });
+            let l = f.into_tree().resolve(&e.entries);
+            assert_eq!(
+                at(&l, "role"),
+                [&Value::Str(role.into())],
+                "kind {kind}, parent {parent_span_id:?}"
+            );
+        }
+    }
+
     /// Wrap one span in a single-resource/single-scope traces request.
     fn trace_req(
         span: Span,

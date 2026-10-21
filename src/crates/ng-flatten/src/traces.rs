@@ -7,7 +7,7 @@
 //!
 //! One span → one SFST row. What becomes what at seal time (the builder is
 //! `src/crates/ng-index/src/sfst_build.rs::populate_trace_row_index`):
-//! - interned facets: `name`, `kind`/`_kind`, `status.code`/`_status_code`,
+//! - interned facets: `name`, `kind`/`_kind`, `role`, `status.code`/`_status_code`,
 //!   `status.message`, `trace_state`, `attributes.*` (emitted by
 //!   [`Flattener::flatten_span`]), plus the event/link `events.*` / `links.*`
 //!   entries — searchable tokens in the shared [`SchemaTree`];
@@ -60,10 +60,10 @@ pub struct SpanScopeGroup {
 /// One span: its per-row columns, its flattened entries, and its structured
 /// sub-objects (span analog of [`crate::logs::Record`]). Carries every OTLP
 /// `Span` field: the scalar facets (`name`, `kind`, `status.code`,
-/// `status.message`, `trace_state`) and `attributes.*` live in
-/// [`entries`](Self::entries); events and links are the structured lists
-/// ([`EventRecord`] / [`LinkRecord`]) whose searchable parts double as entries
-/// at seal time.
+/// `status.message`, `trace_state`, plus the derived `role`) and
+/// `attributes.*` live in [`entries`](Self::entries); events and links are
+/// the structured lists ([`EventRecord`] / [`LinkRecord`]) whose searchable
+/// parts double as entries at seal time.
 ///
 /// Per-row columns (NOT facets): `ts` = the resolved `start_time_unix_nano`
 /// (the row-ordering key at seal); `duration` = `end - start` ns clamped to 0

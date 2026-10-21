@@ -429,6 +429,16 @@ fn oracle_equivalence_under_relayouts() {
             vec![hex(4), hex(1)],
         ),
         (
+            // The non-root spans of T1, T3 and T5 have kind UNSPECIFIED.
+            "role-internal",
+            canon_query(pred(vec![builtin(
+                BuiltinField::Role,
+                CompareOp::Eq,
+                vec![text("INTERNAL")],
+            )])),
+            vec![hex(3), hex(5), hex(1)],
+        ),
+        (
             "duration-floor",
             canon_query(pred(vec![builtin(
                 BuiltinField::Duration,
