@@ -20,6 +20,7 @@ use common::{
     tail_source, unavailable_source, write_wal,
 };
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
+use opentelemetry_proto::tonic::common::v1::{AnyValue, ArrayValue, KeyValue, any_value::Value};
 use sfsq::traces::{
     AttributeOwner, BuiltinField, CompareOp, Condition, ExploreData, ExploreQuery,
     ExploreRequestError, HEATMAP_ROWS, PartialReason, Predicate, PredicateTarget, PredicateValue,
@@ -331,6 +332,40 @@ fn scopes() -> Vec<(&'static str, TokenQuery, Selects)> {
                 )])],
             },
             Box::new(|t| t.key.trace_id != sfst::TraceId::from(trace_bytes(3))),
+        ),
+        (
+            "negated-trace-id",
+            TokenQuery {
+                tokens: vec![negated(vec![builtin(
+                    BuiltinField::TraceId,
+                    CompareOp::Eq,
+                    &t3,
+                )])],
+            },
+            Box::new(|t| t.key.trace_id != sfst::TraceId::from(trace_bytes(3))),
+        ),
+        (
+            "negated-not-trace-id",
+            TokenQuery {
+                tokens: vec![negated(vec![builtin(
+                    BuiltinField::TraceId,
+                    CompareOp::NotEq,
+                    &t3,
+                )])],
+            },
+            Box::new(|t| t.key.trace_id == sfst::TraceId::from(trace_bytes(3))),
+        ),
+        (
+            // A third of the spans lack the key: a negated token keeps them.
+            "negated-absent-key",
+            TokenQuery {
+                tokens: vec![negated(vec![cond(
+                    PredicateTarget::Attribute(AttributeOwner::Span, "http.method".into()),
+                    CompareOp::Eq,
+                    vec![text("GET")],
+                )])],
+            },
+            Box::new(|t| t.method != Some("GET")),
         ),
         (
             "duration",
@@ -713,6 +748,97 @@ fn bad_requests_are_refused() {
     check(ExploreQuery::new(sfst::Grid::new(0, 0, 10)), |e| {
         matches!(e, ExploreRequestError::EmptyGrid)
     });
+    check(query(), |e| matches!(e, ExploreRequestError::NoSection));
+}
+
+fn tags(values: &[&str]) -> KeyValue {
+    KeyValue {
+        key: "tags".into(),
+        value: Some(AnyValue {
+            value: Some(Value::ArrayValue(ArrayValue {
+                values: values
+                    .iter()
+                    .map(|v| AnyValue {
+                        value: Some(Value::StringValue(v.to_string())),
+                    })
+                    .collect(),
+            })),
+        }),
+        key_strindex: 0,
+    }
+}
+
+/// A span with several values of the stack key counts under each, so the
+/// stacked counts can exceed the total; the total still counts spans.
+#[test]
+fn a_span_with_several_stack_values_counts_under_each() {
+    let dir = tempfile::tempdir().unwrap();
+    let spans = vec![
+        SpanSpec {
+            attrs: vec![tags(&["a", "b"])],
+            ..sp(1, 0, BASE, "op")
+        },
+        SpanSpec {
+            attrs: vec![tags(&["a"])],
+            ..sp(2, 0, BASE + 1000, "op")
+        },
+    ];
+    let wal = write_wal(
+        dir.path(),
+        vec![req_with(vec![kv_str("service.name", "svc")], None, &spans)],
+        "tags",
+    );
+    let data = run(
+        vec![sealed_source(dir.path(), &wal, "tags")],
+        ExploreQuery::new(grid()).histogram("attributes.tags[]"),
+    );
+    assert_eq!(data.status, QueryStatus::Complete);
+    let h = data.histogram.unwrap();
+    assert_eq!(h.dimensions, ["a", "b"]);
+    assert_eq!(h.buckets[0].counts, [2, 1]);
+    assert_eq!((h.buckets[0].other, h.buckets[0].unset), (0, 0));
+    assert_eq!(h.total, 2);
+}
+
+/// A window inside the world counts a span that starts exactly at its
+/// start and leaves out one that starts exactly at its end, in every
+/// layout, in the histogram and in the rows alike.
+#[test]
+fn a_window_counts_its_start_and_not_its_end() {
+    let truths = truth(&world());
+    let mut starts: Vec<i64> = truths.iter().map(|t| t.key.start_ns).collect();
+    starts.sort_unstable();
+    starts.dedup();
+    let (start, end) = (starts[3], starts[40]);
+    let mut expected: Vec<RowKey> = truths
+        .iter()
+        .filter(|t| (start..end).contains(&t.key.start_ns))
+        .map(|t| t.key)
+        .collect();
+    expected.sort_by_key(|k| std::cmp::Reverse(*k));
+    let dir = tempfile::tempdir().unwrap();
+    for layout_name in LAYOUTS {
+        let data = run(
+            layout(dir.path(), layout_name),
+            ExploreQuery::new(sfst::Grid::new(start, end - start, 1))
+                .histogram("status.code")
+                .rows(RowsSpec {
+                    limit: 200,
+                    before: None,
+                    columns: Vec::new(),
+                }),
+        );
+        assert_eq!(data.status, QueryStatus::Complete, "{layout_name}");
+        assert_eq!(
+            data.histogram.unwrap().total,
+            expected.len() as u64,
+            "{layout_name}"
+        );
+        let rows = data.rows.unwrap();
+        let listed: Vec<RowKey> = rows.items.iter().map(|row| row.key).collect();
+        assert_eq!(listed, expected, "{layout_name}");
+        assert!(!rows.more, "{layout_name}");
+    }
 }
 
 /// The budget leaves out the older sources and says so; the newer ones
@@ -739,6 +865,39 @@ fn the_budget_stops_at_the_older_sources() {
     );
     // The newer file (the late half) counted; the older one did not.
     assert_eq!(data.histogram.unwrap().total, (SPANS / 2) as u64);
+}
+
+/// Under the budget the rows come from the newer sources it visited.
+#[test]
+fn the_budget_stops_the_rows_at_the_older_sources() {
+    let dir = tempfile::tempdir().unwrap();
+    let spans = world();
+    let (early, late) = spans.split_at(SPANS / 2);
+    let mut expected: Vec<RowKey> = truth(late).iter().map(|t| t.key).collect();
+    expected.sort_by_key(|k| std::cmp::Reverse(*k));
+    let early = write_wal(dir.path(), requests(early), "early");
+    let late = write_wal(dir.path(), requests(late), "late");
+    let data = run(
+        vec![
+            sealed_source(dir.path(), &early, "early"),
+            sealed_source(dir.path(), &late, "late"),
+        ],
+        ExploreQuery::new(grid())
+            .rows(RowsSpec {
+                limit: 200,
+                before: None,
+                columns: Vec::new(),
+            })
+            .rows_ceiling_for_tests((SPANS / 2) as u64 + 10),
+    );
+    assert_eq!(
+        data.status,
+        QueryStatus::Complete.with(PartialReason::WorkCeiling)
+    );
+    let rows = data.rows.unwrap();
+    assert_eq!(rows.matched, (SPANS / 2) as u64);
+    let listed: Vec<RowKey> = rows.items.iter().map(|row| row.key).collect();
+    assert_eq!(listed, expected);
 }
 
 /// An unavailable source in the window and a failed one are reported;

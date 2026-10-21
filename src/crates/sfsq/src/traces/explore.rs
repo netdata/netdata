@@ -28,8 +28,11 @@
 //!   in `other` and the answer is partial
 //!   [`StackFieldHighCard`](PartialReason::StackFieldHighCard).
 //! - **Rows**: newest first by [`RowKey`] (start, trace id, span id), a
-//!   strict total order, so pages never split or repeat a span; a walk
-//!   continues below the last key it was given.
+//!   strict total order over distinct spans, so pages never repeat a span;
+//!   a walk continues strictly below the last key it was given. An exact
+//!   resend shares its span's key: a page lists every copy it holds, but
+//!   copies past a page boundary are not listed (the rows' matched count
+//!   still counts them).
 //! - **One budget**: sources are visited newest first; plan compiles,
 //!   duration reads and row candidates count into one rows budget, and
 //!   once it runs out the older sources are left out
@@ -164,6 +167,9 @@ impl ExploreQuery {
                 stored_key(column)?;
             }
         }
+        if self.stack.is_none() && self.rows.is_none() {
+            return Err(ExploreRequestError::NoSection);
+        }
         Ok(())
     }
 
@@ -208,6 +214,9 @@ pub enum ExploreRequestError {
     RowsLimit { got: usize },
     #[error("{got} row columns exceed the limit of {max}", max = ROW_COLUMNS_MAX)]
     TooManyColumns { got: usize },
+    /// Neither the histogram nor the rows are asked for.
+    #[error("the request asks for nothing: ask for the histogram, the rows or both")]
+    NoSection,
 }
 
 /// One explorer answer: the sections the request asked for.

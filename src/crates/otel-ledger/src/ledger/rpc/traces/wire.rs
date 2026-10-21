@@ -470,8 +470,8 @@ pub struct SuggestParams {
 
 /// The `explore` mode's typed parameters: the span view. Every section
 /// answers over the window aligned to its grid, one row per stored span.
-/// At least one section is usually asked for; without any the answer
-/// carries only the window and the status.
+/// At least one section must be asked for: a request without any is a
+/// client error.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ExploreParams {

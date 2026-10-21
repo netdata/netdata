@@ -1085,6 +1085,7 @@ async fn explore_refuses_what_has_no_span_meaning() {
             "no stored values",
         ),
         (json!({"anchor": "t2:1:2:3:4:5"}), "malformed anchor"),
+        (json!({}), "asks for nothing"),
     ] {
         let err = explore_on(&h, params.clone())
             .await
