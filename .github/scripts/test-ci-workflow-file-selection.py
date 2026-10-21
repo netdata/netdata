@@ -12,6 +12,7 @@ from pathlib import Path, PurePosixPath
 ROOT = Path(__file__).resolve().parents[2]
 REVIEW_WORKFLOW = ROOT / ".github/workflows/review.yml"
 GO_TESTS_WORKFLOW = ROOT / ".github/workflows/go-tests.yml"
+RUST_TESTS_WORKFLOW = ROOT / ".github/workflows/rust-tests.yml"
 SOW_WORKFLOW = ROOT / ".github/workflows/sow.yml"
 BUILD_WORKFLOW_STEPS = (
     (ROOT / ".github/workflows/build.yml", "Check build files"),
@@ -212,6 +213,23 @@ class WorkflowFileSelectionTest(unittest.TestCase):
         self.assertIn("CGO_ENABLED=0 go build", workflow)
         self.assertIn("go test -json ./... -race", workflow)
         self.assertIn("name: Go build tests", workflow)
+
+    def test_rust_workflow_owns_workspace_tests(self) -> None:
+        workflow = RUST_TESTS_WORKFLOW.read_text(encoding="utf-8")
+        check_files_step = workflow_step(workflow, "Check files")
+
+        self.assertEqual(
+            {".github/workflows/rust-tests.yml", "src/crates/**"},
+            literal_block(check_files_step, "files"),
+        )
+        self.assertEqual(
+            {"**/*.md", "src/crates/**/metadata.yaml"},
+            literal_block(check_files_step, "files_ignore"),
+        )
+        self.assertIn(
+            "cargo test --locked --workspace --exclude netflow-plugin --exclude netipc",
+            workflow,
+        )
 
 
 if __name__ == "__main__":
