@@ -130,7 +130,7 @@ static_systemd_unit_allows_capability() {
   ' "${unit}"
 }
 
-installer="${prefix_dir}/install/install-or-update.sh"
+installer="${prefix_dir}/installer/install-or-update.sh"
 unit="${install_dir}/usr/lib/netdata/system/systemd/netdata.service"
 cap=
 rc=
