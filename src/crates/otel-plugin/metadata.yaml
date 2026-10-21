@@ -159,6 +159,12 @@ modules:
                 Setting a CA certificate enables mutual TLS and therefore also requires the server certificate and key. Clients must present a certificate signed by this CA.
               default_value: ""
               required: false
+            - name: auth.enabled
+              description: Require the `X-Scope-OrgID` header (gRPC metadata or HTTP header) to select a log or trace tenant.
+              detailed_description: |
+                This is tenant selection, not credential authentication. When disabled, all logs and traces belong to the `default` tenant. When enabled, trust the header only behind TLS or mutual TLS and suitable network controls. Metrics are not tenant-scoped.
+              default_value: false
+              required: false
             - name: metrics.chart_configs_dir
               description: Directory containing user metric mapping YAML files.
               detailed_description: |
@@ -190,32 +196,6 @@ modules:
               detailed_description: |
                 Retention limits govern retained indexed files. Write-ahead logs, catalogs, and the download cache for offloaded data (in the `remote-read` subdirectory under your configured base directory) can make total usage below this directory exceed the `retention.*.max_total_size` limits.
               default_value: "/var/log/netdata/otel/v2"
-              required: false
-            # Cache and download claims are file-lifecycle behavior: the shared
-            # `{base_dir}/remote-read` cache and the 30s + 1 MiB/s (5 min cap)
-            # deadline are the file-lifecycle crate's remote-read path; fs/s3
-            # select opendal backends.
-            - name: remote_storage.enabled
-              description: Upload retained OpenTelemetry logs and traces to configured remote object storage.
-              detailed_description: |
-                Sealed indexed files are uploaded in addition to being kept under local retention. When a query needs a remotely cataloged file that is no longer local, the plugin downloads it into the bounded download cache shared by logs and traces. Each download may take 30 seconds plus one second per MiB, at most 5 minutes; a file that takes longer or cannot be served is left out (traces report the answer as partial). A query needing more data than the cache holds fails with a message to narrow its time range.
-              default_value: false
-              required: false
-            - name: remote_storage.uri
-              description: Remote storage URI. Supported schemes are `fs` and `s3`.
-              detailed_description: |
-                Put non-secret backend options in the query string. Never put credentials in this file or URI. For S3, use the standard AWS environment, credentials file, or instance-role mechanisms available to the Netdata service account.
-              default_value: "fs:///var/log/netdata/otel/v2/remote"
-              required: false
-            - name: remote_storage.read_cache_max_size
-              description: Maximum size of the local download cache, shared by logs and traces, for data fetched back from remote storage during queries.
-              default_value: "1GB"
-              required: false
-            - name: auth.enabled
-              description: Require the `X-Scope-OrgID` header (gRPC metadata or HTTP header) to select a log or trace tenant.
-              detailed_description: |
-                This is tenant selection, not credential authentication. When disabled, all logs and traces belong to the `default` tenant. When enabled, trust the header only behind TLS or mutual TLS and suitable network controls. Metrics are not tenant-scoped.
-              default_value: false
               required: false
             - name: logs.rotation.default.max_file_size
               description: Write-ahead log file size that triggers rotation.
@@ -262,6 +242,26 @@ modules:
             - name: traces.retention.default.max_age
               description: Maximum retained indexed trace-file age, measured on the start time of its newest span.
               default_value: "7 days"
+              required: false
+            # Cache and download claims are file-lifecycle behavior: the shared
+            # `{base_dir}/remote-read` cache and the 30s + 1 MiB/s (5 min cap)
+            # deadline are the file-lifecycle crate's remote-read path; fs/s3
+            # select opendal backends.
+            - name: remote_storage.enabled
+              description: Upload retained OpenTelemetry logs and traces to configured remote object storage.
+              detailed_description: |
+                Sealed indexed files are uploaded in addition to being kept under local retention. When a query needs a remotely cataloged file that is no longer local, the plugin downloads it into the bounded download cache shared by logs and traces. Each download may take 30 seconds plus one second per MiB, at most 5 minutes; a file that takes longer or cannot be served is left out (traces report the answer as partial). A query needing more data than the cache holds fails with a message to narrow its time range.
+              default_value: false
+              required: false
+            - name: remote_storage.uri
+              description: Remote storage URI. Supported schemes are `fs` and `s3`.
+              detailed_description: |
+                Put non-secret backend options in the query string. Never put credentials in this file or URI. For S3, use the standard AWS environment, credentials file, or instance-role mechanisms available to the Netdata service account.
+              default_value: "fs:///var/log/netdata/otel/v2/remote"
+              required: false
+            - name: remote_storage.read_cache_max_size
+              description: Maximum size of the local download cache, shared by logs and traces, for data fetched back from remote storage during queries.
+              default_value: "1GB"
               required: false
         examples:
           folding:

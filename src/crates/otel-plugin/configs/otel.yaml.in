@@ -50,6 +50,15 @@ receivers:
           key_file: null
           client_ca_file: null
 
+auth:
+  # Require senders to identify a tenant via the X-Scope-OrgID header on
+  # either transport (gRPC metadata or HTTP header). This is tenant
+  # selection, not user authentication — trust the header only
+  # on a protected endpoint (TLS and network controls). When disabled, all
+  # data belongs to a single "default" tenant. Applies to logs and traces;
+  # metrics have no tenants.
+  enabled: false
+
 metrics:
   # Directory holding optional per-metric mapping files that shape how OTEL
   # metrics become Netdata charts. They load on top of the mappings built
@@ -83,42 +92,6 @@ metrics:
 # catalog files under this tree can push total disk usage above the
 # retention caps, which count the retained data files only.
 base_dir: @logdir_POST@/otel/v2
-
-remote_storage:
-  # Upload data to remote object storage, in addition to keeping it on local
-  # disk (local retention still applies). One backend is shared by logs and
-  # traces.
-  enabled: false
-
-  # NEVER put credentials in this file or in the URI below. Credentials are
-  # read from the netdata process environment and the standard cloud
-  # locations — for S3: AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY,
-  # ~/.aws/credentials, or an attached instance role (nothing to configure).
-  # To pass environment variables to the netdata service, use a root-only
-  # systemd EnvironmentFile.
-
-  # Remote storage location, required when enabled is true. The scheme
-  # selects the backend (fs, s3); non-secret backend options go in the query
-  # string. Examples:
-  #   fs:///var/lib/netdata/otel/remote
-  #   s3://bucket/prefix?region=us-east-1
-  #   s3://bucket/prefix?region=us-east-1&endpoint=https://minio.example:9000
-  uri: "fs://@logdir_POST@/otel/v2/remote"
-
-  # Data deleted from local disk by retention but still in remote storage is
-  # downloaded back into a local cache (<base_dir>/remote-read) when a query
-  # needs it. One cache serves logs and traces; a query needing more than it
-  # holds fails with a narrow-the-range error. Cap for that cache:
-  read_cache_max_size: "1GB"
-
-auth:
-  # Require senders to identify a tenant via the X-Scope-OrgID header on
-  # either transport (gRPC metadata or HTTP header). This is tenant
-  # selection, not user authentication — trust the header only
-  # on a protected endpoint (TLS and network controls). When disabled, all
-  # data belongs to a single "default" tenant. Applies to logs and traces;
-  # metrics have no tenants.
-  enabled: false
 
 logs:
   rotation:
@@ -171,3 +144,30 @@ traces:
     # Per-tenant overrides (any subset of the fields above):
     # my-tenant:
     #   max_age: "30 days"
+
+remote_storage:
+  # Upload data to remote object storage, in addition to keeping it on local
+  # disk (local retention still applies). One backend is shared by logs and
+  # traces.
+  enabled: false
+
+  # NEVER put credentials in this file or in the URI below. Credentials are
+  # read from the netdata process environment and the standard cloud
+  # locations — for S3: AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY,
+  # ~/.aws/credentials, or an attached instance role (nothing to configure).
+  # To pass environment variables to the netdata service, use a root-only
+  # systemd EnvironmentFile.
+
+  # Remote storage location, required when enabled is true. The scheme
+  # selects the backend (fs, s3); non-secret backend options go in the query
+  # string. Examples:
+  #   fs:///var/lib/netdata/otel/remote
+  #   s3://bucket/prefix?region=us-east-1
+  #   s3://bucket/prefix?region=us-east-1&endpoint=https://minio.example:9000
+  uri: "fs://@logdir_POST@/otel/v2/remote"
+
+  # Data deleted from local disk by retention but still in remote storage is
+  # downloaded back into a local cache (<base_dir>/remote-read) when a query
+  # needs it. One cache serves logs and traces; a query needing more than it
+  # holds fails with a narrow-the-range error. Cap for that cache:
+  read_cache_max_size: "1GB"
