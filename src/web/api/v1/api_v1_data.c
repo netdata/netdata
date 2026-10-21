@@ -10,14 +10,7 @@ int api_v1_data(RRDHOST *host, struct web_client *w, char *url) {
 
     buffer_flush(w->response.data);
 
-    char    *google_version = "0.6",
-         *google_reqId = "0",
-         *google_sig = "0",
-         *google_out = "json",
-         *responseHandler = NULL,
-         *outFileName = NULL;
-
-    time_t last_timestamp_in_data = 0, google_timestamp = 0;
+    DATA_QUERY_JSONP jp = DATA_QUERY_JSONP_DEFAULTS;
 
     char *chart = NULL;
     char *before_str = NULL;
@@ -78,42 +71,12 @@ int api_v1_data(RRDHOST *host, struct web_client *w, char *url) {
             options |= rrdr_options_parse(value);
         }
         else if(!strcmp(name, "callback")) {
-            responseHandler = value;
+            jp.responseHandler = value;
         }
         else if(!strcmp(name, "filename")) {
-            outFileName = value;
+            jp.outFileName = value;
         }
-        else if(!strcmp(name, "tqx")) {
-            // parse Google Visualization API options
-            // https://developers.google.com/chart/interactive/docs/dev/implementing_data_source
-            char *tqx_name, *tqx_value;
-
-            while(value) {
-                tqx_value = strsep_skip_consecutive_separators(&value, ";");
-                if(!tqx_value || !*tqx_value) continue;
-
-                tqx_name = strsep_skip_consecutive_separators(&tqx_value, ":");
-                if(!tqx_name || !*tqx_name) continue;
-                if(!tqx_value || !*tqx_value) continue;
-
-                if(!strcmp(tqx_name, "version"))
-                    google_version = tqx_value;
-                else if(!strcmp(tqx_name, "reqId"))
-                    google_reqId = tqx_value;
-                else if(!strcmp(tqx_name, "sig")) {
-                    google_sig = tqx_value;
-                    google_timestamp = strtoul(google_sig, NULL, 0);
-                }
-                else if(!strcmp(tqx_name, "out")) {
-                    google_out = tqx_value;
-                    format = google_data_format_str_to_id(google_out);
-                }
-                else if(!strcmp(tqx_name, "responseHandler"))
-                    responseHandler = tqx_value;
-                else if(!strcmp(tqx_name, "outFileName"))
-                    outFileName = tqx_value;
-            }
-        }
+        else if(!strcmp(name, "tqx")) data_query_jsonp_parse_tqx(&jp, value, &format);
         else if(!strcmp(name, "tier")) {
             tier = str2ul(value);
             if(tier < nd_profile.storage_tiers)
@@ -124,12 +87,7 @@ int api_v1_data(RRDHOST *host, struct web_client *w, char *url) {
     }
 
     // validate the google parameters given
-    fix_google_param(google_out);
-    fix_google_param(google_sig);
-    fix_google_param(google_reqId);
-    fix_google_param(google_version);
-    fix_google_param(responseHandler);
-    fix_google_param(outFileName);
+    data_query_jsonp_sanitize(&jp);
 
     RRDSET *st = NULL;
     RRDSET_ACQUIRED *rsa = NULL;
@@ -193,68 +151,24 @@ int api_v1_data(RRDHOST *host, struct web_client *w, char *url) {
     };
     qt = query_target_create(&qtr);
 
+    // checked before "no metrics": a cancelled build may have matched nothing yet
+    int cancelled_code = query_target_cancelled_response(qt, w->response.data);
+    if(cancelled_code) {
+        ret = cancelled_code;
+        goto cleanup;
+    }
+
     if(!qt || !qt->query.used) {
         buffer_sprintf(w->response.data, "No metrics where matched to query.");
         ret = HTTP_RESP_NOT_FOUND;
         goto cleanup;
     }
 
-    web_client_timeout_checkpoint_set(w, timeout);
-    if(web_client_timeout_checkpoint_and_check(w, NULL)) {
-        ret = w->response.code;
+    ret = data_query_response_begin(w, &jp, format, timeout, st ? st->last_updated.tv_sec : 0);
+    if(ret)
         goto cleanup;
-    }
 
-    if(outFileName && *outFileName) {
-        buffer_sprintf(w->response.header, "Content-Disposition: attachment; filename=\"%s\"\r\n", outFileName);
-        netdata_log_debug(D_WEB_CLIENT, "%llu: generating outfilename header: '%s'", w->id, outFileName);
-    }
-
-    if(format == DATASOURCE_DATATABLE_JSONP) {
-        if(responseHandler == NULL)
-            responseHandler = "google.visualization.Query.setResponse";
-
-        netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: GOOGLE JSON/JSONP: version = '%s', reqId = '%s', sig = '%s', out = '%s', responseHandler = '%s', outFileName = '%s'",
-                          w->id, google_version, google_reqId, google_sig, google_out, responseHandler, outFileName
-        );
-
-        buffer_sprintf(
-            w->response.data,
-            "%s({version:'%s',reqId:'%s',status:'ok',sig:'%"PRId64"',table:",
-            responseHandler,
-            google_version,
-            google_reqId,
-            (int64_t)(st ? st->last_updated.tv_sec : 0));
-    }
-    else if(format == DATASOURCE_JSONP) {
-        if(responseHandler == NULL)
-            responseHandler = "callback";
-
-        buffer_strcat(w->response.data, responseHandler);
-        buffer_strcat(w->response.data, "(");
-    }
-
-    ret = data_query_execute(owa, w->response.data, qt, &last_timestamp_in_data);
-
-    if(format == DATASOURCE_DATATABLE_JSONP) {
-        if(google_timestamp < last_timestamp_in_data)
-            buffer_strcat(w->response.data, "});");
-
-        else {
-            // the client already has the latest data
-            buffer_flush(w->response.data);
-            buffer_sprintf(w->response.data,
-                           "%s({version:'%s',reqId:'%s',status:'error',errors:[{reason:'not_modified',message:'Data not modified'}]});",
-                           responseHandler, google_version, google_reqId);
-        }
-    }
-    else if(format == DATASOURCE_JSONP)
-        buffer_strcat(w->response.data, ");");
-
-    if(qt->internal.relative)
-        buffer_no_cacheable(w->response.data);
-    else
-        buffer_cacheable(w->response.data);
+    ret = data_query_response_execute(owa, w, qt, &jp, format);
 
 cleanup:
     query_target_release(qt);

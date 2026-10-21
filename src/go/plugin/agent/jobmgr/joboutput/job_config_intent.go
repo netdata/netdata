@@ -35,8 +35,8 @@ type enabledJobConfigIntent struct {
 	owner    collectorapi.JobConfigIntentOwner
 }
 
-// The graph owns configuration; this index retains only enabled identity and its
-// resource owner. Runtime settlement and activation retry do not remove entries.
+// The candidate controller owns configuration; this index retains only enabled
+// resource identity and its owner, independently of public graph visibility.
 type jobConfigIntentIndex struct {
 	mu      sync.Mutex
 	enabled map[string]enabledJobConfigIntent
@@ -88,13 +88,13 @@ func (p *preparedJobConfigIntent) abort() (err error) {
 func (dcjc *DynCfgJobController) prepareJobConfigIntent(
 	ctx context.Context,
 	id string,
-	postimage *dyncfg.GraphConfig,
+	config confgroup.Config,
 	transition jobConfigIntentTransition,
 ) (*preparedJobConfigIntent, error) {
 	dcjc.configIntents.mu.Lock()
 	previous := dcjc.configIntents.enabled[id]
 	dcjc.configIntents.mu.Unlock()
-	if postimage == nil || postimage.Status == dyncfg.StatusDisabled.String() {
+	if config == nil {
 		transition = jobConfigIntentDisable
 	}
 	enabled := previous.identity.Valid()
@@ -108,14 +108,9 @@ func (dcjc *DynCfgJobController) prepareJobConfigIntent(
 		return nil, errors.New("job output: invalid config intent transition")
 	}
 	var next enabledJobConfigIntent
-	var config confgroup.Config
 	if enabled {
-		creator, ok := dcjc.modules.Lookup(postimage.Module)
+		creator, ok := dcjc.modules.Lookup(config.Module())
 		if ok && !nilInterfaceValue(creator.JobConfigIntent) {
-			if err := yaml.Unmarshal(postimage.Payload, &config); err != nil || config == nil ||
-				config.Module() != postimage.Module || config.Name() != postimage.Name {
-				return nil, errors.New("job output: invalid enabled config intent payload")
-			}
 			next = enabledJobConfigIntent{
 				identity: jobConfigIdentity(config),
 				owner:    creator.JobConfigIntent,
@@ -159,6 +154,36 @@ func (dcjc *DynCfgJobController) prepareJobConfigIntent(
 		return nil, &configIntentAdmissionError{cause: err}
 	}
 	return result.intent, result.err
+}
+
+// Resource demand follows the admitted binding, including hidden Failed stock.
+// Public graph visibility and acquisition authority are separate projections.
+func (dcjc *DynCfgJobController) prepareMutationJobConfigIntent(
+	ctx context.Context, id string, postimage *dyncfg.GraphConfig, reply jobReply, transition jobConfigIntentTransition,
+) (*preparedJobConfigIntent, error) {
+	var config confgroup.Config
+	if delta := reply.candidate; delta != nil {
+		after := delta.after
+		if after.Binding != nil {
+			config = after.Binding.Config
+		}
+		if after.Enablement != candidateEnabled || after.Manual == candidateManualSourceRevoked || config == nil {
+			transition = jobConfigIntentDisable
+		} else {
+			transition = jobConfigIntentEnable
+		}
+	} else if postimage != nil {
+		creator, exists := dcjc.modules.Lookup(postimage.Module)
+		if transition == jobConfigIntentDisable || postimage.Status == dyncfg.StatusDisabled.String() ||
+			!exists || nilInterfaceValue(creator.JobConfigIntent) {
+			return dcjc.prepareJobConfigIntent(ctx, id, nil, jobConfigIntentDisable)
+		}
+		if err := yaml.Unmarshal(postimage.Payload, &config); err != nil || config == nil ||
+			config.Module() != postimage.Module || config.Name() != postimage.Name {
+			return nil, errors.New("job output: invalid enabled config intent payload")
+		}
+	}
+	return dcjc.prepareJobConfigIntent(ctx, id, config, transition)
 }
 
 func prepareConfigIntentOwner(
@@ -225,7 +250,7 @@ func (dcjc *DynCfgJobController) satisfyWithEnabledIntent(
 ) (lifecycle.PreparedResourceTransaction, error) {
 	status := dyncfg.Status(record.Status)
 	postimage := graphConfig(record, status)
-	intent, err := dcjc.prepareJobConfigIntent(ctx, scope.ID, &postimage, jobConfigIntentEnable)
+	intent, err := dcjc.prepareMutationJobConfigIntent(ctx, scope.ID, &postimage, internalReply(), jobConfigIntentEnable)
 	if err != nil {
 		return nil, err
 	}

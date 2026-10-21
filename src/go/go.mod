@@ -30,7 +30,7 @@ require (
 	github.com/blang/semver/v4 v4.0.0
 	github.com/bmatcuk/doublestar/v4 v4.10.3
 	github.com/bougou/go-ipmi v0.9.2-0.20261009051248-b3670df57943
-	github.com/catonetworks/cato-go-sdk v0.4.2
+	github.com/catonetworks/cato-go-sdk v1.1.0
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/clbanning/rfile/v2 v2.0.0-20231024120205-ac3fca974b0e
 	github.com/cloudflare/cfssl v1.7.1
@@ -40,7 +40,7 @@ require (
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/go-ldap/ldap/v3 v3.4.15
 	github.com/go-sql-driver/mysql v1.10.1
-	github.com/godbus/dbus/v5 v5.2.3
+	github.com/godbus/dbus/v5 v5.2.4
 	github.com/gofrs/flock v0.13.1
 	github.com/gohugoio/hashstructure v1.1.0
 	github.com/golang/mock v1.6.0
@@ -49,12 +49,12 @@ require (
 	github.com/gorcon/rcon v1.4.0
 	github.com/gosnmp/gosnmp v1.42.1
 	github.com/grafana/regexp v0.0.0-20240518133315-a468a5bfb3bc
-	github.com/ibm-messaging/mq-golang/v5 v5.7.2
+	github.com/ibm-messaging/mq-golang/v5 v5.7.3
 	github.com/ibmdb/go_ibm_db v0.5.4 // Used by ibm.d.plugin (requires CGO)
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/jessevdk/go-flags v1.6.1
 	github.com/kanocz/fcgi_client v0.0.0-20210113082628-fff85c8adfb7
-	github.com/klauspost/compress v1.20.1
+	github.com/klauspost/compress v1.20.3
 	github.com/likexian/whois v1.15.7
 	github.com/likexian/whois-parser v1.24.21
 	github.com/lmittmann/tint v1.2.1

@@ -47,25 +47,32 @@ func (rg *runGeneration) startDiscovery(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	decisions, err := jobmgrdiscovery.NewDecisionIndex(
-		jobmgrdiscovery.DecisionConfig{
+	inventory, err := jobmgrdiscovery.NewInventoryIndex(
+		jobmgrdiscovery.InventoryConfig{
 			Generation:  rg.run.Generation(),
 			RunJob:      rg.discovery.RunJob,
 			AutoEnable:  rg.discovery.AutoEnable,
 			Commands:    rg.kernel,
 			Diagnostics: rg.diagnostics,
-			Plan: func(change jobmgrdiscovery.DiscoveredChange) (jobmgr.WorkPlan, error) {
-				plan, err := rg.dyncfg.PlanDiscovered(
-					joboutput.DiscoveredJobChange{
-						Config: change.Config,
-						Status: change.Status,
-						Remove: change.Remove,
-					},
-				)
-				if err != nil {
-					return jobmgr.WorkPlan{}, jobmgr.RejectProposal(err)
+			Plan: func(batch jobmgrdiscovery.SourceInventoryBatch) (jobmgr.WorkPlan, error) {
+				observations := make([]joboutput.DiscoveredJobInventory, len(batch.Observations))
+				for i, inventory := range batch.Observations {
+					candidates := make([]joboutput.DiscoveredJobCandidate, len(inventory.Candidates))
+					for j, candidate := range inventory.Candidates {
+						candidates[j] = joboutput.DiscoveredJobCandidate{
+							Config:      candidate.Config,
+							Source:      candidate.Source,
+							Incarnation: candidate.Incarnation,
+						}
+					}
+					observations[i] = joboutput.DiscoveredJobInventory{
+						FullName: inventory.FullName, Version: inventory.Version, Candidates: candidates,
+						Sources: inventory.Sources, AutoEnable: inventory.AutoEnable,
+					}
 				}
-				return plan, nil
+				return rg.dyncfg.PlanInventory(joboutput.DiscoveredJobInventoryBatch{
+					FullName: batch.FullName, Observations: observations,
+				})
 			},
 		},
 	)
@@ -108,7 +115,7 @@ func (rg *runGeneration) startDiscovery(ctx context.Context) error {
 			scope.Successor.ID != discoveryResourceID {
 			return nil, errors.New("jobmgr composition: discovery resource already exists")
 		}
-		prepared, err := newPreparedDiscovery(pipeline, decisions, rg.tasks, scope.Successor, permit)
+		prepared, err := newPreparedDiscovery(pipeline, inventory, rg.tasks, scope.Successor, permit)
 		if err != nil {
 			return nil, err
 		}
@@ -136,7 +143,7 @@ func (rg *runGeneration) startDiscovery(ctx context.Context) error {
 
 type preparedDiscovery struct {
 	pipeline  *agentdiscovery.PipelineGeneration // the discovery pipeline generation
-	decisions *jobmgrdiscovery.DecisionIndex     // the add/remove decision index
+	inventory *jobmgrdiscovery.InventoryIndex    // the source inventory index
 	tasks     *lifecycle.TaskSupervisor          // supervisor owning the pipeline + provider goroutines
 	identity  lifecycle.ResourceIdentity         // singleton discovery resource identity
 	permit    lifecycle.LongLivedPermit          // long-lived permit for the pipeline
@@ -144,12 +151,12 @@ type preparedDiscovery struct {
 
 func newPreparedDiscovery(
 	pipeline *agentdiscovery.PipelineGeneration,
-	decisions *jobmgrdiscovery.DecisionIndex,
+	inventory *jobmgrdiscovery.InventoryIndex,
 	tasks *lifecycle.TaskSupervisor,
 	identity lifecycle.ResourceIdentity,
 	permit lifecycle.LongLivedPermit,
 ) (*preparedDiscovery, error) {
-	if pipeline == nil || decisions == nil ||
+	if pipeline == nil || inventory == nil ||
 		len(pipeline.ProviderNames()) == 0 ||
 		tasks == nil || !identity.Valid() ||
 		!permit.Valid() || permit.Owner() != identity ||
@@ -158,7 +165,7 @@ func newPreparedDiscovery(
 	}
 	return &preparedDiscovery{
 		pipeline:  pipeline,
-		decisions: decisions,
+		inventory: inventory,
 		tasks:     tasks,
 		identity:  identity,
 		permit:    permit,
@@ -178,7 +185,7 @@ func (pd *preparedDiscovery) AcceptStart(ctx context.Context, expected uint64) (
 	}
 	resource := &readyDiscovery{
 		pipeline:         pd.pipeline,
-		decisions:        pd.decisions,
+		inventory:        pd.inventory,
 		tasks:            pd.tasks,
 		identity:         pd.identity,
 		permit:           pd.permit,
@@ -209,7 +216,7 @@ type readyDiscovery struct {
 	mu sync.Mutex // guards the lifecycle flags
 
 	pipeline      *agentdiscovery.PipelineGeneration    // the discovery pipeline generation
-	decisions     *jobmgrdiscovery.DecisionIndex        // the add/remove decision index
+	inventory     *jobmgrdiscovery.InventoryIndex       // the source inventory index
 	tasks         *lifecycle.TaskSupervisor             // supervisor owning the pipeline + provider goroutines
 	identity      lifecycle.ResourceIdentity            // singleton discovery resource identity
 	permit        lifecycle.LongLivedPermit             // long-lived permit for the pipeline
@@ -263,7 +270,7 @@ func (rd *readyDiscovery) start(ctx context.Context) error {
 			if !waitDiscoveryPublication(runCtx, rd.published) {
 				return nil
 			}
-			return runDiscoverySupervisor(runCtx, rd.pipeline, rd.decisions)
+			return runDiscoverySupervisor(runCtx, rd.pipeline, rd.inventory)
 		},
 	)
 	if err != nil {
@@ -309,14 +316,14 @@ func waitDiscoveryPublication(ctx context.Context, published <-chan struct{}) bo
 func runDiscoverySupervisor(
 	ctx context.Context,
 	pipeline *agentdiscovery.PipelineGeneration,
-	decisions *jobmgrdiscovery.DecisionIndex,
+	inventory *jobmgrdiscovery.InventoryIndex,
 ) (err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			err = fmt.Errorf("%w in discovery supervisor: %v", lifecycle.ErrTaskPanic, recovered)
 		}
 	}()
-	err = pipeline.Run(ctx, decisions.Apply)
+	err = pipeline.Run(ctx, inventory.Apply)
 	if err == nil && ctx.Err() == nil {
 		err = errors.New("jobmgr composition: discovery supervisor exited unexpectedly")
 	}

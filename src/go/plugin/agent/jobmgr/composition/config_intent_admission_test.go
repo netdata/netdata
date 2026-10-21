@@ -98,7 +98,7 @@ func TestProcessAutoEnableInvalidConfigDoesNotCommitIntent(t *testing.T) {
 }
 
 // A failed browser probe is an operational error, not malformed input.
-func TestProcessStockJourneyRetryAcquiresIntentAfterProbeRecovery(t *testing.T) {
+func TestProcessStockJourneyRetryRetainsIntentAcrossHiddenFailure(t *testing.T) {
 	owner := &admissionTestIntentOwner{}
 	reader, writer := io.Pipe()
 	output := newProcessSynchronizedBuffer()
@@ -149,7 +149,9 @@ func TestProcessStockJourneyRetryAcquiresIntentAfterProbeRecovery(t *testing.T) 
 	})
 	output.waitContains(t, "CONFIG go.d:collector:test:site delete")
 	require.Positive(t, executor.checks.Load(), "initial rejection must come from Check")
-	require.Zero(t, owner.committed.Load())
+	// Failed stock is hidden, but its admitted enabled binding owns retry and
+	// resource demand independently of the public graph projection.
+	require.EqualValues(t, 1, owner.committed.Load())
 	executor.ready.Store(true)
 
 	t.Cleanup(func() {

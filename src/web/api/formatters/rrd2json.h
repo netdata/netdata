@@ -21,6 +21,7 @@
 void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb);
 
 int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, struct query_target *qt, time_t *latest_timestamp);
+int query_target_cancelled_response(struct query_target *qt, BUFFER *wb);
 
 void rrdr_json_group_by_labels(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options);
 
