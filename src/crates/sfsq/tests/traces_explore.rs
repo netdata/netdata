@@ -775,6 +775,71 @@ fn unavailable_and_failed_sources_are_reported() {
     assert_eq!(data.histogram.unwrap().total, SPANS as u64);
 }
 
+/// A source whose page columns cannot be read leaves the page: the other
+/// sources' rows still list, and the answer says a source failed.
+#[test]
+fn a_failed_column_read_drops_only_its_source() {
+    let dir = tempfile::tempdir().unwrap();
+    let wide: Vec<SpanSpec> = (0..1_200u64)
+        .map(|i| SpanSpec {
+            trace: trace_bytes((i / 250) as usize),
+            attrs: vec![kv_str("user", &format!("u{i}"))],
+            ..sp(((i % 250) + 1) as u8, 0, BASE + i * 1000, "op")
+        })
+        .collect();
+    let narrow = vec![SpanSpec {
+        trace: trace_bytes(9),
+        attrs: vec![kv_str("user", "u-narrow")],
+        ..sp(1, 0, BASE + 5 * NS, "op")
+    }];
+    let wide = write_wal(
+        dir.path(),
+        vec![req_with(vec![kv_str("service.name", "svc")], None, &wide)],
+        "wide",
+    );
+    let narrow = write_wal(
+        dir.path(),
+        vec![req_with(vec![kv_str("service.name", "svc")], None, &narrow)],
+        "narrow",
+    );
+    let TraceSource::Sfst(wide) = sealed_source(dir.path(), &wide, "wide") else {
+        unreachable!()
+    };
+    let sfsq::Source::File(path) = &wide.source else {
+        unreachable!()
+    };
+    // The user values of the wide file are high-cardinality: the only
+    // high field, which nothing but the page's column read touches.
+    corrupt_chunk(path, *b"HF\0\0");
+    let data = run(
+        vec![
+            sealed_source_at(path, "wide"),
+            sealed_source(dir.path(), &narrow, "narrow"),
+        ],
+        ExploreQuery::new(grid()).rows(RowsSpec {
+            limit: 10,
+            before: None,
+            columns: vec!["attributes.user".to_string()],
+        }),
+    );
+    assert_eq!(
+        data.status,
+        QueryStatus::Complete.with(PartialReason::SourceFailure)
+    );
+    let rows = data.rows.unwrap();
+    assert_eq!(rows.matched, 1_201);
+    assert!(!rows.more);
+    let listed: Vec<(i64, Vec<Vec<String>>)> = rows
+        .items
+        .into_iter()
+        .map(|row| (row.key.start_ns, row.columns))
+        .collect();
+    assert_eq!(
+        listed,
+        [((BASE + 5 * NS) as i64, vec![vec!["u-narrow".to_string()]])]
+    );
+}
+
 /// With sources or without any (a cancelled capture hands the engine
 /// none), a cancelled request answers nothing and says so.
 #[test]

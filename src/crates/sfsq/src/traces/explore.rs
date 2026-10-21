@@ -309,9 +309,6 @@ pub fn explore(
     let mut work = sfst::ScanWork::default();
     let mut status = StatusBuilder::new();
     let mut fold = Fold::new(grid);
-    // The sources that list row candidates, kept mapped for the page's
-    // column read; a candidate names its source by index here.
-    let mut row_sources: Vec<Mapped> = Vec::new();
     for source in &sources {
         if cancel.is_cancelled() {
             return Ok(ExploreData::cancelled());
@@ -333,13 +330,8 @@ pub fn explore(
             Prepared::Open(mapped) => Some(mapped),
         };
         if let Some(mapped) = mapped {
-            match evaluate(mapped.bytes(), &request, row_sources.len(), &mut work) {
-                Ok(Some(shard)) => {
-                    if shard.rows.as_ref().is_some_and(|r| !r.rows.is_empty()) {
-                        row_sources.push(mapped);
-                    }
-                    fold.add(shard);
-                }
+            match evaluate(mapped.bytes(), &request, fold.row_sources.len(), &mut work) {
+                Ok(Some(shard)) => fold.add(shard, mapped),
                 Ok(None) => {
                     status.add(PartialReason::WorkCeiling);
                     break;
@@ -360,21 +352,13 @@ pub fn explore(
     }
 
     let histogram = stack.as_ref().map(|_| fold.histogram());
-    let rows = match &query.rows {
-        Some(spec) => match fold.page(spec, &row_sources) {
-            Ok(rows) => Some(rows),
-            Err(error) => {
-                tracing::warn!("sfsq explore: reading the page's columns failed: {error}");
-                status.add(PartialReason::SourceFailure);
-                Some(RowsData {
-                    matched: fold.matched,
-                    items: Vec::new(),
-                    more: fold.below > 0,
-                })
-            }
-        },
-        None => None,
-    };
+    let rows = query.rows.as_ref().map(|spec| {
+        let (rows, failed) = fold.page(spec);
+        if failed {
+            status.add(PartialReason::SourceFailure);
+        }
+        rows
+    });
     Ok(ExploreData {
         status: status.finish(),
         histogram,
@@ -731,8 +715,16 @@ struct Fold {
     high: Vec<u64>,
     stack_high: bool,
     durations: Vec<DurationHistogram>,
-    below: u64,
     rows: Vec<Candidate>,
+    /// The sources that list row candidates, kept mapped for the page's
+    /// column read; a candidate names its source by index here.
+    row_sources: Vec<RowSource>,
+}
+
+struct RowSource {
+    mapped: Mapped,
+    /// Its rows below the walk's key (see [`SourceRows`]).
+    below: u64,
 }
 
 impl Fold {
@@ -747,12 +739,13 @@ impl Fold {
             durations: (0..grid.num_buckets)
                 .map(|_| DurationHistogram::new())
                 .collect(),
-            below: 0,
             rows: Vec::new(),
+            row_sources: Vec::new(),
         }
     }
 
-    fn add(&mut self, shard: Shard) {
+    /// Fold a source's shard; its mapping is kept when it lists rows.
+    fn add(&mut self, shard: Shard, mapped: Mapped) {
         self.matched += shard.matched;
         self.errors += shard.errors;
         if let Some(timeline) = shard.timeline {
@@ -767,8 +760,13 @@ impl Fold {
         for (sum, histogram) in self.durations.iter_mut().zip(&shard.durations) {
             sum.merge(histogram);
         }
-        if let Some(rows) = shard.rows {
-            self.below += rows.below;
+        if let Some(rows) = shard.rows
+            && !rows.rows.is_empty()
+        {
+            self.row_sources.push(RowSource {
+                mapped,
+                below: rows.below,
+            });
             self.rows.extend(rows.rows);
         }
     }
@@ -827,41 +825,83 @@ impl Fold {
     }
 
     /// The page: the newest candidates over every source, with their
-    /// columns read from the sources that list them.
-    fn page(&mut self, spec: &RowsSpec, sources: &[Mapped]) -> Result<RowsData, sfst::Error> {
+    /// columns read from the sources that list them. A source whose
+    /// columns cannot be read leaves the page, and the next candidates
+    /// take its place; the flag says one did.
+    fn page(&mut self, spec: &RowsSpec) -> (RowsData, bool) {
         let mut rows = std::mem::take(&mut self.rows);
         rows.sort_unstable_by_key(|row| std::cmp::Reverse(row.key));
-        rows.truncate(spec.limit);
-        let more = self.below > rows.len() as u64;
         let fields: Vec<&str> = spec.columns.iter().map(String::as_str).collect();
-        let mut columns: Vec<Vec<Vec<String>>> = vec![Vec::new(); rows.len()];
-        let mut by_source: Vec<usize> = rows.iter().map(|r| r.source).collect();
-        by_source.sort_unstable();
-        by_source.dedup();
-        for source in by_source {
-            let reader = sfst::IndexReader::open(sources[source].bytes())?;
-            let slots: Vec<usize> = (0..rows.len())
-                .filter(|&i| rows[i].source == source)
+        let mut failed = vec![false; self.row_sources.len()];
+        let mut columns: Vec<Option<Vec<Vec<String>>>> = vec![None; rows.len()];
+        let page = loop {
+            let page: Vec<usize> = (0..rows.len())
+                .filter(|&i| !failed[rows[i].source])
+                .take(spec.limit)
                 .collect();
-            let positions: Vec<u32> = slots.iter().map(|&i| rows[i].position).collect();
-            let values = reader.materialize_fields(&fields, &positions)?;
-            for (at, &slot) in slots.iter().enumerate() {
-                columns[slot] = values.iter().map(|column| column[at].clone()).collect();
+            let mut unread: Vec<usize> = page
+                .iter()
+                .filter(|&&i| columns[i].is_none())
+                .map(|&i| rows[i].source)
+                .collect();
+            unread.sort_unstable();
+            unread.dedup();
+            let mut clean = true;
+            for source in unread {
+                let slots: Vec<usize> = page
+                    .iter()
+                    .copied()
+                    .filter(|&i| rows[i].source == source && columns[i].is_none())
+                    .collect();
+                let positions: Vec<u32> = slots.iter().map(|&i| rows[i].position).collect();
+                match read_columns(self.row_sources[source].mapped.bytes(), &fields, &positions) {
+                    Ok(values) => {
+                        for (at, &slot) in slots.iter().enumerate() {
+                            columns[slot] =
+                                Some(values.iter().map(|column| column[at].clone()).collect());
+                        }
+                    }
+                    Err(error) => {
+                        tracing::warn!("sfsq explore: reading a page's columns failed: {error}");
+                        failed[source] = true;
+                        clean = false;
+                    }
+                }
             }
-        }
-        let items = rows
+            if clean {
+                break page;
+            }
+        };
+        let below: u64 = self
+            .row_sources
+            .iter()
+            .zip(&failed)
+            .filter(|&(_, &failed)| !failed)
+            .map(|(source, _)| source.below)
+            .sum();
+        let more = below > page.len() as u64;
+        let items = page
             .into_iter()
-            .zip(columns)
-            .map(|(row, columns)| SpanRow {
-                key: row.key,
-                duration_ns: row.duration_ns,
-                columns,
+            .map(|i| SpanRow {
+                key: rows[i].key,
+                duration_ns: rows[i].duration_ns,
+                columns: columns[i].take().expect("read before the page settled"),
             })
             .collect();
-        Ok(RowsData {
+        let rows = RowsData {
             matched: self.matched,
             items,
             more,
-        })
+        };
+        (rows, failed.contains(&true))
     }
+}
+
+/// Read the given columns at `positions` from a source's bytes.
+fn read_columns(
+    bytes: &[u8],
+    fields: &[&str],
+    positions: &[u32],
+) -> Result<Vec<Vec<Vec<String>>>, sfst::Error> {
+    sfst::IndexReader::open(bytes)?.materialize_fields(fields, positions)
 }
