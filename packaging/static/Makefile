@@ -125,17 +125,6 @@ NETDATA_BUILD_DEPS := $(OPENSSL_STAGING) \
                       $(CURL_STAGING) \
                       $(LIBNFACCT_STAGING) \
                       $(NULL)
-NETDATA_ARCHIVE_DEPS := curl \
-                        bash \
-                        ioping \
-                        $(TARGET_STAMPS)/ca-certs.stamp \
-                        $(TARGET_INSTALL)/var/cache/netdata/.keep \
-                        $(TARGET_INSTALL)/var/lib/netdata/.keep \
-                        $(TARGET_INSTALL)/var/log/netdata/.keep \
-                        $(TARGET_INSTALL)/system/functions.sh \
-                        $(TARGET_INSTALL)/system/post-installer.sh \
-                        $(TARGET_INSTALL)/system/install-or-update.sh \
-                        $(NULL)
 $(eval $(call set_paths,NETDATA,netdata))
 NETDATA_BUILD_DIR := $(DOCKER_WORKDIR)/netdata/build
 NETDATA_INSTALL := $(TARGET_STAMPS)/netdata.install.stamp
@@ -155,6 +144,25 @@ NETDATA_CMAKE_OPTS := -DSTATIC_BUILD=On \
                       -DENABLE_PLUGIN_SYSTEMD_UNITS=Off \
                       -DENABLE_PLUGIN_XENSTAT=Off \
                       $(NULL)
+
+ARCHIVE_DEPS := $(NETDATA_INSTALL) \
+                curl \
+                bash \
+                ioping \
+                tests \
+                makeself.lsm \
+                makeself-license.txt \
+                makeself-help-header.txt \
+                makeself/makeself.sh \
+                $(TARGET_STAMPS)/ca-certs.stamp \
+                $(TARGET_INSTALL)/etc/.install-type \
+                $(TARGET_INSTALL)/var/cache/netdata/.keep \
+                $(TARGET_INSTALL)/var/lib/netdata/.keep \
+                $(TARGET_INSTALL)/var/log/netdata/.keep \
+                $(TARGET_INSTALL)/system/functions.sh \
+                $(TARGET_INSTALL)/system/post-installer.sh \
+                $(TARGET_INSTALL)/system/install-or-update.sh \
+                $(NULL)
 
 ifneq ($(strip $(TOPOLOGY_STOCK_DIR)),)
     DOCKER_ARGS := $(DOCKER_ARGS) \
@@ -833,9 +841,7 @@ $(TARGET_INSTALL)/system/install-or-update.sh: $(SRCDIR)/packaging/static/instal
 makeself.lsm: makeself.lsm.in
 	sed -e 's|NETDATA_VERSION|$(VERSION)|' < $< > $@
 
-archive-prep: $(NETDATA_INSTALL) tests $(TARGET_INSTALL)/etc/.install-type $(NETDATA_ARCHIVE_DEPS) makeself.lsm
-
-archives/netdata-$(BUILDARCH)-$(VERSION).gz.run: archive-prep
+archives/netdata-$(BUILDARCH)-$(VERSION).gz.run: $(ARCHIVE_DEPS)
 	mkdir -p archives
 	rm -f $@
 	$(MAKEFILE_DIR)/makeself/makeself.sh \
@@ -858,7 +864,7 @@ archives/netdata-$(BUILDARCH)-latest.gz.run: archives/netdata-$(BUILDARCH)-$(VER
 
 archive-gz: archives/netdata-$(BUILDARCH)-latest.gz.run
 
-archives/netdata-$(BUILDARCH)-$(VERSION).zstd.run: archive-prep
+archives/netdata-$(BUILDARCH)-$(VERSION).zstd.run: $(ARCHIVE_DEPS)
 	mkdir -p archives
 	rm -f $@
 	$(MAKEFILE_DIR)/makeself/makeself.sh \
