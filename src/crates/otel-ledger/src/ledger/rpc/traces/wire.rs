@@ -1,9 +1,9 @@
 //! Netdata function wire types for `otel-traces`.
 //!
 //! The transport layer between the netdata function protocol and the
-//! wire-neutral `sfsq::traces` engine. One Function view plus three
+//! wire-neutral `sfsq::traces` engine. One Function view plus four
 //! explicit peer modes, each selected by exactly one top-level
-//! sub-object — `info`, `trace`, `suggest` — the mode's params
+//! sub-object — `info`, `trace`, `suggest`, `explore` — the mode's params
 //! self-contained in its object. A request without a selector is the
 //! Functions view (the trace list): standard Functions parameters
 //! around the search page, wrapped as `type: "traces"`. Explicit modes keep their native
@@ -44,6 +44,7 @@ pub const ACCEPTED_PARAMS: &[&str] = &[
     "info",
     "trace",
     "suggest",
+    "explore",
     "tenant",
     "after",
     "before",
@@ -74,6 +75,9 @@ struct RawOtelTracesRequest {
     /// Search-bar suggestions: keys, or one key's values.
     #[serde(default, deserialize_with = "present")]
     suggest: Option<serde_json::Value>,
+    /// The span view: spans per bucket and a page of spans.
+    #[serde(default, deserialize_with = "present")]
+    explore: Option<serde_json::Value>,
     #[serde(default, deserialize_with = "present")]
     after: Option<serde_json::Value>,
     #[serde(default, deserialize_with = "present")]
@@ -121,6 +125,7 @@ pub enum TracesMode {
     Info,
     Trace(TraceParams),
     Suggest(SuggestParams),
+    Explore(ExploreParams),
 }
 
 impl<'de> Deserialize<'de> for OtelTracesRequest {
@@ -164,6 +169,7 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
             ("info", raw.info.is_some()),
             ("trace", raw.trace.is_some()),
             ("suggest", raw.suggest.is_some()),
+            ("explore", raw.explore.is_some()),
         ]
         .into_iter()
         .filter_map(|(name, set)| set.then_some(name))
@@ -224,6 +230,8 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
             TracesMode::Trace(typed("trace selector", v)?)
         } else if let Some(v) = &raw.suggest {
             TracesMode::Suggest(typed("suggest selector", v)?)
+        } else if let Some(v) = &raw.explore {
+            TracesMode::Explore(typed("explore selector", v)?)
         } else {
             unreachable!("an explicit selector was verified present");
         };
@@ -281,34 +289,47 @@ pub struct FunctionsParams {
     pub _timeout: Option<u32>,
 }
 
+/// Resolve a Functions-convention window (unix seconds; `0` means
+/// "unspecified", a NEGATIVE value is relative: `before` counted back
+/// from `now`, `after` from the resolved `before`) into absolute seconds,
+/// `0` still meaning "unspecified" (the adapter's `resolve_window`
+/// defaults apply).
+pub fn resolve_relative_window(after: i64, before: i64, now: u32) -> Result<(u32, u32), String> {
+    fn resolve(label: &str, value: i64, base: u32) -> Result<u32, String> {
+        let absolute = if value < 0 {
+            i64::from(base)
+                .checked_add(value)
+                .ok_or_else(|| format!("'{label}' is outside the supported time range"))?
+        } else {
+            value
+        };
+        u32::try_from(absolute)
+            .map_err(|_| format!("'{label}' is outside the supported time range"))
+    }
+
+    let resolved_before = if before == 0 {
+        if after.is_negative() { now } else { 0 }
+    } else {
+        resolve("before", before, now)?
+    };
+    let resolved_after = if after == 0 {
+        0
+    } else {
+        let base = if resolved_before == 0 {
+            now
+        } else {
+            resolved_before
+        };
+        resolve("after", after, base)?
+    };
+    Ok((resolved_after, resolved_before))
+}
+
 impl FunctionsParams {
     /// Translate into the search page's params: relative windows
-    /// resolved (`before` against `now`, `after` against the resolved
-    /// `before`), the rest passed through.
+    /// resolved ([`resolve_relative_window`]), the rest passed through.
     pub fn search_params(&self, now: u32) -> Result<SearchParams, String> {
-        fn resolve(label: &str, value: i64, base: u32) -> Result<u32, String> {
-            let absolute = if value < 0 {
-                i64::from(base)
-                    .checked_add(value)
-                    .ok_or_else(|| format!("'{label}' is outside the supported time range"))?
-            } else {
-                value
-            };
-            u32::try_from(absolute)
-                .map_err(|_| format!("'{label}' is outside the supported time range"))
-        }
-
-        let before = if self.before == 0 {
-            if self.after.is_negative() { now } else { 0 }
-        } else {
-            resolve("before", self.before, now)?
-        };
-        let after = if self.after == 0 {
-            0
-        } else {
-            resolve("after", self.after, if before == 0 { now } else { before })?
-        };
-
+        let (after, before) = resolve_relative_window(self.after, self.before, now)?;
         Ok(SearchParams {
             after,
             before,
@@ -447,6 +468,69 @@ pub struct SuggestParams {
     pub max_items: Option<usize>,
 }
 
+/// The `explore` mode's typed parameters: the span view. Every section
+/// answers over the window aligned to its grid, one row per stored span.
+/// At least one section is usually asked for; without any the answer
+/// carries only the window and the status.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExploreParams {
+    /// Window, unix seconds, with the Functions conventions of
+    /// [`FunctionsParams::after`]: `0` unspecified (`before` now, `after`
+    /// 900 s earlier), a NEGATIVE value relative. Aligned outward to the
+    /// grid; IGNORED on an anchored page (the anchor carries its window).
+    #[serde(default)]
+    pub after: i64,
+    #[serde(default)]
+    pub before: i64,
+    /// The search bar's chips, read PER SPAN: chips AND on the same span,
+    /// and a `!` op keeps the spans that do not match its positive form.
+    /// `trace_id` selects the spans of the given traces. The trace-level
+    /// keys (`root_name`, `root_service_name`, `trace_duration`) describe
+    /// a whole trace and are refused. Otherwise as
+    /// [`FunctionsParams::conditions`].
+    #[serde(default)]
+    pub conditions: Vec<ConditionParams>,
+    /// Free-text tokens, read per span; as [`FunctionsParams::text`].
+    #[serde(default)]
+    pub text: Vec<String>,
+    /// A rows walk: a previous answer's `rows.anchor.next`, echoed. It
+    /// carries the window, so every page lists the same spans.
+    #[serde(default)]
+    pub anchor: Option<String>,
+    /// Ask for the histogram.
+    #[serde(default)]
+    pub histogram: Option<ExploreHistogramParams>,
+    /// Ask for a page of spans, newest first.
+    #[serde(default)]
+    pub rows: Option<ExploreRowsParams>,
+}
+
+/// The histogram section's parameters.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExploreHistogramParams {
+    /// The key whose values stack the spans: a key with stored values
+    /// (`status.code` when absent).
+    #[serde(default)]
+    pub stack: Option<String>,
+}
+
+/// The rows section's parameters.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExploreRowsParams {
+    /// Spans per page (default `sfsq::traces::DEFAULT_ROWS_LIMIT`, at most
+    /// `sfsq::traces::ROWS_LIMIT_MAX`).
+    #[serde(default)]
+    pub limit: Option<usize>,
+    /// The keys each span carries in `fields`, each with stored values
+    /// (at most `sfsq::traces::ROW_COLUMNS_MAX`). Default: the service,
+    /// the span name, the kind and the status.
+    #[serde(default)]
+    pub columns: Option<Vec<String>>,
+}
+
 /// The `trace` mode's typed parameters. Unknown fields are rejected —
 /// a misspelled parameter on a small object is a client error, not a
 /// silent ignore.
@@ -488,6 +572,7 @@ pub enum OtelTracesResponse {
     Info(InfoResponse),
     Trace(Box<TraceResult>),
     Suggest(SuggestResult),
+    Explore(Box<ExploreResult>),
 }
 
 /// Functions protocol envelope for the trace-specific contract. The
@@ -561,6 +646,104 @@ pub struct OverviewPercentilesWire {
 pub struct OverviewTotals {
     /// Distinct traces binned into the grid (= the sum of all cells).
     pub traces: u64,
+}
+
+/// The `explore` answer: the sections asked for, over one aligned window.
+#[derive(Debug, Serialize)]
+pub struct ExploreResult {
+    /// The response's self-description: always `"explore"`.
+    pub mode: &'static str,
+    pub version: u32,
+    pub status: StatusWire,
+    pub window: ExploreWindowWire,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub histogram: Option<ExploreHistogramWire>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rows: Option<ExploreRowsWire>,
+}
+
+/// The window every section answers over: the request's, aligned outward
+/// to whole buckets, and its buckets.
+#[derive(Debug, Serialize)]
+pub struct ExploreWindowWire {
+    /// Unix seconds, `[after, before)`.
+    pub after: u32,
+    pub before: u32,
+    /// First bucket's start and the bucket width, unix seconds.
+    pub bucket_start_s: u32,
+    pub bucket_width_s: u32,
+    pub buckets: usize,
+}
+
+/// The spans per bucket.
+#[derive(Debug, Serialize)]
+pub struct ExploreHistogramWire {
+    /// The stack key, echoed.
+    pub stack: String,
+    /// Its values with the most spans, most first (at most
+    /// `sfsq::traces::STACK_DIMENSIONS_MAX`); each cut to
+    /// [`REQUEST_TEXT_MAX_BYTES`].
+    pub dimensions: Vec<String>,
+    /// One per bucket, in time order.
+    pub buckets: Vec<ExploreBucketWire>,
+    /// Every counted span.
+    pub total: u64,
+    /// Of those, the `ERROR`-status spans.
+    pub errors: u64,
+    /// The window's duration percentiles, nanoseconds (within 1/32 of
+    /// exact); `null` when no span counted.
+    pub percentiles: Option<ExplorePercentilesWire>,
+    /// Each heatmap row's exclusive upper bound, nanoseconds, low to high;
+    /// `null` for the last, unbounded row. Index-parallel to every
+    /// bucket's `durations`.
+    pub duration_rows: Vec<Option<i64>>,
+}
+
+/// One bucket of the histogram.
+#[derive(Debug, Serialize)]
+pub struct ExploreBucketWire {
+    /// Spans per dimension, index-parallel to `dimensions`. A span with
+    /// several values of the key counts under each.
+    pub counts: Vec<u64>,
+    /// Spans with another value, or from a file where the key has too
+    /// many values to stack (then the status says `stack_field_high_card`).
+    pub other: u64,
+    /// Spans without the key.
+    pub unset: u64,
+    /// Spans per heatmap row (`duration_rows`).
+    pub durations: Vec<u64>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ExplorePercentilesWire {
+    pub p50_ns: i64,
+    pub p95_ns: i64,
+    pub p99_ns: i64,
+}
+
+/// A page of spans, newest first by (start, trace id, span id).
+#[derive(Debug, Serialize)]
+pub struct ExploreRowsWire {
+    /// Every span in scope, whatever the page (the histogram's `total`).
+    pub matched: u64,
+    pub items: Vec<ExploreSpanWire>,
+    /// Present when older spans exist: echo `next` as the request's
+    /// `anchor` for the next page.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub anchor: Option<AnchorWire>,
+}
+
+/// One listed span. Ids in W3C lowercase hex.
+#[derive(Debug, Serialize)]
+pub struct ExploreSpanWire {
+    pub start_ns: i64,
+    pub duration_ns: i64,
+    pub trace_id: String,
+    pub span_id: String,
+    /// The requested columns as `[key, value]` pairs, in request order; a
+    /// key repeats for each of several values and is left out when the
+    /// span lacks it. Values are cut to the list's display length.
+    pub fields: Vec<(String, String)>,
 }
 
 /// Suggestions, best first: match class, then bytes. Bounded by

@@ -3,8 +3,8 @@
 //!
 //! The full mode catalog lives here: the Functions view (the trace
 //! list plus its trace-density grid), `info` (capability discovery),
-//! `trace` (exact single-trace fetch), and `suggest` (the search bar's
-//! keys and values). Mode selection and every request-SHAPE check happen at
+//! `trace` (exact single-trace fetch), `suggest` (the search bar's
+//! keys and values), and `explore` (the span view). Mode selection and every request-SHAPE check happen at
 //! deserialization (the wire's typed request — shape errors are
 //! transport 400s); this handler owns only the semantic validation
 //! (trace-id shape, zero limits, bounds).
@@ -37,15 +37,15 @@ use sfsq::traces::{
 
 use super::adapter::{
     ShapedResources, WireShaper, build_tokens, check_request_text, completion_capture_range,
-    heatmap_tokens, parse_cursor, parse_trace_id, parse_values_key, resolve_window,
-    to_overview_section, to_search_result, to_suggest_result, to_trace_result,
-    validate_trace_bounds,
+    explore_request, heatmap_tokens, parse_cursor, parse_explore_anchor, parse_trace_id,
+    parse_values_key, resolve_window, to_explore_result, to_overview_section, to_search_result,
+    to_suggest_result, to_trace_result, validate_trace_bounds,
 };
 use super::sources::{Capture, CaptureError, RemotePolicy, TracesSourceSupplier};
 use super::wire::{
-    CoverageWire, FunctionsParams, FunctionsTracesResponse, InfoResponse, OtelTracesRequest,
-    OtelTracesResponse, SUGGEST_ITEMS_MAX, SearchParams, SearchResult, SuggestParams, TraceParams,
-    TracesMode,
+    CoverageWire, ExploreParams, FunctionsParams, FunctionsTracesResponse, InfoResponse,
+    OtelTracesRequest, OtelTracesResponse, SUGGEST_ITEMS_MAX, SearchParams, SearchResult,
+    SuggestParams, TraceParams, TracesMode, resolve_relative_window,
 };
 use crate::ledger::wal_prefix::WalPrefixes;
 use file_lifecycle::remote_read::RemoteRead;
@@ -132,6 +132,10 @@ const LIST_CONCURRENCY: usize = 2;
 /// How many trace lookups may run at once (a pool of its own, as for
 /// lists).
 const TRACE_CONCURRENCY: usize = 2;
+/// How many span-view requests may run at once (a pool of its own, as
+/// for lists): the span view polls, so a slow window answers `busy`
+/// instead of stacking up behind itself.
+const EXPLORE_CONCURRENCY: usize = 2;
 
 /// How long a suggestion request may walk sources, from its arrival:
 /// suggestions answer per keystroke, so a partial answer now beats a
@@ -154,6 +158,8 @@ pub(crate) struct OtelTracesHandler {
     lists: Arc<tokio::sync::Semaphore>,
     /// Admission for trace lookups (see [`TRACE_CONCURRENCY`]).
     traces: Arc<tokio::sync::Semaphore>,
+    /// Admission for the span view (see [`EXPLORE_CONCURRENCY`]).
+    explores: Arc<tokio::sync::Semaphore>,
 }
 
 impl OtelTracesHandler {
@@ -170,6 +176,7 @@ impl OtelTracesHandler {
             suggestions: Arc::new(tokio::sync::Semaphore::new(SUGGEST_CONCURRENCY)),
             lists: Arc::new(tokio::sync::Semaphore::new(LIST_CONCURRENCY)),
             traces: Arc::new(tokio::sync::Semaphore::new(TRACE_CONCURRENCY)),
+            explores: Arc::new(tokio::sync::Semaphore::new(EXPLORE_CONCURRENCY)),
         }
     }
 
@@ -178,6 +185,13 @@ impl OtelTracesHandler {
     #[cfg(test)]
     pub(crate) fn with_suggest_concurrency(mut self, permits: usize) -> Self {
         self.suggestions = Arc::new(tokio::sync::Semaphore::new(permits));
+        self
+    }
+
+    /// Test-only admission override for the span view.
+    #[cfg(test)]
+    pub(crate) fn with_explore_concurrency(mut self, permits: usize) -> Self {
+        self.explores = Arc::new(tokio::sync::Semaphore::new(permits));
         self
     }
 
@@ -656,6 +670,97 @@ impl OtelTracesHandler {
             Err(e) => Err(handler_err(format!("otel-traces suggest task failed: {e}"))),
         }
     }
+
+    /// The `explore` mode: the span view's histogram and rows over the
+    /// window aligned to its grid (see `sfsq::traces::explore`). An
+    /// anchored page answers over the anchor's window. Offloaded files
+    /// download as for the list, so the same window shows the same data
+    /// in both views.
+    async fn explore(
+        &self,
+        ctx: &FunctionCallContext,
+        params: &ExploreParams,
+        tenant: Option<&str>,
+    ) -> netdata_plugin_error::Result<OtelTracesResponse> {
+        let anchor = params
+            .anchor
+            .as_deref()
+            .map(parse_explore_anchor)
+            .transpose()
+            .map_err(client_err)?;
+        let (after, before) = match &anchor {
+            Some(a) => (a.after_s, a.before_s),
+            None => {
+                let now_s = unix_now_s();
+                let (after, before) = resolve_relative_window(params.after, params.before, now_s)
+                    .map_err(client_err)?;
+                let window = resolve_window(after, before, now_s, None).map_err(client_err)?;
+                (window.capture.start, window.capture.end)
+            }
+        };
+        let (grid, after, before) = super::super::grid::grid_for_window_s(after, before);
+        // Validated before admission: a bad request is a client error,
+        // not `busy`.
+        let request = explore_request(params, grid, anchor.map(|a| a.key)).map_err(client_err)?;
+        let Ok(permit) = Arc::clone(&self.explores).try_acquire_owned() else {
+            let busy = sfsq::traces::ExploreData {
+                status: QueryStatus::Partial([PartialReason::Busy].into()),
+                histogram: None,
+                rows: None,
+            };
+            return Ok(OtelTracesResponse::Explore(Box::new(to_explore_result(
+                busy,
+                &request,
+                grid,
+                (after, before),
+            ))));
+        };
+        let Capture {
+            mut sets,
+            pins,
+            refused,
+        } = self
+            .supplier
+            .capture(
+                &TenantId::resolve_query(tenant),
+                after..before,
+                1,
+                RemotePolicy::Download,
+                &ctx.cancellation,
+                &ctx.progress,
+            )
+            .await
+            .map_err(capture_error)?;
+        let sources = sets.pop().unwrap_or_default();
+        let done = ctx.progress.done_counter();
+        let cancel = ctx.cancellation.clone();
+        let query = request.query.clone();
+        let mut data = match tokio::task::spawn_blocking(move || {
+            let _permit = permit;
+            let _pins = pins;
+            sfsq::traces::explore(sources, query, cancel, done)
+        })
+        .await
+        {
+            Ok(Ok(data)) => data,
+            Ok(Err(sfsq::traces::ExploreRequestError::SourceSet(e))) => {
+                return Err(handler_err(format!(
+                    "otel-traces internal error: captured source set is inconsistent: {e}"
+                )));
+            }
+            Ok(Err(e)) => return Err(engine_rejected(e)),
+            Err(e) => {
+                return Err(handler_err(format!("otel-traces explore task failed: {e}")));
+            }
+        };
+        data.status = reported(refused.first().copied().unwrap_or(false), data.status);
+        Ok(OtelTracesResponse::Explore(Box::new(to_explore_result(
+            data,
+            &request,
+            grid,
+            (after, before),
+        ))))
+    }
 }
 
 /// The wall clock as unix seconds, saturating at the u32 horizon (the
@@ -700,6 +805,7 @@ impl FunctionHandler for OtelTracesHandler {
             TracesMode::Info => Ok(OtelTracesResponse::Info(InfoResponse::default())),
             TracesMode::Trace(params) => self.trace(&ctx, params, tenant).await,
             TracesMode::Suggest(params) => self.suggest(&ctx, params, tenant).await,
+            TracesMode::Explore(params) => self.explore(&ctx, params, tenant).await,
         }
     }
 

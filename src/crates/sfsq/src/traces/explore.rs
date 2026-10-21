@@ -142,6 +142,42 @@ impl ExploreQuery {
         self.rows_ceiling = ceiling;
         self
     }
+
+    /// Every check [`explore`] makes before it reads a source, runnable
+    /// first: a wire can refuse a bad request before admission.
+    pub fn validate(&self) -> Result<(), ExploreRequestError> {
+        self.grid_end()?;
+        Scope::new(&self.tokens)?;
+        if let Some(stack) = &self.stack {
+            stored_key(stack)?;
+        }
+        if let Some(rows) = &self.rows {
+            if rows.limit == 0 || rows.limit > ROWS_LIMIT_MAX {
+                return Err(ExploreRequestError::RowsLimit { got: rows.limit });
+            }
+            if rows.columns.len() > ROW_COLUMNS_MAX {
+                return Err(ExploreRequestError::TooManyColumns {
+                    got: rows.columns.len(),
+                });
+            }
+            for column in &rows.columns {
+                stored_key(column)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// The grid's end, nanoseconds.
+    fn grid_end(&self) -> Result<i64, ExploreRequestError> {
+        let grid = self.grid;
+        if grid.num_buckets == 0 || grid.bucket_width_ns <= 0 {
+            return Err(ExploreRequestError::EmptyGrid);
+        }
+        grid.bucket_width_ns
+            .checked_mul(grid.num_buckets as i64)
+            .and_then(|span| grid.bucket_start_ns.checked_add(span))
+            .ok_or(ExploreRequestError::GridOverflow)
+    }
 }
 
 /// An explorer request error — nothing was queried.
@@ -244,34 +280,13 @@ pub fn explore(
     cancel: CancellationToken,
     progress: Arc<AtomicUsize>,
 ) -> Result<ExploreData, ExploreRequestError> {
+    query.validate()?;
     let grid = query.grid;
-    if grid.num_buckets == 0 || grid.bucket_width_ns <= 0 {
-        return Err(ExploreRequestError::EmptyGrid);
-    }
-    let Some(grid_end) = grid
-        .bucket_width_ns
-        .checked_mul(grid.num_buckets as i64)
-        .and_then(|span| grid.bucket_start_ns.checked_add(span))
-    else {
-        return Err(ExploreRequestError::GridOverflow);
-    };
+    let grid_end = query.grid_end()?;
     let window = TimeWindow::new(grid.bucket_start_ns, grid_end)?;
     validate_sources(&sources)?;
     let scope = Scope::new(&query.tokens)?;
     let stack = query.stack.as_deref().map(stored_key).transpose()?;
-    if let Some(rows) = &query.rows {
-        if rows.limit == 0 || rows.limit > ROWS_LIMIT_MAX {
-            return Err(ExploreRequestError::RowsLimit { got: rows.limit });
-        }
-        if rows.columns.len() > ROW_COLUMNS_MAX {
-            return Err(ExploreRequestError::TooManyColumns {
-                got: rows.columns.len(),
-            });
-        }
-        for column in &rows.columns {
-            stored_key(column)?;
-        }
-    }
 
     newest_first(&mut sources);
     let request = Request {

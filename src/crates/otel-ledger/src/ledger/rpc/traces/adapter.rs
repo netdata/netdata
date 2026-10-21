@@ -17,16 +17,18 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use sfsq::traces::{
-    AttributeKey, AttributeOwner, BuiltinField, CompareOp, Condition, DURATION_BIN_LABELS,
-    DurationPercentiles, FieldKinds, KeyError, OverviewData, Predicate, PredicateError,
-    PredicateTarget, PredicateValue, SearchData, StorageName, TOKENS_MAX, Token, TokenQuery,
-    TraceData,
+    AttributeKey, AttributeOwner, BuiltinField, CompareOp, Condition, DEFAULT_ROWS_LIMIT,
+    DURATION_BIN_LABELS, DurationPercentiles, ExploreData, ExploreQuery, FieldKinds, KeyError,
+    OverviewData, Predicate, PredicateError, PredicateTarget, PredicateValue, RowKey, RowsSpec,
+    SearchData, StorageName, TOKENS_MAX, Token, TokenQuery, TraceData, heatmap_row_bounds,
 };
 
 use super::wire::{
     AnchorWire, CONDITION_VALUES_MAX, ConditionParams, ConditionValue, CoverageWire, EventWire,
-    FieldKindsWire, LinkWire, OverviewGridWire, OverviewPercentilesWire, OverviewSection,
-    OverviewTotals, ResourceWire, SearchItems, SearchResult, ServiceBreakdownWire,
+    ExploreBucketWire, ExploreHistogramWire, ExploreParams, ExplorePercentilesWire, ExploreResult,
+    ExploreRowsWire, ExploreSpanWire, ExploreWindowWire, FieldKindsWire, LinkWire,
+    OverviewGridWire, OverviewPercentilesWire, OverviewSection, OverviewTotals,
+    REQUEST_TEXT_MAX_BYTES, ResourceWire, SearchItems, SearchResult, ServiceBreakdownWire,
     ServiceSpansWire, SpanWire, StatusWire, SuggestResult, SuggestionWire, TraceItems, TraceResult,
     TraceSummaryWire,
 };
@@ -36,18 +38,30 @@ use super::wire::{
 /// here — rejecting it is the caller's semantic job (the handler
 /// pre-captures the engine's `UnsetTraceId` rejection).
 pub(crate) fn parse_trace_id(s: &str) -> Result<sfst::TraceId, String> {
+    parse_hex_id::<16>("trace id", s).map(sfst::TraceId::from)
+}
+
+/// Parse a W3C text-form span id: exactly 16 hex chars (8 bytes),
+/// case-insensitive; the unset sentinel parses, as for trace ids.
+pub(crate) fn parse_span_id(s: &str) -> Result<sfst::SpanId, String> {
+    parse_hex_id::<8>("span id", s).map(sfst::SpanId::from)
+}
+
+/// `N` bytes from exactly `2N` hex chars, surrounding whitespace ignored.
+fn parse_hex_id<const N: usize>(what: &str, s: &str) -> Result<[u8; N], String> {
     let s = s.trim();
-    if s.len() != 32 || !s.bytes().all(|b| b.is_ascii_hexdigit()) {
+    if s.len() != 2 * N || !s.bytes().all(|b| b.is_ascii_hexdigit()) {
         return Err(format!(
-            "trace id must be 32 hex characters (16 bytes), got {s:?}"
+            "{what} must be {} hex characters ({N} bytes), got {s:?}",
+            2 * N
         ));
     }
-    let mut bytes = [0u8; 16];
+    let mut bytes = [0u8; N];
     for (i, chunk) in s.as_bytes().chunks_exact(2).enumerate() {
         // Infallible: both bytes were checked hex above.
         bytes[i] = u8::from_str_radix(std::str::from_utf8(chunk).unwrap(), 16).unwrap();
     }
-    Ok(sfst::TraceId::from(bytes))
+    Ok(bytes)
 }
 
 /// Validate the `trace` sub-object's optional assembly bounds into a
@@ -1103,6 +1117,205 @@ pub(crate) fn parse_cursor(s: &str) -> Result<SearchCursor, String> {
 fn is_served(c: &SearchCursor, t: &sfsq::traces::TraceSummary) -> bool {
     t.newest_matched_start_ns > c.rank_ns
         || (t.newest_matched_start_ns == c.rank_ns && t.trace_id <= c.trace_id)
+}
+
+// ── Explore ─────────────────────────────────────────────────────────
+
+/// The keys a span row carries when the request names none: the service,
+/// the span name, the kind and the status.
+const EXPLORE_DEFAULT_COLUMNS: [&str; 4] = [
+    "resource.attributes.service.name",
+    "name",
+    "kind",
+    "status.code",
+];
+
+/// An `explore` call's engine request, plus what shaping its answer needs.
+pub(crate) struct ExploreRequest {
+    pub query: ExploreQuery,
+    /// The stack key, when the histogram is asked for.
+    pub stack: Option<String>,
+    /// The rows' keys, in request order.
+    pub columns: Vec<String>,
+}
+
+/// Build and validate an `explore` call over `grid`; `before` continues a
+/// rows walk. Every engine check runs here, so a bad request is refused
+/// before admission.
+pub(crate) fn explore_request(
+    params: &ExploreParams,
+    grid: sfst::Grid,
+    before: Option<RowKey>,
+) -> Result<ExploreRequest, String> {
+    let tokens = build_tokens(&params.conditions, &params.text)?;
+    let mut query = ExploreQuery::new(grid).tokens(tokens);
+    let stack = params.histogram.as_ref().map(|h| {
+        h.stack
+            .clone()
+            .unwrap_or_else(|| BuiltinField::Status.key().to_string())
+    });
+    if let Some(stack) = &stack {
+        query = query.histogram(stack.clone());
+    }
+    let mut columns = Vec::new();
+    if let Some(rows) = &params.rows {
+        columns = rows
+            .columns
+            .clone()
+            .unwrap_or_else(|| EXPLORE_DEFAULT_COLUMNS.map(String::from).to_vec());
+        query = query.rows(RowsSpec {
+            limit: rows.limit.unwrap_or(DEFAULT_ROWS_LIMIT),
+            before,
+            columns: columns.clone(),
+        });
+    }
+    query.validate().map_err(|e| e.to_string())?;
+    Ok(ExploreRequest {
+        query,
+        stack,
+        columns,
+    })
+}
+
+/// A rows walk's position: the aligned window its first page answered
+/// over and the last listed span's key.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ExploreAnchor {
+    pub after_s: u32,
+    pub before_s: u32,
+    pub key: RowKey,
+}
+
+/// The anchor's wire form: the `e1:` version prefix, then the window and
+/// the key, colon-joined.
+pub(crate) fn encode_explore_anchor(a: &ExploreAnchor) -> String {
+    format!(
+        "e1:{}:{}:{}:{}:{}",
+        a.after_s, a.before_s, a.key.start_ns, a.key.trace_id, a.key.span_id
+    )
+}
+
+/// Parse an anchor produced by [`encode_explore_anchor`]: exact shape and
+/// an ordered window, else one "malformed anchor" error.
+pub(crate) fn parse_explore_anchor(s: &str) -> Result<ExploreAnchor, String> {
+    let malformed = || format!("malformed anchor {s:?}");
+    let mut parts = s.split(':');
+    let (Some("e1"), Some(after), Some(before), Some(start), Some(trace), Some(span), None) = (
+        parts.next(),
+        parts.next(),
+        parts.next(),
+        parts.next(),
+        parts.next(),
+        parts.next(),
+        parts.next(),
+    ) else {
+        return Err(malformed());
+    };
+    let anchor = ExploreAnchor {
+        after_s: after.parse().map_err(|_| malformed())?,
+        before_s: before.parse().map_err(|_| malformed())?,
+        key: RowKey {
+            start_ns: start.parse().map_err(|_| malformed())?,
+            trace_id: parse_trace_id(trace).map_err(|_| malformed())?,
+            span_id: parse_span_id(span).map_err(|_| malformed())?,
+        },
+    };
+    if anchor.after_s >= anchor.before_s {
+        return Err(malformed());
+    }
+    Ok(anchor)
+}
+
+/// Shape an `explore` answer over `grid` (aligned to `[after_s,
+/// before_s)`). A page with older spans carries the anchor of its last
+/// span.
+pub(crate) fn to_explore_result(
+    data: ExploreData,
+    request: &ExploreRequest,
+    grid: sfst::Grid,
+    (after_s, before_s): (u32, u32),
+) -> ExploreResult {
+    const NS_PER_S: i64 = 1_000_000_000;
+    let histogram = data.histogram.map(|h| ExploreHistogramWire {
+        stack: request.stack.clone().unwrap_or_default(),
+        dimensions: h
+            .dimensions
+            .into_iter()
+            .map(|mut d| {
+                truncate_value(&mut d, REQUEST_TEXT_MAX_BYTES);
+                d
+            })
+            .collect(),
+        buckets: h
+            .buckets
+            .into_iter()
+            .map(|b| ExploreBucketWire {
+                counts: b.counts,
+                other: b.other,
+                unset: b.unset,
+                durations: b.durations.to_vec(),
+            })
+            .collect(),
+        total: h.total,
+        errors: h.errors,
+        percentiles: h.percentiles.map(|p| ExplorePercentilesWire {
+            p50_ns: p.p50,
+            p95_ns: p.p95,
+            p99_ns: p.p99,
+        }),
+        duration_rows: heatmap_row_bounds().to_vec(),
+    });
+    let rows = data.rows.map(|rows| {
+        let anchor = match rows.items.last() {
+            Some(last) if rows.more => Some(AnchorWire {
+                next: encode_explore_anchor(&ExploreAnchor {
+                    after_s,
+                    before_s,
+                    key: last.key,
+                }),
+            }),
+            _ => None,
+        };
+        let items = rows
+            .items
+            .into_iter()
+            .map(|item| {
+                let mut fields = Vec::new();
+                for (key, values) in request.columns.iter().zip(item.columns) {
+                    for mut value in values {
+                        truncate_value(&mut value, LIST_VALUE_MAX_BYTES);
+                        fields.push((key.clone(), value));
+                    }
+                }
+                ExploreSpanWire {
+                    start_ns: item.key.start_ns,
+                    duration_ns: item.duration_ns,
+                    trace_id: item.key.trace_id.to_string(),
+                    span_id: item.key.span_id.to_string(),
+                    fields,
+                }
+            })
+            .collect();
+        ExploreRowsWire {
+            matched: rows.matched,
+            items,
+            anchor,
+        }
+    });
+    ExploreResult {
+        mode: "explore",
+        version: 1,
+        status: StatusWire::from(&data.status),
+        window: ExploreWindowWire {
+            after: after_s,
+            before: before_s,
+            bucket_start_s: (grid.bucket_start_ns / NS_PER_S) as u32,
+            bucket_width_s: (grid.bucket_width_ns / NS_PER_S) as u32,
+            buckets: grid.num_buckets,
+        },
+        histogram,
+        rows,
+    }
 }
 
 // ── Search: window canonicalization ─────────────────────────────────

@@ -78,6 +78,7 @@ async fn info_returns_the_descriptor() {
             "info",
             "trace",
             "suggest",
+            "explore",
             "tenant",
             "after",
             "before",
@@ -123,6 +124,7 @@ async fn every_mode_is_implemented_an_empty_agent_answers_them_all() {
         json!({"trace": {"id": "481451a49451a81bd8807bca88d35e81"}}),
         json!({"suggest": {}}),
         json!({"suggest": {"key": "name", "term": "x"}}),
+        json!({"explore": {"histogram": {}, "rows": {}}}),
     ] {
         call(body.clone())
             .await
@@ -932,6 +934,176 @@ async fn a_refused_wal_is_a_failed_source_in_every_mode() {
     )
     .unwrap();
     assert_eq!(trace["status"], failed, "trace");
+    let explore = serde_json::to_value(
+        call_on(
+            &h,
+            as_mode(
+                "explore",
+                json!({"after": T_S, "before": T_S + 100, "histogram": {}}),
+            ),
+        )
+        .await
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(explore["status"], failed, "explore");
+}
+
+/// `explore` over the search corpus (five traces, eight spans, two
+/// services, a start shared by two traces).
+async fn explore_on(
+    h: &OtelTracesHandler,
+    params: serde_json::Value,
+) -> netdata_plugin_error::Result<serde_json::Value> {
+    let mut body = window_body();
+    merge(&mut body, params);
+    Ok(serde_json::to_value(call_on(h, as_mode("explore", body)).await?).unwrap())
+}
+
+#[tokio::test]
+async fn explore_counts_and_lists_the_spans() {
+    let h = handler_with_search_corpus().await;
+    let v = explore_on(
+        &h,
+        json!({"histogram": {"stack": "resource.attributes.service.name"}, "rows": {"limit": 3}}),
+    )
+    .await
+    .unwrap();
+    assert_eq!(v["mode"], "explore");
+    assert_eq!(v["status"], json!({"complete": true}));
+    // The window is aligned outward to its grid's buckets.
+    let window = &v["window"];
+    let (after, before) = (
+        window["after"].as_u64().unwrap(),
+        window["before"].as_u64().unwrap(),
+    );
+    assert!(after <= u64::from(T_S) && before >= u64::from(T_S) + 100);
+    assert_eq!(
+        window["bucket_start_s"].as_u64().unwrap()
+            + window["bucket_width_s"].as_u64().unwrap() * window["buckets"].as_u64().unwrap(),
+        before
+    );
+    let histogram = &v["histogram"];
+    assert_eq!(histogram["stack"], "resource.attributes.service.name");
+    assert_eq!(histogram["dimensions"], json!(["svc-a", "svc-b"]));
+    assert_eq!(histogram["total"], 8);
+    let mut per_dimension = [0u64; 2];
+    for bucket in histogram["buckets"].as_array().unwrap() {
+        for (sum, count) in per_dimension
+            .iter_mut()
+            .zip(bucket["counts"].as_array().unwrap())
+        {
+            *sum += count.as_u64().unwrap();
+        }
+        assert_eq!(bucket["durations"].as_array().unwrap().len(), 32);
+    }
+    assert_eq!(per_dimension, [5, 3]);
+    assert_eq!(histogram["duration_rows"].as_array().unwrap().len(), 32);
+    assert!(histogram["percentiles"]["p50_ns"].is_i64());
+    let rows = &v["rows"];
+    assert_eq!(rows["matched"], 8);
+    assert_eq!(rows["items"].as_array().unwrap().len(), 3);
+    let first = &rows["items"][0];
+    assert_eq!(
+        first["fields"],
+        json!([
+            ["resource.attributes.service.name", "svc-a"],
+            ["name", "span-3"],
+            ["kind", "UNSPECIFIED"],
+            ["status.code", "UNSET"]
+        ])
+    );
+    assert!(rows["anchor"]["next"].is_string());
+}
+
+/// Walking the anchors lists every span once, newest first, and the
+/// last page carries no anchor.
+#[tokio::test]
+async fn explore_rows_walk_by_anchor() {
+    let h = handler_with_search_corpus().await;
+    let mut seen: Vec<(i64, String, String)> = Vec::new();
+    let mut anchor: Option<String> = None;
+    loop {
+        let mut params = json!({"rows": {"limit": 3, "columns": []}});
+        if let Some(a) = &anchor {
+            merge(&mut params, json!({"anchor": a}));
+        }
+        let v = explore_on(&h, params).await.unwrap();
+        let rows = &v["rows"];
+        for item in rows["items"].as_array().unwrap() {
+            seen.push((
+                item["start_ns"].as_i64().unwrap(),
+                item["trace_id"].as_str().unwrap().to_string(),
+                item["span_id"].as_str().unwrap().to_string(),
+            ));
+        }
+        match rows["anchor"]["next"].as_str() {
+            Some(next) => anchor = Some(next.to_string()),
+            None => break,
+        }
+    }
+    assert_eq!(seen.len(), 8);
+    let mut sorted = seen.clone();
+    sorted.sort_by(|a, b| b.cmp(a));
+    assert_eq!(seen, sorted, "newest first by (start, trace id, span id)");
+    sorted.dedup();
+    assert_eq!(sorted.len(), 8, "no span listed twice");
+}
+
+#[tokio::test]
+async fn explore_chips_select_spans() {
+    let h = handler_with_search_corpus().await;
+    let v = explore_on(
+        &h,
+        json!({
+            "conditions": [{"key": "resource.attributes.service.name", "op": "=", "values": ["svc-b"]}],
+            "histogram": {}
+        }),
+    )
+    .await
+    .unwrap();
+    assert_eq!(v["histogram"]["total"], 3);
+    assert_eq!(v["histogram"]["dimensions"], json!(["UNSET"]));
+}
+
+#[tokio::test]
+async fn explore_refuses_what_has_no_span_meaning() {
+    let h = handler_with_search_corpus().await;
+    for (params, needle) in [
+        (
+            json!({"conditions": [{"key": "root_name", "op": "=", "values": ["x"]}]}),
+            "describes a whole trace",
+        ),
+        (
+            json!({"histogram": {"stack": "duration"}}),
+            "no stored values",
+        ),
+        (json!({"histogram": {"stack": "status"}}), "is not a key"),
+        (json!({"rows": {"limit": 0}}), "rows limit"),
+        (
+            json!({"rows": {"columns": ["trace_id"]}}),
+            "no stored values",
+        ),
+        (json!({"anchor": "t2:1:2:3:4:5"}), "malformed anchor"),
+    ] {
+        let err = explore_on(&h, params.clone())
+            .await
+            .expect_err("must refuse")
+            .to_string();
+        assert!(err.contains(needle), "for {params}: {err}");
+    }
+}
+
+#[tokio::test]
+async fn explore_beyond_its_pool_answers_busy() {
+    let h = handler_with_search_corpus()
+        .await
+        .with_explore_concurrency(0);
+    let v = explore_on(&h, json!({"histogram": {}, "rows": {}}))
+        .await
+        .unwrap();
+    assert_eq!(v["status"], json!({"partial": ["busy"]}));
+    assert!(v.get("histogram").is_none());
 }
 
 #[tokio::test]
@@ -1448,6 +1620,7 @@ async fn every_mode_sets_its_progress_total_and_completes_it() {
         ),
         (functions_body(2), (4, 4)),
         (windowed("suggest", json!({"key": "name"})), (2, 2)),
+        (windowed("explore", json!({"histogram": {}})), (2, 2)),
     ] {
         assert_eq!(progress_of(&h, body.clone()).await, expected, "{body}");
     }

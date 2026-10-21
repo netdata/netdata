@@ -235,6 +235,50 @@ fn trace_params_reject_malformed_and_parse_bounds() {
     assert_eq!(bounded.before, Some(200));
 }
 
+/// The `explore` selector: strict, mutually exclusive with the others and
+/// with the Functions parameters, and its sections parse through.
+#[test]
+fn explore_params_are_strict_and_parse_through() {
+    for (body, needle) in [
+        (json!({"explore": []}), "invalid explore selector"),
+        (json!({"explore": {"bogus": 1}}), "unknown field"),
+        (json!({"explore": {"rows": {"page": 2}}}), "unknown field"),
+        (
+            json!({"explore": {"histogram": {"stack": "kind", "x": 1}}}),
+            "unknown field",
+        ),
+        (
+            json!({"explore": {}, "suggest": {}}),
+            "conflicting mode selectors: suggest, explore",
+        ),
+        (
+            json!({"explore": {}, "after": -900}),
+            "cannot mix a mode selector with Functions parameters",
+        ),
+    ] {
+        let err = req_err(body.clone());
+        assert!(err.contains(needle), "for {body}: {err}");
+    }
+    let TracesMode::Explore(p) = req(json!({"explore": {
+        "after": -900,
+        "conditions": [{"key": "kind", "op": "=", "values": ["SERVER"]}],
+        "text": ["boom"],
+        "histogram": {},
+        "rows": {"limit": 5, "columns": ["name"]}
+    }}))
+    .mode
+    else {
+        panic!("explore mode expected");
+    };
+    assert_eq!((p.after, p.before), (-900, 0));
+    assert_eq!(p.conditions.len(), 1);
+    assert_eq!(p.text, ["boom"]);
+    assert_eq!(p.histogram.unwrap().stack, None);
+    let rows = p.rows.unwrap();
+    assert_eq!(rows.limit, Some(5));
+    assert_eq!(rows.columns, Some(vec!["name".to_string()]));
+}
+
 #[test]
 fn conflicting_selectors_are_a_client_error() {
     let err = req_err(json!({"trace": {}, "suggest": {}}));
@@ -351,7 +395,8 @@ fn info_response_shape_is_pinned() {
             "has_history": true,
             "v": 3,
             "accepted_params": [
-                "info", "trace", "suggest", "tenant", "after", "before", "last", "anchor", "conditions", "text"
+                "info", "trace", "suggest", "explore", "tenant", "after", "before", "last", "anchor",
+                "conditions", "text"
             ],
             "required_params": [],
             "help": "Query and visualize OpenTelemetry traces.",
