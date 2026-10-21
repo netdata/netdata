@@ -382,6 +382,9 @@ struct rrdhost {
     // - A plugin holds a pin on the non-local host it has selected (HOST, HOST_DEFINE_END) for as long
     //   as it is selected, because it keeps using that pointer: see pluginsd_select_host(). Selecting
     //   localhost takes no pin: localhost is never removed.
+    // - A weights query pins the hosts it queries for the whole call (query_scope_hosts_pin()), because
+    //   its worker threads and its results use them after the host walk. A host it cannot pin is left
+    //   out of the query.
     // Nobody ever waits for the write side, so holding a pin cannot block anyone; failing to take a
     // pin means a removal is in progress, and the attacher refuses and retries later. Every pin MUST
     // be released with rrdhost_pin_release() on the thread that took it: a leaked pin makes the host
