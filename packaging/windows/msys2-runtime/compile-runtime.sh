@@ -62,8 +62,10 @@ mkdir "${work}/build"
 cd "${work}/build"
 
 # Same flags as MSYS2's PKGBUILD; CYGPORT_RELEASE_INFO keeps git from appending "-dirty" to the version.
+# GCC 16 defaults to C++20, where the runtime's ++/-- on volatile members fail its -Werror build: pin C++17, the
+# default of the GCC versions this runtime was written for.
 export CFLAGS="-O2 -pipe -ggdb -DCYGPORT_RELEASE_INFO=${MSYS2_RUNTIME_VERSION}"
-export CXXFLAGS="${CFLAGS}"
+export CXXFLAGS="${CFLAGS} -std=gnu++17"
 
 "${work}/src/configure" \
     --with-msys2-runtime-commit="${MSYS2_RUNTIME_PATCHED_COMMIT}" \
