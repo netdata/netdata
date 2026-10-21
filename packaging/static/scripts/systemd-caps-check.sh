@@ -136,15 +136,12 @@ cap=
 rc=
 success=0
 
-[ -f "${installer}" ] || return 0
-[ -f "${unit}" ] || return 0
-
-if [ ! -r "${installer}" ]; then
+if [ ! -f "${installer}" ] || [ ! -r "${installer}" ]; then
   echo >&2 "!!! ${installer} is not a readable regular file"
   exit 1
 fi
 
-if [ ! -r "${unit}" ]; then
+if [ ! -f "${unit}" ] || [ ! -r "${unit}" ]; then
   echo >&2 "!!! ${unit} is not a readable regular file"
   exit 1
 fi
@@ -155,8 +152,7 @@ while IFS= read -r cap; do
   static_systemd_unit_allows_capability "${unit}" "${cap}"
   rc="${?}"
   case "${rc}" in
-    0)
-      ;;
+    0) ;;
     1)
       echo >&2 "!!! static installer grants ${cap}, but ${unit} CapabilityBoundingSet does not allow it"
       success=1
