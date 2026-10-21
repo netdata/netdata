@@ -727,8 +727,11 @@ pub struct ExploreRowsWire {
     /// Every span in scope, whatever the page (the histogram's `total`).
     pub matched: u64,
     pub items: Vec<ExploreSpanWire>,
-    /// Present when older spans exist: echo `next` as the request's
-    /// `anchor` for the next page.
+    /// Present when older spans exist and the rows are complete: echo
+    /// `next` as the request's `anchor` for the next page. A partial
+    /// answer ends the walk (the status says why), as the list's cursor
+    /// does; only `stack_field_high_card`, which touches the histogram
+    /// alone, does not.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub anchor: Option<AnchorWire>,
 }

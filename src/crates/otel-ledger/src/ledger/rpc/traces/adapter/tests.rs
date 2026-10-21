@@ -1701,3 +1701,55 @@ fn every_stored_name_is_a_key() {
         "every kind of stored name is covered"
     );
 }
+
+/// One explore page of one listed span with older spans below it, under
+/// `status`, as the wire shapes it.
+fn explore_page(status: QueryStatus) -> serde_json::Value {
+    let params: ExploreParams =
+        serde_json::from_value(json!({"rows": {"limit": 1, "columns": ["name"]}})).unwrap();
+    let grid = sfst::Grid::new(0, 1_000_000_000, 10);
+    let request = explore_request(&params, grid, None).unwrap();
+    let data = ExploreData {
+        status,
+        histogram: None,
+        rows: Some(sfsq::traces::RowsData {
+            matched: 2,
+            items: vec![sfsq::traces::SpanRow {
+                key: RowKey {
+                    start_ns: 5_000_000_000,
+                    trace_id: sfst::TraceId::from([1; 16]),
+                    span_id: sfst::SpanId::from([2; 8]),
+                },
+                duration_ns: 1,
+                columns: vec![vec!["op".to_string()]],
+            }],
+            more: true,
+        }),
+    };
+    serde_json::to_value(to_explore_result(data, &request, grid, (0, 10), (0, 10))).unwrap()
+}
+
+#[test]
+fn an_explore_walk_continues_only_from_complete_rows() {
+    use sfsq::traces::PartialReason::*;
+    for (status, continues) in [
+        (QueryStatus::Complete, true),
+        (QueryStatus::Complete.with(StackFieldHighCard), true),
+        (QueryStatus::Complete.with(SourceFailure), false),
+        (QueryStatus::Complete.with(WorkCeiling), false),
+        (QueryStatus::Complete.with(RemoteUnavailable), false),
+        (
+            QueryStatus::Complete
+                .with(StackFieldHighCard)
+                .with(WorkCeiling),
+            false,
+        ),
+    ] {
+        let page = explore_page(status.clone());
+        assert_eq!(
+            page["rows"]["anchor"]["next"].is_string(),
+            continues,
+            "{status:?}: {page}"
+        );
+    }
+}

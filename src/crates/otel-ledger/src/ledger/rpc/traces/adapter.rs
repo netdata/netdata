@@ -1229,7 +1229,11 @@ pub(crate) fn parse_explore_anchor(s: &str) -> Result<ExploreAnchor, String> {
 
 /// Shape an `explore` answer over `grid` (aligned to `[after_s,
 /// before_s)`). A page with older spans carries the anchor of its last
-/// span, with `asked`, the window before alignment.
+/// span, with `asked`, the window before alignment, but only when its
+/// rows are complete: as the list's cursor, a partial page's continuation
+/// would not be a stable prefix, so the walk ends there with the status
+/// saying why. The stack's high-cardinality reason touches only the
+/// histogram, so it does not end the walk.
 pub(crate) fn to_explore_result(
     data: ExploreData,
     request: &ExploreRequest,
@@ -1238,6 +1242,12 @@ pub(crate) fn to_explore_result(
     asked: (u32, u32),
 ) -> ExploreResult {
     const NS_PER_S: i64 = 1_000_000_000;
+    let rows_complete = match &data.status {
+        sfsq::traces::QueryStatus::Complete => true,
+        sfsq::traces::QueryStatus::Partial(reasons) => reasons
+            .iter()
+            .all(|reason| *reason == sfsq::traces::PartialReason::StackFieldHighCard),
+    };
     let histogram = data.histogram.map(|h| ExploreHistogramWire {
         stack: request.stack.clone().unwrap_or_default(),
         dimensions: h
@@ -1269,7 +1279,7 @@ pub(crate) fn to_explore_result(
     });
     let rows = data.rows.map(|rows| {
         let anchor = match rows.items.last() {
-            Some(last) if rows.more => Some(AnchorWire {
+            Some(last) if rows.more && rows_complete => Some(AnchorWire {
                 next: encode_explore_anchor(&ExploreAnchor {
                     after_s: asked.0,
                     before_s: asked.1,
