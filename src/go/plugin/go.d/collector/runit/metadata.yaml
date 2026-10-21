@@ -130,17 +130,6 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: global
-          description: These metrics refer to the entire monitored application.
-          labels: []
-          metrics:
-            - name: runit.services
-              description: Services
-              unit: services
-              chart_type: stacked
-              dimensions:
-                - name: running
-                - name: not_running
         - name: service
           description: These metrics refer to the runit service.
           labels:
@@ -150,7 +139,7 @@ modules:
             - name: runit.service_state
               description: Service State
               unit: state
-              chart_type: line
+              chart_type: stacked
               dimensions:
                 - name: running
                 - name: down

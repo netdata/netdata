@@ -29,9 +29,6 @@ var serviceStates = []string{
 }
 
 type collectorMetrics struct {
-	runningServices    metrix.SnapshotGauge
-	notRunningServices metrix.SnapshotGauge
-
 	state           metrix.StateSetInstrument
 	enabled         metrix.SnapshotGauge
 	durationDown    metrix.SnapshotGauge
@@ -41,8 +38,6 @@ type collectorMetrics struct {
 func newCollectorMetrics(store metrix.CollectorStore) *collectorMetrics {
 	m := store.Write().SnapshotMeter("")
 	return &collectorMetrics{
-		runningServices:    m.Gauge("running_services"),
-		notRunningServices: m.Gauge("not_running_services"),
 		state: m.StateSet("service_state",
 			metrix.WithStateSetMode(metrix.ModeEnum),
 			metrix.WithStateSetStates(serviceStates...),

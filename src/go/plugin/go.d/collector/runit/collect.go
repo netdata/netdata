@@ -15,8 +15,6 @@ func (c *Collector) collect() error {
 	}
 
 	meter := c.store.Write().SnapshotMeter("")
-	var running, notRunning int64
-
 	for name, status := range services {
 		labels := meter.LabelSet(metrix.Label{
 			Key:   labelServiceName,
@@ -29,12 +27,6 @@ func (c *Collector) collect() error {
 		}, labels)
 		c.metrics.enabled.Observe(boolToFloat(status.Enabled), labels)
 
-		if state == stateRunning {
-			running++
-		} else {
-			notRunning++
-		}
-
 		var down, run float64
 		switch status.State {
 		case ServiceStateDown:
@@ -45,9 +37,6 @@ func (c *Collector) collect() error {
 		c.metrics.durationDown.Observe(down, labels)
 		c.metrics.durationRunning.Observe(run, labels)
 	}
-
-	c.metrics.runningServices.Observe(float64(running))
-	c.metrics.notRunningServices.Observe(float64(notRunning))
 
 	return nil
 }
