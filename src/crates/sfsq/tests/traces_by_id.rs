@@ -22,7 +22,7 @@ use tokio_util::sync::CancellationToken;
 
 use common::{
     SpanSpec, TRACE, corrupt_chunk, kv_double, kv_int, kv_str, memory_source, missing_source, req,
-    sealed_source, sealed_source_at, sp, tail_source, unavailable_source, write_wal,
+    req_with, sealed_source, sealed_source_at, sp, tail_source, unavailable_source, write_wal,
 };
 use sfsq::Source;
 use sfsq::traces::{
@@ -1163,4 +1163,56 @@ fn highlight_without_tokens_is_empty() {
         matches!(err, sfsq::traces::TraceRequestError::Highlight(_)),
         "{err}"
     );
+}
+
+/// A span's resource attributes lead its fields, in the request's order,
+/// from a sealed file and from the WAL tail alike (resource, then scope,
+/// then span entries). The `otel-traces` answer sends each resource once
+/// and a client rebuilds a span's fields by putting its resource's pairs
+/// first, so this order is what makes that rebuild exact.
+#[test]
+fn resource_pairs_lead_a_spans_fields_on_every_source() {
+    let dir = tempfile::tempdir().unwrap();
+    let resource = vec![
+        kv_str("service.name", "svc"),
+        kv_str("host.name", "h"),
+        kv_int("process.pid", 7),
+        kv_str("deployment.environment", "prod"),
+    ];
+    let mut root = sp(1, 0, 1_000, "root");
+    root.attrs = vec![kv_str("http.method", "GET")];
+    let mut child = sp(2, 1, 2_000, "child");
+    child.attrs = vec![kv_str("db.system", "pg")];
+    let request = || {
+        req_with(
+            resource.clone(),
+            Some(("lib", "1.0", vec![kv_str("tier", "web")])),
+            &[root.clone(), child.clone()],
+        )
+    };
+    let sealed = write_wal(dir.path(), vec![request()], "sealed");
+    let tail = write_wal(dir.path(), vec![request()], "tail");
+    let want = [
+        "resource.attributes.service.name",
+        "resource.attributes.host.name",
+        "resource.attributes.process.pid",
+        "resource.attributes.deployment.environment",
+    ];
+    for (label, source) in [
+        ("sealed", sealed_source(dir.path(), &sealed, "sealed")),
+        ("tail", tail_source(&tail, "tail")),
+    ] {
+        let data = run(vec![source]);
+        assert_eq!(data.trace.spans.len(), 2, "{label}");
+        for span in &data.trace.spans {
+            let names: Vec<&str> = span.fields.iter().map(|(k, _)| k.as_str()).collect();
+            assert_eq!(names[..want.len()], want, "{label}: {names:?}");
+            assert!(
+                !names[want.len()..]
+                    .iter()
+                    .any(|name| name.starts_with("resource.")),
+                "{label}: {names:?}"
+            );
+        }
+    }
 }

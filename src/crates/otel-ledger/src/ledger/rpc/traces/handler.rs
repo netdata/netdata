@@ -36,9 +36,10 @@ use sfsq::traces::{
 };
 
 use super::adapter::{
-    WireShaper, build_tokens, check_request_text, completion_capture_range, heatmap_tokens,
-    parse_cursor, parse_trace_id, parse_values_key, resolve_window, to_overview_section,
-    to_search_result, to_suggest_result, to_trace_result, validate_trace_bounds,
+    ShapedResources, WireShaper, build_tokens, check_request_text, completion_capture_range,
+    heatmap_tokens, parse_cursor, parse_trace_id, parse_values_key, resolve_window,
+    to_overview_section, to_search_result, to_suggest_result, to_trace_result,
+    validate_trace_bounds,
 };
 use super::sources::{Capture, CaptureError, RemotePolicy, TracesSourceSupplier};
 use super::wire::{
@@ -210,9 +211,11 @@ impl OtelTracesHandler {
         // The list's chips mark the matching spans; validated before
         // admission like the list's.
         let highlight = build_tokens(&params.conditions, &params.text).map_err(client_err)?;
+        let shaper = WireShaper::default();
+        let resources = shaper.resources();
         let query = TraceQuery::new(trace_id)
             .span_cap(TRACE_SPAN_CAP)
-            .shaper(Box::new(WireShaper::default()))
+            .shaper(Box::new(shaper))
             .highlight(highlight);
 
         let bounds = validate_trace_bounds(params.after, params.before).map_err(client_err)?;
@@ -241,7 +244,10 @@ impl OtelTracesHandler {
                 matched: Vec::new(),
             };
             return Ok(OtelTracesResponse::Trace(Box::new(to_trace_result(
-                &trace_id, busy, coverage,
+                &trace_id,
+                busy,
+                ShapedResources::default(),
+                coverage,
             ))));
         };
 
@@ -297,7 +303,10 @@ impl OtelTracesHandler {
         };
 
         Ok(OtelTracesResponse::Trace(Box::new(to_trace_result(
-            &trace_id, data, coverage,
+            &trace_id,
+            data,
+            resources.take(),
+            coverage,
         ))))
     }
 

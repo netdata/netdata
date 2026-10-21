@@ -901,10 +901,10 @@ pub struct TraceResult {
 
 /// The value kinds of every attribute key the returned spans expose
 /// (span `fields`, their resources' `attributes`, event and link
-/// `attributes`), keyed by the key itself
-/// — the same key string a chip and a key suggestion use. Builtin keys
-/// (`name`, `kind`, `status.code`, ...) and `trace_state` have no entry,
-/// as on key suggestions. Each key maps to the kinds of value stored
+/// `attributes`), keyed by the key itself — the same key string a chip
+/// and a key suggestion use. Builtin keys (`name`, `kind`,
+/// `status.code`, ...) and `trace_state` have no entry, as on key
+/// suggestions. Each key maps to the kinds of value stored
 /// under it, in the order `null`, `bool`, `int`, `double`, `str`,
 /// `bytes`, `empty_kvlist`, `empty_array`, unioned over the sources that
 /// contributed the returned spans: the same derivation as a key

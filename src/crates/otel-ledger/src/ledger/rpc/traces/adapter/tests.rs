@@ -140,6 +140,7 @@ fn trace_result_shape_is_pinned() {
     let v = serde_json::to_value(to_trace_result(
         &trace_id,
         data,
+        ShapedResources::default(),
         CoverageWire {
             after: 0,
             before: u32::MAX,
@@ -158,6 +159,7 @@ fn trace_result_shape_is_pinned() {
     assert_eq!(v["summary_root"], 0);
     assert_eq!(v["roots"], json!([0]));
     assert_eq!(v["children"], json!([[1], []]));
+    assert_eq!(v["resources"], json!([]));
 
     let s0 = &v["spans"][0];
     assert_eq!(s0["span_id"], "0101010101010101");
@@ -192,10 +194,15 @@ fn trace_result_shape_is_pinned() {
     );
 }
 
-/// The trace by its result, at a complete status.
-fn result_of(spans: Vec<sfst::TraceSpan>, field_kinds: FieldKinds) -> serde_json::Value {
+/// The trace by its result, at a complete status: every span shaped as
+/// the engine shapes the spans it keeps, none refused.
+fn result_of(mut spans: Vec<sfst::TraceSpan>, field_kinds: FieldKinds) -> serde_json::Value {
+    use sfst::trace_combine::SpanShaper;
     let trace_id = parse_trace_id("11111111111111111111111111111111").unwrap();
     let n = spans.len();
+    let mut shaper = WireShaper::default();
+    let resources = shaper.resources();
+    let span_cut = spans.iter_mut().map(|s| shaper.shape(s).cut).collect();
     let data = TraceData {
         trace: sfst::Trace {
             spans,
@@ -204,10 +211,16 @@ fn result_of(spans: Vec<sfst::TraceSpan>, field_kinds: FieldKinds) -> serde_json
         },
         status: QueryStatus::Complete,
         field_kinds,
-        span_cut: Vec::new(),
+        span_cut,
         matched: Vec::new(),
     };
-    serde_json::to_value(to_trace_result(&trace_id, data, coverage_all())).unwrap()
+    serde_json::to_value(to_trace_result(
+        &trace_id,
+        data,
+        resources.take(),
+        coverage_all(),
+    ))
+    .unwrap()
 }
 
 /// Every owner's names go out as keys, with `trace_state`; the internal
@@ -391,7 +404,13 @@ fn names_outside_the_vocabulary_are_dropped_and_reported() {
         span_cut: Vec::new(),
         matched: Vec::new(),
     };
-    let v = serde_json::to_value(to_trace_result(&trace_id, data, coverage_all())).unwrap();
+    let v = serde_json::to_value(to_trace_result(
+        &trace_id,
+        data,
+        ShapedResources::default(),
+        coverage_all(),
+    ))
+    .unwrap();
     assert_eq!(
         v["status"],
         json!({"partial": ["source_failure", "dropped_fields"]})
@@ -807,6 +826,7 @@ fn empty_trace_maps_to_complete_zero_span_result() {
     let v = serde_json::to_value(to_trace_result(
         &trace_id,
         data,
+        ShapedResources::default(),
         CoverageWire {
             after: 0,
             before: u32::MAX,
@@ -817,6 +837,7 @@ fn empty_trace_maps_to_complete_zero_span_result() {
     assert_eq!(v["items"]["returned"], 0);
     assert_eq!(v["summary_root"], serde_json::Value::Null);
     assert_eq!(v["spans"], json!([]));
+    assert_eq!(v["resources"], json!([]));
 }
 
 // ── Response bounds ─────────────────────────────────────────────────
@@ -1045,6 +1066,7 @@ fn shaped_trace(spans: Vec<sfst::TraceSpan>) -> TraceResult {
     let trace_id = parse_trace_id("11111111111111111111111111111111").unwrap();
     let mut source = VecSource(spans);
     let mut shaper = WireShaper::default();
+    let resources = shaper.resources();
     let out = sfst::trace_combine::combine(
         &mut [&mut source as &mut dyn sfst::trace_combine::SpanSource],
         trace_id,
@@ -1064,7 +1086,7 @@ fn shaped_trace(spans: Vec<sfst::TraceSpan>) -> TraceResult {
         span_cut: out.cut,
         matched: Vec::new(),
     };
-    to_trace_result(&trace_id, data, coverage_all())
+    to_trace_result(&trace_id, data, resources.take(), coverage_all())
 }
 
 #[test]
@@ -1269,6 +1291,58 @@ fn resource_pairs_out_of_front_still_share_by_their_order() {
     assert_eq!(
         r.spans[1].fields,
         pairs(&[("scope.name", "lib"), ("name", "b")])
+    );
+}
+
+/// The merge holds what the answer sends: a kept span gives its resource
+/// pairs up when it is shaped, so a resource shared by every span is held
+/// once, not once per span, and the kept spans stay within the budget.
+#[test]
+fn kept_spans_hold_no_resource_copies() {
+    let resource: Vec<(String, String)> = (0..4)
+        .map(|k| {
+            (
+                format!("resource.attributes.k{k}"),
+                "r".repeat(TRACE_VALUE_MAX_BYTES),
+            )
+        })
+        .collect();
+    let n = 500;
+    let id = |i: usize| sfst::SpanId::from((i as u64 + 1).to_be_bytes());
+    let spans: Vec<sfst::TraceSpan> = (0..n)
+        .map(|i| {
+            let mut s = span(1, None, 1_000 + i as i64);
+            s.span_id = id(i);
+            s.fields = [resource.clone(), pairs(&[("name", "op")])].concat();
+            s
+        })
+        .collect();
+    let trace_id = parse_trace_id("11111111111111111111111111111111").unwrap();
+    let mut source = VecSource(spans);
+    let mut shaper = WireShaper::default();
+    let out = sfst::trace_combine::combine(
+        &mut [&mut source as &mut dyn sfst::trace_combine::SpanSource],
+        trace_id,
+        Some(10_000),
+        None,
+        Some(&mut shaper),
+        &|| false,
+    );
+    assert_eq!(
+        out.trace.spans.len(),
+        n,
+        "the shared resource is charged once"
+    );
+    let held: usize = out
+        .trace
+        .spans
+        .iter()
+        .flat_map(|s| &s.fields)
+        .map(|(k, v)| k.len() + v.len())
+        .sum();
+    assert!(
+        held <= TRACE_SPANS_MAX_BYTES,
+        "kept spans hold {held} bytes of fields"
     );
 }
 
