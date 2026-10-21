@@ -20,6 +20,7 @@ type ServiceStatus struct {
 	Paused        bool
 	WantUp        bool
 	WantDown      bool
+	GotTERM       bool
 	Log           bool // The log service of another service.
 	State         ServiceState
 	Enabled       bool
@@ -135,6 +136,7 @@ func parseServiceStatus(match [][]byte) *ServiceStatus {
 		Paused:        len(match[idxPaused]) != 0,
 		WantUp:        bytes.Equal(match[idxWant], tokenUp),
 		WantDown:      bytes.Equal(match[idxWant], tokenDown),
+		GotTERM:       len(match[idxTERM]) != 0,
 		State:         parseServiceState(match[idxState]),
 	}
 	if status.State == ServiceStateDown {
