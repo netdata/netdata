@@ -123,8 +123,13 @@ static ND_SOCK_ERROR connect_socket_to_address(int fd, const struct addrinfo *ai
         // the socket is ready or reported an error - SO_ERROR says if the connection was established
         int so_error = 0;
         socklen_t so_error_len = sizeof(so_error);
-        if(getsockopt(fd, SOL_SOCKET, SO_ERROR, (void *)&so_error, &so_error_len) != 0)
-            so_error = errno;
+        if(getsockopt(fd, SOL_SOCKET, SO_ERROR, (void *)&so_error, &so_error_len) != 0) {
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "Failed to get the connection status of the socket to '%s', port '%s': %s",
+                   ip, port, strerror(errno));
+
+            return ND_SOCK_ERR_POLL_ERROR;
+        }
 
         if(so_error) {
             nd_log(NDLS_DAEMON, NDLP_ERR,
