@@ -7,7 +7,7 @@ file="${1}"
 machine="${2}"
 class="${3}"
 
-elf_info=$(readelf -h "${file}")
+elf_info=$(LC_ALL=C readelf -h "${file}")
 file_machine=$(echo "${elf_info}" | grep 'Machine:' | awk -F: '{print $2}' | xargs)
 file_class=$(echo "${elf_info}" | grep 'Class:' | awk -F: '{print $2}' | xargs)
 

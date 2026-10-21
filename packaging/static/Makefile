@@ -79,7 +79,7 @@ endef
 OPENSSL_VERSION := openssl-3.6.0
 OPENSSL_SOURCE := https://github.com/openssl/openssl
 $(eval $(call set_paths,OPENSSL,openssl))
-OPENSSL_CFLAGS := $(TUNING_FLAGS) -fno-lto -pipe
+OPENSSL_CFLAGS = $(TUNING_FLAGS) -fno-lto -pipe
 OPENSSL_LDFLAGS := -static
 
 LIBNFACCT_VERSION := 1.0.3
@@ -87,13 +87,13 @@ LIBNFACCT_SOURCE := https://www.netfilter.org/projects/libnetfilter_acct/files/l
 LIBNFACCT_ARCHIVE := $(TARGET_WORKDIR)/libnetfilter_acct-$(LIBNFACCT_VERSION).tar.bz2
 LIBNFACCT_HASH := 4250ceef3efe2034f4ac05906c3ee427db31b9b0a2df41b2744f4bf79a959a1a
 $(eval $(call set_paths,LIBNFACCT,libnetfilter_acct))
-LIBNFACCT_CFLAGS := $(TUNING_FLAGS) -static -I/usr/lib/libmnl -pipe
+LIBNFACCT_CFLAGS = $(TUNING_FLAGS) -static -I/usr/lib/libmnl -pipe
 LIBNFACCT_LDFLAGS := -static -L/usr/lib -lmnl
 
 CURL_VERSION := curl-8_20_0
 CURL_SOURCE := https://github.com/curl/curl
 $(eval $(call set_paths,CURL,curl))
-CURL_CFLAGS := $(TUNING_FLAGS) -I$(OPENSSL_INCLUDE) -pipe
+CURL_CFLAGS = $(TUNING_FLAGS) -I$(OPENSSL_INCLUDE) -pipe
 CURL_LDFLAGS := -static -L$(OPENSSL_LIBS)
 
 BASH_VERSION := 5.3
@@ -101,7 +101,7 @@ BASH_SOURCE := http://ftp.gnu.org/gnu/bash/bash-$(BASH_VERSION).tar.gz
 BASH_ARCHIVE := $(TARGET_WORKDIR)/bash-$(BASH_VERSION).tar.gz
 BASH_HASH := 0d5cd86965f869a26cf64f4b71be7b96f90a3ba8b3d74e27e8e9d9d5550f31ba
 $(eval $(call set_paths,BASH,bash))
-BASH_CFLAGS := $(TUNING_FLAGS) -pipe
+BASH_CFLAGS = $(TUNING_FLAGS) -pipe
 BASH_LDFLAGS :=
 
 IOPING_VERSION := 1.3
@@ -109,7 +109,7 @@ IOPING_SOURCE := https://github.com/koct9i/ioping/archive/refs/tags/v$(IOPING_VE
 IOPING_ARCHIVE := $(TARGET_WORKDIR)/ioping-$(IOPING_VERSION).tar.gz
 IOPING_HASH := 7aa48e70aaa766bc112dea57ebbe56700626871052380709df3a26f46766e8c8
 $(eval $(call set_paths,IOPING,ioping))
-IOPING_CFLAGS := $(TUNING_FLAGS) -static -pipe
+IOPING_CFLAGS = $(TUNING_FLAGS) -static -pipe
 IOPING_LDFLAGS :=
 
 # Netdata build config
@@ -120,7 +120,7 @@ NETDATA_BUILD_DEPS := $(OPENSSL_STAGING) \
 $(eval $(call set_paths,NETDATA,netdata))
 NETDATA_BUILD_DIR := $(DOCKER_WORKDIR)/netdata/build
 NETDATA_INSTALL := $(TARGET_STAMPS)/netdata.install.stamp
-NETDATA_CFLAGS := $(TUNING_FLAGS) -pipe -O2 -funroll-loops -I$(OPENSSL_INCLUDE) -I$(LIBNFACCT_INCLUDE) -I$(CURL_INCLUDE)
+NETDATA_CFLAGS = $(TUNING_FLAGS) -pipe -O2 -funroll-loops -I$(OPENSSL_INCLUDE) -I$(LIBNFACCT_INCLUDE) -I$(CURL_INCLUDE)
 NETDATA_LDFLAGS := -Wl,--gc-sections -L$(OPENSSL_LIBS) -L$(LIBNFACCT_LIBS) -L$(CURL_LIBS) -L/usr/lib -lmnl -lzstd
 NETDATA_RUSTFLAGS := -C target-feature=+crt-static
 NETDATA_PKGCONFIG_PATH := $(OPENSSL_PKGCONFIG_PATH):$(LIBNFACCT_PKGCONFIG_PATH):$(CURL_PKGCONFIG_PATH)
@@ -175,7 +175,7 @@ ifneq ($(strip $(TOPOLOGY_STOCK_DIR)),)
                    -e "NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR=/topology-stock" \
                    $(NULL)
     NETDATA_CMAKE_OPTS := $(NETDATA_CMAKE_OPTS) \
-                          -DTOPLOGY_IP_INTEL_STOCK_DIR=/topology-stock \
+                          -DNETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR=/topology-stock \
                           $(NULL)
 endif
 
@@ -194,6 +194,7 @@ ifeq ($(BUILDARCH),x86_64)
                    $(NULL)
     NETDATA_CMAKE_OPTS := $(NETDATA_CMAKE_OPTS) \
                           -DENABLE_NETDATA_JOURNAL_FILE_READER=On \
+                          -DENABLE_PLUGIN_NETFLOW=On \
                           $(NULL)
 else ifeq ($(BUILDARCH),armv6l)
     PLATFORM := linux/arm/v6
@@ -230,9 +231,10 @@ else ifeq ($(BUILDARCH),armv7l)
     NETDATA_CMAKE_OPTS := $(NETDATA_CMAKE_OPTS) \
                           -DENABLE_PLUGIN_EBPF=Off \
                           -DENABLE_NETDATA_JOURNAL_FILE_READER=On \
+                          -DENABLE_PLUGIN_NETFLOW=On \
                           $(NULL)
 else ifeq ($(BUILDARCH),aarch64)
-    PLATFORM := linux/arm64
+    PLATFORM := linux/arm64/v8
     QEMU_ARCH := aarch64
     ELF_MACHINE := AArch64
     ELF_CLASS := ELF64
@@ -244,7 +246,11 @@ else ifeq ($(BUILDARCH),aarch64)
                    $(NULL)
     NETDATA_CMAKE_OPTS := $(NETDATA_CMAKE_OPTS) \
                           -DENABLE_NETDATA_JOURNAL_FILE_READER=On \
+                          -DENABLE_PLUGIN_NETFLOW=On \
                           $(NULL)
+    NETDATA_LDFLAGS := $(NETDATA_LDFLAGS) \
+                       -Wl,--fix-cortex-a53-843419 \
+                       $(NULL)
 else
     $(error Unknown build architecture $(BUILDARCH))
 endif
@@ -295,8 +301,8 @@ clear-full-cache:
 clean-all: clean-workdir clean-staging clear-cache
 
 $(CACHE) $(CACHE)/CACHEDIR.TAG:
-	mkdir -p $@
-	touch $@/CACHEDIR.TAG
+	mkdir -p $(CACHE)
+	touch $(CACHE)/CACHEDIR.TAG
 
 $(TARGET_CACHE): | $(CACHE)
 	mkdir -p $@
@@ -305,10 +311,8 @@ $(TARGET_CACHE): | $(CACHE)
 	$(DOCKER) run --rm --privileged $(QEMU_SETUP) --install "$(QEMU_ARCH)" ; \
 
 docker-image:
-	if $(DOCKER) inspect "$(BUILDER)" > /dev/null 2>&1; then \
-		if [ "$${img_platform}" != "$(PLATFORM)" ]; then \
-			$(DOCKER) image rm "$(BUILDER)" ; \
-		fi \
+	if [ "$(BUILDER_STATUS)" == "MISMATCH" ]; then \
+		$(DOCKER) image rm "$(BUILDER)" ; \
 	fi
 	if ! $(DOCKER) inspect "$(BUILDER)" > /dev/null 2>&1; then \
 		$(DOCKER) pull --platform "$(PLATFORM)" "$(BUILDER)" ; \
@@ -811,7 +815,7 @@ tests: check-static-linking runtime-check netdata-elf-check go-elf-check check-s
 # Archive rules
 
 $(TARGET_STAMPS)/ca-certs.stamp: $(NETDATA_INSTALL)
-	rm -f $@ $(DOCKER_INSTALL)/usr/share/ssl
+	rm -f $@ $(TARGET_INSTALL)/usr/share/ssl
 	$(DOCKER) run $(DOCKER_ARGS) \
 		$(BUILDER) \
 		cp -a --reflink=auto /etc/ssl $(DOCKER_INSTALL)/usr/share/ssl
@@ -821,7 +825,7 @@ $(TARGET_INSTALL)/etc/.install-type: $(NETDATA_INSTALL)
 	echo INSTALL_TYPE='manual-static' >> $@
 	echo PREBUILT_ARCH='$(BUILDARCH)' >> $@
 
-%/.keep:
+%/.keep: | runtime-check
 	mkdir -p $(@D)
 	touch $@
 

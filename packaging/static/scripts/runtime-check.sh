@@ -11,7 +11,7 @@ dump_log() {
     cat /netdata.log
 }
 
-export NETDATA_LIBEXEC_PREFIX="${NETDATA_INSTALL_PATH}/usr/libexec/netdata"
+export NETDATA_LIBEXEC_PREFIX="${prefix}/usr/libexec/netdata"
 export NETDATA_SKIP_LIBEXEC_PARTS="freeipmi|xenstat|cups"
 
 case "${buildarch}" in

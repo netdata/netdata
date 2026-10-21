@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -euo pipefail
-
 prefix_dir="${1}"
 install_dir="${2}"
 

@@ -4,7 +4,7 @@
 prefix="${1}"
 
 if readelf -l "${prefix}/bin/srv/netdata" | grep 'INTERP'; then
-  printf >&2 "Ooops. %s is not a statically linked binary!\n" "${prefix}/bin/netdata"
+  printf >&2 "Ooops. %s is not a statically linked binary!\n" "${prefix}/bin/srv/netdata"
   ldd "${prefix}/bin/srv/netdata"
   exit 1
 fi
