@@ -364,9 +364,11 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_NET
     # Cargo links the Rust executables through the bare compiler driver, so CMAKE_EXE_LINKER_FLAGS never reach those
     # links. When the build asks for the Cortex-A53 erratum workarounds (static aarch64), have the linker apply them to
     # the Rust code too: 843419 and 835769 can both be fixed at link time, and rustc has no -mfix-cortex-a53-* flags.
+    # 8-byte function alignment stops ld.bfd's 843419 fix stubs from shifting code it has already scanned.
     set(_nd_rust_link_flags "")
     if(CMAKE_EXE_LINKER_FLAGS MATCHES "--fix-cortex-a53-843419")
         list(APPEND _nd_rust_link_flags "-Clink-arg=-Wl,--fix-cortex-a53-835769" "-Clink-arg=-Wl,--fix-cortex-a53-843419")
+        list(APPEND _nd_rust_link_flags "-Cllvm-args=-align-all-functions=3")
     endif()
 
     if(ENABLE_PLUGIN_OTEL)
