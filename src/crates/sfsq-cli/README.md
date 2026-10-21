@@ -3,8 +3,8 @@
 Inspect OpenTelemetry logs and traces stored in Netdata's on-disk **WAL/SFST**
 files from the terminal, without a running agent. Useful for forensic and
 offline inspection. Run with no subcommand, it queries **logs** and prints
-NDJSON. The trace subcommands (`trace`, `suggest`, `overview` and `search`)
-query **traces** and print plain text.
+NDJSON. The trace subcommands (`trace`, `suggest`, `overview`, `search` and
+`explore`) query **traces** and print plain text.
 
 > The logs mode also ships inside the Netdata Agent as `otel-plugin logs`
 > (the shipped binary; this standalone `sfsq-cli` is a dev/forensic tool, not
@@ -91,8 +91,8 @@ Common to all of them:
   traces WAL file, repeatable. At least one of the two is required.
 - `--start-ns N` / `--end-ns N` — a half-open window in epoch nanoseconds.
   Give the two flags together, with start before end. `trace` has no
-  window, `overview` needs one (for its grid), and the others make it
-  optional. `search` admits a span when its *start* is in the window.
+  window, `overview` and `explore` need one (for their grid), and the
+  others make it optional. `search` admits a span when its *start* is in the window.
   `suggest` skips whole files outside the window.
 - WAL files are scanned whole as tails — right for shut-down or recovered
   WALs; query an actively written WAL through a live agent instead. A torn
@@ -100,11 +100,14 @@ Common to all of them:
   a corrupt WAL is skipped with a warning so one bad file cannot abort a
   multi-file query, while a nonexistent or header-less path is a hard error.
 
-### Search tokens (`search`, `overview`, `trace`)
+### Search tokens (`search`, `overview`, `explore`, `trace`)
 
 These flags give the search bar's tokens. A trace matches when it matches
 all tokens. Different tokens can match different spans of the trace. All
-four flags are repeatable.
+four flags are repeatable. `explore` applies the tokens to each span
+instead: a span matches when it matches all tokens, and a `--not` token
+keeps the spans that do not match it. In `explore`, a token on the whole
+trace (`root_name`, `root_service_name`, `trace_duration`) is an error.
 
 - `--where COND` — one span must match all `--where` conditions together.
   A condition on the whole trace (`root_name`, `root_service_name`,
@@ -210,6 +213,31 @@ The token flags filter the traces that it counts. A token on
 `trace-duration` is an error, because the duration is the grid's own axis.
 The command is for measurements and does not print the grid. It prints one
 line: `N trace(s), N span(s), N error(s), status …, <time> ms`.
+
+### `explore` — the span view
+
+```
+sfsq-cli explore (--sfst FILE | --wal FILE)… --start-ns N --end-ns N
+                 [--buckets N] [--stack KEY] [--limit N] [--column KEY]…
+                 [token flags]
+```
+
+`explore` counts the spans of the window, one row per stored span, as the
+Traces tab's span view does. The token flags select the spans (see
+*Search tokens*). `--buckets` sets the number of time buckets (default 60).
+`--stack` sets the key whose values divide the count (default
+`status.code`). `--limit` sets how many of the newest spans it lists
+(default 100, at most 200; 0 lists none). Each `--column` adds a key to
+each listed span. The keys of `--stack` and `--column` must have stored
+values, so `duration` and the ids are errors. A WAL file is built into an
+index whole before the query.
+
+It prints one line per listed span, newest first:
+`<start-ns> <trace-id> <span-id> dur=<ns>ns KEY=VALUE…` (several values of
+one key are joined with commas). Then it prints
+`N span(s), N error(s); by KEY: VALUE=N… other=N unset=N`: the values with
+the most spans, the spans with other values (`other`), and the spans
+without the key (`unset`). A final line gives the status and the time.
 
 ### `search` — filter whole traces
 

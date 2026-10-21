@@ -25,10 +25,11 @@ use anyhow::{Context, Result, bail};
 use tokio_util::sync::CancellationToken;
 
 use sfsq::traces::{
-    AttributeKey, AttributeOwner, BuiltinField, CompareOp, Condition, KeyError, OverviewQuery,
-    Predicate, PredicateTarget, PredicateValue, QueryStatus, SearchQuery, SearchSources, SourceId,
-    SuggestQuery, TimeWindow, Token, TokenQuery, TraceQuery, TraceSfstCandidate, TraceSource,
-    TraceWalTail, WalCoverage, overview, search, starts_with_pattern, suggest, trace_by_id,
+    AttributeKey, AttributeOwner, BuiltinField, CompareOp, Condition, DEFAULT_ROWS_LIMIT,
+    ExploreQuery, KeyError, OverviewQuery, Predicate, PredicateTarget, PredicateValue, QueryStatus,
+    RowsSpec, SearchQuery, SearchSources, SourceId, SuggestQuery, TimeWindow, Token, TokenQuery,
+    TraceQuery, TraceSfstCandidate, TraceSource, TraceWalTail, WalCoverage, explore, overview,
+    search, starts_with_pattern, suggest, trace_by_id,
 };
 
 /// Reconstruct one trace across sealed SFSTs and traces WALs.
@@ -578,6 +579,124 @@ pub fn run_overview(args: &OverviewArgs, out: &mut dyn std::io::Write) -> Result
     Ok(())
 }
 
+// ── Explore ────────────────────────────────────────────────────────────
+
+/// The span view over sealed SFSTs and traces WALs: the spans per time
+/// bucket stacked by a key, and the newest spans, one row per stored span
+/// (the tokens apply per span).
+#[derive(Debug, clap::Args)]
+pub struct ExploreArgs {
+    /// A sealed traces SFST file. Repeatable.
+    #[arg(long = "sfst")]
+    pub sfsts: Vec<PathBuf>,
+
+    /// A flattened traces WAL file, built into an image whole. Repeatable.
+    #[arg(long = "wal")]
+    pub wals: Vec<PathBuf>,
+
+    /// Grid start, nanoseconds since the epoch.
+    #[arg(long, allow_hyphen_values = true)]
+    pub start_ns: i64,
+
+    /// Grid end, nanoseconds since the epoch (exclusive).
+    #[arg(long, allow_hyphen_values = true)]
+    pub end_ns: i64,
+
+    /// Time buckets across the grid.
+    #[arg(long, default_value_t = 60)]
+    pub buckets: usize,
+
+    /// The key whose values stack the spans: a key with stored values.
+    #[arg(long, default_value = "status.code")]
+    pub stack: String,
+
+    /// Spans to list, newest first (0 lists none).
+    #[arg(long, default_value_t = DEFAULT_ROWS_LIMIT)]
+    pub limit: usize,
+
+    /// A key each listed span shows, repeatable: a key with stored values.
+    #[arg(long = "column")]
+    pub columns: Vec<String>,
+
+    #[command(flatten)]
+    pub tokens: TokenArgs,
+}
+
+pub fn run_explore(args: &ExploreArgs, out: &mut dyn std::io::Write) -> Result<()> {
+    let started = std::time::Instant::now();
+    if args.buckets == 0 || args.end_ns <= args.start_ns {
+        bail!("--buckets must be positive and --end-ns after --start-ns");
+    }
+    let buckets = args.buckets as i64;
+    let width = (args.end_ns - args.start_ns + buckets - 1) / buckets;
+    let mut query = ExploreQuery::new(sfst::Grid::new(args.start_ns, width, args.buckets))
+        .tokens(args.tokens.tokens(Vec::new())?)
+        .histogram(args.stack.clone());
+    if args.limit > 0 {
+        query = query.rows(RowsSpec {
+            limit: args.limit,
+            before: None,
+            columns: args.columns.clone(),
+        });
+    }
+    let sources = build_sources(&args.sfsts, &args.wals)?;
+    let data = explore(
+        sources,
+        query,
+        CancellationToken::new(),
+        Arc::new(AtomicUsize::new(0)),
+    )?;
+    for row in data.rows.iter().flat_map(|rows| &rows.items) {
+        let fields: Vec<String> = args
+            .columns
+            .iter()
+            .zip(&row.columns)
+            .map(|(key, values)| format!("{key}={}", values.join(",")))
+            .collect();
+        writeln!(
+            out,
+            "{} {} {} dur={}ns {}",
+            row.key.start_ns,
+            row.key.trace_id,
+            row.key.span_id,
+            row.duration_ns,
+            fields.join(" "),
+        )?;
+    }
+    if let Some(h) = &data.histogram {
+        let mut per_value = vec![0u64; h.dimensions.len()];
+        let (mut other, mut unset) = (0, 0);
+        for bucket in &h.buckets {
+            for (sum, count) in per_value.iter_mut().zip(&bucket.counts) {
+                *sum += count;
+            }
+            other += bucket.other;
+            unset += bucket.unset;
+        }
+        let stacked: Vec<String> = h
+            .dimensions
+            .iter()
+            .zip(per_value)
+            .map(|(value, count)| format!("{value}={count}"))
+            .collect();
+        writeln!(
+            out,
+            "{} span(s), {} error(s); by {}: {} other={other} unset={unset}",
+            h.total,
+            h.errors,
+            args.stack,
+            stacked.join(" "),
+        )?;
+    }
+    writeln!(
+        out,
+        "status {}, {:.1} ms",
+        status_word(&data.status),
+        started.elapsed().as_secs_f64() * 1000.0,
+    )?;
+    Ok(())
+}
+
 // ── Search ─────────────────────────────────────────────────────────────
 
 /// Search for traces across sealed SFSTs and traces WALs.
@@ -893,6 +1012,96 @@ mod tests {
             &sources[0],
             TraceSource::Tail(t) if t.path == good_wal.canonicalize().unwrap()
         ));
+    }
+
+    /// `explore` lists the newest spans with their columns and stacks
+    /// every span of the window.
+    #[test]
+    fn explore_lists_and_stacks_the_spans() {
+        use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
+        use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span, Status};
+        let span = |id: u8, start: u64, error: bool| Span {
+            trace_id: vec![9; 16],
+            span_id: vec![id; 8],
+            name: format!("op-{id}"),
+            start_time_unix_nano: start,
+            end_time_unix_nano: start + 1_000,
+            status: error.then(|| Status {
+                code: 2,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let request = ExportTraceServiceRequest {
+            resource_spans: vec![ResourceSpans {
+                scope_spans: vec![ScopeSpans {
+                    spans: vec![
+                        span(1, 1_000_000_000, false),
+                        span(2, 2_000_000_000, true),
+                        span(3, 3_000_000_000, false),
+                    ],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        };
+        let frame = ng_flatten::prepare_trace_frame(request, 0, None).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let seq = std::sync::Arc::new(wal::SeqAllocator::ephemeral(0));
+        let mut writer = wal::Writer::new(
+            dir.path(),
+            wal::Config::default(),
+            seq,
+            wal::FileStamp {
+                pipeline_id: 1,
+                payload_format: ng_flatten::TRACE_FRAME_PAYLOAD_FORMAT,
+            },
+            wal::test_identity(),
+        )
+        .unwrap();
+        writer
+            .write_frame(
+                0,
+                b"",
+                &frame.data,
+                wal::FrameMeta {
+                    entry_count: frame.records,
+                    ingestion_ns: file_registry::TimestampNs(1),
+                    log_ts_range: None,
+                },
+            )
+            .unwrap();
+        writer.shutdown_all().unwrap();
+        let wal = std::fs::read_dir(dir.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .find(|p| p.extension().is_some_and(|x| x == "wal"))
+            .expect("one WAL");
+
+        let args = ExploreArgs {
+            sfsts: Vec::new(),
+            wals: vec![wal],
+            start_ns: 0,
+            end_ns: 4_000_000_000,
+            buckets: 4,
+            stack: "status.code".to_string(),
+            limit: 2,
+            columns: vec!["name".to_string()],
+            tokens: TokenArgs::default(),
+        };
+        let mut out = Vec::new();
+        run_explore(&args, &mut out).unwrap();
+        let text = String::from_utf8(out).unwrap();
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!(lines.len(), 4, "{text}");
+        assert!(lines[0].starts_with("3000000000 ") && lines[0].ends_with(" name=op-3"));
+        assert!(lines[1].starts_with("2000000000 ") && lines[1].ends_with(" name=op-2"));
+        assert_eq!(
+            lines[2],
+            "3 span(s), 1 error(s); by status.code: UNSET=2 ERROR=1 other=0 unset=0"
+        );
+        assert!(lines[3].starts_with("status complete"), "{text}");
     }
 
     /// The torn-tail clamp: a WAL truncated mid-frame serves only the
