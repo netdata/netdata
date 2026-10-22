@@ -344,7 +344,7 @@ $(OPENSSL_CONFIG): $(OPENSSL_DIR) | prepare
 			-e PKG_CONFIG="pkg-config --static" \
 			-w $(DOCKER_WORKDIR)/openssl \
 			$(BUILDER) \
-			/bin/bash ./config -static threads no-tests \
+			/bin/bash ./config -static threads no-tests enable-quic \
 				--prefix=$(OPENSSL_DOCKER_STAGING) \
 				--openssldir=/opt/netdata/etc/ssl \
 				$(OPENSSL_CONFIG_TARGET) ; \
@@ -530,7 +530,7 @@ $(CURL_CONFIG): $(CURL_DIR) | $(OPENSSL_STAGING) prepare
 				--enable-ipv6 \
 				--enable-cookies \
 				--with-ca-fallback \
-				--with-openssl \
+				--with-openssl=$(DOCKER_STAGING)/openssl \
 				--with-ca-bundle=/opt/netdata/etc/ssl/certs/ca-certificates.crt \
 				--with-ca-path=/opt/netdata/etc/ssl/certs \
 				--without-brotli \
