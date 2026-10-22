@@ -73,17 +73,17 @@
       "configType": {
         "type": "string",
         "title": "Alert Type",
-        "description": "Use categories like: 'System', 'Containers', 'Web Servers', 'Message Brokers', etc."
+        "description": "The technology domain of the monitored component. Stock alerts use: 'Application', 'Containers', 'Database', 'DHCP', 'DNS', 'GPU', 'Hardware', 'Kubernetes', 'Messaging', 'Netdata', 'Network', 'Storage', 'Synthetic', 'System', 'Virtual Machine', 'Web Server'."
       },
       "configComponent": {
         "type": "string",
         "title": "Alert Component",
-        "description": "Component is a sub-type of Alert Type. Examples: 'CPU', 'Memory', 'Network', 'Disk', 'Hardware', 'nginx', 'redis', 'postgresql', etc."
+        "description": "Narrows the Alert Type: the host subsystem for System alerts ('CPU', 'Memory', 'Disk'), the Agent subsystem for Netdata alerts ('DB engine', 'Streaming'), the kind of check for Synthetic alerts ('HTTP endpoint'), otherwise the product, service or protocol ('PostgreSQL', 'Azure SQL Database', 'Redfish', 'BGP')."
       },
       "configClassification": {
         "type": "string",
         "title": "Classification",
-        "description": "Use 'Workload', 'Utilization', 'Latency', 'Availability', 'Errors', etc."
+        "description": "The kind of problem the alert detects. Stock alerts use: 'Availability', 'Errors', 'Latency', 'Utilization', 'Workload'."
       },
       "configValue": {
         "type": "object",

@@ -209,35 +209,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: rabbitmq_node_avail_status_down
-        metric: rabbitmq.node_avail_status
-        info: RabbitMQ node is down (node ${label:node} cluster ${label:cluster_id})
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf
-      - name: rabbitmq_node_network_partition_status
-        metric: rabbitmq.node_network_partition_status
-        info: RabbitMQ network partition detected (node ${label:node} cluster ${label:cluster_id})
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf
-      - name: rabbitmq_node_mem_alarm_status_triggered
-        metric: rabbitmq.node_mem_alarm_status
-        info: RabbitMQ mem alarm triggered (node ${label:node} cluster ${label:cluster_id})
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf
-      - name: rabbitmq.node_disk_free_alarm_status_triggered
-        metric: rabbitmq.node_disk_free_alarm_status
-        info: RabbitMQ disk free alarm triggered (node ${label:node} cluster ${label:cluster_id})
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf
-      - name: rabbitmq_vhost_status_unhealthy
-        metric: rabbitmq.vhost_status
-        info: RabbitMQ vhost is not healthy (vhost ${label:vhost} cluster ${label:cluster_id})
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf
-      - name: rabbitmq_queue_status_minority
-        metric: rabbitmq.queue_status
-        info: RabbitMQ queue insufficient online members (queue ${label:queue} node ${label:node} cluster ${label:cluster_id})
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf
-      - name: rabbitmq_queue_status_unhealthy
-        metric: rabbitmq.queue_status
-        info: RabbitMQ queue is unhealthy (queue ${label:queue} node ${label:node} cluster ${label:cluster_id})
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf
     metrics:
       folding:
         title: Metrics

@@ -22,8 +22,9 @@ from _common import (
     make_validator,
     warn,
 )
+from context_owners import context_owners, context_subject
 from descriptions import build_description_index
-from health_alerts import build_alert_index, load_stock_rules
+from health_alerts import alert_owners, alert_ownership, alert_subject, build_alert_index, load_stock_rules
 from prometheus_profile_docs import project_prometheus_profile_coverage
 
 TEMPLATE_PATH = INTEGRATIONS_PATH / 'templates'
@@ -752,8 +753,6 @@ def dedupe_integrations(integrations, ids):
 
 
 def render_collectors(categories, collectors, ids):
-    project_prometheus_profile_coverage(collectors)
-
     debug('Computing default categories.')
 
     default_cats, valid_cats = get_category_sets(categories)
@@ -1361,33 +1360,71 @@ def attach_descriptions(integrations, clean_integrations):
             item['description'] = descriptions[item['id']]
 
 
-def alert_owners(*groups):
-    owners = {}
-
-    for items in groups:
-        for item in items:
-            for alert in item.get('alerts') or []:
-                owners.setdefault(alert['name'], set()).add(make_id(item['meta']))
-
-    return owners
+def declared_contexts(item):
+    """Metric contexts the item declares, including those of its Prometheus profiles (after the coverage projection)."""
+    metrics = item.get('metrics') or {}
+    contexts = [metric['name'] for scope in metrics.get('scopes') or [] for metric in scope.get('metrics') or []]
+    return contexts + (metrics.get('profile_coverage') or {}).get('contexts', [])
 
 
-def render_integrations(categories, integrations, alerts, output_path=OUTPUT_PATH):
+def alert_subjects(items):
+    return [
+        alert_subject(make_id(item['meta']), item['meta']['plugin_name'], item['meta']['module_name'],
+                      declared_contexts(item), item.get('alerts') or [], item.get('excluded_alerts') or [])
+        for item in items
+    ]
+
+
+def declared_context_prefixes(item):
+    return [entry['prefix'] for entry in (item.get('metrics') or {}).get('dynamic_context_prefixes') or []]
+
+
+def context_subjects(items):
+    return [
+        context_subject(make_id(item['meta']), item['meta']['plugin_name'], item['meta']['module_name'],
+                        declared_contexts(item), declared_context_prefixes(item))
+        for item in items
+    ]
+
+
+def build_context_index(collectors, flows):
+    """The `contexts` export over the collector and flow records (NPM device records document no contexts; the SNMP
+    collector owns theirs through its prefix)."""
+    return context_owners(context_subjects(collectors + flows))
+
+
+def attach_alerts(rules, *groups):
+    """Replace each item's listed alert names with its page rows and drop its excluded names; return the owners of each
+    alert name."""
+    items = [item for group in groups for item in group]
+    subjects = alert_subjects(items)
+    ownership = alert_ownership(rules, subjects)
+
+    for item, subject in zip(items, subjects):
+        item['alerts'] = ownership[subject['id']]
+        item.pop('excluded_alerts', None)
+
+    return alert_owners(ownership)
+
+
+def render_integrations(categories, integrations, alerts, contexts, output_path=OUTPUT_PATH):
     template = get_jinja_env().get_template('integrations.js')
     data = template.render(
         categories=json.dumps(categories, indent=4),
         integrations=json.dumps(integrations, indent=4),
         alerts=json.dumps(alerts, indent=4),
+        contexts=json.dumps(contexts, indent=4),
     )
     data = convert_local_links(data, "https://github.com/netdata/netdata/blob/master")
     output_path.write_text(data)
 
 
-def render_json(categories, integrations, alerts):
-    JSON_PATH.write_text(json.dumps({
+def render_json(categories, integrations, alerts, contexts, output_path=JSON_PATH):
+    output_path.write_text(json.dumps({
         'categories': categories,
         'integrations': integrations,
         'alerts': alerts,
+        'contexts': contexts,
     }, indent=4))
 
 
@@ -1406,7 +1443,10 @@ def main():
     secretstores = load_secretstores()
     service_discoveries = load_service_discoveries()
 
-    alerts = build_alert_index(load_stock_rules(), alert_owners(collectors, flows, devices))
+    project_prometheus_profile_coverage(collectors)
+    rules = load_stock_rules()
+    alerts = build_alert_index(rules, attach_alerts(rules, collectors, flows, devices))
+    contexts = build_context_index(collectors, flows)
 
     collectors, clean_collectors, ids = render_collectors(categories, collectors, dict())
     deploy, clean_deploy, ids = render_deploy(distros, categories, deploy, ids)
@@ -1435,8 +1475,8 @@ def main():
         print(f'Error: {error}', file=sys.stderr)
         return 1
 
-    render_integrations(categories, integrations, alerts)
-    render_json(categories, clean_integrations, alerts)
+    render_integrations(categories, integrations, alerts, contexts)
+    render_json(categories, clean_integrations, alerts, contexts)
 
     return fail_on_warnings()
 

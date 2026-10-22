@@ -14,12 +14,14 @@ import (
 
 type treeProcess interface{ Wait() ndexec.TreeResult }
 
-type startFunc func(context.Context, ndexec.ProcessOptions, string, ...string) (treeProcess, error)
+type startFunc func(context.Context, ndexec.TreeOptions, string, ...string) (treeProcess, error)
 
 // executeProcess starts all local I/O ownership only after successful TreeStart.
 // Its parser can request cancellation, but only TreeResult may prove drainage.
 func (e *Engine) executeProcess(
 	ctx context.Context,
+	paths Paths,
+	completion *ndexec.TreeCompletion,
 	args []string,
 	input []byte,
 	stdout func(io.Reader) error,
@@ -60,12 +62,13 @@ func (e *Engine) executeProcess(
 	}
 	process, err := e.start(
 		processCtx,
-		ndexec.ProcessOptions{
-			Stdin:  inRead,
-			Stdout: outWrite,
-			Stderr: errWrite,
+		ndexec.TreeOptions{
+			Completion: completion,
+			Stdin:      inRead,
+			Stdout:     outWrite,
+			Stderr:     errWrite,
 		},
-		e.config.NodePath,
+		paths.Node,
 		args...)
 	if err != nil {
 		return ndexec.TreeResult{

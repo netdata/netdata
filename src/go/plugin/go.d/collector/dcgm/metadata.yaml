@@ -227,27 +227,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: dcgm_gpu_xid_errors
-        metric: dcgm.gpu.reliability.xid
-        info: NVIDIA driver reported a GPU XID error (metric ${label:chart_context}).
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dcgm.conf
-      - name: dcgm_gpu_row_remap_failure
-        metric: dcgm.gpu.reliability.row_remap_status
-        info: Row remapping has failed, indicating a persistent memory reliability problem.
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dcgm.conf
-      - name: dcgm_gpu_uncorrectable_remapped_rows
-        metric: dcgm.gpu.reliability.row_remap_events
-        info: New uncorrectable row remap events were detected in the last 5 minutes.
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dcgm.conf
-      - name: dcgm_gpu_power_violation
-        metric: dcgm.gpu.throttle.duration
-        info: The GPU was power-throttled during the last 5 minutes.
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dcgm.conf
-      - name: dcgm_gpu_thermal_violation
-        metric: dcgm.gpu.throttle.duration
-        info: The GPU was thermally throttled during the last 5 minutes.
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dcgm.conf
     metrics:
       folding:
         title: Metrics

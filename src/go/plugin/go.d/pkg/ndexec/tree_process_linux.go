@@ -6,6 +6,7 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"strconv"
 	"syscall"
 )
 
@@ -15,7 +16,7 @@ import (
 // Nil stdio uses the null device; the caller retains ownership of supplied files.
 func StartUnprivilegedProcessTree(
 	ctx context.Context,
-	opts ProcessOptions,
+	opts TreeOptions,
 	binPath string,
 	args ...string,
 ) (*TreeProcess, error) {
@@ -25,7 +26,7 @@ func StartUnprivilegedProcessTree(
 func startProcessTree(
 	ctx context.Context,
 	helper string,
-	opts ProcessOptions,
+	opts TreeOptions,
 	binPath string,
 	args ...string,
 ) (*TreeProcess, error) {
@@ -69,10 +70,20 @@ func startProcessTree(
 			opts.Stderr = null
 		}
 	}
-	argv := append([]string{"--supervise-tree", "3", "4", "--", binPath}, args...)
+	argv := []string{"--supervise-tree", "3", "4"}
+	files := []*os.File{controlRead, statusWrite}
+	if opts.Completion != nil {
+		if opts.Completion.directory == nil || !validCompletionID(opts.Completion.id) {
+			return nil, treeStartError(os.ErrInvalid)
+		}
+		files = append(files, opts.Completion.directory)
+		argv = append(argv, "--completion", strconv.Itoa(3+len(files)-1), opts.Completion.id)
+	}
+	argv = append(argv, "--", binPath)
+	argv = append(argv, args...)
 	cmd := exec.Command(helper, argv...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = opts.Stdin, opts.Stdout, opts.Stderr
-	cmd.ExtraFiles = []*os.File{controlRead, statusWrite}
+	cmd.ExtraFiles = files
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
 	}

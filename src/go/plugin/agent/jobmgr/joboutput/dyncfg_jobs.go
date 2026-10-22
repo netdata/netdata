@@ -64,7 +64,9 @@ type DynCfgJobController struct {
 	diagnostics      jobmgr.DiagnosticObserver // operational log sink
 	commands         jobmgr.PreparedCommandPort
 	restartObservers restartObservers
-	scheduler        *Scheduler // tick + retry scheduler
+	configIntents    jobConfigIntentIndex
+	scheduler        *Scheduler           // tick + retry scheduler
+	candidates       *candidateController // source selection and activation intent
 }
 
 func NewDynCfgJobController(config DynCfgJobControllerConfig) (*DynCfgJobController, error) {
@@ -91,6 +93,7 @@ func NewDynCfgJobController(config DynCfgJobControllerConfig) (*DynCfgJobControl
 		dependencies:  config.Dependencies,
 		diagnostics:   config.Diagnostics,
 		scheduler:     config.Factory.config.Scheduler,
+		candidates:    newCandidateController(config.Generation),
 	}, nil
 }
 
@@ -102,7 +105,12 @@ func (dcjc *DynCfgJobController) BindBackgroundWorkers(
 	if dcjc == nil || dcjc.scheduler == nil {
 		return errors.New("job output: invalid background worker controller")
 	}
-	dcjc.scheduler.accepted.retire = dcjc.retireActivationRestart
+	dcjc.scheduler.accepted.validWork = dcjc.candidates.valid
+	dcjc.scheduler.accepted.resumeWork = dcjc.retainCandidateResume
+	dcjc.scheduler.retireCandidates = func() {
+		dcjc.candidates.retire()
+		dcjc.restartObservers.retire()
+	}
 	if err := dcjc.scheduler.accepted.bind(
 		dcjc.factory,
 		commands,
@@ -115,7 +123,6 @@ func (dcjc *DynCfgJobController) BindBackgroundWorkers(
 	if err := dcjc.scheduler.bindBackgroundWorkers(
 		commands,
 		dcjc.planAutoDetectionRetry,
-		dcjc.planPendingJob,
 		run,
 		failure,
 	); err != nil {
@@ -238,11 +245,18 @@ func (dcjc *DynCfgJobController) Prepare(
 	case dyncfg.CommandRestart:
 		transaction, err = dcjc.prepareRestart(ctx, target, record, exists, current, scope, permit)
 	case dyncfg.CommandDisable:
-		transaction, err = dcjc.prepareDisable(target, record, exists, current, scope)
+		transaction, err = dcjc.prepareDisable(ctx, target, record, exists, current, scope)
 	case dyncfg.CommandRemove:
-		transaction, err = dcjc.prepareRemove(target, record, exists, current, scope)
+		transaction, err = dcjc.prepareRemove(ctx, target, record, exists, current, scope)
 	default:
 		transaction, err = dcjc.reject(scope, current, permit, notImplementedFailure(target.command))
+	}
+	var admission *configIntentAdmissionError
+	if errors.As(err, &admission) && ctx.Err() == nil && !lifecycle.OwnershipRetained(err) {
+		if rejection, ok := preparationFailure(classifyActivationError(err),
+			validationBusyMessage, validationBusyMessage, validationBusyMessage); ok {
+			transaction, err = dcjc.rejectKeeping(scope, current, permit, rejection, dyncfg.Status(record.Status))
+		}
 	}
 	return dcjc.observeTransaction(target.command, target.resourceID, transaction, err)
 }

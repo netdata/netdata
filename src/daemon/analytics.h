@@ -81,6 +81,7 @@ struct analytics_data {
 
 void set_late_analytics_variables(struct rrdhost_system_info *system_info);
 void analytics_free_data(void);
+void analytics_info_to_json(BUFFER *wb);
 void analytics_log_shell(void);
 void analytics_log_json(void);
 void analytics_log_prometheus(void);

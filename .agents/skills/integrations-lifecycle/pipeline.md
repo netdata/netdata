@@ -48,7 +48,8 @@ Non-YAML inputs: `integrations/categories.yaml` (validated against `categories.j
 (loaded with `load_yaml` and NOT validated, although `distros.json` exists; garbage yields silently broken
 `platform_info` tables); the 17 schemas under `integrations/schemas/` (`schema-reference.md`); the Jinja templates under
 `integrations/templates/` (delimiters below); the stock health configuration `src/health/health.d/*.conf`, read by
-`health_alerts.py` with the line rules of the Agent's `health_readfile` for the `alerts` export (Stage 1: outputs).
+`health_alerts.py` with the line rules of the Agent's `health_readfile` for the pages' alert tables and the `alerts`
+export (Stage 1: outputs).
 
 ## Stage 1: validation
 
@@ -65,25 +66,29 @@ Non-YAML inputs: `integrations/categories.yaml` (validated against `categories.j
 
 ## Stage 1: rendering
 
+Before rendering, `main()` attaches the Prometheus profile projection to the collectors
+(`project_prometheus_profile_coverage`, `how-tos/prometheus-profile-metadata.md`; it also lists the profiles' chart
+contexts), then `attach_alerts` replaces the alert names of every collector, flow and device record with its derived
+page rows and drops `excluded_alerts` from the record (`attach_alerts` in `gen_integrations.py`, rows from
+`alert_ownership` in `health_alerts.py`; the ownership rule is in the metadata skill's `alerts-and-meta.md`, section 1).
+
 For collectors (`render_collectors`; the other types follow the same shape):
 
-1. `project_prometheus_profile_coverage` attaches the Prometheus profile projection
-   (`how-tos/prometheus-profile-metadata.md`).
-2. `make_id` builds `<plugin_name>-<module_name>-<instance>` with the instance name's spaces replaced by `_` and case
+1. `make_id` builds `<plugin_name>-<module_name>-<instance>` with the instance name's spaces replaced by `_` and case
    kept; flows and device entries get ids the same way.
-3. Sort (`sort_integrations`), then `dedupe_integrations` warns on duplicate ids and drops the later one.
-4. `related_resources` are resolved by a cascading lookup: plugin plus module plus `monitored_instance_name`, then
+2. Sort (`sort_integrations`), then `dedupe_integrations` warns on duplicate ids and drops the later one.
+3. `related_resources` are resolved by a cascading lookup: plugin plus module plus `monitored_instance_name`, then
    plugin plus module, then plugin alone (only when no module is given, so a module typo is not masked).
-5. Categories: invalid ids are dropped with a warning (fatal at the end of the run); only a module whose `categories`
+4. Categories: invalid ids are dropped with a warning (fatal at the end of the run); only a module whose `categories`
    list is empty falls back to every category flagged `collector_default: true` in `categories.yaml` (today only
    `data-collection.applications`).
-6. A `metrics.scopes[].name` of `global` is rewritten to `<monitored_instance.name> instance`.
-7. Each key in `*_RENDER_KEYS` is rendered twice through the section template chosen by `get_section_template_name`:
+5. A `metrics.scopes[].name` of `global` is rewritten to `<monitored_instance.name> instance`.
+6. Each key in `*_RENDER_KEYS` is rendered twice through the section template chosen by `get_section_template_name`:
    `clean=False` (the rich variant kept under the key) and `clean=True` (the clean variant kept on a parallel object).
    When `meta.monitored_instance.variables` exists (collectors) or `meta.variables` (other types) the rendered string is
    rendered a second time as a template with `variables=` in context. The trigger is that key test, not any inspection
    of the output.
-8. `_src_path`, `_repo`, `_index` are stripped before serialization.
+7. `_src_path`, `_repo`, `_index` are stripped before serialization.
 
 Custom Jinja delimiters (`get_jinja_env`): `[[ ]]` for variables, `[% %]` for statements, `[# #]` for comments, so the
 templates can emit the frontend's own `{% details %}`, `{% relatedResource %}`, `{% if $showClaimingOptions %}` and `{{
@@ -102,15 +107,17 @@ none. An invalid or duplicate description prints `Error: ...` and exits 1 before
 
 - `integrations/integrations.js`: the `integrations/templates/integrations.js` shell with a two-line `// DO NOT EDIT
   THIS FILE DIRECTLY` banner and `export const categories = [...]; export const integrations = [...]; export const
-  alerts = {...}`, holding the rich variant. `convert_local_links` rewrites every `](/` to
-  `](https://github.com/netdata/netdata/blob/master/` first, so a metadata link written as `](/src/foo/bar.md)` reaches
-  the dashboard as a GitHub link.
-- `integrations/integrations.json`: `{categories, integrations, alerts}` with the clean variant, no banner. The
-  dashboard's drift check reads it from `raw.githubusercontent.com` (`in-app-contract.md`).
+  alerts = {...}; export const contexts = {...}`, holding the rich variant. `convert_local_links` rewrites every
+  `](/` to `](https://github.com/netdata/netdata/blob/master/` first, so a metadata link written as
+  `](/src/foo/bar.md)` reaches the dashboard as a GitHub link.
+- `integrations/integrations.json`: `{categories, integrations, alerts, contexts}` with the clean variant, no banner.
+  The dashboard's drift check reads it from `raw.githubusercontent.com` (`in-app-contract.md`).
 - `alerts` is the same in both files: one entry per stock alert name, built by `build_alert_index` in
-  `health_alerts.py` from `health.d` and, for `integrations`, the names each integration's `metadata.yaml` lists
-  (`alert_owners`, computed before rendering turns `alerts` into Markdown). Text values drop quotes that wrap the
-  whole value and turn inner double quotes into spaces; single quotes stay.
+  `health_alerts.py` from `health.d`; `integrations` comes from the derivation that builds the page rows
+  (`attach_alerts`, before rendering turns `alerts` into Markdown). Text values drop quotes that wrap the whole value
+  and turn inner double quotes into spaces; single quotes stay.
+- `contexts` is the same in both files: context owners from `context_owners` in `context_owners.py`, computed in
+  `main()` from the collector and flow records before rendering (`in-app-contract.md`).
 
 Three content variants therefore exist: rich markers in `.js`, markers stripped in `.json`, and, in the tracked pages,
 markers converted to HTML `<details>` by `clean_and_write` in `gen_docs_integrations.py`, which reads the rich keys.
@@ -208,14 +215,15 @@ that holds exactly one page (multi-integration directories keep their hand-writt
 
 ## CI
 
-`.github/workflows/generate-integrations.yml` (push to `master`, `netdata/netdata` only, path-filtered on the sources,
-schemas, templates, generators, and tests above, except that `integrations/logs/metadata.yaml` is missing from the
-list): stage 0 (`gen_npm_catalog.py`, `go generate` for ibm.d), the "Verify generated runtime outputs" gate (`git diff
---exit-code` on ibm.d `config_schema.json` and `zz_generated_contexts.go`, plus a check that both are tracked for every
-module), stage 1, the unit test modules `test_descriptions`, `test_prometheus_profile_docs`, `test_collector_metadata`,
-`test_health_alerts`, stages 2 to 5, `rm` of the gitignored catalogs and the NPM side report, then
-`peter-evans/create-pull-request` on branch `integrations-regen` (label `integrations-update`, title "Regenerate
-integrations docs", token `NETDATABOT_GITHUB_TOKEN`), and a Slack notification on failure.
+`.github/workflows/generate-integrations.yml` (push to `master`, `netdata/netdata` only, path-filtered on the sources
+including `src/health/health.d/**`, schemas, templates, generators, and tests above, except that
+`integrations/logs/metadata.yaml` is missing from the list): stage 0 (`gen_npm_catalog.py`, `go generate` for ibm.d),
+the "Verify generated runtime outputs" gate (`git diff --exit-code` on ibm.d `config_schema.json` and
+`zz_generated_contexts.go`, plus a check that both are tracked for every module), stage 1, the unit test modules
+`test_descriptions`, `test_prometheus_profile_docs`, `test_collector_metadata`, `test_health_alerts`, stages 2 to 5,
+`rm` of the gitignored catalogs and the NPM side report, then `peter-evans/create-pull-request` on branch
+`integrations-regen` (label `integrations-update`, title "Regenerate integrations docs", token
+`NETDATABOT_GITHUB_TOKEN`), and a Slack notification on failure.
 
 `.github/workflows/check-markdown.yml` (pull requests, path-filtered on Markdown, docs, metadata, `integrations/**`,
 `src/health/health.d/**`, the profile and ibm.d producer inputs): checks out the PR (with full history) and

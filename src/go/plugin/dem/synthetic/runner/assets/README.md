@@ -1,12 +1,21 @@
 # DEM execution assets
 
 The browser runtime requires an unprivileged plugin process on Linux. Root RUM
-operation does not enable browser jobs. These immutable assets adapt prepared
-Node 24+, Playwright Test 1.63.0 and
-Lighthouse 13.4.1 to the DEM execution protocol. Install the dependencies from
-`package-lock.json` into a separate prepared directory with `npm ci`; the plugin
-never downloads packages, modifies the installed assets or updates the browser.
-The prepared full Chromium is Playwright revision 1243, version 153.0.8010.12.
+operation does not enable browser jobs. These immutable assets adapt the qualified
+Node, Playwright Test 1.63.0 and Lighthouse 13.4.1 bundle to the DEM execution
+protocol. Both managed setup and administrator-owned protected preloads require
+the installed trusted runtime manifest. Managed setup prepares the verified bundle
+in its cache; preloaded setup reads the same bundle from its final protected root.
+Separately assembled Node, npm dependencies and browsers cannot be selected.
+Execution never modifies these installed assets or its prepared runtime.
+The qualified full browser is unbranded Chromium 154.0.8037.92 from Debian
+package `154.0.8037.92-1~deb13u1`. Netdata qualifies this exact browser/Playwright
+pair; Playwright's bundled browser revision is not the runtime delivery identity.
+`manifest.json` supplies the compiled Go version checks. These Agent-owned adapters
+and exact component pins are the current experimental contract. Bundle construction,
+publication and independently released adapters are separate work; this tree supplies
+no runtime release artifacts. Development deployments must provide a matching bundle
+and administrator-controlled runtime manifest.
 Browser sandboxing remains enabled and requires a compatible Linux namespace and
 container security policy. The manifest describes the supported target; the Go
 owner validates runtime availability and owns execution completion.

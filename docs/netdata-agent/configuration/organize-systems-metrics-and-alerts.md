@@ -103,6 +103,12 @@ to use `_stream_egress_iface` for those diagnostics.
 Older children can still overwrite `_net_default_iface` with their streaming egress interface, even when connected to an
 upgraded Parent; their interface name and OS-default IP can therefore describe different interfaces until the child is upgraded.
 
+On native NVIDIA Jetson Linux hosts, `_system_l4t_version` identifies the installed Jetson Linux (L4T) release, such as
+`36.5.0`. Use this host label in the **Nodes** or **Metrics** tab filters to select systems running a particular release,
+for example during a fleet upgrade. It is detected at Agent startup from `/etc/nv_tegra_release`, independently of the
+Jetson collector. Restart the Agent after a release upgrade to refresh it. The label is omitted when the file is missing,
+unreadable or invalid, and when Netdata detects that it is running in a container. It does not identify the JetPack or CUDA version.
+
 View your automatic labels at `http://HOST-IP:19999/api/v1/info`:
 
 Host-label values use Netdata's label sanitizer. For example, commas in hardware model identifiers are exposed as dots in host labels.

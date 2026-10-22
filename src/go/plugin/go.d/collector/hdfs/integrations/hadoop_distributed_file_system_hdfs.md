@@ -219,7 +219,7 @@ The following alerts are available:
 | [ hdfs_missing_blocks ](https://github.com/netdata/netdata/blob/master/src/health/health.d/hdfs.conf) | hdfs.blocks | number of missing blocks |
 | [ hdfs_stale_nodes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/hdfs.conf) | hdfs.data_nodes | number of datanodes marked stale due to delayed heartbeat |
 | [ hdfs_dead_nodes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/hdfs.conf) | hdfs.data_nodes | number of datanodes which are currently dead |
-| [ hdfs_num_failed_volumes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/hdfs.conf) | hdfs.num_failed_volumes | number of failed volumes |
+| [ hdfs_num_failed_volumes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/hdfs.conf) | hdfs.datanode_failed_volumes | number of failed volumes |
 
 
 

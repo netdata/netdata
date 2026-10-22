@@ -73,7 +73,7 @@ type riakStats struct {
 	ConsistentPutTime99     *int64 `json:"consistent_put_time_99" stm:"consistent_put_time_99"`
 	ConsistentPutTime100    *int64 `json:"consistent_put_time_100" stm:"consistent_put_time_100"`
 
-	SysProcesses        *int64 `json:"sys_processes" stm:"sys_processes"`
+	SysProcessCount     *int64 `json:"sys_process_count" stm:"sys_process_count"`
 	MemoryProcesses     *int64 `json:"memory_processes" stm:"memory_processes"`
 	MemoryProcessesUsed *int64 `json:"memory_processes_used" stm:"memory_processes_used"`
 

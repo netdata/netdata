@@ -238,51 +238,6 @@ modules:
               TLS verification failed. Options:
               1. Provide the correct CA certificate path in `tls_ca`
               2. Set `tls_skip_verify: yes` (not recommended for production)
-    alerts:
-      - name: k8s_apiserver_1m_requests
-        metric: k8s_apiserver.requests_total
-        info: number of API server requests in the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf
-      - name: k8s_apiserver_dropped_requests
-        metric: k8s_apiserver.requests_dropped
-        info: API server dropped requests in the last minute due to overload
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf
-      - name: k8s_apiserver_5xx_errors
-        metric: k8s_apiserver.requests_by_code
-        info: Percentage of 5xx server error responses over the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf
-      - name: k8s_apiserver_4xx_errors
-        metric: k8s_apiserver.requests_by_code
-        info: Percentage of 4xx client error responses over the last minute (excluding 401/403)
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf
-      - name: k8s_apiserver_latency_10m
-        metric: k8s_apiserver.request_latency
-        info: average API server request latency (p99) over the last 10 minutes
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf
-      - name: k8s_apiserver_latency_high
-        metric: k8s_apiserver.request_latency
-        info: API server request latency (p99) over the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf
-      - name: k8s_apiserver_inflight_mutating
-        metric: k8s_apiserver.inflight_requests
-        info: Average number of mutating requests currently in flight over the last minute (default limit is 600)
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf
-      - name: k8s_apiserver_inflight_readonly
-        metric: k8s_apiserver.inflight_requests
-        info: Average number of read-only requests currently in flight over the last minute (default limit is 1000)
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf
-      - name: k8s_apiserver_workqueue_depth
-        metric: k8s_apiserver.workqueue_depth
-        info: Average depth of controller work queue over the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf
-      - name: k8s_apiserver_goroutines
-        metric: k8s_apiserver.goroutines
-        info: Average number of goroutines over the last 5 minutes
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf
-      - name: k8s_apiserver_open_fds_utilization
-        metric: k8s_apiserver.open_fds
-        info: Percentage of file descriptors used by the API server
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf
     metrics:
       folding:
         title: Metrics

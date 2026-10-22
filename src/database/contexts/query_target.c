@@ -84,9 +84,6 @@ void query_target_release(QUERY_TARGET *qt) {
     simple_pattern_free(qt->instances.chart_label_key_pattern);
     qt->instances.chart_label_key_pattern = NULL;
 
-    simple_pattern_free(qt->instances.scope_chart_label_key_pattern);
-    qt->instances.scope_chart_label_key_pattern = NULL;
-
     simple_pattern_free(qt->instances.labels_pattern);
     qt->instances.labels_pattern = NULL;
 
@@ -190,6 +187,7 @@ static QUERY_TARGET *query_target_get(void) {
     spinlock_unlock(&query_target_base.used.spinlock);
 
     qt->internal.used = true;
+    qt->internal.cancelled = QUERY_TARGET_CANCEL_NONE;
     qt->internal.queries++;
     thread_qt = qt;
 
@@ -229,13 +227,50 @@ typedef struct query_target_locals {
     long long before;
     bool match_ids;
     bool match_names;
+    size_t instances_version;
 
     size_t metrics_skipped_due_to_not_matching_timeframe;
+    size_t cancel_checks;
 
     char host_node_id_str[UUID_STR_LEN];
     const STRING *host_hostname; // borrowed while query_node_add() traverses one host
     QUERY_NODE *qn; // temp to pass on callbacks, ignore otherwise - no need to free
 } QUERY_TARGET_LOCALS;
+
+// how many walk steps between two timeout/interrupt checks
+#define QUERY_TARGET_CANCEL_CHECK_EVERY 64
+
+// True when building the target has to stop: its timeout expired or the requester went away.
+// Without force, the clock and the interrupt callback are consulted only every
+// QUERY_TARGET_CANCEL_CHECK_EVERY calls; the decision sticks once made.
+static bool query_target_build_cancelled(QUERY_TARGET_LOCALS *qtl, bool force) {
+    QUERY_TARGET *qt = qtl->qt;
+
+    if(unlikely(qt->internal.cancelled))
+        return true;
+
+    if(!force && (++qtl->cancel_checks % QUERY_TARGET_CANCEL_CHECK_EVERY))
+        return false;
+
+    if(qt->request.timeout_ms > 0) {
+        usec_t elapsed_ut = now_monotonic_usec() - qt->timings.received_ut;
+        if(elapsed_ut >= (usec_t)qt->request.timeout_ms * USEC_PER_MS) {
+            qt->internal.cancelled = QUERY_TARGET_CANCEL_TIMEOUT;
+            nd_log(NDLS_ACCESS, NDLP_WARNING,
+                   "QUERY CANCELED WHILE PREPARING: RUNTIME EXCEEDED %0.2f ms (LIMIT %lld ms)",
+                   (NETDATA_DOUBLE)elapsed_ut / USEC_PER_MS, (long long)qt->request.timeout_ms);
+            return true;
+        }
+    }
+
+    if(qt->request.interrupt_callback && qt->request.interrupt_callback(qt->request.interrupt_callback_data)) {
+        qt->internal.cancelled = QUERY_TARGET_CANCEL_INTERRUPTED;
+        nd_log(NDLS_ACCESS, NDLP_NOTICE, "QUERY INTERRUPTED WHILE PREPARING");
+        return true;
+    }
+
+    return false;
+}
 
 struct storage *query_metric_storage_engine(QUERY_TARGET *qt, QUERY_METRIC *qm, size_t tier) {
     QUERY_NODE *qn = query_node(qt, qm->link.query_node_id);
@@ -333,8 +368,9 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
             ? true : false;
 
     if(timeframe_matches) {
-        if(ri->rrdset)
-            rrdset_set_last_accessed_time_s(ri->rrdset, qtl->start_s);
+        RRDSET *st = rrdinstance_rrdset_atomic_load(ri);
+        if(st)
+            rrdset_set_last_accessed_time_s(st, qtl->start_s);
 
         if (qt->query.used == qt->query.size) {
             size_t old_mem = qt->query.size * sizeof(*qt->query.array);
@@ -771,7 +807,7 @@ static inline QUERY_INSTANCE *query_instance_allocate(QUERY_TARGET *qt, RRDINSTA
     return qi;
 }
 
-static inline SIMPLE_PATTERN_RESULT query_instance_matches(QUERY_INSTANCE *qi,
+static inline SIMPLE_PATTERN_RESULT query_instance_matches(RRDINSTANCE_ACQUIRED *ria,
                                              RRDINSTANCE *ri,
                                              SIMPLE_PATTERN *instances_sp,
                                              bool match_ids,
@@ -788,14 +824,25 @@ static inline SIMPLE_PATTERN_RESULT query_instance_matches(QUERY_INSTANCE *qi,
             ret = simple_pattern_matches_string_extract(instances_sp, ri->id, NULL, 0);
         if (ret == SP_NOT_MATCHED && match_names && (ri->name != ri->id || !match_ids))
             ret = simple_pattern_matches_string_extract(instances_sp, ri->name, NULL, 0);
-        if (ret == SP_NOT_MATCHED && match_ids)
-            ret = simple_pattern_matches_string_extract(instances_sp, query_instance_id_fqdn(qi, version), NULL, 0);
-        if (ret == SP_NOT_MATCHED && match_names)
-            ret = simple_pattern_matches_string_extract(instances_sp, query_instance_name_fqdn(qi, version, host_hostname), NULL, 0);
+
+        // the fqdn forms are formatted on the stack, the same way query_instance_id_fqdn() and
+        // query_instance_name_fqdn() build them, without interning; in v1 they are the id and the
+        // name, already checked above
+        char buffer[RRD_ID_LENGTH_MAX + 1];
+
+        if (ret == SP_NOT_MATCHED && match_ids && version >= 2) {
+            snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s@%s",
+                      rrdinstance_acquired_id(ria), rrdinstance_acquired_rrdhost(ria)->machine_guid);
+            ret = simple_pattern_matches_extract(instances_sp, buffer, NULL, 0);
+        }
+        if (ret == SP_NOT_MATCHED && match_names && version >= 2) {
+            snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s@%s",
+                      rrdinstance_acquired_name(ria), string2str(host_hostname));
+            ret = simple_pattern_matches_extract(instances_sp, buffer, NULL, 0);
+        }
 
         if (ret == SP_NOT_MATCHED && match_ids && host_node_id_str[0]) {
-            char buffer[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s@%s", rrdinstance_acquired_id(qi->ria), host_node_id_str);
+            snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s@%s", rrdinstance_acquired_id(ria), host_node_id_str);
             ret = simple_pattern_matches_extract(instances_sp, buffer, NULL, 0);
         }
     }
@@ -808,6 +855,11 @@ static inline bool query_instance_matches_labels(
     SIMPLE_PATTERN *chart_label_key_sp,
     struct pattern_array *labels_pa)
 {
+    // Without a label filter every instance matches. Do not read the labels then:
+    // an archived instance loads them from SQLite on first access.
+    if (!chart_label_key_sp && !labels_pa)
+        return true;
+
     RRDLABELS *labels = rrdinstance_labels(ri);
     if (chart_label_key_sp && rrdlabels_match_simple_pattern_parsed(labels, chart_label_key_sp, '\0', NULL) != SP_MATCHED_POSITIVE)
         return false;
@@ -830,14 +882,12 @@ static bool query_instance_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_C
 
     if(queryable_instance && filter_instances)
         queryable_instance = (SP_MATCHED_POSITIVE == query_instance_matches(
-                qi, ri, qt->instances.pattern, qtl->match_ids, qtl->match_names, qt->request.version,
+                ria, ri, qt->instances.pattern, qtl->match_ids, qtl->match_names, qtl->instances_version,
                 qtl->host_hostname, qtl->host_node_id_str));
 
+    // chart_label_key has no scope variant: the scope checks before this call already applied it
     if(queryable_instance)
-        queryable_instance = query_instance_matches_labels(
-            ri,
-            qt->instances.chart_label_key_pattern,
-            qt->instances.labels_pa);
+        queryable_instance = query_instance_matches_labels(ri, NULL, qt->instances.labels_pa);
 
     if(queryable_instance) {
         if(qt->instances.alerts_pattern && !query_target_match_alert_pattern(ria, qt->instances.alerts_pattern))
@@ -856,6 +906,9 @@ static bool query_instance_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_C
     else {
         RRDMETRIC *rm;
         dfe_start_read(ri->rrdmetrics, rm) {
+            if(query_target_build_cancelled(qtl, false))
+                break;
+
             if(query_dimension_add(qtl, qn, qc, qi, (RRDMETRIC_ACQUIRED *) rm_dfe.item,
                                    queryable_instance, &metrics_added, priority++))
                 dimensions_added++;
@@ -919,19 +972,17 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
         
         // Check scope_instances
         if(qt->instances.scope_pattern) {
-            QUERY_INSTANCE qi = { .ria = qt->request.ria };
-            SIMPLE_PATTERN_RESULT ret = query_instance_matches(&qi, ri,
-                qt->instances.scope_pattern, qtl->match_ids, qtl->match_names, 
-                qt->request.version, qtl->host_hostname, qtl->host_node_id_str);
-            query_instance_strings_free(&qi);
+            SIMPLE_PATTERN_RESULT ret = query_instance_matches(qt->request.ria, ri,
+                qt->instances.scope_pattern, qtl->match_ids, qtl->match_names,
+                qtl->instances_version, qtl->host_hostname, qtl->host_node_id_str);
             if(ret != SP_MATCHED_POSITIVE)
                 return 0;
         }
         
         // Check scope_labels
-        if(qt->instances.scope_labels_pa || qt->instances.scope_chart_label_key_pattern) {
+        if(qt->instances.scope_labels_pa || qt->instances.chart_label_key_pattern) {
             if(!query_instance_matches_labels(ri,
-                qt->instances.scope_chart_label_key_pattern,
+                qt->instances.chart_label_key_pattern,
                 qt->instances.scope_labels_pa))
                 return 0;
         }
@@ -950,11 +1001,9 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
         
         // Check scope_instances
         if(qt->instances.scope_pattern) {
-            QUERY_INSTANCE qi = { .ria = ria };
-            SIMPLE_PATTERN_RESULT ret = query_instance_matches(&qi, ri,
+            SIMPLE_PATTERN_RESULT ret = query_instance_matches(ria, ri,
                 qt->instances.scope_pattern, qtl->match_ids, qtl->match_names, 
-                qt->request.version, qtl->host_hostname, qtl->host_node_id_str);
-            query_instance_strings_free(&qi);
+                qtl->instances_version, qtl->host_hostname, qtl->host_node_id_str);
             if(ret != SP_MATCHED_POSITIVE) {
                 rrdinstance_release(ria);
                 return 0;
@@ -962,9 +1011,9 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
         }
         
         // Check scope_labels
-        if(qt->instances.scope_labels_pa || qt->instances.scope_chart_label_key_pattern) {
+        if(qt->instances.scope_labels_pa || qt->instances.chart_label_key_pattern) {
             if(!query_instance_matches_labels(ri,
-                qt->instances.scope_chart_label_key_pattern,
+                qt->instances.chart_label_key_pattern,
                 qt->instances.scope_labels_pa)) {
                 rrdinstance_release(ria);
                 return 0;
@@ -980,6 +1029,9 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
         // Pattern query - iterate through all instances
         RRDINSTANCE *ri;
         dfe_start_read(rc->rrdinstances, ri) {
+            if(query_target_build_cancelled(qtl, false))
+                break;
+
             if(rrd_flag_is_deleted(ri))
                 continue;
 
@@ -987,19 +1039,17 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
             
             // Check scope_instances
             if(qt->instances.scope_pattern) {
-                QUERY_INSTANCE qi = { .ria = ria };
-                SIMPLE_PATTERN_RESULT ret = query_instance_matches(&qi, ri,
+                SIMPLE_PATTERN_RESULT ret = query_instance_matches(ria, ri,
                     qt->instances.scope_pattern, qtl->match_ids, qtl->match_names, 
-                    qt->request.version, qtl->host_hostname, qtl->host_node_id_str);
-                query_instance_strings_free(&qi);
+                    qtl->instances_version, qtl->host_hostname, qtl->host_node_id_str);
                 if(ret != SP_MATCHED_POSITIVE)
                     continue;
             }
             
             // Check scope_labels
-            if(qt->instances.scope_labels_pa || qt->instances.scope_chart_label_key_pattern) {
+            if(qt->instances.scope_labels_pa || qt->instances.chart_label_key_pattern) {
                 if(!query_instance_matches_labels(ri,
-                    qt->instances.scope_chart_label_key_pattern,
+                    qt->instances.chart_label_key_pattern,
                     qt->instances.scope_labels_pa))
                     continue;
             }
@@ -1011,6 +1061,10 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
     }
     
     return added;
+}
+
+static bool query_context_scan_should_stop(void *data) {
+    return query_target_build_cancelled(data, false);
 }
 
 static ssize_t query_context_add(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context) {
@@ -1029,8 +1083,11 @@ static ssize_t query_context_add(void *data, RRDCONTEXT_ACQUIRED *rca, bool quer
     if(!added) {
         query_context_release(qc);
         qt->contexts.used--;
-        return 0;
     }
+
+    // a negative return stops query_scope_foreach_context()
+    if(query_target_build_cancelled(qtl, false))
+        return -1;
 
     return added;
 }
@@ -1060,6 +1117,11 @@ static inline QUERY_NODE *query_node_allocate(QUERY_TARGET *qt, RRDHOST *host) {
 static ssize_t query_node_add(void *data, RRDHOST *host, bool queryable_host) {
     QUERY_TARGET_LOCALS *qtl = data;
     QUERY_TARGET *qt = qtl->qt;
+
+    // a negative return stops query_scope_foreach_host()
+    if(query_target_build_cancelled(qtl, true))
+        return -1;
+
     QUERY_NODE *qn = query_node_allocate(qt, host);
 
     if(!UUIDiszero(host->node_id)) {
@@ -1090,7 +1152,7 @@ static ssize_t query_node_add(void *data, RRDHOST *host, bool queryable_host) {
     qtl->qn = qn;
 
     RRDHOST_IDENTITY host_identity = { 0 };
-    if(qt->request.version >= 2 && qtl->match_names &&
+    if(qtl->instances_version >= 2 && qtl->match_names &&
        (qt->instances.scope_pattern || qt->instances.pattern))
         host_identity = rrdhost_identity_acquire(host);
     qtl->host_hostname = host_identity.hostname;
@@ -1110,7 +1172,7 @@ static ssize_t query_node_add(void *data, RRDHOST *host, bool queryable_host) {
         added = query_scope_foreach_context(
                 host, qtl->scope_contexts,
                 qt->contexts.scope_pattern, qt->contexts.pattern,
-                query_context_add, queryable_host, qtl);
+                query_context_add, queryable_host, qtl, query_context_scan_should_stop);
 
         if(added < 0)
             added = 0;
@@ -1120,13 +1182,18 @@ static ssize_t query_node_add(void *data, RRDHOST *host, bool queryable_host) {
     rrdhost_identity_release(&host_identity);
     qtl->qn = NULL;
 
+    if(qt->internal.cancelled) {
+        // keep the node: contexts added before the stop may reference it (added is not reliable here)
+        return -1;
+    }
+
     if(!added) {
         query_node_release(qn);
         qt->nodes.used--;
-        return false;
+        return 0;
     }
 
-    return true;
+    return 1;
 }
 
 void query_target_generate_name(QUERY_TARGET *qt) {
@@ -1306,7 +1373,6 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     qt->query.pattern = string_to_simple_pattern(qtl.dimensions);
     qt->dimensions.scope_pattern = string_to_simple_pattern(qtl.scope_dimensions);
     qt->instances.chart_label_key_pattern = string_to_simple_pattern(qtl.chart_label_key);
-    qt->instances.scope_chart_label_key_pattern = string_to_simple_pattern(qtl.chart_label_key);  // For now, using same as non-scope
     qt->instances.labels_pattern = string_to_simple_pattern(qtl.labels);
     qt->instances.scope_labels_pattern = string_to_simple_pattern(qtl.scope_labels);
     qt->instances.alerts_pattern = string_to_simple_pattern(qtl.alerts);
@@ -1321,6 +1387,9 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     qtl.match_names = qt->request.options & RRDR_OPTION_MATCH_NAMES;
     if(likely(!qtl.match_ids && !qtl.match_names))
         qtl.match_ids = qtl.match_names = true;
+
+    // the instance names matched may be newer than the response shape (see weights)
+    qtl.instances_version = qt->request.instances_version ? qt->request.instances_version : qt->request.version;
 
     // verify that the chart belongs to the host we are interested
     if(qtl.st) {
@@ -1359,6 +1428,12 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
                                  &qt->versions,
                                  qtl.host_node_id_str);
 
+    // a cancelled target is incomplete: callers get it back marked, and rrd2rrdr() does not execute it
+    if(unlikely(qt->internal.cancelled)) {
+        qt->timings.preprocessed_ut = now_monotonic_usec();
+        return qt;
+    }
+
     // we need the available db retention for this call
     // so it has to be done last
     if(unlikely(!query_target_calculate_window(qt))) {
@@ -1390,6 +1465,8 @@ ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
         return 0;
 
     char host_node_id_str[UUID_STR_LEN] = "";
+    if((scope_instances_sp || instances_sp) && match_ids && !UUIDiszero(rc->rrdhost->node_id))
+        uuid_unparse_lower(rc->rrdhost->node_id.uuid, host_node_id_str);
 
     RRDHOST_IDENTITY host_identity = { 0 };
     if(version >= 2 && match_names && (scope_instances_sp || instances_sp))
@@ -1407,11 +1484,9 @@ ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
                 
                 // Check scope_instances first - if it doesn't match, skip entirely
                 if(scope_instances_sp) {
-                    QUERY_INSTANCE qi = { .ria = ria, };
                     SIMPLE_PATTERN_RESULT ret = query_instance_matches(
-                        &qi, ri, scope_instances_sp, match_ids, match_names, version,
+                        ria, ri, scope_instances_sp, match_ids, match_names, version,
                         host_identity.hostname, host_node_id_str);
-                    query_instance_strings_free(&qi);
 
                     if (ret != SP_MATCHED_POSITIVE)
                         continue;
@@ -1424,11 +1499,9 @@ ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
                 }
 
                 if(instances_sp) {
-                    QUERY_INSTANCE qi = { .ria = ria, };
                     SIMPLE_PATTERN_RESULT ret = query_instance_matches(
-                        &qi, ri, instances_sp, match_ids, match_names, version,
+                        ria, ri, instances_sp, match_ids, match_names, version,
                         host_identity.hostname, host_node_id_str);
-                    query_instance_strings_free(&qi);
 
                     if (ret != SP_MATCHED_POSITIVE)
                         continue;

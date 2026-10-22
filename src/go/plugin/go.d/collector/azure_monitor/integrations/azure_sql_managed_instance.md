@@ -629,9 +629,9 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_sql_managed_instance_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_managed_instance.conf) | azure_monitor.sql_managed_instance.cpu | SQL MI CPU utilization on ${label:resource_name} |
-| [ am_sql_managed_instance_storage_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_managed_instance.conf) | azure_monitor.sql_managed_instance.storage | SQL MI storage utilization on ${label:resource_name} |
-| [ am_sql_managed_instance_io_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_managed_instance.conf) | azure_monitor.sql_managed_instance.io_requests | SQL MI I/O requests on ${label:resource_name} |
+| [ am_sql_managed_instance_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_managed_instance.conf) | azure_monitor.sql_managed_instance.cpu | Average CPU utilization of SQL Managed Instance ${label:resource_name} in ${label:resource_group} (${label:region}). Sustained high CPU indicates insufficient compute tier or query optimization needed |
+| [ am_sql_managed_instance_storage_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_managed_instance.conf) | azure_monitor.sql_managed_instance.storage | Storage used as a percentage of reserved storage on SQL Managed Instance ${label:resource_name} in ${label:resource_group} (${label:region}). Approaching reserved storage limit may cause write failures |
+| [ am_sql_managed_instance_io_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_managed_instance.conf) | azure_monitor.sql_managed_instance.io_requests | Average I/O requests per second on SQL Managed Instance ${label:resource_name} in ${label:resource_group} (${label:region}). High I/O request rates may indicate I/O bottleneck or unoptimized queries |
 
 
 

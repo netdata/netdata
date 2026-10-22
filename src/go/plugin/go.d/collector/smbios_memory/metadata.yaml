@@ -167,15 +167,6 @@ modules:
           - error: Agent registry identity is unavailable; baseline persistence disabled
             cause: The collector cannot read the Agent's registry identity, which every saved baseline is bound to.
             fix: Restore the Agent's registry directory and its permissions, then restart the collector. Inventory is still read, but no baseline is accepted without an Agent identity.
-    alerts:
-      - name: smbios_memory_confirmed_loss
-        metric: smbios_memory.confirmed_loss_status
-        info: Physical memory is missing or smaller than the accepted firmware inventory baseline
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/smbios_memory.conf
-      - name: smbios_memory_comparison_unavailable
-        metric: smbios_memory.comparison_status
-        info: The current firmware inventory cannot be compared with a durable memory baseline
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/smbios_memory.conf
     metrics:
       folding:
         title: Metrics

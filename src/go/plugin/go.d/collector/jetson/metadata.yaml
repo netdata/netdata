@@ -149,7 +149,6 @@ modules:
           - error: tegrastats sample contains no supported GPU, EMC, power or temperature readings
             cause: The latest `tegrastats` line has no valid `GR3D_FREQ` (GPU), `EMC_FREQ` (memory controller), supported power rail reading, or supported scalar temperature. Which readings `tegrastats` prints depends on the Jetson module, the Jetson Linux release, and the account that runs it.
             fix: Run the check in Prerequisites. If its output has no supported GPU, memory controller, power rail, or temperature readings, this collector has nothing to chart on this device.
-    alerts: []
     metrics:
       folding:
         title: Metrics

@@ -635,14 +635,14 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_app_service_health_check ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.health | App Service health on ${label:resource_name} |
-| [ am_app_service_http_5xx_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.http_status | App Service 5xx errors on ${label:resource_name} |
-| [ am_app_service_response_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.response_time | App Service response time on ${label:resource_name} |
-| [ am_app_service_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.cpu | App Service CPU on ${label:resource_name} |
-| [ am_app_service_request_queue ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.request_queue | App Service request queue on ${label:resource_name} |
-| [ am_app_service_http_4xx_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.http_status | App Service 4xx errors on ${label:resource_name} |
-| [ am_app_service_http_403_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.http_error_detail | App Service 403 forbidden on ${label:resource_name} |
-| [ am_app_service_http_401_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.http_error_detail | App Service 401 unauthorized on ${label:resource_name} |
+| [ am_app_service_health_check ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.health | Health check status of App Service ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_app_service_http_5xx_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.http_status | HTTP 5xx server error rate on App Service ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_app_service_response_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.response_time | Average HTTP response time of App Service ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_app_service_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.cpu | CPU utilization of App Service ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_app_service_request_queue ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.request_queue | Requests queued in application queue of App Service ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_app_service_http_4xx_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.http_status | HTTP 4xx client error rate on App Service ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_app_service_http_403_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.http_error_detail | HTTP 403 Forbidden response rate on App Service ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_app_service_http_401_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.http_error_detail | HTTP 401 Unauthorized response rate on App Service ${label:resource_name} in ${label:resource_group} (${label:region}) |
 
 
 

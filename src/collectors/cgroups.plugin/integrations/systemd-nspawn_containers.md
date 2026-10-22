@@ -80,8 +80,8 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ cgroup_10min_cpu_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cgroups.conf) | cgroup.cpu_limit | average cgroup CPU utilization over the last 10 minutes |
-| [ cgroup_ram_in_use ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cgroups.conf) | cgroup.mem_usage | cgroup memory utilization |
+| [ cgroup_10min_cpu_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cgroups.conf) | cgroup.cpu_limit | Cgroup ${label:cgroup_name} average CPU utilization over the last 10 minutes |
+| [ cgroup_ram_in_use ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cgroups.conf) | cgroup.mem_usage | Cgroup ${label:cgroup_name} memory utilization |
 
 
 

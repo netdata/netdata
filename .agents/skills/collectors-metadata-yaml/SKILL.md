@@ -85,7 +85,7 @@ Facts every rule below relies on (`integrations/templates/overview/collector.md`
 | Setup | `prerequisites`, `configuration.file`, `configuration.options` (rows, `detailed_description`, groups), `configuration.examples` | `setup.md` |
 | Troubleshooting | `troubleshooting.errors` (the known-errors catalog), legacy `troubleshooting.problems` | `troubleshooting.md` |
 | Metrics | `metrics.scopes`, labels, metric `description` and `unit`, `dynamic_context_prefixes`, `availability` | `metrics.md` |
-| Alerts, meta, Functions | `alerts`, `meta.monitored_instance`, categories, keywords, icon, `related_resources`, `info_provided_to_referring_integrations`, `functions` (the Live Data section) | `alerts-and-meta.md` |
+| Alerts, meta, Functions | `alerts`, `excluded_alerts`, `meta.monitored_instance`, categories, keywords, icon, `related_resources`, `info_provided_to_referring_integrations`, `functions` (the Live Data section) | `alerts-and-meta.md` |
 
 ## Depth Boundary
 
@@ -153,7 +153,7 @@ complete the validation and preview before committing:
    deleted, limits, addresses probed.
 7. Markdown safety items above; for authorized changes run
    `python3 -m unittest integrations.tests.test_collector_metadata integrations.tests.test_health_alerts` (selected
-   mechanical checks; the second covers `alerts` rows) and the pipeline
-   validation in `integrations-lifecycle/description-authoring.md`
+   mechanical checks; the second fails when a stock alert loses its owner or a listed or excluded alert name is
+   invalid) and the pipeline validation in `integrations-lifecycle/description-authoring.md`
    (`gen_docs_integrations.py --check`, `test_descriptions`).
 8. Generated hunks under `integrations/` are not part of the commit; the post-merge regeneration owns them.

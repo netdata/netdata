@@ -1,12 +1,11 @@
 # Alerts, Meta, And Functions: Identity, Cross-References, Live Data
 
-Small families with one thing in common: they are data that other artifacts define (the health configuration, the
-product, the Function implementation), copied into `metadata.yaml` so the page and the catalog can show them. Almost
-nothing here is authored prose.
+Small families with one thing in common: they come from what other artifacts define (the health configuration, the
+product, the Function implementation), so the page and the catalog can show them. Almost nothing here is authored prose.
 
 Shape rules for every field are in `SKILL.md` and `overview.md` section 1.
 
-## 1. `alerts`: A Mirror Of The Health Configuration
+## 1. `alerts`: Derived From The Health Configuration
 
 **Question:** which alerts will fire on these charts out of the box?
 
@@ -14,18 +13,28 @@ Rendering (`integrations/templates/alerts.md`): a table with the alert name link
 context it watches, and its `info` text. Empty renders "There are no alerts configured by default for this
 integration.", which MUST be true.
 
-- Every alert or template in `src/health/health.d/*.conf` whose `on:` context belongs to this collector has a row.
-  Every row corresponds to one entry in a conf. Adding, renaming, or removing an alert changes both files in the same
-  change.
-- `name` is the alert or template name as written in the conf. `metric` is a template's `on:` context, or for an
-  alarm the context of the chart its `on:` names. `info` is the conf's `info` line verbatim: same words, same case,
-  same punctuation. `link` is the conf file on the master branch
-  (`https://github.com/netdata/netdata/blob/master/src/health/health.d/<file>.conf`). `os` repeats the conf's
-  operating-system restriction (`host labels: _os=...`) with the same values; `*` marks an alert without one.
-- No alert prose is written here. If the `info` reads badly for the page, fix the conf; the page copies it.
-- Rows are ordered as they appear in the conf, so a reader can follow the link and find them in order.
-- CI checks `name`, `link` and `metric` (`../integrations-lifecycle/consistency.md`, "What is enforced today"); `info`,
-  `os`, order and completeness are review checks.
+- The integrations generator builds the table from `src/health/health.d/*.conf`; `metadata.yaml` does not copy alert
+  data. A stock alert is on the page when one of its `on:` targets is a context the integration declares
+  (`metrics.scopes[].metrics[].name`, plus the profile contexts of a Prometheus module), its `_os` host-label filter
+  admits a platform the plugin runs on, and its `_collect_plugin`/`_collect_module` chart-label filter, when present,
+  admits the plugin and module. Owner: `integrations/health_alerts.py` (`rule_admits`, `alert_rows`, and the
+  `PLUGIN_PLATFORMS` table for plugins built for some platforms only).
+- Declared contexts MUST be the contexts the collector creates at runtime: a wrong or missing one drops alerts from the
+  page or lists one that never attaches, and CI fails when a stock alert has no owner (known gaps are listed in
+  `UNOWNED` in `integrations/tests/test_health_alerts.py`). CI also checks the expression variables of the alerts on
+  these contexts against the documented dimension names (`metrics.md`), which MUST be the names the chart shows.
+- `alerts` in `metadata.yaml` is an optional list of alert names for alerts the page owns although no declared context
+  derives them: charts created at runtime from profiles (CloudWatch, SNMP BGP) or an alarm on a chart id that the
+  collector keeps under another context (`ipmi_events` on FreeIPMI and Go IPMI). A comment above the list says why.
+  CI rejects a name that is unknown, an Agent alert, derivable, or excluded by the alert's filters.
+- `excluded_alerts` is an optional list of derived alert names the monitored instance cannot evaluate, because it does
+  not report the data they read (a Redis-compatible server without the Redis field an alert uses). The page leaves
+  them out, and the page's `limits` text says which data is missing. CI rejects a name that is not derived or is also
+  listed in `alerts`.
+- No alert prose is written here. If the `info` reads badly for the page, fix the conf; the page copies it, `${...}`
+  variables included.
+- Rows follow the configuration order (files sorted by name, then file order), one row per alert name and target.
+  Alerts whose every target is an Agent chart (`netdata.*`, `anomaly_detection.*`) belong to no integration.
 
 ## 2. `meta.monitored_instance`: The Product Identity
 
@@ -99,8 +108,8 @@ Prerequisites (one h5 per entry, or "No additional configuration is required."),
 
 ## 6. Review Questions For This Family
 
-- Does every alert in the health conf for this collector's contexts have a row, and does every row's `info` match the
-  conf character for character?
+- Are the declared metric contexts the ones the collector creates at runtime, so the derived alert table lists the
+  alerts that attach? Does every `alerts` or `excluded_alerts` name have its reason on record?
 - Is `name` the vendor's spelling, and is `link` the product page (or justifiably empty)?
 - Is there one primary category, an existing icon, and five to ten real search terms (plus service or vendor names
   only for a multi-service collector)?

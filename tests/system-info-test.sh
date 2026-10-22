@@ -17,6 +17,7 @@ sed -n \
     -e '/^load_lsb_release()/,/^}/p' \
     -e '/^filter_host_os_label_version()/,/^}/p' \
     -e '/^set_host_os_label_versions()/,/^}/p' \
+    -e '/^detect_host_l4t_version()/,/^}/p' \
     "${system_info_script}" > "${functions_script}"
 
 os_release_file="${test_dir}/os-release"
@@ -86,6 +87,62 @@ label_output=$(/bin/sh -c '
     printf 'unexpected non-Linux label output: %s\n' "${label_output}" >&2
     exit 1
 }
+
+# Native AGX Orin capture from #24165: retain only the public release header.
+l4t_header='# R36 (release), REVISION: 5.0, GCID: 43688277, BOARD: generic, EABI: aarch64, DATE: Fri Jan 16 03:50:45 UTC 2026'
+# Exercise redirection with spaces and sed/shell metacharacters in the fixture path.
+l4t_file="${test_dir}/nv_tegra_release &| fixture"
+assert_l4t_version() {
+    expected_l4t=$1
+    l4t_path=$2
+    l4t_kernel=${3:-Linux}
+    l4t_container=${4:-none}
+    l4t_output=$(/bin/sh -eu -c '
+        . "$1"
+        KERNEL_NAME=$3 CONTAINER=$4
+        detect_host_l4t_version "$2"
+        printf "%s" "$HOST_L4T_VERSION"
+    ' sh "${functions_script}" "${l4t_path}" "${l4t_kernel}" "${l4t_container}")
+    [ "$l4t_output" = "$expected_l4t" ] || {
+        printf 'L4T %s/%s: expected %s, got %s\n' "$l4t_kernel" "$l4t_container" "$expected_l4t" "$l4t_output" >&2
+        exit 1
+    }
+}
+printf '%s\n' "$l4t_header" '# KERNEL_VARIANT: oot' 'TARGET_USERSPACE_LIB_DIR=nvidia' > "$l4t_file"
+assert_l4t_version 36.5.0 "$l4t_file"
+assert_l4t_version 36.5.0 "$l4t_file" Linux unknown
+for l4t_container in docker lxc container; do
+    assert_l4t_version '' "$l4t_file" Linux "$l4t_container"
+done
+for l4t_kernel in Darwin FreeBSD; do
+    assert_l4t_version '' "$l4t_file" "$l4t_kernel"
+done
+# NVIDIA AGX Orin setup guide also documents R39 with REVISION 2.1.
+printf '%s\n' '# R39 (release), REVISION: 2.1, BOARD: generic' > "$l4t_file"
+assert_l4t_version 39.2.1 "$l4t_file"
+# Parse only the first header, without padding source components or reading later assignments.
+printf '%s\n' '# R36 (release), REVISION: 5,GCID: ignored' "$l4t_header" > "$l4t_file"
+assert_l4t_version 36.5 "$l4t_file"
+# Shell metacharacters are literal data, never evaluated.
+# shellcheck disable=SC2016
+for l4t_bad in '' 'R36 REVISION: 5.0' '# R36 (release), REVISION: 5.0' \
+    '# RX (release), REVISION: 5.0,' '# R36 (release), REVISION: unknown,' \
+    '# R36 (release), REVISION: .5,' '# R36 (release), REVISION: 5..0,' \
+    '# R36 (release), REVISION: 5.0x,' '# R36 (release), REVISION: $(touch "$L4T_TEST_MARKER"),'; do
+    printf '%s\n' "$l4t_bad" "$l4t_header" > "$l4t_file"
+    L4T_TEST_MARKER="${test_dir}/executed" assert_l4t_version '' "$l4t_file"
+    [ ! -e "${test_dir}/executed" ]
+done
+: > "$l4t_file"
+assert_l4t_version '' "$l4t_file"
+assert_l4t_version '' "${test_dir}/missing-release"
+assert_l4t_version '' "${test_dir}"
+if [ "$(id -u)" -ne 0 ]; then
+    printf '%s\n' "$l4t_header" > "$l4t_file"
+    chmod 000 "$l4t_file"
+    assert_l4t_version '' "$l4t_file"
+    chmod 600 "$l4t_file"
+fi
 
 # Exercise the network probe with command outcomes, not fixture state mutation.
 sed -n -e '/^get_default_interface_ip()/,/^}/p' -e '/^normalize_runtime_value()/,/^}/p' \
@@ -259,6 +316,7 @@ case "$probe:$*" in
                 esac ;;
             *) exec "$SYSTEM_INFO_TEST_AWK" "$@" ;;
         esac ;;
+    systemd-detect-virt:-c) printf '%s\n' "${TEST_CONTAINER:-none}" ;;
     systemd-detect-virt:*) printf 'none\n' ;;
     pgrep:*) exit 1 ;;
     curl:*)
@@ -500,6 +558,43 @@ cpu_output=$(/bin/sh -c '. "$1"; printf "4\n" | count_cpu_list' sh "${functions_
 [ "$cpu_output" = 1 ]
 for cpu_list in '' '4-2' '0-3,3-5' '2,1' '0,,2' '0-2,' '0-1-2' '0-2 bad' '0-2\n4-5'; do
     /bin/sh -c '. "$1"; ! printf "%b\n" "$2" | count_cpu_list' sh "${functions_script}" "$cpu_list"
+done
+
+# Redirect only the release-file path in a copy; execute production startup/output
+# and runtime flow with the existing command shims, without modifying /etc.
+printf '%s\n' "$l4t_header" > "$l4t_file"
+# Keep the reference literal: the copied script reads the path as quoted environment data.
+# shellcheck disable=SC2016
+sed 's|/etc/nv_tegra_release|"$L4T_TEST_SOURCE"|g' "$system_info_script" > "${test_dir}/l4t-system-info.sh"
+for l4t_scenario in native container non-linux invalid missing runtime; do
+    l4t_mode=--bounded
+    l4t_kernel=Linux
+    l4t_container=none
+    l4t_source=$l4t_file
+    case "$l4t_scenario" in
+        container) l4t_container=docker ;;
+        non-linux) l4t_kernel=Darwin ;;
+        invalid) printf '%s\n' invalid > "$l4t_file" ;;
+        missing) l4t_source="${test_dir}/missing-release" ;;
+        runtime) l4t_mode=--runtime; printf '%s\n' "$l4t_header" > "$l4t_file" ;;
+    esac
+    : > "${test_dir}/runtime-probes.log"
+    l4t_output=$(PATH="${test_dir}/runtime-bin:${PATH}" RUNTIME_PROBE_LOG="${test_dir}/runtime-probes.log" \
+        TEST_KERNEL="$l4t_kernel" TEST_CONTAINER="$l4t_container" L4T_TEST_SOURCE="$l4t_source" \
+        /bin/sh "${test_dir}/l4t-system-info.sh" "$l4t_mode")
+    if [ "$l4t_scenario" = native ]; then
+        printf '%s\n' "$l4t_output" | grep -Fx 'NETDATA_SYSTEM_L4T_VERSION=36.5.0' >/dev/null
+    elif printf '%s\n' "$l4t_output" | grep -q '^NETDATA_SYSTEM_L4T_VERSION='; then
+        printf 'unexpected L4T output for %s\n' "$l4t_scenario" >&2
+        exit 1
+    fi
+    if [ "$l4t_mode" = --runtime ]; then
+        assert_runtime_frame "$l4t_output"
+        if grep -F "$l4t_file" "${test_dir}/runtime-probes.log"; then
+            printf 'runtime read the startup-only L4T source\n' >&2
+            exit 1
+        fi
+    fi
 done
 
 printf '%s\n' 'system-info shell tests: OK'

@@ -623,7 +623,8 @@ Config discipline worth knowing:
 `Collect()` per cycle: guard that the receiver is ready → `receiver.Sweep` (rate-limiter GC) → push the journal's
 binary-encoded-field total into telemetry (an absolute value — `Store`, not `Add`) → snapshot the 40 telemetry
 counters → snapshot profile-metric series. All metrics are cumulative counters labeled `job_name`; `metadata.yaml`
-declares the integration surface, including 20 stock alerts over these charts (`src/health/health.d/snmp_traps.conf`).
+declares the integration surface, including the `snmp.trap.*` contexts from which the integration page derives the 20
+stock alerts of `src/health/health.d/snmp_traps.conf`.
 
 The one trap in this area: `receiver.ErrorKind` values are converted to `telemetry.ErrorKind` by a **raw string
 cast**, and the telemetry switch has no default — renaming an error-kind constant on either side silently stops a

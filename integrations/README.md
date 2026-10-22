@@ -1,10 +1,11 @@
 # Integrations pipeline
 
 The scripts in this directory turn every `metadata.yaml` in the repository into the integrations catalog
-(`integrations.js`, `integrations.json`, which also carry the stock alerts of `src/health/health.d/`), one
-documentation page per integration, and the umbrella pages under `src/collectors/`. How the pipeline works, what is
-generated, and how changes are delivered is documented for maintainers in `.agents/skills/integrations-lifecycle/`;
-this file is the local-run reference.
+(`integrations.js`, `integrations.json`, which also carry the stock alerts of `src/health/health.d/` and the owners
+of documented chart contexts and context prefixes), one documentation page per integration (its alert table derived
+from those alerts and the metric contexts the integration declares), and the umbrella pages under `src/collectors/`.
+How the pipeline works, what is generated, and how changes are delivered is documented for maintainers in
+`.agents/skills/integrations-lifecycle/`; this file is the local-run reference.
 
 ## Requirements
 
@@ -36,7 +37,8 @@ python3 integrations/gen_integrations.py                      # validation: ever
 python3 integrations/gen_docs_integrations.py --check         # validation: page descriptions, writes nothing
 # what CI runs; test_collector_page_navigation is manual
 python3 -m unittest integrations.tests.test_descriptions integrations.tests.test_prometheus_profile_docs \
-    integrations.tests.test_collector_metadata integrations.tests.test_health_alerts
+    integrations.tests.test_collector_metadata integrations.tests.test_health_alerts \
+    integrations.tests.test_context_owners
 ```
 
 For a selected collector page, use the isolated recipe in

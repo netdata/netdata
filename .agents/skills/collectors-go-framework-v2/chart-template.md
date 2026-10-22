@@ -148,16 +148,21 @@ a *leaf* is the innermost family that holds charts.
   then `charttpl.DecodeYAML` and `chartengine.Compile`. Native sets validate through `chartengine.NewTemplateSet`;
   follow `src/go/plugin/framework/chartengine/README.md#named-active-template-sets` for runtime membership changes.
 - **Cross-check artifacts.** `collecttest.AssertMetadataDocumentsChartTemplate`,
-  `collecttest.AssertHealthAlertsTargetChartTemplate`, `collecttest.AssertMetadataAlertsMatchHealthConfig` and
-  `collecttest.AssertHealthAlertsMatchMetadata` (`src/go/plugin/go.d/pkg/collecttest/artifacts.go`) compare
-  metadata.yaml, health.d and the template with each other. The `...With` variants take options: `HealthAlertsCheck`
-  narrows a shared health.d file by context prefix (and, for the metadata comparison, selects the module by `meta.id`);
-  `MetadataAlertsCheck` selects the module and accepts a shared health.d file whose other alerts this module does not
-  document. The metadata check compares stateset dimensions in declared order, not rendered order.
+  `collecttest.AssertHealthAlertsTargetChartTemplate` and `collecttest.AssertHealthAlertsMatchMetadata`
+  (`src/go/plugin/go.d/pkg/collecttest/artifacts.go`) compare metadata.yaml, health.d and the template with each other.
+  The `...With` variants take `HealthAlertsCheck`, which narrows a shared health.d file by context prefix (and, for the
+  metadata comparison, selects the module by `meta.id`). `AssertMetadataDocumentsChartTemplate` compares stateset
+  dimensions in declared order, not rendered order. `AssertHealthAlertsMatchMetadata` requires each alert's target,
+  unit and lookup dimensions to be documented, and the variables of `calc`, `warn` and `crit` to be documented
+  dimensions, built-ins, alert names or qualified references. Page alert tables are derived, not checked
+  (`.agents/skills/collectors-metadata-yaml/alerts-and-meta.md`, section 1).
 - **Never restate an artifact.** A test that names one of the template's own contexts, dimension lists or families, or
   pins an alert's thresholds, lookup, cadence or recipients, restates what the artifact said when it was written and
   MUST NOT exist; health.d owns alert policy. An independent oracle, such as a V1 parity manifest during a migration or
   upstream alert rules with a recorded mapping, is not a restatement.
+- **V1 collectors.** `collecttest.V1ChartsByContext` presents V1 charts (a static list or the templates the collector
+  instantiates) as the V1 renderer sends them, so the same metadata checks apply through
+  `collecttest.CheckMetadataMetricsMatchCharts` (the `elasticsearch` and `mssql` artifacts tests).
 - **Coverage.** `collecttest.AssertChartCoverage` (`src/go/plugin/go.d/pkg/collecttest/chart_coverage.go`) derives the
   expected charts and dimensions from the live static or native provider and store, per host scope; do not add
   `RequiredContexts` that repeat it.

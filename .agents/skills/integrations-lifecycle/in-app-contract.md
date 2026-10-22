@@ -49,11 +49,31 @@ export const integrations = [
 
 export const alerts = {
   /* keyed by stock alert name: template (bool), on (targets in file order: contexts for a template, chart ids or names
-     for an alarm), class, type, component, units, summary, info (each only when the conf sets it; summary and info may
-     hold unresolved `${label:...}` and other `${...}` variables), source (repository path of the conf), integrations
-     (ids of the records whose metadata lists the alert); identical in integrations.json under `alerts` */
+     for an alarm), class, type, component (always set), units, summary, info (each only when the conf sets it;
+     summary and info may hold unresolved `${label:...}` and other `${...}` variables), source (repository path of the
+     conf), integrations (ids of the records whose page lists the alert, one derivation for both); identical in
+     integrations.json under `alerts` */
+};
+
+export const contexts = {
+  /* owners of chart contexts, for alerts the `alerts` export does not list (custom alerts): `exact` maps every context
+     a collector or flow record documents (the same sets the alert derivation uses) to the sorted ids of those
+     records; `prefixes` maps a context prefix to the ids of the records it belongs to. Consumers match exactly first,
+     then by the longest prefix; no match means no owner. Identical in integrations.json under `contexts`. */
 };
 ```
+
+Prefixes (`integrations/context_owners.py`) are, per record, the longest common prefix of its documented contexts in
+each first-segment namespace (never `netdata.`) plus its `metrics.dynamic_context_prefixes`; one is exported only when
+every context another module documents under it lies under a longer exported prefix of that module. NPM device
+records are not in the export; the SNMP collector owns their `snmp.` contexts.
+
+- Match chart contexts only (an alert instance's `context`, a template's `on`). Never look up a chart id or an
+  alarm's `on` chart: chart ids do not follow context namespaces (proc.plugin's `mdstat.*` charts have `md.*`
+  contexts).
+- A prefix never takes a context another collector documents, but a context nobody documents can match the wrong
+  collector's prefix, so prefix owners are as accurate as the metadata; chart labels such as `_collect_plugin`, when a
+  consumer has them, are more exact.
 
 The dashboard's renderer interprets the `{% details %}` / `{% /details %}` markers embedded in the rich strings, which
 is why `integrations.js` carries them (`pipeline.md`, "Stage 1: outputs", for the three content variants).
@@ -65,7 +85,7 @@ is why `integrations.js` carries them (`pipeline.md`, "Stage 1: outputs", for th
    under one of those keys breaks the website's Hugo renderer and produces blank tabs or link-check failures in
    cloud-frontend. A new integration type that reuses collector-style sections includes every structured key in its
    render-key list (`how-tos/adding-new-integration-type.md`).
-2. Treat `integrations.js` as a published artifact: the three named exports and the per-integration keys are a contract.
+2. Treat `integrations.js` as a published artifact: the four named exports and the per-integration keys are a contract.
    Coordinate with the cloud-frontend team before renaming or removing a key.
 3. A dashboard surface that needs a one-line description SHOULD read `description` instead of deriving one from the
    `overview` Markdown; it is validated for display alone in a list, card, or search result
@@ -77,4 +97,8 @@ is why `integrations.js` carries them (`pipeline.md`, "Stage 1: outputs", for th
 6. Never commit `integrations.js` or `integrations.json` here; the dashboard pulls fresh on each build.
 7. `alerts` covers stock alerts only, as `src/health/health.d` defines them on master. Custom alerts, user edits of
    stock alerts and alerts of other Agent versions are absent or differ; a dashboard surface MUST treat a missing name
-   as "no catalogue data", not as an error. The Dyncfg Health workspace is its consumer.
+   as "no catalogue data", not as an error. The Dyncfg Health workspace is its consumer. Stock `class` and `type` values
+   come from the closed vocabulary in `integrations/health_alerts.py` (`ALERT_CLASSES`, `ALERT_TYPES`; defined in
+   `src/health/REFERENCE.md`), so a surface may group by them; other values come only from custom alerts, user edits of
+   stock alerts or other Agent versions. `integrations` is empty only for alerts on Agent charts and the few the
+   ownership test lists as unowned.

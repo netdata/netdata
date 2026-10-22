@@ -252,6 +252,9 @@ def load_profile_catalog(design_path=PROFILE_DESIGN_PATH, runtime_path=PROFILE_R
             'chart_count': len(charts),
             'metric_groups': _metric_groups(charts),
             'supports': _profile_supports(profile, design),
+            'app': runtime.get('app') or '',
+            'namespace': design['namespace'],
+            'contexts': [chart['context'] for chart in charts],
         }
 
     _validate_support_graph(catalog)
@@ -290,6 +293,23 @@ def _module_profiles(primary_ids, catalog):
     return profiles
 
 
+def _runtime_contexts(profiles):
+    """The chart contexts a module's profiles create (``buildMergedChartTemplate`` in the Prometheus collector).
+
+    A context is `prometheus.<app>.<namespace>.<context>`, without the namespace segment when it equals the app. The
+    app is the first profile's declared `app:` (``resolveApp``); without one the job name is the app, so the contexts
+    are not known here.
+    """
+    app = next((profile['app'] for profile in profiles if profile['app']), '')
+    if not app:
+        return []
+    contexts = []
+    for profile in profiles:
+        prefix = f'prometheus.{app}' if profile['namespace'] == app else f'prometheus.{app}.{profile["namespace"]}'
+        contexts.extend(f'{prefix}.{context}' for context in profile['contexts'])
+    return contexts
+
+
 def project_prometheus_profile_coverage(collectors, catalog=None):
     catalog = load_profile_catalog() if catalog is None else catalog
     directly_mapped = set()
@@ -313,6 +333,7 @@ def project_prometheus_profile_coverage(collectors, catalog=None):
         item['metrics']['profile_coverage'] = {
             'chart_count': sum(profile['chart_count'] for profile in profiles),
             'profiles': profiles,
+            'contexts': _runtime_contexts(profiles),
         }
 
     missing = sorted(set(catalog) - directly_mapped)

@@ -845,7 +845,8 @@ install_netdata_dirs() {
         fi
       fi
 
-      run chown -R "${NETDATA_USER}:${NETDATA_GROUP}" "${x}"
+      # Applications own descendants, including private files and directories.
+      run chown "${NETDATA_USER}:${NETDATA_GROUP}" "${x}"
     done
 
     run chmod 755 "${NETDATA_LOG_DIR}"
@@ -856,7 +857,7 @@ install_netdata_dirs() {
         warning "failed to create ${NETDATA_CLAIMING_DIR}, it will need to be created manually."
       fi
     fi
-    run chown -R "${NETDATA_USER}:${NETDATA_GROUP}" "${NETDATA_CLAIMING_DIR}"
+    run chown "${NETDATA_USER}:${NETDATA_GROUP}" "${NETDATA_CLAIMING_DIR}"
     run chmod 770 "${NETDATA_CLAIMING_DIR}"
   fi
 

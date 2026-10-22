@@ -232,8 +232,9 @@ int rrdcontext_foreach_instance_with_rrdset_in_context(RRDHOST *host, const char
     int ret = 0;
     RRDINSTANCE *ri;
     dfe_start_read(rc->rrdinstances, ri) {
-        if(ri->rrdset) {
-            int r = callback(ri->rrdset, data);
+        RRDSET *st = rrdinstance_rrdset_atomic_load(ri);
+        if(st) {
+            int r = callback(st, data);
             if(r >= 0) ret += r;
             else {
                 ret = r;

@@ -116,13 +116,15 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ interface_speed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.net | network interface ${label:device} current speed |
-| [ inbound_packets_dropped_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.drops | ratio of inbound dropped packets for the network interface ${label:device} over the last 10 minutes |
-| [ outbound_packets_dropped_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.drops | ratio of outbound dropped packets for the network interface ${label:device} over the last 10 minutes |
-| [ 1m_received_packets_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.packets | average number of packets received by the network interface ${label:device} over the last minute |
-| [ 10s_received_packets_storm ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.packets | ratio of average number of received packets for the network interface ${label:device} over the last 10 seconds, compared to the rate over the last minute |
-| [ interface_inbound_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.errors | number of inbound errors for the network interface ${label:device} in the last 10 minutes |
-| [ interface_outbound_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.errors | number of outbound errors for the network interface ${label:device} in the last 10 minutes |
+| [ interface_speed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.net | Network interface ${label:device} current speed |
+| [ net_interface_inbound_packets ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.packets | Received packets for the network interface ${label:device} in the last 10 minutes |
+| [ net_interface_outbound_packets ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.packets | Sent packets for the network interface ${label:device} in the last 10 minutes |
+| [ inbound_packets_dropped_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.drops | Ratio of inbound dropped packets for the network interface ${label:device} over the last 10 minutes |
+| [ outbound_packets_dropped_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.drops | Ratio of outbound dropped packets for the network interface ${label:device} over the last 10 minutes |
+| [ interface_inbound_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.errors | Number of inbound errors for the network interface ${label:device} in the last 10 minutes |
+| [ interface_outbound_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.errors | Number of outbound errors for the network interface ${label:device} in the last 10 minutes |
+| [ 1m_received_packets_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.packets | Average number of packets received by the network interface ${label:device} over the last minute |
+| [ 10s_received_packets_storm ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.packets | Ratio of average number of received packets for the network interface ${label:device} over the last 10 seconds, compared to the rate over the last minute |
 
 
 

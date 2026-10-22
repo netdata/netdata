@@ -1973,6 +1973,263 @@ static int test_rrddim_divisor_normalization(void) {
     return rc;
 }
 
+// Freeing a chart must not garbage collect the chart name index. That index is a dictionary view and
+// collecting a view walks all its items under the lock chart creation needs, so a cleanup sweep freeing
+// N charts cost N full walks and stalled data collection on parents with churning children. The sweep
+// collects it once instead.
+static int test_rrdset_free_does_not_collect_name_index_per_chart(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    int rc = 0;
+    RRDSET *charts[100];
+    const size_t n = sizeof(charts) / sizeof(charts[0]);
+
+    for(size_t i = 0; i < n; i++) {
+        char id[64];
+        snprintfz(id, sizeof(id), "unittest-name-gc-%zu", i);
+        charts[i] = rrdset_create_localhost(
+            "netdata", id, id, "netdata", NULL,
+            "Unit Testing", "x", "unittest", NULL, 1, nd_profile.update_every, RRDSET_TYPE_LINE);
+
+        if(!charts[i]) {
+            fprintf(stderr, "%s: could not create chart '%s'\n", __FUNCTION__, id);
+            for(size_t j = 0; j < i; j++)
+                rrdset_free(charts[j]);
+            default_rrd_memory_mode = old_default_rrd_memory_mode;
+            return 1;
+        }
+    }
+
+    DICTIONARY *names = localhost->rrdset_root_index_name;
+    size_t pending_before = dictionary_pending_deletes(names);
+
+    for(size_t i = 0; i < n; i++)
+        rrdset_free(charts[i]);
+
+    // a collection reclaims every pending item, so if freeing collected, nothing is left pending
+    size_t pending_after_free = dictionary_pending_deletes(names);
+    if(pending_after_free != pending_before + n) {
+        fprintf(stderr, "%s: freeing %zu charts left %zu deleted names pending (%zu before), expected %zu more - "
+                        "freeing collected the name index\n",
+                __FUNCTION__, n, pending_after_free, pending_before, n);
+        rc = 1;
+    }
+
+    // what the cleanup sweep does after freeing charts
+    dictionary_garbage_collect(names);
+    dictionary_garbage_collect(localhost->rrdset_root_index);
+
+    if(dictionary_pending_deletes(names)) {
+        fprintf(stderr, "%s: collecting the name index left %zu deleted names pending\n",
+                __FUNCTION__, dictionary_pending_deletes(names));
+        rc = 1;
+    }
+
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    return rc;
+}
+
+// The new chart must still own its instance and its metric after the old chart is destroyed.
+static int relinked_chart_check(const char *function, RRDSET *st, RRDDIM *rd) {
+    int rc = 0;
+
+    RRDINSTANCE *ri = st->rrdcontexts.rrdinstance ? rrdinstance_acquired_value(st->rrdcontexts.rrdinstance) : NULL;
+    if(!ri || rrdinstance_rrdset_atomic_load(ri) != st) {
+        fprintf(stderr, "%s: the re-created chart lost its instance\n", function);
+        rc = 1;
+    }
+    else if(rrd_flag_check(ri, RRD_FLAG_OWN_LABELS)) {
+        fprintf(stderr, "%s: the instance of the re-created chart no longer uses its labels\n", function);
+        rc = 1;
+    }
+    else if(dictionary_acquired_item_references((DICTIONARY_ITEM *)st->rrdcontexts.rrdinstance) != 1) {
+        // the old chart must have released its reference, once
+        fprintf(stderr, "%s: the instance has %zu references, expected only the re-created chart's\n", function,
+                dictionary_acquired_item_references((DICTIONARY_ITEM *)st->rrdcontexts.rrdinstance));
+        rc = 1;
+    }
+
+    if(rd) {
+        RRDMETRIC *rm = rd->rrdcontexts.rrdmetric ? rrdmetric_acquired_value(rd->rrdcontexts.rrdmetric) : NULL;
+        if(!rm || rrdmetric_rrddim_atomic_load(rm) != rd) {
+            fprintf(stderr, "%s: the re-created dimension lost its metric\n", function);
+            rc = 1;
+        }
+        else if(dictionary_acquired_item_references((DICTIONARY_ITEM *)rd->rrdcontexts.rrdmetric) != 1) {
+            fprintf(stderr, "%s: the metric has %zu references, expected only the re-created dimension's\n", function,
+                    dictionary_acquired_item_references((DICTIONARY_ITEM *)rd->rrdcontexts.rrdmetric));
+            rc = 1;
+        }
+    }
+
+    return rc;
+}
+
+static RRDSET *relinked_chart_create(const char *id) {
+    RRDSET *st = rrdset_create_localhost(
+        "netdata", id, id, "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1, nd_profile.update_every, RRDSET_TYPE_LINE);
+    rrddim_add(st, "d", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    return st;
+}
+
+// A freed chart is destroyed when its last index entry goes, and the name index keeps its deleted entries
+// until the next collection, so a chart re-created with the same id (a systemd unit that comes back)
+// takes over the instance while the old chart still exists. Here the name insert of the new chart
+// destroys the old one, which must leave the instance to the new chart.
+static int test_rrdset_recreated_chart_keeps_its_instance(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    rrdset_free(relinked_chart_create("unittest-relink-name"));
+    RRDSET *st = relinked_chart_create("unittest-relink-name");
+    int rc = relinked_chart_check(__FUNCTION__, st, rrddim_find(st, "d", false));
+    rrdset_free(st);
+
+    dictionary_garbage_collect(localhost->rrdset_root_index_name);
+    dictionary_garbage_collect(localhost->rrdset_root_index);
+
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    return rc;
+}
+
+// A reference held across the re-creation destroys the old chart after the new one has its dimensions,
+// so the metrics have moved to the new dimensions too and must stay with them.
+static int test_rrdset_recreated_dimension_keeps_its_metric(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    int rc = 0;
+    RRDSET *old = relinked_chart_create("unittest-relink-ref");
+    RRDSET_ACQUIRED *rsa = rrdset_find_and_acquire(localhost, rrdset_id(old), true);
+    rrdset_free(old);
+    RRDSET *st = relinked_chart_create("unittest-relink-ref");
+    if(rsa)
+        rrdset_acquired_release(rsa);
+    else {
+        fprintf(stderr, "%s: could not acquire the old chart\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    // what the obsolete charts cleanup does: this destroys the old chart
+    dictionary_garbage_collect(localhost->rrdset_root_index_name);
+    dictionary_garbage_collect(localhost->rrdset_root_index);
+    rc += relinked_chart_check(__FUNCTION__, st, rrddim_find(st, "d", false));
+    rrdset_free(st);
+
+    dictionary_garbage_collect(localhost->rrdset_root_index_name);
+    dictionary_garbage_collect(localhost->rrdset_root_index);
+
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    return rc ? 1 : 0;
+}
+
+// A chart that changes context moves to a new instance; the old instance it still owns is marked deleted
+// and its metrics are released by the dimensions that still own them.
+static int test_rrdset_context_switch_releases_old_instance(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    int rc = 0;
+    RRDSET *st = rrdset_create_localhost(
+        "netdata", "unittest-relink-ctx", NULL, "netdata", "unittest.relink_a",
+        "Unit Testing", "x", "unittest", NULL, 1, nd_profile.update_every, RRDSET_TYPE_LINE);
+    rrddim_add(st, "d", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+    RRDINSTANCE_ACQUIRED *ria_old = rrdinstance_acquired_dup(st->rrdcontexts.rrdinstance);
+
+    RRDSET *st2 = rrdset_create_localhost(
+        "netdata", "unittest-relink-ctx", NULL, "netdata", "unittest.relink_b",
+        "Unit Testing", "x", "unittest", NULL, 1, nd_profile.update_every, RRDSET_TYPE_LINE);
+
+    RRDINSTANCE *ri_old = rrdinstance_acquired_value(ria_old);
+    if(st2 != st) {
+        fprintf(stderr, "%s: changing the context created a new chart\n", __FUNCTION__);
+        rc = 1;
+    }
+    else if(rrdinstance_acquired_value(st->rrdcontexts.rrdinstance) == ri_old) {
+        fprintf(stderr, "%s: the chart did not move to a new instance\n", __FUNCTION__);
+        rc = 1;
+    }
+    else if(rrdinstance_rrdset_atomic_load(ri_old) != NULL || !rrd_flag_check(ri_old, RRD_FLAG_DELETED)) {
+        fprintf(stderr, "%s: the old instance is still linked or not deleted\n", __FUNCTION__);
+        rc = 1;
+    }
+    else
+        rc = relinked_chart_check(__FUNCTION__, st, rrddim_find(st, "d", false));
+
+    rrdinstance_release(ria_old);
+    rrdset_free(st);
+
+    dictionary_garbage_collect(localhost->rrdset_root_index_name);
+    dictionary_garbage_collect(localhost->rrdset_root_index);
+
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    return rc;
+}
+
+// Health acquires the chart of every alert on every pass. That acquire must not touch last_accessed,
+// or an obsolete chart with an alert never ages past "cleanup obsolete charts after" and is never freed
+// (regressed by #23081). Real readers (rrdset_find_and_acquire()) must still touch it.
+static int test_health_acquire_keeps_obsolete_chart_unaccessed(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    int rc = 0;
+    RRDSET *st = rrdset_create_localhost(
+        "netdata", "unittest-health-acquire", "unittest-health-acquire", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1, nd_profile.update_every, RRDSET_TYPE_LINE);
+
+    rrdset_is_obsolete___safe_from_collector_thread(st);
+
+    const time_t long_ago = 1;
+    rrdset_set_last_accessed_time_s(st, long_ago);
+
+    RRDCALC alert = { 0 };
+    alert.chart = string_strdupz(rrdset_id(st));
+    alert.rrdset = st;
+
+    RRDSET *linked = NULL;
+    RRDSET_ACQUIRED *rsa = rrdcalc_rrdset_acquire_linked(localhost, &alert, &linked);
+    if(!rsa || linked != st) {
+        fprintf(stderr, "%s: health could not acquire the obsolete chart of its alert\n", __FUNCTION__);
+        rc = 1;
+    }
+    if(rsa)
+        rrdset_acquired_release(rsa);
+
+    if(rrdset_last_accessed_time_s(st) != long_ago) {
+        fprintf(stderr, "%s: health acquiring the chart touched last_accessed, the chart can never be freed\n",
+                __FUNCTION__);
+        rc = 1;
+    }
+
+    rsa = rrdset_find_and_acquire(localhost, rrdset_id(st), true);
+    if(!rsa || rrdset_last_accessed_time_s(st) == long_ago) {
+        fprintf(stderr, "%s: a reader acquiring the chart did not touch last_accessed\n", __FUNCTION__);
+        rc = 1;
+    }
+    if(rsa)
+        rrdset_acquired_release(rsa);
+
+    string_freez(alert.chart);
+    rrdset_free(st);
+
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    return rc;
+}
+
 static int test_rrdset_rejects_invalid_update_every(void) {
     fprintf(stderr, "%s() running...\n", __FUNCTION__);
 
@@ -3232,6 +3489,21 @@ int run_all_mockup_tests(void)
         return 1;
 
     if(test_rrdset_rejects_invalid_update_every())
+        return 1;
+
+    if(test_rrdset_free_does_not_collect_name_index_per_chart())
+        return 1;
+
+    if(test_rrdset_recreated_chart_keeps_its_instance())
+        return 1;
+
+    if(test_rrdset_recreated_dimension_keeps_its_metric())
+        return 1;
+
+    if(test_rrdset_context_switch_releases_old_instance())
+        return 1;
+
+    if(test_health_acquire_keeps_obsolete_chart_unaccessed())
         return 1;
 
     // These cover one invariant between them, so run them all and report every failure rather than

@@ -70,13 +70,12 @@ type payload func(context.Context, []string, []byte, *os.File, *os.File) ndexec.
 
 func starter(t *testing.T, body payload) startFunc {
 	t.Helper()
-	return func(ctx context.Context, opts ndexec.ProcessOptions, _ string, args ...string) (treeProcess, error) {
-		dup := func(file *os.File) *os.File {
-			fd, err := unix.Dup(int(file.Fd()))
-			require.NoError(t, err)
-			return os.NewFile(uintptr(fd), "test-owned-child-pipe")
+	return func(ctx context.Context, opts ndexec.TreeOptions, _ string, args ...string) (treeProcess, error) {
+		pipes, err := duplicatePipes(opts.Stdin, opts.Stdout, opts.Stderr)
+		if err != nil {
+			return nil, err
 		}
-		input, output, stderr := dup(opts.Stdin), dup(opts.Stdout), dup(opts.Stderr)
+		input, output, stderr := pipes[0], pipes[1], pipes[2]
 		process := &fakeTree{
 			done: make(chan ndexec.TreeResult, 1),
 		}
@@ -90,6 +89,21 @@ func starter(t *testing.T, body payload) startFunc {
 		return process, nil
 	}
 }
+func duplicatePipes(files ...*os.File) ([]*os.File, error) {
+	var pipes []*os.File
+	for _, file := range files {
+		fd, err := unix.Dup(int(file.Fd()))
+		if err != nil {
+			for _, opened := range pipes {
+				opened.Close()
+			}
+			return nil, err
+		}
+		pipes = append(pipes, os.NewFile(uintptr(fd), "test-owned-child-pipe"))
+	}
+	return pipes, nil
+}
+
 func testEngine(t *testing.T) (*Engine, *fakeHistory, *observedArtifacts) {
 	t.Helper()
 	base := t.TempDir()
@@ -97,7 +111,7 @@ func testEngine(t *testing.T) (*Engine, *fakeHistory, *observedArtifacts) {
 	require.NoError(t, err)
 	assets, err := filepath.Abs("assets")
 	require.NoError(t, err)
-	for name, pin := range packagePins {
+	for name, pin := range requiredRuntime.Packages {
 		dir := filepath.Join(base, "deps", "node_modules", name)
 		require.NoError(t, os.MkdirAll(dir, 0700))
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"version":"`+pin+`"}`), 0600))
@@ -122,12 +136,12 @@ func testEngine(t *testing.T) (*Engine, *fakeHistory, *observedArtifacts) {
 		Store: store,
 	}
 	engine := New(
-		Config{
-			NodePath:         bin,
-			BrowserPath:      bin,
-			AssetsPath:       assets,
-			DependenciesPath: filepath.Join(base, "deps"),
-		},
+		assets,
+		fixtureRuntime{Paths: Paths{
+			Node:         bin,
+			Browser:      bin,
+			Dependencies: filepath.Join(base, "deps"),
+		}},
 		history,
 		owner,
 	)
@@ -395,16 +409,12 @@ func TestQueuedCancellationNeverStartsAChild(t *testing.T) {
 func TestUnverifiedDrainPoisonsBeforeReaderJoin(t *testing.T) {
 	e, _, a := testEngine(t)
 	held := make(chan struct{})
-	e.start = func(_ context.Context, opts ndexec.ProcessOptions, _ string, _ ...string) (treeProcess, error) {
-		outFD, err := unix.Dup(int(opts.Stdout.Fd()))
-		require.NoError(t, err)
-		out := os.NewFile(uintptr(outFD), "unknown-test-survivor")
-		errFD, err := unix.Dup(int(opts.Stderr.Fd()))
-		require.NoError(t, err)
-		stderr := os.NewFile(uintptr(errFD), "unknown-test-survivor-stderr")
-		inFD, err := unix.Dup(int(opts.Stdin.Fd()))
-		require.NoError(t, err)
-		input := os.NewFile(uintptr(inFD), "unknown-test-survivor-input")
+	e.start = func(_ context.Context, opts ndexec.TreeOptions, _ string, _ ...string) (treeProcess, error) {
+		pipes, err := duplicatePipes(opts.Stdin, opts.Stdout, opts.Stderr)
+		if err != nil {
+			return nil, err
+		}
+		input, out, stderr := pipes[0], pipes[1], pipes[2]
 		t.Cleanup(func() { close(held); _ = out.Close(); _ = stderr.Close(); _ = input.Close() })
 		p := &fakeTree{
 			done: make(chan ndexec.TreeResult, 1),
@@ -442,7 +452,9 @@ func TestSecretInputRedactionAndDiagnosticBounds(t *testing.T) {
 	e.start = starter(t, func(_ context.Context, args []string, raw []byte, out, _ *os.File) ndexec.TreeResult {
 		assert.NotContains(t, strings.Join(args, " "), "long-secret")
 		var sent wireRequest
-		require.NoError(t, json.Unmarshal(raw, &sent))
+		if err := json.Unmarshal(raw, &sent); err != nil {
+			return ndexec.TreeResult{Drained: true, Err: err}
+		}
 		assert.Equal(t, request.Secrets, sent.Secrets)
 		for i := 0; i < EventLimit+4; i++ {
 			emit(
@@ -494,7 +506,7 @@ func TestHistoryUncertaintyIsNotReplayed(t *testing.T) {
 }
 func TestOversizeRequestNeverStartsWorkflow(t *testing.T) {
 	e, _, a := testEngine(t)
-	e.start = func(context.Context, ndexec.ProcessOptions, string, ...string) (treeProcess, error) {
+	e.start = func(context.Context, ndexec.TreeOptions, string, ...string) (treeProcess, error) {
 		t.Error("oversize request started a child")
 		return nil, errors.New("unexpected start")
 	}
@@ -520,7 +532,7 @@ func TestCheckVersionProbeIsSupervisedAndDoesNotLoadWorkflow(t *testing.T) {
 		if calls == 1 {
 			fmt.Fprintf(out, `{"version":"24.20.0","uid":%d,"gid":%d}`, os.Geteuid(), os.Getegid())
 		} else {
-			fmt.Fprint(out, "Chromium 153.0.8010.12")
+			fmt.Fprint(out, "Chromium 154.0.8037.92")
 		}
 		return ndexec.TreeResult{
 			Drained: true,
@@ -682,7 +694,7 @@ func TestLighthouseTargetRedactionBeforeHistory(t *testing.T) {
 
 func TestWhitespaceScriptRejectedBeforeExecution(t *testing.T) {
 	e, _, _ := testEngine(t)
-	e.start = func(context.Context, ndexec.ProcessOptions, string, ...string) (treeProcess, error) {
+	e.start = func(context.Context, ndexec.TreeOptions, string, ...string) (treeProcess, error) {
 		t.Error("invalid script started a child")
 		return nil, errors.New("unexpected process start")
 	}
@@ -693,3 +705,99 @@ func TestWhitespaceScriptRejectedBeforeExecution(t *testing.T) {
 	assert.Equal(t, synthetic.Error, got.Run.Outcome)
 	assert.Equal(t, "script must not be blank", got.Run.Error)
 }
+
+func TestCheckRequiresQualifiedBrowserIdentity(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("the prepared runtime explicitly requires unprivileged plugin identity")
+	}
+	for _, tc := range []struct {
+		name    string
+		version string
+		valid   bool
+	}{
+		{name: "qualified binary", version: "Chromium 154.0.8037.92 \n", valid: true},
+		{name: "Debian launcher", version: "Chromium 154.0.8037.92 built on Debian GNU/Linux 13 (trixie)\n", valid: true},
+		{name: "previous browser", version: "Chromium 153.0.8010.12"},
+		{name: "new unqualified version", version: "Chromium 154.0.8037.93"},
+		{name: "version substring", version: "Chromium 154.0.8037.920"},
+		{name: "Chrome for Testing", version: "Google Chrome for Testing 154.0.8037.92"},
+		{name: "unrelated output", version: "diagnostic: Chromium 154.0.8037.92"},
+		{name: "empty response"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e, _, _ := testEngine(t)
+			calls := 0
+			e.start = starter(t, func(_ context.Context, _ []string, _ []byte, out, _ *os.File) ndexec.TreeResult {
+				calls++
+				if calls == 1 {
+					fmt.Fprintf(out, `{"version":"24.20.0","uid":%d,"gid":%d}`, os.Geteuid(), os.Getegid())
+				} else {
+					fmt.Fprint(out, tc.version)
+				}
+				return ndexec.TreeResult{Drained: true}
+			})
+			err := e.Check(context.Background(), synthetic.Journey)
+			if tc.valid {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, "prepared full Chromium must be version 154.0.8037.92")
+			}
+			assert.Equal(t, 2, calls)
+		})
+	}
+}
+
+func TestCheckRejectsUnqualifiedPackageBeforeStarting(t *testing.T) {
+	e, _, _ := testEngine(t)
+	metadata := filepath.Join(e.source.(fixtureRuntime).Paths.Dependencies, "node_modules", "playwright", "package.json")
+	require.NoError(t, os.WriteFile(metadata, []byte(`{"version":"0.0.0"}`), 0600))
+	e.start = func(context.Context, ndexec.TreeOptions, string, ...string) (treeProcess, error) {
+		t.Fatal("unqualified package started a version probe")
+		return nil, errors.New("unexpected process")
+	}
+	require.ErrorContains(t, e.Check(context.Background(), synthetic.Journey), "prepared playwright must be version 1.63.0")
+}
+
+func TestCheckPreservesNodeMinimumFromManifest(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("the prepared runtime explicitly requires unprivileged plugin identity")
+	}
+	for _, tc := range []struct {
+		version string
+		valid   bool
+	}{
+		{version: "23.11.0"}, {version: "24.20.0", valid: true}, {version: "25.0.0", valid: true},
+	} {
+		t.Run(tc.version, func(t *testing.T) {
+			e, _, _ := testEngine(t)
+			calls := 0
+			e.start = starter(t, func(_ context.Context, _ []string, _ []byte, out, _ *os.File) ndexec.TreeResult {
+				calls++
+				if calls == 1 {
+					fmt.Fprintf(out, `{"version":%q,"uid":%d,"gid":%d}`, tc.version, os.Geteuid(), os.Getegid())
+				} else {
+					fmt.Fprint(out, "Chromium 154.0.8037.92")
+				}
+				return ndexec.TreeResult{Drained: true}
+			})
+			err := e.Check(context.Background(), synthetic.Journey)
+			if tc.valid {
+				require.NoError(t, err)
+				assert.Equal(t, 2, calls)
+			} else {
+				require.ErrorContains(t, err, "prepared Node must be version 24 or newer")
+				assert.Equal(t, 1, calls)
+			}
+		})
+	}
+}
+
+type fixtureRuntime struct{ Paths Paths }
+
+func (r fixtureRuntime) BeginUse() (Use, error) { return fixtureUse{r.Paths}, nil }
+
+type fixtureUse struct{ paths Paths }
+
+func (u fixtureUse) Paths() Paths                       { return u.paths }
+func (u fixtureUse) Completion() *ndexec.TreeCompletion { return nil }
+func (u fixtureUse) Finish(bool) error                  { return nil }

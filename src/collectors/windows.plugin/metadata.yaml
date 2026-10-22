@@ -68,7 +68,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -298,11 +297,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: 10min_cpu_usage
-        metric: system.cpu
-        info: "Average CPU utilization over the last 10 minutes"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cpu.conf
     metrics:
       folding:
         title: Metrics
@@ -401,7 +395,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -571,7 +564,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -687,7 +679,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -872,27 +863,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: inbound_packets_dropped_ratio
-        metric: net.drops
-        info: Ratio of inbound dropped packets for the network interface ${label:device} over the last 10 minutes
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
-      - name: outbound_packets_dropped_ratio
-        metric: net.drops
-        info: Ratio of outbound dropped packets for the network interface ${label:device} over the last 10 minutes
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
-      - name: 1m_received_traffic_overflow
-        metric: net.net
-        info: Average inbound utilization for the network interface ${label:device} over the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
-      - name: 1m_sent_traffic_overflow
-        metric: net.net
-        info: Average outbound utilization for the network interface ${label:device} over the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
-      - name: network_interface_output_queue_length
-        metric: net.queue_length
-        info: Output Queue Length on interface ${label:device} should be zero, otherwise there are delays and bottlenecks.
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
     metrics:
       folding:
         title: Metrics
@@ -1194,7 +1164,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1304,7 +1273,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1391,7 +1359,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1485,7 +1452,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1566,7 +1532,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1646,11 +1611,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: power_supply_capacity
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/power_supply_capacity.conf
-        metric: powersupply.capacity
-        info: percentage of remaining power supply capacity
     metrics:
       folding:
         title: Metrics
@@ -1748,7 +1708,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1980,7 +1939,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -2616,7 +2574,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -2718,7 +2675,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -3209,7 +3165,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -3598,7 +3553,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -4280,7 +4234,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -4456,7 +4409,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -4737,7 +4689,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -4830,7 +4781,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -5218,7 +5168,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -5304,7 +5253,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics

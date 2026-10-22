@@ -9,7 +9,8 @@ artifact (root `AGENTS.md`, "Collector Consistency"):
 3. **`config_schema.json`**: the dashboard's DynCfg editor (form rules:
    `.agents/skills/collectors-go-design/config-schema.md`).
 4. **The stock `.conf`**: what `/etc/netdata/<plugin>/...` ships.
-5. **`health.d/*.conf`**: alert definitions for the collector's metrics.
+5. **`health.d/*.conf`**: alert definitions for the collector's metrics; the integration page's alert table is derived
+   from them and the contexts `metadata.yaml` declares.
 6. **The authoritative documentation source**: usually `metadata.yaml`; never a generated integration page or umbrella
    page.
 
@@ -28,8 +29,8 @@ This is the skill's one statement of the boundary; other skill files point here.
 short contributor-facing version.
 
 - The source PR contains authoritative inputs (hand-authored `metadata.yaml`, ibm.d `contexts.yaml`/`config.go`/
-  `module.yaml`, SNMP profiles and the trap catalogue), generators, schemas, templates, workflows, tests, and maintainer
-  contracts.
+  `module.yaml`, SNMP profiles and the trap catalogue, `src/health/health.d`), generators, schemas, templates,
+  workflows, tests, and maintainer contracts.
 - Generated documentation is NOT in the source PR: per-integration `<dir>/integrations/<slug>.md`, generated `README.md`
   files and symlinks, the umbrella pages `src/collectors/COLLECTORS.md`, `SECRETS.md`, `SERVICE-DISCOVERY.md`, and
   producer-generated metadata (ibm.d `metadata.yaml`, the NPM catalog `metadata.yaml`). After the source PR merges,
@@ -70,8 +71,8 @@ short contributor-facing version.
 `integrations/tests/test_taxonomy.py` are an early implementation of a collector dashboard taxonomy that is unused
 today, will change substantially, and is kept in the tree for that later work. No workflow runs any of it (removed
 2026-09-06). Do not author, extend, or seed `taxonomy.yaml` for a new collector; leave the existing files alone unless
-the redesign touches them; `metrics.dynamic_context_prefixes` and `metrics.dynamic_collect_plugins` in `metadata.yaml`
-are read only by this tooling.
+the redesign touches them; `metrics.dynamic_collect_plugins` in `metadata.yaml` is read only by this tooling, and
+`metrics.dynamic_context_prefixes` also feeds the catalogue's `contexts` export.
 
 ## What is enforced today
 
@@ -82,18 +83,29 @@ are read only by this tooling.
   checks. This is not factual verification or a complete MDX build.
 - `integrations/tests/test_descriptions.py` (both workflows): the generated page meta descriptions
   (`description-authoring.md`) resolve, validate, and are unique.
-- `integrations/tests/test_health_alerts.py` (both workflows; `check-markdown.yml` also runs on `src/health/health.d/**`
-  changes): every `metadata.yaml` alert row names a stock alert, links the conf that defines it, and has `metric` equal
-  to the alert's `on:` (an alarm whose chart id differs from the documented context is listed in `METRIC_ELSEWHERE`);
-  it also pins the `alerts` export parser to `health.d`.
+- `integrations/tests/test_health_alerts.py` (both workflows, which also run on `src/health/health.d/**` changes): the
+  alert ownership rule and its invariants (the metadata skill's `alerts-and-meta.md`, section 1; the test's `UNOWNED`
+  names are the only owner-less alerts besides Agent alerts, and an entry that gains an owner fails). It also pins the
+  `alerts` export parser to `health.d`, requires every stock alert to set `class` and `type` from the vocabulary in
+  `health_alerts.py` and a `component` without case or plural spelling variants, keeps that vocabulary equal to the
+  `src/health/REFERENCE.md` tables, and requires every `calc`, `warn` and `crit` variable on a documented target to
+  be a documented dimension name (also with a `_raw` or `_last_collected_t` suffix), an alert name, a listed chart or
+  host variable (`CHART_VARIABLES`, `HOST_VARIABLES`) or a `context.dimension` reference, checked only when that
+  context is documented; health built-ins and the `green`/`red` a rule sets are exempt.
+- `integrations/tests/test_context_owners.py` (both workflows): the `contexts` export rules (`in-app-contract.md`);
+  every declared `dynamic_context_prefixes` entry is exported, and no exported prefix covers a context another module
+  documents outside that module's longer prefixes.
 - `collecttest.AssertConfigSchemaMatchesMetadata` (opt-in, per collector test): option descriptions and tabs agree
   between `config_schema.json` and `metadata.yaml`.
+- `collecttest` artifact checks (opt-in, per collector test;
+  `.agents/skills/collectors-go-framework-v2/chart-template.md#tests`): metric rows against the chart template, and
+  stock alert targets, units, lookup dimensions and the dimensions their expressions read against the documented
+  metrics.
 - The ibm.d runtime-output drift gate ("Delivery boundary" above).
-- Not enforced anywhere: metric rows against the code, alert rows beyond name, link and metric (`info`
-  verbatim, `os`, order, completeness), option names against the schema for collectors that have not opted in, stock
-  conf defaults against the schema. `check-markdown.yml` checks that generated links resolve on Learn, not that
-  sources are in sync. `integrations/check_collector_metadata.py` is broken
-  and unused (`gotchas.md`). Until such checks exist, these are review-time checks.
+- Not enforced anywhere: metric rows against the code and option names against the schema for collectors that have
+  not opted in, stock conf defaults against the schema. `check-markdown.yml` checks that generated links resolve on
+  Learn, not that sources are in sync. `integrations/check_collector_metadata.py` is broken and unused
+  (`gotchas.md`). Until such checks exist, these are review-time checks.
 - ibm.d modules are the exception: docgen generates `metadata.yaml` and `config_schema.json` from `contexts.yaml`,
   `config.go`, and `module.yaml`, so those agree by construction; the stock `.conf` and `health.d/<...>.conf` still need
   manual sync (`ibm-d.md`).
@@ -114,9 +126,10 @@ Review follows `AGENTS.md#skill-selection` and does not itself regenerate or pub
    deriving groups from the collector's own keys, the opt-in `collecttest.AssertConfigSchemaMatchesMetadata` call) are
    owned by `.agents/skills/collectors-go-design/config-schema.md` sections 3 and 8; the metadata side of a row by
    `.agents/skills/collectors-metadata-yaml/setup.md`.
-3. **Alert changes have matching `metadata.yaml.alerts` entries.** An alert added, removed, or renamed in
-   `health.d/<plugin>.conf` changes `metadata.yaml.modules.<m>.alerts[]`. Row content (name, `on:` context, `info`
-   verbatim, link, `os`): `.agents/skills/collectors-metadata-yaml/alerts-and-meta.md`.
+3. **Alerts keep an owner.** An alert added, removed, or retargeted in `health.d` reaches the pages by derivation: its
+   `on:` context is declared in the owning collector's `metadata.yaml` metrics, or the alert is listed by name where
+   the context cannot be declared. An integration whose monitored instance lacks the data an alert reads excludes it
+   by name (`excluded_alerts`). Rule: `.agents/skills/collectors-metadata-yaml/alerts-and-meta.md` section 1.
 4. **README handling.** A plugin directory with one integration has a README symlinked to the generated
    `integrations/<slug>.md`, which follows `metadata.yaml`. A directory with several integrations has a hand-written
    README the author updates. `agent_notification` is special: the README itself is the generated artifact (no
