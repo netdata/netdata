@@ -273,7 +273,7 @@ endif
 
 .PHONY: clean clean-workdir clean-staging clean-all \
         clear-cache clear-full-cache \
-        docker-image docker-shell
+        docker-image docker-shell docker-platform
 
 all: archive-gz archive-zstd
 
@@ -320,6 +320,9 @@ docker-image:
 
 docker-shell: $(QEMU_DEP) $(DOCKER_IMAGE_DEP)
 	+$(DOCKER) run $(DOCKER_ARGS) $(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) -it $(BUILDER) /bin/bash
+
+docker-platform:
+	@echo "$(PLATFORM)"
 
 $(TARGET_PREP): $(QEMU_DEP) $(DOCKER_IMAGE_DEP) Makefile
 	mkdir -p $(TARGET_STAMPS) $(TARGET_STAGING)

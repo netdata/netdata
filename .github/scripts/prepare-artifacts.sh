@@ -15,7 +15,7 @@ TOP="$(pwd)"
 DISTFILE_EXTENSIONS="gz zst"
 MSI_ARCHES="x64"
 STATIC_ARCHES="x86_64 aarch64 armv6l armv7l"
-STATIC_EXTENSIONS="gz"
+STATIC_EXTENSIONS="gz zstd"
 VERSION="$(cat packaging/version)"
 VERSION_URL_PREFIX="https://artifacts.netdata.cloud/${build_type}"
 
