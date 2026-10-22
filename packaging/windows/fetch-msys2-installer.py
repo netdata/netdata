@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-'''Fetch the pinned MSYS2 base tarball bundled in the Windows installer.'''
+'''Fetch a pinned MSYS2 file bundled in the Windows installer.'''
 
 from __future__ import annotations
 
@@ -13,14 +13,21 @@ from tempfile import TemporaryDirectory
 from typing import Final
 from urllib.request import Request, urlopen
 
-REPO: Final = 'msys2/msys2-installer'
-
-# Pinned so an MSYS2 release can not change what we ship without a reviewed change. This release bundles
-# msys2-runtime 3.6.10, whose msys-2.0.dll kills netdata at startup; package-windows.sh replaces that DLL with
-# the patched build from msys2-runtime/ (see msys2-runtime/runtime.env).
-RELEASE: Final = '2026-09-27'
-SHA256: Final = '8a2095647afbf799d113d0cae35f7544589d059819042635504e75bd2179bd02'
-FILE: Final = f'msys2-base-x86_64-{RELEASE.replace("-", "")}.tar.zst'
+# Pinned so an MSYS2 release can not change what we ship without a reviewed change.
+PINS: Final = {
+    # The MSYS2 tree the installer ships. This release bundles msys2-runtime 3.6.10, whose msys-2.0.dll kills netdata
+    # at startup; package-windows.sh replaces that DLL with the one from the runtime package below.
+    'base': (
+        'https://github.com/msys2/msys2-installer/releases/download/2026-09-27/msys2-base-x86_64-20260927.tar.zst',
+        '8a2095647afbf799d113d0cae35f7544589d059819042635504e75bd2179bd02',
+    ),
+    # MSYS2's msys2-runtime 3.6.11, which carries the upstream fixes 3.6.10 lacks. Drop it once the base pin moves to
+    # a release that bundles 3.6.11 or later.
+    'runtime': (
+        'https://repo.msys2.org/msys/x86_64/msys2-runtime-3.6.11-4-x86_64.pkg.tar.zst',
+        '7b1c4b625483ceff9a87f2dfcf3659704dc3da655a0ad414ecb7d9175e7d3ba0',
+    ),
+}
 
 
 def sha256sum(path: Path) -> str:
@@ -28,19 +35,16 @@ def sha256sum(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest().casefold()
 
 
-def fetch_release_asset(tmpdir: Path, file: str) -> Path:
-    '''Fetch a specific asset of the pinned release.'''
-    REQUEST: Final = Request(
-        url=f'https://github.com/{REPO}/releases/download/{RELEASE}/{file}',
-        method='GET',
-    )
-    TARGET: Final = tmpdir / file
+def fetch(tmpdir: Path, url: str) -> Path:
+    '''Fetch a file into a temporary directory.'''
+    FILE: Final = url.rsplit('/', 1)[1]
+    TARGET: Final = tmpdir / FILE
 
-    print(f'>>> Downloading {file}')
+    print(f'>>> Downloading {FILE}')
 
-    with urlopen(REQUEST, timeout=15) as response:
+    with urlopen(Request(url=url, method='GET'), timeout=15) as response:
         if response.status != 200:
-            print(f'!!! Failed to fetch {file}, status={response.status}')
+            print(f'!!! Failed to fetch {FILE}, status={response.status}')
             sys.exit(1)
 
         TARGET.write_bytes(response.read())
@@ -50,32 +54,33 @@ def fetch_release_asset(tmpdir: Path, file: str) -> Path:
 
 def main() -> None:
     '''Core program logic.'''
-    if len(sys.argv) != 2:
-        print(f'{__file__} must be run with exactly one argument.')
+    if len(sys.argv) != 3 or sys.argv[1] not in PINS:
+        print(f'Usage: {__file__} <{"|".join(PINS)}> <target>')
         sys.exit(1)
 
-    target = Path(sys.argv[1])
+    url, sha256 = PINS[sys.argv[1]]
+    target = Path(sys.argv[2])
     tmp_target = target.with_name(f'.{target.name}.tmp')
 
-    if target.is_file() and sha256sum(target) == SHA256:
-        print(f'>>> {target} already holds {FILE}')
+    if target.is_file() and sha256sum(target) == sha256:
+        print(f'>>> {target} already holds {url}')
         return
 
     with TemporaryDirectory() as tmpdir:
-        installer = fetch_release_asset(Path(tmpdir), FILE)
+        file = fetch(Path(tmpdir), url)
 
         print('>>> Verifying SHA256 checksum')
-        actual_checksum = sha256sum(installer)
+        actual_checksum = sha256sum(file)
 
-        if actual_checksum != SHA256:
+        if actual_checksum != sha256:
             print('!!! Checksum mismatch')
-            print(f'!!! Expected: {SHA256}')
+            print(f'!!! Expected: {sha256}')
             print(f'!!! Actual:   {actual_checksum}')
             sys.exit(1)
 
         print(f'>>> Copying to {target}')
 
-        shutil.copy(installer, tmp_target)
+        shutil.copy(file, tmp_target)
         tmp_target.replace(target)
 
 
