@@ -319,7 +319,7 @@ dirs: $(TARGET_CACHE) $(TARGET_WORKDIR) $(TARGET_STAMPS) $(TARGET_STAGING) $(TAR
 
 docker-image:
 	[ "$(BUILDER_STATUS)" == "MISMATCH" ] && "$(DOCKER)" image rm "$(BUILDER)"
-	[ "${BUILDER_STATUS)" != "OK" ] && $(DOCKER) pull --platform "$(PLATFORM)" "$(BUILDER)"
+	[ "$(BUILDER_STATUS)" != "OK" ] && $(DOCKER) pull --platform "$(PLATFORM)" "$(BUILDER)"
 
 docker-shell: $(QEMU_DEP) $(DOCKER_IMAGE_DEP)
 	+$(DOCKER) run $(DOCKER_ARGS) $(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) -it $(BUILDER) /bin/bash
