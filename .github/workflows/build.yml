@@ -74,7 +74,7 @@ jobs:
             .github/scripts/run-updater-check.sh
             src/go/tools/topology-ip-intel-downloader/
             packaging/cmake/
-            packaging/makeself/
+            packaging/static/
             packaging/installer/
             packaging/windows/
             packaging/*.sh
@@ -100,7 +100,7 @@ jobs:
             src/go/tools/topology-ip-intel-downloader/
             src/go/go.mod
             src/go/go.sum
-            packaging/makeself/
+            packaging/static/
           files_ignore: |
             packaging/**/*.md
             packaging/repoconfig/
@@ -363,7 +363,7 @@ jobs:
         id: channel
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.type != 'nightly' && needs.file-check.outputs.run == 'true'
         run: |
-          sed -i 's/^RELEASE_CHANNEL="nightly"/RELEASE_CHANNEL="stable"/' netdata-installer.sh packaging/makeself/install-or-update.sh
+          sed -i 's/^RELEASE_CHANNEL="nightly"/RELEASE_CHANNEL="stable"/' netdata-installer.sh packaging/static/installer/install-or-update.sh
       - name: Get Cache Key
         if: (github.event_name != 'pull_request' || ! contains(github.event.pull_request.labels.*.name, 'run-ci/no-cache')) && needs.file-check.outputs.run == 'true'
         id: cache-key
@@ -397,7 +397,7 @@ jobs:
           if [ "${{ matrix.arch }}" != "armv6l" ]; then
             export NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR="${GITHUB_WORKSPACE}/.topology-ip-intel-stock"
           fi
-          make -C packaging/static -j $(nproc) BUILDARCH=${{ matrix.arch }}
+          make -C packaging/static -j $(nproc) BUILDARCH=${{ matrix.arch }} TOPLOGY_STOCK_DIR="${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}"
       - name: Verify topology-ip-intel stock payload
         id: verify-topology-stock
         if: needs.file-check.outputs.run == 'true' && matrix.arch != 'armv6l'
@@ -405,7 +405,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          archive="$(find "${GITHUB_WORKSPACE}/artifacts" \
+          archive="$(find "${GITHUB_WORKSPACE}/packaging/static/archives" \
             -maxdepth 1 \
             -type f \
             -name 'netdata-${{ matrix.arch }}-*.gz.run' \
@@ -448,7 +448,7 @@ jobs:
 
           # The build machines do not exhibit Cortex-A53 erratum 843419, so the runtime checks cannot see a binary
           # linked without its workaround; scan the shipped executables instead.
-          archive="$(find "${GITHUB_WORKSPACE}/artifacts" \
+          archive="$(find "${GITHUB_WORKSPACE}/packaging/static/archives" \
             -maxdepth 1 \
             -type f \
             -name 'netdata-aarch64-*.gz.run' \
