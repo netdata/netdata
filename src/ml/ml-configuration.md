@@ -94,6 +94,10 @@ When your system detects a potential anomaly:
 2. **Each model independently determines if the data point is anomalous** based on its training period
 3. Only if **ALL** models agree that the data point is anomalous will Netdata set the anomaly bit to 1 (anomalous)
 
+A model trained on data with no usable spread (for example, a metric that sat on the same few values for its whole
+training window) cannot score a data point. It abstains, and the remaining models decide. If every model abstains, the
+data point is normal.
+
 ```mermaid
 flowchart TD
     NewData("New Metric<br/>Data Point")
