@@ -32,7 +32,6 @@ func (c *Collector) collect() error {
 		c.metrics.state.ObserveStateSet(metrix.StateSetPoint{
 			States: map[string]bool{state: true},
 		}, labels)
-		c.metrics.enabled.Observe(boolToFloat(status.Enabled), labels)
 
 		run, seen := c.runs[name]
 		run.observe(status, seen)
@@ -74,26 +73,23 @@ func serviceType(s *ServiceStatus) string {
 	return serviceTypeService
 }
 
-func boolToFloat(v bool) float64 {
-	if v {
-		return 1
-	}
-	return 0
-}
-
 // classifyState maps raw runit status into a single operational state.
 //
 // runit sv(8) reports: state (down/run/finish) + flags (normally up/down, want up/down, paused, got TERM).
-// We collapse these into states meaningful for monitoring:
+// We collapse these into states meaningful for monitoring,
+// where the *_manual states differ from the boot configuration (the presence of the down file)
+// because of `sv up`, `sv once` or `sv down`:
 //
-//   - running:  state=run, not paused, not stopping
-//   - paused:   paused flag set (any underlying state)
-//   - stopping: state=run, want down, got TERM (the process has not exited after `sv down` yet),
-//     or state=finish (transitional);
-//     want down without TERM is a process started by `sv once`, which runs normally
-//   - starting: state=down, want up (transitional — trying to come up)
-//   - failed:   state=down, normally up, not want up (should be running but isn't)
-//   - down:     state=down, not normally up (intentionally stopped)
+//   - running:        state=run, normally up, not want down
+//   - running_manual: state=run, normally down (started by `sv up` or `sv once`),
+//     or want down without TERM (started by `sv once`, it will not be restarted)
+//   - paused:         paused flag set (any underlying state)
+//   - stopping:       state=run, want down, got TERM
+//     (the process has not exited after `sv down` yet),
+//     or state=finish (transitional)
+//   - starting:       state=down, want up (transitional — trying to come up)
+//   - down_manual:    state=down, normally up, not want up (stopped by `sv down` or `sv once`)
+//   - down:           state=down, normally down
 func classifyState(s *ServiceStatus) string {
 	if s.Paused {
 		return statePaused
@@ -103,6 +99,9 @@ func classifyState(s *ServiceStatus) string {
 		if s.WantDown && s.GotTERM {
 			return stateStopping
 		}
+		if !s.Enabled || s.WantDown {
+			return stateRunningManual
+		}
 		return stateRunning
 	case ServiceStateFinish:
 		return stateStopping
@@ -111,7 +110,7 @@ func classifyState(s *ServiceStatus) string {
 			return stateStarting
 		}
 		if s.Enabled {
-			return stateFailed
+			return stateDownManual
 		}
 		return stateDown
 	}

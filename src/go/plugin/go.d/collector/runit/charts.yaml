@@ -8,7 +8,6 @@ groups:
         by_labels: [service_name]
     metrics:
       - service_state
-      - service_enabled
     charts:
       - title: Service State
         context: service_state
@@ -17,20 +16,18 @@ groups:
         dimensions:
           - selector: service_state{service_state="running"}
             name: running
+          - selector: service_state{service_state="running_manual"}
+            name: running_manual
           - selector: service_state{service_state="down"}
             name: down
-          - selector: service_state{service_state="failed"}
-            name: failed
+          - selector: service_state{service_state="down_manual"}
+            name: down_manual
           - selector: service_state{service_state="starting"}
             name: starting
           - selector: service_state{service_state="stopping"}
             name: stopping
           - selector: service_state{service_state="paused"}
             name: paused
-          - selector: service_enabled
-            name: enabled
-            options:
-              hidden: true
   - family: restarts
     chart_defaults:
       priority: 70100

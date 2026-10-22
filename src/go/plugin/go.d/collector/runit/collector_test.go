@@ -170,18 +170,18 @@ func TestCollector_Collect(t *testing.T) {
 				})
 			},
 			wantSeries: mergeSeries(
-				// sshd: run, 12345s — running, enabled (no "normally down").
-				serviceSeries("sshd", serviceTypeService, stateRunning, true, 12345),
-				// cron: run, (pid 123) 999s, paused — paused, enabled.
-				serviceSeries("cron", serviceTypeService, statePaused, true, 999),
-				// getty-5: down, 60s, normally up — failed, enabled.
-				serviceSeries("getty-5", serviceTypeService, stateFailed, true, 60),
-				// socklog: down, 5s, normally up, want up — starting, enabled.
-				serviceSeries("socklog", serviceTypeService, stateStarting, true, 5),
-				// ntpd: down, 100s — down, not enabled.
-				serviceSeries("ntpd", serviceTypeService, stateDown, false, 100),
-				// dhclient: finish, 3s — stopping, enabled (no "normally down").
-				serviceSeries("dhclient", serviceTypeService, stateStopping, true, 3),
+				// sshd: run, 12345s — running (no "normally down").
+				serviceSeries("sshd", serviceTypeService, stateRunning, 12345),
+				// cron: run, (pid 123) 999s, paused — paused.
+				serviceSeries("cron", serviceTypeService, statePaused, 999),
+				// getty-5: down, 60s, normally up — down_manual.
+				serviceSeries("getty-5", serviceTypeService, stateDownManual, 60),
+				// socklog: down, 5s, normally up, want up — starting.
+				serviceSeries("socklog", serviceTypeService, stateStarting, 5),
+				// ntpd: down, 100s — down (no "normally up").
+				serviceSeries("ntpd", serviceTypeService, stateDown, 100),
+				// dhclient: finish, 3s — stopping.
+				serviceSeries("dhclient", serviceTypeService, stateStopping, 3),
 			),
 		},
 		"service with log subprocess": {
@@ -191,9 +191,9 @@ func TestCollector_Collect(t *testing.T) {
 				})
 			},
 			wantSeries: mergeSeries(
-				// socklog: run, 500s; log subprocess also running. Both enabled.
-				serviceSeries("socklog", serviceTypeService, stateRunning, true, 500),
-				serviceSeries("socklog/log", serviceTypeLog, stateRunning, true, 500),
+				// socklog: run, 500s; log subprocess also running.
+				serviceSeries("socklog", serviceTypeService, stateRunning, 500),
+				serviceSeries("socklog/log", serviceTypeLog, stateRunning, 500),
 			),
 		},
 		"running but normally down": {
@@ -203,7 +203,7 @@ func TestCollector_Collect(t *testing.T) {
 				})
 			},
 			wantSeries: mergeSeries(
-				serviceSeries("oneshot", serviceTypeService, stateRunning, false, 5),
+				serviceSeries("oneshot", serviceTypeService, stateRunningManual, 5),
 			),
 		},
 		"running but asked to go down": {
@@ -214,7 +214,7 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			// The process got TERM after `sv down` and has not exited yet.
 			wantSeries: mergeSeries(
-				serviceSeries("nginx", serviceTypeService, stateStopping, true, 10),
+				serviceSeries("nginx", serviceTypeService, stateStopping, 10),
 			),
 		},
 		"running once": {
@@ -224,7 +224,16 @@ func TestCollector_Collect(t *testing.T) {
 				})
 			},
 			// `sv once` runs the service without restarting it after it exits.
-			wantSeries: serviceSeries("backup", serviceTypeService, stateRunning, false, 10),
+			wantSeries: serviceSeries("backup", serviceTypeService, stateRunningManual, 10),
+		},
+		"running once, normally up": {
+			prepare: func(*testing.T) *Collector {
+				return prepareMockCollector(&mockSvCli{
+					data: []byte("run: /service/sshd: (pid 42) 10s, want down\n"),
+				})
+			},
+			// runsv will not restart the service after it exits.
+			wantSeries: serviceSeries("sshd", serviceTypeService, stateRunningManual, 10),
 		},
 		"service disappears on second collect": {
 			prepare: func(t *testing.T) *Collector {
@@ -238,7 +247,7 @@ func TestCollector_Collect(t *testing.T) {
 				return collr
 			},
 			wantSeries: mergeSeries(
-				serviceSeries("sshd", serviceTypeService, stateRunning, true, 12345),
+				serviceSeries("sshd", serviceTypeService, stateRunning, 12345),
 			),
 		},
 		"empty response": {
@@ -359,15 +368,11 @@ func TestCollector_Cleanup(t *testing.T) {
 	assert.NotPanics(t, func() { collr.Cleanup(t.Context()) })
 }
 
-func serviceSeries(name, typ, state string, enabled bool, duration metrix.SampleValue) map[string]metrix.SampleValue {
+func serviceSeries(name, typ, state string, duration metrix.SampleValue) map[string]metrix.SampleValue {
 	label := `{service_name="` + name + `",service_type="` + typ + `"}`
 	series := map[string]metrix.SampleValue{
-		"service_enabled" + label:        0,
 		"service_restarts" + label:       0,
 		"service_state_duration" + label: duration,
-	}
-	if enabled {
-		series["service_enabled"+label] = 1
 	}
 	for _, s := range serviceStates {
 		var v metrix.SampleValue
@@ -394,17 +399,32 @@ func TestClassifyState(t *testing.T) {
 	}{
 		"run state": {
 			status: &ServiceStatus{
-				State: ServiceStateRun,
+				State:   ServiceStateRun,
+				Enabled: true,
 			},
 			want: stateRunning,
 		},
+		"run, not enabled (running_manual)": {
+			status: &ServiceStatus{
+				State: ServiceStateRun,
+			},
+			want: stateRunningManual,
+		},
 		"run, want down, got TERM (stopping)": {
+			status: &ServiceStatus{State: ServiceStateRun, Enabled: true, WantDown: true, GotTERM: true},
+			want:   stateStopping,
+		},
+		"run, not enabled, want down, got TERM (stopping)": {
 			status: &ServiceStatus{State: ServiceStateRun, WantDown: true, GotTERM: true},
 			want:   stateStopping,
 		},
 		"run, want down (once)": {
+			status: &ServiceStatus{State: ServiceStateRun, Enabled: true, WantDown: true},
+			want:   stateRunningManual,
+		},
+		"run, not enabled, want down (once)": {
 			status: &ServiceStatus{State: ServiceStateRun, WantDown: true},
-			want:   stateRunning,
+			want:   stateRunningManual,
 		},
 		"run, want down, got TERM, paused": {
 			status: &ServiceStatus{State: ServiceStateRun, WantDown: true, GotTERM: true, Paused: true},
@@ -437,12 +457,12 @@ func TestClassifyState(t *testing.T) {
 			},
 			want: stateDown,
 		},
-		"down, enabled (failed)": {
+		"down, enabled (down_manual)": {
 			status: &ServiceStatus{
 				State:   ServiceStateDown,
 				Enabled: true,
 			},
-			want: stateFailed,
+			want: stateDownManual,
 		},
 		"down, want up (starting)": {
 			status: &ServiceStatus{

@@ -19,18 +19,20 @@ const (
 )
 
 const (
-	stateRunning  = "running"
-	stateDown     = "down"
-	stateFailed   = "failed"
-	stateStarting = "starting"
-	stateStopping = "stopping"
-	statePaused   = "paused"
+	stateRunning       = "running"
+	stateRunningManual = "running_manual"
+	stateDown          = "down"
+	stateDownManual    = "down_manual"
+	stateStarting      = "starting"
+	stateStopping      = "stopping"
+	statePaused        = "paused"
 )
 
 var serviceStates = []string{
 	stateRunning,
+	stateRunningManual,
 	stateDown,
-	stateFailed,
+	stateDownManual,
 	stateStarting,
 	stateStopping,
 	statePaused,
@@ -38,7 +40,6 @@ var serviceStates = []string{
 
 type collectorMetrics struct {
 	state         metrix.StateSetInstrument
-	enabled       metrix.SnapshotGauge
 	restarts      metrix.SnapshotCounter
 	stateDuration metrix.SnapshotGauge
 }
@@ -50,7 +51,6 @@ func newCollectorMetrics(store metrix.CollectorStore) *collectorMetrics {
 			metrix.WithStateSetMode(metrix.ModeEnum),
 			metrix.WithStateSetStates(serviceStates...),
 		),
-		enabled:       m.Gauge("service_enabled"),
 		restarts:      m.Counter("service_restarts"),
 		stateDuration: m.Gauge("service_state_duration"),
 	}
