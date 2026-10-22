@@ -13,9 +13,10 @@ BUILDARCH ?= $(shell uname -m)
 
 # Paths
 SRCDIR := $(abspath $(MAKEFILE_DIR)../..)
-STAGING ?= $(MAKEFILE_DIR)/staging
-CACHE ?= $(MAKEFILE_DIR)/cache
-WORKDIR ?= $(MAKEFILE_DIR)/work
+STAGING ?= $(MAKEFILE_DIR)staging
+CACHE ?= $(MAKEFILE_DIR)cache
+WORKDIR ?= $(MAKEFILE_DIR)work
+ARCHIVES ?= $(MAKEFILE_DIR)archives
 
 VERSION ?= $(shell cat $(SRCDIR)/packaging/version)
 
@@ -168,6 +169,8 @@ MAKESELF_OPTS = --notemp \
                 ./system/post-installer.sh \
                 $(NULL)
 
+# Topology info setup
+
 ifneq ($(strip $(TOPOLOGY_STOCK_DIR)),)
     DOCKER_ARGS := $(DOCKER_ARGS) \
                    -v "$(abspath $(TOPOLOGY_STOCK_DIR)):/topology-stock:ro" \
@@ -318,8 +321,12 @@ dirs: $(TARGET_CACHE) $(TARGET_WORKDIR) $(TARGET_STAMPS) $(TARGET_STAGING) $(TAR
 	$(DOCKER) run --rm --privileged $(QEMU_SETUP) --install "$(QEMU_ARCH)" ; \
 
 docker-image:
-	[ "$(BUILDER_STATUS)" != "MISMATCH" ] || "$(DOCKER)" image rm "$(BUILDER)"
-	[ "$(BUILDER_STATUS)" != "OK" ] || $(DOCKER) pull --platform "$(PLATFORM)" "$(BUILDER)"
+	if [ "$(BUILDER_STATUS)" = "MISMATCH" ] ; then \
+		"$(DOCKER)" image rm "$(BUILDER)" ; \
+	fi
+	if [ "$(BUILDER_STATUS)" != "OK" ] ; then \
+		$(DOCKER) pull --platform "$(PLATFORM)" "$(BUILDER)" ; \
+	fi
 
 docker-shell: $(QEMU_DEP) $(DOCKER_IMAGE_DEP)
 	+$(DOCKER) run $(DOCKER_ARGS) $(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) -it $(BUILDER) /bin/bash
@@ -616,18 +623,6 @@ $(BASH_CONFIG): prepare $(BASH_DIR) | $(OPENSSL_STAGING)
 			-e PKG_CONFIG_PATH="$(OPENSSL_PKGCONFIG_PATH)" \
 			-w $(DOCKER_WORKDIR)/bash \
 			$(BUILDER) \
-			/usr/bin/autoreconf -if ; \
-	fi
-	+if [ ! -f $(BASH_CACHE_HIT) ]; then \
-		$(DOCKER) run $(DOCKER_ARGS) \
-			$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
-			-e CFLAGS="$(BASH_CFLAGS)" \
-			-e CXXFLAGS="$(BASH_CFLAGS)" \
-			-e LDFLAGS="$(BASH_LDFLAGS)" \
-			-e PKG_CONFIG="pkg-config --static" \
-			-e PKG_CONFIG_PATH="$(OPENSSL_PKGCONFIG_PATH)" \
-			-w $(DOCKER_WORKDIR)/bash \
-			$(BUILDER) \
 			/bin/bash ./configure \
 				--prefix="$(DOCKER_INSTALL)" \
 				--without-bash-malloc \
@@ -857,25 +852,25 @@ $(TARGET_INSTALL)/system/install-or-update.sh: $(SRCDIR)/packaging/static/instal
 makeself.lsm: makeself.lsm.in
 	sed -e 's|NETDATA_VERSION|$(VERSION)|' < $< > $@
 
-archives/netdata-$(BUILDARCH)-$(VERSION).gz.run: $(ARCHIVE_DEPS)
+$(ARCHIVES)/netdata-$(BUILDARCH)-$(VERSION).gz.run: $(ARCHIVE_DEPS)
 	mkdir -p $(@D)
 	rm -f $@
 	$(MAKEFILE_DIR)/makeself/makeself.sh \
 		--gzip --complevel 9 \
 		$(MAKESELF_OPTS)
 
-archives/netdata-$(BUILDARCH)-$(VERSION).zstd.run: $(ARCHIVE_DEPS)
+$(ARCHIVES)/netdata-$(BUILDARCH)-$(VERSION).zstd.run: $(ARCHIVE_DEPS)
 	mkdir -p $(@D)
 	rm -f $@
 	$(MAKEFILE_DIR)/makeself/makeself.sh \
 		--zstd --complevel 19 \
 		$(MAKESELF_OPTS)
 
-archives/netdata-$(BUILDARCH)-latest.gz.run: archives/netdata-$(BUILDARCH)-$(VERSION).gz.run
+$(ARCHIVES)/netdata-$(BUILDARCH)-latest.gz.run: $(ARCHIVES)/netdata-$(BUILDARCH)-$(VERSION).gz.run
 	cp -a --reflink=auto $< $@
 
-archives/netdata-$(BUILDARCH)-latest.zstd.run: archives/netdata-$(BUILDARCH)-$(VERSION).zstd.run
+$(ARCHIVES)/netdata-$(BUILDARCH)-latest.zstd.run: $(ARCHIVES)/netdata-$(BUILDARCH)-$(VERSION).zstd.run
 	cp -a --reflink=auto $< $@
 
-archive-gz: archives/netdata-$(BUILDARCH)-latest.gz.run
-archive-zstd: archives/netdata-$(BUILDARCH)-latest.zstd.run
+archive-gz: $(ARCHIVES)/netdata-$(BUILDARCH)-latest.gz.run
+archive-zstd: $(ARCHIVES)/netdata-$(BUILDARCH)-latest.zstd.run
