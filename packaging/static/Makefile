@@ -809,7 +809,7 @@ go-elf-check: $(NETDATA_INSTALL)
 	$(MAKEFILE_DIR)/scripts/elf-check.sh $(TARGET_INSTALL)/usr/libexec/netdata/plugins.d/go.d.plugin $(ELF_MACHINE) $(ELF_CLASS)
 
 topology-check: $(NETDATA_INSTALL)
-	$(MAKEFILE_DIR)/scripts/check-topology-ip-intel.sh $(TARGET_INSTALL)
+	$(MAKEFILE_DIR)/scripts/check-topology-ip-intel-dir.sh $(TARGET_INSTALL)
 
 cortex-a53-erratum-843419-check: $(NETDATA_INSTALL)
 	python3 $(MAKEFILE_DIR)/scripts/check-a53-erratum-843419.py $(TARGET_INSTALL)
