@@ -2216,12 +2216,7 @@ func TestCollector_Collect(t *testing.T) {
 }
 
 func TestCollector_Collect_ReturnsMetricsetAPIErrors(t *testing.T) {
-	tests := map[string]struct {
-		command     string
-		wantMetric  string
-		wantMissing string
-		wantLog     string
-	}{
+	tests := map[string]metricsetErrorCase{
 		"system": {
 			command:     systemInfoCommand,
 			wantMetric:  stateMetricKey("ha_status", "enabled", nil),
@@ -2252,25 +2247,12 @@ func TestCollector_Collect_ReturnsMetricsetAPIErrors(t *testing.T) {
 			wantMissing: metricKey("ipsec_tunnels_active", nil),
 			wantLog:     "ipsec metricset: IPsec SA query API call: transport failed",
 		},
-		"ipsec tunnel flow": {
-			command:     ipsecFlowCommand,
-			wantMetric:  metricKey("system_uptime", systemLabels()),
-			wantMissing: stateMetricKey("ipsec_tunnel_state", "active", ipsecTunnelStateLabels("branch-a", "1")),
-			wantLog:     "ipsec tunnel state metricset: IPsec tunnel flow query API call: transport failed",
-		},
-		"ipsec gateway": {
-			command:     ipsecGatewayCommand,
-			wantMetric:  metricKey("system_uptime", systemLabels()),
-			wantMissing: stateMetricKey("ipsec_gateway_state", "up", ipsecGatewayLabels("gw-branch-a", "ikev1")),
-			wantLog:     "ipsec gateway metricset: IPsec gateway query API call: transport failed",
-		},
-		"ipsec IKE SA": {
-			command:     ipsecIKESACommand,
-			wantMetric:  metricKey("system_uptime", systemLabels()),
-			wantMissing: stateMetricKey("ipsec_gateway_state", "up", ipsecGatewayLabels("gw-branch-a", "ikev1")),
-			wantLog:     "ipsec gateway metricset: IPsec IKE SA query API call: transport failed",
-		},
 	}
+	maps.Copy(tests, ipsecStateErrorCases(
+		"ipsec tunnel state metricset: IPsec tunnel flow query API call: transport failed",
+		"ipsec gateway metricset: IPsec gateway query API call: transport failed",
+		"ipsec gateway metricset: IPsec IKE SA query API call: transport failed",
+	))
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -2291,12 +2273,7 @@ func TestCollector_Collect_ReturnsMetricsetAPIErrors(t *testing.T) {
 }
 
 func TestCollector_Collect_ReportsMalformedXMLResponse(t *testing.T) {
-	tests := map[string]struct {
-		command     string
-		wantMetric  string
-		wantMissing string
-		wantLog     string
-	}{
+	tests := map[string]metricsetErrorCase{
 		"system": {
 			command:     systemInfoCommand,
 			wantMetric:  stateMetricKey("ha_status", "enabled", nil),
@@ -2327,24 +2304,6 @@ func TestCollector_Collect_ReportsMalformedXMLResponse(t *testing.T) {
 			wantMissing: metricKey("ipsec_tunnels_active", nil),
 			wantLog:     "parse PAN-OS IPsec response",
 		},
-		"ipsec tunnel flow": {
-			command:     ipsecFlowCommand,
-			wantMetric:  metricKey("system_uptime", systemLabels()),
-			wantMissing: stateMetricKey("ipsec_tunnel_state", "active", ipsecTunnelStateLabels("branch-a", "1")),
-			wantLog:     "parse PAN-OS IPsec flow response",
-		},
-		"ipsec gateway": {
-			command:     ipsecGatewayCommand,
-			wantMetric:  metricKey("system_uptime", systemLabels()),
-			wantMissing: stateMetricKey("ipsec_gateway_state", "up", ipsecGatewayLabels("gw-branch-a", "ikev1")),
-			wantLog:     "parse PAN-OS IPsec gateway response",
-		},
-		"ipsec IKE SA": {
-			command:     ipsecIKESACommand,
-			wantMetric:  metricKey("system_uptime", systemLabels()),
-			wantMissing: stateMetricKey("ipsec_gateway_state", "up", ipsecGatewayLabels("gw-branch-a", "ikev1")),
-			wantLog:     "parse PAN-OS IPsec IKE SA response",
-		},
 		"bgp": {
 			command:     legacyBGPPeerCommand,
 			wantMetric:  metricKey("system_uptime", systemLabels()),
@@ -2352,6 +2311,11 @@ func TestCollector_Collect_ReportsMalformedXMLResponse(t *testing.T) {
 			wantLog:     "parse PAN-OS BGP response",
 		},
 	}
+	maps.Copy(tests, ipsecStateErrorCases(
+		"parse PAN-OS IPsec flow response",
+		"parse PAN-OS IPsec gateway response",
+		"parse PAN-OS IPsec IKE SA response",
+	))
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -3538,6 +3502,27 @@ func ipsecLabels(tunnel, gateway, remote, tunnelID, protocol, encryption string)
 		"tunnel_id":  tunnelID,
 		"protocol":   protocol,
 		"encryption": encryption,
+	}
+}
+
+// metricsetErrorCase describes a metricset whose command fails while the system metricset still commits.
+type metricsetErrorCase struct {
+	command     string
+	wantMetric  string
+	wantMissing string
+	wantLog     string
+}
+
+// ipsecStateErrorCases returns the error cases of the IPsec state metricsets, shared by the
+// API error and malformed XML tables, which differ only in the expected log line.
+func ipsecStateErrorCases(flowLog, gatewayLog, ikeSALog string) map[string]metricsetErrorCase {
+	systemUptime := metricKey("system_uptime", systemLabels())
+	tunnelState := stateMetricKey("ipsec_tunnel_state", "active", ipsecTunnelStateLabels("branch-a", "1"))
+	gatewayState := stateMetricKey("ipsec_gateway_state", "up", ipsecGatewayLabels("gw-branch-a", "ikev1"))
+	return map[string]metricsetErrorCase{
+		"ipsec tunnel flow": {command: ipsecFlowCommand, wantMetric: systemUptime, wantMissing: tunnelState, wantLog: flowLog},
+		"ipsec gateway":     {command: ipsecGatewayCommand, wantMetric: systemUptime, wantMissing: gatewayState, wantLog: gatewayLog},
+		"ipsec IKE SA":      {command: ipsecIKESACommand, wantMetric: systemUptime, wantMissing: gatewayState, wantLog: ikeSALog},
 	}
 }
 
