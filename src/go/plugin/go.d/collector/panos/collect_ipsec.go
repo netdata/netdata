@@ -79,31 +79,38 @@ func parseIPSecTunnels(body []byte) (ipsecTunnelPayload, error) {
 		found:        true,
 		entriesFound: result.Entries != nil,
 	}
-	var activeCount int64
-	if strings.TrimSpace(result.NTun) != "" {
-		count, err := parseRequiredPANOSIntField("IPsec active tunnel count", result.NTun)
-		if err != nil {
-			return ipsecTunnelPayload{found: true, entriesFound: result.Entries != nil}, err
-		}
-		activeCount = count
-	}
-	if result.Entries == nil {
-		payload.activeCount = activeCount
+	if result.Entries != nil {
+		// <ntun> is the number of configured tunnels, not established SAs (PAN-OS lists
+		// only established SAs in <entries>), so it is ignored when entries are present.
+		payload.tunnels = result.Entries.Entries
+		payload.activeCount = countIPSecTunnels(payload.tunnels)
 		return payload, nil
 	}
-	// <ntun> is the number of configured tunnels, not established SAs (PAN-OS lists
-	// only established SAs in <entries>), so it is not an active count when entries are present.
-	payload.tunnels = result.Entries.Entries
-	payload.activeCount = countIPSecTunnels(payload.tunnels)
+
+	count, err := parseRequiredPANOSIntField("IPsec active tunnel count", result.NTun)
+	if err != nil {
+		return ipsecTunnelPayload{found: true}, err
+	}
+	payload.activeCount = count
 	return payload, nil
+}
+
+// ipsecTunnelIdentity identifies a tunnel across rekeys. SPIs are left out on purpose: an old SA
+// and its replacement have different SPIs but belong to the same tunnel.
+type ipsecTunnelIdentity struct {
+	name, gateway, tunnelID string
 }
 
 // countIPSecTunnels counts distinct tunnels, so an SA that briefly coexists with
 // its replacement during a rekey is not counted twice.
 func countIPSecTunnels(tunnels []ipsecTunnel) int64 {
-	seen := make(map[string]struct{}, len(tunnels))
+	seen := make(map[ipsecTunnelIdentity]struct{}, len(tunnels))
 	for _, tunnel := range tunnels {
-		seen[ipsecTunnelKey(tunnel)] = struct{}{}
+		seen[ipsecTunnelIdentity{
+			name:     strings.TrimSpace(tunnel.Name),
+			gateway:  strings.TrimSpace(tunnel.Gateway),
+			tunnelID: strings.TrimSpace(tunnel.TID),
+		}] = struct{}{}
 	}
 	return int64(len(seen))
 }

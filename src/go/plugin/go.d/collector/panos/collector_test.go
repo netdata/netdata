@@ -1796,6 +1796,61 @@ func TestCollector_Collect(t *testing.T) {
 				},
 			},
 		},
+		"IPsec malformed ntun does not discard listed SAs": {
+			prepare: func(_ *Collector, api *mockAPIClient) {
+				api.responses = map[string][]byte{
+					ipsecSACommand: []byte(
+						`<response status="success"><result><entries><entry><name>branch-a</name><gateway>gw-branch-a</gateway><remote>198.51.100.10</remote><remain>60</remain><tid>66</tid></entry></entries><ntun>six</ntun></result></response>`,
+					),
+				}
+			},
+			steps: []collectStep{
+				{
+					name: "ntun is ignored when entries are present",
+					wantMetrics: map[string]metrix.SampleValue{
+						metricKey("ipsec_tunnels_active", nil): 1,
+						metricKey("ipsec_tunnel_sa_lifetime", ipsecLabels("branch-a", "gw-branch-a", "198.51.100.10", "66", "unknown", "unknown")): 60,
+					},
+					notWantLog: []string{"IPsec active tunnel count"},
+				},
+			},
+		},
+		"IPsec rekey without a tunnel ID is counted once": {
+			prepare: func(_ *Collector, api *mockAPIClient) {
+				api.responses = map[string][]byte{
+					ipsecSACommand: []byte(
+						`<response status="success"><result><entries>` +
+							`<entry><name>branch-a</name><gateway>gw-a</gateway><remain>60</remain><i_spi>1</i_spi></entry>` +
+							`<entry><name> branch-a </name><gateway>gw-a</gateway><remain>7200</remain><i_spi>2</i_spi></entry>` +
+							`</entries></result></response>`,
+					),
+				}
+			},
+			steps: []collectStep{
+				{
+					name:        "SPIs and padding do not make a second tunnel",
+					wantMetrics: map[string]metrix.SampleValue{metricKey("ipsec_tunnels_active", nil): 1},
+				},
+			},
+		},
+		"IPsec tunnels differing only in punctuation are counted separately": {
+			prepare: func(_ *Collector, api *mockAPIClient) {
+				api.responses = map[string][]byte{
+					ipsecSACommand: []byte(
+						`<response status="success"><result><entries>` +
+							`<entry><name>branch.b</name><gateway>gw-b</gateway><remain>60</remain><tid>1</tid></entry>` +
+							`<entry><name>branch_b</name><gateway>gw-b</gateway><remain>60</remain><tid>1</tid></entry>` +
+							`</entries></result></response>`,
+					),
+				}
+			},
+			steps: []collectStep{
+				{
+					name:        "branch.b and branch_b are two tunnels",
+					wantMetrics: map[string]metrix.SampleValue{metricKey("ipsec_tunnels_active", nil): 2},
+				},
+			},
+		},
 		"IPsec entries-only response infers active count": {
 			prepare: func(_ *Collector, api *mockAPIClient) {
 				api.responses = map[string][]byte{
