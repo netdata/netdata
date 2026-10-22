@@ -47,25 +47,4 @@ void sender_thread_commit_with_trace(struct sender_state *s, BUFFER *wb, STREAM_
 void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buffer *commit, STREAM_TRAFFIC_TYPE type);
 #define sender_commit_clean_buffer(s, wb, type) sender_buffer_commit(s, wb, NULL, type)
 
-// with compression enabled, commits queue their text and the dispatcher compresses it in batches
-// the queue is compressed by the committer once it reaches this size
-#define SENDER_PENDING_MAX_SIZE (COMPRESSION_MAX_MSG_SIZE * 2 / 3)
-
-typedef enum {
-    SENDER_COMPRESS_OK = 0,
-    SENDER_COMPRESS_OVERFLOW,       // the circular buffer is full
-    SENDER_COMPRESS_FAILED,         // the compressor failed twice
-} SENDER_COMPRESS_RC;
-
-// these require the sender lock
-SENDER_COMPRESS_RC sender_pending_add_unsafe(struct sender_state *s, const char *src, size_t src_len, STREAM_TRAFFIC_TYPE type);
-SENDER_COMPRESS_RC sender_pending_compress_unsafe(struct sender_state *s);
-bool sender_pending_has_data_unsafe(struct sender_state *s);
-void sender_pending_flush_unsafe(struct sender_state *s);
-
-// this requires the sender lock and the waitq, and releases both
-void sender_compress_failed_and_unlock(struct sender_state *s, SENDER_COMPRESS_RC rc);
-
-void sender_pending_free(struct sender_state *s);
-
 #endif //NETDATA_STREAM_SENDER_COMMIT_H
