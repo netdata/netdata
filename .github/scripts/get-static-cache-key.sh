@@ -1,7 +1,7 @@
 #!/bin/sh
 
 arch="${1}"
-platform="$(make -C packaging/static BUILDARCH="${arch}" docker-platform)"
+platform="$(make -C packaging/static --no-print-directory BUILDARCH="${arch}" docker-platform)"
 builder_rev="v1"
 
 packaging/static/scripts/cache-key.sh packaging/static > /tmp/static-cache-key-data
