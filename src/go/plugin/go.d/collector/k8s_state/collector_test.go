@@ -1033,6 +1033,7 @@ func TestCollector_Collect_DeleteObjectKeepsLongerNamedSibling(t *testing.T) {
 			for _, c := range *deletedOnly.Charts() {
 				expected[c.ID] = true
 			}
+			// Runs second: charts both collectors have (discovery, node01) must stay active.
 			for _, c := range *liveOnly.Charts() {
 				expected[c.ID] = false
 			}
