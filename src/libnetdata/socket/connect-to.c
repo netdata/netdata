@@ -241,8 +241,8 @@ static void connect_attempt_timed_out(CONNECT_ATTEMPT *a) {
 //             while true IPv6 addresses are skipped (so it affects the calls that follow, not the one that set it);
 //             with a zero timeout there is no expiry, so it is never set
 //
-// returns the connected socket (blocking), or -ND_SOCK_ERR_TIMEOUT when IPs were still connecting when the timeout
-// expired, or else -ND_SOCK_ERROR of the last IP that failed
+// returns the connected socket (blocking), or -ND_SOCK_ERR_TIMEOUT if an attempt is pending at the deadline;
+// otherwise returns -ND_SOCK_ERROR for the last failure (default: -ND_SOCK_ERR_CONNECTION_REFUSED if none was tried)
 
 int connect_to_this_ip46(
     int protocol,
