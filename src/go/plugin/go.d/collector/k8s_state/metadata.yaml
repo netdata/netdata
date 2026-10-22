@@ -494,7 +494,7 @@ modules:
                 - name: OOMKilled
                 - name: Other
         - name: persistentvolumeclaim
-          description: These metrics refer to PersistentVolumeClaims and are collected only when the service account can `list` and `watch` `persistentvolumeclaims` in all namespaces; otherwise they are skipped.
+          description: These metrics refer to PersistentVolumeClaims and are collected only when the service account can `list` and `watch` `persistentvolumeclaims` in all namespaces; otherwise they are skipped. `requested` is the storage the PVC asks for and `capacity` is the size of the volume it got. `requested_capacity_diff` is `requested` minus `capacity`, calculated from the same PVC object. It is positive while the volume is smaller than requested (an expansion is pending or failed), 0 when the sizes are equal, and negative when the volume is larger than requested. A value that is not known is not reported, it is a gap and not 0. For example, a Pending PVC has no `capacity` yet, so it has no `requested_capacity_diff` either.
           labels:
             - name: k8s_cluster_id
               description: Cluster ID. This is equal to the kube-system namespace UID.
@@ -512,3 +512,4 @@ modules:
               dimensions:
                 - name: requested
                 - name: capacity
+                - name: requested_capacity_diff

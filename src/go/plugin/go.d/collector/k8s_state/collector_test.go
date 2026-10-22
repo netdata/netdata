@@ -947,14 +947,16 @@ func TestCollector_Collect(t *testing.T) {
 				step1 := func(t *testing.T, collr *Collector) {
 					mx := collr.Collect(context.Background())
 					expected := map[string]int64{
-						"discovery_node_discoverer_state": 1,
-						"discovery_pod_discoverer_state":  1,
-						"pvc_default_bound_capacity":      10737418240,
-						"pvc_default_bound_requested":     10737418240,
-						"pvc_default_expanding_capacity":  10737418240,
-						"pvc_default_expanding_requested": 21474836480,
-						"pvc_default_no-request_capacity": 1073741824,
-						"pvc_default_pending_requested":   5368709120,
+						"discovery_node_discoverer_state":               1,
+						"discovery_pod_discoverer_state":                1,
+						"pvc_default_bound_capacity":                    10737418240,
+						"pvc_default_bound_requested":                   10737418240,
+						"pvc_default_bound_requested_capacity_diff":     0,
+						"pvc_default_expanding_capacity":                10737418240,
+						"pvc_default_expanding_requested":               21474836480,
+						"pvc_default_expanding_requested_capacity_diff": 10737418240,
+						"pvc_default_no-request_capacity":               1073741824,
+						"pvc_default_pending_requested":                 5368709120,
 					}
 
 					assert.Equal(t, expected, mx)
@@ -964,7 +966,12 @@ func TestCollector_Collect(t *testing.T) {
 						len(*collr.Charts()),
 					)
 					// A value that is not set is a gap: a Pending PVC has no capacity, this one has no request.
-					missing := []string{"pvc_default_pending_capacity", "pvc_default_no-request_requested"}
+					missing := []string{
+						"pvc_default_pending_capacity",
+						"pvc_default_pending_requested_capacity_diff",
+						"pvc_default_no-request_requested",
+						"pvc_default_no-request_requested_capacity_diff",
+					}
 					skip := func(_ *collectorapi.Chart, dim *collectorapi.Dim) bool {
 						return slices.Contains(missing, dim.ID)
 					}
@@ -978,6 +985,19 @@ func TestCollector_Collect(t *testing.T) {
 						{Key: "k8s_namespace", Value: "default", Source: collectorapi.LabelSourceK8s},
 						{Key: "k8s_pvc_name", Value: "bound", Source: collectorapi.LabelSourceK8s},
 					}, chart.Labels)
+					assert.Equal(t, "PVC Capacity", chart.Title)
+					assert.Equal(t, "k8s_state.pvc_capacity", chart.Ctx)
+					var dimIDs, dimNames []string
+					for _, dim := range chart.Dims {
+						dimIDs = append(dimIDs, dim.ID)
+						dimNames = append(dimNames, dim.Name)
+					}
+					assert.Equal(t, []string{
+						"pvc_default_bound_requested",
+						"pvc_default_bound_capacity",
+						"pvc_default_bound_requested_capacity_diff",
+					}, dimIDs)
+					assert.Equal(t, []string{"requested", "capacity", "requested_capacity_diff"}, dimNames)
 
 					// The pending PVC gets bound, the expansion of the other one completes.
 					pvcs := client.CoreV1().PersistentVolumeClaims(corev1.NamespaceDefault)
@@ -988,15 +1008,18 @@ func TestCollector_Collect(t *testing.T) {
 				step2 := func(t *testing.T, collr *Collector) {
 					mx := collr.Collect(context.Background())
 					expected := map[string]int64{
-						"discovery_node_discoverer_state": 1,
-						"discovery_pod_discoverer_state":  1,
-						"pvc_default_bound_capacity":      10737418240,
-						"pvc_default_bound_requested":     10737418240,
-						"pvc_default_expanding_capacity":  21474836480,
-						"pvc_default_expanding_requested": 21474836480,
-						"pvc_default_no-request_capacity": 1073741824,
-						"pvc_default_pending_capacity":    5368709120,
-						"pvc_default_pending_requested":   5368709120,
+						"discovery_node_discoverer_state":               1,
+						"discovery_pod_discoverer_state":                1,
+						"pvc_default_bound_capacity":                    10737418240,
+						"pvc_default_bound_requested":                   10737418240,
+						"pvc_default_bound_requested_capacity_diff":     0,
+						"pvc_default_expanding_capacity":                21474836480,
+						"pvc_default_expanding_requested":               21474836480,
+						"pvc_default_expanding_requested_capacity_diff": 0,
+						"pvc_default_no-request_capacity":               1073741824,
+						"pvc_default_pending_capacity":                  5368709120,
+						"pvc_default_pending_requested":                 5368709120,
+						"pvc_default_pending_requested_capacity_diff":   0,
 					}
 
 					assert.Equal(t, expected, mx)
@@ -1006,7 +1029,10 @@ func TestCollector_Collect(t *testing.T) {
 						len(*collr.Charts()),
 					)
 					assert.Equal(t, 0, calcObsoleteCharts(*collr.Charts()))
-					missing := []string{"pvc_default_no-request_requested"}
+					missing := []string{
+						"pvc_default_no-request_requested",
+						"pvc_default_no-request_requested_capacity_diff",
+					}
 					skip := func(_ *collectorapi.Chart, dim *collectorapi.Dim) bool {
 						return slices.Contains(missing, dim.ID)
 					}
@@ -1016,6 +1042,149 @@ func TestCollector_Collect(t *testing.T) {
 				return testCase{
 					client: client,
 					steps:  []testCaseStep{step1, step2},
+				}
+			},
+		},
+		"PVC requested capacity diff": {
+			create: func(t *testing.T) testCase {
+				client := fake.NewClientset(
+					newPVC("equal-2gi", "2Gi", "2Gi"),
+					newPVC("equal-8gi", "8Gi", "8Gi"),
+					newPVC("equal-20gi-plus-1b", "21474836481", "21474836481"), // 20Gi+1 byte
+					newPVC("short-by-1b", "21474836481", "20Gi"),
+					newPVC("larger-capacity", "1Gi", "2Gi"),
+					newPVC("pending", "5Gi", ""),
+					newPVC("no-request", "", "1Gi"),
+					newPVC("max-requested", "9223372036854775807", "1"), // math.MaxInt64 bytes
+					newPVC("max-capacity", "1", "9223372036854775807"),
+				)
+				allowPVCAccess(client, "list", "watch")
+
+				step1 := func(t *testing.T, collr *Collector) {
+					mx := collr.Collect(context.Background())
+					expected := map[string]int64{
+						"discovery_node_discoverer_state":                        1,
+						"discovery_pod_discoverer_state":                         1,
+						"pvc_default_equal-20gi-plus-1b_capacity":                21474836481,
+						"pvc_default_equal-20gi-plus-1b_requested":               21474836481,
+						"pvc_default_equal-20gi-plus-1b_requested_capacity_diff": 0,
+						"pvc_default_equal-2gi_capacity":                         2147483648,
+						"pvc_default_equal-2gi_requested":                        2147483648,
+						"pvc_default_equal-2gi_requested_capacity_diff":          0,
+						"pvc_default_equal-8gi_capacity":                         8589934592,
+						"pvc_default_equal-8gi_requested":                        8589934592,
+						"pvc_default_equal-8gi_requested_capacity_diff":          0,
+						"pvc_default_larger-capacity_capacity":                   2147483648,
+						"pvc_default_larger-capacity_requested":                  1073741824,
+						"pvc_default_larger-capacity_requested_capacity_diff":    -1073741824,
+						"pvc_default_max-capacity_capacity":                      9223372036854775807,
+						"pvc_default_max-capacity_requested":                     1,
+						"pvc_default_max-capacity_requested_capacity_diff":       -9223372036854775806,
+						"pvc_default_max-requested_capacity":                     1,
+						"pvc_default_max-requested_requested":                    9223372036854775807,
+						"pvc_default_max-requested_requested_capacity_diff":      9223372036854775806,
+						"pvc_default_no-request_capacity":                        1073741824,
+						"pvc_default_pending_requested":                          5368709120,
+						"pvc_default_short-by-1b_capacity":                       21474836480,
+						"pvc_default_short-by-1b_requested":                      21474836481,
+						"pvc_default_short-by-1b_requested_capacity_diff":        1,
+					}
+
+					assert.Equal(t, expected, mx)
+					assert.Equal(t,
+						len(pvcChartsTmpl)*9+
+							len(baseCharts),
+						len(*collr.Charts()),
+					)
+					// A value that is not set is a gap, so is the difference that needs it.
+					missing := []string{
+						"pvc_default_pending_capacity",
+						"pvc_default_pending_requested_capacity_diff",
+						"pvc_default_no-request_requested",
+						"pvc_default_no-request_requested_capacity_diff",
+					}
+					skip := func(_ *collectorapi.Chart, dim *collectorapi.Dim) bool {
+						return slices.Contains(missing, dim.ID)
+					}
+					collecttest.TestMetricsHasAllChartsDimsSkip(t, collr.Charts(), mx, skip)
+				}
+
+				return testCase{
+					client: client,
+					steps:  []testCaseStep{step1},
+				}
+			},
+		},
+		"PVC resize stays pending until the capacity catches up": {
+			create: func(t *testing.T) testCase {
+				ctx := context.Background()
+				client := fake.NewClientset(newPVC("healthy", "8Gi", "8Gi"), newPVC("stuck", "8Gi", "8Gi"))
+				allowPVCAccess(client, "list", "watch")
+				pvcs := client.CoreV1().PersistentVolumeClaims(corev1.NamespaceDefault)
+
+				step1 := func(t *testing.T, collr *Collector) {
+					mx := collr.Collect(ctx)
+					expected := map[string]int64{
+						"discovery_node_discoverer_state":             1,
+						"discovery_pod_discoverer_state":              1,
+						"pvc_default_healthy_capacity":                8589934592,
+						"pvc_default_healthy_requested":               8589934592,
+						"pvc_default_healthy_requested_capacity_diff": 0,
+						"pvc_default_stuck_capacity":                  8589934592,
+						"pvc_default_stuck_requested":                 8589934592,
+						"pvc_default_stuck_requested_capacity_diff":   0,
+					}
+
+					assert.Equal(t, expected, mx)
+					collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+
+					// The request grows, the volume does not follow.
+					_, _ = pvcs.Update(ctx, newPVC("stuck", "10Gi", "8Gi"), metav1.UpdateOptions{})
+				}
+
+				step2 := func(t *testing.T, collr *Collector) {
+					expected := map[string]int64{
+						"discovery_node_discoverer_state":             1,
+						"discovery_pod_discoverer_state":              1,
+						"pvc_default_healthy_capacity":                8589934592,
+						"pvc_default_healthy_requested":               8589934592,
+						"pvc_default_healthy_requested_capacity_diff": 0,
+						"pvc_default_stuck_capacity":                  8589934592,
+						"pvc_default_stuck_requested":                 10737418240,
+						"pvc_default_stuck_requested_capacity_diff":   2147483648,
+					}
+
+					// The shortfall is reported on every collection while the volume is not expanded.
+					for range 2 {
+						mx := collr.Collect(ctx)
+						assert.Equal(t, expected, mx)
+						collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+					}
+
+					// The volume is expanded.
+					_, _ = pvcs.Update(ctx, newPVC("stuck", "10Gi", "10Gi"), metav1.UpdateOptions{})
+				}
+
+				step3 := func(t *testing.T, collr *Collector) {
+					mx := collr.Collect(ctx)
+					expected := map[string]int64{
+						"discovery_node_discoverer_state":             1,
+						"discovery_pod_discoverer_state":              1,
+						"pvc_default_healthy_capacity":                8589934592,
+						"pvc_default_healthy_requested":               8589934592,
+						"pvc_default_healthy_requested_capacity_diff": 0,
+						"pvc_default_stuck_capacity":                  10737418240,
+						"pvc_default_stuck_requested":                 10737418240,
+						"pvc_default_stuck_requested_capacity_diff":   0,
+					}
+
+					assert.Equal(t, expected, mx)
+					collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+				}
+
+				return testCase{
+					client: client,
+					steps:  []testCaseStep{step1, step2, step3},
 				}
 			},
 		},
@@ -1036,10 +1205,11 @@ func TestCollector_Collect(t *testing.T) {
 				step2 := func(t *testing.T, collr *Collector) {
 					mx := collr.Collect(context.Background())
 					expected := map[string]int64{
-						"discovery_node_discoverer_state": 1,
-						"discovery_pod_discoverer_state":  1,
-						"pvc_default_data-old_capacity":   21474836480,
-						"pvc_default_data-old_requested":  21474836480,
+						"discovery_node_discoverer_state":              1,
+						"discovery_pod_discoverer_state":               1,
+						"pvc_default_data-old_capacity":                21474836480,
+						"pvc_default_data-old_requested":               21474836480,
+						"pvc_default_data-old_requested_capacity_diff": 0,
 					}
 
 					assert.Equal(t, expected, mx)

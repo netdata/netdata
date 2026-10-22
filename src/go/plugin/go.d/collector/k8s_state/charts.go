@@ -1005,6 +1005,7 @@ var (
 		Dims: collectorapi.Dims{
 			{ID: "pvc_%s_requested", Name: "requested"},
 			{ID: "pvc_%s_capacity", Name: "capacity"},
+			{ID: "pvc_%s_requested_capacity_diff", Name: "requested_capacity_diff"},
 		},
 	}
 )

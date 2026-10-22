@@ -256,3 +256,9 @@ type pvcState struct {
 }
 
 func (ps pvcState) id() string { return ps.namespace + "_" + ps.name }
+
+// requestedCapacityDiff returns requested - capacity, and false if either quantity is not set. It is signed and not
+// clamped: negative means the volume is larger than requested.
+func (ps pvcState) requestedCapacityDiff() (int64, bool) {
+	return ps.requested - ps.capacity, ps.hasRequested && ps.hasCapacity
+}
