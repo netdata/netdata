@@ -2015,6 +2015,26 @@ func TestCollector_Collect(t *testing.T) {
 				},
 			},
 		},
+		"IPsec unexpected IKE SA payload leaves gateway state as a gap": {
+			prepare: func(_ *Collector, api *mockAPIClient) {
+				api.responses = map[string][]byte{
+					ipsecIKESACommand: []byte(`<response status="success"><result><error>IKE SA query failed.</error></result></response>`),
+				}
+			},
+			steps: []collectStep{
+				{
+					name: "gateways are not reported down when the SA list cannot be read",
+					wantMetrics: mergeMetrics(
+						ipsecTunnelStateMetrics("branch-a", "1", "active"),
+					),
+					wantMissing: []string{
+						stateMetricKey("ipsec_gateway_state", "down", ipsecGatewayLabels("gw-branch-a", "ikev1")),
+						stateMetricKey("ipsec_gateway_state", "up", ipsecGatewayLabels("gw-branch-a", "ikev1")),
+					},
+					wantLog: []string{"unexpected element <error>"},
+				},
+			},
+		},
 		"IPsec IKE SA query failure leaves gateway state as a gap": {
 			prepare: func(_ *Collector, api *mockAPIClient) {
 				api.errors = map[string]error{ipsecIKESACommand: errors.New("transport failed")}
