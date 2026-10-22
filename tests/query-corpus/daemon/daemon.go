@@ -41,6 +41,9 @@ type Options struct {
 	StorageTiers     int    // defaults to 3
 	DBEnginePageType string // empty keeps the stock Gorilla default; also accepts gorilla or raw
 	StreamMemoryMode string // empty defaults to dbengine; also accepts ram or alloc
+	// DisablePulse prevents internal chart creation when a dedicated fixture
+	// needs deterministic chart construction order from the first boot.
+	DisablePulse bool
 	// TierRetentionMB caps a tier's dbengine disk quota (index = tier), so
 	// its oldest datafiles rotate out while the tiers above keep more
 	// history — the plan-switching scenario. Retention TIME knobs are
@@ -292,6 +295,10 @@ func startAttempt(o Options, hostname, streamKey string) (*Daemon, error) {
 		extraDB += fmt.Sprintf("    dbengine page type = %s\n", o.DBEnginePageType)
 	}
 	conf := fmt.Sprintf(netdataConfTemplate, o.RunDir, hostname, o.Port, o.StorageTiers, step, extraDB)
+	if o.DisablePulse {
+		conf = strings.Replace(conf, "[plugins]\n", "[plugins]\n    netdata pulse = no\n", 1)
+		conf += "\n[pulse]\n    extended = no\n"
+	}
 	confPath := filepath.Join(o.RunDir, "etc", "netdata.conf")
 	if err := os.WriteFile(confPath, []byte(conf), 0o644); err != nil {
 		return nil, fmt.Errorf("daemon: write netdata.conf: %w", err)

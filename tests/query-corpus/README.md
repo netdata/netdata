@@ -96,6 +96,15 @@ layers; each layer declares which entries it consumes:
   four numeric observations across a cadence change and an explicit gap.
   AVG/MIN/MAX, SUM, anomaly rate, and partial-data annotation have separate
   fixture-derived expectations.
+- **CASE-043 — completed-tier publication:** aligned 60-second collection
+  tests the existing 65535-second spreading ceiling on 2.5-day tier2 records.
+  A private daemon disables pulse before boot to control chart ordering;
+  an immediate-publication chart and eventual exact-value recovery distinguish
+  delayed visibility from absent source data. Streams stay open throughout.
+- **CASE-044 — retained-tail resumption:** fine-selected automatic queries
+  must resume on newer retained values after an older tier ends. Long-gap,
+  short-gap and overlap fixtures use forced-tier controls. Gap emptiness has
+  its own verdict so missing the entire newer tail cannot pass unnoticed.
 - **CASE-035 and storage backends:** the independent
   `CASE-035/intermediate-page-max-preserved` contract keeps intermediate-page
   and singleton-bridge maxima across restart and repeated warmed queries. A separate signed

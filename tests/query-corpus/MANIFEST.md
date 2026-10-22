@@ -342,6 +342,10 @@ set at the end.
 | L1/storage-backend-signed-values | every tier0 backend preserves the exact signed numeric-gap-numeric fixture, including a negative value after a gap, both hot and after applicable DBENGINE restarts | n/a |  |
 | L1/storage-backend-signed-reset | every tier0 backend preserves RESET only on its signed reset sample, EMPTY only on gaps, and clears both flags on following ordinary samples | n/a |  |
 | L1/storage-backend-signed-anomaly-rate | every tier0 backend preserves the exact 100% anomaly rate of an R-only signed sample while gaps and surrounding A samples have zero anomaly rate | n/a |  |
+| CASE-043/completed-tier-publication | completed tier2 records from aligned 60-second collection become query-visible within the existing 65535-second spreading ceiling plus one collection interval, with an immediate-publication control and an open stream | n/a |  |
+| CASE-043/completed-tier-recovery | a completed constant tier2 record is queryable with its exact average after the next tier record completes, without disconnecting or restarting | n/a |  |
+| CASE-044/fine-selected-resumption | automatic fine-selected queries return the exact newer retained values after an older tier ends, with forced-tier controls across long gaps, a short gap and overlapping retention | n/a |  |
+| CASE-044/retention-gap-null | automatic fine-selected queries keep rows without retained observations empty independently of whether newer retained values resume | n/a |  |
 
 ## Corpus-wide pusher discipline
 

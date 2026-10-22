@@ -1737,5 +1737,37 @@
       "ram",
       "alloc"
     ]
+  },
+  {
+    "name": "CASE-043/completed-tier-publication",
+    "proves": "completed tier2 records from aligned 60-second collection become query-visible within the existing 65535-second spreading ceiling plus one collection interval, with an immediate-publication control and an open stream",
+    "components": [
+      "slow-collector",
+      "control"
+    ]
+  },
+  {
+    "name": "CASE-043/completed-tier-recovery",
+    "proves": "a completed constant tier2 record is queryable with its exact average after the next tier record completes, without disconnecting or restarting"
+  },
+  {
+    "name": "CASE-044/fine-selected-resumption",
+    "proves": "automatic fine-selected queries return the exact newer retained values after an older tier ends, with forced-tier controls across long gaps, a short gap and overlapping retention",
+    "components": [
+      "alloc-long-gap",
+      "alloc-short-gap",
+      "alloc-overlap",
+      "dbengine-long-gap"
+    ]
+  },
+  {
+    "name": "CASE-044/retention-gap-null",
+    "proves": "automatic fine-selected queries keep rows without retained observations empty independently of whether newer retained values resume",
+    "components": [
+      "alloc-long-gap",
+      "alloc-short-gap",
+      "alloc-overlap",
+      "dbengine-long-gap"
+    ]
   }
 ]

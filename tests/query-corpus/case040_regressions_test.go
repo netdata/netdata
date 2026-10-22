@@ -294,6 +294,7 @@ func TestCase040DisjointFineSelectedGap(t *testing.T) {
 // Preserve the pre-existing coarse-selected form under its own key. Moving
 // owned tier0 files simulates expired retention without deleting the evidence.
 func TestCase040DisjointCoarseSelectedGap(t *testing.T) {
+	c044Register(t, "dbengine-long-gap")
 	for _, key := range []string{"coarse-selected-gap-null", "coarse-gap-boundary-average", "coarse-gap-boundary-sum", "coarse-gap-resume-average", "coarse-gap-resume-sum"} {
 		registerContract(t, "CASE-040/"+key)
 	}
@@ -353,6 +354,15 @@ func TestCase040DisjointCoarseSelectedGap(t *testing.T) {
 			}
 		})
 	}
+	t.Run("fine-selected", func(t *testing.T) {
+		var resumed []expectedColumnPoint
+		for off := int64(1501); off <= 1540; off++ {
+			resumed = append(resumed, wantNumberAt(base+off, resumedValue(off)))
+		}
+		c044Assert(t, dd, host, context, "dbengine-long-gap", base, base+1540,
+			base+901, base+1200, base+1201, base+1500,
+			[]daemon.Retention{{FirstEntry: base + 1501, LastEntry: base + 1540}, {FirstEntry: base + 60, LastEntry: base + 1200}}, resumed)
+	})
 }
 
 // The current coarse cadence may differ from the actual first stored interval.
