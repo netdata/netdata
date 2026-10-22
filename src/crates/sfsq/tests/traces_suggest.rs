@@ -487,11 +487,13 @@ fn a_tier_list_holds_every_key_the_visited_sources_rate_in_that_tier() {
     let mid = run(sources.clone(), SuggestQuery::keys_of_tier(FieldTier::Mid));
     assert_eq!(items(&mid), [("attributes.busy", Prefix)]);
 
+    // `attributes.busy` sorts right after the 60 `a..` keys: a cut before
+    // the filter would keep 60 keys, not 61.
     let cut = run(
         sources,
-        SuggestQuery::keys_of_tier(FieldTier::Low).max_items(10),
+        SuggestQuery::keys_of_tier(FieldTier::Low).max_items(61),
     );
-    assert_eq!(cut.items, low.items[..10], "cut after the filter");
+    assert_eq!(cut.items, low.items[..61], "cut after the filter");
     assert!(cut.truncated);
 }
 

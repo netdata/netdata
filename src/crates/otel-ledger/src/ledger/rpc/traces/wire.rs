@@ -72,7 +72,8 @@ struct RawOtelTracesRequest {
     /// The single-trace mode (dumb span list by trace id).
     #[serde(default, deserialize_with = "present")]
     trace: Option<serde_json::Value>,
-    /// Search-bar suggestions: keys, or one key's values.
+    /// Search-bar suggestions: keys, or one key's values; and the span
+    /// view's stack keys (every key of a tier).
     #[serde(default, deserialize_with = "present")]
     suggest: Option<serde_json::Value>,
     /// The span view: spans per bucket and a page of spans.

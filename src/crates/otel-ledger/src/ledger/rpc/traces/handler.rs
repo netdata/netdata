@@ -4,7 +4,8 @@
 //! The full mode catalog lives here: the Functions view (the trace
 //! list plus its trace-density grid), `info` (capability discovery),
 //! `trace` (exact single-trace fetch), `suggest` (the search bar's
-//! keys and values), and `explore` (the span view). Mode selection and every request-SHAPE check happen at
+//! keys and values, and the span view's stack keys), and `explore`
+//! (the span view). Mode selection and every request-SHAPE check happen at
 //! deserialization (the wire's typed request — shape errors are
 //! transport 400s); this handler owns only the semantic validation
 //! (trace-id shape, zero limits, bounds).
@@ -118,8 +119,9 @@ fn reported(refused: bool, status: QueryStatus) -> QueryStatus {
 }
 
 /// How many suggestion requests may run at once (the keystroke class).
-/// They arrive per keystroke; beyond this a request answers `busy` at
-/// once instead of queueing CPU and memory behind the others.
+/// They arrive per keystroke (the span view's tier list once per
+/// window); beyond this a request answers `busy` at once instead of
+/// queueing CPU and memory behind the others.
 const SUGGEST_CONCURRENCY: usize = 2;
 
 /// How many list requests (the Functions view: search page plus its
@@ -139,7 +141,10 @@ const EXPLORE_CONCURRENCY: usize = 2;
 
 /// How long a suggestion request may walk sources, from its arrival:
 /// suggestions answer per keystroke, so a partial answer now beats a
-/// complete one later. The newest source is always visited.
+/// complete one later. A tier list shares it: its keys come from file
+/// metadata, which a walk reads fast. The deadline is checked between
+/// sources (a key walk reads each visited source whole), and the newest
+/// source is always visited.
 const SUGGEST_DEADLINE: std::time::Duration = std::time::Duration::from_millis(250);
 
 /// The engine's span cap for one trace lookup: the item bound beside the

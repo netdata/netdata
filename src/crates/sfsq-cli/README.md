@@ -195,7 +195,8 @@ all.
 - `--max-files` — stop after this number of files that have the key
   (default 256; 0 is an error).
 - `--stale-files` — stop after this number of files in sequence that add
-  no suggestion (default 8; 0 is an error).
+  no suggestion (default 8; 0 is an error). With `--tier`, a file adds a
+  suggestion when it adds a key of any tier.
 - `--deadline-ms` — stop after this number of milliseconds.
 
 Each suggestion is one line: `<text> match=<class>`, then `tier=…` for a
