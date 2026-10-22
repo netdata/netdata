@@ -540,7 +540,6 @@ static void do_msmq(PERF_DATA_BLOCK *pDataBlock, int update_every)
     // A failed name decode still allows fresh values, but cannot prove which queues disappeared.
     if (complete)
         msmq_queues_evict_unseen(now_ut);
-
 }
 
 int do_PerflibMSMQ(int update_every, usec_t dt __maybe_unused)
