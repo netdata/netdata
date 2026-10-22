@@ -108,6 +108,10 @@ struct sender_state {
         uint32_t msg_slot;      // ensures a opcode queue that can never get full
 
         struct compressor_state compressor;
+        struct {
+            BUFFER *wb;                 // text committed but not compressed yet - protected by sender_lock()
+            STREAM_TRAFFIC_TYPE type;   // the traffic type of the text in wb
+        } pending;
 
         struct {
             size_t size;
