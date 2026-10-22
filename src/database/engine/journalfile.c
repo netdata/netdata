@@ -2123,21 +2123,32 @@ bool journalfile_v2_rebuild_from_v1(struct rrdengine_instance *ctx, struct rrden
     (void)close_uv_file(datafile, journalfile->file);
     journalfile->file = 0;
 
-    // the new journal v2 is charged by the migration; the rejected one is gone when
-    // it was overwritten or removed - otherwise datafile_delete() discharges it
+    // the new journal v2 is charged by the migration and overwrote the rejected one
     bool rebuilt = journalfile_v2_data_available(journalfile);
-    struct stat st;
-    journalfile_v2_generate_path(datafile, path, sizeof(path));
-    if (rebuilt || (stat(path, &st) != 0 && errno == ENOENT)) {
+    if (rebuilt) {
         ctx_current_disk_space_decrease(ctx, datafile->populate_mrg.rejected_v2_size);
         datafile->populate_mrg.rejected_v2_size = 0;
+        nd_log_daemon(NDLP_NOTICE, "DBENGINE: tier %d: the rejected journal v2 of datafile %u was rebuilt from its journal v1",
+                      ctx->config.tier, datafile->fileno);
+        return true;
     }
 
-    nd_log_daemon(rebuilt ? NDLP_NOTICE : NDLP_ERR,
-                  "DBENGINE: tier %d: the rejected journal v2 of datafile %u %s",
-                  ctx->config.tier, datafile->fileno,
-                  rebuilt ? "was rebuilt from its journal v1" : "could not be rebuilt from its journal v1");
-    return rebuilt;
+    // No new journal v2: the v1 held no indexable pages, or writing it failed.
+    // The rejected one must not fail again at every start: remove it, so that the
+    // next start replays the v1 as for a missing journal v2. If it cannot be
+    // removed, datafile_delete() discharges it.
+    journalfile_v2_generate_path(datafile, path, sizeof(path));
+    if (unlink(path) == 0 || errno == ENOENT) {
+        ctx_current_disk_space_decrease(ctx, datafile->populate_mrg.rejected_v2_size);
+        datafile->populate_mrg.rejected_v2_size = 0;
+        nd_log_daemon(NDLP_WARNING, "DBENGINE: tier %d: no journal v2 was written for datafile %u from its journal v1; "
+                      "the rejected one was removed", ctx->config.tier, datafile->fileno);
+    }
+    else
+        nd_log_daemon(NDLP_ERR, "DBENGINE: tier %d: no journal v2 was written for datafile %u from its journal v1, "
+                      "and the rejected one \"%s\" cannot be removed", ctx->config.tier, datafile->fileno, path);
+
+    return false;
 }
 
 int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile,
