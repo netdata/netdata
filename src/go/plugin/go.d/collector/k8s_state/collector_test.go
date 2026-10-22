@@ -1025,10 +1025,6 @@ func TestCollector_Collect_DeleteObjectKeepsLongerNamedSibling(t *testing.T) {
 			)
 			collr, deletedOnly, liveOnly := collrs[0], collrs[1], collrs[2]
 
-			require.NoError(t, test.delete(client, deleted))
-			time.Sleep(time.Second)
-			_ = collr.Collect(ctx)
-
 			expected := make(map[string]bool) // chart ID -> obsolete
 			for _, c := range *deletedOnly.Charts() {
 				expected[c.ID] = true
@@ -1037,6 +1033,25 @@ func TestCollector_Collect_DeleteObjectKeepsLongerNamedSibling(t *testing.T) {
 			for _, c := range *liveOnly.Charts() {
 				expected[c.ID] = false
 			}
+			var own int
+			for _, obsolete := range expected {
+				if obsolete {
+					own++
+				}
+			}
+			require.NotZero(t, own, "the deleted object must have charts")
+
+			require.NoError(t, test.delete(client, deleted))
+			require.Eventually(t, func() bool {
+				_ = collr.Collect(ctx)
+				for id, obsolete := range expected {
+					if c := collr.Charts().Get(id); obsolete && (c == nil || !c.Obsolete) {
+						return false
+					}
+				}
+				return true
+			}, 5*time.Second, 50*time.Millisecond, "the deleted object's charts were not removed")
+
 			actual := make(map[string]bool)
 			for _, c := range *collr.Charts() {
 				actual[c.ID] = c.Obsolete
@@ -1057,8 +1072,15 @@ func TestCollector_Collect_ScheduledPodUpdatesOnlyItsNodeLabel(t *testing.T) {
 
 	_, err := client.CoreV1().Pods(pending.Namespace).Update(ctx, newPod("node01", "x-1"), metav1.UpdateOptions{})
 	require.NoError(t, err)
-	time.Sleep(time.Millisecond * 50)
-	_ = collr.Collect(ctx)
+	require.Eventually(t, func() bool {
+		_ = collr.Collect(ctx)
+		for _, c := range *collr.Charts() {
+			if chartLabelValue(c, labelKeyPodName) == "x-1" && chartLabelValue(c, labelKeyNodeName) != "node01" {
+				return false
+			}
+		}
+		return true
+	}, 5*time.Second, 50*time.Millisecond, "the scheduled pod's charts did not get its node label")
 
 	podNode := map[string]string{"x-1": "node01", "x-10": "node02"}
 	seen := make(map[string]bool)
