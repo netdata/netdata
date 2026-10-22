@@ -300,7 +300,16 @@ $(CACHE) $(CACHE)/CACHEDIR.TAG:
 $(TARGET_CACHE): | $(CACHE)
 	mkdir -p $@
 
-$(TARGET_STAMPS):
+$(TARGET_WORKDIR):
+	mkdir -p $@
+
+$(TARGET_STAMPS): | $(TARGET_WORKDIR)
+	mkdir -p $@
+
+$(TARGET_STAGING):
+	mkdir -p $@
+
+$(TARGET_INSTALL): | $(TARGET_STAGING)
 	mkdir -p $@
 
 dirs: $(TARGET_CACHE) $(TARGET_WORKDIR) $(TARGET_STAMPS) $(TARGET_STAGING) $(TARGET_INSTALL)
@@ -327,18 +336,17 @@ prepare: Makefile | $(QEMU_DEP) docker-image dirs
 $(OPENSSL_DIR): prepare
 	rm -rf $(TARGET_WORKDIR)/openssl
 	if [ -d $(OPENSSL_CACHE_PATH)/openssl ]; then \
-		echo "Found cached copy of build directory for openssl, using it." ; \
-		cp -a --reflink=auto $(OPENSSL_CACHE_PATH)/openssl $(TARGET_WORKDIR) ; \
+		cp -a --reflink=auto $(OPENSSL_CACHE_PATH)/openssl $(TARGET_WORKDIR) && \
 		touch $(OPENSSL_CACHE_HIT) ; \
 	else \
-		rm -f $(OPENSSL_CACHE_HIT) ; \
+		rm -f $(OPENSSL_CACHE_HIT) && \
 		git clone --quiet --branch "$(OPENSSL_VERSION)" --single-branch --depth 1 "$(OPENSSL_SOURCE)" "$(TARGET_WORKDIR)/openssl" ; \
 	fi
 	touch $@
 
 $(OPENSSL_CONFIG): prepare $(OPENSSL_DIR)
 	+if [ ! -f $(OPENSSL_CACHE_HIT) ]; then \
-		sed -i "s/disable('static', 'pic', 'threads');/disable('static', 'pic');/" $(TARGET_WORKDIR)/openssl/Configure ; \
+		sed -i "s/disable('static', 'pic', 'threads');/disable('static', 'pic');/" $(TARGET_WORKDIR)/openssl/Configure && \
 		$(DOCKER) run $(DOCKER_ARGS) \
 			$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
 			-e CFLAGS="$(OPENSSL_CFLAGS)" \
@@ -382,8 +390,8 @@ $(OPENSSL_STAGING): prepare $(OPENSSL_BUILD)
 		ln -s lib64 $(TARGET_STAGING)/openssl/lib || true ; \
 	fi
 	if [ ! -f $(OPENSSL_CACHE_HIT) ]; then \
-		rm -rf $(OPENSSL_CACHE_PATH) ; \
-		mkdir -p $(OPENSSL_CACHE_PATH) ; \
+		rm -rf $(OPENSSL_CACHE_PATH) && \
+		mkdir -p $(OPENSSL_CACHE_PATH) && \
 		cp -a --reflink=auto $(TARGET_WORKDIR)/openssl $(OPENSSL_CACHE_PATH) ; \
 	fi
 	touch $@
@@ -395,22 +403,21 @@ openssl: $(OPENSSL_STAGING)
 $(LIBNFACCT_DIR): prepare
 	rm -rf $(TARGET_WORKDIR)/libnfacct
 	if [ -d $(LIBNFACCT_CACHE_PATH)/libnetfilter_acct ]; then \
-		echo "Found cached copy of build directory for libnetfilter_acct, using it." ; \
-		cp -a --reflink=auto $(LIBNFACCT_CACHE_PATH)/libnetfilter_acct $(TARGET_WORKDIR) ; \
+		cp -a --reflink=auto $(LIBNFACCT_CACHE_PATH)/libnetfilter_acct $(TARGET_WORKDIR) && \
 		touch $(LIBNFACCT_CACHE_HIT) ; \
 	else \
-		rm -f $(LIBNFACCT_CACHE_HIT) ; \
-		wget --no-verbose -O $(LIBNFACCT_ARCHIVE) $(LIBNFACCT_SOURCE) ; \
-		echo "$(LIBNFACCT_HASH)  $(LIBNFACCT_ARCHIVE)" | sha256sum -c ; \
-		mkdir -p $(TARGET_WORKDIR)/libnetfilter_acct ; \
-		tar -xapf $(LIBNFACCT_ARCHIVE) -C $(TARGET_WORKDIR)/libnetfilter_acct/ --strip-components=1 ; \
+		rm -f $(LIBNFACCT_CACHE_HIT) && \
+		wget --no-verbose -O $(LIBNFACCT_ARCHIVE) $(LIBNFACCT_SOURCE) && \
+		echo "$(LIBNFACCT_HASH)  $(LIBNFACCT_ARCHIVE)" | sha256sum -c && \
+		mkdir -p $(TARGET_WORKDIR)/libnetfilter_acct && \
+		tar -xapf $(LIBNFACCT_ARCHIVE) -C $(TARGET_WORKDIR)/libnetfilter_acct/ --strip-components=1 && \
 		rm -f $(LIBNFACCT_ARCHIVE) ; \
 	fi
 	touch $@
 
 $(LIBNFACCT_CONFIG): prepare $(LIBNFACCT_DIR)
 	+if [ ! -f $(LIBNFACCT_CACHE_HIT) ]; then \
-		rm -f $(TARGET_WORKDIR)/libnetfilter_acct/libtool ; \
+		rm -f $(TARGET_WORKDIR)/libnetfilter_acct/libtool && \
 		$(DOCKER) run $(DOCKER_ARGS) \
 			$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
 			-e CFLAGS="$(LIBNFACCT_CFLAGS)" \
@@ -421,7 +428,7 @@ $(LIBNFACCT_CONFIG): prepare $(LIBNFACCT_DIR)
 			-w $(DOCKER_WORKDIR)/libnetfilter_acct \
 			$(BUILDER) \
 			/usr/bin/autoreconf -if \
-			; \
+			&& \
 		$(DOCKER) run $(DOCKER_ARGS) \
 			$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
 			-e CFLAGS="$(LIBNFACCT_CFLAGS)" \
@@ -464,10 +471,10 @@ $(LIBNFACCT_STAGING): prepare $(LIBNFACCT_BUILD)
 		-e PKG_CONFIG_PATH=/usr/lib/pkgconfig \
 		-w $(DOCKER_WORKDIR)/libnetfilter_acct \
 		$(BUILDER) \
-		/usr/bin/make install ;
+		/usr/bin/make install
 	if [ ! -f $(LIBNFACCT_CACHE_HIT) ]; then \
-		rm -rf $(LIBNFACCT_CACHE_PATH) ; \
-		mkdir -p $(LIBNFACCT_CACHE_PATH) ; \
+		rm -rf $(LIBNFACCT_CACHE_PATH) && \
+		mkdir -p $(LIBNFACCT_CACHE_PATH) && \
 		cp -a --reflink=auto $(TARGET_WORKDIR)/libnetfilter_acct $(LIBNFACCT_CACHE_PATH) ; \
 	fi
 	touch $@
@@ -479,11 +486,10 @@ libnetfilter_acct: $(LIBNFACCT_STAGING)
 $(CURL_DIR): prepare
 	rm -rf $(TARGET_WORKDIR)/curl
 	if [ -d $(CURL_CACHE_PATH)/curl ]; then \
-		echo "Found cached copy of build directory for curl, using it." ; \
-		cp -a --reflink=auto $(CURL_CACHE_PATH)/curl $(TARGET_WORKDIR) ; \
+		cp -a --reflink=auto $(CURL_CACHE_PATH)/curl $(TARGET_WORKDIR) && \
 		touch $(CURL_CACHE_HIT) ; \
 	else \
-		rm -f $(CURL_CACHE_HIT) ; \
+		rm -f $(CURL_CACHE_HIT) && \
 		git clone --quiet --branch "$(CURL_VERSION)" --single-branch --depth 1 "$(CURL_SOURCE)" "$(TARGET_WORKDIR)/curl" ; \
 	fi
 	touch $@
@@ -499,7 +505,7 @@ $(CURL_CONFIG): prepare $(CURL_DIR) | $(OPENSSL_STAGING)
 			-e PKG_CONFIG_PATH="$(OPENSSL_PKGCONFIG_PATH)" \
 			-w $(DOCKER_WORKDIR)/curl \
 			$(BUILDER) \
-			/usr/bin/autoreconf -if ; \
+			/usr/bin/autoreconf -if && \
 		$(DOCKER) run $(DOCKER_ARGS) \
 			$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
 			-e CFLAGS="$(CURL_CFLAGS)" \
@@ -569,8 +575,8 @@ $(CURL_STAGING): prepare $(CURL_BUILD)
 		$(BUILDER) \
 		/usr/bin/make install ;
 	if [ ! -f $(CURL_CACHE_HIT) ]; then \
-		rm -rf $(CURL_CACHE_PATH) ; \
-		mkdir -p $(CURL_CACHE_PATH) ; \
+		rm -rf $(CURL_CACHE_PATH) && \
+		mkdir -p $(CURL_CACHE_PATH) && \
 		cp -a --reflink=auto $(TARGET_WORKDIR)/curl $(CURL_CACHE_PATH) ; \
 	fi
 	touch $@
@@ -586,15 +592,14 @@ curl: $(TARGET_INSTALL)/bin/curl
 $(BASH_DIR): prepare
 	rm -rf $(TARGET_WORKDIR)/bash
 	if [ -d $(BASH_CACHE_PATH)/bash ]; then \
-		echo "Found cached copy of build directory for bash, using it." ; \
-		cp -a --reflink=auto $(BASH_CACHE_PATH)/bash $(TARGET_WORKDIR) ; \
+		cp -a --reflink=auto $(BASH_CACHE_PATH)/bash $(TARGET_WORKDIR) && \
 		touch $(BASH_CACHE_HIT) ; \
 	else \
-		rm -f $(BASH_CACHE_HIT) ; \
-		wget --no-verbose -O $(BASH_ARCHIVE) $(BASH_SOURCE) ; \
-		echo "$(BASH_HASH)  $(BASH_ARCHIVE)" | sha256sum -c ; \
-		mkdir -p $(TARGET_WORKDIR)/bash ; \
-		tar -xapf $(BASH_ARCHIVE) -C $(TARGET_WORKDIR)/bash/ --strip-components=1 ; \
+		rm -f $(BASH_CACHE_HIT) && \
+		wget --no-verbose -O $(BASH_ARCHIVE) $(BASH_SOURCE) && \
+		echo "$(BASH_HASH)  $(BASH_ARCHIVE)" | sha256sum -c && \
+		mkdir -p $(TARGET_WORKDIR)/bash && \
+		tar -xapf $(BASH_ARCHIVE) -C $(TARGET_WORKDIR)/bash/ --strip-components=1 && \
 		rm -f $(BASH_ARCHIVE) ; \
 	fi
 	touch $@
@@ -610,7 +615,7 @@ $(BASH_CONFIG): prepare $(BASH_DIR) | $(OPENSSL_STAGING)
 			-e PKG_CONFIG_PATH="$(OPENSSL_PKGCONFIG_PATH)" \
 			-w $(DOCKER_WORKDIR)/bash \
 			$(BUILDER) \
-			/usr/bin/autoreconf -if ; \
+			/usr/bin/autoreconf -if && \
 		$(DOCKER) run $(DOCKER_ARGS) \
 			$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
 			-e CFLAGS="$(BASH_CFLAGS)" \
@@ -636,10 +641,10 @@ $(BASH_CONFIG): prepare $(BASH_DIR) | $(OPENSSL_STAGING)
 
 $(BASH_BUILD): prepare $(BASH_CONFIG)
 	+if [ ! -f $(BASH_CACHE_HIT) ]; then \
-		truncate --size=0 $(TARGET_WORKDIR)/bash/examples/loadables/Makefile ; \
-		echo all: >> $(TARGET_WORKDIR)/bash/examples/loadables/Makefile ; \
-		echo clean: >> $(TARGET_WORKDIR)/bash/examples/loadables/Makefile ; \
-		echo install: >> $(TARGET_WORKDIR)/bash/examples/loadables/Makefile ; \
+		truncate --size=0 $(TARGET_WORKDIR)/bash/examples/loadables/Makefile && \
+		echo all: >> $(TARGET_WORKDIR)/bash/examples/loadables/Makefile && \
+		echo clean: >> $(TARGET_WORKDIR)/bash/examples/loadables/Makefile && \
+		echo install: >> $(TARGET_WORKDIR)/bash/examples/loadables/Makefile && \
 		$(DOCKER) run $(DOCKER_ARGS) \
 			$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
 			-e CFLAGS="$(BASH_CFLAGS)" \
@@ -664,10 +669,10 @@ $(TARGET_INSTALL)/bin/bash: prepare $(BASH_BUILD)
 		-e PKG_CONFIG_PATH="$(OPENSSL_PKGCONFIG_PATH)" \
 		-w $(DOCKER_WORKDIR)/bash \
 		$(BUILDER) \
-		/usr/bin/make install ;
+		/usr/bin/make install &&
 	if [ ! -f $(BASH_CACHE_HIT) ]; then \
-		rm -rf $(BASH_CACHE_PATH) ; \
-		mkdir -p $(BASH_CACHE_PATH) ; \
+		rm -rf $(BASH_CACHE_PATH) && \
+		mkdir -p $(BASH_CACHE_PATH) && \
 		cp -a --reflink=auto $(TARGET_WORKDIR)/bash $(BASH_CACHE_PATH) ; \
 	fi
 
@@ -678,15 +683,14 @@ bash: $(TARGET_INSTALL)/bin/bash
 $(IOPING_DIR): prepare
 	rm -rf $(TARGET_WORKDIR)/ioping
 	if [ -d $(IOPING_CACHE_PATH)/ioping ]; then \
-		echo "Found cached copy of build directory for ioping, using it." ; \
-		cp -a --reflink=auto $(IOPING_CACHE_PATH)/ioping $(TARGET_WORKDIR) ; \
+		cp -a --reflink=auto $(IOPING_CACHE_PATH)/ioping $(TARGET_WORKDIR) && \
 		touch $(IOPING_CACHE_HIT) ; \
 	else \
-		rm -f $(IOPING_CACHE_HIT) ; \
-		wget --no-verbose -O $(IOPING_ARCHIVE) $(IOPING_SOURCE) ; \
-		echo "$(IOPING_HASH)  $(IOPING_ARCHIVE)" | sha256sum -c ; \
-		mkdir -p $(TARGET_WORKDIR)/ioping ; \
-		tar -xapf $(IOPING_ARCHIVE) -C $(TARGET_WORKDIR)/ioping/ --strip-components=1 ; \
+		rm -f $(IOPING_CACHE_HIT) && \
+		wget --no-verbose -O $(IOPING_ARCHIVE) $(IOPING_SOURCE) && \
+		echo "$(IOPING_HASH)  $(IOPING_ARCHIVE)" | sha256sum -c && \
+		mkdir -p $(TARGET_WORKDIR)/ioping && \
+		tar -xapf $(IOPING_ARCHIVE) -C $(TARGET_WORKDIR)/ioping/ --strip-components=1 && \
 		rm -f "$(IOPING_ARCHIVE)" ; \
 	fi
 	touch $@
@@ -714,8 +718,8 @@ $(TARGET_INSTALL)/usr/libexec/netdata/plugins.d/ioping: prepare $(IOPING_BUILD)
 	$(DOCKER) run $(DOCKER_ARGS) $(BUILDER) \
 		/usr/bin/install -o root -g root -m 4750 $(DOCKER_WORKDIR)/ioping/ioping $(DOCKER_INSTALL)/usr/libexec/netdata/plugins.d/
 	if [ ! -f $(IOPING_CACHE_HIT) ]; then \
-		rm -rf $(IOPING_CACHE_PATH) ; \
-		mkdir -p $(IOPING_CACHE_PATH) ; \
+		rm -rf $(IOPING_CACHE_PATH) && \
+		mkdir -p $(IOPING_CACHE_PATH) && \
 		cp -a --reflink=auto $(TARGET_WORKDIR)/ioping $(IOPING_CACHE_PATH) ; \
 	fi
 
