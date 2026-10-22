@@ -954,6 +954,150 @@ func TestCollector_Collect(t *testing.T) {
 	}
 }
 
+func TestCollector_Collect_DeleteObjectKeepsLongerNamedSibling(t *testing.T) {
+	// Deleting "x-1" must obsolete only the charts of "x-1", not those of the live "x-10".
+	// The expected chart sets come from collectors that only ever saw one of the two objects.
+	const deleted, live = "x-1", "x-10"
+	ctx := context.Background()
+
+	tests := map[string]struct {
+		objects func(names ...string) []runtime.Object
+		delete  func(client kubernetes.Interface, name string) error
+	}{
+		"Node": {
+			objects: func(names ...string) []runtime.Object {
+				var objs []runtime.Object
+				for _, name := range names {
+					objs = append(objs, newNode(name))
+				}
+				return objs
+			},
+			delete: func(client kubernetes.Interface, name string) error {
+				return client.CoreV1().Nodes().Delete(ctx, name, metav1.DeleteOptions{})
+			},
+		},
+		"Pod": {
+			objects: func(names ...string) []runtime.Object {
+				objs := []runtime.Object{newNode("node01")}
+				for _, name := range names {
+					objs = append(objs, newPod("node01", name))
+				}
+				return objs
+			},
+			delete: func(client kubernetes.Interface, name string) error {
+				return client.CoreV1().Pods(corev1.NamespaceDefault).Delete(ctx, name, metav1.DeleteOptions{})
+			},
+		},
+		"Deployment": {
+			objects: func(names ...string) []runtime.Object {
+				var objs []runtime.Object
+				for _, name := range names {
+					objs = append(objs, newDeployment(name))
+				}
+				return objs
+			},
+			delete: func(client kubernetes.Interface, name string) error {
+				return client.AppsV1().Deployments(corev1.NamespaceDefault).Delete(ctx, name, metav1.DeleteOptions{})
+			},
+		},
+		"CronJob": {
+			objects: func(names ...string) []runtime.Object {
+				var objs []runtime.Object
+				for _, name := range names {
+					objs = append(objs, prepareCronJob(name))
+				}
+				return objs
+			},
+			delete: func(client kubernetes.Interface, name string) error {
+				return client.BatchV1().CronJobs(corev1.NamespaceDefault).Delete(ctx, name, metav1.DeleteOptions{})
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			client := fake.NewClientset(test.objects(deleted, live)...)
+			collrs := startCollectors(t, client,
+				fake.NewClientset(test.objects(deleted)...),
+				fake.NewClientset(test.objects(live)...),
+			)
+			collr, deletedOnly, liveOnly := collrs[0], collrs[1], collrs[2]
+
+			require.NoError(t, test.delete(client, deleted))
+			time.Sleep(time.Second)
+			_ = collr.Collect(ctx)
+
+			expected := make(map[string]bool) // chart ID -> obsolete
+			for _, c := range *deletedOnly.Charts() {
+				expected[c.ID] = true
+			}
+			for _, c := range *liveOnly.Charts() {
+				expected[c.ID] = false
+			}
+			actual := make(map[string]bool)
+			for _, c := range *collr.Charts() {
+				actual[c.ID] = c.Obsolete
+			}
+
+			assert.Equal(t, expected, actual)
+		})
+	}
+}
+
+func TestCollector_Collect_ScheduledPodUpdatesOnlyItsNodeLabel(t *testing.T) {
+	// Scheduling the pending "x-1" must not rewrite the node label of the live "x-10".
+	ctx := context.Background()
+	pending := newPod("node01", "x-1")
+	pending.Spec.NodeName = ""
+	client := fake.NewClientset(newNode("node01"), newNode("node02"), pending, newPod("node02", "x-10"))
+	collr := startCollectors(t, client)[0]
+
+	_, err := client.CoreV1().Pods(pending.Namespace).Update(ctx, newPod("node01", "x-1"), metav1.UpdateOptions{})
+	require.NoError(t, err)
+	time.Sleep(time.Millisecond * 50)
+	_ = collr.Collect(ctx)
+
+	podNode := map[string]string{"x-1": "node01", "x-10": "node02"}
+	seen := make(map[string]bool)
+	expected := make(map[string]string) // chart ID -> node label
+	actual := make(map[string]string)
+	for _, c := range *collr.Charts() {
+		if pod := chartLabelValue(c, labelKeyPodName); pod != "" {
+			seen[pod] = true
+			expected[c.ID] = podNode[pod]
+			actual[c.ID] = chartLabelValue(c, labelKeyNodeName)
+		}
+	}
+
+	require.Equal(t, map[string]bool{"x-1": true, "x-10": true}, seen, "both pods must have charts")
+	assert.Equal(t, expected, actual)
+}
+
+// startCollectors starts one collector per client and waits once for all of them to pass the initial delay.
+func startCollectors(t *testing.T, clients ...kubernetes.Interface) []*Collector {
+	t.Helper()
+	ctx := context.Background()
+
+	var collrs []*Collector
+	for _, client := range clients {
+		collr := New()
+		collr.newKubeClient = func() (kubernetes.Interface, error) { return client, nil }
+		require.NoError(t, collr.Init(ctx))
+		require.NoError(t, collr.Check(ctx))
+		t.Cleanup(func() { collr.Cleanup(ctx) })
+		_ = collr.Collect(ctx)
+		collrs = append(collrs, collr)
+	}
+
+	time.Sleep(collrs[0].initDelay)
+	for _, collr := range collrs {
+		_ = collr.Collect(ctx)
+	}
+	return collrs
+}
+
 func newNode(name string) *corev1.Node {
 	return &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1211,4 +1355,13 @@ func isLabelValueSet(c *collectorapi.Chart, name string) bool {
 		}
 	}
 	return false
+}
+
+func chartLabelValue(c *collectorapi.Chart, name string) string {
+	for _, l := range c.Labels {
+		if l.Key == name {
+			return l.Value
+		}
+	}
+	return ""
 }
