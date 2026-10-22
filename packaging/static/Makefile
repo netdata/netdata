@@ -404,6 +404,7 @@ $(LIBNFACCT_DIR): prepare
 		echo "$(LIBNFACCT_HASH)  $(LIBNFACCT_ARCHIVE)" | sha256sum -c ; \
 		mkdir -p $(TARGET_WORKDIR)/libnetfilter_acct ; \
 		tar -xapf $(LIBNFACCT_ARCHIVE) -C $(TARGET_WORKDIR)/libnetfilter_acct/ --strip-components=1 ; \
+		rm -f $(LIBNFACCT_ARCHIVE) ; \
 	fi
 	touch $@
 
@@ -594,6 +595,7 @@ $(BASH_DIR): prepare
 		echo "$(BASH_HASH)  $(BASH_ARCHIVE)" | sha256sum -c ; \
 		mkdir -p $(TARGET_WORKDIR)/bash ; \
 		tar -xapf $(BASH_ARCHIVE) -C $(TARGET_WORKDIR)/bash/ --strip-components=1 ; \
+		rm -f $(BASH_ARCHIVE) ; \
 	fi
 	touch $@
 
@@ -685,6 +687,7 @@ $(IOPING_DIR): prepare
 		echo "$(IOPING_HASH)  $(IOPING_ARCHIVE)" | sha256sum -c ; \
 		mkdir -p $(TARGET_WORKDIR)/ioping ; \
 		tar -xapf $(IOPING_ARCHIVE) -C $(TARGET_WORKDIR)/ioping/ --strip-components=1 ; \
+		rm -f "$(IOPING_ARCHIVE)" ; \
 	fi
 	touch $@
 
