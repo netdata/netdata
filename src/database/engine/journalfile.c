@@ -2110,10 +2110,6 @@ bool journalfile_v2_rebuild_from_v1(struct rrdengine_instance *ctx, struct rrden
         return false;
     }
 
-    // the rejected journal v2 is overwritten (or removed, on failure) by the new one
-    ctx_current_disk_space_decrease(ctx, datafile->populate_mrg.rejected_v2_size);
-    datafile->populate_mrg.rejected_v2_size = 0;
-
     pgc_open_cache_to_journal_v2(
         open_cache,
         (Word_t)ctx,
@@ -2123,7 +2119,20 @@ bool journalfile_v2_rebuild_from_v1(struct rrdengine_instance *ctx, struct rrden
         (void *)journalfile,
         false);
 
+    // sealed: nothing writes to its v1 again (like a datafile whose v2 loaded)
+    (void)close_uv_file(datafile, journalfile->file);
+    journalfile->file = 0;
+
+    // the new journal v2 is charged by the migration; the rejected one is gone when
+    // it was overwritten or removed - otherwise datafile_delete() discharges it
     bool rebuilt = journalfile_v2_data_available(journalfile);
+    struct stat st;
+    journalfile_v2_generate_path(datafile, path, sizeof(path));
+    if (rebuilt || (stat(path, &st) != 0 && errno == ENOENT)) {
+        ctx_current_disk_space_decrease(ctx, datafile->populate_mrg.rejected_v2_size);
+        datafile->populate_mrg.rejected_v2_size = 0;
+    }
+
     nd_log_daemon(rebuilt ? NDLP_NOTICE : NDLP_ERR,
                   "DBENGINE: tier %d: the rejected journal v2 of datafile %u %s",
                   ctx->config.tier, datafile->fileno,

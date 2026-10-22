@@ -1767,6 +1767,9 @@ void datafile_delete(
     size_t journal_v2_bytes = journalfile_v2_data_size_get(journal_file);
     if (journalfile_v2_data_available(journal_file))
         expected_journal_files |= JOURNALFILE_DELETED_V2;
+    else
+        // a journal v2 rejected at startup and not rebuilt: unmapped, but still charged
+        journal_v2_bytes = datafile->populate_mrg.rejected_v2_size;
     deleted_bytes = 0;
 
     // This will delete journalfile_v2 and journalfile_v1 (returns bitmask of JOURNALFILE_DELETED_V1/V2)
