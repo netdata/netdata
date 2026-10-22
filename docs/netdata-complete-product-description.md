@@ -446,7 +446,7 @@ Netdata provides network performance monitoring covering network devices (SNMP),
   - [Static exporter, interface and network metadata](/src/crates/netflow-plugin/integrations/static_metadata.md) (names, roles, sites, regions, tenants); classifiers
   - SRv6 and VXLAN [decapsulation](/src/crates/netflow-plugin/integrations/decapsulation.md)
 - [Four storage tiers](/docs/npm/network-flows/retention-querying.md) (raw, 1-minute, 5-minute, 1-hour) with independent retention
-- [Network Flows dashboard](/docs/npm/network-flows/visualization/overview.md) (Function `flows:netflow`): Sankey, table, time-series, country/state/city maps, 3D globe; facets on any field (including CIDR), regex search, group by up to 10 fields, top-N talkers by bytes or packets, shareable views
+- [Network Flows dashboard](/docs/npm/network-flows/visualization/overview.md) (Function `flows:netflow`): Sankey, table, time-series, country/state/city maps (down to street-level granularity, depending on the GeoIP database), 3D globe; facets on any field (including CIDR), regex search, group by up to 10 fields, top-N talkers by bytes or packets, shareable views
 - [50,000–100,000 flow records/s per Agent](/docs/npm/network-flows/sizing-capacity.md)
 
 **[SNMP traps](/docs/npm/snmp-traps/README.md)** — go.d `snmp_traps`
@@ -1017,6 +1017,8 @@ Support by plan:
 - Business: Email/ticket support during business hours with SLA
 - Enterprise: 24/7 availability, dedicated support team, phone support
 
+Netdata Cloud availability: 99.5% monthly availability commitment (Service Terms, Service Level Commitment).
+
 **Professional Services:**
 - Implementation assistance
 - Architecture design
@@ -1064,6 +1066,7 @@ Support by plan:
 
 - Open source with a large community: 80,000+ GitHub stars, 690+ contributors
 - Netdata Cloud SaaS serves more than 100,000 reachable nodes
+- University of Amsterdam study (ICSOC 2023) of monitoring tools on Docker-based systems (Netdata, Prometheus, ELK, Zipkin): Netdata had the lowest CPU and RAM overhead, the lowest energy use and the lowest impact on the monitored applications
 - Customers across technology, financial services, education, government, healthcare, hosting and cloud, gaming and digital media, retail, logistics, manufacturing, transportation and automotive (38 published case studies)
 
 ### Standard figures
