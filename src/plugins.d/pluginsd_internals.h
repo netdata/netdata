@@ -566,8 +566,9 @@ static ALWAYS_INLINE RRDSET *pluginsd_rrdset_cache_get_from_slot(PARSER *parser,
                        "PLUGINSD: wrong chart in slot %zd, expected '%s', found '%s'",
                        slot - 1, id, string2str(st->id));
 
-        // Every unslot clears the chart's slot, so an obsolete chart is cached only while it is the scope
-        // chart, whose scope holds a reference to it. Look up any other obsolete chart, to hold one.
+        // Every unslot clears the chart's slot and lookups do not cache obsolete charts, so an obsolete chart is
+        // cached only while it is the scope chart, whose scope holds a reference to it. Look up any other
+        // obsolete chart, to hold one.
         if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) &&
                     !(st == parser->user.st && parser->user.st_ref.scope)))
             st = NULL;
@@ -575,8 +576,10 @@ static ALWAYS_INLINE RRDSET *pluginsd_rrdset_cache_get_from_slot(PARSER *parser,
 
     if(!st) {
         st = pluginsd_find_chart(parser, host, id, keyword);
-        if(st)
-            pluginsd_rrdset_cache_put_to_slot(parser, st, slot, rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE));
+
+        // not an obsolete chart: the caller may fail to make it the scope chart, and then nothing would hold it
+        if(st && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE))
+            pluginsd_rrdset_cache_put_to_slot(parser, st, slot, false);
     }
 
     return st;
