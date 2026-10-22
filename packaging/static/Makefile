@@ -318,7 +318,7 @@ dirs: $(TARGET_CACHE) $(TARGET_WORKDIR) $(TARGET_STAMPS) $(TARGET_STAGING) $(TAR
 	$(DOCKER) run --rm --privileged $(QEMU_SETUP) --install "$(QEMU_ARCH)" ; \
 
 docker-image:
-	[ "$(BUILDER_STATUS)" == "MISMATCH" ] && "$(DOCKER)" image rm "$(BUILDER)"
+	[ "$(BUILDER_STATUS)" != "MISMATCH" ] || "$(DOCKER)" image rm "$(BUILDER)"
 	[ "$(BUILDER_STATUS)" != "OK" ] || $(DOCKER) pull --platform "$(PLATFORM)" "$(BUILDER)"
 
 docker-shell: $(QEMU_DEP) $(DOCKER_IMAGE_DEP)
