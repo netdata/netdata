@@ -433,7 +433,6 @@ modules:
               dimensions:
                 - name: up
                 - name: down
-                - name: unknown
         - name: BGP peer
           description: These metrics refer to a single BGP peer on a PAN-OS virtual router or logical router.
           labels:
