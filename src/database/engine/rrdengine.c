@@ -1917,6 +1917,45 @@ static void after_populate_mrg(struct rrdengine_instance *ctx __maybe_unused, vo
         completion_mark_complete(completion);
 }
 
+// Rebuilds, from their journal v1, the journals v2 rejected while populating the
+// MRG. Runs before the tier is ready, so queries do not see them meanwhile.
+static void populate_mrg_rebuild_rejected_journals(struct rrdengine_instance *ctx) {
+    // acquired, so that a rotation cannot delete them meanwhile
+    struct rrdengine_datafile **rejected = NULL;
+    size_t count = 0, size = 0;
+
+    netdata_rwlock_rdlock(&ctx->datafiles.rwlock);
+    for (struct rrdengine_datafile *df = get_next_datafile(NULL, ctx, true); df; df = get_next_datafile(df, ctx, true)) {
+        if (!df->populate_mrg.rejected_v2_size || !datafile_acquire(df, DATAFILE_ACQUIRE_INDEXING))
+            continue;
+
+        if (count == size) {
+            size = size ? size * 2 : 4;
+            rejected = reallocz(rejected, size * sizeof(*rejected));
+        }
+        rejected[count++] = df;
+    }
+    netdata_rwlock_rdunlock(&ctx->datafiles.rwlock);
+
+    if (!count)
+        return;
+
+    // the journal indexer of this tier migrates the same open cache section
+    bool expected = false;
+    while (!__atomic_compare_exchange_n(&ctx->atomic.migration_to_v2_running, &expected, true, false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)) {
+        expected = false;
+        sleep_usec(10 * USEC_PER_MS);
+    }
+
+    for (size_t i = 0; i < count; i++) {
+        journalfile_v2_rebuild_from_v1(ctx, rejected[i]->journalfile);
+        datafile_release(rejected[i], DATAFILE_ACQUIRE_INDEXING);
+    }
+
+    __atomic_store_n(&ctx->atomic.migration_to_v2_running, false, __ATOMIC_RELEASE);
+    freez(rejected);
+}
+
 static void *populate_mrg_tp_worker(
     struct rrdengine_instance *ctx,
     void *data,
@@ -2010,6 +2049,8 @@ static void *populate_mrg_tp_worker(
             sleep_usec(10 * USEC_PER_MS);
         }
     } while (pending > 0);
+
+    populate_mrg_rebuild_rejected_journals(ctx);
 
     {
         size_t exact = 0, estimated = 0;
@@ -2390,7 +2431,7 @@ static void after_do_extent_cache_evict(struct rrdengine_instance *ctx __maybe_u
 }
 
 static void after_journal_v2_indexing(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
-    __atomic_store_n(&ctx->atomic.migration_to_v2_running, false, __ATOMIC_RELAXED);
+    __atomic_store_n(&ctx->atomic.migration_to_v2_running, false, __ATOMIC_RELEASE);
 
     check_and_schedule_db_rotation(ctx);
 }
@@ -2683,9 +2724,6 @@ void rrdeng_calculate_tier_disk_space_percentage(void)
 #define NOT_DELETING_FILES(ctx)                                                                                        \
      (!__atomic_load_n(&(ctx)->atomic.now_deleting_files, __ATOMIC_RELAXED))
 
-#define NOT_INDEXING_FILES(ctx)                                                                                        \
-    (!__atomic_load_n(&(ctx)->atomic.migration_to_v2_running, __ATOMIC_RELAXED))
-
 void dbengine_event_loop(void* arg) {
     sanity_check();
     uv_thread_set_name_np("DBENGINE");
@@ -2858,8 +2896,10 @@ void dbengine_event_loop(void* arg) {
                     struct rrdengine_datafile *datafile = cmd.data;
                     // We no longer have an indexing command pending
                     ctx->datafiles.pending_index = false;
-                    if (NOT_INDEXING_FILES(ctx) && ctx_is_available_for_queries(ctx)) {
-                        __atomic_store_n(&ctx->atomic.migration_to_v2_running, true, __ATOMIC_RELAXED);
+                    // claimed atomically: the startup rebuild of rejected journals claims it too
+                    bool not_indexing = false;
+                    if (ctx_is_available_for_queries(ctx) &&
+                        __atomic_compare_exchange_n(&ctx->atomic.migration_to_v2_running, &not_indexing, true, false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)) {
                         __atomic_store_n(&ctx->atomic.needs_indexing, false, __ATOMIC_RELAXED);
                         work_dispatch(ctx, datafile, NULL, opcode, journal_v2_indexing_tp_worker, after_journal_v2_indexing);
                     }

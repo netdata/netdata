@@ -58,6 +58,7 @@ struct rrdengine_datafile {
     struct {
         SPINLOCK spinlock;
         bool populated;
+        size_t rejected_v2_size;    // its loaded journal v2 failed while populating; rebuilt from v1
     } populate_mrg;
 
     struct {
