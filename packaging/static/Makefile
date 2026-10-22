@@ -318,10 +318,8 @@ dirs: $(TARGET_CACHE) $(TARGET_WORKDIR) $(TARGET_STAMPS) $(TARGET_STAGING) $(TAR
 	$(DOCKER) run --rm --privileged $(QEMU_SETUP) --install "$(QEMU_ARCH)" ; \
 
 docker-image:
-	if [ "$(BUILDER_STATUS)" == "MISMATCH" ]; then \
-		$(DOCKER) image rm "$(BUILDER)" ; \
-	fi
-	$(DOCKER) pull --platform "$(PLATFORM)" "$(BUILDER)"
+	[ "$(BUILDER_STATUS)" == "MISMATCH" ] && "$(DOCKER)" image rm "$(BUILDER)"
+	[ "${BUILDER_STATUS)" != "OK" ] && $(DOCKER) pull --platform "$(PLATFORM)" "$(BUILDER)"
 
 docker-shell: $(QEMU_DEP) $(DOCKER_IMAGE_DEP)
 	+$(DOCKER) run $(DOCKER_ARGS) $(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) -it $(BUILDER) /bin/bash
@@ -329,7 +327,7 @@ docker-shell: $(QEMU_DEP) $(DOCKER_IMAGE_DEP)
 docker-platform:
 	@echo "$(PLATFORM)"
 
-prepare: Makefile | $(QEMU_DEP) docker-image dirs
+prepare: | $(QEMU_DEP) docker-image dirs
 
 # OpenSSL rules
 
@@ -427,8 +425,9 @@ $(LIBNFACCT_CONFIG): prepare $(LIBNFACCT_DIR)
 			-e PKG_CONFIG_PATH=/usr/lib/pkgconfig \
 			-w $(DOCKER_WORKDIR)/libnetfilter_acct \
 			$(BUILDER) \
-			/usr/bin/autoreconf -if \
-			&& \
+			/usr/bin/autoreconf -if ; \
+	fi
+	+if [ ! -f $(LIBNFACCT_CACHE_HIT) ]; then \
 		$(DOCKER) run $(DOCKER_ARGS) \
 			$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
 			-e CFLAGS="$(LIBNFACCT_CFLAGS)" \
@@ -505,7 +504,9 @@ $(CURL_CONFIG): prepare $(CURL_DIR) | $(OPENSSL_STAGING)
 			-e PKG_CONFIG_PATH="$(OPENSSL_PKGCONFIG_PATH)" \
 			-w $(DOCKER_WORKDIR)/curl \
 			$(BUILDER) \
-			/usr/bin/autoreconf -if && \
+			/usr/bin/autoreconf -if ; \
+	fi
+	+if [ ! -f $(CURL_CACHE_HIT) ]; then \
 		$(DOCKER) run $(DOCKER_ARGS) \
 			$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
 			-e CFLAGS="$(CURL_CFLAGS)" \
@@ -615,7 +616,9 @@ $(BASH_CONFIG): prepare $(BASH_DIR) | $(OPENSSL_STAGING)
 			-e PKG_CONFIG_PATH="$(OPENSSL_PKGCONFIG_PATH)" \
 			-w $(DOCKER_WORKDIR)/bash \
 			$(BUILDER) \
-			/usr/bin/autoreconf -if && \
+			/usr/bin/autoreconf -if ; \
+	fi
+	+if [ ! -f $(BASH_CACHE_HIT) ]; then \
 		$(DOCKER) run $(DOCKER_ARGS) \
 			$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
 			-e CFLAGS="$(BASH_CFLAGS)" \
@@ -628,6 +631,7 @@ $(BASH_CONFIG): prepare $(BASH_DIR) | $(OPENSSL_STAGING)
 			/bin/bash ./configure \
 				--prefix="$(DOCKER_INSTALL)" \
 				--without-bash-malloc \
+				--without-afs \
 				--enable-static-link \
 				--enable-net-redirections \
 				--enable-array-variables \
@@ -641,10 +645,6 @@ $(BASH_CONFIG): prepare $(BASH_DIR) | $(OPENSSL_STAGING)
 
 $(BASH_BUILD): prepare $(BASH_CONFIG)
 	+if [ ! -f $(BASH_CACHE_HIT) ]; then \
-		truncate --size=0 $(TARGET_WORKDIR)/bash/examples/loadables/Makefile && \
-		echo all: >> $(TARGET_WORKDIR)/bash/examples/loadables/Makefile && \
-		echo clean: >> $(TARGET_WORKDIR)/bash/examples/loadables/Makefile && \
-		echo install: >> $(TARGET_WORKDIR)/bash/examples/loadables/Makefile && \
 		$(DOCKER) run $(DOCKER_ARGS) \
 			$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
 			-e CFLAGS="$(BASH_CFLAGS)" \
