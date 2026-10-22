@@ -13,9 +13,9 @@ BUILDARCH ?= $(shell uname -m)
 
 # Paths
 SRCDIR := $(abspath $(MAKEFILE_DIR)../..)
-STAGING ?= staging
-CACHE ?= cache
-WORKDIR ?= work
+STAGING ?= $(MAKEFILE_DIR)/staging
+CACHE ?= $(MAKEFILE_DIR)/cache
+WORKDIR ?= $(MAKEFILE_DIR)/work
 
 VERSION ?= $(shell cat $(SRCDIR)/packaging/version)
 
@@ -300,6 +300,11 @@ $(CACHE) $(CACHE)/CACHEDIR.TAG:
 $(TARGET_CACHE): | $(CACHE)
 	mkdir -p $@
 
+$(TARGET_STAMPS):
+	mkdir -p $@
+
+dirs: $(TARGET_CACHE) $(TARGET_WORKDIR) $(TARGET_STAMPS) $(TARGET_STAGING) $(TARGET_INSTALL)
+
 /proc/sys/fs/binfmt_misc/qemu-$(QEMU_ARCH): /proc/sys/fs/binfmt_misc
 	$(DOCKER) run --rm --privileged $(QEMU_SETUP) --install "$(QEMU_ARCH)" ; \
 
@@ -315,13 +320,11 @@ docker-shell: $(QEMU_DEP) $(DOCKER_IMAGE_DEP)
 docker-platform:
 	@echo "$(PLATFORM)"
 
-prepare: $(QEMU_DEP) docker-image Makefile
-	mkdir -p $(TARGET_STAMPS) $(TARGET_STAGING) $(TARGET_CACHE) $(TARGET_WORK)
+prepare: Makefile | $(QEMU_DEP) docker-image dirs
 
 # OpenSSL rules
 
-$(OPENSSL_DIR):
-	mkdir -p $(TARGET_WORKDIR) $(TARGET_STAMPS)
+$(OPENSSL_DIR): prepare
 	rm -rf $(TARGET_WORKDIR)/openssl
 	if [ -d $(OPENSSL_CACHE_PATH)/openssl ]; then \
 		echo "Found cached copy of build directory for openssl, using it." ; \
@@ -333,7 +336,7 @@ $(OPENSSL_DIR):
 	fi
 	touch $@
 
-$(OPENSSL_CONFIG): $(OPENSSL_DIR) | prepare
+$(OPENSSL_CONFIG): prepare $(OPENSSL_DIR)
 	+if [ ! -f $(OPENSSL_CACHE_HIT) ]; then \
 		sed -i "s/disable('static', 'pic', 'threads');/disable('static', 'pic');/" $(TARGET_WORKDIR)/openssl/Configure ; \
 		$(DOCKER) run $(DOCKER_ARGS) \
@@ -351,7 +354,7 @@ $(OPENSSL_CONFIG): $(OPENSSL_DIR) | prepare
 	fi
 	touch $@
 
-$(OPENSSL_BUILD): $(OPENSSL_CONFIG) | prepare
+$(OPENSSL_BUILD): prepare $(OPENSSL_CONFIG)
 	+if [ ! -f $(OPENSSL_CACHE_HIT) ]; then \
 		$(DOCKER) run $(DOCKER_ARGS) \
 			$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
@@ -365,7 +368,7 @@ $(OPENSSL_BUILD): $(OPENSSL_CONFIG) | prepare
 	fi
 	touch $@
 
-$(OPENSSL_STAGING): $(OPENSSL_BUILD) | prepare
+$(OPENSSL_STAGING): prepare $(OPENSSL_BUILD)
 	+$(DOCKER) run $(DOCKER_ARGS) \
 		$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
 		-e CFLAGS="$(OPENSSL_CFLAGS)" \
@@ -389,8 +392,7 @@ openssl: $(OPENSSL_STAGING)
 
 # libnetfilter_acct rules
 
-$(LIBNFACCT_DIR):
-	mkdir -p $(TARGET_WORKDIR) $(TARGET_STAMPS)
+$(LIBNFACCT_DIR): prepare
 	rm -rf $(TARGET_WORKDIR)/libnfacct
 	if [ -d $(LIBNFACCT_CACHE_PATH)/libnetfilter_acct ]; then \
 		echo "Found cached copy of build directory for libnetfilter_acct, using it." ; \
@@ -405,7 +407,7 @@ $(LIBNFACCT_DIR):
 	fi
 	touch $@
 
-$(LIBNFACCT_CONFIG): $(LIBNFACCT_DIR) | prepare
+$(LIBNFACCT_CONFIG): prepare $(LIBNFACCT_DIR)
 	+if [ ! -f $(LIBNFACCT_CACHE_HIT) ]; then \
 		rm -f $(TARGET_WORKDIR)/libnetfilter_acct/libtool ; \
 		$(DOCKER) run $(DOCKER_ARGS) \
@@ -436,7 +438,7 @@ $(LIBNFACCT_CONFIG): $(LIBNFACCT_DIR) | prepare
 	fi
 	touch $@
 
-$(LIBNFACCT_BUILD): $(LIBNFACCT_CONFIG) | prepare
+$(LIBNFACCT_BUILD): prepare $(LIBNFACCT_CONFIG)
 	+if [ ! -f $(LIBNFACCT_CACHE_HIT) ]; then \
 		$(DOCKER) run $(DOCKER_ARGS) \
 			$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
@@ -451,7 +453,7 @@ $(LIBNFACCT_BUILD): $(LIBNFACCT_CONFIG) | prepare
 	fi
 	touch $@
 
-$(LIBNFACCT_STAGING): $(LIBNFACCT_BUILD) | prepare
+$(LIBNFACCT_STAGING): prepare $(LIBNFACCT_BUILD)
 	+$(DOCKER) run $(DOCKER_ARGS) \
 		$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
 		-e CFLAGS="$(LIBNFACCT_CFLAGS)" \
@@ -473,8 +475,7 @@ libnetfilter_acct: $(LIBNFACCT_STAGING)
 
 # curl rules
 
-$(CURL_DIR):
-	mkdir -p $(TARGET_WORKDIR) $(TARGET_STAMPS)
+$(CURL_DIR): prepare
 	rm -rf $(TARGET_WORKDIR)/curl
 	if [ -d $(CURL_CACHE_PATH)/curl ]; then \
 		echo "Found cached copy of build directory for curl, using it." ; \
@@ -486,7 +487,7 @@ $(CURL_DIR):
 	fi
 	touch $@
 
-$(CURL_CONFIG): $(CURL_DIR) | $(OPENSSL_STAGING) prepare
+$(CURL_CONFIG): prepare $(CURL_DIR) | $(OPENSSL_STAGING)
 	+if [ ! -f $(CURL_CACHE_HIT) ]; then \
 		$(DOCKER) run $(DOCKER_ARGS) \
 			$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
@@ -540,7 +541,7 @@ $(CURL_CONFIG): $(CURL_DIR) | $(OPENSSL_STAGING) prepare
 	sed -i -e "s/LDFLAGS =/LDFLAGS = -all-static/" $(TARGET_WORKDIR)/curl/src/Makefile
 	touch $@
 
-$(CURL_BUILD): $(CURL_CONFIG) | prepare
+$(CURL_BUILD): prepare $(CURL_CONFIG)
 	+if [ ! -f $(CURL_CACHE_HIT) ]; then \
 		$(DOCKER) run $(DOCKER_ARGS) \
 			$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
@@ -555,7 +556,7 @@ $(CURL_BUILD): $(CURL_CONFIG) | prepare
 	fi
 	touch $@
 
-$(CURL_STAGING): $(CURL_BUILD) | prepare
+$(CURL_STAGING): prepare $(CURL_BUILD)
 	+$(DOCKER) run $(DOCKER_ARGS) \
 		$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
 		-e CFLAGS="$(CURL_CFLAGS)" \
@@ -581,8 +582,7 @@ curl: $(TARGET_INSTALL)/bin/curl
 
 # bash rules
 
-$(BASH_DIR):
-	mkdir -p $(TARGET_WORKDIR) $(TARGET_STAMPS)
+$(BASH_DIR): prepare
 	rm -rf $(TARGET_WORKDIR)/bash
 	if [ -d $(BASH_CACHE_PATH)/bash ]; then \
 		echo "Found cached copy of build directory for bash, using it." ; \
@@ -597,7 +597,7 @@ $(BASH_DIR):
 	fi
 	touch $@
 
-$(BASH_CONFIG): $(BASH_DIR) | $(OPENSSL_STAGING) prepare
+$(BASH_CONFIG): prepare $(BASH_DIR) | $(OPENSSL_STAGING)
 	+if [ ! -f $(BASH_CACHE_HIT) ]; then \
 		$(DOCKER) run $(DOCKER_ARGS) \
 			$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
@@ -632,7 +632,7 @@ $(BASH_CONFIG): $(BASH_DIR) | $(OPENSSL_STAGING) prepare
 	fi
 	touch $@
 
-$(BASH_BUILD): $(BASH_CONFIG) | prepare
+$(BASH_BUILD): prepare $(BASH_CONFIG)
 	+if [ ! -f $(BASH_CACHE_HIT) ]; then \
 		truncate --size=0 $(TARGET_WORKDIR)/bash/examples/loadables/Makefile ; \
 		echo all: >> $(TARGET_WORKDIR)/bash/examples/loadables/Makefile ; \
@@ -651,7 +651,7 @@ $(BASH_BUILD): $(BASH_CONFIG) | prepare
 	fi
 	touch $@
 
-$(TARGET_INSTALL)/bin/bash: $(BASH_BUILD) | prepare
+$(TARGET_INSTALL)/bin/bash: prepare $(BASH_BUILD)
 	mkdir -p $(@D)
 	+$(DOCKER) run $(DOCKER_ARGS) \
 		$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
@@ -673,8 +673,7 @@ bash: $(TARGET_INSTALL)/bin/bash
 
 # ioping rules
 
-$(IOPING_DIR):
-	mkdir -p $(TARGET_WORKDIR) $(TARGET_STAMPS)
+$(IOPING_DIR): prepare
 	rm -rf $(TARGET_WORKDIR)/ioping
 	if [ -d $(IOPING_CACHE_PATH)/ioping ]; then \
 		echo "Found cached copy of build directory for ioping, using it." ; \
@@ -689,10 +688,10 @@ $(IOPING_DIR):
 	fi
 	touch $@
 
-$(IOPING_CONFIG): $(IOPING_DIR)
+$(IOPING_CONFIG): prepare $(IOPING_DIR)
 	touch $@
 
-$(IOPING_BUILD): $(IOPING_CONFIG) | prepare
+$(IOPING_BUILD): prepare $(IOPING_CONFIG)
 	+if [ ! -f $(IOPING_CACHE_HIT) ]; then \
 		$(DOCKER) run $(DOCKER_ARGS) \
 			$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
@@ -707,7 +706,7 @@ $(IOPING_BUILD): $(IOPING_CONFIG) | prepare
 	fi
 	touch $@
 
-$(TARGET_INSTALL)/usr/libexec/netdata/plugins.d/ioping: $(IOPING_BUILD) | prepare
+$(TARGET_INSTALL)/usr/libexec/netdata/plugins.d/ioping: prepare $(IOPING_BUILD)
 	mkdir -p $(@D)
 	$(DOCKER) run $(DOCKER_ARGS) $(BUILDER) \
 		/usr/bin/install -o root -g root -m 4750 $(DOCKER_WORKDIR)/ioping/ioping $(DOCKER_INSTALL)/usr/libexec/netdata/plugins.d/
@@ -721,13 +720,12 @@ ioping: $(TARGET_INSTALL)/usr/libexec/netdata/plugins.d/ioping
 
 # netdata rules
 
-$(NETDATA_DIR):
-	mkdir -p $(TARGET_STAMPS)
+$(NETDATA_DIR): prepare
 	rm -rf $(TARGET_WORKDIR)/netdata
 	mkdir -p $(TARGET_WORKDIR)/netdata
 	touch $@
 
-$(NETDATA_CONFIG): $(NETDATA_DIR) $(NETDATA_BUILD_DEPS) | prepare
+$(NETDATA_CONFIG): prepare $(NETDATA_DIR) $(NETDATA_BUILD_DEPS)
 	rm -f $@
 	+$(DOCKER) run $(DOCKER_ARGS) \
 		$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
@@ -746,7 +744,7 @@ $(NETDATA_CONFIG): $(NETDATA_DIR) $(NETDATA_BUILD_DEPS) | prepare
 			$(NETDATA_CMAKE_OPTS) ;
 	touch $@
 
-$(NETDATA_BUILD): $(NETDATA_CONFIG) | prepare
+$(NETDATA_BUILD): prepare $(NETDATA_CONFIG)
 	rm -f $@
 	+$(DOCKER) run $(DOCKER_ARGS) \
 		$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
@@ -760,7 +758,7 @@ $(NETDATA_BUILD): $(NETDATA_CONFIG) | prepare
 		/usr/bin/cmake --build $(NETDATA_BUILD_DIR) ;
 	touch $@
 
-$(NETDATA_INSTALL): $(NETDATA_BUILD)
+$(NETDATA_INSTALL): prepare $(NETDATA_BUILD)
 	rm -rf $@ $(TARGET_INSTALL)
 	mkdir -p $(TARGET_INSTALL) $(TARGET_INSTALL)/bin $(TARGET_INSTALL)/usr $(TARGET_INSTALL)/bin/srv
 	+$(DOCKER) run $(DOCKER_ARGS) \
@@ -783,7 +781,7 @@ netdata: $(NETDATA_INSTALL)
 
 # Testing rules
 
-check-static-linking: $(NETDATA_INSTALL) | prepare
+check-static-linking: prepare $(NETDATA_INSTALL)
 	$(DOCKER) run $(DOCKER_ARGS) \
 		$(BUILDER) \
 		/bin/sh $(NETDATA_SOURCE_DIR)/packaging/static/scripts/check-static-linking.sh $(DOCKER_INSTALL)
@@ -791,7 +789,7 @@ check-static-linking: $(NETDATA_INSTALL) | prepare
 check-systemd-caps: $(NETDATA_INSTALL)
 	$(MAKEFILE_DIR)/scripts/systemd-caps-check.sh $(MAKEFILE_DIR) $(TARGET_INSTALL)
 
-runtime-check: $(NETDATA_INSTALL) | prepare
+runtime-check: prepare $(NETDATA_INSTALL)
 	$(DOCKER) run $(DOCKER_ARGS) \
 		$(BUILDER) \
 		/bin/sh $(NETDATA_SOURCE_DIR)/packaging/static/scripts/runtime-check.sh $(DOCKER_INSTALL) $(NETDATA_SOURCE_DIR) $(BUILDARCH)
