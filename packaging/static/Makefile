@@ -28,7 +28,6 @@ TARGET_STAMPS := $(WORKDIR)/$(BUILDARCH)/stamps
 TARGET_INSTALL_BASE := $(TARGET_STAGING)/install
 TARGET_INSTALL := $(TARGET_INSTALL_BASE)/$(NETDATA_PREFIX)
 TARGET_CACHE_ROOT := $(CACHE)/$(BUILDARCH)
-TARGET_PREP := $(TARGET_STAMPS)/prepare.stamp
 
 ifdef DEVTEST
     TARGET_CACHE := $(TARGET_CACHE_ROOT)/DEVTEST
@@ -263,12 +262,6 @@ endif
 
 BUILDER_STATUS := $(shell $(MAKEFILE_DIR)/scripts/docker-image-status.sh $(DOCKER) $(BUILDER) $(PLATFORM))
 
-ifeq ($(BUILDER_STATUS),OK)
-    DOCKER_IMAGE_DEP :=
-else
-    DOCKER_IMAGE_DEP := docker-image
-endif
-
 # general rules
 
 .PHONY: clean clean-workdir clean-staging clean-all \
@@ -314,9 +307,7 @@ docker-image:
 	if [ "$(BUILDER_STATUS)" == "MISMATCH" ]; then \
 		$(DOCKER) image rm "$(BUILDER)" ; \
 	fi
-	if ! $(DOCKER) inspect "$(BUILDER)" > /dev/null 2>&1; then \
-		$(DOCKER) pull --platform "$(PLATFORM)" "$(BUILDER)" ; \
-	fi
+	$(DOCKER) pull --platform "$(PLATFORM)" "$(BUILDER)"
 
 docker-shell: $(QEMU_DEP) $(DOCKER_IMAGE_DEP)
 	+$(DOCKER) run $(DOCKER_ARGS) $(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) -it $(BUILDER) /bin/bash
@@ -324,9 +315,8 @@ docker-shell: $(QEMU_DEP) $(DOCKER_IMAGE_DEP)
 docker-platform:
 	@echo "$(PLATFORM)"
 
-$(TARGET_PREP): $(QEMU_DEP) $(DOCKER_IMAGE_DEP) Makefile
-	mkdir -p $(TARGET_STAMPS) $(TARGET_STAGING)
-	touch $@
+prepare: $(QEMU_DEP) docker-image Makefile
+	mkdir -p $(TARGET_STAMPS) $(TARGET_STAGING) $(TARGET_CACHE) $(TARGET_WORK)
 
 # OpenSSL rules
 
@@ -343,7 +333,7 @@ $(OPENSSL_DIR):
 	fi
 	touch $@
 
-$(OPENSSL_CONFIG): $(TARGET_PREP) $(OPENSSL_DIR)
+$(OPENSSL_CONFIG): $(OPENSSL_DIR) | prepare
 	+if [ ! -f $(OPENSSL_CACHE_HIT) ]; then \
 		sed -i "s/disable('static', 'pic', 'threads');/disable('static', 'pic');/" $(TARGET_WORKDIR)/openssl/Configure ; \
 		$(DOCKER) run $(DOCKER_ARGS) \
@@ -361,7 +351,7 @@ $(OPENSSL_CONFIG): $(TARGET_PREP) $(OPENSSL_DIR)
 	fi
 	touch $@
 
-$(OPENSSL_BUILD): $(TARGET_PREP) $(OPENSSL_CONFIG)
+$(OPENSSL_BUILD): $(OPENSSL_CONFIG) | prepare
 	+if [ ! -f $(OPENSSL_CACHE_HIT) ]; then \
 		$(DOCKER) run $(DOCKER_ARGS) \
 			$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
@@ -375,7 +365,7 @@ $(OPENSSL_BUILD): $(TARGET_PREP) $(OPENSSL_CONFIG)
 	fi
 	touch $@
 
-$(OPENSSL_STAGING): $(TARGET_PREP) $(OPENSSL_BUILD)
+$(OPENSSL_STAGING): $(OPENSSL_BUILD) | prepare
 	+$(DOCKER) run $(DOCKER_ARGS) \
 		$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
 		-e CFLAGS="$(OPENSSL_CFLAGS)" \
@@ -415,7 +405,7 @@ $(LIBNFACCT_DIR):
 	fi
 	touch $@
 
-$(LIBNFACCT_CONFIG): $(TARGET_PREP) $(LIBNFACCT_DIR)
+$(LIBNFACCT_CONFIG): $(LIBNFACCT_DIR) | prepare
 	+if [ ! -f $(LIBNFACCT_CACHE_HIT) ]; then \
 		rm -f $(TARGET_WORKDIR)/libnetfilter_acct/libtool ; \
 		$(DOCKER) run $(DOCKER_ARGS) \
@@ -446,7 +436,7 @@ $(LIBNFACCT_CONFIG): $(TARGET_PREP) $(LIBNFACCT_DIR)
 	fi
 	touch $@
 
-$(LIBNFACCT_BUILD): $(TARGET_PREP) $(LIBNFACCT_CONFIG)
+$(LIBNFACCT_BUILD): $(LIBNFACCT_CONFIG) | prepare
 	+if [ ! -f $(LIBNFACCT_CACHE_HIT) ]; then \
 		$(DOCKER) run $(DOCKER_ARGS) \
 			$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
@@ -461,7 +451,7 @@ $(LIBNFACCT_BUILD): $(TARGET_PREP) $(LIBNFACCT_CONFIG)
 	fi
 	touch $@
 
-$(LIBNFACCT_STAGING): $(TARGET_PREP) $(LIBNFACCT_BUILD)
+$(LIBNFACCT_STAGING): $(LIBNFACCT_BUILD) | prepare
 	+$(DOCKER) run $(DOCKER_ARGS) \
 		$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
 		-e CFLAGS="$(LIBNFACCT_CFLAGS)" \
@@ -496,7 +486,7 @@ $(CURL_DIR):
 	fi
 	touch $@
 
-$(CURL_CONFIG): $(TARGET_PREP) $(CURL_DIR) | $(OPENSSL_STAGING)
+$(CURL_CONFIG): $(CURL_DIR) | $(OPENSSL_STAGING) prepare
 	+if [ ! -f $(CURL_CACHE_HIT) ]; then \
 		$(DOCKER) run $(DOCKER_ARGS) \
 			$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
@@ -550,7 +540,7 @@ $(CURL_CONFIG): $(TARGET_PREP) $(CURL_DIR) | $(OPENSSL_STAGING)
 	sed -i -e "s/LDFLAGS =/LDFLAGS = -all-static/" $(TARGET_WORKDIR)/curl/src/Makefile
 	touch $@
 
-$(CURL_BUILD): $(TARGET_PREP) $(CURL_CONFIG)
+$(CURL_BUILD): $(CURL_CONFIG) | prepare
 	+if [ ! -f $(CURL_CACHE_HIT) ]; then \
 		$(DOCKER) run $(DOCKER_ARGS) \
 			$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
@@ -565,7 +555,7 @@ $(CURL_BUILD): $(TARGET_PREP) $(CURL_CONFIG)
 	fi
 	touch $@
 
-$(CURL_STAGING): $(TARGET_PREP) $(CURL_BUILD)
+$(CURL_STAGING): $(CURL_BUILD) | prepare
 	+$(DOCKER) run $(DOCKER_ARGS) \
 		$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
 		-e CFLAGS="$(CURL_CFLAGS)" \
@@ -607,7 +597,7 @@ $(BASH_DIR):
 	fi
 	touch $@
 
-$(BASH_CONFIG): $(TARGET_PREP) $(BASH_DIR) | $(OPENSSL_STAGING)
+$(BASH_CONFIG): $(BASH_DIR) | $(OPENSSL_STAGING) prepare
 	+if [ ! -f $(BASH_CACHE_HIT) ]; then \
 		$(DOCKER) run $(DOCKER_ARGS) \
 			$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
@@ -642,7 +632,7 @@ $(BASH_CONFIG): $(TARGET_PREP) $(BASH_DIR) | $(OPENSSL_STAGING)
 	fi
 	touch $@
 
-$(BASH_BUILD): $(TARGET_PREP) $(BASH_CONFIG)
+$(BASH_BUILD): $(BASH_CONFIG) | prepare
 	+if [ ! -f $(BASH_CACHE_HIT) ]; then \
 		truncate --size=0 $(TARGET_WORKDIR)/bash/examples/loadables/Makefile ; \
 		echo all: >> $(TARGET_WORKDIR)/bash/examples/loadables/Makefile ; \
@@ -661,7 +651,7 @@ $(BASH_BUILD): $(TARGET_PREP) $(BASH_CONFIG)
 	fi
 	touch $@
 
-$(TARGET_INSTALL)/bin/bash: $(TARGET_PREP) $(BASH_BUILD)
+$(TARGET_INSTALL)/bin/bash: $(BASH_BUILD) | prepare
 	mkdir -p $(@D)
 	+$(DOCKER) run $(DOCKER_ARGS) \
 		$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
@@ -702,7 +692,7 @@ $(IOPING_DIR):
 $(IOPING_CONFIG): $(IOPING_DIR)
 	touch $@
 
-$(IOPING_BUILD): $(TARGET_PREP) $(IOPING_CONFIG)
+$(IOPING_BUILD): $(IOPING_CONFIG) | prepare
 	+if [ ! -f $(IOPING_CACHE_HIT) ]; then \
 		$(DOCKER) run $(DOCKER_ARGS) \
 			$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
@@ -717,7 +707,7 @@ $(IOPING_BUILD): $(TARGET_PREP) $(IOPING_CONFIG)
 	fi
 	touch $@
 
-$(TARGET_INSTALL)/usr/libexec/netdata/plugins.d/ioping: $(TARGET_PREP) $(IOPING_BUILD)
+$(TARGET_INSTALL)/usr/libexec/netdata/plugins.d/ioping: $(IOPING_BUILD) | prepare
 	mkdir -p $(@D)
 	$(DOCKER) run $(DOCKER_ARGS) $(BUILDER) \
 		/usr/bin/install -o root -g root -m 4750 $(DOCKER_WORKDIR)/ioping/ioping $(DOCKER_INSTALL)/usr/libexec/netdata/plugins.d/
@@ -737,7 +727,7 @@ $(NETDATA_DIR):
 	mkdir -p $(TARGET_WORKDIR)/netdata
 	touch $@
 
-$(NETDATA_CONFIG): $(TARGET_PREP) $(NETDATA_DIR) $(NETDATA_BUILD_DEPS)
+$(NETDATA_CONFIG): $(NETDATA_DIR) $(NETDATA_BUILD_DEPS) | prepare
 	rm -f $@
 	+$(DOCKER) run $(DOCKER_ARGS) \
 		$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
@@ -756,7 +746,7 @@ $(NETDATA_CONFIG): $(TARGET_PREP) $(NETDATA_DIR) $(NETDATA_BUILD_DEPS)
 			$(NETDATA_CMAKE_OPTS) ;
 	touch $@
 
-$(NETDATA_BUILD): $(TARGET_PREP) $(NETDATA_CONFIG)
+$(NETDATA_BUILD): $(NETDATA_CONFIG) | prepare
 	rm -f $@
 	+$(DOCKER) run $(DOCKER_ARGS) \
 		$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
@@ -793,7 +783,7 @@ netdata: $(NETDATA_INSTALL)
 
 # Testing rules
 
-check-static-linking: $(TARGET_PREP) $(NETDATA_INSTALL)
+check-static-linking: $(NETDATA_INSTALL) | prepare
 	$(DOCKER) run $(DOCKER_ARGS) \
 		$(BUILDER) \
 		/bin/sh $(NETDATA_SOURCE_DIR)/packaging/static/scripts/check-static-linking.sh $(DOCKER_INSTALL)
@@ -801,7 +791,7 @@ check-static-linking: $(TARGET_PREP) $(NETDATA_INSTALL)
 check-systemd-caps: $(NETDATA_INSTALL)
 	$(MAKEFILE_DIR)/scripts/systemd-caps-check.sh $(MAKEFILE_DIR) $(TARGET_INSTALL)
 
-runtime-check: $(TARGET_PREP) $(NETDATA_INSTALL)
+runtime-check: $(NETDATA_INSTALL) | prepare
 	$(DOCKER) run $(DOCKER_ARGS) \
 		$(BUILDER) \
 		/bin/sh $(NETDATA_SOURCE_DIR)/packaging/static/scripts/runtime-check.sh $(DOCKER_INSTALL) $(NETDATA_SOURCE_DIR) $(BUILDARCH)
