@@ -76,7 +76,9 @@ void parser_destroy(PARSER *parser) {
     if (unlikely(!parser))
         return;
 
-    // 0. the chart references; a parser destroyed mid-scope still holds its scope's
+    // 0. the chart references; a parser destroyed mid-scope still holds its scope's, so the scope ends first,
+    //    while that reference keeps the chart
+    pluginsd_clear_scope_chart(parser, "PARSER DESTROY", NULL);
     pluginsd_keyword_chart_refs_release(parser);
     rrdset_acquired_release(parser->user.st_ref.scope);
     parser->user.st_ref.scope = NULL;
