@@ -355,3 +355,4 @@ set at the end.
   drain guarantee (an immediate close loses nothing).
 - The historical spike-3 discipline (first point alone, wait, then burst)
   is NOT needed since #23096 — pinned by L0/live-burst.
+| CASE-045/terminal-smoothing-empty | SES and DES return null with EMPTY after the existing terminal EOF allowance when a later tier is skipped, with retained-source and single-plan controls | n/a |  |
