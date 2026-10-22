@@ -357,6 +357,11 @@ bool mrg_metric_has_zero_disk_retention(MRG *mrg __maybe_unused, METRIC *metric)
     size_t countdown = 5;
 
     do {
+        // the collector may flush while the caches are scanned (it sets the clean time, then makes the page dirty,
+        // then clears the hot time): the fields are replaced below only if nobody changed them meanwhile
+        time_t first_time_s_before = __atomic_load_n(&metric->first_time_s, __ATOMIC_RELAXED);
+        time_t clean_time_s_before = __atomic_load_n(&metric->latest_time_s_clean, __ATOMIC_RELAXED);
+
         time_t min_first_time_s = LONG_MAX;
         time_t max_end_time_s = 0;
         PGC_PAGE *page;
@@ -366,17 +371,47 @@ bool mrg_metric_has_zero_disk_retention(MRG *mrg __maybe_unused, METRIC *metric)
             method = PGC_SEARCH_NEXT;
 
             bool is_hot = pgc_is_page_hot(page);
-            bool is_dirty = pgc_is_page_dirty(page);
+            // dirty, or with no status: the flusher takes a page off the dirty list before its save callback reads
+            // the page's metric, so a page being saved still needs it (a page also has no status briefly while it
+            // is added to the cache or changes queue; counting those too only keeps the metric for another rotation)
+            bool is_unsaved = !is_hot && !pgc_is_page_clean(page);
+            // a hot page with gaps only is discarded by the flush, so it is no retention; if it gets a real value
+            // after this scan, its flush sets the clean time and the conditional updates below keep it
+            bool has_data = !pgd_is_empty(pgc_page_data(page));
+            bool counts = (is_hot || is_unsaved) && has_data;
             page_first_time_s = pgc_page_start_time_s(page);
             time_t page_end_time_s = pgc_page_end_time_s(page);
 
-            if ((is_hot || is_dirty) && page_first_time_s > 0 && page_first_time_s < min_first_time_s)
+            if (counts && page_first_time_s > 0 && page_first_time_s < min_first_time_s)
                 min_first_time_s = page_first_time_s;
 
-            if (is_dirty && page_end_time_s > max_end_time_s)
+            // a hot page counts too: if the collector flushes it after this scan, a clean time of 0 would leave the
+            // metric without retention while its page is dirty, and its last release would free it under the page
+            if (counts && page_end_time_s > max_end_time_s)
                 max_end_time_s = page_end_time_s;
 
             pgc_page_release(main_cache, page);
+        }
+
+        // pages already written to a datafile whose journal is not indexed yet: they are on disk. Scanned after
+        // the main cache, because a saved page enters the open cache before it turns clean in the main cache, so
+        // one of the two scans sees it
+        method = PGC_SEARCH_FIRST;
+        page_first_time_s = 0;
+        while ((page = pgc_page_get_and_acquire(open_cache, section, (Word_t)metric, page_first_time_s, method))) {
+            method = PGC_SEARCH_NEXT;
+
+            page_first_time_s = pgc_page_start_time_s(page);
+            time_t page_end_time_s = pgc_page_end_time_s(page);
+            bool is_ours = open_cache_page_is_of_metric(page, metric->uuid);
+
+            if (is_ours && page_first_time_s > 0 && page_first_time_s < min_first_time_s)
+                min_first_time_s = page_first_time_s;
+
+            if (is_ours && page_end_time_s > max_end_time_s)
+                max_end_time_s = page_end_time_s;
+
+            pgc_page_release(open_cache, page);
         }
 
         if (min_first_time_s == LONG_MAX)
@@ -388,8 +423,8 @@ bool mrg_metric_has_zero_disk_retention(MRG *mrg __maybe_unused, METRIC *metric)
             internal_error(!countdown, "METRIC: giving up on updating the retention of metric without disk retention");
 
             do_again = false;
-            set_metric_field_with_condition(metric->first_time_s, min_first_time_s, true);
-            set_metric_field_with_condition(metric->latest_time_s_clean, max_end_time_s, true);
+            set_metric_field_with_condition(metric->first_time_s, min_first_time_s, _current == first_time_s_before);
+            set_metric_field_with_condition(metric->latest_time_s_clean, max_end_time_s, _current == clean_time_s_before);
         }
     } while(do_again);
 
@@ -411,6 +446,14 @@ bool mrg_metric_set_hot_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric, t
     }
 
     return false;
+}
+
+// the collector that stored latest_time_s has no hot page any more: nothing it collected is waiting to be stored.
+// Cleared only if it is still that collector's time - a duplicate writer of the metric may have stored another one
+// (two writers storing the same second cannot be told apart: the other one's next store sets it again)
+ALWAYS_INLINE
+void mrg_metric_clear_hot_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric, time_t latest_time_s) {
+    __atomic_compare_exchange_n(&metric->latest_time_s_hot, &latest_time_s, 0, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
 }
 
 ALWAYS_INLINE

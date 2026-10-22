@@ -1362,9 +1362,6 @@ static time_t find_uuid_first_time(
                 size_t found_index = live_entry - uuid_list;
                 journal_search_start = found_index + 1; // Next search starts after this match
 
-                if (journal_search_start >= journal_metric_count)
-                    break;
-
                 uuid_original_entry->pages_found += live_entry->entries;
                 uuid_original_entry->df_matched++;
 
@@ -1437,10 +1434,22 @@ release_journal:
             continue;
         }
 
-        PGC_PAGE *page = pgc_page_get_and_acquire(
+        // the first open-cache page that really belongs to this metric (see open_cache_page_is_of_metric())
+        UUIDMAP_ID uuid_id = mrg_metric_uuidmap_id(main_mrg, uuid_first_t_entry->metric);
+        PGC_SEARCH method = PGC_SEARCH_FIRST;
+        time_t page_start_time_s = 0;
+        PGC_PAGE *page;
+        while ((page = pgc_page_get_and_acquire(
                 open_cache, (Word_t)ctx,
-                (Word_t)uuid_first_t_entry->metric, 0,
-                PGC_SEARCH_FIRST);
+                (Word_t)uuid_first_t_entry->metric, page_start_time_s,
+                method))) {
+            if (open_cache_page_is_of_metric(page, uuid_id))
+                break;
+
+            method = PGC_SEARCH_NEXT;
+            page_start_time_s = pgc_page_start_time_s(page);
+            pgc_page_release(open_cache, page);
+        }
 
         if (page) {
             time_t old_first_time_s = uuid_first_t_entry->first_time_s;
@@ -2858,7 +2867,11 @@ void dbengine_event_loop(void* arg) {
                     struct rrdengine_datafile *datafile = cmd.data;
                     // We no longer have an indexing command pending
                     ctx->datafiles.pending_index = false;
-                    if (NOT_INDEXING_FILES(ctx) && ctx_is_available_for_queries(ctx)) {
+                    // never while files are deleted: rotation finds the retention of the metrics it rotates in the
+                    // journals and then in the open cache, and indexing moves pages from the open cache to a new
+                    // journal - in between, rotation would see neither and delete metrics that have data
+                    // (needs_indexing stays set, so the end of the rotation schedules it again)
+                    if (NOT_INDEXING_FILES(ctx) && NOT_DELETING_FILES(ctx) && ctx_is_available_for_queries(ctx)) {
                         __atomic_store_n(&ctx->atomic.migration_to_v2_running, true, __ATOMIC_RELAXED);
                         __atomic_store_n(&ctx->atomic.needs_indexing, false, __ATOMIC_RELAXED);
                         work_dispatch(ctx, datafile, NULL, opcode, journal_v2_indexing_tp_worker, after_journal_v2_indexing);
@@ -2869,7 +2882,8 @@ void dbengine_event_loop(void* arg) {
                 case RRDENG_OPCODE_DATABASE_ROTATE: {
                     struct rrdengine_instance *ctx = cmd.ctx;
                     ctx->datafiles.pending_rotate = false;
-                    if (NOT_DELETING_FILES(ctx) && datafile_count(ctx, false) > 2 &&
+                    // never while indexing, see RRDENG_OPCODE_JOURNAL_INDEX (the end of indexing schedules it again)
+                    if (NOT_DELETING_FILES(ctx) && NOT_INDEXING_FILES(ctx) && datafile_count(ctx, false) > 2 &&
                         rrdeng_ctx_tier_cap_exceeded(ctx)) {
                         __atomic_store_n(&ctx->atomic.now_deleting_files, true, __ATOMIC_RELAXED);
                         work_dispatch(ctx, NULL, NULL, opcode, database_rotate_tp_worker, after_database_rotate);
