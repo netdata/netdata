@@ -108,8 +108,8 @@ ml_kmeans_anomaly_score(const ml_kmeans_inlined_t *inlined_km, const DSample &DS
         return std::numeric_limits<calculated_number_t>::quiet_NaN();
 
     // Training used to start max_dist at DBL_MIN, so a model whose distances
-    // were all 0 was stored as (0, DBL_MIN) instead of (0, 0). Such models
-    // still come from ml.db and from children: treat them as flat too.
+    // were all 0 was stored in ml.db as (0, DBL_MIN) instead of (0, 0): treat
+    // it as flat too. Streamed models print DBL_MIN as 0 and arrive as (0, 0).
     if (inlined_km->min_dist == 0.0 && inlined_km->max_dist == std::numeric_limits<calculated_number_t>::min())
         return std::numeric_limits<calculated_number_t>::quiet_NaN();
 
