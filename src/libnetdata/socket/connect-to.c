@@ -237,10 +237,12 @@ static void connect_attempt_timed_out(CONNECT_ATTEMPT *a) {
 // timeout     the time allowed for connecting to the host, over all its IPs; it is also set as SO_SNDTIMEO
 //             on the socket (NULL = 1 second and no SO_SNDTIMEO, zero = no limit: the IPs wait until the kernel
 //             gives up)
-// fallback_ipv4  when not NULL, set to true when an IPv6 address times out, and while true IPv6 addresses are skipped
-//             (so it affects the calls that follow, not the one that set it)
+// fallback_ipv4  when not NULL, set to true when an IPv6 address is still connecting when the timeout expires, and
+//             while true IPv6 addresses are skipped (so it affects the calls that follow, not the one that set it);
+//             with a zero timeout there is no expiry, so it is never set
 //
-// returns the connected socket (blocking), or -ND_SOCK_ERROR of the last failure
+// returns the connected socket (blocking), or -ND_SOCK_ERR_TIMEOUT when IPs were still connecting when the timeout
+// expired, or else -ND_SOCK_ERROR of the last IP that failed
 
 int connect_to_this_ip46(
     int protocol,
