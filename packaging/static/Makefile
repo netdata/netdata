@@ -161,7 +161,7 @@ MAKESELF_OPTS = --notemp \
                 --sha256 \
                 --lsm $(MAKEFILE_DIR)/makeself.lsm \
                 --license $(MAKEFILE_DIR)/makeself-license.txt \
-                --help-header $(MAKEFILE_DIR)/makeself-help.txt \
+                --help-header $(MAKEFILE_DIR)/makeself-help-header.txt \
                 --target /$(NETDATA_PREFIX) \
                 $(TARGET_INSTALL) \
                 $@ \
