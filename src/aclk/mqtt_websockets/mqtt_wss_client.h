@@ -60,10 +60,10 @@ struct mqtt_wss_proxy;
  *   - hostname resolution is synchronous and NOT covered by any timeout here (getaddrinfo() inside
  *     connect_to_this_ip46(), and again for the target host under SOCKS5 - SOCKS5H delegates that
  *     to the proxy), so a stalled resolver blocks for as long as it takes.
- *   - TCP connect waits up to 10s per resolved address, connecting non-blocking and polling. Any
- *     failed or silent address is skipped and the next one is tried, until 20s have passed in total.
- *     That wait DOES observe a thread cancel, which is what stopping SERVICE_ACLK signals, so a
- *     shutdown ends it promptly.
+ *   - TCP connect gets 10s in total. The resolved addresses are tried in parallel, IPv6 and IPv4
+ *     interleaved, the next one started every 250ms (or as soon as one fails) while the earlier
+ *     ones stay pending; the first to connect wins. That wait DOES observe a thread cancel, which
+ *     is what stopping SERVICE_ACLK signals, so a shutdown ends it promptly.
  *   - proxy negotiation, when configured, carries its own 10s timeout and observes no shutdown.
  *   - the first SSL_connect() runs on the non-blocking socket, so it starts the handshake without
  *     waiting on the peer.
