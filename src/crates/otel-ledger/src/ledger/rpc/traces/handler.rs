@@ -581,8 +581,8 @@ impl OtelTracesHandler {
     }
 
     /// The `suggest` mode: keys, or one key's values, matching a typed
-    /// term (see `sfsq::traces::suggest`), bounded in items, sources and
-    /// time.
+    /// term (see `sfsq::traces::suggest`), bounded in sources and time,
+    /// and in items unless it is a tier list.
     async fn suggest(
         &self,
         ctx: &FunctionCallContext,
@@ -590,26 +590,36 @@ impl OtelTracesHandler {
         tenant: Option<&str>,
     ) -> netdata_plugin_error::Result<OtelTracesResponse> {
         let deadline = std::time::Instant::now() + SUGGEST_DEADLINE;
-        let max = params
-            .max_items
-            .unwrap_or(sfsq::traces::DEFAULT_SUGGEST_ITEMS);
-        if max == 0 {
-            return Err(client_err(
-                "a zero 'max_items' would return nothing; omit it or raise it",
-            ));
-        }
-        if max > SUGGEST_ITEMS_MAX {
-            return Err(client_err(format!(
-                "'max_items' {max} exceeds the maximum {SUGGEST_ITEMS_MAX}"
-            )));
+        let max = match (params.tier, params.max_items) {
+            (Some(_), Some(_)) => {
+                return Err(client_err("a 'tier' list is never cut; omit 'max_items'"));
+            }
+            (Some(_), None) => None,
+            (None, max) => Some(max.unwrap_or(sfsq::traces::DEFAULT_SUGGEST_ITEMS)),
+        };
+        if let Some(max) = max {
+            if max == 0 {
+                return Err(client_err(
+                    "a zero 'max_items' would return nothing; omit it or raise it",
+                ));
+            }
+            if max > SUGGEST_ITEMS_MAX {
+                return Err(client_err(format!(
+                    "'max_items' {max} exceeds the maximum {SUGGEST_ITEMS_MAX}"
+                )));
+            }
         }
         check_request_text("term", &params.term).map_err(client_err)?;
-        let query = match &params.key {
-            Some(key) => {
+        let query = match (&params.key, params.tier) {
+            (Some(_), Some(_)) => {
+                return Err(client_err("'tier' lists keys; omit 'key' or 'tier'"));
+            }
+            (Some(key), None) => {
                 let (owner, key) = parse_values_key(key).map_err(client_err)?;
                 SuggestQuery::values(owner, key)
             }
-            None => SuggestQuery::keys(),
+            (None, Some(tier)) => SuggestQuery::keys_of_tier(tier.into()),
+            (None, None) => SuggestQuery::keys(),
         };
         // Validated before admission: a bad request is a client error,
         // not `busy`.
@@ -627,11 +637,13 @@ impl OtelTracesHandler {
                 params.key.clone(),
             )));
         };
-        let query = query
+        let mut query = query
             .term(params.term.clone())
-            .max_items(max)
             .window(engine_window)
             .deadline(deadline);
+        if let Some(max) = max {
+            query = query.max_items(max);
+        }
         let Capture {
             mut sets,
             pins,

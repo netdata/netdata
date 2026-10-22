@@ -43,7 +43,8 @@ enum Cmd {
     /// (`sfsq::traces` search: exact summaries, most-recent-first).
     Search(SearchArgs),
     /// Suggest keys, or one key's values, matching a term (the search
-    /// bar's suggestions: newest data first, bounded).
+    /// bar's suggestions: newest data first, bounded), or every key of a
+    /// tier.
     Suggest(SuggestArgs),
     /// Build the trace-density grid (the list's heatmap) over sealed
     /// SFSTs and traces WALs.
@@ -94,6 +95,7 @@ fn main() -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sfsq_cli::traces::TierArg;
 
     /// clap must accept leading-dash relative times (`--since -1h`) instead of
     /// rejecting `-1h` as an unknown flag — the `allow_hyphen_values` behavior
@@ -165,5 +167,17 @@ mod tests {
                 "{cmd}"
             );
         }
+    }
+
+    /// `suggest --tier` lists keys, so it cannot go with `--key`.
+    #[test]
+    fn suggest_tier_parses_and_refuses_a_key() {
+        let argv = ["sfsq-cli", "suggest", "--sfst", "/x", "--tier", "low"];
+        match Cli::try_parse_from(argv).unwrap().cmd {
+            Some(Cmd::Suggest(a)) => assert_eq!(a.tier, Some(TierArg::Low)),
+            other => panic!("parsed as {other:?}"),
+        }
+        let err = Cli::try_parse_from(argv.into_iter().chain(["--key", "name"])).unwrap_err();
+        assert_eq!(err.kind(), clap::error::ErrorKind::ArgumentConflict);
     }
 }

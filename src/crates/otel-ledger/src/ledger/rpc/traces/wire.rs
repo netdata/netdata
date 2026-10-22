@@ -438,11 +438,13 @@ where
 pub const REQUEST_TEXT_MAX_BYTES: usize = 1024;
 
 /// Wire maximum for [`SuggestParams::max_items`]; absent means the
-/// engine's `DEFAULT_SUGGEST_ITEMS`.
+/// engine's `DEFAULT_SUGGEST_ITEMS`, except for a [`SuggestParams::tier`]
+/// list, which has no limit.
 pub const SUGGEST_ITEMS_MAX: usize = 200;
 
 /// The `suggest` mode's typed parameters: without `key`, suggest keys;
-/// with it, that key's values. Both match `term`.
+/// with it, that key's values. Both match `term`. With `tier`, the keys
+/// of that tier, every one.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SuggestParams {
@@ -463,9 +465,17 @@ pub struct SuggestParams {
     #[serde(default)]
     pub term: String,
     /// Cap the suggestions (the response's `truncated` flag is exact).
-    /// Zero and beyond [`SUGGEST_ITEMS_MAX`] are client errors.
+    /// Zero, beyond [`SUGGEST_ITEMS_MAX`], and with `tier` are client
+    /// errors.
     #[serde(default)]
     pub max_items: Option<usize>,
+    /// Keys only (with `key` it is a client error): the keys whose tier,
+    /// as the visited sources rate them, is this one; every one, never
+    /// cut, and the walk does not stop at sources that add no key (one
+    /// may still raise a tier). The span view's "Stack by" list asks
+    /// `low`.
+    #[serde(default)]
+    pub tier: Option<TierWire>,
 }
 
 /// The `explore` mode's typed parameters: the span view. Every section
@@ -758,7 +768,8 @@ pub struct ExploreSpanWire {
 /// Suggestions, best first: match class, then bytes. Bounded by
 /// construction: at most [`SUGGEST_ITEMS_MAX`] items, each value at most
 /// the adapter's `LIST_VALUE_MAX_BYTES` and each key at most
-/// [`REQUEST_TEXT_MAX_BYTES`].
+/// [`REQUEST_TEXT_MAX_BYTES`]. A [`SuggestParams::tier`] list has no item
+/// limit: it is bounded by the distinct keys of the visited sources.
 #[derive(Debug, Serialize)]
 pub struct SuggestResult {
     /// The response's self-description: always `"suggest"`.
@@ -773,7 +784,8 @@ pub struct SuggestResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub key: Option<String>,
     pub items: Vec<SuggestionWire>,
-    /// Exact: a further match existed among the visited sources.
+    /// Exact: a further match existed among the visited sources. Always
+    /// `false` for a tier list, which is never cut.
     pub truncated: bool,
     /// After an early stop: every span from this second (unix) on lives
     /// in a visited source. Absent when nothing was left unvisited, or
@@ -837,7 +849,7 @@ impl From<sfst::MatchClass> for MatchWire {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TierWire {
     Low,
@@ -851,6 +863,16 @@ impl From<sfst::FieldTier> for TierWire {
             sfst::FieldTier::Low => TierWire::Low,
             sfst::FieldTier::Mid => TierWire::Mid,
             sfst::FieldTier::High => TierWire::High,
+        }
+    }
+}
+
+impl From<TierWire> for sfst::FieldTier {
+    fn from(tier: TierWire) -> Self {
+        match tier {
+            TierWire::Low => sfst::FieldTier::Low,
+            TierWire::Mid => sfst::FieldTier::Mid,
+            TierWire::High => sfst::FieldTier::High,
         }
     }
 }

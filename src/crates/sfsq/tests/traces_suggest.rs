@@ -10,7 +10,9 @@
 //! rejected; keys partition by owner with every builtin (with or without
 //! sources) and no internal field; builtin values are the storage labels,
 //! the OTel defaults included, and virtual builtins have none; a window
-//! prunes files but never a tail.
+//! prunes files but never a tail; a tier list holds every key that the
+//! visited sources rate in its tier, walks past sources that add nothing
+//! and cuts only after the filter.
 
 mod common;
 
@@ -427,6 +429,70 @@ fn every_builtin_is_a_key_without_any_source() {
     want.sort();
     assert_eq!(keys, want, "the builtin keys are static");
     assert_eq!(data.status, QueryStatus::Complete);
+}
+
+/// Spans at `at_s` seconds past [`BASE_S`]: one carrying the span
+/// attributes `a00..a59` (one value each), and `busy` spans with distinct
+/// values of the span attribute `busy`.
+fn tiered(busy: usize, at_s: u64) -> Vec<common::SpanSpec> {
+    let start = (BASE_S + at_s) * 1_000_000_000;
+    let mut wide = sp(1, 0, start, "op");
+    wide.attrs = (0..60).map(|i| kv_str(&format!("a{i:02}"), "x")).collect();
+    let mut spans = vec![wide];
+    for i in 0..busy {
+        let mut s = sp(i as u8 + 2, 0, start, "op");
+        s.attrs = vec![kv_str("busy", &format!("b{i:03}"))];
+        spans.push(s);
+    }
+    spans
+}
+
+#[test]
+fn a_tier_list_holds_every_key_the_visited_sources_rate_in_that_tier() {
+    let dir = tempfile::tempdir().unwrap();
+    // Newest first: ten files where `busy` has 5 values (low), then the
+    // oldest, where it has 150 (mid). The nine after the newest add no key.
+    let mut sources = Vec::new();
+    for at_s in 20..30 {
+        let name = format!("f{at_s}");
+        let wal = write_wal(dir.path(), vec![req(&tiered(5, at_s))], &name);
+        sources.push(sealed_source(dir.path(), &wal, &name));
+    }
+    let old = write_wal(dir.path(), vec![req(&tiered(150, 10))], "old");
+    sources.push(sealed_source(dir.path(), &old, "old"));
+
+    let all = run(sources.clone(), SuggestQuery::keys().max_items(200));
+    assert_eq!(
+        all.status,
+        partial(&[PartialReason::NoNewMatches]),
+        "a plain key list stops before the oldest file"
+    );
+
+    let low = run(sources.clone(), SuggestQuery::keys_of_tier(FieldTier::Low));
+    assert!(low.items.iter().all(|s| s.tier == Some(FieldTier::Low)));
+    let texts: Vec<&str> = low.items.iter().map(|s| s.text.as_str()).collect();
+    let wide = texts
+        .iter()
+        .filter(|t| t.starts_with("attributes.a"))
+        .count();
+    assert_eq!(wide, 60, "every low key, past the default 50");
+    assert!(
+        !texts.contains(&"attributes.busy"),
+        "the oldest file rates it mid"
+    );
+    assert!(!texts.contains(&"duration"), "a virtual key has no tier");
+    assert!(!low.truncated);
+    assert_eq!(low.status, QueryStatus::Complete, "no stale-source stop");
+
+    let mid = run(sources.clone(), SuggestQuery::keys_of_tier(FieldTier::Mid));
+    assert_eq!(items(&mid), [("attributes.busy", Prefix)]);
+
+    let cut = run(
+        sources,
+        SuggestQuery::keys_of_tier(FieldTier::Low).max_items(10),
+    );
+    assert_eq!(cut.items, low.items[..10], "cut after the filter");
+    assert!(cut.truncated);
 }
 
 #[test]

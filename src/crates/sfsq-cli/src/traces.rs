@@ -275,7 +275,7 @@ fn status_word(status: &QueryStatus) -> String {
 
 /// Suggest keys, or one key's values, matching a term — the search
 /// bar's suggestions, newest data first, bounded in items, sources and
-/// time.
+/// time — or every key of a tier.
 #[derive(Debug, clap::Args)]
 pub struct SuggestArgs {
     /// A sealed traces SFST file. Repeatable.
@@ -294,6 +294,12 @@ pub struct SuggestArgs {
     /// The typed text; empty matches everything.
     #[arg(long, default_value = "")]
     pub term: String,
+
+    /// Suggest only the keys of this tier, every one: no item cap and no
+    /// stop at files that add nothing, unless --max-items or
+    /// --stale-files sets one. Not with --key.
+    #[arg(long, value_enum, conflicts_with = "key")]
+    pub tier: Option<TierArg>,
 
     /// Cap the suggestions (exact truncation flag); 0 is rejected.
     #[arg(long)]
@@ -322,14 +328,33 @@ pub struct SuggestArgs {
     pub end_ns: Option<i64>,
 }
 
+/// A key's cardinality tier, for `suggest --tier`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub enum TierArg {
+    Low,
+    Mid,
+    High,
+}
+
+impl From<TierArg> for sfst::FieldTier {
+    fn from(tier: TierArg) -> Self {
+        match tier {
+            TierArg::Low => sfst::FieldTier::Low,
+            TierArg::Mid => sfst::FieldTier::Mid,
+            TierArg::High => sfst::FieldTier::High,
+        }
+    }
+}
+
 pub fn run_suggest(args: &SuggestArgs, out: &mut dyn std::io::Write) -> Result<()> {
     let started = std::time::Instant::now();
-    let mut query = match &args.key {
-        Some(key) => {
+    let mut query = match (&args.key, args.tier) {
+        (Some(key), _) => {
             let (owner, key) = parse_key("--key", key)?;
             SuggestQuery::values(owner, key)
         }
-        None => SuggestQuery::keys(),
+        (None, Some(tier)) => SuggestQuery::keys_of_tier(tier.into()),
+        (None, None) => SuggestQuery::keys(),
     };
     query = query.term(args.term.clone());
     if let Some(max) = args.max_items {

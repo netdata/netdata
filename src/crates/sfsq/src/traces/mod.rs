@@ -57,8 +57,8 @@
 //!   (sealed `TRSU` rows; tails' decoded-span folds, parity
 //!   test-pinned), merged by one cross-source fold.
 //! - suggest — [`suggest()`]: the keys, or a key's values, matched
-//!   against a typed term, newest data first, bounded in items, sources
-//!   and time.
+//!   against a typed term, newest data first, bounded in sources and
+//!   time, and in items unless a tier list asks for every key of a tier.
 //! - order — the newest-first source order behind suggest's early stops.
 //! - status — [`QueryStatus`] and [`PartialReason`]: the reason set
 //!   returned beside every operation's data.

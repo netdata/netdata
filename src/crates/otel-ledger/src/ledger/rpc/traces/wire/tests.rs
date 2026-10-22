@@ -347,8 +347,15 @@ fn suggest_params_parse_with_defaults_and_reject_strays() {
         panic!("suggest mode expected");
     };
     assert_eq!(
-        (p.after, p.before, p.key, p.term.as_str(), p.max_items),
-        (0, 0, None, "", None)
+        (
+            p.after,
+            p.before,
+            p.key,
+            p.term.as_str(),
+            p.max_items,
+            p.tier
+        ),
+        (0, 0, None, "", None, None)
     );
     let TracesMode::Suggest(p) =
         req(json!({"suggest": {"key": "name", "term": "ab", "max_items": 7}})).mode
@@ -359,7 +366,13 @@ fn suggest_params_parse_with_defaults_and_reject_strays() {
         (p.key.as_deref(), p.term.as_str(), p.max_items),
         (Some("name"), "ab", Some(7))
     );
+    let TracesMode::Suggest(p) = req(json!({"suggest": {"tier": "low"}})).mode else {
+        panic!("suggest mode expected");
+    };
+    assert_eq!(p.tier, Some(TierWire::Low));
     let err = req_err(json!({"suggest": {"terms": "ab"}}));
+    assert!(err.contains("invalid suggest selector"), "{err}");
+    let err = req_err(json!({"suggest": {"tier": "lowest"}}));
     assert!(err.contains("invalid suggest selector"), "{err}");
     let err = req_err(json!({"info": {}, "suggest": {}}));
     assert!(

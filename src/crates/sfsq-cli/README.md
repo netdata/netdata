@@ -168,7 +168,7 @@ whole trace or on `trace_id`, mark no span.
 ### `suggest` — suggest keys or values
 
 ```
-sfsq-cli suggest (--sfst FILE | --wal FILE)… [--key KEY]
+sfsq-cli suggest (--sfst FILE | --wal FILE)… [--key KEY | --tier TIER]
                  [--term TEXT] [--max-items N] [--max-files N]
                  [--stale-files N] [--deadline-ms N]
                  [--start-ns N --end-ns N]
@@ -184,6 +184,12 @@ term, starts with it, contains it, or starts within one edit (terms of 4 or
 more characters) or two edits (8 or more) of it. An empty term matches
 all.
 
+- `--tier` — give only the keys of this cardinality tier: `low` (fewer
+  than 100 different values in a file), `mid` (fewer than 1,000) or
+  `high`. A key gets the highest tier that a file gives it. With `--tier`,
+  `suggest` gives all of these keys: there is no default maximum, and the
+  walk does not stop at files that add no key. `--max-items` and
+  `--stale-files` set these limits. You cannot use `--tier` with `--key`.
 - `--max-items` — the maximum number of suggestions (default 50; 0 is an
   error).
 - `--max-files` — stop after this number of files that have the key

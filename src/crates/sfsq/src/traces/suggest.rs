@@ -19,15 +19,24 @@
 //! schemas hold under it (`sfst::SchemaTree::derive_leaf_kinds`; a
 //! tail's scan builds the same tree), unioned; builtins carry none.
 //!
+//! A tier list ([`SuggestQuery::keys_of_tier`]) keeps only the keys whose
+//! tier, once every visited source has rated them, is the one asked for.
+//! A later source can raise a key's tier, so a tier list gathers every
+//! matching key while merging and filters and cuts at the end.
+//!
 //! Bounds, independent of how many files the window holds:
 //! - items: at most `max_items` suggestions, and only that many are kept
 //!   while merging (memory follows the limit, not the key's distinct
 //!   values); `truncated` says a further match existed among the
-//!   visited sources;
+//!   visited sources. A tier list has no limit unless one is set, and
+//!   its memory follows the distinct matching keys of the visited
+//!   sources;
 //! - work: sources are visited newest first ([`super::order`]) and the
 //!   walk stops at `max_files` sources that carry the key
 //!   ([`FileBudget`](PartialReason::FileBudget)), after `stale_files`
-//!   consecutive such sources changed nothing
+//!   consecutive such sources changed nothing (a tier list has no such
+//!   stop unless one is set: a source that only raises a tier changes
+//!   nothing)
 //!   ([`NoNewMatches`](PartialReason::NoNewMatches)), or at the deadline
 //!   ([`Deadline`](PartialReason::Deadline)), checked between sources and
 //!   every [`DEADLINE_CHECK_EVERY`] values inside one; the newest source
@@ -150,7 +159,8 @@ pub const DEADLINE_CHECK_EVERY: usize = 1024;
 
 #[derive(Debug, Clone)]
 enum Target {
-    Keys,
+    /// Keys; with a tier, only the keys of that tier.
+    Keys(Option<sfst::FieldTier>),
     Values(AttributeOwner, AttributeKey),
 }
 
@@ -160,9 +170,11 @@ pub struct SuggestQuery {
     target: Target,
     term: String,
     window: Option<TimeWindow>,
-    max_items: usize,
+    /// `None`: no limit.
+    max_items: Option<usize>,
     max_files: usize,
-    stale_files: usize,
+    /// `None`: no stale-source stop.
+    stale_files: Option<usize>,
     deadline: Option<Instant>,
     deadline_after_values: Option<usize>,
 }
@@ -177,7 +189,18 @@ impl SuggestQuery {
 
     /// Suggest keys, as vocabulary keys.
     pub fn keys() -> Self {
-        Self::new(Target::Keys)
+        Self::new(Target::Keys(None))
+    }
+
+    /// Suggest the keys whose tier is `tier` once every visited source
+    /// has rated them: every one, with no stale-source stop, unless
+    /// [`Self::max_items`] or [`Self::stale_files`] sets one.
+    pub fn keys_of_tier(tier: sfst::FieldTier) -> Self {
+        Self {
+            max_items: None,
+            stale_files: None,
+            ..Self::new(Target::Keys(Some(tier)))
+        }
     }
 
     fn new(target: Target) -> Self {
@@ -185,9 +208,9 @@ impl SuggestQuery {
             target,
             term: String::new(),
             window: None,
-            max_items: DEFAULT_SUGGEST_ITEMS,
+            max_items: Some(DEFAULT_SUGGEST_ITEMS),
             max_files: DEFAULT_SUGGEST_FILES,
-            stale_files: DEFAULT_STALE_FILES,
+            stale_files: Some(DEFAULT_STALE_FILES),
             deadline: None,
             deadline_after_values: None,
         }
@@ -206,7 +229,7 @@ impl SuggestQuery {
 
     /// Zero is rejected ([`SuggestRequestError::ZeroLimit`]).
     pub fn max_items(mut self, max: usize) -> Self {
-        self.max_items = max;
+        self.max_items = Some(max);
         self
     }
 
@@ -218,7 +241,7 @@ impl SuggestQuery {
 
     /// Zero is rejected ([`SuggestRequestError::ZeroLimit`]).
     pub fn stale_files(mut self, n: usize) -> Self {
-        self.stale_files = n;
+        self.stale_files = Some(n);
         self
     }
 
@@ -265,7 +288,8 @@ pub struct Suggestion {
 #[derive(Debug)]
 pub struct SuggestData {
     pub items: Vec<Suggestion>,
-    /// A further match existed among the visited sources.
+    /// A further match (for a tier list, a further key of the tier)
+    /// existed among the visited sources.
     pub truncated: bool,
     pub status: QueryStatus,
     /// Set after an early stop: every span from this second (unix) on
@@ -287,18 +311,22 @@ pub fn suggest(
     cancel: CancellationToken,
     progress: Arc<AtomicUsize>,
 ) -> Result<SuggestData, SuggestRequestError> {
-    if query.max_items == 0 || query.max_files == 0 || query.stale_files == 0 {
+    if query.max_items == Some(0) || query.max_files == 0 || query.stale_files == Some(0) {
         return Err(SuggestRequestError::ZeroLimit);
     }
-    let target = match &query.target {
-        Target::Keys => Resolved::Keys,
-        Target::Values(owner, key) => Resolved::Values(storage_field_of(*owner, key)?),
+    let (target, tier) = match &query.target {
+        Target::Keys(tier) => (Resolved::Keys, *tier),
+        Target::Values(owner, key) => (Resolved::Values(storage_field_of(*owner, key)?), None),
     };
     validate_sources(&sources)?;
     newest_first(&mut sources);
 
     let matcher = ValueMatcher::new(&query.term);
-    let mut set = BoundedSuggestions::new(query.max_items);
+    // A tier list cuts only once every visited source has rated its keys.
+    let mut set = BoundedSuggestions::new(match tier {
+        Some(_) => None,
+        None => query.max_items,
+    });
     if let Resolved::Keys = target {
         for field in BuiltinField::ALL {
             let key = AttributeKey::Builtin(field);
@@ -332,7 +360,7 @@ pub fn suggest(
             stop = Some((i, PartialReason::FileBudget, i));
             break;
         }
-        if stale == query.stale_files {
+        if query.stale_files == Some(stale) {
             stop = Some((i, PartialReason::NoNewMatches, i));
             break;
         }
@@ -376,13 +404,37 @@ pub fn suggest(
         progress.fetch_add(sources.len() - first_unticked, Ordering::Relaxed);
         complete = complete_after(&sources[first_unvisited..]);
     }
-    let truncated = set.truncated;
+    let (items, truncated) = match tier {
+        Some(tier) => of_tier(set.into_items(), tier, query.max_items),
+        None => {
+            let truncated = set.truncated;
+            (set.into_items(), truncated)
+        }
+    };
     Ok(SuggestData {
-        items: set.into_items(),
+        items,
         truncated,
         status: status.finish(),
         complete_after: complete,
     })
+}
+
+/// The keys of `tier`, in order, cut to `max_items`; `true` when the cut
+/// left one out.
+fn of_tier(
+    items: Vec<Suggestion>,
+    tier: sfst::FieldTier,
+    max_items: Option<usize>,
+) -> (Vec<Suggestion>, bool) {
+    let mut items: Vec<Suggestion> = items
+        .into_iter()
+        .filter(|item| item.tier == Some(tier))
+        .collect();
+    let truncated = max_items.is_some_and(|max| items.len() > max);
+    if let Some(max) = max_items {
+        items.truncate(max);
+    }
+    (items, truncated)
 }
 
 /// The query's target, validated.
@@ -601,9 +653,10 @@ struct Entry {
 }
 
 /// The best `k` suggestions seen so far, by (class, text). Memory is
-/// O(k): a candidate that cannot enter is dropped at once.
+/// O(k): a candidate that cannot enter is dropped at once. Without `k`,
+/// every suggestion seen.
 struct BoundedSuggestions {
-    k: usize,
+    k: Option<usize>,
     best: HashMap<Box<str>, Entry>,
     order: BTreeSet<(MatchClass, Box<str>)>,
     /// A match was rejected or evicted.
@@ -611,7 +664,7 @@ struct BoundedSuggestions {
 }
 
 impl BoundedSuggestions {
-    fn new(k: usize) -> Self {
+    fn new(k: Option<usize>) -> Self {
         Self {
             k,
             best: HashMap::new(),
@@ -652,7 +705,7 @@ impl BoundedSuggestions {
             }
             return changed;
         }
-        if self.order.len() == self.k {
+        if self.k == Some(self.order.len()) {
             let worst = self.order.last().expect("k > 0");
             if (class, display) >= (worst.0, &*worst.1) {
                 self.truncated = true;
@@ -723,7 +776,7 @@ mod tests {
 
     #[test]
     fn the_set_keeps_the_best_k_by_class_then_text() {
-        let mut set = BoundedSuggestions::new(2);
+        let mut set = BoundedSuggestions::new(Some(2));
         assert!(set.offer("b", Prefix, None));
         assert!(set.offer("a", Contains, None));
         // Full: a worse candidate is dropped, a better one evicts the worst.
@@ -745,7 +798,7 @@ mod tests {
             kinds: kinds.iter().copied().collect(),
         };
         let matcher = ValueMatcher::new("");
-        let mut set = BoundedSuggestions::new(4);
+        let mut set = BoundedSuggestions::new(Some(4));
         let code = AttributeKey::Attribute("code".into());
         assert!(offer_key(
             &mut set,
@@ -795,7 +848,7 @@ mod tests {
 
     #[test]
     fn a_repeated_text_keeps_its_better_class() {
-        let mut set = BoundedSuggestions::new(3);
+        let mut set = BoundedSuggestions::new(Some(3));
         assert!(set.offer("a", Fuzzy1, None));
         assert!(!set.offer("a", Fuzzy2, None));
         assert!(set.offer("a", Prefix, None));
@@ -807,7 +860,7 @@ mod tests {
     fn an_evicted_text_never_returns_as_a_worse_match() {
         // The worst only improves, so an evicted value cannot re-enter
         // with the class it was evicted at.
-        let mut set = BoundedSuggestions::new(1);
+        let mut set = BoundedSuggestions::new(Some(1));
         assert!(set.offer("b", Contains, None));
         assert!(set.offer("a", Prefix, None));
         assert!(!set.offer("b", Contains, None));
@@ -823,7 +876,7 @@ mod tests {
         };
         let head = "k".repeat(DISPLAY_MAX_BYTES);
         let (long_a, long_b) = (format!("{head}a"), format!("{head}é"));
-        let mut set = BoundedSuggestions::new(4);
+        let mut set = BoundedSuggestions::new(Some(4));
         assert!(set.offer(&long_a, Prefix, Some(info)));
         assert!(set.offer(&long_b, Prefix, Some(info)));
         assert_eq!(
@@ -838,7 +891,7 @@ mod tests {
         let head = "x".repeat(DISPLAY_MAX_BYTES - 1);
         let long_a = format!("{head}éa");
         let long_b = format!("{head}éb");
-        let mut set = BoundedSuggestions::new(4);
+        let mut set = BoundedSuggestions::new(Some(4));
         assert!(set.offer(&long_a, Prefix, None));
         assert!(!set.offer(&long_b, Prefix, None));
         assert_eq!(texts(set), [(head, Prefix, true)]);

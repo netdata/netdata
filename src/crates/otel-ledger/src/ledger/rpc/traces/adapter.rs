@@ -132,7 +132,8 @@ pub(crate) const TRACE_SPANS_MAX_BYTES: usize = 2 * 1024 * 1024;
 /// they can be sent back. With at most [`super::wire::SEARCH_LIMIT_MAX`]
 /// rows or [`super::wire::SUGGEST_ITEMS_MAX`] suggestions, a response
 /// stays well under 1 MB by construction, so no byte budget has to cut
-/// items off.
+/// items off. A suggest tier list has no item limit: its size follows the
+/// distinct keys of the visited sources.
 pub(crate) const LIST_VALUE_MAX_BYTES: usize = 256;
 
 /// Cut `s` at a character boundary so that it takes at most `max` bytes

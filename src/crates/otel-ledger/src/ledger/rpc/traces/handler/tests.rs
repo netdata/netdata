@@ -2218,6 +2218,49 @@ async fn suggest_lists_the_kinds_a_key_holds() {
     );
 }
 
+/// A tier list answers every key of its tier, past the default 50 and
+/// never cut; `name` holds 150 values in the window, so it is `mid`.
+#[tokio::test]
+async fn suggest_lists_every_key_of_a_tier() {
+    use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue, any_value::Value as Av};
+    let mut req = otlp_req_svc(0x0A, 150, base_ns(10), "svc-a");
+    req.resource_spans[0].scope_spans[0].spans[0].attributes = (0..60)
+        .map(|i| KeyValue {
+            key: format!("a{i:02}"),
+            value: Some(AnyValue {
+                value: Some(Av::StringValue("x".into())),
+            }),
+            key_strindex: 0,
+        })
+        .collect();
+    let registries = make_registries();
+    install_wal(&registries, "default", 1, vec![req]).await;
+    let h = make_handler_over(registries);
+    let tier = |tier: &str| {
+        let mut body = window_body();
+        merge(&mut body, json!({ "tier": tier }));
+        as_mode("suggest", body)
+    };
+
+    let v = serde_json::to_value(call_on(&h, tier("low")).await.unwrap()).unwrap();
+    let items = v["items"].as_array().unwrap();
+    assert!(items.iter().all(|item| item["tier"] == "low"), "{v}");
+    let wide = items
+        .iter()
+        .filter(|item| item["text"].as_str().unwrap().starts_with("attributes.a"))
+        .count();
+    assert_eq!(wide, 60, "every low key, past the default 50");
+    assert!(!items.iter().any(|item| item["text"] == "name"));
+    assert_eq!(v["truncated"], false);
+    assert_eq!(v["status"], json!({"complete": true}));
+
+    let v = serde_json::to_value(call_on(&h, tier("mid")).await.unwrap()).unwrap();
+    assert_eq!(
+        v["items"],
+        json!([{"text": "name", "match": "prefix", "tier": "mid"}])
+    );
+}
+
 #[tokio::test]
 async fn suggest_is_validated_before_admission_and_bounded() {
     let h = handler_with_search_corpus()
@@ -2235,6 +2278,14 @@ async fn suggest_is_validated_before_admission_and_bounded() {
         (
             json!({"suggest": {"max_items": 201}}),
             "exceeds the maximum 200",
+        ),
+        (
+            json!({"suggest": {"tier": "low", "max_items": 10}}),
+            "a 'tier' list is never cut",
+        ),
+        (
+            json!({"suggest": {"tier": "low", "key": "name"}}),
+            "'tier' lists keys",
         ),
         (
             json!({"suggest": {"key": "nope.x"}}),
