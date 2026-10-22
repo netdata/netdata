@@ -2138,7 +2138,11 @@ bool journalfile_v2_rebuild_from_v1(struct rrdengine_instance *ctx, struct rrden
     // next start replays the v1 as for a missing journal v2. If it cannot be
     // removed, datafile_delete() discharges it.
     journalfile_v2_generate_path(datafile, path, sizeof(path));
-    if (unlink(path) == 0 || errno == ENOENT) {
+    bool removed = unlink(path) == 0;
+    if (removed)
+        __atomic_add_fetch(&ctx->stats.journalfile_deletions, 1, __ATOMIC_RELAXED);
+
+    if (removed || errno == ENOENT) {
         ctx_current_disk_space_decrease(ctx, datafile->populate_mrg.rejected_v2_size);
         datafile->populate_mrg.rejected_v2_size = 0;
         nd_log_daemon(NDLP_WARNING, "DBENGINE: tier %d: no journal v2 was written for datafile %u from its journal v1; "
