@@ -201,8 +201,9 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
     size_t db_points_read_since_plan_switch = 0; (void)db_points_read_since_plan_switch;
     size_t query_is_finished_counter = 0;
 
-    // The main loop, based on the query granularity we need
-    for( ; points_added < points_wanted && query_is_finished_counter <= 10 ;
+    // Exhausting one tier must not suppress a later tier in the query plan.
+    for( ; points_added < points_wanted &&
+           (query_is_finished_counter <= 10 || ops->current_plan + 1 < qm->plan.used) ;
         now_start_time = now_end_time, now_end_time += ops->view_update_every) {
 
         if(unlikely(query_result_plan_should_switch_plan(ops, now_end_time))) {
