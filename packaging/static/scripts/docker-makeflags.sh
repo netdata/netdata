@@ -5,22 +5,22 @@ if [ -z "${MAKEFLAGS}" ]; then
     exit 0
 fi
 
-IFS=' ' read -ra flags <<< "${MAKEFLAGS}"
-jobserver_index=-1
+# GNU Make backslash-escapes whitespace and backslashes in MAKEFLAGS words.
+# Match the complete FIFO word without splitting or decoding unrelated flags.
+jobserver_pattern='(^|[[:space:]])--jobserver-auth=fifo:(([^\\[:space:]]|\\.)+)'
+JOBSERVER_PATH=
 
-for i in "${!flags[@]}"; do
-    if [[ ${flags[i]} == --jobserver-auth=* ]]; then
-        jobserver_index=$i
-        break
-    fi
-done
-
-if [ "${jobserver_index}" -gt -1 ]; then
-    JOBSERVER_PATH="$(echo "${flags[${jobserver_index}]}" | cut -d ':' -f 2)"
-    unset "flags[${jobserver_index}]"
-    flags=("${flags[@]}" --jobserver-auth=fifo:/jobserver)
+if [[ ${MAKEFLAGS} =~ ${jobserver_pattern} ]]; then
+    # Omitting -r deliberately decodes GNU Make's backslash escapes.
+    # shellcheck disable=SC2162
+    IFS= read JOBSERVER_PATH <<< "${BASH_REMATCH[2]}"
+    MAKEFLAGS="${MAKEFLAGS/"${BASH_REMATCH[0]}"/${BASH_REMATCH[1]}--jobserver-auth=fifo:\/jobserver}"
 fi
 
-MAKEFLAGS="${flags[*]}"
-
-echo "-e MAKEFLAGS='${MAKEFLAGS}' ${JOBSERVER_PATH:+-v "${JOBSERVER_PATH}:/jobserver:rw"}"
+# The caller inserts this output into a /bin/sh command, so emit literal
+# single quotes and escape embedded apostrophes for that shell to interpret.
+printf -- "-e MAKEFLAGS='%s'" "${MAKEFLAGS//\'/\'\\\'\'}"
+if [ -n "${JOBSERVER_PATH}" ]; then
+    printf " -v '%s:/jobserver:rw'" "${JOBSERVER_PATH//\'/\'\\\'\'}"
+fi
+printf '\n'
