@@ -816,7 +816,7 @@ go-elf-check: $(NETDATA_INSTALL)
 topology-check: $(NETDATA_INSTALL)
 	$(MAKEFILE_DIR)/scripts/check-topology-ip-intel.sh $(TARGET_INSTALL)
 
-cortex-a53-erratum-843419-check:
+cortex-a53-erratum-843419-check: $(NETDATA_INSTALL)
 	python3 $(MAKEFILE_DIR)/scripts/check-a53-erratum-843419.py $(TARGET_INSTALL)
 
 TEST_DEPS := check-static-linking \
