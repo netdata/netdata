@@ -397,7 +397,7 @@ jobs:
           if [ "${{ matrix.arch }}" != "armv6l" ]; then
             export NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR="${GITHUB_WORKSPACE}/.topology-ip-intel-stock"
           fi
-          make -C packaging/static -j $(nproc) ${{ matrix.arch }}
+          make -C packaging/static -j $(nproc) BUILDARCH=${{ matrix.arch }}
       - name: Verify topology-ip-intel stock payload
         id: verify-topology-stock
         if: needs.file-check.outputs.run == 'true' && matrix.arch != 'armv6l'
