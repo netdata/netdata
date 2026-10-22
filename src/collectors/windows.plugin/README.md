@@ -81,4 +81,5 @@ The selector accepts comma or pipe separated case-insensitive simple patterns. W
 verbatim; prefix a comma or pipe with `\` to match that character literally. A leading `\!` matches a literal `!`
 instead of negating the pattern. The selector treats `*` as a wildcard; backslashes elsewhere are treated as Windows
 path separators. Matching queue names are selected in case-insensitive alphabetical order; the cap may be set to `0`
-to aggregate all queues.
+to aggregate all queues. A negative-only selector such as `!*temp*` selects no queues for individual charts, so all
+queues go to `Other`; append `*` (`!*temp* *`) to select every queue except those matching `*temp*`.

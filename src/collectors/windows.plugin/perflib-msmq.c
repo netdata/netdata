@@ -155,7 +155,6 @@ static void initialize(void)
 static void msmq_queue_chart_id(
     char *dst,
     size_t size,
-    const char *chart_type,
     size_t chart_type_length,
     const char *instance,
     const char *suffix,
@@ -188,7 +187,6 @@ static void msmq_queue_chart_messages(struct msmq_queue *mq, const char *queue, 
         msmq_queue_chart_id(
             id,
             sizeof(id),
-            "msmq_queue_messages",
             sizeof("msmq_queue_messages") - 1,
             queue,
             "messages",
@@ -224,7 +222,6 @@ static void msmq_queue_chart_bytes(struct msmq_queue *mq, const char *queue, int
         msmq_queue_chart_id(
             id,
             sizeof(id),
-            "msmq_queue_bytes",
             sizeof("msmq_queue_bytes") - 1,
             queue,
             "bytes",
@@ -260,7 +257,6 @@ static void msmq_queue_chart_journal_messages(struct msmq_queue *mq, const char 
         msmq_queue_chart_id(
             id,
             sizeof(id),
-            "msmq_queue_journal_messages",
             sizeof("msmq_queue_journal_messages") - 1,
             queue,
             "journal_messages",
@@ -298,7 +294,6 @@ static void msmq_queue_chart_journal_bytes(struct msmq_queue *mq, const char *qu
         msmq_queue_chart_id(
             id,
             sizeof(id),
-            "msmq_queue_journal_bytes",
             sizeof("msmq_queue_journal_bytes") - 1,
             queue,
             "journal_bytes",
