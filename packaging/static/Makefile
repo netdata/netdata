@@ -669,7 +669,7 @@ $(TARGET_INSTALL)/bin/bash: prepare $(BASH_BUILD)
 		-e PKG_CONFIG_PATH="$(OPENSSL_PKGCONFIG_PATH)" \
 		-w $(DOCKER_WORKDIR)/bash \
 		$(BUILDER) \
-		/usr/bin/make install &&
+		/usr/bin/make install
 	if [ ! -f $(BASH_CACHE_HIT) ]; then \
 		rm -rf $(BASH_CACHE_PATH) && \
 		mkdir -p $(BASH_CACHE_PATH) && \
