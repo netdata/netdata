@@ -125,6 +125,7 @@ static void stream_sender_on_connect_and_disconnect(struct sender_state *s) {
 
     stream_sender_lock(s);
     stream_circular_buffer_flush_unsafe(s->scb, stream_send.buffer_max_size);
+    sender_pending_flush_unsafe(s);
     stream_sender_unlock(s);
 }
 
@@ -373,6 +374,7 @@ void stream_sender_move_queue_to_running_unsafe(struct stream_thread *sth) {
         s->replication.last_progress_ut = now_monotonic_usec();
 
         stream_circular_buffer_flush_unsafe(s->scb, stream_send.buffer_max_size);
+        sender_pending_flush_unsafe(s);
         replication_sender_recalculate_buffer_used_ratio_unsafe(s);
         stream_sender_unlock(s);
 
@@ -528,6 +530,7 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
         stream_sender_lock(s);
         // copy the statistics
         STREAM_CIRCULAR_BUFFER_STATS stats = *stream_circular_buffer_stats_unsafe(s->scb);
+        bool has_pending = sender_pending_has_data_unsafe(s);
         stream_sender_unlock(s);
 
         if (stats.buffer_ratio > overall_buffer_ratio)
@@ -576,7 +579,7 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
         bytes_compressed += stats.bytes_added;
         bytes_uncompressed += stats.bytes_uncompressed;
 
-        stream_sender_set_wanted(sth, s, ND_POLL_READ | (stats.bytes_outstanding ? ND_POLL_WRITE : 0));
+        stream_sender_set_wanted(sth, s, ND_POLL_READ | ((stats.bytes_outstanding || has_pending) ? ND_POLL_WRITE : 0));
     }
 
     if (bytes_compressed && bytes_uncompressed) {
@@ -698,6 +701,24 @@ bool stream_sender_send_data(struct stream_thread *sth, struct sender_state *s, 
         stream_sender_lock(s);
 
         STREAM_CIRCULAR_BUFFER_STATS *stats = stream_circular_buffer_stats_unsafe(s->scb);
+
+        if (sender_pending_has_data_unsafe(s)) {
+            // compress everything committed since the last send in one go
+            worker_is_busy(WORKER_STREAM_JOB_COMPRESS);
+            SENDER_COMPRESS_RC rc = sender_pending_compress_unsafe(s);
+            worker_is_busy(WORKER_STREAM_JOB_SOCKET_SEND);
+
+            if (unlikely(rc != SENDER_COMPRESS_OK)) {
+                // this queues an opcode that restarts the connection from the poll loop;
+                // stop sending, the sender stays valid until that opcode is processed
+                sender_compress_failed_and_unlock(s, rc);
+                status = EVLOOP_STATUS_NO_MORE_DATA;
+                break;
+            }
+
+            replication_sender_recalculate_buffer_used_ratio_unsafe(s);
+        }
+
         char *chunk;
         size_t outstanding = stream_circular_buffer_get_unsafe(s->scb, &chunk);
 
