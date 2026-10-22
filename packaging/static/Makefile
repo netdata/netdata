@@ -813,7 +813,22 @@ netdata-elf-check: $(NETDATA_INSTALL)
 go-elf-check: $(NETDATA_INSTALL)
 	$(MAKEFILE_DIR)/scripts/elf-check.sh $(TARGET_INSTALL)/usr/libexec/netdata/plugins.d/go.d.plugin $(ELF_MACHINE) $(ELF_CLASS)
 
-tests: check-static-linking runtime-check netdata-elf-check go-elf-check check-systemd-caps
+topology-check: $(NETDATA_INSTALL)
+	$(MAKEFILE_DIR)/scripts/check-topology-ip-intel.sh $(TARGET_INSTALL)
+
+cortex-a53-erratum-843419-check:
+	python3 $(MAKEFILE_DIR)/scripts/check-a53-erratum-843419.py $(TARGET_INSTALL)
+
+TEST_DEPS := check-static-linking \
+             runtime-check \
+             netdata-elf-check \
+             go-elf-check \
+             check-systemd-caps \
+             $(if $(strip $(TOPOLOGY_STOCK_DIR)),topology-check,) \
+             $(if $(filter aarch64,$(BUILDARCH)),cortex-a53-erratum-843419-check,) \
+             $(NULL)
+
+tests: $(TEST_DEPS)
 
 # Archive rules
 
