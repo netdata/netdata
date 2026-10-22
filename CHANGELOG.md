@@ -217,6 +217,21 @@
 - Build(go.d): update Cato SDK to v1.1.0 ([#24362](https://github.com/netdata/netdata/issues/24362))
 - Aclk: restore the t-rx timestamp in HTTP replies ([#24252](https://github.com/netdata/netdata/issues/24252))
 - Query: stop building the query target on timeout or interrupt ([#24348](https://github.com/netdata/netdata/issues/24348))
+- Handle curl exit status 56 as a protocol failure in installer/updater. ([#24276](https://github.com/netdata/netdata/issues/24276))
+- Upload updater into a subdirectory instead of the root. ([#24377](https://github.com/netdata/netdata/issues/24377))
+- Fix(config): log the clamped value when update every exceeds the maximum ([#24378](https://github.com/netdata/netdata/issues/24378))
+- Streaming: keep a host alive while remove-stale-node removes it ([#24353](https://github.com/netdata/netdata/issues/24353))
+- Fix rclone upload for netdata-updater.sh ([#24379](https://github.com/netdata/netdata/issues/24379))
+- Update kickstart.sh to use new artifact hosting. ([#24279](https://github.com/netdata/netdata/issues/24279))
+- Treight: faster builders, lookups, counts and set operations ([#24381](https://github.com/netdata/netdata/issues/24381))
+- Build(deps): bump github.com/Azure/azure-sdk-for-go/sdk/azidentity from 1.14.1 to 1.15.0 in /src/go ([#24388](https://github.com/netdata/netdata/issues/24388))
+- Weights: pin the hosts a call queries until its response is built ([#24356](https://github.com/netdata/netdata/issues/24356))
+- Packaging: align Rust functions to 8 bytes in static aarch64 builds ([#24387](https://github.com/netdata/netdata/issues/24387))
+- Build(deps): bump certifi from 2026.5.20 to 2026.10.19 in /packaging/tools/automation/mcp ([#24389](https://github.com/netdata/netdata/issues/24389))
+- Build(deps): bump rustls-webpki to 0.103.16 and webpki-roots to 1.0.10 ([#24393](https://github.com/netdata/netdata/issues/24393))
+- Otel-plugin: make the stock otel.yaml read top to bottom ([#24395](https://github.com/netdata/netdata/issues/24395))
+- Sqlite: mark runtime corruption, count queries once, clearer logs ([#24225](https://github.com/netdata/netdata/issues/24225))
+- Bundle MSYS2's msys2-runtime 3.6.11 DLL instead of building it ([#24390](https://github.com/netdata/netdata/issues/24390))
 
 ## [2.12.0] - 2026-09-30
 

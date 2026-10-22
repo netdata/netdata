@@ -22,20 +22,11 @@ ${GITHUB_ACTIONS+echo "::group::Installing"}
 cmake --install "${build}"
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
-# Always run: it keeps a cached tarball that matches the pin and replaces any other.
+# Always run: it keeps a cached file that matches the pin and replaces any other.
 ${GITHUB_ACTIONS+echo "::group::Fetching MSYS2 files"}
-"${repo_root}/packaging/windows/fetch-msys2-installer.py" /msys2-base.tar.zst
+"${repo_root}/packaging/windows/fetch-msys2-installer.py" base /msys2-base.tar.zst
+"${repo_root}/packaging/windows/fetch-msys2-installer.py" runtime /msys2-runtime.pkg.tar.zst
 ${GITHUB_ACTIONS+echo "::endgroup::"}
-
-# shellcheck source=./msys2-runtime/runtime.env disable=SC1091
-. "${repo_root}/packaging/windows/msys2-runtime/runtime.env"
-msys2_runtime_dir="/msys2-runtime/${MSYS2_RUNTIME_PATCHED_COMMIT}"
-
-if [ ! -f "${msys2_runtime_dir}/msys-2.0.dll" ]; then
-    ${GITHUB_ACTIONS+echo "::group::Building patched MSYS2 runtime"}
-    "${repo_root}/packaging/windows/msys2-runtime/compile-runtime.sh" "${msys2_runtime_dir}"
-    ${GITHUB_ACTIONS+echo "::endgroup::"}
-fi
 
 ${GITHUB_ACTIONS+echo "::group::Licenses"}
 if [ ! -f "/gpl-3.0.txt" ]; then
@@ -62,11 +53,14 @@ check_msys2_runtime() {
     fi
 }
 
-# The override replaces the installer's runtime; if the installer pin moves to another runtime, revisit it.
-check_msys2_runtime "${MSYS2_RUNTIME_VERSION}-${MSYS2_RUNTIME_BASE_COMMIT}" \
-    "The MSYS2 installer pin no longer matches msys2-runtime/runtime.env; update or drop the runtime override."
-cp "${msys2_runtime_dir}/msys-2.0.dll" /opt/netdata/usr/bin/msys-2.0.dll || exit 1
-check_msys2_runtime "${MSYS2_RUNTIME_VERSION}-${MSYS2_RUNTIME_PATCHED_COMMIT}" "The patched runtime was not installed."
+# The installer's msys2-runtime 3.6.10 carries 8fbd980844 ("Cygwin: open: Unlock fdtab before open_with_arch()")
+# without its upstream fixes, and netdata dies at startup with an access violation inside msys-2.0.dll. Replace the DLL
+# with the one from the msys2-runtime 3.6.11 package, which has them. The versions below follow the pins in
+# fetch-msys2-installer.py; if the installer pin moves to another runtime, revisit the override.
+check_msys2_runtime "3.6.10-c770e1b9fa537fff9287c1fd40ebc84ac498fcb6" \
+    "The MSYS2 installer pin no longer bundles msys2-runtime 3.6.10; update or drop the runtime override."
+tar -xf /msys2-runtime.pkg.tar.zst -C /opt/netdata/ usr/bin/msys-2.0.dll || exit 1
+check_msys2_runtime "3.6.11-00eb8435b1c498e9211c7a7cee01584d76bd5f21" "The msys2-runtime DLL was not installed."
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
 ${GITHUB_ACTIONS+echo "::group::Configure Editor"}

@@ -25,6 +25,7 @@ struct logical_disk {
     ULONG divisor;
     ULONG chart_divisor; // the divisor the dimensions were created with
     bool readonly;
+    bool readonly_known;
 
     STRING *filesystem;
 
@@ -113,6 +114,10 @@ static void logical_disk_cleanup(struct logical_disk *d)
     d->mount_point_source = false;
     d->metadata_retry_after = 0;
     d->space_failed_since = 0;
+    d->readonly = false;
+    d->readonly_known = false;
+    d->DriveType = 0;
+    d->SerialNumber = 0;
 
     rrdset_is_obsolete___safe_from_collector_thread(d->st_disk_space);
     d->st_disk_space = NULL;
@@ -224,6 +229,7 @@ struct volume_space_result {
     UINT drive_type;
     DWORD serial_number;
     bool readonly;
+    bool readonly_known;
     char filesystem[128];
 };
 
@@ -232,6 +238,7 @@ struct volume_space_request {
 };
 
 static netdata_mutex_t volume_space_mutex;
+static bool volume_space_mutex_initialized = false;
 static netdata_cond_t volume_space_cond;
 static DICTIONARY *volume_space_request = NULL;
 static DICTIONARY *volume_space_results = NULL;
@@ -411,6 +418,7 @@ static void initialize(void)
     mountPointsDiscoveryWarningActive = false;
 
     netdata_mutex_init(&volume_space_mutex);
+    volume_space_mutex_initialized = true;
     netdata_cond_init(&volume_space_cond);
     volume_space_worker_stop = false;
     mount_points_worker_stop = false;
@@ -694,11 +702,12 @@ static void volume_space_worker(void *ptr __maybe_unused)
             value.metadata_attempted = true;
             struct logical_disk metadata_disk = {0};
             STRING *filesystem = getFileSystemType(&metadata_disk, name);
+            value.drive_type = metadata_disk.DriveType;
+            value.readonly = metadata_disk.readonly;
+            value.readonly_known = metadata_disk.readonly_known;
             if (filesystem) {
                 value.metadata_success = true;
-                value.drive_type = metadata_disk.DriveType;
                 value.serial_number = metadata_disk.SerialNumber;
-                value.readonly = metadata_disk.readonly;
                 snprintfz(value.filesystem, sizeof(value.filesystem), "%s", string2str(filesystem));
                 string_freez(filesystem);
             }
@@ -745,6 +754,7 @@ static void volume_space_worker(void *ptr __maybe_unused)
             value.drive_type = 0;
             value.serial_number = 0;
             value.readonly = false;
+            value.readonly_known = false;
             value.filesystem[0] = '\0';
         }
         if (!result_superseded) {
@@ -1479,6 +1489,54 @@ static void mount_points_worker(void *ptr __maybe_unused)
     InterlockedExchange(&mount_points_worker_finished[worker_id], 1);
 }
 
+static void volume_space_discard_path_work(const char *name)
+{
+    if (!name || !*name)
+        return;
+
+    if (volume_space_cycle_results)
+        dictionary_del(volume_space_cycle_results, name);
+
+    if (volume_space_mutex_initialized) {
+        netdata_mutex_lock(&volume_space_mutex);
+        if (volume_space_results)
+            dictionary_del(volume_space_results, name);
+        if (volume_space_request)
+            dictionary_del(volume_space_request, name);
+        if (volume_space_latest_generation)
+            dictionary_del(volume_space_latest_generation, name);
+        netdata_mutex_unlock(&volume_space_mutex);
+    } else {
+        if (volume_space_results)
+            dictionary_del(volume_space_results, name);
+        if (volume_space_request)
+            dictionary_del(volume_space_request, name);
+        if (volume_space_latest_generation)
+            dictionary_del(volume_space_latest_generation, name);
+    }
+}
+
+static void logical_disks_invalidate_changed_volumes(
+    DICTIONARY *previous_volume_ids, DICTIONARY *new_volume_ids)
+{
+    if (!logicalDisks || !previous_volume_ids || !new_volume_ids)
+        return;
+
+    void *old_id;
+    dfe_start_read(previous_volume_ids, old_id)
+    {
+        const char *path = old_id_dfe.name;
+        const char *new_id = dictionary_get(new_volume_ids, path);
+        if (old_id && new_id && strcmp((const char *)old_id, new_id) != 0) {
+            struct logical_disk *d = dictionary_get(logicalDisks, path);
+            if (d)
+                logical_disk_cleanup(d);
+            volume_space_discard_path_work(path);
+        }
+    }
+    dfe_done(old_id);
+}
+
 // The registry is a snapshot - volumes and CSVs are added and removed while we run - but it is
 // rebuilt into fresh dictionaries and swapped in only once the scan actually produced one.
 // Discarding the old snapshot first would make a transient enumeration failure indistinguishable
@@ -1614,6 +1672,7 @@ static void mount_points_publish_snapshot(struct mount_points_snapshot *snapshot
         dictionary_destroy(mountPoints);
         dictionary_destroy(deviceMountPaths);
         dictionary_destroy(excludedDeviceNames);
+        logical_disks_invalidate_changed_volumes(previous_volume_ids, volume_ids);
         dictionary_destroy(previous_volume_ids);
         dictionary_destroy(uncertainMountPoints);
         dictionary_destroy(failed_volume_ids);
@@ -1643,6 +1702,7 @@ static void mount_points_publish_snapshot(struct mount_points_snapshot *snapshot
     dictionary_destroy(mountPoints);
     dictionary_destroy(deviceMountPaths);
     dictionary_destroy(excludedDeviceNames);
+    logical_disks_invalidate_changed_volumes(previous_volume_ids, volume_ids);
     dictionary_destroy(previous_volume_ids);
     dictionary_destroy(uncertainMountPoints);
     dictionary_destroy(failed_volume_ids);
@@ -1869,6 +1929,7 @@ static STRING *getFileSystemType(struct logical_disk *d, const char *diskName)
         return NULL;
 
     d->readonly = fileSystemFlags & FILE_READ_ONLY_VOLUME;
+    d->readonly_known = true;
     d->SerialNumber = serialNumber;
 
     char fileSystem[128];
@@ -1894,15 +1955,27 @@ static void logical_disk_apply_metadata(
     if (!result || !result->metadata_attempted)
         return;
 
-    if (result->metadata_success) {
+    if (result->drive_type)
         d->DriveType = result->drive_type;
+
+    if (result->metadata_success) {
+        if (d->collected_metadata && d->SerialNumber && result->serial_number &&
+            d->SerialNumber != result->serial_number) {
+            d->readonly = false;
+            d->readonly_known = false;
+        }
         d->SerialNumber = result->serial_number;
         d->readonly = result->readonly;
+        d->readonly_known = true;
         string_freez(d->filesystem);
         d->filesystem = string_strdupz(result->filesystem);
         d->collected_metadata = true;
         d->metadata_retry_after = 0;
     } else {
+        if (result->readonly_known) {
+            d->readonly = result->readonly;
+            d->readonly_known = true;
+        }
         d->metadata_retry_after = now_ut + METADATA_RETRY_EVERY_UT;
     }
 }
@@ -2009,10 +2082,36 @@ static void logical_disk_labels(struct logical_disk *d, const char *name)
     rrdlabels_add(d->st_disk_space->rrdlabels, "serial_number", buf, RRDLABEL_SRC_AUTO);
 }
 
+// Predicate to decide if disk.space chart creation/update should be skipped (#24150)
+static inline bool logical_disk_space_chart_skipped(const struct logical_disk *d)
+{
+    return d && (d->DriveType == 5 /* DRIVE_CDROM */ || (d->readonly_known && d->readonly));
+}
+
+// Handles volume recovery from a transient space query failure.
+// Invalidates cached metadata to trigger collection while preserving readonly_known.
+static inline void logical_disk_handle_space_recovery(struct logical_disk *d)
+{
+    if (d && d->space_failed_since) {
+        d->collected_metadata = false;
+        d->metadata_retry_after = 0;
+        d->space_failed_since = 0;
+    }
+}
+
 // percentDiskFree carries the free space in Data and the size of the volume in Time, both scaled by
 // divisor. Shared by the perflib pass and the mount point pass so every volume looks the same.
 static void logical_disk_chart(struct logical_disk *d, const char *name, int update_every)
 {
+    // Skip optical drives (CD-ROM/DVD) and read-only volumes to prevent permanent critical alerts (#24150).
+    if (logical_disk_space_chart_skipped(d)) {
+        if (d->st_disk_space) {
+            rrdset_is_obsolete___safe_from_collector_thread(d->st_disk_space);
+            d->st_disk_space = NULL;
+        }
+        return;
+    }
+
     if (!d->st_disk_space) {
         char chart_id[RRD_ID_LENGTH_MAX + 1];
         const char *id = logical_disk_chart_id(d, name, chart_id, sizeof(chart_id));
@@ -2107,7 +2206,7 @@ static void logical_disk_collect_instance(
     const struct volume_space_result *result =
         volume_space_cycle_results ? dictionary_get(volume_space_cycle_results, resolved_name) : NULL;
     if (result && result->success)
-        d->space_failed_since = 0;
+        logical_disk_handle_space_recovery(d);
     logical_disk_apply_metadata(d, result, now_ut);
     if (volume_space_extra_targets)
         dictionary_set(volume_space_extra_targets, resolved_name, NULL, 0);
@@ -2227,7 +2326,7 @@ static bool do_mount_points(DICTIONARY *results, int update_every, usec_t now_ut
 
         d = dictionary_set(logicalDisks, name, NULL, sizeof(*d));
         d->mount_point_source = true;
-        d->space_failed_since = 0;
+        logical_disk_handle_space_recovery(d);
 
         logical_disk_apply_metadata(d, result, now_ut);
 
@@ -2922,6 +3021,212 @@ static int volume_space_result_unittest_run(void)
     return errors;
 }
 
+static int logical_disk_metadata_unittest_run(void)
+{
+    int errors = 0;
+    struct logical_disk d = {0};
+    usec_t now_ut = 1000000;
+
+    // Optical drive type is retained even when metadata collection is partial
+    struct volume_space_result optical_res = {
+        .metadata_attempted = true,
+        .metadata_success = false,
+        .drive_type = 5, /* DRIVE_CDROM */
+    };
+    logical_disk_apply_metadata(&d, &optical_res, now_ut);
+    errors += mount_points_unittest_expect(
+        "optical drive type is retained even when metadata_success is false",
+        d.DriveType == 5);
+
+    // Read-only state is retained when readonly_known is true despite metadata_success false
+    struct logical_disk d_ro = {0};
+    struct volume_space_result ro_res = {
+        .metadata_attempted = true,
+        .metadata_success = false,
+        .readonly = true,
+        .readonly_known = true,
+    };
+    logical_disk_apply_metadata(&d_ro, &ro_res, now_ut);
+    errors += mount_points_unittest_expect(
+        "read-only flag is retained when readonly_known is true despite metadata_success false",
+        d_ro.readonly && d_ro.readonly_known);
+
+    // Successful metadata marks collected_metadata and readonly_known
+    struct logical_disk d_success = {0};
+    struct volume_space_result full_res = {
+        .metadata_attempted = true,
+        .metadata_success = true,
+        .serial_number = 0x1234,
+        .readonly = true,
+        .readonly_known = true,
+        .filesystem = "ntfs",
+    };
+    logical_disk_apply_metadata(&d_success, &full_res, now_ut);
+    errors += mount_points_unittest_expect(
+        "successful metadata marks collected_metadata and readonly_known",
+        d_success.collected_metadata && d_success.readonly_known && d_success.readonly);
+    string_freez(d_success.filesystem);
+
+    // Chart suppression predicate tests
+    struct logical_disk optical_disk = { .DriveType = 5 /* DRIVE_CDROM */ };
+    errors += mount_points_unittest_expect(
+        "optical disk space chart is skipped",
+        logical_disk_space_chart_skipped(&optical_disk));
+
+    struct logical_disk known_ro_disk = { .DriveType = 3, .readonly = true, .readonly_known = true };
+    errors += mount_points_unittest_expect(
+        "known read-only disk space chart is skipped",
+        logical_disk_space_chart_skipped(&known_ro_disk));
+
+    struct logical_disk unknown_ro_disk = { .DriveType = 3, .readonly = true, .readonly_known = false };
+    errors += mount_points_unittest_expect(
+        "unknown read-only disk space chart is not skipped",
+        !logical_disk_space_chart_skipped(&unknown_ro_disk));
+
+    struct logical_disk rw_disk = { .DriveType = 3, .readonly = false, .readonly_known = true };
+    errors += mount_points_unittest_expect(
+        "writable disk space chart is not skipped",
+        !logical_disk_space_chart_skipped(&rw_disk));
+
+    errors += mount_points_unittest_expect(
+        "NULL logical disk pointer does not skip space chart",
+        !logical_disk_space_chart_skipped(NULL));
+
+    // Volume replacement and serial number change tests
+    struct logical_disk d_replace = {
+        .collected_metadata = true,
+        .SerialNumber = 0x1111,
+        .readonly = true,
+        .readonly_known = true,
+    };
+    struct volume_space_result new_vol_res = {
+        .metadata_attempted = true,
+        .metadata_success = true,
+        .serial_number = 0x2222,
+        .readonly = false,
+        .readonly_known = true,
+        .filesystem = "fat32",
+    };
+    logical_disk_apply_metadata(&d_replace, &new_vol_res, now_ut);
+    errors += mount_points_unittest_expect(
+        "volume serial number change updates serial number and read-only state",
+        d_replace.SerialNumber == 0x2222 && !d_replace.readonly && d_replace.readonly_known);
+    errors += mount_points_unittest_expect(
+        "replaced writable volume is no longer skipped",
+        !logical_disk_space_chart_skipped(&d_replace));
+    string_freez(d_replace.filesystem);
+
+    // Volume identity snapshot invalidation test
+    DICTIONARY *prev_vids = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    DICTIONARY *new_vids = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    dictionary_set(prev_vids, "E:", "Volume{old}", sizeof("Volume{old}"));
+    dictionary_set(new_vids, "E:", "Volume{new}", sizeof("Volume{new}"));
+
+    DICTIONARY *saved_disks = logicalDisks;
+    DICTIONARY *saved_vsr = volume_space_results;
+    DICTIONARY *saved_vlg = volume_space_latest_generation;
+
+    logicalDisks = dictionary_create_advanced(
+        DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct logical_disk));
+    struct logical_disk *tracked =
+        dictionary_set(logicalDisks, "E:", NULL, sizeof(*tracked));
+    tracked->collected_metadata = true;
+    tracked->readonly = true;
+    tracked->readonly_known = true;
+    tracked->DriveType = 5;
+
+    volume_space_results = dictionary_create_advanced(
+        DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct volume_space_result));
+    struct volume_space_result stale_res = { .success = true, .readonly = true };
+    dictionary_set(volume_space_results, "E:", &stale_res, sizeof(stale_res));
+
+    volume_space_latest_generation = dictionary_create_advanced(
+        DICT_OPTION_FIXED_SIZE, NULL, sizeof(uint64_t));
+    uint64_t stale_gen = 10;
+    dictionary_set(volume_space_latest_generation, "E:", &stale_gen, sizeof(stale_gen));
+
+    logical_disks_invalidate_changed_volumes(prev_vids, new_vids);
+    errors += mount_points_unittest_expect(
+        "changed volume identity invalidates logical disk cached metadata",
+        !tracked->collected_metadata && !tracked->readonly && !tracked->readonly_known);
+    errors += mount_points_unittest_expect(
+        "changed volume identity discards published space results for path",
+        dictionary_get(volume_space_results, "E:") == NULL);
+    errors += mount_points_unittest_expect(
+        "changed volume identity discards in-flight generation for path",
+        dictionary_get(volume_space_latest_generation, "E:") == NULL);
+
+    dictionary_destroy(volume_space_results);
+    dictionary_destroy(volume_space_latest_generation);
+    volume_space_results = saved_vsr;
+    volume_space_latest_generation = saved_vlg;
+    dictionary_destroy(logicalDisks);
+    logicalDisks = saved_disks;
+    dictionary_destroy(prev_vids);
+    dictionary_destroy(new_vids);
+
+    // Space-query recovery retains readonly_known while invalidating collected_metadata
+    struct logical_disk d_recov = {
+        .collected_metadata = true,
+        .readonly = true,
+        .readonly_known = true,
+        .space_failed_since = 500000,
+    };
+    logical_disk_handle_space_recovery(&d_recov);
+    errors += mount_points_unittest_expect(
+        "space query recovery retains readonly_known to prevent false alerts",
+        !d_recov.collected_metadata && d_recov.readonly_known && d_recov.readonly);
+    errors += mount_points_unittest_expect(
+        "space query recovering read-only volume remains skipped",
+        logical_disk_space_chart_skipped(&d_recov));
+
+    // Production do_mount_points recovery path exercises state transition and suppression
+    DICTIONARY *saved_mp = mountPoints;
+    DICTIONARY *saved_ld = logicalDisks;
+    mountPoints = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    dictionary_set(mountPoints, "R:", NULL, 0);
+
+    logicalDisks = dictionary_create_advanced(
+        DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+        NULL, sizeof(struct logical_disk));
+    struct logical_disk *mp_recov =
+        dictionary_set(logicalDisks, "R:", NULL, sizeof(*mp_recov));
+    mp_recov->collected_metadata = true;
+    mp_recov->readonly = true;
+    mp_recov->readonly_known = true;
+    mp_recov->space_failed_since = 500000;
+
+    DICTIONARY *recov_results = dictionary_create_advanced(
+        DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct volume_space_result));
+    struct volume_space_result ok_res = {
+        .success = true,
+        .total_bytes = 1000,
+        .free_bytes = 500,
+    };
+    dictionary_set(recov_results, "R:", &ok_res, sizeof(ok_res));
+
+    do_mount_points(recov_results, 1, 600000);
+    mp_recov = dictionary_get(logicalDisks, "R:");
+    errors += mount_points_unittest_expect(
+        "do_mount_points recovery resets space_failed_since",
+        mp_recov && mp_recov->space_failed_since == 0);
+    errors += mount_points_unittest_expect(
+        "do_mount_points recovery keeps readonly_known and clears metadata",
+        mp_recov && !mp_recov->collected_metadata && mp_recov->readonly_known &&
+            mp_recov->readonly);
+    errors += mount_points_unittest_expect(
+        "do_mount_points recovering read-only volume remains skipped",
+        logical_disk_space_chart_skipped(mp_recov));
+
+    dictionary_destroy(recov_results);
+    dictionary_destroy(mountPoints);
+    dictionary_destroy(logicalDisks);
+    mountPoints = saved_mp;
+    logicalDisks = saved_ld;
+
+    return errors;
+}
+
 int perflib_storage_unittest(void)
 {
     int errors = 0;
@@ -2931,6 +3236,7 @@ int perflib_storage_unittest(void)
     errors += logical_disk_unittest_run("*AssuredRecoveryTemp*", 1, "C:", NULL);
     errors += logical_disk_unittest_run(NULL, 2, "C:", "Z:\\ASSUREDRECOVERYTEMP\\volume");
     errors += volume_space_result_unittest_run();
+    errors += logical_disk_metadata_unittest_run();
     errors += mount_points_query_failure_unittest_run();
     errors += mount_points_excluded_carry_unittest_run();
     errors += mount_points_unittest_run();
@@ -3434,6 +3740,7 @@ void do_PerflibStorage_cleanup(void)
     }
     netdata_mutex_unlock(&volume_space_mutex);
 
+    volume_space_mutex_initialized = false;
     netdata_cond_destroy(&volume_space_cond);
     netdata_mutex_destroy(&volume_space_mutex);
 
