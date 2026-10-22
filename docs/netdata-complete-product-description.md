@@ -993,7 +993,7 @@ Netdata exchanges data with other systems through exporting connectors, Promethe
 | **Enterprise On-Prem** | Custom, from 200 node licenses | Air-gapped facilities, critical infrastructure | Everything in Business, running on customer infrastructure; priority support plans |
 | **Open-source Agent** | Free (Agent GPL v3+; dashboard NCUL1) | Self-hosted, any use | Complete Agent and Parents, no limit on metrics, local dashboards |
 
-Community and Homelab are for personal, non-commercial use only. Freelancers, professionals and businesses use the open-source Agent or the Business plan. A 14-day Business trial with no limit on nodes is available on sign-up.
+Community and Homelab are for personal, non-commercial use only. Freelancers, professionals and businesses use the open-source Agent or the Business plan. A 14-day Business trial with no limit on nodes is available on sign-up. Volume discounts are available for larger deployments.
 
 Netdata is also available on [AWS Marketplace](https://aws.amazon.com/marketplace/seller-profile?id=seller-5bbjpj3csb4mw): Netdata Cloud as a pay-as-you-go subscription or an annual contract (SaaS), Netdata Cloud On-Prem (Helm chart, bring your own license) and the Netdata Agent for EKS (Helm chart, free).
 
