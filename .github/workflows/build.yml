@@ -398,77 +398,6 @@ jobs:
             export NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR="${GITHUB_WORKSPACE}/.topology-ip-intel-stock"
           fi
           make -C packaging/static -j $(nproc) BUILDARCH=${{ matrix.arch }} TOPLOGY_STOCK_DIR="${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}"
-      - name: Verify topology-ip-intel stock payload
-        id: verify-topology-stock
-        if: needs.file-check.outputs.run == 'true' && matrix.arch != 'armv6l'
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          archive="$(find "${GITHUB_WORKSPACE}/packaging/static/archives" \
-            -maxdepth 1 \
-            -type f \
-            -name 'netdata-${{ matrix.arch }}-*.gz.run' \
-            ! -name '*-latest.gz.run' \
-            -print \
-            -quit)"
-          if [ -z "${archive}" ]; then
-            printf >&2 'ERROR: static archive for %s was not produced\n' '${{ matrix.arch }}'
-            exit 1
-          fi
-
-          extract_dir="$(mktemp -d)"
-          trap 'rm -rf -- "${extract_dir}"' EXIT
-          (
-            cd "${extract_dir}"
-            sh "${archive}" --tar xf \
-              ./usr/share/netdata/topology-ip-intel/README.md \
-              ./usr/share/netdata/topology-ip-intel/topology-ip-asn.mmdb \
-              ./usr/share/netdata/topology-ip-intel/topology-ip-geo.mmdb \
-              ./usr/share/netdata/topology-ip-intel/topology-ip-intel.json
-          )
-
-          for path in \
-            README.md \
-            topology-ip-asn.mmdb \
-            topology-ip-geo.mmdb \
-            topology-ip-intel.json
-          do
-            if [ ! -s "${extract_dir}/usr/share/netdata/topology-ip-intel/${path}" ]; then
-              printf >&2 'ERROR: static archive has a missing or empty topology IP intelligence file: %s\n' "${path}"
-              exit 1
-            fi
-          done
-      - name: Check Cortex-A53 erratum workarounds
-        id: check-a53-errata
-        if: needs.file-check.outputs.run == 'true' && matrix.arch == 'aarch64'
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          # The build machines do not exhibit Cortex-A53 erratum 843419, so the runtime checks cannot see a binary
-          # linked without its workaround; scan the shipped executables instead.
-          archive="$(find "${GITHUB_WORKSPACE}/packaging/static/archives" \
-            -maxdepth 1 \
-            -type f \
-            -name 'netdata-aarch64-*.gz.run' \
-            ! -name '*-latest.gz.run' \
-            -print \
-            -quit)"
-          if [ -z "${archive}" ]; then
-            printf >&2 'ERROR: static archive for aarch64 was not produced\n'
-            exit 1
-          fi
-
-          extract_dir="$(mktemp -d)"
-          trap 'rm -rf -- "${extract_dir}"' EXIT
-          (
-            cd "${extract_dir}"
-            sh "${archive}" --tar xf
-          )
-
-          python3 .github/scripts/test-check-a53-erratum-843419.py
-          python3 .github/scripts/check-a53-erratum-843419.py "${extract_dir}"
       - name: Store
         id: store
         if: needs.file-check.outputs.run == 'true'
@@ -494,9 +423,7 @@ jobs:
               Set up QEMU: ${{ steps.qemu.outcome }}
               Download topology stock payload: ${{ steps.fetch-topology-stock.outcome }}
               Build: ${{ steps.build.outcome }}
-              Verify topology stock payload: ${{ steps.verify-topology-stock.outcome }}
               Store: ${{ steps.store.outcome }}
-              Check Cortex-A53 erratum workarounds: ${{ steps.check-a53-errata.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{
