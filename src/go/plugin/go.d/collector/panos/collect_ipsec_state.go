@@ -4,6 +4,7 @@ package panos
 
 import (
 	"context"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"strings"
@@ -43,6 +44,12 @@ type vpnGatewayProtocol struct{}
 
 type vpnIKESAResult struct {
 	Entries []vpnIKESA `xml:"entry"`
+	// Other collects any child that is not an <entry>, such as an <error> element.
+	Other []vpnUnexpectedElement `xml:",any"`
+}
+
+type vpnUnexpectedElement struct {
+	XMLName xml.Name
 }
 
 type vpnIKESA struct {
@@ -171,11 +178,15 @@ func parseVPNGateways(body []byte) ([]vpnGateway, bool, error) {
 }
 
 // parseVPNIKESAs returns the IKE SAs in a show vpn ike-sa response. An empty result is a
-// valid response meaning no gateway has an SA, so there is no "not found" case.
+// valid response meaning no gateway has an SA, so there is no "not found" case. Any child
+// other than <entry> is rejected: reading it as an empty list would mark every gateway down.
 func parseVPNIKESAs(body []byte) ([]vpnIKESA, error) {
 	var result vpnIKESAResult
 	if err := decodePANOSResult(body, "PAN-OS IPsec IKE SA response", &result); err != nil {
 		return nil, err
+	}
+	if len(result.Other) > 0 {
+		return nil, fmt.Errorf("parse PAN-OS IPsec IKE SA response result: unexpected element <%s>", result.Other[0].XMLName.Local)
 	}
 	return result.Entries, nil
 }
