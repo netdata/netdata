@@ -6,14 +6,14 @@ prefix="${1}"
 
 files="
 README.md
-topology-asn.mmdb
-topology-geo.mmdb
+topology-ip-asn.mmdb
+topology-ip-geo.mmdb
 topology-ip-intel.json
 "
 
 for f in ${files} ; do
     p="${prefix}/usr/share/netdata/topology-ip-intel/${f}"
-    if [ ! -f "${p}" ]; then
+    if [ ! -s "${p}" ]; then
         echo "${p} is not present when it should be."
         exit 1
     fi
