@@ -1480,6 +1480,97 @@ static void test_cns_ring_reset_semantics()
     nd_profile.update_every = saved_profile_update_every;
 }
 
+// Test: in ml_dimension_predict() a flat model abstains instead of vetoing.
+// Predict returns false at the first model scoring below the threshold, so a
+// flat model scoring 0 used to keep its dimension from ever being anomalous,
+// even when every real model agreed on an anomaly.
+static void test_predict_flat_model_abstains()
+{
+    fprintf(stderr, "  test_predict_flat_model_abstains...\n");
+
+    unsigned saved_diff_n = Cfg.diff_n;
+    unsigned saved_lag_n = Cfg.lag_n;
+    size_t saved_smooth = Cfg.max_samples_to_smooth;
+    size_t saved_suppression_window = Cfg.suppression_window;
+    size_t saved_suppression_threshold = Cfg.suppression_threshold;
+    double saved_threshold = Cfg.dimension_anomaly_score_threshold;
+    time_t saved_profile_update_every = nd_profile.update_every;
+
+    Cfg.diff_n = 1;
+    Cfg.lag_n = 5;
+    Cfg.max_samples_to_smooth = 3;
+    Cfg.suppression_window = 1000000;
+    Cfg.suppression_threshold = 1000000;
+    Cfg.dimension_anomaly_score_threshold = 0.99;
+    nd_profile.update_every = 1;
+
+    RRDSET st = {};
+    st.update_every = 1;
+
+    RRDDIM rd = {};
+    rd.rrdset = &st;
+
+    // Both models have their centres at 0. The flat one has equal bounds; the
+    // real one scores 0 for a steady series and 100 for a jump.
+    ml_kmeans_inlined_t flat;
+    ml_kmeans_inlined_t real;
+    for (auto *km : { &flat, &real }) {
+        for (auto &cc : km->cluster_centers) {
+            cc.set_size(6);
+            for (int i = 0; i < 6; i++)
+                cc(i) = 0.0;
+        }
+    }
+    flat.min_dist = 5.0;
+    flat.max_dist = 5.0;
+    real.min_dist = 0.0;
+    real.max_dist = 1.0;
+
+    const unsigned n = Cfg.diff_n + 3 + Cfg.lag_n;
+    struct {
+        const char *name;
+        std::vector<ml_kmeans_inlined_t> models;
+        bool jump_anomalous;
+    } cases[] = {
+        { "flat then real", { flat, real }, true },
+        { "real then flat", { real, flat }, true },
+        { "flat only", { flat }, false },
+    };
+
+    for (auto &c : cases) {
+        ml_dimension_t dim = {};
+        spinlock_init(&dim.slock);
+        dim.rd = &rd;
+        dim.mls = MACHINE_LEARNING_STATUS_ENABLED;
+        dim.mt = METRIC_TYPE_CONSTANT;
+        dim.ts = TRAINING_STATUS_TRAINED;
+        dim.km_contexts = c.models;
+
+        // Warm up the ring, then score one more steady sample.
+        bool anomalous = false;
+        for (unsigned i = 0; i <= n; i++)
+            anomalous = ml_dimension_predict(&dim, 100.0, true);
+        ML_TEST_ASSERT(dim.suppression_window_counter == 1, "the sample after warmup must be scored");
+        ML_TEST_ASSERT(!anomalous, "a steady sample must not be anomalous");
+
+        anomalous = ml_dimension_predict(&dim, 1000.0, true);
+        if (c.jump_anomalous)
+            ML_TEST_ASSERT(anomalous, "a flat model must not veto the real model's anomaly");
+        else
+            ML_TEST_ASSERT(!anomalous, "a dimension with only flat models must not be anomalous");
+        if (anomalous != c.jump_anomalous)
+            fprintf(stderr, "    case: %s\n", c.name);
+    }
+
+    Cfg.diff_n = saved_diff_n;
+    Cfg.lag_n = saved_lag_n;
+    Cfg.max_samples_to_smooth = saved_smooth;
+    Cfg.suppression_window = saved_suppression_window;
+    Cfg.suppression_threshold = saved_suppression_threshold;
+    Cfg.dimension_anomaly_score_threshold = saved_threshold;
+    nd_profile.update_every = saved_profile_update_every;
+}
+
 // Test: ml_chart_stats_add() must accumulate EVERY field of
 // ml_machine_learning_stats_t.
 //
@@ -1567,6 +1658,7 @@ extern "C" int ml_unittest()
     test_chart_stats_add_covers_every_field();
     test_circular_buffer_equivalence();
     test_cns_ring_reset_semantics();
+    test_predict_flat_model_abstains();
     test_same_value_uses_newest_sample();
     test_preprocess_predict_equivalence();
     test_constant_input();
