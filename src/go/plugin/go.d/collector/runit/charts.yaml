@@ -50,7 +50,7 @@ groups:
     metrics:
       - service_state_duration
     charts:
-      - title: Service State Duration (single-service view)
+      - title: Service State Duration (meaningful per service only)
         context: service_state_duration
         units: seconds
         dimensions:

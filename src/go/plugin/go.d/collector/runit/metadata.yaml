@@ -157,7 +157,7 @@ modules:
               dimensions:
                 - name: restarts
             - name: runit.service_state_duration
-              description: Service State Duration (single-service view)
+              description: Service State Duration (meaningful per service only)
               unit: seconds
               chart_type: line
               dimensions:
