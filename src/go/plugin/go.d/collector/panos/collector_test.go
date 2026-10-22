@@ -3560,7 +3560,7 @@ func ipsecTunnelStateMetrics(tunnel, tunnelID, active string) map[string]metrix.
 }
 
 func ipsecGatewayStateMetrics(gateway, ikeVersion, active string) map[string]metrix.SampleValue {
-	return stateSetMetrics("ipsec_gateway_state", upDownStates, active, ipsecGatewayLabels(gateway, ikeVersion))
+	return stateSetMetrics("ipsec_gateway_state", ipsecGatewayStates, active, ipsecGatewayLabels(gateway, ikeVersion))
 }
 
 // stateSetMetrics returns every state of a state set: 1 for the active state, 0 for the rest.

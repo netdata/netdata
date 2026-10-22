@@ -79,6 +79,7 @@ var licenseStatusStates = []string{"valid", "expired"}
 var operationalModeStates = []string{"normal", "other"}
 var upDownStates = []string{"up", "down", "unknown"}
 var ipsecTunnelStates = []string{"active", "inactive", "unknown"}
+var ipsecGatewayStates = []string{"up", "down"}
 var haSyncStates = []string{"synchronized", "not_synchronized", "unknown"}
 var alarmStates = []string{"clear", "alarm"}
 var presenceStates = []string{"present", "absent"}
@@ -128,7 +129,7 @@ func newCollectorMetrics(store metrix.CollectorStore) *collectorMetrics {
 			tunnelsActive: meter.Gauge("ipsec_tunnels_active"),
 			saLifetime:    ipsecTunnels.Gauge("ipsec_tunnel_sa_lifetime"),
 			tunnelState:   newStateSetVec(ipsecTunnelState, "ipsec_tunnel_state", ipsecTunnelStates),
-			gatewayState:  newStateSetVec(ipsecGateway, "ipsec_gateway_state", upDownStates),
+			gatewayState:  newStateSetVec(ipsecGateway, "ipsec_gateway_state", ipsecGatewayStates),
 		},
 		bgp: bgpMetricInstruments{
 			peerState:                  newStateSetVec(bgpPeer, "bgp_peer_state", bgpStates),
