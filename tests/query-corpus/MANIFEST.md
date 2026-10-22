@@ -346,6 +346,7 @@ set at the end.
 | CASE-043/completed-tier-recovery | a completed constant tier2 record is queryable with its exact average after the next tier record completes, without disconnecting or restarting | n/a |  |
 | CASE-044/fine-selected-resumption | automatic fine-selected queries return the exact newer retained values after an older tier ends, with forced-tier controls across long gaps, a short gap and overlapping retention | n/a |  |
 | CASE-044/retention-gap-null | automatic fine-selected queries keep rows without retained observations empty independently of whether newer retained values resume | n/a |  |
+| CASE-045/terminal-smoothing-empty | SES and DES return null with EMPTY after the existing terminal EOF allowance when a later tier is skipped, with retained-source and single-plan controls | n/a |  |
 
 ## Corpus-wide pusher discipline
 
@@ -355,4 +356,3 @@ set at the end.
   drain guarantee (an immediate close loses nothing).
 - The historical spike-3 discipline (first point alone, wait, then burst)
   is NOT needed since #23096 — pinned by L0/live-burst.
-| CASE-045/terminal-smoothing-empty | SES and DES return null with EMPTY after the existing terminal EOF allowance when a later tier is skipped, with retained-source and single-plan controls | n/a |  |

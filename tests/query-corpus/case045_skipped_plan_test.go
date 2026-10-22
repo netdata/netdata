@@ -15,8 +15,13 @@ import (
 // plan. Smoothing must still reach the terminal empty fill after reader EOF.
 func TestCase045SkippedPlanTerminal(t *testing.T) {
 	const contract = "CASE-045/terminal-smoothing-empty"
+	scopes := []struct{ name, tier string }{
+		{"single-plan-control", "1"}, {"skipped-successor", ""},
+	}
 	for _, group := range []string{"ses", "des"} {
-		registerContractComponent(t, contract, group)
+		for _, scope := range scopes {
+			registerContractComponent(t, contract, group+"/"+scope.name)
+		}
 	}
 	const host, context = "skipped-plan", "fixture.skipped_plan"
 	const coarseLast, fineFirst, fineLast = int64(480), int64(500), int64(510)
@@ -75,11 +80,9 @@ func TestCase045SkippedPlanTerminal(t *testing.T) {
 	}
 	for _, group := range []string{"ses", "des"} {
 		t.Run(group, func(t *testing.T) {
-			trackContractComponent(t, contract, group)
-			for _, tc := range []struct{ name, tier string }{
-				{"single-plan-control", "1"}, {"skipped-successor", ""},
-			} {
+			for _, tc := range scopes {
 				t.Run(tc.name, func(t *testing.T) {
+					trackContractComponent(t, contract, group+"/"+tc.name)
 					_, rows := c040Query(t, dd, host, context, base, base+duration, duration/step, group, tc.tier)
 					if !assertExactColumnValues(t, c040Rows(rows, base+step, base+step), "load",
 						[]expectedColumnPoint{wantNumberAt(base+step, 7)}, 0) {

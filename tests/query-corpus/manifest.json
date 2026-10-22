@@ -1774,8 +1774,10 @@
     "name": "CASE-045/terminal-smoothing-empty",
     "proves": "SES and DES return null with EMPTY after the existing terminal EOF allowance when a later tier is skipped, with retained-source and single-plan controls",
     "components": [
-      "ses",
-      "des"
+      "ses/single-plan-control",
+      "ses/skipped-successor",
+      "des/single-plan-control",
+      "des/skipped-successor"
     ]
   }
 ]
