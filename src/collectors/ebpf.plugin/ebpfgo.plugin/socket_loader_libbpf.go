@@ -60,15 +60,12 @@ func LoadSocketLegacy(cfg SocketLegacyConfig) (*SocketLegacyHandle, error) {
 	coreSupported := libbpfloader.SupportsCore()
 	if !coreSupported {
 		plan.LoadMode = LoadLegacy
-		if err := validateLegacyArtifactFamily("socket", plan); err != nil {
-			return nil, err
-		}
-		// No fallback in legacy mode: there is only one object.
-		return tryLoadSocketPlan(cfg, plan)
 	}
 
 	plans := buildFallbackPlans(plan, cfg.PluginsDir, cfg.IsRHF, "socket", socketMaxBaseSelector)
-	plans = append(plans, buildCoreLegacyFallbackPlans(plan, cfg.PluginsDir, cfg.IsRHF, "socket", socketMaxBaseSelector)...)
+	if coreSupported {
+		plans = append(plans, buildCoreLegacyFallbackPlans(plan, cfg.PluginsDir, cfg.IsRHF, "socket", socketMaxBaseSelector)...)
+	}
 	if len(plans) == 0 {
 		return nil, fmt.Errorf("socket has no compatible object family for this kernel")
 	}

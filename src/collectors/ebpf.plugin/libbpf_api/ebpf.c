@@ -1289,12 +1289,12 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kv
         return NULL;
     }
 
-    ebpf_mount_name(lpath, 4095, plugins_dir, idx, em->info.thread_name, em->mode, is_rhf);
+    ebpf_mount_name(lpath, 4095, plugins_dir, idx, em->info.thread_name, em->mode == MODE_RETURN, is_rhf);
 
     *obj = bpf_object__open_file(lpath, NULL);
     if ((!*obj || libbpf_get_error(*obj)) && is_rhf > 0 && !ebpf_is_rhel10_6_12_stream(is_rhf, kver)) {
         *obj = NULL;
-        ebpf_mount_name(lpath, sizeof(lpath), plugins_dir, idx, em->info.thread_name, em->mode, -1);
+        ebpf_mount_name(lpath, sizeof(lpath), plugins_dir, idx, em->info.thread_name, em->mode == MODE_RETURN, -1);
         *obj = bpf_object__open_file(lpath, NULL);
     }
     // A failed open leaves nothing to close: libbpf 1.x returns NULL, older versions an error pointer.

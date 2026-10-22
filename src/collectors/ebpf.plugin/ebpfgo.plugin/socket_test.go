@@ -155,18 +155,25 @@ func TestSocket6162BaseFallbackUsesGenerated612Family(t *testing.T) {
 		ObjectFlavor:  "arena",
 	}
 
-	plans := buildFallbackPlans(BuildSocketLegacyPlan(cfg), cfg.PluginsDir, cfg.IsRHF, "socket", socketMaxBaseSelector)
 	want := []string{
 		"pnetdata_ebpf_socket_arena.6.16.2.o",
 		"pnetdata_ebpf_socket_buffer.6.16.2.o",
 		"pnetdata_ebpf_socket.6.12.o",
 	}
-	if len(plans) != len(want) {
-		t.Fatalf("buildFallbackPlans() returned %d plans, want %d: %+v", len(plans), len(want), plans)
-	}
-	for i, expected := range want {
-		if got := filepath.Base(plans[i].ObjectPath); got != expected {
-			t.Errorf("plans[%d] = %q, want %q", i, got, expected)
+	for _, mode := range []LoadMethod{LoadCore, LoadLegacy} {
+		plan := BuildSocketLegacyPlan(cfg)
+		plan.LoadMode = mode
+		plans := buildFallbackPlans(plan, cfg.PluginsDir, cfg.IsRHF, "socket", socketMaxBaseSelector)
+		if len(plans) != len(want) {
+			t.Fatalf("buildFallbackPlans(%v) returned %d plans, want %d: %+v", mode, len(plans), len(want), plans)
+		}
+		for i, expected := range want {
+			if got := filepath.Base(plans[i].ObjectPath); got != expected {
+				t.Errorf("plans[%d] = %q, want %q", i, got, expected)
+			}
+			if plans[i].LoadMode != mode {
+				t.Errorf("plans[%d].LoadMode = %v, want %v", i, plans[i].LoadMode, mode)
+			}
 		}
 	}
 }

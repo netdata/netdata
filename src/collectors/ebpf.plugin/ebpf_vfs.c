@@ -102,6 +102,25 @@ static void ebpf_vfs_disable_probes(struct vfs_bpf *obj)
     bpf_program__set_autoload(obj->progs.netdata_vfs_create_kretprobe, false);
 }
 
+static void ebpf_vfs_select_probe_mode(struct vfs_bpf *obj, netdata_run_mode_t mode)
+{
+    struct bpf_program *entry[] = {
+        obj->progs.netdata_vfs_write_kprobe, obj->progs.netdata_vfs_writev_kprobe,
+        obj->progs.netdata_vfs_read_kprobe, obj->progs.netdata_vfs_readv_kprobe,
+        obj->progs.netdata_vfs_unlink_kprobe, obj->progs.netdata_vfs_fsync_kprobe,
+        obj->progs.netdata_vfs_open_kprobe, obj->progs.netdata_vfs_create_kprobe,
+    };
+    struct bpf_program *returns[] = {
+        obj->progs.netdata_vfs_write_kretprobe, obj->progs.netdata_vfs_writev_kretprobe,
+        obj->progs.netdata_vfs_read_kretprobe, obj->progs.netdata_vfs_readv_kretprobe,
+        obj->progs.netdata_vfs_unlink_kretprobe, obj->progs.netdata_vfs_fsync_kretprobe,
+        obj->progs.netdata_vfs_open_kretprobe, obj->progs.netdata_vfs_create_kretprobe,
+    };
+    struct bpf_program **unused = mode == MODE_RETURN ? entry : returns;
+    for (size_t i = 0; i < sizeof(entry) / sizeof(entry[0]); i++)
+        bpf_program__set_autoload(unused[i], false);
+}
+
 static void ebpf_vfs_disable_trampoline_entry_probes(struct vfs_bpf *obj)
 {
     bpf_program__set_autoload(obj->progs.netdata_vfs_write_fentry, false);
@@ -184,103 +203,51 @@ static void ebpf_vfs_set_trampoline_target(struct vfs_bpf *obj)
  *
  * @return It returns 0 on success and -1 otherwise.
  */
-static int ebpf_vfs_attach_probe(struct vfs_bpf *obj)
+static int ebpf_vfs_attach_probe(struct vfs_bpf *obj, netdata_run_mode_t mode)
 {
-    obj->links.netdata_vfs_write_kprobe = bpf_program__attach_kprobe(
-        obj->progs.netdata_vfs_write_kprobe, false, vfs_targets[NETDATA_EBPF_VFS_WRITE].name);
-    long ret = libbpf_get_error(obj->links.netdata_vfs_write_kprobe);
-    if (ret)
-        return -1;
+    const bool retprobe = mode == MODE_RETURN;
+    struct {
+        struct bpf_program *entry;
+        struct bpf_program *returns;
+        struct bpf_link **entry_link;
+        struct bpf_link **return_link;
+        const char *target;
+    } probes[] = {
+        {obj->progs.netdata_vfs_write_kprobe, obj->progs.netdata_vfs_write_kretprobe,
+         &obj->links.netdata_vfs_write_kprobe, &obj->links.netdata_vfs_write_kretprobe,
+         vfs_targets[NETDATA_EBPF_VFS_WRITE].name},
+        {obj->progs.netdata_vfs_writev_kprobe, obj->progs.netdata_vfs_writev_kretprobe,
+         &obj->links.netdata_vfs_writev_kprobe, &obj->links.netdata_vfs_writev_kretprobe,
+         vfs_targets[NETDATA_EBPF_VFS_WRITEV].name},
+        {obj->progs.netdata_vfs_read_kprobe, obj->progs.netdata_vfs_read_kretprobe,
+         &obj->links.netdata_vfs_read_kprobe, &obj->links.netdata_vfs_read_kretprobe,
+         vfs_targets[NETDATA_EBPF_VFS_READ].name},
+        {obj->progs.netdata_vfs_readv_kprobe, obj->progs.netdata_vfs_readv_kretprobe,
+         &obj->links.netdata_vfs_readv_kprobe, &obj->links.netdata_vfs_readv_kretprobe,
+         vfs_targets[NETDATA_EBPF_VFS_READV].name},
+        {obj->progs.netdata_vfs_unlink_kprobe, obj->progs.netdata_vfs_unlink_kretprobe,
+         &obj->links.netdata_vfs_unlink_kprobe, &obj->links.netdata_vfs_unlink_kretprobe,
+         vfs_targets[NETDATA_EBPF_VFS_UNLINK].name},
+        {obj->progs.netdata_vfs_fsync_kprobe, obj->progs.netdata_vfs_fsync_kretprobe,
+         &obj->links.netdata_vfs_fsync_kprobe, &obj->links.netdata_vfs_fsync_kretprobe,
+         vfs_targets[NETDATA_EBPF_VFS_FSYNC].name},
+        {obj->progs.netdata_vfs_open_kprobe, obj->progs.netdata_vfs_open_kretprobe,
+         &obj->links.netdata_vfs_open_kprobe, &obj->links.netdata_vfs_open_kretprobe,
+         vfs_targets[NETDATA_EBPF_VFS_OPEN].name},
+        {obj->progs.netdata_vfs_create_kprobe, obj->progs.netdata_vfs_create_kretprobe,
+         &obj->links.netdata_vfs_create_kprobe, &obj->links.netdata_vfs_create_kretprobe,
+         vfs_targets[NETDATA_EBPF_VFS_CREATE].name},
+    };
 
-    obj->links.netdata_vfs_write_kretprobe = bpf_program__attach_kprobe(
-        obj->progs.netdata_vfs_write_kretprobe, true, vfs_targets[NETDATA_EBPF_VFS_WRITE].name);
-    ret = libbpf_get_error(obj->links.netdata_vfs_write_kretprobe);
-    if (ret)
-        return -1;
-
-    obj->links.netdata_vfs_writev_kprobe = bpf_program__attach_kprobe(
-        obj->progs.netdata_vfs_writev_kprobe, false, vfs_targets[NETDATA_EBPF_VFS_WRITEV].name);
-    ret = libbpf_get_error(obj->links.netdata_vfs_writev_kprobe);
-    if (ret)
-        return -1;
-
-    obj->links.netdata_vfs_writev_kretprobe = bpf_program__attach_kprobe(
-        obj->progs.netdata_vfs_writev_kretprobe, true, vfs_targets[NETDATA_EBPF_VFS_WRITEV].name);
-    ret = libbpf_get_error(obj->links.netdata_vfs_writev_kretprobe);
-    if (ret)
-        return -1;
-
-    obj->links.netdata_vfs_read_kprobe =
-        bpf_program__attach_kprobe(obj->progs.netdata_vfs_read_kprobe, false, vfs_targets[NETDATA_EBPF_VFS_READ].name);
-    ret = libbpf_get_error(obj->links.netdata_vfs_read_kprobe);
-    if (ret)
-        return -1;
-
-    obj->links.netdata_vfs_read_kretprobe = bpf_program__attach_kprobe(
-        obj->progs.netdata_vfs_read_kretprobe, true, vfs_targets[NETDATA_EBPF_VFS_READ].name);
-    ret = libbpf_get_error(obj->links.netdata_vfs_read_kretprobe);
-    if (ret)
-        return -1;
-
-    obj->links.netdata_vfs_readv_kprobe = bpf_program__attach_kprobe(
-        obj->progs.netdata_vfs_readv_kprobe, false, vfs_targets[NETDATA_EBPF_VFS_READV].name);
-    ret = libbpf_get_error(obj->links.netdata_vfs_readv_kprobe);
-    if (ret)
-        return -1;
-
-    obj->links.netdata_vfs_readv_kretprobe = bpf_program__attach_kprobe(
-        obj->progs.netdata_vfs_readv_kretprobe, true, vfs_targets[NETDATA_EBPF_VFS_READV].name);
-    ret = libbpf_get_error(obj->links.netdata_vfs_readv_kretprobe);
-    if (ret)
-        return -1;
-
-    obj->links.netdata_vfs_unlink_kprobe = bpf_program__attach_kprobe(
-        obj->progs.netdata_vfs_unlink_kprobe, false, vfs_targets[NETDATA_EBPF_VFS_UNLINK].name);
-    ret = libbpf_get_error(obj->links.netdata_vfs_unlink_kprobe);
-    if (ret)
-        return -1;
-
-    obj->links.netdata_vfs_unlink_kretprobe = bpf_program__attach_kprobe(
-        obj->progs.netdata_vfs_unlink_kretprobe, true, vfs_targets[NETDATA_EBPF_VFS_UNLINK].name);
-    ret = libbpf_get_error(obj->links.netdata_vfs_unlink_kretprobe);
-    if (ret)
-        return -1;
-
-    obj->links.netdata_vfs_fsync_kprobe = bpf_program__attach_kprobe(
-        obj->progs.netdata_vfs_fsync_kprobe, false, vfs_targets[NETDATA_EBPF_VFS_FSYNC].name);
-    ret = libbpf_get_error(obj->links.netdata_vfs_fsync_kprobe);
-    if (ret)
-        return -1;
-
-    obj->links.netdata_vfs_fsync_kretprobe = bpf_program__attach_kprobe(
-        obj->progs.netdata_vfs_fsync_kretprobe, true, vfs_targets[NETDATA_EBPF_VFS_FSYNC].name);
-    ret = libbpf_get_error(obj->links.netdata_vfs_fsync_kretprobe);
-    if (ret)
-        return -1;
-
-    obj->links.netdata_vfs_open_kprobe =
-        bpf_program__attach_kprobe(obj->progs.netdata_vfs_open_kprobe, false, vfs_targets[NETDATA_EBPF_VFS_OPEN].name);
-    ret = libbpf_get_error(obj->links.netdata_vfs_open_kprobe);
-    if (ret)
-        return -1;
-
-    obj->links.netdata_vfs_open_kretprobe = bpf_program__attach_kprobe(
-        obj->progs.netdata_vfs_open_kretprobe, true, vfs_targets[NETDATA_EBPF_VFS_OPEN].name);
-    ret = libbpf_get_error(obj->links.netdata_vfs_open_kretprobe);
-    if (ret)
-        return -1;
-
-    obj->links.netdata_vfs_create_kprobe = bpf_program__attach_kprobe(
-        obj->progs.netdata_vfs_create_kprobe, false, vfs_targets[NETDATA_EBPF_VFS_CREATE].name);
-    ret = libbpf_get_error(obj->links.netdata_vfs_create_kprobe);
-    if (ret)
-        return -1;
-
-    obj->links.netdata_vfs_create_kretprobe = bpf_program__attach_kprobe(
-        obj->progs.netdata_vfs_create_kretprobe, true, vfs_targets[NETDATA_EBPF_VFS_CREATE].name);
-    ret = libbpf_get_error(obj->links.netdata_vfs_create_kretprobe);
-    if (ret)
-        return -1;
+    for (size_t i = 0; i < sizeof(probes) / sizeof(probes[0]); i++) {
+        struct bpf_program *program = retprobe ? probes[i].returns : probes[i].entry;
+        struct bpf_link **link = retprobe ? probes[i].return_link : probes[i].entry_link;
+        *link = bpf_program__attach_kprobe(program, retprobe, probes[i].target);
+        if (libbpf_get_error(*link)) {
+            *link = NULL;
+            return -1;
+        }
+    }
 
     return 0;
 }
@@ -338,6 +305,7 @@ static inline int ebpf_vfs_load_and_attach(struct vfs_bpf *obj, ebpf_module_t *e
         ebpf_vfs_set_trampoline_target(obj);
     } else {
         ebpf_vfs_disable_trampoline(obj);
+        ebpf_vfs_select_probe_mode(obj, em->mode);
     }
 
     ebpf_vfs_adjust_map(obj, em);
@@ -347,7 +315,7 @@ static inline int ebpf_vfs_load_and_attach(struct vfs_bpf *obj, ebpf_module_t *e
         return ret;
     }
 
-    ret = (test == EBPF_LOAD_TRAMPOLINE) ? vfs_bpf__attach(obj) : ebpf_vfs_attach_probe(obj);
+    ret = (test == EBPF_LOAD_TRAMPOLINE) ? vfs_bpf__attach(obj) : ebpf_vfs_attach_probe(obj, em->mode);
     if (!ret) {
         ebpf_vfs_set_hash_tables(obj);
 
