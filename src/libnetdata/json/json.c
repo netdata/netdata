@@ -694,7 +694,7 @@ static const char *json_strict_literal(const char *s, const char *e, const char 
 
 const char *json_strict_validate(const char *s, size_t len) {
     if(!s)
-        return "no JSON document";
+        return "invalid JSON: no JSON document";
 
     const char *e = s + len;
     char stack[JSON_STRICT_MAX_DEPTH];
@@ -708,23 +708,23 @@ const char *json_strict_validate(const char *s, size_t len) {
         switch(state) {
             case EXPECT_MEMBER:
                 if(s >= e || *s != '"')
-                    return "expected a double-quoted object key";
+                    return "invalid JSON: expected a double-quoted object key";
                 if(!(s = json_strict_string(s, e)))
-                    return "invalid string";
+                    return "invalid JSON: invalid string";
                 s = json_strict_skip_ws(s, e);
                 if(s >= e || *s != ':')
-                    return "expected ':' after an object key";
+                    return "invalid JSON: expected ':' after an object key";
                 s++;
                 state = EXPECT_VALUE;
                 break;
 
             case EXPECT_VALUE:
                 if(s >= e)
-                    return "expected a value";
+                    return "invalid JSON: expected a value";
 
                 if(*s == '{' || *s == '[') {
                     if(depth >= JSON_STRICT_MAX_DEPTH)
-                        return "too deeply nested";
+                        return "invalid JSON: too deeply nested";
                     char open = *s++;
                     stack[depth++] = open;
 
@@ -750,20 +750,20 @@ const char *json_strict_validate(const char *s, size_t len) {
                 else if(*s == 'n')
                     s = json_strict_literal(s, e, "null");
                 else
-                    return "unexpected character";
+                    return "invalid JSON: unexpected character";
 
                 if(!s)
-                    return "invalid value";
+                    return "invalid JSON: invalid value";
 
                 state = AFTER_VALUE;
                 break;
 
             case AFTER_VALUE:
                 if(!depth)
-                    return (s == e) ? NULL : "unexpected data after the JSON document";
+                    return (s == e) ? NULL : "invalid JSON: unexpected data after the document";
 
                 if(s >= e)
-                    return "unterminated object or array";
+                    return "invalid JSON: unterminated object or array";
 
                 if(*s == ',') {
                     s++;
@@ -774,7 +774,7 @@ const char *json_strict_validate(const char *s, size_t len) {
                     depth--;
                 }
                 else
-                    return "expected ',' or the end of the object or array";
+                    return "invalid JSON: expected ',' or the end of the object or array";
                 break;
         }
     }
