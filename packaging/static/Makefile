@@ -799,7 +799,6 @@ runtime-check: prepare $(NETDATA_INSTALL)
 	$(DOCKER) run $(DOCKER_ARGS) \
 		$(BUILDER) \
 		/bin/sh $(NETDATA_SOURCE_DIR)/packaging/static/scripts/runtime-check.sh $(DOCKER_INSTALL) $(NETDATA_SOURCE_DIR) $(BUILDARCH)
-	rm -rf $(TARGET_INSTALL)/var/log/netdata $(TARGET_INSTALL)/var/lib/netdata $(TARGET_INSTALL)/var/cache/netdata
 
 netdata-elf-check: $(NETDATA_INSTALL)
 	$(MAKEFILE_DIR)/scripts/elf-check.sh $(TARGET_INSTALL)/bin/srv/netdata $(ELF_MACHINE) $(ELF_CLASS)
