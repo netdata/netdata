@@ -145,14 +145,11 @@ func TestOperatorMissingSnapshot(t *testing.T) {
 	data, ok := c.topology.CurrentTopology()
 	require.True(t, ok)
 	labels := topologyTableRows(t, data.Tables.Actor["actor_labels"].Table, data.Dictionaries)
-	for _, r := range labels {
-		if r["actor"] == 0 && (r["key"] == "metrics_collection" || r["key"] == "bgp_collection") {
-			t.Log(r)
-		}
-	}
+	require.Equal(t, "Unavailable", topologyLabelValue(t, labels, 0, "snapshot_collection"))
+	require.Equal(t, "Observed", topologyLabelValue(t, labels, 0, "metrics_collection"))
+	require.Equal(t, "Observed", topologyLabelValue(t, labels, 0, "bgp_collection"))
 	found := false
 	for _, n := range data.Notifications {
-		t.Log(n.Code, n.Message)
 		if n.Code == "cato_snapshot_coverage" {
 			found = true
 		}

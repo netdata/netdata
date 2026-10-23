@@ -13,7 +13,8 @@ import (
 func buildCatoTopologyLabels(dict *topologyv1.StringDictionary, accountID string, sites map[string]*siteState, order []string, indexes map[string]int) (topologyv1.Table, error) {
 	table := topologyv1.NewTableBuilder(catoTopologyLabelColumns()...)
 	add := func(actor int, key, value, kind string) {
-		if strings.TrimSpace(value) == "" {
+		value = strings.TrimSpace(value)
+		if value == "" {
 			return
 		}
 		table.Add(actor, dict.Ref(key), dict.Ref(value), dict.Ref(topologySource), dict.Ref(kind))
@@ -46,15 +47,14 @@ func buildCatoTopologyLabels(dict *topologyv1.StringDictionary, accountID string
 		if site.HostCount != nil {
 			add(actor, "host_count", strconv.FormatInt(*site.HostCount, 10), "metadata")
 		}
-		devices := append([]deviceState(nil), site.Devices...)
-		sort.Slice(devices, func(i, j int) bool { return stableDeviceID(devices[i]) < stableDeviceID(devices[j]) })
-		for _, dev := range devices {
+		for _, dev := range topologyDevices(site.Devices) {
 			actor, ok := indexes[catoDeviceActorID(site.ID, stableDeviceID(dev))]
 			if !ok {
 				continue
 			}
 			siteContext(actor, site)
-			add(actor, "name", deviceDisplayName(dev), "identity")
+			add(actor, "name", topologyDeviceName(site, dev), "identity")
+			add(actor, "source_name", dev.Name, "metadata")
 			add(actor, "device_id", stableDeviceID(dev), "identity")
 			add(actor, "identifier", dev.Identifier, "identity")
 			add(actor, "socket_id", dev.SocketID, "identity")

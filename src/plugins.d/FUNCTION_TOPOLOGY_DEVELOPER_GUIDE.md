@@ -1815,13 +1815,23 @@ as nullable floating-point Mbps; absent capacity is not zero. RTT, directional
 loss and jitter, and last-mile measurements honor their presence flags and
 show units. Less frequently used details appear in expandable rows. Site
 aggregate measurements are not copied onto interface tunnels. The existing
-`connected` availability column is retained for compatibility, while explicit
+`connected` availability column is retained for compatibility: it is true when
+either the tunnel or physical link is up. Explicit
 `tunnel_connected`, `link_up`, and human-readable state columns carry their
-separate meanings. BGP details show local IP/ASN, incoming/outgoing states and
+separate meanings. Human-readable state columns use title case; machine link
+state tokens remain lowercase. Consumers should use references and explicit
+state fields, not compare display strings. BGP details show local IP/ASN, incoming/outgoing states and
 route counts alongside the peer identity.
 
 All actor types expose known metadata through `actor_labels`, modal
-identification and a one-hop miniature. Canonical actor columns remain the
+identification and a one-hop miniature. Device captions preserve configured names
+unless they merely repeat a device identity. Missing or identity-only names use
+the site, HA role (or `device`) and labeled full serial/ID. Other numeric
+configured names remain valid. The source name is retained as `source_name`;
+full identifiers remain separate labels. This policy applies only to topology,
+not metric `device_name` labels. Repeated device identities select the first
+record in stable display-name/ID order consistently for actors, labels and
+fallback links. Label values are trimmed before publication. Canonical actor columns remain the
 identity and search source. Shared PoPs have account/name labels without
 invented geography. Empty labels are omitted; known false/zero values survive.
 Site identification includes inventory, metrics and BGP observation status. Missing

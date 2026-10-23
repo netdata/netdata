@@ -190,10 +190,6 @@ func (c *Collector) collectSnapshot(ctx context.Context) (map[string]*siteState,
 	}
 
 	sites, order := normalizeSnapshot(res, c.discovery.siteNames)
-	if len(order) == 0 {
-		return sites, order, nil
-	}
-
 	seen := make(map[string]bool, len(order))
 	for _, siteID := range order {
 		seen[siteID] = true

@@ -163,6 +163,8 @@ func TestTopologyScale(t *testing.T) {
 	validateCatoTopologyV1Data(t, data)
 	payload, err := json.Marshal(data)
 	require.NoError(t, err)
+	require.Equal(t, 948, data.Actors.Rows)
+	require.Equal(t, 1800, data.Links.Rows)
 	t.Logf("actors=%d links=%d payload_bytes=%d", data.Actors.Rows, data.Links.Rows, len(payload))
 }
 
@@ -172,10 +174,10 @@ func TestTopologyInterfaceOwnersAndFallback(t *testing.T) {
 		interfaces map[string]*interfaceState
 		want       map[string]string
 	}{
-		"site fallback":                      {want: map[string]string{"Office -> Summary": "unknown"}},
-		"unresolved owner":                   {interfaces: map[string]*interfaceState{"wan": {ID: "wan", Name: "WAN", DeviceID: "missing", PopName: "Observed", Connected: new(false)}}, want: map[string]string{"Office -> Observed": "disconnected"}},
-		"unknown owner alongside device":     {devices: []deviceState{{ID: "socket", Name: "Socket"}}, interfaces: map[string]*interfaceState{"wan": {ID: "wan", DeviceID: "missing", PopName: "Observed"}}, want: map[string]string{"Office -> Observed": "unknown", "Socket -> Summary": "unknown"}},
-		"nil and destinationless interfaces": {devices: []deviceState{{ID: "socket", Name: "Socket"}}, interfaces: map[string]*interfaceState{"nil": nil, "wan": {ID: "wan", DeviceID: "socket", Connected: new(true)}}, want: map[string]string{"Socket -> Summary": "unknown"}},
+		"site fallback":                      {want: map[string]string{"Office -> Summary": "cato_pop_association:unknown"}},
+		"unresolved owner":                   {interfaces: map[string]*interfaceState{"wan": {ID: "wan", Name: "WAN", DeviceID: "missing", PopName: "Observed", Connected: new(false)}}, want: map[string]string{"Office -> Observed": "cato_tunnel_disconnected:disconnected"}},
+		"unknown owner alongside device":     {devices: []deviceState{{ID: "socket", Name: "Socket"}}, interfaces: map[string]*interfaceState{"wan": {ID: "wan", DeviceID: "missing", PopName: "Observed"}}, want: map[string]string{"Office -> Observed": "cato_tunnel_unknown:unknown", "Socket -> Summary": "cato_pop_association:unknown"}},
+		"nil and destinationless interfaces": {devices: []deviceState{{ID: "socket", Name: "Socket"}}, interfaces: map[string]*interfaceState{"nil": nil, "wan": {ID: "wan", DeviceID: "socket", Connected: new(true)}}, want: map[string]string{"Socket -> Summary": "cato_pop_association:unknown"}},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -198,7 +200,7 @@ func TestTopologyInterfaceOwnersAndFallback(t *testing.T) {
 				}
 				src := actors[l["src_actor"].(int)]["display_name"].(string)
 				dst := actors[l["dst_actor"].(int)]["display_name"].(string)
-				got[src+" -> "+dst] = l["state"].(string)
+				got[src+" -> "+dst] = l["type"].(string) + ":" + l["state"].(string)
 			}
 			require.Equal(t, tc.want, got)
 		})

@@ -144,7 +144,9 @@ func TopologyActorTypes() map[string]topologyv1.ActorType {
 		},
 	}
 	for id, actorType := range types {
-		actorType.Presentation.Border = &topologyv1.BorderPresentation{Enabled: new(true)}
+		actorType.Presentation.Border = &topologyv1.BorderPresentation{
+			Enabled: new(true),
+		}
 		actorType.Presentation.LabelPolicy.Fallback = "type_label"
 		actorType.Presentation.LabelPolicy.MaxLength = 80
 		actorType.Presentation.LabelPolicy.Array = "reject"
@@ -459,6 +461,11 @@ func catoActorLabels(actorType string) *topologyv1.ModalLabelsPresentation {
 			})
 	case ActorTypeDevice:
 		fields = append(fields,
+			topologyv1.ModalLabelIdentificationField{
+				Key:       "source_name",
+				Label:     "Source name",
+				MaxValues: 1,
+			},
 			topologyv1.ModalLabelIdentificationField{
 				Key:       "site_name",
 				Label:     "Site",

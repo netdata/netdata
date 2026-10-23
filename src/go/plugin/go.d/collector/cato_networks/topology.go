@@ -38,8 +38,8 @@ func buildTopology(
 		siteActorID := catoSiteActorID(site.ID)
 		siteActorIndex := addSiteActor(actors, stringsDict, accountID, site, siteActorID)
 		actorIndexes[siteActorID] = siteActorIndex
-		deviceActors := addDeviceTopology(actors, links, stringsDict, actorIndexes, accountID, site, siteActorIndex)
-		addInterfaceTopology(actors, links, interfaces, stringsDict, actorIndexes, accountID, siteActorIndex, deviceActors, site)
+		addDeviceTopology(actors, links, stringsDict, actorIndexes, accountID, site, siteActorIndex)
+		addInterfaceTopology(actors, links, interfaces, stringsDict, actorIndexes, accountID, site)
 
 		addBGPPeerTopology(actors, links, stringsDict, actorIndexes, site, siteActorIndex)
 	}
@@ -208,11 +208,19 @@ func addDeviceTopology(
 	accountID string,
 	site *siteState,
 	siteActor int,
-) map[string]int {
-	deviceActors := make(map[string]int, len(site.Devices))
+) {
+	for _, dev := range topologyDevices(site.Devices) {
+		deviceID := stableDeviceID(dev)
+		deviceActorID := catoDeviceActorID(site.ID, deviceID)
+		deviceActor := addDeviceActor(actors, dict, accountID, site, dev, deviceID, deviceActorID)
+		actorIndexes[deviceActorID] = deviceActor
+		addOwnershipLink(links, dict, siteActor, deviceActor)
+	}
+}
 
-	sortedDevices := append([]deviceState(nil), site.Devices...)
-	sort.Slice(sortedDevices, func(i, j int) bool {
+func topologyDevices(devices []deviceState) []deviceState {
+	sortedDevices := append([]deviceState(nil), devices...)
+	sort.SliceStable(sortedDevices, func(i, j int) bool {
 		leftName := deviceDisplayName(sortedDevices[i])
 		rightName := deviceDisplayName(sortedDevices[j])
 		if leftName != rightName {
@@ -221,20 +229,34 @@ func addDeviceTopology(
 		return stableDeviceID(sortedDevices[i]) < stableDeviceID(sortedDevices[j])
 	})
 
+	seen := make(map[string]bool, len(sortedDevices))
+	unique := sortedDevices[:0]
 	for _, dev := range sortedDevices {
-		deviceID := stableDeviceID(dev)
-		if deviceID == "" {
+		id := stableDeviceID(dev)
+		if id == "" || seen[id] {
 			continue
 		}
-		deviceActorID := catoDeviceActorID(site.ID, deviceID)
-		deviceActor := addDeviceActor(actors, dict, accountID, site, dev, deviceID, deviceActorID)
-		actorIndexes[deviceActorID] = deviceActor
-		deviceActors[deviceID] = deviceActor
-
-		addOwnershipLink(links, dict, siteActor, deviceActor)
+		seen[id] = true
+		unique = append(unique, dev)
 	}
+	return unique
+}
 
-	return deviceActors
+func topologyDeviceName(site *siteState, dev deviceState) string {
+	name := normalizeName(dev.Name)
+	if name != "" && name != normalizeName(dev.ID) && name != normalizeName(dev.SocketSerial) &&
+		name != normalizeName(dev.Identifier) && name != normalizeName(dev.SocketID) {
+		return name
+	}
+	role := normalizeStatus(dev.HaRole)
+	if role == "none" || role == "unknown" {
+		role = "device"
+	}
+	identity := "ID " + stableDeviceID(dev)
+	if serial := normalizeName(dev.SocketSerial); serial != "" {
+		identity = "serial " + serial
+	}
+	return firstNonEmpty(site.Name, "Site "+site.ID) + " · " + role + " · " + identity
 }
 
 func addDeviceActor(
@@ -245,10 +267,7 @@ func addDeviceActor(
 	dev deviceState,
 	deviceID, deviceActorID string,
 ) int {
-	displayName := deviceDisplayName(dev)
-	if displayName == "" {
-		displayName = deviceID
-	}
+	displayName := topologyDeviceName(site, dev)
 	popName := dev.LastPopName
 	if popName == "" {
 		popName = site.PopName
@@ -409,10 +428,9 @@ func addInterfaceTopology(
 	dict *topologyv1.StringDictionary,
 	actorIndexes map[string]int,
 	accountID string,
-	siteActor int,
-	deviceActors map[string]int,
 	site *siteState,
 ) {
+	siteActor := actorIndexes[catoSiteActorID(site.ID)]
 	ifaceKeys := make([]string, 0, len(site.Interfaces))
 	for key, iface := range site.Interfaces {
 		if iface != nil && !iface.Aggregate {
@@ -430,7 +448,7 @@ func addInterfaceTopology(
 	for _, key := range ifaceKeys {
 		iface := site.Interfaces[key]
 		actor := siteActor
-		if devActor, ok := deviceActors[iface.DeviceID]; ok {
+		if devActor, ok := actorIndexes[catoDeviceActorID(site.ID, iface.DeviceID)]; ok {
 			actor = devActor
 		}
 		var link any
@@ -462,10 +480,9 @@ func addInterfaceTopology(
 			firstNonEmpty(optionalBoolState(iface.LinkUp, "Up", "Down"), "Unknown"))
 	}
 	// Summary destinations are a fallback, not additional observed tunnels.
-	devices := append([]deviceState(nil), site.Devices...)
-	sort.Slice(devices, func(i, j int) bool { return stableDeviceID(devices[i]) < stableDeviceID(devices[j]) })
+	devices := topologyDevices(site.Devices)
 	for _, dev := range devices {
-		actor, ok := deviceActors[stableDeviceID(dev)]
+		actor, ok := actorIndexes[catoDeviceActorID(site.ID, stableDeviceID(dev))]
 		popName := firstNonEmpty(dev.LastPopName, site.PopName)
 		if !ok || hasTunnel[actor] || popName == "" {
 			continue
@@ -473,7 +490,7 @@ func addInterfaceTopology(
 		pop := ensurePopActor(actors, dict, actorIndexes, accountID, popName)
 		addDevicePopLink(links, dict, dev, actor, pop, siteActor)
 	}
-	if len(deviceActors) == 0 && !hasTunnel[siteActor] && site.PopName != "" {
+	if len(devices) == 0 && !hasTunnel[siteActor] && site.PopName != "" {
 		pop := ensurePopActor(actors, dict, actorIndexes, accountID, site.PopName)
 		addSitePopLink(links, dict, site, siteActor, pop)
 	}
@@ -748,7 +765,11 @@ func catoTopologyNotifications(sites map[string]*siteState, order []string) []to
 		}
 	}
 	if snapshot > 0 {
-		notices = append(notices, topologyv1.Notification{Severity: "warning", Code: "cato_snapshot_coverage", Message: fmt.Sprintf("Inventory observations are unavailable for %d selected sites. Missing devices and tunnels do not mean they were removed. Open site details for inventory collection status.", snapshot)})
+		notices = append(notices, topologyv1.Notification{
+			Severity: "warning",
+			Code:     "cato_snapshot_coverage",
+			Message:  fmt.Sprintf("Inventory observations are unavailable for %d selected sites. Missing devices and tunnels do not mean they were removed. Open site details for inventory collection status.", snapshot),
+		})
 	}
 	if metrics > 0 {
 		notices = append(notices, topologyv1.Notification{
