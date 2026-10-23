@@ -161,8 +161,8 @@ async fn every_mode_is_implemented_an_empty_agent_answers_them_all() {
 // tests at the end of this file).
 
 /// The Function declaration the bridge advertises: global visibility,
-/// the `traces` tag, and the SIGNED_ID | SAME_SPACE | SENSITIVE_DATA
-/// access mask.
+/// the `traces` tag, and the SIGNED_ID | SAME_SPACE | COMMERCIAL_SPACE |
+/// SENSITIVE_DATA access mask.
 #[test]
 fn declaration_advertises_otel_traces() {
     let d = make_handler().declaration();
@@ -171,7 +171,12 @@ fn declaration_advertises_otel_traces() {
     assert_eq!(d.tags.as_deref(), Some("traces"));
     assert_eq!(
         d.access,
-        Some(HttpAccess::SIGNED_ID | HttpAccess::SAME_SPACE | HttpAccess::SENSITIVE_DATA)
+        Some(
+            HttpAccess::SIGNED_ID
+                | HttpAccess::SAME_SPACE
+                | HttpAccess::COMMERCIAL_SPACE
+                | HttpAccess::SENSITIVE_DATA
+        )
     );
 }
 
