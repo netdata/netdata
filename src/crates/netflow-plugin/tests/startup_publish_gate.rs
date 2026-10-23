@@ -193,48 +193,61 @@ fn blocked_facet_cache_load_sends_keepalive_without_publishing() {
     let _stdin = child.stdin.take().expect("piped stdin");
     let lines = stdout_lines(&mut child);
     let stderr = stderr_text(&mut child);
-    let deadline = Instant::now() + Duration::from_secs(5);
-    let mut output = Vec::new();
-    let mut heartbeat = false;
-    while let Some(remaining) = deadline.checked_duration_since(Instant::now()) {
-        match lines.recv_timeout(remaining) {
-            Ok(line) => {
-                heartbeat = keyword(&line) == "PLUGIN_KEEPALIVE";
-                output.push(line);
-                if heartbeat {
-                    break;
-                }
-            }
-            Err(_) => break,
-        }
-    }
-    if !heartbeat {
-        let _ = child.kill();
-        let _ = child.wait();
-        let stderr = stderr.join().unwrap();
-        panic!(
-            "no keepalive while facet cache loading was blocked; stdout={output:?}; stderr={stderr}"
-        );
-    }
-
-    // Wait for the reader to reach the FIFO, then release it. Nonblocking open
-    // keeps fixture failures from hanging the test process.
-    let release_deadline = Instant::now() + Duration::from_secs(5);
-    let released = loop {
+    // Connecting the FIFO writer proves that startup reached the cache read.
+    // Keep it open without data so the read remains blocked through a full
+    // heartbeat interval. Nonblocking open bounds failures to reach the reader.
+    let reader_deadline = Instant::now() + STARTUP_TIMEOUT;
+    let mut cache_writer = loop {
         match OpenOptions::new()
             .write(true)
             .custom_flags(libc::O_NONBLOCK)
             .open(&cache_path)
         {
-            Ok(mut file) => break file.write_all(b"invalid cache").is_ok(),
+            Ok(file) => break Some(file),
             Err(err)
-                if err.raw_os_error() == Some(libc::ENXIO) && Instant::now() < release_deadline =>
+                if err.raw_os_error() == Some(libc::ENXIO) && Instant::now() < reader_deadline =>
             {
                 std::thread::sleep(Duration::from_millis(20));
             }
-            Err(_) => break false,
+            Err(_) => break None,
         }
     };
+    if cache_writer.is_none() {
+        let _ = child.kill();
+        let _ = child.wait();
+        let stderr = stderr.join().unwrap();
+        panic!("facet cache reader did not reach FIFO; stderr={stderr}");
+    }
+
+    let mut output = Vec::new();
+    let mut heartbeats = 0;
+    // Two heartbeats cannot both be the immediate startup write. Allow one
+    // production interval plus scheduling slack without a shipped test hook.
+    let deadline = Instant::now() + STARTUP_TIMEOUT * 2;
+    while heartbeats < 2 {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        let Ok(line) = lines.recv_timeout(remaining) else {
+            break;
+        };
+        if keyword(&line) == "PLUGIN_KEEPALIVE" {
+            heartbeats += 1;
+        }
+        output.push(line);
+    }
+    if heartbeats < 2 {
+        let _ = child.kill();
+        let _ = child.wait();
+        let stderr = stderr.join().unwrap();
+        panic!(
+            "no recurring keepalive while facet cache loading was blocked; stdout={output:?}; stderr={stderr}"
+        );
+    }
+    let released = cache_writer
+        .as_mut()
+        .unwrap()
+        .write_all(b"invalid cache")
+        .is_ok();
+    drop(cache_writer);
     if !released {
         let _ = child.kill();
         let _ = child.wait();
@@ -252,4 +265,44 @@ fn blocked_facet_cache_load_sends_keepalive_without_publishing() {
         "{output:?}"
     );
     assert!(stderr.contains("failed to bind"), "{stderr}");
+}
+
+#[test]
+fn unreadable_facet_journal_logs_underlying_error() {
+    let journal_dir = tempfile::tempdir().expect("create journal dir");
+    let raw = journal_dir.path().join("raw");
+    std::fs::create_dir(&raw).unwrap();
+    let path = raw
+        .join("system@11111111111111111111111111111111-0000000000000001-00000000000f4240.journal");
+    // Deliberately malformed: exercise the journal reader's nested error chain.
+    std::fs::write(&path, b"invalid journal").unwrap();
+    let occupied = UdpSocket::bind("127.0.0.1:0").unwrap();
+    let mut child = spawn_plugin(
+        &occupied.local_addr().unwrap().to_string(),
+        journal_dir.path(),
+    );
+    let _stdin = child.stdin.take().unwrap();
+    let lines = stdout_lines(&mut child);
+    let stderr = stderr_text(&mut child);
+    let status = wait_with_deadline(&mut child, STARTUP_TIMEOUT);
+    let stderr = stderr.join().unwrap();
+    let output: Vec<_> = lines.iter().collect();
+    assert_eq!(status.and_then(|s| s.code()), Some(1), "{stderr}");
+    assert!(
+        output
+            .iter()
+            .all(|line| UNPUBLISHED_KEYWORDS.contains(&keyword(line)))
+    );
+    let warning = stderr
+        .lines()
+        .find(|line| {
+            line.contains("skipping unreadable journal file")
+                && line.contains("during netflow facet contribution scan")
+        })
+        .expect("facet scan warning");
+    assert!(warning.contains(&path.display().to_string()), "{warning}");
+    assert!(
+        warning.contains("object exceeds file bounds"),
+        "root cause missing: {warning}"
+    );
 }

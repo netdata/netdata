@@ -65,6 +65,13 @@ Retries use a fresh disk inventory. If all three attempts are rejected, the
 final error includes the last rejection cause and attempt context. Keep the
 preceding warnings too: different attempts can fail for different reasons.
 
+If a cached journal cannot be scanned, preserve both the journal and the cache.
+Check the preceding scan warning for its full error chain. If it reports a
+permission or storage-access error, restore access for the Agent service account
+and restart the plugin. If it reports corrupt data, or the cause remains unclear,
+collect the startup logs and ask the maintainers for recovery guidance. Do not
+delete the cache or journal to bypass the rejection.
+
 An offline query without `--no-persist` can classify a live journal as archived
 and save that classification in the shared cache. After an unclean stop, the
 writer can reopen that journal as active. Startup scans it and rebuilds the
@@ -73,11 +80,12 @@ required scan fails, the cache is preserved and the error identifies the path.
 Use `--no-persist` for diagnostic queries against live data. A successful offline
 query does not validate writer startup.
 
-Startup sends a keepalive immediately and every 60 seconds, starting before
-configuration and cache loading. A separate thread maintains these keepalives
-even when initialization blocks the executor. It stops before the runtime starts
-normal publication; Functions and charts remain unpublished until listeners are
-ready. A keepalive write failure is reported as a startup failure.
+When stdout is a pipe, as it is under the Agent, startup sends a keepalive
+immediately and every 60 seconds, starting before configuration and cache loading.
+A separate thread maintains these keepalives even when initialization blocks the
+executor. It stops before the runtime starts normal publication; Functions and
+charts remain unpublished until listeners are ready. Manual runs with stdout connected to a terminal do not send startup
+keepalives. A keepalive write failure is reported as a startup failure.
 
 The Agent's minimum idle timeout is 120 seconds. Its
 `buffered reader not OK (-7)` log identifies a read timeout, which is different

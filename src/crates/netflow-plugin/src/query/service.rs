@@ -405,13 +405,13 @@ fn scan_facet_contributions_with_cancellation(
             Err(err) => {
                 if is_not_found_error(&err) {
                     tracing::debug!(
-                        "skipping removed journal file {} during netflow facet contribution scan: {}",
+                        "skipping removed journal file {} during netflow facet contribution scan: {:#}",
                         path,
                         err
                     );
                 } else {
                     tracing::warn!(
-                        "skipping unreadable journal file {} during netflow facet contribution scan: {}",
+                        "skipping unreadable journal file {} during netflow facet contribution scan: {:#}",
                         path,
                         err
                     );
