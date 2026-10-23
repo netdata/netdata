@@ -83,3 +83,8 @@ instead of negating the pattern. The selector treats `*` as a wildcard; backslas
 path separators. Matching queue names are selected in case-insensitive alphabetical order; the cap may be set to `0`
 to aggregate all queues. A negative-only selector such as `!*temp*` selects no queues for individual charts, so all
 queues go to `Other`; append `*` (`!*temp*,*`) to select every queue except those matching `*temp*`.
+
+Perflib may not report a newly created queue until it becomes active, such as after a message is sent. Selectors match
+the raw Perflib instance name. The `queue` chart label is sanitized for display; for example,
+`host\private$\name` appears as `host/private_/name`. Use the original queue path in the selector rather than copying
+the displayed label.

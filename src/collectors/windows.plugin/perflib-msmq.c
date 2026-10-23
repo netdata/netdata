@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "windows_plugin.h"
-#include "windows-internals.h"
 #include "libnetdata/sanitizers/chart_id_and_name.h"
 
 #include <ctype.h>
@@ -111,12 +110,19 @@ static long long max_individual_queues = MSMQ_DEFAULT_INDIVIDUAL_QUEUES;
 static RRDSET *other_st_messages, *other_st_bytes, *other_st_journal_messages, *other_st_journal_bytes;
 static RRDDIM *other_rd_messages, *other_rd_bytes, *other_rd_journal_messages, *other_rd_journal_bytes;
 
+static void msmq_chart_obsolete(RRDSET **st, RRDDIM **rd)
+{
+    rrdset_is_obsolete___safe_from_collector_thread(*st);
+    *st = NULL;
+    *rd = NULL;
+}
+
 static void msmq_queue_obsolete_charts(struct msmq_queue *mq)
 {
-    rrdset_is_obsolete___safe_from_collector_thread(mq->st_messages);
-    rrdset_is_obsolete___safe_from_collector_thread(mq->st_bytes);
-    rrdset_is_obsolete___safe_from_collector_thread(mq->st_journal_messages);
-    rrdset_is_obsolete___safe_from_collector_thread(mq->st_journal_bytes);
+    msmq_chart_obsolete(&mq->st_messages, &mq->rd_messages);
+    msmq_chart_obsolete(&mq->st_bytes, &mq->rd_bytes);
+    msmq_chart_obsolete(&mq->st_journal_messages, &mq->rd_journal_messages);
+    msmq_chart_obsolete(&mq->st_journal_bytes, &mq->rd_journal_bytes);
 }
 
 static void msmq_queue_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
@@ -180,147 +186,163 @@ static void msmq_queue_chart_id(
     netdata_fix_chart_name(dst);
 }
 
-static void msmq_queue_chart_messages(struct msmq_queue *mq, const char *queue, int update_every)
+static void msmq_chart(
+    RRDSET **st,
+    RRDDIM **rd,
+    const char *chart_type,
+    const char *chart_id,
+    const char *queue_name,
+    const char *suffix,
+    size_t chart_type_length,
+    size_t suffix_length,
+    const char *family,
+    const char *context,
+    const char *title,
+    const char *units,
+    int priority,
+    uint64_t value,
+    int update_every,
+    const char *queue_label)
 {
-    if (unlikely(!mq->st_messages)) {
-        char id[RRD_ID_LENGTH_MAX + 1];
-        msmq_queue_chart_id(
-            id,
-            sizeof(id),
-            sizeof("msmq_queue_messages") - 1,
-            queue,
-            "messages",
-            sizeof("messages") - 1);
+    if (unlikely(!*st)) {
+        char dynamic_id[RRD_ID_LENGTH_MAX + 1];
+        if (queue_name) {
+            msmq_queue_chart_id(dynamic_id, sizeof(dynamic_id), chart_type_length, queue_name, suffix, suffix_length);
+            chart_id = dynamic_id;
+        }
 
-        mq->st_messages = rrdset_create_localhost(
-            "msmq_queue_messages",
-            id,
+        *st = rrdset_create_localhost(
+            chart_type,
+            chart_id,
             NULL,
-            "queues",
-            "msmq.queue_messages",
-            "MSMQ messages in queue",
-            "messages",
+            family,
+            context,
+            title,
+            units,
             PLUGIN_WINDOWS_NAME,
             "PerflibMSMQ",
-            PRIO_MSMQ_QUEUE_MESSAGES,
+            priority,
             update_every,
             RRDSET_TYPE_LINE);
 
-        mq->rd_messages = rrddim_add(mq->st_messages, "queued", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        rrdlabels_add(mq->st_messages->rrdlabels, "queue", queue, RRDLABEL_SRC_AUTO);
+        *rd = rrddim_add(*st, "queued", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rrdlabels_add((*st)->rrdlabels, "queue", queue_label, RRDLABEL_SRC_AUTO);
     }
 
-    rrdset_isnot_obsolete___safe_from_collector_thread(mq->st_messages);
-    rrddim_set_by_pointer(mq->st_messages, mq->rd_messages, (collected_number)mq->messages_in_queue.current.Data);
-    rrdset_done(mq->st_messages);
+    rrdset_isnot_obsolete___safe_from_collector_thread(*st);
+    rrddim_set_by_pointer(*st, *rd, (collected_number)value);
+    rrdset_done(*st);
+}
+
+static void msmq_queue_chart(
+    RRDSET **st,
+    RRDDIM **rd,
+    const char *queue,
+    const char *chart_type,
+    size_t chart_type_length,
+    const char *suffix,
+    size_t suffix_length,
+    const char *family,
+    const char *context,
+    const char *title,
+    const char *units,
+    int priority,
+    uint64_t value,
+    int update_every)
+{
+    msmq_chart(
+        st,
+        rd,
+        chart_type,
+        NULL,
+        queue,
+        suffix,
+        chart_type_length,
+        suffix_length,
+        family,
+        context,
+        title,
+        units,
+        priority,
+        value,
+        update_every,
+        queue);
+}
+
+static void msmq_queue_chart_messages(struct msmq_queue *mq, const char *queue, int update_every)
+{
+    msmq_queue_chart(
+        &mq->st_messages,
+        &mq->rd_messages,
+        queue,
+        "msmq_queue_messages",
+        sizeof("msmq_queue_messages") - 1,
+        "messages",
+        sizeof("messages") - 1,
+        "queues",
+        "msmq.queue_messages",
+        "MSMQ messages in queue",
+        "messages",
+        PRIO_MSMQ_QUEUE_MESSAGES,
+        mq->messages_in_queue.current.Data,
+        update_every);
 }
 
 static void msmq_queue_chart_bytes(struct msmq_queue *mq, const char *queue, int update_every)
 {
-    if (unlikely(!mq->st_bytes)) {
-        char id[RRD_ID_LENGTH_MAX + 1];
-        msmq_queue_chart_id(
-            id,
-            sizeof(id),
-            sizeof("msmq_queue_bytes") - 1,
-            queue,
-            "bytes",
-            sizeof("bytes") - 1);
-
-        mq->st_bytes = rrdset_create_localhost(
-            "msmq_queue_bytes",
-            id,
-            NULL,
-            "queues",
-            "msmq.queue_bytes",
-            "MSMQ bytes in queue",
-            "bytes",
-            PLUGIN_WINDOWS_NAME,
-            "PerflibMSMQ",
-            PRIO_MSMQ_QUEUE_BYTES,
-            update_every,
-            RRDSET_TYPE_LINE);
-
-        mq->rd_bytes = rrddim_add(mq->st_bytes, "queued", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        rrdlabels_add(mq->st_bytes->rrdlabels, "queue", queue, RRDLABEL_SRC_AUTO);
-    }
-
-    rrdset_isnot_obsolete___safe_from_collector_thread(mq->st_bytes);
-    rrddim_set_by_pointer(mq->st_bytes, mq->rd_bytes, (collected_number)mq->bytes_in_queue.current.Data);
-    rrdset_done(mq->st_bytes);
+    msmq_queue_chart(
+        &mq->st_bytes,
+        &mq->rd_bytes,
+        queue,
+        "msmq_queue_bytes",
+        sizeof("msmq_queue_bytes") - 1,
+        "bytes",
+        sizeof("bytes") - 1,
+        "queues",
+        "msmq.queue_bytes",
+        "MSMQ bytes in queue",
+        "bytes",
+        PRIO_MSMQ_QUEUE_BYTES,
+        mq->bytes_in_queue.current.Data,
+        update_every);
 }
 
 static void msmq_queue_chart_journal_messages(struct msmq_queue *mq, const char *queue, int update_every)
 {
-    if (unlikely(!mq->st_journal_messages)) {
-        char id[RRD_ID_LENGTH_MAX + 1];
-        msmq_queue_chart_id(
-            id,
-            sizeof(id),
-            sizeof("msmq_queue_journal_messages") - 1,
-            queue,
-            "journal_messages",
-            sizeof("journal_messages") - 1);
-
-        mq->st_journal_messages = rrdset_create_localhost(
-            "msmq_queue_journal_messages",
-            id,
-            NULL,
-            "journal",
-            "msmq.queue_journal_messages",
-            "MSMQ messages in journal queue",
-            "messages",
-            PLUGIN_WINDOWS_NAME,
-            "PerflibMSMQ",
-            PRIO_MSMQ_JOURNAL_MESSAGES,
-            update_every,
-            RRDSET_TYPE_LINE);
-
-        mq->rd_journal_messages =
-            rrddim_add(mq->st_journal_messages, "queued", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        rrdlabels_add(mq->st_journal_messages->rrdlabels, "queue", queue, RRDLABEL_SRC_AUTO);
-    }
-
-    rrdset_isnot_obsolete___safe_from_collector_thread(mq->st_journal_messages);
-    rrddim_set_by_pointer(
-        mq->st_journal_messages, mq->rd_journal_messages, (collected_number)mq->messages_in_journal_queue.current.Data);
-    rrdset_done(mq->st_journal_messages);
+    msmq_queue_chart(
+        &mq->st_journal_messages,
+        &mq->rd_journal_messages,
+        queue,
+        "msmq_queue_journal_messages",
+        sizeof("msmq_queue_journal_messages") - 1,
+        "journal_messages",
+        sizeof("journal_messages") - 1,
+        "journal",
+        "msmq.queue_journal_messages",
+        "MSMQ messages in journal queue",
+        "messages",
+        PRIO_MSMQ_JOURNAL_MESSAGES,
+        mq->messages_in_journal_queue.current.Data,
+        update_every);
 }
 
 static void msmq_queue_chart_journal_bytes(struct msmq_queue *mq, const char *queue, int update_every)
 {
-    if (unlikely(!mq->st_journal_bytes)) {
-        char id[RRD_ID_LENGTH_MAX + 1];
-        msmq_queue_chart_id(
-            id,
-            sizeof(id),
-            sizeof("msmq_queue_journal_bytes") - 1,
-            queue,
-            "journal_bytes",
-            sizeof("journal_bytes") - 1);
-
-        mq->st_journal_bytes = rrdset_create_localhost(
-            "msmq_queue_journal_bytes",
-            id,
-            NULL,
-            "journal",
-            "msmq.queue_journal_bytes",
-            "MSMQ bytes in journal queue",
-            "bytes",
-            PLUGIN_WINDOWS_NAME,
-            "PerflibMSMQ",
-            PRIO_MSMQ_JOURNAL_BYTES,
-            update_every,
-            RRDSET_TYPE_LINE);
-
-        mq->rd_journal_bytes = rrddim_add(mq->st_journal_bytes, "queued", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        rrdlabels_add(mq->st_journal_bytes->rrdlabels, "queue", queue, RRDLABEL_SRC_AUTO);
-    }
-
-    rrdset_isnot_obsolete___safe_from_collector_thread(mq->st_journal_bytes);
-    rrddim_set_by_pointer(
-        mq->st_journal_bytes, mq->rd_journal_bytes, (collected_number)mq->bytes_in_journal_queue.current.Data);
-    rrdset_done(mq->st_journal_bytes);
+    msmq_queue_chart(
+        &mq->st_journal_bytes,
+        &mq->rd_journal_bytes,
+        queue,
+        "msmq_queue_journal_bytes",
+        sizeof("msmq_queue_journal_bytes") - 1,
+        "journal_bytes",
+        sizeof("journal_bytes") - 1,
+        "journal",
+        "msmq.queue_journal_bytes",
+        "MSMQ bytes in journal queue",
+        "bytes",
+        PRIO_MSMQ_JOURNAL_BYTES,
+        mq->bytes_in_journal_queue.current.Data,
+        update_every);
 }
 
 static void msmq_chart_other(
@@ -336,28 +358,23 @@ static void msmq_chart_other(
     uint64_t value,
     int update_every)
 {
-    if (unlikely(!*st)) {
-        *st = rrdset_create_localhost(
-            chart_type,
-            id,
-            NULL,
-            family,
-            context,
-            title,
-            units,
-            PLUGIN_WINDOWS_NAME,
-            "PerflibMSMQ",
-            priority,
-            update_every,
-            RRDSET_TYPE_LINE);
-
-        *rd = rrddim_add(*st, "queued", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        rrdlabels_add((*st)->rrdlabels, "queue", "Other (aggregated)", RRDLABEL_SRC_AUTO);
-    }
-
-    rrdset_isnot_obsolete___safe_from_collector_thread(*st);
-    rrddim_set_by_pointer(*st, *rd, (collected_number)value);
-    rrdset_done(*st);
+    msmq_chart(
+        st,
+        rd,
+        chart_type,
+        id,
+        NULL,
+        NULL,
+        0,
+        0,
+        family,
+        context,
+        title,
+        units,
+        priority,
+        value,
+        update_every,
+        "Other (aggregated)");
 }
 
 static void msmq_queues_evict_unseen(usec_t now_ut)
@@ -385,10 +402,10 @@ static void msmq_queues_evict_all(void)
 
 static void msmq_other_charts_obsolete(void)
 {
-    rrdset_is_obsolete___safe_from_collector_thread(other_st_messages);
-    rrdset_is_obsolete___safe_from_collector_thread(other_st_bytes);
-    rrdset_is_obsolete___safe_from_collector_thread(other_st_journal_messages);
-    rrdset_is_obsolete___safe_from_collector_thread(other_st_journal_bytes);
+    msmq_chart_obsolete(&other_st_messages, &other_rd_messages);
+    msmq_chart_obsolete(&other_st_bytes, &other_rd_bytes);
+    msmq_chart_obsolete(&other_st_journal_messages, &other_rd_journal_messages);
+    msmq_chart_obsolete(&other_st_journal_bytes, &other_rd_journal_bytes);
 }
 
 static void do_msmq(PERF_DATA_BLOCK *pDataBlock, int update_every)
