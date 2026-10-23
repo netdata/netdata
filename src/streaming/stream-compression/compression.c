@@ -802,6 +802,8 @@ cleanup:
 int unittest_stream_decompress_bomb_zstd(void);
 #endif
 
+int unittest_stream_sender_pending(void);
+
 int unittest_stream_compressions(void) {
     int ret = 0;
 
@@ -825,6 +827,8 @@ int unittest_stream_compressions(void) {
     ret += unittest_stream_compression_speed(COMPRESSION_ALGORITHM_LZ4, "LZ4");
     ret += unittest_stream_compression_speed(COMPRESSION_ALGORITHM_BROTLI, "BROTLI");
     ret += unittest_stream_compression_speed(COMPRESSION_ALGORITHM_GZIP, "GZIP");
+
+    ret += unittest_stream_sender_pending();
 
     return ret;
 }
