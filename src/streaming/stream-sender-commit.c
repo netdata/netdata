@@ -438,7 +438,7 @@ static int unittest_sender_pending_one(compression_algorithm_t algorithm, const 
                 queue_alloc = s->thread.pending.wb->size;
             else if(s->thread.pending.wb->size != queue_alloc) {
                 fprintf(stderr, "%s: the queue grew from %zu to %zu bytes at commit %zu\n",
-                        name, queue_alloc, s->thread.pending.wb->size, i);
+                        name, queue_alloc, (size_t)s->thread.pending.wb->size, i);
                 errors++;
                 goto cleanup;
             }
