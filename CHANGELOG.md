@@ -232,6 +232,11 @@
 - Otel-plugin: make the stock otel.yaml read top to bottom ([#24395](https://github.com/netdata/netdata/issues/24395))
 - Sqlite: mark runtime corruption, count queries once, clearer logs ([#24225](https://github.com/netdata/netdata/issues/24225))
 - Bundle MSYS2's msys2-runtime 3.6.11 DLL instead of building it ([#24390](https://github.com/netdata/netdata/issues/24390))
+- Build(deps): bump the github-actions group with 6 updates ([#24399](https://github.com/netdata/netdata/issues/24399))
+- Ml: let k-means models with a rounding-only spread abstain ([#24242](https://github.com/netdata/netdata/issues/24242))
+- Fix(windows): skip space charting for optical and read-only drives ([#24352](https://github.com/netdata/netdata/issues/24352))
+- Dbengine: rebuild a journal v2 rejected at startup from its journal v1 ([#24400](https://github.com/netdata/netdata/issues/24400))
+- Fix(db): publish completed tier points after missed flush boundaries ([#24405](https://github.com/netdata/netdata/issues/24405))
 
 ## [2.12.0] - 2026-09-30
 
