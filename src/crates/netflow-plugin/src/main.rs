@@ -122,10 +122,11 @@ fn main() {
 }
 
 async fn async_main() -> i32 {
+    let shutdown = CancellationToken::new();
     let mut keepalive = if std::io::stdout().is_terminal() {
         None
     } else {
-        match startup_keepalive::StartupKeepalive::start() {
+        match startup_keepalive::StartupKeepalive::start(shutdown.clone()) {
             Ok(keepalive) => Some(keepalive),
             Err(err) => {
                 tracing::error!("failed to start initialization keepalive worker: {err}");
@@ -133,7 +134,7 @@ async fn async_main() -> i32 {
             }
         }
     };
-    let exit_code = async_main_with_keepalive(&mut keepalive).await;
+    let exit_code = async_main_with_keepalive(&mut keepalive, shutdown).await;
     if let Some(keepalive) = &mut keepalive
         && let Err(err) = keepalive.stop()
     {
@@ -145,6 +146,7 @@ async fn async_main() -> i32 {
 
 async fn async_main_with_keepalive(
     keepalive: &mut Option<startup_keepalive::StartupKeepalive>,
+    shutdown: CancellationToken,
 ) -> i32 {
     let config = match plugin_config::PluginConfig::new() {
         Ok(cfg) => cfg,
@@ -153,6 +155,10 @@ async fn async_main_with_keepalive(
             return 1;
         }
     };
+
+    if shutdown.is_cancelled() {
+        return 1;
+    }
 
     if !config.enabled {
         tracing::info!("netflow plugin disabled by config (enabled=false)");
@@ -164,11 +170,13 @@ async fn async_main_with_keepalive(
         return 0;
     }
 
-    let shutdown = CancellationToken::new();
     let metrics = Arc::new(ingest::IngestMetrics::default());
     let open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
     let tier_flow_indexes = Arc::new(RwLock::new(tiering::TierFlowIndexStore::default()));
     let facet_runtime = Arc::new(facet_runtime::FacetRuntime::new(&config.journal.base_dir()));
+    if shutdown.is_cancelled() {
+        return 1;
+    }
     let (query_service, notify_rx) =
         match query::FlowQueryService::new_with_facet_runtime(&config, Arc::clone(&facet_runtime))
             .await
@@ -179,6 +187,9 @@ async fn async_main_with_keepalive(
                 return 1;
             }
         };
+    if shutdown.is_cancelled() {
+        return 1;
+    }
     let query_service = Arc::new(query_service);
     let ingest_service = match ingest::IngestService::new_with_facet_runtime(
         config.clone(),
@@ -193,8 +204,21 @@ async fn async_main_with_keepalive(
             return 1;
         }
     };
-    if let Err(err) = query_service.initialize_facets_before_ingest().await {
-        tracing::error!("failed to initialize facet runtime: {err:#}");
+    if shutdown.is_cancelled() {
+        return 1;
+    }
+    match query_service
+        .initialize_facets_before_ingest_cancellable(shutdown.clone())
+        .await
+    {
+        Ok(true) => {}
+        Ok(false) => return 1,
+        Err(err) => {
+            tracing::error!("failed to initialize facet runtime: {err:#}");
+            return 1;
+        }
+    }
+    if shutdown.is_cancelled() {
         return 1;
     }
     let routing_runtime = ingest_service.routing_runtime();
@@ -403,8 +427,7 @@ async fn async_main_with_keepalive(
             }
         } => {
             tracing::error!(
-                "failed to send PLUGIN_KEEPALIVE to the Agent while waiting for the UDP listeners \
-                 (expected the write to stdout to succeed): {err}"
+                "startup keepalive worker failed during NetFlow initialization: {err}"
             );
             exit_code = 1;
             false

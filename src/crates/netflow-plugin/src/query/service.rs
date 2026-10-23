@@ -243,12 +243,24 @@ impl FlowQueryService {
         Ok(files)
     }
 
+    #[cfg(test)]
     pub(crate) async fn initialize_facets_before_ingest(&self) -> Result<()> {
+        self.initialize_facets_before_ingest_cancellable(CancellationToken::new())
+            .await
+            .map(|_| ())
+    }
+
+    pub(crate) async fn initialize_facets_before_ingest_cancellable(
+        &self,
+        cancellation: CancellationToken,
+    ) -> Result<bool> {
+        if cancellation.is_cancelled() {
+            return Ok(false);
+        }
         if !self.facet_runtime.direction_migration_pending() {
             return self
-                .initialize_facets_with_inventory(true, None)
-                .await
-                .map(|_| ());
+                .initialize_facets_with_inventory(true, Some(cancellation))
+                .await;
         }
 
         let retained_files = self.enumerate_facet_files_from_disk()?;
@@ -256,12 +268,20 @@ impl FlowQueryService {
             .facet_runtime
             .build_reconcile_plan(&retained_files)
             .active_files_to_scan;
-        let active_scans =
-            tokio::task::spawn_blocking(move || scan_facet_contributions(&active_files))
-                .await
-                .context("active facet initialization task join failed")??;
+        let scan_cancellation = cancellation.clone();
+        let active_scans = tokio::task::spawn_blocking(move || {
+            scan_facet_contributions_with_cancellation(&active_files, Some(&scan_cancellation))
+        })
+        .await
+        .context("active facet initialization task join failed")?;
+        // Await blocking work rather than abandoning it; cancellation must
+        // prevent a partial contribution from reaching the published cache.
+        if cancellation.is_cancelled() {
+            return Ok(false);
+        }
         self.facet_runtime
-            .apply_active_scan_before_direction_migration(active_scans)
+            .apply_active_scan_before_direction_migration(active_scans?)?;
+        Ok(true)
     }
 
     /// Rebuild archived DIRECTION after ingestion is listening. Returns `false`
@@ -371,6 +391,7 @@ fn is_journal_notify_path(path: &Path) -> bool {
         .is_some_and(journal_sdk_registry::repository::File::is_journal_file)
 }
 
+#[cfg(test)]
 fn scan_facet_contributions(
     files: &[FileInfo],
 ) -> Result<BTreeMap<String, crate::facet_runtime::FacetFileContribution>> {
@@ -728,6 +749,95 @@ mod tests {
             retry.facet_runtime.snapshot().fields["PROTOCOL"].values,
             vec!["6", "17"]
         );
+    }
+
+    #[tokio::test]
+    async fn incomplete_targeted_scan_preserves_cached_facets() {
+        use crate::facet_runtime::FacetRuntime;
+        use journal_sdk_core::{JournalFile, JournalFileOptions, JournalWriter};
+        for reopened_active in [false, true] {
+            let tmp = tempfile::tempdir().unwrap();
+            for tier in ["raw", "1m", "5m", "1h"] {
+                fs::create_dir(tmp.path().join(tier)).unwrap();
+            }
+            let paths = [1, 2].map(|id| {
+                tmp.path().join(format!(
+                    "raw/system@{id:032x}-0000000000000001-00000000000f4240.journal"
+                ))
+            });
+            for path in &paths {
+                let file = journal_sdk_core::repository::File::from_path(path).unwrap();
+                let mut journal = JournalFile::create(
+                    &file,
+                    JournalFileOptions::new(
+                        uuid::Uuid::from_bytes([1; 16]),
+                        uuid::Uuid::from_bytes([2; 16]),
+                        uuid::Uuid::from_bytes([3; 16]),
+                    ),
+                )
+                .unwrap();
+                let mut writer =
+                    JournalWriter::new(&mut journal, 1, uuid::Uuid::from_bytes([4; 16])).unwrap();
+                writer
+                    .add_entry(
+                        &mut journal,
+                        &[
+                            b"PROTOCOL=1",
+                            b"ICMPV4_TYPE=8",
+                            b"ICMPV4_CODE=0",
+                            b"DIRECTION=incoming",
+                        ],
+                        1_000_000,
+                        1,
+                    )
+                    .unwrap();
+                journal.sync().unwrap();
+            }
+            let initial = facet_test_service(tmp.path(), Arc::new(FacetRuntime::new(tmp.path())));
+            initial.initialize_facets().await.unwrap();
+            assert_eq!(
+                initial.facet_runtime.snapshot().fields["ICMPV4"].values,
+                vec!["Echo Request"]
+            );
+            drop(initial);
+            let cached = fs::read(tmp.path().join("facet-state.bin")).unwrap();
+            // Damage an SDK-written ENTRY, leaving its field/DATA chains readable.
+            let mut bytes = fs::read(&paths[0]).unwrap();
+            let mut offset = u64::from_le_bytes(bytes[88..96].try_into().unwrap()) as usize;
+            loop {
+                assert!(offset + 16 <= bytes.len());
+                let size =
+                    u64::from_le_bytes(bytes[offset + 8..offset + 16].try_into().unwrap()) as usize;
+                if bytes[offset] == 3 {
+                    bytes[offset + 8..offset + 16].copy_from_slice(&16u64.to_le_bytes());
+                    break;
+                }
+                assert!(size >= 16);
+                offset = (offset + size + 7) & !7;
+            }
+            fs::write(&paths[0], bytes).unwrap();
+            // A removed archive forces a rebuild. Also exercise the newly
+            // permitted archived-to-active transition with an incomplete scan.
+            fs::rename(&paths[1], paths[1].with_extension("saved")).unwrap();
+            let runtime = Arc::new(FacetRuntime::new(tmp.path()));
+            if reopened_active {
+                runtime.observe_active_path_created(&paths[0]).unwrap();
+            }
+            let startup = facet_test_service(tmp.path(), runtime);
+            let err = startup
+                .initialize_facets_before_ingest()
+                .await
+                .expect_err("partial scans must reject replacement");
+            assert!(format!("{err:#}").contains(paths[0].to_str().unwrap()));
+            assert_eq!(
+                startup.facet_runtime.snapshot().fields["ICMPV4"].values,
+                vec!["Echo Request"]
+            );
+            assert_eq!(
+                fs::read(tmp.path().join("facet-state.bin")).unwrap(),
+                cached
+            );
+        }
     }
 
     #[tokio::test]

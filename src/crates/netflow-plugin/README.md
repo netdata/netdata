@@ -60,6 +60,8 @@ A rejected attempt reports one of these causes:
 - **Cached archive not successfully scanned:** a rebuild could not read a
   previously indexed journal that still exists. The plugin keeps the cached
   values and reports the journal path instead of discarding its contribution.
+  An incomplete scan, including a corrupt entry during ICMP facet scanning,
+  also rejects the replacement.
 
 Retries use a fresh disk inventory. If all three attempts are rejected, the
 final error includes the last rejection cause and attempt context. Keep the
@@ -85,7 +87,10 @@ immediately and every 60 seconds, starting before configuration and cache loadin
 A separate thread maintains these keepalives even when initialization blocks the
 executor. It stops before the runtime starts normal publication; Functions and
 charts remain unpublished until listeners are ready. Manual runs with stdout connected to a terminal do not send startup
-keepalives. A keepalive write failure is reported as a startup failure.
+keepalives. The worker reports a keepalive write failure immediately and cancels
+startup. Facet scans check cancellation; a blocking filesystem call must return
+before startup can stop safely. No further startup phase begins after cancellation
+is observed.
 
 The Agent's minimum idle timeout is 120 seconds. Its
 `buffered reader not OK (-7)` log identifies a read timeout, which is different
