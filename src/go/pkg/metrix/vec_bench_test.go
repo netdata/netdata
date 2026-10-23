@@ -7,16 +7,12 @@ import (
 	"testing"
 )
 
-// Baseline results (2026-02-13, darwin/arm64, Apple M4 Pro):
-// Command:
-//
-//	go test ./pkg/metrix -run '^$' -bench 'VecVsWithLabelsSnapshotGauge' -benchmem
-//
-// BenchmarkVecVsWithLabelsSnapshotGauge/with_labels_10_series-14   188834   6332 ns/op   13456 B/op    215 allocs/op
-// BenchmarkVecVsWithLabelsSnapshotGauge/vec_10_series-14           273654   4356 ns/op    8976 B/op    135 allocs/op
-// BenchmarkVecVsWithLabelsSnapshotGauge/with_labels_100_series-14   18757  63167 ns/op  125457 B/op   1934 allocs/op
-// BenchmarkVecVsWithLabelsSnapshotGauge/vec_100_series-14           27187  44716 ns/op   80658 B/op   1134 allocs/op
-//
+// Scope-refresh cache measurements (2026-10-24, linux/amd64, i9-12900K).
+// Four alternating before/after runs, 300ms per benchmark; median ns/op:
+// vec_10_series: 8216 -> 8545; vec_100_series: 76364 -> 74696.
+// Allocations remain 76 and 622 per cycle respectively. Scoped cache lookup
+// adds metadata comparison: 284 -> 329 ns/op, unchanged 376 B / 5 allocations.
+// Command: go test ./pkg/metrix -run '^$' -bench 'VecScopedLookup|VecVsWithLabelsSnapshotGauge' -benchmem
 // Keep this block updated when changing vec or label-merging write paths.
 func BenchmarkVecVsWithLabelsSnapshotGauge(b *testing.B) {
 	tests := map[string]struct {

@@ -8,6 +8,11 @@ import (
 	"sync"
 )
 
+type vecCacheEntry[T any] struct {
+	scope  HostScope
+	handle T
+}
+
 // vecCache stores per-label-values instrument handles with a read-fast path.
 //
 // Contract: cache entries are intentionally unbounded for the lifetime of the
@@ -19,7 +24,7 @@ type vecCache[T any] struct {
 	keys    []string
 
 	mu    sync.RWMutex
-	cache map[string]T
+	cache map[string]vecCacheEntry[T]
 
 	makeHandle func(scope HostScope, base []LabelSet, vecSet LabelSet) T
 }
@@ -34,7 +39,7 @@ func newVecCache[T any](
 		backend:    backend,
 		base:       base,
 		keys:       keys,
-		cache:      make(map[string]T),
+		cache:      make(map[string]vecCacheEntry[T]),
 		makeHandle: makeHandle,
 	}
 }
@@ -50,18 +55,18 @@ func (v *vecCache[T]) get(scope HostScope, labelValues ...string) (T, error) {
 	cacheKey = scopedVecCacheKey(scope.ScopeKey, cacheKey)
 
 	v.mu.RLock()
-	inst, ok := v.cache[cacheKey]
+	entry, ok := v.cache[cacheKey]
 	v.mu.RUnlock()
-	if ok {
-		return inst, nil
+	if ok && hostScopeEqual(entry.scope, scope) {
+		return entry.handle, nil
 	}
 
 	v.mu.Lock()
 	defer v.mu.Unlock()
 
-	inst, ok = v.cache[cacheKey]
-	if ok {
-		return inst, nil
+	entry, ok = v.cache[cacheKey]
+	if ok && hostScopeEqual(entry.scope, scope) {
+		return entry.handle, nil
 	}
 
 	vecSet, err := vecSeriesCompileLabelSet(v.backend, v.keys, labelValues)
@@ -69,8 +74,12 @@ func (v *vecCache[T]) get(scope HostScope, labelValues ...string) (T, error) {
 		return zero, err
 	}
 
-	inst = v.makeHandle(scope, v.base, vecSet)
-	v.cache[cacheKey] = inst
+	// Replace rather than mutate: previously returned handles retain their scope.
+	inst := v.makeHandle(scope, v.base, vecSet)
+	v.cache[cacheKey] = vecCacheEntry[T]{
+		scope:  scope,
+		handle: inst,
+	}
 	return inst, nil
 }
 
@@ -133,7 +142,10 @@ func vecSeriesCompileLabelSet(backend meterBackend, keys []string, values []stri
 
 	labels := make([]Label, len(keys))
 	for i, key := range keys {
-		labels[i] = Label{Key: key, Value: values[i]}
+		labels[i] = Label{
+			Key:   key,
+			Value: values[i],
+		}
 	}
 	return backend.compileLabelSet(labels...), nil
 }
