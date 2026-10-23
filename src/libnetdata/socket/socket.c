@@ -648,8 +648,12 @@ int connection_allowed(int fd, char *client_ip, char *client_host, size_t hostsi
 {
     if (!access_list)
         return 1;
-    if (simple_pattern_matches(access_list, client_ip))
+    SIMPLE_PATTERN_RESULT ip_match = simple_pattern_matches_extract(access_list, client_ip, NULL, 0);
+    if (ip_match == SP_MATCHED_POSITIVE)
         return 1;
+    // A negative match on the IP is final; the hostname must not override it.
+    if (ip_match == SP_MATCHED_NEGATIVE)
+        return 0;
     // If the hostname is unresolved (and needed) then attempt the DNS lookups.
     //if (client_host[0]==0 && simple_pattern_is_potential_name(access_list))
     if (client_host[0]==0 && allow_dns)

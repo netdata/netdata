@@ -66,6 +66,14 @@
 
 #define PLUGINSD_CALL_QUIT                      "QUIT"                      // ask the plugin to quit
 
+// Function payloads travel unframed between FUNCTION_PAYLOAD and FUNCTION_PAYLOAD_END,
+// so their bytes must never be readable as protocol commands by any plugin or child.
+// Non-empty payloads MUST be strict JSON (RFC 8259), without the end marker text and without lines
+// starting with a quoted FUNCTION, FUNCTION_PAYLOAD, FUNCTION_CANCEL, FUNCTION_PROGRESS or QUIT keyword;
+// an empty payload means no payload and is accepted.
+// Returns NULL when valid, or a static rejection reason.
+const char *functions_payload_validate(const char *payload, size_t len);
+
 // dyncfg
 // enabled with STREAM_CAP_DYNCFG
 #define PLUGINSD_KEYWORD_CONFIG                 "CONFIG"

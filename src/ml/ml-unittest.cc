@@ -13,6 +13,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <limits>
 #include <type_traits>
 #include <set>
 #include <string>
@@ -416,7 +417,7 @@ static void test_kmeans_scoring()
     calculated_number_t score_far = ml_kmeans_anomaly_score(&km, far_away);
     ML_TEST_ASSERT_DOUBLE_EQ(score_far, 100.0, 1e-9, "far away sample should be capped at 100");
 
-    // When min_dist == max_dist, score should be 0
+    // When min_dist == max_dist, the model is flat and abstains (NaN)
     ml_kmeans_inlined_t km_equal;
     km_equal.cluster_centers[0].set_size(6);
     km_equal.cluster_centers[1].set_size(6);
@@ -428,7 +429,161 @@ static void test_kmeans_scoring()
     km_equal.max_dist = 5.0;
 
     calculated_number_t score_eq = ml_kmeans_anomaly_score(&km_equal, at_mid);
-    ML_TEST_ASSERT_DOUBLE_EQ(score_eq, 0.0, 1e-9, "equal min/max should return 0");
+    ML_TEST_ASSERT(std::isnan(score_eq), "equal min/max should abstain (NaN)");
+}
+
+// Test: a model whose min/max spread is only rounding must abstain (score NaN).
+// When every training point sits on a centre (a sparse dimension: zeros plus
+// one repeated spike), every point is |C0 - C1| / 2 from the centres on
+// average, so max_dist - min_dist is 0 or a few ULP. Dividing by a ULP made
+// any sample off the C0-C1 segment score 100. Predict skips NaN scores.
+static void test_kmeans_flat_spread_abstains()
+{
+    fprintf(stderr, "  test_kmeans_flat_spread_abstains...\n");
+
+    // Spike vector taken from a degenerate model found on a production parent.
+    const calculated_number_t spike[6] = { 16.40203, 0.9567466666666675, -16.40203, -16.40203, -0.9567466666666675, 0.0 };
+
+    // A tiny blip in a coordinate the spike does not use: off the C0-C1 segment.
+    DSample blip;
+    blip.set_size(6);
+    for (int i = 0; i < 6; i++)
+        blip(i) = 0.0;
+    blip(5) = 0.001;
+
+    // Model as stored: zero centre, spike centre, spread of one ULP.
+    ml_kmeans_inlined_t km;
+    km.cluster_centers[0].set_size(6);
+    km.cluster_centers[1].set_size(6);
+    for (int i = 0; i < 6; i++) {
+        km.cluster_centers[0](i) = 0.0;
+        km.cluster_centers[1](i) = spike[i];
+    }
+    km.min_dist = 14.220675904568106;
+    km.max_dist = std::nextafter(km.min_dist, 100.0);
+
+    calculated_number_t score = ml_kmeans_anomaly_score(&km, blip);
+    ML_TEST_ASSERT(std::isnan(score), "1-ULP spread model should abstain for a tiny blip");
+
+    // The same kind of model produced by training.
+    std::vector<DSample> training;
+    for (int n = 0; n < 200; n++) {
+        DSample s;
+        s.set_size(6);
+        for (int i = 0; i < 6; i++)
+            s(i) = (n % 67 == 0) ? spike[i] : 0.0;  // 3 spikes: their mean is not exact
+        training.push_back(s);
+    }
+
+    ml_kmeans_t trained;
+    ml_kmeans_init(&trained);
+    ml_kmeans_train(&trained, training, 1000, 0, 100);
+    ML_TEST_ASSERT(trained.cluster_centers.size() == 2, "degenerate training should still produce 2 centres");
+    ML_TEST_ASSERT(trained.max_dist - trained.min_dist < 1e-9 * std::abs(trained.max_dist),
+                   "zeros plus one repeated spike should train a rounding-only spread");
+
+    ml_kmeans_inlined_t trained_inlined(trained);
+    score = ml_kmeans_anomaly_score(&trained_inlined, blip);
+    ML_TEST_ASSERT(std::isnan(score), "trained flat model should abstain for a tiny blip");
+    for (const auto &s : training) {
+        score = ml_kmeans_anomaly_score(&trained_inlined, s);
+        ML_TEST_ASSERT(std::isnan(score), "trained flat model should abstain for its training samples");
+    }
+
+    // A small but real spread is still scored, not treated as flat.
+    ml_kmeans_inlined_t narrow;
+    narrow.cluster_centers[0].set_size(6);
+    narrow.cluster_centers[1].set_size(6);
+    for (int i = 0; i < 6; i++) {
+        narrow.cluster_centers[0](i) = 0.0;
+        narrow.cluster_centers[1](i) = 0.0;
+    }
+    narrow.min_dist = 1.0;
+    narrow.max_dist = 1.0 + 1e-6;
+
+    DSample half;
+    half.set_size(6);
+    for (int i = 0; i < 6; i++)
+        half(i) = 0.0;
+    half(0) = 1.0 + 0.5e-6;
+
+    score = ml_kmeans_anomaly_score(&narrow, half);
+    ML_TEST_ASSERT(!std::isnan(score), "score should not be NaN");
+    ML_TEST_ASSERT_DOUBLE_EQ(score, 50.0, 1e-3, "a 1e-6 relative spread should still be scored");
+
+    // A negative spread is not flat: it keeps its previous score.
+    narrow.min_dist = 2.0;
+    narrow.max_dist = 1.0;
+    score = ml_kmeans_anomaly_score(&narrow, half);
+    ML_TEST_ASSERT(!std::isnan(score), "score should not be NaN");
+    ML_TEST_ASSERT_DOUBLE_EQ(score, 100.0, 1e-3, "negative spread should keep its prior score");
+
+    // Non-finite bounds (accepted from children).
+    const calculated_number_t inf = std::numeric_limits<calculated_number_t>::infinity();
+    narrow.min_dist = inf;
+    narrow.max_dist = inf;
+    score = ml_kmeans_anomaly_score(&narrow, half);
+    ML_TEST_ASSERT(std::isnan(score), "min_dist == max_dist == inf is flat and should abstain");
+
+    narrow.min_dist = -inf;
+    score = ml_kmeans_anomaly_score(&narrow, half);
+    ML_TEST_ASSERT(std::isnan(score), "min_dist -inf, max_dist +inf should stay NaN (skipped by predict)");
+}
+
+// Test: a model whose training distances are all 0 must abstain (score NaN).
+// A series repeating every 3 samples is not constant, but with diff_n=1 and
+// smooth_n=3 each smoothed difference is x[i+3] - x[i] = 0, so every feature
+// is 0. Training used to leave max_dist at its DBL_MIN start value, which the
+// flat check missed, so any later change scored 100.
+static void test_kmeans_zero_distance_model_abstains()
+{
+    fprintf(stderr, "  test_kmeans_zero_distance_model_abstains...\n");
+
+    const size_t diff_n = 1;
+    const size_t smooth_n = 3;
+    const size_t lag_n = 5;
+    const size_t n = 60;
+
+    calculated_number_t src[n], dst[n];
+    for (size_t i = 0; i < n; i++)
+        src[i] = (i % 3 == 1) ? 1.0 : 0.0;
+    memcpy(dst, src, sizeof(src));
+
+    std::vector<DSample> training;
+    ml_features_t features = {
+        diff_n, smooth_n, lag_n,
+        dst, n, src, n
+    };
+    ml_features_preprocess(&features, training, 1.0);
+    ML_TEST_ASSERT(training.size() >= 2, "period-3 series should produce training vectors");
+
+    bool all_zero = true;
+    for (const auto &s : training)
+        for (long i = 0; i < s.size(); i++)
+            all_zero = all_zero && s(i) == 0.0;
+    ML_TEST_ASSERT(all_zero, "period-3 series should produce all-zero features");
+
+    ml_kmeans_t trained;
+    ml_kmeans_init(&trained);
+    ml_kmeans_train(&trained, training, 1000, 0, 100);
+    ML_TEST_ASSERT(trained.min_dist == 0.0 && trained.max_dist == 0.0,
+                   "all-zero distances should train equal (0, 0) bounds");
+
+    // A later change in the series.
+    DSample change;
+    change.set_size(lag_n + 1);
+    for (size_t i = 0; i < lag_n + 1; i++)
+        change(i) = 0.0;
+    change(0) = 1.0;
+
+    ml_kmeans_inlined_t trained_inlined(trained);
+    calculated_number_t score = ml_kmeans_anomaly_score(&trained_inlined, change);
+    ML_TEST_ASSERT(std::isnan(score), "zero-distance model should abstain for a change");
+
+    // The same model as stored by older agents: (0, DBL_MIN).
+    trained_inlined.max_dist = std::numeric_limits<calculated_number_t>::min();
+    score = ml_kmeans_anomaly_score(&trained_inlined, change);
+    ML_TEST_ASSERT(std::isnan(score), "legacy (0, DBL_MIN) model should abstain for a change");
 }
 
 // Test: converting an empty ml_kmeans_t must produce deterministic zeroed centers.
@@ -1336,6 +1491,97 @@ static void test_cns_ring_reset_semantics()
     nd_profile.update_every = saved_profile_update_every;
 }
 
+// Test: in ml_dimension_predict() a flat model abstains instead of vetoing.
+// Predict returns false at the first model scoring below the threshold, so a
+// flat model scoring 0 used to keep its dimension from ever being anomalous,
+// even when every real model agreed on an anomaly.
+static void test_predict_flat_model_abstains()
+{
+    fprintf(stderr, "  test_predict_flat_model_abstains...\n");
+
+    unsigned saved_diff_n = Cfg.diff_n;
+    unsigned saved_lag_n = Cfg.lag_n;
+    size_t saved_smooth = Cfg.max_samples_to_smooth;
+    size_t saved_suppression_window = Cfg.suppression_window;
+    size_t saved_suppression_threshold = Cfg.suppression_threshold;
+    double saved_threshold = Cfg.dimension_anomaly_score_threshold;
+    time_t saved_profile_update_every = nd_profile.update_every;
+
+    Cfg.diff_n = 1;
+    Cfg.lag_n = 5;
+    Cfg.max_samples_to_smooth = 3;
+    Cfg.suppression_window = 1000000;
+    Cfg.suppression_threshold = 1000000;
+    Cfg.dimension_anomaly_score_threshold = 0.99;
+    nd_profile.update_every = 1;
+
+    RRDSET st = {};
+    st.update_every = 1;
+
+    RRDDIM rd = {};
+    rd.rrdset = &st;
+
+    // Both models have their centres at 0. The flat one has equal bounds; the
+    // real one scores 0 for a steady series and 100 for a jump.
+    ml_kmeans_inlined_t flat;
+    ml_kmeans_inlined_t real;
+    for (auto *km : { &flat, &real }) {
+        for (auto &cc : km->cluster_centers) {
+            cc.set_size(6);
+            for (int i = 0; i < 6; i++)
+                cc(i) = 0.0;
+        }
+    }
+    flat.min_dist = 5.0;
+    flat.max_dist = 5.0;
+    real.min_dist = 0.0;
+    real.max_dist = 1.0;
+
+    const unsigned n = Cfg.diff_n + 3 + Cfg.lag_n;
+    struct {
+        const char *name;
+        std::vector<ml_kmeans_inlined_t> models;
+        bool jump_anomalous;
+    } cases[] = {
+        { "flat then real", { flat, real }, true },
+        { "real then flat", { real, flat }, true },
+        { "flat only", { flat }, false },
+    };
+
+    for (auto &c : cases) {
+        ml_dimension_t dim = {};
+        spinlock_init(&dim.slock);
+        dim.rd = &rd;
+        dim.mls = MACHINE_LEARNING_STATUS_ENABLED;
+        dim.mt = METRIC_TYPE_CONSTANT;
+        dim.ts = TRAINING_STATUS_TRAINED;
+        dim.km_contexts = c.models;
+
+        // Warm up the ring, then score one more steady sample.
+        bool anomalous = false;
+        for (unsigned i = 0; i <= n; i++)
+            anomalous = ml_dimension_predict(&dim, 100.0, true);
+        ML_TEST_ASSERT(dim.suppression_window_counter == 1, "the sample after warmup must be scored");
+        ML_TEST_ASSERT(!anomalous, "a steady sample must not be anomalous");
+
+        anomalous = ml_dimension_predict(&dim, 1000.0, true);
+        if (c.jump_anomalous)
+            ML_TEST_ASSERT(anomalous, "a flat model must not veto the real model's anomaly");
+        else
+            ML_TEST_ASSERT(!anomalous, "a dimension with only flat models must not be anomalous");
+        if (anomalous != c.jump_anomalous)
+            fprintf(stderr, "    case: %s\n", c.name);
+    }
+
+    Cfg.diff_n = saved_diff_n;
+    Cfg.lag_n = saved_lag_n;
+    Cfg.max_samples_to_smooth = saved_smooth;
+    Cfg.suppression_window = saved_suppression_window;
+    Cfg.suppression_threshold = saved_suppression_threshold;
+    Cfg.dimension_anomaly_score_threshold = saved_threshold;
+    nd_profile.update_every = saved_profile_update_every;
+}
+
 // Test: ml_chart_stats_add() must accumulate EVERY field of
 // ml_machine_learning_stats_t.
 //
@@ -2153,6 +2399,8 @@ extern "C" int ml_unittest()
     test_features_zero_smooth_matches_one();
     test_features_unused_rows_are_zero();
     test_kmeans_scoring();
+    test_kmeans_flat_spread_abstains();
+    test_kmeans_zero_distance_model_abstains();
     test_full_pipeline();
     test_kmeans_inlined_empty_source_is_zero_initialized();
     test_features_preprocess_below_min_for_kmeans();
@@ -2161,6 +2409,7 @@ extern "C" int ml_unittest()
     test_chart_stats_add_covers_every_field();
     test_circular_buffer_equivalence();
     test_cns_ring_reset_semantics();
+    test_predict_flat_model_abstains();
     test_same_value_uses_newest_sample();
     test_preprocess_predict_equivalence();
     test_constant_input();
