@@ -1777,6 +1777,48 @@ The acceptance check is:
 
 Do not add fields to production payloads solely to make this projection easier.
 
+## Cato Networks Shape
+
+`topology:cato_networks` emits sites, devices, PoPs and BGP peers. A site has an
+explicit `ownership` link to each device, including disconnected devices.
+`parent_identity` metadata complements these edges; it does not replace them.
+Ownership links are structural and carry no traffic measurements.
+
+Each interface with a reported PoP contributes a `cato_tunnel` link from its
+device, or from its site when the device cannot be resolved. Parallel interface
+links retain their own `interface_id`, `interface_name`, state and measurements;
+the actor's Connections section and tunnel hover identify the interface. The
+actor-owned `interfaces` table references its tunnel through nullable `link`.
+An interface without a PoP has no invented destination and its `link` is null.
+
+Tunnel state uses the interface's `connected` observation: true, false and
+missing become `connected`, `disconnected` and `unknown`. Physical `link_up`
+does not establish tunnel connectivity. The interface table exposes
+`tunnel_connected` and `link_up` separately, while retaining the existing
+`connected` availability column for compatibility. Interface measurements
+honor their presence flags; site aggregate measurements are not replicated
+onto interface tunnels.
+
+A device's last PoP, falling back to the site's PoP, supplies a summary tunnel
+only when that device has no interface PoP observations. A device-free site
+uses its summary PoP only when it has no interface PoP observations. Summary
+links have null interface identifiers. No PoP-to-PoP fabric links are inferred.
+
+All actor types expose known metadata through `actor_labels`, with source and
+kind, modal identification fields, and a one-hop miniature. Canonical actor
+columns remain the source for identity and existing search behavior. Device
+and BGP labels include explicitly named site context; PoPs have account/name
+labels without invented geography. Empty labels are omitted; known zero and
+false values are retained. Site and device modals expose owned interfaces;
+site, device and PoP modals expose incident connections. BGP peers retain their
+routing detail section.
+
+Producer tests MUST verify site-device reachability, interface destinations,
+per-owner fallback, parallel interfaces with different states, physical-link
+versus tunnel state, label ownership, and missing/zero/false values in addition
+to schema and semantic validation. Schema conformance alone cannot detect an
+isolated site or a missing metadata presentation recipe.
+
 ## Producer Checklist
 
 Before shipping a topology producer:

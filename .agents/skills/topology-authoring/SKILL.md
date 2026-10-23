@@ -140,7 +140,8 @@ owners before design, while review checks the resulting contracts and evidence. 
     `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#streaming-modal-sections`,
     `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#snmpl2-shape` and
     `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#snmp-logical-l3-and-control-plane-links`,
-    `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#vsphere-shape`.
+    `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#vsphere-shape` and
+    `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#cato-networks-shape`.
 11. Validate and measure: schema plus semantic validation in tests, the producer's own suites (table above), size
     on realistic data, and the checklist.
     Guide: `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#producer-checklist`.
