@@ -122,7 +122,8 @@ int connect_to_this_ip46(
     ND_LOG_STACK_PUSH(lgs);
 
     int fd = -1;
-    for (ai = ai_head; ai != NULL && fd == -1; ai = ai->ai_next) {
+    bool try_next = true;
+    for (ai = ai_head; ai != NULL && try_next; ai = ai->ai_next) {
         if(nd_thread_signaled_to_cancel()) break;
 
         if (fallback_ipv4 && *fallback_ipv4 && ai->ai_family == PF_INET6)
@@ -180,7 +181,6 @@ int connect_to_this_ip46(
                            hostBfr, servBfr);
 
                     int timeout_ms = timeval_to_poll_timeout_ms(timeout);
-
                     switch(wait_on_socket_or_cancel_with_timeout(NULL, fd, timeout_ms, POLLOUT, NULL)) {
                         case  0: // proceed
                             nd_log(NDLS_DAEMON, NDLP_DEBUG,
@@ -195,6 +195,7 @@ int connect_to_this_ip46(
 
                             close(fd);
                             fd = -ND_SOCK_ERR_THREAD_CANCELLED;
+                            try_next = false;
                             break;
 
                         case  1: // timeout
@@ -207,6 +208,7 @@ int connect_to_this_ip46(
 
                             if (fallback_ipv4 && ai->ai_family == PF_INET6)
                                 *fallback_ipv4 = true;
+                            try_next = true;
                             break;
 
                         default:
@@ -217,22 +219,28 @@ int connect_to_this_ip46(
 
                             close(fd);
                             fd = -ND_SOCK_ERR_POLL_ERROR;
+                            try_next = false;
                             break;
                     }
+
+                    if (fd >= 0) break; // connect() completed — stop trying remaining addresses
                 }
                 else {
                     nd_log(NDLS_DAEMON, NDLP_ERR,
-                           "Failed to connect to '%s', port '%s'",
+                           "Failed to connect to '%s', port '%s'.",
                            hostBfr, servBfr);
 
                     close(fd);
                     fd = -ND_SOCK_ERR_CONNECTION_REFUSED;
+                    try_next = true;
                 }
+            } else {
+                break; // connect() succeeded — stop trying remaining addresses
             }
-        }
-        else {
+        } else {
             nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to socket() to '%s', port '%s'", hostBfr, servBfr);
             fd = -ND_SOCK_ERR_FAILED_TO_CREATE_SOCKET;
+            try_next = false;
         }
     }
 
