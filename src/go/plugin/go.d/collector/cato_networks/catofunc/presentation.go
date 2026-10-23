@@ -44,9 +44,6 @@ func TopologyActorTypes() map[string]topologyv1.ActorType {
 				Role:      "actor",
 				Icon:      "network",
 				ColorSlot: "green",
-				Border: &topologyv1.BorderPresentation{
-					Enabled: new(true),
-				},
 				Size: &topologyv1.ActorSizePresentation{
 					Mode:  "link_count",
 					Scale: "emphasized",
@@ -55,10 +52,7 @@ func TopologyActorTypes() map[string]topologyv1.ActorType {
 					Repulsion: "stronger",
 				},
 				LabelPolicy: &topologyv1.LabelPolicy{
-					Columns:   []string{"display_name", "site_id"},
-					Fallback:  "type_label",
-					MaxLength: 80,
-					Array:     "reject",
+					Columns: []string{"display_name", "site_id"},
 				},
 				Modal: catoSiteModal(),
 			},
@@ -86,18 +80,12 @@ func TopologyActorTypes() map[string]topologyv1.ActorType {
 				Role:      "actor",
 				Icon:      "device",
 				ColorSlot: "green",
-				Border: &topologyv1.BorderPresentation{
-					Enabled: new(true),
-				},
 				Size: &topologyv1.ActorSizePresentation{
 					Mode:  "link_count",
 					Scale: "normal",
 				},
 				LabelPolicy: &topologyv1.LabelPolicy{
-					Columns:   []string{"display_name", "device_id"},
-					Fallback:  "type_label",
-					MaxLength: 80,
-					Array:     "reject",
+					Columns: []string{"display_name", "device_id"},
 				},
 				Modal: catoDeviceModal(),
 			},
@@ -115,18 +103,12 @@ func TopologyActorTypes() map[string]topologyv1.ActorType {
 				Role:      "actor",
 				Icon:      "cloud",
 				ColorSlot: "blue",
-				Border: &topologyv1.BorderPresentation{
-					Enabled: new(true),
-				},
 				Size: &topologyv1.ActorSizePresentation{
 					Mode:  "link_count",
 					Scale: "normal",
 				},
 				LabelPolicy: &topologyv1.LabelPolicy{
-					Columns:   []string{"display_name", "pop_name"},
-					Fallback:  "type_label",
-					MaxLength: 80,
-					Array:     "reject",
+					Columns: []string{"display_name", "pop_name"},
 				},
 			},
 		},
@@ -150,24 +132,22 @@ func TopologyActorTypes() map[string]topologyv1.ActorType {
 				Role:      "endpoint",
 				Icon:      "remote-endpoint",
 				ColorSlot: "orange",
-				Border: &topologyv1.BorderPresentation{
-					Enabled: new(true),
-				},
 				Size: &topologyv1.ActorSizePresentation{
 					Mode:  "fixed",
 					Scale: "compact",
 				},
 				LabelPolicy: &topologyv1.LabelPolicy{
-					Columns:   []string{"display_name", "remote_ip", "remote_asn"},
-					Fallback:  "type_label",
-					MaxLength: 80,
-					Array:     "reject",
+					Columns: []string{"display_name", "remote_ip", "remote_asn"},
 				},
 				Modal: catoBGPPeerModal(),
 			},
 		},
 	}
 	for id, actorType := range types {
+		actorType.Presentation.Border = &topologyv1.BorderPresentation{Enabled: new(true)}
+		actorType.Presentation.LabelPolicy.Fallback = "type_label"
+		actorType.Presentation.LabelPolicy.MaxLength = 80
+		actorType.Presentation.LabelPolicy.Array = "reject"
 		if actorType.Presentation.Modal == nil {
 			actorType.Presentation.Modal = &topologyv1.ModalPresentation{}
 		}
