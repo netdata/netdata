@@ -205,10 +205,16 @@ func runDCStatGlobalCollector(
 	}
 
 	createDCStatGlobalCharts(api, updateEvery)
+	if handle.Plan.Flavor == ObjectFlavorArena {
+		createArenaDropsChart(api, dcstatGlobalModule, updateEvery)
+	}
 
 	state := &dcstatGlobalState{}
 	lastCollection := time.Now()
 	collectAndPublish := func(usecSince int) {
+		if handle.Plan.Flavor == ObjectFlavorArena {
+			publishArenaDrops(api, dcstatGlobalModule, handle.Runtime.ArenaDropped(), usecSince)
+		}
 		// Global snapshot — one CGO call.
 		snapshot, err := handle.Runtime.Snapshot(handle.MapsPerCore)
 		if err != nil {

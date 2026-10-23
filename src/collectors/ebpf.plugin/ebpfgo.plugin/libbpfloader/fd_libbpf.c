@@ -101,7 +101,6 @@ struct netdata_ebpf_fd_runtime {
      * directly to tbl_fd_pid, so per-app counters are accumulated here. */
     struct ring_buffer *rb;         /* non-NULL for buffer flavor */
     void              *arena_state; /* mmap'd arena pointer (arena flavor) */
-    uint32_t           arena_tail;  /* last consumed head for arena flavor */
     struct nd_ebpf_acc_table acc;
 #endif
 };
@@ -474,12 +473,14 @@ static void fd_destroy_ring_buffer(struct netdata_ebpf_fd_runtime *rt)
 }
 
 /* The generated arena skeleton maps the arena data section through `arena`. */
-static void fd_setup_arena(struct netdata_ebpf_fd_runtime *rt)
+static int fd_setup_arena(struct netdata_ebpf_fd_runtime *rt)
 {
     if (!rt->core.arena || !rt->core.arena->arena)
-        return;
+        return -1;
 
     rt->arena_state = (void *)&rt->core.arena->arena->fd_arena_state;
+    return nd_ebpf_arena_state_valid(
+        rt->core.arena->maps.fd_events, rt->arena_state, sizeof(struct nd_ebpf_arena_state));
 }
 
 static void fd_rb_event(void *ctx, const struct nd_ebpf_pid_event *ev)
@@ -524,7 +525,7 @@ static int fd_snapshot_from_acc(
 
 static void fd_drain_arena(struct netdata_ebpf_fd_runtime *rt)
 {
-    rt->arena_tail = nd_ebpf_arena_drain(rt->arena_state, rt->arena_tail, fd_rb_event, rt);
+    nd_ebpf_arena_drain(rt->arena_state, fd_rb_event, rt);
 }
 
 #endif /* NETDATA_FD_LIBBPF_CORE_SUPPORTED */
@@ -541,8 +542,8 @@ int netdata_fd_runtime_load(struct netdata_ebpf_fd_runtime *rt)
             return rc;
         if (rt->flavor == NETDATA_FD_RUNTIME_FLAVOR_BUFFER && fd_setup_ring_buffer(rt) != 0)
             return -1;
-        else if (rt->flavor == NETDATA_FD_RUNTIME_FLAVOR_ARENA)
-            fd_setup_arena(rt);
+        else if (rt->flavor == NETDATA_FD_RUNTIME_FLAVOR_ARENA && fd_setup_arena(rt) != 0)
+            return -1;
         return 0;
     }
 #endif
@@ -820,4 +821,13 @@ void netdata_fd_runtime_close(struct netdata_ebpf_fd_runtime *rt)
         bpf_object__close(rt->obj);
 #endif
     freez(rt);
+}
+uint64_t netdata_fd_runtime_arena_drops(struct netdata_ebpf_fd_runtime *rt)
+{
+#ifdef NETDATA_FD_LIBBPF_CORE_SUPPORTED
+    return rt && rt->arena_state ? nd_ebpf_arena_dropped(rt->arena_state) : 0;
+#else
+    (void)rt;
+    return 0;
+#endif
 }

@@ -162,6 +162,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: miss
+            - name: ebpf.cachestat_arena_drops
+              description: "Per-PID events dropped by the Cachestat arena queue. Published only when the arena object is active."
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: dropped
   - meta:
       plugin_name: ebpf-go.plugin
       module_name: dcstat
@@ -314,6 +320,12 @@ modules:
                 - name: reference
                 - name: slow
                 - name: miss
+            - name: ebpf.dcstat_arena_drops
+              description: "Per-PID events dropped by the DCStat arena queue. Published only when the arena object is active."
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: dropped
   - meta:
       plugin_name: ebpf-go.plugin
       module_name: dns
@@ -590,6 +602,12 @@ modules:
               dimensions:
                 - name: open
                 - name: close
+            - name: ebpf.filedescriptor_arena_drops
+              description: "Per-PID events dropped by the FD arena queue. Published only when the arena object is active."
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: dropped
   - meta:
       plugin_name: ebpf-go.plugin
       module_name: socket
@@ -611,7 +629,7 @@ modules:
         - eBPF
     overview:
       data_collection:
-        metrics_description: "Monitor TCP and UDP function calls, bandwidth, errors, and connection counts. Data is exposed through the on-demand `network-protocols` function consumed by the network-viewer."
+        metrics_description: "Monitor TCP and UDP function calls, bandwidth, errors, and connection counts. Data is exposed through the on-demand `network-protocols` function consumed by the network-viewer; an arena-only chart reports dropped per-PID events."
         method_description: "Attach kprobe or fentry/fexit trampolines to the kernel functions `tcp_sendmsg`, `tcp_cleanup_rbuf`, `tcp_connect` (IPv4 and IPv6), `tcp_close`, `udp_sendmsg`, and `udp_recvmsg`. Per-cycle deltas and byte counts are computed in userspace from the BPF map snapshots."
       supported_platforms:
         include:
@@ -752,6 +770,12 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: "All data is delivered through the on-demand `network-protocols` function consumed by network-viewer; no traditional Netdata charts are published for this scope."
+          description: "TCP/UDP activity is delivered through the on-demand `network-protocols` function; a diagnostic chart appears only when the arena object is active."
           labels: []
-          metrics: []
+          metrics:
+            - name: ebpf.socket_arena_drops
+              description: "Per-PID events dropped by the Socket arena queue. Published only when the arena object is active."
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: dropped

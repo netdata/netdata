@@ -5,8 +5,10 @@ package libbpfloader
 /*
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdint.h>
 
 struct netdata_ebpf_socket_runtime;
+uint64_t netdata_socket_runtime_arena_drops(struct netdata_ebpf_socket_runtime *rt);
 
 struct netdata_ebpf_socket_snapshot {
     uint64_t calls_tcp_sendmsg;
@@ -209,4 +211,10 @@ func (r *SocketRuntime) Close() {
 
 	C.netdata_socket_runtime_close(r.ptr)
 	r.ptr = nil
+}
+func (r *SocketRuntime) ArenaDropped() uint64 {
+	if r == nil || r.ptr == nil {
+		return 0
+	}
+	return uint64(C.netdata_socket_runtime_arena_drops(r.ptr))
 }

@@ -43,20 +43,6 @@ func defaultCachestatTargets() CachestatTargets {
 	}
 }
 
-func (t *CachestatTargets) ResolveCacheAndAccessTargets() error {
-	add, err := selectCachestatKernelTarget([]string{"filemap_add_folio", "add_to_page_cache_lru"})
-	if err != nil {
-		return err
-	}
-	access, err := selectCachestatKernelTarget([]string{"folio_mark_accessed", "mark_page_accessed"})
-	if err != nil {
-		return err
-	}
-	t.AddToPageCacheLru.Name = add
-	t.MarkPageAccessed.Name = access
-	return nil
-}
-
 func (t *CachestatTargets) ResolveAllFromReader(symbols io.Reader) error {
 	resolved, err := selectKallsymsCandidateSets(
 		symbols,
@@ -80,15 +66,6 @@ func (t *CachestatTargets) ResolveAllFromReader(symbols io.Reader) error {
 	t.MarkPageAccessed.Name = resolved[1]
 	t.AccountPageDirtied.Name = resolved[2]
 	return nil
-}
-
-func selectCachestatKernelTarget(candidates []string) (string, error) {
-	symbols, err := openProcKallsyms()
-	if err != nil {
-		return "", err
-	}
-	defer symbols.Close()
-	return selectCachestatKernelTargetFromReader(candidates, symbols)
 }
 
 func selectCachestatKernelTargetFromReader(candidates []string, symbols io.Reader) (string, error) {
@@ -116,29 +93,8 @@ func resolveCachestatTargets() (CachestatTargets, error) {
 	return targets, nil
 }
 
-func (t *CachestatTargets) ResolveAccountPageTarget() error {
-	name, err := selectCachestatAccountPageTarget(t.AccountPage)
-	if err != nil {
-		return err
-	}
-
-	t.AccountPageDirtied.Name = name
-	return nil
-}
-
-// selectCachestatAccountPageTarget resolves the account-page target from the
-// live symbol table.  Unlike dcstat, an unresolvable target IS fatal here: the
+// Unlike dcstat, an unresolvable account-page target is fatal here: the
 // caller has no usable default (AccountPageDirtied ships with an empty name).
-func selectCachestatAccountPageTarget(candidates []string) (string, error) {
-	symbols, err := openProcKallsyms()
-	if err != nil {
-		return "", err
-	}
-	defer symbols.Close()
-
-	return selectCachestatAccountPageTargetFromReader(candidates, symbols)
-}
-
 func selectCachestatAccountPageTargetFromReader(candidates []string, r io.Reader) (string, error) {
 	name, err := selectKallsymsCandidate(candidates, r)
 	if err != nil {

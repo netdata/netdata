@@ -395,17 +395,20 @@ func legacyArtifactFamilyAvailable(module string, isRHF int, kver uint32) bool {
 }
 
 func legacyArtifactFlavorAvailable(module string, flavor ObjectFlavor, isRHF int, kver uint32) bool {
+	if !legacyArtifactFamilyAvailable(module, isRHF, kver) {
+		return false
+	}
 	if flavor == ObjectFlavorBase {
-		return legacyArtifactFamilyAvailable(module, isRHF, kver)
+		return true
+	}
+	if flavor != ObjectFlavorBuffer && flavor != ObjectFlavorArena {
+		return false
 	}
 
 	if isRHEL10Kernel612Stream(isRHF, kver) {
 		return true
 	}
 	if flavor == ObjectFlavorArena && kver < minimumKernelVersionArena {
-		return false
-	}
-	if flavor != ObjectFlavorBuffer && flavor != ObjectFlavorArena {
 		return false
 	}
 	if kver < minimumKernelVersionBuffer {

@@ -72,17 +72,15 @@ func LoadDCStatLegacy(cfg DCStatLegacyConfig) (*DCStatLegacyHandle, error) {
 	}
 
 	plan := BuildDCStatLegacyPlan(cfg)
-	if !libbpfloader.DCStatSupportsCore() {
+	coreSupported := libbpfloader.DCStatSupportsCore()
+	if !coreSupported {
 		plan.LoadMode = LoadLegacy
-		if err := validateLegacyArtifactFamily("dcstat", plan); err != nil {
-			return nil, err
-		}
-		// No fallback in legacy mode: there is only one object.
-		return tryLoadDCStatPlan(cfg, plan)
 	}
 
 	plans := buildFallbackPlans(plan, cfg.PluginsDir, cfg.IsRHF, "dc", dcstatMaxBaseSelector)
-	plans = append(plans, buildCoreLegacyFallbackPlans(plan, cfg.PluginsDir, cfg.IsRHF, "dc", dcstatMaxBaseSelector)...)
+	if coreSupported {
+		plans = append(plans, buildCoreLegacyFallbackPlans(plan, cfg.PluginsDir, cfg.IsRHF, "dc", dcstatMaxBaseSelector)...)
+	}
 	if len(plans) == 0 {
 		return nil, fmt.Errorf("dcstat has no compatible object family for this kernel")
 	}

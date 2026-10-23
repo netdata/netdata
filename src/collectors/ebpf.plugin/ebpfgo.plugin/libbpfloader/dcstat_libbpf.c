@@ -109,7 +109,6 @@ struct netdata_ebpf_dcstat_runtime {
      * directly to dcstat_pid, so per-app counters are accumulated here. */
     struct ring_buffer *rb;         /* non-NULL for buffer flavor */
     void              *arena_state; /* mmap'd arena pointer (arena flavor) */
-    uint32_t           arena_tail;  /* last consumed head for arena flavor */
     struct nd_ebpf_acc_table acc;
 #endif
 };
@@ -464,7 +463,8 @@ static int dcstat_setup_arena(struct netdata_ebpf_dcstat_runtime *rt)
             return -1;
 
         rt->arena_state = (void *)&rt->core.arena->arena->dc_arena_state;
-        return 0;
+        return nd_ebpf_arena_state_valid(
+            rt->core.arena->maps.dc_events, rt->arena_state, sizeof(struct nd_ebpf_arena_state));
     }
 #endif
     return nd_ebpf_raw_arena_get_state(rt->raw_arena, &rt->arena_state);
@@ -511,7 +511,7 @@ static int dcstat_snapshot_from_acc(
 
 static void dcstat_drain_arena(struct netdata_ebpf_dcstat_runtime *rt)
 {
-    rt->arena_tail = nd_ebpf_arena_drain(rt->arena_state, rt->arena_tail, dcstat_rb_event, rt);
+    nd_ebpf_arena_drain(rt->arena_state, dcstat_rb_event, rt);
 }
 
 #endif /* NETDATA_DCSTAT_EVENT_FLAVORS_SUPPORTED */
@@ -815,4 +815,13 @@ void netdata_dcstat_runtime_close(struct netdata_ebpf_dcstat_runtime *rt)
             bpf_object__close(rt->obj);
     }
     freez(rt);
+}
+uint64_t netdata_dcstat_runtime_arena_drops(struct netdata_ebpf_dcstat_runtime *rt)
+{
+#ifdef NETDATA_DCSTAT_EVENT_FLAVORS_SUPPORTED
+    return rt && rt->arena_state ? nd_ebpf_arena_dropped(rt->arena_state) : 0;
+#else
+    (void)rt;
+    return 0;
+#endif
 }

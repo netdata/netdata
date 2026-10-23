@@ -100,14 +100,23 @@ typedef struct {
 #define SOCKET_ARENA_EVENT_SLOTS 1024u
 
 #if defined(LIBBPF_MAJOR_VERSION) && (LIBBPF_MAJOR_VERSION >= 1)
+struct netdata_socket_arena_slot {
+    uint32_t ready;
+    uint32_t _pad;
+    netdata_socket_rb_event_t event;
+};
+
 struct netdata_socket_arena_state {
     uint32_t head;
-    uint32_t _pad;
-    netdata_socket_rb_event_t events[SOCKET_ARENA_EVENT_SLOTS];
+    uint32_t tail;
+    uint32_t version;
+    uint32_t reserved;
+    uint64_t dropped;
+    struct netdata_socket_arena_slot slots[SOCKET_ARENA_EVENT_SLOTS];
 };
 
 _Static_assert(sizeof(netdata_socket_rb_event_t) == 152, "socket event layout differs from BPF");
-_Static_assert(sizeof(struct netdata_socket_arena_state) == 155656, "socket arena layout differs from BPF");
+_Static_assert(sizeof(struct netdata_socket_arena_state) == 163864, "socket arena layout differs from BPF");
 #endif
 
 /* Per-PID aggregated socket metrics — output type for per-PID snapshot.
@@ -210,8 +219,7 @@ struct netdata_ebpf_socket_runtime {
 #endif
 #if defined(LIBBPF_MAJOR_VERSION) && (LIBBPF_MAJOR_VERSION >= 1)
     struct nd_ebpf_raw_arena *raw_arena;
-    const struct netdata_socket_arena_state *arena_state;
-    uint32_t arena_tail;
+    struct netdata_socket_arena_state *arena_state;
 #endif
 };
 
@@ -592,29 +600,29 @@ static int socket_setup_ring_buffer(struct netdata_ebpf_socket_runtime *rt)
 #if LIBBPF_MAJOR_VERSION >= 1
 static int socket_setup_arena(struct netdata_ebpf_socket_runtime *rt)
 {
-    size_t data_size = 0;
-    if (!rt->raw_arena || !rt->raw_arena->state ||
-        !bpf_map__initial_value(rt->raw_arena->map, &data_size) ||
-        data_size < sizeof(struct netdata_socket_arena_state))
+    if (!rt->raw_arena || !rt->raw_arena->state)
         return -1;
 
     rt->arena_state = rt->raw_arena->state;
-    return 0;
+    return nd_ebpf_arena_state_valid(
+        rt->raw_arena->map, rt->arena_state, sizeof(struct netdata_socket_arena_state));
 }
 
 static void socket_drain_arena(struct netdata_ebpf_socket_runtime *rt)
 {
-    uint32_t head = __atomic_load_n(&rt->arena_state->head, __ATOMIC_ACQUIRE);
-    uint32_t tail = rt->arena_tail;
-    if (head - tail > SOCKET_ARENA_EVENT_SLOTS)
-        tail = head - SOCKET_ARENA_EVENT_SLOTS;
+    struct netdata_socket_arena_state *state = rt->arena_state;
+    uint32_t head = __atomic_load_n(&state->head, __ATOMIC_ACQUIRE);
+    uint32_t tail = __atomic_load_n(&state->tail, __ATOMIC_RELAXED);
 
     while (tail != head) {
-        const netdata_socket_rb_event_t *event = &rt->arena_state->events[tail % SOCKET_ARENA_EVENT_SLOTS];
-        socket_rb_callback(rt, (void *)event, sizeof(*event));
+        struct netdata_socket_arena_slot *slot = &state->slots[tail % SOCKET_ARENA_EVENT_SLOTS];
+        if (!__atomic_load_n(&slot->ready, __ATOMIC_ACQUIRE))
+            break;
+        socket_rb_callback(rt, &slot->event, sizeof(slot->event));
+        __atomic_store_n(&slot->ready, 0, __ATOMIC_RELEASE);
         tail++;
+        __atomic_store_n(&state->tail, tail, __ATOMIC_RELEASE);
     }
-    rt->arena_tail = head;
 }
 #endif
 
@@ -1213,4 +1221,13 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
     /* Rebuild htable after qsort + eviction reordered rt->acc. */
     socket_acc_htable_rebuild(rt);
     return rt->per_pid_entries;
+}
+uint64_t netdata_socket_runtime_arena_drops(struct netdata_ebpf_socket_runtime *rt)
+{
+#if defined(LIBBPF_MAJOR_VERSION) && (LIBBPF_MAJOR_VERSION >= 1)
+    return rt && rt->arena_state ? __atomic_load_n(&rt->arena_state->dropped, __ATOMIC_ACQUIRE) : 0;
+#else
+    (void)rt;
+    return 0;
+#endif
 }

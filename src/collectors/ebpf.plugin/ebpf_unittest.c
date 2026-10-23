@@ -156,6 +156,14 @@ static int test_rhel10_selector_respects_module_mask(void)
            ebpf_select_index(with_612_mask, 10 * 256, NETDATA_EBPF_KERNEL_6_12) == NETDATA_IDX_V6_12;
 }
 
+static int test_selector_bit_zero_and_empty_mask(void)
+{
+    const int kernel_3_10 = 3 * 65536 + 10 * 256;
+    return ebpf_select_index(NETDATA_V3_10, -1, kernel_3_10) == NETDATA_IDX_V3_10 &&
+           ebpf_select_index(NETDATA_V5_4, -1, kernel_3_10) == UINT32_MAX &&
+           ebpf_select_index(0, -1, NETDATA_EBPF_KERNEL_6_12) == UINT32_MAX;
+}
+
 static int test_rhel10_module_masks(void)
 {
     for (size_t i = 0; ebpf_modules[i].info.thread_name; i++) {
@@ -318,7 +326,8 @@ static int ebpf_ut_load_binary()
         !test_legacy_artifact_family_support() || !test_generic612_module_masks() ||
         !test_generic6162_artifact_masks() ||
         !test_red_hat_kernel_lineage() ||
-        !test_rhel10_selector_respects_module_mask() || !test_rhel10_module_masks() ||
+        !test_rhel10_selector_respects_module_mask() || !test_selector_bit_zero_and_empty_mask() ||
+        !test_rhel10_module_masks() ||
         !test_redhat_release_version_parser() || !test_redhat_os_release_parser()) {
         fprintf(stderr, ">>> FAILED: kernel version parsing or disk selectors are inconsistent\n");
         return -1;

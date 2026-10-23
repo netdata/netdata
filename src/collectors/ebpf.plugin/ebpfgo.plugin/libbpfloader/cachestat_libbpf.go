@@ -4,8 +4,10 @@ package libbpfloader
 
 /*
 #include <stdlib.h>
+#include <stdint.h>
 
 struct netdata_ebpf_cachestat_runtime;
+uint64_t netdata_cachestat_runtime_arena_drops(struct netdata_ebpf_cachestat_runtime *rt);
 struct netdata_ebpf_cachestat_snapshot {
     unsigned long long mark_page_accessed;
     unsigned long long mark_buffer_dirty;
@@ -304,4 +306,10 @@ func (r *CachestatRuntime) Close() {
 	C.netdata_cachestat_runtime_close(r.ptr)
 	r.ptr = nil
 	r.appsBuf = nil
+}
+func (r *CachestatRuntime) ArenaDropped() uint64 {
+	if r == nil || r.ptr == nil {
+		return 0
+	}
+	return uint64(C.netdata_cachestat_runtime_arena_drops(r.ptr))
 }

@@ -681,6 +681,51 @@ func TestLegacyArtifactFamilyAvailability(t *testing.T) {
 	}
 }
 
+func TestLegacyArtifactFlavorRespectsRedHatFamily(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		rhf  int
+		kver uint32
+		want bool
+	}{
+		{name: "RHEL 9 5.17", rhf: 9 * 256, kver: 5<<16 + 17<<8},
+		{name: "RHEL 10 6.13", rhf: 10 * 256, kver: 6<<16 + 13<<8},
+		{name: "RHEL 10 6.12", rhf: 10 * 256, kver: 6<<16 + 12<<8, want: true},
+		{name: "generic 6.13", rhf: -1, kver: 6<<16 + 13<<8, want: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, flavor := range []ObjectFlavor{ObjectFlavorBase, ObjectFlavorBuffer, ObjectFlavorArena} {
+				if got := legacyArtifactFlavorAvailable("dc", flavor, tc.rhf, tc.kver); got != tc.want {
+					t.Errorf("legacyArtifactFlavorAvailable(dc, %v, %d, %d) = %v, want %v",
+						flavor, tc.rhf, tc.kver, got, tc.want)
+				}
+			}
+		})
+	}
+}
+
+func TestDCStatLegacyFallbackOrderWithoutCore(t *testing.T) {
+	cfg := DCStatLegacyConfig{
+		PluginsDir:    defaultPluginsDir(),
+		Kernels:       dcstatKernelMask,
+		IsRHF:         -1,
+		KernelVersion: minimumKernelVersionSeven,
+		HasBTF:        false,
+		ObjectFlavor:  "arena",
+	}
+	plan := BuildDCStatLegacyPlan(cfg)
+	plan.LoadMode = LoadLegacy
+	plans := buildFallbackPlans(plan, cfg.PluginsDir, cfg.IsRHF, "dc", dcstatMaxBaseSelector)
+	if len(plans) != 3 {
+		t.Fatalf("DCStat no-CO-RE fallback returned %d plans, want arena, buffer, base: %+v", len(plans), plans)
+	}
+	for i, want := range []ObjectFlavor{ObjectFlavorArena, ObjectFlavorBuffer, ObjectFlavorBase} {
+		if plans[i].Flavor != want || plans[i].LoadMode != LoadLegacy {
+			t.Errorf("plan[%d] = %+v, want legacy %v", i, plans[i], want)
+		}
+	}
+}
+
 func TestSelectMaxIndexMatchesGenericPre54BuildRung(t *testing.T) {
 	for _, kver := range []uint32{4<<16 + 17<<8, 5 << 16, 5<<16 + 2<<8, 5<<16 + 3<<8} {
 		if got := SelectKernelName(uint32(SelectMaxIndex(-1, kver))); got != "5.4" {

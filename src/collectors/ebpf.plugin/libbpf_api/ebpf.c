@@ -656,12 +656,13 @@ uint32_t ebpf_select_index(uint32_t kernels, int is_rhf, uint32_t kver)
     if (is_rhf <= 0 && kver == NETDATA_EBPF_KERNEL_6_16_2)
         kernels &= ~NETDATA_V7_0;
 
-    for (idx = start; idx; idx--) {
-        if (kernels & 1 << idx)
-            break;
+    for (idx = start + 1; idx > 0;) {
+        idx--;
+        if (kernels & (1U << idx))
+            return idx;
     }
 
-    return idx;
+    return UINT32_MAX;
 }
 
 uint32_t ebpf_select_disk_index(uint32_t kernels, int is_rhf, uint32_t kver)
@@ -1289,6 +1290,13 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kv
         return NULL;
     }
 
+    if (idx == UINT32_MAX) {
+        netdata_log_error("ERROR: no configured legacy eBPF object family for %s on kernel %d.%d.%d",
+                          em->info.thread_name, kver >> 16, (kver >> 8) & 0xff, kver & 0xff);
+        *obj = NULL;
+        return NULL;
+    }
+
     ebpf_mount_name(lpath, 4095, plugins_dir, idx, em->info.thread_name, em->mode == MODE_RETURN, is_rhf);
 
     *obj = bpf_object__open_file(lpath, NULL);
@@ -1873,7 +1881,9 @@ void ebpf_load_addresses(ebpf_addresses_t *fa, int fd)
     if (fa->addr)
         return;
 
-    procfile *ff = procfile_open("/proc/kallsyms", " \t:", PROCFILE_FLAG_DEFAULT);
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, NETDATA_KALLSYMS);
+    procfile *ff = procfile_open(filename, " \t:", PROCFILE_FLAG_DEFAULT);
     if (!ff)
         return;
 
