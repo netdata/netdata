@@ -10,7 +10,9 @@ import (
 // Scope-refresh cache measurements (2026-10-24, linux/amd64, i9-12900K).
 // Six alternating before/after runs, 300ms per benchmark, compared with benchstat:
 // vec_10_series: 7899 -> 8255 ns/op; vec_100_series: 70790 -> 72700 ns/op
-// (neither cycle-time difference significant). Allocation counts remain 76/622.
+// with_labels_10_series: 12430 -> 12960 ns/op; with_labels_100_series: 114800 -> 111600 ns/op.
+// No cycle-time difference is significant. Vec allocation counts remain 76/622;
+// with_labels allocation counts remain 166/1522.
 // Scoped lookup adds metadata comparison: 272.5 -> 319 ns/op (+17%, p=0.002),
 // unchanged 376 B / 5 allocations. The 100-series cycle varies by 0.01% B/op.
 // Command: go test ./pkg/metrix -run '^$' -bench 'VecScopedLookup|VecVsWithLabelsSnapshotGauge' -benchmem
