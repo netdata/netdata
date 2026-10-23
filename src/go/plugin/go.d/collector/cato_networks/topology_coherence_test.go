@@ -236,3 +236,33 @@ func TestTopologyParallelInterfacesPreserveMeasurements(t *testing.T) {
 	require.Nil(t, b["rtt_ms"])
 	require.Len(t, links, 3)
 }
+
+// Cloud keys links by endpoints/type plus the producer-declared group keys.
+// Name-only interfaces are valid when the upstream omits their ID.
+func TestTopologyParallelInterfaceGrouping(t *testing.T) {
+	for name, ids := range map[string][2]string{"with IDs": {"a", "b"}, "name only": {"", ""}} {
+		t.Run(name, func(t *testing.T) {
+			site := &siteState{ID: "site", Interfaces: map[string]*interfaceState{
+				"a": {ID: ids[0], Name: "WAN A", PopName: "PoP", Connected: new(true)},
+				"b": {ID: ids[1], Name: "WAN B", PopName: "PoP", Connected: new(false)},
+			}}
+			data := mustBuildTopology(t, "account", map[string]*siteState{"site": site}, []string{"site"}, fixedCatoTestNow())
+			validateCatoTopologyV1Data(t, data)
+			rows := topologyTableRows(t, data.Links, data.Dictionaries)
+			require.Len(t, rows, 2)
+			keys := make(map[string]bool)
+			for _, row := range rows {
+				key := []any{row["src_actor"], row["dst_actor"], row["type"]}
+				for _, col := range data.Links.Columns {
+					if col.Role == "group_key" {
+						key = append(key, row[col.ID])
+					}
+				}
+				encoded, err := json.Marshal(key)
+				require.NoError(t, err)
+				require.False(t, keys[string(encoded)], "parallel interfaces must not collide during Cloud aggregation")
+				keys[string(encoded)] = true
+			}
+		})
+	}
+}

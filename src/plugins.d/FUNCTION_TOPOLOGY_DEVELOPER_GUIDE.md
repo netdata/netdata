@@ -1786,7 +1786,9 @@ Ownership links are structural and carry no traffic measurements.
 
 Each interface with a reported PoP contributes a `cato_tunnel` link from its
 device, or from its site when the device cannot be resolved. Parallel interface
-links retain their own `interface_id`, `interface_name`, state and measurements;
+links retain their own `interface_id`, `interface_name`, state and measurements.
+Both interface identity columns declare `role: group_key`, so aggregation keeps
+parallel interfaces distinct, including interfaces identified only by name;
 the actor's Connections section and tunnel hover identify the interface. The
 actor-owned `interfaces` table references its tunnel through nullable `link`.
 An interface without a PoP has no invented destination and its `link` is null.

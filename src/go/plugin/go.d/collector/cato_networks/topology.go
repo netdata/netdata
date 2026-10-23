@@ -656,8 +656,8 @@ func catoTopologyLinkColumns() []topologyv1.Column {
 		),
 		topologyv1.NewColumn("incoming_connection_state", "string", topologyv1.WithNullable()),
 		topologyv1.NewColumn("outgoing_connection_state", "string", topologyv1.WithNullable()),
-		topologyv1.NewColumn("interface_id", "string", topologyv1.WithNullable()),
-		topologyv1.NewColumn("interface_name", "string", topologyv1.WithNullable()),
+		topologyv1.NewColumn("interface_id", "string", topologyv1.WithNullable(), topologyv1.WithRole("group_key")),
+		topologyv1.NewColumn("interface_name", "string", topologyv1.WithNullable(), topologyv1.WithRole("group_key")),
 	}
 }
 
