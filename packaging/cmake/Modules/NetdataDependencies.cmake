@@ -36,8 +36,8 @@
 #   lz4, zstd, brotli, libuv,     NetdataLZ4.cmake, NetdataZSTD.cmake,
 #   snappy, OpenSSL               NetdataBrotli.cmake, NetdataLibUV.cmake,
 #                                 NetdataSnappy.cmake, NetdataOpenSSL.cmake.
-#                                 Package formats may bundle these, and the
-#                                 system-or-bundled choice belongs in each one's
+#                                 The macOS package kind (pkg) bundles these, so
+#                                 the system-or-bundled choice lives in each one's
 #                                 module, as with the group above.
 #
 #   CUPS                          NetdataPluginCups.cmake. Three mechanisms in
@@ -98,7 +98,17 @@ endif()
 # Helper binaries.
 #
 
-pkg_check_modules(PCRE2 libpcre2-8)
+# pcre2 gates only log2journal, which the macOS package deliberately does not
+# ship; skipping the lookup under the pkg kind keeps a build-host copy out of
+# the payload instead of adding pcre2 to the bundling set. The explicit FALSE
+# matters: pkg_check_modules caches its result, so a build directory that
+# already probed pcre2 would otherwise keep building log2journal after a
+# reconfigure to the pkg kind.
+if(NETDATA_PACKAGE_KIND STREQUAL "pkg")
+  set(PCRE2_FOUND FALSE)
+else()
+  pkg_check_modules(PCRE2 libpcre2-8)
+endif()
 pkg_check_modules(CAP IMPORTED_TARGET libcap)
 
 #

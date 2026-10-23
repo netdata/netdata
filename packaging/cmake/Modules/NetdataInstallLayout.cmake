@@ -78,6 +78,9 @@ set(WEB_DIR "${NETDATA_RUNTIME_PREFIX}/${WEB_DEST}")
 # Linux concepts - so every rule that writes one is guarded on OS_LINUX. macOS
 # and FreeBSD reach their own service managers through the Netdata-owned copies
 # under SYSTEM_DEST, which system/install-service.sh selects at install time.
+# The macOS package installs its LaunchDaemons to the absolute
+# /Library/LaunchDaemons from NetdataMacOSPackage.cmake, outside this layout;
+# do not widen an existing guard here to cover it.
 set(HOST_LOGROTATE_DEST "etc/logrotate.d")
 set(HOST_INITD_DEST "etc/init.d")
 set(HOST_DEFAULT_DEST "etc/default")
@@ -112,9 +115,11 @@ endif()
 
 # Guards the service-manager toolbox under SYSTEM_DEST (systemd, openrc,
 # rc.d, init.d, cron and friends - the copies install-service.sh picks from
-# at install time). The Windows MSI does not stage the toolbox; every other
-# build keeps it.
-if(OS_WINDOWS)
+# at install time). The macOS package stages only its launchd job: its
+# installer bootstraps launchd directly, so shipping the other managers'
+# files would be dead payload. macOS SOURCE builds keep the full toolbox -
+# the trim keys on the package kind, not the OS.
+if(OS_WINDOWS OR NETDATA_PACKAGE_KIND STREQUAL "pkg")
   set(NETDATA_STAGE_SERVICE_TOOLBOX FALSE)
 else()
   set(NETDATA_STAGE_SERVICE_TOOLBOX TRUE)
