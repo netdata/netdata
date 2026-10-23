@@ -1003,8 +1003,8 @@ static void ebpf_allocate_common_vectors()
  */
 static bool ebpf_same_dir(const char *a, const char *b)
 {
-    size_t la = strlen(a);
-    size_t lb = strlen(b);
+    size_t la = strnlen(a, FILENAME_MAX);
+    size_t lb = strnlen(b, FILENAME_MAX);
 
     while (la > 1 && a[la - 1] == '/')
         la--;
