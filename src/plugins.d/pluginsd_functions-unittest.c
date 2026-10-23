@@ -1497,7 +1497,10 @@ int pluginsd_functions_unittest(void) {
         } cases[] = {
             { "object", "{\"url\":\"http://127.0.0.1/\",\"update_every\":1}", 0, false },
             { "pretty object", "{\n  \"a\": 1,\r\n  \"b\": [\"x\", -0.5e+3, true, false, null]\n}\n", 0, false },
-            { "keyword key at line start", "{\n  \"FUNCTION_PAYLOAD\": \"QUIT\"\n}", 0, false },
+            { "keyword value not at line start", "{\n  \"a\": \"FUNCTION QUIT\"\n}", 0, false },
+            { "quoted keyword key at line start", "{\n  \"FUNCTION_PAYLOAD\": 1\n}", 0, true },
+            { "quoted FUNCTION element (go.d tokenizes it as a call)", "[\"x\",\n\"FUNCTION\" ,0, 30 ,\"a\" ,\"b\" ,\"c\" ]", 0, true },
+            { "indented quoted QUIT element", "[\n\t\"QUIT\"\n]", 0, true },
             { "escapes", "{\"a\":\"x\\ny\\n\\u00e9\\\"\\/\"}", 0, false },
             { "escaped end marker", "{\"a\":\"x\\nFUNCTION_PAYLOAD_END\\n\"}", 0, true },
             { "end marker as a key", "{\"FUNCTION_PAYLOAD_END\":1}", 0, true },

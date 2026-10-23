@@ -536,5 +536,28 @@ const char *functions_payload_validate(const char *payload, size_t len) {
             return "the payload contains the plugins.d payload end marker";
     }
 
+    // plugin tokenizers unquote fields, so a JSON line starting with a quoted keyword can be read as
+    // a command by older go.d versions (e.g. children behind this agent) - refuse it
+    const size_t function_len = sizeof(PLUGINSD_CALL_FUNCTION) - 1;
+    const size_t quit_len = sizeof(PLUGINSD_CALL_QUIT) - 1;
+    for(const char *line = payload; line < end; ) {
+        const char *s = line;
+        while(s < end && (*s == ' ' || *s == '\t' || *s == '\r'))
+            s++;
+
+        if(s < end && *s == '"') {
+            s++;
+            if(((size_t)(end - s) >= function_len && memcmp(s, PLUGINSD_CALL_FUNCTION, function_len) == 0) ||
+               ((size_t)(end - s) >= quit_len && memcmp(s, PLUGINSD_CALL_QUIT, quit_len) == 0))
+                return "the payload has a line starting with a quoted plugins.d keyword";
+        }
+
+        const char *nl = memchr(s, '\n', end - s);
+        if(!nl)
+            break;
+
+        line = nl + 1;
+    }
+
     return NULL;
 }
