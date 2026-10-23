@@ -315,6 +315,16 @@ func (c *Collector) collectURLPatternStats(name string) {
 	}
 	if c.line.hasReqProcTime() {
 		v.ReqProcTime.Observe(c.line.reqProcTime)
+
+		if c.line.hasReqMethod() {
+			summary, ok := v.ReqMethodProcTime[c.line.reqMethod]
+			if !ok {
+				summary = newWebLogSummary()
+				v.ReqMethodProcTime[c.line.reqMethod] = summary
+				c.addDimToURLPatternReqMethodProcTimeChart(name, c.line.reqMethod)
+			}
+			summary.Observe(c.line.reqProcTime)
+		}
 	}
 }
 
@@ -530,6 +540,26 @@ func (c *Collector) addDimToURLPatternReqMethodsChart(name, method string) {
 		ID:   fmt.Sprintf("url_ptn_%s_req_method_%s", name, method),
 		Name: method,
 		Algo: collectorapi.Incremental,
+	}
+
+	if err := chart.AddDim(dim); err != nil {
+		c.Warning(err)
+		return
+	}
+	chart.MarkNotCreated()
+}
+
+func (c *Collector) addDimToURLPatternReqMethodProcTimeChart(name, method string) {
+	id := fmt.Sprintf(urlPatternReqMethodProcTime.ID, name)
+	chart := c.Charts().Get(id)
+	if chart == nil {
+		c.Warningf("add dimension: no '%s' chart", id)
+		return
+	}
+	dim := &Dim{
+		ID:   fmt.Sprintf("url_ptn_%s_req_method_proc_time_%s_avg", name, method),
+		Name: method,
+		Div:  1000,
 	}
 
 	if err := chart.AddDim(dim); err != nil {
