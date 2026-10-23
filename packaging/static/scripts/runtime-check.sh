@@ -30,4 +30,5 @@ kill "$(jobs -p)"
 
 trap - EXIT
 
+wait "$(jobs -p)" || :
 rm -rf "${prefix}/var/log/netdata" "${prefix}/var/lib/netdata" "${prefix}/var/cache/netdata"
