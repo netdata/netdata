@@ -30,14 +30,30 @@ The number of metrics collected determines how far back in time retention extend
 
 ### Monitoring Retention Utilization
 
-Netdata provides a visual representation of storage utilization for both the time and space limits across all Tiers. In the dashboard, these are the **dbengine space and time retention** charts, found under the **Netdata** section → **dbengine retention** family — there is one chart per database tier. Each chart shows exactly how your storage space (disk space limits) and time (time limits) are used for metric retention.
+Netdata provides a visual representation of storage utilization for both the time and space limits across all tiers. In the dashboard, these are the **dbengine space and time retention** charts, found under the **Netdata** section → **dbengine retention** family — there is one chart per database tier (`dbengine_retention_tier0`, `dbengine_retention_tier1`, `dbengine_retention_tier2`, and so on).
 
-Each tier has its own independent **space** and **time** lines on the chart:
+Each chart tracks two dimensions, both shown as a percentage:
 
-- **Space (disk utilization %)**: the percentage of the tier's allocated disk space that is currently occupied, calculated as `disk_used / disk_max × 100`. When a size limit is configured for the tier, `disk_max` is that limit. When no size limit is configured (set to 0), `disk_max` is the total available disk space at the tier's data directory (free space plus already-used space). For example, a space value of 89% means 89% of the tier's allocated or available disk space is occupied by datafiles.
-- **Time (retention time utilization %)**: the percentage of the configured retention time period that has been filled with data, calculated as `current_retention_duration / configured_time_limit × 100`. When no time limit is configured (set to 0), this dimension shows 0% and no time-based retention is enforced. For example, a time value of 61% means 61% of the configured time retention period has elapsed since the oldest sample. This value is capped at 100%.
+| Dimension | What it shows |
+|:----------|:--------------|
+| `space`   | Percentage of the tier's configured disk space limit currently consumed |
+| `time`    | Percentage of the tier's configured time limit that retained data currently spans (capped at 100%) |
 
-Different tiers naturally show different percentages because they have different write volumes, compression ratios, and configured limits. When either the space or time dimension reaches 100%, the oldest datafiles are rotated out as described in the [Retention Size Enforcement](#retention-size-enforcement) section below.
+For example, a `space` value of 89% means the tier is using 89% of its allocated disk space. A `time` value of 61% means the oldest retained sample is 61% of the way to the configured time limit. When either dimension reaches 100%, the oldest datafiles are rotated out as described in [Retention Size Enforcement](#retention-size-enforcement) below.
+
+:::note
+
+**When retention size is set to 0 (disabled):** The `space` dimension has no tier-specific quota to measure against, so it falls back to measuring the tier's disk usage as a percentage of the total partition capacity hosting the dbengine data directory (free space plus space already used by the tier). Because the percentage is relative to the entire partition rather than a tier-specific quota, the `space` value will typically be very low — for example, 9%, 2%, or 1% across tiers on a system that has explicitly set retention size to 0.
+
+**When retention time is set to 0 (disabled):** The `time` dimension reports 0%, since there is no time limit to measure against.
+
+:::
+
+:::tip
+
+**Interpreting consistently low percentages:** Low `space` percentages are normal and do not indicate a problem. With the default per-tier size limits (1 GiB each), a low percentage simply means the tier has not yet filled its quota — common on systems with modest metric volume or limited uptime. If you have explicitly set a tier's retention size to 0, the `space` dimension measures against total partition capacity instead (see the note above), which also produces low values. To determine which mode is in effect, check your retention size settings in `netdata.conf`: a value of 0 activates partition-capacity mode, while any non-zero value (including the default 1 GiB) measures against the tier quota. See [Retention Settings](/src/database/CONFIGURATION.md#retention-settings) for configuration details.
+
+:::
 
 ### Retention Size Enforcement
 
