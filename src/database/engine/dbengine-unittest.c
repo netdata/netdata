@@ -762,6 +762,58 @@ static size_t test_dbengine_page_close_time(RRDHOST *host) {
     return errors;
 }
 
+static size_t test_dbengine_single_missing_sample_reuse(RRDHOST *host) {
+    const time_t t = START_TIMESTAMP + 2750000;
+    RRDDIM *rd = dbengine_cadence_test_create_metric(host, "dbengine-single-missing-sample", 1);
+    if(!rd)
+        return 1;
+
+    dbengine_cadence_test_store_point(rd, t + 100, 1);
+    dbengine_cadence_test_store_point(rd, t + 101, 2);
+    unittest_storage_engine_store_flush(rd->tiers[0].sch);
+    dbengine_cadence_test_store_point(rd, t + 103, 3);
+    unittest_storage_engine_store_flush(rd->tiers[0].sch);
+
+    const DBENGINE_CADENCE_EXPECTED_POINT expected[] = {
+        { t + 99, t + 100, 1 },
+        { t + 100, t + 101, 2 },
+        { t + 102, t + 103, 3 },
+    };
+    struct rrdeng_cache_efficiency_stats before = rrdeng_get_cache_efficiency_stats();
+    size_t errors = dbengine_cadence_test_query_points(
+        rd, t + 100, t + 103, expected, _countof(expected), "single-missing-sample-first");
+    struct rrdeng_cache_efficiency_stats after_first = rrdeng_get_cache_efficiency_stats();
+
+    if(after_first.prep_time_in_journal_v2_lookup.count !=
+           before.prep_time_in_journal_v2_lookup.count + 1 ||
+       after_first.queries_planned_with_gaps != before.queries_planned_with_gaps + 1) {
+        fprintf(stderr,
+                " >>> DBENGINE: first single-missing-sample query used %zu journal lookups and %zu planner gaps, "
+                "expected 1 and 1\n",
+                after_first.prep_time_in_journal_v2_lookup.count - before.prep_time_in_journal_v2_lookup.count,
+                after_first.queries_planned_with_gaps - before.queries_planned_with_gaps);
+        errors++;
+    }
+
+    errors += dbengine_cadence_test_query_points(
+        rd, t + 100, t + 103, expected, _countof(expected), "single-missing-sample-repeat");
+    struct rrdeng_cache_efficiency_stats after_repeat = rrdeng_get_cache_efficiency_stats();
+
+    if(after_repeat.prep_time_in_journal_v2_lookup.count !=
+           after_first.prep_time_in_journal_v2_lookup.count ||
+       after_repeat.queries_planned_with_gaps != after_first.queries_planned_with_gaps) {
+        fprintf(stderr,
+                " >>> DBENGINE: repeated single-missing-sample query used %zu journal lookups and %zu planner gaps, "
+                "expected 0 and 0\n",
+                after_repeat.prep_time_in_journal_v2_lookup.count -
+                    after_first.prep_time_in_journal_v2_lookup.count,
+                after_repeat.queries_planned_with_gaps - after_first.queries_planned_with_gaps);
+        errors++;
+    }
+
+    return errors;
+}
+
 int test_dbengine(void) {
     // provide enough threads to dbengine
     setenv("UV_THREADPOOL_SIZE", "48", 1);
@@ -827,6 +879,8 @@ int test_dbengine(void) {
     // it takes the RRD read lock and stores points, so it must run before the quiesce/exit sequence below
     errors += (size_t)ml_queue_host_order_unittest(host);
 #endif
+
+    errors += test_dbengine_single_missing_sample_reuse(host);
 
     // prevent closing the database before the test is finished
     sleep(5);

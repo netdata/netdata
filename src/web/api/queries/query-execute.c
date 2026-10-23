@@ -200,13 +200,17 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
 
     size_t db_points_read_since_plan_switch = 0; (void)db_points_read_since_plan_switch;
     size_t query_is_finished_counter = 0;
+    // A failed switch can leave skipped entries after the current plan.
+    bool query_can_switch_plan = true;
 
-    // The main loop, based on the query granularity we need
-    for( ; points_added < points_wanted && query_is_finished_counter <= 10 ;
+    // Exhausting one tier must not suppress a later tier in the query plan.
+    for( ; points_added < points_wanted &&
+           (query_is_finished_counter <= 10 ||
+            (query_can_switch_plan && ops->current_plan + 1 < qm->plan.used)) ;
         now_start_time = now_end_time, now_end_time += ops->view_update_every) {
 
         if(unlikely(query_result_plan_should_switch_plan(ops, now_end_time))) {
-            query_planer_next_plan(
+            query_can_switch_plan = query_planer_next_plan(
                 ops, now_end_time - ops->plan_switch_time_offset, new_point.sp.end_time_s);
             db_points_read_since_plan_switch = 0;
         }
@@ -276,8 +280,8 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
 
                 // ONE POINT READ-AHEAD
                 if(unlikely(query_plan_should_switch_plan(ops, sp.end_time_s) &&
-                    query_planer_next_plan(
-                        ops, now_end_time - ops->plan_switch_time_offset, new_point.sp.end_time_s))) {
+                    (query_can_switch_plan = query_planer_next_plan(
+                        ops, now_end_time - ops->plan_switch_time_offset, new_point.sp.end_time_s)))) {
 
                     // The end time of the current point, crosses our plans (tiers)
                     // so, we switched plan (tier)
