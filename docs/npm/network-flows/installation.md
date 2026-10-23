@@ -171,7 +171,7 @@ Anonymous dashboard access to the Network Flows function is not supported; Netda
 
 If the Agent is connected and you are signed in but receive an authorization error, confirm that you belong to its Space and that your role permits sensitive functions. This is different from the **Connect this agent to Netdata** message shown for an unclaimed Agent, which requires a Space Admin to connect it.
 
-If you see **This is a paid feature**, or the error says **This feature is only available for commercial users and supporters of Netdata**, the Space is on the free Community plan. Upgrade the Space to a paid plan to use Network Flows.
+If you see **This is a paid feature**, or the error says **This feature is only available for commercial users and supporters of Netdata**, the Space is not on a paid plan. Upgrade the Space to a paid plan to use Network Flows. If the Space was upgraded recently, use **Refresh access** on the Agent dashboard; otherwise the upgrade reaches existing Agent sign-ins within 24 hours.
 
 See [Netdata Access Control and Feature Availability](/docs/netdata-oss-limitations.md) for the full Anonymous / Community / Paid access model.
 
