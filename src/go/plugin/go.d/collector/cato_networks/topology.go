@@ -99,6 +99,7 @@ func buildTopology(
 			"links": links.Rows(),
 		},
 	}
+	data.Notifications = catoTopologyNotifications(sites, order)
 	return data, nil
 }
 
@@ -177,17 +178,13 @@ func addSitePopLink(
 	siteActor, popActor int,
 ) {
 	table.Add(
-		dict.Ref(catofunc.LinkTypeTunnel),
+		dict.Ref(catofunc.LinkTypePopAssociation),
 		siteActor,
 		popActor,
 		dict.Ref("cato"),
-		dict.Ref(site.ConnectivityStatus),
+		dict.Ref("unknown"),
 		dict.Ref("bidirectional"),
 		1,
-		trafficMetricValue(site.Metrics, trafficMetricBytesUpstreamMax, site.Metrics.BytesUpstreamMax),
-		trafficMetricValue(site.Metrics, trafficMetricBytesDownstreamMax, site.Metrics.BytesDownstreamMax),
-		trafficMetricValue(site.Metrics, trafficMetricLostUpstreamPercent, site.Metrics.LostUpstreamPercent),
-		trafficMetricValue(site.Metrics, trafficMetricRTTMS, site.Metrics.RTTMS),
 		nil,
 		nil,
 		nil,
@@ -196,6 +193,11 @@ func addSitePopLink(
 		nil,
 		nil,
 		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		siteActor, "Site reported PoP", nil, nil,
 	)
 }
 
@@ -283,14 +285,14 @@ func addDevicePopLink(
 	table *topologyv1.TableBuilder,
 	dict *topologyv1.StringDictionary,
 	dev deviceState,
-	deviceActor, popActor int,
+	deviceActor, popActor, siteActor int,
 ) {
 	table.Add(
-		dict.Ref(catofunc.LinkTypeTunnel),
+		dict.Ref(catofunc.LinkTypePopAssociation),
 		deviceActor,
 		popActor,
 		dict.Ref("cato"),
-		dict.Ref(firstNonEmpty(optionalBoolState(dev.Connected, "connected", "disconnected"), "unknown")),
+		dict.Ref("unknown"),
 		dict.Ref("bidirectional"),
 		1,
 		nil,
@@ -305,6 +307,7 @@ func addDevicePopLink(
 		nil,
 		nil,
 		nil,
+		siteActor, associationObservation(dev), nil, nil,
 	)
 }
 
@@ -397,6 +400,7 @@ func addBGPLink(
 		peer.OutgoingState,
 		nil,
 		nil,
+		siteActor, "BGP status", nullableString(peer.LocalIP), nullableString(peer.LocalASN),
 	)
 }
 
@@ -430,9 +434,11 @@ func addInterfaceTopology(
 			actor = devActor
 		}
 		var link any
+		var popActor any
 		if iface.PopName != "" {
 			pop := ensurePopActor(actors, dict, actorIndexes, accountID, iface.PopName)
-			link = addInterfacePopLink(links, dict, actor, pop, iface)
+			popActor = pop
+			link = addInterfacePopLink(links, dict, actor, pop, siteActor, iface)
 			hasTunnel[actor] = true
 		}
 		connected, known := interfaceConnected(iface)
@@ -442,8 +448,18 @@ func addInterfaceTopology(
 		}
 		interfaces.Add(actor, iface.ID, iface.Name, iface.Type, connectedValue,
 			iface.PopName, iface.TunnelRemoteIP, optionalInt64(iface.TunnelUptime),
-			iface.UpstreamBandwidth, iface.DownstreamBandwidth,
-			optionalBool(iface.Connected), optionalBool(iface.LinkUp), link)
+			optionalFloat64(iface.UpstreamBandwidth), optionalFloat64(iface.DownstreamBandwidth),
+			optionalBool(iface.Connected), optionalBool(iface.LinkUp), link,
+			siteActor, popActor,
+			trafficMetricValue(iface.Metrics, trafficMetricRTTMS, iface.Metrics.RTTMS),
+			trafficMetricValue(iface.Metrics, trafficMetricLostUpstreamPercent, iface.Metrics.LostUpstreamPercent),
+			trafficMetricValue(iface.Metrics, trafficMetricLostDownstreamPercent, iface.Metrics.LostDownstreamPercent),
+			trafficMetricValue(iface.Metrics, trafficMetricJitterUpstreamMS, iface.Metrics.JitterUpstreamMS),
+			trafficMetricValue(iface.Metrics, trafficMetricJitterDownstreamMS, iface.Metrics.JitterDownstreamMS),
+			trafficMetricValue(iface.Metrics, trafficMetricLastMileLatencyMS, iface.Metrics.LastMileLatencyMS),
+			trafficMetricValue(iface.Metrics, trafficMetricLastMilePacketLossPercent, iface.Metrics.LastMilePacketLossPercent),
+			firstNonEmpty(optionalBoolState(iface.Connected, "Connected", "Disconnected"), "Unknown"),
+			firstNonEmpty(optionalBoolState(iface.LinkUp, "Up", "Down"), "Unknown"))
 	}
 	// Summary destinations are a fallback, not additional observed tunnels.
 	devices := append([]deviceState(nil), site.Devices...)
@@ -455,7 +471,7 @@ func addInterfaceTopology(
 			continue
 		}
 		pop := ensurePopActor(actors, dict, actorIndexes, accountID, popName)
-		addDevicePopLink(links, dict, dev, actor, pop)
+		addDevicePopLink(links, dict, dev, actor, pop, siteActor)
 	}
 	if len(deviceActors) == 0 && !hasTunnel[siteActor] && site.PopName != "" {
 		pop := ensurePopActor(actors, dict, actorIndexes, accountID, site.PopName)
@@ -475,18 +491,18 @@ func ensurePopActor(actors *topologyv1.TableBuilder, dict *topologyv1.StringDict
 
 func addOwnershipLink(links *topologyv1.TableBuilder, dict *topologyv1.StringDictionary, site, device int) {
 	links.Add(dict.Ref(catofunc.LinkTypeOwnership), site, device, dict.Ref(""), dict.Ref("known"), dict.Ref("parent_to_child"), 1,
-		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, site, "Site membership", nil, nil)
 }
 
-func addInterfacePopLink(links *topologyv1.TableBuilder, dict *topologyv1.StringDictionary, owner, pop int, iface *interfaceState) int {
+func addInterfacePopLink(links *topologyv1.TableBuilder, dict *topologyv1.StringDictionary, owner, pop, site int, iface *interfaceState) int {
 	// Physical link-up does not establish a tunnel to the reported PoP.
 	state := firstNonEmpty(optionalBoolState(iface.Connected, "connected", "disconnected"), "unknown")
-	return links.Add(dict.Ref(catofunc.LinkTypeTunnel), owner, pop, dict.Ref("cato"), dict.Ref(state), dict.Ref("bidirectional"), 1,
+	return links.Add(dict.Ref(tunnelLinkType(iface.Connected)), owner, pop, dict.Ref("cato"), dict.Ref(state), dict.Ref("bidirectional"), 1,
 		trafficMetricValue(iface.Metrics, trafficMetricBytesUpstreamMax, iface.Metrics.BytesUpstreamMax),
 		trafficMetricValue(iface.Metrics, trafficMetricBytesDownstreamMax, iface.Metrics.BytesDownstreamMax),
 		trafficMetricValue(iface.Metrics, trafficMetricLostUpstreamPercent, iface.Metrics.LostUpstreamPercent),
 		trafficMetricValue(iface.Metrics, trafficMetricRTTMS, iface.Metrics.RTTMS),
-		nil, nil, nil, nil, nil, nil, iface.ID, iface.Name)
+		nil, nil, nil, nil, nil, nil, iface.ID, iface.Name, site, "Observed interface", nil, nil)
 }
 
 func trafficMetricValue(metrics trafficMetrics, metric trafficMetricPresence, value float64) any {
@@ -658,6 +674,10 @@ func catoTopologyLinkColumns() []topologyv1.Column {
 		topologyv1.NewColumn("outgoing_connection_state", "string", topologyv1.WithNullable()),
 		topologyv1.NewColumn("interface_id", "string", topologyv1.WithNullable(), topologyv1.WithRole("group_key")),
 		topologyv1.NewColumn("interface_name", "string", topologyv1.WithNullable(), topologyv1.WithRole("group_key")),
+		topologyv1.NewColumn("site_actor", "actor_ref", topologyv1.WithRole("reference")),
+		topologyv1.NewColumn("observation", "string"),
+		topologyv1.NewColumn("local_ip", "ip", topologyv1.WithNullable()),
+		topologyv1.NewColumn("local_asn", "string", topologyv1.WithNullable()),
 	}
 }
 
@@ -671,10 +691,79 @@ func catoTopologyInterfaceColumns() []topologyv1.Column {
 		topologyv1.NewColumn("pop_name", "string"),
 		topologyv1.NewColumn("tunnel_remote_ip", "ip"),
 		topologyv1.NewColumn("tunnel_uptime", "duration", topologyv1.WithNullable()),
-		topologyv1.NewColumn("upstream_bandwidth", "int"),
-		topologyv1.NewColumn("downstream_bandwidth", "int"),
+		topologyv1.NewColumn("upstream_bandwidth", "float", topologyv1.WithNullable()),
+		topologyv1.NewColumn("downstream_bandwidth", "float", topologyv1.WithNullable()),
 		topologyv1.NewColumn("tunnel_connected", "bool", topologyv1.WithNullable()),
 		topologyv1.NewColumn("link_up", "bool", topologyv1.WithNullable()),
 		topologyv1.NewColumn("link", "link_ref", topologyv1.WithNullable()),
+		topologyv1.NewColumn("site_actor", "actor_ref", topologyv1.WithRole("reference")),
+		topologyv1.NewColumn("pop_actor", "actor_ref", topologyv1.WithRole("reference"), topologyv1.WithNullable()),
+		topologyv1.NewColumn("rtt_ms", "float", topologyv1.WithNullable()),
+		topologyv1.NewColumn("lost_upstream_percent", "float", topologyv1.WithNullable()),
+		topologyv1.NewColumn("lost_downstream_percent", "float", topologyv1.WithNullable()),
+		topologyv1.NewColumn("jitter_upstream_ms", "float", topologyv1.WithNullable()),
+		topologyv1.NewColumn("jitter_downstream_ms", "float", topologyv1.WithNullable()),
+		topologyv1.NewColumn("last_mile_latency_ms", "float", topologyv1.WithNullable()),
+		topologyv1.NewColumn("last_mile_loss_percent", "float", topologyv1.WithNullable()),
+		topologyv1.NewColumn("tunnel_state", "string"),
+		topologyv1.NewColumn("physical_link_state", "string"),
 	}
+}
+
+func tunnelLinkType(connected *bool) string {
+	if connected == nil {
+		return catofunc.LinkTypeTunnelUnknown
+	}
+	if !*connected {
+		return catofunc.LinkTypeTunnelDisconnected
+	}
+	return catofunc.LinkTypeTunnel
+}
+func associationObservation(dev deviceState) string {
+	if dev.LastPopName != "" {
+		return "Device last reported PoP"
+	}
+	return "Site reported PoP; device tunnel unobserved"
+}
+func nullableString(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+func catoTopologyNotifications(sites map[string]*siteState, order []string) []topologyv1.Notification {
+	notices := []topologyv1.Notification{{Severity: "info", Code: "cato_access_scope", Message: "Access topology for the selected sites: site membership, observed WAN tunnels, reported PoP associations and BGP adjacencies. Cato backbone and end-to-end reachability are not represented. Separate PoP groups do not imply isolation. Upstream means site to Cato; downstream means Cato to site. Missing values mean not observed."}}
+	var metrics, bgp int
+	for _, id := range order {
+		if site := sites[id]; site != nil {
+			if site.MetricsCollection != "observed" {
+				metrics++
+			}
+			if site.BGPCollection != "observed" && site.BGPCollection != "empty" && site.BGPCollection != "empty_cached" {
+				bgp++
+			}
+		}
+	}
+	if metrics > 0 {
+		notices = append(notices, topologyv1.Notification{
+			Severity: "warning",
+			Code:     "cato_metrics_coverage",
+			Message:  fmt.Sprintf("Metrics are incomplete or unavailable for %d selected sites. Open site details for collection status; missing measurements do not mean zero.", metrics),
+		})
+	}
+	if bgp > 0 {
+		notices = append(notices, topologyv1.Notification{
+			Severity: "warning",
+			Code:     "cato_bgp_coverage",
+			Message:  fmt.Sprintf("BGP observations are incomplete or unavailable for %d selected sites. Missing peers do not mean no BGP is configured. Open site details for collection status.", bgp),
+		})
+	}
+	return notices
+}
+
+func optionalFloat64(v *float64) any {
+	if v == nil {
+		return nil
+	}
+	return *v
 }

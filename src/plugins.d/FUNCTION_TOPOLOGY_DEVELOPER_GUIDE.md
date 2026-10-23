@@ -1784,42 +1784,64 @@ explicit `ownership` link to each device, including disconnected devices.
 `parent_identity` metadata complements these edges; it does not replace them.
 Ownership links are structural and carry no traffic measurements.
 
-Each interface with a reported PoP contributes a `cato_tunnel` link from its
-device, or from its site when the device cannot be resolved. Parallel interface
-links retain their own `interface_id`, `interface_name`, state and measurements.
-Both interface identity columns declare `role: group_key`, so aggregation keeps
-parallel interfaces distinct, including interfaces identified only by name;
-the actor's Connections section and tunnel hover identify the interface. The
-actor-owned `interfaces` table references its tunnel through nullable `link`.
-An interface without a PoP has no invented destination and its `link` is null.
+Each interface with a reported PoP contributes an observed link from its device,
+or from its site when the device cannot be resolved. `cato_tunnel` means connected,
+`cato_tunnel_disconnected` means disconnected, and `cato_tunnel_unknown` means
+unknown. Their legend and line styles distinguish these states. Physical `link_up`
+does not establish tunnel connectivity. Parallel interfaces retain their own
+`interface_id` and `interface_name`, both declared `role: group_key` so CTS keeps
+ID-bearing and name-only interfaces distinct.
 
-Tunnel state uses the interface's `connected` observation: true, false and
-missing become `connected`, `disconnected` and `unknown`. Physical `link_up`
-does not establish tunnel connectivity. The interface table exposes
-`tunnel_connected` and `link_up` separately, while retaining the existing
-`connected` availability column for compatibility. Interface measurements
-honor their presence flags; site aggregate measurements are not replicated
-onto interface tunnels.
+A device's last reported PoP, falling back to the site's PoP, supplies a
+`cato_pop_association` only when that device has no interface PoP observations.
+A device-free site uses its summary PoP only when it has no interface PoP
+observations. These are associations, not observed tunnels: state is unknown,
+interface identifiers are null, and `observation` explains the source. Device
+connectivity is not evidence that a particular fallback tunnel is connected.
+No PoP-to-PoP fabric or end-to-end reachability is inferred.
 
-A device's last PoP, falling back to the site's PoP, supplies a summary tunnel
-only when that device has no interface PoP observations. A device-free site
-uses its summary PoP only when it has no interface PoP observations. Summary
-links have null interface identifiers. No PoP-to-PoP fabric links are inferred.
+The actor-owned `interfaces` table retains actual ownership in `actor`, and
+references its site, observed PoP and tunnel with `site_actor`, nullable
+`pop_actor` and nullable `link`. Site modals filter by `site_actor` to show WANs
+across all devices; device modals filter by `actor`. PoP modals show attached
+WANs and connections with clickable site context. Site device summaries reuse
+ownership links and device labels, including HA role. Miniature graphs retain
+the schema's one-hop depth; the site-wide table provides the full WAN overview.
 
-All actor types expose known metadata through `actor_labels`, with source and
-kind, modal identification fields, and a one-hop miniature. Canonical actor
-columns remain the source for identity and existing search behavior. Device
-and BGP labels include explicitly named site context; PoPs have account/name
-labels without invented geography. Empty labels are omitted; known zero and
-false values are retained. Site and device modals expose owned interfaces;
-site, device and PoP modals expose incident connections. BGP peers retain their
-routing detail section.
+Interface details distinguish physical and tunnel states, configured capacity
+and observed performance. Configured limits use Cato's supported
+`upstreamBandwidthMbpsPrecision` / `downstreamBandwidthMbpsPrecision` fields
+as nullable floating-point Mbps; absent capacity is not zero. RTT, directional
+loss and jitter, and last-mile measurements honor their presence flags and
+show units. Less frequently used details appear in expandable rows. Site
+aggregate measurements are not copied onto interface tunnels. The existing
+`connected` availability column is retained for compatibility, while explicit
+`tunnel_connected`, `link_up`, and human-readable state columns carry their
+separate meanings. BGP details show local IP/ASN, incoming/outgoing states and
+route counts alongside the peer identity.
 
-Producer tests MUST verify site-device reachability, interface destinations,
-per-owner fallback, parallel interfaces with different states, physical-link
-versus tunnel state, label ownership, and missing/zero/false values in addition
-to schema and semantic validation. Schema conformance alone cannot detect an
-isolated site or a missing metadata presentation recipe.
+All actor types expose known metadata through `actor_labels`, modal
+identification and a one-hop miniature. Canonical actor columns remain the
+identity and search source. Shared PoPs have account/name labels without
+invented geography. Empty labels are omitted; known false/zero values survive.
+Site identification includes metrics and BGP observation status. A successful
+empty BGP response, cached empty response, partial normalization and failed
+collection are distinct. Missing peers after a failed observation must not be
+read as configuration removal.
+
+`data.notifications` explains access-topology scope and incomplete metrics/BGP
+coverage without raw errors or tenant identifiers. CTS must accept and preserve
+notifications, and the frontend must display them; site coverage also remains
+available in actor identification. The companion frontend notice control and
+faithful dotted/dashed legend samples are required for the complete operator
+experience. Collection time is not a claim that every source query succeeded.
+
+Producer and consumer validation MUST exercise a site with multiple devices
+and WANs, disconnected and unknown tunnels, fallback associations, PoP site
+context, BGP failure/recovery/empty observations, fractional and absent capacity,
+and zero/absent measurements. Validate actual modal projections and collection
+notices through the consumers, not only schema conformance. The operator must
+be able to identify the affected WAN and understand the limits of the evidence.
 
 ## Producer Checklist
 

@@ -57,6 +57,12 @@ func mergeMetrics(metrics *catosdk.AccountMetrics, sites map[string]*siteState) 
 				iface.DeviceName = existing.DeviceName
 			}
 			existing.Metrics = iface.Metrics
+			if existing.UpstreamBandwidth == nil {
+				existing.UpstreamBandwidth = iface.UpstreamBandwidth
+			}
+			if existing.DownstreamBandwidth == nil {
+				existing.DownstreamBandwidth = iface.DownstreamBandwidth
+			}
 			existing.DeviceID = iface.DeviceID
 			existing.DeviceName = iface.DeviceName
 			existing.DeviceSocketID = iface.DeviceSocketID
@@ -88,8 +94,8 @@ func normalizeMetricsInterface(
 		if iface.Name == "" {
 			iface.Name = derefZero(info.GetName())
 		}
-		iface.UpstreamBandwidth = derefZero(info.GetUpstreamBandwidth())
-		iface.DownstreamBandwidth = derefZero(info.GetDownstreamBandwidth())
+		iface.UpstreamBandwidth = info.GetUpstreamBandwidthMbpsPrecision()
+		iface.DownstreamBandwidth = info.GetDownstreamBandwidthMbpsPrecision()
 	}
 	if socket := raw.GetSocketInfo(); socket != nil {
 		iface.DeviceSocketID = derefZero(socket.GetID())

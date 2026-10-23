@@ -178,6 +178,14 @@ func TopologyActorTypes() map[string]topologyv1.ActorType {
 			Enabled: new(true),
 			Depth:   1,
 		}
+		if id == ActorTypePop {
+			section := catoDeviceModal().Sections[0]
+			section.ID = "attached_wans"
+			section.Label = "Attached WANs"
+			section.OwnerFilter.ActorColumn = "pop_actor"
+			section.Columns = append([]topologyv1.ModalColumn{catoActorRefColumn("site", "Site", "site_actor"), catoActorRefColumn("device", "Device / owner", "actor")}, section.Columns...)
+			modal.Sections = append(modal.Sections, section)
+		}
 		if id != ActorTypeBGPPeer {
 			modal.Sections = append(modal.Sections, catoConnectionsSection())
 		}
@@ -190,7 +198,7 @@ func TopologyActorTypes() map[string]topologyv1.ActorType {
 }
 
 func TopologyLinkTypes() map[string]topologyv1.LinkType {
-	return map[string]topologyv1.LinkType{
+	types := map[string]topologyv1.LinkType{
 		LinkTypeOwnership: {
 			Orientation: "hierarchical", DirectionRole: "ownership", SemanticRole: "ownership",
 			Aggregation: topologyv1.LinkAggregation{
@@ -198,7 +206,7 @@ func TopologyLinkTypes() map[string]topologyv1.LinkType {
 				Evidence:  "drop",
 			},
 			Presentation: &topologyv1.LinkPresentation{
-				Label:     "Site device",
+				Label:     "Site membership (not a network connection)",
 				ColorSlot: "structural",
 				Opacity:   "faded",
 				LineStyle: "dotted",
@@ -222,14 +230,14 @@ func TopologyLinkTypes() map[string]topologyv1.LinkType {
 				},
 			},
 			Presentation: &topologyv1.LinkPresentation{
-				Label:     "Cato tunnel",
+				Label:     "Observed tunnel: connected",
 				ColorSlot: "green",
 				Width:     "normal",
 				Curve:     "auto",
 				Arrow:     "none",
 				Hover: &topologyv1.HoverPresentation{
 					Fields: []topologyv1.PresentationField{
-						{Key: "interface_name", Label: "Interface"}, {Key: "interface_id", Label: "Interface ID"}, {Key: "state", Label: "Tunnel state"},
+						{Key: "observation", Label: "Evidence"}, {Key: "interface_name", Label: "Interface"}, {Key: "interface_id", Label: "Interface ID"}, {Key: "state", Label: "Tunnel state"},
 					},
 				},
 			},
@@ -257,6 +265,23 @@ func TopologyLinkTypes() map[string]topologyv1.LinkType {
 			},
 		},
 	}
+
+	for _, variant := range []struct{ id, label, color, line string }{
+		{LinkTypeTunnelDisconnected, "Observed tunnel: disconnected", "danger", "dashed"},
+		{LinkTypeTunnelUnknown, "Observed tunnel: state unknown", "muted", "dotted"},
+		{LinkTypePopAssociation, "Reported PoP association (tunnel unobserved)", "derived", "dashed"},
+	} {
+		typ := types[LinkTypeTunnel]
+		pres := *typ.Presentation
+		pres.Label, pres.ColorSlot, pres.LineStyle = variant.label, variant.color, variant.line
+		typ.Presentation = &pres
+		if variant.id == LinkTypePopAssociation {
+			typ.SemanticRole = "discovery"
+			typ.Orientation = "undirected"
+		}
+		types[variant.id] = typ
+	}
+	return types
 }
 
 func TopologyPresentation() *topologyv1.Presentation {
@@ -275,16 +300,38 @@ func TopologyPresentation() *topologyv1.Presentation {
 				{Type: ActorTypeBGPPeer, Label: "BGP peer"},
 			},
 			Links: []topologyv1.LegendEntry{
-				{Type: LinkTypeOwnership, Label: "Site device"},
-				{Type: LinkTypeTunnel, Label: "Cato tunnel"},
-				{Type: LinkTypeBGP, Label: "BGP session"},
+				{Type: LinkTypeOwnership, Label: "Site membership (not connectivity)"},
+				{Type: LinkTypeTunnel, Label: "Observed WAN tunnel: connected"},
+				{Type: LinkTypeTunnelDisconnected, Label: "Observed WAN tunnel: disconnected"},
+				{Type: LinkTypeTunnelUnknown, Label: "Observed WAN tunnel: state unknown"},
+				{Type: LinkTypePopAssociation, Label: "Reported PoP association: tunnel unobserved"},
+				{Type: LinkTypeBGP, Label: "BGP adjacency (inspect session state)"},
 			},
 		},
 	}
 }
 
 func catoSiteModal() *topologyv1.ModalPresentation {
-	return catoDeviceModal()
+	modal := catoDeviceModal()
+	modal.Sections[0].Label = "Site WANs (all devices)"
+	modal.Sections[0].OwnerFilter.ActorColumn = "site_actor"
+	modal.Sections[0].Columns = append([]topologyv1.ModalColumn{catoActorRefColumn("device", "Device / owner", "actor")}, modal.Sections[0].Columns...)
+	modal.Sections = append(modal.Sections, topologyv1.ModalSection{
+		ID:    "devices",
+		Label: "Site devices",
+		Order: 2,
+		Source: topologyv1.ModalSource{
+			Kind: "links",
+		},
+		OwnerFilter: &topologyv1.ModalOwnerFilter{
+			Mode:        "actor_column",
+			ActorColumn: "src_actor",
+		},
+		RowFilters: []topologyv1.ModalRowFilter{{Column: "observation", Op: "eq", Value: "Site membership"}},
+		Columns:    []topologyv1.ModalColumn{catoActorRefColumn("device", "Device", "dst_actor"), catoDeviceLabelColumn("ha_role", "HA role"), catoDeviceLabelColumn("connected", "Device connected"), catoDeviceLabelColumn("socket_serial", "Serial"), catoDeviceLabelColumn("socket_version", "Version")},
+		EmptyLabel: "No devices reported for this site.",
+	})
+	return modal
 }
 
 func catoDeviceModal() *topologyv1.ModalPresentation {
@@ -294,9 +341,10 @@ func catoDeviceModal() *topologyv1.ModalPresentation {
 		},
 		Sections: []topologyv1.ModalSection{
 			{
-				ID:    ActorTableInterfaces,
-				Label: "Interfaces",
-				Order: 1,
+				ID:         ActorTableInterfaces,
+				Label:      "WAN interfaces",
+				Order:      1,
+				EmptyLabel: "No interface observations available. This does not establish that no WAN is configured.",
 				Source: topologyv1.ModalSource{
 					Kind:  "actor_table",
 					Table: ActorTableInterfaces,
@@ -307,14 +355,21 @@ func catoDeviceModal() *topologyv1.ModalPresentation {
 				},
 				Columns: []topologyv1.ModalColumn{
 					modalDirectColumn("name", "Name", "name", "text"),
-					modalDirectColumn("type", "Type", "type", "badge"),
-					modalDirectColumn("tunnel_connected", "Tunnel connected", "tunnel_connected", "badge"),
-					modalDirectColumn("link_up", "Physical link up", "link_up", "badge"),
+
+					modalDirectColumn("tunnel_state", "Tunnel state", "tunnel_state", "badge"),
+					modalDirectColumn("physical_link_state", "Physical link", "physical_link_state", "badge"),
 					modalDirectColumn("pop_name", "PoP", "pop_name", "text"),
-					modalDirectColumn("tunnel_remote_ip", "Remote IP", "tunnel_remote_ip", "text"),
-					modalDirectColumn("tunnel_uptime", "Uptime", "tunnel_uptime", "duration"),
-					modalDirectColumn("upstream_bandwidth", "Upstream bandwidth", "upstream_bandwidth", "number"),
-					modalDirectColumn("downstream_bandwidth", "Downstream bandwidth", "downstream_bandwidth", "number"),
+					modalExpandedColumn("tunnel_remote_ip", "Remote IP", "tunnel_remote_ip", "text"),
+					modalExpandedColumn("tunnel_uptime", "Uptime", "tunnel_uptime", "duration"),
+					modalExpandedColumn("upstream_bandwidth", "Configured upstream limit (Mbps)", "upstream_bandwidth", "number"),
+					modalExpandedColumn("downstream_bandwidth", "Configured downstream limit (Mbps)", "downstream_bandwidth", "number"),
+					modalDirectColumn("rtt_ms", "RTT (ms)", "rtt_ms", "number"),
+					modalDirectColumn("lost_upstream_percent", "Upstream loss (%)", "lost_upstream_percent", "number"),
+					modalDirectColumn("lost_downstream_percent", "Downstream loss (%)", "lost_downstream_percent", "number"),
+					modalExpandedColumn("jitter_upstream_ms", "Upstream jitter (ms)", "jitter_upstream_ms", "number"),
+					modalExpandedColumn("jitter_downstream_ms", "Downstream jitter (ms)", "jitter_downstream_ms", "number"),
+					modalExpandedColumn("last_mile_latency_ms", "Last-mile latency (ms)", "last_mile_latency_ms", "number"),
+					modalExpandedColumn("last_mile_loss_percent", "Last-mile loss (%)", "last_mile_loss_percent", "number"),
 				},
 				Sort: &topologyv1.ModalSort{
 					Column:    "name",
@@ -354,6 +409,10 @@ func catoBGPPeerModal() *topologyv1.ModalPresentation {
 						},
 						Cell: "actor_link",
 					},
+					modalDirectColumn("local_ip", "Local IP", "local_ip", "text"),
+					modalDirectColumn("local_asn", "Local ASN", "local_asn", "text"),
+					modalDirectColumn("incoming_connection_state", "Incoming connection", "incoming_connection_state", "badge"),
+					modalDirectColumn("outgoing_connection_state", "Outgoing connection", "outgoing_connection_state", "badge"),
 					modalDirectColumn("protocol", "Protocol", "protocol", "badge"),
 					modalDirectColumn("state", "State", "state", "badge"),
 					modalDirectColumn("routes", "Routes", "routes", "number"),
@@ -383,6 +442,16 @@ func catoActorLabels(actorType string) *topologyv1.ModalLabelsPresentation {
 	switch actorType {
 	case ActorTypeSite:
 		fields = append(fields,
+			topologyv1.ModalLabelIdentificationField{
+				Key:       "metrics_collection",
+				Label:     "Metrics collection",
+				MaxValues: 1,
+			},
+			topologyv1.ModalLabelIdentificationField{
+				Key:       "bgp_collection",
+				Label:     "BGP collection",
+				MaxValues: 1,
+			},
 			topologyv1.ModalLabelIdentificationField{
 				Key:       "description",
 				Label:     "Description",
@@ -473,7 +542,7 @@ func catoConnectionsSection() topologyv1.ModalSection {
 	return topologyv1.ModalSection{
 		ID:    "connections",
 		Label: "Connections",
-		Order: 2,
+		Order: 3,
 		Source: topologyv1.ModalSource{
 			Kind: "links",
 		},
@@ -488,12 +557,44 @@ func catoConnectionsSection() topologyv1.ModalSection {
 				SrcActorColumn: "src_actor",
 				DstActorColumn: "dst_actor",
 			}},
-			modalDirectColumn("type", "Relationship", "type", "badge"),
+			catoActorRefColumn("site", "Site", "site_actor"),
+			modalDirectColumn("observation", "Relationship evidence", "observation", "text"),
 			modalDirectColumn("interface_name", "Interface", "interface_name", "text"),
 			modalDirectColumn("interface_id", "Interface ID", "interface_id", "text"),
 			modalDirectColumn("state", "State", "state", "badge"),
-			modalDirectColumn("rtt_ms", "RTT", "rtt_ms", "number"),
-			modalDirectColumn("lost_upstream_percent", "Upstream loss", "lost_upstream_percent", "number"),
+			modalDirectColumn("rtt_ms", "RTT (ms)", "rtt_ms", "number"),
+			modalDirectColumn("lost_upstream_percent", "Upstream loss (%)", "lost_upstream_percent", "number"),
 		},
 	}
+}
+
+func catoActorRefColumn(id, label, column string) topologyv1.ModalColumn {
+	return topologyv1.ModalColumn{
+		ID:    id,
+		Label: label,
+		Cell:  "actor_link",
+		Projection: topologyv1.ModalProjection{
+			Kind:        "actor_ref_label",
+			ActorColumn: column,
+		},
+	}
+}
+func catoDeviceLabelColumn(key, label string) topologyv1.ModalColumn {
+	return topologyv1.ModalColumn{
+		ID:    key,
+		Label: label,
+		Cell:  "text",
+		Projection: topologyv1.ModalProjection{
+			Kind:        "label_lookup",
+			ActorColumn: "dst_actor",
+			LabelKey:    key,
+			Fallback:    "Unknown",
+		},
+	}
+}
+
+func modalExpandedColumn(id, label, source, cell string) topologyv1.ModalColumn {
+	col := modalDirectColumn(id, label, source, cell)
+	col.Visibility = "expanded"
+	return col
 }

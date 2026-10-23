@@ -40,6 +40,8 @@ func buildCatoTopologyLabels(dict *topologyv1.StringDictionary, accountID string
 		add(actor, "connection_type", site.ConnectionType, "metadata")
 		add(actor, "connectivity_status", site.ConnectivityStatus, "status")
 		add(actor, "operational_status", site.OperationalStatus, "status")
+		add(actor, "metrics_collection", collectionStatusLabel(site.MetricsCollection), "status")
+		add(actor, "bgp_collection", collectionStatusLabel(site.BGPCollection), "status")
 		if site.HostCount != nil {
 			add(actor, "host_count", strconv.FormatInt(*site.HostCount, 10), "metadata")
 		}
@@ -100,5 +102,22 @@ func catoTopologyLabelColumns() []topologyv1.Column {
 		topologyv1.NewColumn("value", "string_ref", topologyv1.WithDictionary("strings")),
 		topologyv1.NewColumn("source", "string_ref", topologyv1.WithDictionary("strings")),
 		topologyv1.NewColumn("kind", "string_ref", topologyv1.WithDictionary("strings")),
+	}
+}
+
+func collectionStatusLabel(status string) string {
+	switch status {
+	case "observed":
+		return "Observed"
+	case "empty":
+		return "No peers reported"
+	case "empty_cached":
+		return "No peers reported (cached result)"
+	case "partial":
+		return "Partial observations"
+	case "unavailable":
+		return "Unavailable"
+	default:
+		return "Unknown"
 	}
 }

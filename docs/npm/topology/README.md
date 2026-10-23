@@ -69,11 +69,16 @@ The topology view brings in the rest of your infrastructure in the same form, so
 - **Netdata streaming** — how your Agents connect to each other (`topology:streaming`).
 - **VMware vSphere** — datacenters, clusters, resource pools, hosts, VMs, datastores, and networks (`topology:vsphere`).
 - **Cato Networks** — Cato SASE sites, devices, PoPs, and BGP peers (`topology:cato_networks`).
-  Sites connect to their devices through dotted ownership links. Tunnel connections use each interface's reported
-  PoP and tunnel status; an active physical WAN port does not mean its tunnel is connected. When interface PoP data
-  is unavailable, the map retains a device/site summary connection. Actor details include known site location,
-  connection status, socket identity, HA role, software version, interfaces, and incident connections. Unknown
-  attributes remain absent, and the map does not invent connections between PoPs.
+  Site membership is structural, not a network connection. Observed WAN tunnels
+  distinguish connected, disconnected and unknown states. Reported PoP associations
+  are shown separately when interface observations are unavailable; they do not
+  establish an active tunnel. Open a site for its devices, HA roles and all WANs;
+  open a PoP for attached WANs and site context. Expand WAN rows for configured
+  limits and diagnostics. Upstream means site to Cato; downstream means Cato to site.
+  Topology information explains coverage gaps, and site identification shows metrics
+  and BGP collection status. Missing data does not mean zero or no configuration.
+  This is an access topology: the Cato backbone and end-to-end reachability are not
+  represented, so separate PoP groups do not imply network isolation.
 
 The device fabric (`topology:snmp`) and application dependencies come up on their own once the devices and hosts are monitored. The streaming map appears once Agents are streaming to a Parent (configured in `stream.conf`); vSphere and Cato come from their own collectors, configured separately.
 

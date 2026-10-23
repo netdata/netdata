@@ -40,8 +40,8 @@ func TestTopologyObservedConnections(t *testing.T) {
 			}
 			require.Equal(t, map[string]string{
 				"Office -> Socket": "ownership:known", "Office -> Backup": "ownership:known",
-				"Socket -> New PoP": "cato_tunnel:" + name, "Socket -> Other PoP": "cato_tunnel:connected",
-				"Backup -> Fallback PoP": "cato_tunnel:disconnected",
+				"Socket -> New PoP": map[string]string{"connected": "cato_tunnel", "disconnected": "cato_tunnel_disconnected", "unknown": "cato_tunnel_unknown"}[name] + ":" + name, "Socket -> Other PoP": "cato_tunnel:connected",
+				"Backup -> Fallback PoP": "cato_pop_association:unknown",
 			}, got)
 			interfaces := topologyTableRows(t, data.Tables.Actor[catofunc.ActorTableInterfaces].Table, data.Dictionaries)
 			require.Equal(t, optionalBool(connected), interfaces[0]["tunnel_connected"])
@@ -193,7 +193,7 @@ func TestTopologyInterfaceOwnersAndFallback(t *testing.T) {
 			links := topologyTableRows(t, data.Links, data.Dictionaries)
 			got := map[string]string{}
 			for _, l := range links {
-				if l["type"] != catofunc.LinkTypeTunnel {
+				if l["protocol"] != "cato" {
 					continue
 				}
 				src := actors[l["src_actor"].(int)]["display_name"].(string)
