@@ -51,10 +51,17 @@ static inline void jb_traverse_pcre2_named_groups_and_send_keys(PCRE2_STATE *pcr
 
             PCRE2_SIZE start_offset = ovector[2 * n];
             PCRE2_SIZE end_offset = ovector[2 * n + 1];
-            PCRE2_SIZE group_length = end_offset - start_offset;
+
+            // groups that did not participate in the match have both offsets set to PCRE2_UNSET
+            const char *value = "";
+            PCRE2_SIZE group_length = 0;
+            if(start_offset != PCRE2_UNSET) {
+                value = line + start_offset;
+                group_length = end_offset - start_offset;
+            }
 
             copy_and_convert_key(pcre2, group_name);
-            log_job_send_extracted_key_value(pcre2->jb, pcre2->key, line + start_offset, group_length);
+            log_job_send_extracted_key_value(pcre2->jb, pcre2->key, value, group_length);
 
             table_ptr += name_entry_size;
         }
