@@ -189,7 +189,28 @@ func TestTopologyDeviceIdentityPrecedesLongSiteContext(t *testing.T) {
 	second := topologyDeviceName(site, deviceState{ID: "2", SocketSerial: "987654321"})
 	require.Contains(t, first, site.Name)
 	require.Contains(t, second, site.Name)
-	require.NotEqual(t, []rune(first)[:79], []rune(second)[:79], "graph caption shortening must retain device identity")
-	require.Contains(t, string([]rune(first)[:79]), "serial 123456789")
-	require.Contains(t, string([]rune(second)[:79]), "serial 987654321")
+	visibleLength := catofunc.TopologyActorTypes()[catofunc.ActorTypeDevice].Presentation.LabelPolicy.MaxLength - 1
+	require.NotEqual(t, []rune(first)[:visibleLength], []rune(second)[:visibleLength], "graph caption shortening must retain device identity")
+	require.Contains(t, string([]rune(first)[:visibleLength]), "serial 123456789")
+	require.Contains(t, string([]rune(second)[:visibleLength]), "serial 987654321")
+}
+
+func TestTopologyMetricsPreservesSnapshotDeviceOwner(t *testing.T) {
+	site := &siteState{ID: "site", Name: "Office", Devices: []deviceState{{ID: "device", Name: "Edge"}}, Interfaces: map[string]*interfaceState{
+		"wan": {ID: "wan", Name: "WAN", DeviceID: "device", DeviceName: "Edge", PopName: "Athens", Connected: new(true)},
+	}}
+	metrics := &catosdk.AccountMetrics{AccountMetrics: &catosdk.AccountMetrics_AccountMetrics{Sites: []*catosdk.AccountMetrics_AccountMetrics_Sites{{
+		ID: new("site"), Interfaces: []*catosdk.AccountMetrics_AccountMetrics_Sites_Interfaces{{
+			Name: new("WAN"), InterfaceInfo: &catosdk.AccountMetrics_AccountMetrics_Sites_Interfaces_InterfaceInfo{ID: "wan"},
+			SocketInfo: &catosdk.AccountMetrics_AccountMetrics_Sites_Interfaces_SocketInfo{ID: new("unmatched-socket")},
+		}},
+	}}}}
+	sites := map[string]*siteState{"site": site}
+	require.Empty(t, mergeMetrics(metrics, sites))
+	require.Equal(t, "device", site.Interfaces["wan"].DeviceID)
+	require.Equal(t, "Edge", site.Interfaces["wan"].DeviceName)
+	data := mustBuildTopology(t, "account", sites, []string{"site"}, fixedCatoTestNow())
+	actors := topologyTableRows(t, data.Actors, data.Dictionaries)
+	interfaces := topologyTableRows(t, data.Tables.Actor[catofunc.ActorTableInterfaces].Table, data.Dictionaries)
+	require.Equal(t, "cato:device:site:device", actors[interfaces[0]["actor"].(int)]["id"])
 }

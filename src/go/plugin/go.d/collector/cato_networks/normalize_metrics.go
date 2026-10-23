@@ -42,7 +42,7 @@ func mergeMetrics(metrics *catosdk.AccountMetrics, sites map[string]*siteState) 
 				site.Metrics, _ = mergeRawInterfaceTrafficMetrics(site.Metrics, rawIface)
 			}
 			key := interfaceKey(iface.ID, iface.Name)
-			resolveMetricInterfaceDevice(site, &iface)
+			matchedDevice := resolveMetricInterfaceDevice(site, &iface)
 			if iface.ID == "" && iface.DeviceID != "" {
 				key = snapshotInterfaceKey(iface.DeviceID, iface.ID, iface.Name)
 			}
@@ -51,8 +51,10 @@ func mergeMetrics(metrics *catosdk.AccountMetrics, sites map[string]*siteState) 
 				site.Interfaces[key] = &iface
 				continue
 			}
-			if iface.DeviceID == "" {
+			if !matchedDevice && existing.DeviceID != "" {
+				// An unmatched socket ID must not displace a known inventory owner.
 				iface.DeviceID = existing.DeviceID
+				iface.DeviceName = existing.DeviceName
 			}
 			if iface.DeviceName == "" {
 				iface.DeviceName = existing.DeviceName

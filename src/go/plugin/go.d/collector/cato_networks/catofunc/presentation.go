@@ -420,100 +420,32 @@ func modalDirectColumn(id, label, sourceColumn, cell string) topologyv1.ModalCol
 }
 
 func catoActorLabels(actorType string) *topologyv1.ModalLabelsPresentation {
-	fields := []topologyv1.ModalLabelIdentificationField{{Key: "account_id", Label: "Account", MaxValues: 1}}
+	fields := []topologyv1.ModalLabelIdentificationField{catoIdentificationField("account_id", "Account")}
 	switch actorType {
 	case ActorTypeSite:
 		fields = append(fields,
-			topologyv1.ModalLabelIdentificationField{
-				Key:       "snapshot_collection",
-				Label:     "Inventory collection",
-				MaxValues: 1,
-			},
-			topologyv1.ModalLabelIdentificationField{
-				Key:       "metrics_collection",
-				Label:     "Metrics collection",
-				MaxValues: 1,
-			},
-			topologyv1.ModalLabelIdentificationField{
-				Key:       "bgp_collection",
-				Label:     "BGP collection",
-				MaxValues: 1,
-			},
-			topologyv1.ModalLabelIdentificationField{
-				Key:       "description",
-				Label:     "Description",
-				MaxValues: 1,
-			},
-			topologyv1.ModalLabelIdentificationField{
-				Key:       "country_name",
-				Label:     "Country",
-				MaxValues: 1,
-			},
-			topologyv1.ModalLabelIdentificationField{
-				Key:       "connection_type",
-				Label:     "Connection",
-				MaxValues: 1,
-			},
-			topologyv1.ModalLabelIdentificationField{
-				Key:       "connectivity_status",
-				Label:     "Connectivity",
-				MaxValues: 1,
-			})
+			catoIdentificationField("snapshot_collection", "Inventory collection"),
+			catoIdentificationField("metrics_collection", "Metrics collection"),
+			catoIdentificationField("bgp_collection", "BGP collection"),
+			catoIdentificationField("description", "Description"),
+			catoIdentificationField("country_name", "Country"),
+			catoIdentificationField("connection_type", "Connection"),
+			catoIdentificationField("connectivity_status", "Connectivity"))
 	case ActorTypeDevice:
 		fields = append(fields,
-			topologyv1.ModalLabelIdentificationField{
-				Key:       "source_name",
-				Label:     "Source name",
-				MaxValues: 1,
-			},
-			topologyv1.ModalLabelIdentificationField{
-				Key:       "site_name",
-				Label:     "Site",
-				MaxValues: 1,
-			},
-			topologyv1.ModalLabelIdentificationField{
-				Key:       "ha_role",
-				Label:     "HA role",
-				MaxValues: 1,
-			},
-			topologyv1.ModalLabelIdentificationField{
-				Key:       "socket_serial",
-				Label:     "Serial",
-				MaxValues: 1,
-			},
-			topologyv1.ModalLabelIdentificationField{
-				Key:       "socket_version",
-				Label:     "Version",
-				MaxValues: 1,
-			},
-			topologyv1.ModalLabelIdentificationField{
-				Key:       "connected",
-				Label:     "Connected",
-				MaxValues: 1,
-			})
+			catoIdentificationField("source_name", "Source name"),
+			catoIdentificationField("site_name", "Site"),
+			catoIdentificationField("ha_role", "HA role"),
+			catoIdentificationField("socket_serial", "Serial"),
+			catoIdentificationField("socket_version", "Version"),
+			catoIdentificationField("connected", "Connected"))
 	case ActorTypePop:
-		fields = append(fields, topologyv1.ModalLabelIdentificationField{
-			Key:       "pop_name",
-			Label:     "PoP",
-			MaxValues: 1,
-		})
+		fields = append(fields, catoIdentificationField("pop_name", "PoP"))
 	case ActorTypeBGPPeer:
 		fields = append(fields,
-			topologyv1.ModalLabelIdentificationField{
-				Key:       "site_name",
-				Label:     "Site",
-				MaxValues: 1,
-			},
-			topologyv1.ModalLabelIdentificationField{
-				Key:       "remote_ip",
-				Label:     "Remote IP",
-				MaxValues: 1,
-			},
-			topologyv1.ModalLabelIdentificationField{
-				Key:       "remote_asn",
-				Label:     "Remote ASN",
-				MaxValues: 1,
-			})
+			catoIdentificationField("site_name", "Site"),
+			catoIdentificationField("remote_ip", "Remote IP"),
+			catoIdentificationField("remote_asn", "Remote ASN"))
 	}
 	return &topologyv1.ModalLabelsPresentation{
 		Enabled:      new(true),
@@ -589,4 +521,8 @@ func modalExpandedColumn(id, label, source, cell string) topologyv1.ModalColumn 
 	col := modalDirectColumn(id, label, source, cell)
 	col.Visibility = "expanded"
 	return col
+}
+
+func catoIdentificationField(key, label string) topologyv1.ModalLabelIdentificationField {
+	return topologyv1.ModalLabelIdentificationField{Key: key, Label: label, MaxValues: 1}
 }
