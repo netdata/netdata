@@ -98,6 +98,8 @@ typedef struct {
 } netdata_socket_rb_event_t;
 
 #define SOCKET_ARENA_EVENT_SLOTS 1024u
+/* The Linux UAPI value is stable; older build headers omit its enum name. */
+#define SOCKET_BPF_MAP_TYPE_ARENA 33
 
 #if defined(LIBBPF_MAJOR_VERSION) && (LIBBPF_MAJOR_VERSION >= 1)
 struct netdata_socket_arena_slot {
@@ -656,7 +658,7 @@ struct netdata_ebpf_socket_runtime *netdata_socket_runtime_open_mode(const char 
     rt->kind = use_core ? NETDATA_SOCKET_RUNTIME_CORE : NETDATA_SOCKET_RUNTIME_LEGACY;
 #if defined(LIBBPF_MAJOR_VERSION) && (LIBBPF_MAJOR_VERSION >= 1)
     struct bpf_map *events = bpf_object__find_map_by_name(obj, "socket_events");
-    if (events && bpf_map__type(events) == BPF_MAP_TYPE_ARENA) {
+    if (events && bpf_map__type(events) == SOCKET_BPF_MAP_TYPE_ARENA) {
         rt->raw_arena = nd_ebpf_raw_arena_create(obj, "socket_events");
         if (!rt->raw_arena) {
             bpf_object__close(obj);
@@ -774,7 +776,7 @@ int netdata_socket_runtime_load(struct netdata_ebpf_socket_runtime *rt)
         if (bpf_map__type(events) == BPF_MAP_TYPE_RINGBUF)
             return socket_setup_ring_buffer(rt);
 #if LIBBPF_MAJOR_VERSION >= 1
-        if (bpf_map__type(events) == BPF_MAP_TYPE_ARENA)
+        if (bpf_map__type(events) == SOCKET_BPF_MAP_TYPE_ARENA)
             return socket_setup_arena(rt);
 #endif
         return -1;
