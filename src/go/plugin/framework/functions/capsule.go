@@ -367,6 +367,12 @@ func (capsule *InputCapsule) handlePayloadSegment(ctx context.Context, consumer 
 }
 
 func parsePayloadReplacement(line []byte) (Call, bool, bool) {
+	// the agent writes command keywords bare at line start; tokenize skips spaces and
+	// unquotes fields, so without this check a JSON line like `"FUNCTION" ,0, 30 ...`
+	// inside a payload would be taken for a call
+	if !bytes.HasPrefix(line, []byte("FUNCTION ")) && !bytes.HasPrefix(line, []byte("FUNCTION_PAYLOAD ")) {
+		return Call{}, false, false
+	}
 	fields, err := tokenize(string(line))
 	if err != nil || len(fields) == 0 ||
 		(fields[0] != "FUNCTION" && fields[0] != "FUNCTION_PAYLOAD") {

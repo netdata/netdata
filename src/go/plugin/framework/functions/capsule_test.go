@@ -290,3 +290,32 @@ func (consumer *recordingCapsuleConsumer) HandleQuit(context.Context) error {
 	consumer.quit = true
 	return nil
 }
+
+func TestInputCapsuleKeepsQuotedKeywordJSONLinesInPayload(t *testing.T) {
+	// valid JSON whose lines start with quoted protocol keywords must stay payload data:
+	// the tokenizer unquotes fields, so these lines tokenize like 6-7 field calls
+	tests := map[string]string{
+		"FUNCTION array element":         "[\"x\",\n\"FUNCTION\" ,0, 30 ,\"a\" ,\"b\" ,\"c\" ]",
+		"FUNCTION_PAYLOAD array element": "[\"x\",\n\"FUNCTION_PAYLOAD\" ,0, 30 ,\"a\" ,\"b\" ,\"c\" ,\"d\" ]",
+		"indented FUNCTION element":      "[\"x\",\n   \"FUNCTION\" ,0, 30 ,\"a\" ,\"b\" ,\"c\" ]",
+	}
+	for name, body := range tests {
+		t.Run(name, func(t *testing.T) {
+			consumer := &recordingCapsuleConsumer{}
+			input := "FUNCTION_PAYLOAD raw 30 \"raw:echo\" 0xFFFF \"source\" application/json\n" +
+				body + "\nFUNCTION_PAYLOAD_END\n" +
+				"FUNCTION successor 30 \"perf:work\" 0xFFFF \"source\"\nQUIT\n"
+			capsule, err := NewInputCapsule(strings.NewReader(input))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := capsule.Run(context.Background(), consumer); err != nil {
+				t.Fatalf("reader stopped: %v (calls=%#v rejections=%#v)", err, consumer.calls, consumer.rejections)
+			}
+			if len(consumer.calls) != 2 || consumer.calls[0].UID != "raw" || string(consumer.calls[0].Payload) != body ||
+				consumer.calls[1].UID != "successor" || len(consumer.rejections) != 0 || !consumer.quit {
+				t.Fatalf("payload flow differs: calls=%#v rejections=%#v quit=%v", consumer.calls, consumer.rejections, consumer.quit)
+			}
+		})
+	}
+}
