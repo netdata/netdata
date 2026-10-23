@@ -68,7 +68,9 @@ func (r *CachestatRuntime) Load() error {
 	return ErrDisabled
 }
 
-func (r *CachestatRuntime) Attach(accountFunction string) error {
+func (r *CachestatRuntime) Attach(addFunction, accessFunction, accountFunction string) error {
+	_ = addFunction
+	_ = accessFunction
 	_ = accountFunction
 	return ErrDisabled
 }
@@ -275,3 +277,7 @@ func (r *DNSRuntime) FlowSnapshot() ([]DNSFlowRecord, error) {
 func (r *DNSRuntime) Close() {
 	// No-op in the disabled build because the runtime never acquired native resources.
 }
+func (r *CachestatRuntime) ArenaDropped() uint64 { return 0 }
+func (r *DCStatRuntime) ArenaDropped() uint64    { return 0 }
+func (r *FDRuntime) ArenaDropped() uint64        { return 0 }
+func (r *SocketRuntime) ArenaDropped() uint64    { return 0 }

@@ -77,9 +77,8 @@ func TestBuildCachestatLegacyPlan(t *testing.T) {
 			wantMode: LoadLegacy,
 		},
 		"arena-on-debian-falls-back-to-tracing": {
-			// Arena is blocked on Debian; base flavor is chosen.  The selector must be
-			// capped to cachestatMaxBaseSelector (9 = 5.16) because no base object
-			// exists for kernels beyond 5.16.
+			// Arena is blocked on Debian; the generic 6.12 build now provides a base
+			// object for this exact kernel stream.
 			cfg: CachestatLegacyConfig{
 				PluginsDir:    defaultPluginsDir(),
 				Kernels:       cachestatKernelMask,
@@ -89,13 +88,11 @@ func TestBuildCachestatLegacyPlan(t *testing.T) {
 				HasBTF:        true,
 				ObjectFlavor:  "arena",
 			},
-			want:     "pnetdata_ebpf_cachestat.5.16.o",
+			want:     "pnetdata_ebpf_cachestat.6.12.o",
 			wantMode: LoadCore,
 		},
 		"tracing-explicit": {
-			// "tracing" (= legacy / base flavor) on kernel 6.12 must fall back to the
-			// highest existing base object (5.16, selector 9) rather than a non-existent
-			// pnetdata_ebpf_cachestat.6.12.o.
+			// "tracing" (= legacy / base flavor) can use the generic 6.12 artifact.
 			cfg: CachestatLegacyConfig{
 				PluginsDir:    defaultPluginsDir(),
 				Kernels:       cachestatKernelMask,
@@ -105,7 +102,7 @@ func TestBuildCachestatLegacyPlan(t *testing.T) {
 				HasBTF:        true,
 				ObjectFlavor:  "tracing",
 			},
-			want:     "pnetdata_ebpf_cachestat.5.16.o",
+			want:     "pnetdata_ebpf_cachestat.6.12.o",
 			wantMode: LoadCore,
 		},
 	}
@@ -121,5 +118,61 @@ func TestBuildCachestatLegacyPlan(t *testing.T) {
 				t.Fatalf("BuildCachestatLegacyPlan().LoadMode = %v, want %v", got.LoadMode, tc.wantMode)
 			}
 		})
+	}
+}
+
+func TestCachestat6162PlansUseShippedFlavors(t *testing.T) {
+	tests := []struct {
+		requested string
+		want      string
+	}{
+		{requested: "buffer", want: "pnetdata_ebpf_cachestat_buffer.6.16.2.o"},
+		{requested: "arena", want: "pnetdata_ebpf_cachestat_arena.6.16.2.o"},
+		{requested: "tracing", want: "pnetdata_ebpf_cachestat.6.12.o"},
+	}
+
+	for _, tc := range tests {
+		cfg := CachestatLegacyConfig{
+			PluginsDir:    defaultPluginsDir(),
+			Kernels:       cachestatKernelMask,
+			IsRHF:         -1,
+			KernelVersion: exactKernelVersion6162,
+			HasBTF:        false,
+			ObjectFlavor:  tc.requested,
+		}
+		got := BuildCachestatLegacyPlan(cfg)
+		if path := filepath.Base(got.ObjectPath); path != tc.want {
+			t.Errorf("BuildCachestatLegacyPlan(%q) = %q, want %q", tc.requested, path, tc.want)
+		}
+	}
+}
+
+func TestCachestatFallbackPlanOrderAcrossFlavors(t *testing.T) {
+	cfg := CachestatLegacyConfig{
+		PluginsDir:    defaultPluginsDir(),
+		Kernels:       cachestatKernelMask,
+		IsRHF:         -1,
+		KernelVersion: exactKernelVersion6162,
+		HasBTF:        false,
+		ObjectFlavor:  "arena",
+	}
+	primary := BuildCachestatLegacyPlan(cfg)
+	primary.LoadMode = LoadLegacy
+	plans := buildFallbackPlans(primary, cfg.PluginsDir, cfg.IsRHF, "cachestat", cachestatMaxBaseSelector)
+	want := []string{
+		"pnetdata_ebpf_cachestat_arena.6.16.2.o",
+		"pnetdata_ebpf_cachestat_buffer.6.16.2.o",
+		"pnetdata_ebpf_cachestat.6.12.o",
+	}
+	if len(plans) != len(want) {
+		t.Fatalf("buildFallbackPlans() returned %d plans, want %d: %+v", len(plans), len(want), plans)
+	}
+	for i := range want {
+		if got := filepath.Base(plans[i].ObjectPath); got != want[i] {
+			t.Errorf("plans[%d] = %q, want %q", i, got, want[i])
+		}
+		if plans[i].LoadMode != LoadLegacy {
+			t.Errorf("plans[%d].LoadMode = %v, want LoadLegacy", i, plans[i].LoadMode)
+		}
 	}
 }

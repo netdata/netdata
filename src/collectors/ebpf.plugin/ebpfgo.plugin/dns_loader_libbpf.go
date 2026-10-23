@@ -40,6 +40,9 @@ func tryLoadDNSPlan(plan LoadPlan, perQuery bool) (*DNSLegacyHandle, error) {
 }
 
 func LoadDNSLegacy(cfg DNSLegacyConfig) (*DNSLegacyHandle, error) {
+	if cfg.KernelVersion < 4<<16+14<<8 {
+		return nil, fmt.Errorf("DNS collection is unavailable on kernel 3.10: no compatible legacy object is shipped")
+	}
 	versionStr, err := KernelVersionString()
 	if err != nil {
 		return nil, fmt.Errorf("kernel version string: %w", err)
@@ -48,13 +51,15 @@ func LoadDNSLegacy(cfg DNSLegacyConfig) (*DNSLegacyHandle, error) {
 	if err != nil {
 		return nil, fmt.Errorf("kernel reject check: %w", err)
 	}
-	if err := CanLoadCode(cfg.KernelVersion, cfg.IsRHF, rejected, IsRoot(), "ebpf-go.plugin"); err != nil {
+	if err := CanLoadCode(cfg.KernelVersion, cfg.IsRHF, rejected, IsRoot(), false, "ebpf-go.plugin"); err != nil {
 		return nil, err
 	}
 
 	plan := BuildDNSLegacyPlan(cfg)
-
 	plans := buildFallbackPlans(plan, cfg.PluginsDir, cfg.IsRHF, "dns", dnsMaxBaseSelector)
+	if len(plans) == 0 {
+		return nil, fmt.Errorf("dns has no compatible object family for this kernel")
+	}
 	var lastErr error
 	for i, fp := range plans {
 		handle, err := tryLoadDNSPlan(fp, cfg.PerQueryTracking)

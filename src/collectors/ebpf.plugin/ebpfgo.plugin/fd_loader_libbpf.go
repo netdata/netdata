@@ -81,24 +81,26 @@ func LoadFDLegacy(cfg FDLegacyConfig) (*FDLegacyHandle, error) {
 	if err != nil {
 		return nil, fmt.Errorf("kernel reject check: %w", err)
 	}
-	if err := CanLoadCode(cfg.KernelVersion, cfg.IsRHF, rejected, IsRoot(), "ebpf-go.plugin"); err != nil {
+	if err := CanLoadCode(cfg.KernelVersion, cfg.IsRHF, rejected, IsRoot(), true, "ebpf-go.plugin"); err != nil {
 		return nil, err
 	}
 
 	plan := BuildFDLegacyPlan(cfg)
 	if !libbpfloader.FDSupportsCore() {
-		selector := SelectIndex(cfg.Kernels, cfg.IsRHF, cfg.KernelVersion)
-		if int(selector) > fdMaxBaseSelector {
-			selector = uint32(fdMaxBaseSelector)
-		}
-		plan.ObjectPath = BuildObjectPathWithFlavor(
-			cfg.PluginsDir, selector, "fd", plan.IsReturn, cfg.IsRHF, ObjectFlavorBase)
 		plan.LoadMode = LoadLegacy
+		plan = forceFDBaseFlavor(plan, cfg.PluginsDir, cfg.IsRHF)
+		if err := validateLegacyArtifactFamily("fd", plan); err != nil {
+			return nil, err
+		}
 		// No fallback in legacy mode: there is only one object.
 		return tryLoadFDPlan(cfg, plan)
 	}
 
 	plans := buildFallbackPlans(plan, cfg.PluginsDir, cfg.IsRHF, "fd", fdMaxBaseSelector)
+	plans = append(plans, buildCoreLegacyFallbackPlans(plan, cfg.PluginsDir, cfg.IsRHF, "fd", fdMaxBaseSelector)...)
+	if len(plans) == 0 {
+		return nil, fmt.Errorf("fd has no compatible object family for this kernel")
+	}
 	var lastErr error
 	for i, fp := range plans {
 		handle, err := tryLoadFDPlan(cfg, fp)

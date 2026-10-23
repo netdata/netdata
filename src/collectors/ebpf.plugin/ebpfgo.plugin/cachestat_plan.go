@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -8,7 +9,7 @@ import (
 	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
 )
 
-const cachestatKernelMask uint32 = (1 << 12) - 1
+const cachestatKernelMask uint32 = (1 << 14) - 1
 const cachestatDefaultPIDTableSize uint32 = 32768
 const cachestatMaxPIDTableSize uint32 = 32768
 const cachestatDefaultBTFFile = "vmlinux"
@@ -18,24 +19,25 @@ const cachestatDefaultBTFFile = "vmlinux"
 const cachestatMaxBaseSelector = 9 // 5.16
 
 type CachestatLegacyConfig struct {
-	PluginsDir      string
-	Kernels         uint32
-	IsRHF           int
-	KernelVersion   uint32
-	IsDebian        bool
-	HasBTF          bool
-	ConfigFound     bool
-	Enabled         bool
-	AppsEnabled     bool
-	CgroupsEnabled  bool
-	BTFPath         string
-	UpdateEvery     int
-	PidTableSize    uint32
-	MapsPerCore     bool
-	ObjectFlavor    string
-	AccountFunction string
-	AppsLevel       int // BPF apps collection level: 0=real parent, 1=parent, 2=all
-	Targets         CachestatTargets
+	PluginsDir          string
+	Kernels             uint32
+	IsRHF               int
+	KernelVersion       uint32
+	IsDebian            bool
+	HasBTF              bool
+	ConfigFound         bool
+	Enabled             bool
+	AppsEnabled         bool
+	CgroupsEnabled      bool
+	BTFPath             string
+	UpdateEvery         int
+	PidTableSize        uint32
+	MapsPerCore         bool
+	ObjectFlavor        string
+	AccountFunction     string
+	AppsLevel           int // BPF apps collection level: 0=real parent, 1=parent, 2=all
+	Targets             CachestatTargets
+	TargetResolutionErr error
 }
 
 type CachestatLegacyHandle struct {
@@ -141,12 +143,22 @@ func resolveCachestatLegacyConfig() (CachestatLegacyConfig, error) {
 	cfg.KernelVersion = kver
 	cfg.IsRHF = isRHF
 
-	if err := cfg.Targets.ResolveAccountPageTarget(); err != nil {
-		return CachestatLegacyConfig{}, err
+	if cfg.Enabled {
+		resolveOptionalCachestatTargets(&cfg, resolveCachestatTargets)
 	}
-	cfg.AccountFunction = cfg.Targets.AccountPageDirtied.Name
 
 	return cfg, nil
+}
+
+func resolveOptionalCachestatTargets(cfg *CachestatLegacyConfig, resolve func() (CachestatTargets, error)) {
+	targets, err := resolve()
+	if err != nil {
+		cfg.TargetResolutionErr = fmt.Errorf("resolve cachestat targets: %w", err)
+		return
+	}
+	cfg.TargetResolutionErr = nil
+	cfg.Targets = targets
+	cfg.AccountFunction = targets.AccountPageDirtied.Name
 }
 
 func BuildCachestatLegacyPlan(cfg CachestatLegacyConfig) LoadPlan {
@@ -164,8 +176,18 @@ func BuildCachestatLegacyPlan(cfg CachestatLegacyConfig) LoadPlan {
 }
 
 func kernelBTFSupported(btfPath string) bool {
-	_, err := os.Stat(filepath.Join(btfPath, cachestatDefaultBTFFile))
-	return err == nil
+	path := filepath.Join(btfPath, cachestatDefaultBTFFile)
+	info, err := os.Stat(path)
+	if err != nil || !info.Mode().IsRegular() {
+		return false
+	}
+
+	file, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	file.Close()
+	return true
 }
 
 func applyPidTableSizeClamp(n uint32) uint32 {

@@ -64,9 +64,8 @@ func TestBuildDCStatLegacyPlan(t *testing.T) {
 			wantMode: LoadCore,
 		},
 		"arena-on-debian-falls-back-to-tracing": {
-			// Arena is blocked on Debian; the base flavor is chosen and the
-			// selector must be capped to dcstatMaxBaseSelector (7 = 5.14),
-			// because no base dc object exists beyond 5.14.
+			// Arena is blocked on Debian; this exact generic 6.12 stream has a
+			// base object, so the plan uses the matching 6.12 artifact.
 			cfg: DCStatLegacyConfig{
 				PluginsDir:    defaultPluginsDir(),
 				Kernels:       dcstatKernelMask,
@@ -76,13 +75,12 @@ func TestBuildDCStatLegacyPlan(t *testing.T) {
 				HasBTF:        true,
 				ObjectFlavor:  "arena",
 			},
-			want:     "pnetdata_ebpf_dc.5.14.o",
+			want:     "pnetdata_ebpf_dc.6.12.o",
 			wantMode: LoadCore,
 		},
 		"tracing-explicit": {
 			// "tracing" (= base flavor) on kernel 6.12 must fall back to the
-			// highest existing base object (5.14, selector 7) rather than a
-			// non-existent pnetdata_ebpf_dc.6.12.o.
+			// generic 6.12 object rather than a stale earlier kernel layout.
 			cfg: DCStatLegacyConfig{
 				PluginsDir:    defaultPluginsDir(),
 				Kernels:       dcstatKernelMask,
@@ -92,7 +90,7 @@ func TestBuildDCStatLegacyPlan(t *testing.T) {
 				HasBTF:        true,
 				ObjectFlavor:  "tracing",
 			},
-			want:     "pnetdata_ebpf_dc.5.14.o",
+			want:     "pnetdata_ebpf_dc.6.12.o",
 			wantMode: LoadCore,
 		},
 	}
@@ -111,15 +109,40 @@ func TestBuildDCStatLegacyPlan(t *testing.T) {
 	}
 }
 
-// TestBuildDCStatFallbackPlansCapBaseSelector guards the one dcstat-specific
-// difference from cachestat: the base-flavor object family stops at 5.14, so a
-// buffer-flavor primary on a newer kernel must degrade to dc.5.14.o.
+func TestDCStat6162PlansUseShippedFlavors(t *testing.T) {
+	tests := []struct {
+		requested string
+		want      string
+	}{
+		{requested: "buffer", want: "pnetdata_ebpf_dc_buffer.6.16.2.o"},
+		{requested: "arena", want: "pnetdata_ebpf_dc_arena.6.16.2.o"},
+		{requested: "tracing", want: "pnetdata_ebpf_dc.6.12.o"},
+	}
+
+	for _, tc := range tests {
+		cfg := DCStatLegacyConfig{
+			PluginsDir:    defaultPluginsDir(),
+			Kernels:       dcstatKernelMask,
+			IsRHF:         -1,
+			KernelVersion: exactKernelVersion6162,
+			HasBTF:        false,
+			ObjectFlavor:  tc.requested,
+		}
+		got := BuildDCStatLegacyPlan(cfg)
+		if path := filepath.Base(got.ObjectPath); path != tc.want {
+			t.Errorf("BuildDCStatLegacyPlan(%q) = %q, want %q", tc.requested, path, tc.want)
+		}
+	}
+}
+
+// TestBuildDCStatFallbackPlansCapBaseSelector verifies that 6.16.2 flavored
+// artifacts are selected while base fallback uses the producer-backed 6.12 family.
 func TestBuildDCStatFallbackPlansCapBaseSelector(t *testing.T) {
 	cfg := DCStatLegacyConfig{
 		PluginsDir:    defaultPluginsDir(),
 		Kernels:       dcstatKernelMask,
 		IsRHF:         -1,
-		KernelVersion: 396288, // 6.12
+		KernelVersion: exactKernelVersion6162,
 		HasBTF:        true,
 		ObjectFlavor:  "arena",
 	}
@@ -130,9 +153,9 @@ func TestBuildDCStatFallbackPlansCapBaseSelector(t *testing.T) {
 	}
 
 	want := []string{
-		"pnetdata_ebpf_dc_arena.6.12.o",
-		"pnetdata_ebpf_dc_buffer.6.12.o",
-		"pnetdata_ebpf_dc.5.14.o",
+		"pnetdata_ebpf_dc_arena.6.16.2.o",
+		"pnetdata_ebpf_dc_buffer.6.16.2.o",
+		"pnetdata_ebpf_dc.6.12.o",
 	}
 	for i, base := range want {
 		if got := filepath.Base(plans[i].ObjectPath); got != base {

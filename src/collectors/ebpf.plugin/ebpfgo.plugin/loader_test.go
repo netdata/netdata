@@ -1,6 +1,9 @@
 package main
 
 import (
+	"errors"
+	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -19,6 +22,14 @@ func TestKernelVersionFromRelease(t *testing.T) {
 			release: "5.14.0-362.13.1.el9_3.x86_64",
 			want:    331264,
 		},
+		"RHEL 10.2 errata kernel": {
+			release: "6.12.0-211.7.1.el10_2.x86_64",
+			want:    396288,
+		},
+		"exact generic 6.16.2 release": {
+			release: "6.16.2-1-generic",
+			want:    exactKernelVersion6162,
+		},
 	}
 
 	for name, tc := range tests {
@@ -31,6 +42,87 @@ func TestKernelVersionFromRelease(t *testing.T) {
 				t.Fatalf("KernelVersionFromRelease(%q) = %d, want %d", tc.release, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestGeneric6162SelectorIsExactAndCannotWalkDownFromSeven(t *testing.T) {
+	tests := []struct {
+		name string
+		kver uint32
+		want uint32
+	}{
+		{name: "6.16.1 uses 6.12", kver: exactKernelVersion6162 - 1, want: 11},
+		{name: "6.16.2 uses exact rung", kver: exactKernelVersion6162, want: 13},
+		{name: "6.16.3 uses 6.12", kver: exactKernelVersion6162 + 1, want: 11},
+		{name: "7.0 does not walk down to 6.16.2", kver: minimumKernelVersionSeven, want: 12},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := SelectMaxIndex(-1, tc.kver); got != int(tc.want) {
+				t.Fatalf("SelectMaxIndex() = %d, want %d", got, tc.want)
+			}
+			if got := SelectIndex(socketKernelMask, -1, tc.kver); got != tc.want {
+				t.Fatalf("SelectIndex() = %d, want %d", got, tc.want)
+			}
+		})
+	}
+
+	if got := SelectIndex((1<<13)-1, -1, exactKernelVersion6162); got != 11 {
+		t.Fatalf("6.16.2 without an exact-rung artifact selected %d, want 6.12 selector 11", got)
+	}
+
+	path := BuildObjectPath(defaultPluginsDir(), 13, "socket", false, -1)
+	if filepath.Base(path) != "pnetdata_ebpf_socket.6.16.2.o" {
+		t.Fatalf("BuildObjectPath() = %q, want exact 6.16.2 object", path)
+	}
+}
+
+func TestRHEL10ErrataKernelSelectsRHF612Object(t *testing.T) {
+	kver, err := KernelVersionFromRelease("6.12.0-211.7.1.el10_2.x86_64")
+	if err != nil {
+		t.Fatalf("KernelVersionFromRelease() error = %v", err)
+	}
+
+	selector := SelectIndex(1<<11, 10*256, kver)
+	if selector != 11 {
+		t.Fatalf("SelectIndex() = %d, want 11 (6.12)", selector)
+	}
+
+	path := BuildObjectPath("/usr/libexec/netdata/plugins.d", selector, "disk", false, 10*256)
+	want := filepath.Join("/usr/libexec/netdata/plugins.d", "ebpf.d", "pnetdata_ebpf_disk.6.12.rhf.o")
+	if path != want {
+		t.Fatalf("BuildObjectPath() = %q, want %q", path, want)
+	}
+}
+
+func TestRHEL10612StreamIsBoundedAndDoesNotTryGenericObjects(t *testing.T) {
+	if !isRHEL10Kernel612Stream(10*256, minimumKernelVersionArena) ||
+		!isRHEL10Kernel612Stream(10*256, minimumKernelVersionArena+211) {
+		t.Fatal("RHEL 10 / 6.12 should use the RHF artifact stream")
+	}
+	if isRHEL10Kernel612Stream(11*256, minimumKernelVersionArena) ||
+		isRHEL10Kernel612Stream(10*256, maximumKernelVersionArena) {
+		t.Fatal("the RHEL 10 / 6.12 selector must not include other RH majors or kernel bases")
+	}
+
+	primary := LoadPlan{
+		KernelVersion: minimumKernelVersionArena,
+		IsRHF:         10 * 256,
+		Selector:      11,
+		Flavor:        ObjectFlavorBuffer,
+	}
+	plans := buildFallbackPlans(primary, defaultPluginsDir(), primary.IsRHF, "socket", socketMaxBaseSelector)
+	for _, plan := range plans {
+		if plan.IsRHF == -1 {
+			t.Fatalf("RHEL 10 / 6.12 must not fall back to generic objects: %#v", plans)
+		}
+	}
+	if len(plans) != 2 {
+		t.Fatalf("buildFallbackPlans() returned %d plans, want RHF buffer and base only: %#v", len(plans), plans)
+	}
+
+	if SelectMaxIndex(11*256, minimumKernelVersionArena) == 11 {
+		t.Fatalf("SelectMaxIndex() selected RHEL 10's 6.12 rung for RHEL 11")
 	}
 }
 
@@ -47,6 +139,10 @@ func TestRedHatReleaseFromFile(t *testing.T) {
 			contents: "Red Hat Enterprise Linux release 9.4 (Plow)",
 			want:     2308,
 		},
+		"cloudlinux": {
+			contents: "CloudLinux release 8.10 (Shared)",
+			want:     2058,
+		},
 	}
 
 	for name, tc := range tests {
@@ -57,6 +153,94 @@ func TestRedHatReleaseFromFile(t *testing.T) {
 			}
 			if got != tc.want {
 				t.Fatalf("RedHatReleaseFromFile(%q) = %d, want %d", tc.contents, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestRedHatReleaseFromOSRelease(t *testing.T) {
+	tests := map[string]struct {
+		contents string
+		want     int
+	}{
+		"rhel id": {
+			contents: "ID=\"rhel\"\nID_LIKE=\"fedora\"\nVERSION_ID=\"10.1\"\n",
+			want:     2561,
+		},
+		"rocky id": {
+			contents: "ID=rocky\nVERSION_ID=9.6\n",
+			want:     2310,
+		},
+		"cloudlinux crlf and patch version": {
+			contents: "ID=cloudlinux\r\nVERSION_ID=\"8.10.1\"\r\n",
+			want:     2058,
+		},
+		"invalid patch component": {
+			contents: "ID=rocky\nVERSION_ID=9.6.bad\n",
+			want:     -1,
+		},
+		"amazon linux 2 ancestry is not sufficient": {
+			contents: "ID=amzn\nID_LIKE=\"centos rhel fedora\"\nVERSION_ID=2\n",
+			want:     -1,
+		},
+		"fedora ancestry is not sufficient": {
+			contents: "ID=fedora\nID_LIKE=rhel\nVERSION_ID=42\n",
+			want:     -1,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			if got := RedHatReleaseFromOSRelease(tc.contents); got != tc.want {
+				t.Fatalf("RedHatReleaseFromOSRelease() = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestRedHatReleaseFallsBackAfterUnreadableReleaseFile(t *testing.T) {
+	redHatErr := fmt.Errorf("read /etc/redhat-release: %w", fs.ErrPermission)
+
+	version, err := redHatReleaseFromUnreadableFile(
+		redHatErr,
+		"ID=rhel\nVERSION_ID=9.6\n",
+		nil,
+	)
+	if err != nil || version != 9*256+6 {
+		t.Fatalf("fallback returned (%d, %v), want (%d, nil)", version, err, 9*256+6)
+	}
+
+	version, err = redHatReleaseFromUnreadableFile(redHatErr, "", fs.ErrPermission)
+	if version != -1 || !errors.Is(err, fs.ErrPermission) {
+		t.Fatalf("both unreadable files returned (%d, %v), want (-1, permission error)", version, err)
+	}
+
+	version, err = redHatReleaseFromUnreadableFile(redHatErr, "", fs.ErrNotExist)
+	if version != -1 || !errors.Is(err, fs.ErrPermission) || errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("permission error plus absent fallback returned (%d, %v), want only the primary permission error to match", version, err)
+	}
+}
+
+func TestShouldWarnRedHatDetectionError(t *testing.T) {
+	tests := map[string]struct {
+		err  error
+		want bool
+	}{
+		"not red hat":         {err: errNotRedHatFamily, want: false},
+		"wrapped not red hat": {err: fmt.Errorf("release lookup: %w", errNotRedHatFamily), want: false},
+		"metadata absent":     {err: fs.ErrNotExist, want: false},
+		"metadata unreadable": {err: fs.ErrPermission, want: true},
+		"primary unreadable fallback absent": {
+			err:  fmt.Errorf("unable to read redhat-release: %w (also unable to read os-release: %v)", fs.ErrPermission, fs.ErrNotExist),
+			want: true,
+		},
+		"no error": {err: nil, want: false},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			if got := shouldWarnRedHatDetectionError(tc.err); got != tc.want {
+				t.Fatalf("shouldWarnRedHatDetectionError(%v) = %v, want %v", tc.err, got, tc.want)
 			}
 		})
 	}
@@ -119,6 +303,13 @@ func TestSelectHelpers(t *testing.T) {
 			kver:    331264,
 			wantIdx: 7,
 			wantObj: "pnetdata_ebpf_process.5.14.rhf.o",
+		},
+		"rhel10-612": {
+			kernels: 1 << 11,
+			isRHF:   10 * 256,
+			kver:    396288,
+			wantIdx: 11,
+			wantObj: "pnetdata_ebpf_process.6.12.rhf.o",
 		},
 	}
 
@@ -189,6 +380,54 @@ func TestSelectLoadAndAttachModes(t *testing.T) {
 
 			if got := ConvertCoreType(tc.attach, tc.mode); got != tc.wantA {
 				t.Fatalf("ConvertCoreType() = %v, want %v", got, tc.wantA)
+			}
+		})
+	}
+}
+
+func TestEffectiveMaxBaseSelector(t *testing.T) {
+	tests := []struct {
+		name string
+		max  int
+		rhf  int
+		kver uint32
+		want int
+	}{
+		{name: "generic 6.12 uses generated base family", max: 7, rhf: -1, kver: 396288, want: 11},
+		{name: "RHEL 9 remains capped", max: 7, rhf: 9 * 256, kver: 396288, want: 7},
+		{name: "RHEL 10 uses generated base family", max: 7, rhf: 10 * 256, kver: 396288, want: 11},
+		{name: "generic 6.16 uses generated 6.12 base family", max: 7, rhf: -1, kver: 6*65536 + 16*256, want: 11},
+		{name: "generic 7.0 uses generated base family", max: 7, rhf: -1, kver: minimumKernelVersionSeven, want: 12},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := effectiveMaxBaseSelector(tc.max, tc.rhf, tc.kver); got != tc.want {
+				t.Fatalf("effectiveMaxBaseSelector() = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestRedHatKernelLineageMatches(t *testing.T) {
+	tests := []struct {
+		name       string
+		release    string
+		rhf        int
+		cloudLinux bool
+		want       bool
+	}{
+		{name: "matching el10", release: "6.12.0-124.8.1.el10_1.x86_64", rhf: 10 * 256, want: true},
+		{name: "matching el9", release: "5.14.0-503.el9.x86_64", rhf: 9 * 256, want: true},
+		{name: "ELRepo RHEL9 rebuild", release: "6.12.1-1.el9.elrepo.x86_64", rhf: 9 * 256, want: false},
+		{name: "UEK suffix", release: "5.15.0-300.163.18.el8uek.x86_64", rhf: 8 * 256, want: false},
+		{name: "wrong el major", release: "5.14.0-503.el8.x86_64", rhf: 9 * 256, want: false},
+		{name: "CloudLinux 8 lve", release: "4.18.0-425.lve.el8.x86_64", rhf: 8 * 256, cloudLinux: true, want: true},
+		{name: "lve on another distro", release: "4.18.0-425.lve.el8.x86_64", rhf: 8 * 256, want: false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := redHatKernelLineageMatches(tc.release, tc.rhf, tc.cloudLinux); got != tc.want {
+				t.Fatalf("redHatKernelLineageMatches() = %t, want %t", got, tc.want)
 			}
 		})
 	}
@@ -339,6 +578,7 @@ func TestBuildLoadPlan(t *testing.T) {
 			})
 
 			tc.want.ObjectPath = filepath.Join(defaultPluginsDir(), "ebpf.d", tc.want.ObjectPath)
+			tc.want.Kernels = tc.kernels
 			// The plan must carry the requested family, not just bake it into the
 			// path: buildFallbackPlans reads primary.IsReturn to keep the fallback
 			// chain in the same 'p'/'r' family.  Asserted for every case here so a
@@ -401,5 +641,142 @@ func TestKernelRejected(t *testing.T) {
 	}
 	if !rejected {
 		t.Fatalf("KernelRejected() = false, want true")
+	}
+}
+
+func TestLegacyArtifactFamilyAvailability(t *testing.T) {
+	tests := []struct {
+		name   string
+		module string
+		rhf    int
+		kver   uint32
+		want   bool
+	}{
+		{name: "3.10 keeps available collector", module: "swap", rhf: 7 * 256, kver: 3<<16 + 10<<8, want: true},
+		{name: "3.10 has no DNS object", module: "dns", rhf: 7 * 256, kver: 3<<16 + 10<<8},
+		{name: "generic 6.10 disk artifact", module: "disk", rhf: -1, kver: 6<<16 + 10<<8, want: true},
+		{name: "generic 6.10 legacy artifact family", module: "process", rhf: -1, kver: 6<<16 + 10<<8, want: true},
+		{name: "generic 6.12 full family", module: "dns", rhf: -1, kver: 6<<16 + 12<<8, want: true},
+		{name: "generic 6.16 falls back to older family", module: "swap", rhf: -1, kver: 6<<16 + 16<<8, want: true},
+		{name: "generic 6.16 disk falls back to older family", module: "disk", rhf: -1, kver: 6<<16 + 16<<8, want: true},
+		{name: "generic 7.0 process artifact", module: "process", rhf: -1, kver: minimumKernelVersionSeven, want: true},
+		{name: "generic 7.0 cachestat base artifact", module: "cachestat", rhf: -1, kver: minimumKernelVersionSeven, want: true},
+		{name: "generic 7.0 dcstat base artifact", module: "dc", rhf: -1, kver: minimumKernelVersionSeven, want: true},
+		{name: "generic 7.0 dcstat validator name", module: "dcstat", rhf: -1, kver: minimumKernelVersionSeven, want: true},
+		{name: "generic 7.0 fd base artifact", module: "fd", rhf: -1, kver: minimumKernelVersionSeven, want: true},
+		{name: "generic 7.0 socket base artifact", module: "socket", rhf: -1, kver: minimumKernelVersionSeven, want: true},
+		{name: "generic 7.0 DNS has an older compatible family", module: "dns", rhf: -1, kver: minimumKernelVersionSeven, want: true},
+		{name: "RHEL 9 object family", module: "socket", rhf: 9 * 256, kver: 5<<16 + 14<<8, want: true},
+		{name: "RHEL 9 5.16 remains compatible", module: "socket", rhf: 9 * 256, kver: 5<<16 + 16<<8, want: true},
+		{name: "non-RHEL10 RH 5.17 fails closed", module: "swap", rhf: 9 * 256, kver: 5<<16 + 17<<8},
+		{name: "RHEL 10 6.12 family", module: "dns", rhf: 10 * 256, kver: 6<<16 + 12<<8, want: true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := legacyArtifactFamilyAvailable(tc.module, tc.rhf, tc.kver); got != tc.want {
+				t.Fatalf("legacyArtifactFamilyAvailable(%q, %d, %d) = %v, want %v", tc.module, tc.rhf, tc.kver, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestLegacyArtifactFlavorRespectsRedHatFamily(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		rhf  int
+		kver uint32
+		want bool
+	}{
+		{name: "RHEL 9 5.17", rhf: 9 * 256, kver: 5<<16 + 17<<8},
+		{name: "RHEL 10 6.13", rhf: 10 * 256, kver: 6<<16 + 13<<8},
+		{name: "RHEL 10 6.12", rhf: 10 * 256, kver: 6<<16 + 12<<8, want: true},
+		{name: "generic 6.13", rhf: -1, kver: 6<<16 + 13<<8, want: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, flavor := range []ObjectFlavor{ObjectFlavorBase, ObjectFlavorBuffer, ObjectFlavorArena} {
+				if got := legacyArtifactFlavorAvailable("dc", flavor, tc.rhf, tc.kver); got != tc.want {
+					t.Errorf("legacyArtifactFlavorAvailable(dc, %v, %d, %d) = %v, want %v",
+						flavor, tc.rhf, tc.kver, got, tc.want)
+				}
+			}
+		})
+	}
+}
+
+func TestDCStatLegacyFallbackOrderWithoutCore(t *testing.T) {
+	cfg := DCStatLegacyConfig{
+		PluginsDir:    defaultPluginsDir(),
+		Kernels:       dcstatKernelMask,
+		IsRHF:         -1,
+		KernelVersion: minimumKernelVersionSeven,
+		HasBTF:        false,
+		ObjectFlavor:  "arena",
+	}
+	plan := BuildDCStatLegacyPlan(cfg)
+	plan.LoadMode = LoadLegacy
+	plans := buildFallbackPlans(plan, cfg.PluginsDir, cfg.IsRHF, "dc", dcstatMaxBaseSelector)
+	if len(plans) != 3 {
+		t.Fatalf("DCStat no-CO-RE fallback returned %d plans, want arena, buffer, base: %+v", len(plans), plans)
+	}
+	for i, want := range []ObjectFlavor{ObjectFlavorArena, ObjectFlavorBuffer, ObjectFlavorBase} {
+		if plans[i].Flavor != want || plans[i].LoadMode != LoadLegacy {
+			t.Errorf("plan[%d] = %+v, want legacy %v", i, plans[i], want)
+		}
+	}
+}
+
+func TestSelectMaxIndexMatchesGenericPre54BuildRung(t *testing.T) {
+	for _, kver := range []uint32{4<<16 + 17<<8, 5 << 16, 5<<16 + 2<<8, 5<<16 + 3<<8} {
+		if got := SelectKernelName(uint32(SelectMaxIndex(-1, kver))); got != "5.4" {
+			t.Errorf("SelectMaxIndex(-1, %d) selected %q, want 5.4 producer family", kver, got)
+		}
+	}
+}
+
+func TestBuildCoreLegacyFallbackPlansUsesOnlyVerifiedFamilies(t *testing.T) {
+	primary := LoadPlan{
+		KernelVersion: minimumKernelVersionArena,
+		Kernels:       (1 << 12) - 1,
+		IsRHF:         -1,
+		Selector:      11,
+		Flavor:        ObjectFlavorBuffer,
+		LoadMode:      LoadCore,
+	}
+	plans := buildCoreLegacyFallbackPlans(primary, "/plugins", -1, "cachestat", cachestatMaxBaseSelector)
+	if len(plans) != 2 {
+		t.Fatalf("buildCoreLegacyFallbackPlans() returned %d plans, want buffer then base", len(plans))
+	}
+	if plans[0].LoadMode != LoadLegacy || plans[0].Flavor != ObjectFlavorBuffer || plans[0].Selector != 11 {
+		t.Fatalf("legacy fallback plan = %+v, want legacy buffer selector 11", plans[0])
+	}
+
+	primary.KernelVersion = minimumKernelVersionSeven
+	primary.Selector = 12
+	primary.Flavor = ObjectFlavorBase
+	if plans := buildFallbackPlans(primary, "/plugins", -1, "cachestat", cachestatMaxBaseSelector); len(plans) != 1 || plans[0].LoadMode != LoadCore {
+		t.Fatalf("CO-RE plan for generic 7.0 cachestat = %+v, want one CO-RE plan", plans)
+	}
+	plans = buildCoreLegacyFallbackPlans(primary, "/plugins", -1, "cachestat", cachestatMaxBaseSelector)
+	if len(plans) != 1 || plans[0].Selector != 12 || plans[0].LoadMode != LoadLegacy {
+		t.Fatalf("fallback plans for generic 7.0 cachestat = %+v, want one 7.0 legacy plan", plans)
+	}
+}
+
+func TestBuildFallbackPlansKeepsGenericSevenArenaObjectWithoutBTF(t *testing.T) {
+	cfg := SocketLegacyConfig{
+		PluginsDir:    defaultPluginsDir(),
+		Kernels:       socketKernelMask,
+		IsRHF:         -1,
+		KernelVersion: minimumKernelVersionSeven,
+		HasBTF:        false,
+		ObjectFlavor:  "arena",
+	}
+	plans := buildFallbackPlans(BuildSocketLegacyPlan(cfg), cfg.PluginsDir, cfg.IsRHF, "socket", socketMaxBaseSelector)
+	if len(plans) != 3 {
+		t.Fatalf("buildFallbackPlans() returned %d plans, want arena, buffer, and base plans: %+v", len(plans), plans)
+	}
+	if plans[0].LoadMode != LoadLegacy || plans[0].Selector != 12 || plans[0].Flavor != ObjectFlavorArena {
+		t.Fatalf("generic 7.0 no-BTF plan = %+v, want arena object at selector 12", plans[0])
 	}
 }

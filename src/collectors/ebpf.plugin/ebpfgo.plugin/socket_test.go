@@ -101,9 +101,7 @@ func TestBuildSocketLegacyPlan(t *testing.T) {
 			wantMode: LoadLegacy,
 		},
 		"arena-on-debian-falls-back-to-base": {
-			// Arena is blocked on Debian; base flavor is chosen.  The selector must be
-			// capped to socketMaxBaseSelector (7 = 5.14) because no base object exists
-			// for kernels beyond 5.14.
+			// Generic 6.12 publishes its own complete legacy object family.
 			cfg: SocketLegacyConfig{
 				PluginsDir:    defaultPluginsDir(),
 				Kernels:       socketKernelMask,
@@ -113,13 +111,12 @@ func TestBuildSocketLegacyPlan(t *testing.T) {
 				HasBTF:        true,
 				ObjectFlavor:  "arena",
 			},
-			want:     "pnetdata_ebpf_socket.5.14.o",
+			want:     "pnetdata_ebpf_socket.6.12.o",
 			wantMode: LoadCore,
 		},
 		"tracing-explicit": {
 			// "tracing" (= legacy / base flavor) on kernel 6.12 must fall back to the
-			// highest existing base object (5.14, selector 7) rather than a non-existent
-			// pnetdata_ebpf_socket.6.12.o.
+			// generic 6.12 object rather than a stale earlier kernel layout.
 			cfg: SocketLegacyConfig{
 				PluginsDir:    defaultPluginsDir(),
 				Kernels:       socketKernelMask,
@@ -129,7 +126,7 @@ func TestBuildSocketLegacyPlan(t *testing.T) {
 				HasBTF:        true,
 				ObjectFlavor:  "tracing",
 			},
-			want:     "pnetdata_ebpf_socket.5.14.o",
+			want:     "pnetdata_ebpf_socket.6.12.o",
 			wantMode: LoadCore,
 		},
 	}
@@ -145,5 +142,38 @@ func TestBuildSocketLegacyPlan(t *testing.T) {
 				t.Fatalf("BuildSocketLegacyPlan().LoadMode = %v, want %v", got.LoadMode, tc.wantMode)
 			}
 		})
+	}
+}
+
+func TestSocket6162BaseFallbackUsesGenerated612Family(t *testing.T) {
+	cfg := SocketLegacyConfig{
+		PluginsDir:    defaultPluginsDir(),
+		Kernels:       socketKernelMask,
+		IsRHF:         -1,
+		KernelVersion: exactKernelVersion6162,
+		HasBTF:        true,
+		ObjectFlavor:  "arena",
+	}
+
+	want := []string{
+		"pnetdata_ebpf_socket_arena.6.16.2.o",
+		"pnetdata_ebpf_socket_buffer.6.16.2.o",
+		"pnetdata_ebpf_socket.6.12.o",
+	}
+	for _, mode := range []LoadMethod{LoadCore, LoadLegacy} {
+		plan := BuildSocketLegacyPlan(cfg)
+		plan.LoadMode = mode
+		plans := buildFallbackPlans(plan, cfg.PluginsDir, cfg.IsRHF, "socket", socketMaxBaseSelector)
+		if len(plans) != len(want) {
+			t.Fatalf("buildFallbackPlans(%v) returned %d plans, want %d: %+v", mode, len(plans), len(want), plans)
+		}
+		for i, expected := range want {
+			if got := filepath.Base(plans[i].ObjectPath); got != expected {
+				t.Errorf("plans[%d] = %q, want %q", i, got, expected)
+			}
+			if plans[i].LoadMode != mode {
+				t.Errorf("plans[%d].LoadMode = %v, want %v", i, plans[i].LoadMode, mode)
+			}
+		}
 	}
 }

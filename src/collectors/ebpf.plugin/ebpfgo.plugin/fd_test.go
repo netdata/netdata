@@ -54,21 +54,19 @@ func TestBuildFDLegacyPlan(t *testing.T) {
 			wantMode:      LoadCore,
 		},
 		"arena-on-debian-falls-back-to-tracing": {
-			// Arena is blocked on Debian; the base flavor is chosen and the
-			// selector must be capped to fdMaxBaseSelector (7 = 5.14), because no
-			// base fd object exists beyond 5.14.
+			// Arena is blocked on Debian, so use the shipped generic 6.12 base fd object.
 			kernelVersion: 396288,
 			isDebian:      true,
 			hasBTF:        true,
 			objectFlavor:  "arena",
-			want:          "rnetdata_ebpf_fd.5.14.o",
+			want:          "rnetdata_ebpf_fd.6.12.o",
 			wantMode:      LoadCore,
 		},
 		"tracing-explicit": {
 			kernelVersion: 396288,
 			hasBTF:        true,
 			objectFlavor:  "tracing",
-			want:          "rnetdata_ebpf_fd.5.14.o",
+			want:          "rnetdata_ebpf_fd.6.12.o",
 			wantMode:      LoadCore,
 		},
 		// fd ships no base object for "5.10".  A 5.10 host asking for the base
@@ -152,17 +150,32 @@ func TestBuildFDLegacyPlanForcedLegacyUsesBaseObject(t *testing.T) {
 	if plan.Flavor != ObjectFlavorBase {
 		t.Fatalf("forced legacy Flavor = %q, want base", plan.Flavor)
 	}
-	if got, want := filepath.Base(plan.ObjectPath), "rnetdata_ebpf_fd.5.14.o"; got != want {
+	if got, want := filepath.Base(plan.ObjectPath), "rnetdata_ebpf_fd.5.11.o"; got != want {
 		t.Fatalf("forced legacy object = %q, want %q", got, want)
 	}
 }
 
-// TestBuildFDFallbackPlansCapBaseSelector guards two things at once: the base
-// object family stops at 5.14, and the whole fallback chain stays in the
+func TestBuildFDLegacyPlanWithoutBTFKeepsArenaFlavor(t *testing.T) {
+	cfg := baseFDConfig()
+	cfg.KernelVersion = 396288 // 6.12
+	cfg.HasBTF = false
+	cfg.ObjectFlavor = "arena"
+
+	plan := BuildFDLegacyPlan(cfg)
+	if plan.LoadMode != LoadLegacy || plan.Flavor != ObjectFlavorArena {
+		t.Fatalf("no-BTF plan = (%v, %q), want legacy arena object", plan.LoadMode, plan.Flavor)
+	}
+	if got, want := filepath.Base(plan.ObjectPath), "rnetdata_ebpf_fd_arena.6.12.o"; got != want {
+		t.Fatalf("no-BTF object = %q, want %q", got, want)
+	}
+}
+
+// TestBuildFDFallbackPlansCapBaseSelector guards that generic 6.16.2 base
+// fallback uses the generated 6.12 family and stays in the
 // return-probe ('r') family.
 func TestBuildFDFallbackPlansCapBaseSelector(t *testing.T) {
 	cfg := baseFDConfig()
-	cfg.KernelVersion = 396288 // 6.12
+	cfg.KernelVersion = exactKernelVersion6162
 	cfg.HasBTF = true
 	cfg.ObjectFlavor = "arena"
 
@@ -172,9 +185,9 @@ func TestBuildFDFallbackPlansCapBaseSelector(t *testing.T) {
 	}
 
 	want := []string{
-		"rnetdata_ebpf_fd_arena.6.12.o",
-		"rnetdata_ebpf_fd_buffer.6.12.o",
-		"rnetdata_ebpf_fd.5.14.o",
+		"rnetdata_ebpf_fd_arena.6.16.2.o",
+		"rnetdata_ebpf_fd_buffer.6.16.2.o",
+		"rnetdata_ebpf_fd.6.12.o",
 	}
 	for i, base := range want {
 		if got := filepath.Base(plans[i].ObjectPath); got != base {

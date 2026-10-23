@@ -96,7 +96,6 @@ struct netdata_ebpf_cachestat_runtime {
      * directly to cstat_pid, so per-app counters are accumulated here. */
     struct ring_buffer *rb;        /* non-NULL for buffer flavor */
     void              *arena_state; /* mmap'd arena pointer (arena flavor) */
-    uint32_t           arena_tail;  /* last consumed head for arena flavor */
     struct nd_ebpf_acc_table acc;
 #endif
 };
@@ -484,7 +483,8 @@ static int cachestat_setup_arena(struct netdata_ebpf_cachestat_runtime *rt)
             return -1;
 
         rt->arena_state = (void *)&rt->core.arena->arena->cachestat_arena_state;
-        return 0;
+        return nd_ebpf_arena_state_valid(
+            rt->core.arena->maps.cachestat_events, rt->arena_state, sizeof(struct nd_ebpf_arena_state));
     }
 #endif
     return nd_ebpf_raw_arena_get_state(rt->raw_arena, &rt->arena_state);
@@ -532,7 +532,7 @@ static int cachestat_snapshot_from_acc(
 
 static void cachestat_drain_arena(struct netdata_ebpf_cachestat_runtime *rt)
 {
-    rt->arena_tail = nd_ebpf_arena_drain(rt->arena_state, rt->arena_tail, cachestat_rb_event, rt);
+    nd_ebpf_arena_drain(rt->arena_state, cachestat_rb_event, rt);
 }
 
 #endif /* NETDATA_CACHESTAT_EVENT_FLAVORS_SUPPORTED */
@@ -570,7 +570,8 @@ int netdata_cachestat_runtime_load(struct netdata_ebpf_cachestat_runtime *rt)
     return 0;
 }
 
-int netdata_cachestat_runtime_attach(struct netdata_ebpf_cachestat_runtime *rt, const char *account_function)
+int netdata_cachestat_runtime_attach(struct netdata_ebpf_cachestat_runtime *rt, const char *add_function,
+                                     const char *access_function, const char *account_function)
 {
     struct bpf_object *obj = cachestat_runtime_object(rt);
     if (!rt || !obj)
@@ -586,12 +587,12 @@ int netdata_cachestat_runtime_attach(struct netdata_ebpf_cachestat_runtime *rt, 
     if (!rt->links)
         return -1;
 
-    rt->links[0] = cachestat_attach_program_by_name(obj, rt->program_names[0], "add_to_page_cache_lru");
-    rt->links[1] = cachestat_attach_program_by_name(obj, rt->program_names[1], "mark_page_accessed");
+    rt->links[0] = cachestat_attach_program_by_name(obj, rt->program_names[0], add_function);
+    rt->links[1] = cachestat_attach_program_by_name(obj, rt->program_names[1], access_function);
     rt->links[2] = cachestat_attach_program_by_name(obj, rt->program_names[2], account_function);
     rt->links[3] = cachestat_attach_program_by_name(obj, rt->program_names[3], "mark_buffer_dirty");
 
-    const char *targets[] = {"add_to_page_cache_lru", "mark_page_accessed", account_function, "mark_buffer_dirty"};
+    const char *targets[] = {add_function, access_function, account_function, "mark_buffer_dirty"};
     if (nd_ebpf_validate_links(rt->links, rt->program_names, targets, 4, "cachestat") != 0) {
         nd_ebpf_destroy_links(&rt->links, 4);
         return -1;
@@ -845,4 +846,13 @@ void netdata_cachestat_runtime_close(struct netdata_ebpf_cachestat_runtime *rt)
             bpf_object__close(rt->obj);
     }
     freez(rt);
+}
+uint64_t netdata_cachestat_runtime_arena_drops(struct netdata_ebpf_cachestat_runtime *rt)
+{
+#ifdef NETDATA_CACHESTAT_EVENT_FLAVORS_SUPPORTED
+    return rt && rt->arena_state ? nd_ebpf_arena_dropped(rt->arena_state) : 0;
+#else
+    (void)rt;
+    return 0;
+#endif
 }
