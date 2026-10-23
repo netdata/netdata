@@ -20,9 +20,9 @@ func status(permitted, effective, ambient string) []byte {
 
 const (
 	noCaps  = "0000000000000000"
-	capBPF  = "0000010000000000" // cap_bpf
-	capPerf = "0000008000000000" // cap_perfmon
-	capBoth = "0000018000000000" // cap_bpf + cap_perfmon
+	capBPF  = "0000008000000000" // cap_bpf
+	capPerf = "0000004000000000" // cap_perfmon
+	capBoth = "000000c000000000" // cap_bpf + cap_perfmon
 )
 
 func TestGainedCapabilitiesAtExec(t *testing.T) {

@@ -122,7 +122,7 @@ if(ENABLE_PLUGIN_EBPF)
                         CGO_LDFLAGS=${EBPF_GO_CGO_LDFLAGS}
                         GOPROXY=https://proxy.golang.org,direct
                         "${GO_EXECUTABLE}" build -buildvcs=false
-                        -ldflags "-X main.netdataPluginsDir=${PLUGINS_DIR} -X main.netdataUserConfigDir=${CONFIG_DIR} -X main.netdataStockConfigDir=${LIBCONFIG_DIR}"
+                        -ldflags "-X 'main.netdataPluginsDir=${PLUGINS_DIR}' -X 'main.netdataUserConfigDir=${CONFIG_DIR}' -X 'main.netdataStockConfigDir=${LIBCONFIG_DIR}'"
                         -tags netdata_ebpf_libbpf
                         -o "${CMAKE_BINARY_DIR}/ebpf-go.plugin"
                         "."
