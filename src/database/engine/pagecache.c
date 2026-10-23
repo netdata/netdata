@@ -345,7 +345,7 @@ static void pgc_inject_gap(struct rrdengine_instance *ctx, METRIC *metric, time_
             .data = PGD_EMPTY,
     };
 
-    if(page_entry.start_time_s >= page_entry.end_time_s)
+    if(page_entry.start_time_s > page_entry.end_time_s)
         return;
 
     PGC_PAGE *page = pgc_page_add_and_acquire(main_cache, page_entry, NULL);
@@ -410,7 +410,7 @@ static ALWAYS_INLINE_HOT size_t list_has_time_gaps(
             dt_s = pd->update_every_s;
 
         if(populate_gaps && pd->first_time_s > now_s)
-            pgc_inject_gap(ctx, metric, now_s, pd->first_time_s);
+            pgc_inject_gap(ctx, metric, now_s, nd_time_t_add_saturating(pd->first_time_s, -1));
 
         now_s = pd->last_time_s + dt_s;
         if(now_s > wanted_end_time_s) {
