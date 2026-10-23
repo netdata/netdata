@@ -88,17 +88,17 @@ func TestTopologyDeviceNamesAndLabels(t *testing.T) {
 			ID:           "1",
 			SocketSerial: "12345",
 			HaRole:       "BACKUP",
-		}, "Office · backup · serial 12345"},
+		}, "serial 12345 · backup · Office"},
 		{"identity as name", deviceState{
 			ID:           "1",
 			Name:         "12345",
 			SocketSerial: "12345",
 			HaRole:       "MASTER",
-		}, "Office · master · serial 12345"},
+		}, "serial 12345 · master · Office"},
 		{"id fallback", deviceState{
 			ID:     "1",
 			HaRole: "NONE",
-		}, "Office · device · ID 1"},
+		}, "ID 1 · device · Office"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			site := &siteState{
@@ -181,4 +181,15 @@ func collectReviewCycle(t *testing.T, c *Collector) {
 		return
 	}
 	require.NoError(t, cc.CommitCycleSuccess())
+}
+
+func TestTopologyDeviceIdentityPrecedesLongSiteContext(t *testing.T) {
+	site := &siteState{ID: "site", Name: "Europe Greece Athens Headquarters Production Operations Centre"}
+	first := topologyDeviceName(site, deviceState{ID: "1", SocketSerial: "123456789"})
+	second := topologyDeviceName(site, deviceState{ID: "2", SocketSerial: "987654321"})
+	require.Contains(t, first, site.Name)
+	require.Contains(t, second, site.Name)
+	require.NotEqual(t, []rune(first)[:79], []rune(second)[:79], "graph caption shortening must retain device identity")
+	require.Contains(t, string([]rune(first)[:79]), "serial 123456789")
+	require.Contains(t, string([]rune(second)[:79]), "serial 987654321")
 }

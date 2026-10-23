@@ -256,7 +256,8 @@ func topologyDeviceName(site *siteState, dev deviceState) string {
 	if serial := normalizeName(dev.SocketSerial); serial != "" {
 		identity = "serial " + serial
 	}
-	return firstNonEmpty(site.Name, "Site "+site.ID) + " · " + role + " · " + identity
+	// Keep identity visible when the graph shortens long site context.
+	return identity + " · " + role + " · " + firstNonEmpty(site.Name, "Site "+site.ID)
 }
 
 func addDeviceActor(
