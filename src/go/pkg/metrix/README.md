@@ -278,6 +278,20 @@ lifetime and reuse profile. It still uses the same deterministic reader indexes 
 
 ### Host-scope reads and metadata
 
+Vec handles are cached by scope key and metric label values. A lookup with
+changed host metadata replaces the cached immutable handle without changing
+series identity or adding a cache key per metadata revision. Identical normalized
+metadata reuses the existing handle. Previously returned handles retain their
+original metadata: obtain a handle from the current `WithHostScope` view after
+metadata changes. Writing old and new metadata for one scope in the same
+collector cycle remains a conflict.
+
+The cache retains instrument pointers and reads metadata from each immutable
+instrument, without copying a `HostScope` into every cache entry. Cache entries
+live for the vector's lifetime, so performance checks must include cache
+population or retained heap: steady-state allocations per lookup do not capture
+the storage cost of existing entries.
+
 - `Read()` selects the default host scope; `ReadHostScope(key)` selects one explicit scope.
 - `HostScopes()` returns every scope present in the snapshot, independent of the reader's active scope. Returned
   metadata is defensively cloned.
