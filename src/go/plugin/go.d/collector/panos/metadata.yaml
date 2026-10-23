@@ -29,7 +29,7 @@ modules:
       data_collection:
         metrics_description: |
           This collector monitors Palo Alto Networks PAN-OS firewalls.
-          It collects read-only XML API telemetry for BGP, system status, HA, environment sensors, licenses, and IPsec SAs.
+          It collects read-only XML API telemetry for BGP, system status, HA, environment sensors, licenses, IPsec SAs, tunnels, and gateways.
         method_description: |
           It gathers metrics by periodically running PAN-OS XML API operational commands through the pango SDK.
       default_behavior:
@@ -402,6 +402,37 @@ modules:
               chart_type: line
               dimensions:
                 - name: remaining_lifetime
+        - name: IPsec tunnel state
+          description: These metrics refer to one configured PAN-OS IPsec tunnel, whether or not it currently has an established SA.
+          labels:
+            - name: tunnel
+              description: Tunnel name.
+            - name: tunnel_id
+              description: PAN-OS tunnel identifier.
+          metrics:
+            - name: panos.ipsec.tunnel.state
+              description: IPsec Tunnel State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: active
+                - name: inactive
+                - name: unknown
+        - name: IPsec gateway
+          description: These metrics refer to one configured PAN-OS IKE gateway.
+          labels:
+            - name: gateway
+              description: Gateway name.
+            - name: ike_version
+              description: IKE version the gateway is configured for (`ikev1`, `ikev2`, or `unknown`).
+          metrics:
+            - name: panos.ipsec.gateway.state
+              description: IPsec Gateway State. `up` means the gateway has an IKE (phase 1) SA, `down` means it is configured but has none.
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: up
+                - name: down
         - name: BGP peer
           description: These metrics refer to a single BGP peer on a PAN-OS virtual router or logical router.
           labels:
