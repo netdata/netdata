@@ -524,6 +524,16 @@ const char *functions_payload_validate(const char *payload, size_t len) {
 
     // in strict JSON a raw newline can only separate tokens, so no payload line can be the end
     // marker or a bare protocol command, and no NUL byte can truncate the call when it is sent
-    const char *reason = json_strict_validate(payload, len);
-    return reason ? "the payload is not a valid JSON document" : NULL;
+    if(json_strict_validate(payload, len))
+        return "the payload is not a valid JSON document";
+
+    // redundant with the above, but makes the guarantee obvious: the end marker never appears, even escaped
+    const size_t marker_len = strlen(PLUGINSD_CALL_FUNCTION_PAYLOAD_END);
+    const char *end = payload + len;
+    for(const char *s = memchr(payload, 'F', len); s; s = memchr(s + 1, 'F', end - s - 1)) {
+        if((size_t)(end - s) >= marker_len && memcmp(s, PLUGINSD_CALL_FUNCTION_PAYLOAD_END, marker_len) == 0)
+            return "the payload contains the plugins.d payload end marker";
+    }
+
+    return NULL;
 }
