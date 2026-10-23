@@ -538,18 +538,27 @@ const char *functions_payload_validate(const char *payload, size_t len) {
 
     // plugin tokenizers unquote fields, so a JSON line starting with a quoted keyword can be read as
     // a command by older go.d versions (e.g. children behind this agent) - refuse it
-    const size_t function_len = sizeof(PLUGINSD_CALL_FUNCTION) - 1;
-    const size_t quit_len = sizeof(PLUGINSD_CALL_QUIT) - 1;
+    static const struct {
+        const char *keyword;
+        size_t len;
+    } quoted_keywords[] = {
+        { "\"" PLUGINSD_CALL_FUNCTION "\"",               sizeof(PLUGINSD_CALL_FUNCTION) + 1 },
+        { "\"" PLUGINSD_CALL_FUNCTION_PAYLOAD_BEGIN "\"", sizeof(PLUGINSD_CALL_FUNCTION_PAYLOAD_BEGIN) + 1 },
+        { "\"" PLUGINSD_CALL_FUNCTION_CANCEL "\"",        sizeof(PLUGINSD_CALL_FUNCTION_CANCEL) + 1 },
+        { "\"" PLUGINSD_CALL_FUNCTION_PROGRESS "\"",      sizeof(PLUGINSD_CALL_FUNCTION_PROGRESS) + 1 },
+        { "\"" PLUGINSD_CALL_QUIT "\"",                   sizeof(PLUGINSD_CALL_QUIT) + 1 },
+    };
     for(const char *line = payload; line < end; ) {
         const char *s = line;
         while(s < end && (*s == ' ' || *s == '\t' || *s == '\r'))
             s++;
 
         if(s < end && *s == '"') {
-            s++;
-            if(((size_t)(end - s) >= function_len && memcmp(s, PLUGINSD_CALL_FUNCTION, function_len) == 0) ||
-               ((size_t)(end - s) >= quit_len && memcmp(s, PLUGINSD_CALL_QUIT, quit_len) == 0))
-                return "the payload has a line starting with a quoted plugins.d keyword";
+            for(size_t i = 0; i < _countof(quoted_keywords); i++) {
+                if((size_t)(end - s) >= quoted_keywords[i].len &&
+                   memcmp(s, quoted_keywords[i].keyword, quoted_keywords[i].len) == 0)
+                    return "the payload has a line starting with a quoted plugins.d keyword";
+            }
         }
 
         const char *nl = memchr(s, '\n', end - s);

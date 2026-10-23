@@ -1501,6 +1501,7 @@ int pluginsd_functions_unittest(void) {
             { "quoted keyword key at line start", "{\n  \"FUNCTION_PAYLOAD\": 1\n}", 0, true },
             { "quoted FUNCTION element (go.d tokenizes it as a call)", "[\"x\",\n\"FUNCTION\" ,0, 30 ,\"a\" ,\"b\" ,\"c\" ]", 0, true },
             { "indented quoted QUIT element", "[\n\t\"QUIT\"\n]", 0, true },
+            { "quoted keyword prefix at line start", "{\n  \"FUNCTIONS_ENABLED\": true,\n  \"QUITE\": 1\n}", 0, false },
             { "escapes", "{\"a\":\"x\\ny\\n\\u00e9\\\"\\/\"}", 0, false },
             { "escaped end marker", "{\"a\":\"x\\nFUNCTION_PAYLOAD_END\\n\"}", 0, true },
             { "end marker as a key", "{\"FUNCTION_PAYLOAD_END\":1}", 0, true },
