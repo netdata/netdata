@@ -2,6 +2,44 @@
 
 ### Merged Pull Requests:
 
+- Fix(plugins.d): restart external plugins after a protocol error ([#24051](https://github.com/netdata/netdata/issues/24051))
+- Fix(go.d/snmp_traps): require authentication from SNMPv3 users configured with it ([#24188](https://github.com/netdata/netdata/issues/24188))
+- Fix label filters when a bare key matches a label name ([#24202](https://github.com/netdata/netdata/issues/24202))
+- Fix(go.d/snmputils): keep SNMP secrets out of the connection-info string ([#24217](https://github.com/netdata/netdata/issues/24217))
+- Procfile: keep the cached filename when rewinding a non-seekable file ([#24212](https://github.com/netdata/netdata/issues/24212))
+- Sqlite: fix metadata cleanup stalls and lost context checks ([#24227](https://github.com/netdata/netdata/issues/24227))
+- Sqlite: fix four health persistence bugs ([#24223](https://github.com/netdata/netdata/issues/24223))
+- Aclk: deliver alert transitions to the cloud exactly as recorded ([#24224](https://github.com/netdata/netdata/issues/24224))
+- Contexts: fix the v1 dimensions filter and weights instance@node_id ([#24245](https://github.com/netdata/netdata/issues/24245))
+- Streaming: release the dimension cache of obsolete charts at scope end ([#24256](https://github.com/netdata/netdata/issues/24256))
+- Proc.plugin: detect diskstats discard and flush fields correctly ([#24243](https://github.com/netdata/netdata/issues/24243))
+- Streaming: report a disconnected child to Cloud only after it is offline ([#24285](https://github.com/netdata/netdata/issues/24285))
+- Health: stop alert evaluation from keeping obsolete charts alive ([#24273](https://github.com/netdata/netdata/issues/24273))
+- Assorted improvements for R2 build artifact uploads. ([#24109](https://github.com/netdata/netdata/issues/24109))
+- Bump version of vendored IBM MQ libraries to 9.4.5.1. ([#24294](https://github.com/netdata/netdata/issues/24294))
+- Static aarch64: work around Cortex-A53 errata 835769 and 843419 ([#24207](https://github.com/netdata/netdata/issues/24207))
+- Bound array nesting depth in json_key_index_and_push ([#24290](https://github.com/netdata/netdata/issues/24290))
+- Reject gorilla disk pages whose length is not a buffer multiple ([#24310](https://github.com/netdata/netdata/issues/24310))
+- Aclk: do not hand out MQTT packet id 1 twice at the wrap ([#24341](https://github.com/netdata/netdata/issues/24341))
+- Dictionary: do not hold the destroy queue lock while freeing dictionaries ([#24344](https://github.com/netdata/netdata/issues/24344))
+- Aclk: return reconnect backoff clamps in milliseconds ([#24340](https://github.com/netdata/netdata/issues/24340))
+- Streaming: wait 125% of the child reboot time before reporting it offline ([#24343](https://github.com/netdata/netdata/issues/24343))
+- Analytics: read the /api/v1/info analytics strings under their lock ([#24342](https://github.com/netdata/netdata/issues/24342))
+- Aclk: restore the t-rx timestamp in HTTP replies ([#24252](https://github.com/netdata/netdata/issues/24252))
+- Packaging: align Rust functions to 8 bytes in static aarch64 builds ([#24387](https://github.com/netdata/netdata/issues/24387))
+- Bundle MSYS2's msys2-runtime 3.6.11 DLL instead of building it ([#24390](https://github.com/netdata/netdata/issues/24390))
+- Fix(db): publish completed tier points after missed flush boundaries ([#24405](https://github.com/netdata/netdata/issues/24405))
+- Go.d/k8s_state: remove only the deleted object's charts ([#24402](https://github.com/netdata/netdata/issues/24402))
+- Fix(dbengine): cache single-timestamp gaps exactly ([#24370](https://github.com/netdata/netdata/issues/24370))
+- Fix(query): continue across exhausted tiers while later plans remain ([#24406](https://github.com/netdata/netdata/issues/24406))
+- Fix(go.d): keep function payload lines out of command parsing ([#24410](https://github.com/netdata/netdata/issues/24410))
+- Fix(functions): require strict JSON function payloads ([#24409](https://github.com/netdata/netdata/issues/24409))
+- Revert "streaming: release the dimension cache of obsolete charts at scope end ([#24256](https://github.com/netdata/netdata/issues/24256))"
+
+## [2.12.1] - 2026-10-08
+
+### Merged Pull Requests:
+
 - Sync repos (netdata, ebpf-co-re, kernel-collector) ([#24008](https://github.com/netdata/netdata/issues/24008))
 - Fix(go.d/ceph): remove the stray selector from the configuration form ([#24108](https://github.com/netdata/netdata/issues/24108))
 - Feat(go.d/redfish): show credentials only for auth methods that use them ([#24106](https://github.com/netdata/netdata/issues/24106))
