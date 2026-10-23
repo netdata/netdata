@@ -42,7 +42,10 @@ The plugin logs the facet-cache path, whether it loaded the cache, its version,
 and the number of indexed archived paths. Each reconciliation attempt logs its
 inventory source (`registry` or `disk`), active and archived path counts, files to
 scan, and whether it must rebuild archived facets. Completion and rejection logs
-include elapsed milliseconds.
+include elapsed milliseconds. For journald, use `journalctl -o verbose` or
+`journalctl -o json` to include these structured fields. Add
+`--namespace=<name>` if the Agent uses a separate systemd journal namespace.
+The rejection cause is also included in the message shown by default output.
 
 A rejected attempt reports one of these causes:
 
