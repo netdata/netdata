@@ -467,11 +467,25 @@ char *health_edit_command_from_source(const char *source)
 }
 
 
-static inline void strip_quotes(char *s) {
-    while(*s) {
-        if(*s == '\'' || *s == '"') *s = ' ';
-        s++;
+// Remove the quotes that wrap a whole value and keep inner single quotes (apostrophes). Inner double quotes become
+// spaces: alarm-notify.sh and the /api/v1/alarms JSON interpolate alert text without escaping.
+void health_strip_quotes(char *s) {
+    size_t len = strlen(s);
+    if(len >= 2 && (s[0] == '\'' || s[0] == '"') && s[len - 1] == s[0]) {
+        memmove(s, s + 1, len - 2);
+        s[len - 2] = '\0';
     }
+
+    for(; *s; s++)
+        if(*s == '"')
+            *s = ' ';
+}
+
+// Roles are identifiers: alarm-notify.sh looks each one up as a variable name, so no quote may remain.
+static inline void health_quotes_to_spaces(char *s) {
+    for(; *s; s++)
+        if(*s == '\'' || *s == '"')
+            *s = ' ';
 }
 
 static void replace_green_red(RRD_ALERT_PROTOTYPE *ap, NETDATA_DOUBLE green, NETDATA_DOUBLE red) {
@@ -770,15 +784,15 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
             PARSE_HEALTH_CONFIG_LINE_PATTERN_APPEND(am, chart_labels, NULL);
         }
         else if(hash == hash_class && !strcasecmp(key, HEALTH_CLASS_KEY)) {
-            strip_quotes(value);
+            health_strip_quotes(value);
             PARSE_HEALTH_CONFIG_LINE_STRING(ac, classification);
         }
         else if(hash == hash_component && !strcasecmp(key, HEALTH_COMPONENT_KEY)) {
-            strip_quotes(value);
+            health_strip_quotes(value);
             PARSE_HEALTH_CONFIG_LINE_STRING(ac, component);
         }
         else if(hash == hash_type && !strcasecmp(key, HEALTH_TYPE_KEY)) {
-            strip_quotes(value);
+            health_strip_quotes(value);
             PARSE_HEALTH_CONFIG_LINE_STRING(ac, type);
         }
         else if(hash == hash_lookup && !strcasecmp(key, HEALTH_LOOKUP_KEY)) {
@@ -848,23 +862,23 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
             }
         }
         else if(hash == hash_exec && !strcasecmp(key, HEALTH_EXEC_KEY)) {
-            strip_quotes(value);
+            health_strip_quotes(value);
             PARSE_HEALTH_CONFIG_LINE_STRING(ac, exec);
         }
         else if(hash == hash_recipient && !strcasecmp(key, HEALTH_RECIPIENT_KEY)) {
-            strip_quotes(value);
+            health_quotes_to_spaces(value);
             PARSE_HEALTH_CONFIG_LINE_STRING(ac, recipient);
         }
         else if(hash == hash_units && !strcasecmp(key, HEALTH_UNITS_KEY)) {
-            strip_quotes(value);
+            health_strip_quotes(value);
             PARSE_HEALTH_CONFIG_LINE_STRING(ac, units);
         }
         else if(hash == hash_summary && !strcasecmp(key, HEALTH_SUMMARY_KEY)) {
-            strip_quotes(value);
+            health_strip_quotes(value);
             PARSE_HEALTH_CONFIG_LINE_STRING(ac, summary);
         }
         else if(hash == hash_info && !strcasecmp(key, HEALTH_INFO_KEY)) {
-            strip_quotes(value);
+            health_strip_quotes(value);
             PARSE_HEALTH_CONFIG_LINE_STRING(ac, info);
         }
         else if(hash == hash_delay && !strcasecmp(key, HEALTH_DELAY_KEY)) {
