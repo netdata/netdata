@@ -8,9 +8,8 @@ import (
 	"sync"
 )
 
-type vecCacheEntry[T any] struct {
-	scope  HostScope
-	handle T
+type hostScopedInstrument interface {
+	hostScope() HostScope
 }
 
 // vecCache stores per-label-values instrument handles with a read-fast path.
@@ -18,18 +17,18 @@ type vecCacheEntry[T any] struct {
 // Contract: cache entries are intentionally unbounded for the lifetime of the
 // vec handle. Store-level retention evicts committed series state, but it does
 // not prune vecCache handles. Collectors must keep vec label cardinality bounded.
-type vecCache[T any] struct {
+type vecCache[T hostScopedInstrument] struct {
 	backend meterBackend
 	base    []LabelSet
 	keys    []string
 
 	mu    sync.RWMutex
-	cache map[string]vecCacheEntry[T]
+	cache map[string]T
 
 	makeHandle func(scope HostScope, base []LabelSet, vecSet LabelSet) T
 }
 
-func newVecCache[T any](
+func newVecCache[T hostScopedInstrument](
 	backend meterBackend,
 	base []LabelSet,
 	keys []string,
@@ -39,7 +38,7 @@ func newVecCache[T any](
 		backend:    backend,
 		base:       base,
 		keys:       keys,
-		cache:      make(map[string]vecCacheEntry[T]),
+		cache:      make(map[string]T),
 		makeHandle: makeHandle,
 	}
 }
@@ -55,18 +54,18 @@ func (v *vecCache[T]) get(scope HostScope, labelValues ...string) (T, error) {
 	cacheKey = scopedVecCacheKey(scope.ScopeKey, cacheKey)
 
 	v.mu.RLock()
-	entry, ok := v.cache[cacheKey]
+	inst, ok := v.cache[cacheKey]
 	v.mu.RUnlock()
-	if ok && hostScopeEqual(entry.scope, scope) {
-		return entry.handle, nil
+	if ok && hostScopeEqual(inst.hostScope(), scope) {
+		return inst, nil
 	}
 
 	v.mu.Lock()
 	defer v.mu.Unlock()
 
-	entry, ok = v.cache[cacheKey]
-	if ok && hostScopeEqual(entry.scope, scope) {
-		return entry.handle, nil
+	inst, ok = v.cache[cacheKey]
+	if ok && hostScopeEqual(inst.hostScope(), scope) {
+		return inst, nil
 	}
 
 	vecSet, err := vecSeriesCompileLabelSet(v.backend, v.keys, labelValues)
@@ -75,11 +74,8 @@ func (v *vecCache[T]) get(scope HostScope, labelValues ...string) (T, error) {
 	}
 
 	// Replace rather than mutate: previously returned handles retain their scope.
-	inst := v.makeHandle(scope, v.base, vecSet)
-	v.cache[cacheKey] = vecCacheEntry[T]{
-		scope:  scope,
-		handle: inst,
-	}
+	inst = v.makeHandle(scope, v.base, vecSet)
+	v.cache[cacheKey] = inst
 	return inst, nil
 }
 
