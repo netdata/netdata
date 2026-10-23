@@ -529,7 +529,7 @@ const char *functions_payload_validate(const char *payload, size_t len) {
         return reason;
 
     // redundant with the above, but makes the guarantee obvious: the end marker never appears, even escaped
-    const size_t marker_len = strlen(PLUGINSD_CALL_FUNCTION_PAYLOAD_END);
+    const size_t marker_len = sizeof(PLUGINSD_CALL_FUNCTION_PAYLOAD_END) - 1;
     const char *end = payload + len;
     for(const char *s = memchr(payload, 'F', len); s; s = memchr(s + 1, 'F', end - s - 1)) {
         if((size_t)(end - s) >= marker_len && memcmp(s, PLUGINSD_CALL_FUNCTION_PAYLOAD_END, marker_len) == 0)

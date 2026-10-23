@@ -685,8 +685,7 @@ static const char *json_strict_number(const char *s, const char *e) {
     return s;
 }
 
-static const char *json_strict_literal(const char *s, const char *e, const char *literal) {
-    size_t len = strlen(literal);
+static const char *json_strict_literal(const char *s, const char *e, const char *literal, size_t len) {
     if((size_t)(e - s) < len || memcmp(s, literal, len) != 0)
         return NULL;
     return s + len;
@@ -744,11 +743,11 @@ const char *json_strict_validate(const char *s, size_t len) {
                 else if(*s == '-' || json_strict_is_digit(*s))
                     s = json_strict_number(s, e);
                 else if(*s == 't')
-                    s = json_strict_literal(s, e, "true");
+                    s = json_strict_literal(s, e, "true", sizeof("true") - 1);
                 else if(*s == 'f')
-                    s = json_strict_literal(s, e, "false");
+                    s = json_strict_literal(s, e, "false", sizeof("false") - 1);
                 else if(*s == 'n')
-                    s = json_strict_literal(s, e, "null");
+                    s = json_strict_literal(s, e, "null", sizeof("null") - 1);
                 else
                     return "invalid JSON: unexpected character";
 
