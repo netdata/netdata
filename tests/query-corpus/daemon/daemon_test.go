@@ -126,6 +126,7 @@ func TestRuntimeSocketPathLimits(t *testing.T) {
 	}{
 		{"boundary", "/" + strings.Repeat("x", maxRunBytes-1), ""},
 		{"spawn-only-overflow", "/" + strings.Repeat("x", maxRunBytes), "netdata-spawn-plugins.sock"},
+		{"unclean-spawn-path", strings.Repeat("/", maxRunBytes) + "x", "netdata-spawn-plugins.sock"},
 		{"cli-overflow", "/" + strings.Repeat("x", maxPathBytes-len("/netdata.pipe")), "netdata.pipe"},
 		{"multibyte-boundary", "/" + strings.Repeat("é", (maxRunBytes-1)/2) + strings.Repeat("x", (maxRunBytes-1)%2), ""},
 		{"multibyte-overflow", "/" + strings.Repeat("é", (maxRunBytes+1)/2), "netdata-spawn-plugins.sock"},
