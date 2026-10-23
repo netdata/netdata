@@ -237,6 +237,12 @@
 - Fix(windows): skip space charting for optical and read-only drives ([#24352](https://github.com/netdata/netdata/issues/24352))
 - Dbengine: rebuild a journal v2 rejected at startup from its journal v1 ([#24400](https://github.com/netdata/netdata/issues/24400))
 - Fix(db): publish completed tier points after missed flush boundaries ([#24405](https://github.com/netdata/netdata/issues/24405))
+- Go.d/k8s_state: remove only the deleted object's charts ([#24402](https://github.com/netdata/netdata/issues/24402))
+- Fix(dbengine): cache single-timestamp gaps exactly ([#24370](https://github.com/netdata/netdata/issues/24370))
+- Fix(query): continue across exhausted tiers while later plans remain ([#24406](https://github.com/netdata/netdata/issues/24406))
+- Ci: run the Rust workspace tests when Rust code changes ([#24396](https://github.com/netdata/netdata/issues/24396))
+- Fix(go.d): keep function payload lines out of command parsing ([#24410](https://github.com/netdata/netdata/issues/24410))
+- Fix(functions): require strict JSON function payloads ([#24409](https://github.com/netdata/netdata/issues/24409))
 
 ## [2.12.0] - 2026-09-30
 
