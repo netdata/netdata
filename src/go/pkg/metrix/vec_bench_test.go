@@ -8,10 +8,11 @@ import (
 )
 
 // Scope-refresh cache measurements (2026-10-24, linux/amd64, i9-12900K).
-// Four alternating before/after runs, 300ms per benchmark; median ns/op:
-// vec_10_series: 8216 -> 8545; vec_100_series: 76364 -> 74696.
-// Allocations remain 76 and 622 per cycle respectively. Scoped cache lookup
-// adds metadata comparison: 284 -> 329 ns/op, unchanged 376 B / 5 allocations.
+// Six alternating before/after runs, 300ms per benchmark, compared with benchstat:
+// vec_10_series: 7899 -> 8255 ns/op; vec_100_series: 70790 -> 72700 ns/op
+// (neither cycle-time difference significant). Allocation counts remain 76/622.
+// Scoped lookup adds metadata comparison: 272.5 -> 319 ns/op (+17%, p=0.002),
+// unchanged 376 B / 5 allocations. The 100-series cycle varies by 0.01% B/op.
 // Command: go test ./pkg/metrix -run '^$' -bench 'VecScopedLookup|VecVsWithLabelsSnapshotGauge' -benchmem
 // Keep this block updated when changing vec or label-merging write paths.
 func BenchmarkVecVsWithLabelsSnapshotGauge(b *testing.B) {
