@@ -902,7 +902,7 @@ static inline int nd_ebpf_raw_arena_get_state(struct nd_ebpf_raw_arena *arena, v
 
 typedef void (*nd_ebpf_event_fn)(void *ctx, const struct nd_ebpf_pid_event *ev);
 
-/* A slot is released only after its callback finishes. */
+/* Not re-entrant: a slot is released only after its callback finishes. */
 static inline void nd_ebpf_arena_drain(void *arena_state, nd_ebpf_event_fn fn, void *ctx)
 {
     if (!arena_state)

@@ -16,8 +16,8 @@ func TestArenaDropsChartAndCumulativeValue(t *testing.T) {
 
 	output := buf.String()
 	for _, want := range []string{
-		"ebpf.dcstat_arena_drops",
-		"ebpf.dcstat_arena_drops",
+		"CHART 'ebpf.dcstat_arena_drops'",
+		"BEGIN 'ebpf.dcstat_arena_drops'",
 		"DIMENSION 'dropped'",
 		"incremental",
 		"SET 'dropped' = 42",

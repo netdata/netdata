@@ -329,7 +329,7 @@ static int ebpf_ut_load_binary()
         !test_rhel10_selector_respects_module_mask() || !test_selector_bit_zero_and_empty_mask() ||
         !test_rhel10_module_masks() ||
         !test_redhat_release_version_parser() || !test_redhat_os_release_parser()) {
-        fprintf(stderr, ">>> FAILED: kernel version parsing or disk selectors are inconsistent\n");
+        fprintf(stderr, ">>> FAILED: kernel version parsing or legacy selectors are inconsistent\n");
         return -1;
     }
 
