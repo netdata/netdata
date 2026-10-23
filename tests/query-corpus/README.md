@@ -12,6 +12,12 @@ The harness overrides inherited CLI socket and runtime paths in the child
 environment, so separate daemons and concurrent corpus runs cannot replace
 another instance's CLI socket.
 
+Runtime directories are created under `TMPDIR`. Before launching a daemon,
+the harness checks that its CLI and main spawn-server socket paths fit the
+platform's Unix-socket byte limit. If a path is too long, the launch is rejected
+and its private runtime directory is removed. Set `TMPDIR` to a shorter writable
+directory; other corpus data continues to use that temporary directory too.
+
 ## The layered ladder
 
 The ladder isolates narrow query stages to control combinatorial growth.

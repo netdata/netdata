@@ -83,6 +83,68 @@ func TestDaemonRuntimeEnvironmentIsPrivate(t *testing.T) {
 	}
 }
 
+func TestDaemonRejectsLongRuntimePathBeforeLaunch(t *testing.T) {
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, "log"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	tmpDir := filepath.Join(t.TempDir(), strings.Repeat("x", len(syscall.RawSockaddrUnix{}.Path)))
+	if err := os.Mkdir(tmpDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("TMPDIR", tmpDir)
+	t.Setenv("QUERY_CORPUS_TEST_DAEMON_ENV", "1")
+	d := &Daemon{Opts: Options{Binary: executable, RunDir: root}, BaseURL: "invalid://environment-test"}
+	err = d.launch()
+	if err == nil || !strings.Contains(err.Error(), "IPC socket path") || !strings.Contains(err.Error(), "TMPDIR") {
+		t.Errorf("long runtime path did not produce an actionable error: %v", err)
+	}
+	if d.process != nil || d.processPID != 0 || d.waitCh != nil {
+		t.Error("long runtime path reached child startup")
+	}
+	if _, err := os.Stat(filepath.Join(root, "log", "stdout.log")); !os.IsNotExist(err) {
+		t.Errorf("long runtime path reached log creation: %v", err)
+	}
+	entries, err := os.ReadDir(tmpDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 || d.runtimeDir != "" {
+		t.Errorf("rejected launch retained runtime state: entries=%v, directory=%q", entries, d.runtimeDir)
+	}
+}
+
+func TestRuntimeSocketPathLimits(t *testing.T) {
+	maxPathBytes := len(syscall.RawSockaddrUnix{}.Path) - 1
+	maxRunBytes := maxPathBytes - len("/netdata-spawn-plugins.sock")
+	for _, tc := range []struct {
+		name, runDir, rejectedSocket string
+	}{
+		{"boundary", "/" + strings.Repeat("x", maxRunBytes-1), ""},
+		{"spawn-only-overflow", "/" + strings.Repeat("x", maxRunBytes), "netdata-spawn-plugins.sock"},
+		{"cli-overflow", "/" + strings.Repeat("x", maxPathBytes-len("/netdata.pipe")), "netdata.pipe"},
+		{"multibyte-boundary", "/" + strings.Repeat("é", (maxRunBytes-1)/2) + strings.Repeat("x", (maxRunBytes-1)%2), ""},
+		{"multibyte-overflow", "/" + strings.Repeat("é", (maxRunBytes+1)/2), "netdata-spawn-plugins.sock"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateRuntimeSocketPaths(tc.runDir)
+			if tc.rejectedSocket == "" {
+				if err != nil {
+					t.Fatalf("valid socket paths rejected: %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tc.rejectedSocket) || !strings.Contains(err.Error(), "TMPDIR") {
+				t.Fatalf("missing socket-specific path diagnostic: %v", err)
+			}
+		})
+	}
+}
+
 func TestNetdataConfigDisablesUnlistedPlugins(t *testing.T) {
 	const disabled = "\n    enable running new plugins = no\n"
 	if !strings.Contains(netdataConfTemplate, disabled) {

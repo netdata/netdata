@@ -331,6 +331,19 @@ func (d *Daemon) cleanupRuntime() error {
 	return err
 }
 
+func validateRuntimeSocketPaths(runDir string) error {
+	maxPathBytes := len(syscall.RawSockaddrUnix{}.Path) - 1
+	// main.c starts the init/plugins spawn servers; external collectors are disabled.
+	for _, name := range []string{"netdata.pipe", "netdata-spawn-init.sock", "netdata-spawn-plugins.sock"} {
+		path := filepath.Join(runDir, name)
+		if len(path) > maxPathBytes {
+			return fmt.Errorf("daemon: IPC socket path %q is %d bytes, exceeds the %d-byte Unix-socket limit; set TMPDIR to a shorter directory",
+				path, len(path), maxPathBytes)
+		}
+	}
+	return nil
+}
+
 func (d *Daemon) launch() (err error) {
 	// Test subdirectory names can exceed Unix-socket limits; keep IPC paths short.
 	runDir, err := os.MkdirTemp("", "qc-ipc-")
@@ -343,6 +356,9 @@ func (d *Daemon) launch() (err error) {
 			err = errors.Join(err, d.cleanupRuntime())
 		}
 	}()
+	if err := validateRuntimeSocketPaths(runDir); err != nil {
+		return err
+	}
 	confPath := filepath.Join(d.Opts.RunDir, "etc", "netdata.conf")
 	cmd := exec.Command(d.Opts.Binary, "-D", "-c", confPath)
 	// CLI startup unlinks its socket, so inherited runtime paths must never reach a test daemon.
