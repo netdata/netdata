@@ -68,7 +68,7 @@
 
 // Function payloads travel unframed between FUNCTION_PAYLOAD and FUNCTION_PAYLOAD_END,
 // so their bytes must never be readable as protocol commands by any plugin or child.
-// Returns NULL when the payload is safe to send, or a static rejection reason.
+// Payloads MUST be strict JSON (RFC 8259). Returns NULL when valid, or a static rejection reason.
 const char *functions_payload_validate(const char *payload, size_t len);
 
 // dyncfg

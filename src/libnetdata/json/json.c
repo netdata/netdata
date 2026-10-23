@@ -589,3 +589,193 @@ int json_test(char *str)
 }
  */
 
+
+// ----------------------------------------------------------------------------
+// strict RFC 8259 validation
+
+#define JSON_STRICT_MAX_DEPTH 256
+
+static inline const char *json_strict_skip_ws(const char *s, const char *e) {
+    while(s < e && (*s == ' ' || *s == '\t' || *s == '\n' || *s == '\r'))
+        s++;
+    return s;
+}
+
+static inline bool json_strict_is_digit(char c) {
+    return c >= '0' && c <= '9';
+}
+
+static inline bool json_strict_is_hex(char c) {
+    return json_strict_is_digit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+}
+
+// s points at the opening quote; returns the byte after the closing quote, or NULL
+static const char *json_strict_string(const char *s, const char *e) {
+    for(s++; s < e; ) {
+        unsigned char c = (unsigned char)*s;
+
+        if(c == '"')
+            return s + 1;
+
+        if(c < 0x20)
+            return NULL;
+
+        if(c != '\\') {
+            s++;
+            continue;
+        }
+
+        if(++s >= e)
+            return NULL;
+
+        switch(*s) {
+            case '"': case '\\': case '/': case 'b': case 'f': case 'n': case 'r': case 't':
+                s++;
+                break;
+
+            case 'u':
+                if(e - s < 5)
+                    return NULL;
+                for(int i = 1; i <= 4; i++)
+                    if(!json_strict_is_hex(s[i]))
+                        return NULL;
+                s += 5;
+                break;
+
+            default:
+                return NULL;
+        }
+    }
+
+    return NULL;
+}
+
+static const char *json_strict_number(const char *s, const char *e) {
+    if(s < e && *s == '-')
+        s++;
+
+    if(s >= e)
+        return NULL;
+
+    if(*s == '0')
+        s++;
+    else if(*s >= '1' && *s <= '9') {
+        while(s < e && json_strict_is_digit(*s))
+            s++;
+    }
+    else
+        return NULL;
+
+    if(s < e && *s == '.') {
+        if(++s >= e || !json_strict_is_digit(*s))
+            return NULL;
+        while(s < e && json_strict_is_digit(*s))
+            s++;
+    }
+
+    if(s < e && (*s == 'e' || *s == 'E')) {
+        if(++s < e && (*s == '+' || *s == '-'))
+            s++;
+        if(s >= e || !json_strict_is_digit(*s))
+            return NULL;
+        while(s < e && json_strict_is_digit(*s))
+            s++;
+    }
+
+    return s;
+}
+
+static const char *json_strict_literal(const char *s, const char *e, const char *literal) {
+    size_t len = strlen(literal);
+    if((size_t)(e - s) < len || memcmp(s, literal, len) != 0)
+        return NULL;
+    return s + len;
+}
+
+const char *json_strict_validate(const char *s, size_t len) {
+    if(!s)
+        return "no JSON document";
+
+    const char *e = s + len;
+    char stack[JSON_STRICT_MAX_DEPTH];
+    size_t depth = 0;
+
+    enum { EXPECT_VALUE, EXPECT_MEMBER, AFTER_VALUE } state = EXPECT_VALUE;
+
+    while(true) {
+        s = json_strict_skip_ws(s, e);
+
+        switch(state) {
+            case EXPECT_MEMBER:
+                if(s >= e || *s != '"')
+                    return "expected a double-quoted object key";
+                if(!(s = json_strict_string(s, e)))
+                    return "invalid string";
+                s = json_strict_skip_ws(s, e);
+                if(s >= e || *s != ':')
+                    return "expected ':' after an object key";
+                s++;
+                state = EXPECT_VALUE;
+                break;
+
+            case EXPECT_VALUE:
+                if(s >= e)
+                    return "expected a value";
+
+                if(*s == '{' || *s == '[') {
+                    if(depth >= JSON_STRICT_MAX_DEPTH)
+                        return "too deeply nested";
+                    char open = *s++;
+                    stack[depth++] = open;
+
+                    const char *t = json_strict_skip_ws(s, e);
+                    if(t < e && *t == (open == '{' ? '}' : ']')) {
+                        s = t + 1;
+                        depth--;
+                        state = AFTER_VALUE;
+                    }
+                    else
+                        state = (open == '{') ? EXPECT_MEMBER : EXPECT_VALUE;
+                    break;
+                }
+
+                if(*s == '"')
+                    s = json_strict_string(s, e);
+                else if(*s == '-' || json_strict_is_digit(*s))
+                    s = json_strict_number(s, e);
+                else if(*s == 't')
+                    s = json_strict_literal(s, e, "true");
+                else if(*s == 'f')
+                    s = json_strict_literal(s, e, "false");
+                else if(*s == 'n')
+                    s = json_strict_literal(s, e, "null");
+                else
+                    return "unexpected character";
+
+                if(!s)
+                    return "invalid value";
+
+                state = AFTER_VALUE;
+                break;
+
+            case AFTER_VALUE:
+                if(!depth)
+                    return (s == e) ? NULL : "unexpected data after the JSON document";
+
+                if(s >= e)
+                    return "unterminated object or array";
+
+                if(*s == ',') {
+                    s++;
+                    state = (stack[depth - 1] == '{') ? EXPECT_MEMBER : EXPECT_VALUE;
+                }
+                else if(*s == (stack[depth - 1] == '{' ? '}' : ']')) {
+                    s++;
+                    depth--;
+                }
+                else
+                    return "expected ',' or the end of the object or array";
+                break;
+        }
+    }
+}

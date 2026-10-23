@@ -52,6 +52,12 @@ typedef struct json_entry {
 
 int json_parse(char *js, void *callback_data, int (*callback_function)(JSON_ENTRY *));
 
+// Strict RFC 8259 validation of one complete document, with no extensions: double-quoted
+// strings without raw control characters, no comments, nothing but whitespace after the value.
+// json-c cannot be used for this - even its strict mode accepts raw newlines in strings and
+// single-quoted strings. Returns NULL when valid, or a static reason.
+const char *json_strict_validate(const char *s, size_t len);
+
 
 // ----------------------------------------------------------------------------
 // private functions

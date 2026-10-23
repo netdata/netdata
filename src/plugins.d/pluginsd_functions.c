@@ -34,6 +34,9 @@ static void pluginsd_calls_insert_cb(const DICTIONARY_ITEM *item, void *func, vo
             nrpc_call_error(pf->result_body_wb, reason, pf->code);
             return;
         }
+
+        // validated as JSON, so label it as such - plugins must not pick another decoder
+        pf->payload->content_type = CT_APPLICATION_JSON;
     }
 
     CLEAN_BUFFER *buffer = buffer_create(1024, NULL);

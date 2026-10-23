@@ -67,6 +67,7 @@ struct c6ut_sends {
     size_t total;
     size_t cancels;
     size_t progresses;
+    size_t json_payloads;   // payload calls labelled application/json
     bool fail;              // simulate a plugin whose pipe is already gone
 };
 
@@ -77,6 +78,9 @@ static ssize_t c6ut_send_cb(const char *txt, void *data, STREAM_TRAFFIC_TYPE typ
         s->cancels++;
     if(strstr(txt, PLUGINSD_CALL_FUNCTION_PROGRESS))
         s->progresses++;
+    if(strncmp(txt, PLUGINSD_CALL_FUNCTION_PAYLOAD_BEGIN " ", strlen(PLUGINSD_CALL_FUNCTION_PAYLOAD_BEGIN " ")) == 0 &&
+       strstr(txt, "\"application/json\"\n"))
+        s->json_payloads++;
     if(s->fail)
         return -1;
     return (ssize_t)strlen(txt);
@@ -1481,7 +1485,7 @@ int pluginsd_functions_unittest(void) {
             fprintf(stderr, "  OK deadline/sync: the registered timeout is the fallback; a sync call leaves no transaction\n");
     }
 
-    // 8. payloads that plugins could read as protocol commands are refused before sending
+    // 8. only strict JSON payloads are sent to plugins, so none can be read as protocol commands
     {
         int before = errors;
 
@@ -1491,17 +1495,28 @@ int pluginsd_functions_unittest(void) {
             size_t len;             // 0 = strlen(payload)
             bool rejected;
         } cases[] = {
-            { "plain json", "{\"url\":\"http://127.0.0.1/\",\"update_every\":1}", 0, false },
-            { "pretty json", "{\n  \"a\": 1,\n  \"b\": [\"x\", \"y\"]\n}\n", 0, false },
-            { "keyword not at line start", "{\"x\": \"FUNCTION QUIT\"}", 0, false },
-            { "FUNCTION_ prefix inside a key", "{\n  \"FUNCTIONS_ENABLED\": true\n}", 0, true },
-            { "replacement call (go.d)", "FUNCTION_PAYLOAD x 30 \"config a test b\" \"0x0\" \"s\" application/json\n{}", 0, true },
-            { "early end marker", "{}\nFUNCTION_PAYLOAD_END\nFUNCTION x 30 \"config a test b\" \"0x0\" \"s\"", 0, true },
-            { "end marker mid-line (evloop)", "{\"a\":\"xFUNCTION_PAYLOAD_END\n\"}", 0, true },
-            { "end marker with CRLF", "{}\r\nFUNCTION_PAYLOAD_END\r\n", 0, true },
-            { "indented and quoted command", "{\n \t\"FUNCTION_CANCEL\" x\n}", 0, true },
-            { "quit line", "{}\nQUIT\n", 0, true },
-            { "NUL byte", "{}\0\nFUNCTION x", 9, true },
+            { "object", "{\"url\":\"http://127.0.0.1/\",\"update_every\":1}", 0, false },
+            { "pretty object", "{\n  \"a\": 1,\r\n  \"b\": [\"x\", -0.5e+3, true, false, null]\n}\n", 0, false },
+            { "keyword key at line start", "{\n  \"FUNCTION_PAYLOAD\": \"QUIT\"\n}", 0, false },
+            { "escapes", "{\"a\":\"x\\nFUNCTION_PAYLOAD_END\\n\\u00e9\\\"\\/\"}", 0, false },
+            { "top-level array", "[]", 0, false },
+            { "top-level string", "\"x\"", 0, false },
+            { "top-level number", "0", 0, false },
+            { "trailing data", "{}\nFUNCTION_PAYLOAD_END\nFUNCTION x 30 \"config a test b\" \"0x0\" \"s\"", 0, true },
+            { "plugins.d command", "FUNCTION_PAYLOAD x 30 \"config a test b\" \"0x0\" \"s\" application/json\n{}", 0, true },
+            { "raw newline in string", "{\"a\":\"x\nFUNCTION_PAYLOAD_END\n\"}", 0, true },
+            { "single-quoted string", "{'a':'x\nFUNCTION_PAYLOAD_END\n'}", 0, true },
+            { "raw tab in string", "{\"a\":\"x\ty\"}", 0, true },
+            { "comment", "{/*\nFUNCTION_PAYLOAD_END\n*/}", 0, true },
+            { "trailing comma", "{\"a\":1,}", 0, true },
+            { "NaN", "{\"a\":NaN}", 0, true },
+            { "leading zero", "{\"a\":01}", 0, true },
+            { "bad escape", "{\"a\":\"\\x\"}", 0, true },
+            { "short unicode escape", "{\"a\":\"\\u12\"}", 0, true },
+            { "unterminated", "{\"a\":[1,2", 0, true },
+            { "whitespace only", " \n", 0, true },
+            { "YAML", "url: http://127.0.0.1/\nupdate_every: 1\n", 0, true },
+            { "NUL byte", "{}\0", 3, true },
         };
 
         for(size_t i = 0; i < _countof(cases); i++) {
@@ -1510,6 +1525,21 @@ int pluginsd_functions_unittest(void) {
             if((reason != NULL) != cases[i].rejected) {
                 fprintf(stderr, "  FAILED payload: '%s' was %s\n",
                         cases[i].name, reason ? "rejected" : "accepted");
+                errors++;
+            }
+        }
+
+        // nesting is bounded
+        {
+            char deep[600];
+            memset(deep, '[', 300);
+            memset(&deep[300], ']', 300);
+            if(!functions_payload_validate(deep, sizeof(deep))) {
+                fprintf(stderr, "  FAILED payload: 300 levels of nesting were accepted\n");
+                errors++;
+            }
+            if(functions_payload_validate(&deep[100], 400)) {
+                fprintf(stderr, "  FAILED payload: 200 levels of nesting were rejected\n");
                 errors++;
             }
         }
@@ -1549,18 +1579,19 @@ int pluginsd_functions_unittest(void) {
         // a clean payload is still sent
         buffer_flush(payload);
         buffer_strcat(payload, "{\"url\":\"http://127.0.0.1/\"}");
+        payload->content_type = CT_TEXT_PLAIN;
         uuid_generate_random(uuid);
         code = pluginsd_nrpc_handler(&req, parser->inflight.transport);
-        if(code != HTTP_RESP_OK || sends.total != 1) {
-            fprintf(stderr, "  FAILED payload: clean payload returned %d with %zu sends, expected 200 and 1 send\n",
-                    code, sends.total);
+        if(code != HTTP_RESP_OK || sends.total != 1 || sends.json_payloads != 1) {
+            fprintf(stderr, "  FAILED payload: clean payload returned %d with %zu sends (%zu as JSON), expected 200 and 1 JSON send\n",
+                    code, sends.total, sends.json_payloads);
             errors++;
         }
 
         parser_destroy(parser);
 
         if(errors == before)
-            fprintf(stderr, "  OK payload: injecting payloads are refused with 400 and never reach the plugin\n");
+            fprintf(stderr, "  OK payload: only strict JSON payloads reach the plugin, labelled application/json\n");
     }
 
     fprintf(stderr, "%s() %s (%d error%s)\n\n",

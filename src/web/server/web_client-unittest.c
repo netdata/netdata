@@ -208,14 +208,6 @@ int web_client_request_size_unittest(void)
     WEB_CLIENT_TEST(w->header_parse_expected_size == 0, "complete POST framing state was not reset");
     web_client_reuse_from_cache(w);
 
-    // bodies that plugins.d would read as protocol commands are rejected early
-    static const char injecting_payload_request[] =
-        "POST /api/v1/function?function=x HTTP/1.1\r\nContent-Length: 25\r\n\r\n{}\nFUNCTION_PAYLOAD_END\nx";
-    buffer_memcat(w->response.data, injecting_payload_request, sizeof(injecting_payload_request) - 1);
-    WEB_CLIENT_TEST(
-        http_request_validate(w) == HTTP_VALIDATION_INVALID_PAYLOAD, "injecting POST payload was not rejected");
-    web_client_reuse_from_cache(w);
-
     static const char split_put_header[] =
         "PUT /api/v1/info HTTP/1.1\r\nContent-Length: 1048496\r\nContent-Type: text/plain\r\n\r\n";
     const size_t split_put_payload_length = NETDATA_WEB_REQUEST_MAX_SIZE - (sizeof(split_put_header) - 1);
