@@ -1,4 +1,5 @@
 use super::*;
+use crate::facet_runtime::FacetReconcileOutcome;
 use crate::local_journal_host::load_local_journal_provider;
 use crate::memory_allocator::trim_allocator_if_worthwhile;
 use tokio_util::sync::CancellationToken;
@@ -105,7 +106,12 @@ impl FlowQueryService {
             {
                 return Ok(false);
             }
-            let registry_files = if attempt == 1 && !disk_first {
+            let inventory_source = if attempt == 1 && !disk_first {
+                "registry"
+            } else {
+                "disk"
+            };
+            let registry_files = if inventory_source == "registry" {
                 self.registry
                     .find_files_in_range(Seconds(0), Seconds(u32::MAX))
                     .context(
@@ -117,6 +123,18 @@ impl FlowQueryService {
             let plan = self.facet_runtime.build_reconcile_plan(&registry_files);
             let archived_files = plan.archived_files_to_scan.clone();
             let active_files = plan.active_files_to_scan.clone();
+            let attempt_started = std::time::Instant::now();
+            tracing::info!(
+                attempt,
+                max_attempts = MAX_RECONCILE_ATTEMPTS,
+                inventory_source,
+                archived_paths = plan.current_archived_paths.len(),
+                active_paths = plan.current_active_paths.len(),
+                archived_files_to_scan = archived_files.len(),
+                active_files_to_scan = active_files.len(),
+                rebuild_archived = plan.rebuild_archived,
+                "starting netflow facet reconciliation"
+            );
             let scan_cancellation = cancellation.clone();
             let scans = tokio::task::spawn_blocking(move || {
                 Ok::<_, anyhow::Error>((
@@ -150,10 +168,21 @@ impl FlowQueryService {
                 return Ok(false);
             }
 
-            if self
+            let archived_paths = plan.current_archived_paths.len();
+            let active_paths = plan.current_active_paths.len();
+            let outcome = self
                 .facet_runtime
-                .apply_reconcile_plan(plan, archived_scans, active_scans)?
-            {
+                .apply_reconcile_plan(plan, archived_scans, active_scans)
+                .with_context(|| format!(
+                    "failed to apply netflow facet reconciliation attempt {attempt}/{MAX_RECONCILE_ATTEMPTS} \
+                     (inventory={inventory_source}, archived_paths={archived_paths}, active_paths={active_paths})"
+                ))?;
+            let FacetReconcileOutcome::Rejected(reason) = outcome else {
+                tracing::info!(
+                    attempt,
+                    elapsed_ms = attempt_started.elapsed().as_millis() as u64,
+                    "completed netflow facet reconciliation"
+                );
                 if let Some(trimmed) = trim_allocator_if_worthwhile() {
                     tracing::info!(
                         before_heap_free = trimmed.before.heap_free_bytes,
@@ -164,19 +193,31 @@ impl FlowQueryService {
                     );
                 }
                 return Ok(true);
-            }
+            };
 
-            tracing::debug!(
+            let elapsed_ms = attempt_started.elapsed().as_millis();
+            if attempt == MAX_RECONCILE_ATTEMPTS {
+                return Err(anyhow::Error::new(reason).context(format!(
+                    "netflow facet reconciliation rejected all {MAX_RECONCILE_ATTEMPTS} attempts; \
+                     last attempt: inventory={inventory_source}, archived_paths={archived_paths}, \
+                     active_paths={active_paths}, elapsed_ms={elapsed_ms}"
+                )));
+            }
+            tracing::warn!(
                 attempt,
-                "retained journals changed during netflow facet reconciliation; retrying"
+                max_attempts = MAX_RECONCILE_ATTEMPTS,
+                inventory_source,
+                archived_paths,
+                active_paths,
+                elapsed_ms = elapsed_ms as u64,
+                reason = %reason,
+                "netflow facet reconciliation rejected on attempt {attempt}/{MAX_RECONCILE_ATTEMPTS}: \
+                 {reason}; retrying with a fresh disk inventory"
             );
             tokio::task::yield_now().await;
         }
 
-        anyhow::bail!(
-            "retained journals changed during all {} netflow facet reconciliation attempts",
-            MAX_RECONCILE_ATTEMPTS
-        )
+        unreachable!("the final reconciliation attempt returns its rejection")
     }
 
     fn enumerate_facet_files_from_disk(&self) -> Result<Vec<FileInfo>> {
@@ -538,6 +579,147 @@ mod tests {
 
         assert!(is_not_found_error(&not_found));
         assert!(!is_not_found_error(&permission_denied));
+    }
+
+    #[tokio::test]
+    async fn startup_reconcile_reports_cached_archived_journal_reopened_as_active() {
+        use crate::facet_runtime::{FacetReconcileRejection, FacetRuntime};
+        use journal_sdk_log_writer::{
+            Compression, Config, EntryTimestamps, Log, RetentionPolicy, RotationPolicy,
+        };
+
+        use journal_sdk_registry::{Origin, Source};
+
+        fn service(base: &Path, runtime: Arc<FacetRuntime>) -> FlowQueryService {
+            let (monitor, _notify_rx) = Monitor::new().expect("create monitor");
+            let registry = Registry::new(monitor);
+            let tier_dirs = HashMap::from([
+                (TierKind::Raw, base.join("raw")),
+                (TierKind::Minute1, base.join("1m")),
+                (TierKind::Minute5, base.join("5m")),
+                (TierKind::Hour1, base.join("1h")),
+            ]);
+            for dir in tier_dirs.values() {
+                registry
+                    .watch_directory(dir.to_str().unwrap())
+                    .expect("watch tier");
+            }
+            FlowQueryService {
+                registry,
+                agent_id: "test-agent".into(),
+                tier_dirs,
+                max_groups: 100,
+                facet_runtime: runtime,
+            }
+        }
+
+        let tmp = tempfile::tempdir().expect("create backend");
+        for tier in ["raw", "1m", "5m", "1h"] {
+            fs::create_dir(tmp.path().join(tier)).expect("create tier");
+        }
+        let writer_config = || {
+            Config::new(
+                Origin {
+                    machine_id: Some(uuid::Uuid::from_bytes([1; 16])),
+                    namespace: None,
+                    source: Source::System,
+                },
+                RotationPolicy::default(),
+                RetentionPolicy::default(),
+            )
+            .with_boot_id(uuid::Uuid::from_bytes([2; 16]))
+            .with_compact(true)
+            .with_compression(Compression::None)
+            .with_live_publish_every_entries(0)
+        };
+        let mut writer = Log::new(&tmp.path().join("raw"), writer_config()).expect("open writer");
+        writer
+            .write_entry_with_timestamps(
+                &[b"PROTOCOL=6", b"DIRECTION=incoming"],
+                EntryTimestamps::default()
+                    .with_entry_realtime_usec(1_000_000)
+                    .with_entry_monotonic_usec(1),
+            )
+            .expect("write flow");
+        writer.sync().expect("sync flow");
+        let path = writer
+            .active_file()
+            .expect("active file")
+            .path()
+            .to_string();
+
+        // Offline persistent queries have no writer lifecycle state. They can
+        // index an Online non-strict filename as archived while ingestion runs.
+        let offline = service(tmp.path(), Arc::new(FacetRuntime::new(tmp.path())));
+        offline
+            .initialize_facets()
+            .await
+            .expect("persist offline facet index");
+        drop(offline);
+        let cached = fs::read(tmp.path().join("facet-state.bin")).expect("read cache");
+        drop(writer);
+
+        // Restore the Online header that an unclean process exit leaves behind.
+        let file = journal_sdk_core::repository::File::from_path(Path::new(&path)).unwrap();
+        let mut journal =
+            journal_sdk_core::JournalFile::<journal_sdk_core::file::MmapMut>::open_for_append(
+                &file,
+                8 * 1024 * 1024,
+            )
+            .expect("open journal header");
+        journal.journal_header_mut().state = journal_sdk_core::file::JournalState::Online as u8;
+        journal.sync().expect("sync Online header");
+        drop(journal);
+
+        let reopened = Log::new(&tmp.path().join("raw"), writer_config()).expect("reopen writer");
+        assert_eq!(reopened.active_file().unwrap().path(), path);
+        let runtime = Arc::new(FacetRuntime::new(tmp.path()));
+        runtime
+            .observe_active_path_created(Path::new(&path))
+            .expect("register reopened writer");
+        let startup = service(tmp.path(), runtime);
+        let err = startup
+            .initialize_facets_before_ingest()
+            .await
+            .expect_err("reject cache classification conflict");
+        assert_eq!(
+            err.downcast_ref::<FacetReconcileRejection>(),
+            Some(&FacetReconcileRejection::ExistingPathOmitted {
+                path: path.clone(),
+                expected: "archived",
+                planned_as_archived: false,
+                planned_as_active: true,
+            }),
+        );
+        let diagnostic = format!("{err:#}");
+        assert!(
+            diagnostic.contains("rejected all 3 attempts"),
+            "{diagnostic}"
+        );
+        assert!(diagnostic.contains("inventory=disk"), "{diagnostic}");
+        assert!(diagnostic.contains(&path), "{diagnostic}");
+        assert!(
+            diagnostic.contains("planned_as_active=true"),
+            "{diagnostic}"
+        );
+        assert_eq!(
+            fs::read(tmp.path().join("facet-state.bin")).unwrap(),
+            cached
+        );
+        drop(startup);
+
+        // A failed normal return drops the writer, archiving the journal. The
+        // next process can reconcile the same persisted cache successfully.
+        drop(reopened);
+        let retry = service(tmp.path(), Arc::new(FacetRuntime::new(tmp.path())));
+        retry
+            .initialize_facets_before_ingest()
+            .await
+            .expect("next restart succeeds");
+        assert_eq!(
+            retry.facet_runtime.snapshot().fields["PROTOCOL"].values,
+            vec!["6"]
+        );
     }
 
     #[tokio::test]

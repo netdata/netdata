@@ -36,6 +36,46 @@ Function output includes volatile fields such as collection timestamps and runti
 statistics. Test harnesses should normalize those fields before comparing fixture
 outputs.
 
+## Startup facet diagnostics
+
+The plugin logs the facet-cache path, whether it loaded the cache, its version,
+and the number of indexed archived paths. Each reconciliation attempt logs its
+inventory source (`registry` or `disk`), active and archived path counts, files to
+scan, and whether it must rebuild archived facets. Completion and rejection logs
+include elapsed milliseconds.
+
+A rejected attempt reports one of these causes:
+
+- **Topology generation changed:** journal lifecycle events changed the runtime
+  state during the scan. The log gives the planned and current generations.
+- **Archived rebuild became required:** the runtime needs a rebuild that was not
+  in the scan plan.
+- **Existing path missing from an inventory:** the log names the journal, its
+  expected classification, and whether the plan lists it as active or archived.
+  An archived cache entry listed as active by the writer is a classification
+  conflict, not evidence that a file disappeared.
+
+Retries use a fresh disk inventory. If all three attempts are rejected, the
+final error includes the last rejection cause and attempt context. Keep the
+preceding warnings too: different attempts can fail for different reasons.
+
+An offline query without `--no-persist` can classify a live journal as archived
+and save that classification in the shared cache. After an unclean stop, the
+writer can reopen that journal as active and reject the cached classification.
+A failed startup that exits normally closes and archives the journal, so the next
+startup can succeed. Use `--no-persist` for diagnostic queries against live data.
+A successful offline query does not validate writer startup.
+
+A separate failure is a supervisor read timeout before startup keepalives begin.
+Compare the start/completion timestamps with the Agent logs. The default minimum
+idle timeout is 120 seconds; the Agent logs `buffered reader not OK (-7)` on this
+path. This is different from a facet reconciliation rejection. Collect both the
+plugin and Agent logs, including the configured systemd journal namespace, before
+rotation removes the failure window.
+
+Journal lifecycle behavior comes from the published `systemd-journal-sdk-*`
+dependencies in `Cargo.toml`, not the similarly named in-tree journal crates.
+
 ## Configuration
 
 When running under Netdata, config is loaded from `netflow.yaml` in:

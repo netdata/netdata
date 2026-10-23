@@ -113,6 +113,32 @@ pub(crate) struct FacetReconcilePlan {
     pub(crate) rebuild_archived: bool,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum FacetReconcileOutcome {
+    Applied,
+    Rejected(FacetReconcileRejection),
+}
+
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub(crate) enum FacetReconcileRejection {
+    #[error(
+        "journal topology generation changed during scan (planned={planned}, current={current})"
+    )]
+    TopologyChanged { planned: u64, current: u64 },
+    #[error("archived facet rebuild became required during scan (planned=false, current=true)")]
+    RebuildRequired,
+    #[error(
+        "retained journal {path:?} exists but is missing from the planned {expected} inventory \
+         (planned_as_archived={planned_as_archived}, planned_as_active={planned_as_active})"
+    )]
+    ExistingPathOmitted {
+        path: String,
+        expected: &'static str,
+        planned_as_archived: bool,
+        planned_as_active: bool,
+    },
+}
+
 pub(crate) struct FacetRuntime {
     state: Mutex<FacetState>,
     persist_lock: Mutex<()>,
@@ -153,6 +179,13 @@ impl FacetRuntime {
         let state_path = base_dir.join(FACET_STATE_FILE_NAME);
         let loaded = load_persisted_state(&state_path);
         let ready = loaded.is_some();
+        tracing::info!(
+            path = %state_path.display(),
+            loaded = ready,
+            version = loaded.as_ref().map(|state| state.version),
+            indexed_archived_paths = loaded.as_ref().map_or(0, |state| state.indexed_archived_paths.len()),
+            "initialized netflow facet cache"
+        );
         let state = loaded
             .map(FacetState::from_persisted)
             .unwrap_or_else(FacetState::new);
@@ -287,19 +320,27 @@ impl FacetRuntime {
         plan: FacetReconcilePlan,
         archived_scans: BTreeMap<String, FacetFileContribution>,
         active_scans: BTreeMap<String, FacetFileContribution>,
-    ) -> Result<bool> {
+    ) -> Result<FacetReconcileOutcome> {
         let (sidecar_deletes, sidecar_writes, persist_snapshot) = {
             let mut state = self
                 .state
                 .lock()
                 .map_err(|_| anyhow::anyhow!("facet runtime lock poisoned"))?;
-            if state.topology_generation != plan.topology_generation
-                || (state.rebuild_archived && !plan.rebuild_archived)
-            {
-                return Ok(false);
+            if state.topology_generation != plan.topology_generation {
+                return Ok(FacetReconcileOutcome::Rejected(
+                    FacetReconcileRejection::TopologyChanged {
+                        planned: plan.topology_generation,
+                        current: state.topology_generation,
+                    },
+                ));
             }
-            if plan_omits_existing_runtime_path(&state, &plan)? {
-                return Ok(false);
+            if state.rebuild_archived && !plan.rebuild_archived {
+                return Ok(FacetReconcileOutcome::Rejected(
+                    FacetReconcileRejection::RebuildRequired,
+                ));
+            }
+            if let Some(reason) = plan_omits_existing_runtime_path(&state, &plan)? {
+                return Ok(FacetReconcileOutcome::Rejected(reason));
             }
 
             let mut sidecar_deletes = Vec::new();
@@ -392,7 +433,7 @@ impl FacetRuntime {
         }
         self.persist_snapshot(persist_snapshot)?;
         self.mark_ready();
-        Ok(true)
+        Ok(FacetReconcileOutcome::Applied)
     }
 
     pub(crate) fn observe_active_contribution(
@@ -1359,27 +1400,37 @@ fn mark_topology_changed(state: &mut FacetState) {
     state.topology_generation = state.topology_generation.wrapping_add(1);
 }
 
-fn plan_omits_existing_runtime_path(state: &FacetState, plan: &FacetReconcilePlan) -> Result<bool> {
+fn plan_omits_existing_runtime_path(
+    state: &FacetState,
+    plan: &FacetReconcilePlan,
+) -> Result<Option<FacetReconcileRejection>> {
     let omitted_paths = state
         .indexed_archived_paths
         .iter()
         .filter(|path| !plan.current_archived_paths.contains(*path))
+        .map(|path| (path, "archived"))
         .chain(
             state
                 .active_contributions
                 .keys()
-                .filter(|path| !plan.current_active_paths.contains(*path)),
+                .filter(|path| !plan.current_active_paths.contains(*path))
+                .map(|path| (path, "active")),
         );
 
-    for path in omitted_paths {
+    for (path, expected) in omitted_paths {
         if Path::new(path)
             .try_exists()
             .with_context(|| format!("failed to verify retained netflow journal path {path}"))?
         {
-            return Ok(true);
+            return Ok(Some(FacetReconcileRejection::ExistingPathOmitted {
+                path: path.clone(),
+                expected,
+                planned_as_archived: plan.current_archived_paths.contains(path),
+                planned_as_active: plan.current_active_paths.contains(path),
+            }));
         }
     }
-    Ok(false)
+    Ok(None)
 }
 
 fn persisted_state_from_runtime_state(state: &FacetState) -> PersistedFacetState {
@@ -1937,14 +1988,15 @@ mod tests {
         runtime
             .observe_active_contribution(&active_path, &live)
             .expect("observe live update during reconcile scan");
-        assert!(
+        assert_eq!(
             runtime
                 .apply_reconcile_plan(
                     plan,
                     BTreeMap::new(),
                     BTreeMap::from([(active_path_str, scanned)]),
                 )
-                .expect("apply current reconcile plan")
+                .expect("apply current reconcile plan"),
+            FacetReconcileOutcome::Applied
         );
 
         assert_eq!(
@@ -1973,11 +2025,12 @@ mod tests {
         runtime
             .observe_active_contribution(&active_path, &live)
             .expect("observe first live contribution");
-        assert!(
-            !runtime
+        assert!(matches!(
+            runtime
                 .apply_reconcile_plan(stale_plan, BTreeMap::new(), BTreeMap::new())
-                .expect("reject stale reconcile plan")
-        );
+                .expect("reject stale reconcile plan"),
+            FacetReconcileOutcome::Rejected(FacetReconcileRejection::TopologyChanged { .. })
+        ));
 
         assert_eq!(
             runtime
@@ -1989,6 +2042,59 @@ mod tests {
             vec!["17".to_string()],
             "a stale scan must not remove a newly created active path"
         );
+    }
+
+    #[test]
+    fn reconcile_reports_new_rebuild_requirement_without_changing_state() {
+        let tmp = tempfile::tempdir().expect("create backend");
+        let runtime = FacetRuntime::new(tmp.path());
+        let plan = runtime.build_reconcile_plan(&[]);
+        runtime.state.lock().unwrap().rebuild_archived = true;
+        let outcome = runtime
+            .apply_reconcile_plan(plan, BTreeMap::new(), BTreeMap::new())
+            .unwrap();
+        assert_eq!(
+            outcome,
+            FacetReconcileOutcome::Rejected(FacetReconcileRejection::RebuildRequired)
+        );
+        assert!(runtime.state.lock().unwrap().rebuild_archived);
+        let message = FacetReconcileRejection::RebuildRequired.to_string();
+        assert!(message.contains("planned=false, current=true"));
+    }
+
+    #[test]
+    fn reconcile_reports_existing_path_missing_from_inventory() {
+        for expected in ["archived", "active"] {
+            let tmp = tempfile::tempdir().expect("create backend");
+            let runtime = FacetRuntime::new(tmp.path());
+            let path = tmp.path().join("system.journal");
+            fs::File::create(&path).unwrap();
+            let path_str = path.to_str().unwrap().to_string();
+            {
+                let mut state = runtime.state.lock().unwrap();
+                if expected == "archived" {
+                    state.indexed_archived_paths.insert(path_str.clone());
+                } else {
+                    state
+                        .active_contributions
+                        .insert(path_str.clone(), FacetFileContribution::default());
+                }
+            }
+            let mut plan = runtime.build_reconcile_plan(&[]);
+            plan.current_active_paths.clear();
+            let outcome = runtime
+                .apply_reconcile_plan(plan, BTreeMap::new(), BTreeMap::new())
+                .unwrap();
+            let reason = FacetReconcileRejection::ExistingPathOmitted {
+                path: path_str.clone(),
+                expected,
+                planned_as_archived: false,
+                planned_as_active: false,
+            };
+            assert!(reason.to_string().contains(&path_str));
+            assert!(reason.to_string().contains(expected));
+            assert_eq!(outcome, FacetReconcileOutcome::Rejected(reason));
+        }
     }
 
     #[test]
@@ -2006,10 +2112,11 @@ mod tests {
         runtime
             .observe_active_contribution(&active_path, &live)
             .expect("observe first live contribution during scan");
-        assert!(
+        assert_eq!(
             runtime
                 .apply_reconcile_plan(stale_plan, BTreeMap::new(), BTreeMap::new())
-                .expect("apply registry-skewed reconcile plan")
+                .expect("apply registry-skewed reconcile plan"),
+            FacetReconcileOutcome::Applied
         );
 
         assert_eq!(
@@ -2069,11 +2176,12 @@ mod tests {
         runtime
             .observe_deleted_paths(std::slice::from_ref(&archived_path))
             .expect("delete archived path during reconcile scan");
-        assert!(
-            !runtime
+        assert!(matches!(
+            runtime
                 .apply_reconcile_plan(stale_plan, BTreeMap::new(), BTreeMap::new())
-                .expect("reject stale reconcile plan")
-        );
+                .expect("reject stale reconcile plan"),
+            FacetReconcileOutcome::Rejected(FacetReconcileRejection::TopologyChanged { .. })
+        ));
 
         let state = runtime.state.lock().expect("lock facet state");
         assert!(
