@@ -53,10 +53,11 @@ type Consumer interface {
 // InputCapsule is the process-fixed bounded parser. It owns only the current
 // parser payload and transfers completed calls to Consumer.
 type InputCapsule struct {
-	reader        io.Reader
-	payload       *payloadState
-	discarding    bool
-	discardingUID string
+	reader            io.Reader
+	payload           *payloadState
+	discarding        bool
+	discardingUID     string
+	discardingPayload bool
 }
 
 type payloadState struct {
@@ -66,14 +67,16 @@ type payloadState struct {
 	separatorBytes int
 	hasLine        bool
 	lineStarted    bool
-	overflow       bool
+	rejectStatus   int
 }
 
 func NewInputCapsule(reader io.Reader) (*InputCapsule, error) {
 	if reader == nil {
 		return nil, errors.New("function ingress: nil input reader")
 	}
-	return &InputCapsule{reader: reader}, nil
+	return &InputCapsule{
+		reader: reader,
+	}, nil
 }
 
 func (capsule *InputCapsule) Run(ctx context.Context, consumer Consumer) error {
@@ -116,39 +119,43 @@ func (capsule *InputCapsule) consumeRead(ctx context.Context, consumer Consumer,
 	complete := !errors.Is(readErr, bufio.ErrBufferFull)
 	if capsule.payload != nil {
 		if errors.Is(readErr, io.EOF) && (len(segment) == 0 || !hasLF(segment)) {
-			return false, false, errors.Join(errors.New("function ingress: unterminated payload"), capsule.abortPayload())
+			capsule.abortPayload()
+			return false, false, errors.New("function ingress: unterminated payload")
 		}
-		quit, handleErr := capsule.handlePayloadSegment(ctx, consumer, segment, complete)
-		if handleErr != nil {
-			return false, false, errors.Join(handleErr, capsule.abortPayload())
-		}
-		if quit {
-			return true, false, nil
+		if handleErr := capsule.handlePayloadSegment(ctx, consumer, segment, complete); handleErr != nil {
+			capsule.abortPayload()
+			return false, false, handleErr
 		}
 	} else if capsule.discarding {
 		if complete {
+			if !hasLF(segment) {
+				return false, false, errors.New("function ingress: unterminated line")
+			}
 			uid := capsule.discardingUID
+			payload := capsule.discardingPayload
 			capsule.discarding = false
 			capsule.discardingUID = ""
-			if rejectErr := consumer.HandleReject(ctx, uid, 400); rejectErr != nil {
+			capsule.discardingPayload = false
+			if rejectErr := capsule.rejectHeader(ctx, consumer, uid, payload); rejectErr != nil {
 				return false, false, rejectErr
 			}
 		}
 	} else if !complete {
-		uid := rejectionUID(string(segment))
+		uid, payload := rejectionHeader(string(segment))
 		if uid == "" {
 			return false, false, errors.New("function ingress: oversized line lacks safe UID")
 		}
 		capsule.discarding = true
 		capsule.discardingUID = strings.Clone(uid)
+		capsule.discardingPayload = payload
 	} else if len(segment) > 0 {
 		line, _, terminated := splitLine(segment)
 		if !terminated {
 			return false, false, errors.New("function ingress: unterminated line")
 		}
 		if len(line) > MaximumCommandLineBytes {
-			if uid := rejectionUID(string(line)); uid != "" {
-				if rejectErr := consumer.HandleReject(ctx, uid, 400); rejectErr != nil {
+			if uid, payload := rejectionHeader(string(line)); uid != "" {
+				if rejectErr := capsule.rejectHeader(ctx, consumer, uid, payload); rejectErr != nil {
 					return false, false, rejectErr
 				}
 				return false, false, nil
@@ -157,8 +164,8 @@ func (capsule *InputCapsule) consumeRead(ctx context.Context, consumer Consumer,
 		}
 		quit, handleErr := capsule.handleCommandLine(ctx, consumer, string(line))
 		if handleErr != nil {
-			if uid := rejectionUID(string(line)); uid != "" {
-				if rejectErr := consumer.HandleReject(ctx, uid, 400); rejectErr != nil {
+			if uid, payload := rejectionHeader(string(line)); uid != "" {
+				if rejectErr := capsule.rejectHeader(ctx, consumer, uid, payload); rejectErr != nil {
 					return false, false, rejectErr
 				}
 				return false, false, nil
@@ -183,12 +190,8 @@ func (capsule *InputCapsule) consumeRead(ctx context.Context, consumer Consumer,
 func (capsule *InputCapsule) DiscardPausedPayload() {
 	capsule.discarding = false
 	capsule.discardingUID = ""
-	if capsule.payload == nil {
-		return
-	}
-	state := capsule.payload
-	capsule.payload = nil
-	state.body = nil
+	capsule.discardingPayload = false
+	capsule.abortPayload()
 }
 
 func hasLF(value []byte) bool {
@@ -224,22 +227,38 @@ func (capsule *InputCapsule) handleCommandLine(ctx context.Context, consumer Con
 		return false, err
 	}
 	if payload {
-		capsule.payload = &payloadState{call: call}
+		capsule.payload = &payloadState{
+			call: call,
+		}
 		return false, nil
 	}
 	return false, consumer.HandleCall(ctx, call)
 }
 
-func rejectionUID(line string) string {
+func rejectionHeader(line string) (uid string, payload bool) {
 	fields := strings.Fields(line)
 	if len(fields) < 2 || (fields[0] != "FUNCTION" && fields[0] != "FUNCTION_PAYLOAD") {
-		return ""
+		return "", false
 	}
-	uid := fields[1]
+	uid = fields[1]
 	if uid == "" || len(uid) > 128 || strings.ContainsAny(uid, " \t\r\n\x00") {
-		return ""
+		return "", false
 	}
-	return uid
+	return uid, fields[0] == "FUNCTION_PAYLOAD"
+}
+
+func (capsule *InputCapsule) rejectHeader(ctx context.Context, consumer Consumer, uid string, payload bool) error {
+	if payload {
+		// Even an invalid header owns its body until the payload terminator.
+		capsule.payload = &payloadState{
+			call: Call{
+				UID: uid,
+			},
+			rejectStatus: 400,
+		}
+		return nil
+	}
+	return consumer.HandleReject(ctx, uid, 400)
 }
 
 func parseCapsuleCall(fields []string) (Call, bool, error) {
@@ -276,9 +295,13 @@ func parseCapsuleCall(fields []string) (Call, bool, error) {
 		return Call{}, false, errors.New("function ingress: empty call")
 	}
 	call := Call{
-		UID: fields[1], Timeout: time.Duration(timeoutSeconds) * time.Second,
-		Method: callFields[0], Args: append([]string(nil), callFields[1:]...),
-		Access: fields[4], Source: fields[5], HasPayload: payload,
+		UID:        fields[1],
+		Timeout:    time.Duration(timeoutSeconds) * time.Second,
+		Method:     callFields[0],
+		Args:       append([]string(nil), callFields[1:]...),
+		Access:     fields[4],
+		Source:     fields[5],
+		HasPayload: payload,
 	}
 	if len(fields) == 7 {
 		call.ContentType = fields[6]
@@ -286,7 +309,7 @@ func parseCapsuleCall(fields []string) (Call, bool, error) {
 	return call, payload, nil
 }
 
-func (capsule *InputCapsule) handlePayloadSegment(ctx context.Context, consumer Consumer, segment []byte, complete bool) (bool, error) {
+func (capsule *InputCapsule) handlePayloadSegment(ctx context.Context, consumer Consumer, segment []byte, complete bool) error {
 	state := capsule.payload
 	content := segment
 	var ending []byte
@@ -294,67 +317,21 @@ func (capsule *InputCapsule) handlePayloadSegment(ctx context.Context, consumer 
 		var terminated bool
 		content, ending, terminated = splitLine(segment)
 		if !terminated {
-			return false, errors.New("function ingress: unterminated payload line")
+			return errors.New("function ingress: unterminated payload line")
 		}
 	}
-	if complete && !state.lineStarted {
-		switch {
-		case bytes.Equal(content, []byte("FUNCTION_PAYLOAD_END")):
-			return false, capsule.completePayload(ctx, consumer)
-		case bytes.Equal(content, []byte("QUIT")):
-			if err := capsule.abortPayload(); err != nil {
-				return false, err
-			}
-			return true, consumer.HandleQuit(ctx)
-		case bytes.HasPrefix(content, []byte("FUNCTION_CANCEL")):
-			fields, err := tokenize(string(content))
-			if err == nil && len(fields) == 2 && fields[0] == "FUNCTION_CANCEL" {
-				if fields[1] == state.call.UID {
-					uid := state.call.UID
-					if err := capsule.abortPayload(); err != nil {
-						return false, err
-					}
-					return false, consumer.HandleReject(ctx, uid, 499)
-				}
-				return false, consumer.HandleCancel(ctx, fields[1])
-			}
-		case bytes.HasPrefix(content, []byte("FUNCTION_PROGRESS")):
-			fields, err := tokenize(string(content))
-			if err == nil && len(fields) == 2 && fields[0] == "FUNCTION_PROGRESS" {
-				return false, nil
-			}
-		}
-		if call, payload, ok := parsePayloadReplacement(content); ok {
-			status := 400
-			if state.overflow {
-				status = 413
-			}
-			abandonedUID := state.call.UID
-			if err := capsule.abortPayload(); err != nil {
-				return false, err
-			}
-			if err := consumer.HandleReject(ctx, abandonedUID, status); err != nil {
-				return false, err
-			}
-			if payload {
-				capsule.payload = &payloadState{call: call}
-				return false, nil
-			}
-			return false, consumer.HandleCall(ctx, call)
-		}
+	// Commands cannot interleave with a payload; only its framing marker is protocol.
+	if complete && !state.lineStarted && bytes.Equal(content, []byte("FUNCTION_PAYLOAD_END")) {
+		return capsule.completePayload(ctx, consumer)
 	}
-	if state.overflow {
+	if state.rejectStatus != 0 {
 		state.lineStarted = !complete
-		return false, nil
+		return nil
 	}
 	if !state.lineStarted && state.hasLine {
-		if err := capsule.appendPayload(ctx, state.separator[:state.separatorBytes]); err != nil {
-			return false, err
-		}
+		capsule.appendPayload(state.separator[:state.separatorBytes])
 	}
-	if err := capsule.appendPayload(ctx, content); err != nil {
-		return false, err
-	}
+	capsule.appendPayload(content)
 	if complete {
 		copy(state.separator[:], ending)
 		state.separatorBytes = len(ending)
@@ -363,34 +340,18 @@ func (capsule *InputCapsule) handlePayloadSegment(ctx context.Context, consumer 
 	} else {
 		state.lineStarted = true
 	}
-	return false, nil
+	return nil
 }
 
-func parsePayloadReplacement(line []byte) (Call, bool, bool) {
-	// the agent writes command keywords bare at line start; tokenize skips spaces and
-	// unquotes fields, so without this check a JSON line like `"FUNCTION" ,0, 30 ...`
-	// inside a payload would be taken for a call
-	if !bytes.HasPrefix(line, []byte("FUNCTION ")) && !bytes.HasPrefix(line, []byte("FUNCTION_PAYLOAD ")) {
-		return Call{}, false, false
-	}
-	fields, err := tokenize(string(line))
-	if err != nil || len(fields) == 0 ||
-		(fields[0] != "FUNCTION" && fields[0] != "FUNCTION_PAYLOAD") {
-		return Call{}, false, false
-	}
-	call, payload, err := parseCapsuleCall(fields)
-	return call, payload, err == nil
-}
-
-func (capsule *InputCapsule) appendPayload(ctx context.Context, value []byte) error {
+func (capsule *InputCapsule) appendPayload(value []byte) {
 	state := capsule.payload
-	if state.overflow {
-		return nil
+	if state.rejectStatus != 0 {
+		return
 	}
 	if len(value) > MaximumInputBodyBytes-len(state.body) {
 		state.body = nil
-		state.overflow = true
-		return nil
+		state.rejectStatus = 413
+		return
 	}
 	needed := len(state.body) + len(value)
 	if needed > cap(state.body) {
@@ -400,15 +361,14 @@ func (capsule *InputCapsule) appendPayload(ctx context.Context, value []byte) er
 		state.body = grown
 	}
 	state.body = append(state.body, value...)
-	return nil
 }
 
 func (capsule *InputCapsule) completePayload(ctx context.Context, consumer Consumer) error {
 	state := capsule.payload
-	if state.overflow {
+	if state.rejectStatus != 0 {
 		uid := state.call.UID
 		capsule.payload = nil
-		return consumer.HandleReject(ctx, uid, 413)
+		return consumer.HandleReject(ctx, uid, state.rejectStatus)
 	}
 	call := state.call
 	call.Payload = state.body
@@ -416,14 +376,8 @@ func (capsule *InputCapsule) completePayload(ctx context.Context, consumer Consu
 	return consumer.HandleCall(ctx, call)
 }
 
-func (capsule *InputCapsule) abortPayload() error {
-	if capsule.payload == nil {
-		return nil
-	}
-	state := capsule.payload
+func (capsule *InputCapsule) abortPayload() {
 	capsule.payload = nil
-	state.body = nil
-	return nil
 }
 
 func tokenize(line string) ([]string, error) {
