@@ -303,6 +303,11 @@ void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jobs) {
 
     internal_error(true, "RRDCONTEXT: garbage collecting context structures of host '%s'", rrdhost_hostname(host));
 
+    // metrics deleted here have no data in any tier, so their metadata rows can go too; nothing else deletes
+    // them while their context stays alive (ram/alloc/none dimensions delete theirs when they are freed)
+    METADATA_EXPIRED_DIMENSIONS *expired = NULL;
+    bool report_expired = host->rrd_memory_mode == RRD_DB_MODE_DBENGINE;
+
     RRDCONTEXT *rc;
     dfe_start_reentrant(host->rrdctx.contexts, rc) {
                 if(unlikely(worker_jobs && !service_running(SERVICE_CONTEXT))) break;
@@ -325,7 +330,7 @@ void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jobs) {
                                                                   string2str(ri->id),
                                                                   string2str(rc->id),
                                                                   rrdhost_hostname(host));
-                                            else
+                                            else {
                                                 internal_error(
                                                         true,
                                                         "RRDCONTEXT: metric '%s' of instance '%s' of context '%s' of host '%s', deleted from rrdmetrics dictionary.",
@@ -333,6 +338,14 @@ void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jobs) {
                                                         string2str(ri->id),
                                                         string2str(rc->id),
                                                         rrdhost_hostname(host));
+
+                                                // the traversal still holds rm, so it is valid after the delete
+                                                if(report_expired) {
+                                                    if(!expired)
+                                                        expired = metadata_expired_dimensions_create(host->machine_guid);
+                                                    metadata_expired_dimensions_add(expired, rm->uuid, ri->id, rm->id);
+                                                }
+                                            }
                                         }
                                     }
                             dfe_done(rm);
@@ -382,6 +395,8 @@ void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jobs) {
     dfe_done(rc);
 
     dictionary_garbage_collect(host->rrdctx.contexts);
+
+    metaqueue_delete_expired_dimensions(expired);
 }
 
 static void rrdcontext_garbage_collect_for_all_hosts(void) {
