@@ -161,25 +161,35 @@ void sender_pending_free(struct sender_state *s) {
     s->thread.pending.wb = NULL;
 }
 
-// Queue a committed message for compression. The queue is compressed here only when needed
-// to keep it at about one frame; otherwise the dispatcher compresses it before sending.
+// the committer compresses only in the cases below; on a stream thread, account that time as compression
+static void sender_committer_compresses(struct sender_state *s) {
+    if (s->host && rrdhost_is_this_a_stream_thread(s->host))
+        worker_is_busy(WORKER_STREAM_JOB_COMPRESS);
+}
+
+// Queue a committed message for compression. The queue is compressed here only when needed to keep it
+// below one frame; otherwise the dispatcher compresses it before sending. Every compression of the queue
+// therefore produces exactly one frame, and the queue never outgrows its initial allocation.
 SENDER_COMPRESS_RC sender_pending_add_unsafe(struct sender_state *s, const char *src, size_t src_len, STREAM_TRAFFIC_TYPE type) {
     SENDER_COMPRESS_RC rc;
 
-    // the circular buffer accounts bytes per traffic type, so a frame carries one type only
-    if (unlikely(sender_pending_has_data_unsafe(s) && s->thread.pending.type != type)) {
+    if (sender_pending_has_data_unsafe(s) &&
+        // the circular buffer accounts bytes per traffic type, so a frame carries one type only
+        (s->thread.pending.type != type ||
+         // this message goes to the circular buffer directly (below), so what was queued must go first
+         src_len >= SENDER_PENDING_MAX_SIZE ||
+         // the queue and this message would not fit in one frame
+         buffer_strlen(s->thread.pending.wb) + src_len >= COMPRESSION_MAX_MSG_SIZE)) {
+        sender_committer_compresses(s);
         rc = sender_pending_compress_unsafe(s);
         if (rc != SENDER_COMPRESS_OK)
             return rc;
     }
 
     if (unlikely(src_len >= SENDER_PENDING_MAX_SIZE)) {
-        // large messages (like function responses) go to the circular buffer directly, after
-        // whatever is already queued, so the queue never grows (and stays allocated) beyond a frame
-        rc = sender_pending_compress_unsafe(s);
-        if (rc != SENDER_COMPRESS_OK)
-            return rc;
-
+        // large messages (like function responses) go to the circular buffer directly,
+        // after whatever was queued, which has been compressed above
+        sender_committer_compresses(s);
         return sender_compress_to_scb_unsafe(s, src, src_len, type);
     }
 
@@ -189,8 +199,10 @@ SENDER_COMPRESS_RC sender_pending_add_unsafe(struct sender_state *s, const char 
     s->thread.pending.type = type;
     buffer_memcat(s->thread.pending.wb, src, src_len);
 
-    if (buffer_strlen(s->thread.pending.wb) >= SENDER_PENDING_MAX_SIZE)
+    if (buffer_strlen(s->thread.pending.wb) >= SENDER_PENDING_MAX_SIZE) {
+        sender_committer_compresses(s);
         return sender_pending_compress_unsafe(s);
+    }
 
     return SENDER_COMPRESS_OK;
 }
@@ -277,9 +289,6 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
     if (s->thread.compressor.initialized) {
         // compressed traffic: queue the text; the dispatcher compresses everything queued
         // in one frame right before sending (stream_sender_send_data())
-        if(rrdhost_is_this_a_stream_thread(s->host))
-            worker_is_busy(WORKER_STREAM_JOB_COMPRESS);
-
         rc = sender_pending_add_unsafe(s, src, src_len, type);
     }
     else {
@@ -369,7 +378,7 @@ static int unittest_sender_pending_one(compression_algorithm_t algorithm, const 
     BUFFER *msg = buffer_create(0, NULL);
     BUFFER *wire = buffer_create(0, NULL);
     time_t now_s = now_realtime_sec();
-    size_t commits = 0, frames = 0;
+    size_t commits = 0, frames = 0, queue_alloc = 0;
 
     for(size_t i = 0; i < 2000; i++) {
         // a commit: one chart update, sometimes a large message spanning several frames,
@@ -382,7 +391,13 @@ static int unittest_sender_pending_one(compression_algorithm_t algorithm, const 
                 buffer_sprintf(msg, "RTEST %zu %zu\n", i, l);
         }
         else {
-            size_t target = (i % 500 == 499) ? COMPRESSION_MAX_MSG_SIZE * 3 : 1 + os_random32() % 2000;
+            // mostly small chart updates, some mid-sized ones that may not fit next to the queue,
+            // some that bypass the queue but fit in a frame (they must still go after the queue),
+            // and now and then a message larger than a frame
+            size_t target = (i % 500 == 499) ? COMPRESSION_MAX_MSG_SIZE * 3 :
+                            (i % 13 == 7)    ? SENDER_PENDING_MAX_SIZE + os_random32() % 4000 :
+                            (i % 11 == 5)    ? 4000 + os_random32() % 6000 :
+                                               1 + os_random32() % 2000;
             while(buffer_strlen(msg) < target)
                 unittest_generate_message(msg, now_s, i);
         }
@@ -393,9 +408,17 @@ static int unittest_sender_pending_one(compression_algorithm_t algorithm, const 
         // what sender_buffer_commit() does with compression enabled
         SENDER_COMPRESS_RC rc = sender_pending_add_unsafe(s, buffer_tostring(msg), buffer_strlen(msg), type);
 
-        // what the dispatcher does whenever it wakes up
-        if(rc == SENDER_COMPRESS_OK && os_random32() % 8 == 0)
+        // what the dispatcher does whenever it wakes up: the queue must always fit in one frame
+        if(rc == SENDER_COMPRESS_OK && os_random32() % 8 == 0 && sender_pending_has_data_unsafe(s)) {
+            size_t adds = stream_circular_buffer_stats_unsafe(s->scb)->adds;
             rc = sender_pending_compress_unsafe(s);
+            if(rc == SENDER_COMPRESS_OK && stream_circular_buffer_stats_unsafe(s->scb)->adds - adds != 2) {
+                fprintf(stderr, "%s: compressing the queue produced %zu frames at commit %zu\n",
+                        name, (stream_circular_buffer_stats_unsafe(s->scb)->adds - adds) / 2, i);
+                errors++;
+                goto cleanup;
+            }
+        }
 
         if(rc != SENDER_COMPRESS_OK) {
             fprintf(stderr, "%s: compression failed at commit %zu\n", name, i);
@@ -407,6 +430,18 @@ static int unittest_sender_pending_one(compression_algorithm_t algorithm, const 
             fprintf(stderr, "%s: the queue holds %zu bytes after commit %zu\n", name, buffer_strlen(s->thread.pending.wb), i);
             errors++;
             goto cleanup;
+        }
+
+        // the queue never outgrows its initial allocation
+        if(s->thread.pending.wb) {
+            if(!queue_alloc)
+                queue_alloc = s->thread.pending.wb->size;
+            else if(s->thread.pending.wb->size != queue_alloc) {
+                fprintf(stderr, "%s: the queue grew from %zu to %zu bytes at commit %zu\n",
+                        name, queue_alloc, s->thread.pending.wb->size, i);
+                errors++;
+                goto cleanup;
+            }
         }
 
         // drain the circular buffer, like sending does
