@@ -9,6 +9,7 @@ in the `artifacts` subdirectory of this directory.
 Building requires the following tools:
 
 - GNU Make 4.4 or newer
+- Python 3.14 or newer
 - A recent version of either Docker or Podman
 - A recent version of Git
 - A recent version of GNU Coreutils

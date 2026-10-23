@@ -24,10 +24,11 @@ NETDATA_SOURCE_DIR := /netdata
 NETDATA_PREFIX := opt/netdata
 
 TARGET_STAGING := $(STAGING)/$(BUILDARCH)
-TARGET_WORKDIR := $(WORKDIR)/$(BUILDARCH)
-TARGET_STAMPS := $(WORKDIR)/$(BUILDARCH)/stamps
+TARGET_BUILD_STAGING := $(TARGET_STAGING)/build
 TARGET_INSTALL_BASE := $(TARGET_STAGING)/install
 TARGET_INSTALL := $(TARGET_INSTALL_BASE)/$(NETDATA_PREFIX)
+TARGET_WORKDIR := $(WORKDIR)/$(BUILDARCH)
+TARGET_STAMPS := $(WORKDIR)/$(BUILDARCH)/stamps
 TARGET_CACHE_ROOT := $(CACHE)/$(BUILDARCH)
 
 ifdef DEVTEST
@@ -37,9 +38,11 @@ else
 endif
 
 DOCKER_STAGING := /staging
+DOCKER_BUILD_STAGING := $(DOCKER_STAGING)/build
 DOCKER_WORKDIR := /work
-DOCKER_INSTALL_BASE := /staging/install
+DOCKER_INSTALL_BASE := $(DOCKER_STAGING)/install
 DOCKER_INSTALL := $(DOCKER_INSTALL_BASE)/$(NETDATA_PREFIX)
+DOCKER_PKGCONFIG_PATH := $(DOCKER_BUILD_STAGING)/lib/pkgconfig:$(DOCKER_BUILD_STAGING)/lib64/pkgconfig
 
 # Docker configuration
 
@@ -70,7 +73,7 @@ define set_paths
 	$(1)_CONFIG := $$(TARGET_STAMPS)/$(2).config.stamp
 	$(1)_BUILD := $$(TARGET_STAMPS)/$(2).build.stamp
 	$(1)_STAGING := $$(TARGET_STAMPS)/$(2).staging.stamp
-	$(1)_DOCKER_STAGING := $$(DOCKER_STAGING)/$(2)
+	$(1)_DOCKER_STAGING := $$(DOCKER_STAGING)/build
 	$(1)_LIBS := $$($(1)_DOCKER_STAGING)/lib
 	$(1)_INCLUDE := $$($(1)_DOCKER_STAGING)/include
 	$(1)_PKGCONFIG_PATH = $$($(1)_LIBS)/pkgconfig
@@ -80,7 +83,7 @@ OPENSSL_VERSION := openssl-3.6.0
 OPENSSL_SOURCE := https://github.com/openssl/openssl
 $(eval $(call set_paths,OPENSSL,openssl))
 OPENSSL_CFLAGS = $(TUNING_FLAGS) -fno-lto -pipe
-OPENSSL_LDFLAGS := -static
+OPENSSL_LDFLAGS = -static
 
 LIBNFACCT_VERSION := 1.0.3
 LIBNFACCT_SOURCE := https://www.netfilter.org/projects/libnetfilter_acct/files/libnetfilter_acct-$(LIBNFACCT_VERSION).tar.bz2
@@ -88,13 +91,13 @@ LIBNFACCT_ARCHIVE := $(TARGET_WORKDIR)/libnetfilter_acct-$(LIBNFACCT_VERSION).ta
 LIBNFACCT_HASH := 4250ceef3efe2034f4ac05906c3ee427db31b9b0a2df41b2744f4bf79a959a1a
 $(eval $(call set_paths,LIBNFACCT,libnetfilter_acct))
 LIBNFACCT_CFLAGS = $(TUNING_FLAGS) -static -I/usr/lib/libmnl -pipe
-LIBNFACCT_LDFLAGS := -static -L/usr/lib -lmnl
+LIBNFACCT_LDFLAGS = -static -L/usr/lib -lmnl
 
 CURL_VERSION := curl-8_20_0
 CURL_SOURCE := https://github.com/curl/curl
 $(eval $(call set_paths,CURL,curl))
-CURL_CFLAGS = $(TUNING_FLAGS) -I$(OPENSSL_INCLUDE) -pipe
-CURL_LDFLAGS := -static -L$(OPENSSL_LIBS)
+CURL_CFLAGS = $(TUNING_FLAGS) -pipe
+CURL_LDFLAGS = -static
 
 BASH_VERSION := 5.3
 BASH_SOURCE := http://ftp.gnu.org/gnu/bash/bash-$(BASH_VERSION).tar.gz
@@ -102,7 +105,7 @@ BASH_ARCHIVE := $(TARGET_WORKDIR)/bash-$(BASH_VERSION).tar.gz
 BASH_HASH := 0d5cd86965f869a26cf64f4b71be7b96f90a3ba8b3d74e27e8e9d9d5550f31ba
 $(eval $(call set_paths,BASH,bash))
 BASH_CFLAGS = $(TUNING_FLAGS) -pipe
-BASH_LDFLAGS :=
+BASH_LDFLAGS =
 
 IOPING_VERSION := 1.3
 IOPING_SOURCE := https://github.com/koct9i/ioping/archive/refs/tags/v$(IOPING_VERSION).tar.gz
@@ -110,7 +113,7 @@ IOPING_ARCHIVE := $(TARGET_WORKDIR)/ioping-$(IOPING_VERSION).tar.gz
 IOPING_HASH := 7aa48e70aaa766bc112dea57ebbe56700626871052380709df3a26f46766e8c8
 $(eval $(call set_paths,IOPING,ioping))
 IOPING_CFLAGS = $(TUNING_FLAGS) -static -pipe
-IOPING_LDFLAGS :=
+IOPING_LDFLAGS =
 
 # Netdata build config
 NETDATA_BUILD_DEPS := $(OPENSSL_STAGING) \
@@ -120,10 +123,9 @@ NETDATA_BUILD_DEPS := $(OPENSSL_STAGING) \
 $(eval $(call set_paths,NETDATA,netdata))
 NETDATA_BUILD_DIR := $(DOCKER_WORKDIR)/netdata/build
 NETDATA_INSTALL := $(TARGET_STAMPS)/netdata.install.stamp
-NETDATA_CFLAGS = $(TUNING_FLAGS) -pipe -O2 -funroll-loops -I$(OPENSSL_INCLUDE) -I$(LIBNFACCT_INCLUDE) -I$(CURL_INCLUDE)
-NETDATA_LDFLAGS := -Wl,--gc-sections -L$(OPENSSL_LIBS) -L$(LIBNFACCT_LIBS) -L$(CURL_LIBS) -L/usr/lib -lmnl -lzstd
+NETDATA_CFLAGS = $(TUNING_FLAGS) -pipe -O2 -funroll-loops -I$(LIBNFACCT_INCLUDE)
+NETDATA_LDFLAGS = -Wl,--gc-sections -L$(LIBNFACCT_LIBS) -L/usr/lib -lmnl
 NETDATA_RUSTFLAGS := -C target-feature=+crt-static
-NETDATA_PKGCONFIG_PATH := $(OPENSSL_PKGCONFIG_PATH):$(LIBNFACCT_PKGCONFIG_PATH):$(CURL_PKGCONFIG_PATH)
 NETDATA_CMAKE_OPTS := -DSTATIC_BUILD=On \
                       -DCMAKE_INSTALL_PREFIX=/$(NETDATA_PREFIX) \
                       -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=$(if $(DEVTEST),Off,On) \
@@ -194,6 +196,7 @@ ifeq ($(BUILDARCH),x86_64)
                    -e QEMU_CPU=Nehalem-v2 \
                    -e GOAMD64=v1 -e GOARCH=amd64 \
                    $(NULL)
+    OPENSSL_LIBS := $(OPENSSL_DOCKER_STAGING)/lib64
     NETDATA_CMAKE_OPTS := $(NETDATA_CMAKE_OPTS) \
                           -DENABLE_NETDATA_JOURNAL_FILE_READER=On \
                           -DENABLE_PLUGIN_NETFLOW=On \
@@ -263,7 +266,7 @@ else
     QEMU_DEP :=
 endif
 
-BUILDER_STATUS := $(shell $(MAKEFILE_DIR)/scripts/docker-image-status.sh $(DOCKER) $(BUILDER) $(PLATFORM))
+BUILDER_STATUS := $(shell $(MAKEFILE_DIR)/scripts/docker-image-status.py $(DOCKER) $(BUILDER) $(PLATFORM))
 
 # general rules
 
@@ -313,12 +316,13 @@ $(TARGET_STAGING):
 	mkdir -p $@
 
 $(TARGET_INSTALL): | $(TARGET_STAGING)
+	rm -rf $@
 	mkdir -p $@
 
 dirs: $(TARGET_CACHE) $(TARGET_WORKDIR) $(TARGET_STAMPS) $(TARGET_STAGING) $(TARGET_INSTALL)
 
 /proc/sys/fs/binfmt_misc/qemu-$(QEMU_ARCH): /proc/sys/fs/binfmt_misc
-	$(DOCKER) run --rm --privileged $(QEMU_SETUP) --install "$(QEMU_ARCH)" ; \
+	$(DOCKER) run --rm --privileged $(QEMU_SETUP) --install "$(QEMU_ARCH)"
 
 docker-image:
 	if [ "$(BUILDER_STATUS)" = "MISMATCH" ] ; then \
@@ -358,6 +362,7 @@ $(OPENSSL_CONFIG): prepare $(OPENSSL_DIR)
 			-e CXXFLAGS="$(OPENSSL_CFLAGS)" \
 			-e LDFLAGS="-static" \
 			-e PKG_CONFIG="pkg-config --static" \
+			-e PKG_CONFIG_PATH="$(DOCKER_PKGCONFIG_PATH)" \
 			-w $(DOCKER_WORKDIR)/openssl \
 			$(BUILDER) \
 			/bin/bash ./config -static threads no-tests enable-quic \
@@ -375,6 +380,7 @@ $(OPENSSL_BUILD): prepare $(OPENSSL_CONFIG)
 			-e CXXFLAGS="$(OPENSSL_CFLAGS)" \
 			-e LDFLAGS="-static" \
 			-e PKG_CONFIG="pkg-config --static" \
+			-e PKG_CONFIG_PATH="$(DOCKER_PKGCONFIG_PATH)" \
 			-w $(DOCKER_WORKDIR)/openssl \
 			$(BUILDER) \
 			/usr/bin/make ; \
@@ -388,12 +394,10 @@ $(OPENSSL_STAGING): prepare $(OPENSSL_BUILD)
 		-e CXXFLAGS="$(OPENSSL_CFLAGS)" \
 		-e LDFLAGS="-static" \
 		-e PKG_CONFIG="pkg-config --static" \
+		-e PKG_CONFIG_PATH="$(DOCKER_PKGCONFIG_PATH)" \
 		-w $(DOCKER_WORKDIR)/openssl \
 		$(BUILDER) \
 		/usr/bin/make install_sw
-	if [ -d "$(TARGET_STAGING)/openssl/lib64" ]; then \
-		ln -s lib64 $(TARGET_STAGING)/openssl/lib || true ; \
-	fi
 	if [ ! -f $(OPENSSL_CACHE_HIT) ]; then \
 		rm -rf $(OPENSSL_CACHE_PATH) && \
 		mkdir -p $(OPENSSL_CACHE_PATH) && \
@@ -429,7 +433,7 @@ $(LIBNFACCT_CONFIG): prepare $(LIBNFACCT_DIR)
 			-e CXXFLAGS="$(LIBNFACCT_CFLAGS)" \
 			-e LDFLAGS="$(LIBNFACCT_LDFLAGS)" \
 			-e PKG_CONFIG="pkg-config --static" \
-			-e PKG_CONFIG_PATH=/usr/lib/pkgconfig \
+			-e PKG_CONFIG_PATH="$(DOCKER_PKGCONFIG_PATH)" \
 			-w $(DOCKER_WORKDIR)/libnetfilter_acct \
 			$(BUILDER) \
 			/usr/bin/autoreconf -if ; \
@@ -441,7 +445,7 @@ $(LIBNFACCT_CONFIG): prepare $(LIBNFACCT_DIR)
 			-e CXXFLAGS="$(LIBNFACCT_CFLAGS)" \
 			-e LDFLAGS="$(LIBNFACCT_LDFLAGS)" \
 			-e PKG_CONFIG="pkg-config --static" \
-			-e PKG_CONFIG_PATH=/usr/lib/pkgconfig \
+			-e PKG_CONFIG_PATH="$(DOCKER_PKGCONFIG_PATH)" \
 			-w $(DOCKER_WORKDIR)/libnetfilter_acct \
 			$(BUILDER) \
 			/bin/bash ./configure \
@@ -460,7 +464,7 @@ $(LIBNFACCT_BUILD): prepare $(LIBNFACCT_CONFIG)
 			-e CXXFLAGS="$(LIBNFACCT_CFLAGS)" \
 			-e LDFLAGS="$(LIBNFACCT_LDFLAGS)" \
 			-e PKG_CONFIG="pkg-config --static" \
-			-e PKG_CONFIG_PATH=/usr/lib/pkgconfig \
+			-e PKG_CONFIG_PATH="$(DOCKER_PKGCONFIG_PATH)" \
 			-w $(DOCKER_WORKDIR)/libnetfilter_acct \
 			$(BUILDER) \
 			/usr/bin/make ; \
@@ -474,7 +478,7 @@ $(LIBNFACCT_STAGING): prepare $(LIBNFACCT_BUILD)
 		-e CXXFLAGS="$(LIBNFACCT_CFLAGS)" \
 		-e LDFLAGS="$(LIBNFACCT_LDFLAGS)" \
 		-e PKG_CONFIG="pkg-config --static" \
-		-e PKG_CONFIG_PATH=/usr/lib/pkgconfig \
+		-e PKG_CONFIG_PATH="$(DOCKER_PKGCONFIG_PATH)" \
 		-w $(DOCKER_WORKDIR)/libnetfilter_acct \
 		$(BUILDER) \
 		/usr/bin/make install
@@ -508,7 +512,7 @@ $(CURL_CONFIG): prepare $(CURL_DIR) | $(OPENSSL_STAGING)
 			-e CXXFLAGS="$(CURL_CFLAGS)" \
 			-e LDFLAGS="$(CURL_LDFLAGS)" \
 			-e PKG_CONFIG="pkg-config --static" \
-			-e PKG_CONFIG_PATH="$(OPENSSL_PKGCONFIG_PATH)" \
+			-e PKG_CONFIG_PATH="$(DOCKER_PKGCONFIG_PATH)" \
 			-w $(DOCKER_WORKDIR)/curl \
 			$(BUILDER) \
 			/usr/bin/autoreconf -if ; \
@@ -520,7 +524,7 @@ $(CURL_CONFIG): prepare $(CURL_DIR) | $(OPENSSL_STAGING)
 			-e CXXFLAGS="$(CURL_CFLAGS)" \
 			-e LDFLAGS="$(CURL_LDFLAGS)" \
 			-e PKG_CONFIG="pkg-config --static" \
-			-e PKG_CONFIG_PATH="$(OPENSSL_PKGCONFIG_PATH)" \
+			-e PKG_CONFIG_PATH="$(DOCKER_PKGCONFIG_PATH)" \
 			-w $(DOCKER_WORKDIR)/curl \
 			$(BUILDER) \
 			/bin/bash ./configure \
@@ -546,7 +550,7 @@ $(CURL_CONFIG): prepare $(CURL_DIR) | $(OPENSSL_STAGING)
 				--enable-ipv6 \
 				--enable-cookies \
 				--with-ca-fallback \
-				--with-openssl=$(DOCKER_STAGING)/openssl \
+				--with-openssl=$(OPENSSL_DOCKER_STAGING) \
 				--with-ca-bundle=/opt/netdata/etc/ssl/certs/ca-certificates.crt \
 				--with-ca-path=/opt/netdata/etc/ssl/certs \
 				--without-brotli \
@@ -564,7 +568,7 @@ $(CURL_BUILD): prepare $(CURL_CONFIG)
 			-e CXXFLAGS="$(CURL_CFLAGS)" \
 			-e LDFLAGS="$(CURL_LDFLAGS)" \
 			-e PKG_CONFIG="pkg-config --static" \
-			-e PKG_CONFIG_PATH="$(OPENSSL_PKGCONFIG_PATH)" \
+			-e PKG_CONFIG_PATH="$(DOCKER_PKGCONFIG_PATH)" \
 			-w $(DOCKER_WORKDIR)/curl \
 			$(BUILDER) \
 			/usr/bin/make ; \
@@ -578,7 +582,7 @@ $(CURL_STAGING): prepare $(CURL_BUILD)
 		-e CXXFLAGS="$(CURL_CFLAGS)" \
 		-e LDFLAGS="$(CURL_LDFLAGS)" \
 		-e PKG_CONFIG="pkg-config --static" \
-		-e PKG_CONFIG_PATH="$(OPENSSL_PKGCONFIG_PATH)" \
+		-e PKG_CONFIG_PATH="$(DOCKER_PKGCONFIG_PATH)" \
 		-w $(DOCKER_WORKDIR)/curl \
 		$(BUILDER) \
 		/usr/bin/make install ;
@@ -589,9 +593,9 @@ $(CURL_STAGING): prepare $(CURL_BUILD)
 	fi
 	touch $@
 
-$(TARGET_INSTALL)/bin/curl: $(CURL_STAGING)
+$(TARGET_INSTALL)/bin/curl: $(TARGET_INSTALL) $(CURL_STAGING)
 	mkdir -p $(TARGET_INSTALL)/bin
-	cp -a --reflink=auto $(TARGET_STAGING)/curl/bin/curl $@
+	cp -a --reflink=auto $(TARGET_BUILD_STAGING)/bin/curl $@
 
 curl: $(TARGET_INSTALL)/bin/curl
 
@@ -612,7 +616,7 @@ $(BASH_DIR): prepare
 	fi
 	touch $@
 
-$(BASH_CONFIG): prepare $(BASH_DIR) | $(OPENSSL_STAGING)
+$(BASH_CONFIG): prepare $(BASH_DIR)
 	+if [ ! -f $(BASH_CACHE_HIT) ]; then \
 		$(DOCKER) run $(DOCKER_ARGS) \
 			$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
@@ -620,7 +624,7 @@ $(BASH_CONFIG): prepare $(BASH_DIR) | $(OPENSSL_STAGING)
 			-e CXXFLAGS="$(BASH_CFLAGS)" \
 			-e LDFLAGS="$(BASH_LDFLAGS)" \
 			-e PKG_CONFIG="pkg-config --static" \
-			-e PKG_CONFIG_PATH="$(OPENSSL_PKGCONFIG_PATH)" \
+			-e PKG_CONFIG_PATH="$(DOCKER_PKGCONFIG_PATH)" \
 			-w $(DOCKER_WORKDIR)/bash \
 			$(BUILDER) \
 			/bin/bash ./configure \
@@ -646,14 +650,14 @@ $(BASH_BUILD): prepare $(BASH_CONFIG)
 			-e CXXFLAGS="$(BASH_CFLAGS)" \
 			-e LDFLAGS="$(BASH_LDFLAGS)" \
 			-e PKG_CONFIG="pkg-config --static" \
-			-e PKG_CONFIG_PATH="$(OPENSSL_PKGCONFIG_PATH)" \
+			-e PKG_CONFIG_PATH="$(DOCKER_PKGCONFIG_PATH)" \
 			-w $(DOCKER_WORKDIR)/bash \
 			$(BUILDER) \
 			/usr/bin/make ; \
 	fi
 	touch $@
 
-$(TARGET_INSTALL)/bin/bash: prepare $(BASH_BUILD)
+$(TARGET_INSTALL)/bin/bash: prepare $(TARGET_INSTALL) $(BASH_BUILD)
 	mkdir -p $(@D)
 	+$(DOCKER) run $(DOCKER_ARGS) \
 		$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
@@ -661,7 +665,7 @@ $(TARGET_INSTALL)/bin/bash: prepare $(BASH_BUILD)
 		-e CXXFLAGS="$(BASH_CFLAGS)" \
 		-e LDFLAGS="$(BASH_LDFLAGS)" \
 		-e PKG_CONFIG="pkg-config --static" \
-		-e PKG_CONFIG_PATH="$(OPENSSL_PKGCONFIG_PATH)" \
+		-e PKG_CONFIG_PATH="$(DOCKER_PKGCONFIG_PATH)" \
 		-w $(DOCKER_WORKDIR)/bash \
 		$(BUILDER) \
 		/usr/bin/make install
@@ -701,14 +705,14 @@ $(IOPING_BUILD): prepare $(IOPING_CONFIG)
 			-e CXXFLAGS="$(IOPING_CFLAGS)" \
 			-e LDFLAGS="$(IOPING_LDFLAGS)" \
 			-e PKG_CONFIG="pkg-config --static" \
-			-e PKG_CONFIG_PATH="$(OPENSSL_PKGCONFIG_PATH)" \
+			-e PKG_CONFIG_PATH="$(DOCKER_PKGCONFIG_PATH)" \
 			-w $(DOCKER_WORKDIR)/ioping \
 			$(BUILDER) \
 			/usr/bin/make ; \
 	fi
 	touch $@
 
-$(TARGET_INSTALL)/usr/libexec/netdata/plugins.d/ioping: prepare $(IOPING_BUILD)
+$(TARGET_INSTALL)/usr/libexec/netdata/plugins.d/ioping: prepare $(TARGET_INSTALL) $(IOPING_BUILD)
 	mkdir -p $(@D)
 	$(DOCKER) run $(DOCKER_ARGS) $(BUILDER) \
 		/usr/bin/install -o root -g root -m 4750 $(DOCKER_WORKDIR)/ioping/ioping $(DOCKER_INSTALL)/usr/libexec/netdata/plugins.d/
@@ -736,7 +740,7 @@ $(NETDATA_CONFIG): prepare $(NETDATA_DIR) $(NETDATA_BUILD_DEPS)
 		-e LDFLAGS="$(NETDATA_LDFLAGS)" \
 		-e RUSTFLAGS="$(NETDATA_RUSTFLAGS)" \
 		-e PKG_CONFIG="pkg-config --static" \
-		-e PKG_CONFIG_PATH="$(NETDATA_PKGCONFIG_PATH)" \
+		-e PKG_CONFIG_PATH="$(DOCKER_PKGCONFIG_PATH)" \
 		$(BUILDER) \
 		/usr/bin/cmake \
 			-S $(NETDATA_SOURCE_DIR) \
@@ -755,14 +759,14 @@ $(NETDATA_BUILD): prepare $(NETDATA_CONFIG)
 		-e LDFLAGS="$(NETDATA_LDFLAGS)" \
 		-e RUSTFLAGS="$(NETDATA_RUSTFLAGS)" \
 		-e PKG_CONFIG="pkg-config --static" \
-		-e PKG_CONFIG_PATH="$(NETDATA_PKGCONFIG_PATH)" \
+		-e PKG_CONFIG_PATH="$(DOCKER_PKGCONFIG_PATH)" \
 		$(BUILDER) \
 		/usr/bin/cmake --build $(NETDATA_BUILD_DIR) ;
 	touch $@
 
-$(NETDATA_INSTALL): prepare $(NETDATA_BUILD)
-	rm -rf $@ $(TARGET_INSTALL)
-	mkdir -p $(TARGET_INSTALL) $(TARGET_INSTALL)/bin $(TARGET_INSTALL)/usr $(TARGET_INSTALL)/bin/srv
+$(NETDATA_INSTALL): prepare $(TARGET_INSTALL) $(NETDATA_BUILD)
+	rm -rf $@
+	mkdir -p $(TARGET_INSTALL)/bin $(TARGET_INSTALL)/usr $(TARGET_INSTALL)/bin/srv
 	+$(DOCKER) run $(DOCKER_ARGS) \
 		$(shell $(MAKEFILE_DIR)/scripts/docker-makeflags.sh) \
 		-e CFLAGS="$(NETDATA_CFLAGS)" \
@@ -770,7 +774,7 @@ $(NETDATA_INSTALL): prepare $(NETDATA_BUILD)
 		-e LDFLAGS="$(NETDATA_LDFLAGS)" \
 		-e RUSTFLAGS="$(NETDATA_RUSTFLAGS)" \
 		-e PKG_CONFIG="pkg-config --static" \
-		-e PKG_CONFIG_PATH="$(NETDATA_PKGCONFIG_PATH)" \
+		-e PKG_CONFIG_PATH="$(DOCKER_PKGCONFIG_PATH)" \
 		$(BUILDER) \
 		/bin/sh $(NETDATA_SOURCE_DIR)/packaging/static/scripts/install-staging-tree.sh $(NETDATA_BUILD_DIR) /$(NETDATA_PREFIX) $(DOCKER_INSTALL)
 	mv $(TARGET_INSTALL)/bin/netdata $(TARGET_INSTALL)/bin/srv/netdata
