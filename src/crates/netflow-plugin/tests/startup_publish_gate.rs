@@ -169,3 +169,87 @@ fn successful_startup_publishes_function_and_charts() {
         "plugin must exit cleanly when stdin closes; stderr:\n{stderr}"
     );
 }
+
+#[cfg(unix)]
+#[test]
+fn blocked_facet_cache_load_sends_keepalive_without_publishing() {
+    use std::ffi::CString;
+    use std::fs::OpenOptions;
+    use std::io::Write;
+    use std::os::unix::ffi::OsStrExt;
+    use std::os::unix::fs::OpenOptionsExt;
+
+    let journal_dir = tempfile::tempdir().expect("create journal dir");
+    let cache_path = journal_dir.path().join("facet-state.bin");
+    let fifo_path = CString::new(cache_path.as_os_str().as_bytes()).unwrap();
+    // A FIFO deterministically stalls the real cache reader, without a test
+    // switch in the shipped binary or a large journal fixture.
+    assert_eq!(unsafe { libc::mkfifo(fifo_path.as_ptr(), 0o600) }, 0);
+    let occupied = UdpSocket::bind("127.0.0.1:0").expect("occupy UDP port");
+    let mut child = spawn_plugin(
+        &occupied.local_addr().unwrap().to_string(),
+        journal_dir.path(),
+    );
+    let _stdin = child.stdin.take().expect("piped stdin");
+    let lines = stdout_lines(&mut child);
+    let stderr = stderr_text(&mut child);
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let mut output = Vec::new();
+    let mut heartbeat = false;
+    while let Some(remaining) = deadline.checked_duration_since(Instant::now()) {
+        match lines.recv_timeout(remaining) {
+            Ok(line) => {
+                heartbeat = keyword(&line) == "PLUGIN_KEEPALIVE";
+                output.push(line);
+                if heartbeat {
+                    break;
+                }
+            }
+            Err(_) => break,
+        }
+    }
+    if !heartbeat {
+        let _ = child.kill();
+        let _ = child.wait();
+        let stderr = stderr.join().unwrap();
+        panic!(
+            "no keepalive while facet cache loading was blocked; stdout={output:?}; stderr={stderr}"
+        );
+    }
+
+    // Wait for the reader to reach the FIFO, then release it. Nonblocking open
+    // keeps fixture failures from hanging the test process.
+    let release_deadline = Instant::now() + Duration::from_secs(5);
+    let released = loop {
+        match OpenOptions::new()
+            .write(true)
+            .custom_flags(libc::O_NONBLOCK)
+            .open(&cache_path)
+        {
+            Ok(mut file) => break file.write_all(b"invalid cache").is_ok(),
+            Err(err)
+                if err.raw_os_error() == Some(libc::ENXIO) && Instant::now() < release_deadline =>
+            {
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            Err(_) => break false,
+        }
+    };
+    if !released {
+        let _ = child.kill();
+        let _ = child.wait();
+        let stderr = stderr.join().unwrap();
+        panic!("could not release facet cache reader; stderr={stderr}");
+    }
+    let status = wait_with_deadline(&mut child, STARTUP_TIMEOUT);
+    let stderr = stderr.join().unwrap();
+    output.extend(lines.iter());
+    assert_eq!(status.and_then(|s| s.code()), Some(1), "{stderr}");
+    assert!(
+        output
+            .iter()
+            .all(|line| UNPUBLISHED_KEYWORDS.contains(&keyword(line))),
+        "{output:?}"
+    );
+    assert!(stderr.contains("failed to bind"), "{stderr}");
+}

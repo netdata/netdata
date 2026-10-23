@@ -581,37 +581,40 @@ mod tests {
         assert!(!is_not_found_error(&permission_denied));
     }
 
+    fn facet_test_service(
+        base: &Path,
+        runtime: Arc<crate::facet_runtime::FacetRuntime>,
+    ) -> FlowQueryService {
+        let (monitor, _notify_rx) = Monitor::new().expect("create monitor");
+        let registry = Registry::new(monitor);
+        let tier_dirs = HashMap::from([
+            (TierKind::Raw, base.join("raw")),
+            (TierKind::Minute1, base.join("1m")),
+            (TierKind::Minute5, base.join("5m")),
+            (TierKind::Hour1, base.join("1h")),
+        ]);
+        for dir in tier_dirs.values() {
+            registry
+                .watch_directory(dir.to_str().unwrap())
+                .expect("watch tier");
+        }
+        FlowQueryService {
+            registry,
+            agent_id: "test-agent".into(),
+            tier_dirs,
+            max_groups: 100,
+            facet_runtime: runtime,
+        }
+    }
+
     #[tokio::test]
-    async fn startup_reconcile_reports_cached_archived_journal_reopened_as_active() {
-        use crate::facet_runtime::{FacetReconcileRejection, FacetRuntime};
+    async fn startup_reconcile_recovers_cached_archived_journal_reopened_as_active() {
+        use crate::facet_runtime::FacetRuntime;
         use journal_sdk_log_writer::{
             Compression, Config, EntryTimestamps, Log, RetentionPolicy, RotationPolicy,
         };
 
         use journal_sdk_registry::{Origin, Source};
-
-        fn service(base: &Path, runtime: Arc<FacetRuntime>) -> FlowQueryService {
-            let (monitor, _notify_rx) = Monitor::new().expect("create monitor");
-            let registry = Registry::new(monitor);
-            let tier_dirs = HashMap::from([
-                (TierKind::Raw, base.join("raw")),
-                (TierKind::Minute1, base.join("1m")),
-                (TierKind::Minute5, base.join("5m")),
-                (TierKind::Hour1, base.join("1h")),
-            ]);
-            for dir in tier_dirs.values() {
-                registry
-                    .watch_directory(dir.to_str().unwrap())
-                    .expect("watch tier");
-            }
-            FlowQueryService {
-                registry,
-                agent_id: "test-agent".into(),
-                tier_dirs,
-                max_groups: 100,
-                facet_runtime: runtime,
-            }
-        }
 
         let tmp = tempfile::tempdir().expect("create backend");
         for tier in ["raw", "1m", "5m", "1h"] {
@@ -650,13 +653,21 @@ mod tests {
 
         // Offline persistent queries have no writer lifecycle state. They can
         // index an Online non-strict filename as archived while ingestion runs.
-        let offline = service(tmp.path(), Arc::new(FacetRuntime::new(tmp.path())));
+        let offline = facet_test_service(tmp.path(), Arc::new(FacetRuntime::new(tmp.path())));
         offline
             .initialize_facets()
             .await
             .expect("persist offline facet index");
         drop(offline);
-        let cached = fs::read(tmp.path().join("facet-state.bin")).expect("read cache");
+        writer
+            .write_entry_with_timestamps(
+                &[b"PROTOCOL=17", b"DIRECTION=incoming"],
+                EntryTimestamps::default()
+                    .with_entry_realtime_usec(2_000_000)
+                    .with_entry_monotonic_usec(2),
+            )
+            .expect("append a flow absent from the cached contribution");
+        writer.sync().expect("sync appended flow");
         drop(writer);
 
         // Restore the Online header that an unclean process exit leaves behind.
@@ -677,19 +688,78 @@ mod tests {
         runtime
             .observe_active_path_created(Path::new(&path))
             .expect("register reopened writer");
-        let startup = service(tmp.path(), runtime);
-        let err = startup
+        let startup = facet_test_service(tmp.path(), runtime);
+        startup
             .initialize_facets_before_ingest()
             .await
-            .expect_err("reject cache classification conflict");
+            .expect("recover the cached classification on the first startup");
+        assert_eq!(
+            startup.facet_runtime.snapshot().fields["PROTOCOL"].values,
+            vec!["6", "17"],
+        );
+        let plan = startup
+            .facet_runtime
+            .build_reconcile_plan(&startup.enumerate_facet_files_from_disk().unwrap());
+        assert!(
+            !plan.rebuild_archived,
+            "the stale archived membership must be removed"
+        );
+        assert!(plan.current_active_paths.contains(&path));
+        assert!(!plan.current_archived_paths.contains(&path));
+        let persisted = FacetRuntime::new(tmp.path());
+        let mut persisted_values = persisted.snapshot().fields["PROTOCOL"].values.clone();
+        persisted_values.sort();
+        assert_eq!(
+            persisted_values,
+            vec!["17", "6"],
+            "the corrected snapshot must persist without losing live values",
+        );
+        drop(startup);
+
+        // A clean stop archives the writer; the next startup indexes it again
+        // and must retain both pre-cache and post-cache values.
+        drop(reopened);
+        let retry = facet_test_service(tmp.path(), Arc::new(FacetRuntime::new(tmp.path())));
+        retry
+            .initialize_facets_before_ingest()
+            .await
+            .expect("next restart succeeds");
+        assert_eq!(
+            retry.facet_runtime.snapshot().fields["PROTOCOL"].values,
+            vec!["6", "17"]
+        );
+    }
+
+    #[tokio::test]
+    async fn facet_reconcile_exhaustion_preserves_unscanned_transition_reason() {
+        use crate::facet_runtime::{FacetReconcileRejection, FacetRuntime};
+        let tmp = tempfile::tempdir().unwrap();
+        for tier in ["raw", "1m", "5m", "1h"] {
+            fs::create_dir(tmp.path().join(tier)).unwrap();
+        }
+        let path = tmp.path().join("raw/system.journal");
+        fs::write(&path, b"unreadable journal fixture").unwrap();
+        let runtime = Arc::new(FacetRuntime::new(tmp.path()));
+        runtime.observe_active_path_created(&path).unwrap();
+        runtime
+            .observe_rotation(&path, &tmp.path().join("raw/next.journal"))
+            .unwrap();
+        runtime.observe_active_path_created(&path).unwrap();
+        let cached = fs::read(tmp.path().join("facet-state.bin")).unwrap();
+        let service = facet_test_service(tmp.path(), runtime);
+        let err = service
+            .initialize_facets_before_ingest()
+            .await
+            .expect_err("an unreadable active transition must not discard its cache");
         assert_eq!(
             err.downcast_ref::<FacetReconcileRejection>(),
             Some(&FacetReconcileRejection::ExistingPathOmitted {
-                path: path.clone(),
+                path: path.to_str().unwrap().into(),
                 expected: "archived",
                 planned_as_archived: false,
                 planned_as_active: true,
-            }),
+                active_scan_available: false,
+            })
         );
         let diagnostic = format!("{err:#}");
         assert!(
@@ -697,28 +767,14 @@ mod tests {
             "{diagnostic}"
         );
         assert!(diagnostic.contains("inventory=disk"), "{diagnostic}");
-        assert!(diagnostic.contains(&path), "{diagnostic}");
         assert!(
-            diagnostic.contains("planned_as_active=true"),
+            diagnostic.contains("active_scan_available=false"),
             "{diagnostic}"
         );
+        assert!(diagnostic.contains(path.to_str().unwrap()), "{diagnostic}");
         assert_eq!(
             fs::read(tmp.path().join("facet-state.bin")).unwrap(),
             cached
-        );
-        drop(startup);
-
-        // A failed normal return drops the writer, archiving the journal. The
-        // next process can reconcile the same persisted cache successfully.
-        drop(reopened);
-        let retry = service(tmp.path(), Arc::new(FacetRuntime::new(tmp.path())));
-        retry
-            .initialize_facets_before_ingest()
-            .await
-            .expect("next restart succeeds");
-        assert_eq!(
-            retry.facet_runtime.snapshot().fields["PROTOCOL"].values,
-            vec!["6"]
         );
     }
 

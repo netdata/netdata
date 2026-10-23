@@ -54,9 +54,12 @@ A rejected attempt reports one of these causes:
 - **Archived rebuild became required:** the runtime needs a rebuild that was not
   in the scan plan.
 - **Existing path missing from an inventory:** the log names the journal, its
-  expected classification, and whether the plan lists it as active or archived.
-  An archived cache entry listed as active by the writer is a classification
-  conflict, not evidence that a file disappeared.
+  expected classification, whether the plan lists it as active or archived,
+  and whether an active scan succeeded. A cached archived entry can move to
+  active only after a successful active scan and an archived-facet rebuild.
+- **Cached archive not successfully scanned:** a rebuild could not read a
+  previously indexed journal that still exists. The plugin keeps the cached
+  values and reports the journal path instead of discarding its contribution.
 
 Retries use a fresh disk inventory. If all three attempts are rejected, the
 final error includes the last rejection cause and attempt context. Keep the
@@ -64,17 +67,23 @@ preceding warnings too: different attempts can fail for different reasons.
 
 An offline query without `--no-persist` can classify a live journal as archived
 and save that classification in the shared cache. After an unclean stop, the
-writer can reopen that journal as active and reject the cached classification.
-A failed startup that exits normally closes and archives the journal, so the next
-startup can succeed. Use `--no-persist` for diagnostic queries against live data.
-A successful offline query does not validate writer startup.
+writer can reopen that journal as active. Startup scans it and rebuilds the
+archived facet index to recover the classification on the first attempt. If a
+required scan fails, the cache is preserved and the error identifies the path.
+Use `--no-persist` for diagnostic queries against live data. A successful offline
+query does not validate writer startup.
 
-A separate failure is a supervisor read timeout before startup keepalives begin.
-Compare the start/completion timestamps with the Agent logs. The default minimum
-idle timeout is 120 seconds; the Agent logs `buffered reader not OK (-7)` on this
-path. This is different from a facet reconciliation rejection. Collect both the
-plugin and Agent logs, including the configured systemd journal namespace, before
-rotation removes the failure window.
+Startup sends a keepalive immediately and every 60 seconds, starting before
+configuration and cache loading. A separate thread maintains these keepalives
+even when initialization blocks the executor. It stops before the runtime starts
+normal publication; Functions and charts remain unpublished until listeners are
+ready. A keepalive write failure is reported as a startup failure.
+
+The Agent's minimum idle timeout is 120 seconds. Its
+`buffered reader not OK (-7)` log identifies a read timeout, which is different
+from a facet reconciliation rejection. Compare scan timestamps with both the
+plugin and Agent logs, including the configured systemd journal namespace,
+before rotation removes the failure window.
 
 Journal lifecycle behavior comes from the published `systemd-journal-sdk-*`
 dependencies in `Cargo.toml`, not the similarly named in-tree journal crates.
