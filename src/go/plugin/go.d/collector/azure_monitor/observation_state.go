@@ -3,11 +3,14 @@
 package azure_monitor
 
 import (
+	"slices"
+	"strings"
+
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/azure_monitor/azureprofiles"
 )
 
-type observationLabelIdentity [7]string
+type observationLabelIdentity string
 
 type scopedLabelIdentity struct {
 	ScopeKey string
@@ -22,16 +25,29 @@ type observationKey struct {
 
 type observationState struct {
 	instruments  map[string]*instrumentRuntime
+	profiles     map[string]*profileRuntime
 	accumulators map[observationKey]float64
 	lastObserved map[observationKey]lastObservation
 }
 
-func newObservationState(instruments map[string]*instrumentRuntime) *observationState {
+func newObservationState(runtime *collectorRuntime) *observationState {
+	profiles := make(map[string]*profileRuntime, len(runtime.Profiles))
+	for _, profile := range runtime.Profiles {
+		profiles[profile.Name] = profile
+	}
 	return &observationState{
-		instruments:  instruments,
+		instruments:  runtime.Instruments,
+		profiles:     profiles,
 		accumulators: make(map[observationKey]float64),
 		lastObserved: make(map[observationKey]lastObservation),
 	}
+}
+
+func (s *observationState) resourceLabels(resource resourceInfo, profileName string) metrix.Labels {
+	if profile, ok := s.profiles[profileName]; ok {
+		return profileResourceLabels(resource, profile)
+	}
+	return resourceLabels(resource, profileName)
 }
 
 func (s *observationState) reset() {
@@ -113,7 +129,7 @@ func (s *observationState) pruneStaleResources(current map[string][]resourceInfo
 		for _, resource := range resources {
 			activeLabels[scopedLabelIdentity{
 				ScopeKey: resource.HostScope.ScopeKey,
-				Labels:   labelIdentity(labelValues(resourceLabels(resource, profileName))),
+				Labels:   labelIdentity(labelValues(s.resourceLabels(resource, profileName))),
 			}] = struct{}{}
 		}
 	}
@@ -145,19 +161,28 @@ func sampleObservationKey(instrument string, scope metrix.HostScope, values []st
 }
 
 func labelIdentity(values []string) observationLabelIdentity {
-	var out observationLabelIdentity
-	copy(out[:], values)
-	return out
+	return observationLabelIdentity(strings.Join(values, "\x00"))
+}
+
+// labelKeysFor orders the reserved resource labels first, then the profile's labels by name.
+func labelKeysFor(labelNames []string) []string {
+	extra := slices.Clone(labelNames)
+	slices.Sort(extra)
+	return append(slices.Clone(azureprofiles.ReservedLabelNames), extra...)
 }
 
 func labelValues(labels metrix.Labels) []string {
-	return []string{
-		labels["resource_uid"],
-		labels["subscription_id"],
-		labels["resource_name"],
-		labels["resource_group"],
-		labels["region"],
-		labels["resource_type"],
-		labels["profile"],
+	extra := make([]string, 0, len(labels))
+	for key := range labels {
+		if !slices.Contains(azureprofiles.ReservedLabelNames, key) {
+			extra = append(extra, key)
+		}
 	}
+
+	keys := labelKeysFor(extra)
+	values := make([]string, len(keys))
+	for i, key := range keys {
+		values[i] = labels[key]
+	}
+	return values
 }

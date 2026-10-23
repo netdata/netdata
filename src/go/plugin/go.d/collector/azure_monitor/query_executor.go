@@ -14,6 +14,7 @@ import (
 	azcloud "github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
 	"github.com/Azure/azure-sdk-for-go/sdk/monitor/query/azmetrics"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/azure_monitor/azureprofiles"
 )
 
 type queryExecutor struct {
@@ -103,7 +104,7 @@ func (e *queryExecutor) executeQueryBatch(ctx context.Context, batch queryBatch,
 		return nil, err
 	}
 
-	return samplesFromQueryResponse(resp.Values, batch.Profile.Name, queryBatchMetricIndex(batch.Metrics), resourceByID), nil
+	return samplesFromQueryResponse(resp.Values, batch.Profile, queryBatchMetricIndex(batch.Metrics), resourceByID), nil
 }
 
 func queryBatchMetricIndex(metrics []*metricRuntime) map[string]*metricRuntime {
@@ -148,14 +149,14 @@ func effectiveQueryOffset(queryOffsetSeconds int, batchTimeGrainEvery time.Durat
 	return offset
 }
 
-func samplesFromQueryResponse(metricData []azmetrics.MetricData, profileName string, metricToRuntime map[string]*metricRuntime, resourceByID map[string]resourceInfo) []metricSample {
+func samplesFromQueryResponse(metricData []azmetrics.MetricData, profile *profileRuntime, metricToRuntime map[string]*metricRuntime, resourceByID map[string]resourceInfo) []metricSample {
 	samples := make([]metricSample, 0, len(metricData))
 	for _, data := range metricData {
 		resource, ok := resourceByID[stringsLowerTrim(derefOrZero(data.ResourceID))]
 		if !ok {
 			continue
 		}
-		samples = append(samples, samplesFromMetricValues(data.Values, resource.HostScope, resourceLabels(resource, profileName), metricToRuntime)...)
+		samples = append(samples, samplesFromMetricValues(data.Values, resource.HostScope, profileResourceLabels(resource, profile), metricToRuntime)...)
 	}
 	return samples
 }
@@ -194,6 +195,23 @@ func resourceLabels(resource resourceInfo, profileName string) metrix.Labels {
 		"resource_type":   resource.Type,
 		"profile":         profileName,
 	}
+}
+
+// profileResourceLabels adds the profile's resource labels to the labels every resource carries.
+func profileResourceLabels(resource resourceInfo, profile *profileRuntime) metrix.Labels {
+	labels := resourceLabels(resource, profile.Name)
+	for _, label := range profile.ResourceLabels {
+		labels[label.Name] = resourceLabelValue(resource.Properties[label.Property], label.Value)
+	}
+	return labels
+}
+
+func resourceLabelValue(value, format string) string {
+	if format != azureprofiles.ResourceLabelValueARMName {
+		return value
+	}
+	parts := strings.Split(strings.Trim(value, "/"), "/")
+	return parts[len(parts)-1]
 }
 
 func (e *queryExecutor) getMetricsClient(region string) (metricsQueryClient, error) {

@@ -374,6 +374,29 @@ metrics:
     series:
       - aggregation: average
         kind: gauge
+resource_labels:
+  - name: vm_size
+    property: properties.hardwareProfile.vmSize
+  - name: os_type
+    property: properties.storageProfile.osDisk.osType
+resource_states:
+  - id: power_state
+    property: properties.extended.instanceView.powerState.code
+    states:
+      - name: running
+        value: PowerState/running
+      - name: stopped
+        value: PowerState/stopped
+      - name: deallocated
+        value: PowerState/deallocated
+      - name: starting
+        value: PowerState/starting
+      - name: stopping
+        value: PowerState/stopping
+      - name: deallocating
+        value: PowerState/deallocating
+      - name: unknown
+        value: PowerState/unknown
 template:
   family: Azure Virtual Machine
   context_namespace: virtual_machines
@@ -384,6 +407,9 @@ template:
       - region
       - resource_type
       - profile
+      - subscription_id
+      - vm_size
+      - os_type
     instances:
       by_labels:
         - resource_uid
@@ -440,6 +466,28 @@ template:
       dimensions:
         - selector: vm_availability_metric_average
           name: average
+    - id: am_azure_virtual_machines__power_state
+      title: Azure Virtual Machine Power State
+      context: power_state
+      family: Availability
+      type: line
+      units: state
+      algorithm: absolute
+      dimensions:
+        - selector: power_state_running
+          name: running
+        - selector: power_state_stopped
+          name: stopped
+        - selector: power_state_deallocated
+          name: deallocated
+        - selector: power_state_starting
+          name: starting
+        - selector: power_state_stopping
+          name: stopping
+        - selector: power_state_deallocating
+          name: deallocating
+        - selector: power_state_unknown
+          name: unknown
     - id: am_azure_virtual_machines__network_traffic
       title: Azure Virtual Machine Network Traffic
       context: network_traffic
