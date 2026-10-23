@@ -24,7 +24,21 @@ type profileRuntime struct {
 	MetricNamespace string
 	Filters         *ResourceFiltersConfig
 	Metrics         []*metricRuntime
+	ResourceLabels  []azureprofiles.ResourceLabel
+	ResourceStates  []*resourceStateRuntime
+	LabelKeys       []string
 	Template        charttpl.Group
+}
+
+type resourceStateRuntime struct {
+	ID       string
+	Property string
+	Options  []*stateOptionRuntime
+}
+
+type stateOptionRuntime struct {
+	Value      string
+	Instrument string
 }
 
 type metricRuntime struct {
@@ -85,6 +99,7 @@ type resourceInfo struct {
 	ResourceGroup  string
 	Region         string
 	Tags           []resourceTag
+	Properties     map[string]string
 	HostScope      metrix.HostScope
 }
 

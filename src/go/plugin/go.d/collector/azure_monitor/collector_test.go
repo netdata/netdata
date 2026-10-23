@@ -771,6 +771,93 @@ func TestCollector_CollectScenarios(t *testing.T) {
 				assert.Contains(t, strings.Join(keys, "\n"), `subscription_id="sub-2"`)
 			},
 		},
+		"virtual machines carry discovery labels and report power state without metric data": {
+			prepare: func(c *Collector, rg *mockResourceGraph, mx *mockMetricsClient) {
+				c.Config = testConfig()
+				c.Config.Profiles.ModeExact = testProfilesModeEntries("virtual_machines")
+				c.now = func() time.Time { return now }
+				rg.resources = []map[string]any{
+					{
+						"id":                                   "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.Compute/virtualMachines/vm-a",
+						"name":                                 "vm-a",
+						"type":                                 "Microsoft.Compute/virtualMachines",
+						"resourceGroup":                        "rg-a",
+						"location":                             "eastus",
+						"nd_properties_hardwareProfile_vmSize": "Standard_D2s_v3",
+						"nd_properties_storageProfile_osDisk_osType":          "Linux",
+						"nd_properties_extended_instanceView_powerState_code": "PowerState/running",
+					},
+					{
+						"id":                                   "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.Compute/virtualMachines/vm-b",
+						"name":                                 "vm-b",
+						"type":                                 "Microsoft.Compute/virtualMachines",
+						"resourceGroup":                        "rg-a",
+						"location":                             "eastus",
+						"nd_properties_hardwareProfile_vmSize": "Standard_B2s",
+						"nd_properties_storageProfile_osDisk_osType":          "Windows",
+						"nd_properties_extended_instanceView_powerState_code": "powerstate/deallocated",
+					},
+				}
+				mx.queryResponse = azmetrics.QueryResourcesResponse{MetricResults: azmetrics.MetricResults{Values: []azmetrics.MetricData{
+					{
+						ResourceID: new("/subscriptions/sub-1/resourcegroups/rg-a/providers/microsoft.compute/virtualmachines/vm-a"),
+						Values:     []azmetrics.Metric{metricWithAvg("Percentage CPU", now, 42)},
+					},
+				}}}
+			},
+			check: func(t *testing.T, series map[string]metrix.SampleValue, err error, rg *mockResourceGraph, mx *mockMetricsClient) {
+				require.NoError(t, err)
+				assert.Contains(t, rg.lastQuery(), "tostring(properties.extended.instanceView.powerState.code)")
+				assert.NotContains(t, rg.lastQuery(), "properties.serverFarmId")
+
+				cpu, ok := seriesValue(series, "virtual_machines.percentage_cpu_average", `resource_name="vm-a"`, `vm_size="Standard_D2s_v3"`, `os_type="Linux"`)
+				require.True(t, ok)
+				assert.Equal(t, metrix.SampleValue(42), cpu)
+
+				states := map[string]metrix.SampleValue{
+					"vm-a running":     1,
+					"vm-a deallocated": 0,
+					"vm-b running":     0,
+					"vm-b deallocated": 1,
+				}
+				for name, want := range states {
+					parts := strings.Fields(name)
+					got, ok := seriesValue(series, "virtual_machines.power_state_"+parts[1]+"{", `resource_name="`+parts[0]+`"`)
+					require.Truef(t, ok, "missing power state series for %s", name)
+					assert.Equalf(t, want, got, "power state %s", name)
+				}
+				_, ok = seriesValue(series, "virtual_machines.percentage_cpu_average", `resource_name="vm-b"`)
+				assert.False(t, ok)
+			},
+		},
+		"app service apps carry the name of their plan": {
+			prepare: func(c *Collector, rg *mockResourceGraph, mx *mockMetricsClient) {
+				c.Config = testConfig()
+				c.Config.Profiles.ModeExact = testProfilesModeEntries("app_service")
+				c.now = func() time.Time { return now }
+				rg.resources = []map[string]any{
+					{
+						"id":                         "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.Web/sites/app-a",
+						"name":                       "app-a",
+						"type":                       "Microsoft.Web/sites",
+						"resourceGroup":              "rg-a",
+						"location":                   "eastus",
+						"nd_properties_serverFarmId": "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.Web/serverfarms/asp-a",
+					},
+				}
+				mx.queryResponse = azmetrics.QueryResourcesResponse{MetricResults: azmetrics.MetricResults{Values: []azmetrics.MetricData{
+					{
+						ResourceID: new("/subscriptions/sub-1/resourcegroups/rg-a/providers/microsoft.web/sites/app-a"),
+						Values:     []azmetrics.Metric{metricWithAvg("HttpResponseTime", now, 0.25)},
+					},
+				}}}
+			},
+			check: func(t *testing.T, series map[string]metrix.SampleValue, err error, rg *mockResourceGraph, mx *mockMetricsClient) {
+				require.NoError(t, err)
+				_, ok := seriesValue(series, "app_service.http_response_time_average", `app_service_plan="asp-a"`)
+				assert.True(t, ok)
+			},
+		},
 		"idle when no resources match": {
 			prepare: func(c *Collector, rg *mockResourceGraph, mx *mockMetricsClient) {
 				c.Config = testConfig()
@@ -1233,7 +1320,7 @@ func TestSamplesFromQueryResponse_UsesResourceHostScope(t *testing.T) {
 						metricWithAvg("cpu_percent", now, 10),
 					},
 				}},
-				"postgres_flexible",
+				&profileRuntime{Name: "postgres_flexible"},
 				map[string]*metricRuntime{
 					"cpu_percent": {
 						Series: []*seriesRuntime{{
@@ -2779,6 +2866,22 @@ func uniqueStrings(values []string) []string {
 	return out
 }
 
+func seriesValue(series map[string]metrix.SampleValue, substrings ...string) (metrix.SampleValue, bool) {
+	for key, value := range series {
+		matches := true
+		for _, substring := range substrings {
+			if !strings.Contains(key, substring) {
+				matches = false
+				break
+			}
+		}
+		if matches {
+			return value, true
+		}
+	}
+	return 0, false
+}
+
 func keysFromSeries(series map[string]metrix.SampleValue) []string {
 	out := make([]string, 0, len(series))
 	for key := range series {
@@ -2820,4 +2923,39 @@ func scalarKeyFromLabelView(name string, labels metrix.LabelView) string {
 	}
 	b.WriteByte('}')
 	return b.String()
+}
+
+func TestBuildDiscoveryQuery_ResourceProperties(t *testing.T) {
+	properties := []string{"properties.hardwareProfile.vmSize", "properties.bad) | take 1"}
+
+	plain := buildDiscoveryQuery([]string{"Microsoft.Compute/virtualMachines"}, nil, properties)
+	assert.Equal(t,
+		"resources | where type in~ ('Microsoft.Compute/virtualMachines')"+
+			" | extend nd_properties_hardwareProfile_vmSize = tostring(properties.hardwareProfile.vmSize)"+
+			" | project id, name, type, resourceGroup, location, tags, nd_properties_hardwareProfile_vmSize",
+		plain)
+
+	tagged := buildDiscoveryQuery([]string{"Microsoft.Compute/virtualMachines"}, &ResourceFiltersConfig{
+		Tags: map[string][]string{"env": {"prod"}},
+	}, properties)
+	assert.Contains(t, tagged, "nd_properties_hardwareProfile_vmSize = take_any(nd_properties_hardwareProfile_vmSize) by id, name, type, resourceGroup, location")
+	assert.True(t, strings.HasSuffix(tagged, ", tags, nd_properties_hardwareProfile_vmSize"))
+	assert.NotContains(t, tagged, "take 1")
+}
+
+func TestResourceLabelValue(t *testing.T) {
+	planID := "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.Web/serverfarms/asp-a"
+	assert.Equal(t, "asp-a", resourceLabelValue(planID, azureprofiles.ResourceLabelValueARMName))
+	assert.Equal(t, "asp-a", resourceLabelValue(planID+"/", azureprofiles.ResourceLabelValueARMName))
+	assert.Equal(t, planID, resourceLabelValue(planID, azureprofiles.ResourceLabelValueRaw))
+	assert.Empty(t, resourceLabelValue("", azureprofiles.ResourceLabelValueARMName))
+}
+
+func TestResourcePropertyValues_MissingColumnsStayEmpty(t *testing.T) {
+	row := map[string]any{"nd_properties_hardwareProfile_vmSize": " Standard_B2s "}
+
+	assert.Equal(t,
+		map[string]string{"properties.hardwareProfile.vmSize": "Standard_B2s"},
+		resourcePropertyValues(row, []string{"properties.hardwareProfile.vmSize", "properties.serverFarmId"}))
+	assert.Nil(t, resourcePropertyValues(map[string]any{}, []string{"properties.serverFarmId"}))
 }

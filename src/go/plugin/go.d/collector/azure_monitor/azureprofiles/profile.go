@@ -18,10 +18,19 @@ const (
 	SeriesKindCounter = "counter"
 )
 
-var (
-	reResourceType = regexp.MustCompile(`^[A-Za-z0-9._/-]+$`)
-	reIdentityID   = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
+const (
+	ResourceLabelValueRaw     = "raw"
+	ResourceLabelValueARMName = "arm_name"
 )
+
+var (
+	reResourceType     = regexp.MustCompile(`^[A-Za-z0-9._/-]+$`)
+	reIdentityID       = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
+	reResourceProperty = regexp.MustCompile(`^properties(\.[A-Za-z][A-Za-z0-9_]*)+$`)
+)
+
+// ReservedLabelNames are the labels the collector sets on every resource series.
+var ReservedLabelNames = []string{"resource_uid", "subscription_id", "resource_name", "resource_group", "region", "resource_type", "profile"}
 
 var SupportedTimeGrains = map[string]time.Duration{
 	"PT1M":  time.Minute,
@@ -32,11 +41,33 @@ var SupportedTimeGrains = map[string]time.Duration{
 }
 
 type Profile struct {
-	DisplayName     string         `yaml:"display_name" json:"display_name,omitempty"`
-	ResourceType    string         `yaml:"resource_type" json:"resource_type,omitempty"`
-	MetricNamespace string         `yaml:"metric_namespace,omitempty" json:"metric_namespace,omitempty"`
-	Metrics         []Metric       `yaml:"metrics" json:"metrics,omitempty"`
-	Template        charttpl.Group `yaml:"template" json:"template"`
+	DisplayName     string          `yaml:"display_name" json:"display_name,omitempty"`
+	ResourceType    string          `yaml:"resource_type" json:"resource_type,omitempty"`
+	MetricNamespace string          `yaml:"metric_namespace,omitempty" json:"metric_namespace,omitempty"`
+	Metrics         []Metric        `yaml:"metrics" json:"metrics,omitempty"`
+	ResourceLabels  []ResourceLabel `yaml:"resource_labels,omitempty" json:"resource_labels,omitempty"`
+	ResourceStates  []ResourceState `yaml:"resource_states,omitempty" json:"resource_states,omitempty"`
+	Template        charttpl.Group  `yaml:"template" json:"template"`
+}
+
+// ResourceLabel adds a series label read from an Azure Resource Graph property of each resource.
+type ResourceLabel struct {
+	Name     string `yaml:"name" json:"name,omitempty"`
+	Property string `yaml:"property" json:"property,omitempty"`
+	Value    string `yaml:"value,omitempty" json:"value,omitempty"`
+}
+
+// ResourceState exports one 0/1 series per state, from an Azure Resource Graph property
+// of each resource. It reports state even when Azure Monitor has no metric data for it.
+type ResourceState struct {
+	ID       string        `yaml:"id" json:"id,omitempty"`
+	Property string        `yaml:"property" json:"property,omitempty"`
+	States   []StateOption `yaml:"states" json:"states,omitempty"`
+}
+
+type StateOption struct {
+	Name  string `yaml:"name" json:"name,omitempty"`
+	Value string `yaml:"value" json:"value,omitempty"`
 }
 
 type Metric struct {
@@ -52,7 +83,7 @@ type MetricSeries struct {
 }
 
 func (p *Profile) Normalize(baseName string) error {
-	visibleMetrics := visibleMetricsForProfile(baseName, p.Metrics)
+	visibleMetrics := visibleMetricsForProfile(baseName, *p)
 	normalizeGroupSelectors(baseName, visibleMetrics, &p.Template)
 	return nil
 }
@@ -106,7 +137,10 @@ func (p Profile) Validate(prefix, baseName string) error {
 		}
 	}
 
-	if len(errs) == 0 {
+	errs = append(errs, validateResourceLabels(prefix, p.ResourceLabels))
+	errs = append(errs, validateResourceStates(prefix, p.ResourceStates, seenMetricIDs))
+
+	if errors.Join(errs...) == nil {
 		if err := validateTemplate(prefix, baseName, p); err != nil {
 			errs = append(errs, err)
 		}
@@ -167,6 +201,112 @@ func (s MetricSeries) validate(metricPrefix string, idx int) error {
 	return errors.Join(errs...)
 }
 
+func validateResourceLabels(prefix string, labels []ResourceLabel) error {
+	var errs []error
+	seen := map[string]struct{}{}
+	for i, label := range labels {
+		labelPrefix := fmt.Sprintf("%s.resource_labels[%d]", prefix, i)
+		name := strings.TrimSpace(label.Name)
+		if !IsValidIdentityID(name) {
+			errs = append(errs, fmt.Errorf("%s: 'name' must match %q", labelPrefix, reIdentityID.String()))
+		}
+		for _, reserved := range ReservedLabelNames {
+			if name == reserved {
+				errs = append(errs, fmt.Errorf("%s: 'name' %q is reserved", labelPrefix, name))
+			}
+		}
+		if _, ok := seen[name]; ok {
+			errs = append(errs, fmt.Errorf("%s: duplicate label name %q", labelPrefix, name))
+		}
+		seen[name] = struct{}{}
+		if !IsValidResourceProperty(label.Property) {
+			errs = append(errs, fmt.Errorf("%s: 'property' must match %q", labelPrefix, reResourceProperty.String()))
+		}
+		if NormalizeResourceLabelValue(label.Value) == "" {
+			errs = append(errs, fmt.Errorf("%s: 'value' must be one of %q or %q", labelPrefix, ResourceLabelValueRaw, ResourceLabelValueARMName))
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func validateResourceStates(prefix string, states []ResourceState, metricIDs map[string]struct{}) error {
+	var errs []error
+	seen := map[string]struct{}{}
+	for i, state := range states {
+		statePrefix := fmt.Sprintf("%s.resource_states[%d]", prefix, i)
+		id := strings.TrimSpace(state.ID)
+		if !IsValidIdentityID(id) {
+			errs = append(errs, fmt.Errorf("%s: 'id' must match %q", statePrefix, reIdentityID.String()))
+		}
+		if _, ok := seen[id]; ok {
+			errs = append(errs, fmt.Errorf("%s: duplicate state id %q", statePrefix, id))
+		}
+		if _, ok := metricIDs[strings.ToLower(id)]; ok {
+			errs = append(errs, fmt.Errorf("%s: id %q collides with a metric id", statePrefix, id))
+		}
+		seen[id] = struct{}{}
+		if !IsValidResourceProperty(state.Property) {
+			errs = append(errs, fmt.Errorf("%s: 'property' must match %q", statePrefix, reResourceProperty.String()))
+		}
+		if len(state.States) == 0 {
+			errs = append(errs, fmt.Errorf("%s: 'states' must contain at least one state", statePrefix))
+		}
+		seenOptions := map[string]struct{}{}
+		for j, option := range state.States {
+			optionPrefix := fmt.Sprintf("%s.states[%d]", statePrefix, j)
+			name := strings.TrimSpace(option.Name)
+			if !IsValidIdentityID(name) {
+				errs = append(errs, fmt.Errorf("%s: 'name' must match %q", optionPrefix, reIdentityID.String()))
+			}
+			if _, ok := seenOptions[name]; ok {
+				errs = append(errs, fmt.Errorf("%s: duplicate state name %q", optionPrefix, name))
+			}
+			seenOptions[name] = struct{}{}
+			if strings.TrimSpace(option.Value) == "" {
+				errs = append(errs, fmt.Errorf("%s: 'value' is required", optionPrefix))
+			}
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// ExportedStateSeriesName is the series of one state option, valued 1 when the resource is in it.
+func ExportedStateSeriesName(profileName, stateID, stateName string) string {
+	return strings.TrimSpace(profileName) + "." + strings.TrimSpace(stateID) + "_" + strings.TrimSpace(stateName)
+}
+
+// ResourcePropertyColumn is the discovery query column that carries a resource property.
+func ResourcePropertyColumn(property string) string {
+	return "nd_" + strings.ReplaceAll(strings.TrimSpace(property), ".", "_")
+}
+
+func IsValidResourceProperty(v string) bool {
+	return reResourceProperty.MatchString(strings.TrimSpace(v))
+}
+
+func NormalizeResourceLabelValue(v string) string {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "", ResourceLabelValueRaw:
+		return ResourceLabelValueRaw
+	case ResourceLabelValueARMName:
+		return ResourceLabelValueARMName
+	default:
+		return ""
+	}
+}
+
+// ResourceProperties lists the resource properties a profile reads during discovery.
+func (p Profile) ResourceProperties() []string {
+	var properties []string
+	for _, label := range p.ResourceLabels {
+		properties = append(properties, strings.TrimSpace(label.Property))
+	}
+	for _, state := range p.ResourceStates {
+		properties = append(properties, strings.TrimSpace(state.Property))
+	}
+	return properties
+}
+
 func ExportedSeriesName(profileName, metricID, aggregation string) string {
 	return strings.TrimSpace(profileName) + "." + strings.TrimSpace(metricID) + "_" + NormalizeAggregation(aggregation)
 }
@@ -212,7 +352,7 @@ func IsValidResourceType(v string) bool {
 }
 
 func validateTemplate(prefix, baseName string, profile Profile) error {
-	visibleMetrics := visibleMetricsForProfile(baseName, profile.Metrics)
+	visibleMetrics := visibleMetricsForProfile(baseName, profile)
 	visibleList := make([]string, 0, len(visibleMetrics))
 	for metric := range visibleMetrics {
 		visibleList = append(visibleList, metric)
@@ -233,11 +373,16 @@ func validateTemplate(prefix, baseName string, profile Profile) error {
 	return nil
 }
 
-func visibleMetricsForProfile(baseName string, metrics []Metric) map[string]struct{} {
+func visibleMetricsForProfile(baseName string, profile Profile) map[string]struct{} {
 	visible := make(map[string]struct{})
-	for _, metric := range metrics {
+	for _, metric := range profile.Metrics {
 		for _, series := range metric.Series {
 			visible[ExportedSeriesName(baseName, metric.ID, series.Aggregation)] = struct{}{}
+		}
+	}
+	for _, state := range profile.ResourceStates {
+		for _, option := range state.States {
+			visible[ExportedStateSeriesName(baseName, state.ID, option.Name)] = struct{}{}
 		}
 	}
 	return visible

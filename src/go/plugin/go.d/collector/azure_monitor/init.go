@@ -35,27 +35,33 @@ func (c *Collector) initInstruments(runtime *collectorRuntime) error {
 		return errors.New("nil collector runtime")
 	}
 
-	var labelKeys = []string{"resource_uid", "subscription_id", "resource_name", "resource_group", "region", "resource_type", "profile"}
-
-	vec := c.store.Write().SnapshotMeter("").Vec(labelKeys...)
 	if runtime.Instruments == nil {
 		runtime.Instruments = make(map[string]*instrumentRuntime)
 	}
 
 	for _, p := range runtime.Profiles {
+		vec := c.store.Write().SnapshotMeter("").Vec(p.LabelKeys...)
+		register := func(name, kind string) {
+			if _, ok := runtime.Instruments[name]; ok {
+				return
+			}
+			inst := &instrumentRuntime{Kind: kind}
+			if kind == azureprofiles.SeriesKindCounter {
+				inst.Counter = vec.Counter(name)
+			} else {
+				inst.Gauge = vec.Gauge(name)
+			}
+			runtime.Instruments[name] = inst
+		}
+
 		for _, m := range p.Metrics {
 			for _, series := range m.Series {
-				name := series.Instrument
-				if _, ok := runtime.Instruments[name]; ok {
-					continue
-				}
-				inst := &instrumentRuntime{Kind: series.Kind}
-				if series.Kind == azureprofiles.SeriesKindCounter {
-					inst.Counter = vec.Counter(name)
-				} else {
-					inst.Gauge = vec.Gauge(name)
-				}
-				runtime.Instruments[name] = inst
+				register(series.Instrument, series.Kind)
+			}
+		}
+		for _, state := range p.ResourceStates {
+			for _, option := range state.Options {
+				register(option.Instrument, azureprofiles.SeriesKindGauge)
 			}
 		}
 	}
@@ -127,7 +133,7 @@ func (c *Collector) ensureBootstrapped(ctx context.Context) error {
 	now := c.now()
 
 	c.runtime = runtime
-	c.observations = newObservationState(runtime.Instruments)
+	c.observations = newObservationState(runtime)
 	c.discovery = buildDiscoveryState(fetched.Resources, runtime, now, c.Discovery.RefreshEvery, 1, fetched)
 	c.warnDiscoveryScopeFallbacks(c.discovery, runtime)
 
@@ -187,6 +193,7 @@ func fetchInitDiscovery(ctx context.Context, cfg Config, catalog azureprofiles.C
 			resourceGraph,
 			cfg.Discovery.ModeQuery.KQL,
 			supportedResourceTypes,
+			catalog.ResourceProperties(),
 		)
 		if err != nil {
 			return discoveryFetchResult{}, fmt.Errorf("discover candidate resources: %w", err)
@@ -206,6 +213,7 @@ func fetchInitDiscovery(ctx context.Context, cfg Config, catalog azureprofiles.C
 		resourceGraph,
 		discoveryTypes,
 		cfg.Discovery.ModeFilters,
+		catalog.ResourceProperties(discoveryTypes...),
 	)
 	if err != nil {
 		return discoveryFetchResult{}, fmt.Errorf("discover candidate resources: %w", err)

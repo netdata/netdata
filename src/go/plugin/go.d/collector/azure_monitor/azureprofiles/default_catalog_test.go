@@ -74,6 +74,20 @@ func TestLoadFromDefaultDirs_StockProfilesUseSelectorShorthand(t *testing.T) {
 	}
 }
 
+func TestLoadFromDefaultDirs_StockProfilesPromoteDocumentedResourceLabels(t *testing.T) {
+	catalog, err := LoadFromDefaultDirs()
+	require.NoError(t, err)
+
+	documented := []string{"resource_name", "resource_group", "region", "resource_type", "profile", "subscription_id"}
+	for _, entry := range catalog.Sorted() {
+		defaults := entry.Profile.Template.ChartDefaults
+		require.NotNilf(t, defaults, "stock profile %q has no chart_defaults", entry.Name)
+		for _, label := range documented {
+			assert.Containsf(t, defaults.LabelPromoted, label, "stock profile %q does not promote %q", entry.Name, label)
+		}
+	}
+}
+
 // Catalog caching (load-once, retry-after-failure, disabled-under-test) is now
 // provided and tested by pkg/profilecatalog (Cached); it is not re-tested per
 // collector.

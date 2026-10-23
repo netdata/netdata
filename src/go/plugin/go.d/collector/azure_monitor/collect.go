@@ -6,7 +6,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/azure_monitor/azureprofiles"
 )
 
 func (c *Collector) collect(ctx context.Context) error {
@@ -26,6 +29,7 @@ func (c *Collector) collect(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	samples = append(samples, resourceStateSamples(c.runtime, c.discovery.ByProfile)...)
 
 	observedThisCycle := c.observations.observeSamples(samples)
 	c.observations.reobserveCachedObservations(dueInstruments, observedThisCycle)
@@ -78,4 +82,42 @@ func (c *Collector) collectQuerySamples(ctx context.Context, batches []queryBatc
 	}
 
 	return allSamples, nil
+}
+
+// resourceStateSamples reports each resource state from discovery, so resources without
+// Azure Monitor data (for example deallocated VMs) are still counted in their state.
+func resourceStateSamples(runtime *collectorRuntime, byProfile map[string][]resourceInfo) []metricSample {
+	if runtime == nil {
+		return nil
+	}
+
+	var samples []metricSample
+	for _, profile := range runtime.Profiles {
+		if len(profile.ResourceStates) == 0 {
+			continue
+		}
+		for _, resource := range byProfile[profile.Name] {
+			labels := profileResourceLabels(resource, profile)
+			for _, state := range profile.ResourceStates {
+				current := resource.Properties[state.Property]
+				if current == "" {
+					continue
+				}
+				for _, option := range state.Options {
+					value := 0.0
+					if strings.EqualFold(current, option.Value) {
+						value = 1
+					}
+					samples = append(samples, metricSample{
+						Instrument: option.Instrument,
+						Kind:       azureprofiles.SeriesKindGauge,
+						Labels:     labels,
+						Scope:      resource.HostScope,
+						Value:      value,
+					})
+				}
+			}
+		}
+	}
+	return samples
 }
