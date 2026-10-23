@@ -895,6 +895,12 @@ HTTP_VALIDATION http_request_validate(struct web_client *w) {
                 w->header_parse_last_size = 0;
                 w->header_parse_expected_size = 0;
                 web_client_disable_wait_receive(w);
+
+                // reject early what the plugins.d framing would refuse later
+                if(w->payload && buffer_strlen(w->payload) &&
+                    functions_payload_validate(buffer_tostring(w->payload), buffer_strlen(w->payload)))
+                    return HTTP_VALIDATION_INVALID_PAYLOAD;
+
                 return HTTP_VALIDATION_OK;
             }
 
@@ -1650,6 +1656,16 @@ void web_client_process_request_from_web_server(struct web_client *w) {
             buffer_strcat(w->response.data, "Request URI is too long.\r\n");
             w->response.code = HTTP_RESP_URI_TOO_LONG;
             break;
+
+        case HTTP_VALIDATION_INVALID_PAYLOAD: {
+            const char *reason = functions_payload_validate(buffer_tostring(w->payload), buffer_strlen(w->payload));
+            netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: Request payload rejected: %s.", w->id, reason ? reason : "");
+
+            buffer_flush(w->response.data);
+            buffer_sprintf(w->response.data, "Request payload rejected: %s.\r\n", reason ? reason : "invalid payload");
+            w->response.code = HTTP_RESP_BAD_REQUEST;
+            break;
+        }
 
         case HTTP_VALIDATION_MALFORMED_URL:
             netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: Malformed URL '%s'.", w->id, w->response.data->buffer);

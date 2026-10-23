@@ -1481,6 +1481,88 @@ int pluginsd_functions_unittest(void) {
             fprintf(stderr, "  OK deadline/sync: the registered timeout is the fallback; a sync call leaves no transaction\n");
     }
 
+    // 8. payloads that plugins could read as protocol commands are refused before sending
+    {
+        int before = errors;
+
+        static const struct {
+            const char *name;
+            const char *payload;
+            size_t len;             // 0 = strlen(payload)
+            bool rejected;
+        } cases[] = {
+            { "plain json", "{\"url\":\"http://127.0.0.1/\",\"update_every\":1}", 0, false },
+            { "pretty json", "{\n  \"a\": 1,\n  \"b\": [\"x\", \"y\"]\n}\n", 0, false },
+            { "keyword not at line start", "{\"x\": \"FUNCTION QUIT\"}", 0, false },
+            { "FUNCTION_ prefix inside a key", "{\n  \"FUNCTIONS_ENABLED\": true\n}", 0, true },
+            { "replacement call (go.d)", "FUNCTION_PAYLOAD x 30 \"config a test b\" \"0x0\" \"s\" application/json\n{}", 0, true },
+            { "early end marker", "{}\nFUNCTION_PAYLOAD_END\nFUNCTION x 30 \"config a test b\" \"0x0\" \"s\"", 0, true },
+            { "end marker mid-line (evloop)", "{\"a\":\"xFUNCTION_PAYLOAD_END\n\"}", 0, true },
+            { "end marker with CRLF", "{}\r\nFUNCTION_PAYLOAD_END\r\n", 0, true },
+            { "indented and quoted command", "{\n \t\"FUNCTION_CANCEL\" x\n}", 0, true },
+            { "quit line", "{}\nQUIT\n", 0, true },
+            { "NUL byte", "{}\0\nFUNCTION x", 9, true },
+        };
+
+        for(size_t i = 0; i < _countof(cases); i++) {
+            size_t len = cases[i].len ? cases[i].len : strlen(cases[i].payload);
+            const char *reason = functions_payload_validate(cases[i].payload, len);
+            if((reason != NULL) != cases[i].rejected) {
+                fprintf(stderr, "  FAILED payload: '%s' was %s\n",
+                        cases[i].name, reason ? "rejected" : "accepted");
+                errors++;
+            }
+        }
+
+        // the transport refuses an injecting payload with 400 and sends nothing
+        struct c6ut_sends sends = { 0 };
+        struct c6ut_result res = { 0 };
+        PARSER *parser = c6ut_parser_create(&sends);
+        usec_t stop_ut = now_monotonic_usec() + 60 * USEC_PER_SEC;
+        CLEAN_BUFFER *wb = buffer_create(0, NULL);
+        CLEAN_BUFFER *payload = buffer_create(0, NULL);
+        buffer_strcat(payload, "{}\nFUNCTION_PAYLOAD_END\nFUNCTION x 30 \"config a test b\" \"0x0\" \"s\"");
+
+        nd_uuid_t uuid;
+        uuid_generate_random(uuid);
+        struct nrpc_request req = {
+            .call_id = &uuid,
+            .function = "c8-payload-fn",
+            .payload = payload,
+            .source = "unittest",
+            .user_access = HTTP_ACCESS_ALL,
+            .stop_monotonic_ut = &stop_ut,
+            .result = { .wb = wb, .cb = c6ut_result_cb, .data = &res },
+        };
+
+        int code = pluginsd_nrpc_handler(&req, parser->inflight.transport);
+        if(code != HTTP_RESP_BAD_REQUEST || res.calls != 1 || res.code != HTTP_RESP_BAD_REQUEST) {
+            fprintf(stderr, "  FAILED payload: injecting payload returned %d, delivered %zu times with %d, expected 400 once\n",
+                    code, res.calls, res.code);
+            errors++;
+        }
+        if(sends.total != 0) {
+            fprintf(stderr, "  FAILED payload: injecting payload reached the plugin (%zu sends)\n", sends.total);
+            errors++;
+        }
+
+        // a clean payload is still sent
+        buffer_flush(payload);
+        buffer_strcat(payload, "{\"url\":\"http://127.0.0.1/\"}");
+        uuid_generate_random(uuid);
+        code = pluginsd_nrpc_handler(&req, parser->inflight.transport);
+        if(code != HTTP_RESP_OK || sends.total != 1) {
+            fprintf(stderr, "  FAILED payload: clean payload returned %d with %zu sends, expected 200 and 1 send\n",
+                    code, sends.total);
+            errors++;
+        }
+
+        parser_destroy(parser);
+
+        if(errors == before)
+            fprintf(stderr, "  OK payload: injecting payloads are refused with 400 and never reach the plugin\n");
+    }
+
     fprintf(stderr, "%s() %s (%d error%s)\n\n",
             __FUNCTION__, errors ? "FAILED" : "passed", errors, errors == 1 ? "" : "s");
 

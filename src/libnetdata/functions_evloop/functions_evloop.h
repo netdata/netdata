@@ -66,6 +66,11 @@
 
 #define PLUGINSD_CALL_QUIT                      "QUIT"                      // ask the plugin to quit
 
+// Function payloads travel unframed between FUNCTION_PAYLOAD and FUNCTION_PAYLOAD_END,
+// so their bytes must never be readable as protocol commands by any plugin or child.
+// Returns NULL when the payload is safe to send, or a static rejection reason.
+const char *functions_payload_validate(const char *payload, size_t len);
+
 // dyncfg
 // enabled with STREAM_CAP_DYNCFG
 #define PLUGINSD_KEYWORD_CONFIG                 "CONFIG"

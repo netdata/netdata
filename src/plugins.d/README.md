@@ -531,7 +531,7 @@ When the function to be called is to receive a payload of parameters, the call l
 ```
 FUNCTION_PAYLOAD transaction_id timeout "name and parameters of the function as one quoted parameter" "user permissions value" "source of request" "content/type"
 body of the payload, formatted according to content/type
-FUNCTION PAYLOAD END
+FUNCTION_PAYLOAD_END
 ```
 
 In this case, Netdata will send:
@@ -539,6 +539,8 @@ In this case, Netdata will send:
 - A line starting with `FUNCTION_PAYLOAD` together with the required metadata for the function, like the transaction id, the function name and its parameters, the timeout and the content type. This line ends with a newline.
 - Then, the payload itself (which may or may not have newlines in it). The payload should be parsed according to the content type parameter.
 - Finally, a line starting with `FUNCTION_PAYLOAD_END`, so it is expected like `\nFUNCTION_PAYLOAD_END\n`.
+
+The payload is not escaped or length-prefixed, so Netdata refuses (with HTTP 400) any payload that contains a NUL byte, the text `FUNCTION_PAYLOAD_END` anywhere, or a line whose first word, after leading spaces, tabs, carriage returns and quotes, starts with `FUNCTION` or `QUIT`. Plugins must treat the payload as opaque data: only a line that is exactly `FUNCTION_PAYLOAD_END` ends it, and no other line inside it is a command.
 
 Note 1: The plugins.d protocol allows parameters without single or double quotes if they don't contain spaces. However, the plugin should be able to parse parameters even if they are enclosed in single or double quotes. If the first character of a parameter is a single quote, its last character should also be a single quote too, and similarly for double quotes.
 

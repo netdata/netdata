@@ -514,3 +514,51 @@ void functions_evloop_dyncfg_status(struct functions_evloop_globals *wg, const c
 
     netdata_mutex_unlock(wg->stdout_mutex);
 }
+
+// ----------------------------------------------------------------------------
+// payload validation
+
+static inline bool functions_payload_has_prefix(const char *s, const char *end, const char *prefix, size_t prefix_len) {
+    return (size_t)(end - s) >= prefix_len && memcmp(s, prefix, prefix_len) == 0;
+}
+
+const char *functions_payload_validate(const char *payload, size_t len) {
+    if(!payload || !len)
+        return NULL;
+
+    // the payload is sent with strlen(), so a NUL truncates the call before its end
+    // marker and the plugin then reads the next calls as part of this payload
+    if(memchr(payload, '\0', len))
+        return "the payload contains NUL bytes";
+
+    const char *end = payload + len;
+
+    // the functions_evloop parser matches the end marker anywhere, not only on its own line
+    const size_t end_marker_len = strlen(PLUGINSD_CALL_FUNCTION_PAYLOAD_END);
+    for(const char *s = memchr(payload, 'F', len); s; s = memchr(s + 1, 'F', end - s - 1)) {
+        if(functions_payload_has_prefix(s, end, PLUGINSD_CALL_FUNCTION_PAYLOAD_END, end_marker_len))
+            return "the payload contains the plugins.d payload end marker";
+    }
+
+    // go.d reads command lines inside payloads: it skips leading spaces and unquotes the first word,
+    // so look past whitespace and quotes; FUNCTION covers FUNCTION_PAYLOAD, FUNCTION_CANCEL, etc.
+    const size_t function_len = strlen(PLUGINSD_CALL_FUNCTION);
+    const size_t quit_len = strlen(PLUGINSD_CALL_QUIT);
+    for(const char *line = payload; line < end; ) {
+        const char *s = line;
+        while(s < end && (*s == ' ' || *s == '\t' || *s == '\r' || *s == '"' || *s == '\''))
+            s++;
+
+        if(functions_payload_has_prefix(s, end, PLUGINSD_CALL_FUNCTION, function_len) ||
+           functions_payload_has_prefix(s, end, PLUGINSD_CALL_QUIT, quit_len))
+            return "the payload contains a line starting with a plugins.d command";
+
+        const char *nl = memchr(s, '\n', end - s);
+        if(!nl)
+            break;
+
+        line = nl + 1;
+    }
+
+    return NULL;
+}
