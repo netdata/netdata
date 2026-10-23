@@ -59,7 +59,7 @@ const char *weights_method_to_string(WEIGHTS_METHOD method) {
 
 typedef enum {
     RESULT_IS_BASE_HIGH_RATIO     = (1 << 0),
-    RESULT_IS_PERCENTAGE_OF_TIME  = (1 << 1),
+    RESULT_IS_PERCENTAGE_OF_SAMPLES  = (1 << 1),
 } RESULT_FLAGS;
 
 struct register_result {
@@ -1846,9 +1846,10 @@ static void rrdset_metric_correlations_volume(
         return;
     }
 
-    // this represents the percentage of time
-    // the highlighted window was above/below the baseline window
-    // (above or below depending on their averages)
+    // this is the percentage of SAMPLES (not of time) that the
+    // highlighted window was above/below the baseline window - the
+    // grouping used here is percentage-of-samples; percentage-of-time
+    // exists separately and is NOT what weights ranks on
     highlight_countif.value = highlight_countif.value / 100.0; // countif returns 0 - 100.0
 
     RESULT_FLAGS flags;
@@ -1858,7 +1859,7 @@ static void rrdset_metric_correlations_volume(
         pcent = (highlight_average.value - baseline_average.value) / baseline_average.value * highlight_countif.value;
     }
     else {
-        flags = RESULT_IS_PERCENTAGE_OF_TIME;
+        flags = RESULT_IS_PERCENTAGE_OF_SAMPLES;
         pcent = highlight_countif.value;
     }
 
@@ -2071,7 +2072,7 @@ static size_t spread_results_evenly(DICTIONARY *results, WEIGHTS_STATS *stats) {
     NETDATA_DOUBLE *slots = mallocz(dimensions * sizeof(*slots));
     dimensions = 0;
     dfe_start_read(results, t) {
-        if(t->flags & RESULT_IS_PERCENTAGE_OF_TIME)
+        if(t->flags & RESULT_IS_PERCENTAGE_OF_SAMPLES)
             t->value = t->value * stats->max_base_high_ratio;
 
         slots[dimensions++] = t->value;

@@ -73,30 +73,131 @@ void version_hashes_api_v2(BUFFER *wb, struct query_versions *versions) {
     buffer_json_object_close(wb);
 }
 
-static void query_target_combined_units_v2(BUFFER *wb, QUERY_TARGET *qt, size_t contexts, bool ignore_percentage) {
-    if(!ignore_percentage && query_target_has_percentage_units(qt)) {
-        buffer_json_member_add_string(wb, "units", "%");
+static void combined_units_to_json(BUFFER *wb, DICTIONARY *dict, bool has_empty_units) {
+    bool single = dictionary_entries(dict) + (has_empty_units ? 1 : 0) == 1;
+    if(!single)
+        buffer_json_member_add_array(wb, "units");
+
+    if(has_empty_units) {
+        if(single)
+            buffer_json_member_add_string(wb, "units", "");
+        else
+            buffer_json_add_array_item_string(wb, "");
+    }
+
+    const char *s;
+    dfe_start_read(dict, s) {
+        if(single)
+            buffer_json_member_add_string(wb, "units", s_dfe.name);
+        else
+            buffer_json_add_array_item_string(wb, s_dfe.name);
+    }
+    dfe_done(s);
+
+    if(!single)
+        buffer_json_array_close(wb);
+}
+
+// `source_units` asks for the units the DATABASE stores: neither the
+// grouping's own units nor the rate integration a sum performs apply there,
+// because that section describes what is stored, not what was computed.
+static void query_target_combined_units_v2(BUFFER *wb, QUERY_TARGET *qt, size_t contexts, bool source_units) {
+    const char *units_override = source_units ? NULL : query_target_units_override(qt);
+    const bool rates = !source_units && query_target_all_metrics_stored_as_rates(qt);
+    if(units_override) {
+        buffer_json_member_add_string(wb, "units", units_override);
     }
     else if(contexts == 1) {
-        buffer_json_member_add_string(wb, "units", rrdcontext_acquired_units(qt->contexts.array[0].rca));
+        char units_buf[64];
+        buffer_json_member_add_string(wb, "units",
+            query_target_rate_adjusted_units_for(
+                qt, rates, rrdcontext_acquired_units(qt->contexts.array[0].rca), units_buf, sizeof(units_buf)));
     }
     else if(contexts > 1) {
         DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
-        for(size_t c = 0; c < qt->contexts.used ;c++)
-            dictionary_set(dict, rrdcontext_acquired_units(qt->contexts.array[c].rca), NULL, 0);
-
-        if(dictionary_entries(dict) == 1)
-            buffer_json_member_add_string(wb, "units", rrdcontext_acquired_units(qt->contexts.array[0].rca));
-        else {
-            buffer_json_member_add_array(wb, "units");
-            const char *s;
-            dfe_start_read(dict, s)
-                buffer_json_add_array_item_string(wb, s_dfe.name);
-            dfe_done(s);
-            buffer_json_array_close(wb);
+        for(size_t c = 0; c < qt->contexts.used ;c++) {
+            char ub[64];
+            dictionary_set(dict, query_target_rate_adjusted_units_for(
+                qt, rates, rrdcontext_acquired_units(qt->contexts.array[c].rca), ub, sizeof(ub)), NULL, 0);
         }
+
+        if(dictionary_entries(dict) == 1) {
+            char ub[64];
+            buffer_json_member_add_string(wb, "units", query_target_rate_adjusted_units_for(
+                qt, rates, rrdcontext_acquired_units(qt->contexts.array[0].rca), ub, sizeof(ub)));
+        }
+        else
+            combined_units_to_json(wb, dict, false);
         dictionary_destroy(dict);
     }
+}
+
+static const char *rrdr_dimension_units_v2(
+    RRDR *r, size_t dimension, bool source_units, char *buffer, size_t size) {
+    if(!source_units) {
+        const char *override = query_target_units_override(r->internal.qt);
+        if(override)
+            return override;
+        if(r->result_units && r->result_units[dimension])
+            return string2str(r->result_units[dimension]);
+    }
+
+    // SUM integrates each rate independently; mixed groups retain their existing fallback.
+    bool rates = !source_units && !(r->od[dimension] & RRDR_DIMENSION_NOT_RATE);
+    return query_target_rate_adjusted_units_for(
+        r->internal.qt, rates, string2str(r->du[dimension]), buffer, size);
+}
+
+static void rrdr_combined_units_v2(BUFFER *wb, RRDR *r, RRDR_OPTIONS options) {
+    const char *override = query_target_units_override(r->internal.qt);
+    if(override) {
+        buffer_json_member_add_string(wb, "units", override);
+        return;
+    }
+
+    DICTIONARY *dict = NULL;
+    bool has_empty_units = false;
+    const char *first_units = NULL;
+    char first_buffer[64];
+    if(r->du) {
+        for(size_t c = 0; c < r->d; c++) {
+            if(!rrdr_dimension_should_be_exposed(r->od[c], options))
+                continue;
+
+            if(!first_units) {
+                first_units = rrdr_dimension_units_v2(r, c, false, first_buffer, sizeof(first_buffer));
+                continue;
+            }
+
+            char buffer[64];
+            const char *units = rrdr_dimension_units_v2(r, c, false, buffer, sizeof(buffer));
+            if(!dict && strcmp(first_units, units) != 0) {
+                dict = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
+                if(*first_units)
+                    dictionary_set(dict, first_units, NULL, 0);
+                else
+                    has_empty_units = true;
+            }
+            if(dict) {
+                // Empty units are valid metadata, but dictionary keys must be nonempty.
+                if(*units)
+                    dictionary_set(dict, units, NULL, 0);
+                else
+                    has_empty_units = true;
+            }
+        }
+    }
+
+    if(dict)
+        combined_units_to_json(wb, dict, has_empty_units);
+    else if(first_units)
+        buffer_json_member_add_string(wb, "units", first_units);
+    else
+        // Empty views retain their context metadata even when no result dimension is exposed.
+        query_target_combined_units_v2(wb, r->internal.qt, r->internal.contexts, false);
+
+    if(dict)
+        dictionary_destroy(dict);
 }
 
 static inline void rrdr_dimension_query_points_statistics(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options, bool dview) {
@@ -252,21 +353,17 @@ static void rrdr_grouped_by_array_v2(BUFFER *wb, const char *key, RRDR *r, RRDR_
     buffer_json_array_close(wb); // group_by_order
 }
 
-static void rrdr_dimension_units_array_v2(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options, bool ignore_percentage) {
+static void rrdr_dimension_units_array_v2(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options, bool source_units) {
     if(!r->du)
         return;
-
-    bool percentage = !ignore_percentage && query_target_has_percentage_units(r->internal.qt);
 
     buffer_json_member_add_array(wb, key);
     for(size_t c = 0; c < r->d ; c++) {
         if(!rrdr_dimension_should_be_exposed(r->od[c], options))
             continue;
 
-        if(percentage)
-            buffer_json_add_array_item_string(wb, "%");
-        else
-            buffer_json_add_array_item_string(wb, string2str(r->du[c]));
+        char buffer[64];
+        buffer_json_add_array_item_string(wb, rrdr_dimension_units_v2(r, c, source_units, buffer, sizeof(buffer)));
     }
     buffer_json_array_close(wb);
 }
@@ -535,7 +632,7 @@ void rrdr_json_wrapper_end2(RRDR *r, BUFFER *wb) {
         if(options & RRDR_OPTION_RETURN_RAW)
             buffer_json_member_add_uint64(wb, "points", rrdr_rows(r));
 
-        query_target_combined_units_v2(wb, qt, r->internal.contexts, false);
+        rrdr_combined_units_v2(wb, r, options);
         query_target_combined_chart_type(wb, qt, r->internal.contexts);
         buffer_json_member_add_object(wb, "dimensions");
         {

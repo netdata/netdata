@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "query-internal.h"
+#include "tg-expression.h"
 
 // ----------------------------------------------------------------------------
 // helpers to find our way in RRDR
@@ -84,27 +85,211 @@ static NETDATA_DOUBLE query_point_total_projection(
             &(point), (now) - (view_update_every), (now));                           \
 } while(0)
 
-#define query_add_point_to_group(r, point, ops, add_flush, now_end_time, source_end_time) do { \
-    if(likely(netdata_double_isnumber((point).value))) {                \
-        if(likely(fpclassify((point).value) != FP_ZERO))                \
-            (ops)->group_points_non_zero++;                             \
-                                                                        \
-        time_t _row_start = (now_end_time) - (ops)->view_update_every;  \
-        bool _sample_in_row = (source_end_time) > _row_start &&         \
-                              (source_end_time) <= (now_end_time);       \
-                                                                        \
-        if(unlikely((point).sp.flags & SN_FLAG_RESET) && _sample_in_row) \
-            (ops)->group_value_flags |= RRDR_VALUE_RESET;               \
-                                                                        \
-        time_grouping_add(r, (point).value, add_flush);                  \
-                                                                        \
-        if((point).tier != 0 || _sample_in_row)                          \
-            storage_point_merge_to((ops)->group_point, (point).sp);     \
-        if(!(point).added)                                              \
-            storage_point_merge_to((ops)->query_point, (point).sp);     \
-    }                                                                   \
-                                                                        \
-    (ops)->group_points_added++;                                        \
+ALWAYS_INLINE
+static time_t query_row_start_time(const QUERY_ENGINE_OPS *ops, time_t row_end_time) {
+    time_t row_start = row_end_time - ops->view_update_every;
+
+    // Multi-row results keep the released lower-inclusive grid geometry;
+    // only a one-point result clips its sole interval to the requested window.
+    return (ops->r->internal.qt->window.points == 1) ?
+               MAX(row_start, ops->r->internal.qt->window.after) : row_start;
+}
+
+ALWAYS_INLINE
+static time_t query_point_storage_cadence(const QUERY_POINT *point) {
+    return point->storage_cadence;
+}
+
+typedef struct query_pending_gap {
+    time_t duration;
+    time_t cadence;
+    time_t inferred_duration;
+    size_t samples;
+    bool first;
+} QUERY_PENDING_GAP;
+
+ALWAYS_INLINE
+static time_t query_gap_cadence(const QUERY_ENGINE_OPS *ops, time_t storage_cadence) {
+    return storage_cadence > 0 ? storage_cadence :
+        ((ops->tier_ptr && ops->tier_ptr->db_update_every_s > 0) ?
+             ops->tier_ptr->db_update_every_s :
+             ((ops->query_granularity > 0) ? ops->query_granularity : 1));
+}
+
+ALWAYS_INLINE
+static void query_flush_gap_to_group(
+    RRDR *r, RRDR_TIME_GROUPING add_flush, QUERY_PENDING_GAP *pending) {
+    if(pending->duration <= 0)
+        return;
+
+    size_t samples = pending->samples + (size_t)(pending->inferred_duration / pending->cadence);
+    TG_POINT gap = {
+        .value = NAN,
+        .sum = NAN,
+        .min = NAN,
+        .max = NAN,
+        .count = 0,
+        .duration = pending->duration,
+        .samples = samples ? samples : 1,
+        .is_gap = true,
+        .first = pending->first,
+    };
+    time_grouping_add_point(r, &gap, add_flush);
+    *pending = (QUERY_PENDING_GAP){ 0 };
+}
+
+ALWAYS_INLINE
+static void query_add_gap_to_group(
+    RRDR *r, QUERY_ENGINE_OPS *ops, RRDR_TIME_GROUPING add_flush,
+    QUERY_PENDING_GAP *pending, time_t duration, time_t storage_cadence,
+    bool first, bool inferred, bool count_as_group_point) {
+    if(likely(!r->time_grouping.wants_gaps || duration <= 0))
+        return;
+
+    time_t cadence = query_gap_cadence(ops, storage_cadence);
+    if(pending->duration > 0 && (pending->cadence != cadence || pending->first != first))
+        query_flush_gap_to_group(r, add_flush, pending);
+
+    pending->duration += duration;
+    pending->cadence = cadence;
+    // Inferred bridges count elapsed slots; delivered gaps retain their individual weights.
+    if(inferred)
+        pending->inferred_duration += duration;
+    else
+        pending->samples += (size_t)(duration / cadence) + (duration % cadence != 0);
+    pending->first = first;
+    if(count_as_group_point)
+        ops->group_points_added++;
+}
+
+ALWAYS_INLINE
+static void query_add_synthetic_gap_to_group(
+    RRDR *r, QUERY_ENGINE_OPS *ops, RRDR_TIME_GROUPING add_flush,
+    QUERY_PENDING_GAP *pending, time_t from, time_t to, time_t origin, time_t cadence) {
+    // A fine bucket may start inside a missing slot already delivered to the previous bucket.
+    time_t offset = (from - origin) % cadence;
+    if(offset) {
+        time_t duration = MIN(to - from, cadence - offset);
+        query_add_gap_to_group(r, ops, add_flush, pending, duration, cadence, false, false, false);
+        from += duration;
+    }
+
+    query_add_gap_to_group(r, ops, add_flush, pending, to - from, cadence, true, false, false);
+}
+
+// Feeds one delivered point into the current bucket.
+//
+// The time each point stands for is its overlap with the part of the
+// bucket not yet accounted for - a storage point wider than the bucket is
+// re-delivered with its ORIGINAL start (query_interpolate_point only trims
+// the end), so its own span would double-count. Timestamp-free gaps fill
+// whatever the collected points left uncovered. Missing intervals use the
+// bracketing stored cadence, not the metric's latest cadence.
+//
+// Which groupings see a gap: percentage-of-time ALWAYS does, because its
+// denominator is the selected duration and uncollected time belongs in
+// it. The others see one only when their condition names a gap token.
+#define query_add_point_to_group(r, point, ops, add_flush, pending_gap, now_end_time, gap_cadence, source_end_time, row_evidence) do { \
+    time_t _source_row_start = (now_end_time) - (ops)->view_update_every;                                            \
+    bool _sample_in_row = (source_end_time) > _source_row_start &&                                                   \
+                          (source_end_time) <= (now_end_time);                                                       \
+    if(likely(!time_grouping_is_expression(add_flush))) {                                                            \
+        /* the common path: unchanged, and none of the accounting below */                                           \
+        if(likely(netdata_double_isnumber((point).value))) {                                                         \
+            if(likely(fpclassify((point).value) != FP_ZERO))                                                         \
+                (ops)->group_points_non_zero++;                                                                      \
+                                                                                                                     \
+            if(unlikely((point).sp.flags & SN_FLAG_RESET) && _sample_in_row)                                         \
+                (ops)->group_value_flags |= RRDR_VALUE_RESET;                                                        \
+                                                                                                                     \
+            time_grouping_add(r, (point).value, add_flush);                                                          \
+                                                                                                                     \
+            if((point).tier != 0 || _sample_in_row)                                                                  \
+                storage_point_merge_to((ops)->group_point, (point).sp);                                              \
+            if(!(point).added)                                                                                       \
+                storage_point_merge_to((ops)->query_point, (point).sp);                                              \
+        }                                                                                                            \
+        (ops)->group_points_added++;                                                                                 \
+        break;                                                                                                       \
+    }                                                                                                                \
+                                                                                                                     \
+    time_t _row_start = query_row_start_time((ops), (now_end_time));                                                 \
+    time_t _slot_from = _row_start + (time_t)(ops)->group_covered_s;                                                 \
+    time_t _from, _to;                                                                                               \
+    bool _is_gap = !netdata_double_isnumber((point).value);                                                          \
+    time_t _gap_cadence = query_point_storage_cadence(&(point));                                                     \
+    if(_gap_cadence <= 0)                                                                                            \
+        _gap_cadence = (gap_cadence);                                                                                \
+                                                                                                                     \
+    if(unlikely((point).sp.end_time_s <= (point).sp.start_time_s)) {                                                 \
+        /* the synthetic bucket gap (QUERY_POINT_EMPTY) carries no                                                   \
+         * timestamps at all, so it fills what the stored points left                                                \
+         * uncovered; a STORED gap is a real point with a NaN value and                                              \
+         * keeps its own span, handled below */                                                                      \
+        _from = _slot_from;                                                                                          \
+        _to = (now_end_time);                                                                                        \
+    }                                                                                                                \
+    else {                                                                                                           \
+        _from = ((point).sp.start_time_s > _slot_from) ?                                                             \
+                (point).sp.start_time_s : _slot_from;                                                                \
+        _to = ((point).sp.end_time_s < (now_end_time)) ?                                                             \
+              (point).sp.end_time_s : (now_end_time);                                                                \
+    }                                                                                                                \
+    if(unlikely(_from > _slot_from && (r)->time_grouping.wants_gaps)) {                                              \
+        time_t _missing = _from - _slot_from;                                                                        \
+        query_add_gap_to_group(                                                                                      \
+            (r), (ops), (add_flush), (pending_gap), _missing, _gap_cadence, true, true, true);                      \
+        (ops)->group_covered_s += _missing;                                                                          \
+        _slot_from = _from;                                                                                          \
+    }                                                                                                                \
+                                                                                                                     \
+    time_t _duration = (_to > _from) ? (_to - _from) : 0;                                                            \
+    (ops)->group_covered_s += _duration;                                                                             \
+                                                                                                                     \
+    if(likely(!_is_gap)) {                                                                                           \
+        query_flush_gap_to_group((r), (add_flush), (pending_gap));                                                   \
+        if(likely(fpclassify((point).value) != FP_ZERO))                                                             \
+            (ops)->group_points_non_zero++;                                                                          \
+                                                                                                                     \
+        if((row_evidence) && unlikely((point).sp.flags & SN_FLAG_RESET) && _sample_in_row)                          \
+            (ops)->group_value_flags |= RRDR_VALUE_RESET;                                                            \
+                                                                                                                     \
+        /* under anomaly-bit the value is an anomaly RATE while sp.min and                                           \
+         * sp.max stay in the metric's own domain, so the window model                                               \
+         * would compare unrelated numbers - count 1 forces the stepwise                                             \
+         * evaluation on the delivered value */                                                                      \
+        size_t _pcount = (point).sp.count;                                                                           \
+        if(unlikely((r)->internal.qt->window.options & RRDR_OPTION_ANOMALY_BIT))                                     \
+            _pcount = 1;                                                                                             \
+                                                                                                                     \
+        TG_POINT _tgp = { .value = (point).value,                                                                    \
+                          .sum = (point).sp.sum,                                                                     \
+                          .min = (point).sp.min, .max = (point).sp.max,                                              \
+                          .count = _pcount,                                                                          \
+                          .duration = _duration, .samples = 1,                                                       \
+                          .is_gap = false, .first = !(point).added };                                                \
+        time_grouping_add_point(r, &_tgp, add_flush);                                                                \
+                                                                                                                     \
+        if((row_evidence) && ((point).tier != 0 || _sample_in_row))                                                 \
+            storage_point_merge_to((ops)->group_point, (point).sp);                                                  \
+        if(!(point).added)                                                                                           \
+            storage_point_merge_to((ops)->query_point, (point).sp);                                                  \
+    }                                                                                                                \
+    else if(unlikely((r)->time_grouping.wants_gaps && _duration > 0)) {                                              \
+        /* a gap contributes neither a value nor retention: only the                                                 \
+         * expression groupings see it, and only as "no data here" */                                                \
+        if((point).synthetic && (point).storage_cadence > 0 && (point).sp.start_time_s > 0)                          \
+            query_add_synthetic_gap_to_group(                                                                        \
+                (r), (ops), (add_flush), (pending_gap), _from, _to,                                                \
+                (point).sp.start_time_s, _gap_cadence);                                                             \
+        else                                                                                                         \
+            query_add_gap_to_group(                                                                                  \
+                (r), (ops), (add_flush), (pending_gap),                                                              \
+                _duration, _gap_cadence, !(point).added,                                                             \
+                (point).sp.end_time_s <= (point).sp.start_time_s, false);                                           \
+    }                                                                                                                \
+                                                                                                                     \
+    (ops)->group_points_added++;                                                                                     \
 } while(0)
 
 // serve the single LATEST point from the collector's cached value
@@ -188,6 +373,7 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
     QUERY_POINT last2_point = QUERY_POINT_EMPTY;
     QUERY_POINT last1_point = QUERY_POINT_EMPTY;
     QUERY_POINT new_point   = QUERY_POINT_EMPTY;
+    QUERY_PENDING_GAP pending_gap = { 0 };
 
     // ONE POINT READ-AHEAD
     // when we switch plans, we read-ahead a point from the next plan
@@ -201,8 +387,17 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
     size_t db_points_read_since_plan_switch = 0; (void)db_points_read_since_plan_switch;
     size_t query_is_finished_counter = 0;
 
-    // The main loop, based on the query granularity we need
-    for( ; points_added < points_wanted && query_is_finished_counter <= 10 ;
+    // The main loop, based on the query granularity we need.
+    //
+    // Once storage is exhausted the loop normally gives up after a few more
+    // buckets and the caller fills the rest with EMPTY - which is right when
+    // a gap has no value to contribute. A condition that NAMES gaps is the
+    // exception: every remaining bucket is uncollected time and has to be
+    // counted as such, or "the share of the last day a node was unreachable"
+    // stops counting a few buckets after the node went away. points_wanted
+    // still bounds the walk.
+    for( ; points_added < points_wanted &&
+          (query_is_finished_counter <= 10 || r->time_grouping.wants_gaps) ;
         now_start_time = now_end_time, now_end_time += ops->view_update_every) {
 
         if(unlikely(query_result_plan_should_switch_plan(ops, now_end_time))) {
@@ -244,7 +439,9 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                             last1_point = new_point;
                         }
                         new_point = QUERY_POINT_EMPTY;
-                        new_point.sp.start_time_s = last1_point.sp.end_time_s;
+                        new_point.storage_cadence = last1_point.storage_cadence;
+                        new_point.sp.start_time_s = last1_point.synthetic ?
+                            last1_point.sp.start_time_s : last1_point.sp.end_time_s;
                         new_point.sp.end_time_s   = now_end_time;
 //
 //                      if(debug_this) netdata_log_info("QUERY: is finished() returned true");
@@ -273,6 +470,8 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                 }
 
                 NETDATA_DOUBLE prepared_sum = sp.sum;
+                time_t storage_cadence = sp.end_time_s > sp.start_time_s ?
+                    sp.end_time_s - sp.start_time_s : 0;
 
                 // ONE POINT READ-AHEAD
                 if(unlikely(query_plan_should_switch_plan(ops, sp.end_time_s) &&
@@ -292,19 +491,26 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                     ops->db_points_read_per_tier[ops->tier]++;
                     ops->db_total_points_read++;
 
+                    // sp2 is the one just read; sp came from the previous
+                    // plan and was made positive when it was read. Applying
+                    // it to sp again left sp2 signed, so a query with
+                    // options=absolute could keep a negative value across a
+                    // tier-plan switch.
                     if(unlikely(options & RRDR_OPTION_ABSOLUTE))
                         storage_point_make_positive(sp2);
 
-                    bool finer_total_overlap =
-                        ops->point_mode == QUERY_POINT_MODE_TOTAL &&
-                        sp2_tier < sp_tier && sp2.start_time_s < sp.end_time_s;
+                    bool finer_overlap = sp2_tier < sp_tier && sp2.start_time_s < sp.end_time_s;
+                    bool finer_total_overlap = ops->point_mode == QUERY_POINT_MODE_TOTAL && finer_overlap;
+                    bool finer_expression_overlap = time_grouping_is_expression(add_flush) && finer_overlap;
 
                     if(sp.start_time_s > sp2.start_time_s ||
-                       (finer_total_overlap && sp2.start_time_s <= sp.start_time_s)) {
+                       ((finer_total_overlap || finer_expression_overlap) && sp2.start_time_s <= sp.start_time_s)) {
                         // the point from the previous plan is useless
                         sp = sp2;
                         sp_tier = sp2_tier;
                         prepared_sum = sp2.sum;
+                        storage_cadence = sp2.end_time_s > sp2.start_time_s ?
+                            sp2.end_time_s - sp2.start_time_s : 0;
                     }
                     else {
                         // let the query run from the previous plan
@@ -313,10 +519,10 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                         next1_point = sp2;
                         next1_tier = sp2_tier;
 
-                        if(unlikely(finer_total_overlap)) {
+                        if(unlikely(finer_total_overlap || finer_expression_overlap)) {
                             time_t duration = sp.end_time_s - sp.start_time_s;
                             time_t retained = sp2.start_time_s - sp.start_time_s;
-                            if(!qm->values_stored_as_rates && duration > 0)
+                            if(finer_total_overlap && !qm->values_stored_as_rates && duration > 0)
                                 prepared_sum *= (NETDATA_DOUBLE)retained / (NETDATA_DOUBLE)duration;
                             sp.end_time_s = sp2.start_time_s;
                         }
@@ -324,8 +530,11 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                 }
 
                 new_point.sp = sp;
+                new_point.storage_cadence = storage_cadence > 0 ?
+                    storage_cadence : qm->tiers[sp_tier].db_update_every_s;
                 new_point.tier = sp_tier;
                 new_point.added = false;
+                new_point.synthetic = false;
                 query_point_set_id(new_point, ops->db_total_points_read);
 
 //                if(debug_this)
@@ -410,7 +619,8 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                     // this db point ends after our now_start time
 
                     query_add_point_to_group(
-                        r, new_point, ops, add_flush, now_end_time, new_point.sp.end_time_s);
+                        r, new_point, ops, add_flush, &pending_gap, now_end_time,
+                        query_point_storage_cadence(&new_point), new_point.sp.end_time_s, true);
                     new_point.added = true;
                 }
                 else {
@@ -538,8 +748,16 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                 source_end_time = 0;
             }
 
+            time_t gap_cadence = query_point_storage_cadence(&current_point);
+            if(gap_cadence <= 0)
+                gap_cadence = query_point_storage_cadence(&new_point);
+            if(gap_cadence <= 0)
+                gap_cadence = query_point_storage_cadence(&last1_point);
+
             query_add_point_to_group(
-                r, current_point, ops, add_flush, now_end_time, source_end_time);
+                r, current_point, ops, add_flush, &pending_gap, now_end_time, gap_cadence, source_end_time, true);
+
+            query_flush_gap_to_group(r, add_flush, &pending_gap);
 
             rrdr_line = rrdr_line_init(r, now_end_time, rrdr_line);
             size_t rrdr_o_v_index = rrdr_line * r->d + dim_id_in_rrdr;
@@ -547,8 +765,11 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
             // find the place to store our values
             RRDR_VALUE_FLAGS *rrdr_value_options_ptr = &r->o[rrdr_o_v_index];
 
-            // update the dimension options
-            if(likely(ops->group_points_non_zero))
+            // update the dimension options - for the expression groupings
+            // the source samples say nothing about the answer, so their
+            // visibility is decided from the flushed value below INSTEAD,
+            // never from the samples that went in
+            if(likely(ops->group_points_non_zero && !time_grouping_is_expression(add_flush)))
                 r->od[dim_id_in_rrdr] |= RRDR_DIMENSION_NONZERO;
 
             // store the specific point options
@@ -557,6 +778,14 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
             // store the group value
             NETDATA_DOUBLE group_value = time_grouping_flush(r, rrdr_value_options_ptr, add_flush);
             r->v[rrdr_o_v_index] = group_value;
+
+            // The expression groupings answer a question ABOUT the samples
+            // rather than reporting them, so their visibility has to follow
+            // the ANSWER: a dimension that is nothing but gaps legitimately
+            // returns 100 for `==gap`, yet contributes no non-zero source
+            // sample and would be dropped by options=nonzero.
+            if(unlikely(time_grouping_is_expression(add_flush)) && group_value != 0.0)
+                r->od[dim_id_in_rrdr] |= RRDR_DIMENSION_NONZERO;
 
             r->ar[rrdr_o_v_index] = storage_point_anomaly_rate(ops->group_point);
 
@@ -575,6 +804,7 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
 
             points_added++;
             ops->group_points_added = 0;
+            ops->group_covered_s = 0;
             ops->group_value_flags = RRDR_VALUE_NOTHING;
             ops->group_points_non_zero = 0;
             ops->group_point = STORAGE_POINT_UNSET;
@@ -587,8 +817,19 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
             break;
 
         time_t next_row_start_time = now_end_time - ops->view_update_every;
-        if(unlikely(new_point.sp.end_time_s > next_row_start_time &&
-                    netdata_double_isnumber(new_point.value) &&
+        if(unlikely(time_grouping_is_expression(add_flush))) {
+            time_t covered_until = query_row_start_time(ops, now_end_time) + (time_t)ops->group_covered_s;
+            if(new_point.sp.end_time_s > new_point.sp.start_time_s &&
+               MAX(new_point.sp.start_time_s, covered_until) < MIN(new_point.sp.end_time_s, now_end_time)) {
+                // Keep the interval and delivery identity; value-only carry invents another event.
+                query_add_point_to_group(
+                    r, new_point, ops, add_flush, &pending_gap, now_end_time,
+                    query_point_storage_cadence(&new_point), new_point.sp.end_time_s, new_point.tier != 0);
+                new_point.added = true;
+            }
+        }
+        else if(unlikely(new_point.sp.end_time_s > next_row_start_time &&
+                         netdata_double_isnumber(new_point.value) &&
                     ((new_point.added &&
                       (ops->point_mode == QUERY_POINT_MODE_TOTAL ||
                        (new_point.tier == 0 &&
