@@ -35,6 +35,13 @@ int api_v1_config(RRDHOST *host, struct web_client *w, char *url __maybe_unused)
         }
     }
 
+    // reject early what the plugins.d framing would refuse later
+    const char *reason = w->payload ? functions_payload_validate(buffer_tostring(w->payload), buffer_strlen(w->payload)) : NULL;
+    if(reason) {
+        buffer_flush(w->response.data);
+        return nrpc_call_error(w->response.data, reason, HTTP_RESP_BAD_REQUEST);
+    }
+
     char transaction[UUID_COMPACT_STR_LEN];
     uuid_unparse_lower_compact(w->transaction, transaction);
 

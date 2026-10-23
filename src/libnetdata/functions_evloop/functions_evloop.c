@@ -514,3 +514,59 @@ void functions_evloop_dyncfg_status(struct functions_evloop_globals *wg, const c
 
     netdata_mutex_unlock(wg->stdout_mutex);
 }
+
+// ----------------------------------------------------------------------------
+// payload validation
+
+const char *functions_payload_validate(const char *payload, size_t len) {
+    if(!payload || !len)
+        return NULL;
+
+    // in strict JSON a raw newline can only separate tokens, so no payload line can be the end
+    // marker or a bare protocol command, and no NUL byte can truncate the call when it is sent
+    const char *reason = json_strict_validate(payload, len);
+    if(reason)
+        return reason;
+
+    // redundant with the above, but makes the guarantee obvious: the end marker never appears, even escaped
+    const size_t marker_len = sizeof(PLUGINSD_CALL_FUNCTION_PAYLOAD_END) - 1;
+    const char *end = payload + len;
+    for(const char *s = memchr(payload, 'F', len); s; s = memchr(s + 1, 'F', end - s - 1)) {
+        if((size_t)(end - s) >= marker_len && memcmp(s, PLUGINSD_CALL_FUNCTION_PAYLOAD_END, marker_len) == 0)
+            return "the payload contains the plugins.d payload end marker";
+    }
+
+    // plugin tokenizers unquote fields, so a JSON line starting with a quoted keyword can be read as
+    // a command by older go.d versions (e.g. children behind this agent) - refuse it
+    static const struct {
+        const char *keyword;
+        size_t len;
+    } quoted_keywords[] = {
+        { "\"" PLUGINSD_CALL_FUNCTION "\"",               sizeof(PLUGINSD_CALL_FUNCTION) + 1 },
+        { "\"" PLUGINSD_CALL_FUNCTION_PAYLOAD_BEGIN "\"", sizeof(PLUGINSD_CALL_FUNCTION_PAYLOAD_BEGIN) + 1 },
+        { "\"" PLUGINSD_CALL_FUNCTION_CANCEL "\"",        sizeof(PLUGINSD_CALL_FUNCTION_CANCEL) + 1 },
+        { "\"" PLUGINSD_CALL_FUNCTION_PROGRESS "\"",      sizeof(PLUGINSD_CALL_FUNCTION_PROGRESS) + 1 },
+        { "\"" PLUGINSD_CALL_QUIT "\"",                   sizeof(PLUGINSD_CALL_QUIT) + 1 },
+    };
+    for(const char *line = payload; line < end; ) {
+        const char *s = line;
+        while(s < end && (*s == ' ' || *s == '\t' || *s == '\r'))
+            s++;
+
+        if(s < end && *s == '"') {
+            for(size_t i = 0; i < _countof(quoted_keywords); i++) {
+                if((size_t)(end - s) >= quoted_keywords[i].len &&
+                   memcmp(s, quoted_keywords[i].keyword, quoted_keywords[i].len) == 0)
+                    return "the payload has a line starting with a quoted plugins.d keyword";
+            }
+        }
+
+        const char *nl = memchr(s, '\n', end - s);
+        if(!nl)
+            break;
+
+        line = nl + 1;
+    }
+
+    return NULL;
+}
