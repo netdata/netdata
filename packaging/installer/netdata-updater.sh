@@ -1319,7 +1319,7 @@ update_binpkg() {
         amzn) repo_path="amazonlinux/${SYSVERSION}/$(uname -m)" ;;
         centos-stream) repo_path="el/c${SYSVERSION}s/$(uname -m)" ;;
         fedora) repo_path="fedora/${SYSVERSION}/$(uname -m)" ;;
-        ol) repo_path="ol/${SYSVERSION}/$(uname -m)" ;;
+        ol) repo_path="ol/$(echo "${SYSVERSION}" | cut -f 1 -d '.')/$(uname -m)" ;;
         *) repo_path="el/$(echo "${SYSVERSION}" | cut -f 1 -d '.')/$(uname -m)" ;;
       esac
       ;;
