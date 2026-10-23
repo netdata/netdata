@@ -160,7 +160,7 @@ If you select **Network Flows** on the Live tab and see the message **Connect th
 
 To use Network Flows from your standalone host:
 
-1. **Sign in to Netdata Cloud** at [app.netdata.cloud](https://app.netdata.cloud). If the Agent is not connected yet, a Space Admin must claim/connect it to the Space. After it is connected, your own Space role must allow you to run sensitive functions; see the **Node Management** and **Functions** tables under [Detailed Permissions](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md#detailed-permissions). The Space must be on a paid plan (Homelab, Business, or Enterprise On-Premise). The free Community plan does not include Network Flows.
+1. **Sign in to Netdata Cloud** at [app.netdata.cloud](https://app.netdata.cloud). If the Agent is not connected yet, a Space Admin must claim/connect it to the Space. After it is connected, your own Space role must allow you to run sensitive functions; see the **Node Management** and **Functions** tables under [Detailed Permissions](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md#detailed-permissions). The Space must be on a paid plan (Homelab, Business, or Enterprise On-Premise; an active Business trial also qualifies). The free Community plan does not include Network Flows.
 2. After the agent is connected, open Network Flows either from the authenticated local Agent dashboard or through Netdata Cloud:
    - **Local Agent dashboard:** stay on `http://<agent-ip>:19999` while signed in. Function query results travel directly from the Agent to your browser.
    - **Netdata Cloud:** open the connected node and select Network Flows. Cloud proxies the Function request and response between your browser and the Agent.

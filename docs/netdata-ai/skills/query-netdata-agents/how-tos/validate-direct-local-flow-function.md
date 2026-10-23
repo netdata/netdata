@@ -94,8 +94,9 @@ in stdout or durable artifacts.
   `Authorization: Bearer <cloud-token>`.
 - `flows:netflow` requires a Space on a paid plan. A free Space gets 403
   with `errorMsgKey: "ErrCommercialRequired"`. A bearer keeps the access it
-  was minted with, so after an upgrade, mint a new bearer instead of
-  reusing a cached one.
+  was minted with, so after an upgrade, delete the cached
+  `.local/audits/query-netdata-agents/bearers/<machine_guid>.json` before
+  calling the helper, so it mints a new bearer.
 - The helper caches the raw bearer under
   `.local/audits/query-netdata-agents/bearers/`; that directory is
   gitignored and should stay mode `0700`, with bearer files mode

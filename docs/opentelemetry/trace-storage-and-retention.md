@@ -83,7 +83,7 @@ expire them with the object storage's own lifecycle rules. Add headroom for the 
 
 Stored traces are explored in the Traces tab, which queries the Agent's `otel-traces` Function. As with logs, viewing
 traces requires a signed-in Netdata Cloud user of the Agent's Space. Viewing traces also requires a paid plan
-(Homelab, Business, or Enterprise On-Premise). The free Community plan does not include it. The Agent receives and stores
+(Homelab, Business, or Enterprise On-Premise; an active Business trial also qualifies). The free Community plan does not include it. The Agent receives and stores
 traces on all plans. Trace data is not stored in Netdata Cloud.
 
 ## Where to next

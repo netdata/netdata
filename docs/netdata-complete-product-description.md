@@ -1006,7 +1006,7 @@ Netdata is also available on [AWS Marketplace](https://aws.amazon.com/marketplac
 - **Free Preview:** Logs Management (collecting, storing and indexing logs) and Digital Experience Monitoring (RUM, synthetic journeys, Lighthouse audits) are in Free Preview.
 - **Netdata AI:** usage measured in AI credits — one credit per investigation or report, fractional credits for smaller actions (conversations, alert creation and suggestion); alert explanations consume no credits. Business includes 10 AI credits per month; the 14-day trial includes 10 AI credits; additional credits are purchased in the app.
 - **Windows:** Windows Agents count as nodes like any other Agent; their local dashboard follows the same plan rules as on Linux.
-- **Plan-gated features:** exploring Network Flows (NetFlow, IPFIX, sFlow) and Traces (the Traces explorer over OpenTelemetry traces) requires a paid plan; collection and storage on the Agent are not restricted. Netdata Cloud MCP, enterprise notification integrations (all Cloud integrations except Discord, personal email and the mobile app), additional roles, SSO and SCIM require a paid plan.
+- **Plan-gated features:** exploring Network Flows (NetFlow, IPFIX, sFlow) and Traces (the Traces explorer over OpenTelemetry traces) requires a paid plan or an active trial; collection and storage on the Agent are not restricted. Netdata Cloud MCP, enterprise notification integrations (all Cloud integrations except Discord, personal email and the mobile app), additional roles, SSO and SCIM require a paid plan.
 
 ### Support
 
