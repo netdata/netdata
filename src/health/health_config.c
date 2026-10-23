@@ -658,6 +658,10 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
     while((s = fgets(&buffer[append], (int)(HEALTH_CONF_MAX_LINE - append), fp)) || append) {
         int stop_appending = !s;
         line++;
+
+        if(line == 1)
+            remove_utf8_bom(buffer);
+
         s = trim(buffer);
         if(!s || *s == '#') continue;
 
