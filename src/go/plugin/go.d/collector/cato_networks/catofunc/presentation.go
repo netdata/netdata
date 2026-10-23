@@ -443,6 +443,11 @@ func catoActorLabels(actorType string) *topologyv1.ModalLabelsPresentation {
 	case ActorTypeSite:
 		fields = append(fields,
 			topologyv1.ModalLabelIdentificationField{
+				Key:       "snapshot_collection",
+				Label:     "Inventory collection",
+				MaxValues: 1,
+			},
+			topologyv1.ModalLabelIdentificationField{
 				Key:       "metrics_collection",
 				Label:     "Metrics collection",
 				MaxValues: 1,

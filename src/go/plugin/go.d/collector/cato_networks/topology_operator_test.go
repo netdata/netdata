@@ -131,3 +131,49 @@ func TestOperatorBGPCoverageRecovery(t *testing.T) {
 	require.NoError(t, c.collectBGP(t.Context(), sites, []string{"1001"}))
 	require.Equal(t, "empty_cached", sites["1001"].BGPCollection)
 }
+
+func TestOperatorMissingSnapshot(t *testing.T) {
+	c := New()
+	c.AccountID = "account"
+	c.APIKey = "secret"
+	c.now = fixedCatoTestNow
+	fake := newFixtureAPIClient()
+	fake.snapshot.Sites = fake.snapshot.Sites[1:]
+	c.client = fake
+	initCollector(t, c)
+	collectOnce(t, c)
+	data, ok := c.topology.CurrentTopology()
+	require.True(t, ok)
+	labels := topologyTableRows(t, data.Tables.Actor["actor_labels"].Table, data.Dictionaries)
+	for _, r := range labels {
+		if r["actor"] == 0 && (r["key"] == "metrics_collection" || r["key"] == "bgp_collection") {
+			t.Log(r)
+		}
+	}
+	found := false
+	for _, n := range data.Notifications {
+		t.Log(n.Code, n.Message)
+		if n.Code == "cato_snapshot_coverage" {
+			found = true
+		}
+	}
+	require.True(t, found, "missing selected-site snapshot must emit inventory coverage warning")
+}
+func TestOperatorAggregateNotWAN(t *testing.T) {
+	c := New()
+	c.AccountID = "account"
+	c.APIKey = "secret"
+	c.now = fixedCatoTestNow
+	c.client = newFixtureAPIClient()
+	initCollector(t, c)
+	collectOnce(t, c)
+	data, ok := c.topology.CurrentTopology()
+	require.True(t, ok)
+	rows := topologyTableRows(t, data.Tables.Actor["interfaces"].Table, data.Dictionaries)
+	for _, r := range rows {
+		if r["name"] == "all" {
+			t.Log(r)
+			t.Error("aggregate appears in WAN interface table with unknown physical and tunnel state")
+		}
+	}
+}

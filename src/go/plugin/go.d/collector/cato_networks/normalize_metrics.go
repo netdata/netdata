@@ -38,6 +38,7 @@ func mergeMetrics(metrics *catosdk.AccountMetrics, sites map[string]*siteState) 
 				iface.Name = "all"
 			}
 			if strings.EqualFold(iface.Name, "all") {
+				iface.Aggregate = iface.ID == ""
 				site.Metrics, _ = mergeRawInterfaceTrafficMetrics(site.Metrics, rawIface)
 			}
 			key := interfaceKey(iface.ID, iface.Name)
@@ -57,6 +58,7 @@ func mergeMetrics(metrics *catosdk.AccountMetrics, sites map[string]*siteState) 
 				iface.DeviceName = existing.DeviceName
 			}
 			existing.Metrics = iface.Metrics
+			existing.Aggregate = iface.Aggregate
 			if existing.UpstreamBandwidth == nil {
 				existing.UpstreamBandwidth = iface.UpstreamBandwidth
 			}

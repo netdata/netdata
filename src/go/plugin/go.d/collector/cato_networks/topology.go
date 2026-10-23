@@ -415,7 +415,7 @@ func addInterfaceTopology(
 ) {
 	ifaceKeys := make([]string, 0, len(site.Interfaces))
 	for key, iface := range site.Interfaces {
-		if iface != nil {
+		if iface != nil && !iface.Aggregate {
 			ifaceKeys = append(ifaceKeys, key)
 		}
 	}
@@ -733,9 +733,12 @@ func nullableString(s string) any {
 }
 func catoTopologyNotifications(sites map[string]*siteState, order []string) []topologyv1.Notification {
 	notices := []topologyv1.Notification{{Severity: "info", Code: "cato_access_scope", Message: "Access topology for the selected sites: site membership, observed WAN tunnels, reported PoP associations and BGP adjacencies. Cato backbone and end-to-end reachability are not represented. Separate PoP groups do not imply isolation. Upstream means site to Cato; downstream means Cato to site. Missing values mean not observed."}}
-	var metrics, bgp int
+	var snapshot, metrics, bgp int
 	for _, id := range order {
 		if site := sites[id]; site != nil {
+			if site.SnapshotCollection != "observed" {
+				snapshot++
+			}
 			if site.MetricsCollection != "observed" {
 				metrics++
 			}
@@ -743,6 +746,9 @@ func catoTopologyNotifications(sites map[string]*siteState, order []string) []to
 				bgp++
 			}
 		}
+	}
+	if snapshot > 0 {
+		notices = append(notices, topologyv1.Notification{Severity: "warning", Code: "cato_snapshot_coverage", Message: fmt.Sprintf("Inventory observations are unavailable for %d selected sites. Missing devices and tunnels do not mean they were removed. Open site details for inventory collection status.", snapshot)})
 	}
 	if metrics > 0 {
 		notices = append(notices, topologyv1.Notification{

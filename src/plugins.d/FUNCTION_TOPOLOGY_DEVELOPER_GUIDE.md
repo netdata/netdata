@@ -1824,12 +1824,15 @@ All actor types expose known metadata through `actor_labels`, modal
 identification and a one-hop miniature. Canonical actor columns remain the
 identity and search source. Shared PoPs have account/name labels without
 invented geography. Empty labels are omitted; known false/zero values survive.
-Site identification includes metrics and BGP observation status. A successful
+Site identification includes inventory, metrics and BGP observation status. Missing
+selected sites in a snapshot are explicitly unavailable, and failed discovery
+refreshes are identified as cached inventory. Site-wide aggregate metric rows
+are excluded from WAN details; they are not interfaces. A successful
 empty BGP response, cached empty response, partial normalization and failed
 collection are distinct. Missing peers after a failed observation must not be
 read as configuration removal.
 
-`data.notifications` explains access-topology scope and incomplete metrics/BGP
+`data.notifications` explains access-topology scope and incomplete inventory/metrics/BGP
 coverage without raw errors or tenant identifiers. CTS must accept and preserve
 notifications, and the frontend must display them; site coverage also remains
 available in actor identification. The companion frontend notice control and

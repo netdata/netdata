@@ -41,9 +41,10 @@ func normalizeSnapshot(
 			connType = derefZero(info.ConnType)
 		}
 		site := &siteState{
-			ID:          siteID,
-			Name:        siteDisplayName(siteID, siteNames, infoName, ""),
-			Description: description,
+			SnapshotCollection: "observed",
+			ID:                 siteID,
+			Name:               siteDisplayName(siteID, siteNames, infoName, ""),
+			Description:        description,
 			ConnectivityStatus: normalizeSnapshotConnectivity(
 				raw.ConnectivityStatus,
 				raw.DegradedStatus,

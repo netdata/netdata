@@ -75,7 +75,7 @@ The topology view brings in the rest of your infrastructure in the same form, so
   establish an active tunnel. Open a site for its devices, HA roles and all WANs;
   open a PoP for attached WANs and site context. Expand WAN rows for configured
   limits and diagnostics. Upstream means site to Cato; downstream means Cato to site.
-  Topology information explains coverage gaps, and site identification shows metrics
+  Topology information explains coverage gaps, and site identification shows inventory, metrics
   and BGP collection status. Missing data does not mean zero or no configuration.
   This is an access topology: the Cato backbone and end-to-end reachability are not
   represented, so separate PoP groups do not imply network isolation.

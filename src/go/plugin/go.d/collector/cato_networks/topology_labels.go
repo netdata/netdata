@@ -40,6 +40,7 @@ func buildCatoTopologyLabels(dict *topologyv1.StringDictionary, accountID string
 		add(actor, "connection_type", site.ConnectionType, "metadata")
 		add(actor, "connectivity_status", site.ConnectivityStatus, "status")
 		add(actor, "operational_status", site.OperationalStatus, "status")
+		add(actor, "snapshot_collection", collectionStatusLabel(site.SnapshotCollection), "status")
 		add(actor, "metrics_collection", collectionStatusLabel(site.MetricsCollection), "status")
 		add(actor, "bgp_collection", collectionStatusLabel(site.BGPCollection), "status")
 		if site.HostCount != nil {

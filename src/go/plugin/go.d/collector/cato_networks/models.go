@@ -16,8 +16,9 @@ type siteState struct {
 	Region             string
 	HostCount          *int64
 
-	MetricsCollection string
-	BGPCollection     string
+	SnapshotCollection string
+	MetricsCollection  string
+	BGPCollection      string
 
 	Metrics    trafficMetrics
 	Interfaces map[string]*interfaceState
@@ -39,6 +40,7 @@ type deviceState struct {
 }
 
 type interfaceState struct {
+	Aggregate           bool
 	ID                  string
 	Name                string
 	DeviceID            string

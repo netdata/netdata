@@ -6,15 +6,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 	"strings"
 	"time"
 )
 
 type discoveryState struct {
-	siteIDs           []string
-	siteNames         map[string]string
-	fetchedAt         time.Time
-	skippedBySelector int
+	siteIDs            []string
+	siteNames          map[string]string
+	fetchedAt          time.Time
+	skippedBySelector  int
+	cachedAfterFailure bool
 }
 
 func (c *Collector) collect(ctx context.Context) error {
@@ -54,6 +56,9 @@ func (c *Collector) collect(ctx context.Context) error {
 	topo, err := buildTopology(c.AccountID, sites, order, now)
 	if err != nil {
 		return fmt.Errorf("build topology: %w", err)
+	}
+	if c.discovery.cachedAfterFailure {
+		topo.Notifications = append(topo.Notifications, topologyv1.Notification{Severity: "warning", Code: "cato_discovery_cached", Message: "Site discovery could not be refreshed. The topology uses the cached selected-site inventory and may not include recent site additions or removals."})
 	}
 	c.topology.Publish(topo)
 
@@ -172,6 +177,7 @@ func (c *Collector) useCachedDiscoveryAfterRefreshFailure(now time.Time, force b
 	}
 
 	c.discovery.fetchedAt = now
+	c.discovery.cachedAfterFailure = true
 	errorClass := classifyCatoError(err)
 	c.warnRecoverable(warningKeyDiscoveryCache, errorClass, "entityLookup refresh failed; using cached discovery for %d site(s), error_class=%s", len(c.discovery.siteIDs), errorClass)
 	return true
@@ -197,6 +203,7 @@ func (c *Collector) collectSnapshot(ctx context.Context) (map[string]*siteState,
 			continue
 		}
 		sites[siteID] = &siteState{
+			SnapshotCollection: "unavailable",
 			ID:                 siteID,
 			Name:               siteDisplayName(siteID, c.discovery.siteNames, "", ""),
 			ConnectivityStatus: "unknown",
