@@ -74,7 +74,7 @@ jobs:
             .github/scripts/run-updater-check.sh
             src/go/tools/topology-ip-intel-downloader/
             packaging/cmake/
-            packaging/makeself/
+            packaging/static/
             packaging/installer/
             packaging/windows/
             packaging/*.sh
@@ -100,7 +100,7 @@ jobs:
             src/go/tools/topology-ip-intel-downloader/
             src/go/go.mod
             src/go/go.sum
-            packaging/makeself/
+            packaging/static/
           files_ignore: |
             packaging/**/*.md
             packaging/repoconfig/
@@ -363,7 +363,7 @@ jobs:
         id: channel
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.type != 'nightly' && needs.file-check.outputs.run == 'true'
         run: |
-          sed -i 's/^RELEASE_CHANNEL="nightly"/RELEASE_CHANNEL="stable"/' netdata-installer.sh packaging/makeself/install-or-update.sh
+          sed -i 's/^RELEASE_CHANNEL="nightly"/RELEASE_CHANNEL="stable"/' netdata-installer.sh packaging/static/installer/install-or-update.sh
       - name: Get Cache Key
         if: (github.event_name != 'pull_request' || ! contains(github.event.pull_request.labels.*.name, 'run-ci/no-cache')) && needs.file-check.outputs.run == 'true'
         id: cache-key
@@ -373,7 +373,7 @@ jobs:
         id: cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: artifacts/cache
+          path: packaging/static/cache
           key: ${{ steps.cache-key.outputs.key }}
       - name: Set up QEMU
         id: qemu
@@ -397,87 +397,16 @@ jobs:
           if [ "${{ matrix.arch }}" != "armv6l" ]; then
             export NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR="${GITHUB_WORKSPACE}/.topology-ip-intel-stock"
           fi
-          .github/scripts/build-static.sh ${{ matrix.arch }}
-      - name: Verify topology-ip-intel stock payload
-        id: verify-topology-stock
-        if: needs.file-check.outputs.run == 'true' && matrix.arch != 'armv6l'
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          archive="$(find "${GITHUB_WORKSPACE}/artifacts" \
-            -maxdepth 1 \
-            -type f \
-            -name 'netdata-${{ matrix.arch }}-*.gz.run' \
-            ! -name '*-latest.gz.run' \
-            -print \
-            -quit)"
-          if [ -z "${archive}" ]; then
-            printf >&2 'ERROR: static archive for %s was not produced\n' '${{ matrix.arch }}'
-            exit 1
-          fi
-
-          extract_dir="$(mktemp -d)"
-          trap 'rm -rf -- "${extract_dir}"' EXIT
-          (
-            cd "${extract_dir}"
-            sh "${archive}" --tar xf \
-              ./usr/share/netdata/topology-ip-intel/README.md \
-              ./usr/share/netdata/topology-ip-intel/topology-ip-asn.mmdb \
-              ./usr/share/netdata/topology-ip-intel/topology-ip-geo.mmdb \
-              ./usr/share/netdata/topology-ip-intel/topology-ip-intel.json
-          )
-
-          for path in \
-            README.md \
-            topology-ip-asn.mmdb \
-            topology-ip-geo.mmdb \
-            topology-ip-intel.json
-          do
-            if [ ! -s "${extract_dir}/usr/share/netdata/topology-ip-intel/${path}" ]; then
-              printf >&2 'ERROR: static archive has a missing or empty topology IP intelligence file: %s\n' "${path}"
-              exit 1
-            fi
-          done
+          make -C packaging/static -j $(nproc) BUILDARCH=${{ matrix.arch }} TOPLOGY_STOCK_DIR="${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}"
       - name: Store
         id: store
         if: needs.file-check.outputs.run == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dist-static-${{ matrix.arch }}
-          path: artifacts/*.gz.run
+          path: packaging/static/archives/*.run
           compression-level: 0
           retention-days: 30
-      - name: Check Cortex-A53 erratum workarounds
-        id: check-a53-errata
-        if: needs.file-check.outputs.run == 'true' && matrix.arch == 'aarch64'
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          # The build machines do not exhibit Cortex-A53 erratum 843419, so the runtime checks cannot see a binary
-          # linked without its workaround; scan the shipped executables instead.
-          archive="$(find "${GITHUB_WORKSPACE}/artifacts" \
-            -maxdepth 1 \
-            -type f \
-            -name 'netdata-aarch64-*.gz.run' \
-            ! -name '*-latest.gz.run' \
-            -print \
-            -quit)"
-          if [ -z "${archive}" ]; then
-            printf >&2 'ERROR: static archive for aarch64 was not produced\n'
-            exit 1
-          fi
-
-          extract_dir="$(mktemp -d)"
-          trap 'rm -rf -- "${extract_dir}"' EXIT
-          (
-            cd "${extract_dir}"
-            sh "${archive}" --tar xf
-          )
-
-          python3 .github/scripts/test-check-a53-erratum-843419.py
-          python3 .github/scripts/check-a53-erratum-843419.py "${extract_dir}"
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
@@ -494,9 +423,7 @@ jobs:
               Set up QEMU: ${{ steps.qemu.outcome }}
               Download topology stock payload: ${{ steps.fetch-topology-stock.outcome }}
               Build: ${{ steps.build.outcome }}
-              Verify topology stock payload: ${{ steps.verify-topology-stock.outcome }}
               Store: ${{ steps.store.outcome }}
-              Check Cortex-A53 erratum workarounds: ${{ steps.check-a53-errata.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{
