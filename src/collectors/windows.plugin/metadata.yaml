@@ -4738,9 +4738,9 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          This collector monitors Microsoft Exchange.
+          Monitor Exchange transport queues, Active Directory access, client activity, HTTP proxy traffic, and background workloads.
         method_description: |
-          It queries different Exchange objects from Perflib in order to gather the metrics.
+          The collector reads registered Microsoft Exchange performance counters through Windows Perflib.
       supported_platforms:
         include: ["windows"]
         exclude: []
@@ -4750,7 +4750,7 @@ modules:
       default_behavior:
         auto_detection:
           description: |
-            The collector automatically detects all of the metrics, no further configuration is required.
+            The collector is enabled by default. Charts appear when Exchange registers the corresponding performance objects and counters.
         limits:
           description: ""
         performance_impact:
@@ -4788,9 +4788,99 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: Windows Exchange
-          description: "These metrics refer to Windows Exchange."
+        - name: Exchange host
+          description: Aggregate Exchange client and service counters on this host.
           labels: []
+          metrics:
+            - name: exchange.activesync_ping_cmds_pending
+              description: Ping commands pending in queue.
+              unit: commands
+              chart_type: line
+              dimensions:
+                - name: pending
+            - name: exchange.activesync_requests
+              description: HTTP requests received from ASP.NET.
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: received
+            - name: exchange.activesync_sync_cmds
+              description: Sync commands processed.
+              unit: commands/s
+              chart_type: line
+              dimensions:
+                - name: processed
+            - name: exchange.rpc_avg_latency
+              description: Average latency.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: latency
+            - name: exchange.rpc_requests
+              description: Clients requests currently being processed.
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: processed
+            - name: exchange.rpc_active_user
+              description: Active unique users in the last 2 minutes.
+              unit: users
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: exchange.rpc_connection
+              description: Client connections.
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: connections
+            - name: exchange.rpc_operations
+              description: RPC operations.
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: operations
+            - name: exchange.rpc_user_count
+              description: RPC users.
+              unit: users
+              chart_type: line
+              dimensions:
+                - name: users
+            - name: exchange.owa_current_unique_users
+              description: Unique users currently logged on to Outlook Web App
+              unit: users
+              chart_type: line
+              dimensions:
+                - name: logged-in
+            - name: exchange.owa_requests_total
+              description: Requests handled by Outlook Web App.
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: handled
+            - name: exchange.autodiscover_requests
+              description: Autodiscover service requests processed.
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: processed
+            - name: exchange.avail_service_requests
+              description: Requests serviced.
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: serviced
+            - name: exchange.mapihttp_emsmdb_active_user_count
+              description: Unique MAPI HTTP EMSMDB users active in the last 2 minutes.
+              unit: users
+              chart_type: line
+              dimensions:
+                - name: active
+        - name: Transport queue priority
+          description: Each Exchange transport priority or reported aggregate with registered queue counters. Aggregate instances such as `total excluding priority none` overlap with individual priorities and should not be summed with them.
+          labels:
+            - name: priority
+              description: The transport priority or aggregate instance reported by Exchange.
           metrics:
             - name: exchange.transport_queues_active_mail_box_delivery
               description: Active Mailbox Delivery Queue length.
@@ -4839,7 +4929,7 @@ modules:
               unit: messages
               chart_type: line
               dimensions:
-                - name: unreachable
+                - name: poison
             - name: exchange.transport_queues_messages_queued_for_delivery_total
               description: Messages queued for delivery.
               unit: messages/s
@@ -4906,84 +4996,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: resubmitted
-            - name: exchange.activesync_ping_cmds_pending
-              description: Ping commands pending in queue.
-              unit: commands
-              chart_type: line
-              dimensions:
-                - name: pending
-            - name: exchange.activesync_requests
-              description: HTTP requests received from ASP.NET.
-              unit: requests/s
-              chart_type: line
-              dimensions:
-                - name: received
-            - name: exchange.activesync_sync_cmds
-              description: Sync commands processed.
-              unit: commands/s
-              chart_type: line
-              dimensions:
-                - name: processed
-            - name: exchange.rpc_active_user_count
-              description: Active unique users in the last 2 minutes.
-              unit: users
-              chart_type: line
-              dimensions:
-                - name: active
-            - name: exchange.rpc_avg_latency
-              description: Average latency.
-              unit: seconds
-              chart_type: line
-              dimensions:
-                - name: latency
-            - name: exchange.rpc_connection_count
-              description: Client connections.
-              unit: connections
-              chart_type: line
-              dimensions:
-                - name: connections
-            - name: exchange.rpc_requests
-              description: Clients requests currently being processed.
-              unit: requests
-              chart_type: line
-              dimensions:
-                - name: processed
-            - name: exchange.rpc_active_user
-              description: Active unique users in the last 2 minutes.
-              unit: users
-              chart_type: line
-              dimensions:
-                - name: users
-            - name: exchange.rpc_connection
-              description: Client connections.
-              unit: connections
-              chart_type: line
-              dimensions:
-                - name: connections
-            - name: exchange.rpc_operations
-              description: RPC operations.
-              unit: operations/s
-              chart_type: line
-              dimensions:
-                - name: operations
-            - name: exchange.rpc_user_count
-              description: RPC users.
-              unit: users
-              chart_type: line
-              dimensions:
-                - name: users
-            - name: exchange.owa_current_unique_users
-              description: Unique users currently logged on to Outlook Web App.
-              unit: users
-              chart_type: line
-              dimensions:
-                - name: logged-in
-            - name: exchange.owa_requests_total
-              description: Requests handled by Outlook Web App.
-              unit: requests/s
-              chart_type: line
-              dimensions:
-                - name: handled
+        - name: Workload
+          description: Each background workload reported by Exchange Workload Management.
+          labels:
+            - name: workload
+              description: The Exchange workload name.
+          metrics:
             - name: exchange.workload_active_tasks
               description: Workload active tasks.
               unit: tasks
@@ -4998,7 +5016,7 @@ modules:
                 - name: completed
             - name: exchange.workload_queued_tasks
               description: Workload queued tasks.
-              unit: tasks/s
+              unit: tasks
               chart_type: line
               dimensions:
                 - name: queued
@@ -5009,12 +5027,18 @@ modules:
               dimensions:
                 - name: yielded
             - name: exchange.workload_activity_status
-              description: Workload activity status
+              description: Workload activity status.
               unit: status
               chart_type: line
               dimensions:
                 - name: active
                 - name: paused
+        - name: HTTP proxy
+          description: Each Exchange HTTP proxy endpoint with registered counters.
+          labels:
+            - name: http_proxy
+              description: The HTTP proxy endpoint name reported by Exchange.
+          metrics:
             - name: exchange.http_proxy_avg_auth_latency
               description: Average time spent authenticating CAS requests.
               unit: seconds
@@ -5029,7 +5053,7 @@ modules:
                 - name: latency
             - name: exchange.http_proxy_mailbox_proxy_failure_rate
               description: Percentage of failures between this CAS and MBX servers.
-              unit: seconds
+              unit: percentage
               chart_type: line
               dimensions:
                 - name: failures
@@ -5041,28 +5065,22 @@ modules:
                 - name: latency
             - name: exchange.http_proxy_outstanding_proxy_requests
               description: Concurrent outstanding proxy requests.
-              unit: seconds
+              unit: requests
               chart_type: line
               dimensions:
                 - name: requests
             - name: exchange.http_proxy_requests
               description: Number of proxy requests processed each second.
-              unit: seconds
+              unit: requests/s
               chart_type: line
               dimensions:
                 - name: requests
-            - name: exchange.autodiscover_requests
-              description: Autodiscover service requests processed
-              unit: requests/s
-              chart_type: line
-              dimensions:
-                - name: processed
-            - name: exchange.avail_service_requests
-              description: Requests serviced
-              unit: requests/s
-              chart_type: line
-              dimensions:
-                - name: serviced
+        - name: AD access process
+          description: Each Exchange process reporting Active Directory access counters.
+          labels:
+            - name: process
+              description: The Exchange process name.
+          metrics:
             - name: exchange.ldap_read_time_sec
               description: Time to send an LDAP read request and receive a response.
               unit: seconds
@@ -5081,6 +5099,24 @@ modules:
               chart_type: line
               dimensions:
                 - name: write
+            - name: exchange.ldap_read_operations_total
+              description: LDAP read operations.
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: operations
+            - name: exchange.ldap_search_operations_total
+              description: LDAP search operations.
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: operations
+            - name: exchange.ldap_write_operations_total
+              description: LDAP write operations.
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: operations
             - name: exchange.ldap_timeout_errors_total
               description: LDAP timeout errors.
               unit: errors/s
@@ -5093,12 +5129,6 @@ modules:
               chart_type: line
               dimensions:
                 - name: operations
-            - name: exchange.mapihttp_emsmdb_active_user_count
-              description: Unique MAPI HTTP EMSMDB users active in the last 2 minutes.
-              unit: users
-              chart_type: line
-              dimensions:
-                - name: active
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibNUMA
