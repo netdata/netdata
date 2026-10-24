@@ -138,6 +138,7 @@ typedef struct daemon_status_file {
 
 // saves the current status
 void daemon_status_file_update_status(DAEMON_STATUS status);
+void daemon_status_file_periodic_update(void);
 
 // returns true when the event is duplicate and should not be reported again
 bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE code, void *fault_address, bool chained_handler);

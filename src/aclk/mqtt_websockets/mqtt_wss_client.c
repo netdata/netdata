@@ -18,6 +18,16 @@
 #define POLLFD_SOCKET  0
 #define POLLFD_PIPE    1
 
+#if defined(OS_WINDOWS)
+static ERROR_LIMIT mqtt_wss_wakeup_error_erl = {
+    .spinlock = SPINLOCK_INITIALIZER,
+    .log_every = 60,
+    .last_logged = -60, // Make the first failure visible immediately.
+};
+#endif
+
+typedef int mqtt_wss_wakeup_fd_t;
+
 #define PING_TIMEOUT    (60)  //Expect a ping response within this time (seconds)
 time_t ping_timeout = 0;
 
@@ -123,7 +133,7 @@ struct mqtt_wss_client_struct {
 
 // nonblock IO related
     int sockfd;
-    int write_notif_pipe[2];
+    mqtt_wss_wakeup_fd_t write_notif_pipe[2];
     struct pollfd poll_fds[2];
 
 // monotonic time of the last forward progress (plaintext moved, a clean poll() timeout, or -
@@ -174,7 +184,7 @@ struct mqtt_wss_client_struct {
 static void mqtt_wss_close_sockfd(mqtt_wss_client client)
 {
     if (client->sockfd >= 0)
-        close(client->sockfd);
+        sock_close(client->sockfd);
 
     client->sockfd = -1;
     client->poll_fds[POLLFD_SOCKET].fd = -1;
@@ -234,14 +244,29 @@ mqtt_wss_client mqtt_wss_new(
         goto fail_1;
     }
 
-#ifdef __APPLE__
+#if defined(OS_WINDOWS)
+    if (!sock_create_loopback_pair(client->write_notif_pipe)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Couldn't create ACLK wakeup sockets");
+        goto fail_2;
+    }
+    if (sock_setnonblock(client->write_notif_pipe[PIPE_READ_END], true) == -1 ||
+        sock_setnonblock(client->write_notif_pipe[PIPE_WRITE_END], true) == -1) {
+        sock_close(client->write_notif_pipe[PIPE_READ_END]);
+        sock_close(client->write_notif_pipe[PIPE_WRITE_END]);
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Couldn't configure ACLK wakeup sockets");
+        goto fail_2;
+    }
+#elif defined(__APPLE__)
     if (pipe(client->write_notif_pipe)) {
-#else
-    if (pipe2(client->write_notif_pipe, O_CLOEXEC /*| O_DIRECT*/)) {
-#endif
         nd_log(NDLS_DAEMON, NDLP_ERR, "Couldn't create pipe");
         goto fail_2;
     }
+#else
+    if (pipe2(client->write_notif_pipe, O_CLOEXEC /*| O_DIRECT*/)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Couldn't create pipe");
+        goto fail_2;
+    }
+#endif
 
     client->poll_fds[POLLFD_PIPE].fd = client->write_notif_pipe[PIPE_READ_END];
     client->poll_fds[POLLFD_PIPE].events = POLLIN;
@@ -276,8 +301,8 @@ void mqtt_wss_destroy(mqtt_wss_client client)
 {
     mqtt_ng_destroy(client->mqtt);
 
-    close(client->write_notif_pipe[PIPE_WRITE_END]);
-    close(client->write_notif_pipe[PIPE_READ_END]);
+    sock_close(client->write_notif_pipe[PIPE_WRITE_END]);
+    sock_close(client->write_notif_pipe[PIPE_READ_END]);
 
     ws_client_destroy(client->ws_client);
 
@@ -522,7 +547,16 @@ int mqtt_wss_connect(
     }
 
     if (!(client->ssl_flags & MQTT_WSS_SSL_DONT_CHECK_CERTS)) {
+#if defined(OS_WINDOWS)
+        if (!netdata_ssl_load_windows_ca_certs(client->ssl_ctx)) {
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "ACLK: failed to load CA certs from Windows Certificate Store");
+            mqtt_wss_close_sockfd(client);
+            return -1;
+        }
+#else
         SSL_CTX_set_default_verify_paths(client->ssl_ctx);
+#endif
         SSL_CTX_set_verify(client->ssl_ctx, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE, cert_verify_callback);
     } else
         nd_log(NDLS_DAEMON, NDLP_ERR, "SSL Certificate checking completely disabled!!!");
@@ -822,14 +856,40 @@ void mqtt_wss_disconnect(mqtt_wss_client client, int timeout_ms)
 
 static void mqtt_wss_wakeup(mqtt_wss_client client)
 {
+#if defined(OS_WINDOWS)
+    SOCKET writer = (SOCKET)(uintptr_t)(unsigned)client->write_notif_pipe[PIPE_WRITE_END];
+    int sent = send(writer, " ", 1, 0);
+    if (sent == 1)
+        return;
+
+    int error = sent == SOCKET_ERROR ? WSAGetLastError() : WSAECONNRESET;
+    // A full nonblocking socket already has a pending wakeup; other errors
+    // mean the service loop may not observe newly queued work promptly.
+    if (error != WSAEWOULDBLOCK)
+        nd_log_limit(&mqtt_wss_wakeup_error_erl, NDLS_ACLK, NDLP_WARNING,
+                     "ACLK: wakeup socket send failed with Winsock error %d", error);
+#else
     if(write(client->write_notif_pipe[PIPE_WRITE_END], " ", 1) <= 0) { ; }
+#endif
 }
 
 #define THROWAWAY_BUF_SIZE 32
 char throwaway[THROWAWAY_BUF_SIZE];
-static void util_clear_pipe(int fd)
+static void util_clear_pipe(mqtt_wss_wakeup_fd_t fd)
 {
+#if defined(OS_WINDOWS)
+    SOCKET reader = (SOCKET)(uintptr_t)(unsigned)fd;
+    int received = recv(reader, throwaway, THROWAWAY_BUF_SIZE, 0);
+    if (received > 0)
+        return;
+
+    int error = received == SOCKET_ERROR ? WSAGetLastError() : WSAECONNRESET;
+    if (error != WSAEWOULDBLOCK)
+        nd_log_limit(&mqtt_wss_wakeup_error_erl, NDLS_ACLK, NDLP_WARNING,
+                     "ACLK: wakeup socket receive failed with Winsock error %d", error);
+#else
     if(read(fd, throwaway, THROWAWAY_BUF_SIZE) <= 0)  { ; }
+#endif
 }
 
 // Did either wire counter move? Split out so the comparison is unit-testable.

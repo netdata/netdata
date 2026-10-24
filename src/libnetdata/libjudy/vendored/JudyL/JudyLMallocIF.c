@@ -55,7 +55,7 @@
 // Note:  To keep the MALLOC macro faster and simpler, set j__uMaxWords to
 // MAXINT, not zero, by default.
 
-Word_t j__uMaxWords = ~0UL;
+Word_t j__uMaxWords = ~(Word_t)0;
 
 // This macro hides the faking of a malloc failure:
 //

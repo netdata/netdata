@@ -370,7 +370,15 @@ typedef struct J__UDY_BRANCH_UNCOMPRESSED
 
 // Produce 1-digit mask at specified state:
 
+// Windows uses LLP64, where long remains 32 bits in 64-bit builds. Keep the
+// original expression for Unix-like platforms and promote the mask before a
+// shift that can reach bit 56 on Windows. This vendor source cannot use
+// Netdata's OS_WINDOWS macro, so use the compiler-provided _WIN32 guard.
+#ifdef _WIN32
+#define cJU_MASKATSTATE(State)  ((Word_t)0xff << (((State) - 1) * cJU_BITSPERBYTE))
+#else
 #define cJU_MASKATSTATE(State)  (0xffL << (((State) - 1) * cJU_BITSPERBYTE))
+#endif
 
 // Get byte (digit) from Index at the specified state, right justified:
 //
@@ -456,8 +464,15 @@ FUNCTION void Init (
         *PoIndex = (91 << 24) | (92 << 16) | (93 << 8) | 94;
 #else
 
+#ifdef _WIN32
+        // Match cJU_MASKATSTATE: LLP64 long literals cannot be shifted to
+        // the upper half of a 64-bit index on Windows.
+        *PoIndex = ((Word_t)91 << 56) | ((Word_t)92 << 48) | ((Word_t)93 << 40) | ((Word_t)94 << 32)
+                 | ((Word_t)95 << 24) | ((Word_t)96 << 16) | ((Word_t)97 <<  8) | (Word_t)98;
+#else
         *PoIndex = (91L << 56) | (92L << 48) | (93L << 40) | (94L << 32)
                  | (95L << 24) | (96L << 16) | (97L <<  8) |  98L;
+#endif
 
         for (offset = 0; offset < (INDEXES + 1) * 5; ++offset)
             Poleaf5[offset] = base + offset;

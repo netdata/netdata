@@ -17,16 +17,17 @@ static void fix_directory_file_permissions(const char *dirname, uid_t uid, gid_t
     struct dirent *de = NULL;
 
     while ((de = readdir(dir))) {
-        if (de->d_type == DT_DIR && (!strcmp(de->d_name, ".") || !strcmp(de->d_name, "..")))
+        unsigned char type = nd_dirent_type(dirname, de);
+        if (type == DT_DIR && (!strcmp(de->d_name, ".") || !strcmp(de->d_name, "..")))
             continue;
 
         (void) snprintfz(filename, FILENAME_MAX, "%s/%s", dirname, de->d_name);
-        if (de->d_type == DT_REG || recursive) {
+        if (type == DT_REG || recursive) {
             if (chown(filename, uid, gid) == -1)
-                netdata_log_error("Cannot chown %s '%s' to %u:%u", de->d_type == DT_DIR ? "directory" : "file", filename, (unsigned int)uid, (unsigned int)gid);
+                netdata_log_error("Cannot chown %s '%s' to %u:%u", type == DT_DIR ? "directory" : "file", filename, (unsigned int)uid, (unsigned int)gid);
         }
 
-        if (de->d_type == DT_DIR && recursive)
+        if (type == DT_DIR && recursive)
             fix_directory_file_permissions(filename, uid, gid, recursive);
     }
 
@@ -47,13 +48,23 @@ static inline void clean_directory(const char *dirname)
     DIR *dir = opendir(dirname);
     if(!dir) return;
 
-    int dir_fd = dirfd(dir);
     struct dirent *de = NULL;
 
     while((de = readdir(dir)))
-        if(de->d_type == DT_REG)
-            if (unlinkat(dir_fd, de->d_name, 0))
+        if(nd_dirent_type(dirname, de) == DT_REG)
+        {
+            char filename[FILENAME_MAX + 1];
+            snprintfz(filename, sizeof(filename), "%s/%s", dirname, de->d_name);
+#if defined(OS_WINDOWS)
+            wchar_t *native_filename = os_translate_msys_to_windows_pathW(filename);
+            bool deleted = native_filename && DeleteFileW(native_filename);
+            freez(native_filename);
+#else
+            bool deleted = unlinkat(dirfd(dir), de->d_name, 0) == 0;
+#endif
+            if (!deleted)
                 netdata_log_error("Cannot delete %s/%s", dirname, de->d_name);
+        }
 
     closedir(dir);
 }
