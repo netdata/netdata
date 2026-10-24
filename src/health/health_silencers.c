@@ -333,7 +333,7 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
         ret = HTTP_RESP_FORBIDDEN;
     } else {
         netdata_log_debug(D_HEALTH, "HEALTH command API: Comparing secret '%s' to '%s'", w->auth_bearer_token, api_secret);
-        if (strcmp(w->auth_bearer_token, api_secret) != 0) {
+        if (!streq_constant_time(w->auth_bearer_token, api_secret)) {
             buffer_strcat(wb, HEALTH_CMDAPI_MSG_AUTHERROR);
             ret = HTTP_RESP_FORBIDDEN;
         } else {
