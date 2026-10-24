@@ -2506,10 +2506,71 @@ cleanup:
     return errors;
 }
 
+// A rejected journal v2 whose journal v1 is unusable (shorter than its superblock)
+// cannot be rebuilt: the rebuild fails and leaves the rejected v2 on disk, recorded.
+static int mrg_jv2_rebuild_with_unusable_v1_check(void) {
+    int errors = 0;
+    enum { TEST_FILENO = 15 };
+
+    struct jv2_one_metric t = { 0 };
+    if(!jv2_journal_fixture_init(&t.fx, TEST_FILENO))
+        return 0;
+
+    char v1_path[FILENAME_MAX + 1];
+    journalfile_v1_generate_path(&t.fx.datafile, v1_path, sizeof(v1_path));
+
+    if(!jv2_one_metric_publish(&t)) {
+        errors++;
+        goto cleanup;
+    }
+
+    struct rrdengine_journalfile *journalfile = t.fx.journalfile;
+    size_t loaded_size = journalfile_v2_data_size_get(journalfile);
+    jv2_break_next_mapping(journalfile);
+    journalfile_v2_populate_retention_to_mrg(&t.fx.ctx, journalfile);
+
+    int v1_fd = open(v1_path, O_CREAT | O_TRUNC | O_WRONLY | O_CLOEXEC, 0644);
+    bool v1_written = v1_fd != -1 && write(v1_fd, "x", 1) == 1;
+    if(v1_fd != -1)
+        close(v1_fd);
+    if(!v1_written) {
+        fprintf(stderr, "ERROR: cannot write the short journal v1\n");
+        errors++;
+        goto cleanup;
+    }
+
+    if(journalfile_v2_rebuild_from_v1(&t.fx.ctx, journalfile)) {
+        fprintf(stderr, "ERROR: a journal v2 was rebuilt from an unusable journal v1\n");
+        errors++;
+    }
+
+    char v2_path[FILENAME_MAX + 1];
+    journalfile_v2_generate_path(&t.fx.datafile, v2_path, sizeof(v2_path));
+    if(access(v2_path, F_OK) != 0) {
+        fprintf(stderr, "ERROR: the rejected journal v2 was removed although its v1 is unusable\n");
+        errors++;
+    }
+    if(t.fx.datafile.populate_mrg.rejected_v2_size != loaded_size) {
+        fprintf(stderr, "ERROR: the rejected journal v2 records %zu bytes after the failed rebuild, expected %zu\n",
+                t.fx.datafile.populate_mrg.rejected_v2_size, loaded_size);
+        errors++;
+    }
+    if(journalfile->file != -1) {
+        fprintf(stderr, "ERROR: the failed rebuild left v1 fd %d in the journal\n", (int)journalfile->file);
+        errors++;
+    }
+
+cleanup:
+    unlink(v1_path);
+    errors += jv2_one_metric_destroy(&t);
+    return errors;
+}
+
 static int mrg_jv2_rejected_journal_unittest(void) {
-    fprintf(stderr, "\nTesting rejected journal v2 end states (mapping failure, v1 close)...\n");
+    fprintf(stderr, "\nTesting rejected journal v2 end states (mapping failure, v1 close, rebuild)...\n");
     int errors = mrg_jv2_rejected_on_mapping_failure_check();
     errors += mrg_jv2_close_owned_v1_check();
+    errors += mrg_jv2_rebuild_with_unusable_v1_check();
     fprintf(stderr, "jv2 rejected journal test: %s\n", errors ? "FAILED" : "OK");
     return errors;
 }

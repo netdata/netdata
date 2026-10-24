@@ -2140,8 +2140,10 @@ bool journalfile_v2_rebuild_from_v1(struct rrdengine_instance *ctx, struct rrden
     }
 
     int ret = check_file_properties(file, &file_size, sizeof(struct rrdeng_df_sb));
-    if (ret)
-        CLOSE_FILE(ctx, path, file, ret);
+    if (ret) {
+        int close_ret;  // CLOSE_FILE() sets it: ret keeps the failure
+        CLOSE_FILE(ctx, path, file, close_ret);
+    }
     else {
         // the replay hands the file to the journal, also when it fails
         ret = journalfile_v1_replay(ctx, journalfile, file, file_size, path);
