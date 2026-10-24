@@ -20,12 +20,12 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
       - name: SSH setup
         id: ssh-setup
-        uses: shimataro/ssh-key-action@v2
+        uses: shimataro/ssh-key-action@87a8f067114a8ce263df83e9ed5c849953548bc3 # v2.8.1
         with:
           key: ${{ secrets.NETDATABOT_PACKAGES_SSH_KEY }}
           name: id_ecdsa
@@ -38,7 +38,7 @@ jobs:
         id: upload-packages2
         run: rsync -vp packaging/installer/kickstart.sh netdatabot@packages2.netdata.cloud:/home/netdatabot/incoming/kickstart.sh
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_ICON_EMOJI: ':github-actions:'
@@ -48,7 +48,7 @@ jobs:
               ${{ github.repository }}: Failed to upload updated kickstart script to repo server.
               Checkout: ${{ steps.checkout.outcome }}
               Import SSH Key: ${{ steps.ssh-setup.outcome }}
-              Upload to packages.netdata.cloud: ${{ steps.upload-packages.outcome }}
+              Upload to packages.netdata.cloud: ${{ steps.upload-primary.outcome }}
               Upload to packages2.netdata.cloud: ${{ steps.upload-packages2.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-

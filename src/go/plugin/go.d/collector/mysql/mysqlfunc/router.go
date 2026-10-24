@@ -55,11 +55,11 @@ func (r *router) Cleanup(ctx context.Context) {
 	}
 }
 
-func Methods() []funcapi.MethodConfig {
-	return []funcapi.MethodConfig{
-		topQueriesMethodConfig(),
-		deadlockInfoMethodConfig(),
-		errorInfoMethodConfig(),
+func Methods() []funcapi.FunctionConfig {
+	return []funcapi.FunctionConfig{
+		topQueriesFunctionConfig(),
+		deadlockInfoFunctionConfig(),
+		errorInfoFunctionConfig(),
 	}
 }
 

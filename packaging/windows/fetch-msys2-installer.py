@@ -1,11 +1,10 @@
 #!/usr/bin/env python
 
-'''Fetch the MSYS2 installer.'''
+'''Fetch a pinned MSYS2 file bundled in the Windows installer.'''
 
 from __future__ import annotations
 
 import hashlib
-import json
 import shutil
 import sys
 
@@ -14,50 +13,38 @@ from tempfile import TemporaryDirectory
 from typing import Final
 from urllib.request import Request, urlopen
 
-REPO: Final = 'msys2/msys2-installer'
+# Pinned so an MSYS2 release can not change what we ship without a reviewed change.
+PINS: Final = {
+    # The MSYS2 tree the installer ships. This release bundles msys2-runtime 3.6.10, whose msys-2.0.dll kills netdata
+    # at startup; package-windows.sh replaces that DLL with the one from the runtime package below.
+    'base': (
+        'https://github.com/msys2/msys2-installer/releases/download/2026-09-27/msys2-base-x86_64-20260927.tar.zst',
+        '8a2095647afbf799d113d0cae35f7544589d059819042635504e75bd2179bd02',
+    ),
+    # MSYS2's msys2-runtime 3.6.11, which carries the upstream fixes 3.6.10 lacks. Drop it once the base pin moves to
+    # a release that bundles 3.6.11 or later.
+    'runtime': (
+        'https://repo.msys2.org/msys/x86_64/msys2-runtime-3.6.11-4-x86_64.pkg.tar.zst',
+        '7b1c4b625483ceff9a87f2dfcf3659704dc3da655a0ad414ecb7d9175e7d3ba0',
+    ),
+}
 
 
-def get_latest_release() -> tuple[str, str]:
-    '''Get the latest release for the repo.'''
-    REQUEST: Final = Request(
-        url=f'https://api.github.com/repos/{REPO}/releases',
-        headers={
-            'Accept': 'application/vnd.github+json',
-            'X-GitHub-API-Version': '2022-11-28',
-        },
-        method='GET',
-    )
+def sha256sum(path: Path) -> str:
+    '''Return the SHA256 checksum of a file.'''
+    return hashlib.sha256(path.read_bytes()).hexdigest().casefold()
 
-    print('>>> Fetching release list')
 
-    with urlopen(REQUEST, timeout=15) as response:
+def fetch(tmpdir: Path, url: str) -> Path:
+    '''Fetch a file into a temporary directory.'''
+    FILE: Final = url.rsplit('/', 1)[1]
+    TARGET: Final = tmpdir / FILE
+
+    print(f'>>> Downloading {FILE}')
+
+    with urlopen(Request(url=url, method='GET'), timeout=15) as response:
         if response.status != 200:
-            print(f'!!! Failed to fetch release list, status={response.status}')
-            sys.exit(1)
-
-        data = json.load(response)
-
-    data = list(filter(lambda x: x['name'] != 'Nightly Installer Build', data))
-
-    name = data[0]['name']
-    version = data[0]['tag_name'].replace('-', '')
-
-    return name, version
-
-
-def fetch_release_asset(tmpdir: Path, name: str, file: str) -> Path:
-    '''Fetch a specific release asset.'''
-    REQUEST: Final = Request(
-        url=f'https://github.com/{REPO}/releases/download/{name}/{file}',
-        method='GET',
-    )
-    TARGET: Final = tmpdir / file
-
-    print(f'>>> Downloading {file}')
-
-    with urlopen(REQUEST, timeout=15) as response:
-        if response.status != 200:
-            print(f'!!! Failed to fetch {file}, status={response.status}')
+            print(f'!!! Failed to fetch {FILE}, status={response.status}')
             sys.exit(1)
 
         TARGET.write_bytes(response.read())
@@ -67,33 +54,33 @@ def fetch_release_asset(tmpdir: Path, name: str, file: str) -> Path:
 
 def main() -> None:
     '''Core program logic.'''
-    if len(sys.argv) != 2:
-        print(f'{__file__} must be run with exactly one argument.')
+    if len(sys.argv) != 3 or sys.argv[1] not in PINS:
+        print(f'Usage: {__file__} <{"|".join(PINS)}> <target>')
+        sys.exit(1)
 
-    target = Path(sys.argv[1])
+    url, sha256 = PINS[sys.argv[1]]
+    target = Path(sys.argv[2])
     tmp_target = target.with_name(f'.{target.name}.tmp')
 
-    name, version = get_latest_release()
+    if target.is_file() and sha256sum(target) == sha256:
+        print(f'>>> {target} already holds {url}')
+        return
 
     with TemporaryDirectory() as tmpdir:
-        tmppath = Path(tmpdir)
-
-        installer = fetch_release_asset(tmppath, name, f'msys2-base-x86_64-{version}.tar.zst')
-        checksums = fetch_release_asset(tmppath, name, f'msys2-base-x86_64-{version}.tar.zst.sha256')
+        file = fetch(Path(tmpdir), url)
 
         print('>>> Verifying SHA256 checksum')
-        expected_checksum = checksums.read_text().partition(' ')[0].casefold()
-        actual_checksum = hashlib.sha256(installer.read_bytes()).hexdigest().casefold()
+        actual_checksum = sha256sum(file)
 
-        if expected_checksum != actual_checksum:
+        if actual_checksum != sha256:
             print('!!! Checksum mismatch')
-            print(f'!!! Expected: {expected_checksum}')
+            print(f'!!! Expected: {sha256}')
             print(f'!!! Actual:   {actual_checksum}')
             sys.exit(1)
 
         print(f'>>> Copying to {target}')
 
-        shutil.copy(installer, tmp_target)
+        shutil.copy(file, tmp_target)
         tmp_target.replace(target)
 
 

@@ -140,7 +140,9 @@ int poll_default_rcv_callback(POLLINFO *pi, nd_poll_event_t *events) {
 
                 return -1;
             }
-        } else if (rc) {
+        } else if (!rc) {
+            return -1;
+        } else {
             // data received
             nd_log(NDLS_DAEMON, NDLP_WARNING,
                    "POLLFD: internal error: poll_default_rcv_callback() is discarding %zd bytes received on socket %d",
@@ -367,6 +369,11 @@ void poll_events(LISTEN_SOCKETS *sockets
         .tmr_callback = tmr_callback?tmr_callback:poll_default_tmr_callback
     };
 
+    if(unlikely(!p.ndpl)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "POLLFD: failed to create nd_poll");
+        return;
+    }
+
     size_t i;
     for(i = 0; i < sockets->opened ;i++) {
 
@@ -406,14 +413,6 @@ void poll_events(LISTEN_SOCKETS *sockets
 
     CLEANUP_FUNCTION_REGISTER(poll_events_cleanup) cleanup_ptr = &p;
 
-    size_t iteration_counter = 0,
-            timeout_counter = 0,
-            errors_counter = 0,
-            read_counter = 0,
-            writes_counter = 0,
-            unhandled_counter = 0,
-            cleanup_counter = 0;
-
     while(!check_to_stop_callback() && !nd_thread_signaled_to_cancel()) {
         if(unlikely(timer_usec)) {
             now_usec = now_boottime_usec();
@@ -444,7 +443,6 @@ void poll_events(LISTEN_SOCKETS *sockets
 
         nd_poll_result_t result;
         retval = nd_poll_wait(p.ndpl, ND_CHECK_CANCELLABILITY_WHILE_WAITING_EVERY_MS, &result);
-        iteration_counter++;
         time_t now = now_boottime_sec();
 
         if(unlikely(retval == -1)) {
@@ -452,7 +450,6 @@ void poll_events(LISTEN_SOCKETS *sockets
             break;
         }
         else if(unlikely(!retval)) {
-            timeout_counter++;
             // timeout
             ;
         }
@@ -460,15 +457,12 @@ void poll_events(LISTEN_SOCKETS *sockets
             POLLINFO *pi = (POLLINFO *)result.data;
 
             if(result.events & (ND_POLL_HUP | ND_POLL_INVALID | ND_POLL_ERROR)) {
-                errors_counter++;
                 poll_process_error(pi, result.events);
             }
             else if(result.events & ND_POLL_WRITE) {
-                writes_counter++;
                 poll_process_send(pi, now);
             }
             else if(result.events & ND_POLL_READ) {
-                read_counter++;
                 if (pi->flags & POLLINFO_FLAG_CLIENT_SOCKET) {
                     if (pi->socktype == SOCK_DGRAM)
                         poll_process_udp_read(pi, now);
@@ -520,8 +514,6 @@ void poll_events(LISTEN_SOCKETS *sockets
                 }
             }
             else {
-                unhandled_counter++;
-
                 nd_log(NDLS_DAEMON, NDLP_ERR,
                        "POLLFD: LISTENER: socket slot %zu (fd %d) client %s port %s unhandled event id %d."
                        , i
@@ -536,8 +528,6 @@ void poll_events(LISTEN_SOCKETS *sockets
         }
 
         if(unlikely(p.checks_every > 0 && now - last_check > p.checks_every)) {
-            cleanup_counter++;
-
             last_check = now;
 
             // cleanup old sockets

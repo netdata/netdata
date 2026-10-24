@@ -1,0 +1,115 @@
+# prometheus-fastapi-instrumentator HTTP server instrumentation shared by applications.
+# Generated *_created gauges are registration timestamps rather than operational signals.
+
+match: 'http_requests* http_request_duration* http_request_size* http_response_size*'
+autogen:
+  selector:
+    deny:
+      - http_request_size_bytes
+      - http_response_size_bytes
+relabeling:
+  - match: http_*_created
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'http_.+_created'
+        action: drop
+template:
+  family: FastAPI
+  context_namespace: fastapi
+  groups:
+    - family: HTTP Endpoints
+      context_namespace: http_endpoints
+      chart_defaults:
+        instances:
+          by_labels: [handler, method]
+      metrics:
+        - http_requests_total
+        - http_request_duration_seconds_bucket
+        - http_request_duration_seconds_count
+        - http_request_duration_seconds_sum
+      charts:
+        - title: HTTP Request Outcomes
+          context: request_outcomes
+          units: requests/s
+          dimensions:
+            - selector: http_requests_total
+              name_from_label: status
+
+        - title: HTTP Request Duration
+          context: request_duration
+          units: observations/s
+          dimensions:
+            - selector: http_request_duration_seconds_bucket
+
+        - title: HTTP Request Measurements
+          context: request_measurements
+          units: requests/s
+          dimensions:
+            - selector: http_request_duration_seconds_count
+              name: requests
+
+        - title: HTTP Completed Request Time
+          context: completed_request_time
+          units: seconds/s
+          dimensions:
+            - selector: http_request_duration_seconds_sum
+              name: time
+
+    - family: HTTP Service
+      context_namespace: http_service
+      metrics:
+        - http_request_duration_highr_seconds_bucket
+        - http_request_duration_highr_seconds_count
+        - http_request_duration_highr_seconds_sum
+      charts:
+        - title: High-Resolution HTTP Request Duration
+          context: request_duration
+          units: observations/s
+          dimensions:
+            - selector: http_request_duration_highr_seconds_bucket
+
+        - title: HTTP Request Measurements
+          context: request_measurements
+          units: requests/s
+          dimensions:
+            - selector: http_request_duration_highr_seconds_count
+              name: requests
+
+        - title: HTTP Completed Request Time
+          context: completed_request_time
+          units: seconds/s
+          dimensions:
+            - selector: http_request_duration_highr_seconds_sum
+              name: time
+
+    - family: HTTP In Progress
+      context_namespace: http_inprogress
+      metrics:
+        - http_requests_inprogress
+      charts:
+        - title: HTTP Requests In Progress
+          context: requests
+          units: requests
+          instances:
+            optional_by_labels: [handler, method]
+          dimensions:
+            - selector: http_requests_inprogress
+              name: requests
+
+    - family: HTTP Body Traffic
+      context_namespace: http_body
+      chart_defaults:
+        instances:
+          by_labels: [handler]
+      metrics:
+        - http_request_size_bytes_sum
+        - http_response_size_bytes_sum
+      charts:
+        - title: HTTP Body Throughput
+          context: throughput
+          units: bytes/s
+          dimensions:
+            - selector: http_request_size_bytes_sum
+              name: request
+            - selector: http_response_size_bytes_sum
+              name: response

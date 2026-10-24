@@ -1,0 +1,194 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package cloudwatch
+
+import (
+	"testing"
+	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwquery"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func chartTestCollector(t *testing.T, baseNames ...string) *Collector {
+	t.Helper()
+	catalog, err := cwprofiles.LoadFromDefaultDirs()
+	require.NoError(t, err)
+	want := make(map[string]struct{}, len(baseNames))
+	for _, n := range baseNames {
+		want[n] = struct{}{}
+	}
+	var profs []cwprofiles.ResolvedProfile
+	for _, p := range catalog.AllProfiles() {
+		if _, ok := want[p.Name]; ok {
+			profs = append(profs, p)
+		}
+	}
+	require.Len(t, profs, len(baseNames))
+
+	c := New()
+	c.plan = &collectionPlan{Profiles: profs}
+	return c
+}
+
+func TestBuildChartSpec_InjectsMetricsWithoutStaticRateDivisors(t *testing.T) {
+	c := chartTestCollector(t, "ec2")
+
+	spec := buildChartSpec(c.plan.Profiles)
+	require.Len(t, spec.Groups, 2)
+
+	group := spec.Groups[0]
+	assert.NotEmpty(t, group.Metrics, "template.metrics (visible series) is injected")
+
+	dims := 0
+	for _, chart := range group.Charts {
+		for _, d := range chart.Dimensions {
+			dims++
+			assert.Nilf(t, d.Options, "dimension %q gets no collector-injected options", d.Selector)
+		}
+	}
+	assert.Positive(t, dims)
+}
+
+func TestBuildChartSpec_DoesNotMutateCatalog(t *testing.T) {
+	c := chartTestCollector(t, "ec2")
+
+	// Building the spec deep-copies each profile template before injecting options.
+	buildChartSpec(c.plan.Profiles)
+
+	// The deep copy must leave the resolved profile's template untouched.
+	for _, chart := range c.plan.Profiles[0].Config.Template.Charts {
+		for _, d := range chart.Dimensions {
+			assert.Nilf(t, d.Options, "catalog profile dimension %q must not be mutated", d.Selector)
+		}
+	}
+}
+
+func TestActivityChartGroupContract(t *testing.T) {
+	spec := buildChartSpec(nil)
+	assert.Equal(t, "cloudwatch", spec.ContextNamespace)
+	require.Len(t, spec.Groups, 1)
+	group := spec.Groups[0]
+	assert.Equal(t, "Collector Activity", group.Family)
+	assert.ElementsMatch(t, []string{
+		activitySDKInvocationsMetric,
+		activityCalculatedMetricRequestsMetric,
+		activityProfileMetricRequestEstimatesMetric,
+		activityQueryItemsMetric,
+	}, group.Metrics)
+
+	want := map[string]struct {
+		title     string
+		context   string
+		units     string
+		selector  string
+		name      string
+		instances []string
+	}{
+		"aws_cloudwatch_collector_sdk_invocations": {
+			title:   "CloudWatch SDK Invocations",
+			context: "collector_sdk_invocations", units: "invocations",
+			selector: activitySDKInvocationsMetric, name: "invocations",
+			instances: []string{"account_id", "region", "operation"},
+		},
+		"aws_cloudwatch_collector_get_metric_data_calculated_metric_requests": {
+			title:   "GetMetricData Calculated Metric Requests",
+			context: "collector_get_metric_data_calculated_metric_requests", units: "metric requests",
+			selector: activityCalculatedMetricRequestsMetric, name: "calculated_metric_requests",
+			instances: []string{"account_id", "region"},
+		},
+		"aws_cloudwatch_collector_get_metric_data_profile_metric_request_estimates": {
+			title:   "GetMetricData Profile Metric Request Estimates",
+			context: "collector_get_metric_data_profile_metric_request_estimates", units: "metric requests",
+			selector: activityProfileMetricRequestEstimatesMetric, name: "estimated_metric_requests",
+			instances: []string{"account_id", "region", "profile"},
+		},
+		"aws_cloudwatch_collector_get_metric_data_query_items": {
+			title:   "GetMetricData Query Items",
+			context: "collector_get_metric_data_query_items", units: "query items",
+			selector: activityQueryItemsMetric, name: "query_items",
+			instances: []string{"account_id", "region", "profile"},
+		},
+	}
+	require.Len(t, group.Charts, len(want))
+	for _, chart := range group.Charts {
+		expected, ok := want[chart.ID]
+		require.True(t, ok, "unexpected chart %q", chart.ID)
+		assert.Equal(t, expected.title, chart.Title)
+		assert.Equal(t, expected.context, chart.Context)
+		assert.Equal(t, "cloudwatch."+expected.context, spec.ContextNamespace+"."+chart.Context)
+		assert.Equal(t, expected.units, chart.Units)
+		assert.Equal(t, "absolute", chart.Algorithm)
+		instances := chart.Instances
+		if instances == nil {
+			instances = group.ChartDefaults.Instances
+		}
+		require.NotNil(t, instances)
+		assert.Equal(t, expected.instances, instances.ByLabels)
+		require.Len(t, chart.Dimensions, 1)
+		assert.Equal(t, expected.selector, chart.Dimensions[0].Selector)
+		assert.Equal(t, expected.name, chart.Dimensions[0].Name)
+		assert.Empty(t, chart.Dimensions[0].NameFromLabel)
+	}
+}
+
+func TestEnsurePlan_BuildsValidChartTemplate(t *testing.T) {
+	cat, err := cwprofiles.LoadFromDefaultDirs()
+	require.NoError(t, err)
+
+	enabled := 0
+	for _, p := range cat.AllProfiles() {
+		if !p.Config.Disabled {
+			enabled++
+		}
+	}
+
+	var names []string
+	for _, profile := range cat.AllProfiles() {
+		names = append(names, profile.Name)
+	}
+	tests := map[string]struct {
+		explicitAll bool
+		wantCount   int
+	}{
+		"default-enabled profiles": {wantCount: enabled},
+		"explicit all profiles":    {explicitAll: true, wantCount: len(cat.AllProfiles())},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			c := New()
+			c.Config = validConfig()
+			if tc.explicitAll {
+				falseValue := false
+				c.Config.Rules[0].Profiles = &ProfileSelectorConfig{Defaults: &falseValue, Include: names}
+			}
+			c.applyDefaults()
+			c.newCatalog = cwprofiles.LoadFromDefaultDirs
+
+			require.NoError(t, c.ensurePlan())
+			assert.Len(t, c.plan.Profiles, tc.wantCount)
+			require.NotEmpty(t, c.chartTemplateYAML)
+			collecttest.AssertChartTemplateSchema(t, c.chartTemplateYAML)
+		})
+	}
+}
+
+func TestProfileSeries_ContainsEveryDeclaredStatisticIncludingDisabled(t *testing.T) {
+	prof := cwprofiles.Profile{
+		Query: cwquery.Config{Period: longDuration(5 * time.Minute)},
+		Metrics: []cwprofiles.Metric{
+			{ID: "req", Statistics: []string{"sum", "average"}, Rate: true},
+			{ID: "evt", Statistics: []string{"sample_count"}, Disabled: true, Rate: true},
+		},
+	}
+
+	series := profileSeries("svc", prof)
+
+	require.Contains(t, series, "svc.req_sum")
+	require.Contains(t, series, "svc.evt_sample_count")
+	require.Contains(t, series, "svc.req_average")
+}

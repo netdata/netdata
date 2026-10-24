@@ -76,7 +76,9 @@ To edit the `ebpf.d.conf`:
 
 ### `[global]` configuration options
 
-The `[global]` section defines settings for the whole eBPF collector.
+The `[global]` section defines settings for the whole eBPF collector. For `update every`, the configuration file value
+takes precedence when set; the pluginsd command-line interval is used only as a fallback when no configuration file
+value is present, and the built-in default is used last.
 
 #### eBPF load mode
 
@@ -92,6 +94,16 @@ accepts the following values:
 - `return`: In the `return` mode, the eBPF collector monitors the same kernel functions as `entry`, but also creates new
     charts for the return of these functions, such as errors. Monitoring function returns can help in debugging software,
     such as failing to close file descriptors or creating zombie processes.
+
+#### eBPF object flavor
+
+The `ebpf object flavor` option selects which cachestat object family the Go collector loads from `ebpf.d`.
+
+- `buffer`: The default flavor. Use the buffer object when the current kernel supports it.
+- `arena`: Use the arena object when it is available on the host.
+- `tracing`: Use the legacy tracing object path.
+
+If the requested flavor is not available on the current host, the collector falls back to `tracing`.
 
 #### Integration with `apps.plugin`
 
@@ -149,8 +161,8 @@ will only enable these threads integrated with other collectors when the kernel 
 
 #### Collection period
 
-The plugin uses the option `update every` to define the number of seconds used for eBPF to send data for Netdata. The default value
-is 5 seconds.
+The plugin uses the option `update every` to define the number of seconds used for eBPF to send data when Netdata does
+not provide a pluginsd interval. The default value is 10 seconds.
 
 #### PID table size
 
@@ -228,7 +240,8 @@ The eBPF collector enables and runs the following eBPF programs by default:
 - `cachestat`: Netdata's eBPF data collector creates charts about the memory page cache. When the integration with
     [`apps.plugin`](/src/collectors/apps.plugin/README.md) is enabled, this collector creates charts for the whole host _and_
     for each application.
-- `fd` :  This eBPF program creates charts that show information about calls to open files.
+- `fd`: The eBPFGo program creates charts that show information about calls to open and close files. Its object
+    flavor instruments the kernel's open and close entry points; the error charts require `ebpf load mode = return`.
 - `mount`: This eBPF program creates charts that show calls to syscalls mount(2) and umount(2).
 - `shm`: This eBPF program creates charts that show calls to syscalls shmget(2), shmat(2), shmdt(2) and shmctl(2).
 - `process`: This eBPF program creates charts that show information about process life. When in `return` mode, it also
@@ -243,17 +256,13 @@ The eBPF collector enables and runs the following eBPF programs by default:
 
 You can also enable the following eBPF programs:
 
-- `dcstat` : This eBPF program creates charts that show information about file access using directory cache. It appends
-    `kprobes` for `lookup_fast()` and `d_lookup()` to identify if files are inside directory cache, outside and files are
-    not found.
+- `dcstat`: The eBPFGo program creates charts that show file access through the directory cache. Its object flavor uses
+    `lookup_fast()` and `d_lookup()` instrumentation to distinguish cache hits, slow-path lookups, and misses.
 - `disk` : This eBPF program creates charts that show information about disk latency independent of filesystem.
 - `filesystem` : This eBPF program creates charts that show information about some filesystem latency.
 - `swap` : This eBPF program creates charts that show information about swap access.
-- `mdflush`: This eBPF program creates charts that show information about
+- `mdflush`: This eBPF program creates charts that show information about multi-device software flushes.
 - `sync`: Monitor calls to syscalls sync(2), fsync(2), fdatasync(2), syncfs(2), msync(2), and sync_file_range(2).
-- `socket`: This eBPF program creates charts with information about `TCP` and `UDP` functions, including the
-    bandwidth consumed by each.
-    multi-device software flushes.
 - `vfs`: This eBPF program creates charts that show information about VFS (Virtual File System) functions.
 
 ### Configuring eBPF threads
@@ -270,78 +279,29 @@ To configure an eBPF thread:
 
 2. Use the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) script to edit a thread configuration file. The following configuration files are available:
 
-    - `network.conf`: Configuration for the [`network` thread](#network-configuration). This config file overwrites the global options and also
-        lets you specify which network the eBPF collector monitors.
-    - `process.conf`: Configuration for the [`process` thread](#sync-configuration).
     - `cachestat.conf`: Configuration for the `cachestat` thread(#filesystem-configuration).
-    - `dcstat.conf`: Configuration for the `dcstat` thread.
+    - `dcstat.conf`: Legacy compatibility overlay for the eBPFGo `dcstat` program. Prefer enabling `dcstat` in the
+      `[ebpf programs]` section of `ebpf.d.conf`.
     - `disk.conf`: Configuration for the `disk` thread.
-    - `fd.conf`: Configuration for the `file descriptor` thread.
+    - `dns.conf`: Configuration for the `dns` thread.
+    - `fd.conf`: Legacy compatibility overlay for the eBPFGo `fd` program. Prefer enabling `fd` in the
+      `[ebpf programs]` section of `ebpf.d.conf`.
     - `filesystem.conf`: Configuration for the `filesystem` thread.
     - `hardirq.conf`: Configuration for the `hardirq` thread.
+    - `mdflush.conf`: Configuration for the `mdflush` thread.
+    - `mount.conf`: Configuration for the `mount` thread.
+    - `oomkill.conf`: Configuration for the `oomkill` thread.
+    - `process.conf`: Configuration for the [`process` thread](#sync-configuration).
+    - `shm.conf`: Configuration for the `shm` thread.
+    - `socket.conf`: Configuration for the `ebpfgo.plugin` socket program (the C socket thread was removed). Controls BPF map sizes (`socket monitoring table size`, `udp connection table size`) and the standard `ebpf object flavor`/`maps per core` options. The legacy `network.conf` keys `bandwidth table size` (was dead config — never read by C code), `collect pid` (no per-apps-plugin equivalent in the new SHM design), and `lifetime` (the C socket thread's function lifetime) have no socket.conf equivalent and are silently ignored if present.
     - `softirq.conf`: Configuration for the `softirq` thread.
+    - `swap.conf`: Configuration for the `swap` thread.
     - `sync.conf`: Configuration for the `sync` thread.
     - `vfs.conf`: Configuration for the `vfs` thread.
 
         ```bash
         ./edit-config FILE.conf
         ```
-
-### Network configuration
-
-The network configuration has specific options to configure which network(s) the eBPF collector monitors. These options
-are divided in the following sections:
-
-#### `[network connections]`
-
-You can configure the information shown with function `ebpf_socket` using the settings in this section.
-
-```text
-[network connections]
-    enabled = yes
-    resolve hostname ips = no
-    resolve service names = yes
-    ports = 1-1024 !145 !domain
-    hostnames = !example.com
-    ips = !127.0.0.1/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 fc00::/7
-```
-
-When you define a `ports` setting, Netdata will collect network metrics for that specific port. For example, if you
-write `ports = 19999`, Netdata will collect only connections for itself. The `hostnames` setting accepts
-[simple patterns](/src/libnetdata/simple_pattern/README.md). The `ports`, and `ips` settings accept negation (`!`) to deny
-specific values or asterisk alone to define all values.
-
-In the above example, Netdata will collect metrics for all ports between `1` and `1024`, with the exception of `53` (domain)
-and `145`.
-
-The following options are available:
-
-- `enabled`: Disable network connections monitoring. This can affect directly some funcion output.
-- `resolve hostname ips`: Enable resolving IPs to hostnames. It is disabled by default because it can be too slow.
-- `resolve service names`: Convert destination ports into service names, for example, port `53` protocol `UDP` becomes `domain`.
-    all names are read from /etc/services.
-- `ports`: Define the destination ports for Netdata to monitor.
-- `hostnames`: The list of hostnames that can be resolved to an IP address.
-- `ips`: The IP or range of IPs that you want to monitor. You can use IPv4 or IPv6 addresses, use dashes to define a
-    range of IPs, or use CIDR values.
-
-By default the traffic table is created using the destination IPs and ports of the sockets. This can be
-changed, so that Netdata uses service names (if possible), by specifying `resolve service name = yes` in the configuration
-section.
-
-#### `[service name]`
-
-Netdata uses the list of services in `/etc/services` to plot network connection charts. If this file does not contain
-the name for a particular service you use in your infrastructure, you will need to add it to the `[service name]`
-section.
-
-For example, Netdata's default port (`19999`) is not listed in `/etc/services`. To associate that port with the Netdata
-service in network connection charts, and thus see the name of the service instead of its port, define it:
-
-```text
-[service name]
-    19999 = Netdata
-```
 
 ### Sync configuration
 
@@ -446,7 +406,10 @@ Internally, the Linux kernel treats both processes and threads as `tasks`. To cr
 system calls: `fork(2)`, `vfork(2)`, and `clone(2)`. To generate this chart, the eBPF
 collector uses the following `tracepoints` and `kprobe`:
 
-- `sched/sched_process_fork`: Tracepoint called after a call for `fork (2)`, `vfork (2)` and `clone (2)`.
+- `sched/sched_process_fork`: Tracepoint called after a call for `fork (2)`, `vfork (2)` and `clone (2)`. It is
+     attached as a BTF raw tracepoint (`tp_btf`) when CO-RE code runs in `trampoline` or `tracepoint` mode.
+- `kprobe/wake_up_new_task`: called when a new task is started. Legacy code, CO-RE code in `probe` mode, and CO-RE
+     code in `tracepoint` mode on kernels without BTF raw tracepoint support use it instead of `sched/sched_process_fork`.
 - `sched/sched_process_exec`: Tracepoint called after a exec-family syscall.
 - `kprobe/kernel_clone`: This is the main [`fork()`](https://elixir.bootlin.com/linux/v5.10/source/kernel/fork.c#L2415)
      routine since kernel `5.10.0` was released.
@@ -637,12 +600,20 @@ The eBPF plugin also shows a chart in the Disk section when the `disk` thread is
 
 #### Disk Latency
 
-This will create the chart `disk_latency_io` for each disk on the host. The following tracepoints are used:
+This will create the chart `disk_latency_io` for each disk on the host. The following functions are monitored:
 
-- [`block/block_rq_issue`](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_block_rq_issue):
-    IO request operation to a device drive.
-- [`block/block_rq_complete`](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_block_rq_complete):
-    IO operation completed by device.
+- `kprobe/blk_mq_start_request`: IO request operation sent to a device driver.
+- `kprobe/blk_start_request`: IO request operation sent through the older single-queue path on kernels before 5.0.
+- `kprobe/blk_mq_end_request`: IO operation completed by the device.
+- `kprobe/__blk_mq_end_request`: IO operation completed by the SCSI layer (SCSI, SATA and SAS disks), which does not
+    call `blk_mq_end_request`. If this symbol cannot be probed, `kprobe/blk_mq_free_request` is used as a fallback.
+    A request seen by multiple completion probes is counted once.
+- `blk_complete_request`: IO completion on the older request path. It is attached only when the running kernel
+    provides this function (a `kprobe` with legacy code, `fentry` with CO-RE code).
+
+On generic kernels 6.8 and newer, disk latency is unavailable when the plugin must use legacy BPF objects. The
+plugin refuses the older 5.4 disk object because its compiled kernel structure offsets are not validated for these
+kernels. On builds with CO-RE support, kernel BTF allows the plugin to use the CO-RE object instead.
 
 Disk Latency is the single most important metric to focus on when it comes to storage performance, under most circumstances.
 For hard drives, an average latency somewhere between 10 to 20 ms can be considered acceptable. For SSD (Solid State Drives),
@@ -723,20 +694,33 @@ filesystem, the collector needs to attach `kprobes` and `kretprobes` for each of
 
 #### File descriptor
 
-To give metrics related to `open` and `close` events, instead of attaching kprobes for each syscall used to do these
-events, the collector attaches `kprobes` for the common function used for syscalls:
+To give metrics related to `open` and `close` events, the eBPFGo `fd` collector resolves its attach symbols from
+`/proc/kallsyms` at start-up, because they differ across kernel versions and architectures.
 
-- [`do_sys_open`](https://0xax.gitbooks.io/linux-insides/content/SysCall/linux-syscall-5.html): Internal function used to
-     open files.
+For open it instruments the inner function that every entry point funnels through, so one probe covers `open`, `openat`
+and `openat2`:
+
 - [`do_sys_openat2`](https://elixir.bootlin.com/linux/v5.6/source/fs/open.c#L1162):
     Function called from `do_sys_open` since version `5.6.0`.
-- [`close_fd`](https://www.mail-archive.com/linux-kernel@vger.kernel.org/msg2271761.html): Function used to close file
-    descriptor since kernel `5.11.0`.
-- `__close_fd`: Function used to close files before version `5.11.0`.
+- [`do_sys_open`](https://0xax.gitbooks.io/linux-insides/content/SysCall/linux-syscall-5.html): Internal function used to
+     open files on older kernels.
+
+Close is resolved differently, because no inner function stayed on the close(2) path across kernel versions. Newer
+kernels call `file_close_fd()` from the syscall and leave `close_fd()` for in-kernel callers only, so a probe on the
+inner helper attaches successfully and then never fires. The collector therefore instruments the syscall itself:
+
+- `__x64_sys_close`, `__arm64_sys_close`, and the equivalents on other architectures with syscall wrappers.
+- `sys_close` on architectures without them, such as 32-bit ARM and PowerPC.
+- [`close_fd`](https://www.mail-archive.com/linux-kernel@vger.kernel.org/msg2271761.html) and `__close_fd`, the inner
+    helpers, only as a fallback on kernels that predate the syscall wrappers.
+
+Both open and close are instrumented as return probes, because the return value is what distinguishes a successful call
+from a failed one. The selected eBPF object flavor supplies the appropriate attachment method for the running kernel.
 
 #### File error
 
-This chart shows the number of times some software tried and failed to open or close a file descriptor.
+This chart shows the number of times some software tried and failed to open or close a file descriptor. It is published
+only with `ebpf load mode = return`; the counters behind it are collected in every mode.
 
 #### VFS
 
@@ -803,9 +787,8 @@ This chart shows the number of calls to `vfs_open`. This function is responsible
 
 #### Directory Cache
 
-Metrics for directory cache are collected using kprobe for `lookup_fast`, because we are interested in the number of
-times this function is accessed. On the other hand, for `d_lookup` we are not only interested in the number of times it
-is accessed, but also in possible errors, so we need to attach a `kretprobe`. For this reason, the following is used:
+The eBPFGo dcstat collector instruments `lookup_fast` for cache lookups and `d_lookup` for slow-path results. The selected
+eBPF object flavor supplies the appropriate attachment method for the running kernel.
 
 - [`lookup_fast`](https://lwn.net/Articles/649115/): Called to look at data inside the directory cache.
 - [`d_lookup`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/fs/dcache.c?id=052b398a43a7de8c68c13e7fa05d6b3d16ce6801#n2223):
@@ -826,45 +809,23 @@ The following `tracing` are used to collect `mount` & `unmount` call counts:
 
 ### Networking Stack
 
-Netdata monitors socket bandwidth attaching `tracing` for internal functions.
+Socket monitoring is provided by `ebpfgo.plugin` and exposed through the on-demand
+**`network-protocols`** function (FUNCTIONGLOBAL) consumed by the network-viewer. The function
+attaches kprobes or fentry/fexit trampolines to `tcp_sendmsg`, `tcp_cleanup_rbuf`,
+`tcp_v4_connect`, `tcp_v6_connect`, `tcp_close`, `udp_sendmsg`, and `udp_recvmsg`.
 
-#### TCP outbound connections
-
-This chart demonstrates calls to `tcp_v4_connection` and `tcp_v6_connection` that start connections for IPV4 and IPV6, respectively.
-
-#### TCP inbound connections
-
-This chart demonstrates TCP and UDP connections that the host receives.
-To collect this information, netdata attaches a tracing to `inet_csk_accept`.
-
-#### TCP bandwidth functions
-
-This chart demonstrates calls to functions `tcp_sendmsg`, `tcp_cleanup_rbuf`, and `tcp_close`; these functions are used
-to send & receive data and to close connections when `TCP` protocol is used.
-
-#### TCP bandwidth
-
-This chart demonstrates calls to functions:
-
-- `tcp_sendmsg`: Function responsible to send data for a specified destination.
-- `tcp_cleanup_rbuf`: We use this function instead of `tcp_recvmsg`, because the last one misses `tcp_read_sock` traffic
-     and we would also need to add more `tracing` to get the socket and package size.
-- `tcp_close`: Function responsible to close connection.
-
-#### TCP retransmit
-
-This chart demonstrates calls to function `tcp_retransmit` that is responsible for executing TCP retransmission when the
-receiver did not return the packet during the expected time.
-
-#### UDP functions
-
-This chart demonstrates calls to functions `udp_sendmsg` and `udp_recvmsg`, which are responsible for sending &
-receiving data for connections when the `UDP` protocol is used.
-
-#### UDP bandwidth
-
-Like the previous chart, this one also monitors `udp_sendmsg` and `udp_recvmsg`, but instead of showing the number of
-calls, it monitors the number of bytes sent and received.
+> **Migration note** — Prior versions of `ebpf.plugin` (the legacy C plugin) published standalone
+> charts for networking data: TCP/UDP connection counts, bandwidth, function call rates,
+> retransmits, and per-app equivalents. Those standalone charts are **permanently removed**; the
+> data is now available on demand through the `network-protocols` function in network-viewer.
+> Per-cgroup and per-service equivalents (`cgroup.net_*`, `systemd.service.net_*`) are **not
+> removed** — they are now emitted by `cgroups.plugin` via the shared-memory bridge to
+> `ebpfgo.plugin`. On-demand function output does not support alerting or metric retention.
+>
+> The `network-sockets-tracing` on-demand Function (which provided per-connection byte
+> accounting and hostname resolution drilldowns) is **permanently removed** and has no direct
+> replacement. The `network-protocols` function exposes aggregate per-PID socket metrics;
+> per-connection drilldowns are a known gap in this release.
 
 ### Apps
 
@@ -979,83 +940,3 @@ shows how the lockdown module impacts `ebpf.plugin` based on the selected option
 
 If you or your distribution compiled the kernel with the last combination, your system cannot load shared libraries
 required to run `ebpf.plugin`.
-
-## Functions
-
-### ebpf_thread
-
-The eBPF plugin has a [function](/docs/top-monitoring-netdata-functions.md) named
-`ebpf_thread` that controls its internal threads and helps to reduce the overhead on host. Using the function you
-can run the plugin with all threads disabled and enable them only when you want to take a look in specific areas.
-
-#### List threads
-
-To list all threads status you can query directly the endpoint function:
-
-`http://localhost:19999/api/v1/function?function=ebpf_thread`
-
-It is also possible to query a specific thread adding keyword `thread` and thread name:
-
-`http://localhost:19999/api/v1/function?function=ebpf_thread%20thread:mount`
-
-#### Enable thread
-
-It is possible to enable a specific thread using the keyword `enable`:
-
-`http://localhost:19999/api/v1/function?function=ebpf_thread%20enable:mount`
-
-this will run thread `mount` during 300 seconds (5 minutes). You can specify a specific period by appending the period
-after the thread name:
-
-`http://localhost:19999/api/v1/function?function=ebpf_thread%20enable:mount:600`
-
-in this example thread `mount` will run during 600 seconds (10 minutes).
-
-#### Disable thread
-
-It is also possible to stop any thread running using the keyword `disable`. For example, to disable `cachestat` you can
-request:
-
-`http://localhost:19999/api/v1/function?function=ebpf_thread%20disable:cachestat`
-
-#### Debugging threads
-
-You can verify the impact of threads on the host by running the
-[ebpf_thread_function.sh](https://github.com/netdata/netdata/blob/master/tests/ebpf/ebpf_thread_function.sh)
-script on your environment.
-
-You can check the results of having threads running on your environment in the Netdata monitoring section on your
-dashboard
-
-<img src="https://github.com/netdata/netdata/assets/49162938/91823573-114c-4c16-b634-cc46f7bb1bcf" alt="Threads running." />
-
-### ebpf_socket
-
-The eBPF plugin has a [function](/docs/top-monitoring-netdata-functions.md) named
-`ebpf_socket` that shows the current status of open sockets on host.
-
-#### Families
-
-The plugin shows by default sockets for IPV4 and IPV6, but it is possible to select a specific family by passing the
-family as an argument:
-
-`http://localhost:19999/api/v1/function?function=ebpf_socket%20family:IPV4`
-
-#### Resolve
-
-The plugin resolves ports to service names by default. You can show the port number by disabling the name resolution:
-
-`http://localhost:19999/api/v1/function?function=ebpf_socket%20resolve:NO`
-
-#### CIDR
-
-The plugin shows connections for all possible destination IPs by default. You can limit the range by specifying the CIDR:
-
-`http://localhost:19999/api/v1/function?function=ebpf_socket%20cidr:192.168.1.0/24`
-
-#### PORT
-
-The plugin shows connections for all possible ports by default. You can limit the range by specifying a port or range
-of ports:
-
-`http://localhost:19999/api/v1/function?function=ebpf_socket%20port:1-1024`

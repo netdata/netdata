@@ -364,7 +364,7 @@ func TestSpecValidateScenarios(t *testing.T) {
 								Context: "queries_total",
 								Units:   "queries/s",
 								Lifecycle: &Lifecycle{
-									ExpireAfterCycles: -1,
+									ExpireAfterCycles: new(-1),
 								},
 								Dimensions: []Dimension{
 									{Selector: "mysql_queries_total", Name: "total"},
@@ -784,6 +784,35 @@ func TestSpecValidateScenarios(t *testing.T) {
 			wantErr: true,
 			errLike: "engine.autogen.max_type_id_len",
 		},
+		"fails on blank engine autogen counter_raw_charts item": {
+			spec: Spec{
+				Version: VersionV1,
+				Engine: &Engine{
+					Autogen: &EngineAutogen{
+						Enabled:          true,
+						CounterRawCharts: []string{"mysql_*", " "},
+					},
+				},
+				Groups: []Group{
+					{
+						Family:  "Database",
+						Metrics: []string{"mysql_queries_total"},
+						Charts: []Chart{
+							{
+								Title:   "Queries",
+								Context: "queries_total",
+								Units:   "queries/s",
+								Dimensions: []Dimension{
+									{Selector: "mysql_queries_total", Name: "total"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+			errLike: "engine.autogen.counter_raw_charts",
+		},
 	}
 
 	for name, tc := range tests {
@@ -829,6 +858,72 @@ func TestSpecValidateNilAndVersion(t *testing.T) {
 	err = spec.Validate()
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "expected \"v1\"")
+}
+
+func TestSpecValidateRootGroupFamily(t *testing.T) {
+	tests := map[string]struct {
+		mutate  func(spec *Spec)
+		wantErr string
+	}{
+		"transparent root with named child": {
+			mutate: func(spec *Spec) {
+				root := &spec.Groups[0]
+				child := root.Clone()
+				child.Family = "Service"
+				root.Family = ""
+				root.Charts = nil
+				root.Groups = []Group{child}
+			},
+		},
+		"transparent root with chart family": {
+			mutate: func(spec *Spec) {
+				spec.Groups[0].Family = ""
+				spec.Groups[0].Charts[0].Family = "Service"
+			},
+		},
+		"transparent root rejects whitespace family": {
+			mutate: func(spec *Spec) {
+				root := &spec.Groups[0]
+				child := root.Clone()
+				child.Family = "Service"
+				root.Family = " "
+				root.Charts = nil
+				root.Groups = []Group{child}
+			},
+			wantErr: "groups[0].family",
+		},
+		"transparent root without effective chart family": {
+			mutate: func(spec *Spec) {
+				spec.Groups[0].Family = ""
+			},
+			wantErr: "groups[0].charts[0].family",
+		},
+		"nested group without family under transparent root": {
+			mutate: func(spec *Spec) {
+				root := &spec.Groups[0]
+				child := root.Clone()
+				child.Family = ""
+				root.Family = ""
+				root.Charts = nil
+				root.Groups = []Group{child}
+			},
+			wantErr: "groups[0].groups[0].family",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			spec := validationSpec()
+			tc.mutate(&spec)
+			err := spec.Validate()
+			if tc.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.ErrorContains(t, err, tc.wantErr)
+		})
+	}
 }
 
 func TestSpecValidateReportsAllSemanticErrors(t *testing.T) {
@@ -1055,6 +1150,171 @@ func TestSpecValidateRejectsNegationOnlyInstances(t *testing.T) {
 			err := tc.spec.Validate()
 			require.Error(t, err)
 			assert.ErrorContains(t, err, tc.errLike)
+		})
+	}
+}
+
+func TestSpecValidateChartAggregation(t *testing.T) {
+	for _, aggregation := range []Aggregation{"", AggregationSum, AggregationMin, AggregationMax, AggregationAvg} {
+		t.Run("accepts_"+string(aggregation), func(t *testing.T) {
+			spec := validationSpec()
+			spec.Groups[0].Charts[0].Aggregation = aggregation
+			require.NoError(t, spec.Validate())
+		})
+	}
+
+	spec := validationSpec()
+	spec.Groups[0].Charts[0].Aggregation = Aggregation("median")
+	err := spec.Validate()
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "groups[0].charts[0].aggregation")
+	assert.ErrorContains(t, err, "must be one of [sum min max avg]")
+}
+
+func TestSpecValidateOptionalInstanceLabels(t *testing.T) {
+	tests := map[string]struct {
+		instances *Instances
+		wantErr   string
+	}{
+		"accepts optional-only identity": {
+			instances: &Instances{OptionalByLabels: []string{"pid"}},
+		},
+		"accepts required and optional identity": {
+			instances: &Instances{ByLabels: []string{"deployment"}, OptionalByLabels: []string{"pid"}},
+		},
+		"rejects empty instances": {
+			instances: &Instances{},
+			wantErr:   "instances",
+		},
+		"rejects empty optional key": {
+			instances: &Instances{OptionalByLabels: []string{" "}},
+			wantErr:   "optional_by_labels[0]",
+		},
+		"rejects optional wildcard": {
+			instances: &Instances{OptionalByLabels: []string{"*"}},
+			wantErr:   "optional_by_labels[0]",
+		},
+		"rejects optional exclusion": {
+			instances: &Instances{OptionalByLabels: []string{"!pid"}},
+			wantErr:   "optional_by_labels[0]",
+		},
+		"rejects duplicate optional key": {
+			instances: &Instances{OptionalByLabels: []string{"pid", " pid "}},
+			wantErr:   "duplicate label key",
+		},
+		"rejects required and optional overlap": {
+			instances: &Instances{ByLabels: []string{"pid"}, OptionalByLabels: []string{"pid"}},
+			wantErr:   "conflicts with instances.by_labels",
+		},
+		"rejects excluded optional key": {
+			instances: &Instances{ByLabels: []string{"deployment", "!pid"}, OptionalByLabels: []string{"pid"}},
+			wantErr:   "conflicts with instances.by_labels",
+		},
+		"rejects optional keys with wildcard identity": {
+			instances: &Instances{ByLabels: []string{"*"}, OptionalByLabels: []string{"pid"}},
+			wantErr:   "cannot be combined with instances.by_labels wildcard",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			spec := validationSpec()
+			spec.Groups[0].Charts[0].Instances = tc.instances
+			err := spec.Validate()
+			if tc.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.ErrorContains(t, err, tc.wantErr)
+		})
+	}
+}
+
+func validationSpec() Spec {
+	return Spec{
+		Version: VersionV1,
+		Groups: []Group{{
+			Family:  "Service",
+			Metrics: []string{"service_metric"},
+			Charts: []Chart{{
+				Title:   "Service metric",
+				Context: "service_metric",
+				Units:   "value",
+				Dimensions: []Dimension{{
+					Selector: "service_metric",
+					Name:     "value",
+				}},
+			}},
+		}},
+	}
+}
+
+func TestCompileCounterRawCharts(t *testing.T) {
+	tests := map[string]struct {
+		patterns []string
+		wantErr  string
+		selects  map[string]bool
+	}{
+		"no patterns select nothing": {
+			selects: map[string]bool{"app_requests_total": false},
+		},
+		"exact name": {
+			patterns: []string{"app_requests_total"},
+			selects:  map[string]bool{"app_requests_total": true, "app_errors_total": false},
+		},
+		"glob syntax shared with fallback_type": {
+			patterns: []string{"app_*_total", "db_query_[ab]_total"},
+			selects: map[string]bool{
+				"app_requests_total": true,
+				"db_query_a_total":   true,
+				"db_query_c_total":   false,
+				"app_requests":       false,
+			},
+		},
+		"first match wins and negation excludes": {
+			patterns: []string{"!app_internal_total", "app_*"},
+			selects:  map[string]bool{"app_requests_total": true, "app_internal_total": false},
+		},
+		"blank item": {
+			patterns: []string{"app_*", ""},
+			wantErr:  "item 1: must not be blank",
+		},
+		"surrounding whitespace": {
+			patterns: []string{" app_*"},
+			wantErr:  `item 0 (" app_*"): must not contain whitespace`,
+		},
+		"several patterns in one item": {
+			patterns: []string{"app_*", "app_* !app_internal_*"},
+			wantErr:  `item 1 ("app_* !app_internal_*"): must not contain whitespace`,
+		},
+		"lone negation": {
+			patterns: []string{"app_*", "!"},
+			wantErr:  `item 1 ("!"): negation needs a pattern`,
+		},
+		"only negative patterns": {
+			patterns: []string{"!app_*"},
+			wantErr:  "at least one positive pattern",
+		},
+		"invalid glob": {
+			patterns: []string{"app_*", "!app_["},
+			wantErr:  `item 1 ("!app_["):`,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			compiled, err := CompileCounterRawCharts(tc.patterns)
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			got := make(map[string]bool, len(tc.selects))
+			for name := range tc.selects {
+				got[name] = compiled.Selects(name)
+			}
+			assert.Equal(t, tc.selects, got)
 		})
 	}
 }

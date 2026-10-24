@@ -39,21 +39,21 @@
       "username": {
         "title": "Username",
         "description": "The username for basic authentication.",
-        "type": "string",
-        "sensitive": true
+        "type": "string"
       },
       "password": {
         "title": "Password",
         "description": "The password for basic authentication.",
-        "type": "string",
-        "sensitive": true
+        "type": "string"
       },
       "functions": {
         "title": "Functions",
+        "description": "Settings of the interactive Functions this job exposes in the UI.",
         "type": "object",
         "properties": {
           "running_queries": {
             "title": "Running Queries",
+            "description": "Settings of the Running Queries function, which lists the queries executing right now.",
             "type": "object",
             "properties": {
               "disabled": {
@@ -86,9 +86,6 @@
     ]
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
     "vnode": {
       "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
     },
@@ -97,9 +94,6 @@
     },
     "timeout": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
-    },
-    "username": {
-      "ui:widget": "password"
     },
     "password": {
       "ui:widget": "password"

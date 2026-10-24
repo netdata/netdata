@@ -8,10 +8,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -21,6 +22,13 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/internal/envx"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/internal/httpx"
 )
+
+const (
+	ecsMetadataEndpoint  = "http://169.254.170.2"
+	imdsMetadataEndpoint = "http://169.254.169.254"
+)
+
+var imdsRoleNamePattern = regexp.MustCompile(`^[A-Za-z0-9_+=,.@-]{1,64}$`)
 
 func (s *publishedStore) Resolve(ctx context.Context, req secretstore.ResolveRequest) (string, error) {
 	return s.resolve(ctx, req)
@@ -122,7 +130,11 @@ func envCredentials() (*credentials, error) {
 }
 
 func (s *publishedStore) ecsCredentials(ctx context.Context, relativeURI string) (*credentials, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://169.254.170.2"+relativeURI, nil)
+	endpoint, err := ecsCredentialsEndpoint(relativeURI)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating ECS credentials request: %w", err)
 	}
@@ -130,13 +142,9 @@ func (s *publishedStore) ecsCredentials(ctx context.Context, relativeURI string)
 	if err != nil {
 		return nil, fmt.Errorf("ECS credentials request failed: %w", err)
 	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	body, err := readAndCloseAWSResponse(resp, "ECS credentials", true)
 	if err != nil {
-		return nil, fmt.Errorf("reading ECS credentials response: %w", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("ECS credentials returned HTTP %d: %s", resp.StatusCode, httpx.TruncateBody(body))
+		return nil, err
 	}
 	var result struct {
 		AccessKeyID     string `json:"AccessKeyId"`
@@ -157,7 +165,7 @@ func (s *publishedStore) ecsCredentials(ctx context.Context, relativeURI string)
 }
 
 func (s *publishedStore) imdsCredentials(ctx context.Context) (*credentials, error) {
-	tokenReq, err := http.NewRequestWithContext(ctx, http.MethodPut, "http://169.254.169.254/latest/api/token", nil)
+	tokenReq, err := http.NewRequestWithContext(ctx, http.MethodPut, imdsMetadataEndpoint+"/latest/api/token", nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating IMDS token request: %w", err)
 	}
@@ -166,17 +174,16 @@ func (s *publishedStore) imdsCredentials(ctx context.Context) (*credentials, err
 	if err != nil {
 		return nil, fmt.Errorf("IMDS token request failed: %w", err)
 	}
-	defer tokenResp.Body.Close()
-	tokenBody, err := io.ReadAll(io.LimitReader(tokenResp.Body, 1<<20))
+	tokenBody, err := readAndCloseAWSResponse(tokenResp, "IMDS token request", false)
 	if err != nil {
-		return nil, fmt.Errorf("reading IMDS token response: %w", err)
-	}
-	if tokenResp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("IMDS token request returned HTTP %d", tokenResp.StatusCode)
+		return nil, err
 	}
 	imdsToken := strings.TrimSpace(string(tokenBody))
+	if imdsToken == "" {
+		return nil, fmt.Errorf("IMDS returned empty token")
+	}
 
-	roleReq, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://169.254.169.254/latest/meta-data/iam/security-credentials/", nil)
+	roleReq, err := http.NewRequestWithContext(ctx, http.MethodGet, imdsMetadataEndpoint+"/latest/meta-data/iam/security-credentials/", nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating IMDS role request: %w", err)
 	}
@@ -185,20 +192,16 @@ func (s *publishedStore) imdsCredentials(ctx context.Context) (*credentials, err
 	if err != nil {
 		return nil, fmt.Errorf("IMDS role request failed: %w", err)
 	}
-	defer roleResp.Body.Close()
-	roleBody, err := io.ReadAll(io.LimitReader(roleResp.Body, 1<<20))
+	roleBody, err := readAndCloseAWSResponse(roleResp, "IMDS role request", false)
 	if err != nil {
-		return nil, fmt.Errorf("reading IMDS role response: %w", err)
-	}
-	if roleResp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("IMDS role request returned HTTP %d", roleResp.StatusCode)
+		return nil, err
 	}
 	role := strings.TrimSpace(string(roleBody))
-	if role == "" {
-		return nil, fmt.Errorf("IMDS returned empty role name")
+	if !imdsRoleNamePattern.MatchString(role) {
+		return nil, fmt.Errorf("IMDS returned invalid role name")
 	}
 
-	credReq, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://169.254.169.254/latest/meta-data/iam/security-credentials/"+role, nil)
+	credReq, err := http.NewRequestWithContext(ctx, http.MethodGet, imdsMetadataEndpoint+"/latest/meta-data/iam/security-credentials/"+role, nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating IMDS credentials request: %w", err)
 	}
@@ -207,13 +210,9 @@ func (s *publishedStore) imdsCredentials(ctx context.Context) (*credentials, err
 	if err != nil {
 		return nil, fmt.Errorf("IMDS credentials request failed: %w", err)
 	}
-	defer credResp.Body.Close()
-	credBody, err := io.ReadAll(io.LimitReader(credResp.Body, 1<<20))
+	credBody, err := readAndCloseAWSResponse(credResp, "IMDS credentials request", false)
 	if err != nil {
-		return nil, fmt.Errorf("reading IMDS credentials response: %w", err)
-	}
-	if credResp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("IMDS credentials request returned HTTP %d", credResp.StatusCode)
+		return nil, err
 	}
 	var result struct {
 		AccessKeyID     string `json:"AccessKeyId"`
@@ -267,13 +266,9 @@ func (s *publishedStore) secretValue(ctx context.Context, creds *credentials, re
 	if err != nil {
 		return "", fmt.Errorf("resolving secret '%s': request failed: %w", original, err)
 	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	body, err := readAndCloseAWSResponse(resp, "AWS Secrets Manager", true)
 	if err != nil {
-		return "", fmt.Errorf("resolving secret '%s': reading response: %w", original, err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("resolving secret '%s': AWS Secrets Manager returned HTTP %d: %s", original, resp.StatusCode, httpx.TruncateBody(body))
+		return "", fmt.Errorf("resolving secret '%s': %w", original, err)
 	}
 	var result struct {
 		SecretString *string `json:"SecretString"`
@@ -285,6 +280,42 @@ func (s *publishedStore) secretValue(ctx context.Context, creds *credentials, re
 		return "", fmt.Errorf("resolving secret '%s': SecretString is empty (binary secrets are not supported)", original)
 	}
 	return *result.SecretString, nil
+}
+
+func ecsCredentialsEndpoint(relativeURI string) (string, error) {
+	if !strings.HasPrefix(relativeURI, "/") {
+		return "", fmt.Errorf("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI is invalid")
+	}
+	relative, err := url.Parse(relativeURI)
+	if err != nil || relative.IsAbs() || relative.Host != "" || relative.User != nil || relative.Fragment != "" {
+		return "", fmt.Errorf("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI is invalid")
+	}
+
+	endpoint := ecsMetadataEndpoint + relativeURI
+	parsed, err := url.Parse(endpoint)
+	if err != nil || parsed.Scheme != "http" || parsed.Host != "169.254.170.2" || parsed.User != nil {
+		return "", fmt.Errorf("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI is invalid")
+	}
+	return endpoint, nil
+}
+
+func readAndCloseAWSResponse(resp *http.Response, operation string, includeErrorBody bool) ([]byte, error) {
+	defer func() { _ = resp.Body.Close() }()
+
+	body, err := httpx.ReadResponseBody(resp.Body, responseBodyLimit)
+	if resp.StatusCode != http.StatusOK {
+		if err != nil && !errors.Is(err, httpx.ErrResponseTooLarge) {
+			return nil, fmt.Errorf("reading %s response: %w", operation, err)
+		}
+		if includeErrorBody {
+			return nil, fmt.Errorf("%s returned HTTP %d: %s", operation, resp.StatusCode, httpx.TruncateBody(body))
+		}
+		return nil, fmt.Errorf("%s returned HTTP %d", operation, resp.StatusCode)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("reading %s response: %w", operation, err)
+	}
+	return body, nil
 }
 
 func secretsManagerHost(region string) string {

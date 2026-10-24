@@ -9,7 +9,7 @@
 #define _COMMON_PLUGIN_MODULE_NAME PLUGIN_PROC_MODULE_DISKSTATS_NAME
 #include "../common-contexts/common-contexts.h"
 
-#define RRDFUNCTIONS_DISKSTATS_HELP "Displays block device I/O statistics including read/write throughput, operations, latency, and utilization."
+#define FUNCTION_DISKSTATS_HELP "Displays block device I/O statistics including read/write throughput, operations, latency, and utilization."
 
 #define DISK_TYPE_UNKNOWN   0
 #define DISK_TYPE_PHYSICAL  1
@@ -709,21 +709,29 @@ static void get_disk_config(struct disk *d) {
     }
 }
 
-static struct disk *get_disk(unsigned long major, unsigned long minor, char *disk) {
+// cursor is the disk matched for the previous line of /proc/diskstats in this pass (NULL at the start of a pass).
+// The kernel lists disks in a stable order and we append them in read order, so the next line is almost always
+// cursor->next - this keeps a pass linear instead of quadratic.
+static struct disk *get_disk(unsigned long major, unsigned long minor, char *disk, struct disk **cursor) {
     static struct mountinfo *disk_mountinfo_root = NULL;
 
     struct disk *d;
 
     uint32_t hash = simple_hash(disk);
 
-    // search for it in our RAM list.
-    // this is sequential, but since we just walk through
-    // and the number of disks / partitions in a system
-    // should not be that many, it should be acceptable
-    for(d = disk_root; d ; d = d->next){
+    // search for it in our RAM list, from the last position to the end,
+    // then wrap from the start up to the last position
+    struct disk *start = (*cursor && (*cursor)->next) ? (*cursor)->next : disk_root;
+    for(d = start; d ; ) {
         if (unlikely(
-                d->major == major && d->minor == minor && d->hash == hash && !strcmp(d->device, disk)))
+                d->major == major && d->minor == minor && d->hash == hash && !strcmp(d->device, disk))) {
+            *cursor = d;
             return d;
+        }
+
+        d = d->next ? d->next : disk_root;
+        if(d == start)
+            break;
     }
 
     // not found
@@ -753,6 +761,8 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
         for(last = disk_root; last->next ;last = last->next);
         last->next = d;
     }
+
+    *cursor = d;
 
     d->chart_id = strdupz(d->device);
 
@@ -993,7 +1003,7 @@ static int diskstats_function_block_devices(BUFFER *wb, const char *function __m
     buffer_json_member_add_string(wb, "type", "table");
     buffer_json_member_add_time_t(wb, "update_every", 1);
     buffer_json_member_add_boolean(wb, "has_history", false);
-    buffer_json_member_add_string(wb, "help", RRDFUNCTIONS_DISKSTATS_HELP);
+    buffer_json_member_add_string(wb, "help", FUNCTION_DISKSTATS_HELP);
     buffer_json_member_add_array(wb, "data");
 
     double max_io_reads = 0.0;
@@ -1407,11 +1417,17 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 inicfg_get(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "exclude disks", DEFAULT_EXCLUDED_DISKS), NULL,
                 SIMPLE_PATTERN_EXACT, true);
 
-        rrd_function_add_inline(localhost, NULL, "block-devices", 10,
-                                RRDFUNCTIONS_PRIORITY_DEFAULT, RRDFUNCTIONS_VERSION_DEFAULT,
-                                RRDFUNCTIONS_DISKSTATS_HELP,
-                                "top", HTTP_ACCESS_ANONYMOUS_DATA,
-                                diskstats_function_block_devices);
+        nrpc_method_register_builtin(&(struct nrpc_builtin_desc) {
+            .owner = rrdhost_nrpc_owner(localhost),
+            .name = "block-devices",
+            .help = FUNCTION_DISKSTATS_HELP,
+            .tags = "top",
+            .timeout_s = 10,
+            .priority = NRPC_PRIORITY_DEFAULT,
+            .version = NRPC_VERSION_DEFAULT,
+            .access = HTTP_ACCESS_ANONYMOUS_DATA,
+            .handler = diskstats_function_block_devices,
+        });
     }
 
     // --------------------------------------------------------------------------
@@ -1430,10 +1446,9 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
     collected_number system_read_kb = 0, system_write_kb = 0;
 
-    int do_dc_stats = 0, do_fl_stats = 0;
-
     netdata_mutex_lock(&diskstats_dev_mutex);
 
+    struct disk *cursor = NULL;
     for(l = 0; l < lines ;l++) {
         // --------------------------------------------------------------------------
         // Read parameters
@@ -1455,6 +1470,12 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
         size_t words = procfile_linewords(ff, l);
         if(unlikely(words < 14)) continue;
+
+        // discard fields were added in kernel 4.18 (18 words), flush fields in 5.5 (20 words)
+        int do_dc_stats = 0, do_fl_stats = 0;
+
+        // the flush await needs the previous flush counters, so it waits until both counters have a sample
+        bool flush_ops_had_sample = false, flush_iotime_had_sample = false;
 
         major           = str2ul(procfile_lineword(ff, l, 0));
         minor           = str2ul(procfile_lineword(ff, l, 1));
@@ -1500,7 +1521,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         // I/O completion time and the backlog that may be accumulating.
         backlog_ms      = str2ull(procfile_lineword(ff, l, 13), NULL); // rq_ticks
 
-        if (unlikely(words > 13)) {
+        if (unlikely(words >= 18)) {
             do_dc_stats = 1;
 
             // # of discards completed
@@ -1521,7 +1542,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             discardms      = str2ull(procfile_lineword(ff, l, 17), NULL); // dc_ticks
         }
 
-        if (unlikely(words > 17)) {
+        if (unlikely(words >= 20)) {
             do_fl_stats = 1;
 
             // number of flush I/Os processed
@@ -1537,7 +1558,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         // --------------------------------------------------------------------------
         // get a disk structure for the disk
 
-        struct disk *d = get_disk(major, minor, disk);
+        struct disk *d = get_disk(major, minor, disk, &cursor);
         d->updated = 1;
 
         // --------------------------------------------------------------------------
@@ -1631,15 +1652,18 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 );
 
                 d->rd_ops_discards = rrddim_add(d->st_ext_ops, "discards", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                if (do_fl_stats)
-                    d->rd_ops_flushes = rrddim_add(d->st_ext_ops, "flushes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
                 add_labels_to_disk(d, d->st_ext_ops);
             }
 
             last_discards = rrddim_set_by_pointer(d->st_ext_ops, d->rd_ops_discards, discards);
-            if (do_fl_stats)
+            if (do_fl_stats) {
+                if (likely(d->rd_ops_flushes))
+                    flush_ops_had_sample = true;
+                else
+                    d->rd_ops_flushes = rrddim_add(d->st_ext_ops, "flushes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 last_flushes = rrddim_set_by_pointer(d->st_ext_ops, d->rd_ops_flushes, flushes);
+            }
             rrdset_done(d->st_ext_ops);
         }
 
@@ -1804,15 +1828,18 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 );
 
                 d->rd_iotime_discards = rrddim_add(d->st_ext_iotime, "discards", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                if (do_fl_stats)
-                    d->rd_iotime_flushes = rrddim_add(d->st_ext_iotime, "flushes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
                 add_labels_to_disk(d, d->st_ext_iotime);
             }
 
             last_discardms = rrddim_set_by_pointer(d->st_ext_iotime, d->rd_iotime_discards, discardms);
-            if (do_fl_stats)
+            if (do_fl_stats) {
+                if (likely(d->rd_iotime_flushes))
+                    flush_iotime_had_sample = true;
+                else
+                    d->rd_iotime_flushes = rrddim_add(d->st_ext_iotime, "flushes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 last_flushms = rrddim_set_by_pointer(d->st_ext_iotime, d->rd_iotime_flushes, flushms);
+            }
             rrdset_done(d->st_ext_iotime);
         }
 
@@ -1855,8 +1882,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                     );
 
                     d->rd_await_discards = rrddim_add(d->st_ext_await, "discards", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-                    if (do_fl_stats)
-                        d->rd_await_flushes = rrddim_add(d->st_ext_await, "flushes", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
 
                     add_labels_to_disk(d, d->st_ext_await);
                 }
@@ -1868,8 +1893,11 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 rrddim_set_by_pointer(d->st_ext_await, d->rd_await_discards, (collected_number)(discard_avg * 1000));
 
-                if (do_fl_stats)
+                if (do_fl_stats && flush_ops_had_sample && flush_iotime_had_sample) {
+                    if (unlikely(!d->rd_await_flushes))
+                        d->rd_await_flushes = rrddim_add(d->st_ext_await, "flushes", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
                     rrddim_set_by_pointer(d->st_ext_await, d->rd_await_flushes, (collected_number)(flushe_avg * 1000));
+                }
 
                 rrdset_done(d->st_ext_await);
             }

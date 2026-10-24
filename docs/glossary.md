@@ -6,8 +6,8 @@ This glossary serves as a living document, continuously updated to help you unde
 
 Missing a term? Let us know or submit a request to expand our glossary. Together, we can make Netdata more accessible to everyone.
 
-[A](#a) | [B](#b) | [C](#c) | [D](#d)| [E](#e) | [F](#f) | [G](#g) | [H](#h) | [I](#i) | [J](#j) | [K](#k) | [L](#l) | [M](#m) | [N](#n) | [O](#o) | [P](#p)
-| [Q](#q) | [R](#r) | [S](#s) | [T](#t) | [U](#u) | [V](#v) | [W](#w) | [X](#x) | [Y](#y) | [Z](#z)
+[A](#a) | [C](#c) | [D](#d)| [E](#e) | [F](#f) | [G](#g) | [I](#i) | [K](#k) | [L](#l) | [M](#m) | [N](#n) | [O](#o) | [P](#p)
+| [R](#r) | [S](#s) | [T](#t) | [U](#u) | [V](#v) | [Z](#z)
 
 ## A
 

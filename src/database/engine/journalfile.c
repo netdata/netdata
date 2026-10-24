@@ -64,14 +64,27 @@ void journalfile_v1_generate_path(struct rrdengine_datafile *datafile, char *str
 
 // ----------------------------------------------------------------------------
 
+static ALWAYS_INLINE struct journal_v2_header *journalfile_v2_data_acquire_internal(
+    struct rrdengine_journalfile *journalfile, size_t *data_size,
+    time_t wanted_first_time_s, time_t wanted_last_time_s,
+    JOURNALFILE_V2_ACCESS_HINT hint, bool cleanup_on_failure);
+static bool journalfile_v2_data_needs_permanent_unmap(struct rrdengine_journalfile *journalfile);
+static bool journalfile_v2_data_unmap_permanently_if_indexed(struct rrdengine_journalfile *journalfile);
+
 ALWAYS_INLINE struct rrdengine_datafile *njfv2idx_find_and_acquire_j2_header(NJFV2IDX_FIND_STATE *s) {
     if (unlikely(!s)) return NULL;
 
     struct rrdengine_datafile *datafile = NULL;
+    struct rrdengine_datafile *cleanup_datafile = NULL;
+    Pvoid_t *PValue = NULL;
+
+restart:
+    datafile = NULL;
+    cleanup_datafile = NULL;
+    PValue = NULL;
+    s->j2_header_acquired = NULL;
 
     rw_spinlock_read_lock(&s->ctx->njfv2idx.spinlock);
-
-    Pvoid_t *PValue = NULL;
 
     if(unlikely(!s->init)) {
         s->init = true;
@@ -107,9 +120,16 @@ ALWAYS_INLINE struct rrdengine_datafile *njfv2idx_find_and_acquire_j2_header(NJF
 
         datafile = *PValue;
 
-        struct rrdengine_journalfile *journalfile = datafile ? datafile->journalfile : NULL;
+        if (!datafile || !datafile_acquire(datafile, DATAFILE_ACQUIRE_PAGE_DETAILS)) {
+            datafile = NULL;
+            PValue = NULL;
+            continue;
+        }
 
-        if (!datafile || !journalfile) {
+        struct rrdengine_journalfile *journalfile = datafile->journalfile;
+
+        if (!journalfile) {
+            datafile_release(datafile, DATAFILE_ACQUIRE_PAGE_DETAILS);
             datafile = NULL;
             PValue = NULL;
             continue;
@@ -121,32 +141,52 @@ ALWAYS_INLINE struct rrdengine_datafile *njfv2idx_find_and_acquire_j2_header(NJF
                                                       s->wanted_end_time_s);
 
         if(rc == PAGE_IS_IN_RANGE) {
-            // this is good to return
-            break;
+            // This scan holds the index read lock, so write-side cleanup must be deferred.
+            s->j2_header_acquired = journalfile_v2_data_acquire_internal(
+                journalfile, NULL, s->wanted_start_time_s, s->wanted_end_time_s,
+                JOURNALFILE_V2_ACCESS_AUTO, false);
+            if(s->j2_header_acquired) {
+                // this is good to return
+                break;
+            }
+
+            if(journalfile_v2_data_needs_permanent_unmap(journalfile)) {
+                cleanup_datafile = datafile;
+                datafile = NULL;
+                break;
+            }
+
+            datafile_release(datafile, DATAFILE_ACQUIRE_PAGE_DETAILS);
+            datafile = NULL;
+            PValue = NULL;
+            continue;
         }
         else if(rc == PAGE_IS_IN_THE_PAST) {
             // continue to get the next
+            datafile_release(datafile, DATAFILE_ACQUIRE_PAGE_DETAILS);
             datafile = NULL;
             PValue = NULL;
             continue;
         }
         else /* PAGE_IS_IN_THE_FUTURE */ {
             // we finished - no more datafiles
+            datafile_release(datafile, DATAFILE_ACQUIRE_PAGE_DETAILS);
             datafile = NULL;
             PValue = NULL;
             break;
         }
     }
 
-    struct rrdengine_journalfile *journalfile = datafile ? datafile->journalfile : NULL;
-    if(datafile && journalfile)
-        s->j2_header_acquired = journalfile_v2_data_acquire(journalfile, NULL,
-                                                            s->wanted_start_time_s,
-                                                            s->wanted_end_time_s);
-    else
+    if(!datafile)
         s->j2_header_acquired = NULL;
 
     rw_spinlock_read_unlock(&s->ctx->njfv2idx.spinlock);
+
+    if(cleanup_datafile) {
+        journalfile_v2_data_unmap_permanently_if_indexed(cleanup_datafile->journalfile);
+        datafile_release(cleanup_datafile, DATAFILE_ACQUIRE_PAGE_DETAILS);
+        goto restart;
+    }
 
     return datafile;
 }
@@ -156,37 +196,49 @@ static void njfv2idx_add(struct rrdengine_datafile *datafile) {
         fatal("DBENGINE: NJFV2IDX trying to index a journal file with no datafile");
 
     struct rrdengine_instance *ctx = datafile_ctx(datafile);
+    time_t last_time_s = datafile->journalfile->v2.last_time_s;
 
-    internal_fatal(datafile->journalfile->v2.last_time_s <= 0, "DBENGINE: NJFV2IDX trying to index a journal file with invalid first_time_s");
+    if(unlikely(last_time_s <= 0))
+        fatal("DBENGINE: NJFV2IDX trying to index a journal file with invalid last_time_s");
+
+    if(unlikely((uintmax_t)last_time_s > (uintmax_t)(Word_t)~0UL))
+        fatal("DBENGINE: NJFV2IDX trying to index a journal file with last_time_s outside Judy word range");
+
+    Word_t indexed_as = (Word_t)last_time_s;
 
     rw_spinlock_write_lock(&ctx->njfv2idx.spinlock);
-    datafile->journalfile->njfv2idx.indexed_as = datafile->journalfile->v2.last_time_s;
 
-    do {
-        internal_fatal(datafile->journalfile->njfv2idx.indexed_as <= 0, "DBENGINE: NJFV2IDX journalfile is already indexed");
+    // Ask Judy for the empty slot so collision probing is bounded and cannot wrap.
+    int rc = JudyLFirstEmpty(ctx->njfv2idx.JudyL, &indexed_as, PJE0);
+    if(unlikely(rc == JERR))
+        fatal("DBENGINE: NJFV2IDX corrupted judy array");
 
-        Pvoid_t *PValue = JudyLIns(&ctx->njfv2idx.JudyL, datafile->journalfile->njfv2idx.indexed_as, PJE0);
-        if (!PValue || PValue == PJERR)
-            fatal("DBENGINE: NJFV2IDX corrupted judy array");
+    if(unlikely(!rc))
+        fatal("DBENGINE: NJFV2IDX cannot find an empty journal file index slot");
 
-        if (unlikely(*PValue)) {
-            // already there
-            datafile->journalfile->njfv2idx.indexed_as++;
-        }
-        else {
-            *PValue = datafile;
-            break;
-        }
-    } while(1);
+    Pvoid_t *PValue = JudyLIns(&ctx->njfv2idx.JudyL, indexed_as, PJE0);
+    if (!PValue || PValue == PJERR)
+        fatal("DBENGINE: NJFV2IDX corrupted judy array");
+
+    if(unlikely(*PValue))
+        fatal("DBENGINE: NJFV2IDX selected an occupied journal file index slot");
+
+    *PValue = datafile;
+    datafile->journalfile->njfv2idx.indexed_as = indexed_as;
 
     rw_spinlock_write_unlock(&ctx->njfv2idx.spinlock);
 }
 
-static void njfv2idx_remove(struct rrdengine_datafile *datafile) {
-    internal_fatal(!datafile->journalfile->njfv2idx.indexed_as, "DBENGINE: NJFV2IDX journalfile to remove is not indexed");
-
+static bool njfv2idx_remove_internal(struct rrdengine_datafile *datafile, bool required) {
     struct rrdengine_instance *ctx = datafile_ctx(datafile);
     rw_spinlock_write_lock(&ctx->njfv2idx.spinlock);
+
+    if(!datafile->journalfile->njfv2idx.indexed_as) {
+        if(required)
+            internal_fatal(true, "DBENGINE: NJFV2IDX journalfile to remove is not indexed");
+        rw_spinlock_write_unlock(&ctx->njfv2idx.spinlock);
+        return false;
+    }
 
     int rc = JudyLDel(&ctx->njfv2idx.JudyL, datafile->journalfile->njfv2idx.indexed_as, PJE0);
     (void)rc;
@@ -195,6 +247,15 @@ static void njfv2idx_remove(struct rrdengine_datafile *datafile) {
     datafile->journalfile->njfv2idx.indexed_as = 0;
 
     rw_spinlock_write_unlock(&ctx->njfv2idx.spinlock);
+    return true;
+}
+
+static void njfv2idx_remove(struct rrdengine_datafile *datafile) {
+    (void)njfv2idx_remove_internal(datafile, true);
+}
+
+static bool njfv2idx_remove_if_indexed(struct rrdengine_datafile *datafile) {
+    return njfv2idx_remove_internal(datafile, false);
 }
 
 // ----------------------------------------------------------------------------
@@ -202,7 +263,7 @@ static void njfv2idx_remove(struct rrdengine_datafile *datafile) {
 static struct journal_v2_header *journalfile_v2_mounted_data_get(struct rrdengine_journalfile *journalfile, size_t *data_size) {
     struct journal_v2_header *j2_header = NULL;
 
-    spinlock_lock(&journalfile->data_spinlock);
+    spinlock_tracked_lock(&journalfile->data_spinlock);
 
     if(!journalfile->mmap.data) {
         journalfile->mmap.data = nd_mmap(NULL, journalfile->mmap.size, PROT_READ, MAP_SHARED, journalfile->mmap.fd, 0);
@@ -245,7 +306,7 @@ static struct journal_v2_header *journalfile_v2_mounted_data_get(struct rrdengin
             *data_size = journalfile->mmap.size;
     }
 
-    spinlock_unlock(&journalfile->data_spinlock);
+    spinlock_tracked_unlock(&journalfile->data_spinlock);
 
     return j2_header;
 }
@@ -255,11 +316,11 @@ static bool journalfile_v2_mounted_data_unmount(struct rrdengine_journalfile *jo
 
     if(!have_locks) {
         if(!wait) {
-            if (!spinlock_trylock(&journalfile->data_spinlock))
+            if (!spinlock_tracked_trylock(&journalfile->data_spinlock))
                 return false;
         }
         else
-            spinlock_lock(&journalfile->data_spinlock);
+            spinlock_tracked_lock(&journalfile->data_spinlock);
     }
 
     if(!journalfile->v2.refcount) {
@@ -282,7 +343,7 @@ static bool journalfile_v2_mounted_data_unmount(struct rrdengine_journalfile *jo
     }
 
     if(!have_locks) {
-        spinlock_unlock(&journalfile->data_spinlock);
+        spinlock_tracked_unlock(&journalfile->data_spinlock);
     }
 
     return unmounted;
@@ -311,7 +372,7 @@ void journalfile_v2_data_unmount_cleanup(time_t now_s) {
 
             struct rrdengine_journalfile *journalfile = datafile->journalfile;
 
-            if(!spinlock_trylock(&journalfile->data_spinlock))
+            if(!spinlock_tracked_trylock(&journalfile->data_spinlock))
                 continue;
 
             bool unmount = false;
@@ -326,7 +387,7 @@ void journalfile_v2_data_unmount_cleanup(time_t now_s) {
                     // enough time has passed since we last needed this journal
                     unmount = true;
             }
-            spinlock_unlock(&journalfile->data_spinlock);
+            spinlock_tracked_unlock(&journalfile->data_spinlock);
 
             if (unmount)
                 journalfile_v2_mounted_data_unmount(journalfile, false, false);
@@ -335,10 +396,41 @@ void journalfile_v2_data_unmount_cleanup(time_t now_s) {
     }
 }
 
-ALWAYS_INLINE struct journal_v2_header *journalfile_v2_data_acquire_with_hint(struct rrdengine_journalfile *journalfile,
-    size_t *data_size, time_t wanted_first_time_s, time_t wanted_last_time_s, JOURNALFILE_V2_ACCESS_HINT hint)
+static bool journalfile_v2_data_release_failed_acquire(struct rrdengine_journalfile *journalfile) {
+    bool needs_permanent_unmap = false;
+
+    spinlock_tracked_lock(&journalfile->data_spinlock);
+
+    internal_fatal(journalfile->v2.refcount < 1, "trying to release a non-acquired journalfile");
+
+    if(likely(journalfile->v2.refcount > 0)) {
+        journalfile->v2.refcount--;
+
+        if(!journalfile->v2.refcount) {
+            journalfile->v2.not_needed_since_s = 0;
+            needs_permanent_unmap = !(journalfile->v2.flags & JOURNALFILE_FLAG_IS_AVAILABLE);
+        }
+    }
+
+    spinlock_tracked_unlock(&journalfile->data_spinlock);
+
+    return needs_permanent_unmap;
+}
+
+static bool journalfile_v2_data_needs_permanent_unmap(struct rrdengine_journalfile *journalfile) {
+    spinlock_tracked_lock(&journalfile->data_spinlock);
+    bool needs_permanent_unmap = !journalfile->v2.refcount &&
+        !(journalfile->v2.flags & JOURNALFILE_FLAG_IS_AVAILABLE);
+    spinlock_tracked_unlock(&journalfile->data_spinlock);
+
+    return needs_permanent_unmap;
+}
+
+static ALWAYS_INLINE struct journal_v2_header *journalfile_v2_data_acquire_internal(struct rrdengine_journalfile *journalfile,
+    size_t *data_size, time_t wanted_first_time_s, time_t wanted_last_time_s,
+    JOURNALFILE_V2_ACCESS_HINT hint, bool cleanup_on_failure)
 {
-    spinlock_lock(&journalfile->data_spinlock);
+    spinlock_tracked_lock(&journalfile->data_spinlock);
 
     bool has_data = (journalfile->v2.flags & JOURNALFILE_FLAG_IS_AVAILABLE);
     bool is_mounted = (journalfile->v2.flags & JOURNALFILE_FLAG_IS_MOUNTED);
@@ -376,12 +468,24 @@ ALWAYS_INLINE struct journal_v2_header *journalfile_v2_data_acquire_with_hint(st
 
         }
     }
-    spinlock_unlock(&journalfile->data_spinlock);
+    spinlock_tracked_unlock(&journalfile->data_spinlock);
 
-    if(do_we_need_it)
-        return journalfile_v2_mounted_data_get(journalfile, data_size);
+    if(do_we_need_it) {
+        struct journal_v2_header *j2_header = journalfile_v2_mounted_data_get(journalfile, data_size);
+        if(unlikely(!j2_header) && journalfile_v2_data_release_failed_acquire(journalfile) && cleanup_on_failure)
+            journalfile_v2_data_unmap_permanently_if_indexed(journalfile);
+
+        return j2_header;
+    }
 
     return NULL;
+}
+
+ALWAYS_INLINE struct journal_v2_header *journalfile_v2_data_acquire_with_hint(struct rrdengine_journalfile *journalfile,
+    size_t *data_size, time_t wanted_first_time_s, time_t wanted_last_time_s, JOURNALFILE_V2_ACCESS_HINT hint)
+{
+    return journalfile_v2_data_acquire_internal(
+        journalfile, data_size, wanted_first_time_s, wanted_last_time_s, hint, true);
 }
 
 ALWAYS_INLINE struct journal_v2_header *journalfile_v2_data_acquire(struct rrdengine_journalfile *journalfile, size_t *data_size, time_t wanted_first_time_s, time_t wanted_last_time_s) {
@@ -389,7 +493,7 @@ ALWAYS_INLINE struct journal_v2_header *journalfile_v2_data_acquire(struct rrden
 }
 
 ALWAYS_INLINE void journalfile_v2_data_release(struct rrdengine_journalfile *journalfile) {
-    spinlock_lock(&journalfile->data_spinlock);
+    spinlock_tracked_lock(&journalfile->data_spinlock);
 
     internal_fatal(!journalfile->mmap.data, "trying to release a journalfile without data");
     internal_fatal(journalfile->v2.refcount < 1, "trying to release a non-acquired journalfile");
@@ -404,7 +508,7 @@ ALWAYS_INLINE void journalfile_v2_data_release(struct rrdengine_journalfile *jou
         if(journalfile->v2.flags & JOURNALFILE_FLAG_MOUNTED_FOR_RETENTION)
             unmount = true;
     }
-    spinlock_unlock(&journalfile->data_spinlock);
+    spinlock_tracked_unlock(&journalfile->data_spinlock);
 
     if(unmount)
         journalfile_v2_mounted_data_unmount(journalfile, false, true);
@@ -412,18 +516,18 @@ ALWAYS_INLINE void journalfile_v2_data_release(struct rrdengine_journalfile *jou
 
 bool journalfile_v2_data_available(struct rrdengine_journalfile *journalfile) {
 
-    spinlock_lock(&journalfile->data_spinlock);
+    spinlock_tracked_lock(&journalfile->data_spinlock);
     bool has_data = (journalfile->v2.flags & JOURNALFILE_FLAG_IS_AVAILABLE);
-    spinlock_unlock(&journalfile->data_spinlock);
+    spinlock_tracked_unlock(&journalfile->data_spinlock);
 
     return has_data;
 }
 
 size_t journalfile_v2_data_size_get(struct rrdengine_journalfile *journalfile) {
 
-    spinlock_lock(&journalfile->data_spinlock);
+    spinlock_tracked_lock(&journalfile->data_spinlock);
     size_t data_size = journalfile->mmap.size;
-    spinlock_unlock(&journalfile->data_spinlock);
+    spinlock_tracked_unlock(&journalfile->data_spinlock);
 
     return data_size;
 }
@@ -435,7 +539,7 @@ void journalfile_v2_data_set(struct rrdengine_journalfile *journalfile, int fd, 
     if(unlikely(!journalfile->datafile))
         fatal("DBENGINE: JOURNALFILE: trying to set journal data without a datafile");
 
-    spinlock_lock(&journalfile->data_spinlock);
+    spinlock_tracked_lock(&journalfile->data_spinlock);
 
     internal_fatal(journalfile->mmap.fd != -1, "DBENGINE JOURNALFILE: trying to re-set journal fd");
     internal_fatal(journalfile->mmap.data, "DBENGINE JOURNALFILE: trying to re-set journal_data");
@@ -450,18 +554,16 @@ void journalfile_v2_data_set(struct rrdengine_journalfile *journalfile, int fd, 
     struct journal_v2_header *j2_header = journalfile->mmap.data;
     journalfile->v2.first_time_s = (time_t)(j2_header->start_time_ut / USEC_PER_SEC);
     journalfile->v2.last_time_s = (time_t)(j2_header->end_time_ut / USEC_PER_SEC);
-    journalfile->v2.size_of_directory = j2_header->metric_offset + j2_header->metric_count * sizeof(struct journal_metric_list);
+    journalfile->v2.size_of_directory = MIN(j2_header->metric_trailer_offset, journalfile->mmap.size);
 
     journalfile_v2_mounted_data_unmount(journalfile, true, true);
 
-    spinlock_unlock(&journalfile->data_spinlock);
+    spinlock_tracked_unlock(&journalfile->data_spinlock);
 
     njfv2idx_add(journalfile->datafile);
 }
 
-static void journalfile_v2_data_unmap_permanently(struct rrdengine_journalfile *journalfile) {
-    njfv2idx_remove(journalfile->datafile);
-
+static void journalfile_v2_data_clear_unmapped_state(struct rrdengine_journalfile *journalfile) {
     bool has_references = false;
     char path_v2[RRDENG_PATH_MAX];
 
@@ -471,7 +573,7 @@ static void journalfile_v2_data_unmap_permanently(struct rrdengine_journalfile *
         if (has_references)
             sleep_usec(10 * USEC_PER_MS);
 
-        spinlock_lock(&journalfile->data_spinlock);
+        spinlock_tracked_lock(&journalfile->data_spinlock);
 
         if(journalfile_v2_mounted_data_unmount(journalfile, true, true)) {
             if(journalfile->mmap.fd != -1)
@@ -483,6 +585,7 @@ static void journalfile_v2_data_unmap_permanently(struct rrdengine_journalfile *
             journalfile->v2.first_time_s = 0;
             journalfile->v2.last_time_s = 0;
             journalfile->v2.flags = 0;
+            has_references = false;
         }
         else {
             has_references = true;
@@ -490,16 +593,29 @@ static void journalfile_v2_data_unmap_permanently(struct rrdengine_journalfile *
             nd_log_limit(&journalfile_erl, NDLS_DAEMON, NDLP_WARNING, "DBENGINE: journalfile \"%s\" is not available for unmap", path_v2);
         }
 
-        spinlock_unlock(&journalfile->data_spinlock);
+        spinlock_tracked_unlock(&journalfile->data_spinlock);
 
     } while(has_references);
+}
+
+static void journalfile_v2_data_unmap_permanently(struct rrdengine_journalfile *journalfile) {
+    njfv2idx_remove(journalfile->datafile);
+    journalfile_v2_data_clear_unmapped_state(journalfile);
+}
+
+static bool journalfile_v2_data_unmap_permanently_if_indexed(struct rrdengine_journalfile *journalfile) {
+    if(!njfv2idx_remove_if_indexed(journalfile->datafile))
+        return false;
+
+    journalfile_v2_data_clear_unmapped_state(journalfile);
+    return true;
 }
 
 struct rrdengine_journalfile *journalfile_alloc_and_init(struct rrdengine_datafile *datafile)
 {
     struct rrdengine_journalfile *journalfile = callocz(1, sizeof(struct rrdengine_journalfile));
     journalfile->datafile = datafile;
-    spinlock_init(&journalfile->data_spinlock);
+    spinlock_tracked_init(&journalfile->data_spinlock);
     spinlock_init(&journalfile->unsafe.spinlock);
     journalfile->mmap.fd = -1;
     datafile->journalfile = journalfile;
@@ -680,7 +796,7 @@ static int journalfile_check_superblock(uv_file file)
 
 static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile, void *buf, unsigned max_size)
 {
-    static bitmap64_t page_error_map = BITMAP64_INITIALIZER;
+    static bool page_error_map[UINT8_MAX + 1];
     unsigned i, count, payload_length, descr_size;
     struct rrdeng_jf_store_data *jf_metric_data;
 
@@ -688,7 +804,7 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
     count = jf_metric_data->number_of_pages;
     descr_size = sizeof(*jf_metric_data->descr) * count;
     payload_length = sizeof(*jf_metric_data) + descr_size;
-    if (payload_length > max_size) {
+    if (payload_length > max_size || !rrdeng_valid_extent_disk_size(jf_metric_data->extent_size)) {
         netdata_log_error("DBENGINE: corrupted transaction payload.");
         return;
     }
@@ -701,9 +817,8 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
         uint8_t page_type = jf_metric_data->descr[i].type;
 
         if (page_type > RRDENG_PAGE_TYPE_MAX) {
-            if (!bitmap64_get(&page_error_map, page_type)) {
+            if (!__atomic_exchange_n(&page_error_map[page_type], true, __ATOMIC_RELAXED)) {
                 netdata_log_error("DBENGINE: unknown page type %d encountered.", page_type);
-                bitmap64_set(&page_error_map, page_type);
             }
             continue;
         }
@@ -738,13 +853,11 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
             metric = mrg_metric_add_and_acquire(main_mrg, entry, &added);
             if(added)
                 update_metric_time = false;
-
-            if (vd.update_every_s) {
-                uint64_t samples = (vd.end_time_s - vd.start_time_s) / vd.update_every_s;
-                __atomic_add_fetch(&ctx->atomic.samples, samples, __ATOMIC_RELAXED);
-            }
         }
         Word_t metric_id = mrg_metric_id(main_mrg, metric);
+
+        // the page is on disk in this datafile: its slots are samples of it
+        rrdeng_datafile_samples_charge(journalfile->datafile, vd.entries);
 
         if (update_metric_time)
             mrg_metric_expand_retention(main_mrg, metric, vd.start_time_s, vd.end_time_s, vd.update_every_s);
@@ -752,6 +865,7 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
         pgc_open_add_hot_page(
             (Word_t)ctx,
             metric_id,
+            mrg_metric_uuidmap_id(main_mrg, metric),
             vd.start_time_s,
             vd.end_time_s,
             vd.update_every_s,
@@ -887,11 +1001,26 @@ skip_file:
 // Checks that the extent list checksum is valid
 static int journalfile_check_v2_extent_list (void *data_start, size_t file_size)
 {
-    UNUSED(file_size);
     uLong crc;
 
     struct journal_v2_header *j2_header = (void *) data_start;
     struct journal_v2_block_trailer *journal_v2_trailer;
+
+    // Bound the header-controlled offsets against the trusted file size before
+    // reading through them. Check extent_offset first so the subtraction cannot
+    // underflow, then bound extent_count via division instead of multiplying
+    // extent_count * sizeof(...), which would wrap size_t on 32-bit builds. The
+    // on-disk layout (journalfile_migrate_to_v2_callback) places the extent
+    // trailer immediately after the extent list. Same pattern as the walk in
+    // journalfile_v2_populate_retention_to_mrg().
+    if ((size_t)j2_header->extent_offset > file_size ||
+        (size_t)j2_header->extent_count > (file_size - (size_t)j2_header->extent_offset) / sizeof(struct journal_extent_list) ||
+        (size_t)j2_header->extent_trailer_offset > file_size ||
+        file_size - (size_t)j2_header->extent_trailer_offset < sizeof(struct journal_v2_block_trailer) ||
+        (size_t)j2_header->extent_trailer_offset != (size_t)j2_header->extent_offset + (size_t)j2_header->extent_count * sizeof(struct journal_extent_list)) {
+        netdata_log_error("DBENGINE: extent list header offsets out of range");
+        return 1;
+    }
 
     journal_v2_trailer = (struct journal_v2_block_trailer *) ((uint8_t *) data_start + j2_header->extent_trailer_offset);
     crc = crc32(0L, Z_NULL, 0);
@@ -907,11 +1036,26 @@ static int journalfile_check_v2_extent_list (void *data_start, size_t file_size)
 // Checks that the metric list (UUIDs) checksum is valid
 static int journalfile_check_v2_metric_list(void *data_start, size_t file_size)
 {
-    UNUSED(file_size);
     uLong crc;
 
     struct journal_v2_header *j2_header = (void *) data_start;
     struct journal_v2_block_trailer *journal_v2_trailer;
+
+    // Bound the header-controlled offsets against the trusted file size before
+    // reading through them. Check metric_offset first so the subtraction cannot
+    // underflow, then bound metric_count via division instead of multiplying
+    // metric_count * sizeof(...), which would wrap size_t on 32-bit builds. The
+    // on-disk layout (journalfile_migrate_to_v2_callback) places the metric
+    // trailer immediately after the metric list. Same pattern as the walk in
+    // journalfile_v2_populate_retention_to_mrg().
+    if ((size_t)j2_header->metric_offset > file_size ||
+        (size_t)j2_header->metric_count > (file_size - (size_t)j2_header->metric_offset) / sizeof(struct journal_metric_list) ||
+        (size_t)j2_header->metric_trailer_offset > file_size ||
+        file_size - (size_t)j2_header->metric_trailer_offset < sizeof(struct journal_v2_block_trailer) ||
+        (size_t)j2_header->metric_trailer_offset != (size_t)j2_header->metric_offset + (size_t)j2_header->metric_count * sizeof(struct journal_metric_list)) {
+        netdata_log_error("DBENGINE: metric list header offsets out of range");
+        return 1;
+    }
 
     journal_v2_trailer = (struct journal_v2_block_trailer *) ((uint8_t *) data_start + j2_header->metric_trailer_offset);
     crc = crc32(0L, Z_NULL, 0);
@@ -987,7 +1131,16 @@ static int journalfile_v2_validate(void *data_start, size_t journal_v2_file_size
 
         char uuid_str[UUID_STR_LEN];
         uuid_unparse_lower(metric->uuid, uuid_str);
-        struct journal_page_header *metric_list_header = (void *) (data_start + metric->page_offset);
+        size_t page_offset = (size_t)metric->page_offset;
+        if (page_offset > journal_v2_file_size ||
+            journal_v2_file_size - page_offset < sizeof(struct journal_page_header)) {
+            netdata_log_info(
+                "DBENGINE: verification failed invalid page list header offset -- index %u at offset %u",
+                entries, metric->page_offset);
+            return 1;
+        }
+
+        struct journal_page_header *metric_list_header = (void *) ((uint8_t *) data_start + page_offset);
         struct journal_page_header local_metric_list_header = *metric_list_header;
 
         local_metric_list_header.crc = JOURVAL_V2_MAGIC;
@@ -997,8 +1150,17 @@ static int journalfile_v2_validate(void *data_start, size_t journal_v2_file_size
         rc = crc32cmp(metric_list_header->checksum, crc);
 
         if (!rc) {
+            size_t page_list_room = journal_v2_file_size - page_offset - sizeof(struct journal_page_header);
+            if (page_list_room < sizeof(struct journal_v2_block_trailer) ||
+                (size_t)metric_list_header->entries > (page_list_room - sizeof(struct journal_v2_block_trailer)) / sizeof(struct journal_page_list)) {
+                netdata_log_info("DBENGINE: verification failed invalid page list entries -- index %u entries %u at offset %u",
+                                 entries, metric_list_header->entries, metric->page_offset);
+                return 1;
+            }
+
             struct journal_v2_block_trailer *journal_trailer =
-                (void *) data_start + metric->page_offset + sizeof(struct journal_page_header) + (metric_list_header->entries * sizeof(struct journal_page_list));
+                (void *) ((uint8_t *) data_start + page_offset + sizeof(struct journal_page_header) +
+                          (metric_list_header->entries * sizeof(struct journal_page_list)));
 
             crc = crc32(0L, Z_NULL, 0);
             crc = crc32(crc, (uint8_t *) metric_list_header + sizeof(struct journal_page_header), metric_list_header->entries * sizeof(struct journal_page_list));
@@ -1027,6 +1189,98 @@ static int journalfile_v2_validate(void *data_start, size_t journal_v2_file_size
     return 0;
 }
 
+_Static_assert(JOURNAL_V2_SAMPLES_DESCRIPTOR_OFFSET >= sizeof(struct journal_v2_header) + sizeof(struct journal_v2_block_trailer),
+               "journal v2 samples descriptor overlaps the journal v2 header");
+_Static_assert(JOURNAL_V2_SAMPLES_DESCRIPTOR_OFFSET + sizeof(struct journal_v2_samples_descriptor) <= RRDENG_BLOCK_SIZE,
+               "journal v2 samples descriptor does not fit in the journal v2 header padding");
+
+_Static_assert(sizeof(struct journal_v2_samples_descriptor) == 24, "journal v2 samples descriptor has padding");
+
+// The validated samples descriptor of a journal v2 file, or false when it has
+// none (older files) or an invalid one (then the caller estimates). Reads only
+// the header page: file_size must be the size of the mapping, and the caller
+// must be inside a protected region, since this reads the mmap.
+bool journalfile_v2_samples_descriptor(const uint8_t *data_start, size_t file_size, struct journal_v2_samples_descriptor *out) {
+    const struct journal_v2_header *j2_header = (const void *)data_start;
+
+    if (file_size < RRDENG_BLOCK_SIZE)
+        return false;
+
+    struct journal_v2_samples_descriptor descriptor;
+    memcpy(&descriptor, data_start + JOURNAL_V2_SAMPLES_DESCRIPTOR_OFFSET, sizeof(descriptor));
+    if (descriptor.magic != JOURNAL_V2_SAMPLES_MAGIC)
+        return false;
+
+    uLong crc = crc32(0L, Z_NULL, 0);
+    crc = crc32(crc, (void *)&descriptor, offsetof(struct journal_v2_samples_descriptor, crc));
+    if (descriptor.crc != (uint32_t)crc)
+        return false;
+
+    // one entry per metric, 4-byte aligned, after the metric list and its
+    // trailer, ending with its own trailer exactly where the file trailer
+    // starts - which is where the writer puts it
+    if (descriptor.count != j2_header->metric_count)
+        return false;
+
+    if ((descriptor.offset % sizeof(uint32_t)) ||
+        (size_t)descriptor.offset < (size_t)j2_header->metric_trailer_offset ||
+        (size_t)descriptor.offset - (size_t)j2_header->metric_trailer_offset < sizeof(struct journal_v2_block_trailer) ||
+        (size_t)descriptor.offset > file_size ||
+        file_size - (size_t)descriptor.offset < 2 * sizeof(struct journal_v2_block_trailer))
+        return false;
+
+    // the array fills the space between its offset and the two trailers;
+    // compare by division, since count * sizeof(uint32_t) wraps size_t on
+    // 32-bit builds
+    size_t samples_bytes = file_size - (size_t)descriptor.offset - 2 * sizeof(struct journal_v2_block_trailer);
+    if (samples_bytes % sizeof(uint32_t) || samples_bytes / sizeof(uint32_t) != descriptor.count)
+        return false;
+
+    // the total cannot exceed one uint32_t per metric
+    if (descriptor.samples > samples_bytes / sizeof(uint32_t) * (uint64_t)UINT32_MAX)
+        return false;
+
+    *out = descriptor;
+    return true;
+}
+
+// The per-metric samples of a journal v2 file, or NULL when it has no valid
+// samples section: no valid descriptor, a damaged array, or an array that does
+// not add up to the descriptor's total. This faults in the array; the startup
+// loader does not need it, only per-metric consumers do.
+const uint32_t *journalfile_v2_samples_section(const uint8_t *data_start, size_t file_size) {
+    struct journal_v2_samples_descriptor descriptor;
+    if (!journalfile_v2_samples_descriptor(data_start, file_size, &descriptor))
+        return NULL;
+
+    size_t samples_bytes = (size_t)descriptor.count * sizeof(uint32_t);
+    const uint8_t *samples = data_start + descriptor.offset;
+    const struct journal_v2_block_trailer *trailer = (const void *)(samples + samples_bytes);
+    uLong crc = crc32(0L, Z_NULL, 0);
+    crc = crc32(crc, samples, samples_bytes);
+    if (crc32cmp((void *)trailer->checksum, crc))
+        return NULL;
+
+    uint64_t total = 0;
+    for (size_t i = 0; i < descriptor.count; i++)
+        total += ((const uint32_t *)samples)[i];
+    if (total != descriptor.samples)
+        return NULL;
+
+    return (const uint32_t *)samples;
+}
+
+// The samples of a metric entry of a journal v2 file without a samples section:
+// the slots its time range would hold at its latest collection frequency, and
+// never fewer than its pages - every page holds at least one slot.
+uint64_t journalfile_v2_metric_estimated_samples(const struct journal_metric_list *metric) {
+    if (!metric->update_every_s || metric->delta_end_s < metric->delta_start_s)
+        return metric->entries;
+
+    uint64_t samples = page_entries_by_time(metric->delta_start_s, metric->delta_end_s, metric->update_every_s);
+    return samples > metric->entries ? samples : metric->entries;
+}
+
 void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile) {
     usec_t started_ut = now_monotonic_usec();
 
@@ -1038,54 +1292,158 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
 
     uint8_t *data_start = (uint8_t *)j2_header;
 
-    if (journalfile->v2.flags & JOURNALFILE_FLAG_METRIC_CRC_CHECK) {
-        journalfile->v2.flags &= ~JOURNALFILE_FLAG_METRIC_CRC_CHECK;
-        if (journalfile_check_v2_metric_list(data_start, j2_header->journal_v2_file_size)) {
-            journalfile->v2.flags &= ~JOURNALFILE_FLAG_IS_AVAILABLE;
-            // needs rebuild
-            return;
-        }
-    }
-
     char path_v2[RRDENG_PATH_MAX];
     journalfile_v2_generate_path(journalfile->datafile, path_v2, sizeof(path_v2));
-    time_t global_first_time_s;
+    time_t global_first_time_s = 0;
     bool failed = false;
-    uint32_t entries;
-    // Calculate number of samples here and update once the file is loaded
+    uint32_t entries = 0;
+    // the samples of this file, charged to its datafile once it is loaded
     uint64_t journal_samples = 0;
-    PROTECTED_ACCESS_SETUP(data_start, journalfile->mmap.size, path_v2, "mrg-load");
+    bool samples_estimated = true;
+
+    // Protect the whole walk -- both the optional CRC check and the mrg update
+    // read into the mmap'd v2 journal. If a backing page cannot be paged in
+    // (file truncated, sparse hole, transient I/O error) the kernel raises
+    // SIGBUS; without a protected region active the process aborts. Same
+    // pattern as journalfile_v2_validate() in journalfile_v2_load().
+    PROTECTED_ACCESS_SETUP(journalfile->mmap.data, journalfile->mmap.size, path_v2, "mrg-load");
     if(no_signal_received) {
-        entries = j2_header->metric_count;
-        struct journal_metric_list *metric = (struct journal_metric_list *) (data_start + j2_header->metric_offset);
-        time_t header_start_time_s  = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
-        global_first_time_s = header_start_time_s;
-        time_t now_s = max_acceptable_collected_time();
-        for (size_t i=0; i < entries; i++) {
-            time_t start_time_s = header_start_time_s + metric->delta_start_s;
-            time_t end_time_s = header_start_time_s + metric->delta_end_s;
-
-            mrg_update_metric_retention_and_granularity_by_uuid(
-                main_mrg,
-                (Word_t)ctx,
-                &metric->uuid,
-                start_time_s,
-                end_time_s,
-                metric->update_every_s,
-                now_s,
-                &journal_samples);
-
-            metric++;
+        // Validate header-controlled offsets against the actual mapping size
+        // BEFORE reading through them. PROTECTED_ACCESS_SETUP only catches
+        // faults whose address falls within [data_start, data_start+mmap.size);
+        // an over-read driven by a corrupted offset past the registered range
+        // would not be recovered and the process would still abort. Out-of-
+        // range offsets are treated as a rebuild trigger (same outcome as a
+        // CRC failure).
+        size_t mmap_size = journalfile->mmap.size;
+        // Order matters: short-circuit on metric_offset > mmap_size first so the
+        // subtraction below cannot underflow, then compare metric_count against
+        // the available slot capacity via division rather than multiplying out
+        // metric_count * sizeof(...), which would wrap size_t on 32-bit builds
+        // and silently pass a malformed header. Only after those two checks is
+        // metric_count * sizeof(...) known to fit in size_t, which lets the
+        // trailer-ordering check below compute the expected trailer offset
+        // safely. The on-disk layout (see journalfile_migrate_to_v2_callback)
+        // places the metric-list trailer immediately after the metric list, so
+        // any deviation indicates a corrupted header that would otherwise let
+        // the CRC compare against bytes inside the metric list itself.
+        if ((size_t)j2_header->metric_offset > mmap_size ||
+            (size_t)j2_header->metric_count > (mmap_size - (size_t)j2_header->metric_offset) / sizeof(struct journal_metric_list) ||
+            (size_t)j2_header->metric_trailer_offset > mmap_size ||
+            mmap_size - (size_t)j2_header->metric_trailer_offset < sizeof(struct journal_v2_block_trailer) ||
+            (size_t)j2_header->metric_trailer_offset != (size_t)j2_header->metric_offset + (size_t)j2_header->metric_count * sizeof(struct journal_metric_list)) {
+            // header offsets out of range -- needs rebuild
+            nd_log_daemon(NDLP_ERR,
+                          "DBENGINE: journal v2 \"%s\" has out-of-range header offsets "
+                          "(metric_offset=%u, metric_count=%u, metric_trailer_offset=%u, mmap_size=%zu); "
+                          "marking unavailable for rebuild",
+                          path_v2,
+                          j2_header->metric_offset,
+                          j2_header->metric_count,
+                          j2_header->metric_trailer_offset,
+                          mmap_size);
+            failed = true;
         }
-    } else
+        else if (journalfile->v2.flags & JOURNALFILE_FLAG_METRIC_CRC_CHECK) {
+            journalfile->v2.flags &= ~JOURNALFILE_FLAG_METRIC_CRC_CHECK;
+            // Pass the verified mmap_size, not the header-controlled
+            // j2_header->journal_v2_file_size; the helper currently ignores the
+            // size argument (UNUSED) but the value at the call site should
+            // still reflect the trusted bound for clarity and future-proofing.
+            if (journalfile_check_v2_metric_list(data_start, mmap_size)) {
+                // needs rebuild
+                failed = true;
+            }
+        }
+
+        if (!failed) {
+            entries = j2_header->metric_count;
+            struct journal_metric_list *metric = (struct journal_metric_list *) (data_start + j2_header->metric_offset);
+            time_t header_start_time_s  = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
+            global_first_time_s = header_start_time_s;
+            time_t now_s = max_acceptable_collected_time();
+            // the samples of this file come from its descriptor (in the header
+            // page, read anyway); the per-metric array at the end of the file is
+            // not touched, so it costs no page faults at startup
+            struct journal_v2_samples_descriptor samples_descriptor;
+            bool samples_known = journalfile_v2_samples_descriptor(data_start, mmap_size, &samples_descriptor);
+            samples_estimated = !samples_known;
+            if (samples_known)
+                journal_samples = samples_descriptor.samples;
+            if (!samples_known && mmap_size >= RRDENG_BLOCK_SIZE &&
+                ((const struct journal_v2_samples_descriptor *)(data_start + JOURNAL_V2_SAMPLES_DESCRIPTOR_OFFSET))->magic == JOURNAL_V2_SAMPLES_MAGIC) {
+                nd_log_limit_static_global_var(erl, 60, 0);
+                nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
+                             "DBENGINE: journal v2 \"%s\" has a samples section that failed validation; "
+                             "estimating its samples instead", path_v2);
+            }
+            for (size_t i=0; i < entries; i++) {
+                // Copy uuid out of the mmap onto the stack BEFORE calling mrg.
+                // If a backing page is unreadable, uuid_copy SIGBUSes here and
+                // the protected region recovers cleanly; the mrg call then
+                // never executes. If we passed &metric->uuid into mrg, a
+                // SIGBUS could fire INSIDE mrg while it holds internal locks,
+                // and siglongjmp would skip mrg's unlock paths.
+                nd_uuid_t local_uuid;
+                uuid_copy(local_uuid, metric->uuid);
+                time_t start_time_s = header_start_time_s + metric->delta_start_s;
+                time_t end_time_s = header_start_time_s + metric->delta_end_s;
+                uint32_t update_every_s = metric->update_every_s;
+
+                mrg_update_metric_retention_and_granularity_by_uuid(
+                    main_mrg,
+                    (Word_t)ctx,
+                    &local_uuid,
+                    start_time_s,
+                    end_time_s,
+                    update_every_s,
+                    now_s);
+
+                if (!samples_known)
+                    journal_samples += journalfile_v2_metric_estimated_samples(metric);
+
+                metric++;
+            }
+        }
+    }
+    else {
+        // SIGBUS/SIGSEGV inside the mmap walk. The PROTECTED_ACCESS_SETUP
+        // macro already rate-limits the error log.
         failed = true;
+    }
+
+    if (unlikely(failed)) {
+        // Clear IS_AVAILABLE under the data spinlock BEFORE releasing our
+        // refcount, so no concurrent journalfile_v2_data_acquire_with_hint()
+        // can succeed and walk the (potentially corrupted) mmap between here
+        // and the permanent unmap. The bounds, CRC, and signal-recovery paths
+        // all converge through this single transition; without it, teardown
+        // (journalfile_close / journalfile_destroy_unsafe) would gate on
+        // IS_AVAILABLE and skip journalfile_v2_data_unmap_permanently(),
+        // leaving a dangling njfv2idx entry, an unclosed fd, and an unmapped
+        // region.
+        spinlock_tracked_lock(&journalfile->data_spinlock);
+        journalfile->v2.flags &= ~JOURNALFILE_FLAG_IS_AVAILABLE;
+        spinlock_tracked_unlock(&journalfile->data_spinlock);
+    }
 
     journalfile_v2_data_release(journalfile);
 
-    if (unlikely(failed))
-        return;
+    if (unlikely(failed)) {
+        // its samples are unknown until the journal is rebuilt
+        rrdeng_datafile_samples_set(journalfile->datafile, 0, true);
+        journalfile_v2_data_unmap_permanently_if_indexed(journalfile);
 
-    __atomic_add_fetch(&ctx->atomic.samples, journal_samples, __ATOMIC_RELAXED);
+        // its journal v1 was not replayed, because this journal v2 loaded:
+        // journalfile_v2_rebuild_from_v1() replays it before the tier is ready
+        journalfile->datafile->populate_mrg.rejected_v2_size = data_size;
+        return;
+    }
+
+    // SET, not add: this file's samples are what its journal says, whatever was
+    // charged before (e.g. a startup migration that could not write a section) -
+    // every later startup reads the same value from this file
+    rrdeng_datafile_samples_set(journalfile->datafile, journal_samples, samples_estimated);
 
     usec_t ended_ut = now_monotonic_usec();
 
@@ -1096,11 +1454,18 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
         , ((double)(ended_ut - started_ut) / USEC_PER_MS)
         );
 
-    time_t old = __atomic_load_n(&ctx->atomic.first_time_s, __ATOMIC_RELAXED);;
-    do {
-        if(old <= global_first_time_s)
-            break;
-    } while(!__atomic_compare_exchange_n(&ctx->atomic.first_time_s, &old, global_first_time_s, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
+    // A zero header start time means this v2 file carries no usable retention
+    // start (a header written by an older agent, or one whose metrics had an
+    // unknown first time); it is not a retention start of the epoch. Letting it
+    // win the MIN below pins the whole tier's global first time to the epoch
+    // permanently, for every consumer of storage_engine_global_first_time_s().
+    if(global_first_time_s > 0) {
+        time_t old = __atomic_load_n(&ctx->atomic.first_time_s, __ATOMIC_RELAXED);
+        do {
+            if(old <= global_first_time_s)
+                break;
+        } while(!__atomic_compare_exchange_n(&ctx->atomic.first_time_s, &old, global_first_time_s, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
+    }
 }
 
 int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)
@@ -1358,15 +1723,21 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
                                         Pvoid_t JudyL_metrics, Pvoid_t JudyL_extents_pos,
                                         size_t number_of_extents, size_t number_of_metrics, size_t number_of_pages, void *user_data)
 {
-    // Nothing to migrate if no metrics
-    if (number_of_metrics == 0)
-        return true;
-
     char path[RRDENG_PATH_MAX];
     Pvoid_t *PValue;
     struct rrdengine_instance *ctx = (struct rrdengine_instance *) section;
     struct rrdengine_journalfile *journalfile = (struct rrdengine_journalfile *) user_data;
     struct rrdengine_datafile *datafile = journalfile->datafile;
+
+    // Nothing to migrate if no metrics. Every page may have been rejected (all
+    // of deleted metrics): they become unreachable, so the datafile holds no
+    // indexed samples - drop the flush-time charge, like the reset below does
+    if (number_of_metrics == 0) {
+        internal_fatal(datafile->writers.running || datafile->writers.flushed_to_open_running,
+                       "DBENGINE: resetting the samples of a datafile that has writers");
+        rrdeng_datafile_samples_set(datafile, 0, false);
+        return true;
+    }
     time_t min_time_s = LONG_MAX;
     time_t max_time_s = 0;
     struct jv2_metrics_info *metric_info;
@@ -1382,6 +1753,39 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
 #ifdef NETDATA_INTERNAL_CHECKS
     usec_t start_loading = now_monotonic_usec();
 #endif
+
+    // The slots of every metric, for the samples section, derived from the time
+    // ranges of its indexed pages: a page holds one slot per update_every from
+    // its start to its end (rrdeng_store_metric_next() fills in-page gaps with
+    // empty slots, validate_page() reconciles replayed v1 pages), and a page with
+    // no update_every (replayed from a v1 journal before its metric was known) is
+    // a single slot - what queries read from it. The section is written only when
+    // every metric fits in uint32_t; otherwise the file has no section and
+    // loaders estimate its samples.
+    bool samples_exact = true;
+    uint64_t file_samples = 0;
+    {
+        Word_t metric_index = 0;
+        bool metric_first = true;
+        while ((PValue = JudyLFirstThenNext(JudyL_metrics, &metric_index, &metric_first))) {
+            metric_info = *PValue;
+            metric_info->samples = 0;
+
+            Pvoid_t *PValue2;
+            Word_t start_time = 0;
+            bool page_first = true;
+            while ((PValue2 = JudyLFirstThenNext(metric_info->JudyL_pages_by_start_time, &start_time, &page_first))) {
+                struct jv2_page_info *page_info = *PValue2;
+                metric_info->samples += page_entries_by_time(
+                    page_info->start_time_s, page_info->end_time_s, page_info->update_every_s);
+            }
+
+            if (metric_info->samples > UINT32_MAX)
+                samples_exact = false;
+
+            file_samples += metric_info->samples;
+        }
+    }
 
     size_t total_file_size = 0;
     total_file_size  += (sizeof(struct journal_v2_header) + JOURNAL_V2_HEADER_PADDING_SZ);
@@ -1405,18 +1809,33 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
     uint32_t pages_offset = total_file_size;
     total_file_size  += (number_of_pages * (sizeof(struct journal_page_list) + sizeof(struct journal_page_header) + sizeof(struct journal_v2_block_trailer)));
 
+    // samples section (optional), after the page section - never the reason
+    // a journal outgrows the uint32_t offsets of its header
+    uint32_t samples_offset = 0;
+    size_t samples_size = number_of_metrics * sizeof(uint32_t) + sizeof(struct journal_v2_block_trailer);
+    if (samples_exact && total_file_size + samples_size + sizeof(struct journal_v2_block_trailer) > UINT32_MAX)
+        samples_exact = false;
+
+    if (samples_exact) {
+        samples_offset = total_file_size;
+        total_file_size += samples_size;
+    }
+
     // File trailer
     uint32_t trailer_offset = total_file_size;
     total_file_size  += sizeof(struct journal_v2_block_trailer);
 
-    int fd_v2;
+    int fd_v2 = -1;
     uint8_t *data_start = nd_mmap_advanced(path, total_file_size, MAP_SHARED, 0, false, true, &fd_v2);
     if(!data_start) {
-        nd_log_daemon(NDLP_WARNING, "DBENGINE: Failed to allocate %"PRIu64" bytes of memory for journal file \"%s\". Will retry later", total_file_size, path);
+        if(fd_v2 != -1)
+            close(fd_v2);
+        nd_log_daemon(NDLP_WARNING, "DBENGINE: Failed to allocate %zu bytes of memory for journal file \"%s\". Will retry later", total_file_size, path);
         return false;
     }
 
-    struct journal_metric_list_to_sort *uuid_list = NULL;
+    // Recovery cleanup reads this after siglongjmp(), including after allocation.
+    struct journal_metric_list_to_sort * volatile uuid_list = NULL;
 
     PROTECTED_ACCESS_SETUP(data_start, total_file_size, path, "migrate");
     if(no_signal_received) {
@@ -1507,6 +1926,10 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
             if (unlikely(!data))
                 break;
 
+            // its samples, in metric list order
+            if (samples_exact)
+                ((uint32_t *)(data_start + samples_offset))[Index] = (uint32_t)metric_info->samples;
+
             // Next we will write
             //   Header
             //   Detailed entries (descr @ time)
@@ -1552,6 +1975,25 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
             internal_error(
                 true, "DBENGINE: CALCULATE CRC FOR UUIDs  %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
 
+            if (samples_exact) {
+                size_t samples_bytes = number_of_metrics * sizeof(uint32_t);
+                journal_v2_trailer = (struct journal_v2_block_trailer *)(data_start + samples_offset + samples_bytes);
+                crc = crc32(0L, Z_NULL, 0);
+                crc = crc32(crc, data_start + samples_offset, samples_bytes);
+                crc32set(journal_v2_trailer->checksum, crc);
+
+                struct journal_v2_samples_descriptor samples_descriptor = {
+                    .magic = JOURNAL_V2_SAMPLES_MAGIC,
+                    .count = (uint32_t)number_of_metrics,
+                    .samples = file_samples,
+                    .offset = samples_offset,
+                };
+                crc = crc32(0L, Z_NULL, 0);
+                crc = crc32(crc, (void *)&samples_descriptor, offsetof(struct journal_v2_samples_descriptor, crc));
+                samples_descriptor.crc = (uint32_t)crc;
+                memcpy(data_start + JOURNAL_V2_SAMPLES_DESCRIPTOR_OFFSET, &samples_descriptor, sizeof(samples_descriptor));
+            }
+
             // Prepare to write checksum for the file
             j2_header.data = NULL;
             journal_v2_trailer = (struct journal_v2_block_trailer *)(data_start + trailer_offset);
@@ -1573,6 +2015,19 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
             // msync(data_start, total_file_size, MS_SYNC);
             journalfile_v2_data_set(journalfile, fd_v2, data_start, total_file_size);
 
+            // From now on this datafile is described by this journal: its samples
+            // are the indexed ones (duplicate pages and pages of deleted metrics
+            // were dropped). Without a section the next startup estimates them,
+            // so keep what was charged at flush time until then.
+            if (samples_exact) {
+                // the reset replaces the charge: a flush charging this datafile at
+                // the same time would be lost - the indexer only picks datafiles
+                // without writers (journal_v2_indexing_tp_worker), so there is none
+                internal_fatal(datafile->writers.running || datafile->writers.flushed_to_open_running,
+                               "DBENGINE: resetting the samples of a datafile that has writers");
+                rrdeng_datafile_samples_set(datafile, file_samples, false);
+            }
+
             internal_error(
                 true, "DBENGINE: ACTIVATING NEW INDEX JNL %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
             ctx_current_disk_space_increase(ctx, total_file_size);
@@ -1589,7 +2044,114 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
     netdata_log_info("DBENGINE: failed to build index \"%s\", file will be skipped", path);
 
     nd_munmap(data_start, total_file_size);
+    if(fd_v2 != -1)
+        close(fd_v2);
     unlink(path);
+    return false;
+}
+
+// Replays an open journal v1 into the open cache and the MRG. The journal keeps
+// the file. Returns 0 on success.
+static int journalfile_v1_replay(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile,
+                                 uv_file file, uint64_t file_size, const char *path)
+{
+    file_size = ALIGN_BYTES_FLOOR(file_size);
+    journalfile->unsafe.pos = file_size;
+    journalfile->file = file;
+
+    int ret = journalfile_check_superblock(file);
+    if (ret) {
+        netdata_log_info("DBENGINE: invalid journal file \"%s\" ; superblock check failed.", path);
+        return ret;
+    }
+    ctx_io_read_op_bytes(ctx, sizeof(struct rrdeng_jf_sb));
+
+    nd_log_daemon(NDLP_DEBUG, "DBENGINE: loading journal file \"%s\"", path);
+
+    uint64_t max_id = journalfile_iterate_transactions(ctx, journalfile);
+
+    __atomic_store_n(&ctx->atomic.transaction_id, MAX(__atomic_load_n(&ctx->atomic.transaction_id, __ATOMIC_RELAXED), max_id + 1), __ATOMIC_RELAXED);
+
+    nd_log_daemon(NDLP_DEBUG, "DBENGINE: journal file \"%s\" loaded (size:%" PRIu64 ").", path, file_size);
+    return 0;
+}
+
+// The journal v2 of this datafile loaded, so its journal v1 was not replayed,
+// but the v2 was rejected while populating the MRG (its metric list failed its
+// checks). Do what journalfile_load() does for an invalid journal v2: replay
+// the v1 and index it into a new v2. The caller excludes the journal indexer of
+// the tier. Returns true when the new journal v2 is active.
+bool journalfile_v2_rebuild_from_v1(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile)
+{
+    struct rrdengine_datafile *datafile = journalfile->datafile;
+    char path[RRDENG_PATH_MAX];
+    uv_file file;
+    uint64_t file_size;
+
+    journalfile_v1_generate_path(datafile, path, sizeof(path));
+
+    int fd = open_file_for_io(path, O_RDWR, &file, dbengine_use_direct_io);
+    if (fd < 0) {
+        ctx_fs_error(ctx);
+        nd_log_daemon(NDLP_ERR, "DBENGINE: tier %d: cannot open \"%s\" to rebuild its rejected journal v2; "
+                      "the data of this datafile will not be available", ctx->config.tier, path);
+        return false;
+    }
+
+    int ret = check_file_properties(file, &file_size, sizeof(struct rrdeng_df_sb));
+    if (!ret)
+        ret = journalfile_v1_replay(ctx, journalfile, file, file_size, path);
+
+    if (ret) {
+        nd_log_daemon(NDLP_ERR, "DBENGINE: tier %d: cannot replay \"%s\" to rebuild its rejected journal v2; "
+                      "the data of this datafile will not be available", ctx->config.tier, path);
+        CLOSE_FILE(ctx, path, file, ret);
+        journalfile->file = 0;
+        return false;
+    }
+
+    pgc_open_cache_to_journal_v2(
+        open_cache,
+        (Word_t)ctx,
+        (int)datafile->fileno,
+        ctx->config.page_type,
+        journalfile_migrate_to_v2_callback,
+        (void *)journalfile,
+        false);
+
+    // sealed: nothing writes to its v1 again (like a datafile whose v2 loaded)
+    (void)close_uv_file(datafile, journalfile->file);
+    journalfile->file = 0;
+
+    // the new journal v2 is charged by the migration and overwrote the rejected one
+    bool rebuilt = journalfile_v2_data_available(journalfile);
+    if (rebuilt) {
+        ctx_current_disk_space_decrease(ctx, datafile->populate_mrg.rejected_v2_size);
+        datafile->populate_mrg.rejected_v2_size = 0;
+        nd_log_daemon(NDLP_NOTICE, "DBENGINE: tier %d: the rejected journal v2 of datafile %u was rebuilt from its journal v1",
+                      ctx->config.tier, datafile->fileno);
+        return true;
+    }
+
+    // No new journal v2: the v1 held no indexable pages, or writing it failed.
+    // The rejected one must not fail again at every start: remove it, so that the
+    // next start replays the v1 as for a missing journal v2. If it cannot be
+    // removed, datafile_delete() discharges it.
+    journalfile_v2_generate_path(datafile, path, sizeof(path));
+    bool removed = unlink(path) == 0;
+    if (removed)
+        __atomic_add_fetch(&ctx->stats.journalfile_deletions, 1, __ATOMIC_RELAXED);
+
+    if (removed || errno == ENOENT) {
+        ctx_current_disk_space_decrease(ctx, datafile->populate_mrg.rejected_v2_size);
+        datafile->populate_mrg.rejected_v2_size = 0;
+        nd_log_daemon(NDLP_WARNING, "DBENGINE: tier %d: no journal v2 was written for datafile %u from its journal v1; "
+                      "the rejected one was removed", ctx->config.tier, datafile->fileno);
+    }
+    else
+        nd_log_daemon(NDLP_ERR, "DBENGINE: tier %d: no journal v2 was written for datafile %u from its journal v1, "
+                      "and the rejected one \"%s\" cannot be removed", ctx->config.tier, datafile->fileno, path);
+
     return false;
 }
 
@@ -1598,7 +2160,7 @@ int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfil
 {
     uv_file file;
     int ret, fd, error;
-    uint64_t file_size, max_id;
+    uint64_t file_size;
     char path[RRDENG_PATH_MAX];
     bool loaded_v2 = false;
 
@@ -1630,25 +2192,11 @@ int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfil
         goto cleanup;
     }
 
-    file_size = ALIGN_BYTES_FLOOR(file_size);
-    journalfile->unsafe.pos = file_size;
-    journalfile->file = file;
-
-    ret = journalfile_check_superblock(file);
+    ret = journalfile_v1_replay(ctx, journalfile, file, file_size, path);
     if (ret) {
-        netdata_log_info("DBENGINE: invalid journal file \"%s\" ; superblock check failed.", path);
         error = ret;
         goto cleanup;
     }
-    ctx_io_read_op_bytes(ctx, sizeof(struct rrdeng_jf_sb));
-
-    nd_log_daemon(NDLP_DEBUG, "DBENGINE: loading journal file \"%s\"", path);
-
-    max_id = journalfile_iterate_transactions(ctx, journalfile);
-
-    __atomic_store_n(&ctx->atomic.transaction_id, MAX(__atomic_load_n(&ctx->atomic.transaction_id, __ATOMIC_RELAXED), max_id + 1), __ATOMIC_RELAXED);
-
-    nd_log_daemon(NDLP_DEBUG, "DBENGINE: journal file \"%s\" loaded (size:%" PRIu64 ").", path, file_size);
 
     bool is_last_file = (ctx_last_fileno_get(ctx) == journalfile->datafile->fileno);
     bool has_old_data = false;

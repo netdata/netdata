@@ -12,7 +12,7 @@
 #define SERVING_STREAMING(parser) ((parser)->repertoire == PARSER_INIT_STREAMING)
 #define SERVING_PLUGINSD(parser) ((parser)->repertoire == PARSER_INIT_PLUGINSD)
 
-PARSER_RC PLUGINSD_DISABLE_PLUGIN(PARSER *parser, const char *keyword, const char *msg);
+PARSER_RC PLUGINSD_PROTOCOL_ERROR(const char *keyword, const char *msg);
 
 ssize_t send_to_plugin(const char *txt, PARSER *parser, STREAM_TRAFFIC_TYPE type);
 
@@ -84,7 +84,13 @@ static inline void pluginsd_clear_scope_chart(PARSER *parser, const char *keywor
 
     RRDSET *st = parser->user.st;
 
-    if(parser->user.cleanup_slots && st)
+    // An obsolete chart must not leave the scope holding cached dimension references: the reaper frees
+    // a dimension only when nobody else references it, and an obsolete chart that is not scoped again
+    // gets its cache released only when the child reconnects - so it would be kept for as long as the
+    // child stays connected. Marking a chart obsolete unslots it, but a later scope can repopulate the
+    // cache without reviving the chart (a replication RBEGIN/RSET/REND for a chart the child has already
+    // obsoleted), and pluginsd_set_scope_chart() resets cleanup_slots.
+    if(st && (parser->user.cleanup_slots || rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))
         rrdset_pluginsd_receive_unslot(st);
 
     // Clear collector ownership when scope ends, except when explicitly preserving
@@ -120,6 +126,37 @@ static inline void pluginsd_clear_scope_chart(PARSER *parser, const char *keywor
     parser->user.st = NULL;
     parser->user.cleanup_slots = false;
     parser->user.clabel_count = 0;
+    parser->user.clabel_changed = false;
+}
+
+// Makes host the host the plugin collects into (parser->user.host). Every switch of the selected host
+// goes through here.
+//
+// The selected host is used by every later CHART/BEGIN/SET until the plugin selects another one, so
+// the parser holds a pin on it (see metadata_lifetime_lock) for as long as it is selected: a removal
+// (`netdatacli remove-stale-node`, the reaper) refuses it as busy until the plugin switches away from
+// it or exits - even when it is offline, e.g. another plugin that also fed it stopped. A parser holds
+// at most one pin: this one.
+//
+// pinned: the caller pinned host (under the rrd lock) and hands the pin over. It is false for
+// localhost, which is not removed while collectors run, and for NULL, which ends the selection.
+// The chart scope belongs to the previous host, so it is cleared before that host's pin is released.
+// Re-selecting the same host is fine: the new pin is held before the old one is released.
+static inline void pluginsd_select_host(PARSER *parser, RRDHOST *host, bool pinned, const char *keyword) {
+    RRDHOST *old_pin = parser->user.host_pin;
+
+    // a BEGIN2 left without END2 keeps its stream buffer open, and the next BEGIN2 appends to it;
+    // that data is for the previous host's parent, so send it there now
+    if(parser->user.v2.stream_buffer.wb && parser->user.st)
+        stream_send_rrdset_metrics_finished(&parser->user.v2.stream_buffer, parser->user.st);
+
+    pluginsd_clear_scope_chart(parser, keyword, NULL);
+
+    parser->user.host = host;
+    parser->user.host_pin = pinned ? host : NULL;
+
+    if(old_pin)
+        rrdhost_pin_release(old_pin);
 }
 
 static ALWAYS_INLINE bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, const char *keyword) {
@@ -152,6 +189,7 @@ static ALWAYS_INLINE bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, c
     parser->user.st = st;
     parser->user.cleanup_slots = false;
     parser->user.clabel_count = 0;
+    parser->user.clabel_changed = false;
 
     return true;
 }
@@ -369,13 +407,36 @@ static inline RRDSET *pluginsd_find_chart(RRDHOST *host, const char *chart, cons
     return st;
 }
 
-static ALWAYS_INLINE ssize_t pluginsd_parse_rrd_slot(char **words, size_t num_words) {
+static ALWAYS_INLINE ssize_t pluginsd_parse_rrd_slot(char **words, size_t num_words, size_t max_slot) {
+    // Contract: max_slot must fit in ssize_t so the (ssize_t) cast below stays
+    // non-negative. All callers pass small compile-time caps (PLUGINSD_*_SLOT_MAX),
+    // so for the inlined constant this check is folded away by the compiler.
+    internal_fatal(max_slot > (size_t)SSIZE_MAX,
+                   "PLUGINSD: max_slot %zu exceeds SSIZE_MAX", max_slot);
+
     ssize_t slot = -1;
     char *id = get_word(words, num_words, 1);
+    // Words are NUL-terminated and && short-circuits left-to-right, so each id[k]
+    // is read only after id[0..k-1] matched the non-NUL "SLOT" chars. A shorter word
+    // (e.g. "X" or "SLOT") fails an earlier comparison or hits the terminator at id[4],
+    // so these fixed-index reads never go past the token's NUL. No bounds check needed.
     if(id && id[0] == PLUGINSD_KEYWORD_SLOT[0] && id[1] == PLUGINSD_KEYWORD_SLOT[1] &&
        id[2] == PLUGINSD_KEYWORD_SLOT[2] && id[3] == PLUGINSD_KEYWORD_SLOT[3] && id[4] == ':') {
-        slot = (ssize_t) str2ull_encoded(&id[5]);
-        if(slot < 0) slot = 0; // to make the caller increment its idx of the words
+        unsigned long long parsed_slot = str2ull_encoded(&id[5]);
+        if(unlikely(parsed_slot > max_slot)) {
+            nd_log_limit_static_global_var(erl_slot, 1, 0);
+            nd_log_limit(&erl_slot, NDLS_COLLECTORS, NDLP_WARNING,
+                         "PLUGINSD: ignoring invalid SLOT value '%s' above the supported maximum %zu",
+                         &id[5], max_slot);
+            // slot 0 means: the SLOT word was present (so the caller still advances its
+            // word index), but the value is unusable as a cache index. Each caller
+            // handles slot < 1 per its own path -- chart lookups fall back to finding
+            // the chart by id, and dimension caching switches to the non-slotted
+            // (by-position) path (pluginsd_rrddim_put_to_slot sets dims_with_slots=false).
+            slot = 0;
+        }
+        else
+            slot = (ssize_t)parsed_slot;
     }
 
     return slot;

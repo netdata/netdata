@@ -1,0 +1,94 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": "Netdata collector taxonomy section registry.",
+  "additionalProperties": false,
+  "patternProperties": {
+    "^x_": {}
+  },
+  "properties": {
+    "taxonomy_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "sections": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/section"
+      },
+      "minItems": 1
+    }
+  },
+  "required": [
+    "taxonomy_version",
+    "sections"
+  ],
+  "$defs": {
+    "section": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^x_": {}
+      },
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+        },
+        "parent_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "short_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "icon": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.-]+$"
+        },
+        "section_order": {
+          "type": "integer"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "active",
+            "deprecated"
+          ]
+        },
+        "deprecation": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "replacement_id": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+            },
+            "since": {
+              "type": "string",
+              "minLength": 1
+            },
+            "removal_in": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "since"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "section_order",
+        "status"
+      ]
+    }
+  }
+}

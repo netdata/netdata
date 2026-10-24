@@ -15,12 +15,13 @@ struct tg_trimmed_mean {
 };
 
 static inline void tg_trimmed_mean_create_internal(RRDR *r, const char *options, NETDATA_DOUBLE def) {
-    long entries = r->view.group;
+    size_t entries = r->view.group;
     if(entries < 10) entries = 10;
 
     struct tg_trimmed_mean *g = (struct tg_trimmed_mean *)onewayalloc_callocz(r->internal.owa, 1, sizeof(struct tg_trimmed_mean));
-    g->series = onewayalloc_mallocz(r->internal.owa, entries * sizeof(NETDATA_DOUBLE));
-    g->series_size = (size_t)entries;
+    g->series = onewayalloc_mallocz(
+        r->internal.owa, onewayalloc_mul_or_fatal(entries, sizeof(*g->series), "trimmed mean series"));
+    g->series_size = entries;
 
     g->percent = def;
     if(options && *options) {
@@ -78,7 +79,10 @@ static inline void tg_trimmed_mean_add(RRDR *r, NETDATA_DOUBLE value) {
     struct tg_trimmed_mean *g = (struct tg_trimmed_mean *)r->time_grouping.data;
 
     if(unlikely(g->next_pos >= g->series_size)) {
-        g->series = onewayalloc_doublesize( r->internal.owa, g->series, g->series_size * sizeof(NETDATA_DOUBLE));
+        g->series = onewayalloc_doublesize(
+            r->internal.owa,
+            g->series,
+            onewayalloc_mul_or_fatal(g->series_size, sizeof(*g->series), "trimmed mean series"));
         g->series_size *= 2;
     }
 
@@ -121,28 +125,28 @@ static inline NETDATA_DOUBLE tg_trimmed_mean_flush(RRDR *r, RRDR_VALUE_FLAGS *rr
                 percent_last_slot = 1 - percent_interpolation_slot;
             }
 
-            int start_slot, stop_slot, step, last_slot, interpolation_slot;
+            ssize_t start_slot, stop_slot, step, last_slot, interpolation_slot;
             if(min >= 0.0 && max >= 0.0) {
-                start_slot = (int)((available_slots - slots_to_use) / 2);
-                stop_slot = start_slot + (int)slots_to_use;
+                start_slot = (ssize_t)((available_slots - slots_to_use) / 2);
+                stop_slot = start_slot + (ssize_t)slots_to_use;
                 last_slot = stop_slot - 1;
                 interpolation_slot = stop_slot;
                 step = 1;
             }
             else {
-                start_slot = (int)available_slots - 1 - (int)((available_slots - slots_to_use) / 2);
-                stop_slot = start_slot - (int)slots_to_use;
+                start_slot = (ssize_t)available_slots - 1 - (ssize_t)((available_slots - slots_to_use) / 2);
+                stop_slot = start_slot - (ssize_t)slots_to_use;
                 last_slot = stop_slot + 1;
                 interpolation_slot = stop_slot;
                 step = -1;
             }
 
             value = 0.0;
-            for(int slot = start_slot; slot != stop_slot ; slot += step)
+            for(ssize_t slot = start_slot; slot != stop_slot ; slot += step)
                 value += g->series[slot];
 
             size_t counted = slots_to_use;
-            if(percent_interpolation_slot > 0.0 && interpolation_slot >= 0 && interpolation_slot < (int)available_slots) {
+            if(percent_interpolation_slot > 0.0 && interpolation_slot >= 0 && interpolation_slot < (ssize_t)available_slots) {
                 value += g->series[interpolation_slot] * percent_interpolation_slot;
                 value += g->series[last_slot] * percent_last_slot;
                 counted++;

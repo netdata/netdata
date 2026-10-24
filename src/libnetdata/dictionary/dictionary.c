@@ -13,11 +13,15 @@ struct dictionary_stats dictionary_stats_category_other = {
 // public locks API
 
 inline void dictionary_write_lock(DICTIONARY *dict) {
+    // paired with dictionary_write_unlock(): the caller holds this
+    // dictionary's lock in between, so the object must stay alive
+    dictionary_api_enter(dict);
     ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
 }
 
 inline void dictionary_write_unlock(DICTIONARY *dict) {
     ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
+    dictionary_api_exit(dict);
 }
 
 // ----------------------------------------------------------------------------
@@ -145,6 +149,18 @@ size_t dictionary_referenced_items(DICTIONARY *dict) {
     return referenced_items;
 }
 
+// items marked deleted and unreferenced, waiting for a garbage collection to free them; on a view,
+// items orphaned by a master deletion are counted only once a collection walks past them
+size_t dictionary_pending_deletes(DICTIONARY *dict) {
+    if(unlikely(!dict)) return 0;
+
+    long int pending = DICTIONARY_PENDING_DELETES_GET(dict);
+    if(pending < 0)
+        fatal("DICTIONARY: pending deletes is negative: %ld", pending);
+
+    return pending;
+}
+
 void dictionary_version_increment(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->version, 1, __ATOMIC_RELAXED);
 }
@@ -178,6 +194,31 @@ void garbage_collect_pending_deletes(DICTIONARY *dict) {
 
     DICTIONARY_STATS_GARBAGE_COLLECTIONS_PLUS1(dict);
 
+    // The traversal below MUST stay callback-free.
+    //
+    // item_next is cached without a reference, and that is only safe while nothing can free a
+    // linked item under us:
+    //
+    //  - no other thread can: claiming an item (dict_item_free_or_mark_deleted()) is just a
+    //    negative refcount store; the free happens after item_linked_list_remove() acquires the
+    //    items write lock we are holding, so a linked-but-claimed successor stays allocated;
+    //  - and we must not do it ourselves: dict_item_free_with_hooks() runs the user's delete
+    //    callback, which may delete or garbage collect this same dictionary (the items lock is
+    //    recursive, so nothing stops it) and free the item item_next points to.
+    //
+    // So victims are only DETACHED here - unlinked, unindexed (views, inside
+    // item_check_and_acquire_advanced()), pending-mark cleared and exclusively owned through the
+    // refcount claim - and chained FIFO. Their frees, and therefore every delete callback, run
+    // after the traversal is over, where there is no cursor left to invalidate. A callback that
+    // re-enters the garbage collector then walks a list these victims are no longer part of, so it
+    // can neither see nor free them again.
+    //
+    // That re-entry is safe on a MASTER, whose items lock is recursive. On a view it is not: delivery
+    // below still runs under the view's index write lock, a plain rw_spinlock, so a callback that
+    // re-enters the view through anything taking that lock would deadlock on it. That is a pre-existing limitation of running
+    // callbacks under the locks at all, which this ordering fix does not change.
+    DICTIONARY_ITEM *detached = NULL, *detached_last = NULL;
+
     size_t deleted = 0, pending = 0, examined = 0;
     DICTIONARY_ITEM *item = dict->items.list, *item_next;
     while(item) {
@@ -192,11 +233,33 @@ void garbage_collect_pending_deletes(DICTIONARY *dict) {
 
             if(item_is_not_referenced_and_can_be_removed(dict, item)) {
                 DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(dict->items.list, item, prev, next);
-                dict_item_free_with_hooks(dict, item);
+                long int remaining = item_pending_deletion_clear(dict, item);
+
+                // chain the detached victim, in traversal order;
+                // prev/next are dead after the list removal, so ->next is free to reuse
+                item->next = NULL;
+                if(detached_last)
+                    detached_last->next = item;
+                else
+                    detached = item;
+                detached_last = item;
+
                 deleted++;
 
-                pending = DICTIONARY_PENDING_DELETES_MINUS1(dict);
-                if (!pending)
+                // On a master, every victim is a pending-deletion item and they are all counted,
+                // so once the counter reaches zero there is nothing left to find: stop, instead of
+                // scanning the remaining live items on every insert and delete.
+                //
+                // On a view we must keep going. A view item orphaned by a MASTER deletion is
+                // discovered - and only then counted - by item_check_and_acquire_advanced() above,
+                // as this walk reaches it. So a zero counter on a view says nothing about the items
+                // the walk has not visited yet, and stopping here would strand them.
+                //
+                // An item another thread pends after this point is left to the next collection - the
+                // entry check at the top of this function tests the counter. Nothing schedules that
+                // collection, so on a dictionary that then goes idle the victim waits for the next
+                // insert, delete or explicit collect; that is pre-existing behaviour, not a guarantee.
+                if(!is_view && !remaining)
                     break;
             }
         }
@@ -209,13 +272,25 @@ void garbage_collect_pending_deletes(DICTIONARY *dict) {
         item = item_next;
     }
 
+    // the traversal is over - deliver the victims
+    // (still under the same locks; moving delivery outside them is a separate change)
+    while(detached) {
+        DICTIONARY_ITEM *next = detached->next;
+        dict_item_free_with_hooks(dict, detached);
+        detached = next;
+    }
+
     if(is_view)
         dictionary_index_wrlock_unlock(dict);
 
     ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
 
+    // after delivery: the callbacks above may have changed it
+    pending = (size_t)DICTIONARY_PENDING_DELETES_GET(dict);
+
     (void)deleted;
     (void)examined;
+    (void)pending;
 
     dictionary_internal_error(false, dict, "DICTIONARY: garbage collected dictionary, "
                           "examined %zu items, deleted %zu items, still pending %zu items",
@@ -224,7 +299,95 @@ void garbage_collect_pending_deletes(DICTIONARY *dict) {
 
 void dictionary_garbage_collect(DICTIONARY *dict) {
     if(!dict) return;
+
+    dictionary_api_enter(dict);
     garbage_collect_pending_deletes(dict);
+    dictionary_api_exit(dict);
+}
+
+// Like dictionary_garbage_collect(), but the victims' delete callbacks run
+// OUTSIDE the dictionary locks: under the items write lock the
+// pending-deletion victims (already hashtable-unlinked) are DETACHED - removed
+// from the items list with their pending marks cleared - and their delete
+// callbacks are delivered only after the lock is released.
+//
+// Use this instead of dictionary_garbage_collect() whenever the delete
+// callback can deliver results to waiters (take mutexes, invoke arbitrary
+// code): the stock garbage collector fires delete callbacks under the items
+// WRITE lock, which deadlocks against any waiter that touches the dictionary
+// while holding the resources the callback needs.
+//
+// Returns the number of victims delivered. Not supported on views.
+size_t dictionary_garbage_collect_and_deliver(DICTIONARY *dict) {
+    if(!dict) return 0;
+
+    dictionary_api_enter(dict);
+
+    // hard API misuse, same class (and same handling) as the view check in
+    // dictionary_set_and_acquire_item_advanced(): a view here would scan
+    // master items with is_view=false and skip the index wrlock the view GC
+    // path requires - silent corruption in release builds if merely internal
+    if(unlikely(is_view_dictionary(dict)))
+        fatal("DICTIONARY: dictionary_garbage_collect_and_deliver() does not support views.");
+
+    // the happy path pays nothing
+    if(DICTIONARY_PENDING_DELETES_GET(dict) <= 0) {
+        dictionary_api_exit(dict);
+        return 0;
+    }
+
+    DICTIONARY_ITEM *detached = NULL;
+
+    ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
+
+    __atomic_store_n(&dict->last_gc_run_us, now_realtime_usec(), __ATOMIC_RELAXED);
+    DICTIONARY_STATS_GARBAGE_COLLECTIONS_PLUS1(dict);
+
+    size_t pending = 0;
+    DICTIONARY_ITEM *item = dict->items.list, *item_next;
+    while(item) {
+        item_next = item->next;
+        int rc = item_check_and_acquire_advanced(dict, item, false);
+
+        if(rc == RC_ITEM_MARKED_FOR_DELETION) {
+            // we didn't get a reference
+
+            if(item_is_not_referenced_and_can_be_removed(dict, item)) {
+                DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(dict->items.list, item, prev, next);
+                pending = item_pending_deletion_clear(dict, item);
+
+                // chain the detached victim; prev/next are dead after the
+                // list removal, so ->next is free to reuse
+                item->next = detached;
+                detached = item;
+
+                if(!pending)
+                    break;
+            }
+        }
+        else if(rc == RC_ITEM_IS_CURRENTLY_BEING_DELETED)
+            ; // do not touch this item (we didn't get a reference)
+
+        else if(rc == RC_ITEM_OK)
+            item_release(dict, item);
+
+        item = item_next;
+    }
+
+    ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
+
+    // deliver outside all dictionary locks
+    size_t delivered = 0;
+    while(detached) {
+        DICTIONARY_ITEM *next = detached->next;
+        dict_item_free_with_hooks(dict, detached); // runs the delete callback lock-free
+        detached = next;
+        delivered++;
+    }
+
+    dictionary_api_exit(dict);
+
+    return delivered;
 }
 
 // ----------------------------------------------------------------------------
@@ -252,7 +415,8 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool fo
     if(mem)
         *mem = 0;
 
-    if(!force && dictionary_referenced_items(dict))
+    // referenced_items keeps items alive; inflight keeps this object alive
+    if(!force && (dictionary_referenced_items(dict) || dictionary_inflight(dict)))
         return false;
 
     size_t dict_size = 0, counted_items = 0, item_size = 0, index_size = 0;
@@ -311,15 +475,21 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool fo
     return true;
 }
 
+// guards the queue list only; never held while a dictionary is freed
 netdata_mutex_t dictionaries_waiting_to_be_destroyed_mutex;
 static DICTIONARY *dictionaries_waiting_to_be_destroyed = NULL;
 
+// held for a whole cleanup pass, so that passes do not overlap
+static netdata_mutex_t dictionaries_cleanup_mutex;
+
 static void __attribute__((constructor)) init_mutex(void) {
     netdata_mutex_init(&dictionaries_waiting_to_be_destroyed_mutex);
+    netdata_mutex_init(&dictionaries_cleanup_mutex);
 }
 
 static void __attribute__((destructor)) destroy_mutex(void) {
     netdata_mutex_destroy(&dictionaries_waiting_to_be_destroyed_mutex);
+    netdata_mutex_destroy(&dictionaries_cleanup_mutex);
 }
 
 #ifdef FSANITIZE_ADDRESS
@@ -327,17 +497,19 @@ DEFINE_JUDYL_TYPED(STACKTRACE, size_t);
 #endif
 
 static void dictionary_queue_for_destruction(DICTIONARY *dict) {
-    if(is_dictionary_destroyed(dict))
-        return;
+    netdata_mutex_lock(&dictionaries_waiting_to_be_destroyed_mutex);
+
+    if(dict_flag_check(dict, DICT_FLAG_QUEUED_FOR_DESTRUCTION))
+        goto cleanup;
 
     DICTIONARY_STATS_DICT_DESTROY_QUEUED_PLUS1(dict);
     dict_flag_set(dict, DICT_FLAG_DESTROYED);
-
-    netdata_mutex_lock(&dictionaries_waiting_to_be_destroyed_mutex);
+    dict_flag_set(dict, DICT_FLAG_QUEUED_FOR_DESTRUCTION);
 
     dict->next = dictionaries_waiting_to_be_destroyed;
     dictionaries_waiting_to_be_destroyed = dict;
 
+cleanup:
     netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
 }
 
@@ -354,15 +526,20 @@ size_t dictionary_destroy_delayed_count(void) {
     return count;
 }
 
-size_t cleanup_destroyed_dictionaries(bool shutdown __maybe_unused)
+static size_t cleanup_destroyed_dictionaries_pass(bool shutdown __maybe_unused, size_t *freed)
 {
-    if (netdata_mutex_trylock(&dictionaries_waiting_to_be_destroyed_mutex) != 0)
-        return 0;
+    *freed = 0;
 
-    if (!dictionaries_waiting_to_be_destroyed) {
-        netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
+    // Take the whole queue and free it without holding the queue mutex: freeing a dictionary runs its delete
+    // callbacks, and a callback that destroys a nested dictionary that still has referenced items queues it,
+    // which takes the queue mutex again.
+    netdata_mutex_lock(&dictionaries_waiting_to_be_destroyed_mutex);
+    DICTIONARY *queued = dictionaries_waiting_to_be_destroyed;
+    dictionaries_waiting_to_be_destroyed = NULL;
+    netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
+
+    if (!queued)
         return 0;
-    }
 
     size_t remaining = 0;
 
@@ -377,15 +554,13 @@ size_t cleanup_destroyed_dictionaries(bool shutdown __maybe_unused)
     STACKTRACE_INIT(&item_stacktrace_counts);
 #endif
 
-    DICTIONARY *dict, *last = NULL, *next = NULL;
-    for(dict = dictionaries_waiting_to_be_destroyed; dict ; dict = next) {
+    DICTIONARY *dict, *next = NULL, *survivors = NULL, *survivors_last = NULL;
+    for(dict = queued; dict ; dict = next) {
         next = dict->next;
 
         DICTIONARY_STATS_DICT_DESTROY_QUEUED_MINUS1(dict);
-        if(dictionary_free_all_resources(dict, NULL, false)) {
-            if(last) last->next = next;
-            else dictionaries_waiting_to_be_destroyed = next;
-        }
+        if(dictionary_free_all_resources(dict, NULL, false))
+            (*freed)++;
         else {
 #ifdef FSANITIZE_ADDRESS
             size_t ref_items = dictionary_referenced_items(dict);
@@ -411,13 +586,16 @@ size_t cleanup_destroyed_dictionaries(bool shutdown __maybe_unused)
 #endif
 
             DICTIONARY_STATS_DICT_DESTROY_QUEUED_PLUS1(dict);
-            last = dict;
+            dict->next = NULL;
+            if(survivors_last) survivors_last->next = dict;
+            else survivors = dict;
+            survivors_last = dict;
             remaining++;
         }
     }
 
 #ifdef FSANITIZE_ADDRESS
-    if (remaining > 0 && shutdown) {
+    if (remaining > 0 && shutdown && !*freed) {
         // Print deduplicated report
         fprintf(stderr, "WARNING: There are %zu dictionaries with references in them, that cannot be destroyed.\n", 
                 remaining);
@@ -452,7 +630,7 @@ size_t cleanup_destroyed_dictionaries(bool shutdown __maybe_unused)
             fprintf(stderr, "\n========= DICTIONARY ITEMS GROUPED BY CREATION STACKTRACE =========\n");
             
         // Loop through dictionaries to collect item stacktraces
-        for(dict = dictionaries_waiting_to_be_destroyed; dict; dict = dict->next) {
+        for(dict = survivors; dict; dict = dict->next) {
             // Iterate through all items and count by stacktrace
             DICTIONARY_ITEM *item;
             for(item = dict->items.list; item; item = item->next) {
@@ -499,8 +677,47 @@ size_t cleanup_destroyed_dictionaries(bool shutdown __maybe_unused)
     }
 #endif
 
-    netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
+    // put back what is still referenced, in front of anything queued meanwhile
+    if(survivors) {
+        netdata_mutex_lock(&dictionaries_waiting_to_be_destroyed_mutex);
+        survivors_last->next = dictionaries_waiting_to_be_destroyed;
+        dictionaries_waiting_to_be_destroyed = survivors;
+        netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
+    }
 
+    return remaining;
+}
+
+size_t cleanup_destroyed_dictionaries(bool shutdown)
+{
+    // a delete callback running inside a pass reaches here again on the same thread: let the running pass
+    // finish (the cleanup mutex cannot tell: it is recursive on Windows)
+    static __thread bool in_cleanup = false;
+    if (in_cleanup)
+        return 0;
+
+    // One pass at a time. Other callers only try: whoever holds it is already doing the work.
+    // Shutdown waits for a running pass, so that its count and report see everything.
+    if (shutdown)
+        netdata_mutex_lock(&dictionaries_cleanup_mutex);
+    else if (netdata_mutex_trylock(&dictionaries_cleanup_mutex) != 0)
+        return 0;
+
+    in_cleanup = true;
+
+    size_t freed, remaining;
+    if(!shutdown)
+        remaining = cleanup_destroyed_dictionaries_pass(false, &freed);
+    else {
+        // freeing a dictionary can queue nested ones from its delete callbacks: repeat until a pass frees
+        // nothing, so that the count (and the report of that last pass) covers them too
+        do {
+            remaining = cleanup_destroyed_dictionaries_pass(true, &freed);
+        } while(freed);
+    }
+
+    in_cleanup = false;
+    netdata_mutex_unlock(&dictionaries_cleanup_mutex);
     return remaining;
 }
 
@@ -526,13 +743,21 @@ static bool api_is_name_good_with_trace(DICTIONARY *dict __maybe_unused, const c
         return false;
     }
 
+    size_t real_name_len = strnlen(name, KEY_LEN_MAX + 1);
+    if(unlikely(real_name_len > KEY_LEN_MAX)) {
+        dictionary_internal_error(true, dict,
+            "DICTIONARY: attempted to %s() with a name longer than the maximum acceptable size %zu",
+            function, (size_t)KEY_LEN_MAX);
+        return false;
+    }
+
     dictionary_internal_error(
-        name_len > 0 && name_len != (ssize_t)strlen(name), dict,
+        name_len > 0 && name_len != (ssize_t)real_name_len, dict,
         "DICTIONARY: attempted to %s() with a name of '%s', having length of %zu, "
         "but the supplied name_len = %ld",
         function,
         name,
-        strlen(name),
+        real_name_len,
         (long int) name_len);
 
     dictionary_internal_error(
@@ -541,7 +766,7 @@ static bool api_is_name_good_with_trace(DICTIONARY *dict __maybe_unused, const c
         "but the supplied name_len = %ld",
         function,
         name,
-        strlen(name),
+        real_name_len,
         (long int) name_len);
 
     return true;
@@ -613,6 +838,13 @@ DICTIONARY *dictionary_create_advanced(DICT_OPTIONS options, struct dictionary_s
 }
 
 DICTIONARY *dictionary_create_view(DICTIONARY *master) {
+    // Keep the MASTER alive for the whole view construction: we dereference it
+    // and mutate its hooks across dictionary_create_internal(), which allocates
+    // and takes locks. Without this, a concurrent dictionary_destroy(master)
+    // could observe inflight == 0 and free the master (and its hooks) while we
+    // are still building the view on top of it.
+    dictionary_api_enter(master);
+
     DICTIONARY *dict = dictionary_create_internal(master->options, master->stats,
                                                   master->value_aral ? aral_requested_element_size(master->value_aral) : 0);
 
@@ -636,19 +868,30 @@ DICTIONARY *dictionary_create_view(DICTIONARY *master) {
 
     DICTIONARY_STATS_DICT_CREATIONS_PLUS1(dict);
     dictionary_debug_track_dict(dict);
+
+    // matches dictionary_api_enter(master) above; the view now holds a hooks
+    // link, and the master's lifetime past this point is the caller's
+    dictionary_api_exit(master);
+
     return dict;
 }
 
-void dictionary_flush(DICTIONARY *dict) {
-    if(unlikely(!dict))
-        return;
-
+static void dictionary_flush_internal(DICTIONARY *dict) {
     ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
 
-    DICTIONARY_ITEM *item, *next = NULL;
-    for(item = dict->items.list; item ;item = next) {
-        next = item->next;
+    DICTIONARY_ITEM *item = dict->items.list;
+    while(item && !item_check_and_acquire(dict, item))
+        item = item->next;
+
+    while(item) {
         dict_item_del(dict, item_get_name(item), (ssize_t)item_get_name_len(item));
+
+        DICTIONARY_ITEM *next = item->next;
+        while(next && !item_check_and_acquire(dict, next))
+            next = next->next;
+
+        dict_item_release_and_check_if_it_is_deleted_and_can_be_removed_under_this_lock_mode(dict, item, DICTIONARY_LOCK_WRITE);
+        item = next;
     }
 
     ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
@@ -658,10 +901,20 @@ void dictionary_flush(DICTIONARY *dict) {
     dictionary_garbage_collect(dict);
 }
 
+void dictionary_flush(DICTIONARY *dict) {
+    if(unlikely(!dict))
+        return;
+
+    dictionary_api_enter(dict);
+    dictionary_flush_internal(dict);
+    dictionary_api_exit(dict);
+}
+
 size_t dictionary_destroy(DICTIONARY *dict) {
     cleanup_destroyed_dictionaries(false);
 
-    if(!dict) return 0;
+    if(!dict || unlikely(is_dictionary_destroyed(dict)))
+        return 0;
 
     ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
 
@@ -681,6 +934,39 @@ size_t dictionary_destroy(DICTIONARY *dict) {
         return 0;
     }
 
+    // Publish the destroyed flag before reading the in-flight counter below.
+    // Both are SEQ_CST, as is a caller's inflight++ / destroyed-flag check, so
+    // the four operations are totally ordered and the two sides cannot miss
+    // each other: either we observe the caller's increment and defer, or the
+    // caller observes this flag and bails out. See dictionary-internals.h.
+    dict_flag_set(dict, DICT_FLAG_DESTROYED);
+
+    // Destroy the index while holding the items write lock.
+    // This prevents a TOCTOU race: without this, a reader could pass the
+    // is_dictionary_destroyed() check, then acquire an item via the index,
+    // after we've decided to force-free all items.
+    // By destroying the index here, any concurrent dictionary_get_and_acquire_item()
+    // that acquires the index lock after this point will find an empty index.
+    // This uses hashtable_destroy_unsafe(); the later cleanup path in
+    // dictionary_free_all_resources() may invoke the same index teardown
+    // again, so this relies on that full destruction flow being safe to repeat.
+    dictionary_index_lock_wrlock(dict);
+    hashtable_destroy_unsafe(dict);
+    dictionary_index_wrlock_unlock(dict);
+
+    // Re-check: a reader that held the index read lock during the destroy
+    // above may have acquired an item before we got the index write lock.
+    // Also refuse to free the object while any thread is inside the API - it
+    // holds no item reference, but it is about to touch this object and the
+    // locks that live in it. Both cases fall back to the deferred destruction
+    // path, and cleanup_destroyed_dictionaries() frees once they drain.
+    if(dictionary_referenced_items(dict) || dictionary_inflight(dict)) {
+        dictionary_queue_for_destruction(dict);
+
+        ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
+        return 0;
+    }
+
     ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
 
     size_t freed;
@@ -692,9 +978,26 @@ size_t dictionary_destroy(DICTIONARY *dict) {
 // ----------------------------------------------------------------------------
 // SET an item to the dictionary
 
-DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data) {
+static DICTIONARY_ITEM *dictionary_set_and_acquire_item_internal(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data) {
     if(unlikely(!api_is_name_good(dict, name, name_len)))
         return NULL;
+
+    if(name_len == -1)
+        name_len = (ssize_t)strnlen(name, KEY_LEN_MAX + 1);
+
+    if(unlikely((size_t)name_len > KEY_LEN_MAX)) {
+        dictionary_internal_error(true, dict,
+                                  "DICTIONARY: tried to index a key of size %zu, but the maximum acceptable is %zu",
+                                  (size_t)name_len, (size_t)KEY_LEN_MAX);
+        return NULL;
+    }
+
+    if(unlikely(value_len > VALUE_LEN_MAX)) {
+        dictionary_internal_error(true, dict,
+                                  "DICTIONARY: tried to add an item of size %zu, but the maximum acceptable is %zu",
+                                  value_len, (size_t)VALUE_LEN_MAX);
+        return NULL;
+    }
 
     api_internal_check(dict, NULL, false, true);
 
@@ -703,7 +1006,21 @@ DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced(DICTIO
 
     DICTIONARY_ITEM *item =
         dict_item_add_or_reset_value_and_acquire(dict, name, name_len, value, value_len, constructor_data, NULL);
-    api_internal_check(dict, item, false, false);
+
+    // NULL is a valid result: a concurrent dictionary_destroy() refuses the
+    // insert under the index write lock. See dictionary.h.
+    api_internal_check(dict, item, false, true);
+    return item;
+}
+
+DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_set_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, void *value, size_t value_len, void *constructor_data) {
+    if(unlikely(!dict)) return NULL;
+
+    dictionary_api_enter(dict);
+    DICTIONARY_ITEM *item =
+        dictionary_set_and_acquire_item_internal(dict, name, name_len, value, value_len, constructor_data);
+    dictionary_api_exit(dict);
+
     return item;
 }
 
@@ -712,16 +1029,26 @@ void *dictionary_set_advanced(DICTIONARY *dict, const char *name, ssize_t name_l
 
     if(likely(item)) {
         void *v = item->shared->value;
-        item_release(dict, item);
+        dictionary_acquired_item_release(dict, item);
         return v;
     }
 
     return NULL;
 }
 
-DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_view_set_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, DICTIONARY_ITEM *master_item) {
+static DICTIONARY_ITEM *dictionary_view_set_and_acquire_item_internal(DICTIONARY *dict, const char *name, ssize_t name_len, DICTIONARY_ITEM *master_item) {
     if(unlikely(!api_is_name_good(dict, name, name_len)))
         return NULL;
+
+    if(name_len == -1)
+        name_len = (ssize_t)strnlen(name, KEY_LEN_MAX + 1);
+
+    if(unlikely((size_t)name_len > KEY_LEN_MAX)) {
+        dictionary_internal_error(true, dict,
+                                  "DICTIONARY: tried to index a key of size %zu, but the maximum acceptable is %zu",
+                                  (size_t)name_len, (size_t)KEY_LEN_MAX);
+        return NULL;
+    }
 
     api_internal_check(dict, NULL, false, true);
 
@@ -734,7 +1061,18 @@ DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_view_set_and_acquire_item_advanced(D
     DICTIONARY_ITEM *item = dict_item_add_or_reset_value_and_acquire(dict, name, name_len, NULL, 0, NULL, master_item);
     dictionary_acquired_item_release(dict->master, master_item);
 
-    api_internal_check(dict, item, false, false);
+    // NULL is a valid result; see dictionary_set_and_acquire_item_internal().
+    api_internal_check(dict, item, false, true);
+    return item;
+}
+
+DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_view_set_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len, DICTIONARY_ITEM *master_item) {
+    if(unlikely(!dict)) return NULL;
+
+    dictionary_api_enter(dict);
+    DICTIONARY_ITEM *item = dictionary_view_set_and_acquire_item_internal(dict, name, name_len, master_item);
+    dictionary_api_exit(dict);
+
     return item;
 }
 
@@ -743,7 +1081,7 @@ void *dictionary_view_set_advanced(DICTIONARY *dict, const char *name, ssize_t n
 
     if(likely(item)) {
         void *v = item->shared->value;
-        item_release(dict, item);
+        dictionary_acquired_item_release(dict, item);
         return v;
     }
 
@@ -753,7 +1091,7 @@ void *dictionary_view_set_advanced(DICTIONARY *dict, const char *name, ssize_t n
 // ----------------------------------------------------------------------------
 // GET an item from the dictionary
 
-DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_get_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len) {
+static DICTIONARY_ITEM *dictionary_get_and_acquire_item_internal(DICTIONARY *dict, const char *name, ssize_t name_len) {
     if(unlikely(!api_is_name_good(dict, name, name_len)))
         return NULL;
 
@@ -763,12 +1101,22 @@ DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_get_and_acquire_item_advanced(DICTIO
     return item;
 }
 
+DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_get_and_acquire_item_advanced(DICTIONARY *dict, const char *name, ssize_t name_len) {
+    if(unlikely(!dict)) return NULL;
+
+    dictionary_api_enter(dict);
+    DICTIONARY_ITEM *item = dictionary_get_and_acquire_item_internal(dict, name, name_len);
+    dictionary_api_exit(dict);
+
+    return item;
+}
+
 void *dictionary_get_advanced(DICTIONARY *dict, const char *name, ssize_t name_len) {
     DICTIONARY_ITEM *item = dictionary_get_and_acquire_item_advanced(dict, name, name_len);
 
     if(likely(item)) {
         void *v = item->shared->value;
-        item_release(dict, item);
+        dictionary_acquired_item_release(dict, item);
         return v;
     }
 
@@ -778,13 +1126,31 @@ void *dictionary_get_advanced(DICTIONARY *dict, const char *name, ssize_t name_l
 // ----------------------------------------------------------------------------
 // DUP/REL an item (increase/decrease its reference counter)
 
+DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_item_acquire_if_not_deleted(DICTIONARY *dict, DICT_ITEM_CONST DICTIONARY_ITEM *item) {
+    if(unlikely(!dict || !item))
+        return NULL;
+
+    dictionary_api_enter(dict);
+    bool acquired = item_check_and_acquire(dict, item);
+    dictionary_api_exit(dict);
+
+    if(unlikely(!acquired))
+        return NULL;
+
+    api_internal_check(dict, item, false, false);
+    return item;
+}
+
 ALWAYS_INLINE
 DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_acquired_item_dup(DICTIONARY *dict, DICT_ITEM_CONST DICTIONARY_ITEM *item) {
     // we allow the item to be NULL here
     api_internal_check(dict, item, false, true);
 
     if(likely(item)) {
+        dictionary_api_enter(dict);
         item_acquire(dict, item);
+        dictionary_api_exit(dict);
+
         api_internal_check(dict, item, false, false);
     }
 
@@ -800,8 +1166,13 @@ void dictionary_acquired_item_release(DICTIONARY *dict, DICT_ITEM_CONST DICTIONA
     // we pass the last parameter to reference_counter_release() as true
     // so that the release may get a write-lock if required to clean up
 
-    if(likely(item))
+    if(likely(item)) {
+        // the reference we are dropping is what kept this dictionary alive, so
+        // hold it across the release itself
+        dictionary_api_enter(dict);
         item_release(dict, item);
+        dictionary_api_exit(dict);
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -830,7 +1201,7 @@ size_t dictionary_acquired_item_references(DICT_ITEM_CONST DICTIONARY_ITEM *item
 // ----------------------------------------------------------------------------
 // DEL an item
 
-bool dictionary_del_advanced(DICTIONARY *dict, const char *name, ssize_t name_len) {
+static bool dictionary_del_internal(DICTIONARY *dict, const char *name, ssize_t name_len) {
     if(unlikely(!api_is_name_good(dict, name, name_len)))
         return false;
 
@@ -842,4 +1213,14 @@ bool dictionary_del_advanced(DICTIONARY *dict, const char *name, ssize_t name_le
     }
 
     return dict_item_del(dict, name, name_len);
+}
+
+bool dictionary_del_advanced(DICTIONARY *dict, const char *name, ssize_t name_len) {
+    if(unlikely(!dict)) return false;
+
+    dictionary_api_enter(dict);
+    bool ret = dictionary_del_internal(dict, name, name_len);
+    dictionary_api_exit(dict);
+
+    return ret;
 }

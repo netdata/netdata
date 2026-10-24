@@ -133,44 +133,34 @@ func (d *KubeDiscoverer) Discover(ctx context.Context, in chan<- []model.TargetG
 		go func(disc model.Discoverer) { defer wg.Done(); disc.Discover(ctx, updates) }(disc)
 	}
 
-	done := make(chan struct{})
-	go func() { defer close(done); wg.Wait() }()
+	go func() { wg.Wait(); close(updates) }()
 
 	close(d.started)
 
-	for {
-		select {
-		case <-ctx.Done():
-			select {
-			case <-done:
-				d.Info("all discoverers exited")
-			case <-time.After(time.Second * 5):
-				d.Warning("not all discoverers exited")
-			}
-			return
-		case <-done:
-			d.Info("all discoverers exited")
-			return
-		case tggs := <-updates:
-			if d.cfgSource != "" {
-				for _, tgg := range tggs {
-					if v, ok := tgg.(interface{ setSource(string) }); ok {
-						src := fmt.Sprintf("%s,%s", tgg.Source(), d.cfgSource)
-						v.setSource(src)
-					}
+	// Drain until every child exits, including any final sends after cancellation.
+	for tggs := range updates {
+		if ctx.Err() != nil {
+			continue
+		}
+		if d.cfgSource != "" {
+			for _, tgg := range tggs {
+				if v, ok := tgg.(interface{ setSource(string) }); ok {
+					src := fmt.Sprintf("%s,%s", tgg.Source(), d.cfgSource)
+					v.setSource(src)
 				}
 			}
-			select {
-			case <-ctx.Done():
-			case in <- tggs:
-			}
+		}
+		select {
+		case <-ctx.Done():
+		case in <- tggs:
 		}
 	}
+	d.Info("all discoverers exited")
 }
 
 func (d *KubeDiscoverer) setupPodDiscoverer(ctx context.Context, ns string) *podDiscoverer {
 	pod := d.client.CoreV1().Pods(ns)
-	podLW := &cache.ListWatch{
+	podLW := cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 		ListWithContextFunc: func(_ context.Context, opts metav1.ListOptions) (runtime.Object, error) {
 			opts.FieldSelector = d.selectorField
 			opts.LabelSelector = d.selectorLabel
@@ -181,27 +171,27 @@ func (d *KubeDiscoverer) setupPodDiscoverer(ctx context.Context, ns string) *pod
 			opts.LabelSelector = d.selectorLabel
 			return pod.Watch(ctx, opts)
 		},
-	}
+	}, d.client)
 
 	cmap := d.client.CoreV1().ConfigMaps(ns)
-	cmapLW := &cache.ListWatch{
+	cmapLW := cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 		ListWithContextFunc: func(_ context.Context, opts metav1.ListOptions) (runtime.Object, error) {
 			return cmap.List(ctx, opts)
 		},
 		WatchFuncWithContext: func(_ context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 			return cmap.Watch(ctx, opts)
 		},
-	}
+	}, d.client)
 
 	secret := d.client.CoreV1().Secrets(ns)
-	secretLW := &cache.ListWatch{
+	secretLW := cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 		ListWithContextFunc: func(_ context.Context, opts metav1.ListOptions) (runtime.Object, error) {
 			return secret.List(ctx, opts)
 		},
 		WatchFuncWithContext: func(_ context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 			return secret.Watch(ctx, opts)
 		},
-	}
+	}, d.client)
 
 	td := newPodDiscoverer(
 		cache.NewSharedInformer(podLW, &corev1.Pod{}, resyncPeriod),
@@ -215,7 +205,7 @@ func (d *KubeDiscoverer) setupPodDiscoverer(ctx context.Context, ns string) *pod
 func (d *KubeDiscoverer) setupServiceDiscoverer(ctx context.Context, namespace string) *serviceDiscoverer {
 	svc := d.client.CoreV1().Services(namespace)
 
-	svcLW := &cache.ListWatch{
+	svcLW := cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 		ListWithContextFunc: func(_ context.Context, opts metav1.ListOptions) (runtime.Object, error) {
 			opts.FieldSelector = d.selectorField
 			opts.LabelSelector = d.selectorLabel
@@ -226,7 +216,7 @@ func (d *KubeDiscoverer) setupServiceDiscoverer(ctx context.Context, namespace s
 			opts.LabelSelector = d.selectorLabel
 			return svc.Watch(ctx, opts)
 		},
-	}
+	}, d.client)
 
 	inf := cache.NewSharedInformer(svcLW, &corev1.Service{}, resyncPeriod)
 

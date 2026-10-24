@@ -61,7 +61,6 @@ pub struct FieldHashTable<B: ByteSlice> {
     pub items: Ref<B, [HashItem]>,
 }
 
-// Implement HashTable for DataHashTable
 impl<B: ByteSlice> HashTable for DataHashTable<B> {
     type Object = DataObject<B>;
 
@@ -75,7 +74,6 @@ impl<B: ByteSlice> HashTable for DataHashTable<B> {
     }
 }
 
-// Implement HashTable for FieldHashTable
 impl<B: ByteSlice> HashTable for FieldHashTable<B> {
     type Object = FieldObject<B>;
 
@@ -89,7 +87,6 @@ impl<B: ByteSlice> HashTable for FieldHashTable<B> {
     }
 }
 
-// Implement HashTableMut for DataHashTable
 impl<B: ByteSliceMut> HashTableMut for DataHashTable<B> {
     fn hash_item_mut(&mut self, hash: u64) -> &mut HashItem {
         let bucket_index = hash as usize % self.items.len();
@@ -97,7 +94,6 @@ impl<B: ByteSliceMut> HashTableMut for DataHashTable<B> {
     }
 }
 
-// Implement HashTableMut for FieldHashTable
 impl<B: ByteSliceMut> HashTableMut for FieldHashTable<B> {
     fn hash_item_mut(&mut self, hash: u64) -> &mut HashItem {
         let bucket_index = hash as usize % self.items.len();
@@ -105,7 +101,6 @@ impl<B: ByteSliceMut> HashTableMut for FieldHashTable<B> {
     }
 }
 
-// Implement JournalObject for DataHashTable
 impl<B: SplitByteSlice> JournalObject<B> for DataHashTable<B> {
     fn from_data(data: B, _is_compact: bool) -> Option<Self> {
         let (header_data, items_data) = data.split_at(std::mem::size_of::<ObjectHeader>()).ok()?;
@@ -117,7 +112,6 @@ impl<B: SplitByteSlice> JournalObject<B> for DataHashTable<B> {
     }
 }
 
-// Implement JournalObjectMut for DataHashTable
 impl<B: SplitByteSliceMut> JournalObjectMut<B> for DataHashTable<B> {
     fn from_data_mut(data: B, _is_compact: bool) -> Option<Self> {
         let (header_data, items_data) = data.split_at(std::mem::size_of::<ObjectHeader>()).ok()?;
@@ -129,7 +123,6 @@ impl<B: SplitByteSliceMut> JournalObjectMut<B> for DataHashTable<B> {
     }
 }
 
-// Implement JournalObject for FieldHashTable
 impl<B: SplitByteSlice> JournalObject<B> for FieldHashTable<B> {
     fn from_data(data: B, _is_compact: bool) -> Option<Self> {
         let (header_data, items_data) = data.split_at(std::mem::size_of::<ObjectHeader>()).ok()?;
@@ -141,7 +134,6 @@ impl<B: SplitByteSlice> JournalObject<B> for FieldHashTable<B> {
     }
 }
 
-// Implement JournalObjectMut for FieldHashTable
 impl<B: SplitByteSliceMut> JournalObjectMut<B> for FieldHashTable<B> {
     fn from_data_mut(data: B, _is_compact: bool) -> Option<Self> {
         let (header_data, items_data) = data.split_at(std::mem::size_of::<ObjectHeader>()).ok()?;
@@ -218,12 +210,14 @@ impl HashableObjectMut for DataObject<&mut [u8]> {
 
 /// Trait to standardize creation of journal objects from byte slices
 pub trait JournalObject<B: SplitByteSlice>: Sized {
-    /// Create a new journal object from a byte slice
+    /// Interpret a byte slice as this journal object. `is_compact` selects the compact layout
+    /// (the journal header's `Compact` incompatible flag) for object types that have one; the
+    /// others ignore it.
     fn from_data(data: B, is_compact: bool) -> Option<Self>;
 }
 
 pub trait JournalObjectMut<B: SplitByteSliceMut>: JournalObject<B> {
-    /// Create a new journal object from a byte slice
+    /// Mutable variant of [`JournalObject::from_data`].
     fn from_data_mut(data: B, is_compact: bool) -> Option<Self>;
 }
 
@@ -264,29 +258,29 @@ impl TryFrom<u8> for JournalState {
 #[repr(C)]
 pub struct JournalHeader {
     pub signature: [u8; 8],                          // "LPKSHHRH"
-    pub compatible_flags: u32,                       // Compatible extension flags
-    pub incompatible_flags: u32,                     // Incompatible extension flags
+    pub compatible_flags: u32,
+    pub incompatible_flags: u32,
     pub state: u8,                                   // File state (offline=0, online=1, archived=2)
-    pub reserved: [u8; 7],                           // Reserved space
-    pub file_id: [u8; 16],                           // Unique ID for this file
-    pub machine_id: [u8; 16],                        // Machine ID this belongs to
-    pub tail_entry_boot_id: [u8; 16],                // Boot ID of the last entry
-    pub seqnum_id: [u8; 16],                         // Sequence number ID
-    pub header_size: u64,                            // Size of the header
-    pub arena_size: u64,                             // Size of the data arena
-    pub data_hash_table_offset: Option<NonZeroU64>,  // Offset of the data hash table
-    pub data_hash_table_size: Option<NonZeroU64>,    // Size of the data hash table
-    pub field_hash_table_offset: Option<NonZeroU64>, // Offset of the field hash table
-    pub field_hash_table_size: Option<NonZeroU64>,   // Size of the field hash table
-    pub tail_object_offset: Option<NonZeroU64>,      // Offset of the last object
-    pub n_objects: u64,                              // Number of objects
-    pub n_entries: u64,                              // Number of entries
-    pub tail_entry_seqnum: u64,                      // Sequence number of the last entry
-    pub head_entry_seqnum: u64,                      // Sequence number of the first entry
-    pub entry_array_offset: Option<NonZeroU64>,      // Offset of the entry array
-    pub head_entry_realtime: u64,                    // Realtime timestamp of the first entry
-    pub tail_entry_realtime: u64,                    // Realtime timestamp of the last entry
-    pub tail_entry_monotonic: u64,                   // Monotonic timestamp of the last entry
+    pub reserved: [u8; 7],
+    pub file_id: [u8; 16],
+    pub machine_id: [u8; 16],
+    pub tail_entry_boot_id: [u8; 16],
+    pub seqnum_id: [u8; 16],
+    pub header_size: u64,
+    pub arena_size: u64,
+    pub data_hash_table_offset: Option<NonZeroU64>,
+    pub data_hash_table_size: Option<NonZeroU64>,
+    pub field_hash_table_offset: Option<NonZeroU64>,
+    pub field_hash_table_size: Option<NonZeroU64>,
+    pub tail_object_offset: Option<NonZeroU64>,
+    pub n_objects: u64,
+    pub n_entries: u64,
+    pub tail_entry_seqnum: u64,
+    pub head_entry_seqnum: u64,
+    pub entry_array_offset: Option<NonZeroU64>,
+    pub head_entry_realtime: u64,
+    pub tail_entry_realtime: u64,
+    pub tail_entry_monotonic: u64,
 }
 
 /*
@@ -381,6 +375,7 @@ impl ObjectHeader {
         self.zstd_compressed() | self.lz4_compressed() | self.xz_compressed()
     }
 
+    /// Object size rounded up to the next multiple of 8.
     pub fn aligned_size(&self) -> u64 {
         (self.size + 7) & !7
     }
@@ -474,6 +469,8 @@ impl<B: ByteSlice> OffsetArrayObject<B> {
         }
     }
 
+    /// Number of items in this node that are in use: the array's capacity, clamped to
+    /// `remaining_items` (the items left for this array and any later arrays in the chain).
     pub fn len(&self, remaining_items: usize) -> usize {
         self.capacity().min(remaining_items)
     }
@@ -563,7 +560,7 @@ pub struct EntryObjectHeader {
     pub seqnum: u64,
     pub realtime: u64,
     pub monotonic: u64,
-    pub boot_id: [u8; 16], // UUID/128-bit ID
+    pub boot_id: [u8; 16], // Boot ID of the entry
     pub xor_hash: u64,
 }
 
@@ -724,6 +721,9 @@ impl DataObjectHeader {
         self.object_header.is_compressed()
     }
 
+    /// Cursor over the entries referencing this data object: the first entry is stored directly at
+    /// `entry_offset`; with more than one entry (`n_entries`), the rest are enumerated by the
+    /// entry array at `entry_array_offset`.
     pub fn inlined_cursor(&self) -> Option<InlinedCursor> {
         let inlined_offset = self.entry_offset?;
         let cursor = match self.n_entries?.get() {
@@ -773,10 +773,82 @@ impl<B: ByteSlice> std::fmt::Debug for DataPayloadType<B> {
     }
 }
 
-// Complete Data Object structure
 pub struct DataObject<B: ByteSlice> {
     pub header: Ref<B, DataObjectHeader>,
     pub payload: DataPayloadType<B>,
+}
+
+// systemd limits journal DATA field payloads to 768 MiB; reject corrupt size prefixes before allocating.
+const MAX_UNCOMPRESSED_DATA_OBJECT_SIZE: usize = 768 * 1024 * 1024;
+const DECOMPRESSION_READ_CHUNK_SIZE: usize = 8 * 1024;
+const MIN_DECOMPRESSION_RESERVE_SIZE: usize = 64 * 1024;
+
+fn read_limited_to_end<R: std::io::Read>(reader: R, buf: &mut Vec<u8>) -> Result<usize> {
+    read_limited_to_end_with_cap(reader, buf, MAX_UNCOMPRESSED_DATA_OBJECT_SIZE)
+}
+
+/// Reads `reader` to EOF into `buf`, replacing its contents. On any read failure or output that
+/// would exceed `max_size`, empties `buf` and returns `DecompressorError`.
+fn read_limited_to_end_with_cap<R: std::io::Read>(
+    mut reader: R,
+    buf: &mut Vec<u8>,
+    max_size: usize,
+) -> Result<usize> {
+    buf.clear();
+    let mut chunk = [0u8; DECOMPRESSION_READ_CHUNK_SIZE];
+
+    loop {
+        if buf.len() == max_size {
+            let mut extra = [0u8; 1];
+            match reader.read(&mut extra) {
+                Ok(0) => return Ok(buf.len()),
+                Ok(_) => {
+                    *buf = Vec::new();
+                    return Err(JournalError::DecompressorError);
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(_) => {
+                    *buf = Vec::new();
+                    return Err(JournalError::DecompressorError);
+                }
+            }
+        }
+
+        let remaining = max_size - buf.len();
+        let read_len = remaining.min(chunk.len());
+        match reader.read(&mut chunk[..read_len]) {
+            Ok(0) => return Ok(buf.len()),
+            Ok(len) => {
+                let Some(required) = buf
+                    .len()
+                    .checked_add(len)
+                    .filter(|required| *required <= max_size)
+                else {
+                    *buf = Vec::new();
+                    return Err(JournalError::DecompressorError);
+                };
+
+                if required > buf.capacity() {
+                    let target_capacity = required
+                        .max(buf.capacity().saturating_mul(2))
+                        .max(MIN_DECOMPRESSION_RESERVE_SIZE)
+                        .min(max_size);
+
+                    if buf.try_reserve_exact(target_capacity - buf.len()).is_err() {
+                        *buf = Vec::new();
+                        return Err(JournalError::DecompressorError);
+                    }
+                }
+
+                buf.extend_from_slice(&chunk[..len]);
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(_) => {
+                *buf = Vec::new();
+                return Err(JournalError::DecompressorError);
+            }
+        }
+    }
 }
 
 impl<B: ByteSlice> std::fmt::Debug for DataObject<B> {
@@ -875,19 +947,218 @@ impl<B: ByteSlice> DataObject<B> {
 
         if self.zstd_compressed() {
             use ruzstd::decoding::StreamingDecoder;
-            use ruzstd::io::Read;
 
             let payload = self.payload_bytes();
-            let mut decoder =
-                StreamingDecoder::new(payload).map_err(|_| JournalError::DecompressorError)?;
+            let decoder = match StreamingDecoder::new(payload) {
+                Ok(decoder) => decoder,
+                Err(_) => {
+                    *buf = Vec::new();
+                    return Err(JournalError::DecompressorError);
+                }
+            };
+
+            read_limited_to_end(decoder, buf)
+        } else if self.lz4_compressed() {
+            let payload = self.payload_bytes();
+
+            if payload.len() < 8 {
+                *buf = Vec::new();
+                return Err(JournalError::DecompressorError);
+            }
+
+            let size_bytes = match payload[..8].try_into() {
+                Ok(size_bytes) => size_bytes,
+                Err(_) => {
+                    *buf = Vec::new();
+                    return Err(JournalError::DecompressorError);
+                }
+            };
+            let uncompressed_size = match usize::try_from(u64::from_le_bytes(size_bytes)) {
+                Ok(uncompressed_size) => uncompressed_size,
+                Err(_) => {
+                    *buf = Vec::new();
+                    return Err(JournalError::DecompressorError);
+                }
+            };
+            if uncompressed_size > MAX_UNCOMPRESSED_DATA_OBJECT_SIZE {
+                *buf = Vec::new();
+                return Err(JournalError::DecompressorError);
+            }
+            let compressed_data = &payload[8..];
 
             buf.clear();
-            decoder
-                .read_to_end(buf)
-                .map_err(|_| JournalError::DecompressorError)
+            if uncompressed_size > buf.capacity()
+                && buf.try_reserve_exact(uncompressed_size).is_err()
+            {
+                *buf = Vec::new();
+                return Err(JournalError::DecompressorError);
+            }
+            buf.resize(uncompressed_size, 0);
+
+            match lz4_flex::block::decompress_into(compressed_data, buf) {
+                Ok(len) if len == uncompressed_size => Ok(len),
+                Ok(_) | Err(_) => {
+                    *buf = Vec::new();
+                    Err(JournalError::DecompressorError)
+                }
+            }
+        } else if self.xz_compressed() {
+            use lzma_rust2::XzReader;
+
+            let payload = self.payload_bytes();
+            let decoder = XzReader::new(payload, false);
+
+            read_limited_to_end(decoder, buf)
         } else {
+            *buf = Vec::new();
             Err(JournalError::UnknownCompressionMethod)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::{self, Read};
+
+    struct FixedSizeReader {
+        remaining: usize,
+    }
+
+    impl Read for FixedSizeReader {
+        fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+            let len = self.remaining.min(buf.len());
+            buf[..len].fill(b'x');
+            self.remaining -= len;
+            Ok(len)
+        }
+    }
+
+    fn data_object_bytes(payload: &[u8], flags: u8) -> Vec<u8> {
+        let header = DataObjectHeader {
+            object_header: ObjectHeader {
+                type_: ObjectType::Data as u8,
+                flags,
+                reserved: [0; 6],
+                size: (std::mem::size_of::<DataObjectHeader>() + payload.len()) as u64,
+            },
+            hash: 0,
+            next_hash_offset: None,
+            next_field_offset: None,
+            entry_offset: None,
+            entry_array_offset: None,
+            n_entries: None,
+        };
+
+        let mut bytes = Vec::with_capacity(header.object_header.size as usize);
+        bytes.extend_from_slice(header.as_bytes());
+        bytes.extend_from_slice(payload);
+        bytes
+    }
+
+    #[test]
+    fn lz4_decompress_clears_buffer_on_short_prefix() {
+        let bytes = data_object_bytes(b"short", ObjectFlags::CompressedLz4 as u8);
+        let object = DataObject::from_data(bytes.as_slice(), false).unwrap();
+        let mut buf = b"stale".to_vec();
+
+        assert!(matches!(
+            object.decompress(&mut buf),
+            Err(JournalError::DecompressorError)
+        ));
+        assert!(buf.is_empty());
+        assert_eq!(buf.capacity(), 0);
+    }
+
+    #[test]
+    fn lz4_decompress_rejects_oversized_payload_prefix() {
+        let mut stored_payload = Vec::new();
+        stored_payload
+            .extend_from_slice(&((MAX_UNCOMPRESSED_DATA_OBJECT_SIZE as u64) + 1).to_le_bytes());
+        stored_payload.extend_from_slice(b"invalid");
+
+        let bytes = data_object_bytes(&stored_payload, ObjectFlags::CompressedLz4 as u8);
+        let object = DataObject::from_data(bytes.as_slice(), false).unwrap();
+        let mut buf = b"stale".to_vec();
+
+        assert!(matches!(
+            object.decompress(&mut buf),
+            Err(JournalError::DecompressorError)
+        ));
+        assert!(buf.is_empty());
+        assert_eq!(buf.capacity(), 0);
+    }
+
+    #[test]
+    fn lz4_decompress_clears_buffer_on_decode_error() {
+        let uncompressed_size = 4usize;
+        let mut stored_payload = Vec::new();
+        stored_payload.extend_from_slice(&(uncompressed_size as u64).to_le_bytes());
+        stored_payload.extend_from_slice(&[0x10, b'a', 1, 0]);
+
+        let bytes = data_object_bytes(&stored_payload, ObjectFlags::CompressedLz4 as u8);
+        let object = DataObject::from_data(bytes.as_slice(), false).unwrap();
+        let mut buf = b"stale".to_vec();
+
+        assert!(matches!(
+            object.decompress(&mut buf),
+            Err(JournalError::DecompressorError)
+        ));
+        assert!(buf.is_empty());
+        assert_eq!(buf.capacity(), 0);
+    }
+
+    #[test]
+    fn lz4_decompress_rejects_size_mismatch() {
+        let uncompressed_size = 4usize;
+        let mut stored_payload = Vec::new();
+        stored_payload.extend_from_slice(&(uncompressed_size as u64).to_le_bytes());
+        stored_payload.extend_from_slice(&[0x30, b'a', b'b', b'c']);
+
+        let bytes = data_object_bytes(&stored_payload, ObjectFlags::CompressedLz4 as u8);
+        let object = DataObject::from_data(bytes.as_slice(), false).unwrap();
+        let mut buf = b"stale".to_vec();
+
+        assert!(matches!(
+            object.decompress(&mut buf),
+            Err(JournalError::DecompressorError)
+        ));
+        assert!(buf.is_empty());
+        assert_eq!(buf.capacity(), 0);
+    }
+
+    #[test]
+    fn read_limited_to_end_errors_and_clears_when_limit_is_exceeded() {
+        let mut buf = b"stale".to_vec();
+
+        assert!(matches!(
+            read_limited_to_end_with_cap(FixedSizeReader { remaining: 5 }, &mut buf, 4),
+            Err(JournalError::DecompressorError)
+        ));
+        assert!(buf.is_empty());
+        assert_eq!(buf.capacity(), 0);
+    }
+
+    #[test]
+    fn xz_decompress_returns_payload() {
+        let payload = b"_SYSTEMD_UNIT=netdata.service";
+        let compressed = [
+            0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00, 0x00, 0x01, 0x69, 0x22, 0xde, 0x36, 0x04, 0xc0,
+            0x21, 0x1d, 0x21, 0x01, 0x16, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0xe6, 0x6a, 0x1c, 0x77, 0x01, 0x00, 0x1c, 0x5f, 0x53, 0x59, 0x53, 0x54, 0x45, 0x4d,
+            0x44, 0x5f, 0x55, 0x4e, 0x49, 0x54, 0x3d, 0x6e, 0x65, 0x74, 0x64, 0x61, 0x74, 0x61,
+            0x2e, 0x73, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x00, 0x00, 0x00, 0x00, 0x11, 0x15,
+            0x71, 0xd5, 0x00, 0x01, 0x39, 0x1d, 0x48, 0x54, 0x04, 0x4d, 0x90, 0x42, 0x99, 0x0d,
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x01, 0x59, 0x5a,
+        ];
+
+        let bytes = data_object_bytes(&compressed, ObjectFlags::CompressedXz as u8);
+        let object = DataObject::from_data(bytes.as_slice(), false).unwrap();
+        let mut buf = Vec::new();
+
+        let len = object.decompress(&mut buf).unwrap();
+
+        assert_eq!(&buf[..len], payload);
     }
 }
 
@@ -930,7 +1201,6 @@ impl<B: SplitByteSliceMut> JournalObjectMut<B> for TagObject<B> {
 }
 
 impl<B: ByteSlice> TagObject<B> {
-    // Helper function to format tag as hex string
     pub fn tag_as_hex(&self) -> String {
         self.header
             .tag

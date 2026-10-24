@@ -6,8 +6,34 @@
 
 static void health_dyncfg_register_prototype(RRD_ALERT_PROTOTYPE *ap);
 
+static char *health_dyncfg_alert_prototype_id_strdupz(const char *alert_name) {
+    size_t prefix_len = strlen(DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX);
+    size_t alert_name_len = strlen(alert_name);
+    size_t id_len = prefix_len + 1 + alert_name_len;
+    char *id = mallocz(id_len + 1);
+
+    int written = snprintfz(id, id_len + 1, DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX ":%s", alert_name);
+    internal_fatal((size_t)written != id_len,
+                   "HEALTH DYNCFG: failed to build dyncfg id for alert '%s'", alert_name);
+
+    return id;
+}
+
 // ---------------------------------------------------------------------------------------------------------------------
 // parse the json object of an alert definition
+
+static bool parse_bounded_int64(json_object *jobj, const char *path, const char *member, int64_t *value,
+                                int64_t minimum, int64_t maximum, BUFFER *error, unsigned flags) {
+    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, member, *value, error, flags);
+
+    if(*value < minimum || *value > maximum) {
+        buffer_sprintf(error, "value for '%s.%s' is outside range [%" PRId64 ", %" PRId64 "]",
+                       path, member, minimum, maximum);
+        return false;
+    }
+
+    return true;
+}
 
 static void dims_grouping_to_rrdr_options(RRD_ALERT_PROTOTYPE *ap) {
     ap->config.options &= ~(RRDR_OPTIONS_DIMS_AGGREGATION);
@@ -56,6 +82,15 @@ static void data_source_to_rrdr_options(RRD_ALERT_PROTOTYPE *ap) {
 static bool parse_match(json_object *jobj, const char *path, struct rrd_alert_match *match, BUFFER *error, unsigned flags) {
     STRING *on = NULL;
     JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "on", on, error, flags);
+
+    // string_strdupz("") returns NULL, so an empty 'on' is indistinguishable downstream from a
+    // missing one, and health_prototype_to_json() writes a NULL 'on' back out as "" - which used to
+    // let a match-everything rule persist across restarts. Refuse it where we can still report why.
+    if(!on && (flags & (JSONC_REQUIRED | JSONC_STRICT))) {
+        buffer_sprintf(error, "member '%s.on' cannot be empty", path);
+        return false;
+    }
+
     if(match->is_template)
         match->on.context = on;
     else
@@ -68,8 +103,15 @@ static bool parse_match(json_object *jobj, const char *path, struct rrd_alert_ma
 }
 
 static bool parse_config_value_database_lookup(json_object *jobj, const char *path, struct rrd_alert_config *config, BUFFER *error, unsigned flags) {
-    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "after", config->after, error, flags);
-    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "before", config->before, error, flags);
+    int64_t after = config->after;
+    int64_t before = config->before;
+    if(!parse_bounded_int64(jobj, path, "after", &after, INT_MIN, INT_MAX, error, flags) ||
+       !parse_bounded_int64(jobj, path, "before", &before, INT_MIN, INT_MAX, error, flags))
+        return false;
+
+    config->after = (int)after;
+    config->before = (int)before;
+
     JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "time_group", time_grouping_txt2id, config->time_group, error, flags);
     JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "dims_group", alerts_dims_grouping2id, config->dims_group, error, flags);
     JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "data_source", alerts_data_sources2id, config->data_source, error, flags);
@@ -98,7 +140,19 @@ static bool parse_config_value(json_object *jobj, const char *path, struct rrd_a
     JSONC_PARSE_SUBOBJECT_CB(jobj, path, "database_lookup", config, parse_config_value_database_lookup, error, flags);
     JSONC_PARSE_TXT2EXPRESSION_OR_ERROR_AND_RETURN(jobj, path, "calculation", config->calculation, error, JSONC_OPTIONAL);
     JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "units", config->units, error, JSONC_OPTIONAL);
-    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "update_every", config->update_every, error, flags);
+    int64_t update_every = config->update_every;
+    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "update_every", update_every, error, flags);
+    if(update_every < 0) {
+        buffer_sprintf(error, "negative value for '%s.update_every'", path);
+        return false;
+    }
+    if(update_every > INT_MAX) {
+        buffer_sprintf(error, "value for '%s.update_every' exceeds maximum %d", path, INT_MAX);
+        return false;
+    }
+
+    config->update_every = (int)update_every;
+
     return true;
 }
 
@@ -109,17 +163,45 @@ static bool parse_config_conditions(json_object *jobj, const char *path, struct 
 }
 
 static bool parse_config_action_delay(json_object *jobj, const char *path, struct rrd_alert_config *config, BUFFER *error, unsigned flags) {
-    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "up", config->delay_up_duration, error, flags);
-    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "down", config->delay_down_duration, error, flags);
-    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "max", config->delay_max_duration, error, flags);
-    JSONC_PARSE_DOUBLE_OR_ERROR_AND_RETURN(jobj, path, "multiplier", config->delay_multiplier, error, flags);
+    int64_t up = config->delay_up_duration;
+    int64_t down = config->delay_down_duration;
+    int64_t max = config->delay_max_duration;
+    if(!parse_bounded_int64(jobj, path, "up", &up, INT_MIN, INT_MAX, error, flags) ||
+       !parse_bounded_int64(jobj, path, "down", &down, INT_MIN, INT_MAX, error, flags) ||
+       !parse_bounded_int64(jobj, path, "max", &max, INT_MIN, INT_MAX, error, flags))
+        return false;
+
+    config->delay_up_duration = (int)up;
+    config->delay_down_duration = (int)down;
+    config->delay_max_duration = (int)max;
+
+    json_object *jmultiplier = NULL;
+    bool multiplier_is_int = json_object_object_get_ex(jobj, "multiplier", &jmultiplier) &&
+                             jmultiplier && json_object_is_type(jmultiplier, json_type_int);
+
+    double multiplier = config->delay_multiplier;
+    JSONC_PARSE_DOUBLE_OR_ERROR_AND_RETURN(jobj, path, "multiplier", multiplier, error, flags);
+    if(!isfinite(multiplier) || multiplier < -(double)FLT_MAX || multiplier > (double)FLT_MAX) {
+        buffer_sprintf(error, "non-finite or out-of-range value for '%s.multiplier'", path);
+        return false;
+    }
+    config->delay_multiplier = multiplier_is_int ? (float)json_object_get_int64(jmultiplier) : (float)multiplier;
+
     return true;
 }
 
 static bool parse_config_action_repeat(json_object *jobj, const char *path, struct rrd_alert_config *config, BUFFER *error, unsigned flags) {
     JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "enabled", config->has_custom_repeat_config, error, flags);
-    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "warning", config->warn_repeat_every, error, flags);
-    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "critical", config->crit_repeat_every, error, flags);
+
+    int64_t warning = config->warn_repeat_every;
+    int64_t critical = config->crit_repeat_every;
+    if(!parse_bounded_int64(jobj, path, "warning", &warning, 0, INT_MAX, error, flags) ||
+       !parse_bounded_int64(jobj, path, "critical", &critical, 0, INT_MAX, error, flags))
+        return false;
+
+    config->warn_repeat_every = (uint32_t)warning;
+    config->crit_repeat_every = (uint32_t)critical;
+
     return true;
 }
 
@@ -207,7 +289,7 @@ static bool parse_prototype(json_object *jobj, const char *path, RRD_ALERT_PROTO
     return true;
 }
 
-static RRD_ALERT_PROTOTYPE *health_prototype_payload_parse(const char *payload, size_t payload_len, BUFFER *error, const char *name, unsigned flags) {
+RRD_ALERT_PROTOTYPE *health_prototype_payload_parse(const char *payload, size_t payload_len, BUFFER *error, const char *name, unsigned flags) {
     RRD_ALERT_PROTOTYPE *base = callocz(1, sizeof(*base));
     CLEAN_JSON_OBJECT *jobj = NULL;
 
@@ -551,6 +633,17 @@ static void dyncfg_health_prototype_reapply(RRD_ALERT_PROTOTYPE *ap) {
     health_prototype_apply_to_all_hosts(ap);
 }
 
+// A saved configuration replayed at startup is echoed with no caller to read the response, so record
+// the rejection here. Keep the detailed parser reason only in that response: alert payload fields,
+// including expressions and action strings, are user-provided and may contain sensitive content.
+static int health_dyncfg_reject(BUFFER *result, const char *cmd, const char *alert, const char *reason) {
+    nd_log(NDLS_DAEMON, NDLP_ERR,
+           "HEALTH DYNCFG: rejected '%s' of alert prototype '%s'",
+           cmd, alert ? alert : "");
+
+    return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, reason);
+}
+
 static int dyncfg_health_prototype_template_action(BUFFER *result, DYNCFG_CMDS cmd, const char *add_name, BUFFER *payload, const char *source __maybe_unused) {
     int code = HTTP_RESP_INTERNAL_SERVER_ERROR;
     switch(cmd) {
@@ -558,9 +651,9 @@ static int dyncfg_health_prototype_template_action(BUFFER *result, DYNCFG_CMDS c
             CLEAN_BUFFER *error = buffer_create(0, NULL);
             RRD_ALERT_PROTOTYPE *nap = health_prototype_payload_parse(buffer_tostring(payload), buffer_strlen(payload), error, add_name, JSONC_REQUIRED);
             if(!nap)
-                code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, buffer_tostring(error));
+                code = health_dyncfg_reject(result, "add", add_name, buffer_tostring(error));
             else {
-                char *msg = "";
+                const char *msg = "";
 
                 nap->config.source_type = DYNCFG_SOURCE_TYPE_DYNCFG;
                 bool added = health_prototype_add(nap, &msg); // this swaps ap <-> nap
@@ -632,9 +725,7 @@ static int dyncfg_health_prototype_job_action(BUFFER *result, DYNCFG_CMDS cmd, B
         return dyncfg_default_response(result, HTTP_RESP_NOT_FOUND, "no alert prototype is available by the name given");
 
     RRD_ALERT_PROTOTYPE *ap = dictionary_acquired_item_value(item);
-
-    char alert_name_dyncfg[strlen(DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX) + strlen(alert_name) + 10];
-    snprintfz(alert_name_dyncfg, sizeof(alert_name_dyncfg), DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX ":%s", alert_name);
+    CLEAN_CHAR_P *alert_name_dyncfg = health_dyncfg_alert_prototype_id_strdupz(alert_name);
 
     int code = HTTP_RESP_INTERNAL_SERVER_ERROR;
 
@@ -686,16 +777,17 @@ static int dyncfg_health_prototype_job_action(BUFFER *result, DYNCFG_CMDS cmd, B
                 CLEAN_BUFFER *error = buffer_create(0, NULL);
                 RRD_ALERT_PROTOTYPE *nap = health_prototype_payload_parse(buffer_tostring(payload), buffer_strlen(payload), error, alert_name, JSONC_REQUIRED);
                 if(!nap)
-                    code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, buffer_tostring(error));
+                    code = health_dyncfg_reject(result, "update", alert_name, buffer_tostring(error));
                 else {
-                    char *msg = "";
+                    const char *msg = "";
                     nap->config.source_type = DYNCFG_SOURCE_TYPE_DYNCFG;
                     bool added = health_prototype_add(nap, &msg); // this swaps ap <-> nap
 
                     if(!added) {
                         health_prototype_free(nap);
                         if(!msg || !*msg) msg = "required attributes are missing";
-                        return dyncfg_default_response( result, HTTP_RESP_BAD_REQUEST, msg);
+                        code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, msg);
+                        break;
                     }
                     else
                         freez(nap);
@@ -744,9 +836,7 @@ static int dyncfg_health_prototype_job_action(BUFFER *result, DYNCFG_CMDS cmd, B
 int dyncfg_health_cb(const char *transaction __maybe_unused, const char *id, DYNCFG_CMDS cmd, const char *add_name,
                      BUFFER *payload, usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
                      BUFFER *result, HTTP_ACCESS access __maybe_unused, const char *source, void *data __maybe_unused) {
-
-    char buf[strlen(id) + 1];
-    memcpy(buf, id, sizeof(buf));
+    CLEAN_CHAR_P *buf = strdupz(id);
 
     char *words[100] = { NULL };
     size_t num_words = quoted_strings_splitter_dyncfg_id(buf, words, 100);
@@ -780,14 +870,13 @@ int dyncfg_health_cb(const char *transaction __maybe_unused, const char *id, DYN
 }
 
 void health_dyncfg_unregister_all_prototypes(void) {
-    char key[HEALTH_CONF_MAX_LINE];
     RRD_ALERT_PROTOTYPE *ap;
 
     // remove dyncfg
     // it is ok if they are not added before
 
     dfe_start_read(health_globals.prototypes.dict, ap) {
-        snprintfz(key, sizeof(key), DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX ":%s", string2str(ap->config.name));
+        CLEAN_CHAR_P *key = health_dyncfg_alert_prototype_id_strdupz(string2str(ap->config.name));
         dyncfg_del(localhost, key);
     }
     dfe_done(ap);
@@ -795,22 +884,27 @@ void health_dyncfg_unregister_all_prototypes(void) {
 }
 
 static void health_dyncfg_register_prototype(RRD_ALERT_PROTOTYPE *ap) {
-    char key[HEALTH_CONF_MAX_LINE];
+    CLEAN_CHAR_P *key = health_dyncfg_alert_prototype_id_strdupz(string2str(ap->config.name));
 
 //    bool trace = false;
 //    if(string_strcmp(ap->config.name, "ram_available") == 0)
 //        trace = true;
 
-    snprintfz(key, sizeof(key), DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX ":%s", string2str(ap->config.name));
-    dyncfg_add(localhost, key, "/health/alerts/prototypes",
-               ap->_internal.enabled ? DYNCFG_STATUS_ACCEPTED : DYNCFG_STATUS_DISABLED, DYNCFG_TYPE_JOB,
-               ap->config.source_type, string2str(ap->config.source),
-               DYNCFG_CMD_SCHEMA | DYNCFG_CMD_GET | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE |
-                   DYNCFG_CMD_UPDATE | DYNCFG_CMD_USERCONFIG |
-                   (ap->config.source_type == DYNCFG_SOURCE_TYPE_DYNCFG /* && !ap->_internal.is_on_disk */ ? DYNCFG_CMD_REMOVE : 0),
-               HTTP_ACCESS_NONE,
-               HTTP_ACCESS_NONE,
-               dyncfg_health_cb, NULL);
+    dyncfg_add(&(struct dyncfg_add_inline_spec) {
+        .host = localhost,
+        .id = key,
+        .path = "/health/alerts/prototypes",
+        .status = ap->_internal.enabled ? DYNCFG_STATUS_ACCEPTED : DYNCFG_STATUS_DISABLED,
+        .type = DYNCFG_TYPE_JOB,
+        .source_type = ap->config.source_type,
+        .source = string2str(ap->config.source),
+        .cmds = DYNCFG_CMD_SCHEMA | DYNCFG_CMD_GET | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE |
+                DYNCFG_CMD_UPDATE | DYNCFG_CMD_USERCONFIG |
+                (ap->config.source_type == DYNCFG_SOURCE_TYPE_DYNCFG /* && !ap->_internal.is_on_disk */ ? DYNCFG_CMD_REMOVE : 0),
+        .view_access = HTTP_ACCESS_NONE,
+        .edit_access = HTTP_ACCESS_NONE,
+        .cb = dyncfg_health_cb,
+    });
 
 #ifdef NETDATA_TEST_HEALTH_PROTOTYPES_JSON_AND_PARSING
     {
@@ -835,14 +929,19 @@ static void health_dyncfg_register_prototype(RRD_ALERT_PROTOTYPE *ap) {
 void health_dyncfg_register_all_prototypes(void) {
     RRD_ALERT_PROTOTYPE *ap;
 
-    dyncfg_add(localhost,
-               DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX, "/health/alerts/prototypes",
-               DYNCFG_STATUS_ACCEPTED, DYNCFG_TYPE_TEMPLATE,
-               DYNCFG_SOURCE_TYPE_INTERNAL, "internal",
-               DYNCFG_CMD_SCHEMA | DYNCFG_CMD_ADD | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE | DYNCFG_CMD_USERCONFIG,
-               HTTP_ACCESS_NONE,
-               HTTP_ACCESS_NONE,
-               dyncfg_health_cb, NULL);
+    dyncfg_add(&(struct dyncfg_add_inline_spec) {
+        .host = localhost,
+        .id = DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX,
+        .path = "/health/alerts/prototypes",
+        .status = DYNCFG_STATUS_ACCEPTED,
+        .type = DYNCFG_TYPE_TEMPLATE,
+        .source_type = DYNCFG_SOURCE_TYPE_INTERNAL,
+        .source = "internal",
+        .cmds = DYNCFG_CMD_SCHEMA | DYNCFG_CMD_ADD | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE | DYNCFG_CMD_USERCONFIG,
+        .view_access = HTTP_ACCESS_NONE,
+        .edit_access = HTTP_ACCESS_NONE,
+        .cb = dyncfg_health_cb,
+    });
 
     dfe_start_read(health_globals.prototypes.dict, ap) {
         if(ap->config.source_type != DYNCFG_SOURCE_TYPE_DYNCFG)

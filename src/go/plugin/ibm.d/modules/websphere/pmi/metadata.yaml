@@ -10,6 +10,7 @@ modules:
         categories:
           - data-collection.applications
         icon_filename: "ibm.svg"
+        description: Monitor IBM WebSphere Application Server through the PMI PerfServlet, including JVM, thread pools, JDBC and JMS resources, applications, and clusters.
       related_resources:
         integrations:
           list: []
@@ -76,7 +77,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics

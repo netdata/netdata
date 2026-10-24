@@ -2,7 +2,7 @@
 
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# shellcheck source=./packaging/makeself/functions.sh
+# shellcheck source=/dev/null
 . "$(dirname "${0}")"/functions.sh
 
 export LC_ALL=C
@@ -13,6 +13,14 @@ renice 19 $$ >/dev/null 2>/dev/null
 
 NETDATA_PREFIX="/opt/netdata"
 NETDATA_USER_CONFIG_DIR="${NETDATA_PREFIX}/etc/netdata"
+NETDATA_LIB_DIR="${NETDATA_PREFIX}/var/lib/netdata"
+# Consumed by install_netdata_dirs in functions.sh.
+# shellcheck disable=SC2034
+NETDATA_CACHE_DIR="${NETDATA_PREFIX}/var/cache/netdata"
+NETDATA_LOG_DIR="${NETDATA_PREFIX}/var/log/netdata"
+# Consumed by install_netdata_dirs in functions.sh.
+# shellcheck disable=SC2034
+NETDATA_CLAIMING_DIR="${NETDATA_LIB_DIR}/cloud.d"
 
 # -----------------------------------------------------------------------------
 if [ -d /opt/netdata/etc/netdata.old ]; then
@@ -91,9 +99,13 @@ fi
 # -----------------------------------------------------------------------------
 progress "Attempt to create user/group netdata/netadata"
 
-NETDATA_WANTED_GROUPS="docker nginx varnish haproxy adm nsd proxy squid ceph nobody I2C"
+# These variables are consumed by helper functions from functions.sh.
+# shellcheck disable=SC2034
+NETDATA_WANTED_GROUPS="docker nginx varnish adm nsd proxy squid ceph nobody I2C"
+# shellcheck disable=SC2034
 NETDATA_ADDED_TO_GROUPS=""
 # Default user/group
+# shellcheck disable=SC2034
 NETDATA_USER="netdata"
 NETDATA_GROUP="netdata"
 
@@ -168,19 +180,59 @@ dir_should_be_link etc/netdata ../../usr/lib/netdata/conf.d orig
 progress "fix permissions"
 
 run chmod g+rx,o+rx /opt
-run find /opt/netdata -type d -exec chmod go+rx '{}' \+
+# Makeself creates implicit package parents with a private umask. Apply package
+# permissions only to shipped paths, never to discovered application state.
+if [ ! -s "${NETDATA_PREFIX}/system/package-manifest" ]; then
+  run_failed "Missing package path inventory"
+  exit 1
+fi
+while IFS= read -r package_path; do
+  path="${NETDATA_PREFIX}/${package_path}"
+  [ -e "${path}" ] || [ -L "${path}" ] || continue
+  if [ -d "${path}" ] && [ ! -L "${path}" ]; then
+    run chmod go+rx "${path}" || exit 1
+  fi
+  case "${package_path}" in
+    ./usr/libexec/netdata/plugins.d/ebpf.d | ./usr/libexec/netdata/plugins.d/ebpf.d/*)
+      run chown -h "root:${NETDATA_GROUP}" "${path}" || exit 1 ;;
+  esac
+done < "${NETDATA_PREFIX}/system/package-manifest"
 
 install_netdata_dirs
 
-if [ -d /opt/netdata/usr/libexec/netdata/plugins.d/ebpf.d ]; then
-  run chown -R root:${NETDATA_GROUP} /opt/netdata/usr/libexec/netdata/plugins.d/ebpf.d
+# Earlier static packages leaked the builder's otel-plugin state into the
+# archive; extracting it left root-owned parent directories under
+# var/log/netdata/otel, which the otel-plugin (running as netdata) cannot
+# write to, crash-looping the plugin. Repair ownership on every
+# install/update so affected installs self-heal. The daemon only chowns
+# the log dir non-recursively, so nothing else fixes the subtree.
+if [ -d "${NETDATA_LOG_DIR}/otel" ]; then
+  run chown -R ${NETDATA_USER}:${NETDATA_GROUP} "${NETDATA_LOG_DIR}/otel"
 fi
+
+# The Go helper replaces the old Bash artifact. Remove leftovers from an
+# overlay upgrade so persisted defaults cannot keep executing stale code.
+if [ -e "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-name.sh" ] ||
+  [ -L "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-name.sh" ]; then
+  run rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-name.sh"
+fi
+
+# The otel-signal-viewer plugin was removed in favour of otel-plugin plus the
+# read-only legacy-otel-logs function. Native packages drop its files via
+# Obsoletes/Replaces, but an overlay upgrade only stops shipping them, so both
+# artifacts linger here. Only stock paths are touched, never user config.
+for x in usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin \
+  usr/lib/netdata/conf.d/otel-signal-viewer.yaml; do
+  if [ -e "${NETDATA_PREFIX}/${x}" ] || [ -L "${NETDATA_PREFIX}/${x}" ]; then
+    run rm -f "${NETDATA_PREFIX}/${x}"
+  fi
+done
 
 # -----------------------------------------------------------------------------
 
 progress "changing plugins ownership and permissions"
 
-for x in ndsudo apps.plugin perf.plugin slabinfo.plugin debugfs.plugin freeipmi.plugin ioping cgroup-network local-listeners network-viewer.plugin ebpf.plugin nfacct.plugin xenstat.plugin python.d.plugin charts.d.plugin go.d.plugin ioping.plugin cgroup-network-helper.sh otel-plugin otel-signal-viewer-plugin systemd-journal.plugin; do
+for x in ndsudo apps.plugin perf.plugin slabinfo.plugin debugfs.plugin freeipmi.plugin ioping cgroup-network local-listeners network-viewer.plugin ebpf.plugin ebpf-go.plugin nfacct.plugin xenstat.plugin python.d.plugin charts.d.plugin go.d.plugin snmp-trap-profile-gen ioping.plugin cgroup-network-helper.sh cgroup-name otel-plugin systemd-journal.plugin macos-logs.plugin netflow-plugin; do
   f="usr/libexec/netdata/plugins.d/${x}"
   if [ -f "${f}" ]; then
     run chown root:${NETDATA_GROUP} "${f}"
@@ -188,17 +240,25 @@ for x in ndsudo apps.plugin perf.plugin slabinfo.plugin debugfs.plugin freeipmi.
 done
 
 if command -v setcap >/dev/null 2>&1; then
-  if ! run setcap "cap_dac_read_search,cap_sys_ptrace=ep" "usr/libexec/netdata/plugins.d/apps.plugin"; then
-    run chmod 4750 "usr/libexec/netdata/plugins.d/apps.plugin"
+  if [ -f "usr/libexec/netdata/plugins.d/apps.plugin" ]; then
+    if ! run setcap "cap_dac_read_search,cap_sys_ptrace=ep" "usr/libexec/netdata/plugins.d/apps.plugin"; then
+      run chmod 4750 "usr/libexec/netdata/plugins.d/apps.plugin"
+    fi
   fi
-  if ! run setcap "cap_dac_read_search=ep" "usr/libexec/netdata/plugins.d/slabinfo.plugin"; then
-    run chmod 4750 "usr/libexec/netdata/plugins.d/slabinfo.plugin"
+  if [ -f "usr/libexec/netdata/plugins.d/slabinfo.plugin" ]; then
+    if ! run setcap "cap_dac_read_search=ep" "usr/libexec/netdata/plugins.d/slabinfo.plugin"; then
+      run chmod 4750 "usr/libexec/netdata/plugins.d/slabinfo.plugin"
+    fi
   fi
-  if ! run setcap "cap_dac_read_search=ep" "usr/libexec/netdata/plugins.d/debugfs.plugin"; then
-    run chmod 4750 "usr/libexec/netdata/plugins.d/debugfs.plugin"
+  if [ -f "usr/libexec/netdata/plugins.d/debugfs.plugin" ]; then
+    if ! run setcap "cap_dac_read_search,cap_audit_control=ep" "usr/libexec/netdata/plugins.d/debugfs.plugin"; then
+      run chmod 4750 "usr/libexec/netdata/plugins.d/debugfs.plugin"
+    fi
   fi
-  if ! run setcap "cap_dac_read_search+epi cap_net_admin+epi cap_net_raw=eip" "usr/libexec/netdata/plugins.d/go.d.plugin"; then
-    run chmod 4750 "usr/libexec/netdata/plugins.d/go.d.plugin"
+  if [ -f "usr/libexec/netdata/plugins.d/go.d.plugin" ]; then
+    if ! run setcap "cap_dac_read_search+epi cap_net_admin+epi cap_net_raw=eip cap_net_bind_service=eip" "usr/libexec/netdata/plugins.d/go.d.plugin"; then
+      run chmod 4750 "usr/libexec/netdata/plugins.d/go.d.plugin"
+    fi
   fi
 
   perf_caps="cap_sys_admin=ep"
@@ -206,12 +266,9 @@ if command -v setcap >/dev/null 2>&1; then
     perf_caps="cap_perfmon=ep"
   fi
 
-  if ! run setcap "${perf_caps}" "usr/libexec/netdata/plugins.d/perf.plugin"; then
-    run chmod 4750 "usr/libexec/netdata/plugins.d/perf.plugin"
-  fi
-  if [ -f "usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin" ]; then
-    if ! run setcap "cap_dac_read_search=eip" "usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin"; then
-      run chmod 4750 "usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin"
+  if [ -f "usr/libexec/netdata/plugins.d/perf.plugin" ]; then
+    if ! run setcap "${perf_caps}" "usr/libexec/netdata/plugins.d/perf.plugin"; then
+      run chmod 4750 "usr/libexec/netdata/plugins.d/perf.plugin"
     fi
   fi
   if [ -f "usr/libexec/netdata/plugins.d/systemd-journal.plugin" ]; then
@@ -219,24 +276,36 @@ if command -v setcap >/dev/null 2>&1; then
       run chmod 4750 "usr/libexec/netdata/plugins.d/systemd-journal.plugin"
     fi
   fi
+  if [ -f "usr/libexec/netdata/plugins.d/macos-logs.plugin" ]; then
+    run chmod 4750 "usr/libexec/netdata/plugins.d/macos-logs.plugin"
+  fi
 else
   for x in apps.plugin perf.plugin slabinfo.plugin debugfs.plugin; do
     f="usr/libexec/netdata/plugins.d/${x}"
-    run chmod 4750 "${f}"
+    if [ -f "${f}" ]; then
+      run chmod 4750 "${f}"
+    fi
   done
-  if [ -f "usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin" ]; then
-    run chmod 4750 "usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin"
-  fi
   if [ -f "usr/libexec/netdata/plugins.d/systemd-journal.plugin" ]; then
     run chmod 4750 "usr/libexec/netdata/plugins.d/systemd-journal.plugin"
   fi
+  if [ -f "usr/libexec/netdata/plugins.d/macos-logs.plugin" ]; then
+    run chmod 4750 "usr/libexec/netdata/plugins.d/macos-logs.plugin"
+  fi
 fi
 
-for x in ndsudo freeipmi.plugin ioping cgroup-network local-listeners network-viewer.plugin ebpf.plugin nfacct.plugin xenstat.plugin; do
+for x in ndsudo freeipmi.plugin ioping cgroup-network local-listeners network-viewer.plugin ebpf.plugin ebpf-go.plugin nfacct.plugin xenstat.plugin; do
   f="usr/libexec/netdata/plugins.d/${x}"
 
   if [ -f "${f}" ]; then
     run chmod 4750 "${f}"
+  fi
+done
+
+for x in otel-plugin netflow-plugin snmp-trap-profile-gen cgroup-name; do
+  f="usr/libexec/netdata/plugins.d/${x}"
+  if [ -f "${f}" ]; then
+    run chmod 0750 "${f}"
   fi
 done
 

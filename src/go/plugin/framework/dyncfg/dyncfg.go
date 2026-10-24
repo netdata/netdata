@@ -3,6 +3,7 @@
 package dyncfg
 
 import (
+	"context"
 	"errors"
 	"strings"
 )
@@ -25,6 +26,7 @@ func (s Status) String() string {
 type ConfigType string
 
 const (
+	ConfigTypeSingle   ConfigType = "single"
 	ConfigTypeTemplate ConfigType = "template"
 	ConfigTypeJob      ConfigType = "job"
 )
@@ -48,35 +50,25 @@ const (
 	CommandUserconfig Command = "userconfig"
 )
 
+// Testable is an optional operational-test capability for configured resources.
+// Implementations must honor ctx and release resources acquired by the test.
+// They must return failures for caller-side sanitization instead of logging raw
+// user configuration, credentials, or endpoint material. NewPublicError may
+// attach a static, code-authored explanation that is safe to render publicly.
+// Test may return ErrTestUnsupported when a valid configured instance cannot
+// safely perform an operational test.
+type Testable interface {
+	Test(ctx context.Context) error
+}
+
+// ErrTestUnsupported reports that a Testable resource cannot safely run an
+// operational test for the configured instance.
+var ErrTestUnsupported = errors.New("operational test is not supported")
+
 func JoinCommands(commands ...Command) string {
 	strs := make([]string, len(commands))
 	for i, cmd := range commands {
 		strs[i] = string(cmd)
 	}
 	return strings.Join(strs, " ")
-}
-
-// ErrNonDisruptiveUpdate marks update failures where runtime state was not changed.
-// Handler rollback logic uses this marker to keep old config/status authoritative.
-var ErrNonDisruptiveUpdate = errors.New("non-disruptive update")
-
-type nonDisruptiveUpdateError struct {
-	err error
-}
-
-func (e *nonDisruptiveUpdateError) Error() string        { return e.err.Error() }
-func (e *nonDisruptiveUpdateError) Unwrap() error        { return e.err }
-func (e *nonDisruptiveUpdateError) Is(target error) bool { return target == ErrNonDisruptiveUpdate }
-
-// MarkNonDisruptiveUpdate wraps err to indicate update failed before disrupting runtime.
-func MarkNonDisruptiveUpdate(err error) error {
-	if err == nil {
-		return nil
-	}
-
-	if errors.Is(err, ErrNonDisruptiveUpdate) {
-		return err
-	}
-
-	return &nonDisruptiveUpdateError{err: err}
 }

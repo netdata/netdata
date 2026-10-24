@@ -7,7 +7,10 @@ c_rhash c_rhash_new(size_t bin_count) {
     if (!bin_count)
         bin_count = 1000;
 
-    c_rhash hash = callocz(1, sizeof(struct c_rhash_s) + (bin_count * sizeof(struct bin_ll*)) );
+    if (unlikely(bin_count > (SIZE_MAX - sizeof(struct c_rhash_s)) / sizeof(c_rhash_bin)))
+        fatal("C_RHASH: bin count is too large.");
+
+    c_rhash hash = callocz(1, sizeof(struct c_rhash_s) + (bin_count * sizeof(c_rhash_bin)) );
     hash->bin_count = bin_count;
     hash->bins = (c_rhash_bin *)((char*)hash + sizeof(struct c_rhash_s));
 
@@ -112,7 +115,7 @@ int c_rhash_get_uint8_by_str(c_rhash hash, const char *key, uint8_t *ret_val) {
     struct bin_item *bin = hash->bins[nhash];
 
     while (bin) {
-        if (bin->key_type == ITEMTYPE_STRING) {
+        if (bin->key_type == ITEMTYPE_STRING && bin->value_type == ITEMTYPE_UINT8) {
             if (!strcmp(bin->key, key)) {
                 *ret_val = *(uint8_t*)bin->value;
                 return 0;
@@ -120,6 +123,7 @@ int c_rhash_get_uint8_by_str(c_rhash hash, const char *key, uint8_t *ret_val) {
         }
         bin = bin->next;
     }
+    *ret_val = 0;
     return 1;
 }
 
@@ -129,7 +133,7 @@ int c_rhash_get_ptr_by_str(c_rhash hash, const char *key, void **ret_val) {
     struct bin_item *bin = hash->bins[nhash];
 
     while (bin) {
-        if (bin->key_type == ITEMTYPE_STRING) {
+        if (bin->key_type == ITEMTYPE_STRING && bin->value_type == ITEMTYPE_OPAQUE_PTR) {
             if (!strcmp(bin->key, key)) {
                 *ret_val = *((void**)bin->value);
                 return 0;
@@ -147,7 +151,7 @@ int c_rhash_get_ptr_by_uint64(c_rhash hash, uint64_t key, void **ret_val) {
     struct bin_item *bin = hash->bins[nhash];
 
     while (bin) {
-        if (bin->key_type == ITEMTYPE_UINT64) {
+        if (bin->key_type == ITEMTYPE_UINT64 && bin->value_type == ITEMTYPE_OPAQUE_PTR) {
             if (*((uint64_t *)bin->key) == key) {
                 *ret_val = *((void**)bin->value);
                 return 0;

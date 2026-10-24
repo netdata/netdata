@@ -1,0 +1,121 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package cloudwatch
+
+import (
+	"context"
+	"sync"
+	"sync/atomic"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestNewDiscoveryBudget_GroupCapacity(t *testing.T) {
+	_, err := newDiscoveryBudget(maxListMetricsOperationsPerRefresh, func(error) {})
+	require.NoError(t, err)
+
+	_, err = newDiscoveryBudget(maxListMetricsOperationsPerRefresh+1, func(error) {})
+	assert.ErrorContains(t, err, "defines 101 groups")
+}
+
+func TestDiscoveryBudget_ListMetricsOperations(t *testing.T) {
+	ctx, cancel := context.WithCancelCause(context.Background())
+	budget, err := newDiscoveryBudget(defaultMaxDiscoveryGroups, cancel)
+	require.NoError(t, err)
+
+	for range maxListMetricsOperationsPerRefresh {
+		require.NoError(t, budget.reserveListMetricsOperation())
+	}
+	err = budget.reserveListMetricsOperation()
+	assert.ErrorContains(t, err, "more than 100 ListMetrics SDK operations")
+	assert.Equal(t, err, context.Cause(ctx))
+}
+
+func TestDiscoveryBudget_WorkReservations(t *testing.T) {
+	tests := map[string]struct {
+		limit   int
+		reserve func(*discoveryBudget, int) error
+		message string
+	}{
+		"scanned metrics": {
+			limit: maxScannedMetricsPerRefresh,
+			reserve: func(b *discoveryBudget, n int) error {
+				return b.reserveScannedMetrics(n)
+			},
+			message: "scans more than 50000 metrics",
+		},
+		"matcher evaluations": {
+			limit: maxDiscoveryMatcherEvaluationsPerRefresh,
+			reserve: func(b *discoveryBudget, n int) error {
+				return b.reserveMatcherEvaluations(n)
+			},
+			message: "more than 1000000 residual profile matches",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			budget := testDiscoveryBudget(1)
+			require.NoError(t, test.reserve(budget, test.limit))
+			assert.ErrorContains(t, test.reserve(budget, 1), test.message)
+		})
+	}
+}
+
+func TestDiscoveryBudget_CandidateReservationIsTransactional(t *testing.T) {
+	tests := map[string]struct {
+		reservation int
+		attempts    int
+		wantErr     string
+		wantCount   int
+		wantBytes   int
+	}{
+		"count": {
+			reservation: 1, attempts: maxCandidateInstancesPerRefresh,
+			wantErr:   "more than 20000 candidate instances",
+			wantCount: maxCandidateInstancesPerRefresh, wantBytes: maxCandidateInstancesPerRefresh,
+		},
+		"weighted bytes": {
+			reservation: maxRetainedCandidateBytesPerRefresh, attempts: 1,
+			wantErr: "more than 64 MiB", wantCount: 1, wantBytes: maxRetainedCandidateBytesPerRefresh,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			budget := testDiscoveryBudget(1)
+			for range tc.attempts {
+				require.NoError(t, budget.reserveCandidate(tc.reservation))
+			}
+			assert.ErrorContains(t, budget.reserveCandidate(1), tc.wantErr)
+			assert.Equal(t, tc.wantCount, budget.candidateInstances)
+			assert.Equal(t, tc.wantBytes, budget.retainedCandidateBytes)
+		})
+	}
+}
+
+func TestDiscoveryBudget_ConcurrentCandidateReservationsDoNotOvershoot(t *testing.T) {
+	budget := testDiscoveryBudget(1)
+	const reservation = 1 << 20
+	var admitted atomic.Int32
+	var wg sync.WaitGroup
+	for range 100 {
+		wg.Go(func() {
+			if budget.reserveCandidate(reservation) == nil {
+				admitted.Add(1)
+			}
+		})
+	}
+	wg.Wait()
+
+	assert.Equal(t, int32(maxRetainedCandidateBytesPerRefresh/reservation), admitted.Load())
+	assert.Equal(t, maxRetainedCandidateBytesPerRefresh, budget.retainedCandidateBytes)
+	assert.Equal(t, int(admitted.Load()), budget.candidateInstances)
+}
+
+func TestRetainedCandidateBytes(t *testing.T) {
+	want := len("one\x1ftwo") + retainedCandidateBaseBytes + 2*retainedCandidatePerDimensionBytes
+	assert.Equal(t, want, retainedCandidateBytes("one\x1ftwo", 2))
+	assert.Equal(t, want, retainedDiscoveredInstanceBytes(collectionInstance{DimensionValues: []string{"one", "two"}}))
+}

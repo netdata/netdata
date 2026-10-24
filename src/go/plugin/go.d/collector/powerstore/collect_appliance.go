@@ -2,9 +2,12 @@
 
 package powerstore
 
-import "sync"
+import (
+	"context"
+	"sync"
+)
 
-func (c *Collector) collectAppliances() {
+func (c *Collector) collectAppliances(ctx context.Context) {
 	var wg sync.WaitGroup
 
 	for id, app := range c.discovered.appliances {
@@ -14,7 +17,7 @@ func (c *Collector) collectAppliances() {
 			c.sem <- struct{}{}
 			defer func() { <-c.sem }()
 
-			pm, err := c.client.PerformanceMetricsByAppliance(id)
+			pm, err := c.client.PerformanceMetricsByAppliance(ctx, id)
 			if err != nil {
 				c.Warningf("error collecting appliance %s perf metrics: %v", id, err)
 			} else if len(pm) > 0 {
@@ -29,7 +32,7 @@ func (c *Collector) collectAppliances() {
 				c.mx.appliance.cpu.WithLabelValues(name).Observe(last.IoWorkloadCPUUtilization)
 			}
 
-			sm, err := c.client.SpaceMetricsByAppliance(id)
+			sm, err := c.client.SpaceMetricsByAppliance(ctx, id)
 			if err != nil {
 				c.Warningf("error collecting appliance %s space metrics: %v", id, err)
 			} else if len(sm) > 0 {

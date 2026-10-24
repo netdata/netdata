@@ -114,7 +114,7 @@ func compileMatcher(patterns []string) (matcher.Matcher, error) {
 	return matcher.NewSimplePatternsMatcher(expr)
 }
 
-func (c *Collector) warnOnce(key string, format string, args ...interface{}) {
+func (c *Collector) warnOnce(key string, format string, args ...any) {
 	c.warnMu.Lock()
 	defer c.warnMu.Unlock()
 

@@ -244,6 +244,7 @@ void txt_utf8_cleanup(TXT_UTF8 *dst) {
     freez(dst->data);
     dst->data = NULL;
     dst->used = 0;
+    dst->size = 0;
 }
 
 void txt_utf8_resize(TXT_UTF8 *dst, size_t required_size, bool keep) {
@@ -295,6 +296,9 @@ void txt_utf8_append(TXT_UTF8 *dst, const char *txt, size_t txt_len) {
 
 void txt_utf16_cleanup(TXT_UTF16 *dst) {
     freez(dst->data);
+    dst->data = NULL;
+    dst->used = 0;
+    dst->size = 0;
 }
 
 void txt_utf16_resize(TXT_UTF16 *dst, size_t required_size, bool keep) {

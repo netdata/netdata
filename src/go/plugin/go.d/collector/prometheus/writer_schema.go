@@ -1,0 +1,321 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package prometheus
+
+import (
+	"cmp"
+	"math"
+	"slices"
+
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
+	commonmodel "github.com/prometheus/common/model"
+)
+
+// metricFamilySchema captures the per-name distribution schema that metrix requires to stay stable
+// across a family's series: the quantile set for summaries, the bucket bounds for histograms.
+// Label keys are intentionally NOT part of the schema — each series carries its own labels, so a
+// family may legitimately mix label-key sets (V1 rendered every series independently).
+type metricFamilySchema struct {
+	summaryQuantiles []float64
+	histogramBounds  []float64
+}
+
+func deriveMetricFamilySchema(
+	mf *prompkg.MetricFamily,
+	typ commonmodel.MetricType,
+	allowUntypedFallback bool,
+) (metricFamilySchema, PipelineReason) {
+	invalidValue := false
+	for _, metric := range mf.Metrics() {
+		schema, reason := inspectMetricSchema(metric, typ, allowUntypedFallback)
+		if reason == "" {
+			return schema, ""
+		}
+		if reason == PipelineReasonInvalidSeriesValue {
+			invalidValue = true
+		}
+	}
+
+	if invalidValue {
+		return metricFamilySchema{}, PipelineReasonInvalidSeriesValue
+	}
+	return metricFamilySchema{}, PipelineReasonInvalidFamilySchema
+}
+
+func (w *metricFamilyWriter) inspectMetricFamilySchema(
+	mf *prompkg.MetricFamily,
+	typ commonmodel.MetricType,
+	allowUntypedFallback bool,
+) (metricFamilySchema, PipelineReason) {
+	if handle, ok := w.handles[mf.Name()]; ok {
+		if handle.typ != typ {
+			return metricFamilySchema{}, PipelineReasonFamilyTypeDrift
+		}
+		return metricFamilySchema{
+			summaryQuantiles: handle.summaryQuantiles,
+			histogramBounds:  handle.histogramBounds,
+		}, ""
+	}
+	return deriveMetricFamilySchema(mf, typ, allowUntypedFallback)
+}
+
+// inspectMetricSchema separates an incompatible metric representation/schema
+// from a structurally valid series whose value cannot be written. The writer
+// uses the distinction only for diagnostics; both outcomes remain unwritable.
+func inspectMetricSchema(
+	metric prompkg.Metric,
+	typ commonmodel.MetricType,
+	allowUntypedFallback bool,
+) (metricFamilySchema, PipelineReason) {
+	var schema metricFamilySchema
+
+	switch typ {
+	case commonmodel.MetricTypeGauge:
+		value, ok := metricScalarRawValue(metric, commonmodel.MetricTypeGauge, allowUntypedFallback)
+		if !ok {
+			return metricFamilySchema{}, PipelineReasonInvalidSeriesSchema
+		}
+		if !isFinite(value) {
+			return metricFamilySchema{}, PipelineReasonInvalidSeriesValue
+		}
+	case commonmodel.MetricTypeCounter:
+		value, ok := metricScalarRawValue(metric, commonmodel.MetricTypeCounter, allowUntypedFallback)
+		if !ok {
+			return metricFamilySchema{}, PipelineReasonInvalidSeriesSchema
+		}
+		if !isFinite(value) {
+			return metricFamilySchema{}, PipelineReasonInvalidSeriesValue
+		}
+	case commonmodel.MetricTypeSummary:
+		summary := metric.Summary()
+		if summary == nil {
+			return metricFamilySchema{}, PipelineReasonInvalidSeriesSchema
+		}
+		qs, ok := summaryQuantiles(summary)
+		if !ok {
+			return metricFamilySchema{}, PipelineReasonInvalidSeriesSchema
+		}
+		if _, ok := toSummaryPoint(summary); !ok {
+			return metricFamilySchema{}, PipelineReasonInvalidSeriesValue
+		}
+		schema.summaryQuantiles = qs
+	case commonmodel.MetricTypeHistogram:
+		histogram := metric.Histogram()
+		if histogram == nil || len(histogram.Buckets()) == 0 {
+			return metricFamilySchema{}, PipelineReasonInvalidSeriesSchema
+		}
+		bounds, ok := histogramBounds(histogram)
+		if !ok {
+			return metricFamilySchema{}, PipelineReasonInvalidSeriesSchema
+		}
+		if _, ok := toHistogramPoint(histogram); !ok {
+			return metricFamilySchema{}, PipelineReasonInvalidSeriesValue
+		}
+		schema.histogramBounds = bounds
+	default:
+		return metricFamilySchema{}, PipelineReasonUnsupportedType
+	}
+
+	return schema, ""
+}
+
+// metricIsWritable reports whether a series can be written under the family's canonical schema.
+// Only the distribution schema must match (metrix keys hist/summary schema by metric name); label
+// keys may differ between series and are written per-series.
+func metricIsWritable(
+	metric prompkg.Metric,
+	typ commonmodel.MetricType,
+	schema metricFamilySchema,
+	allowUntypedFallback bool,
+) bool {
+	return metricSchemaRejectionReason(metric, typ, schema, allowUntypedFallback) == ""
+}
+
+func metricSchemaRejectionReason(
+	metric prompkg.Metric,
+	typ commonmodel.MetricType,
+	schema metricFamilySchema,
+	allowUntypedFallback bool,
+) PipelineReason {
+	metricSchema, reason := inspectMetricSchema(metric, typ, allowUntypedFallback)
+	if reason != "" {
+		return reason
+	}
+	if !slices.Equal(schema.summaryQuantiles, metricSchema.summaryQuantiles) ||
+		!slices.Equal(schema.histogramBounds, metricSchema.histogramBounds) {
+		return PipelineReasonDistributionSchemaDrift
+	}
+	return ""
+}
+
+func metricScalarValue(metric prompkg.Metric, typ commonmodel.MetricType, allowUntypedFallback bool) (float64, bool) {
+	value, ok := metricScalarRawValue(metric, typ, allowUntypedFallback)
+	return value, ok && isFinite(value)
+}
+
+func metricScalarRawValue(metric prompkg.Metric, typ commonmodel.MetricType, allowUntypedFallback bool) (float64, bool) {
+	switch typ {
+	case commonmodel.MetricTypeGauge:
+		if gauge := metric.Gauge(); gauge != nil {
+			return gauge.Value(), true
+		}
+	case commonmodel.MetricTypeCounter:
+		if counter := metric.Counter(); counter != nil {
+			return counter.Value(), true
+		}
+	}
+
+	// Ordinary family-level fallback resolves after assembly, so its value remains in Untyped(). The
+	// profile-normalized path binds eligible samples before relabeling; bound mode must reject an
+	// ineligible untyped sample merged into the same final family as a bound gauge/counter sample.
+	if !allowUntypedFallback {
+		return 0, false
+	}
+	if untyped := metric.Untyped(); untyped != nil {
+		return untyped.Value(), true
+	}
+
+	return 0, false
+}
+
+func toSummaryPoint(summary *prompkg.Summary) (metrix.SummaryPoint, bool) {
+	if summary == nil || !summary.HasCountAndSum() {
+		return metrix.SummaryPoint{}, false
+	}
+	// A Prometheus summary leaves every quantile NaN for an empty observation window. Skip the
+	// whole summary so a chart is not created until it has a real value (consistent with the
+	// scalar NaN-skip); writing resumes once any quantile is observed. A summary without
+	// configured quantiles still carries valid count and sum values, so this check does not apply.
+	if summary.AllQuantilesNaN() {
+		return metrix.SummaryPoint{}, false
+	}
+	if !isFinite(summary.Count()) || !isFinite(summary.Sum()) || summary.Count() < 0 {
+		return metrix.SummaryPoint{}, false
+	}
+
+	quantiles := make([]metrix.QuantilePoint, 0, len(summary.Quantiles()))
+	for _, q := range summary.Quantiles() {
+		// A partially-observed summary can still carry a NaN quantile (an all-NaN summary is
+		// skipped above). Keep the NaN: metrix stores it and chartengine renders that dimension
+		// as a gap. Only an infinite quantile value is rejected.
+		if !isFinite(q.Quantile()) || q.Quantile() < 0 || q.Quantile() > 1 || math.IsInf(q.Value(), 0) {
+			return metrix.SummaryPoint{}, false
+		}
+		quantiles = append(quantiles, metrix.QuantilePoint{
+			Quantile: q.Quantile(),
+			Value:    q.Value(),
+		})
+	}
+
+	return metrix.SummaryPoint{
+		Count:     summary.Count(),
+		Sum:       summary.Sum(),
+		Quantiles: quantiles,
+	}, true
+}
+
+// toHistogramPoint validates and converts a scraped histogram into a metrix point. The le="+Inf"
+// bucket is intentionally dropped: metrix synthesizes the le="+Inf" flattened series from Count, so a
+// malformed +Inf count is superseded by Count rather than causing the whole histogram to be rejected.
+// Validation (finiteness, strictly-increasing bounds, monotonic cumulative counts, last bucket <=
+// Count) therefore runs over the finite buckets only.
+func toHistogramPoint(histogram *prompkg.Histogram) (metrix.HistogramPoint, bool) {
+	if histogram == nil || len(histogram.Buckets()) == 0 {
+		return metrix.HistogramPoint{}, false
+	}
+	if !isFinite(histogram.Count()) || !isFinite(histogram.Sum()) || histogram.Count() < 0 {
+		return metrix.HistogramPoint{}, false
+	}
+
+	buckets := make([]metrix.BucketPoint, 0, len(histogram.Buckets()))
+	for _, b := range histogram.Buckets() {
+		if math.IsNaN(b.UpperBound()) || math.IsInf(b.UpperBound(), -1) {
+			return metrix.HistogramPoint{}, false
+		}
+		if math.IsInf(b.UpperBound(), +1) {
+			continue
+		}
+		if !isFinite(b.CumulativeCount()) || b.CumulativeCount() < 0 {
+			return metrix.HistogramPoint{}, false
+		}
+		buckets = append(buckets, metrix.BucketPoint{
+			UpperBound:      b.UpperBound(),
+			CumulativeCount: b.CumulativeCount(),
+		})
+	}
+
+	slices.SortFunc(buckets, func(a, b metrix.BucketPoint) int { return cmp.Compare(a.UpperBound, b.UpperBound) })
+	for i := 1; i < len(buckets); i++ {
+		if buckets[i].UpperBound <= buckets[i-1].UpperBound {
+			return metrix.HistogramPoint{}, false
+		}
+		if buckets[i].CumulativeCount < buckets[i-1].CumulativeCount {
+			return metrix.HistogramPoint{}, false
+		}
+	}
+	if n := len(buckets); n > 0 && buckets[n-1].CumulativeCount > histogram.Count() {
+		return metrix.HistogramPoint{}, false
+	}
+
+	return metrix.HistogramPoint{
+		Count:   histogram.Count(),
+		Sum:     histogram.Sum(),
+		Buckets: buckets,
+	}, true
+}
+
+func summaryQuantiles(summary *prompkg.Summary) ([]float64, bool) {
+	if summary == nil {
+		return nil, false
+	}
+	if len(summary.Quantiles()) == 0 {
+		return nil, true
+	}
+
+	qs := make([]float64, 0, len(summary.Quantiles()))
+	for _, q := range summary.Quantiles() {
+		if !isFinite(q.Quantile()) || q.Quantile() < 0 || q.Quantile() > 1 {
+			return nil, false
+		}
+		qs = append(qs, q.Quantile())
+	}
+	slices.Sort(qs)
+	for i := 1; i < len(qs); i++ {
+		if qs[i] <= qs[i-1] {
+			return nil, false
+		}
+	}
+	return qs, true
+}
+
+func histogramBounds(histogram *prompkg.Histogram) ([]float64, bool) {
+	if histogram == nil || len(histogram.Buckets()) == 0 {
+		return nil, false
+	}
+
+	bounds := make([]float64, 0, len(histogram.Buckets()))
+	for _, b := range histogram.Buckets() {
+		if math.IsNaN(b.UpperBound()) || math.IsInf(b.UpperBound(), -1) {
+			return nil, false
+		}
+		if math.IsInf(b.UpperBound(), +1) {
+			continue
+		}
+		bounds = append(bounds, b.UpperBound())
+	}
+	if len(bounds) == 0 {
+		return []float64{}, true
+	}
+	slices.Sort(bounds)
+	for i := 1; i < len(bounds); i++ {
+		if bounds[i] <= bounds[i-1] {
+			return nil, false
+		}
+	}
+	return bounds, true
+}
+
+func isFinite(v float64) bool {
+	return !math.IsNaN(v) && !math.IsInf(v, 0)
+}

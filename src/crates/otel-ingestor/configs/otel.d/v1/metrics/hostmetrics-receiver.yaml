@@ -1,0 +1,177 @@
+# Per-metric chart configuration for the metrics that the OpenTelemetry
+# hostmetrics receiver reports. This mapping is compiled into the plugin as
+# the fallback; YAML files in the chart configs directory (otel.yaml's
+# metrics.chart_configs_dir, default /etc/netdata/otel.d/v1/metrics) take
+# precedence for the metric names they configure.
+#
+# Collection timing (interval, grace, expiry) is not set here; it comes from
+# the metrics section of otel.yaml. Entries may override interval and grace
+# per metric with interval_secs and grace_period_secs (grace defaults to
+# 5x the interval when omitted).
+metrics:
+  # Keys are exact metric names (no wildcards); each maps to one or more
+  # entries, tried in order - the first entry whose instrumentation_scope
+  # matches the metric's OTel scope wins. Metrics not listed here have their
+  # dimensions named "value".
+  #
+  # instrumentation_scope fields (name, version) are regular expressions; all
+  # set fields must match, unset fields are ignored. The name patterns below
+  # pin each metric to the hostmetrics receiver scraper that reports it.
+  #
+  # dimension_attribute_key names the data-point attribute whose value becomes
+  # the chart dimension (state on system.network.connections, for example,
+  # yields one dimension per connection state). When unset, when the attribute
+  # is missing, or when its value is not a string, the dimension is named
+  # "value".
+  #
+  # Unknown keys inside an entry are ignored; an unknown top-level key (a
+  # misspelled metrics:, for example) makes the whole file fail to load.
+  "system.network.connections":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*networkscraper$
+      dimension_attribute_key: state
+
+  "system.network.dropped":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*networkscraper$
+      dimension_attribute_key: direction
+
+  "system.network.errors":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*networkscraper$
+      dimension_attribute_key: direction
+
+  "system.network.io":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*networkscraper$
+      dimension_attribute_key: direction
+
+  "system.network.packets":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*networkscraper$
+      dimension_attribute_key: direction
+
+  "system.cpu.time":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*cpuscraper$
+      dimension_attribute_key: state
+
+  "system.cpu.frequency":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*cpuscraper$
+
+  "system.cpu.utilization":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*cpuscraper$
+      dimension_attribute_key: state
+
+  "system.disk.io":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*diskscraper$
+      dimension_attribute_key: direction
+
+  "system.disk.io_time":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*diskscraper$
+
+  "system.disk.merged":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*diskscraper$
+      dimension_attribute_key: direction
+
+  "system.disk.operation_time":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*diskscraper$
+      dimension_attribute_key: direction
+
+  "system.disk.operations":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*diskscraper$
+      dimension_attribute_key: direction
+
+  "system.disk.pending_operations":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*diskscraper$
+
+  "system.disk.weighted_io":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*diskscraper$
+
+  "system.filesystem.inodes.usage":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*filesystemscraper$
+      dimension_attribute_key: state
+
+  "system.filesystem.usage":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*filesystemscraper$
+      dimension_attribute_key: state
+
+  "system.filesystem.utilization":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*filesystemscraper$
+
+  "system.memory.utilization":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*memoryscraper$
+      dimension_attribute_key: state
+
+  "system.memory.usage":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*memoryscraper$
+      dimension_attribute_key: state
+
+  "system.paging.faults":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*pagingscraper$
+      dimension_attribute_key: type
+
+  "system.paging.operations":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*pagingscraper$
+      dimension_attribute_key: direction
+
+  "system.paging.usage":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*pagingscraper$
+      dimension_attribute_key: state
+
+  "system.paging.utilization":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*pagingscraper$
+      dimension_attribute_key: state
+
+  "system.processes.count":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*processesscraper$
+      dimension_attribute_key: status
+
+  "process.cpu.time":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*processscraper$
+      dimension_attribute_key: state
+
+  "process.disk.io":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*processscraper$
+      dimension_attribute_key: direction
+
+  "process.context_switches":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*processscraper$
+      dimension_attribute_key: type
+
+  "process.cpu.utilization":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*processscraper$
+      dimension_attribute_key: state
+
+  "process.disk.operations":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*processscraper$
+      dimension_attribute_key: direction
+
+  "process.paging.faults":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*processscraper$
+      dimension_attribute_key: type

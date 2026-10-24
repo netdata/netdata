@@ -1,0 +1,98 @@
+version: v1
+context_namespace: ipmi_go
+groups:
+  - family: Sensors
+    chart_defaults:
+      instances:
+        by_labels: [sensor_id]
+    groups:
+      - family: Temperature
+        metrics: [temperature_c]
+        charts:
+          - id: sensor_temperature_c
+            context: sensor_temperature_c
+            title: IPMI Sensor Temperature
+            units: Celsius
+            dimensions:
+              - selector: temperature_c
+                name: temperature
+      - family: Temperature
+        metrics: [temperature_f]
+        charts:
+          - id: sensor_temperature_f
+            context: sensor_temperature_f
+            title: IPMI Sensor Temperature
+            units: Fahrenheit
+            dimensions:
+              - selector: temperature_f
+                name: temperature
+      - family: Voltage
+        metrics: [voltage]
+        charts:
+          - id: sensor_voltage
+            context: sensor_voltage
+            title: IPMI Sensor Voltage
+            units: Volts
+            dimensions:
+              - selector: voltage
+                name: voltage
+      - family: Current
+        metrics: [ampere]
+        charts:
+          - id: sensor_ampere
+            context: sensor_ampere
+            title: IPMI Sensor Current
+            units: Amps
+            dimensions:
+              - selector: ampere
+                name: ampere
+      - family: Fan Speed
+        metrics: [fan_speed]
+        charts:
+          - id: sensor_fan_speed
+            context: sensor_fan_speed
+            title: IPMI Sensor Fan Speed
+            units: RPM
+            dimensions:
+              - selector: fan_speed
+                name: rotations
+      - family: Power
+        metrics: [power]
+        charts:
+          - id: sensor_power
+            context: sensor_power
+            title: IPMI Sensor Power
+            units: Watts
+            dimensions:
+              - selector: power
+                name: power
+      - family: Percentage Reading
+        metrics: [reading_percent]
+        charts:
+          - id: sensor_reading_percent
+            context: sensor_reading_percent
+            title: IPMI Sensor Percentage Reading
+            units: "%"
+            dimensions:
+              - selector: reading_percent
+                name: percentage
+      - family: Health
+        metrics: [sensor_state]
+        charts:
+          - id: sensor_state
+            context: sensor_state
+            title: IPMI Sensor State
+            units: state
+            type: stacked
+            dimensions:
+              - selector: sensor_state
+  - family: System Event Log
+    metrics: [sel_events]
+    charts:
+      - id: events
+        context: sel
+        title: IPMI System Event Log Entries
+        units: events
+        dimensions:
+          - selector: sel_events
+            name: events

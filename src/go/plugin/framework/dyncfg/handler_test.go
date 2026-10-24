@@ -9,10 +9,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 
@@ -26,18 +23,21 @@ type codedErr struct {
 	code int
 }
 
-func (e *codedErr) Error() string { return e.err.Error() }
-func (e *codedErr) Code() int     { return e.code }
+func (e *codedErr) Error() string   { return e.err.Error() }
+func (e *codedErr) DyncfgCode() int { return e.code }
 
 // mockCallbacks records all callback invocations for verification.
 type mockCallbacks struct {
 	extractKeyFn       func(fn Function) (string, string, bool)
 	parseAndValidateFn func(fn Function, name string) (testConfig, error)
 	startFn            func(cfg testConfig) error
+	enableFn           func(cfg testConfig) (func(), error)
+	prepareUpdateFn    func(fn Function, oldCfg, newCfg testConfig) (PreparedActivation, error)
 	updateFn           func(oldCfg, newCfg testConfig) error
 	stopFn             func(cfg testConfig)
 	onStatusChangeFn   func(entry *Entry[testConfig], oldStatus Status, fn Function)
 	configIDFn         func(cfg testConfig) string
+	configTypeFn       func(cfg testConfig) ConfigType
 
 	startCalls  []testConfig
 	updateCalls []updateCall
@@ -70,23 +70,56 @@ func (m *mockCallbacks) ParseAndValidate(fn Function, name string) (testConfig, 
 	if m.parseAndValidateFn != nil {
 		return m.parseAndValidateFn(fn, name)
 	}
-	return testConfig{uid: "dyncfg:" + name, key: name, sourceType: "dyncfg", source: "test"}, nil
+	return testConfig{
+		uid:        "dyncfg:" + name,
+		key:        name,
+		sourceType: "dyncfg",
+		source:     "test",
+	}, nil
 }
 
-func (m *mockCallbacks) Start(cfg testConfig) error {
+func (m *mockCallbacks) ValidateConfigName(name string) error {
+	return JobNameRuleStrict(name)
+}
+
+func (m *mockCallbacks) Enable(cfg testConfig) (func(), error) {
 	m.startCalls = append(m.startCalls, cfg)
-	if m.startFn != nil {
-		return m.startFn(cfg)
+	if m.enableFn != nil {
+		return m.enableFn(cfg)
 	}
-	return nil
+	if m.startFn != nil {
+		return nil, m.startFn(cfg)
+	}
+	return nil, nil
+}
+func (m *mockCallbacks) PrepareUpdate(fn Function, oldCfg, newCfg testConfig) (PreparedActivation, error) {
+	m.updateCalls = append(m.updateCalls, updateCall{oldCfg, newCfg})
+	if m.prepareUpdateFn != nil {
+		return m.prepareUpdateFn(fn, oldCfg, newCfg)
+	}
+	if m.updateFn != nil {
+		if err := m.updateFn(oldCfg, newCfg); err != nil {
+			return nil, err
+		}
+	}
+	return &mockPreparedActivation{}, nil
 }
 
-func (m *mockCallbacks) Update(oldCfg, newCfg testConfig) error {
-	m.updateCalls = append(m.updateCalls, updateCall{oldCfg, newCfg})
-	if m.updateFn != nil {
-		return m.updateFn(oldCfg, newCfg)
+type mockPreparedActivation struct {
+	accept  func() (func(), error)
+	dispose func()
+}
+
+func (p *mockPreparedActivation) Accept() (func(), error) {
+	if p.accept != nil {
+		return p.accept()
 	}
-	return nil
+	return nil, nil
+}
+func (p *mockPreparedActivation) Dispose() {
+	if p.dispose != nil {
+		p.dispose()
+	}
 }
 
 func (m *mockCallbacks) Stop(cfg testConfig) {
@@ -97,7 +130,10 @@ func (m *mockCallbacks) Stop(cfg testConfig) {
 }
 
 func (m *mockCallbacks) OnStatusChange(entry *Entry[testConfig], oldStatus Status, fn Function) {
-	m.statusCalls = append(m.statusCalls, statusChangeCall{entry: entry, oldStatus: oldStatus})
+	m.statusCalls = append(m.statusCalls, statusChangeCall{
+		entry:     entry,
+		oldStatus: oldStatus,
+	})
 	if m.onStatusChangeFn != nil {
 		m.onStatusChangeFn(entry, oldStatus, fn)
 	}
@@ -110,15 +146,22 @@ func (m *mockCallbacks) ConfigID(cfg testConfig) string {
 	return "test:" + cfg.ExposedKey()
 }
 
-func newTestHandler(cb *mockCallbacks) *Handler[testConfig] {
-	return newTestHandlerWithWaitTimeout(cb, 5*time.Second)
+func (m *mockCallbacks) ConfigType(cfg testConfig) ConfigType {
+	if m.configTypeFn != nil {
+		return m.configTypeFn(cfg)
+	}
+	return ConfigTypeJob
 }
 
-func newTestHandlerWithWaitTimeout(cb *mockCallbacks, waitTimeout time.Duration) *Handler[testConfig] {
+func newTestHandler(cb *mockCallbacks) *Handler[testConfig] {
+	h, _ := newTestHandlerWithOutput(cb)
+	return h
+}
+
+func newTestHandlerWithOutput(cb *mockCallbacks) (*Handler[testConfig], *bytes.Buffer) {
 	var buf bytes.Buffer
-	api := NewResponder(netdataapi.New(safewriter.New(&buf)))
-	return NewHandler(HandlerOpts[testConfig]{
-		Logger:    logger.New(),
+	api := NewResponder(NewProtocolOutput(safewriter.New(&buf)))
+	h := NewHandler(HandlerOpts[testConfig]{
 		API:       api,
 		Seen:      NewSeenCache[testConfig](),
 		Exposed:   NewExposedCache[testConfig](),
@@ -126,12 +169,8 @@ func newTestHandlerWithWaitTimeout(cb *mockCallbacks, waitTimeout time.Duration)
 		WaitKey: func(cfg testConfig) string {
 			return cfg.Source()
 		},
-		WaitTimeout: waitTimeout,
-
-		Path:                    "/test/path",
-		EnableFailCode:          200,
-		RemoveStockOnEnableFail: true,
-		JobCommands: []Command{
+		Path: "/test/path",
+		ConfigCommands: []Command{
 			CommandSchema,
 			CommandGet,
 			CommandEnable,
@@ -142,6 +181,7 @@ func newTestHandlerWithWaitTimeout(cb *mockCallbacks, waitTimeout time.Duration)
 			CommandUserconfig,
 		},
 	})
+	return h, &buf
 }
 
 func newTestFn(id, cmd, name string, payload []byte) Function {
@@ -149,7 +189,7 @@ func newTestFn(id, cmd, name string, payload []byte) Function {
 	if name != "" {
 		args = append(args, name)
 	}
-	return NewFunction(functions.Function{
+	return NewFunction(context.Background(), functions.Function{
 		UID:     "test-uid",
 		Args:    args,
 		Payload: payload,
@@ -166,7 +206,10 @@ func TestHandler_WaitForDecision_MatchingEnableClearsWait(t *testing.T) {
 		sourceType: "stock",
 		source:     "mod/job1",
 	}
-	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusAccepted})
+	h.exposed.Add(&Entry[testConfig]{
+		Cfg:    cfg,
+		Status: StatusAccepted,
+	})
 
 	h.WaitForDecision(cfg)
 	assert.True(t, h.WaitingForDecision())
@@ -191,8 +234,14 @@ func TestHandler_WaitForDecision_MismatchedCommandKeepsWait(t *testing.T) {
 		sourceType: "stock",
 		source:     "mod/job2",
 	}
-	h.exposed.Add(&Entry[testConfig]{Cfg: waitCfg, Status: StatusAccepted})
-	h.exposed.Add(&Entry[testConfig]{Cfg: otherCfg, Status: StatusAccepted})
+	h.exposed.Add(&Entry[testConfig]{
+		Cfg:    waitCfg,
+		Status: StatusAccepted,
+	})
+	h.exposed.Add(&Entry[testConfig]{
+		Cfg:    otherCfg,
+		Status: StatusAccepted,
+	})
 
 	h.WaitForDecision(waitCfg)
 	assert.True(t, h.WaitingForDecision())
@@ -208,134 +257,6 @@ func TestHandler_WaitForDecision_MismatchedCommandKeepsWait(t *testing.T) {
 	// Matching command clears wait state.
 	h.SyncDecision(newTestFn("test:job1", "disable", "", nil))
 	assert.False(t, h.WaitingForDecision())
-}
-
-func TestHandler_WaitForDecision_TimeoutClearsWait(t *testing.T) {
-	cb := &mockCallbacks{}
-	h := newTestHandlerWithWaitTimeout(cb, 5*time.Second)
-
-	cfg := testConfig{
-		uid:        "uid-job1",
-		key:        "job1",
-		sourceType: "stock",
-		source:     "mod/job1",
-	}
-	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusAccepted})
-
-	base := time.Unix(1000, 0)
-	h.waitGate.setNow(func() time.Time { return base })
-
-	h.WaitForDecision(cfg)
-	assert.True(t, h.WaitingForDecision())
-
-	h.waitGate.setNow(func() time.Time { return base.Add(4 * time.Second) })
-	remaining, ok := h.WaitDecisionRemaining()
-	assert.True(t, ok)
-	assert.Equal(t, time.Second, remaining)
-
-	_, timedOut := h.ExpireWaitDecision()
-	assert.False(t, timedOut)
-	assert.True(t, h.WaitingForDecision())
-
-	h.waitGate.setNow(func() time.Time { return base.Add(5 * time.Second) })
-	event, timedOut := h.ExpireWaitDecision()
-	assert.True(t, timedOut)
-	assert.Equal(t, "mod/job1", event.Key)
-	assert.Equal(t, 5*time.Second, event.Threshold)
-	assert.Equal(t, 5*time.Second, event.Elapsed)
-	assert.False(t, h.WaitingForDecision())
-
-	_, ok = h.WaitDecisionRemaining()
-	assert.False(t, ok)
-}
-
-func TestHandler_WaitForDecision_TimeoutDisabledKeepsWait(t *testing.T) {
-	cb := &mockCallbacks{}
-	h := newTestHandlerWithWaitTimeout(cb, 0)
-
-	cfg := testConfig{
-		uid:        "uid-job1",
-		key:        "job1",
-		sourceType: "stock",
-		source:     "mod/job1",
-	}
-	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusAccepted})
-
-	base := time.Unix(1000, 0)
-	h.waitGate.setNow(func() time.Time { return base })
-	h.WaitForDecision(cfg)
-
-	h.waitGate.setNow(func() time.Time { return base.Add(24 * time.Hour) })
-	_, timedOut := h.ExpireWaitDecision()
-	assert.False(t, timedOut)
-	assert.True(t, h.WaitingForDecision())
-}
-
-func TestHandler_NextWaitDecisionStep_Command(t *testing.T) {
-	cb := &mockCallbacks{}
-	h := newTestHandlerWithWaitTimeout(cb, 5*time.Second)
-
-	cfg := testConfig{
-		uid:        "uid-job1",
-		key:        "job1",
-		sourceType: "stock",
-		source:     "mod/job1",
-	}
-	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusAccepted})
-	h.WaitForDecision(cfg)
-
-	ch := make(chan Function, 1)
-	fn := newTestFn("test:job1", "enable", "", nil)
-	ch <- fn
-
-	step, ok := h.NextWaitDecisionStep(context.Background(), ch)
-	require.True(t, ok)
-	require.True(t, step.HasCommand)
-	assert.Equal(t, fn.UID(), step.Command.UID())
-	assert.False(t, step.TimedOut)
-}
-
-func TestHandler_NextWaitDecisionStep_Timeout(t *testing.T) {
-	cb := &mockCallbacks{}
-	h := newTestHandlerWithWaitTimeout(cb, 20*time.Millisecond)
-
-	cfg := testConfig{
-		uid:        "uid-job1",
-		key:        "job1",
-		sourceType: "stock",
-		source:     "mod/job1",
-	}
-	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusAccepted})
-	h.WaitForDecision(cfg)
-
-	ch := make(chan Function)
-	step, ok := h.NextWaitDecisionStep(context.Background(), ch)
-	require.True(t, ok)
-	require.True(t, step.TimedOut)
-	assert.Equal(t, "mod/job1", step.Timeout.Key)
-	assert.False(t, h.WaitingForDecision())
-}
-
-func TestHandler_NextWaitDecisionStep_ContextCancel(t *testing.T) {
-	cb := &mockCallbacks{}
-	h := newTestHandlerWithWaitTimeout(cb, 5*time.Second)
-
-	cfg := testConfig{
-		uid:        "uid-job1",
-		key:        "job1",
-		sourceType: "stock",
-		source:     "mod/job1",
-	}
-	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusAccepted})
-	h.WaitForDecision(cfg)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	ch := make(chan Function)
-	_, ok := h.NextWaitDecisionStep(ctx, ch)
-	assert.False(t, ok)
-	assert.True(t, h.WaitingForDecision())
 }
 
 func TestHandler_AddDiscoveredConfig_TracksSeenAndExposed(t *testing.T) {
@@ -382,7 +303,10 @@ func TestHandler_RemoveDiscoveredConfig_MismatchedExposedUID(t *testing.T) {
 	}
 
 	h.seen.Add(cfg)
-	h.exposed.Add(&Entry[testConfig]{Cfg: other, Status: StatusRunning})
+	h.exposed.Add(&Entry[testConfig]{
+		Cfg:    other,
+		Status: StatusRunning,
+	})
 
 	entry, ok := h.RemoveDiscoveredConfig(cfg)
 	require.False(t, ok, "mismatched exposed uid should not return an exposed entry")
@@ -405,7 +329,7 @@ func TestCmdAdd_ExtractKeyFailure(t *testing.T) {
 	fn := newTestFn("badid", "add", "job1", []byte(`{}`))
 	h.CmdAdd(fn)
 
-	assert.Equal(t, 0, h.exposed.Count())
+	assert.Equal(t, 0, exposedCacheCount(h.exposed))
 }
 
 func TestCmdEnable_ExtractKeyFailure(t *testing.T) {
@@ -448,17 +372,6 @@ func TestCmdUpdate_ExtractKeyFailure(t *testing.T) {
 	assert.Len(t, cb.updateCalls, 0)
 }
 
-func TestCmdRestart_ExtractKeyFailure(t *testing.T) {
-	cb := &mockCallbacks{}
-	h := newTestHandler(cb)
-
-	fn := newTestFn("badid", "restart", "", nil)
-	h.CmdRestart(fn)
-
-	assert.Len(t, cb.stopCalls, 0)
-	assert.Len(t, cb.startCalls, 0)
-}
-
 // --- CmdAdd Tests ---
 
 func TestCmdAdd_Success(t *testing.T) {
@@ -469,7 +382,7 @@ func TestCmdAdd_Success(t *testing.T) {
 	h.CmdAdd(fn)
 
 	// Config should be in both caches.
-	_, ok := h.seen.LookupByUID("dyncfg:job1")
+	_, ok := lookupSeenByUID(h.seen, "dyncfg:job1")
 	assert.True(t, ok, "config should be in seen cache")
 
 	entry, ok := h.exposed.LookupByKey("job1")
@@ -486,7 +399,7 @@ func TestCmdAdd_InvalidArgs(t *testing.T) {
 	fn.fn.Args = fn.fn.Args[:2]
 	h.CmdAdd(fn)
 
-	assert.Equal(t, 0, h.exposed.Count())
+	assert.Equal(t, 0, exposedCacheCount(h.exposed))
 }
 
 func TestCmdAdd_NoPayload(t *testing.T) {
@@ -496,10 +409,10 @@ func TestCmdAdd_NoPayload(t *testing.T) {
 	fn := newTestFn("test:job1", "add", "job1", nil)
 	h.CmdAdd(fn)
 
-	assert.Equal(t, 0, h.exposed.Count())
+	assert.Equal(t, 0, exposedCacheCount(h.exposed))
 }
 
-func TestCmdAdd_InvalidJobName(t *testing.T) {
+func TestCmdAdd_InvalidConfigName(t *testing.T) {
 	cb := &mockCallbacks{}
 	h := newTestHandler(cb)
 
@@ -510,7 +423,26 @@ func TestCmdAdd_InvalidJobName(t *testing.T) {
 	fn := newTestFn("test:bad.name", "add", "bad.name", []byte(`{}`))
 	h.CmdAdd(fn)
 
-	assert.Equal(t, 0, h.exposed.Count())
+	assert.Equal(t, 0, exposedCacheCount(h.exposed))
+}
+
+func TestCmdAdd_NonJobConfigTypeRejected(t *testing.T) {
+	cb := &mockCallbacks{
+		configTypeFn: func(testConfig) ConfigType { return ConfigTypeSingle },
+	}
+	h, out := newTestHandlerWithOutput(cb)
+
+	fn := newTestFn("test:job1", "add", "job1", []byte(`{}`))
+	h.CmdAdd(fn)
+
+	assert.Equal(t, 0, seenCacheCount(h.seen))
+	assert.Equal(t, 0, exposedCacheCount(h.exposed))
+	assert.Contains(t, out.String(), "405")
+	assert.Contains(
+		t,
+		out.String(),
+		"adding configurations of type 'single' is not supported, only 'job' configurations can be added.",
+	)
 }
 
 func TestCmdAdd_ParseError(t *testing.T) {
@@ -523,16 +455,42 @@ func TestCmdAdd_ParseError(t *testing.T) {
 	fn := newTestFn("test:job1", "add", "job1", []byte(`{}`))
 	h.CmdAdd(fn)
 
-	assert.Equal(t, 0, h.exposed.Count())
+	assert.Equal(t, 0, exposedCacheCount(h.exposed))
+}
+
+func TestCmdAdd_ParseErrorUsesCallbackCode(t *testing.T) {
+	cb := &mockCallbacks{}
+	cb.parseAndValidateFn = func(_ Function, _ string) (testConfig, error) {
+		return testConfig{}, &codedErr{
+			err:  errors.New("materialization busy"),
+			code: 503,
+		}
+	}
+	h, out := newTestHandlerWithOutput(cb)
+
+	fn := newTestFn("test:job1", "add", "job1", []byte(`{}`))
+	h.CmdAdd(fn)
+
+	assert.Equal(t, 0, exposedCacheCount(h.exposed))
+	assert.Contains(t, out.String(), " 503 ")
+	assert.Contains(t, out.String(), "materialization busy")
 }
 
 func TestCmdAdd_ReplacesExisting(t *testing.T) {
 	cb := &mockCallbacks{}
 	h := newTestHandler(cb)
 
-	oldCfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg", hash: 100}
+	oldCfg := testConfig{
+		uid:        "dyncfg:job1",
+		key:        "job1",
+		sourceType: "dyncfg",
+		hash:       100,
+	}
 	h.seen.Add(oldCfg)
-	h.exposed.Add(&Entry[testConfig]{Cfg: oldCfg, Status: StatusRunning})
+	h.exposed.Add(&Entry[testConfig]{
+		Cfg:    oldCfg,
+		Status: StatusRunning,
+	})
 
 	fn := newTestFn("test:job1", "add", "job1", []byte(`{}`))
 	h.CmdAdd(fn)
@@ -551,15 +509,22 @@ func TestCmdAdd_ReplacesExisting_KeepsNonDyncfgInSeen(t *testing.T) {
 	h := newTestHandler(cb)
 
 	// Existing is a stock config — should NOT be removed from seen.
-	oldCfg := testConfig{uid: "stock:job1", key: "job1", sourceType: "stock"}
+	oldCfg := testConfig{
+		uid:        "stock:job1",
+		key:        "job1",
+		sourceType: "stock",
+	}
 	h.seen.Add(oldCfg)
-	h.exposed.Add(&Entry[testConfig]{Cfg: oldCfg, Status: StatusRunning})
+	h.exposed.Add(&Entry[testConfig]{
+		Cfg:    oldCfg,
+		Status: StatusRunning,
+	})
 
 	fn := newTestFn("test:job1", "add", "job1", []byte(`{}`))
 	h.CmdAdd(fn)
 
 	// Stock config stays in seen (for re-promotion).
-	_, ok := h.seen.LookupByUID("stock:job1")
+	_, ok := lookupSeenByUID(h.seen, "stock:job1")
 	assert.True(t, ok, "stock config should remain in seen cache")
 }
 
@@ -569,14 +534,22 @@ func TestCmdEnable_Success(t *testing.T) {
 	cb := &mockCallbacks{}
 	h := newTestHandler(cb)
 
-	cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
-	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusAccepted})
+	cfg := testConfig{
+		uid:        "dyncfg:job1",
+		key:        "job1",
+		sourceType: "dyncfg",
+	}
+	h.exposed.Add(&Entry[testConfig]{
+		Cfg:    cfg,
+		Status: StatusAccepted,
+	})
 
 	fn := newTestFn("test:job1", "enable", "", nil)
 	h.CmdEnable(fn)
 
 	entry, _ := h.exposed.LookupByKey("job1")
-	assert.Equal(t, StatusRunning, entry.Status)
+	assert.Equal(t, StatusAccepted, entry.Status)
+	assert.True(t, entry.Enabled)
 	assert.Len(t, cb.startCalls, 1)
 	assert.Len(t, cb.statusCalls, 1)
 }
@@ -585,8 +558,15 @@ func TestCmdEnable_AlreadyRunning(t *testing.T) {
 	cb := &mockCallbacks{}
 	h := newTestHandler(cb)
 
-	cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
-	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusRunning})
+	cfg := testConfig{
+		uid:        "dyncfg:job1",
+		key:        "job1",
+		sourceType: "dyncfg",
+	}
+	h.exposed.Add(&Entry[testConfig]{
+		Cfg:    cfg,
+		Status: StatusRunning,
+	})
 
 	fn := newTestFn("test:job1", "enable", "", nil)
 	h.CmdEnable(fn)
@@ -606,31 +586,49 @@ func TestCmdEnable_NotFound(t *testing.T) {
 	assert.Len(t, cb.startCalls, 0)
 }
 
-func TestCmdEnable_StartFails_RegularError(t *testing.T) {
+func TestCmdEnable_AdoptionError(t *testing.T) {
 	cb := &mockCallbacks{}
 	cb.startFn = func(_ testConfig) error { return errors.New("start failed") }
 	h := newTestHandler(cb)
 
-	cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "stock"}
-	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusAccepted})
+	cfg := testConfig{
+		uid:        "dyncfg:job1",
+		key:        "job1",
+		sourceType: "stock",
+	}
+	h.exposed.Add(&Entry[testConfig]{
+		Cfg:    cfg,
+		Status: StatusAccepted,
+	})
 
 	fn := newTestFn("test:job1", "enable", "", nil)
 	h.CmdEnable(fn)
 
-	// Stock config should be removed on regular (non-coded) error.
-	_, ok := h.exposed.LookupByKey("job1")
-	assert.False(t, ok, "stock config should be removed from exposed on enable failure")
+	entry, ok := h.exposed.LookupByKey("job1")
+	require.True(t, ok)
+	assert.Equal(t, StatusAccepted, entry.Status)
+	assert.False(t, entry.Enabled)
 }
 
-func TestCmdEnable_StartFails_CodedError(t *testing.T) {
+func TestCmdEnable_AdoptionError_CodedError(t *testing.T) {
 	cb := &mockCallbacks{}
 	cb.startFn = func(_ testConfig) error {
-		return &codedErr{err: errors.New("validation failed"), code: 400}
+		return &codedErr{
+			err:  errors.New("validation failed"),
+			code: 400,
+		}
 	}
 	h := newTestHandler(cb)
 
-	cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "stock"}
-	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusAccepted})
+	cfg := testConfig{
+		uid:        "dyncfg:job1",
+		key:        "job1",
+		sourceType: "stock",
+	}
+	h.exposed.Add(&Entry[testConfig]{
+		Cfg:    cfg,
+		Status: StatusAccepted,
+	})
 
 	fn := newTestFn("test:job1", "enable", "", nil)
 	h.CmdEnable(fn)
@@ -638,21 +636,30 @@ func TestCmdEnable_StartFails_CodedError(t *testing.T) {
 	// Stock config should NOT be removed on coded error.
 	entry, ok := h.exposed.LookupByKey("job1")
 	require.True(t, ok, "stock config should stay on coded error")
-	assert.Equal(t, StatusFailed, entry.Status)
+	assert.Equal(t, StatusAccepted, entry.Status)
+	assert.False(t, entry.Enabled)
 }
 
 func TestCmdEnable_FromDisabled(t *testing.T) {
 	cb := &mockCallbacks{}
 	h := newTestHandler(cb)
 
-	cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
-	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusDisabled})
+	cfg := testConfig{
+		uid:        "dyncfg:job1",
+		key:        "job1",
+		sourceType: "dyncfg",
+	}
+	h.exposed.Add(&Entry[testConfig]{
+		Cfg:    cfg,
+		Status: StatusDisabled,
+	})
 
 	fn := newTestFn("test:job1", "enable", "", nil)
 	h.CmdEnable(fn)
 
 	entry, _ := h.exposed.LookupByKey("job1")
-	assert.Equal(t, StatusRunning, entry.Status)
+	assert.Equal(t, StatusAccepted, entry.Status)
+	assert.True(t, entry.Enabled)
 	require.Len(t, cb.statusCalls, 1)
 	assert.Equal(t, StatusDisabled, cb.statusCalls[0].oldStatus)
 }
@@ -663,8 +670,15 @@ func TestCmdDisable_FromRunning(t *testing.T) {
 	cb := &mockCallbacks{}
 	h := newTestHandler(cb)
 
-	cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
-	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusRunning})
+	cfg := testConfig{
+		uid:        "dyncfg:job1",
+		key:        "job1",
+		sourceType: "dyncfg",
+	}
+	h.exposed.Add(&Entry[testConfig]{
+		Cfg:    cfg,
+		Status: StatusRunning,
+	})
 
 	fn := newTestFn("test:job1", "disable", "", nil)
 	h.CmdDisable(fn)
@@ -680,8 +694,15 @@ func TestCmdDisable_AlreadyDisabled(t *testing.T) {
 	cb := &mockCallbacks{}
 	h := newTestHandler(cb)
 
-	cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
-	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusDisabled})
+	cfg := testConfig{
+		uid:        "dyncfg:job1",
+		key:        "job1",
+		sourceType: "dyncfg",
+	}
+	h.exposed.Add(&Entry[testConfig]{
+		Cfg:    cfg,
+		Status: StatusDisabled,
+	})
 
 	fn := newTestFn("test:job1", "disable", "", nil)
 	h.CmdDisable(fn)
@@ -694,8 +715,15 @@ func TestCmdDisable_FromFailed(t *testing.T) {
 	cb := &mockCallbacks{}
 	h := newTestHandler(cb)
 
-	cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
-	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusFailed})
+	cfg := testConfig{
+		uid:        "dyncfg:job1",
+		key:        "job1",
+		sourceType: "dyncfg",
+	}
+	h.exposed.Add(&Entry[testConfig]{
+		Cfg:    cfg,
+		Status: StatusFailed,
+	})
 
 	fn := newTestFn("test:job1", "disable", "", nil)
 	h.CmdDisable(fn)
@@ -722,14 +750,21 @@ func TestCmdRemove_DyncfgConfig(t *testing.T) {
 	cb := &mockCallbacks{}
 	h := newTestHandler(cb)
 
-	cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
+	cfg := testConfig{
+		uid:        "dyncfg:job1",
+		key:        "job1",
+		sourceType: "dyncfg",
+	}
 	h.seen.Add(cfg)
-	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusRunning})
+	h.exposed.Add(&Entry[testConfig]{
+		Cfg:    cfg,
+		Status: StatusRunning,
+	})
 
 	fn := newTestFn("test:job1", "remove", "", nil)
 	h.CmdRemove(fn)
 
-	_, ok := h.seen.LookupByUID("dyncfg:job1")
+	_, ok := lookupSeenByUID(h.seen, "dyncfg:job1")
 	assert.False(t, ok, "should be removed from seen")
 
 	_, ok = h.exposed.LookupByKey("job1")
@@ -742,8 +777,15 @@ func TestCmdRemove_NonDyncfg_Rejected(t *testing.T) {
 	cb := &mockCallbacks{}
 	h := newTestHandler(cb)
 
-	cfg := testConfig{uid: "stock:job1", key: "job1", sourceType: "stock"}
-	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusRunning})
+	cfg := testConfig{
+		uid:        "stock:job1",
+		key:        "job1",
+		sourceType: "stock",
+	}
+	h.exposed.Add(&Entry[testConfig]{
+		Cfg:    cfg,
+		Status: StatusRunning,
+	})
 
 	fn := newTestFn("test:job1", "remove", "", nil)
 	h.CmdRemove(fn)
@@ -751,6 +793,34 @@ func TestCmdRemove_NonDyncfg_Rejected(t *testing.T) {
 	// Should still be in cache — removal rejected.
 	_, ok := h.exposed.LookupByKey("job1")
 	assert.True(t, ok, "non-dyncfg config should not be removed")
+	assert.Len(t, cb.stopCalls, 0)
+}
+
+func TestCmdRemove_DyncfgSingleRejected(t *testing.T) {
+	cb := &mockCallbacks{
+		configTypeFn: func(testConfig) ConfigType { return ConfigTypeSingle },
+	}
+	h := newTestHandler(cb)
+
+	cfg := testConfig{
+		uid:        "dyncfg:job1",
+		key:        "job1",
+		sourceType: "dyncfg",
+	}
+	h.seen.Add(cfg)
+	h.exposed.Add(&Entry[testConfig]{
+		Cfg:    cfg,
+		Status: StatusRunning,
+	})
+
+	fn := newTestFn("test:job1", "remove", "", nil)
+	h.CmdRemove(fn)
+
+	_, ok := lookupSeenByUID(h.seen, "dyncfg:job1")
+	assert.True(t, ok, "dyncfg single should not be removed")
+
+	_, ok = h.exposed.LookupByKey("job1")
+	assert.True(t, ok, "dyncfg single should remain exposed")
 	assert.Len(t, cb.stopCalls, 0)
 }
 
@@ -770,13 +840,27 @@ func TestCmdUpdate_NonConversion_Success(t *testing.T) {
 	cb := &mockCallbacks{}
 	h := newTestHandler(cb)
 
-	oldCfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg", hash: 100}
+	oldCfg := testConfig{
+		uid:        "dyncfg:job1",
+		key:        "job1",
+		sourceType: "dyncfg",
+		hash:       100,
+	}
 	h.seen.Add(oldCfg)
-	h.exposed.Add(&Entry[testConfig]{Cfg: oldCfg, Status: StatusRunning})
+	h.exposed.Add(&Entry[testConfig]{
+		Cfg:    oldCfg,
+		Status: StatusRunning,
+	})
 
 	// ParseAndValidate returns config with different hash.
 	cb.parseAndValidateFn = func(_ Function, name string) (testConfig, error) {
-		return testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg", hash: 200, source: "test"}, nil
+		return testConfig{
+			uid:        "dyncfg:job1",
+			key:        "job1",
+			sourceType: "dyncfg",
+			hash:       200,
+			source:     "test",
+		}, nil
 	}
 
 	fn := newTestFn("test:job1", "update", "job1", []byte(`{}`))
@@ -789,7 +873,8 @@ func TestCmdUpdate_NonConversion_Success(t *testing.T) {
 
 	entry, ok := h.exposed.LookupByKey("job1")
 	require.True(t, ok)
-	assert.Equal(t, StatusRunning, entry.Status)
+	assert.Equal(t, StatusAccepted, entry.Status)
+	assert.True(t, entry.Enabled)
 	assert.Equal(t, uint64(200), entry.Cfg.Hash())
 }
 
@@ -797,11 +882,24 @@ func TestCmdUpdate_NonConversion_NoOp(t *testing.T) {
 	cb := &mockCallbacks{}
 	h := newTestHandler(cb)
 
-	oldCfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg", hash: 100}
-	h.exposed.Add(&Entry[testConfig]{Cfg: oldCfg, Status: StatusRunning})
+	oldCfg := testConfig{
+		uid:        "dyncfg:job1",
+		key:        "job1",
+		sourceType: "dyncfg",
+		hash:       100,
+	}
+	h.exposed.Add(&Entry[testConfig]{
+		Cfg:    oldCfg,
+		Status: StatusRunning,
+	})
 
 	cb.parseAndValidateFn = func(_ Function, _ string) (testConfig, error) {
-		return testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg", hash: 100}, nil
+		return testConfig{
+			uid:        "dyncfg:job1",
+			key:        "job1",
+			sourceType: "dyncfg",
+			hash:       100,
+		}, nil
 	}
 
 	fn := newTestFn("test:job1", "update", "job1", []byte(`{}`))
@@ -817,28 +915,43 @@ func TestCmdUpdate_Conversion_Success(t *testing.T) {
 	cb := &mockCallbacks{}
 	h := newTestHandler(cb)
 
-	oldCfg := testConfig{uid: "stock:job1", key: "job1", sourceType: "stock", hash: 100}
+	oldCfg := testConfig{
+		uid:        "stock:job1",
+		key:        "job1",
+		sourceType: "stock",
+		hash:       100,
+	}
 	h.seen.Add(oldCfg)
-	h.exposed.Add(&Entry[testConfig]{Cfg: oldCfg, Status: StatusRunning})
+	h.exposed.Add(&Entry[testConfig]{
+		Cfg:    oldCfg,
+		Status: StatusRunning,
+	})
 
 	cb.parseAndValidateFn = func(_ Function, name string) (testConfig, error) {
-		return testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg", hash: 200, source: "test"}, nil
+		return testConfig{
+			uid:        "dyncfg:job1",
+			key:        "job1",
+			sourceType: "dyncfg",
+			hash:       200,
+			source:     "test",
+		}, nil
 	}
 
 	fn := newTestFn("test:job1", "update", "job1", []byte(`{}`))
 	h.CmdUpdate(fn)
 
-	// Conversion uses Stop + Start, not Update.
-	assert.Len(t, cb.stopCalls, 1)
-	assert.Len(t, cb.startCalls, 1)
-	assert.Len(t, cb.updateCalls, 0)
+	// Conversion uses the same prepared replacement boundary.
+	assert.Empty(t, cb.stopCalls)
+	assert.Empty(t, cb.startCalls)
+	assert.Len(t, cb.updateCalls, 1)
 
 	entry, _ := h.exposed.LookupByKey("job1")
-	assert.Equal(t, StatusRunning, entry.Status)
+	assert.Equal(t, StatusAccepted, entry.Status)
+	assert.True(t, entry.Enabled)
 	assert.Equal(t, "dyncfg", entry.Cfg.SourceType())
 
 	// Old stock config should still be in seen (for re-promotion).
-	_, ok := h.seen.LookupByUID("stock:job1")
+	_, ok := lookupSeenByUID(h.seen, "stock:job1")
 	assert.True(t, ok, "stock config should stay in seen for conversion")
 }
 
@@ -846,12 +959,25 @@ func TestCmdUpdate_Disabled_PreservesStatus(t *testing.T) {
 	cb := &mockCallbacks{}
 	h := newTestHandler(cb)
 
-	oldCfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg", hash: 100}
+	oldCfg := testConfig{
+		uid:        "dyncfg:job1",
+		key:        "job1",
+		sourceType: "dyncfg",
+		hash:       100,
+	}
 	h.seen.Add(oldCfg)
-	h.exposed.Add(&Entry[testConfig]{Cfg: oldCfg, Status: StatusDisabled})
+	h.exposed.Add(&Entry[testConfig]{
+		Cfg:    oldCfg,
+		Status: StatusDisabled,
+	})
 
 	cb.parseAndValidateFn = func(_ Function, _ string) (testConfig, error) {
-		return testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg", hash: 200}, nil
+		return testConfig{
+			uid:        "dyncfg:job1",
+			key:        "job1",
+			sourceType: "dyncfg",
+			hash:       200,
+		}, nil
 	}
 
 	fn := newTestFn("test:job1", "update", "job1", []byte(`{}`))
@@ -869,11 +995,23 @@ func TestCmdUpdate_Accepted_Rejected(t *testing.T) {
 	cb := &mockCallbacks{}
 	h := newTestHandler(cb)
 
-	oldCfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
-	h.exposed.Add(&Entry[testConfig]{Cfg: oldCfg, Status: StatusAccepted})
+	oldCfg := testConfig{
+		uid:        "dyncfg:job1",
+		key:        "job1",
+		sourceType: "dyncfg",
+	}
+	h.exposed.Add(&Entry[testConfig]{
+		Cfg:    oldCfg,
+		Status: StatusAccepted,
+	})
 
 	cb.parseAndValidateFn = func(_ Function, _ string) (testConfig, error) {
-		return testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg", hash: 200}, nil
+		return testConfig{
+			uid:        "dyncfg:job1",
+			key:        "job1",
+			sourceType: "dyncfg",
+			hash:       200,
+		}, nil
 	}
 
 	fn := newTestFn("test:job1", "update", "job1", []byte(`{}`))
@@ -885,6 +1023,51 @@ func TestCmdUpdate_Accepted_Rejected(t *testing.T) {
 
 	entry, _ := h.exposed.LookupByKey("job1")
 	assert.Equal(t, StatusAccepted, entry.Status)
+}
+
+func TestCmdUpdate_ValidationPrecedesAcceptedStateRejection(t *testing.T) {
+	tests := map[string]struct {
+		parseErr string
+	}{
+		"invalid payload against accepted entry returns 400 not 403": {
+			parseErr: "invalid payload before accepted rejection",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cb := &mockCallbacks{}
+			h, out := newTestHandlerWithOutput(cb)
+
+			oldCfg := testConfig{
+				uid:        "dyncfg:job1",
+				key:        "job1",
+				sourceType: "dyncfg",
+			}
+			h.exposed.Add(&Entry[testConfig]{
+				Cfg:    oldCfg,
+				Status: StatusAccepted,
+			})
+
+			cb.parseAndValidateFn = func(_ Function, _ string) (testConfig, error) {
+				return testConfig{}, errors.New(tc.parseErr)
+			}
+
+			fn := newTestFn("test:job1", "update", "job1", []byte(`{}`))
+			h.CmdUpdate(fn)
+
+			output := out.String()
+			assert.Contains(t, output, `"status":400`)
+			assert.Contains(t, output, tc.parseErr)
+			assert.NotContains(t, output, `"status":403`)
+			assert.Len(t, cb.updateCalls, 0)
+			assert.Len(t, cb.startCalls, 0)
+
+			entry, ok := h.exposed.LookupByKey("job1")
+			require.True(t, ok)
+			assert.Equal(t, StatusAccepted, entry.Status)
+		})
+	}
 }
 
 func TestCmdUpdate_NotFound(t *testing.T) {
@@ -904,8 +1087,15 @@ func TestCmdUpdate_ParseError(t *testing.T) {
 	}
 	h := newTestHandler(cb)
 
-	cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
-	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusRunning})
+	cfg := testConfig{
+		uid:        "dyncfg:job1",
+		key:        "job1",
+		sourceType: "dyncfg",
+	}
+	h.exposed.Add(&Entry[testConfig]{
+		Cfg:    cfg,
+		Status: StatusRunning,
+	})
 
 	fn := newTestFn("test:job1", "update", "job1", []byte(`{}`))
 	h.CmdUpdate(fn)
@@ -915,37 +1105,63 @@ func TestCmdUpdate_ParseError(t *testing.T) {
 	assert.Equal(t, StatusRunning, entry.Status)
 }
 
-func TestCmdUpdate_NonConversion_StartFails(t *testing.T) {
+func TestCmdUpdate_NonConversion_PreflightFails(t *testing.T) {
 	cb := &mockCallbacks{}
 	cb.updateFn = func(_, _ testConfig) error { return errors.New("update failed") }
 	h := newTestHandler(cb)
 
-	oldCfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg", hash: 100}
+	oldCfg := testConfig{
+		uid:        "dyncfg:job1",
+		key:        "job1",
+		sourceType: "dyncfg",
+		hash:       100,
+	}
 	h.seen.Add(oldCfg)
-	h.exposed.Add(&Entry[testConfig]{Cfg: oldCfg, Status: StatusRunning})
+	h.exposed.Add(&Entry[testConfig]{
+		Cfg:    oldCfg,
+		Status: StatusRunning,
+	})
 
 	cb.parseAndValidateFn = func(_ Function, _ string) (testConfig, error) {
-		return testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg", hash: 200}, nil
+		return testConfig{
+			uid:        "dyncfg:job1",
+			key:        "job1",
+			sourceType: "dyncfg",
+			hash:       200,
+		}, nil
 	}
 
 	fn := newTestFn("test:job1", "update", "job1", []byte(`{}`))
 	h.CmdUpdate(fn)
 
 	entry, _ := h.exposed.LookupByKey("job1")
-	assert.Equal(t, StatusFailed, entry.Status)
+	assert.Equal(t, StatusRunning, entry.Status)
 }
 
-func TestCmdUpdate_NonConversion_StartFails_NonDisruptiveRollback(t *testing.T) {
+func TestCmdUpdate_NonConversion_PreflightPreservesCaches(t *testing.T) {
 	cb := &mockCallbacks{}
 	cb.updateFn = func(_, _ testConfig) error {
-		return MarkNonDisruptiveUpdate(errors.New("update preflight failed"))
+		return errors.New("update preflight failed")
 	}
 	h := newTestHandler(cb)
 
-	oldCfg := testConfig{uid: "dyncfg:job1:v1", key: "job1", sourceType: "dyncfg", hash: 100}
-	newCfg := testConfig{uid: "dyncfg:job1:v2", key: "job1", sourceType: "dyncfg", hash: 200}
+	oldCfg := testConfig{
+		uid:        "dyncfg:job1:v1",
+		key:        "job1",
+		sourceType: "dyncfg",
+		hash:       100,
+	}
+	newCfg := testConfig{
+		uid:        "dyncfg:job1:v2",
+		key:        "job1",
+		sourceType: "dyncfg",
+		hash:       200,
+	}
 	h.seen.Add(oldCfg)
-	h.exposed.Add(&Entry[testConfig]{Cfg: oldCfg, Status: StatusRunning})
+	h.exposed.Add(&Entry[testConfig]{
+		Cfg:    oldCfg,
+		Status: StatusRunning,
+	})
 
 	cb.parseAndValidateFn = func(_ Function, _ string) (testConfig, error) {
 		return newCfg, nil
@@ -958,44 +1174,105 @@ func TestCmdUpdate_NonConversion_StartFails_NonDisruptiveRollback(t *testing.T) 
 	assert.Equal(t, StatusRunning, entry.Status)
 	assert.Equal(t, oldCfg.UID(), entry.Cfg.UID())
 
-	_, ok := h.seen.LookupByUID(oldCfg.UID())
-	assert.True(t, ok, "old config should be restored in seen cache")
+	_, ok := lookupSeenByUID(h.seen, oldCfg.UID())
+	assert.True(t, ok, "old config stays in seen cache")
 
-	_, ok = h.seen.LookupByUID(newCfg.UID())
-	assert.False(t, ok, "new config should be removed from seen cache on rollback")
+	_, ok = lookupSeenByUID(h.seen, newCfg.UID())
+	assert.False(t, ok, "rejected config never enters seen cache")
 }
 
-func TestCmdUpdate_Conversion_StartFails(t *testing.T) {
+func TestCmdUpdate_NonConversion_PreflightRejectionUsesCallbackCode(t *testing.T) {
 	cb := &mockCallbacks{}
-	cb.startFn = func(_ testConfig) error { return errors.New("start failed") }
+	cb.updateFn = func(_, _ testConfig) error {
+		return &codedErr{
+			err:  errors.New("materialization busy"),
+			code: 503,
+		}
+	}
+	h, out := newTestHandlerWithOutput(cb)
+
+	oldCfg := testConfig{
+		uid:        "dyncfg:job1:v1",
+		key:        "job1",
+		sourceType: "dyncfg",
+		hash:       100,
+	}
+	newCfg := testConfig{
+		uid:        "dyncfg:job1:v2",
+		key:        "job1",
+		sourceType: "dyncfg",
+		hash:       200,
+	}
+	h.seen.Add(oldCfg)
+	h.exposed.Add(&Entry[testConfig]{
+		Cfg:    oldCfg,
+		Status: StatusRunning,
+	})
+	cb.parseAndValidateFn = func(_ Function, _ string) (testConfig, error) {
+		return newCfg, nil
+	}
+
+	h.CmdUpdate(newTestFn("test:job1", "update", "job1", []byte(`{}`)))
+
+	entry, _ := h.exposed.LookupByKey("job1")
+	assert.Equal(t, StatusRunning, entry.Status)
+	assert.Equal(t, oldCfg.UID(), entry.Cfg.UID())
+	assert.Contains(t, out.String(), `"status":503`)
+	assert.Contains(t, out.String(), "materialization busy")
+}
+
+func TestCmdUpdate_Conversion_PreflightFails(t *testing.T) {
+	cb := &mockCallbacks{}
+	cb.updateFn = func(_, _ testConfig) error { return errors.New("start failed") }
 	h := newTestHandler(cb)
 
-	oldCfg := testConfig{uid: "stock:job1", key: "job1", sourceType: "stock", hash: 100}
+	oldCfg := testConfig{
+		uid:        "stock:job1",
+		key:        "job1",
+		sourceType: "stock",
+		hash:       100,
+	}
 	h.seen.Add(oldCfg)
-	h.exposed.Add(&Entry[testConfig]{Cfg: oldCfg, Status: StatusRunning})
+	h.exposed.Add(&Entry[testConfig]{
+		Cfg:    oldCfg,
+		Status: StatusRunning,
+	})
 
 	cb.parseAndValidateFn = func(_ Function, name string) (testConfig, error) {
-		return testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg", hash: 200, source: "test"}, nil
+		return testConfig{
+			uid:        "dyncfg:job1",
+			key:        "job1",
+			sourceType: "dyncfg",
+			hash:       200,
+			source:     "test",
+		}, nil
 	}
 
 	fn := newTestFn("test:job1", "update", "job1", []byte(`{}`))
 	h.CmdUpdate(fn)
 
-	// Conversion uses Stop + Start; Start fails → Failed status.
-	assert.Len(t, cb.stopCalls, 1)
-	assert.Len(t, cb.startCalls, 1)
+	// Failed preflight leaves the stock runtime and config intact.
+	assert.Empty(t, cb.stopCalls)
+	assert.Empty(t, cb.startCalls)
 
 	entry, _ := h.exposed.LookupByKey("job1")
-	assert.Equal(t, StatusFailed, entry.Status)
-	assert.Equal(t, "dyncfg", entry.Cfg.SourceType())
+	assert.Equal(t, StatusRunning, entry.Status)
+	assert.Equal(t, "stock", entry.Cfg.SourceType())
 }
 
 func TestCmdUpdate_NoPayload(t *testing.T) {
 	cb := &mockCallbacks{}
 	h := newTestHandler(cb)
 
-	cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
-	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusRunning})
+	cfg := testConfig{
+		uid:        "dyncfg:job1",
+		key:        "job1",
+		sourceType: "dyncfg",
+	}
+	h.exposed.Add(&Entry[testConfig]{
+		Cfg:    cfg,
+		Status: StatusRunning,
+	})
 
 	// No payload (nil).
 	fn := newTestFn("test:job1", "update", "job1", nil)
@@ -1011,168 +1288,162 @@ func TestCmdUpdate_Conversion_Disabled(t *testing.T) {
 	cb := &mockCallbacks{}
 	h := newTestHandler(cb)
 
-	oldCfg := testConfig{uid: "stock:job1", key: "job1", sourceType: "stock"}
-	h.exposed.Add(&Entry[testConfig]{Cfg: oldCfg, Status: StatusDisabled})
+	oldCfg := testConfig{
+		uid:        "stock:job1",
+		key:        "job1",
+		sourceType: "stock",
+	}
+	h.exposed.Add(&Entry[testConfig]{
+		Cfg:    oldCfg,
+		Status: StatusDisabled,
+	})
 
 	cb.parseAndValidateFn = func(_ Function, _ string) (testConfig, error) {
-		return testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg", source: "test"}, nil
+		return testConfig{
+			uid:        "dyncfg:job1",
+			key:        "job1",
+			sourceType: "dyncfg",
+			source:     "test",
+		}, nil
 	}
 
 	fn := newTestFn("test:job1", "update", "job1", []byte(`{}`))
 	h.CmdUpdate(fn)
 
-	// Conversion with Disabled: Stop old, update caches, preserve Disabled.
-	assert.Len(t, cb.stopCalls, 1)
+	// Disabled conversion changes configuration without activating it.
+	assert.Empty(t, cb.stopCalls)
 	assert.Len(t, cb.startCalls, 0)
 
 	entry, _ := h.exposed.LookupByKey("job1")
 	assert.Equal(t, StatusDisabled, entry.Status)
 }
 
-// --- CmdRestart Tests ---
-
-func TestCmdRestart_FromRunning(t *testing.T) {
+func TestCmdUpdate_NonConversion_PreflightFails_CodedError(t *testing.T) {
 	cb := &mockCallbacks{}
-	h := newTestHandler(cb)
-
-	cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
-	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusRunning})
-
-	fn := newTestFn("test:job1", "restart", "", nil)
-	h.CmdRestart(fn)
-
-	assert.Len(t, cb.stopCalls, 1)
-	assert.Len(t, cb.startCalls, 1)
-
-	entry, _ := h.exposed.LookupByKey("job1")
-	assert.Equal(t, StatusRunning, entry.Status)
-	require.Len(t, cb.statusCalls, 1)
-	assert.Equal(t, StatusRunning, cb.statusCalls[0].oldStatus)
-}
-
-func TestCmdRestart_FromFailed(t *testing.T) {
-	cb := &mockCallbacks{}
-	h := newTestHandler(cb)
-
-	cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
-	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusFailed})
-
-	fn := newTestFn("test:job1", "restart", "", nil)
-	h.CmdRestart(fn)
-
-	assert.Len(t, cb.stopCalls, 1)
-	assert.Len(t, cb.startCalls, 1)
-
-	entry, _ := h.exposed.LookupByKey("job1")
-	assert.Equal(t, StatusRunning, entry.Status)
-	require.Len(t, cb.statusCalls, 1)
-	assert.Equal(t, StatusFailed, cb.statusCalls[0].oldStatus)
-}
-
-func TestCmdRestart_Accepted_Rejected(t *testing.T) {
-	cb := &mockCallbacks{}
-	h := newTestHandler(cb)
-
-	cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
-	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusAccepted})
-
-	fn := newTestFn("test:job1", "restart", "", nil)
-	h.CmdRestart(fn)
-
-	assert.Len(t, cb.stopCalls, 0)
-	assert.Len(t, cb.startCalls, 0)
-
-	entry, _ := h.exposed.LookupByKey("job1")
-	assert.Equal(t, StatusAccepted, entry.Status)
-}
-
-func TestCmdRestart_Disabled_Rejected(t *testing.T) {
-	cb := &mockCallbacks{}
-	h := newTestHandler(cb)
-
-	cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
-	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusDisabled})
-
-	fn := newTestFn("test:job1", "restart", "", nil)
-	h.CmdRestart(fn)
-
-	assert.Len(t, cb.stopCalls, 0)
-	assert.Len(t, cb.startCalls, 0)
-
-	entry, _ := h.exposed.LookupByKey("job1")
-	assert.Equal(t, StatusDisabled, entry.Status)
-}
-
-func TestCmdRestart_NotFound(t *testing.T) {
-	cb := &mockCallbacks{}
-	h := newTestHandler(cb)
-
-	fn := newTestFn("test:job1", "restart", "", nil)
-	h.CmdRestart(fn)
-
-	assert.Len(t, cb.stopCalls, 0)
-	assert.Len(t, cb.startCalls, 0)
-}
-
-func TestCmdRestart_StartFails(t *testing.T) {
-	cb := &mockCallbacks{}
-	cb.startFn = func(_ testConfig) error { return errors.New("restart failed") }
-	h := newTestHandler(cb)
-
-	cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
-	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusRunning})
-
-	fn := newTestFn("test:job1", "restart", "", nil)
-	h.CmdRestart(fn)
-
-	assert.Len(t, cb.stopCalls, 1)
-	assert.Len(t, cb.startCalls, 1)
-
-	entry, _ := h.exposed.LookupByKey("job1")
-	assert.Equal(t, StatusFailed, entry.Status)
-	require.Len(t, cb.statusCalls, 1)
-	assert.Equal(t, StatusRunning, cb.statusCalls[0].oldStatus)
-}
-
-func TestCmdRestart_StartFails_CodedError(t *testing.T) {
-	cb := &mockCallbacks{}
-	cb.startFn = func(_ testConfig) error {
-		return &codedErr{err: errors.New("bad config"), code: 400}
+	cb.updateFn = func(_, _ testConfig) error {
+		return &codedErr{
+			err:  errors.New("bind failed"),
+			code: 422,
+		}
 	}
-	h := newTestHandler(cb)
+	h, out := newTestHandlerWithOutput(cb)
 
-	cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
-	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusRunning})
+	oldCfg := testConfig{
+		uid:        "dyncfg:job1",
+		key:        "job1",
+		sourceType: "dyncfg",
+		hash:       100,
+	}
+	h.seen.Add(oldCfg)
+	h.exposed.Add(&Entry[testConfig]{
+		Cfg:    oldCfg,
+		Status: StatusRunning,
+	})
 
-	fn := newTestFn("test:job1", "restart", "", nil)
-	h.CmdRestart(fn)
+	cb.parseAndValidateFn = func(_ Function, _ string) (testConfig, error) {
+		return testConfig{
+			uid:        "dyncfg:job1",
+			key:        "job1",
+			sourceType: "dyncfg",
+			hash:       200,
+		}, nil
+	}
+
+	fn := newTestFn("test:job1", "update", "job1", []byte(`{}`))
+	h.CmdUpdate(fn)
 
 	entry, _ := h.exposed.LookupByKey("job1")
-	assert.Equal(t, StatusFailed, entry.Status)
+	assert.Equal(t, StatusRunning, entry.Status)
+	assert.Contains(t, out.String(), `"status":422`)
+	assert.Contains(t, out.String(), "bind failed")
+}
+
+func TestCmdUpdate_Conversion_PreflightFails_CodedError(t *testing.T) {
+	cb := &mockCallbacks{}
+	cb.updateFn = func(_, _ testConfig) error {
+		return &codedErr{
+			err:  errors.New("bind failed"),
+			code: 422,
+		}
+	}
+	h, out := newTestHandlerWithOutput(cb)
+
+	oldCfg := testConfig{
+		uid:        "stock:job1",
+		key:        "job1",
+		sourceType: "stock",
+		hash:       100,
+	}
+	h.seen.Add(oldCfg)
+	h.exposed.Add(&Entry[testConfig]{
+		Cfg:    oldCfg,
+		Status: StatusRunning,
+	})
+
+	cb.parseAndValidateFn = func(_ Function, name string) (testConfig, error) {
+		return testConfig{
+			uid:        "dyncfg:job1",
+			key:        "job1",
+			sourceType: "dyncfg",
+			hash:       200,
+			source:     "test",
+		}, nil
+	}
+
+	fn := newTestFn("test:job1", "update", "job1", []byte(`{}`))
+	h.CmdUpdate(fn)
+
+	assert.Empty(t, cb.stopCalls)
+	assert.Empty(t, cb.startCalls)
+
+	entry, _ := h.exposed.LookupByKey("job1")
+	assert.Equal(t, StatusRunning, entry.Status)
+	assert.Equal(t, "stock", entry.Cfg.SourceType())
+	assert.Contains(t, out.String(), `"status":422`)
+	assert.Contains(t, out.String(), "bind failed")
 }
 
 // --- Notify Tests ---
 
-func TestNotifyJobCreate_SupportedCommands(t *testing.T) {
+func TestNotifyConfigCreate_SupportedCommands(t *testing.T) {
 	tests := []struct {
 		name       string
 		commands   []Command
 		sourceType string
+		configType ConfigType
 		wantRemove bool
 	}{
-		{"dyncfg with restart", []Command{CommandSchema, CommandGet, CommandRestart}, "dyncfg", true},
-		{"dyncfg no restart", []Command{CommandSchema, CommandGet}, "dyncfg", true},
-		{"stock with restart", []Command{CommandSchema, CommandGet, CommandRestart}, "stock", false},
-		{"stock no restart", []Command{CommandSchema, CommandGet}, "stock", false},
+		{
+			"dyncfg job with restart",
+			[]Command{CommandSchema, CommandGet, CommandRestart},
+			"dyncfg",
+			ConfigTypeJob,
+			true,
+		},
+		{"dyncfg job no restart", []Command{CommandSchema, CommandGet}, "dyncfg", ConfigTypeJob, true},
+		{"stock job with restart", []Command{CommandSchema, CommandGet, CommandRestart}, "stock", ConfigTypeJob, false},
+		{"stock job no restart", []Command{CommandSchema, CommandGet}, "stock", ConfigTypeJob, false},
+		{
+			"dyncfg single no remove",
+			[]Command{CommandSchema, CommandGet, CommandUpdate},
+			"dyncfg",
+			ConfigTypeSingle,
+			false,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cb := &mockCallbacks{}
+			cb := &mockCallbacks{
+				configTypeFn: func(testConfig) ConfigType { return tt.configType },
+			}
 			h := newTestHandler(cb)
-			h.jobCommands = tt.commands
+			h.configCommands = tt.commands
 
-			cmds := h.jobSupportedCommands(tt.sourceType == "dyncfg")
+			cfg := testConfig{
+				sourceType: tt.sourceType,
+			}
+			cmds := h.configSupportedCommands(cfg, tt.sourceType == "dyncfg")
 
 			// Base commands should always be present.
 			for _, cmd := range tt.commands {
@@ -1187,31 +1458,68 @@ func TestNotifyJobCreate_SupportedCommands(t *testing.T) {
 	}
 }
 
-// --- ValidateJobName Tests ---
+// --- Job-name rule tests ---
 
-func TestValidateJobName(t *testing.T) {
-	tests := []struct {
-		name    string
+func TestJobNameRuleStrict(t *testing.T) {
+	tests := map[string]struct {
 		input   string
 		wantErr bool
 	}{
-		{"valid", "my_job", false},
-		{"valid with numbers", "job123", false},
-		{"valid with dashes", "my-job", false},
-		{"space", "my job", true},
-		{"tab", "my\tjob", true},
-		{"dot", "my.job", true},
-		{"colon", "my:job", true},
-		{"empty", "", false},
+		"valid":              {input: "my_job"},
+		"valid with numbers": {input: "job123"},
+		"valid with dashes":  {input: "my-job"},
+		"space":              {input: "my job", wantErr: true},
+		"tab":                {input: "my\tjob", wantErr: true},
+		"dot":                {input: "my.job", wantErr: true},
+		"colon":              {input: "my:job", wantErr: true},
+		"equals":             {input: "my=job", wantErr: true},
+		"single quote":       {input: "my'job", wantErr: true},
+		"double quote":       {input: `my"job`, wantErr: true},
+		"backslash":          {input: `my\job`, wantErr: true},
+		"NUL":                {input: "my\x00job", wantErr: true},
+		"empty":              {input: ""},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateJobName(tt.input)
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := JobNameRuleStrict(tt.input)
 			if tt.wantErr {
-				assert.Error(t, err, fmt.Sprintf("ValidateJobName(%q) should fail", tt.input))
+				assert.Error(t, err, fmt.Sprintf("JobNameRuleStrict(%q) should fail", tt.input))
 			} else {
-				assert.NoError(t, err, fmt.Sprintf("ValidateJobName(%q) should pass", tt.input))
+				assert.NoError(t, err, fmt.Sprintf("JobNameRuleStrict(%q) should pass", tt.input))
+			}
+		})
+	}
+}
+
+func TestJobNameRuleAllowDots(t *testing.T) {
+	tests := map[string]struct {
+		input   string
+		wantErr bool
+	}{
+		"valid":              {input: "my_job"},
+		"valid with numbers": {input: "job123"},
+		"valid with dashes":  {input: "my-job"},
+		"dotted name":        {input: "my.job"},
+		"fqdn":               {input: "host.example.com"},
+		"space":              {input: "my job", wantErr: true},
+		"tab":                {input: "my\tjob", wantErr: true},
+		"colon":              {input: "my:job", wantErr: true},
+		"equals":             {input: "my=job", wantErr: true},
+		"single quote":       {input: "my'job", wantErr: true},
+		"double quote":       {input: `my"job`, wantErr: true},
+		"backslash":          {input: `my\job`, wantErr: true},
+		"NUL":                {input: "my\x00job", wantErr: true},
+		"empty":              {input: ""},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := JobNameRuleAllowDots(tt.input)
+			if tt.wantErr {
+				assert.Error(t, err, fmt.Sprintf("JobNameRuleAllowDots(%q) should fail", tt.input))
+			} else {
+				assert.NoError(t, err, fmt.Sprintf("JobNameRuleAllowDots(%q) should pass", tt.input))
 			}
 		})
 	}

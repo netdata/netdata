@@ -63,7 +63,7 @@ jobs:
 		assert.Equal(t, confgroup.TypeStock, cfgs[3].SourceType())
 	})
 
-	t.Run("keeps explicit kind and allows unknown file stem", func(t *testing.T) {
+	t.Run("keeps explicit kind and rejects invalid inferred or typed kinds", func(t *testing.T) {
 		base := t.TempDir()
 		userRoot := filepath.Join(base, "etc", "netdata", "go.d")
 
@@ -80,13 +80,40 @@ jobs:
     mode_token:
       token: custom-token
     addr: https://vault.example
+  - name: non_string_kind
+    kind: 123
+    mode: token
+    mode_token:
+      token: custom-token
+    addr: https://vault.example
+`)
+
+		cfgs, errs := secretstore.LoadFileConfigs([]string{userRoot})
+		require.Len(t, cfgs, 1)
+		require.Len(t, errs, 2)
+		assert.Equal(t, secretstore.KindVault, cfgs[0].Kind())
+		assert.Contains(t, errs[0].Error(), "invalid store kind 'custom'")
+		assert.Contains(t, errs[1].Error(), "store kind must be a string")
+	})
+
+	t.Run("infers supported filename kind from an explicit empty string", func(t *testing.T) {
+		base := t.TempDir()
+		userRoot := filepath.Join(base, "etc", "netdata", "go.d")
+
+		mustWriteSecretStoreConfigFile(t, filepath.Join(userRoot, "ss", "vault.conf"), `
+jobs:
+  - name: explicit_empty
+    kind: ""
+    mode: token
+    mode_token:
+      token: vault-token
+    addr: https://vault.example
 `)
 
 		cfgs, errs := secretstore.LoadFileConfigs([]string{userRoot})
 		require.Empty(t, errs)
-		require.Len(t, cfgs, 2)
+		require.Len(t, cfgs, 1)
 		assert.Equal(t, secretstore.KindVault, cfgs[0].Kind())
-		assert.Equal(t, secretstore.StoreKind("custom"), cfgs[1].Kind())
 	})
 
 	t.Run("skips malformed files and non-keyable jobs", func(t *testing.T) {
@@ -123,6 +150,24 @@ jobs:
 		assert.Contains(t, joined, "store name is required")
 		assert.Contains(t, joined, "secretstore file config")
 	})
+
+	t.Run("skips null jobs without losing valid siblings", func(t *testing.T) {
+		base := t.TempDir()
+		userRoot := filepath.Join(base, "etc", "netdata", "go.d")
+
+		mustWriteSecretStoreConfigFile(t, filepath.Join(userRoot, "ss", "vault.conf"), `
+jobs:
+  - null
+  - name: valid
+    value: accepted
+`)
+
+		cfgs, errs := secretstore.LoadFileConfigs([]string{userRoot})
+		require.Len(t, cfgs, 1)
+		require.Len(t, errs, 1)
+		assert.Equal(t, "valid", cfgs[0].Name())
+	})
+
 }
 
 func mustWriteSecretStoreConfigFile(t *testing.T, path, content string) {

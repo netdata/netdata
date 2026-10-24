@@ -6,6 +6,7 @@ modules:
       module_name: hfs
       monitored_instance:
         name: Hadoop Distributed File System (HDFS)
+        description: "Monitor HDFS NameNode and DataNode capacity, activity, RPC, and JVM metrics through JMX web endpoints."
         link: https://hadoop.apache.org/docs/r1.2.1/hdfs_design.html
         icon_filename: hadoop.svg
         categories:
@@ -189,39 +190,18 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Collecting metrics from local and remote instances.
               config: |
                 jobs:
                   - name: local
                     url: http://127.0.0.1:9870/jmx
-                
+
                   - name: remote
                     url: http://192.0.2.1:9870/jmx
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: hdfs_capacity_usage
-        metric: hdfs.capacity
-        info: summary datanodes space capacity utilization
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/hdfs.conf
-      - name: hdfs_missing_blocks
-        metric: hdfs.blocks
-        info: number of missing blocks
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/hdfs.conf
-      - name: hdfs_stale_nodes
-        metric: hdfs.data_nodes
-        info: number of datanodes marked stale due to delayed heartbeat
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/hdfs.conf
-      - name: hdfs_dead_nodes
-        metric: hdfs.data_nodes
-        info: number of datanodes which are currently dead
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/hdfs.conf
-      - name: hdfs_num_failed_volumes
-        metric: hdfs.num_failed_volumes
-        info: number of failed volumes
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/hdfs.conf
     metrics:
       folding:
         title: Metrics

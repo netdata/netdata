@@ -1,114 +1,117 @@
-# Extreme Cardinality Protection in Netdata
+# Extreme cardinality protection
 
-Netdata’s tiered storage is designed to efficiently retain metric data and metadata for long periods. However, when extreme cardinality occurs—often unintentionally through misconfigurations or inadvertent practices (e.g., spawning many short-lived docker containers or using unbounded label values)—the long-term retention of metadata can lead to excessive resource consumption.
+Extreme cardinality occurs when a node continually creates new, short-lived chart instances. Common causes include ephemeral containers and collectors that repeatedly discover transient resources.
 
-To protect Netdata from extreme cardinality, Netdata has an automated protection. This document explains **why** this protection is needed, **how** it works, **how** to configure it, and **how** to verify its operation.
+Netdata's extreme cardinality protection limits the long-term resource cost of this churn. It removes access to selected historical metrics after they have no samples left in tier 0, allowing their obsolete metadata to be cleaned up later.
 
-## Why Extreme Cardinality Protection is Needed
+:::warning
 
-Extreme cardinality refers to the explosion in the number of unique time series generated when metrics are combined with a wide range of labels or dimensions. In modern observability platforms like Netdata, metrics aren’t just simple numeric values—they come with metadata (labels, tags, dimensions) that help contextualize the data. When these labels are overly dynamic or unbounded (for example, when using unique identifiers such as session IDs, user IDs, or ephemeral container names), combined with a very long retention, like the one provided by Netdata, the system ends up tracking an enormous number of unique series.
+The protection deliberately makes some long-term historical samples inaccessible. Review the thresholds before lowering them or enabling the protection in an environment where old, short-lived instances must remain queryable.
 
-Despite the fact that Netdata performs better than most other observability solution, extreme cardinality has a few implications:
+:::
 
--   **Resource Consumption:** The system needs to remember and index vast amounts of metadata, increasing its memory footprint.
--   **Performance Degradation:** When performing long-term queries (days, weeks, months), the system needs to query a vast number of time-series leading to slower query responses.
--   **Operational Complexity:** High cardinality makes it harder to manage, visualize, and analyze data. Dashboards can become cluttered.
--   **Scalability Challenges:** As the number of time series grows, the resources required for maintaining aggregation points (Netdata parents) increase too.
+## What the protection measures
 
-## Definition of Metrics Ephemerality
+Netdata evaluates cardinality independently for each node and context:
 
-Metrics ephemerality is the percentage of metrics that is no longer actively collected (old) compared to the total metrics available (sum of currently collected metrics and old metrics).
+- A **context** groups charts that describe the same type of resource, such as disks, network interfaces, or containers.
+- An **instance** is one chart within that context, such as a specific disk or container.
+- A **metric** is one dimension within an instance.
 
-- **Old Metrics** = The number of unique time-series that were once collected, but not currently.
-- **Current Metrics** = The number of unique time-series actively being collected.
+An instance is eligible for cleanup only after all its remaining metrics have no retention in tier 0. Netdata calculates the context's ephemerality as the percentage of its retained instances that meet this condition.
 
-High Ephemerality (close to 100%): The system frequently generates new unique metrics for a short period, indicating a high turnover in metrics.
-Low Ephemerality (close to 0%): The system maintains a stable set of metrics over time, with little change in the total number of unique series.
+Counts shown in dashboards can aggregate multiple nodes. They do not necessarily match the per-node, per-context counts used by this protection.
 
-## How The Netdata Protection Works
+## When cleanup runs
 
-The mechanism kicks in during tier0 (high-resolution) database rotations (i.e., when the oldest tier0 samples are deleted) and proceeds as follows:
+The protection is enabled by default when the Agent uses `dbengine` with more than one storage tier. It is disabled by default for other database configurations.
 
-1. **Counting Instances with Zero Tier0 Retention:**
-    - For each context (e.g., containers, disks, network interfaces, etc), Netdata counts the number of instances that have **ZERO** retention in tier0.
+After the first real rotation in any `dbengine` tier, Netdata schedules a full retention scan approximately two minutes later. During that scan, a context is eligible only when:
 
-2. **Threshold Verification:**
-    - If the number of instances with zero tier0 retention is **greater than or equal to 1000** (the default threshold) **and** these instances make up more than **50%** (the default Ephemerality threshold) of the total instances in that context, further action is taken.
+- the protection is enabled;
+- the number of instances without tier-0 retention is at least `extreme cardinality keep instances`; and
+- those instances represent at least `extreme cardinality min ephemerality` percent of all retained instances in the context.
 
-3. **Forceful Clearing in Long-Term Storage:**
-    - The system forcefully clears the retention of the excess time-series. This action automatically triggers the deletion of the associated metadata. So, Netdata "forgets" them. Their samples are still on disk, but they are no longer accessible.
+Netdata retains at least the larger of:
 
-4. **Retention Rules:**
-    - **Protected Data:**
-        - Metrics that are actively collected (and thus present in tier0) are never deleted.
-        - A context with fewer than 1000 instances (as presented in the Netdata dashboards at the NIDL bar of the charts) is considered safe and is not modified.
-    - **Clean-up Trigger:**
-        - Only metrics that have lost their tier0 retention in a context that meets the thresholds (≥1000 instances and >50% ephemerality) will have their long-term retention cleared.
+- the configured `extreme cardinality keep instances` value; or
+- the configured ephemerality percentage of all instances in the context.
 
-## Configuration
+Only eligible instances above that retained amount are cleaned. Meeting both thresholds does not guarantee that anything will be removed; there must also be eligible instances above the amount Netdata keeps.
 
-You can control the protection mechanism via the following settings in the `netdata.conf` file under the `[db]` section:
+With the defaults, for example, a context with 3,000 instances and 2,000 instances without tier-0 retention has 66% ephemerality. Netdata keeps 1,500 of those instances and clears long-term retention from up to 500 eligible instances.
+
+## What cleanup keeps and removes
+
+Netdata never selects an instance or metric that is currently being collected, even if it has not yet established tier-0 retention.
+
+For selected archived instances, Netdata clears the retention records for eligible metrics in every configured storage tier. Those historical samples become unavailable to queries immediately. The operation does not rewrite or compact existing `dbengine` datafiles; their physical blocks continue through normal database rotation.
+
+Netdata emits a notice only when it actually clears retention from at least one metric.
+
+## Metadata cleanup and disk space
+
+Metric metadata, including chart definitions, dimensions, and chart labels, is stored in `netdata-meta.db` in the Agent's [cache directory](/docs/netdata-agent/backup-and-restore-an-agent.md). The directory varies by operating system and installation method.
+
+Clearing metric retention does not synchronously delete its SQLite metadata. Metadata maintenance:
+
+- starts its first scan about 30 minutes after the Agent starts;
+- processes large tables in bounded batches;
+- rescans dimensions weekly; and
+- deletes a chart and its labels after the chart's final dimension is removed.
+
+Depending on when retention is cleared relative to the scan, obsolete rows can remain until a later weekly pass.
+
+Deleted rows first become free pages that SQLite can reuse inside `netdata-meta.db`. With the default `[sqlite] auto vacuum = INCREMENTAL` setting, Netdata checks for reclaimable pages at most once per minute. It requests an incremental vacuum only when free pages exceed 5% of the database, and each pass requests 10% of the current free pages.
+
+As a result:
+
+- the database file can shrink gradually after enough pages become free;
+- smaller amounts of free space can remain allocated and be reused by later writes;
+- cleanup and file shrinkage do not have a fixed completion time;
+- with `NONE` or `OFF` auto-vacuum, freed pages remain available for reuse but are not automatically returned by this mechanism; and
+- `FULL` auto-vacuum follows SQLite's separate full-auto-vacuum behavior.
+
+These outcomes are normal and do not mean the cleanup failed. See the [SQLite configuration reference](/src/daemon/config/README.md) for the `auto vacuum` setting.
+
+## Configure the protection
+
+The settings are in the `[db]` section of `netdata.conf`:
+
+| Setting                                | Default                                         | Set to               | Effect                                                                                                                                        |
+|:---------------------------------------|:------------------------------------------------|:---------------------|:----------------------------------------------------------------------------------------------------------------------------------------------|
+| `extreme cardinality protection`       | `yes` for multi-tier `dbengine`; otherwise `no` | `yes` or `no`        | Enables or disables forced cardinality cleanup. Normal size- and time-based retention still expires data when this protection is disabled.    |
+| `extreme cardinality keep instances`   | `1000`                                          | `1` to `1000000`     | Sets the minimum eligible-instance count and a lower bound on how many eligible instances remain. Higher values make cleanup less aggressive. |
+| `extreme cardinality min ephemerality` | `50`                                            | `0` to `100` percent | Sets the minimum ephemerality and contributes to the number of eligible instances retained. Higher values make cleanup less aggressive.       |
+
+The defaults need no manual configuration for a multi-tier `dbengine` Agent. To retain more short-lived instances, use higher thresholds, for example:
 
 ```ini
 [db]
-    extreme cardinality protection = yes
-    extreme cardinality keep instances = 1000
-    extreme cardinality min ephemerality = 50
+    extreme cardinality keep instances = 2000
+    extreme cardinality min ephemerality = 75
 ```
 
--   **extreme cardinality keep instances:**  
-    The minimum number of instances per context that should be kept. The default value is **1000**.
+Use the [Netdata Agent configuration guide](/docs/netdata-agent/configuration/README.md#edit-configuration-files) to locate and edit `netdata.conf`, then [restart the Agent](/docs/netdata-agent/start-stop-restart.md) for the changes to take effect.
 
--   **extreme cardinality min ephemerality:**  
-    The minimum percentage (in percent) of instances in a context that have zero tier0 retention to trigger the cleanup. The default value is **50%**.
+## Verify cleanup
 
+When cleanup removes retention, the notice follows this pattern:
 
-**Recommendations:**
-
--   If you have samples in tier0, you also have their corresponding long-term data and metadata. Ensure that tier0 retention is configured properly.
--   If you expect to have more than 1000 instances per context per node (for example, more than 1000 containers, disks, network interfaces, database tables, etc.), adjust these settings to suit your specific environment.
-
-## How to Check Its Work
-
-When the protection mechanism is activated, Netdata logs a detailed message. The log entry includes:
-
--   The host name.
--   The context affected.
--   The number of metrics and instances that had their retention forcefully cleared.
--   The time range for which the non-tier0 retention was deleted.
-
-### Example Log Message
-
-```
-EXTREME CARDINALITY PROTECTION: on host '<HOST>', for context '<CONTEXT>': forcefully cleared the retention of <METRICS_COUNT> metrics and <INSTANCES_COUNT> instances, having non-tier0 retention from <START_TIME> to <END_TIME>.
+```text
+EXTREME CARDINALITY PROTECTION: host '<HOST>', context '<CONTEXT>', total active instances <TOTAL>, not in tier0 <WITHOUT_TIER0>, ephemerality <PERCENT>%: forcefully cleared the retention of <METRICS> metrics and <INSTANCES> instances, having non-tier0 retention from <START_TIME> to <END_TIME>.
 ```
 
-This log message is tagged with the following message ID for easy identification:
+The event uses this message ID:
 
+```text
+d1f59606dd4d41e3b217a0cfcae8e632
 ```
-MESSAGE_ID=d1f59606dd4d41e3b217a0cfcae8e632
+
+On Linux systems that use the Netdata journal namespace, query it with:
+
+```bash
+sudo journalctl --namespace=netdata MESSAGE_ID=d1f59606dd4d41e3b217a0cfcae8e632
 ```
 
-### Verification Steps
-
-1.  **Using System Logs:**
-
-    You can use `journalctl` (or your system’s log viewer) to search for the message ID:
-
-```
-journalctl --namespace=netdata MESSAGE_ID=d1f59606dd4d41e3b217a0cfcae8e632
-``` 
-
-2.  **Netdata Logs Dashboard:**
-
-    Navigate to the Netdata Logs dashboard. On the right side under `MESSAGE_ID`, select **"Netdata extreme cardinality"** to filter only those messages.
-
-## Summary
-
-The extreme cardinality protection mechanism in Netdata is designed to automatically safeguard your system against the potential issues caused by excessive metric metadata retention. It does so by:
-
--   Automatically counting instances without tier0 retention.
--   Checking against configurable thresholds.
--   Forcefully clearing long-term retention (and metadata) when thresholds are exceeded.
-
-By properly configuring tier0 and adjusting the `extreme cardinality` settings in `netdata.conf`, you can ensure that your system remains both efficient and protected, even when extreme cardinality issues occur.
+You can also open the **Logs** tab and filter `MESSAGE_ID` by **Netdata extreme cardinality**. For platform-specific log access and permission requirements, see [Netdata Logging](/src/libnetdata/log/README.md#platform-specific-log-access).

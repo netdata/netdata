@@ -1,0 +1,719 @@
+//! Tests for the high-level `Bitmap` layer (bitmap.rs): the `RawBitmap`
+//! descriptor plus `inverted` flag that lets dense sets store their
+//! complement. Pinned here:
+//!
+//! - Query results are representation-independent: `contains`, `len` and
+//!   `is_empty` answer the same whether the set is stored directly or as
+//!   its complement, and `is_inverted` reports which form is in use.
+//! - `contains` rejects out-of-range values before the flag flips the
+//!   answer — even `full`, which contains every in-range value, excludes
+//!   everything at or past the universe.
+//! - `and`/`or` dispatch on the two inverted flags (the De Morgan tables
+//!   in bitmap.rs), pinned per combination and exhaustively against a
+//!   plain set oracle over the same logical operands.
+//! - `and_not` = `and` with the complemented rhs, across flag
+//!   combinations and the full/empty identities.
+//! - `empty`/`full` carry their state in the flag alone over an empty raw
+//!   tree; boolean short-circuits against them return identity results,
+//!   `and` with a full operand copying the other side's tree bytes into
+//!   `out`.
+//! - An inverted `is_empty` holds only for a stored tree of the whole
+//!   universe: rejected on blob length, counted when the length matches
+//!   (a same-length tree can still miss values), up to depth 7; the
+//!   full-tree length equals `estimate_data_size` over the universe.
+//! - A double `complement()` round-trips to the original set.
+//! - `from_range` holds exactly the range, follows the half-universe
+//!   complement rule, and stores the same bytes as the direct builder
+//!   over the stored set, exhaustively in small universes, at large ones
+//!   up to `u32::MAX`, and as a proptest.
+//!
+//! The raw tree layer itself is pinned in tests_raw.rs; the roaring
+//! bridge in tests_roaring.rs (feature `roaring`).
+use crate::*;
+use proptest::prelude::*;
+
+// ── single-bitmap queries ─────────────────────────────────────────
+
+/// A directly stored bitmap contains exactly its stored values: present
+/// values hit, absent and out-of-range values miss.
+#[test]
+fn test_bitmap_contains_normal() {
+    let mut data = Vec::new();
+    let bm = Bitmap::from_sorted_iter([10, 20, 30].into_iter(), 64, &mut data);
+    assert!(bm.contains(&data, 10));
+    assert!(bm.contains(&data, 20));
+    assert!(bm.contains(&data, 30));
+    assert!(!bm.contains(&data, 0));
+    assert!(!bm.contains(&data, 15));
+    assert!(!bm.is_inverted());
+}
+
+/// The complement-stored form of the same set answers the opposite way:
+/// stored (clear) values miss, every other value in the universe hits.
+#[test]
+fn test_bitmap_contains_inverted() {
+    let mut data = Vec::new();
+    let bm = Bitmap::from_sorted_iter_complemented([10, 20, 30].into_iter(), 64, &mut data);
+    assert!(!bm.contains(&data, 10));
+    assert!(!bm.contains(&data, 20));
+    assert!(!bm.contains(&data, 30));
+    assert!(bm.contains(&data, 0));
+    assert!(bm.contains(&data, 15));
+    assert!(bm.contains(&data, 63));
+    assert!(bm.is_inverted());
+}
+
+/// Out-of-range values are never contained, whatever the representation:
+/// the universe bound is checked before the inverted flag flips the
+/// answer — so `full`, which contains every in-range value, still rejects
+/// everything at or past the universe.
+#[test]
+fn test_bitmap_contains_out_of_bounds() {
+    let mut data = Vec::new();
+    let normal = Bitmap::from_sorted_iter([0, 1, 2].into_iter(), 5, &mut data);
+    assert!(!normal.contains(&data, 5));
+    assert!(!normal.contains(&data, 100));
+
+    let mut data2 = Vec::new();
+    let inverted = Bitmap::from_sorted_iter_complemented([1].into_iter(), 5, &mut data2);
+    assert!(inverted.contains(&data2, 0));
+    assert!(!inverted.contains(&data2, 1));
+    assert!(inverted.contains(&data2, 4));
+    assert!(!inverted.contains(&data2, 5));
+    assert!(!inverted.contains(&data2, 100));
+
+    let full = Bitmap::full(5);
+    let empty_data: Vec<u8> = Vec::new();
+    assert!(full.contains(&empty_data, 0));
+    assert!(full.contains(&empty_data, 4));
+    assert!(!full.contains(&empty_data, 5));
+    assert!(!full.contains(&empty_data, u32::MAX));
+}
+
+/// `len` counts logical set bits: the stored count when directly stored,
+/// universe minus stored count when complement-stored (3 clear of 64
+/// means 61 set).
+#[test]
+fn test_bitmap_len() {
+    let mut data = Vec::new();
+    let bm = Bitmap::from_sorted_iter([10, 20, 30].into_iter(), 64, &mut data);
+    assert_eq!(bm.len(&data), 3);
+
+    let mut data2 = Vec::new();
+    let bm = Bitmap::from_sorted_iter_complemented([10, 20, 30].into_iter(), 64, &mut data2);
+    assert_eq!(bm.len(&data2), 61);
+}
+
+/// `empty` and `full` are pure flag states over an empty raw tree: with a
+/// zero-byte data buffer, empty reports no bits and full behaves as if
+/// every value in the universe were set.
+#[test]
+fn test_bitmap_empty_full() {
+    let bm = Bitmap::empty(64);
+    let empty_data: Vec<u8> = Vec::new();
+    assert!(bm.is_empty(&empty_data));
+    assert_eq!(bm.len(&empty_data), 0);
+    assert!(!bm.contains(&empty_data, 0));
+
+    let bm = Bitmap::full(64);
+    assert!(!bm.is_empty(&empty_data));
+    assert_eq!(bm.len(&empty_data), 64);
+    for i in 0..64 {
+        assert!(bm.contains(&empty_data, i));
+    }
+}
+
+/// The full-tree length `is_empty` compares against equals the builder's
+/// size for the whole universe: the empty universe, both sides of every
+/// depth boundary up to 7, and a few sizes between.
+#[test]
+fn test_full_tree_len_matches_estimate() {
+    let mut universes = vec![0u32, 100, 1000, 30_000, 1_000_000];
+    for depth in 1..=7u32 {
+        let top = 1u32 << (3 * depth);
+        universes.extend([top - 1, top, top + 1]);
+    }
+    for u in universes {
+        assert_eq!(
+            crate::bitmap::full_tree_len(u),
+            estimate_data_size(u, 0..u),
+            "u={u}"
+        );
+    }
+}
+
+/// An inverted bitmap is empty only when its stored tree holds the whole
+/// universe. `is_empty` rejects any other blob length without walking, but
+/// a tree of the full tree's length can still miss values (a leaf keeps
+/// another bit), so that case must fall through to the count. Pinned at
+/// every depth up to 7, on and between the depth boundaries, together with
+/// `and`/`or`, which consult `is_empty` for their short-circuits.
+#[test]
+fn test_bitmap_inverted_is_empty() {
+    let universes = [
+        1, 2, 7, 8, 9, 16, 63, 64, 65, 100, 511, 512, 513, 4095, 4096, 4097, 32768, 32769, 262_144,
+        262_145, 2_097_152,
+    ];
+    for u in universes {
+        let mut full_data = Vec::new();
+        let full = Bitmap::from_sorted_iter_complemented(0..u, u, &mut full_data);
+        assert!(full.is_empty(&full_data), "u={u}: every value stored");
+        assert_eq!(full.len(&full_data), 0, "u={u}");
+
+        if u < 2 {
+            continue;
+        }
+
+        // Value 0 shares its leaf with value 1, so the blob keeps its length.
+        let mut same_len = Vec::new();
+        let one = Bitmap::from_sorted_iter_complemented(1..u, u, &mut same_len);
+        assert_eq!(same_len.len(), full_data.len(), "u={u}");
+        assert!(
+            !one.is_empty(&same_len),
+            "u={u}: same length, value 0 missing"
+        );
+        assert_eq!(one.len(&same_len), 1, "u={u}");
+
+        let mut zero_data = Vec::new();
+        let zero = Bitmap::from_sorted_iter([0].into_iter(), u, &mut zero_data);
+        let mut out = Vec::new();
+        let and = one.and(&same_len, &zero, &zero_data, &mut out);
+        assert!(
+            !and.is_empty(&out) && and.contains(&out, 0) && and.len(&out) == 1,
+            "u={u}: and"
+        );
+        let mut out = Vec::new();
+        let and = full.and(&full_data, &zero, &zero_data, &mut out);
+        assert!(
+            and.is_empty(&out),
+            "u={u}: and with an empty inverted operand"
+        );
+        let mut out = Vec::new();
+        let or = full.or(&full_data, &one, &same_len, &mut out);
+        assert!(
+            or.contains(&out, 0) && or.len(&out) == 1,
+            "u={u}: or with an empty inverted operand"
+        );
+
+        if u > 8 {
+            // A whole leaf missing: a shorter blob, rejected on length.
+            let mut short = Vec::new();
+            let eight = Bitmap::from_sorted_iter_complemented(8..u, u, &mut short);
+            assert!(short.len() < full_data.len(), "u={u}");
+            assert!(!eight.is_empty(&short), "u={u}: first leaf missing");
+            assert_eq!(eight.len(&short), 8, "u={u}");
+        }
+    }
+}
+
+// ── from_range: density-aware construction ────────────────────────
+
+/// The stored set `from_range(start..end)` must produce, per its
+/// half-universe rule: the range itself, or its complement
+/// `[0, start) ∪ [end, universe)` when the range covers more than half
+/// the universe. Returns (stored bytes, inverted) built by the direct
+/// builder — the byte reference for the tests below.
+fn from_range_reference(start: u32, end: u32, universe: u32) -> (Vec<u8>, bool) {
+    let mut data = Vec::new();
+    if start >= end {
+        return (data, false);
+    }
+    if (end - start) as u64 > universe as u64 / 2 {
+        RawBitmap::from_sorted_iter((0..start).chain(end..universe), universe, &mut data);
+        (data, true)
+    } else {
+        RawBitmap::from_sorted_iter(start..end, universe, &mut data);
+        (data, false)
+    }
+}
+
+/// Assert `bm` holds exactly `start..end`: the count over the whole
+/// universe and inside the range both equal the range length.
+fn assert_holds_range(bm: &Bitmap, data: &[u8], start: u32, end: u32, label: &str) {
+    let want = end.saturating_sub(start) as u64;
+    assert_eq!(bm.len(data), want, "{label}: len");
+    assert_eq!(
+        bm.range_cardinality(data, start..end.max(start)),
+        want,
+        "{label}: range_cardinality"
+    );
+}
+
+/// For every start..end in universes at each level boundary: the set is
+/// exactly the range, `is_inverted` follows the half-universe rule, and
+/// the stored bytes equal the direct builder's over the stored set.
+#[test]
+fn test_bitmap_from_range_exhaustive() {
+    for universe in [1u32, 2, 7, 8, 9, 63, 64, 65, 100, 511, 512, 513] {
+        for start in 0..=universe {
+            for end in start..=universe {
+                let label = format!("universe={universe} range={start}..{end}");
+                let mut data = Vec::new();
+                let bm = Bitmap::from_range(start..end, universe, &mut data);
+                assert_holds_range(&bm, &data, start, end, &label);
+                assert_eq!(
+                    (data, bm.is_inverted()),
+                    from_range_reference(start, end, universe),
+                    "{label}"
+                );
+            }
+        }
+    }
+}
+
+/// The same pin at large universes, including the 11-level `u32::MAX`
+/// tree: direct ranges, one-piece complements (a range touching either
+/// end) and two-piece complements.
+#[test]
+fn test_bitmap_from_range_large_universes() {
+    let cases: [(u32, u32, u32); 8] = [
+        (1 << 24, 12_345, 112_345),
+        (1 << 24, 5, (1 << 24) - 7),
+        (1 << 24, 0, (1 << 24) - 70_000),
+        (1 << 24, 70_000, 1 << 24),
+        (u32::MAX, (1 << 30) - 3, (1 << 30) + 70_000),
+        (u32::MAX, 0, u32::MAX - 5),
+        (u32::MAX, 10, u32::MAX),
+        (u32::MAX, 40_000, u32::MAX - 40_000),
+    ];
+    for (universe, start, end) in cases {
+        let label = format!("universe={universe} range={start}..{end}");
+        let mut data = Vec::new();
+        let bm = Bitmap::from_range(start..end, universe, &mut data);
+        assert_holds_range(&bm, &data, start, end, &label);
+        assert_eq!(
+            (data, bm.is_inverted()),
+            from_range_reference(start, end, universe),
+            "{label}"
+        );
+    }
+}
+
+/// Bound forms normalize to a half-open range: inclusive ends widen by
+/// one, unbounded ends span the universe, ends past it clamp, and empty
+/// or reversed ranges yield the empty set. The whole universe is the
+/// inverted empty tree: zero stored bytes.
+#[test]
+fn test_bitmap_from_range_bounds() {
+    let u = 64;
+
+    let mut data = Vec::new();
+    let bm = Bitmap::from_range(5..=10, u, &mut data);
+    assert_holds_range(&bm, &data, 5, 11, "5..=10");
+
+    let mut data = Vec::new();
+    let bm = Bitmap::from_range(..10, u, &mut data);
+    assert_holds_range(&bm, &data, 0, 10, "..10");
+
+    let mut data = Vec::new();
+    let bm = Bitmap::from_range(60.., u, &mut data);
+    assert_holds_range(&bm, &data, 60, 64, "60..");
+
+    let mut data = Vec::new();
+    let bm = Bitmap::from_range(10..1000, u, &mut data);
+    assert_holds_range(&bm, &data, 10, 64, "10..1000");
+    assert!(bm.is_inverted());
+
+    let mut data = Vec::new();
+    let bm = Bitmap::from_range(.., u, &mut data);
+    assert_holds_range(&bm, &data, 0, 64, "..");
+    assert!(bm.is_inverted() && data.is_empty());
+
+    let mut data = Vec::new();
+    let bm = Bitmap::from_range(10..10, u, &mut data);
+    assert!(bm.is_empty(&data) && !bm.is_inverted() && data.is_empty());
+
+    // The reversed range is deliberate: `start > end` is empty, not a
+    // panic or a wraparound.
+    #[allow(clippy::reversed_empty_ranges)]
+    let reversed = 20..10;
+    let mut data = Vec::new();
+    let bm = Bitmap::from_range(reversed, u, &mut data);
+    assert!(bm.is_empty(&data) && data.is_empty());
+}
+
+proptest! {
+    /// Generated windows at every tree depth, sized so the stored set
+    /// stays small: direct ranges up to 20,000 values, and complements
+    /// whose two pieces hold up to 20,000 values together.
+    #[test]
+    fn bitmap_from_range_matches_reference(
+        universe in crate::tests_raw::arb_universe(),
+        start_frac in 0.0f64..=1.0,
+        len in 0u32..=20_000,
+        complement in any::<bool>(),
+        head in 0u32..=10_000,
+        tail in 0u32..=10_000,
+    ) {
+        let (start, end) = if complement {
+            let start = head.min(universe);
+            (start, universe.saturating_sub(tail).max(start))
+        } else {
+            let start = (universe as f64 * start_frac) as u32;
+            (start, start.saturating_add(len).min(universe))
+        };
+        let mut data = Vec::new();
+        let bm = Bitmap::from_range(start..end, universe, &mut data);
+        prop_assert_eq!(bm.len(&data), (end - start) as u64);
+        prop_assert_eq!((data, bm.is_inverted()), from_range_reference(start, end, universe));
+    }
+}
+
+// ── boolean ops: the De Morgan and/or tables ──────────────────────
+/// De Morgan row N&N: a raw intersection, result normal.
+/// {0,1,2,3} ∩ {2,3,4,5} = {2,3}.
+#[test]
+fn test_bitmap_and_nn() {
+    let mut da = Vec::new();
+    let a = Bitmap::from_sorted_iter([0, 1, 2, 3].into_iter(), 64, &mut da);
+    let mut db = Vec::new();
+    let b = Bitmap::from_sorted_iter([2, 3, 4, 5].into_iter(), 64, &mut db);
+    let mut out = Vec::new();
+    let c = a.and(&da, &b, &db, &mut out);
+    assert!(!c.is_inverted());
+    assert_eq!(c.len(&out), 2);
+    assert!(c.contains(&out, 2));
+    assert!(c.contains(&out, 3));
+    assert!(!c.contains(&out, 0));
+    assert!(!c.contains(&out, 4));
+}
+
+/// De Morgan row N&I: lowered to a raw difference, result normal.
+/// {0,1,2,3} ∩ ¬{2,3} = {0,1}.
+#[test]
+fn test_bitmap_and_ni() {
+    let mut da = Vec::new();
+    let a = Bitmap::from_sorted_iter([0, 1, 2, 3].into_iter(), 64, &mut da);
+    let mut db = Vec::new();
+    let b = Bitmap::from_sorted_iter_complemented([2, 3].into_iter(), 64, &mut db);
+    let mut out = Vec::new();
+    let c = a.and(&da, &b, &db, &mut out);
+    assert!(!c.is_inverted());
+    assert_eq!(c.len(&out), 2);
+    assert!(c.contains(&out, 0));
+    assert!(c.contains(&out, 1));
+    assert!(!c.contains(&out, 2));
+    assert!(!c.contains(&out, 3));
+}
+
+/// De Morgan row I&N: the inverted lhs's stored tree is subtracted from
+/// the rhs's, result normal. ¬{2,3} ∩ {0,1,2,3} = {0,1}.
+#[test]
+fn test_bitmap_and_in() {
+    let mut da = Vec::new();
+    let a = Bitmap::from_sorted_iter_complemented([2, 3].into_iter(), 64, &mut da);
+    let mut db = Vec::new();
+    let b = Bitmap::from_sorted_iter([0, 1, 2, 3].into_iter(), 64, &mut db);
+    let mut out = Vec::new();
+    let c = a.and(&da, &b, &db, &mut out);
+    assert!(!c.is_inverted());
+    assert_eq!(c.len(&out), 2);
+    assert!(c.contains(&out, 0));
+    assert!(c.contains(&out, 1));
+    assert!(!c.contains(&out, 2));
+}
+
+/// De Morgan row I&I: lowered to a raw union, result inverted.
+/// ¬{0,1} ∩ ¬{2,3} = ¬{0,1,2,3} = {4..63}.
+#[test]
+fn test_bitmap_and_ii() {
+    let mut da = Vec::new();
+    let a = Bitmap::from_sorted_iter_complemented([0, 1].into_iter(), 64, &mut da);
+    let mut db = Vec::new();
+    let b = Bitmap::from_sorted_iter_complemented([2, 3].into_iter(), 64, &mut db);
+    let mut out = Vec::new();
+    let c = a.and(&da, &b, &db, &mut out);
+    assert!(c.is_inverted());
+    assert!(!c.contains(&out, 0));
+    assert!(!c.contains(&out, 1));
+    assert!(!c.contains(&out, 2));
+    assert!(!c.contains(&out, 3));
+    assert!(c.contains(&out, 4));
+    assert!(c.contains(&out, 63));
+}
+
+/// De Morgan row N|N: a raw union, result normal.
+/// {0,1} ∪ {2,3} = {0,1,2,3}.
+#[test]
+fn test_bitmap_or_nn() {
+    let mut da = Vec::new();
+    let a = Bitmap::from_sorted_iter([0, 1].into_iter(), 64, &mut da);
+    let mut db = Vec::new();
+    let b = Bitmap::from_sorted_iter([2, 3].into_iter(), 64, &mut db);
+    let mut out = Vec::new();
+    let c = a.or(&da, &b, &db, &mut out);
+    assert!(!c.is_inverted());
+    assert_eq!(c.len(&out), 4);
+    assert!(c.contains(&out, 0));
+    assert!(c.contains(&out, 3));
+    assert!(!c.contains(&out, 4));
+}
+
+/// De Morgan row N|I: lowered to an inverted difference.
+/// {10,20} ∪ ¬{5,10,15} = ¬{5,15}, result inverted.
+#[test]
+fn test_bitmap_or_ni() {
+    let mut da = Vec::new();
+    let a = Bitmap::from_sorted_iter([10, 20].into_iter(), 64, &mut da);
+    let mut db = Vec::new();
+    let b = Bitmap::from_sorted_iter_complemented([5, 10, 15].into_iter(), 64, &mut db);
+    let mut out = Vec::new();
+    let c = a.or(&da, &b, &db, &mut out);
+    assert!(c.is_inverted());
+    assert!(!c.contains(&out, 5));
+    assert!(c.contains(&out, 10));
+    assert!(!c.contains(&out, 15));
+    assert!(c.contains(&out, 20));
+    assert!(c.contains(&out, 0));
+    assert!(c.contains(&out, 63));
+}
+
+/// De Morgan row I|N, mirror of N|I: ¬{5,10,15} ∪ {10,20} = ¬{5,15},
+/// result inverted.
+#[test]
+fn test_bitmap_or_in() {
+    let mut da = Vec::new();
+    let a = Bitmap::from_sorted_iter_complemented([5, 10, 15].into_iter(), 64, &mut da);
+    let mut db = Vec::new();
+    let b = Bitmap::from_sorted_iter([10, 20].into_iter(), 64, &mut db);
+    let mut out = Vec::new();
+    let c = a.or(&da, &b, &db, &mut out);
+    assert!(c.is_inverted());
+    assert!(!c.contains(&out, 5));
+    assert!(c.contains(&out, 10));
+    assert!(!c.contains(&out, 15));
+    assert!(c.contains(&out, 20));
+}
+
+/// De Morgan row I|I: lowered to a raw intersection, result inverted.
+/// ¬{0,1,2} ∪ ¬{2,3,4} = ¬{2} — 63 of 64 values set.
+#[test]
+fn test_bitmap_or_ii() {
+    let mut da = Vec::new();
+    let a = Bitmap::from_sorted_iter_complemented([0, 1, 2].into_iter(), 64, &mut da);
+    let mut db = Vec::new();
+    let b = Bitmap::from_sorted_iter_complemented([2, 3, 4].into_iter(), 64, &mut db);
+    let mut out = Vec::new();
+    let c = a.or(&da, &b, &db, &mut out);
+    assert!(c.is_inverted());
+    assert_eq!(c.len(&out), 63);
+    assert!(c.contains(&out, 0));
+    assert!(c.contains(&out, 1));
+    assert!(!c.contains(&out, 2));
+    assert!(c.contains(&out, 3));
+    assert!(c.contains(&out, 4));
+}
+
+/// `and` short-circuits on degenerate operands: an empty operand yields an
+/// empty result without writing `out`; a full operand returns the other
+/// side unchanged, its tree bytes copied into `out` (a ∩ full = a).
+#[test]
+fn test_bitmap_and_with_empty() {
+    let mut da = Vec::new();
+    let a = Bitmap::from_sorted_iter([10, 20].into_iter(), 64, &mut da);
+    let b = Bitmap::empty(64);
+    let db: Vec<u8> = Vec::new();
+    let mut out = Vec::new();
+    let c = a.and(&da, &b, &db, &mut out);
+    assert!(c.is_empty(&out));
+
+    let full = Bitmap::full(64);
+    let full_data: Vec<u8> = Vec::new();
+    let mut out2 = Vec::new();
+    let c = a.and(&da, &full, &full_data, &mut out2);
+    assert_eq!(c.len(&out2), 2);
+    assert!(c.contains(&out2, 10));
+    assert!(c.contains(&out2, 20));
+}
+
+/// `or` against a full operand short-circuits to `full` itself: `out`
+/// stays empty, yet `len` reports the full 64 because an inverted
+/// bitmap's len needs no stored bytes.
+#[test]
+fn test_bitmap_or_with_full() {
+    let mut da = Vec::new();
+    let a = Bitmap::from_sorted_iter([10, 20].into_iter(), 64, &mut da);
+    let b = Bitmap::full(64);
+    let db: Vec<u8> = Vec::new();
+    let mut out = Vec::new();
+    let c = a.or(&da, &b, &db, &mut out);
+    assert_eq!(c.len(&out), 64);
+}
+
+/// One stored operand serves both operations: the same `b` tree bytes are
+/// read as rhs of `and` and of `or` — operands are immutable inputs, each
+/// call appends its result's tree bytes to a fresh caller-owned `out`.
+#[test]
+fn test_bitmap_assign_variants() {
+    let mut db = Vec::new();
+    let b = Bitmap::from_sorted_iter([2, 3, 4].into_iter(), 64, &mut db);
+
+    // a ∩ b = {2}
+    let mut da = Vec::new();
+    let a = Bitmap::from_sorted_iter([0, 1, 2].into_iter(), 64, &mut da);
+    let mut out = Vec::new();
+    let c = a.and(&da, &b, &db, &mut out);
+    assert!(c.contains(&out, 2));
+    assert!(!c.contains(&out, 0));
+
+    // a ∪ b = {0,1,2,3,4}
+    let mut da = Vec::new();
+    let a = Bitmap::from_sorted_iter([0, 1, 2].into_iter(), 64, &mut da);
+    let mut out = Vec::new();
+    let c = a.or(&da, &b, &db, &mut out);
+    for v in [0, 1, 2, 3, 4] {
+        assert!(c.contains(&out, v), "missing {v}");
+    }
+}
+
+/// All four `and` inverted-flag combinations on the same logical sets:
+/// each row re-encodes `a_vals`/`b_vals` (directly, or as
+/// complement-of-complement through the complement value list), and every
+/// value in the universe must land in `a_vals ∩ b_vals`.
+#[test]
+fn test_bitmap_and_exhaustive() {
+    let universe = 64u32;
+    let a_vals: Vec<u32> = vec![0, 1, 7, 8, 32, 63];
+    let b_vals: Vec<u32> = vec![1, 8, 32, 40, 63];
+    let a_complement: Vec<u32> = (0..universe).filter(|v| !a_vals.contains(v)).collect();
+    let b_complement: Vec<u32> = (0..universe).filter(|v| !b_vals.contains(v)).collect();
+
+    let mut da_nn = Vec::new();
+    let a_nn = Bitmap::from_sorted_iter(a_vals.iter().copied(), universe, &mut da_nn);
+    let mut db_nn = Vec::new();
+    let b_nn = Bitmap::from_sorted_iter(b_vals.iter().copied(), universe, &mut db_nn);
+
+    let mut da_ni = Vec::new();
+    let a_ni = Bitmap::from_sorted_iter(a_vals.iter().copied(), universe, &mut da_ni);
+    let mut db_ni = Vec::new();
+    let b_ni =
+        Bitmap::from_sorted_iter_complemented(b_complement.iter().copied(), universe, &mut db_ni);
+
+    let mut da_in = Vec::new();
+    let a_in =
+        Bitmap::from_sorted_iter_complemented(a_complement.iter().copied(), universe, &mut da_in);
+    let mut db_in = Vec::new();
+    let b_in = Bitmap::from_sorted_iter(b_vals.iter().copied(), universe, &mut db_in);
+
+    let mut da_ii = Vec::new();
+    let a_ii =
+        Bitmap::from_sorted_iter_complemented(a_complement.iter().copied(), universe, &mut da_ii);
+    let mut db_ii = Vec::new();
+    let b_ii =
+        Bitmap::from_sorted_iter_complemented(b_complement.iter().copied(), universe, &mut db_ii);
+
+    let representations = [
+        (&a_nn, &da_nn, &b_nn, &db_nn, "N&N"),
+        (&a_ni, &da_ni, &b_ni, &db_ni, "N&I"),
+        (&a_in, &da_in, &b_in, &db_in, "I&N"),
+        (&a_ii, &da_ii, &b_ii, &db_ii, "I&I"),
+    ];
+
+    for (a, da, b, db, label) in &representations {
+        let mut out = Vec::new();
+        let c = a.and(da, b, db, &mut out);
+        for v in 0..universe {
+            let expected = a_vals.contains(&v) && b_vals.contains(&v);
+            assert_eq!(c.contains(&out, v), expected, "{label}: value {v}");
+        }
+    }
+}
+
+/// The same four-representation matrix for `or`: every value in the
+/// universe must land in `a_vals ∪ b_vals`, whichever way each operand is
+/// stored.
+#[test]
+fn test_bitmap_or_exhaustive() {
+    let universe = 64u32;
+    let a_vals: Vec<u32> = vec![0, 1, 7, 8, 32, 63];
+    let b_vals: Vec<u32> = vec![1, 8, 32, 40, 63];
+    let a_complement: Vec<u32> = (0..universe).filter(|v| !a_vals.contains(v)).collect();
+    let b_complement: Vec<u32> = (0..universe).filter(|v| !b_vals.contains(v)).collect();
+
+    let mut da_nn = Vec::new();
+    let a_nn = Bitmap::from_sorted_iter(a_vals.iter().copied(), universe, &mut da_nn);
+    let mut db_nn = Vec::new();
+    let b_nn = Bitmap::from_sorted_iter(b_vals.iter().copied(), universe, &mut db_nn);
+
+    let mut da_ni = Vec::new();
+    let a_ni = Bitmap::from_sorted_iter(a_vals.iter().copied(), universe, &mut da_ni);
+    let mut db_ni = Vec::new();
+    let b_ni =
+        Bitmap::from_sorted_iter_complemented(b_complement.iter().copied(), universe, &mut db_ni);
+
+    let mut da_in = Vec::new();
+    let a_in =
+        Bitmap::from_sorted_iter_complemented(a_complement.iter().copied(), universe, &mut da_in);
+    let mut db_in = Vec::new();
+    let b_in = Bitmap::from_sorted_iter(b_vals.iter().copied(), universe, &mut db_in);
+
+    let mut da_ii = Vec::new();
+    let a_ii =
+        Bitmap::from_sorted_iter_complemented(a_complement.iter().copied(), universe, &mut da_ii);
+    let mut db_ii = Vec::new();
+    let b_ii =
+        Bitmap::from_sorted_iter_complemented(b_complement.iter().copied(), universe, &mut db_ii);
+
+    let representations = [
+        (&a_nn, &da_nn, &b_nn, &db_nn, "N|N"),
+        (&a_ni, &da_ni, &b_ni, &db_ni, "N|I"),
+        (&a_in, &da_in, &b_in, &db_in, "I|N"),
+        (&a_ii, &da_ii, &b_ii, &db_ii, "I|I"),
+    ];
+
+    for (a, da, b, db, label) in &representations {
+        let mut out = Vec::new();
+        let c = a.or(da, b, db, &mut out);
+        for v in 0..universe {
+            let expected = a_vals.contains(&v) || b_vals.contains(&v);
+            assert_eq!(c.contains(&out, v), expected, "{label}: value {v}");
+        }
+    }
+}
+
+/// `and_not` (self ∩ ¬other) through the `and` dispatch: directly stored
+/// rhs, complement-stored rhs (subtracting it keeps its cleared bits),
+/// full \ N = ¬N, the identities a \ empty = a and a \ full = empty, and
+/// a double `complement()` round-tripping to the original set.
+#[test]
+fn test_bitmap_and_not_all_flag_combinations() {
+    let mut da = Vec::new();
+    let mut db = Vec::new();
+    let a = Bitmap::from_sorted_iter([1, 5, 10, 20].into_iter(), 64, &mut da);
+    let b = Bitmap::from_sorted_iter([5, 20, 40].into_iter(), 64, &mut db);
+
+    // N \ N
+    let mut out = Vec::new();
+    let c = a.and_not(&da, &b, &db, &mut out);
+    assert_eq!(c.iter(&out).collect::<Vec<_>>(), vec![1, 10]);
+
+    // N \ I (b complemented: {5,20,40} are the CLEAR bits)
+    let mut dbi = Vec::new();
+    let bi = Bitmap::from_sorted_iter_complemented([5, 20, 40].into_iter(), 64, &mut dbi);
+    let mut out = Vec::new();
+    let c = a.and_not(&da, &bi, &dbi, &mut out);
+    assert_eq!(c.iter(&out).collect::<Vec<_>>(), vec![5, 20]);
+
+    // full \ N = complement of N
+    let full = Bitmap::full(64);
+    let mut out = Vec::new();
+    let c = full.and_not(&[], &b, &db, &mut out);
+    assert_eq!(c.len(&out), 61);
+    assert!(!c.contains(&out, 5) && !c.contains(&out, 20) && !c.contains(&out, 40));
+    assert!(c.contains(&out, 0) && c.contains(&out, 63));
+
+    // A \ empty = A; A \ full = empty
+    let empty = Bitmap::empty(64);
+    let mut out = Vec::new();
+    let c = a.and_not(&da, &empty, &[], &mut out);
+    assert_eq!(c.iter(&out).collect::<Vec<_>>(), vec![1, 5, 10, 20]);
+    let mut out = Vec::new();
+    let c = a.and_not(&da, &full, &[], &mut out);
+    assert!(c.is_empty(&out));
+
+    // complement round-trips
+    assert_eq!(
+        a.complement().complement().iter(&da).collect::<Vec<_>>(),
+        a.iter(&da).collect::<Vec<_>>()
+    );
+}

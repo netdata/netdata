@@ -187,7 +187,10 @@ static struct web_api_command api_commands_v3[] = {
     {
         .api = "settings",
         .hash = 0,
-        .acl = HTTP_ACL_NOCHECK,
+        // settings is a dashboard feature: gate it behind `allow dashboard from` like the rest
+        // of the dashboard, instead of HTTP_ACL_NOCHECK which bypassed the per-feature IP
+        // allowlists and exposed the anonymous state-modifying PUT remotely.
+        .acl = HTTP_ACL_DASHBOARD,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
         .callback = api_v3_settings,
         .allow_subpaths = 0
@@ -256,15 +259,11 @@ static struct web_api_command api_commands_v3[] = {
     },
 };
 
+static SPINLOCK api_commands_v3_spinlock = SPINLOCK_INITIALIZER;
+static bool api_commands_v3_initialized = false;
+
 inline int web_client_api_request_v3(RRDHOST *host, struct web_client *w, char *url_path_endpoint) {
-    static int initialized = 0;
-
-    if(unlikely(initialized == 0)) {
-        initialized = 1;
-
-        for(int i = 0; api_commands_v3[i].api ; i++)
-            api_commands_v3[i].hash = simple_hash(api_commands_v3[i].api);
-    }
+    web_api_command_hashes_init(api_commands_v3, &api_commands_v3_spinlock, &api_commands_v3_initialized);
 
     return web_client_api_request_vX(host, w, url_path_endpoint, api_commands_v3);
 }

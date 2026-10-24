@@ -311,6 +311,32 @@ void pgd_init_arals(void) {
                 0,
                 &pgd_aral_statistics,
                 NULL, NULL, false, false, true);
+
+            // offer to KSM only the pools that hold dbengine page data - what
+            // netdata.conf's memory deduplication (ksm) option documents as
+            // "the dbengine page data". uncompressed data pages (raw
+            // ARRAY_32BIT, and ARRAY_TIER1 which every tier above 0 uses
+            // regardless of 'dbengine page type') are plain value arrays, so
+            // constant-valued metrics can produce identical bytes.
+            // expect a poor yield, though: every ARAL element carries a trailer
+            // holding a tagged pointer to its owning ARAL page, so two base
+            // pages taken from different ARAL pages differ at every element
+            // trailer no matter what the data is. Only base pages within one
+            // ARAL page can match. A measurement with the default gorilla tier
+            // 0 saw no merging at all.
+            // PGD descriptors and gorilla_writer_t are mutable structures that
+            // never merge; marking them would only cost scanner time and
+            // copy-on-write faults, so their size classes are excluded here.
+            // These two classes are also where the smallest pages loaded from
+            // disk end up, since the lookup rounds up: up to 24 bytes of data
+            // (1 point of a tier > 0 page) lands in the sizeof(PGD) class and
+            // up to 32 bytes (2 points) in the sizeof(gorilla_writer_t) one.
+            // They lose nothing by not being offered: in the sizeof(PGD) class
+            // every from-disk page allocates a descriptor next to its data from
+            // the same pool, and each descriptor holds a unique data pointer,
+            // so no base page there can ever be identical to another.
+            if(aral_sizes[slot] != sizeof(PGD) && aral_sizes[slot] != sizeof(gorilla_writer_t))
+                aral_enable_ksm(arals[arals_slot(slot, partition)]);
         }
     }
 
@@ -498,6 +524,14 @@ ALWAYS_INLINE PGD *pgd_create_from_disk_data(uint8_t type, void *base, uint32_t 
     if (!size || size < page_type_size[type])
         return PGD_EMPTY;
 
+    // A gorilla page is stored on disk as a chain of fixed RRDENG_GORILLA_32BIT_BUFFER_SIZE buffers, so a
+    // valid length is always a positive multiple of it. A corrupted or crafted extent can carry any length;
+    // without this check size / RRDENG_GORILLA_32BIT_BUFFER_SIZE truncates to a smaller buffer count (zero for
+    // a sub-buffer size) while the allocation is sized to the shorter length, and gorilla_buffer_patch() then
+    // walks header.next past the end of the allocation.
+    if (type == RRDENG_PAGE_TYPE_GORILLA_32BIT && (size % RRDENG_GORILLA_32BIT_BUFFER_SIZE))
+        return PGD_EMPTY;
+
     PGD *pg = pgd_alloc(false); // this is malloc'd !
     pg->type = type;
     pg->states = PGD_STATE_CREATED_FROM_DISK;
@@ -506,17 +540,20 @@ ALWAYS_INLINE PGD *pgd_create_from_disk_data(uint8_t type, void *base, uint32_t 
     switch (type)
     {
         case RRDENG_PAGE_TYPE_GORILLA_32BIT:
-            internal_fatal(size == 0, "Asked to create page with 0 data!!!");
-            internal_fatal(size % sizeof(uint32_t), "Unaligned gorilla buffer size");
-            internal_fatal(size % RRDENG_GORILLA_32BIT_BUFFER_SIZE, "Expected size to be a multiple of %zu-bytes",
-                RRDENG_GORILLA_32BIT_BUFFER_SIZE);
-
             pg->raw.data = (void *)pgd_data_alloc(size, pg->partition, false);
             pg->raw.size = size;
 
             memcpy(pg->raw.data, base, pg->raw.size);
 
-            uint32_t total_entries = gorilla_buffer_patch((void *) pg->raw.data);
+            uint32_t total_entries = 0;
+            if(unlikely(!gorilla_buffer_patch((void *) pg->raw.data,
+                                              size / RRDENG_GORILLA_32BIT_BUFFER_SIZE,
+                                              &total_entries))) {
+                netdata_log_error("DBENGINE: invalid gorilla disk page chain.");
+                pgd_free(pg);
+                pg = PGD_EMPTY;
+                break;
+            }
             pg->used = total_entries;
             pg->slots = pg->used;
             break;

@@ -12,7 +12,8 @@ else
   export CFLAGS="${TUNING_FLAGS} -O1 -pipe -ggdb -Wall -Wextra -Wformat-signedness -DNETDATA_INTERNAL_CHECKS=1 -I/openssl-static/include -I/libnetfilter-acct-static/include/libnetfilter_acct -I/curl-local/include/curl -I/usr/include/libmnl"
 fi
 
-export LDFLAGS="-Wl,--gc-sections -L/openssl-static/lib64 -L/libnetfilter-acct-static/lib -lnetfilter_acct -L/usr/lib -lmnl -L/usr/lib -lzstd -L/curl-local/lib"
+LDFLAGS="-Wl,--gc-sections -L/openssl-static/lib64 -L/libnetfilter-acct-static/lib -lnetfilter_acct -L/usr/lib -lmnl -L/usr/lib -lzstd -L/curl-local/lib $(errata_ldflags)"
+export LDFLAGS
 export PKG_CONFIG_PATH="/openssl-static/lib64/pkgconfig:/libnetfilter-acct-static/lib/pkgconfig:/usr/lib/pkgconfig:/curl-local/lib/pkgconfig"
 
 # We export this to 'yes', installer sets this to .environment.
@@ -26,14 +27,17 @@ export NETDATA_BUILD_DIR
 # Once Cargo's profile-rustflags feature is a bit more widespread, we should switch to using that to specify this.
 export RUSTFLAGS="-C target-feature=+crt-static"
 
+export NETDATA_CMAKE_OPTIONS="-DSTATIC_BUILD=On -DENABLE_LIBBACKTRACE=On"
+if [ -n "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR:-}" ]; then
+    NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} -DNETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR=${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}"
+fi
+
 case "${BUILDARCH}" in
     armv6l)
-        export NETDATA_CMAKE_OPTIONS="-DSTATIC_BUILD=On -DENABLE_LIBBACKTRACE=On"
-        export INSTALLER_ARGS="--disable-plugin-systemd-journal --disable-plugin-otel --disable-plugin-otel-signal-viewer"
+        export INSTALLER_ARGS="--disable-plugin-systemd-journal --disable-plugin-otel --disable-plugin-netflow"
         ;;
     *)
-        export NETDATA_CMAKE_OPTIONS="-DSTATIC_BUILD=On -DENABLE_LIBBACKTRACE=On"
-        export INSTALLER_ARGS="--enable-plugin-systemd-journal --internal-systemd-journal --enable-plugin-otel --enable-plugin-otel-signal-viewer"
+        export INSTALLER_ARGS="--enable-plugin-systemd-journal --internal-systemd-journal --enable-plugin-otel --enable-plugin-netflow"
         ;;
 esac
 

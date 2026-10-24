@@ -1,10 +1,6 @@
 [submodule "aclk/aclk-schemas"]
 	path = src/aclk/aclk-schemas
 	url = https://github.com/netdata/aclk-schemas.git
-[submodule "src/web/server/h2o/libh2o"]
-	path = src/web/server/h2o/libh2o
-	url = https://github.com/h2o/h2o.git
-	ignore = untracked
 [submodule "src/collectors/debugfs.plugin/libsensors/vendored"]
 	path = src/collectors/debugfs.plugin/libsensors/vendored
 	url = https://github.com/lm-sensors/lm-sensors.git

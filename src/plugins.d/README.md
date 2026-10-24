@@ -41,13 +41,30 @@ Each of the external plugins is expected to run forever.
 Netdata will start it when it starts and stop it when it exits.
 
 If the external plugin exits or crashes, Netdata will log an error.
-If the external plugin exits or crashes without pushing metrics to Netdata, Netdata will not start it again.
+Whether Netdata starts it again depends on its exit status and on whether it has produced useful output since Netdata started.
 
--   Plugins that exit with any value other than zero, will be disabled. Plugins that exit with zero, will be restarted after some time.
--   Plugins may also be disabled by Netdata if they output things that Netdata does not understand.
+Netdata counts these lines as useful output (collected data): `END`, `FUNCTION`, `FUNCTION_DEL`, `FUNCTION_RESULT_END`
+and `CONFIG`. A declared function counts even though no metric has been collected yet.
+`TRUST_DURATIONS`, `PLUGIN_KEEPALIVE`, `CHART` and `DIMENSION` do not count.
+
+-   A plugin that exits with a non-zero value without having produced useful output since Netdata started is disabled until Netdata restarts.
+-   A plugin that exits with a non-zero value after it has produced useful output since Netdata started, in this run or an earlier one, is restarted after `10 * update_every` seconds.
+    It is disabled only after more than 10 consecutive runs without useful output, so a plugin that produces useful output on every run before failing is restarted forever.
+-   A plugin that exits with zero after it has produced useful output since Netdata started is restarted after `update_every` seconds, always.
+    One that exits with zero and has never produced useful output is restarted after `10 * update_every` seconds, and disabled after more than 10 such runs.
+-   A plugin killed by a signal other than `SIGTERM` or `SIGPIPE` is disabled.
+-   When Netdata ends the connection itself because it could not create or take ownership of a virtual node the plugin defined, the plugin is restarted after `update_every` seconds, unless it was killed by a signal other than `SIGTERM` or `SIGPIPE`, and a run without useful output does not add to the consecutive-run count.
+-   When Netdata ends the connection because it cannot parse the plugin's output (an unknown keyword, a malformed or rejected command, a command sent in the wrong context, or a function response larger than Netdata accepts), it treats the run as an exit with a non-zero value, whatever the actual exit status: the plugin is disabled if it has not produced useful output since Netdata started, and otherwise restarted after `10 * update_every` seconds, following the same consecutive-run rule. A plugin killed by a signal other than `SIGTERM` or `SIGPIPE` is still disabled.
+-   A plugin that sends `DISABLE` is disabled until Netdata restarts.
+
+So a plugin that cannot start (for example, its listening port is already in use) should finish every fallible startup step before it declares functions or sends data, and exit with a non-zero value if any of them fails.
 
 The `stdout` of external plugins is connected to Netdata to receive metrics,
 with the API defined below.
+
+Netdata disconnects an external plugin that produces no output for the longer of two minutes or twice its configured `[plugin:NAME] update every` interval. This allows five- and ten-minute plugins to wait between collections. The timeout is capped at the maximum signed millisecond value accepted by the reader.
+
+A blank line or `PLUGIN_KEEPALIVE` keeps the connection active without submitting metrics. Plugins may send these independently of collection to provide liveness activity more frequently. Function-call deadlines are separate and are not extended by the collector idle timeout.
 
 The `stderr` of external plugins is connected to Netdata's `error.log`.
 
@@ -105,7 +122,7 @@ Keep in mind, that the user may use Netdata configuration to overwrite chart and
 
 Plugins should attempt to autoconfigure themselves when possible.
 
-For example, if your plugin wants to monitor `squid`, you can search for it on port `3128` or `8080`. If any succeeds, you can proceed. If it fails you can output an error (on stderr) saying that you cannot find `squid` running and giving instructions about the plugin configuration. Then you can stop (exit with non-zero value), so that Netdata will not attempt to start the plugin again.
+For example, if your plugin wants to monitor `squid`, you can search for it on port `3128` or `8080`. If any succeeds, you can proceed. If it fails you can output an error (on stderr) saying that you cannot find `squid` running and giving instructions about the plugin configuration. Then you can stop (exit with non-zero value) before sending any data or function declarations, so that Netdata will not attempt to start the plugin again.
 
 ## External Plugins API
 
@@ -119,12 +136,12 @@ Netdata parses lines starting with:
 -    `CLABEL` - add a label to a chart
 -    `CLABEL_COMMIT` - commit added labels to the chart
 -    `FUNCTION` - define a function that can be called later to execute it
+- `FUNCTION_DEL` - unregister a function
 -    `BEGIN` - initialize data collection for a chart
 -    `SET` - set the value of a dimension for the initialized chart
 -    `END` - complete data collection for the initialized chart
 -    `FLUSH` - ignore the last collected values
 -    `DISABLE` - disable this plugin
--    `FUNCTION` - define functions
 -    `FUNCTION_PROGRESS` - report the progress of a function execution
 -    `FUNCTION_RESULT_BEGIN` - to initiate the transmission of function results
 -    `FUNCTION_RESULT_END` - to end the transmission of function result
@@ -162,6 +179,7 @@ available for the plugin to use.
 |:--------------------------------:|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 |    `NETDATA_USER_CONFIG_DIR`     | The directory where all Netdata-related user configuration should be stored. If the plugin requires custom user configuration, this is the place the user has saved it (normally under `/etc/netdata`).                                                |
 |    `NETDATA_STOCK_CONFIG_DIR`    | The directory where all Netdata -related stock configuration should be stored. If the plugin is shipped with configuration files, this is the place they can be found (normally under `/usr/lib/netdata/conf.d`).                                      |
+|     `NETDATA_STOCK_DATA_DIR`     | The directory where immutable Netdata stock data files are stored. Plugins can use this for packaged data assets such as MMDB files (normally under `/usr/share/netdata`).                                                                            |
 |      `NETDATA_PLUGINS_DIR`       | The directory where all Netdata plugins are stored.                                                                                                                                                                                                    |
 |   `NETDATA_USER_PLUGINS_DIRS`    | The list of directories where custom plugins are stored.                                                                                                                                                                                               |
 |        `NETDATA_WEB_DIR`         | The directory where the web files of Netdata are saved.                                                                                                                                                                                                |
@@ -185,7 +203,7 @@ The plugin should output instructions for Netdata to its output (`stdout`). Sinc
 
 #### DISABLE
 
-`DISABLE` will disable this plugin. This will prevent Netdata from restarting the plugin. You can also exit with the value `1` to have the same effect.
+`DISABLE` will disable this plugin. This will prevent Netdata from restarting the plugin. Exiting with the value `1` has the same effect only if the plugin has not produced useful output yet (see [Operation](#operation)).
 
 #### HOST_DEFINE
 
@@ -230,6 +248,11 @@ There are a few special keys that are used to define the system information of t
 - `_cloud_instance_region`
 - `_os_name`
 - `_os_version`
+- `_os_marketing_version`
+- `_os_release`
+- `_os_codename`
+- `_os_edition`
+- `_os_build`
 - `_kernel_version`
 - `_system_cores`
 - `_system_cpu_freq`
@@ -480,14 +503,22 @@ The plugin can register functions to Netdata, like this:
 - Priority defines the position of the function relative to the other functions (default is 100).
 - Version defines the version of the function (default is 0).
 
-Users can use a function to ask for more information from the collector. Netdata maintains a registry of functions in 2 levels:
-
-- per node
-- per chart
-
-Both node and chart functions are exactly the same, but chart functions allow Netdata to relate functions with charts and therefore present a context-sensitive menu of functions related to the chart the user is using.
+Users can use a function to ask for more information from the collector. Netdata maintains a per-node registry of
+functions; every function is registered host-wide. The `GLOBAL` word is accepted and optional: a `FUNCTION` line
+without it registers the function host-wide all the same (chart-scoped functions no longer exist - a line sent while a
+chart definition is open is coerced to host-wide, with a notice in the logs).
 
 Users can get a list of all the registered functions using the `/api/v1/functions` endpoint of Netdata and call functions using the `/api/v1/function` API call of Netdata.
+
+#### FUNCTION_DEL
+
+The plugin can unregister a previously registered function while continuing to run:
+
+> FUNCTION_DEL [GLOBAL] "name of the function"
+
+- The delete is keyed on the function name alone; the optional `GLOBAL` word is accepted and ignored.
+- Unregistered functions disappear from `/api/v1/functions` and return 503 on calls.
+- Functions can be re-registered later with a new `FUNCTION` line.
 
 Once a function is called, the plugin will receive at its standard input a command that looks like this:
 
@@ -499,15 +530,17 @@ When the function to be called is to receive a payload of parameters, the call l
 
 ```
 FUNCTION_PAYLOAD transaction_id timeout "name and parameters of the function as one quoted parameter" "user permissions value" "source of request" "content/type"
-body of the payload, formatted according to content/type
-FUNCTION PAYLOAD END
+body of the payload, a JSON document
+FUNCTION_PAYLOAD_END
 ```
 
 In this case, Netdata will send:
 
 - A line starting with `FUNCTION_PAYLOAD` together with the required metadata for the function, like the transaction id, the function name and its parameters, the timeout and the content type. This line ends with a newline.
-- Then, the payload itself (which may or may not have newlines in it). The payload should be parsed according to the content type parameter.
+- Then, the payload itself: a JSON document, which may or may not have newlines in it.
 - Finally, a line starting with `FUNCTION_PAYLOAD_END`, so it is expected like `\nFUNCTION_PAYLOAD_END\n`.
+
+The payload is not escaped or length-prefixed, so Netdata only sends payloads that are a single strict JSON document (RFC 8259: double-quoted strings without raw control characters, no comments, nothing but whitespace after the document) that do not contain the text `FUNCTION_PAYLOAD_END` anywhere and have no line starting (after spaces, tabs or carriage returns) with a quoted plugins.d keyword (`"FUNCTION"`, `"FUNCTION_PAYLOAD"`, `"FUNCTION_CANCEL"`, `"FUNCTION_PROGRESS"` or `"QUIT"`), and always labels them `application/json`. An empty payload means no payload block and is accepted. Any other payload is refused with HTTP 400. Plugins must treat the payload as opaque data: only a line that is exactly `FUNCTION_PAYLOAD_END` ends it, and no other line inside it is a command.
 
 Note 1: The plugins.d protocol allows parameters without single or double quotes if they don't contain spaces. However, the plugin should be able to parse parameters even if they are enclosed in single or double quotes. If the first character of a parameter is a single quote, its last character should also be a single quote too, and similarly for double quotes.
 
@@ -714,7 +747,7 @@ or (for commands: `update`, `add` and `test`):
 
 ```
 FUNCTION_PAYLOAD transaction_id timeout "config id command" "user permissions value" "source string" "content/type"
-body of the payload formatted according to content/type
+body of the payload, a JSON document
 FUNCTION_PAYLOAD_END
 ```
 
@@ -799,7 +832,8 @@ it can issue a `FLUSH`. The `FLUSH` command will instruct Netdata to ignore
 all the values collected since the last `BEGIN` command.
 
 If a plugin does not behave properly (outputs invalid lines, or does not
-follow these guidelines), will be disabled by Netdata.
+follow these guidelines), Netdata disconnects it and decides whether to
+restart it as described in [Operation](#operation).
 
 ### collected values
 

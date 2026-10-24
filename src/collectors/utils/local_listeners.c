@@ -2,7 +2,6 @@
 
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/local-sockets/local-sockets.h"
-#include "libnetdata/required_dummies.h"
 
 // --------------------------------------------------------------------------------------------------------------------
 
@@ -67,6 +66,10 @@ int main(int argc, char **argv) {
 
     netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
     if(!netdata_configured_host_prefix) netdata_configured_host_prefix = "";
+
+    // Validate host prefix (must be a real procfs/sysfs mount)
+    if(verify_netdata_host_prefix(true) == -1)
+        exit(1);
 
     for (int i = 1; i < argc; i++) {
         char *s = argv[i];

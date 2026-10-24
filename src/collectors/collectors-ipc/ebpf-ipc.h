@@ -41,6 +41,10 @@ enum ebpf_pids_index {
     NETDATA_EBPF_PIDS_DCSTAT_IDX,
     NETDATA_EBPF_PIDS_SWAP_IDX,
     NETDATA_EBPF_PIDS_VFS_IDX,
+    // Retained slot: the fd module moved to ebpf-go.plugin, but this enum indexes
+    // the legacy ebpf.plugin shared-memory `threads` bitmask, so renumbering it
+    // would change what every surviving module's bit means.  Same treatment as
+    // NETDATA_EBPF_PIDS_DCSTAT_IDX.
     NETDATA_EBPF_PIDS_FD_IDX,
     NETDATA_EBPF_PIDS_SHM_IDX,
 
@@ -82,19 +86,6 @@ typedef struct ebpf_publish_process {
     uint32_t task_err;
 } ebpf_publish_process_t;
 
-typedef struct ebpf_socket_publish_apps {
-    // Data read
-    uint64_t bytes_sent;             // Bytes sent
-    uint64_t bytes_received;         // Bytes received
-    uint64_t call_tcp_sent;          // Number of times tcp_sendmsg was called
-    uint64_t call_tcp_received;      // Number of times tcp_cleanup_rbuf was called
-    uint64_t retransmit;             // Number of times tcp_retransmit was called
-    uint64_t call_udp_sent;          // Number of times udp_sendmsg was called
-    uint64_t call_udp_received;      // Number of times udp_recvmsg was called
-    uint64_t call_close;             // Number of times tcp_close was called
-    uint64_t call_tcp_v4_connection; // Number of times tcp_v4_connect was called
-    uint64_t call_tcp_v6_connection; // Number of times tcp_v6_connect was called
-} ebpf_socket_publish_apps_t;
 
 typedef struct netdata_socket {
     char name[TASK_COMM_LEN];
@@ -125,66 +116,6 @@ typedef struct netdata_socket {
         uint64_t udp_bytes_received;
     } udp;
 } netdata_socket_t;
-
-typedef struct netdata_cachestat_pid {
-    uint64_t ct;
-    uint32_t tgid;
-    uint32_t uid;
-    uint32_t gid;
-    char name[TASK_COMM_LEN];
-
-    uint32_t add_to_page_cache_lru;
-    uint32_t mark_page_accessed;
-    uint32_t account_page_dirtied;
-    uint32_t mark_buffer_dirty;
-} netdata_cachestat_pid_t;
-
-typedef struct netdata_cachestat {
-    uint32_t add_to_page_cache_lru;
-    uint32_t mark_page_accessed;
-    uint32_t account_page_dirtied;
-    uint32_t mark_buffer_dirty;
-} netdata_cachestat_t;
-
-typedef struct netdata_publish_cachestat {
-    uint64_t ct;
-
-    long long ratio;
-    long long dirty;
-    long long hit;
-    long long miss;
-
-    netdata_cachestat_t current;
-    netdata_cachestat_t prev;
-} netdata_publish_cachestat_t;
-
-typedef struct netdata_publish_dcstat_pid {
-    uint64_t cache_access;
-    uint64_t file_system;
-    uint64_t not_found;
-} netdata_publish_dcstat_pid_t;
-
-typedef struct netdata_publish_dcstat {
-    uint64_t ct;
-
-    long long ratio;
-    long long cache_access;
-
-    netdata_publish_dcstat_pid_t curr;
-    netdata_publish_dcstat_pid_t prev;
-} netdata_publish_dcstat_t;
-
-typedef struct netdata_dcstat_pid {
-    uint64_t ct;
-    uint32_t tgid;
-    uint32_t uid;
-    uint32_t gid;
-    char name[TASK_COMM_LEN];
-
-    uint64_t cache_access;
-    uint64_t file_system;
-    uint64_t not_found;
-} netdata_dcstat_pid_t;
 
 typedef struct __attribute__((packed)) netdata_publish_swap {
     uint64_t ct;
@@ -268,32 +199,6 @@ typedef struct netdata_ebpf_vfs {
     uint32_t create_err;
 } netdata_ebpf_vfs_t;
 
-typedef struct netdata_publish_fd_stat {
-    uint64_t ct;
-
-    uint32_t open_call;  // Open syscalls (open and openat)
-    uint32_t close_call; // Close syscall (close)
-
-    // Errors
-    uint32_t open_err;
-    uint32_t close_err;
-} netdata_publish_fd_stat_t;
-
-typedef struct netdata_fd_stat {
-    uint64_t ct;
-    uint32_t tgid;
-    uint32_t uid;
-    uint32_t gid;
-    char name[TASK_COMM_LEN];
-
-    uint32_t open_call;  // Open syscalls (open and openat)
-    uint32_t close_call; // Close syscall (close)
-
-    // Errors
-    uint32_t open_err;
-    uint32_t close_err;
-} netdata_fd_stat_t;
-
 typedef struct netdata_publish_shm {
     uint64_t ct;
 
@@ -321,12 +226,8 @@ typedef struct netdata_ebpf_pid_stats {
     uint32_t pid;
 
     ebpf_publish_process_t process;
-    ebpf_socket_publish_apps_t socket;
-    netdata_publish_cachestat_t cachestat;
-    netdata_publish_dcstat_t directory_cache;
     netdata_publish_swap_t swap;
     netdata_publish_vfs_t vfs;
-    netdata_publish_fd_stat_t fd;
     netdata_publish_shm_t shm;
 } netdata_ebpf_pid_stats_t;
 
@@ -339,7 +240,9 @@ typedef struct netdata_ebpf_pid_stats {
 int netdata_integration_initialize_shm(size_t pids);
 void netdata_integration_cleanup_shm();
 netdata_ebpf_pid_stats_t *netdata_ebpf_get_shm_pointer_unsafe(uint32_t pid, enum ebpf_pids_index idx);
+netdata_ebpf_pid_stats_t *netdata_ebpf_lookup_shm_pointer_unsafe(uint32_t pid);
 bool netdata_ebpf_reset_shm_pointer_unsafe(int fd, uint32_t pid, enum ebpf_pids_index idx);
+void netdata_ebpf_sweep_shm_for_module_unsafe(enum ebpf_pids_index idx);
 void netdata_integration_current_ipc_data(ebpf_user_mem_stat_t *values);
 
 extern sem_t *shm_mutex_ebpf_integration;

@@ -6,24 +6,36 @@ package metrix
 type snapshotStateSetInstrument struct {
 	backend meterBackend
 	desc    *instrumentDescriptor
+	scope   HostScope
 	base    []LabelSet
+}
+
+func (i *snapshotStateSetInstrument) hostScope() HostScope {
+	return i.scope
 }
 
 // statefulStateSetInstrument writes maintained full-state points.
 type statefulStateSetInstrument struct {
 	backend meterBackend
 	desc    *instrumentDescriptor
+	scope   HostScope
 	base    []LabelSet
+}
+
+func (i *statefulStateSetInstrument) hostScope() HostScope {
+	return i.scope
 }
 
 // stagedStateSet holds one in-cycle stateset sample for a single series identity.
 type stagedStateSet struct {
-	key       string
-	name      string
-	labels    []Label
-	labelsKey string
-	desc      *instrumentDescriptor
-	states    map[string]bool
+	key          string
+	name         string
+	hostScopeKey string
+	hostScope    HostScope
+	labels       []Label
+	labelsKey    string
+	desc         *instrumentDescriptor
+	states       map[string]bool
 }
 
 // StateSet declares or reuses a snapshot stateset under this meter.
@@ -35,6 +47,7 @@ func (m *snapshotMeter) StateSet(name string, opts ...InstrumentOption) StateSet
 	return &snapshotStateSetInstrument{
 		backend: m.backend,
 		desc:    desc,
+		scope:   m.scope,
 		base:    appendLabelSets(m.sets, nil),
 	}
 }
@@ -48,13 +61,14 @@ func (m *statefulMeter) StateSet(name string, opts ...InstrumentOption) StateSet
 	return &statefulStateSetInstrument{
 		backend: m.backend,
 		desc:    desc,
+		scope:   m.scope,
 		base:    appendLabelSets(m.sets, nil),
 	}
 }
 
 // ObserveStateSet writes a full-state sample for this collect cycle.
 func (s *snapshotStateSetInstrument) ObserveStateSet(p StateSetPoint, labels ...LabelSet) {
-	s.backend.recordStateSetObserve(s.desc, p, appendLabelSets(s.base, labels))
+	s.backend.recordStateSetObserve(s.desc, s.scope, p, appendLabelSets(s.base, labels))
 }
 
 // Enable writes enum/bitset convenience sample with listed active states.
@@ -64,7 +78,7 @@ func (s *snapshotStateSetInstrument) Enable(actives ...string) {
 
 // ObserveStateSet writes a full-state sample for this collect cycle.
 func (s *statefulStateSetInstrument) ObserveStateSet(p StateSetPoint, labels ...LabelSet) {
-	s.backend.recordStateSetObserve(s.desc, p, appendLabelSets(s.base, labels))
+	s.backend.recordStateSetObserve(s.desc, s.scope, p, appendLabelSets(s.base, labels))
 }
 
 // Enable writes enum/bitset convenience sample with listed active states.
@@ -98,7 +112,7 @@ func stateSetPointFromActives(desc *instrumentDescriptor, actives ...string) Sta
 }
 
 // recordStateSetObserve writes one full-state stateset sample into the active frame.
-func (c *storeCore) recordStateSetObserve(desc *instrumentDescriptor, point StateSetPoint, sets []LabelSet) {
+func (c *storeCore) recordStateSetObserve(desc *instrumentDescriptor, scope HostScope, point StateSetPoint, sets []LabelSet) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -118,20 +132,33 @@ func (c *storeCore) recordStateSetObserve(desc *instrumentDescriptor, point Stat
 	if labelsContainKey(labels, desc.name) {
 		panic(errStateSetLabelKey)
 	}
+	scope, ok := c.prepareHostScopeForWriteLocked(scope)
+	if !ok {
+		return
+	}
 
 	states := normalizeStateSetPoint(point, schema)
 
-	key := makeSeriesKey(desc.name, labelsKey)
+	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	entry, ok := c.active.stateSet[key]
+	if ok && entry.desc != desc {
+		canonical, proceed := c.reconcileSameKeyDesc(key, entry.desc, desc)
+		if !proceed {
+			return
+		}
+		entry.desc = canonical
+	}
 	if !ok {
 		entry = &stagedStateSet{
-			key:       key,
-			name:      desc.name,
-			labels:    labels,
-			labelsKey: labelsKey,
-			desc:      desc,
+			key:          key,
+			name:         desc.name,
+			hostScopeKey: scope.ScopeKey,
+			hostScope:    scope,
+			labels:       labels,
+			labelsKey:    labelsKey,
+			desc:         desc,
 		}
-		c.active.stateSet[key] = entry
+		stageEntry(&c.active.stateSet, key, entry)
 	}
 	entry.states = states
 }

@@ -4,8 +4,10 @@
 
 #include <array>
 
+#include <dlib/error.h>
+
 #include "ad_charts.h"
-#include "database/sqlite/vendored/sqlite3.h"
+#include "sqlite3.h"
 #include "streaming/stream-control.h"
 
 #define WORKER_TRAIN_QUEUE_POP         0
@@ -18,7 +20,132 @@
 #define WORKER_TRAIN_FLUSH_MODELS      7
 
 sqlite3 *ml_db = NULL;
+// File-private. Accessed exclusively via __atomic_* operations -- callers
+// in other TUs must go through ml_db_is_unusable() / ml_db_mark_corrupt().
+static bool ml_db_unusable = false;
 static netdata_mutex_t db_mutex;
+
+bool ml_db_is_unusable(void)
+{
+    return __atomic_load_n(&ml_db_unusable, __ATOMIC_RELAXED);
+}
+
+void ml_db_force_unusable(void)
+{
+    __atomic_store_n(&ml_db_unusable, true, __ATOMIC_RELAXED);
+}
+
+void ml_db_mark_corrupt(int rc)
+{
+    // Latch the flag first so concurrent callers stop hitting the bad DB
+    // even if the sentinel write fails. Use __ATOMIC_RELAXED -- this is a
+    // best-effort poison flag, not a synchronization primitive.
+    if (__atomic_exchange_n(&ml_db_unusable, true, __ATOMIC_RELAXED))
+        return; // already flagged, sentinel already attempted
+
+    char sentinel[FILENAME_MAX + 1];
+    snprintfz(sentinel, sizeof(sentinel), "%s/.ml.db.delete", netdata_configured_cache_dir);
+
+    // Use O_CREAT|O_EXCL (atomic create-or-fail) so a malicious symlink at
+    // the sentinel path cannot redirect a O_TRUNC write to an attacker-
+    // chosen target. EEXIST is treated as success-equivalent: the desired
+    // post-condition is "next agent start will see something at this path
+    // and try to quarantine", and that is satisfied whether the path holds
+    // our sentinel or any other file/symlink. Startup attempts unlink()
+    // before quarantine; if unlink fails with anything other than ENOENT
+    // (e.g. EISDIR on a directory, EACCES on a permission-denied path,
+    // EROFS on a read-only mount), quarantine is deferred and the operator
+    // is logged at NDLP_ERR -- we cannot promise quarantine, only "will be
+    // attempted".
+    int fd = open(sentinel, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
+    int oerr = errno;
+    if (fd >= 0) {
+        close(fd);
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "ML: ml.db reported corruption (rc=%d); sentinel %s created. "
+               "Quarantine to a timestamped ml.db.bad.* will be attempted at next agent start. "
+               "Stored anomaly-detection models will be lost; ML will retrain.",
+               rc, sentinel);
+    }
+    else if (oerr == EEXIST) {
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "ML: ml.db reported corruption (rc=%d); sentinel %s already present. "
+               "Quarantine to ml.db.bad.* will be attempted at next agent start "
+               "(deferred if the sentinel path cannot be unlinked then).",
+               rc, sentinel);
+    }
+    else {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "ML: ml.db reported corruption (rc=%d) but failed to create sentinel %s (errno=%d). "
+               "Operator must remove ml.db manually.", rc, sentinel, oerr);
+    }
+}
+
+// Mask with 0xFF to also catch SQLite extended result codes (e.g.
+// SQLITE_CORRUPT_VTAB, SQLITE_CORRUPT_INDEX, ...) which encode the primary
+// code in the low 8 bits. Extended codes are off by default but can be
+// enabled per-connection via sqlite3_extended_result_codes(); masking is
+// the canonical way to compare regardless of that setting.
+bool ml_db_mark_if_corrupt(int rc)
+{
+    if (int primary = rc & 0xFF; primary != SQLITE_CORRUPT && primary != SQLITE_NOTADB)
+        return false;
+    ml_db_mark_corrupt(rc);
+    return true;
+}
+
+// Execute a prepared model-table statement (INSERT/DELETE/UPDATE) and reset
+// it. Latches ml.db corruption on either step so the sentinel is dropped
+// regardless of which call surfaces the bad page. `action_name` is the
+// infinitive used in "Failed to <action_name>" ("store model",
+// "delete models", "prune old models"); `gerund_name` is the form used in
+// "Failed to reset statement when <gerund_name>" ("storing model",
+// "deleting models", "pruning old models"). The exact wording is preserved
+// so operator log searches keep matching.
+static int execute_and_reset_model_stmt(sqlite3_stmt *res,
+                                        const char *action_name,
+                                        const char *gerund_name)
+{
+    int step_rc = execute_insert(res);
+    if (unlikely(step_rc != SQLITE_DONE)) {
+        error_report("Failed to %s, rc = %d", action_name, step_rc);
+        ml_db_mark_if_corrupt(step_rc);
+
+        // SQLite requires the statement to be reset before it can be reused
+        // after a failed sqlite3_step(). Without this, the next call that
+        // reuses the cached prepared statement (e.g. next flush iteration
+        // on a transient BUSY/IOERR) would re-bind onto a statement in an
+        // undefined state. Best-effort reset; latch separately if it
+        // surfaces corruption the step didn't.
+        int reset_rc = sqlite3_reset(res);
+        if (unlikely(reset_rc != SQLITE_OK && reset_rc != step_rc))
+            ml_db_mark_if_corrupt(reset_rc);
+        return step_rc;
+    }
+
+    int reset_rc = sqlite3_reset(res);
+    if (unlikely(reset_rc != SQLITE_OK)) {
+        error_report("Failed to reset statement when %s, rc = %d", gerund_name, reset_rc);
+        ml_db_mark_if_corrupt(reset_rc);
+        return reset_rc;
+    }
+
+    return 0;
+}
+
+// Common bind-failure handler for model-table statements. Reports which
+// parameter failed, attempts a reset (logging separately if reset also
+// fails), and returns the original bind rc.
+static int handle_model_bind_fail(sqlite3_stmt *res, int param, int rc, const char *action_name)
+{
+    error_report("Failed to bind parameter %d to %s, rc = %d", param, action_name, rc);
+    int reset_rc = sqlite3_reset(res);
+    if (unlikely(reset_rc != SQLITE_OK)) {
+        error_report("Failed to reset statement to %s, rc = %d", action_name, reset_rc);
+        ml_db_mark_if_corrupt(reset_rc);
+    }
+    return rc;
+}
 
 static void __attribute__((constructor)) init_mutex(void) {
     netdata_mutex_init(&db_mutex);
@@ -30,33 +157,26 @@ static void __attribute__((destructor)) destroy_mutex(void) {
 
 namespace {
 
-template <bool NeedLowerBound, bool NeedUpperBound>
-inline bool ml_sqlite_int64_fits_time_t(sqlite3_int64 value)
+// Guard against silent truncation when time_t is narrower than sqlite3_int64
+// (e.g. 32-bit builds). if constexpr ensures the dead branches are elided at
+// compile time on 64-bit platforms, avoiding constant-expression warnings.
+static inline bool ml_sqlite_int64_fits_time_t(sqlite3_int64 value)
 {
-    (void)value;
+    if constexpr (!std::numeric_limits<time_t>::is_signed ||
+                  std::numeric_limits<time_t>::digits < std::numeric_limits<sqlite3_int64>::digits) {
+        // coverity[CONSTANT_EXPRESSION_RESULT] - on 64-bit, Coverity still analyzes
+        // this dead branch; reachable only on 32-bit or unsigned time_t builds.
+        if (value < (sqlite3_int64) std::numeric_limits<time_t>::min())
+            return false;
+    }
+    if constexpr (std::numeric_limits<time_t>::digits < std::numeric_limits<sqlite3_int64>::digits) {
+        // coverity[CONSTANT_EXPRESSION_RESULT] - dead on same-width 64-bit time_t;
+        // reachable only when time_t is narrower than sqlite3_int64, but Coverity
+        // still analyzes this discarded if constexpr branch.
+        if (value > (sqlite3_int64) std::numeric_limits<time_t>::max())
+            return false;
+    }
     return true;
-}
-
-template <>
-inline bool ml_sqlite_int64_fits_time_t<true, false>(sqlite3_int64 value)
-{
-    const sqlite3_int64 kTimeMin = (sqlite3_int64) std::numeric_limits<time_t>::min();
-    return value >= kTimeMin;
-}
-
-template <>
-inline bool ml_sqlite_int64_fits_time_t<false, true>(sqlite3_int64 value)
-{
-    const sqlite3_int64 kTimeMax = (sqlite3_int64) std::numeric_limits<time_t>::max();
-    return value <= kTimeMax;
-}
-
-template <>
-inline bool ml_sqlite_int64_fits_time_t<true, true>(sqlite3_int64 value)
-{
-    const sqlite3_int64 kTimeMin = (sqlite3_int64) std::numeric_limits<time_t>::min();
-    const sqlite3_int64 kTimeMax = (sqlite3_int64) std::numeric_limits<time_t>::max();
-    return value >= kTimeMin && value <= kTimeMax;
 }
 
 }
@@ -228,7 +348,7 @@ const char *db_models_delete =
 
 const char *db_models_prune =
     "DELETE FROM models "
-    "WHERE after < @after LIMIT @n;";
+    "WHERE rowid IN (SELECT rowid FROM models WHERE after < @after LIMIT @n);";
 
 static int
 ml_dimension_add_model(const nd_uuid_t *metric_uuid, const ml_kmeans_inlined_t *inlined_km)
@@ -243,10 +363,14 @@ ml_dimension_add_model(const nd_uuid_t *metric_uuid, const ml_kmeans_inlined_t *
         return 1;
     }
 
+    if (unlikely(ml_db_is_unusable()))
+        return 1;
+
     if (unlikely(!res)) {
         rc = prepare_statement(ml_db, db_models_add_model, &res);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("Failed to prepare statement to store model, rc = %d", rc);
+            ml_db_mark_if_corrupt(rc);
             return 1;
         }
     }
@@ -283,26 +407,10 @@ ml_dimension_add_model(const nd_uuid_t *metric_uuid, const ml_kmeans_inlined_t *
         }
     }
 
-    rc = execute_insert(res);
-    if (unlikely(rc != SQLITE_DONE)) {
-        error_report("Failed to store model, rc = %d", rc);
-        return rc;
-    }
-
-    rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to reset statement when storing model, rc = %d", rc);
-        return rc;
-    }
-
-    return 0;
+    return execute_and_reset_model_stmt(res, "store model", "storing model");
 
 bind_fail:
-    error_report("Failed to bind parameter %d to store model, rc = %d", param, rc);
-    rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to reset statement to store model, rc = %d", rc);
-    return rc;
+    return handle_model_bind_fail(res, param, rc, "store model");
 }
 
 static int
@@ -318,10 +426,14 @@ ml_dimension_delete_models(const nd_uuid_t *metric_uuid, time_t before)
         return 1;
     }
 
+    if (unlikely(ml_db_is_unusable()))
+        return 1;
+
     if (unlikely(!res)) {
         rc = prepare_statement(ml_db, db_models_delete, &res);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("Failed to prepare statement to delete models, rc = %d", rc);
+            ml_db_mark_if_corrupt(rc);
             return rc;
         }
     }
@@ -334,26 +446,10 @@ ml_dimension_delete_models(const nd_uuid_t *metric_uuid, time_t before)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = execute_insert(res);
-    if (unlikely(rc != SQLITE_DONE)) {
-        error_report("Failed to delete models, rc = %d", rc);
-        return rc;
-    }
-
-    rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to reset statement when deleting models, rc = %d", rc);
-        return rc;
-    }
-
-    return 0;
+    return execute_and_reset_model_stmt(res, "delete models", "deleting models");
 
 bind_fail:
-    error_report("Failed to bind parameter %d to delete models, rc = %d", param, rc);
-    rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to reset statement to delete models, rc = %d", rc);
-    return rc;
+    return handle_model_bind_fail(res, param, rc, "delete models");
 }
 
 static int
@@ -369,10 +465,14 @@ ml_prune_old_models(size_t num_models_to_prune)
         return 1;
     }
 
+    if (unlikely(ml_db_is_unusable()))
+        return 1;
+
     if (unlikely(!res)) {
         rc = prepare_statement(ml_db, db_models_prune, &res);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("Failed to prepare statement to prune models, rc = %d", rc);
+            ml_db_mark_if_corrupt(rc);
             return rc;
         }
     }
@@ -387,26 +487,10 @@ ml_prune_old_models(size_t num_models_to_prune)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = execute_insert(res);
-    if (unlikely(rc != SQLITE_DONE)) {
-        error_report("Failed to prune old models, rc = %d", rc);
-        return rc;
-    }
-
-    rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to reset statement when pruning old models, rc = %d", rc);
-        return rc;
-    }
-
-    return 0;
+    return execute_and_reset_model_stmt(res, "prune old models", "pruning old models");
 
 bind_fail:
-    error_report("Failed to bind parameter %d to prune old models, rc = %d", param, rc);
-    rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to reset statement to prune old models, rc = %d", rc);
-    return rc;
+    return handle_model_bind_fail(res, param, rc, "prune old models");
 }
 
 int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
@@ -421,11 +505,14 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
     if (!is_empty)
         return 0;
 
-    std::vector<ml_kmeans_t> V;
+    std::vector<ml_kmeans_inlined_t> loaded_km_contexts;
 
     sqlite3_stmt *res = active_stmt ? *active_stmt : NULL;
     int rc = 0;
     int param = 0;
+    int step_rc = 0;
+    bool step_corrupt = false;
+    bool cleanup_corrupt = false;
 
     if (unlikely(!ml_db)) {
         nd_log_limit_static_global_var(erl, 1, 0);
@@ -433,10 +520,14 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
         return 1;
     }
 
+    if (unlikely(ml_db_is_unusable()))
+        return 1;
+
     if (unlikely(!res)) {
         rc = sqlite3_prepare_v2(ml_db, db_models_load, -1, &res, NULL);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("Failed to prepare statement to load models, rc = %d", rc);
+            ml_db_mark_if_corrupt(rc);
             return 1;
         }
         if (active_stmt)
@@ -456,36 +547,27 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    spinlock_lock(&dim->slock);
-
-    dim->km_contexts.reserve(Cfg.num_models_to_use);
+    loaded_km_contexts.reserve(Cfg.num_models_to_use);
     while ((rc = sqlite3_step_monitored(res)) == SQLITE_ROW) {
-        ml_kmeans_t km;
-
         sqlite3_int64 raw_after  = sqlite3_column_int64(res, 0);
         sqlite3_int64 raw_before = sqlite3_column_int64(res, 1);
-        constexpr bool kNeedLowerBound =
-            !std::numeric_limits<time_t>::is_signed ||
-            std::numeric_limits<time_t>::digits < std::numeric_limits<sqlite3_int64>::digits;
-        constexpr bool kNeedUpperBound =
-            std::numeric_limits<time_t>::digits < std::numeric_limits<sqlite3_int64>::digits;
-
         // Protect against silent truncation when time_t is narrower than int64_t
         // (e.g. 32-bit builds, corrupted DB, or far-future timestamps).
-        if (!ml_sqlite_int64_fits_time_t<kNeedLowerBound, kNeedUpperBound>(raw_after) ||
-            !ml_sqlite_int64_fits_time_t<kNeedLowerBound, kNeedUpperBound>(raw_before)) {
+        if (!ml_sqlite_int64_fits_time_t(raw_after) ||
+            !ml_sqlite_int64_fits_time_t(raw_before)) {
             error_report("Skipping ML model row with out-of-range timestamps: after=%" PRId64 " before=%" PRId64,
                          (int64_t) raw_after, (int64_t) raw_before);
             continue;
         }
+
+        loaded_km_contexts.emplace_back();
+        ml_kmeans_inlined_t &km = loaded_km_contexts.back();
 
         km.after  = (time_t) raw_after;
         km.before = (time_t) raw_before;
 
         km.min_dist = sqlite3_column_double(res, 2);
         km.max_dist = sqlite3_column_double(res, 3);
-
-        km.cluster_centers.resize(2);
 
         km.cluster_centers[0].set_size(Cfg.lag_n + 1);
         km.cluster_centers[0](0) = sqlite3_column_double(res, 4);
@@ -502,25 +584,51 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
         km.cluster_centers[1](3) = sqlite3_column_double(res, 13);
         km.cluster_centers[1](4) = sqlite3_column_double(res, 14);
         km.cluster_centers[1](5) = sqlite3_column_double(res, 15);
-
-        dim->km_contexts.emplace_back(km);
     }
 
-    if (!dim->km_contexts.empty()) {
-        dim->ts = TRAINING_STATUS_TRAINED;
+    if (rc == SQLITE_DONE && !loaded_km_contexts.empty()) {
+        spinlock_lock(&dim->slock);
+        if (dim->km_contexts.empty()) {
+            dim->km_contexts.swap(loaded_km_contexts);
+            dim->ts = TRAINING_STATUS_TRAINED;
+        }
+        spinlock_unlock(&dim->slock);
     }
 
-    spinlock_unlock(&dim->slock);
-
-    if (unlikely(rc != SQLITE_DONE))
-        error_report("Failed to load models, rc = %d", rc);
+    step_rc = rc;
+    if (unlikely(step_rc != SQLITE_DONE))
+        error_report("Failed to load models, rc = %d", step_rc);
 
     if (active_stmt)
         rc = sqlite3_reset(res);
     else
         rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
+    // sqlite3_reset returns the prior step error if step failed; only log if
+    // reset reports a new error beyond what we already logged for step.
+    if (unlikely(rc != SQLITE_OK && rc != step_rc))
         error_report("Failed to %s statement when loading models, rc = %d", active_stmt ? "reset" : "finalize", rc);
+
+    // Latch on either step-time OR cleanup-time corruption. sqlite3_reset /
+    // sqlite3_finalize can surface SQLITE_CORRUPT / SQLITE_NOTADB even when
+    // step succeeded; without both checks, cleanup-only corruption would log
+    // but never trip ml_db_unusable. Both calls are idempotent.
+    step_corrupt    = ml_db_mark_if_corrupt(step_rc);
+    cleanup_corrupt = ml_db_mark_if_corrupt(rc);
+
+    // Partial step results stay local. On failure, only repair an otherwise
+    // empty dimension's state; do not clear a model installed concurrently
+    // while SQLite was stepping.
+    if (step_rc != SQLITE_DONE) {
+        spinlock_lock(&dim->slock);
+        if (dim->km_contexts.empty())
+            dim->ts = TRAINING_STATUS_UNTRAINED;
+        spinlock_unlock(&dim->slock);
+    }
+
+    // Either signal trips skip_models in metadata_scan_host so we stop
+    // hammering the bad DB.
+    if (step_corrupt || cleanup_corrupt)
+        return 1;
 
     return 0;
 
@@ -549,9 +657,37 @@ static void ml_dimension_serialize_kmeans(const ml_dimension_t *dim, BUFFER *wb)
     buffer_json_finalize(wb);
 }
 
-bool
-ml_dimension_deserialize_kmeans(const char *json_str)
+// Both machine-guids in the rejection log line below are untrusted input: the one in the received
+// payload, and the one stored for the host - the streaming handshake validates it with
+// regenerate_guid() but keeps the original string (rrdhost.c), so it is whatever the child sent.
+// A guid may only be echoed into a log line when it is at most GUID_LEN characters of hex digits
+// and hyphens, so that a crafted value cannot carry control characters or a newline into the
+// daemon log.
+//
+// uuid_parse() is NOT sufficient for this: libnetdata #defines it to uuid_parse_flexi(), whose
+// loop ends as soon as it has decoded 16 bytes and never checks that the string ended there, so
+// a valid UUID followed by arbitrary bytes parses successfully.
+static bool ml_machine_guid_is_loggable(const char *guid)
 {
+    for (size_t i = 0; guid[i]; i++) {
+        if (i >= GUID_LEN)
+            return false;
+
+        if (!isxdigit((uint8_t) guid[i]) && guid[i] != '-')
+            return false;
+    }
+
+    return true;
+}
+
+bool
+ml_dimension_deserialize_kmeans(RRDHOST *host, const char *json_str)
+{
+    if (!host) {
+        netdata_log_error("Failed to deserialize kmeans: no host is associated with this connection");
+        return false;
+    }
+
     if (!json_str) {
         netdata_log_error("Failed to deserialize kmeans: json string is null");
         return false;
@@ -610,6 +746,31 @@ ml_dimension_deserialize_kmeans(const char *json_str)
         }
     }
 
+    // The streaming connection is authenticated for exactly one host: JSON/ML_MODEL is a
+    // PARSER_INIT_STREAMING keyword and HOST (scope switching) is PARSER_INIT_PLUGINSD only, and a
+    // model is always sent on the sender of the host that owns the dimension - so on any hop the
+    // payload's machine-guid names the host of the connection that carries it. A payload naming
+    // another host is a child trying to write ML state it is not authorized for: it would let it
+    // pin another host's anomaly scores and suppress that host's training.
+    //
+    // The check does not bound the length of the guid: uuid_parse_flexi() accepts non-canonical
+    // spellings (32 hex digits without hyphens, for example) and the handshake stores what the
+    // child sent, so host->machine_guid - and a payload that matches it - can be shorter than
+    // GUID_LEN. The GUID copy in DimensionLookupInfo is bounded for that reason.
+    if (strcmp(values[0], host->machine_guid) != 0) {
+        const char *target = ml_machine_guid_is_loggable(values[0]) ? values[0] : "(not log-safe)";
+        const char *connected =
+            ml_machine_guid_is_loggable(host->machine_guid) ? host->machine_guid : "(not log-safe)";
+
+        nd_log_limit_static_global_var(erl, 1, 0);
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
+                     "ML: rejecting a model received from host '%s' (%s): it targets machine guid '%s', "
+                     "which is not the host this connection is authenticated for",
+                     rrdhost_hostname(host), connected, target);
+        json_object_put(root);
+        return false;
+    }
+
     DimensionLookupInfo DLI(values[0], values[1], values[2]);
 
     // Parse the kmeans model
@@ -646,12 +807,23 @@ ml_dimension_deserialize_kmeans(const char *json_str)
         return true;
     }
 
+    // ml_host may have been unpublished by ml_host_delete() concurrently;
+    // the acquired RRDHOST keeps RH alive but not RH->ml_host.
+    {
+        AcquiredMLHost acquired_host = AcqDim.host();
+        if (!acquired_host.get()) {
+            pulse_ml_models_ignored();
+            json_object_put(root);
+            return true;
+        }
+    }
+
     ml_queue_item_t item;
     item.type = ML_QUEUE_ITEM_TYPE_ADD_EXISTING_MODEL;
     item.add_existing_model = {
         DLI, inlined_km
     };
-    ml_queue_push(AcqDim.queue(), item);
+    ml_queue_push(Cfg.training_queue, item);
 
     json_object_put(root);
     return true;
@@ -684,60 +856,166 @@ static void ml_dimension_stream_kmeans(ml_worker_t *worker, const ml_dimension_t
     pulse_ml_models_sent();
 }
 
-static void ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim)
+bool ml_dimension_train_model_precheck(enum ml_metric_type mt,
+                                       bool has_received_downstream_model,
+                                       bool training_in_progress,
+                                       enum ml_worker_result *worker_res)
+{
+    if (has_received_downstream_model) {
+        *worker_res = ML_WORKER_RESULT_DOWNSTREAM_MODEL_SUPPLIED;
+        return true;
+    }
+
+    if (mt == METRIC_TYPE_CONSTANT) {
+        *worker_res = ML_WORKER_RESULT_OK;
+        return true;
+    }
+
+    if (training_in_progress) {
+        *worker_res = ML_WORKER_RESULT_TRAINING_IN_PROGRESS;
+        return true;
+    }
+
+    return false;
+}
+
+bool ml_should_requeue_create_new_model(enum ml_worker_result worker_res)
+{
+    // TRAINING_IN_PROGRESS keeps requeueing so the dim stays in the periodic
+    // retrain cycle; the worker loop is paced by Cfg.train_every, so this is
+    // not a tight CPU spin. DIMENSION_UNAVAILABLE keeps requeueing too: the dim
+    // keeps create_new_model_queued, so ml_host_start() on reconnect would not
+    // enqueue it again; it is dropped once the host or chart is really gone.
+    return worker_res != ML_WORKER_RESULT_NULL_ACQUIRED_DIMENSION &&
+           worker_res != ML_WORKER_RESULT_DOWNSTREAM_MODEL_SUPPLIED;
+}
+
+bool ml_should_publish_model_update(bool host_running,
+                                    uint32_t current_generation,
+                                    uint32_t expected_generation,
+                                    bool superseded_by_downstream,
+                                    bool *training_in_progress)
+{
+    if (!host_running || current_generation != expected_generation || superseded_by_downstream) {
+        if (training_in_progress)
+            *training_in_progress = false;
+        return false;
+    }
+
+    return true;
+}
+
+void ml_dimension_finalize_constant_state(ml_dimension_t *dim)
+{
+    dim->mt = METRIC_TYPE_CONSTANT;
+    dim->ts = TRAINING_STATUS_TRAINED;
+    dim->suppression_anomaly_counter = 0;
+    dim->suppression_window_counter = 0;
+}
+
+void ml_pending_models_add(const ml_model_info_t &model_info)
+{
+    spinlock_lock(&Cfg.pending_models_spinlock);
+    Cfg.pending_models.push_back(model_info);
+    spinlock_unlock(&Cfg.pending_models_spinlock);
+}
+
+size_t ml_pending_models_count()
+{
+    spinlock_lock(&Cfg.pending_models_spinlock);
+    size_t n = Cfg.pending_models.size();
+    spinlock_unlock(&Cfg.pending_models_spinlock);
+    return n;
+}
+
+void ml_pending_models_take(std::vector<ml_model_info_t> &batch)
+{
+    batch.clear();
+    spinlock_lock(&Cfg.pending_models_spinlock);
+    batch.swap(Cfg.pending_models);
+    spinlock_unlock(&Cfg.pending_models_spinlock);
+}
+
+// Installs km as the dimension's newest model. The caller holds dim->slock.
+static bool ml_dimension_update_models_locked(ml_worker_t *worker, ml_dimension_t *dim, const ml_kmeans_inlined_t &km, uint32_t expected_generation, bool from_downstream)
 {
     worker_is_busy(WORKER_TRAIN_UPDATE_MODELS);
 
-    spinlock_lock(&dim->slock);
-
-    ml_host_t *host = (ml_host_t *) dim->rd->rrdset->rrdhost->ml_host;
-    if (!host || !host->ml_running) {
-        dim->training_in_progress = false;
-        spinlock_unlock(&dim->slock);
-        return;
+    // Sample ml_running inside the same slock critical section as the
+    // reset_generation check, so a stop that starts first cancels this install.
+    // A local model is also dropped when a downstream model was installed while
+    // it trained: the dimension is downstream-supplied from then on. Only a local
+    // install owns (and so clears) training_in_progress.
+    if (!ml_should_publish_model_update(ml_running_load(dim->rd->rrdset->rrdhost),
+                                        dim->reset_generation,
+                                        expected_generation,
+                                        !from_downstream && dim->has_received_downstream_model,
+                                        from_downstream ? nullptr : &dim->training_in_progress)) {
+        return false;
     }
 
+    // Mark the dim as downstream-supplied only after the publish-check passes
+    // and under the same slock as the install. Setting it earlier would risk
+    // suppressing local training if the install was cancelled.
+    if (from_downstream)
+        dim->has_received_downstream_model = true;
+
     if (dim->km_contexts.size() < Cfg.num_models_to_use) {
-        dim->km_contexts.emplace_back(dim->kmeans);
+        // First install: reserve exactly the final capacity, so a dimension
+        // that never gets a model never pays for the model array, and one that
+        // does still allocates only once (push_back growth would otherwise
+        // realloc its way up to 32 slots).
+        if (dim->km_contexts.empty())
+            dim->km_contexts.reserve(Cfg.num_models_to_use);
+
+        dim->km_contexts.emplace_back(km);
     } else {
         bool can_drop_middle_km = false;
 
         if (Cfg.num_models_to_use > 2) {
             const ml_kmeans_inlined_t *old_km = &dim->km_contexts[dim->km_contexts.size() - 1];
             const ml_kmeans_inlined_t *middle_km = &dim->km_contexts[dim->km_contexts.size() - 2];
-            const ml_kmeans_t *new_km = &dim->kmeans;
+            const ml_kmeans_inlined_t *new_km = &km;
 
             can_drop_middle_km = (middle_km->after < old_km->before) &&
                                  (middle_km->before > new_km->after);
         }
 
         if (can_drop_middle_km) {
-            dim->km_contexts.back() = dim->kmeans;
+            dim->km_contexts.back() = km;
         } else {
             std::rotate(std::begin(dim->km_contexts), std::begin(dim->km_contexts) + 1, std::end(dim->km_contexts));
-            dim->km_contexts[dim->km_contexts.size() - 1] = dim->kmeans;
+            dim->km_contexts[dim->km_contexts.size() - 1] = km;
         }
     }
 
-    dim->mt = METRIC_TYPE_CONSTANT;
-    dim->ts = TRAINING_STATUS_TRAINED;
+    ml_dimension_finalize_constant_state(dim);
 
-    dim->suppression_anomaly_counter = 0;
-    dim->suppression_window_counter = 0;
-
-    // Add the newly generated model to the list of pending models to flush
+    // Add the latest model to the list of pending models to flush.
     ml_model_info_t model_info;
     nd_uuid_t *rd_uuid = uuidmap_uuid_ptr(dim->rd->uuid);
     uuid_copy(model_info.metric_uuid, *rd_uuid);
     model_info.inlined_kmeans = dim->km_contexts.back();
-    worker->pending_model_info.push_back(model_info);
+
+    // into the shared list while still holding dim->slock, so two installs of this dimension (on any threads) are
+    // appended in install order
+    ml_pending_models_add(model_info);
 
     ml_dimension_stream_kmeans(worker, dim);
 
     // Clear the training in progress flag
-    dim->training_in_progress = false;
+    if (!from_downstream)
+        dim->training_in_progress = false;
 
+    return true;
+}
+
+static bool ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim, const ml_kmeans_inlined_t &km, uint32_t expected_generation, bool from_downstream)
+{
+    spinlock_lock(&dim->slock);
+    bool installed = ml_dimension_update_models_locked(worker, dim, km, expected_generation, from_downstream);
     spinlock_unlock(&dim->slock);
+    return installed;
 }
 
 static enum ml_worker_result
@@ -746,20 +1024,22 @@ ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim)
     worker_is_busy(WORKER_TRAIN_QUERY);
 
     spinlock_lock(&dim->slock);
-    if (dim->mt == METRIC_TYPE_CONSTANT) {
+    ml_worker_result precheck;
+    if (ml_dimension_train_model_precheck(dim->mt,
+                                          dim->has_received_downstream_model,
+                                          dim->training_in_progress,
+                                          &precheck)) {
+        if (precheck == ML_WORKER_RESULT_DOWNSTREAM_MODEL_SUPPLIED)
+            dim->create_new_model_queued = false;
         spinlock_unlock(&dim->slock);
-        return ML_WORKER_RESULT_OK;
+        return precheck;
     }
 
-    // Check if training is already in progress for this dimension
-    // If so, skip this training request to prevent concurrent access to dim->kmeans
-    if (dim->training_in_progress) {
-        spinlock_unlock(&dim->slock);
-        return ML_WORKER_RESULT_OK;
-    }
-
-    // Mark training as in progress
+    // Mark training as in progress and snapshot the generation so that
+    // ml_dimension_update_models() can detect a stop/reset that happened
+    // while training was running.
     dim->training_in_progress = true;
+    uint32_t generation = dim->reset_generation;
     spinlock_unlock(&dim->slock);
 
     auto P = ml_dimension_calculated_numbers(worker, dim);
@@ -792,14 +1072,14 @@ ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim)
             worker->scratch_training_cns, training_response.total_values,
             worker->training_cns, training_response.total_values
         };
-        
+
         // Calculate dynamic sampling ratio based on expected output size
         // After diff and smooth, we'll have approximately this many vectors
         size_t expected_vectors = training_response.total_values;
         if (Cfg.diff_n > 0) expected_vectors--;
         if (smoothing_window > 1) expected_vectors = expected_vectors - smoothing_window + 1;
         expected_vectors = expected_vectors - Cfg.lag_n;
-        
+
         double sampling_ratio = 1.0;
         if (expected_vectors > Cfg.max_training_vectors) {
             sampling_ratio = (double)Cfg.max_training_vectors / expected_vectors;
@@ -808,12 +1088,43 @@ ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim)
         // Apply sampling during lag feature extraction
         ml_features_preprocess(&features, worker->training_samples, sampling_ratio);
 
-        ml_kmeans_init(&dim->kmeans);
-        ml_kmeans_train(&dim->kmeans, worker->training_samples, Cfg.max_kmeans_iters, training_response.query_after_t, training_response.query_before_t);
+        // Preprocessing can leave fewer than 2 vectors after diff/smooth/lag/sampling.
+        // k-means cannot build 2 cluster centers from that input, so reuse the
+        // post-cycle state machine and bail out before kmeans_train.
+        if (worker->training_samples.size() < 2) {
+            spinlock_lock(&dim->slock);
+            ml_dimension_finalize_constant_state(dim);
+            dim->training_in_progress = false;
+            spinlock_unlock(&dim->slock);
+            return ML_WORKER_RESULT_NOT_ENOUGH_COLLECTED_VALUES;
+        }
+
+        ml_kmeans_init(&worker->training_kmeans);
+        try {
+            ml_kmeans_train(&worker->training_kmeans, worker->training_samples, Cfg.max_kmeans_iters, training_response.query_after_t, training_response.query_before_t);
+        }
+        catch (const dlib::error &e) {
+            // dlib (kmeans/matrix) can throw dlib::fatal_error (and other
+            // dlib::error subtypes) on numerical edge cases. Letting it escape
+            // ml_train_main terminates the process. Skip this dimension's model
+            // for this round instead. A non-dlib std::exception such as
+            // std::bad_alloc is a genuine fatal condition, not a transient
+            // training failure, so it is intentionally left to propagate.
+            // Clear training_in_progress here (the normal path clears it via
+            // ml_dimension_update_models()); otherwise the precheck would keep
+            // returning TRAINING_IN_PROGRESS and the dimension would be stuck.
+            // Do NOT finalize constant state -- this is a transient failure and
+            // the dimension should retrain normally next round.
+            netdata_log_error("ML: KMeans training raised an exception (%s); skipping model creation for this dimension this round", e.what());
+            spinlock_lock(&dim->slock);
+            dim->training_in_progress = false;
+            spinlock_unlock(&dim->slock);
+            return ML_WORKER_RESULT_NOT_ENOUGH_COLLECTED_VALUES;
+        }
     }
 
     // update models
-    ml_dimension_update_models(worker, dim);
+    (void) ml_dimension_update_models(worker, dim, ml_kmeans_inlined_t(worker->training_kmeans), generation, /*from_downstream=*/false);
 
     return worker_result;
 }
@@ -831,7 +1142,7 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
 
     // Don't treat values that don't exist as anomalous
     if (!exists) {
-        dim->cns.clear();
+        dim->cns_count = 0;
         dim->cns_head = 0;
         spinlock_unlock(&dim->slock);
         return false;
@@ -841,7 +1152,11 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
     size_t smoothing_window = ml_dimension_smoothing_window(dim);
     unsigned n = Cfg.diff_n + smoothing_window + Cfg.lag_n;
 
-    size_t cns_size = dim->cns.size();
+    fatal_assert(n <= ML_DIMENSION_MAX_CNS &&
+                 "Prediction history ring too small. This should not be possible with the "
+                 "default clamping of feature extraction options");
+
+    size_t cns_size = dim->cns_count;
 
     // The ring buffer modulus is derived from the current effective smoothing
     // window. When the effective window changes, the existing history is only
@@ -852,13 +1167,15 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
     bool size_changed_with_wrapped_state = (cns_size != n && dim->cns_head != 0);
     bool shrunk_below_existing_history = (cns_size > n);
     if (invalid_head || size_changed_with_wrapped_state || shrunk_below_existing_history) {
-        dim->cns.clear();
+        dim->cns_count = 0;
         dim->cns_head = 0;
         cns_size = 0;
     }
 
     if (cns_size < n) {
-        dim->cns.push_back(value);
+        // Warmup. cns_head is still 0 until the ring first fills, so appending
+        // at cns_count is exactly what push_back() did on the vector.
+        dim->cns[dim->cns_count++] = value;
         spinlock_unlock(&dim->slock);
         return false;
     }
@@ -883,28 +1200,26 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
     size_t newest_idx = (dim->cns_head + n - 1) % n;
     bool same_value = (dim->cns[newest_idx] == value);
     dim->cns[dim->cns_head] = value;
-    dim->cns_head = (dim->cns_head + 1) % n;
+    dim->cns_head = (uint8_t)((dim->cns_head + 1) % n);
 
-    // Create the sample
-    calculated_number_t src_cns[128];
-    calculated_number_t dst_cns[128];
-    constexpr size_t src_cns_capacity = sizeof(src_cns) / sizeof(src_cns[0]);
-    constexpr size_t dst_cns_capacity = sizeof(dst_cns) / sizeof(dst_cns[0]);
-    fatal_assert((n <= src_cns_capacity && n <= dst_cns_capacity) &&
-                 "Static buffers too small to perform prediction. "
-                 "This should not be possible with the default clamping of feature extraction options");
+    // Create the sample. n <= ML_DIMENSION_MAX_CNS is asserted above.
+    calculated_number_t src_cns[ML_DIMENSION_MAX_CNS];
+    calculated_number_t dst_cns[ML_DIMENSION_MAX_CNS];
 
     size_t first_chunk = n - dim->cns_head;
-    memcpy(src_cns, dim->cns.data() + dim->cns_head, first_chunk * sizeof(calculated_number_t));
+    memcpy(src_cns, dim->cns + dim->cns_head, first_chunk * sizeof(calculated_number_t));
     if (dim->cns_head)
-        memcpy(src_cns + first_chunk, dim->cns.data(), dim->cns_head * sizeof(calculated_number_t));
-    memcpy(dst_cns, src_cns, n * sizeof(calculated_number_t));
+        memcpy(src_cns + first_chunk, dim->cns, dim->cns_head * sizeof(calculated_number_t));
 
     ml_features_t features = {
         Cfg.diff_n, smoothing_window, Cfg.lag_n,
         dst_cns, n, src_cns, n
     };
-    ml_features_preprocess_predict(&features, dim->feature);
+    // The feature vector is live only inside this call (built here, consumed by
+    // the scoring loop below), so it is a local. It used to be a 48-byte member
+    // of every ml_dimension_t.
+    DSample feature;
+    ml_features_preprocess_predict(&features, feature);
 
     // Mark the metric time as variable if we received different values
     if (!same_value)
@@ -928,7 +1243,9 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
     for (const auto &km_ctx : dim->km_contexts) {
         models_consulted++;
 
-        calculated_number_t anomaly_score = ml_kmeans_anomaly_score(&km_ctx, dim->feature);
+        calculated_number_t anomaly_score = ml_kmeans_anomaly_score(&km_ctx, feature);
+
+        // NaN: the model abstains (it is flat, or its score cannot be computed)
         if (std::isnan(anomaly_score))
             continue;
 
@@ -964,49 +1281,100 @@ ml_chart_is_available_for_ml(ml_chart_t *chart)
     return rrdset_is_available_for_exporting_and_alarms(chart->rs);
 }
 
+void ml_chart_stats_add(ml_machine_learning_stats_t *dst, const ml_machine_learning_stats_t &src)
+{
+    dst->num_machine_learning_status_enabled += src.num_machine_learning_status_enabled;
+    dst->num_machine_learning_status_disabled_sp += src.num_machine_learning_status_disabled_sp;
+
+    dst->num_metric_type_constant += src.num_metric_type_constant;
+    dst->num_metric_type_variable += src.num_metric_type_variable;
+
+    dst->num_training_status_untrained += src.num_training_status_untrained;
+    dst->num_training_status_pending_without_model += src.num_training_status_pending_without_model;
+    dst->num_training_status_trained += src.num_training_status_trained;
+    dst->num_training_status_pending_with_model += src.num_training_status_pending_with_model;
+    dst->num_training_status_silenced += src.num_training_status_silenced;
+    dst->num_dimensions_with_models += src.num_dimensions_with_models;
+
+    dst->num_anomalous_dimensions += src.num_anomalous_dimensions;
+    dst->num_normal_dimensions += src.num_normal_dimensions;
+}
+
+void ml_chart_reset_stats(ml_chart_t *chart)
+{
+    spinlock_lock(&chart->mls_spinlock);
+    chart->mls = {};
+    spinlock_unlock(&chart->mls_spinlock);
+}
+
+ml_machine_learning_stats_t ml_chart_get_stats(ml_chart_t *chart)
+{
+    spinlock_lock(&chart->mls_spinlock);
+    ml_machine_learning_stats_t mls = chart->mls;
+    spinlock_unlock(&chart->mls_spinlock);
+
+    return mls;
+}
+
 void
 ml_chart_update_dimension(ml_chart_t *chart, ml_dimension_t *dim, bool is_anomalous)
 {
-    switch (dim->mls) {
-        case MACHINE_LEARNING_STATUS_DISABLED_DUE_TO_EXCLUDED_CHART:
-            chart->mls.num_machine_learning_status_disabled_sp++;
-            return;
-        case MACHINE_LEARNING_STATUS_ENABLED: {
-            chart->mls.num_machine_learning_status_enabled++;
+    spinlock_lock(&dim->slock);
+    enum ml_machine_learning_status mls = dim->mls;
+    enum ml_metric_type mt = dim->mt;
+    enum ml_training_status ts = dim->ts;
+    bool has_models = !dim->km_contexts.empty();
+    spinlock_unlock(&dim->slock);
 
-            switch (dim->mt) {
+    ml_machine_learning_stats_t delta = {};
+
+    switch (mls) {
+        case MACHINE_LEARNING_STATUS_DISABLED_DUE_TO_EXCLUDED_CHART:
+            delta.num_machine_learning_status_disabled_sp++;
+            break;
+        case MACHINE_LEARNING_STATUS_ENABLED: {
+            delta.num_machine_learning_status_enabled++;
+
+            if (has_models)
+                delta.num_dimensions_with_models++;
+
+            switch (mt) {
                 case METRIC_TYPE_CONSTANT:
-                    chart->mls.num_metric_type_constant++;
-                    chart->mls.num_training_status_trained++;
-                    chart->mls.num_normal_dimensions++;
-                    return;
+                    delta.num_metric_type_constant++;
+                    delta.num_training_status_trained++;
+                    delta.num_normal_dimensions++;
+                    break;
                 case METRIC_TYPE_VARIABLE:
-                    chart->mls.num_metric_type_variable++;
+                    delta.num_metric_type_variable++;
+
+                    switch (ts) {
+                        case TRAINING_STATUS_UNTRAINED:
+                            delta.num_training_status_untrained++;
+                            break;
+                        case TRAINING_STATUS_TRAINED:
+                            delta.num_training_status_trained++;
+
+                            delta.num_anomalous_dimensions += is_anomalous ? 1 : 0;
+                            delta.num_normal_dimensions += is_anomalous ? 0 : 1;
+                            break;
+                        case TRAINING_STATUS_SILENCED:
+                            delta.num_training_status_silenced++;
+                            delta.num_training_status_trained++;
+
+                            delta.num_anomalous_dimensions += is_anomalous ? 1 : 0;
+                            delta.num_normal_dimensions += is_anomalous ? 0 : 1;
+                            break;
+                    }
                     break;
             }
 
-            switch (dim->ts) {
-                case TRAINING_STATUS_UNTRAINED:
-                    chart->mls.num_training_status_untrained++;
-                    return;
-                case TRAINING_STATUS_TRAINED:
-                    chart->mls.num_training_status_trained++;
-
-                    chart->mls.num_anomalous_dimensions += is_anomalous;
-                    chart->mls.num_normal_dimensions += !is_anomalous;
-                    return;
-                case TRAINING_STATUS_SILENCED:
-                    chart->mls.num_training_status_silenced++;
-                    chart->mls.num_training_status_trained++;
-
-                    chart->mls.num_anomalous_dimensions += is_anomalous;
-                    chart->mls.num_normal_dimensions += !is_anomalous;
-                    return;
-            }
-
-            return;
+            break;
         }
     }
+
+    spinlock_lock(&chart->mls_spinlock);
+    ml_chart_stats_add(&chart->mls, delta);
+    spinlock_unlock(&chart->mls_spinlock);
 }
 
 /*
@@ -1019,15 +1387,19 @@ ml_chart_update_dimension(ml_chart_t *chart, ml_dimension_t *dim, bool is_anomal
 #define WORKER_JOB_DETECTION_STATS 3
 
 static void
-ml_host_detect_once(ml_host_t *host)
+ml_host_detect_once(ml_host_t *host, ONEWAYALLOC *owa)
 {
     worker_is_busy(WORKER_JOB_DETECTION_COLLECT_STATS);
 
-    host->mls = {};
     ml_machine_learning_stats_t mls_copy = {};
+    ml_machine_learning_stats_t host_mls = {};
+    calculated_number_t host_anomaly_rate = 0.0;
 
-    if (host->ml_running) {
-        netdata_mutex_lock(&host->mutex);
+    if (ml_running_load(host->rh)) {
+        // Snapshot the stop generation before the chart walk. If it changes by
+        // the time we publish, a stop overlapped the walk and the accumulated
+        // snapshot must be discarded.
+        uint64_t stop_gen_before = host->ml_stop_generation.load();
 
         /*
          * prediction/detection stats
@@ -1036,29 +1408,20 @@ ml_host_detect_once(ml_host_t *host)
         rrdset_foreach_read(rsp, host->rh) {
             RRDSET *rs = static_cast<RRDSET *>(rsp);
 
-            ml_chart_t *chart = (ml_chart_t *) rs->ml_chart;
+            ml_chart_t *chart = (ml_chart_t *) __atomic_load_n(&rs->ml_chart, __ATOMIC_ACQUIRE);
             if (!chart)
                 continue;
 
             if (!ml_chart_is_available_for_ml(chart))
                 continue;
 
-            ml_machine_learning_stats_t chart_mls = chart->mls;
+            ml_machine_learning_stats_t chart_mls = ml_chart_get_stats(chart);
 
-            host->mls.num_machine_learning_status_enabled += chart_mls.num_machine_learning_status_enabled;
-            host->mls.num_machine_learning_status_disabled_sp += chart_mls.num_machine_learning_status_disabled_sp;
-
-            host->mls.num_metric_type_constant += chart_mls.num_metric_type_constant;
-            host->mls.num_metric_type_variable += chart_mls.num_metric_type_variable;
-
-            host->mls.num_training_status_untrained += chart_mls.num_training_status_untrained;
-            host->mls.num_training_status_pending_without_model += chart_mls.num_training_status_pending_without_model;
-            host->mls.num_training_status_trained += chart_mls.num_training_status_trained;
-            host->mls.num_training_status_pending_with_model += chart_mls.num_training_status_pending_with_model;
-            host->mls.num_training_status_silenced += chart_mls.num_training_status_silenced;
-
-            host->mls.num_anomalous_dimensions += chart_mls.num_anomalous_dimensions;
-            host->mls.num_normal_dimensions += chart_mls.num_normal_dimensions;
+            // Roll the chart's counters into the host's through the same
+            // helper the dimension->chart step uses. This was a hand-rolled
+            // copy of ml_chart_stats_add()'s field list, and a field added to
+            // one enumeration but not the other silently published as zero.
+            ml_chart_stats_add(&host_mls, chart_mls);
 
             if (spinlock_trylock(&host->context_anomaly_rate_spinlock))
             {
@@ -1066,12 +1429,15 @@ ml_host_detect_once(ml_host_t *host)
                 auto &um = host->context_anomaly_rate;
                 auto it = um.find(key);
                 if (it == um.end()) {
-                    um[key] = ml_context_anomaly_rate_t {
+                    STRING *owned_key = string_dup(key);
+                    auto insert_result = um.emplace(owned_key, ml_context_anomaly_rate_t {
                         .rd = NULL,
                         .normal_dimensions = 0,
                         .anomalous_dimensions = 0
-                    };
-                    it = um.find(key);
+                    });
+                    if (!insert_result.second)
+                        string_freez(owned_key);
+                    it = insert_result.first;
                 }
 
                 it->second.anomalous_dimensions += chart_mls.num_anomalous_dimensions;
@@ -1081,31 +1447,46 @@ ml_host_detect_once(ml_host_t *host)
         }
         rrdset_foreach_done(rsp);
 
-        host->host_anomaly_rate = 0.0;
-        size_t NumActiveDimensions = host->mls.num_anomalous_dimensions + host->mls.num_normal_dimensions;
-        if (NumActiveDimensions)
-              host->host_anomaly_rate = static_cast<double>(host->mls.num_anomalous_dimensions) / NumActiveDimensions;
+        size_t num_active_dimensions = host_mls.num_anomalous_dimensions + host_mls.num_normal_dimensions;
+        if (num_active_dimensions)
+            host_anomaly_rate = static_cast<double>(host_mls.num_anomalous_dimensions) / num_active_dimensions;
 
-        mls_copy = host->mls;
+        // Publish the final host snapshot after chart traversal so chart
+        // deletion cannot block other host->mutex users for the full walk.
+        // Discard the snapshot if either (a) ml_running is now false, or
+        // (b) the stop generation changed since the walk started — the
+        // latter catches a stop+start that completed during the walk and
+        // would otherwise pass the boolean check. In either case the chart
+        // walk may have spanned stop's resets, so zero the snapshot and the
+        // per-context counts. The chart updates below run unconditionally:
+        // ml_update_dimensions_chart reads the host running state directly (so
+        // the ml_running chart records the stop), and the chart-update path resets
+        // and republishes the rest.
+        netdata_mutex_lock(&host->mutex);
+        uint64_t stop_gen_after = host->ml_stop_generation.load();
+        if (!ml_running_load(host->rh) || stop_gen_before != stop_gen_after) {
+            host_mls = {};
+            host_anomaly_rate = 0.0;
 
+            spinlock_lock(&host->context_anomaly_rate_spinlock);
+            for (auto &p : host->context_anomaly_rate) {
+                p.second.anomalous_dimensions = 0;
+                p.second.normal_dimensions = 0;
+            }
+            spinlock_unlock(&host->context_anomaly_rate_spinlock);
+        }
+        host->mls = host_mls;
+        host->host_anomaly_rate = host_anomaly_rate;
+        mls_copy = host_mls;
         netdata_mutex_unlock(&host->mutex);
 
         worker_is_busy(WORKER_JOB_DETECTION_DIM_CHART);
         ml_update_dimensions_chart(host, mls_copy);
 
         worker_is_busy(WORKER_JOB_DETECTION_HOST_CHART);
-        ml_update_host_and_detection_rate_charts(host, host->host_anomaly_rate * 10000.0);
+        ml_update_host_and_detection_rate_charts(host, host_anomaly_rate * 10000.0, owa);
     } else {
         host->host_anomaly_rate = 0.0;
-
-        auto &um = host->context_anomaly_rate;
-        for (auto &entry: um) {
-            entry.second = ml_context_anomaly_rate_t {
-                .rd = NULL,
-                .normal_dimensions = 0,
-                .anomalous_dimensions = 0
-            };
-        }
     }
 }
 
@@ -1122,6 +1503,10 @@ void ml_detect_main(void *arg)
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);
 
+    // Reuse query scratch across hosts and iterations. Reset between hosts
+    // retains the arena's high-water capacity until this detector stops.
+    ONEWAYALLOC *detect_owa = onewayalloc_create(0);
+
     while (!Cfg.detection_stop && service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
         heartbeat_next(&hb);
@@ -1129,13 +1514,15 @@ void ml_detect_main(void *arg)
         RRDHOST *rh;
         rrd_rdlock();
         rrdhost_foreach_read(rh) {
-            if (!rh->ml_host)
+            AcquiredMLHost acquired_host(rh);
+            ml_host_t *host = acquired_host.get();
+            if (!host)
                 continue;
 
             if (!service_running(SERVICE_COLLECTORS))
                 break;
 
-            ml_host_detect_once((ml_host_t *) rh->ml_host);
+            ml_host_detect_once(host, detect_owa);
         }
         rrd_rdunlock();
 
@@ -1145,23 +1532,56 @@ void ml_detect_main(void *arg)
                 ml_worker_t *worker = &Cfg.workers[idx];
 
                 netdata_mutex_lock(&worker->nd_mutex);
-                ml_queue_stats_t queue_stats = worker->queue_stats;
+                ml_worker_stats_t training_stats = worker->training_stats;
                 netdata_mutex_unlock(&worker->nd_mutex);
 
-                ml_update_training_statistics_chart(worker, queue_stats);
+                ml_update_training_statistics_chart(worker, training_stats);
             }
+
+            ml_update_training_queue_charts(ml_queue_stats(Cfg.training_queue), ml_queue_size(Cfg.training_queue));
         }
     }
+
+    onewayalloc_destroy(detect_owa);
+
     Cfg.training_stop = true;
     finalize_self_prepared_sql_statements();
 }
 
-static void ml_flush_pending_models(ml_worker_t *worker) {
+// Called with db_mutex held. Takes every model pending in Cfg.pending_models as this thread's batch: the swap
+// happens under db_mutex, so batches reach the database in the order they were taken, and every dimension's models
+// in the order they were installed. Returns false when another thread took the batch first.
+static bool ml_flush_pending_models(ml_worker_t *worker) {
     static time_t next_vacuum_run = 0;
     int op_no = 1;
 
-    // begin transaction
-    int rc = db_execute(ml_db, "BEGIN TRANSACTION;", NULL);
+    ml_pending_models_take(worker->pending_model_info);
+
+    // another thread that reached the batch size at the same time took them first
+    if (worker->pending_model_info.empty())
+        return false;
+
+    // Bail when ml.db is missing OR poisoned. The NULL check covers
+    // non-corruption init failures (sqlite3_open ENOSPC/EACCES, ...) that
+    // leave ml_db == NULL without setting the unusable flag -- without it
+    // we'd drive db_execute(NULL, ...) / vacuum_database(NULL, ...) every
+    // flush and spam the log.
+    if (unlikely(!ml_db || ml_db_is_unusable())) {
+        worker->pending_model_info.clear();
+        return true;
+    }
+
+    // begin transaction. Capture the SQLite rc so we can latch the corrupt
+    // flag if BEGIN/COMMIT/ROLLBACK themselves trip CORRUPT or NOTADB --
+    // db_execute() returns only 0/1, the actual rc is exposed via the
+    // out-param.
+    // Reset sqlite_rc before every db_execute() call: db_execute() returns
+    // early without writing the out-param if its `db` argument is NULL, so
+    // a stale value from a prior call could otherwise survive and be fed
+    // to ml_db_mark_if_corrupt().
+    int sqlite_rc = SQLITE_OK;
+    int rc = db_execute(ml_db, "BEGIN TRANSACTION;", &sqlite_rc);
+    ml_db_mark_if_corrupt(sqlite_rc);
 
     // add/delete models
     if (!rc) {
@@ -1188,14 +1608,23 @@ static void ml_flush_pending_models(ml_worker_t *worker) {
     // commit transaction
     if (!rc) {
         op_no++;
-        rc = db_execute(ml_db, "COMMIT TRANSACTION;", NULL);
+        sqlite_rc = SQLITE_OK;
+        rc = db_execute(ml_db, "COMMIT TRANSACTION;", &sqlite_rc);
+        ml_db_mark_if_corrupt(sqlite_rc);
     }
 
+    // If corruption was detected mid-loop (add/delete/prune set ml_db_unusable
+    // before returning), skip rollback and vacuum -- the DB is already flagged
+    // and will be quarantined at next restart; further SQL only spams errors.
+    bool became_unusable = ml_db_is_unusable();
+
     // rollback transaction on failure
-    if (rc) {
+    if (rc && !became_unusable) {
         netdata_log_error("Trying to rollback ML transaction because it failed with rc=%d, op_no=%d", rc, op_no);
         op_no++;
-        rc = db_execute(ml_db, "ROLLBACK;", NULL);
+        sqlite_rc = SQLITE_OK;
+        rc = db_execute(ml_db, "ROLLBACK;", &sqlite_rc);
+        ml_db_mark_if_corrupt(sqlite_rc);
         if (rc)
             netdata_log_error("ML transaction rollback failed with rc=%d", rc);
     }
@@ -1205,26 +1634,77 @@ static void ml_flush_pending_models(ml_worker_t *worker) {
         worker->num_models_to_prune += worker->pending_model_info.size();
     }
 
-    vacuum_database(ml_db, "ML", 0, 0, &next_vacuum_run);
+    if (likely(!became_unusable))
+        vacuum_database(ml_db, "ML", 0, 0, &next_vacuum_run);
 
     worker->pending_model_info.clear();
+    return true;
 }
 
-static enum ml_worker_result ml_worker_create_new_model(ml_worker_t *worker, ml_request_create_new_model_t req) {
+time_t ml_queue_dimension_pass_key(const ml_request_create_new_model_t &req, void *arg __maybe_unused) {
+    AcquiredDimension AcqDim(req.DLI);
+
+    if (!AcqDim.acquired())
+        return 0;
+
+    RRDDIM *rd = AcqDim.rrddim();
+    if (!rd)
+        return 0;
+
+    // the tier spinlock keeps the collect handle alive across the read (rrddim_free finalizes it under the
+    // same lock); the handle's fields are read atomically (see storage_engine_store_page_time_to_close_s())
+    spinlock_lock(&rd->tiers[0].spinlock);
+    time_t to_close_s = storage_engine_store_page_time_to_close_s(rd->tiers[0].sch);
+    spinlock_unlock(&rd->tiers[0].spinlock);
+
+    if (to_close_s < 0)
+        return 0;
+
+    // the local time the page will complete: the data it still needs arrives at the collection rate from now on,
+    // however far this dimension's timestamps lag the local clock (a child behind its parent)
+    return now_realtime_sec() + to_close_s;
+}
+
+enum ml_worker_result ml_worker_create_new_model(ml_worker_t *worker, const ml_request_create_new_model_t &req) {
     AcquiredDimension AcqDim(req.DLI);
 
     if (!AcqDim.acquired()) {
-        return ML_WORKER_RESULT_NULL_ACQUIRED_DIMENSION;
+        return AcqDim.unavailable_temporarily() ? ML_WORKER_RESULT_DIMENSION_UNAVAILABLE :
+                                                  ML_WORKER_RESULT_NULL_ACQUIRED_DIMENSION;
     }
 
     ml_dimension_t *Dim = reinterpret_cast<ml_dimension_t *>(AcqDim.dimension());
     return ml_dimension_train_model(worker, Dim);
 }
 
-static enum ml_worker_result ml_worker_add_existing_model(ml_worker_t *worker, ml_request_add_existing_model_t req) {
-    UNUSED(worker);
-    UNUSED(req);
+bool ml_dimension_accept_downstream_model(const ml_dimension_t *dim, const ml_kmeans_inlined_t &km)
+{
+    // Loop detection: skip if we already have this exact model.
+    // The (after, before) pair uniquely identifies a model per dimension and is
+    // preserved across hops, so a model that loops back is detected as a duplicate.
+    for (const auto &ctx : dim->km_contexts) {
+        if (ctx.after == km.after && ctx.before == km.before)
+            return false;
+    }
 
+    // Reject models that are not newer than the newest accepted model. This
+    // prevents an older model from being re-accepted after it has been evicted
+    // from km_contexts and later loops back from downstream.
+    //
+    // The check sees only km_contexts: what was installed or loaded since the
+    // dimension was created or last reset by ml_host_stop(). Persisted models
+    // are not loaded for ML-excluded dimensions (see ml_dimension_new()) and
+    // are not reloaded after a reset, so in those cases a model older than one
+    // already in ml.db is accepted.
+    if (!dim->km_contexts.empty() && km.before <= dim->km_contexts.back().before)
+        return false;
+
+    // A local training in progress does not block it: that training writes to its worker's buffer, and its own
+    // install is dropped once this model is in (see ml_dimension_update_models_locked()).
+    return true;
+}
+
+static enum ml_worker_result ml_worker_add_existing_model(ml_worker_t *worker, const ml_request_add_existing_model_t &req) {
     AcquiredDimension AcqDim(req.DLI);
 
     if (!AcqDim.acquired()) {
@@ -1237,20 +1717,30 @@ static enum ml_worker_result ml_worker_add_existing_model(ml_worker_t *worker, m
         return ML_WORKER_RESULT_OK;
     }
 
-    // Check if training is in progress and skip if so to avoid race condition
+    if (!ml_running_load(Dim->rd->rrdset->rrdhost)) {
+        pulse_ml_models_ignored();
+        return ML_WORKER_RESULT_OK;
+    }
+
+    // Check, stage and install in ONE dim->slock critical section. Training threads share one queue, so two of them
+    // can hold models of the same dimension at once: done this way their installs serialise, and the newer-than check
+    // keeps the newest model whichever arrives first. The install, and the has_received_downstream_model flag-set,
+    // happen under the same slock as the publish-check, so a concurrent ml_host_stop() either commits both or
+    // cancels both.
     spinlock_lock(&Dim->slock);
-    if (Dim->training_in_progress) {
+
+    if (!ml_dimension_accept_downstream_model(Dim, req.inlined_km)) {
         spinlock_unlock(&Dim->slock);
         pulse_ml_models_ignored();
         return ML_WORKER_RESULT_OK;
     }
+
+    bool installed = ml_dimension_update_models_locked(worker, Dim, req.inlined_km, Dim->reset_generation, /*from_downstream=*/true);
     spinlock_unlock(&Dim->slock);
 
-    // Safe without Dim->slock: per-host work is serialized through a single worker queue,
-    // and stop/reset no longer writes Dim->kmeans from non-worker threads.
-    Dim->kmeans = req.inlined_km;
-    ml_dimension_update_models(worker, Dim);
-    pulse_ml_models_received();
+    if (installed)
+        pulse_ml_models_received();
+
     return ML_WORKER_RESULT_OK;
 }
 
@@ -1279,18 +1769,23 @@ void ml_train_main(void *arg) {
 
         worker_is_busy(WORKER_TRAIN_QUEUE_POP);
 
-        ml_queue_stats_t loop_stats{};
+        ml_worker_stats_t loop_stats{};
+        ml_queue_pass_timing_t pass_timing;
 
-        ml_queue_item_t item = ml_queue_pop(worker->queue);
+        ml_queue_item_t item = ml_queue_pop(Cfg.training_queue, &pass_timing);
         if (item.type == ML_QUEUE_ITEM_STOP_REQUEST) {
             break;
         }
 
-        ml_queue_size_t queue_size = ml_queue_size(worker->queue);
+        ml_queue_size_t queue_size = ml_queue_size(Cfg.training_queue);
 
-        usec_t allotted_ut = (Cfg.train_every * USEC_PER_SEC) / (queue_size.create_new_model + 1);
-        if (allotted_ut > USEC_PER_SEC)
-            allotted_ut = USEC_PER_SEC;
+        // all training threads consume the one queue, so each paces itself to its share of it; this assumes the
+        // configured number of threads is running (a missing or throttled thread makes the pass longer). The cap
+        // keeps the threads TOGETHER at no more than one item per second when there are fewer queued dimensions than
+        // seconds in train_every - the rate one thread had when it held all of a host's dimensions.
+        usec_t allotted_ut = (Cfg.train_every * USEC_PER_SEC * Cfg.num_worker_threads) / (queue_size.create_new_model + 1);
+        if (allotted_ut > USEC_PER_SEC * Cfg.num_worker_threads)
+            allotted_ut = USEC_PER_SEC * Cfg.num_worker_threads;
 
         usec_t start_ut = now_monotonic_usec();
 
@@ -1299,8 +1794,8 @@ void ml_train_main(void *arg) {
         switch (item.type) {
             case ML_QUEUE_ITEM_TYPE_CREATE_NEW_MODEL: {
                 worker_res = ml_worker_create_new_model(worker, item.create_new_model);
-                if (worker_res != ML_WORKER_RESULT_NULL_ACQUIRED_DIMENSION) {
-                    ml_queue_push(worker->queue, item);
+                if (ml_should_requeue_create_new_model(worker_res)) {
+                    ml_queue_push(Cfg.training_queue, item);
                 }
                 break;
             }
@@ -1322,16 +1817,15 @@ void ml_train_main(void *arg) {
         if (Cfg.enable_statistics_charts) {
             worker_is_busy(WORKER_TRAIN_UPDATE_HOST);
 
-            ml_queue_stats_t queue_stats = ml_queue_stats(worker->queue);
-
-            loop_stats.total_add_existing_model_requests_pushed = queue_stats.total_add_existing_model_requests_pushed;
-            loop_stats.total_add_existing_model_requests_popped = queue_stats.total_add_existing_model_requests_popped;
-            loop_stats.total_create_new_model_requests_pushed = queue_stats.total_create_new_model_requests_pushed;
-            loop_stats.total_create_new_model_requests_popped = queue_stats.total_create_new_model_requests_popped;
-
             loop_stats.allotted_ut = allotted_ut;
             loop_stats.consumed_ut = consumed_ut;
             loop_stats.remaining_ut = remaining_ut;
+
+            // only the thread that sorted a pass accounts for its resolution and sorting
+            if (pass_timing.sorted) {
+                loop_stats.pass_resolve_ut = pass_timing.resolve_ut;
+                loop_stats.pass_sort_ut = pass_timing.sort_ut;
+            }
 
             switch (worker_res) {
                 case ML_WORKER_RESULT_OK:
@@ -1344,42 +1838,46 @@ void ml_train_main(void *arg) {
                     loop_stats.item_result_not_enough_collected_values = 1;
                     break;
                 case ML_WORKER_RESULT_NULL_ACQUIRED_DIMENSION:
+                case ML_WORKER_RESULT_DIMENSION_UNAVAILABLE:
                     loop_stats.item_result_null_acquired_dimension = 1;
                     break;
                 case ML_WORKER_RESULT_CHART_UNDER_REPLICATION:
                     loop_stats.item_result_chart_under_replication = 1;
                     break;
+                case ML_WORKER_RESULT_DOWNSTREAM_MODEL_SUPPLIED:
+                    loop_stats.item_result_ok = 1;
+                    break;
+                case ML_WORKER_RESULT_TRAINING_IN_PROGRESS:
+                    loop_stats.item_result_ok = 1;
+                    break;
             }
 
             netdata_mutex_lock(&worker->nd_mutex);
 
-            worker->queue_stats.total_add_existing_model_requests_pushed = loop_stats.total_add_existing_model_requests_pushed;
-            worker->queue_stats.total_add_existing_model_requests_popped = loop_stats.total_add_existing_model_requests_popped;
+            worker->training_stats.allotted_ut += loop_stats.allotted_ut;
+            worker->training_stats.consumed_ut += loop_stats.consumed_ut;
+            worker->training_stats.remaining_ut += loop_stats.remaining_ut;
 
-            worker->queue_stats.total_create_new_model_requests_pushed = loop_stats.total_create_new_model_requests_pushed;
-            worker->queue_stats.total_create_new_model_requests_popped = loop_stats.total_create_new_model_requests_popped;
+            worker->training_stats.pass_resolve_ut += loop_stats.pass_resolve_ut;
+            worker->training_stats.pass_sort_ut += loop_stats.pass_sort_ut;
 
-            worker->queue_stats.allotted_ut += loop_stats.allotted_ut;
-            worker->queue_stats.consumed_ut += loop_stats.consumed_ut;
-            worker->queue_stats.remaining_ut += loop_stats.remaining_ut;
-
-            worker->queue_stats.item_result_ok += loop_stats.item_result_ok;
-            worker->queue_stats.item_result_invalid_query_time_range += loop_stats.item_result_invalid_query_time_range;
-            worker->queue_stats.item_result_not_enough_collected_values += loop_stats.item_result_not_enough_collected_values;
-            worker->queue_stats.item_result_null_acquired_dimension += loop_stats.item_result_null_acquired_dimension;
-            worker->queue_stats.item_result_chart_under_replication += loop_stats.item_result_chart_under_replication;
+            worker->training_stats.item_result_ok += loop_stats.item_result_ok;
+            worker->training_stats.item_result_invalid_query_time_range += loop_stats.item_result_invalid_query_time_range;
+            worker->training_stats.item_result_not_enough_collected_values += loop_stats.item_result_not_enough_collected_values;
+            worker->training_stats.item_result_null_acquired_dimension += loop_stats.item_result_null_acquired_dimension;
+            worker->training_stats.item_result_chart_under_replication += loop_stats.item_result_chart_under_replication;
 
             netdata_mutex_unlock(&worker->nd_mutex);
         }
 
         bool should_sleep = true;
 
-        if (worker->pending_model_info.size() >= Cfg.flush_models_batch_size) {
+        if (ml_pending_models_count() >= Cfg.flush_models_batch_size) {
             worker_is_busy(WORKER_TRAIN_FLUSH_MODELS);
             netdata_mutex_lock(&db_mutex);
-            ml_flush_pending_models(worker);
+            // a thread that finds the batch already taken by another did no flush, so it still paces itself
+            should_sleep = !ml_flush_pending_models(worker);
             netdata_mutex_unlock(&db_mutex);
-            should_sleep = false;
         }
 
         if (item.type == ML_QUEUE_ITEM_TYPE_ADD_EXISTING_MODEL) {
@@ -1390,7 +1888,14 @@ void ml_train_main(void *arg) {
             continue;
 
         worker_is_idle();
-        std::this_thread::sleep_for(std::chrono::microseconds{remaining_ut});
+
+        // the allotment can be several seconds (see above): sleep in slices of at most a second, so a stop request
+        // is noticed as quickly as it was with the 1-second cap
+        while (remaining_ut && !Cfg.training_stop) {
+            usec_t slice_ut = remaining_ut < USEC_PER_SEC ? remaining_ut : USEC_PER_SEC;
+            std::this_thread::sleep_for(std::chrono::microseconds{slice_ut});
+            remaining_ut -= slice_ut;
+        }
     }
     finalize_self_prepared_sql_statements();
 }

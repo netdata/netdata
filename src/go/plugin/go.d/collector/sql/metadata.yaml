@@ -336,7 +336,7 @@ modules:
               description: >
                 A list of SQL functions exposed as interactive table views in Netdata's Live tab.
                 Each function runs a SQL query and displays results in a filterable, sortable table.
-                See [Functions](#functions) for details.
+                See [Live Data](#live-data) for details.
               default_value: "[]"
               required: false
               group: Functions
@@ -803,7 +803,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     functions:
       description: |
         This collector supports user-defined SQL functions that expose query results as
@@ -837,4 +836,9 @@ modules:
         :::
 
       availability: []
+      dynamic_context_prefixes:
+        - prefix: sql.
+          reason: >-
+            Chart contexts come from the configured metric blocks and are generated at runtime as
+            sql.<driver>_<context>.
       scopes: []

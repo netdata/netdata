@@ -9,16 +9,17 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/model"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/internal/naming"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 )
 
 type Config struct {
+	PipelineID     string             `yaml:"-" json:"-"`
 	Source         string             `yaml:"-" json:"-"`
 	ConfigDefaults confgroup.Registry `yaml:"-" json:"-"`
 
-	Disabled bool   `yaml:"disabled,omitempty" json:"disabled,omitempty"`
-	Name     string `yaml:"name" json:"name"`
+	Disabled               bool   `yaml:"disabled,omitempty" json:"disabled,omitempty"`
+	Name                   string `yaml:"name" json:"name"`
+	TrustDiscoveredTargets bool   `yaml:"trust_discovered_targets,omitempty" json:"trust_discovered_targets,omitempty"`
 
 	// Canonical format: discoverer: { <type>: <config> }
 	Discoverer DiscovererPayload `yaml:"discoverer,omitempty" json:"discoverer"`
@@ -193,12 +194,6 @@ func normalizeYAMLValue(v any) (any, error) {
 	}
 }
 
-// CleanName returns the name sanitized for use in dyncfg IDs.
-// Sanitizes for safe use in IDs and paths.
-func (c Config) CleanName() string {
-	return naming.Sanitize(c.Name)
-}
-
 // UnmarshalYAML implements yaml.Unmarshaler.
 // It converts legacy formats to the canonical format:
 // - discover[] -> discoverer{}
@@ -307,28 +302,22 @@ func mergeJSONArrays(aRaw, bRaw json.RawMessage) (json.RawMessage, error) {
 	return bs, nil
 }
 
-func NewDiscovererPayload(typ string, cfg any) (DiscovererPayload, error) {
-	bs, err := json.Marshal(cfg)
-	if err != nil {
-		return DiscovererPayload{}, err
-	}
-	return DiscovererPayload{Kind: typ, Config: bs}, nil
-}
-
 // MarshalYAML implements yaml.Marshaler.
 // It only marshals the canonical format, not legacy fields.
 func (c Config) MarshalYAML() (any, error) {
 	type output struct {
-		Disabled   bool                `yaml:"disabled,omitempty"`
-		Name       string              `yaml:"name,omitempty"`
-		Discoverer DiscovererPayload   `yaml:"discoverer,omitempty"`
-		Services   []ServiceRuleConfig `yaml:"services,omitempty"`
+		Disabled               bool                `yaml:"disabled,omitempty"`
+		Name                   string              `yaml:"name,omitempty"`
+		Discoverer             DiscovererPayload   `yaml:"discoverer,omitempty"`
+		Services               []ServiceRuleConfig `yaml:"services,omitempty"`
+		TrustDiscoveredTargets bool                `yaml:"trust_discovered_targets,omitempty"`
 	}
 	return output{
-		Disabled:   c.Disabled,
-		Name:       c.Name,
-		Discoverer: c.Discoverer,
-		Services:   c.Services,
+		Disabled:               c.Disabled,
+		Name:                   c.Name,
+		Discoverer:             c.Discoverer,
+		Services:               c.Services,
+		TrustDiscoveredTargets: c.TrustDiscoveredTargets,
 	}, nil
 }
 

@@ -114,18 +114,18 @@ func parseFail2banJailStatus(jailStatus []byte) (failed, banned int64, err error
 		}
 
 		if !failedFound {
-			if i := strings.Index(text, failedSub); i != -1 {
+			if _, after, ok := strings.Cut(text, failedSub); ok {
 				failedFound = true
-				s := strings.TrimSpace(text[i+len(failedSub):])
+				s := strings.TrimSpace(after)
 				if failed, err = strconv.ParseInt(s, 10, 64); err != nil {
 					return 0, 0, fmt.Errorf("failed to parse currently failed value (%s): %v", s, err)
 				}
 			}
 		}
 		if !bannedFound {
-			if i := strings.Index(text, bannedSub); i != -1 {
+			if _, after, ok := strings.Cut(text, bannedSub); ok {
 				bannedFound = true
-				s := strings.TrimSpace(text[i+len(bannedSub):])
+				s := strings.TrimSpace(after)
 				if banned, err = strconv.ParseInt(s, 10, 64); err != nil {
 					return 0, 0, fmt.Errorf("failed to parse currently banned value (%s): %v", s, err)
 				}
@@ -150,8 +150,8 @@ func parseFail2banStatus(status []byte) ([]string, error) {
 	for sc.Scan() {
 		text := strings.TrimSpace(sc.Text())
 
-		if i := strings.Index(text, sub); i != -1 {
-			s := strings.ReplaceAll(text[i+len(sub):], ",", "")
+		if _, after, ok := strings.Cut(text, sub); ok {
+			s := strings.ReplaceAll(after, ",", "")
 			jails = strings.Fields(s)
 			break
 		}

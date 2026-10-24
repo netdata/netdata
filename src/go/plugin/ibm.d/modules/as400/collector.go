@@ -1,5 +1,4 @@
 //go:build cgo
-// +build cgo
 
 package as400
 
@@ -88,7 +87,6 @@ type Collector struct {
 	networkInterfacesCardinality cardinalityGuard
 	httpServersCardinality       cardinalityGuard
 
-	dump   *dumpContext
 	groups []collectionGroup
 
 	messageQueueTargets []queueTarget
@@ -188,9 +186,6 @@ func (c *Collector) CollectOnce() error {
 
 	if err := c.collect(ctx); err != nil {
 		return err
-	}
-	if c.dump != nil {
-		c.dump.recordMetrics(c.snapshotMetrics())
 	}
 
 	// Populate contexts from metric struct maps
@@ -1069,10 +1064,7 @@ func (c *Collector) slowPathIntervalSeconds() int {
 	}
 	interval := int(c.slow.config.interval / time.Second)
 	if interval < 1 {
-		interval = c.fastPathIntervalSeconds()
-		if interval < 1 {
-			interval = 1
-		}
+		interval = max(c.fastPathIntervalSeconds(), 1)
 	}
 	return interval
 }
@@ -1109,18 +1101,6 @@ func (c *Collector) Cleanup(ctx context.Context) {
 	}
 	c.Collector.Cleanup(ctx)
 }
-
-// EnableCaptureArtifacts allows the collector to emit structured capture artifacts when requested.
-func (c *Collector) EnableCaptureArtifacts(dir string) {
-	ctx, err := newDumpContext(dir, &c.Config)
-	if err != nil {
-		c.Errorf("failed to initialise dump context: %v", err)
-		return
-	}
-	c.dump = ctx
-	c.Infof("dump data enabled, writing artifacts to %s", dir)
-}
-
 func (c *Collector) buildDSNIfNeeded(ctx context.Context) error {
 	if strings.TrimSpace(c.DSN) != "" {
 		return nil

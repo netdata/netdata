@@ -10,6 +10,7 @@ modules:
         icon_filename: network-wired.svg
         categories:
           - data-collection.networking
+        description: 'Monitor temperature, voltage, laser bias current, and transmit and receive power for optical modules that support Digital Diagnostic Monitoring.'
       keywords:
         - sfp
         - ddm
@@ -82,7 +83,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics

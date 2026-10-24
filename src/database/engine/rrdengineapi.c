@@ -214,7 +214,9 @@ static inline void check_and_fix_mrg_update_every(struct rrdeng_collect_handle *
               (uint32_t)(handle->update_every_ut / USEC_PER_SEC), mrg_metric_get_update_every_s(main_mrg, handle->metric));
 
         if(unlikely(!handle->update_every_ut))
-            handle->update_every_ut = (usec_t)mrg_metric_get_update_every_s(main_mrg, handle->metric) * USEC_PER_SEC;
+            __atomic_store_n(&handle->update_every_ut,
+                             (usec_t)mrg_metric_get_update_every_s(main_mrg, handle->metric) * USEC_PER_SEC,
+                             __ATOMIC_RELAXED);
         else
             mrg_metric_set_update_every(main_mrg, handle->metric, (uint32_t)(handle->update_every_ut / USEC_PER_SEC));
     }
@@ -321,7 +323,7 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *smh, uin
 
     time_t db_first_time_s, db_last_time_s;
     mrg_metric_get_retention(main_mrg, metric, &db_first_time_s, &db_last_time_s, NULL);
-    handle->page_end_time_ut = (usec_t)db_last_time_s * USEC_PER_SEC;
+    __atomic_store_n(&handle->page_end_time_ut, (usec_t)db_last_time_s * USEC_PER_SEC, __ATOMIC_RELAXED);
 
     return (STORAGE_COLLECT_HANDLE *)handle;
 }
@@ -339,24 +341,16 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *sch) {
         check_completed_page_consistency(handle);
         mrg_metric_set_clean_latest_time_s(main_mrg, handle->metric, pgc_page_end_time_s(handle->pgc_page));
 
-        struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
-        time_t start_time_s = pgc_page_start_time_s(handle->pgc_page);
-        time_t end_time_s = pgc_page_end_time_s(handle->pgc_page);
-        uint32_t update_every_s = mrg_metric_get_update_every_s(main_mrg, handle->metric);
-        if (end_time_s && start_time_s && end_time_s > start_time_s && update_every_s) {
-            uint64_t add_samples = (end_time_s - start_time_s) / update_every_s;
-            __atomic_add_fetch(&ctx->atomic.samples, add_samples, __ATOMIC_RELAXED);
-        }
-
+        // samples are charged when the page reaches disk, see extent_flush_to_open()
         pgc_page_hot_to_dirty_and_release(main_cache, handle->pgc_page, false);
     }
 
     mrg_metric_set_hot_latest_time_s(main_mrg, handle->metric, 0);
 
-    handle->pgc_page = NULL;
+    __atomic_store_n(&handle->pgc_page, NULL, __ATOMIC_RELAXED);
     handle->page_flags = 0;
     handle->page_position = 0;
-    handle->page_entries_max = 0;
+    __atomic_store_n(&handle->page_entries_max, 0, __ATOMIC_RELAXED);
     handle->page_data = NULL;
 
     // important!
@@ -403,14 +397,14 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
         nd_log_limit_static_global_var(erl, 1, 0);
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
 #endif
-                    "DBENGINE: metric '%s' new page from %ld to %ld, update every %u, has a conflict in main cache "
-                    "with existing %s%s page from %ld to %ld, update every %u - "
+                    "DBENGINE: metric '%s' new page from %" PRId64 " to %" PRId64 ", update every %u, has a conflict in main cache "
+                    "with existing %s%s page from %" PRId64 " to %" PRId64 ", update every %u - "
                     "is it collected more than once?",
                     uuid,
-                    page_entry.start_time_s, page_entry.end_time_s, page_entry.update_every_s,
+                    (int64_t)page_entry.start_time_s, (int64_t)page_entry.end_time_s, page_entry.update_every_s,
                     pgc_is_page_hot(pgc_page) ? "hot" : "not-hot",
                     pgc_page_data(pgc_page) == PGD_EMPTY ? " gap" : "",
-                    pgc_page_start_time_s(pgc_page), pgc_page_end_time_s(pgc_page), pgc_page_update_every_s(pgc_page)
+                    (int64_t)pgc_page_start_time_s(pgc_page), (int64_t)pgc_page_end_time_s(pgc_page), pgc_page_update_every_s(pgc_page)
               );
 
         pgc_page_release(main_cache, pgc_page);
@@ -422,11 +416,14 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
         pgc_page = pgc_page_add_and_acquire(main_cache, page_entry, &added);
     }
 
-    handle->page_entries_max = pgd_capacity(data);
-    handle->page_start_time_ut = point_in_time_ut;
-    handle->page_end_time_ut = point_in_time_ut;
+    // page_entries_max, page_start_time_ut, page_end_time_ut and pgc_page are read without the collector's
+    // cooperation by rrdeng_store_metric_page_time_to_close_s(); store them atomically so that reader sees whole
+    // values.
+    __atomic_store_n(&handle->page_entries_max, pgd_capacity(data), __ATOMIC_RELAXED);
+    __atomic_store_n(&handle->page_start_time_ut, point_in_time_ut, __ATOMIC_RELAXED);
+    __atomic_store_n(&handle->page_end_time_ut, point_in_time_ut, __ATOMIC_RELAXED);
     handle->page_position = 1; // zero is already in our data
-    handle->pgc_page = pgc_page;
+    __atomic_store_n(&handle->pgc_page, pgc_page, __ATOMIC_RELAXED);
     handle->page_flags = conflicts? RRDENG_PAGE_CONFLICT : 0;
 
     if(point_in_time_s > max_acceptable_collected_time())
@@ -494,6 +491,21 @@ static PGD *rrdeng_alloc_new_page_data(struct rrdeng_collect_handle *handle, use
     return d;
 }
 
+static ALWAYS_INLINE void rrdeng_store_metric_first_retention(struct rrdeng_collect_handle *handle) {
+    if(likely((handle->page_flags & (RRDENG_PAGE_RETENTION_RECORDED | RRDENG_PAGE_CREATED_IN_FUTURE)) ||
+              pgd_is_empty(handle->page_data)))
+        return;
+
+    // once the page holds a real (non-gap) value, record the page start as
+    // the metric's retention start; gap-only pages are discarded at flush,
+    // so they must not leave retention behind; without this stamp, a metric
+    // without retention gets first_time_s set by the first retention reader
+    // using the newest hot point, hiding all older points of this page from
+    // queries (burst ingestion: replication catch-up)
+    mrg_metric_expand_retention(main_mrg, handle->metric, pgc_page_start_time_s(handle->pgc_page), 0, 0);
+    handle->page_flags |= RRDENG_PAGE_RETENTION_RECORDED;
+}
+
 static ALWAYS_INLINE_HOT void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *sch,
                                              const usec_t point_in_time_ut,
                                              const NETDATA_DOUBLE n,
@@ -521,12 +533,16 @@ static ALWAYS_INLINE_HOT void rrdeng_store_metric_append_point(STORAGE_COLLECT_H
     if(unlikely(!handle->pgc_page)) {
         rrdeng_store_metric_create_new_page(handle, ctx, point_in_time_ut, handle->page_data);
         // handle->position is set to 1 already
+
+        rrdeng_store_metric_first_retention(handle);
     }
     else {
         // update an existing page
         pgc_page_hot_set_end_time_s(main_cache, handle->pgc_page,
                                     (time_t) (point_in_time_ut / USEC_PER_SEC), additional_bytes);
-        handle->page_end_time_ut = point_in_time_ut;
+        __atomic_store_n(&handle->page_end_time_ut, point_in_time_ut, __ATOMIC_RELAXED);
+
+        rrdeng_store_metric_first_retention(handle);
 
         if(unlikely(++handle->page_position >= handle->page_entries_max)) {
             internal_fatal(handle->page_position > handle->page_entries_max, "DBENGINE: exceeded page max number of points");
@@ -557,16 +573,16 @@ static void store_metric_next_error_log(struct rrdeng_collect_handle *handle __m
 
     nd_log_limit_static_global_var(erl, 1, 0);
     nd_log_limit(&erl, NDLS_DAEMON, NDLP_NOTICE,
-                "DBENGINE: metric '%s' collected point at %ld, %s last collection at %ld, "
-                "update every %ld, %s page from %ld to %ld, position %u (of %u), flags: %s",
+                "DBENGINE: metric '%s' collected point at %" PRId64 ", %s last collection at %" PRId64 ", "
+                "update every %" PRId64 ", %s page from %" PRId64 " to %" PRId64 ", position %u (of %u), flags: %s",
                 uuid,
-                point_in_time_s,
+                (int64_t)point_in_time_s,
                 msg,
-                (time_t)(handle->page_end_time_ut / USEC_PER_SEC),
-                (time_t)(handle->update_every_ut / USEC_PER_SEC),
+                (int64_t)(handle->page_end_time_ut / USEC_PER_SEC),
+                (int64_t)(handle->update_every_ut / USEC_PER_SEC),
                 handle->pgc_page ? "current" : "*LAST*",
-                (time_t)(handle->page_start_time_ut / USEC_PER_SEC),
-                (time_t)(handle->page_end_time_ut / USEC_PER_SEC),
+                (int64_t)(handle->page_start_time_ut / USEC_PER_SEC),
+                (int64_t)(handle->page_end_time_ut / USEC_PER_SEC),
                 handle->page_position, handle->page_entries_max,
                 wb ? buffer_tostring(wb) : ""
                 );
@@ -707,7 +723,32 @@ void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch
     handle->page_flags |= RRDENG_PAGE_UPDATE_EVERY_CHANGE;
     rrdeng_store_metric_flush_current_page(sch);
     mrg_metric_set_update_every(main_mrg, metric, update_every);
-    handle->update_every_ut = update_every_ut;
+    __atomic_store_n(&handle->update_every_ut, update_every_ut, __ATOMIC_RELAXED);
+}
+
+time_t rrdeng_store_metric_page_time_to_close_s(STORAGE_COLLECT_HANDLE *sch) {
+    struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)sch;
+
+    if(!__atomic_load_n(&handle->pgc_page, __ATOMIC_RELAXED))
+        return -1;
+
+    uint32_t entries_max = __atomic_load_n(&handle->page_entries_max, __ATOMIC_RELAXED);
+    usec_t update_every_ut = __atomic_load_n(&handle->update_every_ut, __ATOMIC_RELAXED);
+    usec_t start_ut = __atomic_load_n(&handle->page_start_time_ut, __ATOMIC_RELAXED);
+    usec_t last_ut = __atomic_load_n(&handle->page_end_time_ut, __ATOMIC_RELAXED);
+
+    if(!entries_max || !update_every_ut || !start_ut || last_ut < start_ut)
+        return -1;
+
+    // the page flushes when its entries_max-th point arrives (rrdeng_store_metric_next()), so the last point
+    // of a full page is at start + (entries_max - 1) * update_every
+    usec_t close_ut = start_ut + (usec_t)(entries_max - 1) * update_every_ut;
+
+    // a read racing a page change can mix the fields of two pages
+    if(close_ut < last_ut)
+        return -1;
+
+    return (time_t)((close_ut - last_ut) / USEC_PER_SEC);
 }
 
 // ----------------------------------------------------------------------------
@@ -1107,9 +1148,9 @@ void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long
     array[31] = (uint64_t)__atomic_load_n(&global_stats.global_fs_errors, __ATOMIC_RELAXED); // used
     array[32] = (uint64_t)__atomic_load_n(&global_stats.rrdeng_reserved_file_descriptors, __ATOMIC_RELAXED); // used
     array[33] = 0; // (uint64_t)__atomic_load_n(&ctx->stats.pg_cache_over_half_dirty_events, __ATOMIC_RELAXED);
-    array[34] = (uint64_t)__atomic_load_n(&global_stats.global_pg_cache_over_half_dirty_events, __ATOMIC_RELAXED); // used
+    array[34] = 0;
     array[35] = 0; // (uint64_t)__atomic_load_n(&ctx->stats.flushing_pressure_page_deletions, __ATOMIC_RELAXED);
-    array[36] = (uint64_t)__atomic_load_n(&global_stats.global_flushing_pressure_page_deletions, __ATOMIC_RELAXED); // used
+    array[36] = 0;
     array[37] = 0; //(uint64_t)pg_cache->active_descriptors;
 
     fatal_assert(RRDENG_NR_STATS == 38);
@@ -1162,6 +1203,7 @@ int rrdeng_init(
 {
     struct rrdengine_instance *ctx;
     uint32_t max_open_files;
+    bool freshly_initialized_ctx = false;
 
     max_open_files = rlimit_nofile.rlim_cur / 4;
 
@@ -1181,6 +1223,7 @@ int rrdeng_init(
     if(ctxp) {
         *ctxp = ctx = mallocz(sizeof(*ctx));
         initialize_single_ctx(ctx);
+        freshly_initialized_ctx = true;
     }
     else
         ctx = multidb_ctx[tier];
@@ -1203,8 +1246,8 @@ int rrdeng_init(
     ctx->quiesce.enabled = false;
 
     ctx->atomic.first_time_s = LONG_MAX;
-    ctx->atomic.metrics = 0;
-    ctx->atomic.samples = 0;
+    // Global contexts may already have MRG prepopulation accounting from the first DBEngine spawn.
+    rrdeng_reset_accounting_if_fresh(ctx, freshly_initialized_ctx);
 
     if (rrdeng_dbengine_spawn(ctx) && !init_rrd_files(ctx)) {
         // success - we run this ctx too
@@ -1293,68 +1336,121 @@ void rrdeng_quiesce(struct rrdengine_instance *ctx)
 static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_SIZE_STATS *stats)
 {
     struct journal_v2_header *j2_header = journalfile_v2_data_acquire(datafile->journalfile, NULL, 0, 0);
-    void *data_start = (void *)j2_header;
+    uint8_t *data_start = (uint8_t *)j2_header;
 
     if(unlikely(!j2_header))
         return;
 
-    stats->extents += j2_header->extent_count;
+    char file_path[RRDENG_PATH_MAX];
+    journalfile_v2_generate_path(datafile, file_path, sizeof(file_path));
 
-    unsigned entries;
-    struct journal_extent_list *extent_list = (void *) (data_start + j2_header->extent_offset);
-    for (entries = 0; entries < j2_header->extent_count; entries++) {
-        stats->extents_compressed_bytes += extent_list->datafile_size;
-        stats->extents_pages += extent_list->pages;
-        extent_list++;
-    }
+    // Protect the mmap walk: every j2_header->*, extent_list, metric, and
+    // descr access reads the mmap'd v2 journal. If the underlying file has
+    // any unreadable page (truncated, sparse hole, transient I/O error), the
+    // walk SIGBUSes and the process aborts. Same pattern as the sister sites
+    // (populate_retention_to_mrg, find_uuid_first_time, update_metrics_first_time_s).
+    // Partial accumulator increments on signal recovery are acceptable:
+    // size statistics are best-effort across datafiles, the caller continues
+    // to the next datafile in rrdeng_size_statistics().
+    PROTECTED_ACCESS_SETUP(datafile->journalfile->mmap.data, datafile->journalfile->mmap.size, file_path, "size-stats");
+    if(no_signal_received) {
+        size_t mmap_size = datafile->journalfile->mmap.size;
 
-    struct journal_metric_list *metric = (void *) (data_start + j2_header->metric_offset);
-    time_t journal_start_time_s = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
+        // Bounds-check the extent list array against the mapping size before
+        // walking through header-controlled offsets. PROTECTED_ACCESS_SETUP
+        // only catches faults in [data_start, data_start+mmap_size); a
+        // corrupted offset that points past mmap_size would over-read into
+        // unrelated memory and abort. Same idiom as the bounds check in
+        // journalfile_v2_populate_retention_to_mrg.
+        bool extents_in_bounds = (size_t)j2_header->extent_offset <= mmap_size &&
+                                 (size_t)j2_header->extent_count <= (mmap_size - (size_t)j2_header->extent_offset) / sizeof(struct journal_extent_list);
+        if (extents_in_bounds) {
+            stats->extents += j2_header->extent_count;
 
-    stats->metrics += j2_header->metric_count;
-    for (entries = 0; entries < j2_header->metric_count; entries++) {
+            struct journal_extent_list *extent_list = (void *) (data_start + j2_header->extent_offset);
+            for (unsigned entries = 0; entries < j2_header->extent_count; entries++) {
+                stats->extents_compressed_bytes += extent_list->datafile_size;
+                stats->extents_pages += extent_list->pages;
+                extent_list++;
+            }
+        }
 
-        struct journal_page_header *metric_list_header = (void *) (data_start + metric->page_offset);
-        stats->metrics_pages += metric_list_header->entries;
-        struct journal_page_list *descr =  (void *) (data_start + metric->page_offset + sizeof(struct journal_page_header));
-        for (uint32_t idx=0; idx < metric_list_header->entries; idx++) {
+        bool metrics_in_bounds = (size_t)j2_header->metric_offset <= mmap_size &&
+                                 (size_t)j2_header->metric_count <= (mmap_size - (size_t)j2_header->metric_offset) / sizeof(struct journal_metric_list);
+        if (!metrics_in_bounds)
+            goto release;
 
-            time_t update_every_s;
+        struct journal_metric_list *metric = (void *) (data_start + j2_header->metric_offset);
+        time_t journal_start_time_s = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
 
-            size_t points = descr->page_length / CTX_POINT_SIZE_BYTES(datafile_ctx(datafile));
+        stats->metrics += j2_header->metric_count;
+        for (unsigned entries = 0; entries < j2_header->metric_count; entries++) {
 
-            time_t start_time_s = journal_start_time_s + descr->delta_start_s;
-            time_t end_time_s = journal_start_time_s + descr->delta_end_s;
-
-            if(likely(points > 1))
-                update_every_s = (time_t) ((end_time_s - start_time_s) / (points - 1));
-            else {
-                update_every_s = (time_t) (nd_profile.update_every * get_tier_grouping(datafile_ctx(datafile)->config.tier));
-                stats->single_point_pages++;
+            // Per-metric: page_offset is header-controlled. Validate it points
+            // into the mapping and that there is room for the page_header AND
+            // its trailing page_list[] before dereferencing through it.
+            if ((size_t)metric->page_offset > mmap_size ||
+                mmap_size - (size_t)metric->page_offset < sizeof(struct journal_page_header)) {
+                metric++;
+                continue;
             }
 
-            time_t duration_s = (time_t)((end_time_s - start_time_s + update_every_s));
+            struct journal_page_header *metric_list_header = (void *) (data_start + metric->page_offset);
 
-            stats->pages_uncompressed_bytes += descr->page_length;
-            stats->pages_duration_secs += duration_s;
-            stats->points += points;
+            size_t page_list_room = mmap_size - (size_t)metric->page_offset - sizeof(struct journal_page_header);
+            if ((size_t)metric_list_header->entries > page_list_room / sizeof(struct journal_page_list)) {
+                metric++;
+                continue;
+            }
 
-            stats->page_types[descr->type].pages++;
-            stats->page_types[descr->type].pages_uncompressed_bytes += descr->page_length;
-            stats->page_types[descr->type].pages_duration_secs += duration_s;
-            stats->page_types[descr->type].points += points;
+            stats->metrics_pages += metric_list_header->entries;
+            struct journal_page_list *descr =  (void *) (data_start + metric->page_offset + sizeof(struct journal_page_header));
+            for (uint32_t idx=0; idx < metric_list_header->entries; idx++) {
 
-            if(!stats->first_time_s || (start_time_s - update_every_s) < stats->first_time_s)
-                stats->first_time_s = (start_time_s - update_every_s);
+                time_t update_every_s;
 
-            if(!stats->last_time_s || end_time_s > stats->last_time_s)
-                stats->last_time_s = end_time_s;
+                size_t points = descr->page_length / CTX_POINT_SIZE_BYTES(datafile_ctx(datafile));
 
-            descr++;
+                time_t start_time_s = journal_start_time_s + descr->delta_start_s;
+                time_t end_time_s = journal_start_time_s + descr->delta_end_s;
+
+                if(likely(points > 1))
+                    update_every_s = (time_t) ((end_time_s - start_time_s) / (points - 1));
+                else {
+                    update_every_s = (time_t) (nd_profile.update_every * get_tier_grouping(datafile_ctx(datafile)->config.tier));
+                    stats->single_point_pages++;
+                }
+
+                time_t duration_s = (time_t)((end_time_s - start_time_s + update_every_s));
+
+                stats->pages_uncompressed_bytes += descr->page_length;
+                stats->pages_duration_secs += duration_s;
+                stats->points += points;
+
+                // descr->type is uint8_t (range [0, 255]); page_types is sized
+                // [256]. The index is bounded by the type width, so no runtime
+                // check is needed -- a `descr->type < 256` guard would be a
+                // tautology. Note for static analyzers flagging this site.
+                stats->page_types[descr->type].pages++;
+                stats->page_types[descr->type].pages_uncompressed_bytes += descr->page_length;
+                stats->page_types[descr->type].pages_duration_secs += duration_s;
+                stats->page_types[descr->type].points += points;
+
+                if(!stats->first_time_s || (start_time_s - update_every_s) < stats->first_time_s)
+                    stats->first_time_s = (start_time_s - update_every_s);
+
+                if(!stats->last_time_s || end_time_s > stats->last_time_s)
+                    stats->last_time_s = end_time_s;
+
+                descr++;
+            }
+            metric++;
         }
-        metric++;
     }
+    // On SIGBUS/SIGSEGV the PROTECTED_ACCESS_SETUP macro already
+    // rate-limits the error log; fall through to release the journal.
 
+release:
     journalfile_v2_data_release(datafile->journalfile);
 }
 

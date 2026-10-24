@@ -1,13 +1,26 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "ml_config.h"
+#include "ml_dimension.h"
 #include "ml_features.h"
 #include "ml_kmeans.h"
+#include "ml_private.h"
+#include "ml_queue.h"
 
 #include <algorithm>
+#include <array>
+#include <atomic>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <limits>
+#include <type_traits>
+#include <set>
+#include <string>
+#include <condition_variable>
+#include <functional>
+#include <mutex>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -203,6 +216,61 @@ static void test_features_zero_smooth_matches_one()
     }
 }
 
+// Regression: DSample is a fixed 6-row matrix whose constructor leaves the rows
+// uninitialized, and set_size() does not resize it. With lag_n < 5 feature
+// extraction writes only lag_n + 1 rows, but training and scoring use all 6,
+// so the unused rows must be zero in both the training and prediction samples.
+//
+// The sample is poisoned with NaN first, so a row that is not explicitly zeroed
+// fails here instead of passing by luck of a zeroed stack.
+static void test_features_unused_rows_are_zero()
+{
+    fprintf(stderr, "  test_features_unused_rows_are_zero...\n");
+
+    const size_t n = 6;
+    const calculated_number_t input[n] = {10, 20, 30, 40, 50, 60};
+
+    for (size_t lag_n = 1; lag_n <= 5; lag_n++) {
+        calculated_number_t src[n], dst[n];
+        memcpy(src, input, sizeof(src));
+        memcpy(dst, input, sizeof(dst));
+        ml_features_t features = {
+            0, 0, lag_n,
+            dst, n, src, n
+        };
+
+        DSample sample;
+        sample = NAN;
+        ml_features_preprocess_predict(&features, sample);
+
+        for (long row = (long)lag_n + 1; row < sample.nr(); row++) {
+            char msg[128];
+            snprintf(msg, sizeof(msg), "prediction sample row %ld must be zero with lag_n=%zu", row, lag_n);
+            ML_TEST_ASSERT(sample(row) == 0.0, msg);
+        }
+
+        // Training: the worker reuses one vector across dimensions, so
+        // emplace_back() constructs into storage that still holds the previous
+        // samples. Poison that storage the same way.
+        memcpy(src, input, sizeof(src));
+        memcpy(dst, input, sizeof(dst));
+        std::vector<DSample> pf(n);
+        for (auto &ds : pf)
+            ds = NAN;
+        pf.clear();
+        ml_features_preprocess(&features, pf, 1.0);
+
+        ML_TEST_ASSERT(!pf.empty(), "training must produce at least one sample");
+        for (size_t i = 0; i < pf.size(); i++) {
+            for (long row = (long)lag_n + 1; row < pf[i].nr(); row++) {
+                char msg[128];
+                snprintf(msg, sizeof(msg), "training sample %zu row %ld must be zero with lag_n=%zu", i, row, lag_n);
+                ML_TEST_ASSERT(pf[i](row) == 0.0, msg);
+            }
+        }
+    }
+}
+
 // Test: full pipeline with default-like params (diff_n=1, smooth_n=3, lag_n=5)
 // Validates the feature vector shape and that a round-trip through
 // train + score produces sensible anomaly scores.
@@ -349,7 +417,7 @@ static void test_kmeans_scoring()
     calculated_number_t score_far = ml_kmeans_anomaly_score(&km, far_away);
     ML_TEST_ASSERT_DOUBLE_EQ(score_far, 100.0, 1e-9, "far away sample should be capped at 100");
 
-    // When min_dist == max_dist, score should be 0
+    // When min_dist == max_dist, the model is flat and abstains (NaN)
     ml_kmeans_inlined_t km_equal;
     km_equal.cluster_centers[0].set_size(6);
     km_equal.cluster_centers[1].set_size(6);
@@ -361,7 +429,334 @@ static void test_kmeans_scoring()
     km_equal.max_dist = 5.0;
 
     calculated_number_t score_eq = ml_kmeans_anomaly_score(&km_equal, at_mid);
-    ML_TEST_ASSERT_DOUBLE_EQ(score_eq, 0.0, 1e-9, "equal min/max should return 0");
+    ML_TEST_ASSERT(std::isnan(score_eq), "equal min/max should abstain (NaN)");
+}
+
+// Test: a model whose min/max spread is only rounding must abstain (score NaN).
+// When every training point sits on a centre (a sparse dimension: zeros plus
+// one repeated spike), every point is |C0 - C1| / 2 from the centres on
+// average, so max_dist - min_dist is 0 or a few ULP. Dividing by a ULP made
+// any sample off the C0-C1 segment score 100. Predict skips NaN scores.
+static void test_kmeans_flat_spread_abstains()
+{
+    fprintf(stderr, "  test_kmeans_flat_spread_abstains...\n");
+
+    // Spike vector taken from a degenerate model found on a production parent.
+    const calculated_number_t spike[6] = { 16.40203, 0.9567466666666675, -16.40203, -16.40203, -0.9567466666666675, 0.0 };
+
+    // A tiny blip in a coordinate the spike does not use: off the C0-C1 segment.
+    DSample blip;
+    blip.set_size(6);
+    for (int i = 0; i < 6; i++)
+        blip(i) = 0.0;
+    blip(5) = 0.001;
+
+    // Model as stored: zero centre, spike centre, spread of one ULP.
+    ml_kmeans_inlined_t km;
+    km.cluster_centers[0].set_size(6);
+    km.cluster_centers[1].set_size(6);
+    for (int i = 0; i < 6; i++) {
+        km.cluster_centers[0](i) = 0.0;
+        km.cluster_centers[1](i) = spike[i];
+    }
+    km.min_dist = 14.220675904568106;
+    km.max_dist = std::nextafter(km.min_dist, 100.0);
+
+    calculated_number_t score = ml_kmeans_anomaly_score(&km, blip);
+    ML_TEST_ASSERT(std::isnan(score), "1-ULP spread model should abstain for a tiny blip");
+
+    // The same kind of model produced by training.
+    std::vector<DSample> training;
+    for (int n = 0; n < 200; n++) {
+        DSample s;
+        s.set_size(6);
+        for (int i = 0; i < 6; i++)
+            s(i) = (n % 67 == 0) ? spike[i] : 0.0;  // 3 spikes: their mean is not exact
+        training.push_back(s);
+    }
+
+    ml_kmeans_t trained;
+    ml_kmeans_init(&trained);
+    ml_kmeans_train(&trained, training, 1000, 0, 100);
+    ML_TEST_ASSERT(trained.cluster_centers.size() == 2, "degenerate training should still produce 2 centres");
+    ML_TEST_ASSERT(trained.max_dist - trained.min_dist < 1e-9 * std::abs(trained.max_dist),
+                   "zeros plus one repeated spike should train a rounding-only spread");
+
+    ml_kmeans_inlined_t trained_inlined(trained);
+    score = ml_kmeans_anomaly_score(&trained_inlined, blip);
+    ML_TEST_ASSERT(std::isnan(score), "trained flat model should abstain for a tiny blip");
+    for (const auto &s : training) {
+        score = ml_kmeans_anomaly_score(&trained_inlined, s);
+        ML_TEST_ASSERT(std::isnan(score), "trained flat model should abstain for its training samples");
+    }
+
+    // A small but real spread is still scored, not treated as flat.
+    ml_kmeans_inlined_t narrow;
+    narrow.cluster_centers[0].set_size(6);
+    narrow.cluster_centers[1].set_size(6);
+    for (int i = 0; i < 6; i++) {
+        narrow.cluster_centers[0](i) = 0.0;
+        narrow.cluster_centers[1](i) = 0.0;
+    }
+    narrow.min_dist = 1.0;
+    narrow.max_dist = 1.0 + 1e-6;
+
+    DSample half;
+    half.set_size(6);
+    for (int i = 0; i < 6; i++)
+        half(i) = 0.0;
+    half(0) = 1.0 + 0.5e-6;
+
+    score = ml_kmeans_anomaly_score(&narrow, half);
+    ML_TEST_ASSERT(!std::isnan(score), "score should not be NaN");
+    ML_TEST_ASSERT_DOUBLE_EQ(score, 50.0, 1e-3, "a 1e-6 relative spread should still be scored");
+
+    // A negative spread is not flat: it keeps its previous score.
+    narrow.min_dist = 2.0;
+    narrow.max_dist = 1.0;
+    score = ml_kmeans_anomaly_score(&narrow, half);
+    ML_TEST_ASSERT(!std::isnan(score), "score should not be NaN");
+    ML_TEST_ASSERT_DOUBLE_EQ(score, 100.0, 1e-3, "negative spread should keep its prior score");
+
+    // Non-finite bounds (accepted from children).
+    const calculated_number_t inf = std::numeric_limits<calculated_number_t>::infinity();
+    narrow.min_dist = inf;
+    narrow.max_dist = inf;
+    score = ml_kmeans_anomaly_score(&narrow, half);
+    ML_TEST_ASSERT(std::isnan(score), "min_dist == max_dist == inf is flat and should abstain");
+
+    narrow.min_dist = -inf;
+    score = ml_kmeans_anomaly_score(&narrow, half);
+    ML_TEST_ASSERT(std::isnan(score), "min_dist -inf, max_dist +inf should stay NaN (skipped by predict)");
+}
+
+// Test: a model whose training distances are all 0 must abstain (score NaN).
+// A series repeating every 3 samples is not constant, but with diff_n=1 and
+// smooth_n=3 each smoothed difference is x[i+3] - x[i] = 0, so every feature
+// is 0. Training used to leave max_dist at its DBL_MIN start value, which the
+// flat check missed, so any later change scored 100.
+static void test_kmeans_zero_distance_model_abstains()
+{
+    fprintf(stderr, "  test_kmeans_zero_distance_model_abstains...\n");
+
+    const size_t diff_n = 1;
+    const size_t smooth_n = 3;
+    const size_t lag_n = 5;
+    const size_t n = 60;
+
+    calculated_number_t src[n], dst[n];
+    for (size_t i = 0; i < n; i++)
+        src[i] = (i % 3 == 1) ? 1.0 : 0.0;
+    memcpy(dst, src, sizeof(src));
+
+    std::vector<DSample> training;
+    ml_features_t features = {
+        diff_n, smooth_n, lag_n,
+        dst, n, src, n
+    };
+    ml_features_preprocess(&features, training, 1.0);
+    ML_TEST_ASSERT(training.size() >= 2, "period-3 series should produce training vectors");
+
+    bool all_zero = true;
+    for (const auto &s : training)
+        for (long i = 0; i < s.size(); i++)
+            all_zero = all_zero && s(i) == 0.0;
+    ML_TEST_ASSERT(all_zero, "period-3 series should produce all-zero features");
+
+    ml_kmeans_t trained;
+    ml_kmeans_init(&trained);
+    ml_kmeans_train(&trained, training, 1000, 0, 100);
+    ML_TEST_ASSERT(trained.min_dist == 0.0 && trained.max_dist == 0.0,
+                   "all-zero distances should train equal (0, 0) bounds");
+
+    // A later change in the series.
+    DSample change;
+    change.set_size(lag_n + 1);
+    for (size_t i = 0; i < lag_n + 1; i++)
+        change(i) = 0.0;
+    change(0) = 1.0;
+
+    ml_kmeans_inlined_t trained_inlined(trained);
+    calculated_number_t score = ml_kmeans_anomaly_score(&trained_inlined, change);
+    ML_TEST_ASSERT(std::isnan(score), "zero-distance model should abstain for a change");
+
+    // The same model as stored by older agents: (0, DBL_MIN).
+    trained_inlined.max_dist = std::numeric_limits<calculated_number_t>::min();
+    score = ml_kmeans_anomaly_score(&trained_inlined, change);
+    ML_TEST_ASSERT(std::isnan(score), "legacy (0, DBL_MIN) model should abstain for a change");
+}
+
+// Test: converting an empty ml_kmeans_t must produce deterministic zeroed centers.
+static void test_kmeans_inlined_empty_source_is_zero_initialized()
+{
+    fprintf(stderr, "  test_kmeans_inlined_empty_source_is_zero_initialized...\n");
+
+    ml_kmeans_t empty_km;
+    empty_km.cluster_centers.clear();
+    empty_km.min_dist = 1.5;
+    empty_km.max_dist = 9.5;
+    empty_km.after = 11;
+    empty_km.before = 22;
+
+    ml_kmeans_inlined_t constructed(empty_km);
+    ML_TEST_ASSERT(constructed.after == empty_km.after, "constructed empty model should preserve 'after'");
+    ML_TEST_ASSERT(constructed.before == empty_km.before, "constructed empty model should preserve 'before'");
+    ML_TEST_ASSERT_DOUBLE_EQ(constructed.min_dist, empty_km.min_dist, 0.0, "constructed empty model should preserve min_dist");
+    ML_TEST_ASSERT_DOUBLE_EQ(constructed.max_dist, empty_km.max_dist, 0.0, "constructed empty model should preserve max_dist");
+    for (size_t center = 0; center < constructed.cluster_centers.size(); center++) {
+        ML_TEST_ASSERT(constructed.cluster_centers[center].size() == 6, "constructed empty-source centers must keep fixed-size geometry");
+        for (long i = 0; i < constructed.cluster_centers[center].size(); i++) {
+            char msg[160];
+            snprintf(msg, sizeof(msg), "constructed empty-source center[%zu](%ld) should be zero", center, i);
+            ML_TEST_ASSERT_DOUBLE_EQ(constructed.cluster_centers[center](i), 0.0, 0.0, msg);
+        }
+    }
+
+    ml_kmeans_inlined_t assigned;
+    for (int i = 0; i < 6; i++) {
+        assigned.cluster_centers[0](i) = 10.0 + i;
+        assigned.cluster_centers[1](i) = 20.0 + i;
+    }
+    assigned = empty_km;
+
+    ML_TEST_ASSERT(assigned.after == empty_km.after, "assigned empty model should preserve 'after'");
+    ML_TEST_ASSERT(assigned.before == empty_km.before, "assigned empty model should preserve 'before'");
+    ML_TEST_ASSERT_DOUBLE_EQ(assigned.min_dist, empty_km.min_dist, 0.0, "assigned empty model should preserve min_dist");
+    ML_TEST_ASSERT_DOUBLE_EQ(assigned.max_dist, empty_km.max_dist, 0.0, "assigned empty model should preserve max_dist");
+    for (size_t center = 0; center < assigned.cluster_centers.size(); center++) {
+        ML_TEST_ASSERT(assigned.cluster_centers[center].size() == 6, "empty-source centers must keep fixed-size geometry");
+        for (long i = 0; i < assigned.cluster_centers[center].size(); i++) {
+            char msg[160];
+            snprintf(msg, sizeof(msg), "empty-source center[%zu](%ld) should be zero", center, i);
+            ML_TEST_ASSERT_DOUBLE_EQ(assigned.cluster_centers[center](i), 0.0, 0.0, msg);
+        }
+    }
+}
+
+// Test: at the smallest legal input (src_n == diff_n + smooth_n + lag_n),
+// ml_features_preprocess yields exactly one feature vector. This guards the
+// preprocess boundary that triggers the <2-vectors early-return in
+// ml_dimension_train_model. Scope is intentionally limited to preprocess output:
+// ml_dimension_train_model itself depends on a live ml_dimension_t (worker, rd,
+// rrdset, host, sqlite) and is not unit-testable without significant plumbing.
+static void test_features_preprocess_below_min_for_kmeans()
+{
+    fprintf(stderr, "  test_features_preprocess_below_min_for_kmeans...\n");
+
+    const size_t diff_n = 1;
+    const size_t smooth_n = 1;
+    const size_t lag_n = 1;
+    const size_t src_n = diff_n + smooth_n + lag_n; // 3, the minimum allowed by ml_validate_features_input
+
+    calculated_number_t src[16] = {1.0, 2.0, 3.0};
+    calculated_number_t dst[16] = {0};
+
+    std::vector<DSample> pf;
+    ml_features_t features = {
+        diff_n, smooth_n, lag_n,
+        dst, src_n, src, src_n
+    };
+
+    ml_features_preprocess(&features, pf, 1.0);
+
+    // n_vectors = src_n - diff_n - smooth_n + 1 - lag_n = 3 - 1 - 1 + 1 - 1 = 1
+    ML_TEST_ASSERT(pf.size() == 1, "boundary input should yield exactly 1 feature vector");
+    ML_TEST_ASSERT(pf.size() < 2, "<2 vectors must trigger the kmeans-skip early-return in ml_dimension_train_model");
+}
+
+// Test: ml_dimension_finalize_constant_state is the shared post-cycle state
+// transition used by both the successful-training path and the undersampled
+// early-return. It sets mt = CONSTANT, ts = TRAINED, and resets suppression
+// counters. Matches the existing master behavior in ml_dimension_update_models.
+static void test_dimension_finalize_constant_state()
+{
+    fprintf(stderr, "  test_dimension_finalize_constant_state...\n");
+
+    ml_dimension_t dim = {};
+    spinlock_init(&dim.slock);
+    dim.mt = METRIC_TYPE_VARIABLE;
+    dim.ts = TRAINING_STATUS_UNTRAINED;
+    dim.suppression_anomaly_counter = 7;
+    dim.suppression_window_counter = 13;
+
+    // Match the helper's documented contract (caller holds dim->slock).
+    spinlock_lock(&dim.slock);
+    ml_dimension_finalize_constant_state(&dim);
+    spinlock_unlock(&dim.slock);
+
+    ML_TEST_ASSERT(dim.mt == METRIC_TYPE_CONSTANT, "mt must become CONSTANT");
+    ML_TEST_ASSERT(dim.ts == TRAINING_STATUS_TRAINED, "ts must become TRAINED");
+    ML_TEST_ASSERT(dim.suppression_anomaly_counter == 0, "anomaly counter must reset");
+    ML_TEST_ASSERT(dim.suppression_window_counter == 0, "window counter must reset");
+}
+
+static void test_chart_update_dimension_counts()
+{
+    fprintf(stderr, "  test_chart_update_dimension_counts...\n");
+
+    ml_dimension_t dim = {};
+    spinlock_init(&dim.slock);
+
+    ml_chart_t chart = {};
+    spinlock_init(&chart.mls_spinlock);
+
+    dim.mls = MACHINE_LEARNING_STATUS_DISABLED_DUE_TO_EXCLUDED_CHART;
+    dim.mt = METRIC_TYPE_VARIABLE;
+    dim.ts = TRAINING_STATUS_TRAINED;
+    ml_chart_update_dimension(&chart, &dim, true);
+    ML_TEST_ASSERT(chart.mls.num_machine_learning_status_disabled_sp == 1,
+                   "excluded dimensions must increment disabled status");
+    ML_TEST_ASSERT(chart.mls.num_machine_learning_status_enabled == 0,
+                   "excluded dimensions must not increment enabled status");
+
+    ml_chart_reset_stats(&chart);
+    dim.mls = MACHINE_LEARNING_STATUS_ENABLED;
+    dim.mt = METRIC_TYPE_CONSTANT;
+    dim.ts = TRAINING_STATUS_UNTRAINED;
+    ml_chart_update_dimension(&chart, &dim, true);
+    ML_TEST_ASSERT(chart.mls.num_machine_learning_status_enabled == 1,
+                   "constant dimensions must increment enabled status");
+    ML_TEST_ASSERT(chart.mls.num_metric_type_constant == 1,
+                   "constant dimensions must increment constant metric type");
+    ML_TEST_ASSERT(chart.mls.num_training_status_trained == 1,
+                   "constant dimensions are counted as trained");
+    ML_TEST_ASSERT(chart.mls.num_normal_dimensions == 1,
+                   "constant dimensions are counted as normal");
+    ML_TEST_ASSERT(chart.mls.num_anomalous_dimensions == 0,
+                   "constant dimensions must ignore anomaly input");
+
+    ml_chart_reset_stats(&chart);
+    dim.mt = METRIC_TYPE_VARIABLE;
+    dim.ts = TRAINING_STATUS_UNTRAINED;
+    ml_chart_update_dimension(&chart, &dim, true);
+    ML_TEST_ASSERT(chart.mls.num_metric_type_variable == 1,
+                   "variable untrained dimensions must increment variable metric type");
+    ML_TEST_ASSERT(chart.mls.num_training_status_untrained == 1,
+                   "variable untrained dimensions must increment untrained status");
+    ML_TEST_ASSERT(chart.mls.num_anomalous_dimensions == 0,
+                   "untrained dimensions must not count anomaly input");
+
+    ml_chart_reset_stats(&chart);
+    dim.ts = TRAINING_STATUS_TRAINED;
+    ml_chart_update_dimension(&chart, &dim, true);
+    ML_TEST_ASSERT(chart.mls.num_training_status_trained == 1,
+                   "trained dimensions must increment trained status");
+    ML_TEST_ASSERT(chart.mls.num_anomalous_dimensions == 1,
+                   "trained anomalous dimensions must increment anomalous count");
+    ML_TEST_ASSERT(chart.mls.num_normal_dimensions == 0,
+                   "trained anomalous dimensions must not increment normal count");
+
+    ml_chart_reset_stats(&chart);
+    dim.ts = TRAINING_STATUS_SILENCED;
+    ml_chart_update_dimension(&chart, &dim, false);
+    ML_TEST_ASSERT(chart.mls.num_training_status_silenced == 1,
+                   "silenced dimensions must increment silenced status");
+    ML_TEST_ASSERT(chart.mls.num_training_status_trained == 1,
+                   "silenced dimensions must also increment trained status");
+    ML_TEST_ASSERT(chart.mls.num_normal_dimensions == 1,
+                   "silenced normal dimensions must increment normal count");
+    ML_TEST_ASSERT(chart.mls.num_anomalous_dimensions == 0,
+                   "silenced normal dimensions must not increment anomalous count");
 }
 
 // Test: circular buffer linearization produces the same result as std::rotate
@@ -862,6 +1257,1129 @@ static void test_kmeans_timestamp_rejection()
     }
 }
 
+static void test_downstream_model_short_circuit_and_requeue()
+{
+    fprintf(stderr, "  test_downstream_model_short_circuit_and_requeue...\n");
+
+    enum ml_worker_result worker_res = ML_WORKER_RESULT_OK;
+    bool should_short_circuit = ml_dimension_train_model_precheck(METRIC_TYPE_VARIABLE,
+                                                                  true,
+                                                                  false,
+                                                                  &worker_res);
+    ML_TEST_ASSERT(should_short_circuit,
+                   "downstream-supplied dimensions should short-circuit local training");
+    ML_TEST_ASSERT(worker_res == ML_WORKER_RESULT_DOWNSTREAM_MODEL_SUPPLIED,
+                   "downstream-supplied dimensions should short-circuit local training");
+    ML_TEST_ASSERT(!ml_should_requeue_create_new_model(worker_res),
+                   "downstream-supplied result should stop CREATE_NEW_MODEL requeueing");
+
+    worker_res = ML_WORKER_RESULT_OK;
+    should_short_circuit = ml_dimension_train_model_precheck(METRIC_TYPE_CONSTANT,
+                                                             true,
+                                                             false,
+                                                             &worker_res);
+    ML_TEST_ASSERT(should_short_circuit,
+                   "constant downstream-supplied dimensions should short-circuit local training");
+    ML_TEST_ASSERT(worker_res == ML_WORKER_RESULT_DOWNSTREAM_MODEL_SUPPLIED,
+                   "constant downstream-supplied dimensions should drain CREATE_NEW_MODEL items");
+    ML_TEST_ASSERT(!ml_should_requeue_create_new_model(worker_res),
+                   "constant downstream-supplied result should stop CREATE_NEW_MODEL requeueing");
+
+    worker_res = ML_WORKER_RESULT_OK;
+    should_short_circuit = ml_dimension_train_model_precheck(METRIC_TYPE_VARIABLE,
+                                                             false,
+                                                             false,
+                                                             &worker_res);
+    ML_TEST_ASSERT(!should_short_circuit,
+                   "dimensions without downstream models should continue to training");
+    ML_TEST_ASSERT(ml_should_requeue_create_new_model(ML_WORKER_RESULT_OK),
+                   "ordinary training results should keep CREATE_NEW_MODEL items requeueing");
+
+    worker_res = ML_WORKER_RESULT_OK;
+    should_short_circuit = ml_dimension_train_model_precheck(METRIC_TYPE_VARIABLE,
+                                                             false,
+                                                             true,
+                                                             &worker_res);
+    ML_TEST_ASSERT(should_short_circuit,
+                   "training-in-progress dimensions should short-circuit local training");
+    ML_TEST_ASSERT(worker_res == ML_WORKER_RESULT_TRAINING_IN_PROGRESS,
+                   "training-in-progress dimensions should report the distinct result");
+    ML_TEST_ASSERT(ml_should_requeue_create_new_model(worker_res),
+                   "training-in-progress result should keep CREATE_NEW_MODEL items requeueing "
+                   "so the dim stays in the periodic retrain cycle");
+}
+
+static void test_reset_generation_cancels_model_publish()
+{
+    fprintf(stderr, "  test_reset_generation_cancels_model_publish...\n");
+
+    bool training_in_progress = true;
+    bool should_publish = ml_should_publish_model_update(true, 8, 7, false, &training_in_progress);
+    ML_TEST_ASSERT(!should_publish,
+                   "generation mismatch should cancel model publication");
+    ML_TEST_ASSERT(!training_in_progress,
+                   "generation mismatch should clear training_in_progress");
+
+    training_in_progress = true;
+    should_publish = ml_should_publish_model_update(false, 7, 7, false, &training_in_progress);
+    ML_TEST_ASSERT(!should_publish,
+                   "stopped hosts should cancel model publication");
+    ML_TEST_ASSERT(!training_in_progress,
+                   "stopped-host cancellation should clear training_in_progress");
+
+    training_in_progress = true;
+    should_publish = ml_should_publish_model_update(true, 7, 7, false, &training_in_progress);
+    ML_TEST_ASSERT(should_publish,
+                   "matching generation on a running host should allow model publication");
+    ML_TEST_ASSERT(training_in_progress,
+                   "successful publication path should leave training_in_progress unchanged");
+
+    should_publish = ml_should_publish_model_update(true, 7, 7, false, nullptr);
+    ML_TEST_ASSERT(should_publish, "a downstream install (no training flag to clear) is published");
+}
+
+// Regression: DimensionLookupInfo's ctors used to copy a fixed
+// sizeof(MachineGuid) bytes from their source string, so a machine-guid shorter than GUID_LEN
+// (the streaming ML_MODEL payload supplies it) read past the end of the source allocation.
+// The sources here are sized exactly strlen + 1, the way libjson-c allocates a string value, so
+// an over-read is a heap-buffer-overflow under ASan and not merely a garbage GUID.
+//
+// The expected values are spelled out rather than computed with strncpyz(), so that the test
+// cannot agree with a broken copy by using the same helper to describe it.
+static void test_dimension_lookup_info_short_machine_guid()
+{
+    fprintf(stderr, "  test_dimension_lookup_info_short_machine_guid...\n");
+
+    struct {
+        const char *guid;
+        const char *expected;
+    } cases[] = {
+        // 1-byte source: the shortest possible input
+        { "", "" },
+        { "abc", "abc" },
+        // one character short of GUID_LEN
+        { "00000000-0000-0000-0000-00000000000", "00000000-0000-0000-0000-00000000000" },
+        // exactly GUID_LEN (control: must be copied whole)
+        { "00000000-0000-0000-0000-000000000000", "00000000-0000-0000-0000-000000000000" },
+        // longer than GUID_LEN: truncated, never overflowing the array
+        { "00000000-0000-0000-0000-000000000000-and-then-some", "00000000-0000-0000-0000-000000000000" },
+    };
+
+    for (const auto &c : cases) {
+        size_t len = strlen(c.guid);
+        char *src = (char *) mallocz(len + 1);
+        memcpy(src, c.guid, len + 1);
+
+        DimensionLookupInfo DLI(src, "chart", "dimension");
+
+        freez(src);
+
+        ML_TEST_ASSERT(strcmp(DLI.machineGuid(), c.expected) == 0,
+                       "machine guid must be the source truncated to GUID_LEN");
+        ML_TEST_ASSERT(strlen(DLI.machineGuid()) <= GUID_LEN,
+                       "machine guid must stay within GUID_LEN characters");
+    }
+}
+
+// Test: the inline cns ring in ml_dimension_t.
+//
+// The prediction history used to be a std::vector whose size() carried the
+// warmup progress; it is now an inline array plus an explicit cns_count. Every
+// site that used to cns.clear() must zero BOTH cns_count and cns_head. Zeroing
+// cns_head alone would leave stale history readable and would let the very next
+// sample be scored as if the ring were still full.
+//
+// test_circular_buffer_equivalence() above models the ring with a local vector
+// and would pass even if the real ring were broken, so this test drives the
+// real ml_dimension_predict() instead.
+static void test_cns_ring_reset_semantics()
+{
+    fprintf(stderr, "  test_cns_ring_reset_semantics...\n");
+
+    // Saved so the test does not leak configuration into its neighbours.
+    unsigned saved_diff_n = Cfg.diff_n;
+    unsigned saved_lag_n = Cfg.lag_n;
+    size_t saved_smooth = Cfg.max_samples_to_smooth;
+    size_t saved_suppression_window = Cfg.suppression_window;
+    size_t saved_suppression_threshold = Cfg.suppression_threshold;
+    time_t saved_profile_update_every = nd_profile.update_every;
+
+    Cfg.diff_n = 1;
+    Cfg.lag_n = 5;
+    Cfg.max_samples_to_smooth = 3;
+    // Large enough that nothing in this test can reach TRAINING_STATUS_SILENCED.
+    Cfg.suppression_window = 1000000;
+    Cfg.suppression_threshold = 1000000;
+    nd_profile.update_every = 1;
+
+    RRDSET st = {};
+    st.update_every = 1;   // <= nd_profile.update_every, so smoothing window is max(3,1)=3
+
+    RRDDIM rd = {};
+    rd.rrdset = &st;
+
+    ml_dimension_t dim = {};
+    spinlock_init(&dim.slock);
+    dim.rd = &rd;
+    dim.mls = MACHINE_LEARNING_STATUS_ENABLED;
+    dim.mt = METRIC_TYPE_CONSTANT;
+    dim.ts = TRAINING_STATUS_UNTRAINED;
+
+    const unsigned n = Cfg.diff_n + 3 + Cfg.lag_n;   // 9
+    ML_TEST_ASSERT(n <= ML_DIMENSION_MAX_CNS, "test n must fit the inline ring");
+
+    // suppression_window_counter is incremented only on the full-ring path, so
+    // it is an exact count of "this sample was scored rather than buffered".
+    #define SCORED (dim.suppression_window_counter)
+
+    // --- warmup: the first n samples buffer and do not score --------------
+    for (unsigned i = 0; i < n; i++) {
+        (void) ml_dimension_predict(&dim, 100.0, true);
+        ML_TEST_ASSERT(dim.cns_count == i + 1, "warmup must grow cns_count by one per sample");
+        ML_TEST_ASSERT(dim.cns_head == 0, "cns_head must stay 0 until the ring first fills");
+        ML_TEST_ASSERT(SCORED == 0, "warmup samples must not be scored");
+    }
+
+    // --- first full-ring sample scores ------------------------------------
+    (void) ml_dimension_predict(&dim, 100.0, true);
+    ML_TEST_ASSERT(SCORED == 1, "the sample after warmup must be scored");
+    ML_TEST_ASSERT(dim.cns_count == n, "cns_count must saturate at n");
+    ML_TEST_ASSERT(dim.cns_head == 1, "cns_head must advance once the ring is full");
+    ML_TEST_ASSERT(dim.mt == METRIC_TYPE_CONSTANT, "a repeated value must leave mt CONSTANT");
+
+    // A differing value must be detected against the NEWEST sample.
+    (void) ml_dimension_predict(&dim, 200.0, true);
+    ML_TEST_ASSERT(dim.mt == METRIC_TYPE_VARIABLE, "a changed value must set mt VARIABLE");
+    ML_TEST_ASSERT(SCORED == 2, "the changed sample must also be scored");
+
+    // --- missing-data reset: BOTH fields must be zeroed --------------------
+    (void) ml_dimension_predict(&dim, 0.0, false);
+    ML_TEST_ASSERT(dim.cns_count == 0, "a missing sample must reset cns_count");
+    ML_TEST_ASSERT(dim.cns_head == 0, "a missing sample must reset cns_head");
+
+    // The regression this test exists for: with cns_count reset, the next n
+    // samples must warm up again. If only cns_head had been reset, the very
+    // next sample would take the full-ring path and score against stale history.
+    for (unsigned i = 0; i < n; i++) {
+        (void) ml_dimension_predict(&dim, 300.0, true);
+        ML_TEST_ASSERT(SCORED == 2, "samples after a reset must warm up, not score");
+    }
+    (void) ml_dimension_predict(&dim, 300.0, true);
+    ML_TEST_ASSERT(SCORED == 3, "scoring must resume once the ring refills");
+
+    // --- window-change reset while the ring is wrapped --------------------
+    ML_TEST_ASSERT(dim.cns_head != 0, "precondition: the ring must be wrapped here");
+    Cfg.max_samples_to_smooth = 5;                     // n becomes 1 + 5 + 5 = 11
+    const unsigned n2 = Cfg.diff_n + 5 + Cfg.lag_n;
+    ML_TEST_ASSERT(n2 <= ML_DIMENSION_MAX_CNS, "widened n must still fit the inline ring");
+
+    for (unsigned i = 0; i < n2; i++) {
+        (void) ml_dimension_predict(&dim, 400.0, true);
+        ML_TEST_ASSERT(SCORED == 3, "a window change with wrapped state must restart warmup");
+    }
+    (void) ml_dimension_predict(&dim, 400.0, true);
+    ML_TEST_ASSERT(SCORED == 4, "scoring must resume at the new window size");
+    ML_TEST_ASSERT(dim.cns_count == n2, "cns_count must saturate at the new n");
+
+    #undef SCORED
+
+    Cfg.diff_n = saved_diff_n;
+    Cfg.lag_n = saved_lag_n;
+    Cfg.max_samples_to_smooth = saved_smooth;
+    Cfg.suppression_window = saved_suppression_window;
+    Cfg.suppression_threshold = saved_suppression_threshold;
+    nd_profile.update_every = saved_profile_update_every;
+}
+
+// Test: in ml_dimension_predict() a flat model abstains instead of vetoing.
+// Predict returns false at the first model scoring below the threshold, so a
+// flat model scoring 0 used to keep its dimension from ever being anomalous,
+// even when every real model agreed on an anomaly.
+static void test_predict_flat_model_abstains()
+{
+    fprintf(stderr, "  test_predict_flat_model_abstains...\n");
+
+    unsigned saved_diff_n = Cfg.diff_n;
+    unsigned saved_lag_n = Cfg.lag_n;
+    size_t saved_smooth = Cfg.max_samples_to_smooth;
+    size_t saved_suppression_window = Cfg.suppression_window;
+    size_t saved_suppression_threshold = Cfg.suppression_threshold;
+    double saved_threshold = Cfg.dimension_anomaly_score_threshold;
+    time_t saved_profile_update_every = nd_profile.update_every;
+
+    Cfg.diff_n = 1;
+    Cfg.lag_n = 5;
+    Cfg.max_samples_to_smooth = 3;
+    Cfg.suppression_window = 1000000;
+    Cfg.suppression_threshold = 1000000;
+    Cfg.dimension_anomaly_score_threshold = 0.99;
+    nd_profile.update_every = 1;
+
+    RRDSET st = {};
+    st.update_every = 1;
+
+    RRDDIM rd = {};
+    rd.rrdset = &st;
+
+    // Both models have their centres at 0. The flat one has equal bounds; the
+    // real one scores 0 for a steady series and 100 for a jump.
+    ml_kmeans_inlined_t flat;
+    ml_kmeans_inlined_t real;
+    for (auto *km : { &flat, &real }) {
+        for (auto &cc : km->cluster_centers) {
+            cc.set_size(6);
+            for (int i = 0; i < 6; i++)
+                cc(i) = 0.0;
+        }
+    }
+    flat.min_dist = 5.0;
+    flat.max_dist = 5.0;
+    real.min_dist = 0.0;
+    real.max_dist = 1.0;
+
+    const unsigned n = Cfg.diff_n + 3 + Cfg.lag_n;
+    struct {
+        const char *name;
+        std::vector<ml_kmeans_inlined_t> models;
+        bool jump_anomalous;
+    } cases[] = {
+        { "flat then real", { flat, real }, true },
+        { "real then flat", { real, flat }, true },
+        { "flat only", { flat }, false },
+    };
+
+    for (auto &c : cases) {
+        ml_dimension_t dim = {};
+        spinlock_init(&dim.slock);
+        dim.rd = &rd;
+        dim.mls = MACHINE_LEARNING_STATUS_ENABLED;
+        dim.mt = METRIC_TYPE_CONSTANT;
+        dim.ts = TRAINING_STATUS_TRAINED;
+        dim.km_contexts = c.models;
+
+        // Warm up the ring, then score one more steady sample.
+        bool anomalous = false;
+        for (unsigned i = 0; i <= n; i++)
+            anomalous = ml_dimension_predict(&dim, 100.0, true);
+        ML_TEST_ASSERT(dim.suppression_window_counter == 1, "the sample after warmup must be scored");
+        ML_TEST_ASSERT(!anomalous, "a steady sample must not be anomalous");
+
+        anomalous = ml_dimension_predict(&dim, 1000.0, true);
+        if (c.jump_anomalous)
+            ML_TEST_ASSERT(anomalous, "a flat model must not veto the real model's anomaly");
+        else
+            ML_TEST_ASSERT(!anomalous, "a dimension with only flat models must not be anomalous");
+        if (anomalous != c.jump_anomalous)
+            fprintf(stderr, "    case: %s\n", c.name);
+    }
+
+    Cfg.diff_n = saved_diff_n;
+    Cfg.lag_n = saved_lag_n;
+    Cfg.max_samples_to_smooth = saved_smooth;
+    Cfg.suppression_window = saved_suppression_window;
+    Cfg.suppression_threshold = saved_suppression_threshold;
+    Cfg.dimension_anomaly_score_threshold = saved_threshold;
+    nd_profile.update_every = saved_profile_update_every;
+}
+
+// Test: ml_chart_stats_add() must accumulate EVERY field of
+// ml_machine_learning_stats_t.
+//
+// The struct is rolled up twice -- dimension -> chart and chart -> host. The
+// chart -> host step used to be a hand-rolled copy of this function's field
+// list, and when num_dimensions_with_models was added to one enumeration but
+// not the other, the counter published a permanent zero at host level while
+// looking correct everywhere else.
+//
+// This test does not enumerate the fields, because a second enumeration is the
+// bug. Every member is uint32_t, so it treats the struct's object
+// representation as an array of uint32_t: add a field and forget the
+// accumulator and this fails immediately.
+//
+// The copies go through memcpy rather than a reinterpret_cast<uint32_t *> walk:
+// indexing one member's pointer across the following members is not valid array
+// pointer arithmetic, so the cast version was undefined behaviour that an
+// optimiser or sanitiser could turn into a silently passing guard.
+static void test_chart_stats_add_covers_every_field()
+{
+    fprintf(stderr, "  test_chart_stats_add_covers_every_field...\n");
+
+    static_assert(std::is_trivially_copyable<ml_machine_learning_stats_t>::value,
+                  "stats struct must be trivially copyable for this test to copy its representation");
+    // has_unique_object_representations is C++17-only; USE_CXX_11 builds skip
+    // the padding check and keep the memcpy round-trip below.
+#if __cplusplus >= 201703L
+    static_assert(std::has_unique_object_representations<ml_machine_learning_stats_t>::value,
+                  "stats struct must have no padding for this test to walk it as uint32_t");
+#endif
+    static_assert(sizeof(ml_machine_learning_stats_t) % sizeof(uint32_t) == 0,
+                  "stats struct must be a whole number of uint32_t fields for this test to walk it");
+    constexpr size_t nfields = sizeof(ml_machine_learning_stats_t) / sizeof(uint32_t);
+
+    std::array<uint32_t, nfields> words;
+    for (size_t i = 0; i < nfields; i++)
+        words[i] = (uint32_t)(i + 1);
+
+    ml_machine_learning_stats_t src = {};
+    memcpy(&src, words.data(), sizeof(src));
+
+    ml_machine_learning_stats_t dst = {};
+    ml_chart_stats_add(&dst, src);
+
+    std::array<uint32_t, nfields> got;
+    memcpy(got.data(), &dst, sizeof(dst));
+    for (size_t i = 0; i < nfields; i++)
+        ML_TEST_ASSERT(got[i] == (uint32_t)(i + 1),
+                       "every stats field must be accumulated (one is missing from ml_chart_stats_add)");
+
+    // Accumulating is additive, not assignment.
+    ml_chart_stats_add(&dst, src);
+    memcpy(got.data(), &dst, sizeof(dst));
+    for (size_t i = 0; i < nfields; i++)
+        ML_TEST_ASSERT(got[i] == (uint32_t)(2 * (i + 1)),
+                       "ml_chart_stats_add must add, not overwrite");
+}
+
+// ---- create-model queue: pass ordering -------------------------------------------------------------------------
+//
+// The key function used by the workers resolves the dimension and reads its page close; here the dimension id
+// carries the key so the queue can be tested without a running RRD tree: "k:<seconds from now>", "k:none" (no
+// page), or "k:past" (a key earlier than the sort, which the queue must not treat as missing). "stop" makes the key
+// function signal the queue, to test a stop request during the sort.
+
+static ml_queue_item_t ml_test_create_item(const char *dim_id)
+{
+    ml_queue_item_t item;
+    item.type = ML_QUEUE_ITEM_TYPE_CREATE_NEW_MODEL;
+    item.create_new_model.DLI = DimensionLookupInfo("00000000-0000-0000-0000-000000000000", "chart", dim_id);
+    return item;
+}
+
+static size_t ml_test_key_calls = 0;
+
+static time_t ml_test_pass_key(const ml_request_create_new_model_t &req, void *arg)
+{
+    ml_test_key_calls++;
+    const char *id = req.DLI.dimensionId();
+    time_t now = now_realtime_sec();
+
+    if (!strcmp(id, "stop")) {
+        ml_queue_signal(static_cast<ml_queue_t *>(arg));
+        return 0;
+    }
+    if (!strcmp(id, "k:none"))
+        return 0;
+    if (!strncmp(id, "k:past", 6))
+        return now - 50;
+    if (!strncmp(id, "k:", 2))
+        return now + strtol(id + 2, nullptr, 10);
+    return 0;
+}
+
+static std::string ml_test_pop_id(ml_queue_t *q, bool *stopped)
+{
+    ml_queue_item_t item = ml_queue_pop(q);
+    if (item.type == ML_QUEUE_ITEM_STOP_REQUEST) {
+        *stopped = true;
+        return "";
+    }
+    *stopped = false;
+    return std::string(item.create_new_model.DLI.dimensionId());
+}
+
+static void test_queue_pass_is_sorted_by_key()
+{
+    fprintf(stderr, "  test_queue_pass_is_sorted_by_key...\n");
+
+    ml_queue_t *q = ml_queue_init();
+    ml_queue_set_pass_key_fn(q, ml_test_pass_key, q);
+
+    // push order is deliberately not key order; one entry has no open page
+    const char *ids[] = { "k:300", "k:none", "k:100", "k:past", "k:200" };
+    for (const char *id : ids)
+        ml_queue_push(q, ml_test_create_item(id));
+
+    ML_TEST_ASSERT(ml_queue_size(q).create_new_model == 5, "all pushed entries are counted before the pass starts");
+
+    bool stopped = false;
+    ML_TEST_ASSERT(ml_test_pop_id(q, &stopped) == "k:none", "the key-0 entry (no page) is trained first");
+    ML_TEST_ASSERT(ml_test_pop_id(q, &stopped) == "k:past", "then the key earlier than the sort, in its own place");
+    ML_TEST_ASSERT(ml_test_pop_id(q, &stopped) == "k:100", "then the earliest page completion");
+    ML_TEST_ASSERT(ml_test_pop_id(q, &stopped) == "k:200", "then the next page close");
+    ML_TEST_ASSERT(ml_test_pop_id(q, &stopped) == "k:300", "then the latest page close");
+    ML_TEST_ASSERT(!stopped, "no stop request was seen");
+
+    ml_queue_stats_t stats = ml_queue_stats(q);
+    ML_TEST_ASSERT(stats.passes_sorted == 1, "exactly one pass was sorted");
+    ML_TEST_ASSERT(stats.pass_entries == 5, "the pass had all five entries");
+    ML_TEST_ASSERT(stats.pass_key0_entries == 1, "one entry had no open page");
+    ML_TEST_ASSERT(stats.total_create_new_model_requests_popped == 5, "five entries were popped");
+    ML_TEST_ASSERT(ml_queue_size(q).create_new_model == 0, "the queue is empty after the pass");
+
+    ml_queue_destroy(q);
+}
+
+static void test_queue_once_per_pass_and_mid_pass_arrivals()
+{
+    fprintf(stderr, "  test_queue_once_per_pass_and_mid_pass_arrivals...\n");
+
+    ml_queue_t *q = ml_queue_init();
+    ml_queue_set_pass_key_fn(q, ml_test_pass_key, q);
+
+    ml_queue_push(q, ml_test_create_item("k:30"));
+    ml_queue_push(q, ml_test_create_item("k:10"));
+    ml_queue_push(q, ml_test_create_item("k:20"));
+
+    bool stopped = false;
+    ML_TEST_ASSERT(ml_test_pop_id(q, &stopped) == "k:10", "the first pop sorts the pass and serves the earliest key");
+
+    // arrivals during a pass - a requeue of the entry just trained, and a brand-new dimension with an earlier
+    // key than everything still in the pass - belong to the FOLLOWING pass
+    ml_queue_push(q, ml_test_create_item("k:10"));
+    ml_queue_push(q, ml_test_create_item("k:5"));
+
+    ML_TEST_ASSERT(ml_test_pop_id(q, &stopped) == "k:20", "the current pass continues in its sorted order");
+    ML_TEST_ASSERT(ml_test_pop_id(q, &stopped) == "k:30", "the current pass is finished before any arrival");
+    ML_TEST_ASSERT(ml_test_pop_id(q, &stopped) == "k:5", "the next pass is sorted on its own keys");
+    ML_TEST_ASSERT(ml_test_pop_id(q, &stopped) == "k:10", "the requeued entry is trained once in the next pass");
+    ML_TEST_ASSERT(ml_queue_size(q).create_new_model == 0, "every entry was trained exactly once per pass");
+
+    ml_queue_stats_t stats = ml_queue_stats(q);
+    ML_TEST_ASSERT(stats.passes_sorted == 2, "two passes were sorted");
+    ML_TEST_ASSERT(stats.pass_entries == 2, "the last pass had the two arrivals");
+
+    ml_queue_destroy(q);
+}
+
+static void test_queue_without_key_fn_keeps_push_order()
+{
+    fprintf(stderr, "  test_queue_without_key_fn_keeps_push_order...\n");
+
+    ml_queue_t *q = ml_queue_init();
+    ml_queue_push(q, ml_test_create_item("k:300"));
+    ml_queue_push(q, ml_test_create_item("k:100"));
+    ml_queue_push(q, ml_test_create_item("k:200"));
+
+    bool stopped = false;
+    ML_TEST_ASSERT(ml_test_pop_id(q, &stopped) == "k:300", "without a key function the pass keeps push order (1)");
+    ML_TEST_ASSERT(ml_test_pop_id(q, &stopped) == "k:100", "without a key function the pass keeps push order (2)");
+    ML_TEST_ASSERT(ml_test_pop_id(q, &stopped) == "k:200", "without a key function the pass keeps push order (3)");
+
+    ml_queue_destroy(q);
+}
+
+static void test_queue_add_model_served_before_create_model()
+{
+    fprintf(stderr, "  test_queue_add_model_served_before_create_model...\n");
+
+    ml_queue_t *q = ml_queue_init();
+    ml_queue_set_pass_key_fn(q, ml_test_pass_key, q);
+
+    ml_queue_push(q, ml_test_create_item("k:100"));
+
+    ml_queue_item_t add;
+    add.type = ML_QUEUE_ITEM_TYPE_ADD_EXISTING_MODEL;
+    add.add_existing_model.DLI = DimensionLookupInfo("00000000-0000-0000-0000-000000000000", "chart", "streamed");
+    add.add_existing_model.inlined_km = ml_kmeans_inlined_t();
+    ml_queue_push(q, add);
+
+    ml_queue_item_t item = ml_queue_pop(q);
+    ML_TEST_ASSERT(item.type == ML_QUEUE_ITEM_TYPE_ADD_EXISTING_MODEL, "add-model requests keep their priority over the pass");
+    item = ml_queue_pop(q);
+    ML_TEST_ASSERT(item.type == ML_QUEUE_ITEM_TYPE_CREATE_NEW_MODEL, "then the pass is served");
+
+    ml_queue_destroy(q);
+}
+
+static void test_queue_stop_during_pass_sort()
+{
+    fprintf(stderr, "  test_queue_stop_during_pass_sort...\n");
+
+    ml_queue_t *q = ml_queue_init();
+    ml_queue_set_pass_key_fn(q, ml_test_pass_key, q);
+
+    ml_queue_push(q, ml_test_create_item("k:100"));
+    ml_queue_push(q, ml_test_create_item("stop"));
+    ml_queue_push(q, ml_test_create_item("k:200"));
+
+    ml_test_key_calls = 0;
+    ml_queue_item_t item = ml_queue_pop(q);
+    ML_TEST_ASSERT(item.type == ML_QUEUE_ITEM_STOP_REQUEST, "a stop request during the key resolution is honoured");
+    ML_TEST_ASSERT(ml_test_key_calls < 3, "the resolution stops at the stop request instead of finishing the pass");
+    ML_TEST_ASSERT(ml_queue_size(q).create_new_model == 3, "the entries of the abandoned pass are kept");
+
+    ml_queue_stats_t stats = ml_queue_stats(q);
+    ML_TEST_ASSERT(stats.passes_sorted == 0, "an abandoned pass is not counted as sorted");
+
+    ml_queue_destroy(q);
+}
+
+static void test_queue_stop_at_last_key()
+{
+    fprintf(stderr, "  test_queue_stop_at_last_key...\n");
+
+    ml_queue_t *q = ml_queue_init();
+    ml_queue_set_pass_key_fn(q, ml_test_pass_key, q);
+
+    ml_queue_push(q, ml_test_create_item("k:100"));
+    ml_queue_push(q, ml_test_create_item("k:200"));
+    ml_queue_push(q, ml_test_create_item("stop"));
+
+    ml_queue_item_t item = ml_queue_pop(q);
+    ML_TEST_ASSERT(item.type == ML_QUEUE_ITEM_STOP_REQUEST, "a stop request during the last key callback is honoured");
+    ML_TEST_ASSERT(ml_queue_size(q).create_new_model == 3, "the entries of the abandoned pass are kept");
+
+    ml_queue_stats_t stats = ml_queue_stats(q);
+    ML_TEST_ASSERT(stats.passes_sorted == 0, "a pass whose last key saw the stop request is not sorted");
+
+    ml_queue_destroy(q);
+}
+
+static void test_queue_sort_pass_orders_by_key()
+{
+    fprintf(stderr, "  test_queue_sort_pass_orders_by_key...\n");
+
+    std::deque<ml_create_model_entry_t> pass;
+    ml_create_model_entry_t e;
+    e.req.DLI = DimensionLookupInfo("00000000-0000-0000-0000-000000000000", "chart", "d");
+    e.key = 1000; pass.push_back(e);
+    e.key = 999;  pass.push_back(e);   // an early key is a valid completion time, not an idle page
+    e.key = 5000; pass.push_back(e);
+    e.key = 0;    pass.push_back(e);
+    e.key = 1000; pass.push_back(e);   // equal keys are allowed and stay adjacent
+
+    size_t key0 = 0;
+    ml_queue_sort_pass(pass, &key0);
+
+    ML_TEST_ASSERT(key0 == 1, "only the zero key is counted as key 0");
+    ML_TEST_ASSERT(pass[0].key == 0, "the key-0 entry sorts first");
+    ML_TEST_ASSERT(pass[1].key == 999, "an early key keeps its place instead of becoming key 0");
+    ML_TEST_ASSERT(pass[2].key == 1000 && pass[3].key == 1000, "equal keys sort together");
+    ML_TEST_ASSERT(pass[4].key == 5000, "later completions sort last");
+}
+
+// ---- shared queue: several consumers --------------------------------------------------------------------------
+//
+// All training threads consume one queue. The key callback below parks the sorter on a gate on its first call, so a
+// test knows a pass is being sorted (the queue marks it and releases its mutex) while it starts the other consumers.
+
+struct ml_test_gate {
+    std::mutex mutex;
+    std::condition_variable cv;
+    bool reached = false;
+    bool released = false;
+};
+
+static time_t ml_test_gated_key(const ml_request_create_new_model_t &req, void *arg)
+{
+    ml_test_gate *gate = static_cast<ml_test_gate *>(arg);
+    {
+        std::unique_lock<std::mutex> lock(gate->mutex);
+        if (!gate->reached) {
+            gate->reached = true;
+            gate->cv.notify_all();
+            gate->cv.wait(lock, [gate] { return gate->released; });
+        }
+    }
+    const char *id = req.DLI.dimensionId();
+    return now_realtime_sec() + strtol(id + 2, nullptr, 10);
+}
+
+static bool ml_test_wait_for(const std::function<bool()> &cond)
+{
+    // bounded: a broken queue fails an assertion (and the run is aborted) instead of hanging the test run
+    for (size_t i = 0; i < 5000; i++) {
+        if (cond())
+            return true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    return false;
+}
+
+static size_t ml_test_queue_waiters(ml_queue_t *q)
+{
+    netdata_mutex_lock(&q->mutex);
+    size_t n = q->waiters;
+    netdata_mutex_unlock(&q->mutex);
+    return n;
+}
+
+static void ml_test_join_or_abort(std::vector<std::thread> &threads, bool all_returned, const char *what)
+{
+    if (!all_returned) {
+        // a consumer is stuck in the queue; its thread references this test's locals, so it can be neither joined nor
+        // left behind: stop the test run here
+        fprintf(stderr, "  FAIL: %s - consumers did not return, aborting the test run\n", what);
+        abort();
+    }
+    for (auto &t : threads)
+        t.join();
+}
+
+static void test_queue_consumers_share_one_sort()
+{
+    fprintf(stderr, "  test_queue_consumers_share_one_sort...\n");
+
+    const size_t consumers = 4, entries = 200;
+    ml_test_gate gate;
+    ml_queue_t *q = ml_queue_init();
+    ml_queue_set_pass_key_fn(q, ml_test_gated_key, &gate);
+
+    for (size_t i = 0; i < entries; i++) {
+        char id[32];
+        snprintfz(id, sizeof(id), "k:%zu", (i * 7919) % entries);   // pushed out of key order
+        ml_queue_push(q, ml_test_create_item(id));
+    }
+
+    std::mutex popped_mutex;
+    std::vector<std::string> popped;
+    std::atomic<size_t> returned{0};
+    std::atomic<size_t> sorted_by{0};
+    std::atomic<size_t> add_models{0};
+
+    auto consume = [&]() {
+        while (true) {
+            ml_queue_pass_timing_t timing;
+            ml_queue_item_t item = ml_queue_pop(q, &timing);
+            if (timing.sorted)
+                sorted_by++;
+            if (item.type == ML_QUEUE_ITEM_STOP_REQUEST)
+                break;
+            if (item.type == ML_QUEUE_ITEM_TYPE_ADD_EXISTING_MODEL) {
+                add_models++;
+                continue;
+            }
+            std::lock_guard<std::mutex> lock(popped_mutex);
+            popped.emplace_back(item.create_new_model.DLI.dimensionId());
+        }
+        returned++;
+    };
+
+    std::vector<std::thread> threads;
+    threads.emplace_back(consume);
+    bool sorting = ml_test_wait_for([&] { std::lock_guard<std::mutex> l(gate.mutex); return gate.reached; });
+    ML_TEST_ASSERT(sorting, "the first consumer starts sorting the pass");
+
+    for (size_t i = 1; i < consumers; i++)
+        threads.emplace_back(consume);
+    bool parked = ml_test_wait_for([&] { return ml_test_queue_waiters(q) == consumers - 1; });
+    ML_TEST_ASSERT(parked, "consumers arriving during the sort wait instead of sorting again");
+
+    // the sorter is still parked in the key callback: a waiting consumer serves an add-model request meanwhile
+    ml_queue_item_t add;
+    add.type = ML_QUEUE_ITEM_TYPE_ADD_EXISTING_MODEL;
+    add.add_existing_model.DLI = DimensionLookupInfo("00000000-0000-0000-0000-000000000000", "chart", "add");
+    ml_queue_push(q, add);
+    bool served = ml_test_wait_for([&] { return add_models.load() == 1; });
+    ML_TEST_ASSERT(served, "an add-model request is served while another consumer sorts the pass");
+    bool reparked = ml_test_wait_for([&] { return ml_test_queue_waiters(q) == consumers - 1; });
+    ML_TEST_ASSERT(reparked && ml_queue_stats(q).passes_sorted == 0,
+                   "after serving it the consumer waits for the pass again, still inside the one sort");
+
+    {
+        std::lock_guard<std::mutex> l(gate.mutex);
+        gate.released = true;
+    }
+    gate.cv.notify_all();
+
+    bool drained = ml_test_wait_for([&] { std::lock_guard<std::mutex> l(popped_mutex); return popped.size() == entries; });
+    ML_TEST_ASSERT(drained, "the consumers drain the published pass");
+    bool idle = ml_test_wait_for([&] { return ml_test_queue_waiters(q) == consumers; });
+    ML_TEST_ASSERT(idle, "with the pass drained every consumer waits");
+
+    ml_queue_signal(q);
+    bool all_returned = ml_test_wait_for([&] { return returned.load() == consumers; });
+    ML_TEST_ASSERT(all_returned, "a stop request wakes every consumer");
+    ml_test_join_or_abort(threads, all_returned, "test_queue_consumers_share_one_sort");
+
+    std::set<std::string> unique(popped.begin(), popped.end());
+    ML_TEST_ASSERT(popped.size() == entries && unique.size() == entries, "every entry is popped exactly once");
+    ML_TEST_ASSERT(ml_queue_stats(q).passes_sorted == 1, "one sort serves every consumer");
+    ML_TEST_ASSERT(sorted_by.load() == 1, "only the consumer that sorted reports the pass timing");
+
+    ml_queue_destroy(q);
+}
+
+static void test_queue_stop_during_sort_wakes_every_consumer()
+{
+    fprintf(stderr, "  test_queue_stop_during_sort_wakes_every_consumer...\n");
+
+    const size_t consumers = 4, entries = 50;
+    ml_test_gate gate;
+    ml_queue_t *q = ml_queue_init();
+    ml_queue_set_pass_key_fn(q, ml_test_gated_key, &gate);
+
+    for (size_t i = 0; i < entries; i++) {
+        char id[32];
+        snprintfz(id, sizeof(id), "k:%zu", i);
+        ml_queue_push(q, ml_test_create_item(id));
+    }
+
+    std::atomic<size_t> stops{0};
+    auto consume = [&]() {
+        ml_queue_item_t item = ml_queue_pop(q);
+        if (item.type == ML_QUEUE_ITEM_STOP_REQUEST)
+            stops++;
+    };
+
+    std::vector<std::thread> threads;
+    threads.emplace_back(consume);
+    bool sorting = ml_test_wait_for([&] { std::lock_guard<std::mutex> l(gate.mutex); return gate.reached; });
+    ML_TEST_ASSERT(sorting, "the first consumer starts sorting the pass");
+
+    for (size_t i = 1; i < consumers; i++)
+        threads.emplace_back(consume);
+    bool parked = ml_test_wait_for([&] { return ml_test_queue_waiters(q) == consumers - 1; });
+    ML_TEST_ASSERT(parked, "the other consumers wait for the pass");
+
+    ml_queue_signal(q);
+    {
+        std::lock_guard<std::mutex> l(gate.mutex);
+        gate.released = true;
+    }
+    gate.cv.notify_all();
+
+    bool all_stopped = ml_test_wait_for([&] { return stops.load() == consumers; });
+    ML_TEST_ASSERT(all_stopped, "a stop during a sort returns STOP to the sorter and to every waiting consumer");
+    ml_test_join_or_abort(threads, all_stopped, "test_queue_stop_during_sort_wakes_every_consumer");
+
+    ML_TEST_ASSERT(ml_queue_size(q).create_new_model == entries, "the entries of the abandoned pass are kept");
+    ML_TEST_ASSERT(ml_queue_stats(q).passes_sorted == 0, "an abandoned pass is not counted as sorted");
+
+    ml_queue_destroy(q);
+}
+
+static void test_dimension_accept_downstream_model()
+{
+    fprintf(stderr, "  test_dimension_accept_downstream_model...\n");
+
+    ml_dimension_t dim = {};
+    spinlock_init(&dim.slock);
+
+    ml_kmeans_inlined_t older;
+    older.after = 100;
+    older.before = 200;
+    ml_kmeans_inlined_t newer;
+    newer.after = 150;
+    newer.before = 300;
+
+    ML_TEST_ASSERT(ml_dimension_accept_downstream_model(&dim, older), "a first model is accepted");
+
+    dim.km_contexts.emplace_back(newer);
+    ML_TEST_ASSERT(!ml_dimension_accept_downstream_model(&dim, newer), "the installed model is refused as a duplicate");
+    ML_TEST_ASSERT(!ml_dimension_accept_downstream_model(&dim, older),
+                   "a model older than the installed one is refused, whichever order two threads pop them in");
+
+    ml_kmeans_inlined_t newest = newer;
+    newest.after = 200;
+    newest.before = 400;
+    ML_TEST_ASSERT(ml_dimension_accept_downstream_model(&dim, newest), "a newer model is accepted");
+
+    dim.training_in_progress = true;
+    ML_TEST_ASSERT(ml_dimension_accept_downstream_model(&dim, newest),
+                   "a local training in progress does not block a downstream model");
+}
+
+// Regression: training threads share one queue, so a child's model for dimension X can be popped by one thread
+// while another trains X. The model used to be refused (and never retried) because the local training wrote into the
+// dimension's own buffer; now the downstream model is installed, and the local result is dropped when it is ready.
+static void test_downstream_model_during_local_training()
+{
+    fprintf(stderr, "  test_downstream_model_during_local_training...\n");
+
+    ml_dimension_t dim = {};
+    spinlock_init(&dim.slock);
+    dim.reset_generation = 7;
+
+    // thread A starts a local training of X (ml_dimension_train_model())
+    enum ml_worker_result precheck = ML_WORKER_RESULT_OK;
+    ML_TEST_ASSERT(!ml_dimension_train_model_precheck(METRIC_TYPE_VARIABLE, dim.has_received_downstream_model,
+                                                      dim.training_in_progress, &precheck),
+                   "thread A: X goes to local training");
+    dim.training_in_progress = true;
+    uint32_t generation_a = dim.reset_generation;
+
+    // thread B pops the child's model for X and installs it (ml_worker_add_existing_model())
+    ml_kmeans_inlined_t child;
+    child.after = 100;
+    child.before = 200;
+    ML_TEST_ASSERT(ml_dimension_accept_downstream_model(&dim, child), "thread B: the child's model is accepted mid-training");
+    ML_TEST_ASSERT(ml_should_publish_model_update(true, dim.reset_generation, dim.reset_generation, false, nullptr),
+                   "thread B: the child's model is installed");
+    dim.km_contexts.emplace_back(child);
+    dim.has_received_downstream_model = true;
+    ML_TEST_ASSERT(dim.training_in_progress, "thread B: the install leaves thread A's training flag alone");
+
+    // thread A's training completes: its install is dropped, and its flag cleared
+    ML_TEST_ASSERT(!ml_should_publish_model_update(true, dim.reset_generation, generation_a,
+                                                   dim.has_received_downstream_model, &dim.training_in_progress),
+                   "thread A: the local model is dropped, X is downstream-supplied now");
+    ML_TEST_ASSERT(!dim.training_in_progress, "thread A: the dropped install clears its training flag");
+
+    // X's create-model entry then leaves the queue
+    ML_TEST_ASSERT(ml_dimension_train_model_precheck(METRIC_TYPE_VARIABLE, dim.has_received_downstream_model,
+                                                     dim.training_in_progress, &precheck) &&
+                   precheck == ML_WORKER_RESULT_DOWNSTREAM_MODEL_SUPPLIED && !ml_should_requeue_create_new_model(precheck),
+                   "the next pop of X stops local training");
+}
+
+static void test_pending_models_keep_install_order()
+{
+    fprintf(stderr, "  test_pending_models_keep_install_order...\n");
+
+    spinlock_init(&Cfg.pending_models_spinlock);
+    Cfg.pending_models.clear();
+
+    // two threads install models of ONE dimension; in production its slock orders the installs, here dim_lock does,
+    // and the install sequence number is taken under it. A third thread takes batches meanwhile, as the flushes do.
+    const time_t per_thread = 2000;
+    SPINLOCK dim_lock;
+    spinlock_init(&dim_lock);
+    time_t next_seq = 0;
+    std::atomic<bool> installing{true};
+    std::vector<time_t> written;
+
+    auto install = [&]() {
+        for (time_t i = 0; i < per_thread; i++) {
+            ml_model_info_t info = {};
+            spinlock_lock(&dim_lock);
+            info.inlined_kmeans.before = next_seq++;
+            ml_pending_models_add(info);
+            spinlock_unlock(&dim_lock);
+        }
+    };
+    auto flush = [&]() {
+        std::vector<ml_model_info_t> batch;
+        while (installing.load()) {
+            ml_pending_models_take(batch);
+            for (const auto &m : batch)
+                written.push_back(m.inlined_kmeans.before);
+        }
+    };
+
+    std::thread flusher(flush);
+    std::thread a(install), b(install);
+    a.join();
+    b.join();
+    installing = false;
+    flusher.join();
+
+    std::vector<ml_model_info_t> batch;
+    ml_pending_models_take(batch);
+    for (const auto &m : batch)
+        written.push_back(m.inlined_kmeans.before);
+
+    bool in_order = written.size() == (size_t)(2 * per_thread);
+    for (size_t i = 0; in_order && i < written.size(); i++)
+        in_order = written[i] == (time_t)i;
+    ML_TEST_ASSERT(in_order, "the batches carry every model of the dimension once, in install order");
+    ML_TEST_ASSERT(ml_pending_models_count() == 0, "taking a batch empties the shared list");
+}
+
+// ---- host-backed ordering test --------------------------------------------------------------------------------
+//
+// Drives the real key function (ml_queue_dimension_pass_key(): resolve the dimension, read how many seconds of data
+// its current tier-0 page still needs) against dbengine-backed charts on a live host. Called from test_dbengine()
+// with the dbengine unit-test host, because ML's own test entry point has no RRD tree. Two of the charts store data
+// that lags the local clock by 30 and 60 minutes, as a parent's children do when it falls behind: their page closes,
+// in their own timestamps, are already in the local past, and they must still be ordered by when their pages fill.
+
+static size_t ml_host_test_failures = 0;
+#define ML_HOST_TEST_CHECK(cond, msg) do { \
+    if (!(cond)) { fprintf(stderr, " >>> ML host-order: %s (line %d)\n", msg, __LINE__); ml_host_test_failures++; } \
+} while (0)
+
+static RRDDIM *ml_host_test_create(RRDHOST *host, const char *name, time_t first_point_s, int update_every)
+{
+    char id[128];
+    snprintfz(id, sizeof(id) - 1, "ml-order-%s-%d", name, (int)getpid());
+
+    RRDSET *st = rrdset_create(host, "netdata", id, id, "netdata", NULL, "Unit Testing", "a value", "unittest",
+                               NULL, 1, update_every, RRDSET_TYPE_LINE);
+    RRDDIM *rd = rrddim_add(st, "dim", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    if (!rd || rd->tiers[0].seb != STORAGE_ENGINE_BACKEND_DBENGINE || !rd->tiers[0].sch)
+        return nullptr;
+
+    storage_engine_store_metric(rd->tiers[0].sch, (usec_t)first_point_s * USEC_PER_SEC, 1, 1, 1, 1, 0, SN_DEFAULT_FLAGS);
+    return rd;
+}
+
+static ml_queue_item_t ml_host_test_item(RRDHOST *host, const char *chart_id, const char *dim_id)
+{
+    ml_queue_item_t item;
+    item.type = ML_QUEUE_ITEM_TYPE_CREATE_NEW_MODEL;
+    item.create_new_model.DLI = DimensionLookupInfo(host->machine_guid, chart_id, dim_id);
+    return item;
+}
+
+static std::string ml_host_test_pop(ml_queue_t *q)
+{
+    ml_queue_item_t item = ml_queue_pop(q);
+    if (item.type != ML_QUEUE_ITEM_TYPE_CREATE_NEW_MODEL)
+        return "<stop>";
+    return std::string(item.create_new_model.DLI.chartId());
+}
+
+static time_t ml_host_test_to_close(RRDDIM *rd)
+{
+    spinlock_lock(&rd->tiers[0].spinlock);
+    time_t to_close = storage_engine_store_page_time_to_close_s(rd->tiers[0].sch);
+    spinlock_unlock(&rd->tiers[0].spinlock);
+    return to_close;
+}
+
+static void ml_host_test_store_next(RRDDIM *rd, time_t *t)
+{
+    *t += 1;
+    storage_engine_store_metric(rd->tiers[0].sch, (usec_t)*t * USEC_PER_SEC, 1, 1, 1, 1, 0, SN_DEFAULT_FLAGS);
+}
+
+// Store consecutive points (update_every 1) after *t until the open page needs exactly `target` more seconds. A page
+// holds at least max_slots / 3 points (341 on 64-bit builds, 170 on 32-bit ones, whose tier-0 pages are half the
+// size), so any target below 169 is reached by counting down a fresh page.
+static bool ml_host_test_fill_to(RRDDIM *rd, time_t *t, time_t target)
+{
+    for (size_t i = 0; i < 5000; i++) {
+        if (ml_host_test_to_close(rd) == target)
+            return true;
+        ml_host_test_store_next(rd, t);
+    }
+    return false;
+}
+
+extern "C" int ml_queue_host_order_unittest(RRDHOST *host)
+{
+    fprintf(stderr, "  ml_queue_host_order_unittest...\n");
+    ml_host_test_failures = 0;
+
+    // Each chart is filled until its open page needs a known number of seconds, so the order of page completion is
+    // a (20) < b (60) < c (100) < e (140), and the update_every 5 chart d, which needs at least 169 * 5 s, completes
+    // last. Filling stores at most 1024 points, so every chart starts far enough back that none is written
+    // in the future: a and e end over an hour and over half an hour behind the local clock, b and c a few minutes.
+    time_t now = now_realtime_sec();
+    time_t t_a = now - 4800, t_b = now - 1200, t_c = now - 1200, t_e = now - 3000;
+    RRDDIM *rd_a = ml_host_test_create(host, "a", t_a, 1);
+    RRDDIM *rd_b = ml_host_test_create(host, "b", t_b, 1);
+    RRDDIM *rd_c = ml_host_test_create(host, "c", t_c, 1);
+    RRDDIM *rd_d = ml_host_test_create(host, "d", now - 1200, 5);
+    RRDDIM *rd_e = ml_host_test_create(host, "e", t_e, 1);    // deleted mid-pass later
+    if (!rd_a || !rd_b || !rd_c || !rd_d || !rd_e) {
+        fprintf(stderr, " >>> ML host-order: could not create dbengine-backed charts\n");
+        return 1;
+    }
+    const char *id_a = rrdset_id(rd_a->rrdset), *id_b = rrdset_id(rd_b->rrdset), *id_c = rrdset_id(rd_c->rrdset), *id_d = rrdset_id(rd_d->rrdset);
+    std::string id_e = rrdset_id(rd_e->rrdset);      // a copy: the chart's dimension is freed mid-test
+
+    bool filled = ml_host_test_fill_to(rd_a, &t_a, 20) && ml_host_test_fill_to(rd_b, &t_b, 60) &&
+                  ml_host_test_fill_to(rd_c, &t_c, 100) && ml_host_test_fill_to(rd_e, &t_e, 140);
+    ML_HOST_TEST_CHECK(filled, "every chart reached its target seconds-to-close");
+    ML_HOST_TEST_CHECK(ml_host_test_to_close(rd_d) > 140, "the update_every 5 chart's page fills after chart e's");
+    ML_HOST_TEST_CHECK(t_a + 20 < now - 3600 && t_e + 140 < now - 1800 && t_b + 60 < now && t_c + 100 < now,
+                       "every chart's page close, in its own timestamps, is in the local past (an hour and half an hour for a and e)");
+
+    // the real key function turns the seconds still needed into a local completion time
+    ml_request_create_new_model_t req_a = { DimensionLookupInfo(host->machine_guid, id_a, "dim") };
+    time_t before = now_realtime_sec();
+    time_t key_a = ml_queue_dimension_pass_key(req_a, nullptr);
+    time_t after = now_realtime_sec();
+    ML_HOST_TEST_CHECK(key_a >= before + 20 && key_a <= after + 20, "ml_queue_dimension_pass_key() returns now + the seconds the page still needs, for a lagging chart too");
+    ml_request_create_new_model_t req_missing = { DimensionLookupInfo(host->machine_guid, id_a, "no-such-dim") };
+    ML_HOST_TEST_CHECK(ml_queue_dimension_pass_key(req_missing, nullptr) == 0, "an unresolvable dimension gets key 0");
+
+    ml_queue_t *q = ml_queue_init();
+    ml_queue_set_pass_key_fn(q, ml_queue_dimension_pass_key, nullptr);
+
+    // pass 1: pushed d, c, e, a, b - trained a, b, c, e, d (lagging and current charts, mixed update_every, ordered
+    // by when their pages fill)
+    ml_queue_push(q, ml_host_test_item(host, id_d, "dim"));
+    ml_queue_push(q, ml_host_test_item(host, id_c, "dim"));
+    ml_queue_push(q, ml_host_test_item(host, id_e.c_str(), "dim"));
+    ml_queue_push(q, ml_host_test_item(host, id_a, "dim"));
+    ml_queue_push(q, ml_host_test_item(host, id_b, "dim"));
+    ML_HOST_TEST_CHECK(ml_host_test_pop(q) == id_a, "pass 1: the hour-behind chart whose page fills first is trained first");
+    // a mid-pass arrival (a requeue of a) belongs to the next pass, whatever its key
+    ml_queue_push(q, ml_host_test_item(host, id_a, "dim"));
+    ML_HOST_TEST_CHECK(ml_host_test_pop(q) == id_b, "pass 1: then the next");
+    ML_HOST_TEST_CHECK(ml_host_test_pop(q) == id_c, "pass 1: then c");
+    ML_HOST_TEST_CHECK(ml_host_test_pop(q) == id_e, "pass 1: then the half-hour-behind chart e");
+    ML_HOST_TEST_CHECK(ml_host_test_pop(q) == id_d, "pass 1: the update_every 5 chart fills last and is trained last");
+    ml_queue_stats_t stats = ml_queue_stats(q);
+    ML_HOST_TEST_CHECK(stats.pass_entries == 5 && stats.pass_key0_entries == 0, "pass 1: five entries, none with key 0 although two charts lag the clock");
+    ML_HOST_TEST_CHECK(ml_host_test_pop(q) == id_a, "pass 2 (the mid-pass arrival alone): a");
+
+    // phase change: chart a collects until its page fills and flushes, and opens a new one; a fresh page needs at
+    // least 169 more seconds, so among a, b, c, e it now fills last (still before d's, which is not part of the
+    // following passes)
+    for (size_t i = 0; i < 5000 && ml_host_test_to_close(rd_a) >= 0; i++)
+        ml_host_test_store_next(rd_a, &t_a);
+    ml_host_test_store_next(rd_a, &t_a);
+    ML_HOST_TEST_CHECK(ml_host_test_to_close(rd_a) > 140, "chart a's new page fills after chart e's");
+
+    // pass 3: a, b, c, e requeued in the old order - the new key moves a to the end. MID-PASS, chart c is
+    // obsoleted and chart e's dimension is deleted outright: both entries keep the place their keys earned at
+    // the pass start and are still served (the worker's training step is what fails to acquire them, as today)
+    ml_queue_push(q, ml_host_test_item(host, id_a, "dim"));
+    ml_queue_push(q, ml_host_test_item(host, id_b, "dim"));
+    ml_queue_push(q, ml_host_test_item(host, id_c, "dim"));
+    ml_queue_push(q, ml_host_test_item(host, id_e.c_str(), "dim"));
+    ML_HOST_TEST_CHECK(ml_host_test_pop(q) == id_b, "pass 3: b first, its page now fills first");
+    rrdset_is_obsolete___safe_from_collector_thread(rd_c->rrdset);
+    rrddim_free(rd_e->rrdset, rd_e);
+    rd_e = nullptr;
+    ML_HOST_TEST_CHECK(ml_host_test_pop(q) == id_c, "pass 3: c is still served in its sorted place after its chart was obsoleted mid-pass");
+    ML_HOST_TEST_CHECK(ml_host_test_pop(q) == id_e, "pass 3: e is still served in its sorted place after its dimension was deleted mid-pass");
+    ML_HOST_TEST_CHECK(ml_host_test_pop(q) == id_a, "pass 3: a last, its key was re-read at the pass start (its page now fills after e's)");
+
+    // pass 4: the obsoleted chart's dimension, the deleted dimension and one that never existed get key 0 and
+    // are trained first, as one group, ahead of every resolvable dimension
+    ml_queue_push(q, ml_host_test_item(host, id_b, "dim"));
+    ml_queue_push(q, ml_host_test_item(host, id_c, "dim"));
+    ml_queue_push(q, ml_host_test_item(host, "ml-order-never-existed", "dim"));
+    ml_queue_push(q, ml_host_test_item(host, id_e.c_str(), "dim"));
+    ml_queue_push(q, ml_host_test_item(host, id_a, "dim"));
+    std::set<std::string> key0_ids = { ml_host_test_pop(q), ml_host_test_pop(q), ml_host_test_pop(q) };
+    std::set<std::string> key0_expected = { std::string(id_c), std::string("ml-order-never-existed"), id_e };
+    ML_HOST_TEST_CHECK(key0_ids == key0_expected, "pass 4: the obsoleted, the deleted and the unknown dimension form the key-0 group at the front");
+    ML_HOST_TEST_CHECK(ml_host_test_pop(q) == id_b, "pass 4: then b");
+    ML_HOST_TEST_CHECK(ml_host_test_pop(q) == id_a, "pass 4: then a");
+    stats = ml_queue_stats(q);
+    ML_HOST_TEST_CHECK(stats.passes_sorted == 4 && stats.pass_key0_entries == 3, "pass 4: three key-0 entries reported for the last pass");
+    ML_HOST_TEST_CHECK(ml_queue_size(q).create_new_model == 0, "every entry was trained exactly once per pass");
+
+    ml_queue_destroy(q);
+
+    // Regression: a create-model request popped while its child is disconnected (orphan host) or its chart is
+    // obsolete used to be dropped. The dimension keeps create_new_model_queued, so ml_host_start() does not enqueue it
+    // again on reconnect and it was never trained again. Such requests are requeued now; only a dimension that is
+    // really gone is dropped. (The worker is not used when the dimension cannot be acquired.)
+    ml_request_create_new_model_t req_b = { DimensionLookupInfo(host->machine_guid, id_b, "dim") };
+    bool was_orphan = rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN);
+    rrdhost_flag_set(host, RRDHOST_FLAG_ORPHAN);
+    enum ml_worker_result res = ml_worker_create_new_model(nullptr, req_b);
+    if (!was_orphan)
+        __atomic_and_fetch(&host->flags, (RRDHOST_FLAGS)~RRDHOST_FLAG_ORPHAN, __ATOMIC_RELEASE);
+    ML_HOST_TEST_CHECK(res == ML_WORKER_RESULT_DIMENSION_UNAVAILABLE && ml_should_requeue_create_new_model(res),
+                       "a dimension of a disconnected child is requeued, not dropped");
+
+    ml_request_create_new_model_t req_c = { DimensionLookupInfo(host->machine_guid, id_c, "dim") };
+    res = ml_worker_create_new_model(nullptr, req_c);
+    ML_HOST_TEST_CHECK(res == ML_WORKER_RESULT_DIMENSION_UNAVAILABLE && ml_should_requeue_create_new_model(res),
+                       "a dimension of an obsolete chart is requeued, not dropped");
+
+    ml_request_create_new_model_t req_e = { DimensionLookupInfo(host->machine_guid, id_e.c_str(), "dim") };
+    res = ml_worker_create_new_model(nullptr, req_e);
+    ML_HOST_TEST_CHECK(res == ML_WORKER_RESULT_NULL_ACQUIRED_DIMENSION && !ml_should_requeue_create_new_model(res),
+                       "a deleted dimension is dropped");
+
+    storage_engine_store_flush(rd_a->tiers[0].sch);
+    storage_engine_store_flush(rd_b->tiers[0].sch);
+    storage_engine_store_flush(rd_c->tiers[0].sch);
+    storage_engine_store_flush(rd_d->tiers[0].sch);
+
+    fprintf(stderr, "  ml_queue_host_order_unittest: %zu failures\n", ml_host_test_failures);
+    return ml_host_test_failures ? 1 : 0;
+}
+
 extern "C" int ml_unittest()
 {
     fprintf(stderr, "\nML unit tests:\n");
@@ -879,15 +2397,40 @@ extern "C" int ml_unittest()
     test_features_no_diff();
     test_features_smooth();
     test_features_zero_smooth_matches_one();
+    test_features_unused_rows_are_zero();
     test_kmeans_scoring();
+    test_kmeans_flat_spread_abstains();
+    test_kmeans_zero_distance_model_abstains();
     test_full_pipeline();
+    test_kmeans_inlined_empty_source_is_zero_initialized();
+    test_features_preprocess_below_min_for_kmeans();
+    test_dimension_finalize_constant_state();
+    test_chart_update_dimension_counts();
+    test_chart_stats_add_covers_every_field();
     test_circular_buffer_equivalence();
+    test_cns_ring_reset_semantics();
+    test_predict_flat_model_abstains();
     test_same_value_uses_newest_sample();
     test_preprocess_predict_equivalence();
     test_constant_input();
     test_parameter_combinations();
     test_kmeans_timestamp_roundtrip();
     test_kmeans_timestamp_rejection();
+    test_downstream_model_short_circuit_and_requeue();
+    test_reset_generation_cancels_model_publish();
+    test_dimension_lookup_info_short_machine_guid();
+    test_queue_pass_is_sorted_by_key();
+    test_queue_once_per_pass_and_mid_pass_arrivals();
+    test_queue_without_key_fn_keeps_push_order();
+    test_queue_add_model_served_before_create_model();
+    test_queue_stop_during_pass_sort();
+    test_queue_stop_at_last_key();
+    test_queue_sort_pass_orders_by_key();
+    test_queue_consumers_share_one_sort();
+    test_queue_stop_during_sort_wakes_every_consumer();
+    test_dimension_accept_downstream_model();
+    test_downstream_model_during_local_training();
+    test_pending_models_keep_install_order();
 
     fprintf(stderr, "\nML tests: %d run, %d failed\n", tests_run, tests_failed);
 

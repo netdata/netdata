@@ -1,0 +1,13 @@
+[package]
+name = "netipc"
+version = "0.1.0"
+edition.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+libc = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }

@@ -58,7 +58,7 @@ modules:
         list:
           - title: Enable Prometheus telemetry
             description: |
-              [Enable](https://developer.hashicorp.com/consul/docs/agent/config/config-files#telemetry-prometheus_retention_time) telemetry on your Consul Agent, by increasing the value of `prometheus_retention_time` from `0`.
+              [Enable](https://developer.hashicorp.com/consul/docs/reference/agent/configuration-file/telemetry#telemetry-prometheus_retention_time) telemetry on your Consul Agent, by increasing the value of `prometheus_retention_time` from `0`.
           - title: Add required ACLs to Token
             description: |
               Required **only if authentication is enabled**.
@@ -229,55 +229,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: consul_node_health_check_status
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf
-        metric: consul.node_health_check_status
-        info: node health check ${label:check_name} has failed on server ${label:node_name} datacenter ${label:datacenter}
-      - name: consul_service_health_check_status
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf
-        metric: consul.service_health_check_status
-        info: service health check ${label:check_name} for service ${label:service_name} has failed on server ${label:node_name} datacenter ${label:datacenter}
-      - name: consul_client_rpc_requests_exceeded
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf
-        metric: consul.client_rpc_requests_exceeded_rate
-        info: number of rate-limited RPC requests made by server ${label:node_name} datacenter ${label:datacenter}
-      - name: consul_client_rpc_requests_failed
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf
-        metric: consul.client_rpc_requests_failed_rate
-        info: number of failed RPC requests made by server ${label:node_name} datacenter ${label:datacenter}
-      - name: consul_gc_pause_time
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf
-        metric: consul.gc_pause_time
-        info: time spent in stop-the-world garbage collection pauses on server ${label:node_name} datacenter ${label:datacenter}
-      - name: consul_autopilot_health_status
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf
-        metric: consul.autopilot_health_status
-        info: datacenter ${label:datacenter} cluster is unhealthy as reported by server ${label:node_name}
-      - name: consul_autopilot_server_health_status
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf
-        metric: consul.autopilot_server_health_status
-        info: server ${label:node_name} from datacenter ${label:datacenter} is unhealthy
-      - name: consul_raft_leader_last_contact_time
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf
-        metric: consul.raft_leader_last_contact_time
-        info: median time elapsed since leader server ${label:node_name} datacenter ${label:datacenter} was last able to contact the follower nodes
-      - name: consul_raft_leadership_transitions
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf
-        metric: consul.raft_leadership_transitions_rate
-        info: there has been a leadership change and server ${label:node_name} datacenter ${label:datacenter} has become the leader
-      - name: consul_raft_thread_main_saturation
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf
-        metric: consul.raft_thread_main_saturation_perc
-        info: average saturation of the main Raft goroutine on server ${label:node_name} datacenter ${label:datacenter}
-      - name: consul_raft_thread_fsm_saturation
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf
-        metric: consul.raft_thread_fsm_saturation_perc
-        info: average saturation of the FSM Raft goroutine on server ${label:node_name} datacenter ${label:datacenter}
-      - name: consul_license_expiration_time
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf
-        metric: consul.license_expiration_time
-        info: Consul Enterprise licence expiration time on node ${label:node_name} datacenter ${label:datacenter}
     metrics:
       folding:
         title: Metrics

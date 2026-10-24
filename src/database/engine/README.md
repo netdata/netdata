@@ -21,7 +21,7 @@ Using the **timestamp** and **duration**, Netdata calculates for each point its 
 
 For incremental metrics (counters), Netdata interpolates the collected values to align them to the expected **end time** at the microsecond level, absorbing data collection micro-latencies.
 
-When data points are stored in higher tiers (time aggregations - see [Tiers](#Tiers) below), each data point has:
+When data points are stored in higher tiers (time aggregations - see [Tiers](#tiers) below), each data point has:
 
 1. The **sum** of the original values that have been aggregated
 2. The **count** of all the original values aggregated,
@@ -83,7 +83,7 @@ This collection of 64 pages that is packed and compressed together is called an 
 
 #### Datafiles
 
-Multiple **extents** are appended to **datafiles** (filename suffix `.ndf`), until these **datafiles** become full. The size of each **datafile** is determined automatically by Netdata. The minimum for each **datafile** is 4MB and the maximum 512MB. Depending on the amount of disk space configured for each tier, Netdata will decide a **datafile** size trying to maintain about 50 datafiles for the whole database, within the limits mentioned (4MB min, 512MB max per file). The maximum number of datafiles supported is 65536, and therefore the maximum database size (per tier) that Netdata can support is 32TB.
+Multiple **extents** are appended to **datafiles** (filename suffix `.ndf`) until these **datafiles** become full. The size of each **datafile** is determined automatically by Netdata. Depending on the amount of disk space configured for each tier, Netdata chooses a target **datafile** size and clamps it between the compiled minimum and maximum datafile sizes. The current target is to keep about 100 datafiles for the tier.
 
 #### Journal Files
 
@@ -91,7 +91,9 @@ Each **datafile** has two **journal files** with metadata related to the stored 
 
 - **journal file v1**, with filename suffix `.njf`, holds information about the transactions in its **datafile** and provides the ability to recover as much data as possible, in case either the datafile or the journal files get corrupted. This journal file has a maximum transaction size of 4KB, so in case data are corrupted on disk transactions of 4KB are lost. Each transaction holds the metadata of one **extent** (this is why DBENGINE supports up to 64 pages per extent).
 
-- **journal file v2**, with filename suffix `.njfv2`, which is a disk-based index for all the **pages** and **extents**. This file is memory mapped at runtime and is consulted to find where the data of a metric are in the datafile. This journal file is automatically re-created from **journal file v1** if it is missing. It is safe to delete these files (when Netdata does not run). Netdata will re-create them on the next run. Journal files v2 are supported in Netdata Agents with version `netdata-1.37.0-115-nightly`. Older versions maintain the journal index in memory.
+- **journal file v2**, with filename suffix `.njfv2`, which is a disk-based index for all the **pages** and **extents**. This file is memory mapped at runtime and is consulted to find where the data of a metric are in the datafile. If this journal file is missing or fails its checks at startup, Netdata rebuilds it from **journal file v1**. This requires the journal file v1 to be readable; otherwise the data of that datafile are not available. It is safe to delete these files (when Netdata does not run), as long as their journal file v1 is intact. Netdata will re-create them on the next run. Journal files v2 are supported in Netdata Agents with version `netdata-1.37.0-115-nightly`. Older versions maintain the journal index in memory.
+
+  Newer agents also write an optional **samples section** in each **journal file v2**: the number of slots (points, empty ones included) of every metric in that file, derived from the time ranges of its pages, and their total in the section descriptor (so that startup reads only the header page). Only pages the index can reach are counted: if a file holds two pages of a metric with the same start time, the index keeps one of them (the one that ends later; if both end together, the one written earlier in the datafile) and only that one is counted. The per-tier `samples` reported in `db_size` by `/api/v2/info` is the sum of what each datafile holds: exact for files that have this section, estimated from the metric time ranges for files without it (files written by older agents). A page whose descriptor on disk is malformed is counted as what queries read from it (after repair), which can differ from the slots physically stored. Pages are counted when they are written to disk, so pages still waiting to be flushed are not included yet. Agents that do not know this section ignore it.
 
 #### Database Rotation
 
@@ -116,6 +118,8 @@ data from lower tiers, so that the aggregation they provide will be accurate.
 
 Configuring how the number of tiers and the disk space allocated to each tier is how you can
 [change how long netdata stores metrics](/src/database/CONFIGURATION.md#tiers).
+
+For how `update every` controls each tier's granularity and interacts with retention time and disk size, see [Update Every and Tier Granularity](/src/database/CONFIGURATION.md#update-every-and-tier-granularity).
 
 ### Data loss
 
@@ -169,7 +173,7 @@ Its primary use is to index information about the open datafile, the one that st
 
 The clean queue is an LRU for reducing the journal v2 scans during querying.
 
-Open cache uses memory ballooning too, like the main cache, based on its own hot pages. Open cache hot size is mainly controlled by the size of the open datafile. This is why on netdata versions with journal files v2, we decreased the maximum datafile size from 1GB to 512MB, and we increased the target number of datafiles from 20 to 50.
+Open cache uses memory ballooning too, like the main cache, based on its own hot pages. Open cache hot size is mainly controlled by the size of the open datafile. This is why Netdata keeps datafile sizes bounded and targets many datafiles per tier.
 
 On bigger setups open cache will get a bigger LRU by automatically sizing it (the whole open cache) to 5% to the size of (the whole) main cache.
 
@@ -186,7 +190,3 @@ The time-ranges of the queries running control the amount of shared memory requi
 ## Metrics Registry
 
 DBENGINE uses 150 bytes of memory for every metric for which retention is maintained but is not currently being collected.
-
-
-
-

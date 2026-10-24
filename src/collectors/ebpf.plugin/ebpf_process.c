@@ -62,10 +62,8 @@ static ebpf_local_maps_t process_maps[] = {
 char *tracepoint_sched_type = "sched";
 char *tracepoint_sched_process_exit = "sched_process_exit";
 char *tracepoint_sched_process_exec = "sched_process_exec";
-char *tracepoint_sched_process_fork = "sched_process_fork";
 static int was_sched_process_exit_enabled = 0;
 static int was_sched_process_exec_enabled = 0;
-static int was_sched_process_fork_enabled = 0;
 
 static netdata_idx_t *process_hash_values = NULL;
 ebpf_process_stat_t *process_stat_vector = NULL;
@@ -76,6 +74,8 @@ static netdata_publish_syscall_t process_publish_aggregated[NETDATA_KEY_PUBLISH_
 struct config process_config = APPCONFIG_INITIALIZER;
 
 #ifdef LIBBPF_MAJOR_VERSION
+#include <bpf/btf.h>
+
 /**
  * Disable probe
  *
@@ -88,6 +88,7 @@ static void ebpf_process_disable_probe(struct process_bpf *obj)
     bpf_program__set_autoload(obj->progs.netdata_release_task_probe, false);
     bpf_program__set_autoload(obj->progs.netdata_do_fork_probe, false);
     bpf_program__set_autoload(obj->progs.netdata_kernel_clone_probe, false);
+    bpf_program__set_autoload(obj->progs.netdata_wake_up_new_task_probe, false);
 }
 
 static void ebpf_disable_tracepoints(struct process_bpf *obj)
@@ -128,47 +129,6 @@ static inline void ebpf_disable_clone3(struct process_bpf *obj)
     bpf_program__set_autoload(obj->progs.netdata_clone3_fexit, false);
 }
 
-static inline void ebpf_adjust_process_fork(struct process_bpf *obj)
-{
-    if (running_on_kernel <= NETDATA_EBPF_KERNEL_6_16) {
-        bpf_program__set_autoload(obj->progs.netdata_tracepoint_sched_process_fork, true);
-        bpf_program__set_autoload(obj->progs.netdata_tracepoint_sched_process_fork_v2, false);
-    } else {
-        bpf_program__set_autoload(obj->progs.netdata_tracepoint_sched_process_fork_v2, true);
-        bpf_program__set_autoload(obj->progs.netdata_tracepoint_sched_process_fork, false);
-    }
-}
-
-/**
- * Mount Attach Probe
- *
- * Attach probes to target
- *
- * @param obj is the main structure for bpf objects.
- *
- * @return It returns 0 on success and -1 otherwise.
- */
-static inline int process_attach_kprobe_target(struct process_bpf *obj)
-{
-    obj->links.netdata_release_task_probe = bpf_program__attach_kprobe(
-        obj->progs.netdata_release_task_probe, false, process_targets[PROCESS_RELEASE_TASK_NAME].name);
-    int ret = libbpf_get_error(obj->links.netdata_release_task_probe);
-    if (ret)
-        goto endakt;
-
-    if (running_on_kernel < NETDATA_EBPF_KERNEL_5_9_16) {
-        obj->links.netdata_do_fork_probe =
-            bpf_program__attach_kprobe(obj->progs.netdata_do_fork_probe, false, process_targets[PROCESS_SYS_FORK].name);
-        ret = libbpf_get_error(obj->links.netdata_do_fork_probe);
-    } else {
-        obj->links.netdata_kernel_clone_probe = bpf_program__attach_kprobe(
-            obj->progs.netdata_kernel_clone_probe, false, process_targets[PROCESS_KERNEL_CLONE].name);
-        ret = libbpf_get_error(obj->links.netdata_kernel_clone_probe);
-    }
-endakt:
-    return ret;
-}
-
 /**
  * Set hash tables
  *
@@ -204,6 +164,7 @@ static inline int ebpf_process_load_and_attach(struct process_bpf *obj, ebpf_mod
     } else if (mode == EBPF_LOAD_PROBE || mode == EBPF_LOAD_RETPROBE) {
         ebpf_disable_tracepoints(obj);
         ebpf_disable_trampoline(obj);
+        bpf_program__set_autoload(obj->progs.netdata_sched_process_fork_btf, false);
 
         bpf_program__set_autoload(
             (running_on_kernel <= NETDATA_EBPF_KERNEL_5_9_16) ? obj->progs.netdata_kernel_clone_probe :
@@ -212,24 +173,45 @@ static inline int ebpf_process_load_and_attach(struct process_bpf *obj, ebpf_mod
     } else { // Tracepoint
         ebpf_process_disable_probe(obj);
         ebpf_disable_trampoline(obj);
+
+        // Keep release accounting active; tracepoint-only exit counts otherwise
+        // make every unreaped exit appear to be a zombie.
+        bpf_program__set_autoload(obj->progs.netdata_release_task_probe, true);
+
+#if defined(__aarch64__)
+        // arm64 has no fork/vfork syscalls, so these syscall tracepoints cannot attach.
+        bpf_program__set_autoload(obj->progs.netdata_fork_exit, false);
+        bpf_program__set_autoload(obj->progs.netdata_vfork_exit, false);
+#endif
+
+        // tp_btf needs tracing support and its target in kernel BTF; otherwise count forks with the kprobe.
+        bool raw_tracepoint_available = false;
+        if (libbpf_probe_bpf_prog_type(BPF_PROG_TYPE_TRACING, NULL) > 0) {
+            raw_tracepoint_available =
+                ebpf_kernel_btf_find_by_name_kind("btf_trace_sched_process_fork", BTF_KIND_TYPEDEF) > 0;
+        }
+
+        if (!raw_tracepoint_available) {
+            bpf_program__set_autoload(obj->progs.netdata_sched_process_fork_btf, false);
+            bpf_program__set_autoload(obj->progs.netdata_wake_up_new_task_probe, true);
+        }
     }
 
     if (running_on_kernel < NETDATA_EBPF_KERNEL_5_3) {
         ebpf_disable_clone3(obj);
     }
 
-    ebpf_adjust_process_fork(obj);
-
     int ret = process_bpf__load(obj);
     if (ret) {
         return ret;
     }
 
-    ret = (mode == EBPF_LOAD_TRAMPOLINE) ? process_bpf__attach(obj) : process_attach_kprobe_target(obj);
+    // Section names carry each program's target and probe type, so auto-attach covers every mode.
+    ret = process_bpf__attach(obj);
     if (!ret) {
         ebpf_process_set_hash_tables(obj);
 
-        ebpf_update_controller(cachestat_maps[NETDATA_PROCESS_CTRL_TABLE].map_fd, em);
+        ebpf_update_controller(process_maps[NETDATA_PROCESS_CTRL_TABLE].map_fd, em);
     }
 
     return ret;
@@ -314,8 +296,7 @@ static void ebpf_update_global_publish(
 
     pvc->running =
         (long)publish[NETDATA_KEY_PUBLISH_PROCESS_FORK].ncall - (long)publish[NETDATA_KEY_PUBLISH_PROCESS_CLONE].ncall;
-    publish[NETDATA_KEY_PUBLISH_PROCESS_RELEASE_TASK].ncall = -publish[NETDATA_KEY_PUBLISH_PROCESS_RELEASE_TASK].ncall;
-    pvc->zombie = (long)publish[NETDATA_KEY_PUBLISH_PROCESS_EXIT].ncall +
+    pvc->zombie = (long)publish[NETDATA_KEY_PUBLISH_PROCESS_EXIT].ncall -
                   (long)publish[NETDATA_KEY_PUBLISH_PROCESS_RELEASE_TASK].ncall;
 }
 
@@ -464,9 +445,8 @@ static void ebpf_update_process_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             uint32_t pid = pids->pid;
             ebpf_publish_process_t *out = &pids->ps;
-            netdata_ebpf_pid_stats_t *local_pid =
-                netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_PROCESS_IDX);
-            if (!local_pid)
+            netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_lookup_shm_pointer_unsafe(pid);
+            if (!local_pid || !(local_pid->threads & (1U << (NETDATA_EBPF_PIDS_PROCESS_IDX << 1))))
                 continue;
 
             ebpf_publish_process_t *in = &local_pid->process;
@@ -692,242 +672,6 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
 
 static void ebpf_obsolete_specific_process_charts(char *type, ebpf_module_t *em);
 
-/**
- * Obsolete services
- *
- * Obsolete all service charts created
- *
- * @param em a pointer to `struct ebpf_module`
- */
-static void ebpf_obsolete_process_services(ebpf_module_t *em, char *id)
-{
-    ebpf_write_chart_obsolete(
-        id,
-        NETDATA_SYSCALL_APPS_TASK_PROCESS,
-        "",
-        "Process started",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_APPS_PROCESS_GROUP,
-        NETDATA_EBPF_CHART_TYPE_STACKED,
-        NETDATA_SYSTEMD_PROCESS_CREATE_CONTEXT,
-        20065,
-        em->update_every);
-
-    ebpf_write_chart_obsolete(
-        id,
-        NETDATA_SYSCALL_APPS_TASK_THREAD,
-        "",
-        "Threads started",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_APPS_PROCESS_GROUP,
-        NETDATA_EBPF_CHART_TYPE_STACKED,
-        NETDATA_SYSTEMD_THREAD_CREATE_CONTEXT,
-        20066,
-        em->update_every);
-
-    ebpf_write_chart_obsolete(
-        id,
-        NETDATA_SYSCALL_APPS_TASK_CLOSE,
-        "",
-        "Tasks starts exit process.",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_APPS_PROCESS_GROUP,
-        NETDATA_EBPF_CHART_TYPE_STACKED,
-        NETDATA_SYSTEMD_PROCESS_EXIT_CONTEXT,
-        20067,
-        em->update_every);
-
-    ebpf_write_chart_obsolete(
-        id,
-        NETDATA_SYSCALL_APPS_TASK_EXIT,
-        "",
-        "Tasks closed",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_APPS_PROCESS_GROUP,
-        NETDATA_EBPF_CHART_TYPE_STACKED,
-        NETDATA_SYSTEMD_PROCESS_CLOSE_CONTEXT,
-        20068,
-        em->update_every);
-
-    if (em->mode < MODE_ENTRY) {
-        ebpf_write_chart_obsolete(
-            id,
-            NETDATA_SYSCALL_APPS_TASK_ERROR,
-            "",
-            "Errors to create process or threads.",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_APPS_PROCESS_GROUP,
-            NETDATA_EBPF_CHART_TYPE_STACKED,
-            NETDATA_SYSTEMD_PROCESS_ERROR_CONTEXT,
-            20069,
-            em->update_every);
-    }
-}
-
-/**
- * Obsolete cgroup chart
- *
- * Send obsolete for all charts created before to close.
- *
- * @param em a pointer to `struct ebpf_module`
- */
-static inline void ebpf_obsolete_process_cgroup_charts(ebpf_module_t *em)
-{
-    netdata_mutex_lock(&mutex_cgroup_shm);
-
-    ebpf_cgroup_target_t *ect;
-    for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
-        if (ect->systemd) {
-            ebpf_obsolete_process_services(em, ect->name);
-
-            continue;
-        }
-
-        ebpf_obsolete_specific_process_charts(ect->name, em);
-    }
-    netdata_mutex_unlock(&mutex_cgroup_shm);
-}
-
-/**
- * Obsolette apps charts
- *
- * Obsolete apps charts.
- *
- * @param em a pointer to the structure with the default values.
- */
-void ebpf_obsolete_process_apps_charts(struct ebpf_module *em)
-{
-    struct ebpf_target *w;
-    int update_every = em->update_every;
-    for (w = apps_groups_root_target; w; w = w->next) {
-        if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_PROCESS_IDX))))
-            continue;
-
-        ebpf_write_chart_obsolete(
-            NETDATA_APP_FAMILY,
-            w->clean_name,
-            "_ebpf_process_start",
-            "Process started.",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_PROCESS_GROUP,
-            NETDATA_EBPF_CHART_TYPE_STACKED,
-            "app.ebpf_process_start",
-            20161,
-            update_every);
-
-        ebpf_write_chart_obsolete(
-            NETDATA_APP_FAMILY,
-            w->clean_name,
-            "_ebpf_thread_start",
-            "Threads started.",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_PROCESS_GROUP,
-            NETDATA_EBPF_CHART_TYPE_STACKED,
-            "app.ebpf_thread_start",
-            20162,
-            update_every);
-
-        ebpf_write_chart_obsolete(
-            NETDATA_APP_FAMILY,
-            w->clean_name,
-            "_ebpf_task_exit",
-            "Tasks starts exit process.",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_PROCESS_GROUP,
-            NETDATA_EBPF_CHART_TYPE_STACKED,
-            "app.ebpf_task_exit",
-            20163,
-            update_every);
-
-        ebpf_write_chart_obsolete(
-            NETDATA_APP_FAMILY,
-            w->clean_name,
-            "_ebpf_task_released",
-            "Tasks released.",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_PROCESS_GROUP,
-            NETDATA_EBPF_CHART_TYPE_STACKED,
-            "app.ebpf_task_released",
-            20164,
-            update_every);
-
-        if (em->mode < MODE_ENTRY) {
-            ebpf_write_chart_obsolete(
-                NETDATA_APP_FAMILY,
-                w->clean_name,
-                "_ebpf_task_error",
-                "Errors to create process or threads.",
-                EBPF_COMMON_UNITS_CALLS_PER_SEC,
-                NETDATA_PROCESS_GROUP,
-                NETDATA_EBPF_CHART_TYPE_STACKED,
-                "app.ebpf_task_error",
-                20165,
-                update_every);
-        }
-
-        w->charts_created &= ~(1 << EBPF_MODULE_PROCESS_IDX);
-    }
-}
-
-/**
- * Obsolete global
- *
- * Obsolete global charts created by thread.
- *
- * @param em a pointer to `struct ebpf_module`
- */
-static void ebpf_obsolete_process_global(ebpf_module_t *em)
-{
-    ebpf_write_chart_obsolete(
-        NETDATA_EBPF_SYSTEM_GROUP,
-        NETDATA_PROCESS_SYSCALL,
-        "",
-        "Start process",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_PROCESS_GROUP,
-        NETDATA_EBPF_CHART_TYPE_LINE,
-        "system.process_thread",
-        21002,
-        em->update_every);
-
-    ebpf_write_chart_obsolete(
-        NETDATA_EBPF_SYSTEM_GROUP,
-        NETDATA_EXIT_SYSCALL,
-        "",
-        "Exit process",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_PROCESS_GROUP,
-        NETDATA_EBPF_CHART_TYPE_LINE,
-        "system.exit",
-        21003,
-        em->update_every);
-
-    ebpf_write_chart_obsolete(
-        NETDATA_EBPF_SYSTEM_GROUP,
-        NETDATA_PROCESS_STATUS_NAME,
-        "",
-        "Process not closed",
-        EBPF_COMMON_UNITS_CALLS,
-        NETDATA_PROCESS_GROUP,
-        NETDATA_EBPF_CHART_TYPE_LINE,
-        "system.process_status",
-        21004,
-        em->update_every);
-
-    if (em->mode < MODE_ENTRY) {
-        ebpf_write_chart_obsolete(
-            NETDATA_EBPF_SYSTEM_GROUP,
-            NETDATA_PROCESS_ERROR_NAME,
-            "",
-            "Fails to create process",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_PROCESS_GROUP,
-            NETDATA_EBPF_CHART_TYPE_LINE,
-            "system.task_error",
-            21005,
-            em->update_every);
-    }
-}
 
 /**
  * Process disable tracepoints
@@ -946,11 +690,6 @@ static void ebpf_process_disable_tracepoints()
         if (ebpf_disable_tracing_values(tracepoint_sched_type, tracepoint_sched_process_exec))
             netdata_log_error("%s %s/%s.", default_message, tracepoint_sched_type, tracepoint_sched_process_exec);
     }
-
-    if (!was_sched_process_fork_enabled) {
-        if (ebpf_disable_tracing_values(tracepoint_sched_type, tracepoint_sched_process_fork))
-            netdata_log_error("%s %s/%s.", default_message, tracepoint_sched_type, tracepoint_sched_process_fork);
-    }
 }
 
 static void ebpf_process_exit(void *pptr)
@@ -962,7 +701,7 @@ static void ebpf_process_exit(void *pptr)
 
     if (!process_safe_clean) {
         netdata_mutex_lock(&ebpf_exit_cleanup);
-        em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+        ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_STOPPED);
         netdata_mutex_unlock(&ebpf_exit_cleanup);
         return;
     }
@@ -971,21 +710,11 @@ static void ebpf_process_exit(void *pptr)
     collect_pids &= ~(1 << EBPF_MODULE_PROCESS_IDX);
     netdata_mutex_unlock(&lock);
 
-    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
-        netdata_mutex_lock(&lock);
-        if (em->cgroup_charts) {
-            ebpf_obsolete_process_cgroup_charts(em);
-            fflush(stdout);
-        }
-
-        if (em->apps_charts & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
-            ebpf_obsolete_process_apps_charts(em);
-        }
-
-        ebpf_obsolete_process_global(em);
-
-        fflush(stdout);
-        netdata_mutex_unlock(&lock);
+    // Drop this module's bits from the shared PID pool so its slots don't
+    // stay pinned if the plugin keeps running after the module stops.
+    if (integration_shm && ebpf_shm_sem_wait_or_stop(shm_mutex_ebpf_integration)) {
+        netdata_ebpf_sweep_shm_for_module_unsafe(NETDATA_EBPF_PIDS_PROCESS_IDX);
+        sem_post(shm_mutex_ebpf_integration);
     }
 
     freez(process_hash_values);
@@ -998,7 +727,7 @@ static void ebpf_process_exit(void *pptr)
 
     netdata_mutex_lock(&ebpf_exit_cleanup);
     process_pid_fd = -1;
-    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_STOPPED);
     netdata_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -1417,8 +1146,8 @@ static void ebpf_process_send_cgroup_data(ebpf_module_t *em)
         return;
     }
 
-    if (shm_ebpf_cgroup.header->systemd_enabled) {
-        if (send_cgroup_chart) {
+    if (ebpf_cgroup_systemd_enabled_get()) {
+        if (ebpf_send_cgroup_chart_get()) {
             ebpf_create_systemd_process_charts(em);
         }
 
@@ -1508,8 +1237,8 @@ void ebpf_process_sum_values_for_pids(ebpf_process_stat_t *process, struct ebpf_
             break;
 
         uint32_t pid = root->pid;
-        netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_PROCESS_IDX);
-        if (!local_pid)
+        netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_lookup_shm_pointer_unsafe(pid);
+        if (!local_pid || !(local_pid->threads & (1U << (NETDATA_EBPF_PIDS_PROCESS_IDX << 1))))
             continue;
 
         ebpf_publish_process_t *in = &local_pid->process;
@@ -1556,7 +1285,7 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
             netdata_ebpf_pid_stats_t *local_pid =
                 netdata_ebpf_get_shm_pointer_unsafe(key, NETDATA_EBPF_PIDS_PROCESS_IDX);
             if (!local_pid)
-                continue;
+                goto end_process_loop;
 
             ebpf_publish_process_t *w = &local_pid->process;
 
@@ -1568,7 +1297,7 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
                 w->release_call = process_stat_vector[0].release_call;
                 w->task_err = process_stat_vector[0].task_err;
             } else {
-                if (kill((pid_t)key, 0)) { // No PID found
+                if (kill((pid_t)key, 0) == -1 && errno == ESRCH) {
                     if (netdata_ebpf_reset_shm_pointer_unsafe(tbl_pid_stats_fd, key, NETDATA_EBPF_PIDS_PROCESS_IDX))
                         memset(w, 0, sizeof(*w));
                 }
@@ -1642,7 +1371,7 @@ static void process_collector(ebpf_module_t *em)
                 netdata_mutex_lock(&collect_data_mutex);
                 collect_data_for_all_processes(process_pid_fd, process_maps_per_core);
 
-                if (cgroups && shm_ebpf_cgroup.header) {
+                if (cgroups && ebpf_cgroup_integration_active_get()) {
                     ebpf_update_process_cgroup();
                 }
                 netdata_mutex_unlock(&collect_data_mutex);
@@ -1669,7 +1398,7 @@ static void process_collector(ebpf_module_t *em)
                 ebpf_process_send_apps_data(apps_groups_root_target, em);
             }
 
-            if (cgroups && shm_ebpf_cgroup.header) {
+            if (cgroups && ebpf_cgroup_integration_active_get()) {
                 if (!ebpf_plugin_stop())
                     ebpf_process_send_cgroup_data(em);
             }
@@ -1771,9 +1500,6 @@ static int ebpf_process_enable_tracepoints()
     if (ebpf_enable_single_tracepoint(tracepoint_sched_process_exec, &was_sched_process_exec_enabled))
         return -1;
 
-    if (ebpf_enable_single_tracepoint(tracepoint_sched_process_fork, &was_sched_process_fork_enabled))
-        return -1;
-
     return 0;
 }
 
@@ -1795,7 +1521,8 @@ void ebpf_process_thread(void *ptr)
     CLEANUP_FUNCTION_REGISTER(ebpf_process_exit) cleanup_ptr = em;
 
     if (!ebpf_module_thread_has_valid_state(em)) {
-        em->enabled = em->global_charts = em->apps_charts = em->cgroup_charts = NETDATA_THREAD_EBPF_STOPPING;
+        em->global_charts = em->apps_charts = em->cgroup_charts = NETDATA_THREAD_EBPF_STOPPING;
+        ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_STOPPING);
         netdata_mutex_lock(&ebpf_exit_cleanup);
         ebpf_update_disabled_plugin_stats(em);
         netdata_mutex_unlock(&ebpf_exit_cleanup);
@@ -1806,7 +1533,8 @@ void ebpf_process_thread(void *ptr)
 
     netdata_mutex_lock(&ebpf_exit_cleanup);
     if (ebpf_process_enable_tracepoints()) {
-        em->enabled = em->global_charts = em->apps_charts = em->cgroup_charts = NETDATA_THREAD_EBPF_STOPPING;
+        em->global_charts = em->apps_charts = em->cgroup_charts = NETDATA_THREAD_EBPF_STOPPING;
+        ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_STOPPING);
     }
     netdata_mutex_unlock(&ebpf_exit_cleanup);
 
@@ -1816,7 +1544,10 @@ void ebpf_process_thread(void *ptr)
 
     set_local_pointers();
     if (ebpf_process_load_bpf(em)) {
-        em->enabled = em->global_charts = em->apps_charts = em->cgroup_charts = NETDATA_THREAD_EBPF_STOPPING;
+        em->global_charts = em->apps_charts = em->cgroup_charts = NETDATA_THREAD_EBPF_STOPPING;
+        ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_STOPPING);
+    } else {
+        ebpf_mark_program_loaded();
     }
 
     int algorithms[NETDATA_KEY_PUBLISH_PROCESS_END] = {

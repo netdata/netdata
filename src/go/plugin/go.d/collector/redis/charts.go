@@ -2,7 +2,11 @@
 
 package redis
 
-import "github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+import (
+	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+)
 
 const (
 	prioConnections = collectorapi.Priority + iota
@@ -26,7 +30,7 @@ const (
 	prioPersistenceRDBChanges
 	prioPersistenceRDBBgSaveNow
 	prioPersistenceRDBBgSaveHealth
-	prioPersistenceRDBBgSaveLastSaveSinceTime
+	prioPersistenceRDBLastSaveSinceTime
 	prioPersistenceAOFSize
 
 	prioCommandsCalls
@@ -44,7 +48,7 @@ var redisCharts = collectorapi.Charts{
 	chartConnections.Copy(),
 	chartClients.Copy(),
 
-	pingLatencyCommands.Copy(),
+	chartPingLatency.Copy(),
 	chartCommands.Copy(),
 	chartKeyLookupHitRate.Copy(),
 
@@ -102,7 +106,7 @@ var (
 )
 
 var (
-	pingLatencyCommands = collectorapi.Chart{
+	chartPingLatency = collectorapi.Chart{
 		ID:       "ping_latency",
 		Title:    "Ping latency",
 		Units:    "seconds",
@@ -200,6 +204,54 @@ var (
 )
 
 var (
+	chartConnectedReplicas = collectorapi.Chart{
+		ID:       "connected_replicas",
+		Title:    "Connected replicas",
+		Units:    "replicas",
+		Fam:      "replication",
+		Ctx:      "redis.connected_replicas",
+		Priority: prioConnectedReplicas,
+		Dims: collectorapi.Dims{
+			{ID: "connected_slaves", Name: "connected"},
+		},
+	}
+	chartMasterLinkStatus = collectorapi.Chart{
+		ID:       "master_last_status",
+		Title:    "Master link status",
+		Units:    "status",
+		Fam:      "replication",
+		Ctx:      "redis.master_link_status",
+		Priority: prioMasterLinkStatus,
+		Dims: collectorapi.Dims{
+			{ID: "master_link_status_up", Name: "up"},
+			{ID: "master_link_status_down", Name: "down"},
+		},
+	}
+	chartMasterLastIOSinceTime = collectorapi.Chart{
+		ID:       "master_last_io_since_time",
+		Title:    "Time elapsed since the last interaction with master",
+		Units:    "seconds",
+		Fam:      "replication",
+		Ctx:      "redis.master_last_io_since_time",
+		Priority: prioMasterLastIOSinceTime,
+		Dims: collectorapi.Dims{
+			{ID: "master_last_io_seconds_ago", Name: "time"},
+		},
+	}
+	chartMasterLinkDownSinceTime = collectorapi.Chart{
+		ID:       "master_link_down_since_stime",
+		Title:    "Time elapsed since the link between master and slave is down",
+		Units:    "seconds",
+		Fam:      "replication",
+		Ctx:      "redis.master_link_down_since_time",
+		Priority: prioMasterLinkDownSinceTime,
+		Dims: collectorapi.Dims{
+			{ID: "master_link_down_since_seconds", Name: "time"},
+		},
+	}
+)
+
+var (
 	chartPersistenceRDBChanges = collectorapi.Chart{
 		ID:       "persistence",
 		Title:    "Operations that produced changes since the last SAVE or BGSAVE",
@@ -239,7 +291,7 @@ var (
 		Units:    "seconds",
 		Fam:      "persistence",
 		Ctx:      "redis.bgsave_last_rdb_save_since_time",
-		Priority: prioPersistenceRDBBgSaveLastSaveSinceTime,
+		Priority: prioPersistenceRDBLastSaveSinceTime,
 		Dims: collectorapi.Dims{
 			{ID: "rdb_last_save_time", Name: "last_bgsave_time"},
 		},
@@ -321,54 +373,6 @@ var (
 )
 
 var (
-	chartConnectedReplicas = collectorapi.Chart{
-		ID:       "connected_replicas",
-		Title:    "Connected replicas",
-		Units:    "replicas",
-		Fam:      "replication",
-		Ctx:      "redis.connected_replicas",
-		Priority: prioConnectedReplicas,
-		Dims: collectorapi.Dims{
-			{ID: "connected_slaves", Name: "connected"},
-		},
-	}
-	masterLinkStatusChart = collectorapi.Chart{
-		ID:       "master_last_status",
-		Title:    "Master link status",
-		Units:    "status",
-		Fam:      "replication",
-		Ctx:      "redis.master_link_status",
-		Priority: prioMasterLinkStatus,
-		Dims: collectorapi.Dims{
-			{ID: "master_link_status_up", Name: "up"},
-			{ID: "master_link_status_down", Name: "down"},
-		},
-	}
-	masterLastIOSinceTimeChart = collectorapi.Chart{
-		ID:       "master_last_io_since_time",
-		Title:    "Time elapsed since the last interaction with master",
-		Units:    "seconds",
-		Fam:      "replication",
-		Ctx:      "redis.master_last_io_since_time",
-		Priority: prioMasterLastIOSinceTime,
-		Dims: collectorapi.Dims{
-			{ID: "master_last_io_seconds_ago", Name: "time"},
-		},
-	}
-	masterLinkDownSinceTimeChart = collectorapi.Chart{
-		ID:       "master_link_down_since_stime",
-		Title:    "Time elapsed since the link between master and slave is down",
-		Units:    "seconds",
-		Fam:      "replication",
-		Ctx:      "redis.master_link_down_since_time",
-		Priority: prioMasterLinkDownSinceTime,
-		Dims: collectorapi.Dims{
-			{ID: "master_link_down_since_seconds", Name: "time"},
-		},
-	}
-)
-
-var (
 	chartUptime = collectorapi.Chart{
 		ID:       "uptime",
 		Title:    "Uptime",
@@ -381,3 +385,66 @@ var (
 		},
 	}
 )
+
+func (c *Collector) addAOFCharts() {
+	c.addCharts(&chartPersistenceAOFSize)
+}
+
+func (c *Collector) addReplicaCharts() {
+	c.addCharts(&chartMasterLinkStatus, &chartMasterLastIOSinceTime, &chartMasterLinkDownSinceTime)
+}
+
+func (c *Collector) addCharts(charts ...*collectorapi.Chart) {
+	for _, chart := range charts {
+		if err := c.charts.Add(chart.Copy()); err != nil {
+			c.Warningf("error on adding '%s' chart: %v", chart.ID, err)
+		}
+	}
+}
+
+func (c *Collector) addCmdToCommandsCharts(cmd string) {
+	name := strings.ToUpper(cmd)
+	c.addDimToChart(chartCommandsCalls.ID, &collectorapi.Dim{
+		ID:   "cmd_" + cmd + "_calls",
+		Name: name,
+		Algo: collectorapi.Incremental,
+	})
+	// Garnet command timings are placeholders, not measurements.
+	if c.server == "garnet" {
+		return
+	}
+	c.addDimToChart(chartCommandsUsec.ID, &collectorapi.Dim{
+		ID:   "cmd_" + cmd + "_usec",
+		Name: name,
+		Algo: collectorapi.Incremental,
+	})
+	c.addDimToChart(chartCommandsUsecPerSec.ID, &collectorapi.Dim{
+		ID:   "cmd_" + cmd + "_usec_per_call",
+		Name: name,
+		Div:  precision,
+	})
+}
+
+func (c *Collector) addDBToKeyspaceCharts(db string) {
+	c.addDimToChart(chartKeys.ID, &collectorapi.Dim{
+		ID:   db + "_keys",
+		Name: db,
+	})
+	c.addDimToChart(chartExpiresKeys.ID, &collectorapi.Dim{
+		ID:   db + "_expires_keys",
+		Name: db,
+	})
+}
+
+func (c *Collector) addDimToChart(chartID string, dim *collectorapi.Dim) {
+	chart := c.charts.Get(chartID)
+	if chart == nil {
+		c.Warningf("error on adding '%s' dimension: can not find '%s' chart", dim.ID, chartID)
+		return
+	}
+	if err := chart.AddDim(dim); err != nil {
+		c.Warning(err)
+		return
+	}
+	chart.MarkNotCreated()
+}

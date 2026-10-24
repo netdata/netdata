@@ -17,7 +17,6 @@
 
 // required compilation options
 
-#cmakedefine HAVE_FEXCEPTIONS
 
 // checked headers
 
@@ -50,7 +49,6 @@
 
 #cmakedefine HAVE_CAPABILITY
 #cmakedefine HAVE_PROTOBUF
-#cmakedefine BUNDLED_PROTOBUF
 #cmakedefine HAVE_MONGOC
 #cmakedefine HAVE_LIBDATACHANNEL
 
@@ -71,9 +69,7 @@
 #cmakedefine HAVE_GETPRIORITY
 #cmakedefine HAVE_SETENV
 #cmakedefine HAVE_DLSYM
-#cmakedefine HAVE_CLEARENV
 
-#cmakedefine HAVE_LIBCURL
 #cmakedefine HAVE_LIBICONV
 
 #cmakedefine HAVE_SETRESUID
@@ -91,6 +87,7 @@
 #cmakedefine HAVE_TM_GMTOFF
 
 #cmakedefine HAVE_LIBBACKTRACE
+#cmakedefine HAVE_STACKTRACE
 #cmakedefine HAVE_LIBUNWIND
 #cmakedefine HAVE_BACKTRACE
 #cmakedefine HAVE_CLOSE_RANGE
@@ -103,6 +100,7 @@
 #cmakedefine HAVE_SD_JOURNAL_OS_ROOT
 #cmakedefine HAVE_SD_JOURNAL_OPEN_FILES_FD
 #cmakedefine HAVE_SD_JOURNAL_RESTART_FIELDS
+#cmakedefine HAVE_SD_JOURNAL_ENUMERATE_AVAILABLE_UNIQUE
 #cmakedefine HAVE_SD_JOURNAL_GET_SEQNUM
 #cmakedefine ENABLE_SYSTEMD_DBUS
 
@@ -118,7 +116,6 @@
 #cmakedefine HAVE_C_MALLINFO2
 #cmakedefine HAVE_SETNS
 #cmakedefine HAVE_STRNDUP
-#cmakedefine SSL_HAS_PENDING
 
 #cmakedefine HAVE_FUNC_ATTRIBUTE_FORMAT_GNU_PRINTF
 #cmakedefine HAVE_FUNC_ATTRIBUTE_FORMAT_PRINTF
@@ -127,19 +124,15 @@
 #cmakedefine HAVE_FUNC_ATTRIBUTE_NORETURN
 #cmakedefine HAVE_FUNC_ATTRIBUTE_RETURNS_NONNULL
 #cmakedefine HAVE_FUNC_ATTRIBUTE_WARN_UNUSED_RESULT
-#cmakedefine HAVE_JEMALLOC_ARENA_API
 
 // enabled features
 
 #cmakedefine ENABLE_ML
-#cmakedefine ENABLE_EXPORTING_MONGODB
 #cmakedefine ENABLE_DBENGINE
 #cmakedefine ENABLE_LZ4
 #cmakedefine ENABLE_ZSTD
 #cmakedefine ENABLE_BROTLI
 
-#cmakedefine ENABLE_LOGSMANAGEMENT
-#cmakedefine ENABLE_LOGSMANAGEMENT_TESTS
 #cmakedefine ENABLE_PROMETHEUS_REMOTE_WRITE
 
 // enabled plugins
@@ -153,6 +146,7 @@
 #cmakedefine ENABLE_PLUGIN_SLABINFO
 #cmakedefine ENABLE_PLUGIN_CUPS
 #cmakedefine ENABLE_PLUGIN_CGROUP_NETWORK
+#cmakedefine ENABLE_CGROUPS_LOOKUP_SERVER
 #cmakedefine ENABLE_PLUGIN_EBPF
 #cmakedefine ENABLE_PLUGIN_SYSTEMD_JOURNAL
 #cmakedefine ENABLE_PLUGIN_NETWORK_VIEWER
@@ -169,14 +163,15 @@
 #cmakedefine ENABLE_BUNDLED_JSONC
 #cmakedefine ENABLE_BUNDLED_YAML
 #cmakedefine ENABLE_BUNDLED_PROTOBUF
-#cmakedefine ENABLE_MIMALLOC
 
 // directory paths
 
 #define NETDATA_RUNTIME_PREFIX "@NETDATA_RUNTIME_PREFIX@"
+#cmakedefine NETDATA_WINDOWS_PATH_PREFIX "@NETDATA_WINDOWS_PATH_PREFIX_ESCAPED@"
 #cmakedefine CACHE_DIR "@CACHE_DIR@"
 #cmakedefine CONFIG_DIR "@CONFIG_DIR@"
 #cmakedefine LIBCONFIG_DIR "@LIBCONFIG_DIR@"
+#cmakedefine STOCK_DATA_DIR "@STOCK_DATA_DIR@"
 #cmakedefine LOG_DIR "@LOG_DIR@"
 #cmakedefine PLUGINS_DIR "@PLUGINS_DIR@"
 #cmakedefine WEB_DIR "@WEB_DIR@"

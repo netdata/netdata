@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "libnetdata/libnetdata.h"
-#include "libnetdata/required_dummies.h"
 
-SPAWN_SERVER *spawn_server = NULL;
+extern char **environ;
 
-char env_netdata_host_prefix[FILENAME_MAX + 50] = "";
-char env_netdata_log_method[FILENAME_MAX + 50] = "";
-char env_netdata_log_format[FILENAME_MAX + 50] = "";
-char env_netdata_log_level[FILENAME_MAX + 50] = "";
-char *environment[] = {
+static SPAWN_SERVER *spawn_server = NULL;
+
+static char env_netdata_host_prefix[FILENAME_MAX + 50] = "";
+static char env_netdata_log_method[FILENAME_MAX + 50] = "";
+static char env_netdata_log_format[FILENAME_MAX + 50] = "";
+static char env_netdata_log_level[FILENAME_MAX + 50] = "";
+static char *environment[] = {
         "PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin",
         env_netdata_host_prefix,
         env_netdata_log_method,
@@ -199,7 +200,7 @@ static void continue_as_child(void) {
     exit(EXIT_FAILURE);
 }
 
-int proc_pid_fd(const char *prefix, const char *ns, pid_t pid) {
+int proc_pid_fd(const char *prefix, const char *ns, pid_t pid, ND_LOG_FIELD_PRIORITY priority) {
     if(!prefix) prefix = "";
 
     char filename[FILENAME_MAX + 1];
@@ -207,7 +208,7 @@ int proc_pid_fd(const char *prefix, const char *ns, pid_t pid) {
     int fd = open(filename, O_RDONLY | O_CLOEXEC);
 
     if(fd == -1)
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot open proc_pid_fd() file '%s'", filename);
+        nd_log(NDLS_COLLECTORS, priority, "Cannot open proc_pid_fd() file '%s'", filename);
 
     return fd;
 }
@@ -234,11 +235,27 @@ static struct ns {
 static int switch_namespace(const char *prefix, pid_t pid) {
 #ifdef HAVE_SETNS
     int i;
-    for(i = 0; all_ns[i].name ; i++)
-        all_ns[i].fd = proc_pid_fd(prefix, all_ns[i].path, pid);
+    int root_fd = -1;
 
-    int root_fd = proc_pid_fd(prefix, "root", pid);
-    int cwd_fd  = proc_pid_fd(prefix, "cwd", pid);
+    for(i = 0; all_ns[i].name ; i++) {
+        // Only network namespace is mandatory; optional namespaces log warnings
+        ND_LOG_FIELD_PRIORITY prio = (all_ns[i].nstype == CLONE_NEWNET) ? NDLP_ERR : NDLP_WARNING;
+        all_ns[i].fd = proc_pid_fd(prefix, all_ns[i].path, pid, prio);
+    }
+
+    root_fd = proc_pid_fd(prefix, "root", pid, NDLP_ERR);
+
+    // Verify we can access the network namespace fd
+    // This is the only namespace critical for correct interface detection
+    for(i = 0; all_ns[i].name ; i++) {
+        if(all_ns[i].nstype == CLONE_NEWNET) {
+            if(all_ns[i].fd == -1) {
+                // proc_pid_fd() already logs the open failure
+                goto cleanup_and_fail;
+            }
+            break;
+        }
+    }
 
     setgroups(0, NULL);
 
@@ -255,9 +272,13 @@ static int switch_namespace(const char *prefix, pid_t pid) {
                 if(setns(all_ns[i].fd, all_ns[i].nstype) == -1) {
                     if(pass == 1) {
                         all_ns[i].status = 0;
-                        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                               "Cannot switch to %s namespace of pid %d",
-                               all_ns[i].name, (int) pid);
+                        // Only log critical namespace failures here;
+                        // non-critical failures are logged in the verification loop below
+                        if(all_ns[i].nstype == CLONE_NEWNET) {
+                            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                                   "Cannot switch to %s namespace of pid %d",
+                                   all_ns[i].name, (int) pid);
+                        }
                     }
                 }
                 else
@@ -266,24 +287,43 @@ static int switch_namespace(const char *prefix, pid_t pid) {
         }
     }
 
+    // Verify critical namespaces were successfully switched
+    for(i = 0; all_ns[i].name ; i++) {
+        if(all_ns[i].fd != -1 && !all_ns[i].status) {
+            if(all_ns[i].nstype == CLONE_NEWNET) {
+                // Network namespace is mandatory for correct interface detection
+                nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                       "Failed to switch to %s namespace of pid %d",
+                       all_ns[i].name, (int) pid);
+                goto cleanup_and_fail;
+            }
+            // Mount/PID namespace failure is non-critical for network detection
+            nd_log(NDLS_COLLECTORS, NDLP_WARNING,
+                   "Failed to switch to %s namespace of pid %d (continuing)",
+                   all_ns[i].name, (int) pid);
+        }
+    }
+
     gettid_uncached();
     setgroups(0, NULL);
 
     if(root_fd != -1) {
-        if(fchdir(root_fd) < 0)
+        if(fchdir(root_fd) < 0) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot fchdir() to pid %d root directory", (int)pid);
+            goto cleanup_and_fail;
+        }
 
-        if(chroot(".") < 0)
+        if(chroot(".") < 0) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot chroot() to pid %d root directory", (int)pid);
+            goto cleanup_and_fail;
+        }
+
+        if(chdir("/") < 0) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot chdir() to / after chroot for pid %d", (int)pid);
+            goto cleanup_and_fail;
+        }
 
         close(root_fd);
-    }
-
-    if(cwd_fd != -1) {
-        if(fchdir(cwd_fd) < 0)
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot fchdir() to pid %d current working directory", (int)pid);
-
-        close(cwd_fd);
     }
 
     int do_fork = 0;
@@ -295,12 +335,24 @@ static int switch_namespace(const char *prefix, pid_t pid) {
                 do_fork = 1;
 
             close(all_ns[i].fd);
+            all_ns[i].fd = -1;
         }
 
     if(do_fork)
         continue_as_child();
 
     return 0;
+
+cleanup_and_fail:
+    if(root_fd != -1) close(root_fd);
+    for(i = 0; all_ns[i].name ; i++) {
+        if(all_ns[i].fd != -1) {
+            close(all_ns[i].fd);
+            all_ns[i].fd = -1;
+        }
+        all_ns[i].status = -1;
+    }
+    return 1;
 
 #else
 
@@ -321,6 +373,7 @@ pid_t read_pid_from_cgroup_file(const char *filename) {
     FILE *fp = fdopen(fd, "r");
     if(!fp) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot upgrade fd to fp for file '%s'.", filename);
+        close(fd);
         return 0;
     }
 
@@ -534,26 +587,28 @@ static void read_from_spawned(SPAWN_INSTANCE *si, const char *name __maybe_unuse
     char buffer[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
     char *s;
     FILE *fp = fdopen(spawn_server_instance_read_fd(si), "r");
-    while((s = fgets(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, fp))) {
-        trim(s);
+    if(fp) {
+        while((s = fgets(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, fp))) {
+            trim(s);
 
-        if(*s && *s != '\n') {
-            char *t = s;
-            while(*t && *t != ' ') t++;
-            if(*t == ' ') {
-                *t = '\0';
-                t++;
+            if(*s && *s != '\n') {
+                char *t = s;
+                while(*t && *t != ' ') t++;
+                if(*t == ' ') {
+                    *t = '\0';
+                    t++;
+                }
+
+                if(strcmp(s, "EXIT") == 0)
+                    break;
+
+                if(!*s || !*t) continue;
+                add_device(s, t);
             }
-
-            if(strcmp(s, "EXIT") == 0)
-                break;
-
-            if(!*s || !*t) continue;
-            add_device(s, t);
         }
+        fclose(fp);
+        spawn_server_instance_read_fd_unset(si);
     }
-    fclose(fp);
-    spawn_server_instance_read_fd_unset(si);
     spawn_server_exec_kill(spawn_server, si, 0);
 }
 
@@ -654,7 +709,7 @@ int verify_path(const char *path) {
 
     const char *s = path;
     while(*s != '\0') {
-        if (isalnum(*s) || is_valid_path_symbol(*s))
+        if (isalnum((uint8_t)*s) || is_valid_path_symbol(*s))
             s += 1;
         else if (*s == '\\' && is_valid_hex_escape(s))
             s += 4;
@@ -664,9 +719,9 @@ int verify_path(const char *path) {
         }
     }
 
-    if(strstr(path, "/../")) {
+    if(strstr(path, "/../") || strendswith(path, "/..")) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "invalid parent path sequence detected in '%s'", path);
-        return 1;
+        return -1;
     }
 
     if(path[0] != '/') {
@@ -743,8 +798,6 @@ int main(int argc, const char **argv) {
         collector_error("setresuid(0, 0, 0) failed.");
 
     nd_log_initialize_for_external_plugins("cgroup-network");
-    spawn_server = spawn_server_create(SPAWN_SERVER_OPTION_EXEC | SPAWN_SERVER_OPTION_CALLBACK, NULL, spawn_callback, argc, argv);
-    nd_log_register_fatal_final_cb(cleanup_spawn_server_on_fatal);
 
     // since cgroup-network runs as root, prevent it from opening symbolic links
     procfile_open_flags = O_RDONLY|O_NOFOLLOW;
@@ -757,6 +810,10 @@ int main(int argc, const char **argv) {
 
     if(netdata_configured_host_prefix[0] != '\0' && verify_path(netdata_configured_host_prefix) == -1)
         fatal("invalid NETDATA_HOST_PREFIX '%s'", netdata_configured_host_prefix);
+
+    int helper = 1;
+    if (getenv("KUBERNETES_SERVICE_HOST") != NULL && getenv("KUBERNETES_SERVICE_PORT") != NULL)
+        helper = 0;
 
     // ------------------------------------------------------------------------
     // build a safe environment for our script
@@ -779,6 +836,14 @@ int main(int argc, const char **argv) {
 
     // ------------------------------------------------------------------------
 
+    // This is a dedicated privileged process; no child may inherit its caller's environment.
+    environ = environment;
+
+    spawn_server = spawn_server_create(SPAWN_SERVER_OPTION_EXEC | SPAWN_SERVER_OPTION_CALLBACK, NULL, spawn_callback, argc, argv);
+    // Spawn initialization may publish its detected runtime directory; do not pass it to helper requests.
+    environ = environment;
+    nd_log_register_fatal_final_cb(cleanup_spawn_server_on_fatal);
+
     if(argc == 2 && (!strcmp(argv[1], "version") || !strcmp(argv[1], "-version") || !strcmp(argv[1], "--version") || !strcmp(argv[1], "-v") || !strcmp(argv[1], "-V"))) {
         fprintf(stderr, "cgroup-network %s\n", NETDATA_VERSION);
         exit(0);
@@ -788,9 +853,6 @@ int main(int argc, const char **argv) {
         usage();
 
     int arg = 1;
-    int helper = 1;
-    if (getenv("KUBERNETES_SERVICE_HOST") != NULL && getenv("KUBERNETES_SERVICE_PORT") != NULL)
-        helper = 0;
 
     if(!strcmp(argv[arg], "-p") || !strcmp(argv[arg], "--pid")) {
         pid = atoi(argv[arg+1]);

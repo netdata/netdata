@@ -3,6 +3,7 @@
 package pihole
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"maps"
@@ -16,12 +17,12 @@ const (
 	precision = 1000
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
-	if err := c.checkAuthSession(); err != nil {
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
+	if err := c.checkAuthSession(ctx); err != nil {
 		return nil, err
 	}
 	if c.auth == nil {
-		auth, err := c.getAuthSession()
+		auth, err := c.getAuthSession(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -30,7 +31,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 
 	mx := make(map[string]int64)
 
-	if err := c.collectMetrics(mx); err != nil {
+	if err := c.collectMetrics(ctx, mx); err != nil {
 		if web.IsStatusCode(err, 401) {
 			c.auth = nil
 		}
@@ -40,12 +41,12 @@ func (c *Collector) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (c *Collector) collectMetrics(mx map[string]int64) error {
+func (c *Collector) collectMetrics(ctx context.Context, mx map[string]int64) error {
 	if c.auth == nil {
 		return errors.New("no auth session")
 	}
 
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathAPIStatsSummary)
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathAPIStatsSummary)
 	if err != nil {
 		return err
 	}

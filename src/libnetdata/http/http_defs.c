@@ -197,23 +197,37 @@ static struct {
         , { "bmp"  , 0    , CT_IMAGE_BMP }
         , { "ico"  , 0    , CT_IMAGE_XICON }
         , { "icns" , 0    , CT_IMAGE_ICNS }
+        , { "wasm" , 0    , CT_APPLICATION_WASM }
 
         // terminator
         , { NULL   , 0    , 0 }
 };
 
+static SPINLOCK mime_types_init_spinlock = SPINLOCK_INITIALIZER;
+static bool mime_types_initialized = false;
+
+static inline void mime_types_init(void) {
+    if(likely(__atomic_load_n(&mime_types_initialized, __ATOMIC_ACQUIRE)))
+        return;
+
+    spinlock_lock(&mime_types_init_spinlock);
+
+    if(unlikely(!__atomic_load_n(&mime_types_initialized, __ATOMIC_ACQUIRE))) {
+        for(int i = 0; mime_types[i].extension; i++)
+            mime_types[i].hash = simple_hash(mime_types[i].extension);
+
+        __atomic_store_n(&mime_types_initialized, true, __ATOMIC_RELEASE);
+    }
+
+    spinlock_unlock(&mime_types_init_spinlock);
+}
+
 HTTP_CONTENT_TYPE contenttype_for_filename(const char *filename) {
     // netdata_log_info("checking filename '%s'", filename);
 
-    static int initialized = 0;
     int i;
 
-    if(unlikely(!initialized)) {
-        for (i = 0; mime_types[i].extension; i++)
-            mime_types[i].hash = simple_hash(mime_types[i].extension);
-
-        initialized = 1;
-    }
+    mime_types_init();
 
     const char *s = filename, *last_dot = NULL;
 

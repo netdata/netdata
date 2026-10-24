@@ -17,6 +17,12 @@ typedef enum tier_query_fetch {
     TIER_QUERY_FETCH_AVERAGE
 } TIER_QUERY_FETCH;
 
+typedef enum query_point_mode {
+    QUERY_POINT_MODE_LINEAR,
+    QUERY_POINT_MODE_HOLD,
+    QUERY_POINT_MODE_TOTAL,
+} QUERY_POINT_MODE;
+
 typedef enum __attribute__ ((__packed__)) rrdr_value_flag {
 
     // IMPORTANT:
@@ -46,6 +52,7 @@ typedef enum __attribute__ ((__packed__)) rrdr_result_flags {
     RRDR_RESULT_FLAG_RELATIVE      = (1 << 1), // the query uses relative time-frames
                                                // (should not to be cached by browsers and proxies)
     RRDR_RESULT_FLAG_CANCEL        = (1 << 2), // the query needs to be cancelled
+    RRDR_RESULT_FLAG_TIMEOUT       = (1 << 3), // set with CANCEL when the cause is the query timeout
 } RRDR_RESULT_FLAGS;
 
 #define RRDR_DVIEW_ANOMALY_COUNT_MULTIPLIER 1000.0
@@ -75,6 +82,8 @@ typedef struct rrdresult {
     RRDR_VALUE_FLAGS *o;      // array n x d options for each value returned
     NETDATA_DOUBLE *ar;       // array n x d of anomaly rates (0 - 100)
     uint32_t *gbc;            // array n x d of group by count - NOT ALLOCATED when RRDR is created
+    uint32_t *arc;            // array n x d of anomaly-rate contributors, internal to group-by - NOT ALLOCATED when RRDR is created
+    uint32_t *hgbc;           // array n x d of hidden (vh) group by count, internal to group-by - NOT ALLOCATED when RRDR is created
 
     struct {
         size_t group;         // how many collected values were grouped for each row - NEEDED BY GROUPING FUNCTIONS
@@ -103,6 +112,7 @@ typedef struct rrdresult {
         NETDATA_DOUBLE (*flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
 
         TIER_QUERY_FETCH tier_query_fetch;  // which value to use from STORAGE_POINT
+        QUERY_POINT_MODE point_mode;
 
         size_t points_wanted;               // used by SES and DES
         size_t resampling_group;            // used by AVERAGE
@@ -118,6 +128,11 @@ typedef struct rrdresult {
         time_t expected_after;
         time_t trimmed_after;
     } partial_data_trimming;
+
+    struct {
+        size_t folded;              // dimensions folded into 'remaining'
+        NETDATA_DOUBLE cut;         // the largest folded |sum| contribution
+    } cardinality;
 
     struct {
         ONEWAYALLOC *owa;           // the allocator used

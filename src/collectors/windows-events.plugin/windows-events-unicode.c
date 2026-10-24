@@ -3,16 +3,26 @@
 #include "windows-events-unicode.h"
 
 inline void utf82unicode(wchar_t *dst, size_t dst_size, const char *src) {
+    if (unlikely(!dst || !dst_size))
+        return;
+
     if (src) {
         // Convert from UTF-8 to wide char (UTF-16)
-        if (utf8_to_utf16(dst, dst_size, src, -1) == 0)
+        if (utf8_to_utf16(dst, dst_size, src, -1) == 0) {
             wcsncpy(dst, L"[failed conv.]", dst_size - 1);
+            dst[dst_size - 1] = L'\0';
+        }
     }
-    else
+    else {
         wcsncpy(dst, L"[null]", dst_size - 1);
+        dst[dst_size - 1] = L'\0';
+    }
 }
 
 inline void unicode2utf8(char *dst, size_t dst_size, const wchar_t *src) {
+    if (unlikely(!dst || !dst_size))
+        return;
+
     if (src) {
         if(WideCharToMultiByte(CP_UTF8, 0, src, -1, dst, (int)dst_size, NULL, NULL) == 0)
             strncpyz(dst, "[failed conv.]", dst_size - 1);

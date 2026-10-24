@@ -62,7 +62,9 @@ static void store_metric_at_tier_save_last_completed(RRDDIM *rd, size_t tier, st
 
 ALWAYS_INLINE_HOT
 void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAGE_POINT sp, usec_t now_ut __maybe_unused) {
-    if(LAST_COMPLETED_POINT_EXISTS(t) && sp.start_time_s % t->last_completed_point_flush_modulo == 0)
+    // Slow collection can skip a flush instant; preserve the modulo phase without requiring an exact hit.
+    if(LAST_COMPLETED_POINT_EXISTS(t) &&
+       sp.start_time_s - sp.start_time_s % t->last_completed_point_flush_modulo > t->last_completed_point.end_time_s)
         store_metric_at_tier_flush_last_completed(rd, tier, t);
 
     if (unlikely(!t->next_point_end_time_s))
@@ -125,14 +127,14 @@ void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
     rd->rrddim_store_metric_count++;
 
     if(likely(rd->rrddim_store_metric_count > 1)) {
-        usec_t expected = rd->rrddim_store_metric_last_ut + rd->update_every * USEC_PER_SEC;
+        usec_t expected = rd->rrddim_store_metric_last_ut + rd->rrdset->update_every * USEC_PER_SEC;
 
         if(point_end_time_ut != rd->rrddim_store_metric_last_ut) {
             internal_error(true,
                            "%s COLLECTION: 'host:%s/chart:%s/dim:%s' granularity %d, collection %zu, expected to store at tier 0 a value at %llu, but it gave %llu [%s%llu usec] (called from %s(), previously by %s())",
                            (point_end_time_ut < rd->rrddim_store_metric_last_ut) ? "**PAST**" : "GAP",
                            rrdhost_hostname(rd->rrdset->rrdhost), rrdset_id(rd->rrdset), rrddim_id(rd),
-                           rd->update_every,
+                           rd->rrdset->update_every,
                            rd->rrddim_store_metric_count,
                            expected, point_end_time_ut,
                            (point_end_time_ut < rd->rrddim_store_metric_last_ut)?"by -" : "gap ",

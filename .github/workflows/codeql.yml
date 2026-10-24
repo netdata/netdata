@@ -25,7 +25,7 @@ jobs:
       rust: ${{ steps.rust.outputs.run }}
     steps:
       - name: Clone repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
           fetch-depth: 0
@@ -104,12 +104,12 @@ jobs:
       security-events: write
     steps:
       - name: Git clone repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
           fetch-depth: 0
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
+        uses: github/codeql-action/init@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
           languages: c-cpp
           config-file: ./.github/codeql/c-cpp-config.yml
@@ -118,8 +118,31 @@ jobs:
       - name: Build netdata
         run: ./netdata-installer.sh --dont-start-it --disable-telemetry --dont-wait --install-prefix /tmp/install --one-time-build
       - name: Run CodeQL
-        uses: github/codeql-action/analyze@v4
+        uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
+          category: "/language:cpp"
+          output: ${{ runner.temp }}/codeql-sarif
+          upload: failure-only
+      # CodeQL indexes everything the compiler traces, which for a real build
+      # includes FetchContent-fetched protobuf/abseil and protoc-generated
+      # .pb.cc under build/. The config's paths-ignore cannot exclude them:
+      # for C/C++ it only applies when analyzing without building. Drop those
+      # results here instead, keeping full-build accuracy on our own sources.
+      - name: Drop results from build/ (vendored + generated code)
+        run: |
+          for f in "${RUNNER_TEMP}"/codeql-sarif/*.sarif; do
+            before=$(jq '[.runs[].results[]] | length' "$f")
+            jq '.runs[].results |= map(select(
+                  (.locations[0].physicalLocation.artifactLocation.uri // "")
+                  | startswith("build/") | not))' "$f" > "$f.tmp"
+            mv "$f.tmp" "$f"
+            after=$(jq '[.runs[].results[]] | length' "$f")
+            echo "$(basename "$f"): ${before} results, ${after} kept after dropping build/"
+          done
+      - name: Upload filtered results
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        with:
+          sarif_file: ${{ runner.temp }}/codeql-sarif
           category: "/language:cpp"
 
   analyze-python:
@@ -131,17 +154,17 @@ jobs:
       security-events: write
     steps:
       - name: Git clone repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
           fetch-depth: 0
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
+        uses: github/codeql-action/init@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
           config-file: ./.github/codeql/python-config.yml
           languages: python
       - name: Run CodeQL
-        uses: github/codeql-action/analyze@v4
+        uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
           category: "/language:python"
 
@@ -158,20 +181,20 @@ jobs:
       security-events: write
     steps:
       - name: Git clone repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
           fetch-depth: 0
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
+        uses: github/codeql-action/init@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
           languages: go
       - name: Autobuild
-        uses: github/codeql-action/autobuild@v4
+        uses: github/codeql-action/autobuild@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
           working-directory: ${{ matrix.tree }}
       - name: Run CodeQL
-        uses: github/codeql-action/analyze@v4
+        uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
           category: "/language:go"
 
@@ -188,19 +211,19 @@ jobs:
       security-events: write
     steps:
       - name: Git clone repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
           fetch-depth: 0
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
+        uses: github/codeql-action/init@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
           languages: rust
       - name: Autobuild
-        uses: github/codeql-action/autobuild@v4
+        uses: github/codeql-action/autobuild@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
           working-directory: ${{ matrix.tree }}
       - name: Run CodeQL
-        uses: github/codeql-action/analyze@v4
+        uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
           category: "/language:rust"

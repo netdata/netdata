@@ -28,7 +28,7 @@ func init() {
 		JobConfigSchema: configSchema,
 		Create:          func() collectorapi.CollectorV1 { return New() },
 		Config:          func() any { return &Config{} },
-		Methods:         pgMethods,
+		SharedFunctions: pgMethods,
 		MethodHandler:   pgFunctionHandler,
 	})
 }
@@ -118,6 +118,7 @@ type (
 		dbConns map[string]*dbConn
 
 		superUser               *bool
+		canExecutePgLsDir       *bool
 		pgIsInRecovery          *bool
 		pgVersion               int
 		pgStatStatementsAvail   bool            // cached positive result only

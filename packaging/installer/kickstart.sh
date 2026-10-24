@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F0520
+# Next unused error code: F052F
 
 # ======================================================================
 # Constants
@@ -20,8 +20,8 @@ KICKSTART_SOURCE="$(
     echo "$(pwd -P)/${self##*/}"
 )"
 DEFAULT_PLUGIN_PACKAGES=""
-REPOCONFIG_DEB_VERSION="5-1"
-REPOCONFIG_RPM_VERSION="5-1"
+REPOCONFIG_DEB_VERSION="5-5"
+REPOCONFIG_RPM_VERSION="5-5"
 START_TIME="$(date +%s)"
 STATIC_INSTALL_ARCHES="x86_64 armv7l armv6l aarch64"
 
@@ -57,6 +57,7 @@ STABLE_REPO_URL_PREFIX="https://repository.netdata.cloud/repos/stable"
 NIGHTLY_REPO_URL_PREFIX="https://repository.netdata.cloud/repos/edge"
 REPOCONFIG_URL_PREFIX="https://repository.netdata.cloud/repos/repoconfig"
 TELEMETRY_URL="https://us-east1-netdata-analytics-bi.cloudfunctions.net/ingest_agent_events"
+RELEASE_ARTIFACT_URL_PREFIX="https://artifacts.netdata.cloud"
 
 # ======================================================================
 # Defaults for environment variables
@@ -95,6 +96,8 @@ else
 fi
 
 CURL="$(PATH="${PATH}:/opt/netdata/bin" command -v curl 2>/dev/null && true)"
+WGET="$(command -v wget 2>/dev/null && true)"
+[ -z "${WGET}" ] && WGET="$(command -v wget2 2>/dev/null && true)"
 
 # ======================================================================
 # Shared messages used in multiple places throughout the script.
@@ -103,6 +106,8 @@ BADCACHE_MSG="Usually this is a result of an older copy of the file being cached
 BADNET_MSG="This is usually a result of a networking issue"
 ERROR_F0003="Could not find a usable HTTP client. Either curl or wget is required to proceed with installation."
 BADOPT_MSG="If you are following a third-party guide online, please see ${INSTALL_DOC_URL} for current instructions for using this script. If you are using a local copy of this script instead of fetching it from our servers, consider updating it. If you intended to pass this option to the installer code, please use either --local-build-options or --static-install-options to specify it instead."
+GITHUB_BADNET_MSG="This usually means there is some networking issue preventing access to https://github.com/ from this system."
+RELEASE_BADNET_MSG="This usually means there is some networking issue preventing access to ${RELEASE_ARTIFACT_URL_PREFIX} from this system."
 
 # ======================================================================
 # Core program logic
@@ -332,16 +337,16 @@ EOF
   fi
 
   if [ "${succeeded}" -eq 0 ]; then
-    if command -v wget > /dev/null 2>&1; then
-      if wget --help 2>&1 | grep BusyBox > /dev/null 2>&1; then
+    if [ -n "${WGET}" ]; then
+      if "${WGET}" --help 2>&1 | grep BusyBox > /dev/null 2>&1; then
         # BusyBox-compatible version of wget, there is no --no-check-certificate option
-        wget -q -O - \
+        "${WGET}" -q -O - \
         -T 1 \
         --header 'Content-Type: application/json' \
         --post-data "${REQ_BODY}" \
         "${TELEMETRY_URL}" > /dev/null
       else
-        wget -q -O - --no-check-certificate \
+        "${WGET}" -q -O - --no-check-certificate \
         --method POST \
         --timeout=1 \
         --header 'Content-Type: application/json' \
@@ -388,6 +393,29 @@ trap 'trap_handler 15 0' TERM
 # ======================================================================
 # Utility functions
 
+# Check if a URL is valid, and ensure it uses one of the specified protocols.
+is_valid_url() {
+  printf "%s\n" "${1}" | grep -qE "^(${2})://([^@\/:[:space:]]+(:[^@\/:[:space:]]*)?@)?(\[[0-9A-Fa-f:]+\]|[A-Za-z0-9.-]+)(:[0-9]{1,5})?(/[-A-Za-z0-9._~:/?#\[\]@!$&'()*+,;=]*)?$" || return 1
+}
+
+sanitize_string() {
+  v="${1}"
+  r="$(printf '%s\n' "${1}" | tr -cd "[:alnum:] ._=-")"
+  [ "${v}" = "${r}" ] || warning "Unsafe characters found in string, sanitized to ${r}"
+  echo "${r}"
+}
+
+sanitize_path() {
+  v="${1}"
+  _path_unsafe=";&'\"|\\<>()\n\$*?\`{}[]"
+  if [ -z "${_path_replace}" ]; then
+    _path_replace="$(printf "%$(printf "%s" "${_path_unsafe}" | wc -m)s" | tr " " "_")"
+  fi
+  r="$(printf '%s' "$1" | tr "${_path_unsafe}" "${_path_replace}")"
+  [ "${v}" = "${r}" ] || warning "Unsafe characters found in path, sanitized to ${r}"
+  echo "${r}"
+}
+
 canonical_path() {
   OLDPWD="$(pwd)"
   cd "$(dirname "${1}")" || exit 1
@@ -406,6 +434,17 @@ setup_terminal() {
   TPUT_BGGREEN=""
   TPUT_BOLD=""
   TPUT_DIM=""
+
+  case "${COLUMNS}" in
+    "" | *[!0-9]*) TERM_WIDTH=80 ;;
+    *)
+      if [ "${COLUMNS}" -ge 0 ]; then
+        TERM_WIDTH="${COLUMNS}"
+      else
+        TERM_WIDTH="80"
+      fi
+      ;;
+  esac
 
   # Is stderr on the terminal? If not, then fail
   test -t 2 || return 1
@@ -451,7 +490,7 @@ cleanup() {
   if [ -z "${NO_CLEANUP}" ] && [ -n "${tmpdir}" ]; then
     cd || true
     DRY_RUN=0
-    run_as_root rm -rf "${tmpdir}"
+    run_as_root_silent rm -rf "${tmpdir}"
   fi
 }
 
@@ -465,8 +504,16 @@ deferred_warnings() {
 }
 
 fatal() {
+  bracket="${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}$(printf "%${TERM_WIDTH}s" " " | tr " " "X")${TPUT_RESET}"
+  printf >&2 "%s\n\n" "${bracket}"
   deferred_warnings
-  printf >&2 "%b\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${1}"
+  printf >&2 "%s\n" "${bracket}"
+  printf >&2 "%s\n" "${TPUT_BOLD} A FATAL ERROR WAS ENCOUNTERED! ${TPUT_RESET}"
+  printf >&2 "%s\n" "${TPUT_BOLD} \\/ \\/ \\/ \\/ \\/ \\/ \\/ \\/ \\/ \\/ ${TPUT_RESET}"
+  printf >&2 "\n%b\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${1}"
+  printf >&2 "%s\n" "${TPUT_BOLD} /\\ /\\ /\\ /\\ /\\ /\\ /\\ /\\ /\\ /\\ ${TPUT_RESET}"
+  printf >&2 "%s\n" "${TPUT_BOLD} A FATAL ERROR WAS ENCOUNTERED! ${TPUT_RESET}"
+  printf >&2 "%s\n" "${bracket}"
   printf >&2 "%s\n" "For community support, you can connect with us on:"
   support_list
   telemetry_event "INSTALL_FAILED" "${1}" "${2}"
@@ -496,7 +543,7 @@ progress() {
 }
 
 run_logfile="/dev/null"
-run() {
+_get_run_info() {
   user="${USER--}"
   dir="${PWD}"
 
@@ -507,11 +554,9 @@ run() {
     info="[${user} ${dir}]$ "
     info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]$ "
   fi
+}
 
-  if [ "${DRY_RUN}" -eq 1 ]; then
-    printf >&2 "%s" "Would run command:\n"
-  fi
-
+_log_run_cmd() {
   {
     printf "%s" "${info}"
     escaped_print "${@}"
@@ -521,15 +566,12 @@ run() {
   printf >&2 "%s" "${info_console}${TPUT_BOLD}"
   escaped_print >&2 "${@}"
   printf >&2 "%s\n" "${TPUT_RESET}"
+}
 
-  if [ "${DRY_RUN}" -ne 1 ]; then
-    "${@}"
-    ret=$?
-  else
-    ret=0
-  fi
-
-  if [ ${ret} -ne 0 ]; then
+_log_run_result() {
+  ret="${1}"
+  shift 1
+  if [ "${ret}" -ne 0 ]; then
     printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET}"
     printf "%s\n" "FAILED with exit code ${ret}" >> "${run_logfile}"
     # shellcheck disable=SC2089
@@ -538,8 +580,36 @@ run() {
     printf >&2 "%s\n\n" "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET}"
     printf "OK\n" >> "${run_logfile}"
   fi
+}
 
-  return ${ret}
+run() {
+  _get_run_info
+
+  if [ "${DRY_RUN}" -eq 1 ]; then
+    printf >&2 "%s\n" "Would run command:"
+  fi
+
+  _log_run_cmd "${@}"
+
+  if [ "${DRY_RUN}" -ne 1 ]; then
+    "${@}"
+    ret=$?
+  else
+    ret=0
+  fi
+
+  _log_run_result "${ret}" "${@}"
+
+  return "${ret}"
+}
+
+always_run() {
+  _get_run_info
+  _log_run_cmd "${@}"
+  "${@}"
+  ret="$?"
+  _log_run_result "${ret}" "${@}"
+  return "${ret}"
 }
 
 run_as_root() {
@@ -552,7 +622,19 @@ run_as_root() {
   run ${ROOTCMD} "${@}"
 }
 
+# Only to be used in cleanup code.
+run_as_root_silent() {
+  confirm_root_support
+
+  if [ "$(id -u)" -ne "0" ]; then
+    printf >&2 "Root privileges required to run %s\n" "${*}"
+  fi
+
+  ${ROOTCMD} "${@}"
+}
+
 run_script() {
+  old_pwd="${PWD}"
   set_tmpdir
 
   export NETDATA_SCRIPT_STATUS_PATH="${tmpdir}/.script-status"
@@ -573,11 +655,14 @@ run_script() {
     rm -f "${NETDATA_SCRIPT_STATUS_PATH}"
   fi
 
+  cd "${old_pwd}" || fatal "Failed to change current working directory to ${old_pwd}." F000A
   return "${ret}"
 }
 
 warning() {
-  printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} WARNING ${TPUT_RESET} ${*}"
+  bracket="${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}$(printf "%${TERM_WIDTH}s" " " | tr " " "=")${TPUT_RESET}"
+  msg="${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} WARNING ${TPUT_RESET} ${*}"
+  printf >&2 "%s\n%s\n%s\n" "${bracket}" "${msg}" "${bracket}"
   NETDATA_WARNINGS="${NETDATA_WARNINGS}\n  - ${*}"
 }
 
@@ -625,10 +710,122 @@ set_tmpdir() {
   fi
 }
 
+handle_http_status() {
+  status="${1}"
+  url="${2}"
+  action="${3}"
+
+  warn_msg="Server returned ${status} when ${action} ${url}"
+  case "${status}" in
+    404)
+      warning "File not found when ${action} ${url}"
+      return 1
+      ;;
+    4*)
+      warning "${warn_msg}"
+      return 5
+      ;;
+    5*)
+      warning "${warn_msg}"
+      return 6
+      ;;
+    *)
+      warning "${warn_msg}"
+      return 4
+      ;;
+  esac
+}
+
+handle_curl_result() {
+  ret="${1}"
+  url="${2}"
+  dl_log="${3}"
+  action="${4}"
+  dest="${5}"
+
+  case "${ret}" in
+    0) return 0 ;;
+    22|78)
+      status="$(tail -n 1 "${dl_log}")"
+      [ -n "${dest}" ] && rm -f "${dest}"
+      handle_http_status "${status}" "${url}" "${action}"
+      return "$?"
+      ;;
+    56)
+      status="$(tail -n 1 "${dl_log}")"
+      [ -n "${dest}" ] && rm -f "${dest}"
+      case "${status}" in
+        2*)
+          warning "Protocol error when ${action} ${url}"
+          return 4
+          ;;
+        *)
+          handle_http_status "${status}" "${url}" "${action}"
+          return "$?"
+          ;;
+      esac
+      ;;
+    5|6|7)
+      [ -n "${dest}" ] && rm -f "${dest}"
+      warning "Failed to connect to remote host when ${action} ${url}"
+      return 2
+      ;;
+    35|60|83)
+      [ -n "${dest}" ] && rm -f "${dest}"
+      warning "TLS error while connecting to remote host when ${action} ${url}"
+      return 3
+      ;;
+    *)
+      [ -n "${dest}" ] && rm -f "${dest}"
+      fatal "Unknown error when ${action} ${url}" F0520
+      ;;
+  esac
+}
+
+handle_wget_result() {
+  ret="${1}"
+  url="${2}"
+  dl_log="${3}"
+  action="${4}"
+  dest="${5}"
+
+  case "${ret}" in
+    0) return 0 ;;
+    8)
+      status="$(grep "HTTP/" "${dl_log}" | tail -n 1 | awk '{ print $2 }')"
+      [ -n "${dest}" ] && rm -f "${dest}"
+      handle_http_status "${status}" "${url}" "${action}"
+      return "$?"
+      ;;
+    4)
+      [ -n "${dest}" ] && rm -f "${dest}"
+      warning "Failed to connect to remote host when ${action} ${url}"
+      return 2
+      ;;
+    5)
+      [ -n "${dest}" ] && rm -f "${dest}"
+      warning "TLS error while connecting to remote host when ${action} ${url}"
+      return 3
+      ;;
+    *)
+      [ -n "${dest}" ] && rm -f "${dest}"
+      fatal "Unknown error when ${action} ${url}" F0520
+      ;;
+  esac
+}
+
+# It’s unlikely that any caller of this function will care why exactly it
+# wasn’t possible to retrieve the requested URL, but it’s still useful
+# to log the differentiated warnings based on the actual result, so we do
+# still have the full logic for inspecting the return codes of curl/wget.
 check_for_remote_file() {
   url="${1}"
-  succeeded=0
-  checked=0
+
+  old_pwd="${PWD}"
+  set_tmpdir
+  cd "${old_pwd}" || fatal "Failed to change current working directory to ${old_pwd}." F000A
+  dl_log="${tmpdir}/download.log"
+  rm -f "${dl_log}"
 
   if echo "${url}" | grep -Eq "^file:///"; then
     [ -e "${url#file://}" ] || return 1
@@ -638,81 +835,74 @@ check_for_remote_file() {
   fi
 
   if [ -n "${CURL}" ]; then
-    checked=1
+    always_run "${CURL}" --write-out "%{http_code}" --output /dev/null --silent --head --fail "${url}" > "${dl_log}"
 
-    if "${CURL}" --output /dev/null --silent --head --fail "${url}"; then
-      succeeded=1
-    fi
+    handle_curl_result "$?" "${url}" "${dl_log}" "checking for remote file at"
+    return "$?"
   fi
 
-  if [ "${succeeded}" -eq 0 ]; then
-    if command -v wget > /dev/null 2>&1; then
-      checked=1
+  if [ -n "${WGET}" ]; then
+    always_run "${WGET}" -S -o "${dl_log}" --spider "${url}"
 
-      if wget -S --spider "${url}" 2>&1 | grep -q 'HTTP/1.1 200 OK'; then
-        succeeded=1
-      fi
-    fi
+    handle_wget_result "$?" "${url}" "${dl_log}" "checking for remote file at"
+    return "$?"
   fi
 
-  if [ "${succeeded}" -eq 1 ]; then
-    return 0
-  elif [ "${checked}" -eq 1 ]; then
-    return 1
-  else
-    fatal "${ERROR_F0003}" F0003
-  fi
+  fatal "${ERROR_F0003}" F0003
 }
 
 download() {
   url="${1}"
   dest="${2}"
-  succeeded=0
-  checked=0
+  force="${3}"
+
+  old_pwd="${PWD}"
+  set_tmpdir
+  cd "${old_pwd}" || fatal "Failed to change current working directory to ${old_pwd}." F000A
+  dl_log="${tmpdir}/download.log"
+  rm -f "${dl_log}"
+
+  if [ "${force}" = "force" ]; then
+    runcmd="always_run"
+  else
+    runcmd="run"
+  fi
 
   if echo "${url}" | grep -Eq "^file:///"; then
-    run cp "${url#file://}" "${dest}" || return 1
+    "${runcmd}" cp "${url#file://}" "${dest}" || return 1
     return 0
   fi
-
 
   if [ -n "${CURL}" ]; then
-    checked=1
+    "${runcmd}" sh -c '"${1}" --fail -q -sSL --connect-timeout 10 --retry 3 --write-out "%{http_code}" --output "${2}" "${3}" > "${4}"' _ "${CURL}" "${dest}" "${url}" "${dl_log}"
 
-    if run "${CURL}" --fail -q -sSL --connect-timeout 10 --retry 3 --output "${dest}" "${url}"; then
-      succeeded=1
-    else
-      rm -f "${dest}"
-    fi
+    handle_curl_result "$?" "${url}" "${dl_log}" "downloading" "${dest}"
+    return "$?"
   fi
 
-  if [ "${succeeded}" -eq 0 ]; then
-    if command -v wget > /dev/null 2>&1; then
-      checked=1
+  if [ -n "${WGET}" ]; then
+    "${runcmd}" "${WGET}" -S -T 15 -o "${dl_log}" -O "${dest}" "${url}"
 
-      if run wget -T 15 -O "${dest}" "${url}"; then
-        succeeded=1
-      fi
-    fi
+    handle_wget_result "$?" "${url}" "${dl_log}" "downloading" "${dest}"
+    return "$?"
   fi
 
-  if [ "${succeeded}" -eq 1 ]; then
-    return 0
-  elif [ "${checked}" -eq 1 ]; then
-    return 1
-  else
-    fatal "${ERROR_F0003}" F0003
-  fi
+  fatal "${ERROR_F0003}" F0003
 }
 
 get_actual_version() {
     major="${1}"
     channel="${2}"
     url="${RELEASE_INFO_URL}/${channel}/${major}"
+    old_pwd="${PWD}"
+    set_tmpdir
+    cd "${old_pwd}" || true
+    tmp_file="${tmpdir}/version-info"
 
     if check_for_remote_file "${RELEASE_INFO_URL}"; then
         if check_for_remote_file "${url}"; then
-            download "${url}" -
+            download "${url}" "${tmp_file}"
+            cat "${tmp_file}"
         else
             echo "NONE"
         fi
@@ -723,34 +913,127 @@ get_actual_version() {
 
 get_redirect() {
   url="${1}"
-  succeeded=0
-  checked=0
+  old_pwd="${PWD}"
+  set_tmpdir
+  cd "${old_pwd}" || fatal "Failed to change current working directory to ${old_pwd}." F000A
+  output="${tmpdir}/download.log"
+  rm -f "${output}"
 
   if [ -n "${CURL}" ]; then
-    checked=1
+    always_run sh -c '"${1}" "${2}" -s -L -I -o /dev/null -w "%{url_effective}" > "${3}"' _ "${CURL}" "${url}" "${output}"
 
-    if run sh -c "${CURL} ${url} -s -L -I -o /dev/null -w '%{url_effective}' | grep -Eo '[^/]+$'"; then
-      succeeded=1
-    fi
+    ret="$?"
+
+    case "${ret}" in
+      0)
+        grep -Eo '[^/]+/?$' "${output}" | grep -Eo '^[^/]+'
+        rm -f "${output}"
+        return 0
+        ;;
+      *)
+        handle_curl_result "${ret}" "${url}" "${output}" "checking redirects for"
+        return "$?"
+        ;;
+    esac
   fi
 
-  if [ "${succeeded}" -eq 0 ]; then
-    if command -v wget > /dev/null 2>&1; then
-      checked=1
+  if [ -n "${WGET}" ]; then
+    always_run "${WGET}" -S -o "${output}" -O /dev/null "${url}"
 
-      if run sh -c "wget -S -O /dev/null ${url} 2>&1 | grep -m 1 Location | grep -Eo '[^/]+$'"; then
-        succeeded=1
-      fi
-    fi
+    ret="$?"
+
+    case "${ret}" in
+      0)
+        grep -m 1 Location "${output}" | grep -Eo '[^/]+/?$' | grep -Eo '[^/]+$'
+        rm -f "${output}"
+        return 0
+        ;;
+      *)
+        handle_wget_result "${ret}" "${url}" "${output}" "checking redirects for"
+        return "$?"
+        ;;
+    esac
   fi
 
-  if [ "${succeeded}" -eq 1 ]; then
-    return 0
-  elif [ "${checked}" -eq 1 ]; then
-    return 1
+  fatal "${ERROR_F0003}" F0003
+}
+
+verify_manifest() {
+  dir="${1}"
+  required_file="${2}"
+  old_pwd="${PWD}"
+  failed=0
+  cd "${dir}" || fatal "Failed to change current working directory to ${dir}." F000A
+
+  if [ "${DRY_RUN}" -eq 1 ]; then
+    progress "Would verify integrity of downloaded files."
   else
-    fatal "${ERROR_F0003}" F0003
+    progress "Verifying integrity of downloaded files."
+
+    if [ -r "./Manifest" ]; then
+      files="$(awk '{ print $1 }' ./Manifest)"
+      if [ -n "${required_file}" ]; then
+        progress "Verifying that ${required_file} exists in Manifest"
+
+        if ! echo "${files}" | grep -qxF "${required_file}" ; then
+          fatal "${required_file} is not present in Manifest" F052C
+        fi
+
+        if [ ! -r "${required_file}" ]; then
+          fatal "${required_file} cannot be read" F052D
+        fi
+      fi
+      for f in ${files} ; do
+        if [ -r "${f}" ]; then
+          file_info="$(grep -E "^${f} " ./Manifest)"
+          file_size="$(echo "${file_info}" | awk '{ print $2 }')"
+          file_hash="$(echo "${file_info}" | awk '{ print $3 }')"
+
+          actual_size="$(wc -c "${f}" | awk '{ print $1 }')"
+          if [ "${actual_size}" -ne "${file_size}" ]; then
+            failed="$((failed + 1))"
+            warning "Invalid file size for ${dir}/${f}, expected ${file_size}, actual ${actual_size}"
+            continue
+          fi
+
+          if ! echo "${file_hash} *${f}" | safe_sha256sum -c -; then
+            failed="$((failed + 1))"
+            warning "Invalid checksum for ${dir}/${f}, expected: ${file_hash}, actual $(safe_sha256sum "${f}" | awk '{print $1}')"
+          fi
+        fi
+      done
+    elif [ -r "./sha256sums.txt" ]; then
+      files="$(awk '{ print $2 }' ./sha256sums.txt | tr -d '*' | sed -e 's|^\./||' -)"
+      if [ -n "${required_file}" ]; then
+        progress "Verifying that ${required_file} exists in sha256sums.txt"
+
+        if ! echo "${files}" | grep -qxF "${required_file}" ; then
+          fatal "${required_file} is not present in sha256sums.txt" F052C
+        fi
+
+        if [ ! -r "${required_file}" ]; then
+          fatal "${required_file} cannot be read" F052D
+        fi
+      fi
+      for f in ${files} ; do
+        if [ -r "${f}" ]; then
+          csum="$(grep -E "${f}\$" ./sha256sums.txt | awk '{print $1}')"
+          if ! echo "${csum} *${f}" | safe_sha256sum -c -; then
+            failed="$((failed + 1))"
+            warning "Invalid checksum for ${dir}/${f}, expected: ${csum}, actual $(safe_sha256sum "${f}" | awk '{print $1}')"
+          fi
+        fi
+      done
+    else
+      fatal "No Manifest or sha256sums.txt file found, unable to verify files in ${dir}" F0524
+    fi
   fi
+
+  if [ "${failed}" -gt 0 ]; then
+    fatal "${failed} files failed verification, see warnings for details on the failed files.\n${BADCACHE_MSG}" F0525
+  fi
+
+  cd "${old_pwd}" || fatal "Failed to change current working directory to ${old_pwd}." F000A
 }
 
 safe_sha256sum() {
@@ -973,16 +1256,19 @@ uninstall() {
     fi
   else
     if [ "${DRY_RUN}" -eq 1 ]; then
-      progress "Would download installer script from: ${uninstaller_url}"
+      progress "Would download uninstaller script from: ${uninstaller_url}"
       progress "Would attempt to uninstall existing install with downloaded uninstaller script."
       return 0
     else
       progress "Downloading netdata-uninstaller ..."
-      download "${uninstaller_url}" "${tmpdir}/netdata-uninstaller.sh"
-      chmod +x "${tmpdir}/netdata-uninstaller.sh"
-      # shellcheck disable=SC2086
-      if ! run_script "${tmpdir}/netdata-uninstaller.sh" ${FLAGS}; then
-        warning "Uninstaller failed. Some parts of Netdata may still be present on the system."
+      if download "${uninstaller_url}" "${tmpdir}/netdata-uninstaller.sh"; then
+        chmod +x "${tmpdir}/netdata-uninstaller.sh"
+        # shellcheck disable=SC2086
+        if ! run_script "${tmpdir}/netdata-uninstaller.sh" ${FLAGS}; then
+            warning "Uninstaller failed. Some parts of Netdata may still be present on the system."
+        fi
+      else
+        fatal "Failed to fetch uninstaller script" F0529
       fi
     fi
   fi
@@ -1116,20 +1402,11 @@ handle_existing_install() {
         return 0
       elif [ "${INSTALL_TYPE}" = "unknown" ]; then
         claimonly_notice="If you just want to claim this install, you should re-run this command with the --claim-only option instead."
-        if [ "${EXISTING_INSTALL_IS_NATIVE}" -eq 1 ]; then
-          failmsg="Attempting to update an installation managed by the system package manager is known to not work in most cases. If you are trying to install the latest version of Netdata, you will need to manually uninstall it through your system package manager. ${claimonly_notice}"
-          promptmsg="Attempting to update an installation managed by the system package manager is known to not work in most cases. If you are trying to install the latest version of Netdata, you will need to manually uninstall it through your system package manager. ${claimonly_notice} Are you sure you want to continue?"
-        else
-          failmsg="We do not support trying to update or claim installations when we cannot determine the install type. You will need to uninstall the existing install using the same method you used to install it to proceed. ${claimonly_notice}"
-          promptmsg="Attempting to update an existing install with an unknown installation type is not officially supported. It may work, but it also might break your system. ${claimonly_notice} Are you sure you want to continue?"
-        fi
-        if [ "${INTERACTIVE}" -eq 0 ] && [ "${ACTION}" != "claim" ]; then
-          fatal "${failmsg}" F0106
-        elif [ "${INTERACTIVE}" -eq 1 ] && [ "${ACTION}" != "claim" ]; then
-          if confirm "${promptmsg}"; then
-            progress "OK, continuing"
+        if [ "${ACTION}" != "claim" ]; then
+          if [ "${EXISTING_INSTALL_IS_NATIVE}" -eq 1 ]; then
+            fatal "Attempting to update an installation managed by the system package manager is known to not work in most cases. If you are trying to install the latest version of Netdata, you will need to manually uninstall it through your system package manager. ${claimonly_notice}" F0106
           else
-            fatal "Cancelling update of unknown installation type at user request." F050C
+            fatal "We do not support trying to update installations when we cannot determine the install type. You will need to uninstall the existing install using the same method you used to install it to proceed. ${claimonly_notice}" F0106
           fi
         fi
       fi
@@ -1258,6 +1535,10 @@ is_netdata_running() {
 }
 
 write_claim_config() {
+  old_pwd="${PWD}"
+  set_tmpdir
+  cd "${old_pwd}" || fatal "Failed to change current working directory to ${old_pwd}." F000A
+
   if [ -z "${INSTALL_PREFIX}" ] || [ "${INSTALL_PREFIX}" = "/" ]; then
     config_path="/etc/netdata"
     netdatacli="$(command -v netdatacli)"
@@ -1273,6 +1554,7 @@ write_claim_config() {
   fi
 
   claim_config="${config_path}/claim.conf"
+  claim_config_tmp="$(mktemp "${tmpdir}/claim.conf.XXXXXX")"
 
   if [ "${DRY_RUN}" -eq 1 ]; then
     progress "Would attempt to write claiming configuration to ${claim_config}"
@@ -1281,24 +1563,22 @@ write_claim_config() {
 
   progress "Writing claiming configuration to ${claim_config}"
 
-  config="[global]"
-  config="${config}\n    url = ${NETDATA_CLAIM_URL}"
-  config="${config}\n    token = ${NETDATA_CLAIM_TOKEN}"
+  printf "[global]\n" > "${claim_config_tmp}" || return 1
+  printf "    url = %s\n" "${NETDATA_CLAIM_URL}" >> "${claim_config_tmp}" || return 1
+  printf "    token = %s\n" "${NETDATA_CLAIM_TOKEN}" >> "${claim_config_tmp}" || return 1
   if [ -n "${NETDATA_CLAIM_ROOMS}" ]; then
-      config="${config}\n    rooms = ${NETDATA_CLAIM_ROOMS}"
+    printf "    rooms = %s\n" "${NETDATA_CLAIM_ROOMS}" >> "${claim_config_tmp}" || return 1
   fi
   if [ -n "${NETDATA_CLAIM_PROXY}" ]; then
-      config="${config}\n    proxy = ${NETDATA_CLAIM_PROXY}"
+    printf "    proxy = %s\n" "${NETDATA_CLAIM_PROXY}" >> "${claim_config_tmp}" || return 1
   fi
   if [ -n "${NETDATA_CLAIM_INSECURE}" ]; then
-      config="${config}\n    insecure = ${NETDATA_CLAIM_INSECURE}"
+    printf "    insecure = %s\n" "${NETDATA_CLAIM_INSECURE}" >> "${claim_config_tmp}" || return 1
   fi
 
-  run_as_root touch "${claim_config}.tmp" || return 1
-  run_as_root chmod 0640 "${claim_config}.tmp" || return 1
-  run_as_root chown ":${NETDATA_CLAIM_GROUP:-netdata}" "${claim_config}.tmp" || return 1
-  run_as_root sh -c "printf '${config}\\n' > \"${claim_config}.tmp\"" || return 1
-  run_as_root mv -f "${claim_config}.tmp" "${claim_config}" || return 1
+  run_as_root chown "root:${NETDATA_CLAIM_GROUP:-netdata}" "${claim_config_tmp}" || return 1
+  run_as_root chmod 0640 "${claim_config_tmp}" || return 1
+  run_as_root mv -f "${claim_config_tmp}" "${claim_config}" || return 1
 
   if [ -z "${NETDATA_CLAIM_NORELOAD}" ]; then
     if [ -n "${netdatacli}" ]; then
@@ -1533,8 +1813,13 @@ check_special_native_deps() {
     fi
 
     if [ "${DISTRO}" = "rhel" ]; then
+      if [ "${SYSVERSION}" -eq 7 ]; then
+        epel_url="https://archives.fedoraproject.org/pub/archive/epel/7/x86_64/Packages/e/epel-release-7-14.noarch.rpm"
+      else
+        epel_url="https://dl.fedoraproject.org/pub/epel/epel-release-latest-${SYSVERSION}.noarch.rpm"
+      fi
       # shellcheck disable=SC2086
-      if ! run_as_root env ${env} ${pm_cmd} ${install_subcmd} ${pkg_install_opts} "https://dl.fedoraproject.org/pub/epel/epel-release-latest-${SYSVERSION}.noarch.rpm"; then
+      if ! run_as_root env ${env} ${pm_cmd} ${install_subcmd} ${pkg_install_opts} "${epel_url}"; then
         warning "Failed to install EPEL, even though it is required to install native packages on this system."
         return 1
       fi
@@ -1747,16 +2032,34 @@ try_package_install() {
       ;;
   esac
 
-  if ! check_for_remote_file "${ref_check_url}"; then
-    NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT=1
-  fi
+  check_for_remote_file "${ref_check_url}"
+
+  case "$?" in
+    0) ;;
+    1) NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT=1 ;;
+    *)
+      warning "Unable to communicate with Netdata package repositories"
+      return 1
+      ;;
+  esac
 
   progress "Checking if native packages are being published for this platform."
-  if ! check_for_remote_file "${pub_check_url}"; then
-    warning "Native packages are not being published for this system."
-    return 3
-  fi
+  check_for_remote_file "${pub_check_url}"
 
+  case "$?" in
+    0) ;;
+    1)
+      warning "Native packages are not being published for this system."
+      return 3
+      ;;
+    *)
+      warning "Unable to determine if native packages are being published for this system."
+      return 1
+      ;;
+  esac
+
+  # Due to the check above for pub_check_url, it’s safe to assume here
+  # that the only error we’re going to get is a missing file.
   if ! check_for_remote_file "${pkg_meta_url}"; then
     warning "Native packages have not yet been published for this system."
     return 4
@@ -1858,81 +2161,126 @@ set_static_archive_urls() {
     arch="${2}"
   fi
 
-  if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
-    path="$(cd "${NETDATA_OFFLINE_INSTALL_SOURCE}" || exit 1; pwd)"
-    export NETDATA_STATIC_ARCHIVE_URL="file://${path}/netdata-${arch}-latest.gz.run"
-    export NETDATA_STATIC_ARCHIVE_NAME="netdata-${arch}-latest.gz.run"
-    export NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="file://${path}/sha256sums.txt"
-  elif [ "${1}" = "stable" ]; then
-    if [ -n "${INSTALL_VERSION}" ]; then
-      export NETDATA_STATIC_ARCHIVE_URL="https://github.com/netdata/netdata/releases/download/v${INSTALL_VERSION}/netdata-${arch}-v${INSTALL_VERSION}.gz.run"
-      export NETDATA_STATIC_ARCHIVE_OLD_URL="https://github.com/netdata/netdata/releases/download/v${INSTALL_VERSION}/netdata-v${INSTALL_VERSION}.gz.run"
-      export NETDATA_STATIC_ARCHIVE_NAME="netdata-${arch}-v${INSTALL_VERSION}.gz.run"
-      export NETDATA_STATIC_ARCHIVE_OLD_NAME="netdata-v${INSTALL_VERSION}.gz.run"
-      export NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/v${INSTALL_VERSION}/sha256sums.txt"
-    else
-      latest="$(get_redirect "https://github.com/netdata/netdata/releases/latest")"
-      export NETDATA_STATIC_ARCHIVE_URL="https://github.com/netdata/netdata/releases/download/${latest}/netdata-${arch}-latest.gz.run"
-      export NETDATA_STATIC_ARCHIVE_NAME="netdata-${arch}-latest.gz.run"
-      export NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/${latest}/sha256sums.txt"
-    fi
+  prefix_set="0"
+
+  if [ -n "${NETDATA_ARTIFACT_URL_PREFIX}" ]; then
+    prefix_set="1"
+    NETDATA_STATIC_ARCHIVE_URL_PREFIX="${NETDATA_ARTIFACT_URL_PREFIX}"
+  elif [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
+    prefix_set="1"
+    NETDATA_STATIC_ARCHIVE_URL_PREFIX="file://${NETDATA_OFFLINE_INSTALL_SOURCE}"
+  elif [ -n "${INSTALL_VERSION}" ]; then
+    NETDATA_STATIC_ARCHIVE_URL_PREFIX="${RELEASE_ARTIFACT_URL_PREFIX}/${1}/v${INSTALL_VERSION}"
   else
-    if [ -n "${INSTALL_VERSION}" ]; then
-      export NETDATA_STATIC_ARCHIVE_URL="${NETDATA_TARBALL_BASEURL}/download/v${INSTALL_VERSION}/netdata-${arch}-v${INSTALL_VERSION}.gz.run"
-      export NETDATA_STATIC_ARCHIVE_OLD_URL="${NETDATA_TARBALL_BASEURL}/download/v${INSTALL_VERSION}/netdata-v${INSTALL_VERSION}.gz.run"
-      export NETDATA_STATIC_ARCHIVE_NAME="netdata-${arch}-v${INSTALL_VERSION}.gz.run"
-      export NETDATA_STATIC_ARCHIVE_OLD_NAME="netdata-v${INSTALL_VERSION}.gz.run"
-      export NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="${NETDATA_TARBALL_BASEURL}/download/v${INSTALL_VERSION}/sha256sums.txt"
-    else
-      tag="$(get_redirect "${NETDATA_TARBALL_BASEURL}/latest")"
-      export NETDATA_STATIC_ARCHIVE_URL="${NETDATA_TARBALL_BASEURL}/download/${tag}/netdata-${arch}-latest.gz.run"
-      export NETDATA_STATIC_ARCHIVE_NAME="netdata-${arch}-latest.gz.run"
-      export NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="${NETDATA_TARBALL_BASEURL}/download/${tag}/sha256sums.txt"
-    fi
+    NETDATA_STATIC_ARCHIVE_URL_PREFIX="${RELEASE_ARTIFACT_URL_PREFIX}/${1}/latest"
   fi
+
+  check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/Manifest"
+
+  case $? in
+    0) NETDATA_MANIFEST_INSTALL=1 ;;
+    *)
+      if [ "${prefix_set}" -eq 0 ]; then
+        if [ "${1}" = "stable" ]; then
+          if [ -n "${INSTALL_VERSION}" ]; then
+            version="v${INSTALL_VERSION}"
+          else
+            version="$(get_redirect "https://github.com/netdata/netdata/releases/latest")"
+          fi
+          NETDATA_STATIC_ARCHIVE_URL_PREFIX="https://github.com/netdata/netdata/releases/download/${version}"
+        else
+          if [ -n "${INSTALL_VERSION}" ]; then
+            version="v${INSTALL_VERSION}"
+          else
+            version="$(get_redirect "${NETDATA_TARBALL_BASEURL}/latest")"
+          fi
+          NETDATA_STATIC_ARCHIVE_URL_PREFIX="${NETDATA_TARBALL_BASEURL}/download/${version}"
+        fi
+
+        check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/Manifest"
+
+        case $? in
+          0) NETDATA_MANIFEST_INSTALL=1 ;;
+          1)
+            NETDATA_MANIFEST_INSTALL=0
+            NETDATA_STATIC_ARCHIVE_NAME="netdata-${arch}-${version}.gz.run"
+            NETDATA_STATIC_ARCHIVE_URL="${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/${NETDATA_STATIC_ARCHIVE_NAME}"
+            NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/sha256sums.txt"
+            ;;
+          *) fatal "Unable to communicate with GitHub. ${GITHUB_BADNET_MSG}" F052A ;;
+        esac
+      else
+        if [ -n "${INSTALL_VERSION}" ]; then
+          version="v${INSTALL_VERSION}"
+        else
+          version="$(get_redirect "${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/latest")"
+        fi
+        NETDATA_MANIFEST_INSTALL=0
+        NETDATA_STATIC_ARCHIVE_NAME="netdata-${arch}-${version}.gz.run"
+        NETDATA_STATIC_ARCHIVE_URL="${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/${NETDATA_STATIC_ARCHIVE_NAME}"
+        NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/sha256sums.txt"
+      fi
+
+      check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL_PREFIX}"
+
+      case "$?" in
+        0) ;;
+        1) NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT=1 ;;
+        *) fatal "Unable to communicate with GitHub. ${GITHUB_BADNET_MSG}" F052A ;;
+      esac
+      ;;
+  esac
 }
 
 try_static_install() {
-  set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}"
+  set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" || return 1
+
   if [ "${DRY_RUN}" -eq 1 ]; then
     progress "Would attempt to install using static build..."
   else
     progress "Attempting to install using static build..."
   fi
 
-  if ! check_for_remote_file "${NETDATA_TARBALL_BASEURL}"; then
-    NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT=1
-  fi
+  if [ "${NETDATA_MANIFEST_INSTALL}" -eq 1 ]; then
+    if ! download "${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/Manifest" "./Manifest" "force"; then
+      fatal "Unable to download release manifest file. ${BADNET_MSG}" F0526
+    fi
 
-  # Check status code first, so that we can provide nicer fallback for dry runs.
-  if check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL}"; then
-    netdata_agent="${NETDATA_STATIC_ARCHIVE_NAME}"
-  elif [ "${SYSARCH}" = "x86_64" ] && check_for_remote_file "${NETDATA_STATIC_ARCHIVE_OLD_URL}"; then
-    netdata_agent="${NETDATA_STATIC_ARCHIVE_OLD_NAME}"
-    export NETDATA_STATIC_ARCHIVE_URL="${NETDATA_STATIC_ARCHIVE_OLD_URL}"
+    archive_info="$(grep -E "^netdata-${SYSARCH}-.*\\.run " ./Manifest)"
+
+    if [ -z "${archive_info}" ]; then
+      warning "Could not find a ${SELECTED_RELEASE_CHANNEL} static build for ${SYSARCH} CPUs."
+      return 2
+    fi
+
+    if [ "$(echo "${archive_info}" | wc -l)" -gt 1 ]; then
+      archive_info="$(echo "${archive_info}" | grep -v ".*-latest.*" | tail -n 1)"
+    fi
+
+    archive_name="$(echo "${archive_info}" | awk '{ print $1 }')"
+
+    if ! download "${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/${archive_name}" "./${archive_name}"; then
+      fatal "Unable to download static build archive for ${SYSARCH}. ${BADNET_MSG}." F0208
+    fi
   else
-    warning "Could not find a ${SELECTED_RELEASE_CHANNEL} static build for ${SYSARCH} CPUs. This usually means there is some networking issue preventing access to https://github.com/ from this system."
-    return 2
-  fi
+    # Check status code first, so that we can provide nicer fallback for dry runs.
+    if check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL}"; then
+      archive_name="${NETDATA_STATIC_ARCHIVE_NAME}"
+    else
+      warning "Could not find a ${SELECTED_RELEASE_CHANNEL} static build for ${SYSARCH} CPUs. ${GITHUB_BADNET_MSG}"
+      return 2
+    fi
 
-  if ! download "${NETDATA_STATIC_ARCHIVE_URL}" "./${netdata_agent}"; then
-    fatal "Unable to download static build archive for ${SYSARCH}. ${BADNET_MSG}." F0208
-  fi
+    if ! download "${NETDATA_STATIC_ARCHIVE_URL}" "./${archive_name}"; then
+      fatal "Unable to download static build archive for ${SYSARCH}. ${BADNET_MSG}." F0208
+    fi
 
-  if ! download "${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}" "./sha256sum.txt"; then
-    fatal "Unable to fetch checksums to verify static build archive. ${BADNET_MSG}." F0206
-  fi
-
-  if [ "${DRY_RUN}" -eq 1 ]; then
-    progress "Would validate SHA256 checksum of downloaded static build archive."
-  else
-    if [ -z "${INSTALL_VERSION}" ]; then
-      if ! grep "${netdata_agent}" ./sha256sum.txt | safe_sha256sum -c - > /dev/null 2>&1; then
-        bad_sums_report="$(report_bad_sha256sum "${netdata_agent}" "./sha256sum.txt")"
-        fatal "Static binary checksum validation failed.\n${bad_sums_report}\n${BADCACHE_MSG}." F0207
-      fi
+    if ! download "${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}" "./sha256sums.txt"; then
+      fatal "Unable to fetch checksums to verify static build archive. ${BADNET_MSG}." F0206
     fi
   fi
+
+  verify_manifest ./ "${archive_name}"
 
   if [ "${INTERACTIVE}" -eq 0 ]; then
     opts="${opts} --accept"
@@ -1946,7 +2294,7 @@ try_static_install() {
 
   progress "Installing netdata"
   # shellcheck disable=SC2086
-  if ! run_as_root ${env_cmd} /bin/sh "./${netdata_agent}" ${opts} -- ${NETDATA_INSTALLER_OPTIONS}; then
+  if ! run_as_root ${env_cmd} /bin/sh "./${archive_name}" ${opts} -- ${NETDATA_INSTALLER_OPTIONS}; then
     warning "Failed to install static build of Netdata on ${SYSARCH}."
     run rm -rf /opt/netdata
     return 2
@@ -1973,25 +2321,72 @@ try_static_install() {
 # Local build install code
 
 set_source_archive_urls() {
-  if [ "$1" = "stable" ]; then
-    if [ -n "${INSTALL_VERSION}" ]; then
-      export NETDATA_SOURCE_ARCHIVE_URL="https://github.com/netdata/netdata/releases/download/v${INSTALL_VERSION}/netdata-v${INSTALL_VERSION}.tar.gz"
-      export NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/v${INSTALL_VERSION}/sha256sums.txt"
-    else
-      latest="$(get_redirect "https://github.com/netdata/netdata/releases/latest")"
-      export NETDATA_SOURCE_ARCHIVE_URL="https://github.com/netdata/netdata/releases/download/${latest}/netdata-${latest}.tar.gz"
-      export NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/${latest}/sha256sums.txt"
-    fi
+  prefix_set="0"
+
+  if [ -n "${NETDATA_ARTIFACT_URL_PREFIX}" ]; then
+    prefix_set="1"
+    NETDATA_SOURCE_ARCHIVE_URL_PREFIX="${NETDATA_ARTIFACT_URL_PREFIX}"
+  elif [ -n "${INSTALL_VERSION}" ]; then
+    NETDATA_SOURCE_ARCHIVE_URL_PREFIX="${RELEASE_ARTIFACT_URL_PREFIX}/${1}/v${INSTALL_VERSION}"
   else
-    if [ -n "${INSTALL_VERSION}" ]; then
-      export NETDATA_SOURCE_ARCHIVE_URL="${NETDATA_TARBALL_BASEURL}/download/v${INSTALL_VERSION}/netdata-latest.tar.gz"
-      export NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL="${NETDATA_TARBALL_BASEURL}/download/v${INSTALL_VERSION}/sha256sums.txt"
-    else
-      tag="$(get_redirect "${NETDATA_TARBALL_BASEURL}/latest")"
-      export NETDATA_SOURCE_ARCHIVE_URL="${NETDATA_TARBALL_BASEURL}/download/${tag}/netdata-latest.tar.gz"
-      export NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL="${NETDATA_TARBALL_BASEURL}/download/${tag}/sha256sums.txt"
-    fi
+    NETDATA_SOURCE_ARCHIVE_URL_PREFIX="${RELEASE_ARTIFACT_URL_PREFIX}/${1}/latest"
   fi
+
+  check_for_remote_file "${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/Manifest"
+
+  case $? in
+    0) NETDATA_MANIFEST_INSTALL=1 ;;
+    *)
+      if [ "${prefix_set}" -eq 0 ]; then
+        if [ "${1}" = "stable" ]; then
+          if [ -n "${INSTALL_VERSION}" ]; then
+            version="v${INSTALL_VERSION}"
+          else
+            version="$(get_redirect "https://github.com/netdata/netdata/releases/latest")"
+          fi
+          NETDATA_SOURCE_ARCHIVE_URL_PREFIX="https://github.com/netdata/netdata/releases/download/${version}"
+        else
+          if [ -n "${INSTALL_VERSION}" ]; then
+            version="v${INSTALL_VERSION}"
+          else
+            version="$(get_redirect "${NETDATA_TARBALL_BASEURL}/latest")"
+          fi
+          NETDATA_SOURCE_ARCHIVE_URL_PREFIX="${NETDATA_TARBALL_BASEURL}/download/${version}"
+        fi
+
+        check_for_remote_file "${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/Manifest"
+
+        case $? in
+          0) NETDATA_MANIFEST_INSTALL=1 ;;
+          1)
+            NETDATA_MANIFEST_INSTALL=0
+            NETDATA_SOURCE_ARCHIVE_BASE_NAME="netdata-${version}.tar"
+            NETDATA_SOURCE_ARCHIVE_BASEURL="${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/${NETDATA_SOURCE_ARCHIVE_BASE_NAME}"
+            NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL="${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/sha256sums.txt"
+            ;;
+          *) fatal "Unable to communicate with GitHub. ${GITHUB_BADNET_MSG}" F0528 ;;
+        esac
+      else
+        if [ -n "${INSTALL_VERSION}" ]; then
+          version="v${INSTALL_VERSION}"
+        else
+          version="$(get_redirect "${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/latest")"
+        fi
+        NETDATA_MANIFEST_INSTALL=0
+        NETDATA_SOURCE_ARCHIVE_BASE_NAME="netdata-${version}.tar"
+        NETDATA_SOURCE_ARCHIVE_BASEURL="${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/${NETDATA_SOURCE_ARCHIVE_BASE_NAME}"
+        NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL="${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/sha256sums.txt"
+      fi
+
+      check_for_remote_file "${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}"
+
+      case "$?" in
+        0) ;;
+        1) NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT=1 ;;
+        *) fatal "Unable to communicate with GitHub. ${GITHUB_BADNET_MSG}" F0528 ;;
+      esac
+      ;;
+  esac
 }
 
 install_local_build_dependencies() {
@@ -2079,38 +2474,81 @@ try_build_install() {
   fi
 
   set_source_archive_urls "${SELECTED_RELEASE_CHANNEL}"
+  zstd="$(command -v zstd 2>/dev/null || true)"
+  archive_name=""
 
-  if [ -n "${INSTALL_VERSION}" ]; then
-    if ! download "${NETDATA_SOURCE_ARCHIVE_URL}" "./netdata-v${INSTALL_VERSION}.tar.gz"; then
-      fatal "Failed to download source tarball for local build. ${BADNET_MSG}." F000B
+  if [ "${NETDATA_MANIFEST_INSTALL}" -eq 1 ]; then
+    if ! download "${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/Manifest" "./Manifest" "force"; then
+      fatal "Unable to download release manifest file. ${BADNET_MSG}" F0526
     fi
-  elif ! download "${NETDATA_SOURCE_ARCHIVE_URL}" "./netdata-latest.tar.gz"; then
-    fatal "Failed to download source tarball for local build. ${BADNET_MSG}." F000B
-  fi
 
-  if ! download "${NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL}" "./sha256sum.txt"; then
-    fatal "Failed to download checksums for source tarball verification. ${BADNET_MSG}." F000C
-  fi
+    zstd_info="$(grep -E "^netdata-.*\\.tar\\.zst " ./Manifest)"
+    gzip_info="$(grep -E "^netdata-.*\\.tar\\.gz " ./Manifest)"
 
-  if [ "${DRY_RUN}" -eq 1 ]; then
-    progress "Would validate SHA256 checksum of downloaded source archive."
-  else
-    if [ -z "${INSTALL_VERSION}" ]; then
-      # shellcheck disable=SC2086
-      if ! grep netdata-latest.tar.gz "./sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
-        bad_sums_report="$(report_bad_sha256sum netdata-latest.tar.gz "./sha256sum.txt")"
-        fatal "Tarball checksum validation failed.\n${bad_sums_report}\n${BADCACHE_MSG}." F0005
+    if [ -n "${zstd}" ] && [ -n "${zstd_info}" ]; then
+      if [ "$(echo "${zstd_info}" | wc -l)" -gt 1 ]; then
+        zstd_info="$(echo "${zstd_info}" | grep -v ".*-latest.*" | tail -n 1)"
+      fi
+
+      zstd_name="$(echo "${zstd_info}" | awk '{ print $1 }')"
+
+      if download "${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/${zstd_name}" "${zstd_name}"; then
+        archive_name="${zstd_name}"
+        decompress="${zstd} -dcf"
+      else
+        warning "Unable to fetch zstd compressed source tarball, trying gzip compressed tarball instead."
       fi
     fi
+
+    if [ -z "${archive_name}" ] && [ -n "${gzip_info}" ]; then
+      if [ "$(echo "${gzip_info}" | wc -l)" -gt 1 ]; then
+        gzip_info="$(echo "${gzip_info}" | grep -v ".*-latest.*" | tail -n 1)"
+      fi
+
+      gzip_name="$(echo "${gzip_info}" | awk '{ print $1 }')"
+
+      if download "${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/${gzip_name}" "${gzip_name}"; then
+        archive_name="${gzip_name}"
+        decompress="$(command -v gzip 2>/dev/null) -dc"
+      else
+        fatal "Unable to find a usable ${SELECTED_RELEASE_CHANNEL} source archive in Manifest file.\n${BADNET_MSG}" F0527
+      fi
+    fi
+
+    if [ -z "${archive_name}" ]; then
+      fatal "Failed to download source tarball for local build. ${BADNET_MSG}." F000B
+    fi
+  else
+    if [ -n "${zstd}" ]; then
+      if download "${NETDATA_SOURCE_ARCHIVE_BASEURL}.zst" "${NETDATA_SOURCE_ARCHIVE_BASE_NAME}.zst"; then
+        archive_name="${NETDATA_SOURCE_ARCHIVE_BASE_NAME}.zst"
+        decompress="${zstd} -dcf"
+      else
+        rm -f "${NETDATA_SOURCE_ARCHIVE_BASE_NAME}.zst"
+        warning "Unable to fetch zstd compressed source tarball, trying gzip compressed tarball instead."
+      fi
+    fi
+
+    if [ -z "${archive_name}" ]; then
+      if download "${NETDATA_SOURCE_ARCHIVE_BASEURL}.gz" "${NETDATA_SOURCE_ARCHIVE_BASE_NAME}.gz"; then
+        archive_name="${NETDATA_SOURCE_ARCHIVE_BASE_NAME}.gz"
+        decompress="$(command -v gzip 2>/dev/null) -dc"
+      fi
+    fi
+
+    if [ -z "${archive_name}" ]; then
+      fatal "Failed to download source tarball for local build. ${BADNET_MSG}." F000B
+    fi
+
+    if ! download "${NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL}" "./sha256sums.txt"; then
+      fatal "Failed to download checksums for source tarball verification. ${BADNET_MSG}." F000C
+    fi
   fi
 
-  if [ -n "${INSTALL_VERSION}" ]; then
-    run tar -xf "./netdata-v${INSTALL_VERSION}.tar.gz" -C "${tmpdir}"
-    rm -rf "./netdata-v${INSTALL_VERSION}.tar.gz" > /dev/null 2>&1
-  else
-    run tar -xf "./netdata-latest.tar.gz" -C "${tmpdir}"
-    rm -rf "./netdata-latest.tar.gz" > /dev/null 2>&1
-  fi
+  verify_manifest ./ "${archive_name}"
+
+  run sh -c '${0} "${1}" | tar -xf - -C "${2}"' "${decompress}" "${archive_name}" "${tmpdir}"
+  rm -rf "${archive_name}" > /dev/null 2>&1
 
   if [ "${DRY_RUN}" -ne 1 ]; then
     netdata_src_dir="$(find "${tmpdir}" -mindepth 1 -maxdepth 1 -type d -name 'netdata-*' | head -n 1)"
@@ -2137,6 +2575,8 @@ prepare_offline_install_source() {
   if [ -e "${1}" ]; then
     if [ ! -d "${1}" ]; then
       fatal "${1} is not a directory, unable to prepare offline install source." F0503
+    elif [ -n "$(find "${1}/" -mindepth 1 -maxdepth 1 -print)" ]; then
+      fatal "${1} already contains files. Either specify a different directory, or remove the files." F052E
     fi
   else
     run mkdir -p "${1}" || fatal "Unable to create target directory for offline install preparation." F0504
@@ -2148,67 +2588,82 @@ prepare_offline_install_source() {
     static|auto|any)
       set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" "x86_64"
 
-      if ! check_for_remote_file "${NETDATA_TARBALL_BASEURL}"; then
-        NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT=1
-      fi
+      if [ "${NETDATA_MANIFEST_INSTALL}" -eq 1 ]; then
+        manifest_url="${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/Manifest"
+        progress "Fetching ${manifest_url}"
+        if ! download "${manifest_url}" "./Manifest" "force"; then
+          fatal "Unable to download release Manifest file. ${BADNET_MSG}" F0526
+        fi
 
-      if check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL}"; then
+        if ! download "${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/Version" "./Version"; then
+          fatal "Unable to download release Version file. ${BADNET_MSG}" F0526
+        fi
+
+        archive_info="$(grep -E "^netdata-.*-.*\\.run " ./Manifest)"
+
+        if [ -z "${archive_info}" ]; then
+          warning "Could not find a ${SELECTED_RELEASE_CHANNEL} static build for ${SYSARCH} CPUs."
+          return 2
+        fi
+
+        archive_names="$(echo "${archive_info}" | awk '{ print $1 }')"
+
+        failed=0
+
+        for f in ${archive_names}; do
+          archive_url="${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/${f}"
+          progress "Fetching ${archive_url}"
+          if ! download "${archive_url}" "${f}"; then
+            failed="$((failed + 1))"
+            warning "Failed to download ${archive_url}. ${BADNET_MSG}."
+          elif echo "${f}" | grep -qvE ".*-latest.*" ; then
+            latest_name="$(echo "${f}" | sed -e 's/v.*\.\([a-z]\+\)\.run$/latest.\1.run/' -)"
+            ln -sf "${f}" "${latest_name}"
+          fi
+        done
+
+        if [ "${failed}" -ne 0 ]; then
+          fatal "Failed to download one or more static installer archives, cannot continue. ${BADNET_MSG}." F052B
+        fi
+      else
+        check_for_remote_file "${NETDATA_TARBALL_BASEURL}"
+
+        case "$?" in
+          0) ;;
+          1) NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT=1 ;;
+          *)
+            warning "Unable to communicate with GitHub. ${GITHUB_BADNET_MSG}"
+            return 1
+            ;;
+        esac
+
         for arch in $(echo "${NETDATA_OFFLINE_ARCHES:-${STATIC_INSTALL_ARCHES}}" | awk '{for (i=1;i<=NF;i++) if (!a[$i]++) printf("%s%s",$i,FS)}{printf("\n")}'); do
           set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" "${arch}"
 
           if check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL}"; then
-            progress "Fetching ${NETDATA_STATIC_ARCHIVE_URL}"
-            if ! download "${NETDATA_STATIC_ARCHIVE_URL}" "netdata-${arch}-latest.gz.run"; then
-                warning "Failed to download static installer archive for ${arch}. ${BADNET_MSG}."
-            fi
+              progress "Fetching ${NETDATA_STATIC_ARCHIVE_URL}"
+              if ! download "${NETDATA_STATIC_ARCHIVE_URL}" "${NETDATA_STATIC_ARCHIVE_NAME}"; then
+                  warning "Failed to download static installer archive for ${arch}. ${BADNET_MSG}."
+              fi
           else
-            progress "Skipping ${NETDATA_STATIC_ARCHIVE_URL} as it does not exist on the server."
+              progress "Skipping ${NETDATA_STATIC_ARCHIVE_URL} as it does not exist on the server."
           fi
         done
-        legacy=0
-      else
-        warning "Selected version of Netdata only provides static builds for x86_64. You will only be able to install on x86_64 systems with this offline install source."
-        progress "Fetching ${NETDATA_STATIC_ARCHIVE_OLD_URL}"
-        legacy=1
 
-        if ! download "${NETDATA_STATIC_ARCHIVE_OLD_URL}" "netdata-x86_64-latest.gz.run"; then
-          warning "Failed to download static installer archive for x86_64. ${BADNET_MSG}."
+        if [ -z "$(find . -name '*.gz.run')" ]; then
+          fatal "Did not actually download any static installer archives, cannot continue. ${BADNET_MSG}." F0516
         fi
-      fi
 
-      if [ -z "$(find . -name '*.gz.run')" ]; then
-        fatal "Did not actually download any static installer archives, cannot continue. ${BADNET_MSG}." F0516
-      fi
-
-      progress "Fetching ${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}"
-      if ! download "${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}" "sha256sums.txt"; then
-        fatal "Failed to download checksum file. ${BADNET_MSG}." F0506
+        progress "Fetching ${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}"
+        if ! download "${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}" "sha256sums.txt"; then
+          fatal "Failed to download checksum file. ${BADNET_MSG}." F0506
+        fi
       fi
       ;;
     *) fatal "Install type ${NETDATA_REQUESTED_INSTALL_TYPE} is not supported for offline installs." F051B
   esac
 
-  if [ "${legacy:-0}" -eq 1 ]; then
-    sed -e 's/netdata-latest.gz.run/netdata-x86_64-latest.gz.run' sha256sums.txt > sha256sums.tmp
-    mv sha256sums.tmp sha256sums.txt
-  fi
-
-  if [ "${DRY_RUN}" -ne 1 ]; then
-    progress "Verifying checksums."
-
-    failed_files=""
-    for file in $(find . -name '*.gz.run'); do
-      if ! grep -e "${file}" sha256sums.txt | safe_sha256sum -c -; then
-        failed_files="${failed_files}\n${file}\n$(report_bad_sha256sum "${file}" sha256sums.txt)"
-      fi
-    done
-
-    if [ -n "${failed_files}" ]; then
-      fatal "Checksums for offline install files are incorrect.\n${failed_files}\n${BADCACHE_MSG}." F0507
-    fi
-  else
-    progress "Would verify SHA256 checksums of downloaded installation files."
-  fi
+  verify_manifest ./
 
   if [ "${DRY_RUN}" -ne 1 ]; then
     progress "Preparing install script."
@@ -2235,6 +2690,22 @@ prepare_offline_install_source() {
     echo "${SELECTED_RELEASE_CHANNEL}" > "channel"
   else
     progress "Would save release channel information to offline install source directory"
+  fi
+
+  if [ "${DRY_RUN}" -ne 1 ]; then
+    progress "Generating updated Manifest for offline install source directory."
+    rm -f sha256sums.txt
+    rm -f Manifest
+
+    for f in *; do
+      [ -f "${f}" ] || continue
+      h="$(safe_sha256sum "${f}" | awk '{ print $1 }')"
+      s="$(wc -c "${f}" | awk '{ print $1 }')"
+      echo "${f} ${s} ${h}" >> ./Manifest
+      echo "${h} *${f}" >> ./sha256sums.txt
+    done
+  else
+    progress "Would generate updated Manifest for offline install source directory."
   fi
 
   progress "Finished preparing offline install source directory at ${1}. You can now copy this directory to a target system and then run the script ‘install.sh’ from it to install on that system."
@@ -2521,7 +2992,6 @@ parse_args() {
         warning "Cloud is always required"
         ;;
       "--dont-start-it")
-        NETDATA_NO_START=1
         NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --dont-start-it"
         ;;
       "--disable-telemetry")
@@ -2529,11 +2999,19 @@ parse_args() {
         NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --disable-telemetry"
         ;;
       "--install-prefix")
-        INSTALL_PREFIX="${2}"
+        p="$(sanitize_path "${2}")"
+        if [ "${p}" != "${2}" ]; then
+          fatal "Unsafe characters detected in install prefix" F0525
+        fi
+        INSTALL_PREFIX="${p}"
         shift 1
         ;;
       "--old-install-prefix")
-        OLD_INSTALL_PREFIX="${2}"
+        p="$(sanitize_path "${2}")"
+        if [ "${p}" != "${2}" ]; then
+          fatal "Unsafe characters detected in old install prefix" F0526
+        fi
+        OLD_INSTALL_PREFIX="${p}"
         shift 1
         ;;
       "--install-major-version")
@@ -2578,15 +3056,23 @@ parse_args() {
       "--claim-"*)
         optname="$(echo "${1}" | cut -d '-' -f 4-)"
         case "${optname}" in
-          token) NETDATA_CLAIM_TOKEN="${2}"; shift 1 ;;
-          rooms) NETDATA_CLAIM_ROOMS="${2}"; shift 1 ;;
-          url) NETDATA_CLAIM_URL="${2}"; shift 1 ;;
-          proxy) NETDATA_CLAIM_PROXY="${2}"; shift 1 ;;
+          url)
+            is_valid_url "${2}" "http|https" || fatal "${2} is not a valid claim URL" F0522
+            NETDATA_CLAIM_URL="${2}"
+            shift 1
+            ;;
+          proxy)
+            is_valid_url "${2}" "http|https|socks|socks5" || fatal "${2} is not a valid claim proxy URL" F0523
+            NETDATA_CLAIM_PROXY="${2}"
+            shift 1
+            ;;
+          token) NETDATA_CLAIM_TOKEN="$(sanitize_string "${2}")"; shift 1 ;;
+          rooms) NETDATA_CLAIM_ROOMS="$(sanitize_string "${2}")"; shift 1 ;;
           noproxy) NETDATA_CLAIM_PROXY="none" ;;
           insecure) NETDATA_CLAIM_INSECURE=yes ;;
           noreload) NETDATA_CLAIM_NORELOAD=1 ;;
           id|user|hostname)
-            NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -${optname}=${2}"
+            NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -${optname}=$(sanitize_string "${2}")"
             shift 1
             ;;
           verbose|daemon-not-running) NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -${optname}" ;;
@@ -2594,17 +3080,17 @@ parse_args() {
         esac
         ;;
       "--local-build-options")
-        LOCAL_BUILD_OPTIONS="${LOCAL_BUILD_OPTIONS} ${2}"
+        LOCAL_BUILD_OPTIONS="${LOCAL_BUILD_OPTIONS} $(sanitize_string "${2}")"
         shift 1
         ;;
       "--static-install-options")
-        STATIC_INSTALL_OPTIONS="${STATIC_INSTALL_OPTIONS} ${2}"
+        STATIC_INSTALL_OPTIONS="${STATIC_INSTALL_OPTIONS} $(sanitize_string "${2}")"
         shift 1
         ;;
       "--prepare-offline-install-source")
         if [ -n "${2}" ]; then
           set_action 'prepare-offline'
-          OFFLINE_TARGET="${2}"
+          OFFLINE_TARGET="$(sanitize_string "${2}")"
           shift 1
         else
           fatal "A target directory must be specified with the --prepare-offline-install-source option." F0500
@@ -2620,9 +3106,8 @@ parse_args() {
         ;;
       "--offline-install-source")
         if [ -d "${2}" ]; then
-          NETDATA_OFFLINE_INSTALL_SOURCE="${2}"
-          # shellcheck disable=SC2164
-          NETDATA_TARBALL_BASEURL="file://$(cd "${2}"; pwd)"
+          NETDATA_OFFLINE_INSTALL_SOURCE="$(canonical_path "${2}")"
+          NETDATA_TARBALL_BASEURL="file://${NETDATA_OFFLINE_INSTALL_SOURCE}"
           shift 1
         else
           fatal "A source directory must be specified with the --offline-install-source option." F0501

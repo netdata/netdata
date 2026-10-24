@@ -18,7 +18,13 @@ STRING *rrdset_fix_name(RRDHOST *host, const char *chart_full_id, const char *ty
     strncpyz(new_name, sanitized_name, CONFIG_MAX_VALUE);
 
     if(rrdset_index_find_name(host, new_name)) {
-        netdata_log_debug(D_RRD_CALLS, "RRDSET: chart name '%s' on host '%s' already exists.", new_name, rrdhost_hostname(host));
+#ifdef NETDATA_INTERNAL_CHECKS
+        if(unlikely(debug_flags & D_RRD_CALLS)) {
+            RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+            netdata_log_debug(D_RRD_CALLS, "RRDSET: chart name '%s' on host '%s' already exists.", new_name, string2str(identity.hostname));
+            rrdhost_identity_release(&identity);
+        }
+#endif
         if(!strcmp(chart_full_id, full_name) && (!current_name || !*current_name)) {
             unsigned i = 1;
 
@@ -37,7 +43,22 @@ STRING *rrdset_fix_name(RRDHOST *host, const char *chart_full_id, const char *ty
 }
 
 int rrdset_reset_name(RRDSET *st, const char *name) {
-    if(unlikely(!strcmp(rrdset_name(st), name)))
+    // re-registrations pass the short name, while the stored name is "type.name": compare against that form, so
+    // an unchanged name skips rrdset_fix_name(); sanitized, truncated or suffixed names still take the slow path,
+    // and so does a chart missing from the name index, which the slow path re-adds once the name is free
+    const char *current = rrdset_name(st);
+    const char *type = rrdset_parts_type(st);
+    size_t type_len = string_strlen(st->parts.type);
+    if(likely(st->name &&
+              rrdset_flag_check(st, RRDSET_FLAG_INDEXED_NAME) &&
+              type_len + 1 < RRD_ID_LENGTH_MAX &&
+              string_strlen(st->name) < RRD_ID_LENGTH_MAX &&
+              strncmp(current, type, type_len) == 0 &&
+              current[type_len] == '.' &&
+              strcmp(current + type_len + 1, name) == 0))
+        return 1;
+
+    if(unlikely(!strcmp(current, name)))
         return 1;
 
     RRDHOST *host = st->rrdhost;
@@ -47,9 +68,13 @@ int rrdset_reset_name(RRDSET *st, const char *name) {
     STRING *name_string = rrdset_fix_name(host, rrdset_id(st), rrdset_parts_type(st), string2str(st->name), name);
     if(!name_string) return 0;
 
+    bool renamed = false;
     if(st->name) {
         rrdset_index_del_name(host, st);
         SWAP(name_string, st->name);
+        // after the SWAP, name_string holds the old name; STRING is interned, so
+        // pointer inequality means the name really changed
+        renamed = (name_string != st->name);
         string_freez(name_string);
     }
     else
@@ -59,6 +84,20 @@ int rrdset_reset_name(RRDSET *st, const char *name) {
 
     rrdset_flag_clear(st, RRDSET_FLAG_EXPORTING_SEND|RRDSET_FLAG_EXPORTING_IGNORE|RRDSET_FLAG_UPSTREAM_SEND|RRDSET_FLAG_UPSTREAM_IGNORE);
     rrdset_metadata_updated(st);
+
+    // The name is a prototype matching input - health_prototype_matches_rrdset() compares
+    // ap->match.on.chart against both st->id and st->name - so a rename can both
+    // invalidate the alerts currently attached and enable new matches.
+    // This is the only place a rename is detected, and not all callers go through
+    // rrdset_create_custom() (tc.plugin renames its charts directly), so queue the
+    // re-evaluation here. It has to be the recheck flag: the incremental path only
+    // adds alerts, it never detaches the ones that stopped matching.
+    // Only on a real rename: this function is also called on every re-emission of
+    // every chart, and the recheck is a detach-and-reattach of all its alerts.
+    if(renamed) {
+        rrdset_flag_set(st, RRDSET_FLAG_PENDING_LABEL_RECHECK);
+        rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
+    }
 
     rrdcontext_updated_rrdset_name(st);
     return 2;
@@ -99,8 +138,10 @@ void rrdset_index_del_name(RRDHOST *host, RRDSET *st) {
             if(dictionary_acquired_item_value(sta) == st)
                 dictionary_del(host->rrdset_root_index_name, rrdset_name(st));
 
+            // no garbage collection here: collecting a view walks all its items, so doing it per
+            // deleted chart makes freeing N charts cost N full walks. The obsolete charts cleanup
+            // collects once per sweep, and the next name insert collects anyway.
             dictionary_acquired_item_release(host->rrdset_root_index_name, sta);
-            dictionary_garbage_collect(host->rrdset_root_index_name);
         }
 
         rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_NAME);
@@ -114,8 +155,27 @@ RRDSET *rrdset_find_byname(RRDHOST *host, const char *name) {
         if(!rrdset_is_discoverable(st))
             return NULL;
 
-        st->last_accessed_time_s = now_realtime_sec();
+        rrdset_touch_last_accessed_time_s(st);
     }
 
     return(st);
+}
+
+RRDSET_ACQUIRED *rrdset_find_byname_and_acquire(RRDHOST *host, const char *name) {
+    if (unlikely(!host->rrdset_root_index_name))
+        return NULL;
+
+    const DICTIONARY_ITEM *name_item = dictionary_get_and_acquire_item(host->rrdset_root_index_name, name);
+    if (!name_item)
+        return NULL;
+
+    RRDSET *st = dictionary_acquired_item_value(name_item);
+    RRDSET_ACQUIRED *rsa = NULL;
+
+    if (st && rrdset_is_discoverable(st))
+        rsa = rrdset_find_and_acquire(host, rrdset_id(st), false);
+
+    dictionary_acquired_item_release(host->rrdset_root_index_name, name_item);
+
+    return rsa;
 }

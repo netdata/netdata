@@ -138,17 +138,17 @@ modules:
             enabled: true
           list:
             - name: update_every
-              description: Data collection interval (seconds). Must be at least 60.
+              description: "Data collection interval, in seconds. Must be at least 60."
               default_value: 60
               required: false
               group: Collection
             - name: autodetection_retry
-              description: Autodetection retry interval (seconds). Set 0 to disable.
+              description: "How often to retry the initial connection when the job fails to start, in seconds. Zero disables retries."
               default_value: 0
               required: false
               group: Collection
             - name: subscription_ids
-              description: List of Azure subscription IDs to monitor. Used as the scope for resource discovery.
+              description: "Azure subscription IDs to monitor. They scope resource discovery."
               default_value: ""
               required: true
               group: Collection
@@ -158,7 +158,7 @@ modules:
               required: false
               group: Collection
             - name: query_offset
-              description: Minimum offset (seconds) subtracted from metric query windows. Increase if metrics appear incomplete.
+              description: "Minimum offset subtracted from metric query windows, in seconds. Increase it if metrics appear incomplete."
               default_value: 180
               required: false
               group: Collection
@@ -172,12 +172,12 @@ modules:
                 - **Increase to 240-300s** if you still see gaps or missing data points.
                 - **Do not set below 60s** -- metrics will likely be incomplete.
             - name: timeout
-              description: Timeout for Azure Resource Graph and Azure Monitor API requests, in seconds.
+              description: "Timeout for Azure Resource Graph and Azure Monitor API requests, in seconds."
               default_value: 30
               required: false
               group: Collection
             - name: auth.mode
-              description: "Authentication method: `service_principal`, `managed_identity`, or `default`."
+              description: "How Netdata authenticates to Azure: `service_principal`, `managed_identity`, or `default`."
               default_value: ""
               required: true
               group: Authentication
@@ -190,32 +190,32 @@ modules:
                 | `managed_identity` | Running on Azure VMs, VMSS, or AKS with a managed identity | Optionally `client_id` for user-assigned identity |
                 | `default` | Uses the Azure SDK default credential chain (environment variables, managed identity, Azure CLI, etc.) | None |
             - name: auth.mode_service_principal.tenant_id
-              description: Entra ID tenant ID (required for `service_principal` mode).
+              description: "Entra ID tenant ID. Required for `service_principal` mode."
               default_value: ""
               required: false
               group: Authentication
             - name: auth.mode_service_principal.client_id
-              description: Entra ID application (client) ID (required for `service_principal` mode).
+              description: "Entra ID application (client) ID. Required for `service_principal` mode."
               default_value: ""
               required: false
               group: Authentication
             - name: auth.mode_service_principal.client_secret
-              description: Entra ID client secret (required for `service_principal` mode).
+              description: "Entra ID client secret. Required for `service_principal` mode."
               default_value: ""
               required: false
               group: Authentication
             - name: auth.mode_managed_identity.client_id
-              description: Client ID for user-assigned managed identity. Leave empty for system-assigned.
+              description: "Client ID of a user-assigned managed identity. Leave empty for a system-assigned identity."
               default_value: ""
               required: false
               group: Authentication
             - name: discovery.refresh_every
-              description: Interval (seconds) for refreshing discovered resources. Set `0` to disable runtime re-discovery after bootstrap.
+              description: "How often to refresh the discovered resources, in seconds. Zero disables rediscovery after startup."
               default_value: 300
               required: false
               group: Discovery
             - name: discovery.mode
-              description: "Resource discovery method: `filters` (structured filters) or `query` (custom KQL)."
+              description: "How resources are selected: `filters` (structured filters) or `query` (custom KQL)."
               default_value: filters
               required: false
               group: Discovery
@@ -225,24 +225,24 @@ modules:
                 | Mode | Behavior |
                 |:-----|:---------|
                 | `filters` | Builds an Azure Resource Graph query from the structured `mode_filters.*` options (resource groups, regions, tags). This is the default. |
-                | `query` | Uses the raw KQL you provide in `discovery.mode_query.kql`. The query must project `id`, `name`, `type`, `resourceGroup`, and `location`. |
+                | `query` | Uses the raw KQL you provide in `discovery.mode_query.kql`. The query must project `id`, `name`, `type`, `resourceGroup`, and `location`. Project `tags` too when using `virtual_nodes.by_resource_tag`. |
             - name: discovery.mode_filters.resource_groups
-              description: Optional list of Azure resource groups to include in `filters` mode.
+              description: "Azure resource groups to include. Leave empty for all."
               default_value: "[]"
               required: false
               group: Discovery
             - name: discovery.mode_filters.regions
-              description: Optional list of Azure regions to include in `filters` mode.
+              description: "Azure regions to include. Leave empty for all."
               default_value: "[]"
               required: false
               group: Discovery
             - name: discovery.mode_filters.tags
-              description: Optional exact-match tag filters for `filters` mode. Keys are matched case-insensitively and values case-sensitively.
+              description: "Exact-match tag filters. Keys match case-insensitively, values case-sensitively."
               default_value: "{}"
               required: false
               group: Discovery
             - name: discovery.mode_query.kql
-              description: Custom Azure Resource Graph KQL for `query` mode. Must project `id`, `name`, `type`, `resourceGroup`, `location`.
+              description: "Azure Resource Graph query selecting the resources. It must project `id`, `name`, `type`, `resourceGroup`, and `location`, plus `tags` for tag-based virtual nodes."
               default_value: ""
               required: false
               group: Discovery
@@ -260,10 +260,12 @@ modules:
                 | `resourceGroup` | Resource group name |
                 | `location` | Azure region |
 
+                If `virtual_nodes.by_resource_tag` is set, also project `tags`. Missing `tags` or non-object-shaped `tags` do not fail discovery; affected resources fall back to the default job host scope and the collector logs a warning once per successful discovery refresh.
+
                 :::info
 
-                - Returned resource `type` values should match the Azure resource types expected by the active profiles. 
-                - Resources with unsupported or non-matching types are ignored and do not activate profiles. 
+                - Returned resource `type` values should match the Azure resource types expected by the active profiles.
+                - Resources with unsupported or non-matching types are ignored and do not activate profiles.
                 - For the stock catalog, see [built-in profiles](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/azure_monitor.profiles/default).
 
                 :::
@@ -273,10 +275,10 @@ modules:
                 ```
                 resources
                 | where tags.env =~ "prod"
-                | project id, name, type, resourceGroup, location
+                | project id, name, type, resourceGroup, location, tags
                 ```
             - name: profiles.mode
-              description: "How profiles are selected: `auto` (discover from resources), `exact` (explicit list), or `combined` (both)."
+              description: "How profiles are selected: `auto` (from discovered resources), `exact` (explicit list), or `combined` (both)."
               default_value: auto
               required: false
               group: Profiles
@@ -299,7 +301,7 @@ modules:
                 - Per-profile filters never widen or bypass the global discovery scope.
                 - In `discovery.mode: query`, per-profile filters can use only `resource_groups` and `regions`. If you need per-profile tag filtering there, encode it in the KQL.
             - name: profiles.mode_auto.entries
-              description: Optional per-profile overrides applied only to profiles that auto-activate at bootstrap.
+              description: "Per-profile overrides applied only to profiles that activate automatically at startup."
               default_value: "[]"
               required: false
               group: Profiles
@@ -316,7 +318,7 @@ modules:
                 Auto-mode entries do not activate profiles on their own. They only override filtering for profiles that were auto-selected at bootstrap.
                 In `discovery.mode: query`, only `filters.resource_groups` and `filters.regions` apply.
             - name: profiles.mode_exact.entries
-              description: Explicit profile entries used by `exact` mode.
+              description: "Explicit profile entries used by `exact` mode."
               default_value: "[]"
               required: false
               group: Profiles
@@ -333,7 +335,7 @@ modules:
                 Per-profile filters only narrow the globally discovered resource set. They never widen it.
                 In `discovery.mode: query`, only `filters.resource_groups` and `filters.regions` apply.
             - name: profiles.mode_combined.entries
-              description: Explicit profile entries merged with auto-discovered profiles in `combined` mode.
+              description: "Explicit profile entries merged with auto-discovered profiles in `combined` mode."
               default_value: "[]"
               required: false
               group: Profiles
@@ -350,25 +352,43 @@ modules:
                 If an explicit `combined` entry matches an auto-selected profile, the collector keeps one runtime profile and overlays the explicit entry filters onto it.
                 In `discovery.mode: query`, only `filters.resource_groups` and `filters.regions` apply.
             - name: limits.max_concurrency
-              description: Maximum concurrent batch queries to Azure Monitor.
+              description: "Maximum concurrent batch requests to Azure Monitor."
               default_value: 4
               required: false
               group: Limits
             - name: limits.max_batch_resources
-              description: Maximum resources per Azure Monitor batch request.
+              description: "Maximum resources per Azure Monitor batch request."
               default_value: 50
               required: false
               group: Limits
             - name: limits.max_metrics_per_query
-              description: Maximum metrics per Azure Monitor batch request.
+              description: "Maximum metric names per Azure Monitor batch request."
               default_value: 20
               required: false
               group: Limits
             - name: vnode
-              description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+              description: "Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes)."
               default_value: ""
               required: false
               group: Virtual Node
+              detailed_description: |
+                This job-level virtual node is used for metrics written to the default host scope.
+                If `virtual_nodes.by_resource_tag` is also set, resources that have a safe value for the configured tag are routed to workload virtual nodes instead. Resources without that tag, with an empty value, or with an unsafe hostname value continue to use the job-level `vnode` when configured.
+            - name: virtual_nodes.by_resource_tag
+              description: "Azure resource tag whose value becomes the virtual node for the resources carrying it. Leave empty to keep everything on this host."
+              default_value: ""
+              required: false
+              group: Virtual Node
+              detailed_description: |
+                Set this to an Azure resource tag key, for example `workload`, to route resource metrics under virtual nodes named after that tag value.
+
+                - Tag keys are matched case-insensitively; tag values keep their Azure case and are trimmed.
+                - Empty or missing tag values use the default job host scope.
+                - Unsafe hostname values use the default job host scope and are summarized in a warning once per successful discovery refresh.
+                - The virtual node GUID is deterministic from `azure_monitor:` plus the trimmed tag value, so the same Azure workload value maps to the same Azure Monitor virtual node across jobs and subscriptions.
+                - Virtual node metadata includes `_vnode_type=azure_workload`. Netdata also adds `_hostname` when emitting the virtual node definition.
+                - Workload virtual nodes increase host and alert cardinality. Health alerts defined for Azure Monitor charts attach per workload virtual node.
+                - The metrix scoped vec cache grows with observed workload scope and label cardinality during the collector runtime; keep the configured tag's cardinality bounded by operator policy.
         examples:
           folding:
             title: Config
@@ -402,6 +422,61 @@ modules:
                         tenant_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                         client_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                         client_secret: "your-client-secret"
+            - name: Workload virtual nodes from resource tags
+              description: Route resources with `tags.workload` to virtual nodes named after the workload value. Resources without the tag stay on the default job host scope.
+              config: |
+                jobs:
+                  - name: prod-workloads
+                    subscription_ids:
+                      - "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    virtual_nodes:
+                      by_resource_tag: workload
+                    discovery:
+                      mode: filters
+                    profiles:
+                      mode: auto
+                    auth:
+                      mode: service_principal
+                      mode_service_principal:
+                        tenant_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                        client_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                        client_secret: "your-client-secret"
+            - name: Custom KQL with workload virtual nodes
+              description: In `query` discovery mode, project `tags` so `virtual_nodes.by_resource_tag` can derive workload virtual nodes.
+              config: |
+                jobs:
+                  - name: prod-query-workloads
+                    subscription_ids:
+                      - "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    virtual_nodes:
+                      by_resource_tag: workload
+                    discovery:
+                      mode: query
+                      mode_query:
+                        kql: |
+                          resources
+                          | where tags.env =~ "prod"
+                          | project id, name, type, resourceGroup, location, tags
+                    profiles:
+                      mode: auto
+                    auth:
+                      mode: default
+            - name: Job virtual node plus workload virtual nodes
+              description: Use a job-level `vnode` as the default host scope while tagged resources route to workload virtual nodes.
+              config: |
+                jobs:
+                  - name: prod-with-fallback-node
+                    vnode: azure-fallback-node
+                    subscription_ids:
+                      - "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    virtual_nodes:
+                      by_resource_tag: workload
+                    discovery:
+                      mode: filters
+                    profiles:
+                      mode: auto
+                    auth:
+                      mode: managed_identity
             - name: Managed identity with exact profiles
               description: Use a managed identity (on an Azure VM, VMSS, or AKS) and monitor only SQL Database and PostgreSQL Flexible Server resources -- skip auto-discovery of other services.
               config: |
@@ -461,7 +536,7 @@ modules:
                         kql: |
                           resources
                           | where tags.env =~ "prod"
-                          | project id, name, type, resourceGroup, location
+                          | project id, name, type, resourceGroup, location, tags
                     profiles:
                       mode: auto
                     auth:
@@ -515,6 +590,18 @@ modules:
               - The collector uses `query_offset` (default: **180 seconds**) as the minimum offset for metric query windows.
               - Slower time-grain batches automatically use a larger effective offset when needed.
               - If metrics are still missing or incomplete, increase `query_offset` to **240** or **300** seconds.
+          - name: Workload virtual nodes are not created
+            description: |
+              When `virtual_nodes.by_resource_tag` is set, check the discovered resource tags:
+
+              - The configured tag key is matched case-insensitively, but the value must be non-empty after trimming.
+              - In `discovery.mode: query`, the KQL must project `tags`. If the `tags` column is missing or not an object, the collector logs a warning and affected resources use the default job host scope.
+              - Tag values must be safe Netdata hostnames. Unsafe values are summarized in a warning once per successful discovery refresh and affected resources use the default job host scope.
+              - The same Azure workload value intentionally maps to the same Azure Monitor virtual node across subscriptions and jobs. Use distinct tag values when tenants should remain separate.
+              - Azure Monitor namespaces workload GUID input with `azure_monitor:` to avoid accidental collisions with other collectors that derive virtual node GUIDs from hostnames.
+          - name: More alerts appear after enabling workload virtual nodes
+            description: |
+              Workload virtual nodes multiply the host scope of Azure Monitor charts. Health alerts attached to those charts evaluate per workload virtual node, so alert volume can increase with the number of distinct workload tag values.
           - name: Authentication errors in sovereign clouds
             description: |
               For Azure Government or Azure China clouds, set the `cloud` parameter:
@@ -523,7 +610,6 @@ modules:
               - Azure China (21Vianet): `cloud: china`
 
               Ensure the service principal is registered in the correct cloud tenant.
-    alerts: &alerts []
     metrics: &metrics
       folding:
         title: Metrics
@@ -535,6 +621,11 @@ modules:
 
         **See the service-specific integrations below for detailed metric lists per Azure service.**
       availability: []
+      dynamic_context_prefixes:
+        - prefix: azure_monitor.
+          reason: >-
+            Profile charts, including those of user-supplied profiles, are generated at runtime under the
+            azure_monitor namespace.
       scopes: []
   - <<: *module
     meta:
@@ -542,6 +633,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-sql_managed_instance
       monitored_instance:
         name: Azure SQL Managed Instance
+        description: Monitor CPU, storage, and input and output performance for Azure SQL Managed Instance resources through Azure Monitor.
         link: https://learn.microsoft.com/azure/azure-sql/managed-instance/
         icon_filename: azure.svg
         categories:
@@ -569,19 +661,6 @@ modules:
           - **Storage** -- reserved and used storage
           - **I/O** -- read/write throughput, I/O request rate
         method_description: *method_description
-    alerts:
-      - name: am_sql_managed_instance_cpu
-        metric: azure_monitor.sql_managed_instance.cpu
-        info: "SQL MI CPU utilization on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_managed_instance.conf
-      - name: am_sql_managed_instance_storage_utilization
-        metric: azure_monitor.sql_managed_instance.storage
-        info: "SQL MI storage utilization on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_managed_instance.conf
-      - name: am_sql_managed_instance_io_requests
-        metric: azure_monitor.sql_managed_instance.io_requests
-        info: "SQL MI I/O requests on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_managed_instance.conf
     metrics:
       folding:
         title: Metrics
@@ -646,6 +725,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-sql_database
       monitored_instance:
         name: Azure SQL Database
+        description: Monitor operational and performance metrics for Azure SQL Database resources through Azure Monitor.
         link: https://learn.microsoft.com/azure/azure-sql/database/
         icon_filename: azure.svg
         categories:
@@ -676,83 +756,6 @@ modules:
           - **Availability** -- database availability percentage
           - **Advanced** -- deadlocks, replication lag, serverless CPU/memory/billing, ledger digest, free tier usage
         method_description: *method_description
-    alerts:
-      - name: am_sql_database_availability
-        metric: azure_monitor.sql_database.availability
-        info: "SQL Database availability on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf
-      - name: am_sql_database_cpu
-        metric: azure_monitor.sql_database.cpu
-        info: "SQL Database CPU on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf
-      - name: am_sql_database_instance_cpu
-        metric: azure_monitor.sql_database.instance_cpu
-        info: "SQL Database instance CPU on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf
-      - name: am_sql_database_instance_memory
-        metric: azure_monitor.sql_database.instance_memory
-        info: "SQL Database instance memory on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf
-      - name: am_sql_database_dtu_consumption
-        metric: azure_monitor.sql_database.dtu_consumption
-        info: "SQL Database DTU consumption on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf
-      - name: am_sql_database_data_io
-        metric: azure_monitor.sql_database.io_utilization
-        info: "SQL Database data I/O on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf
-      - name: am_sql_database_log_write
-        metric: azure_monitor.sql_database.io_utilization
-        info: "SQL Database log write I/O on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf
-      - name: am_sql_database_workers
-        metric: azure_monitor.sql_database.resource_utilization
-        info: "SQL Database worker utilization on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf
-      - name: am_sql_database_sessions
-        metric: azure_monitor.sql_database.resource_utilization
-        info: "SQL Database session utilization on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf
-      - name: am_sql_database_connection_failures
-        metric: azure_monitor.sql_database.connections
-        info: "SQL Database system connection failures on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf
-      - name: am_sql_database_firewall_blocks
-        metric: azure_monitor.sql_database.connections
-        info: "SQL Database firewall blocks on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf
-      - name: am_sql_database_deadlocks
-        metric: azure_monitor.sql_database.deadlocks
-        info: "SQL Database deadlocks on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf
-      - name: am_sql_database_storage_utilization
-        metric: azure_monitor.sql_database.storage_utilization
-        info: "SQL Database storage utilization on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf
-      - name: am_sql_database_xtp_storage
-        metric: azure_monitor.sql_database.xtp_storage
-        info: "SQL Database In-Memory OLTP storage on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf
-      - name: am_sql_database_tempdb_log_utilization
-        metric: azure_monitor.sql_database.tempdb_log_utilization
-        info: "SQL Database tempdb log utilization on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf
-      - name: am_sql_database_replication_lag
-        metric: azure_monitor.sql_database.replication_lag
-        info: "SQL Database replication lag on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf
-      - name: am_sql_database_serverless_cpu
-        metric: azure_monitor.sql_database.serverless_utilization
-        info: "SQL Database serverless CPU on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf
-      - name: am_sql_database_serverless_memory
-        metric: azure_monitor.sql_database.serverless_utilization
-        info: "SQL Database serverless memory on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf
-      - name: am_sql_database_ledger_digest_failures
-        metric: azure_monitor.sql_database.ledger_digest
-        info: "SQL Database ledger digest failures on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf
     metrics:
       folding:
         title: Metrics
@@ -930,6 +933,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-postgres_flexible
       monitored_instance:
         name: Azure PostgreSQL Flexible Server
+        description: Monitor compute, storage, connections, database activity, replication, and availability for Azure PostgreSQL Flexible Server.
         link: https://learn.microsoft.com/azure/postgresql/flexible-server/
         icon_filename: azure.svg
         categories:
@@ -962,83 +966,6 @@ modules:
           - **Sessions** -- sessions by state and wait event type, backend count
           - **Availability** -- database alive state
         method_description: *method_description
-    alerts:
-      - name: am_postgres_flexible_availability
-        metric: azure_monitor.postgres_flexible.availability
-        info: "PostgreSQL Flexible Server down on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf
-      - name: am_postgres_flexible_cpu
-        metric: azure_monitor.postgres_flexible.cpu
-        info: "PostgreSQL Flexible CPU on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf
-      - name: am_postgres_flexible_memory
-        metric: azure_monitor.postgres_flexible.memory
-        info: "PostgreSQL Flexible memory on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf
-      - name: am_postgres_flexible_storage_utilization
-        metric: azure_monitor.postgres_flexible.storage_utilization
-        info: "PostgreSQL Flexible storage on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf
-      - name: am_postgres_flexible_disk_bandwidth_saturation
-        metric: azure_monitor.postgres_flexible.disk_saturation
-        info: "PostgreSQL Flexible disk bandwidth saturation on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf
-      - name: am_postgres_flexible_disk_iops_saturation
-        metric: azure_monitor.postgres_flexible.disk_saturation
-        info: "PostgreSQL Flexible disk IOPS saturation on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf
-      - name: am_postgres_flexible_disk_queue_depth
-        metric: azure_monitor.postgres_flexible.disk_queue_depth
-        info: "PostgreSQL Flexible disk queue depth on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf
-      - name: am_postgres_flexible_failed_connections
-        metric: azure_monitor.postgres_flexible.connection_rate
-        info: "PostgreSQL Flexible failed connections on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf
-      - name: am_postgres_flexible_tcp_connection_backlog
-        metric: azure_monitor.postgres_flexible.tcp_connection_backlog
-        info: "PostgreSQL Flexible TCP connection backlog on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf
-      - name: am_postgres_flexible_deadlocks
-        metric: azure_monitor.postgres_flexible.deadlocks
-        info: "PostgreSQL Flexible deadlocks on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf
-      - name: am_postgres_flexible_rollback_ratio
-        metric: azure_monitor.postgres_flexible.transactions
-        info: "PostgreSQL Flexible rollback ratio on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf
-      - name: am_postgres_flexible_longest_query
-        metric: azure_monitor.postgres_flexible.long_running
-        info: "PostgreSQL Flexible long running query on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf
-      - name: am_postgres_flexible_longest_transaction
-        metric: azure_monitor.postgres_flexible.long_running
-        info: "PostgreSQL Flexible long running transaction on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf
-      - name: am_postgres_flexible_xid_usage
-        metric: azure_monitor.postgres_flexible.xid_usage
-        info: "PostgreSQL Flexible transaction ID usage on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf
-      - name: am_postgres_flexible_xmin_age
-        metric: azure_monitor.postgres_flexible.xmin_age
-        info: "PostgreSQL Flexible backend xmin age on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf
-      - name: am_postgres_flexible_bloat
-        metric: azure_monitor.postgres_flexible.bloat
-        info: "PostgreSQL Flexible table bloat on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf
-      - name: am_postgres_flexible_replication_lag
-        metric: azure_monitor.postgres_flexible.replication_lag_time
-        info: "PostgreSQL Flexible replication lag on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf
-      - name: am_postgres_flexible_cpu_credits_remaining
-        metric: azure_monitor.postgres_flexible.cpu_credits
-        info: "PostgreSQL Flexible CPU credits low on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf
-      - name: am_postgres_flexible_temp_bytes
-        metric: azure_monitor.postgres_flexible.temp_bytes
-        info: "PostgreSQL Flexible temp file I/O on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf
     metrics:
       folding:
         title: Metrics
@@ -1356,6 +1283,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-cosmos_db
       monitored_instance:
         name: Azure Cosmos DB Account
+        description: Monitor operational and performance metrics for Azure Cosmos DB accounts through Azure Monitor.
         link: https://learn.microsoft.com/azure/cosmos-db/
         icon_filename: azure.svg
         categories:
@@ -1386,47 +1314,6 @@ modules:
           - **Availability** -- service availability percentage
           - **Advanced** -- document count, partition count, dedicated gateway CPU/memory, integrated cache hit rate
         method_description: *method_description
-    alerts:
-      - name: am_cosmos_db_availability
-        metric: azure_monitor.cosmos_db.availability
-        info: "Cosmos DB availability on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cosmos_db.conf
-      - name: am_cosmos_db_normalized_ru_consumption
-        metric: azure_monitor.cosmos_db.normalized_ru_consumption
-        info: "Cosmos DB RU consumption on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cosmos_db.conf
-      - name: am_cosmos_db_storage_utilization
-        metric: azure_monitor.cosmos_db.storage
-        info: "Cosmos DB storage utilization on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cosmos_db.conf
-      - name: am_cosmos_db_server_side_latency_direct
-        metric: azure_monitor.cosmos_db.server_side_latency
-        info: "Cosmos DB direct latency on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cosmos_db.conf
-      - name: am_cosmos_db_server_side_latency_gateway
-        metric: azure_monitor.cosmos_db.server_side_latency
-        info: "Cosmos DB gateway latency on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cosmos_db.conf
-      - name: am_cosmos_db_replication_latency
-        metric: azure_monitor.cosmos_db.replication_latency
-        info: "Cosmos DB replication latency on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cosmos_db.conf
-      - name: am_cosmos_db_dedicated_gateway_cpu
-        metric: azure_monitor.cosmos_db.dedicated_gateway_cpu
-        info: "Cosmos DB dedicated gateway CPU on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cosmos_db.conf
-      - name: am_cosmos_db_integrated_cache_item_hit_rate
-        metric: azure_monitor.cosmos_db.integrated_cache_hit_rate
-        info: "Cosmos DB cache item hit rate on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cosmos_db.conf
-      - name: am_cosmos_db_integrated_cache_query_hit_rate
-        metric: azure_monitor.cosmos_db.integrated_cache_hit_rate
-        info: "Cosmos DB cache query hit rate on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cosmos_db.conf
-      - name: am_cosmos_db_cassandra_connection_closures
-        metric: azure_monitor.cosmos_db.cassandra_connections
-        info: "Cosmos DB Cassandra connection closures on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cosmos_db.conf
     metrics:
       folding:
         title: Metrics
@@ -1588,6 +1475,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-logic_apps
       monitored_instance:
         name: Azure Logic Apps Workflow
+        description: Monitor operational and performance metrics for Azure Logic Apps workflows through Azure Monitor.
         link: https://learn.microsoft.com/azure/logic-apps/
         icon_filename: azure.svg
         categories:
@@ -1618,55 +1506,6 @@ modules:
           - **Billing** -- billable executions (total/actions/triggers), billing by type (native/connector/storage)
           - **Throttling** -- run, action, and trigger throttling events
         method_description: *method_description
-    alerts:
-      - name: am_logic_apps_run_failure_rate
-        metric: azure_monitor.logic_apps.run_failure_rate
-        info: "Logic Apps run failure rate on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf
-      - name: am_logic_apps_runs_failed
-        metric: azure_monitor.logic_apps.run_lifecycle
-        info: "Logic Apps failed runs on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf
-      - name: am_logic_apps_run_latency
-        metric: azure_monitor.logic_apps.run_latency
-        info: "Logic Apps run latency on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf
-      - name: am_logic_apps_run_throttled
-        metric: azure_monitor.logic_apps.run_throttling
-        info: "Logic Apps run throttling on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf
-      - name: am_logic_apps_actions_failed
-        metric: azure_monitor.logic_apps.action_lifecycle
-        info: "Logic Apps failed actions on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf
-      - name: am_logic_apps_action_latency
-        metric: azure_monitor.logic_apps.action_latency
-        info: "Logic Apps action latency on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf
-      - name: am_logic_apps_action_throttled
-        metric: azure_monitor.logic_apps.action_throttling
-        info: "Logic Apps action throttling on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf
-      - name: am_logic_apps_triggers_failed
-        metric: azure_monitor.logic_apps.trigger_lifecycle
-        info: "Logic Apps failed triggers on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf
-      - name: am_logic_apps_trigger_latency
-        metric: azure_monitor.logic_apps.trigger_latency
-        info: "Logic Apps trigger latency on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf
-      - name: am_logic_apps_trigger_throttled
-        metric: azure_monitor.logic_apps.trigger_throttling
-        info: "Logic Apps trigger throttling on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf
-      - name: am_logic_apps_completion_token_overflow
-        metric: azure_monitor.logic_apps.agent
-        info: "Logic Apps completion token overflow on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf
-      - name: am_logic_apps_prompt_token_overflow
-        metric: azure_monitor.logic_apps.agent
-        info: "Logic Apps prompt token overflow on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf
     metrics:
       folding:
         title: Metrics
@@ -1800,6 +1639,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-virtual_machines
       monitored_instance:
         name: Azure Virtual Machine
+        description: Monitor compute, memory, disk, network, throttling, and availability metrics for Azure Virtual Machine resources.
         link: https://learn.microsoft.com/azure/virtual-machines/
         icon_filename: azure.svg
         categories:
@@ -1832,103 +1672,6 @@ modules:
           - **Availability** -- VM availability state
           - **Throttling** -- cached and uncached I/O bandwidth/IOPS throttling
         method_description: *method_description
-    alerts:
-      - name: am_vm_cpu
-        metric: azure_monitor.virtual_machines.cpu
-        info: "VM CPU on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_virtual_machines.conf
-      - name: am_vm_cpu_credits_remaining
-        metric: azure_monitor.virtual_machines.cpu_credits
-        info: "VM CPU credits low on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_virtual_machines.conf
-      - name: am_vm_memory_available
-        metric: azure_monitor.virtual_machines.memory_percentage
-        info: "VM available memory on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_virtual_machines.conf
-      - name: am_vm_availability
-        metric: azure_monitor.virtual_machines.availability
-        info: "VM unavailable ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_virtual_machines.conf
-      - name: am_vm_os_disk_latency
-        metric: azure_monitor.virtual_machines.os_disk_latency
-        info: "VM OS disk latency on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_virtual_machines.conf
-      - name: am_vm_os_disk_queue_depth
-        metric: azure_monitor.virtual_machines.os_disk_queue_depth
-        info: "VM OS disk queue depth on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_virtual_machines.conf
-      - name: am_vm_os_disk_bandwidth_throttling
-        metric: azure_monitor.virtual_machines.os_disk_throttling
-        info: "VM OS disk bandwidth throttling on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_virtual_machines.conf
-      - name: am_vm_os_disk_iops_throttling
-        metric: azure_monitor.virtual_machines.os_disk_throttling
-        info: "VM OS disk IOPS throttling on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_virtual_machines.conf
-      - name: am_vm_os_disk_burst_bps_credits
-        metric: azure_monitor.virtual_machines.os_disk_burst_credits
-        info: "VM OS disk burst bandwidth credits on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_virtual_machines.conf
-      - name: am_vm_os_disk_burst_io_credits
-        metric: azure_monitor.virtual_machines.os_disk_burst_credits
-        info: "VM OS disk burst IO credits on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_virtual_machines.conf
-      - name: am_vm_data_disk_latency
-        metric: azure_monitor.virtual_machines.data_disk_latency
-        info: "VM data disk latency on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_virtual_machines.conf
-      - name: am_vm_data_disk_queue_depth
-        metric: azure_monitor.virtual_machines.data_disk_queue_depth
-        info: "VM data disk queue depth on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_virtual_machines.conf
-      - name: am_vm_data_disk_bandwidth_throttling
-        metric: azure_monitor.virtual_machines.data_disk_throttling
-        info: "VM data disk bandwidth throttling on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_virtual_machines.conf
-      - name: am_vm_data_disk_iops_throttling
-        metric: azure_monitor.virtual_machines.data_disk_throttling
-        info: "VM data disk IOPS throttling on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_virtual_machines.conf
-      - name: am_vm_data_disk_burst_bps_credits
-        metric: azure_monitor.virtual_machines.data_disk_burst_credits
-        info: "VM data disk burst bandwidth credits on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_virtual_machines.conf
-      - name: am_vm_data_disk_burst_io_credits
-        metric: azure_monitor.virtual_machines.data_disk_burst_credits
-        info: "VM data disk burst IO credits on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_virtual_machines.conf
-      - name: am_vm_cached_bandwidth_throttling
-        metric: azure_monitor.virtual_machines.vm_cached_throttling
-        info: "VM cached bandwidth throttling on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_virtual_machines.conf
-      - name: am_vm_cached_iops_throttling
-        metric: azure_monitor.virtual_machines.vm_cached_throttling
-        info: "VM cached IOPS throttling on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_virtual_machines.conf
-      - name: am_vm_uncached_bandwidth_throttling
-        metric: azure_monitor.virtual_machines.vm_uncached_throttling
-        info: "VM uncached bandwidth throttling on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_virtual_machines.conf
-      - name: am_vm_uncached_iops_throttling
-        metric: azure_monitor.virtual_machines.vm_uncached_throttling
-        info: "VM uncached IOPS throttling on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_virtual_machines.conf
-      - name: am_vm_cached_burst_bps_credits
-        metric: azure_monitor.virtual_machines.vm_cached_burst_credits
-        info: "VM cached burst bandwidth credits on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_virtual_machines.conf
-      - name: am_vm_cached_burst_io_credits
-        metric: azure_monitor.virtual_machines.vm_cached_burst_credits
-        info: "VM cached burst IO credits on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_virtual_machines.conf
-      - name: am_vm_uncached_burst_bps_credits
-        metric: azure_monitor.virtual_machines.vm_uncached_burst_credits
-        info: "VM uncached burst bandwidth credits on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_virtual_machines.conf
-      - name: am_vm_uncached_burst_io_credits
-        metric: azure_monitor.virtual_machines.vm_uncached_burst_credits
-        info: "VM uncached burst IO credits on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_virtual_machines.conf
     metrics:
       folding:
         title: Metrics
@@ -2202,6 +1945,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-aks
       monitored_instance:
         name: Azure Kubernetes Service Cluster
+        description: Monitor control plane, node, pod, and autoscaler health for Azure Kubernetes Service clusters through Azure Monitor.
         link: https://learn.microsoft.com/azure/aks/
         icon_filename: azure.svg
         categories:
@@ -2230,55 +1974,6 @@ modules:
           - **Pods** -- pods by phase, pods in ready state, node conditions
           - **Autoscaler** -- autoscaler health, unneeded nodes, unschedulable pods
         method_description: *method_description
-    alerts:
-      - name: am_aks_apiserver_cpu
-        metric: azure_monitor.aks.apiserver_cpu
-        info: "AKS API server CPU on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf
-      - name: am_aks_apiserver_memory
-        metric: azure_monitor.aks.apiserver_memory
-        info: "AKS API server memory on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf
-      - name: am_aks_apiserver_inflight_requests
-        metric: azure_monitor.aks.apiserver_inflight_requests
-        info: "AKS API server inflight requests on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf
-      - name: am_aks_etcd_cpu
-        metric: azure_monitor.aks.etcd_cpu
-        info: "AKS etcd CPU on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf
-      - name: am_aks_etcd_memory
-        metric: azure_monitor.aks.etcd_memory
-        info: "AKS etcd memory on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf
-      - name: am_aks_etcd_database
-        metric: azure_monitor.aks.etcd_database
-        info: "AKS etcd database usage on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf
-      - name: am_aks_autoscaler_safe_to_autoscale
-        metric: azure_monitor.aks.autoscaler_health
-        info: "AKS autoscaler unsafe on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf
-      - name: am_aks_autoscaler_unschedulable_pods
-        metric: azure_monitor.aks.autoscaler_unschedulable_pods
-        info: "AKS unschedulable pods on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf
-      - name: am_aks_node_cpu
-        metric: azure_monitor.aks.node_cpu_percentage
-        info: "AKS node CPU on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf
-      - name: am_aks_node_memory_working_set
-        metric: azure_monitor.aks.node_memory_working_set_percentage
-        info: "AKS node memory working set on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf
-      - name: am_aks_node_memory_rss
-        metric: azure_monitor.aks.node_memory_rss_percentage
-        info: "AKS node memory RSS on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf
-      - name: am_aks_node_disk
-        metric: azure_monitor.aks.node_disk_percentage
-        info: "AKS node disk usage on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf
     metrics:
       folding:
         title: Metrics
@@ -2463,6 +2158,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-storage_accounts
       monitored_instance:
         name: Azure Storage Account
+        description: Monitor transactions, latency, throughput, availability, and storage capacity for Azure Storage Account resources.
         link: https://learn.microsoft.com/azure/storage/common/storage-account-overview
         icon_filename: azure.svg
         categories:
@@ -2493,27 +2189,6 @@ modules:
           - **Availability** -- service availability percentage
           - **Capacity** -- used storage capacity
         method_description: *method_description
-    alerts:
-      - name: am_storage_accounts_availability
-        metric: azure_monitor.storage_accounts.availability
-        info: "Storage availability on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_storage_accounts.conf
-      - name: am_storage_accounts_e2e_latency
-        metric: azure_monitor.storage_accounts.e2e_latency
-        info: "Storage E2E latency on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_storage_accounts.conf
-      - name: am_storage_accounts_e2e_latency_peak
-        metric: azure_monitor.storage_accounts.e2e_latency
-        info: "Storage E2E latency peak on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_storage_accounts.conf
-      - name: am_storage_accounts_server_latency
-        metric: azure_monitor.storage_accounts.server_latency
-        info: "Storage server latency on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_storage_accounts.conf
-      - name: am_storage_accounts_server_latency_peak
-        metric: azure_monitor.storage_accounts.server_latency
-        info: "Storage server latency peak on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_storage_accounts.conf
     metrics:
       folding:
         title: Metrics
@@ -2584,6 +2259,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-load_balancers
       monitored_instance:
         name: Azure Load Balancer
+        description: Monitor availability, throughput, connections, and source network address translation ports for Azure Load Balancer resources.
         link: https://learn.microsoft.com/azure/load-balancer/
         icon_filename: azure.svg
         categories:
@@ -2611,23 +2287,6 @@ modules:
           - **Connections** -- SNAT connections, SYN packet count
           - **SNAT ports** -- allocated and used SNAT ports
         method_description: *method_description
-    alerts:
-      - name: am_load_balancers_vip_availability
-        metric: azure_monitor.load_balancers.vip_availability
-        info: "LB data path availability on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_load_balancers.conf
-      - name: am_load_balancers_dip_availability
-        metric: azure_monitor.load_balancers.dip_availability
-        info: "LB health probe status on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_load_balancers.conf
-      - name: am_load_balancers_global_backend_availability
-        metric: azure_monitor.load_balancers.global_backend_availability
-        info: "LB global backend availability on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_load_balancers.conf
-      - name: am_load_balancers_snat_port_utilization
-        metric: azure_monitor.load_balancers.snat_ports
-        info: "LB SNAT port utilization on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_load_balancers.conf
     metrics:
       folding:
         title: Metrics
@@ -2708,6 +2367,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-app_service
       monitored_instance:
         name: Azure App Service
+        description: Monitor operational and performance metrics for Azure App Service resources through Azure Monitor.
         link: https://learn.microsoft.com/azure/app-service/
         icon_filename: azure.svg
         categories:
@@ -2741,39 +2401,6 @@ modules:
           - **Functions** -- function executions and execution units (MB-ms), always-ready and on-demand units
           - **Health** -- health check status
         method_description: *method_description
-    alerts:
-      - name: am_app_service_health_check
-        metric: azure_monitor.app_service.health
-        info: "App Service health on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf
-      - name: am_app_service_http_5xx_rate
-        metric: azure_monitor.app_service.http_status
-        info: "App Service 5xx errors on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf
-      - name: am_app_service_response_time
-        metric: azure_monitor.app_service.response_time
-        info: "App Service response time on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf
-      - name: am_app_service_cpu_utilization
-        metric: azure_monitor.app_service.cpu
-        info: "App Service CPU on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf
-      - name: am_app_service_request_queue
-        metric: azure_monitor.app_service.request_queue
-        info: "App Service request queue on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf
-      - name: am_app_service_http_4xx_rate
-        metric: azure_monitor.app_service.http_status
-        info: "App Service 4xx errors on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf
-      - name: am_app_service_http_403_rate
-        metric: azure_monitor.app_service.http_error_detail
-        info: "App Service 403 forbidden on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf
-      - name: am_app_service_http_401_rate
-        metric: azure_monitor.app_service.http_error_detail
-        info: "App Service 401 unauthorized on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf
     metrics:
       folding:
         title: Metrics
@@ -2978,6 +2605,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-azure_functions
       monitored_instance:
         name: Azure Functions
+        description: Monitor operational and performance metrics for Azure Functions resources through Azure Monitor.
         link: https://learn.microsoft.com/azure/azure-functions/
         icon_filename: azure.svg
         categories:
@@ -3212,6 +2840,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-redis_cache
       monitored_instance:
         name: Azure Cache for Redis
+        description: Monitor performance, latency, memory, connections, keys, throughput, and replication for Azure Cache for Redis resources.
         link: https://learn.microsoft.com/azure/azure-cache-for-redis/
         icon_filename: azure.svg
         categories:
@@ -3244,51 +2873,6 @@ modules:
           - **Geo-replication** -- replication health, connectivity lag, sync events, data sync offset
           - **Per-shard** -- instance-level breakdowns for hit rate, clients, commands, server load, keys, operations, throughput
         method_description: *method_description
-    alerts:
-      - name: am_redis_cache_server_load
-        metric: azure_monitor.redis_cache.server_load
-        info: "Redis server load on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf
-      - name: am_redis_cache_cpu
-        metric: azure_monitor.redis_cache.cpu
-        info: "Redis CPU on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf
-      - name: am_redis_cache_memory_utilization
-        metric: azure_monitor.redis_cache.memory_utilization
-        info: "Redis memory utilization on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf
-      - name: am_redis_cache_miss_rate
-        metric: azure_monitor.redis_cache.miss_rate
-        info: "Redis cache miss rate on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf
-      - name: am_redis_cache_errors
-        metric: azure_monitor.redis_cache.errors
-        info: "Redis errors on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf
-      - name: am_redis_cache_latency
-        metric: azure_monitor.redis_cache.latency
-        info: "Redis average latency on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf
-      - name: am_redis_cache_latency_p99
-        metric: azure_monitor.redis_cache.latency_p99
-        info: "Redis P99 latency on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf
-      - name: am_redis_cache_evicted_keys
-        metric: azure_monitor.redis_cache.key_events
-        info: "Redis key evictions on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf
-      - name: am_redis_cache_geo_replication_health
-        metric: azure_monitor.redis_cache.geo_replication_health
-        info: "Redis geo-replication health on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf
-      - name: am_redis_cache_geo_replication_lag
-        metric: azure_monitor.redis_cache.geo_replication_lag
-        info: "Redis geo-replication lag on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf
-      - name: am_redis_cache_geo_replication_sync_offset
-        metric: azure_monitor.redis_cache.geo_replication_sync_offset
-        info: "Redis geo-replication sync offset on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf
     metrics:
       folding:
         title: Metrics
@@ -3526,6 +3110,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-event_hubs
       monitored_instance:
         name: Azure Event Hubs Namespace
+        description: Monitor operational and performance metrics for Azure Event Hubs namespaces through Azure Monitor.
         link: https://learn.microsoft.com/azure/event-hubs/
         icon_filename: azure.svg
         categories:
@@ -3557,47 +3142,6 @@ modules:
           - **Replication** -- replication lag (messages and duration)
           - **Resources** -- namespace size, CPU and memory utilization
         method_description: *method_description
-    alerts:
-      - name: am_event_hubs_server_errors
-        metric: azure_monitor.event_hubs.errors
-        info: "Event Hubs server errors on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf
-      - name: am_event_hubs_throttled_requests
-        metric: azure_monitor.event_hubs.errors
-        info: "Event Hubs throttled requests on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf
-      - name: am_event_hubs_quota_exceeded
-        metric: azure_monitor.event_hubs.errors
-        info: "Event Hubs quota exceeded on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf
-      - name: am_event_hubs_user_errors
-        metric: azure_monitor.event_hubs.errors
-        info: "Event Hubs user errors on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf
-      - name: am_event_hubs_success_rate
-        metric: azure_monitor.event_hubs.requests
-        info: "Event Hubs request success rate on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf
-      - name: am_event_hubs_namespace_cpu
-        metric: azure_monitor.event_hubs.namespace_resources
-        info: "Event Hubs namespace CPU on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf
-      - name: am_event_hubs_namespace_memory
-        metric: azure_monitor.event_hubs.namespace_resources
-        info: "Event Hubs namespace memory on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf
-      - name: am_event_hubs_capture_backlog
-        metric: azure_monitor.event_hubs.capture_backlog
-        info: "Event Hubs capture backlog on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf
-      - name: am_event_hubs_replication_lag
-        metric: azure_monitor.event_hubs.replication_lag
-        info: "Event Hubs replication lag on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf
-      - name: am_event_hubs_replication_lag_duration
-        metric: azure_monitor.event_hubs.replication_lag_duration
-        info: "Event Hubs replication lag duration on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf
     metrics:
       folding:
         title: Metrics
@@ -3715,6 +3259,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-service_bus
       monitored_instance:
         name: Azure Service Bus Namespace
+        description: Monitor operational and performance metrics for Azure Service Bus namespaces through Azure Monitor.
         link: https://learn.microsoft.com/azure/service-bus-messaging/
         icon_filename: azure.svg
         categories:
@@ -3747,55 +3292,6 @@ modules:
           - **Replication** -- replication lag (messages and duration)
           - **Resources** -- namespace size, CPU and memory utilization, pending checkpoint operations
         method_description: *method_description
-    alerts:
-      - name: am_service_bus_server_errors
-        metric: azure_monitor.service_bus.errors
-        info: "Service Bus server errors on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf
-      - name: am_service_bus_throttled_requests
-        metric: azure_monitor.service_bus.errors
-        info: "Service Bus throttled requests on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf
-      - name: am_service_bus_user_errors
-        metric: azure_monitor.service_bus.errors
-        info: "Service Bus user errors on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf
-      - name: am_service_bus_namespace_cpu
-        metric: azure_monitor.service_bus.namespace_resources
-        info: "Service Bus namespace CPU on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf
-      - name: am_service_bus_namespace_memory
-        metric: azure_monitor.service_bus.namespace_resources
-        info: "Service Bus namespace memory on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf
-      - name: am_service_bus_send_latency
-        metric: azure_monitor.service_bus.send_latency
-        info: "Service Bus send latency on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf
-      - name: am_service_bus_dead_lettered_messages
-        metric: azure_monitor.service_bus.problem_messages
-        info: "Service Bus dead-lettered messages on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf
-      - name: am_service_bus_active_messages
-        metric: azure_monitor.service_bus.queue_depth
-        info: "Service Bus queue depth on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf
-      - name: am_service_bus_request_success_rate
-        metric: azure_monitor.service_bus.requests
-        info: "Service Bus request success rate on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf
-      - name: am_service_bus_abandoned_messages
-        metric: azure_monitor.service_bus.message_operations
-        info: "Service Bus abandoned messages on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf
-      - name: am_service_bus_replication_lag
-        metric: azure_monitor.service_bus.replication_lag
-        info: "Service Bus replication lag on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf
-      - name: am_service_bus_replication_lag_duration
-        metric: azure_monitor.service_bus.replication_lag_duration
-        info: "Service Bus replication lag duration on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf
     metrics:
       folding:
         title: Metrics
@@ -3932,6 +3428,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-application_gateway
       monitored_instance:
         name: Azure Application Gateway
+        description: Monitor traffic, responses, backend health, latency, connections, capacity, and firewall activity for Azure Application Gateway.
         link: https://learn.microsoft.com/azure/application-gateway/
         icon_filename: azure.svg
         categories:
@@ -3963,35 +3460,6 @@ modules:
           - **Capacity** -- capacity units, compute units, billed/fixed billed, CPU utilization
           - **WAF** -- WAF requests (total/blocked/matched), rule matches (managed/custom/bot), challenges, penalty box
         method_description: *method_description
-    alerts:
-      - name: am_appgw_failed_requests
-        metric: azure_monitor.application_gateway.requests
-        info: "App Gateway failed requests on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf
-      - name: am_appgw_unhealthy_hosts
-        metric: azure_monitor.application_gateway.backend_health
-        info: "App Gateway unhealthy backends on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf
-      - name: am_appgw_backend_connect_time
-        metric: azure_monitor.application_gateway.backend_latency
-        info: "App Gateway backend connect time on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf
-      - name: am_appgw_backend_first_byte
-        metric: azure_monitor.application_gateway.backend_latency
-        info: "App Gateway backend TTFB on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf
-      - name: am_appgw_total_time
-        metric: azure_monitor.application_gateway.client_latency
-        info: "App Gateway total request time on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf
-      - name: am_appgw_cpu_utilization
-        metric: azure_monitor.application_gateway.cpu
-        info: "App Gateway CPU utilization on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf
-      - name: am_appgw_waf_blocked_ratio
-        metric: azure_monitor.application_gateway.waf_requests
-        info: "App Gateway WAF block ratio on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf
     metrics:
       folding:
         title: Metrics
@@ -4158,6 +3626,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-key_vault
       monitored_instance:
         name: Azure Key Vault
+        description: Monitor operational and performance metrics for Azure Key Vault resources through Azure Monitor.
         link: https://learn.microsoft.com/azure/key-vault/
         icon_filename: azure.svg
         categories:
@@ -4185,19 +3654,6 @@ modules:
           - **API** -- API activity (hits/results), API latency
           - **Saturation** -- API saturation approaching service limits
         method_description: *method_description
-    alerts:
-      - name: am_key_vault_availability
-        metric: azure_monitor.key_vault.availability
-        info: "Key Vault availability on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_key_vault.conf
-      - name: am_key_vault_api_latency
-        metric: azure_monitor.key_vault.api_latency
-        info: "Key Vault API latency on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_key_vault.conf
-      - name: am_key_vault_saturation
-        metric: azure_monitor.key_vault.saturation
-        info: "Key Vault saturation on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_key_vault.conf
     metrics:
       folding:
         title: Metrics
@@ -4254,6 +3710,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-api_management
       monitored_instance:
         name: Azure API Management
+        description: Monitor requests, latency, compute, capacity, events, WebSockets, and network connectivity for Azure API Management resources.
         link: https://learn.microsoft.com/azure/api-management/
         icon_filename: azure.svg
         categories:
@@ -4284,51 +3741,6 @@ modules:
           - **WebSockets** -- WebSocket connection attempts, WebSocket messages
           - **Network** -- network connectivity status
         method_description: *method_description
-    alerts:
-      - name: am_api_management_capacity
-        metric: azure_monitor.api_management.capacity
-        info: "APIM capacity on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_api_management.conf
-      - name: am_api_management_gateway_cpu
-        metric: azure_monitor.api_management.gateway_cpu
-        info: "APIM gateway CPU on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_api_management.conf
-      - name: am_api_management_gateway_memory
-        metric: azure_monitor.api_management.gateway_memory
-        info: "APIM gateway memory on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_api_management.conf
-      - name: am_api_management_request_duration
-        metric: azure_monitor.api_management.request_duration
-        info: "APIM request duration on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_api_management.conf
-      - name: am_api_management_backend_duration
-        metric: azure_monitor.api_management.request_duration
-        info: "APIM backend duration on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_api_management.conf
-      - name: am_api_management_network_connectivity
-        metric: azure_monitor.api_management.network_connectivity
-        info: "APIM network connectivity on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_api_management.conf
-      - name: am_api_management_eventhub_failed_events
-        metric: azure_monitor.api_management.eventhub_events
-        info: "APIM EventHub failed events on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_api_management.conf
-      - name: am_api_management_eventhub_dropped_events
-        metric: azure_monitor.api_management.eventhub_events
-        info: "APIM EventHub dropped events on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_api_management.conf
-      - name: am_api_management_eventhub_rejected_events
-        metric: azure_monitor.api_management.eventhub_events
-        info: "APIM EventHub rejected events on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_api_management.conf
-      - name: am_api_management_eventhub_throttled_events
-        metric: azure_monitor.api_management.eventhub_events
-        info: "APIM EventHub throttled events on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_api_management.conf
-      - name: am_api_management_eventhub_timedout_events
-        metric: azure_monitor.api_management.eventhub_events
-        info: "APIM EventHub timed out events on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_api_management.conf
     metrics:
       folding:
         title: Metrics
@@ -4427,6 +3839,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-front_door
       monitored_instance:
         name: Azure Front Door
+        description: Monitor operational and performance metrics for Azure Front Door resources through Azure Monitor.
         link: https://learn.microsoft.com/azure/frontdoor/
         icon_filename: azure.svg
         categories:
@@ -4458,35 +3871,6 @@ modules:
           - **WAF** -- WAF requests, challenges (CAPTCHA/JS challenge)
           - **WebSocket** -- WebSocket connections (requested/active), connection duration
         method_description: *method_description
-    alerts:
-      - name: am_front_door_origin_health
-        metric: azure_monitor.front_door.origin_health
-        info: "Front Door origin health on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_front_door.conf
-      - name: am_front_door_total_latency
-        metric: azure_monitor.front_door.latency
-        info: "Front Door total latency on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_front_door.conf
-      - name: am_front_door_origin_latency
-        metric: azure_monitor.front_door.latency
-        info: "Front Door origin latency on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_front_door.conf
-      - name: am_front_door_5xx_error_rate
-        metric: azure_monitor.front_door.error_rate
-        info: "Front Door 5xx error rate on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_front_door.conf
-      - name: am_front_door_4xx_error_rate
-        metric: azure_monitor.front_door.error_rate
-        info: "Front Door 4xx error rate on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_front_door.conf
-      - name: am_front_door_byte_hit_ratio
-        metric: azure_monitor.front_door.byte_hit_ratio
-        info: "Front Door cache hit ratio on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_front_door.conf
-      - name: am_front_door_waf_rate_limited
-        metric: azure_monitor.front_door.origin_shield_requests
-        info: "Front Door origin shield rate limiting on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_front_door.conf
     metrics:
       folding:
         title: Metrics
@@ -4598,6 +3982,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-vmss
       monitored_instance:
         name: Azure Virtual Machine Scale Set
+        description: Monitor compute, memory, disk, network, throttling, and availability metrics across Azure Virtual Machine Scale Sets.
         link: https://learn.microsoft.com/azure/virtual-machine-scale-sets/
         icon_filename: azure.svg
         categories:
@@ -4633,111 +4018,6 @@ modules:
 
           Metrics are aggregated across all instances in the scale set.
         method_description: *method_description
-    alerts:
-      - name: am_vmss_cpu
-        metric: azure_monitor.vmss.cpu
-        info: "VMSS CPU utilization on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf
-      - name: am_vmss_cpu_credits_remaining
-        metric: azure_monitor.vmss.cpu_credits
-        info: "VMSS CPU credits low on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf
-      - name: am_vmss_memory_available
-        metric: azure_monitor.vmss.memory_percentage
-        info: "VMSS available memory low on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf
-      - name: am_vmss_availability
-        metric: azure_monitor.vmss.availability
-        info: "VMSS availability degraded on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf
-      - name: am_vmss_os_disk_latency
-        metric: azure_monitor.vmss.os_disk_latency
-        info: "VMSS OS disk latency on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf
-      - name: am_vmss_os_disk_queue_depth
-        metric: azure_monitor.vmss.os_disk_queue_depth
-        info: "VMSS OS disk queue depth on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf
-      - name: am_vmss_os_disk_bandwidth_throttling
-        metric: azure_monitor.vmss.os_disk_throttling
-        info: "VMSS OS disk bandwidth consumed on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf
-      - name: am_vmss_os_disk_iops_throttling
-        metric: azure_monitor.vmss.os_disk_throttling
-        info: "VMSS OS disk IOPS consumed on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf
-      - name: am_vmss_os_disk_burst_bps_credits
-        metric: azure_monitor.vmss.os_disk_burst_credits
-        info: "VMSS OS disk burst BPS credits depleting on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf
-      - name: am_vmss_os_disk_burst_io_credits
-        metric: azure_monitor.vmss.os_disk_burst_credits
-        info: "VMSS OS disk burst IO credits depleting on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf
-      - name: am_vmss_data_disk_latency
-        metric: azure_monitor.vmss.data_disk_latency
-        info: "VMSS data disk latency on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf
-      - name: am_vmss_data_disk_queue_depth
-        metric: azure_monitor.vmss.data_disk_queue_depth
-        info: "VMSS data disk queue depth on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf
-      - name: am_vmss_data_disk_bandwidth_throttling
-        metric: azure_monitor.vmss.data_disk_throttling
-        info: "VMSS data disk bandwidth consumed on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf
-      - name: am_vmss_data_disk_iops_throttling
-        metric: azure_monitor.vmss.data_disk_throttling
-        info: "VMSS data disk IOPS consumed on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf
-      - name: am_vmss_data_disk_burst_bps_credits
-        metric: azure_monitor.vmss.data_disk_burst_credits
-        info: "VMSS data disk burst BPS credits depleting on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf
-      - name: am_vmss_data_disk_burst_io_credits
-        metric: azure_monitor.vmss.data_disk_burst_credits
-        info: "VMSS data disk burst IO credits depleting on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf
-      - name: am_vmss_temp_disk_latency
-        metric: azure_monitor.vmss.temp_disk_latency
-        info: "VMSS temp disk latency on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf
-      - name: am_vmss_temp_disk_queue_depth
-        metric: azure_monitor.vmss.temp_disk_queue_depth
-        info: "VMSS temp disk queue depth on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf
-      - name: am_vmss_vm_cached_bandwidth_throttling
-        metric: azure_monitor.vmss.vm_cached_throttling
-        info: "VMSS cached bandwidth consumed on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf
-      - name: am_vmss_vm_cached_iops_throttling
-        metric: azure_monitor.vmss.vm_cached_throttling
-        info: "VMSS cached IOPS consumed on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf
-      - name: am_vmss_vm_uncached_bandwidth_throttling
-        metric: azure_monitor.vmss.vm_uncached_throttling
-        info: "VMSS uncached bandwidth consumed on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf
-      - name: am_vmss_vm_uncached_iops_throttling
-        metric: azure_monitor.vmss.vm_uncached_throttling
-        info: "VMSS uncached IOPS consumed on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf
-      - name: am_vmss_vm_cached_burst_bps_credits
-        metric: azure_monitor.vmss.vm_cached_burst_credits
-        info: "VMSS cached burst BPS credits depleting on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf
-      - name: am_vmss_vm_cached_burst_io_credits
-        metric: azure_monitor.vmss.vm_cached_burst_credits
-        info: "VMSS cached burst IO credits depleting on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf
-      - name: am_vmss_vm_uncached_burst_bps_credits
-        metric: azure_monitor.vmss.vm_uncached_burst_credits
-        info: "VMSS uncached burst BPS credits depleting on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf
-      - name: am_vmss_vm_uncached_burst_io_credits
-        metric: azure_monitor.vmss.vm_uncached_burst_credits
-        info: "VMSS uncached burst IO credits depleting on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf
     metrics:
       folding:
         title: Metrics
@@ -5011,6 +4291,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-sql_elastic_pool
       monitored_instance:
         name: Azure SQL Elastic Pool
+        description: Monitor compute, memory, storage, input and output, sessions, and billing metrics for Azure SQL Elastic Pool resources.
         link: https://learn.microsoft.com/azure/azure-sql/database/elastic-pool-overview
         icon_filename: azure.svg
         categories:
@@ -5043,63 +4324,6 @@ modules:
 
           Metrics are aggregated across all databases in the pool.
         method_description: *method_description
-    alerts:
-      - name: am_sql_elastic_pool_cpu
-        metric: azure_monitor.sql_elastic_pool.cpu
-        info: "SQL Elastic Pool CPU on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf
-      - name: am_sql_elastic_pool_instance_cpu
-        metric: azure_monitor.sql_elastic_pool.instance_cpu
-        info: "SQL Elastic Pool instance CPU on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf
-      - name: am_sql_elastic_pool_instance_memory
-        metric: azure_monitor.sql_elastic_pool.instance_memory
-        info: "SQL Elastic Pool instance memory on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf
-      - name: am_sql_elastic_pool_dtu_consumption
-        metric: azure_monitor.sql_elastic_pool.dtu_consumption
-        info: "SQL Elastic Pool DTU consumption on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf
-      - name: am_sql_elastic_pool_data_io
-        metric: azure_monitor.sql_elastic_pool.io_utilization
-        info: "SQL Elastic Pool data I/O on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf
-      - name: am_sql_elastic_pool_log_write
-        metric: azure_monitor.sql_elastic_pool.io_utilization
-        info: "SQL Elastic Pool log write on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf
-      - name: am_sql_elastic_pool_workers
-        metric: azure_monitor.sql_elastic_pool.resource_utilization
-        info: "SQL Elastic Pool workers on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf
-      - name: am_sql_elastic_pool_sessions
-        metric: azure_monitor.sql_elastic_pool.resource_utilization
-        info: "SQL Elastic Pool sessions on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf
-      - name: am_sql_elastic_pool_storage_used
-        metric: azure_monitor.sql_elastic_pool.storage_utilization
-        info: "SQL Elastic Pool storage used on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf
-      - name: am_sql_elastic_pool_storage_allocated
-        metric: azure_monitor.sql_elastic_pool.storage_utilization
-        info: "SQL Elastic Pool storage allocated on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf
-      - name: am_sql_elastic_pool_xtp_storage
-        metric: azure_monitor.sql_elastic_pool.xtp_storage
-        info: "SQL Elastic Pool In-Memory OLTP storage on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf
-      - name: am_sql_elastic_pool_tempdb_log
-        metric: azure_monitor.sql_elastic_pool.tempdb_log_utilization
-        info: "SQL Elastic Pool tempdb log on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf
-      - name: am_sql_elastic_pool_serverless_cpu
-        metric: azure_monitor.sql_elastic_pool.serverless_utilization
-        info: "SQL Elastic Pool serverless CPU on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf
-      - name: am_sql_elastic_pool_serverless_memory
-        metric: azure_monitor.sql_elastic_pool.serverless_utilization
-        info: "SQL Elastic Pool serverless memory on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf
     metrics:
       folding:
         title: Metrics
@@ -5237,6 +4461,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-mysql_flexible
       monitored_instance:
         name: Azure MySQL Flexible Server
+        description: Monitor compute, memory, storage, connections, queries, replication, network, and health for Azure MySQL Flexible Server.
         link: https://learn.microsoft.com/azure/mysql/flexible-server/
         icon_filename: azure.svg
         categories:
@@ -5268,83 +4493,6 @@ modules:
           - **Network** -- network traffic (in/out)
           - **Health** -- uptime, deadlocks, lock timeouts
         method_description: *method_description
-    alerts:
-      - name: am_mysql_flexible_cpu
-        metric: azure_monitor.mysql_flexible.cpu
-        info: "MySQL Flexible CPU on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf
-      - name: am_mysql_flexible_memory
-        metric: azure_monitor.mysql_flexible.memory
-        info: "MySQL Flexible memory on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf
-      - name: am_mysql_flexible_io_utilization
-        metric: azure_monitor.mysql_flexible.io_utilization
-        info: "MySQL Flexible I/O utilization on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf
-      - name: am_mysql_flexible_storage_utilization
-        metric: azure_monitor.mysql_flexible.storage_utilization
-        info: "MySQL Flexible storage on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf
-      - name: am_mysql_flexible_serverlog_storage_utilization
-        metric: azure_monitor.mysql_flexible.serverlog_storage_utilization
-        info: "MySQL Flexible server log storage on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf
-      - name: am_mysql_flexible_cpu_credits_remaining
-        metric: azure_monitor.mysql_flexible.cpu_credits
-        info: "MySQL Flexible CPU credits low on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf
-      - name: am_mysql_flexible_ha_io_status
-        metric: azure_monitor.mysql_flexible.ha_status
-        info: "MySQL Flexible HA IO thread down on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf
-      - name: am_mysql_flexible_ha_sql_status
-        metric: azure_monitor.mysql_flexible.ha_status
-        info: "MySQL Flexible HA SQL thread down on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf
-      - name: am_mysql_flexible_replica_io_status
-        metric: azure_monitor.mysql_flexible.replica_status
-        info: "MySQL Flexible replica IO thread down on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf
-      - name: am_mysql_flexible_replica_sql_status
-        metric: azure_monitor.mysql_flexible.replica_status
-        info: "MySQL Flexible replica SQL thread down on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf
-      - name: am_mysql_flexible_replication_lag
-        metric: azure_monitor.mysql_flexible.replication_lag
-        info: "MySQL Flexible replica lag on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf
-      - name: am_mysql_flexible_ha_replication_lag
-        metric: azure_monitor.mysql_flexible.replication_lag
-        info: "MySQL Flexible HA replication lag on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf
-      - name: am_mysql_flexible_innodb_row_lock_time
-        metric: azure_monitor.mysql_flexible.innodb_row_lock_time
-        info: "MySQL Flexible row lock wait time on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf
-      - name: am_mysql_flexible_lock_deadlocks
-        metric: azure_monitor.mysql_flexible.lock_deadlocks
-        info: "MySQL Flexible deadlocks on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf
-      - name: am_mysql_flexible_lock_timeouts
-        metric: azure_monitor.mysql_flexible.lock_timeouts
-        info: "MySQL Flexible lock timeouts on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf
-      - name: am_mysql_flexible_aborted_connections
-        metric: azure_monitor.mysql_flexible.aborted_connections
-        info: "MySQL Flexible aborted connections on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf
-      - name: am_mysql_flexible_slow_queries
-        metric: azure_monitor.mysql_flexible.queries
-        info: "MySQL Flexible slow queries on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf
-      - name: am_mysql_flexible_innodb_row_lock_waits
-        metric: azure_monitor.mysql_flexible.innodb_row_lock_waits
-        info: "MySQL Flexible row lock waits on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf
-      - name: am_mysql_flexible_history_list_length
-        metric: azure_monitor.mysql_flexible.history_list_length
-        info: "MySQL Flexible history list length on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf
     metrics:
       folding:
         title: Metrics
@@ -5596,6 +4744,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-container_apps
       monitored_instance:
         name: Azure Container Apps
+        description: Monitor compute, memory, requests, network, replicas, Java runtime, and resiliency metrics for Azure Container Apps.
         link: https://learn.microsoft.com/azure/container-apps/
         icon_filename: azure.svg
         categories:
@@ -5626,51 +4775,6 @@ modules:
           - **JVM** -- thread count, GC collections and duration, buffer count
           - **Resiliency** -- host ejections, request retries
         method_description: *method_description
-    alerts:
-      - name: am_container_apps_cpu_utilization
-        metric: azure_monitor.container_apps.cpu_percentage
-        info: "Container Apps CPU on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf
-      - name: am_container_apps_memory_utilization
-        metric: azure_monitor.container_apps.memory_percentage
-        info: "Container Apps memory on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf
-      - name: am_container_apps_restarts
-        metric: azure_monitor.container_apps.restart_count
-        info: "Container Apps restarts on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf
-      - name: am_container_apps_response_time
-        metric: azure_monitor.container_apps.response_time
-        info: "Container Apps response time on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf
-      - name: am_container_apps_resiliency_timeouts
-        metric: azure_monitor.container_apps.resiliency_timeouts
-        info: "Container Apps resiliency timeouts on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf
-      - name: am_container_apps_resiliency_retries
-        metric: azure_monitor.container_apps.resiliency_retries
-        info: "Container Apps resiliency retries on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf
-      - name: am_container_apps_pending_connections
-        metric: azure_monitor.container_apps.resiliency_pending_connections
-        info: "Container Apps pending connections on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf
-      - name: am_container_apps_host_ejections
-        metric: azure_monitor.container_apps.resiliency_ejections
-        info: "Container Apps host ejections on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf
-      - name: am_container_apps_replica_count
-        metric: azure_monitor.container_apps.replicas
-        info: "Container Apps replicas on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf
-      - name: am_container_apps_gpu_utilization
-        metric: azure_monitor.container_apps.gpu_utilization
-        info: "Container Apps GPU on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf
-      - name: am_container_apps_jvm_gc_duration
-        metric: azure_monitor.container_apps.jvm_gc_duration
-        info: "Container Apps JVM GC duration on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf
     metrics:
       folding:
         title: Metrics
@@ -5848,6 +4952,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-firewall
       monitored_instance:
         name: Azure Firewall
+        description: Monitor operational and performance metrics for Azure Firewall resources through Azure Monitor.
         link: https://learn.microsoft.com/azure/firewall/
         icon_filename: azure.svg
         categories:
@@ -5877,19 +4982,6 @@ modules:
           - **Latency** -- latency probe
           - **Capacity** -- observed capacity units
         method_description: *method_description
-    alerts:
-      - name: am_firewall_health
-        metric: azure_monitor.firewall.health
-        info: "Firewall health on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_firewall.conf
-      - name: am_firewall_latency
-        metric: azure_monitor.firewall.latency
-        info: "Firewall latency on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_firewall.conf
-      - name: am_firewall_snat_port_utilization
-        metric: azure_monitor.firewall.snat_port_utilization
-        info: "Firewall SNAT port utilization on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_firewall.conf
     metrics:
       folding:
         title: Metrics
@@ -5964,6 +5056,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-cognitive_services
       monitored_instance:
         name: Azure Cognitive Services
+        description: Monitor calls, errors, latency, tokens, availability, content safety, and model activity for Azure Cognitive Services.
         link: https://learn.microsoft.com/azure/ai-services/
         icon_filename: azure.svg
         categories:
@@ -6000,75 +5093,6 @@ modules:
           - **Fine-tuning** -- training hours
           - **Personalizer** -- events, rewards, actions, feature cardinality
         method_description: *method_description
-    alerts:
-      - name: am_cognitive_services_availability
-        metric: azure_monitor.cognitive_services.availability
-        info: "Cognitive Services availability on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf
-      - name: am_cognitive_services_server_errors
-        metric: azure_monitor.cognitive_services.errors
-        info: "Cognitive Services server errors on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf
-      - name: am_cognitive_services_client_errors
-        metric: azure_monitor.cognitive_services.errors
-        info: "Cognitive Services client errors on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf
-      - name: am_cognitive_services_latency
-        metric: azure_monitor.cognitive_services.latency
-        info: "Cognitive Services latency on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf
-      - name: am_cognitive_services_rate_limit
-        metric: azure_monitor.cognitive_services.rate_limit
-        info: "Cognitive Services rate limiting on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf
-      - name: am_cognitive_services_blocked_calls
-        metric: azure_monitor.cognitive_services.calls
-        info: "Cognitive Services blocked calls on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf
-      - name: am_cognitive_services_openai_availability
-        metric: azure_monitor.cognitive_services.openai_availability
-        info: "Azure OpenAI availability on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf
-      - name: am_cognitive_services_openai_time_to_response
-        metric: azure_monitor.cognitive_services.openai_latency
-        info: "Azure OpenAI time to response on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf
-      - name: am_cognitive_services_openai_time_to_first_token
-        metric: azure_monitor.cognitive_services.openai_latency
-        info: "Azure OpenAI time to first token on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf
-      - name: am_cognitive_services_openai_provisioned_utilization
-        metric: azure_monitor.cognitive_services.openai_provisioned_utilization
-        info: "Azure OpenAI provisioned utilization on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf
-      - name: am_cognitive_services_model_availability
-        metric: azure_monitor.cognitive_services.model_availability
-        info: "Model availability on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf
-      - name: am_cognitive_services_model_time_to_response
-        metric: azure_monitor.cognitive_services.model_latency
-        info: "Model time to response on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf
-      - name: am_cognitive_services_model_time_to_first_token
-        metric: azure_monitor.cognitive_services.model_latency
-        info: "Model time to first token on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf
-      - name: am_cognitive_services_model_provisioned_utilization
-        metric: azure_monitor.cognitive_services.model_provisioned_utilization
-        info: "Model provisioned utilization on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf
-      - name: am_cognitive_services_harmful_requests
-        metric: azure_monitor.cognitive_services.content_safety_requests
-        info: "Harmful content requests on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf
-      - name: am_cognitive_services_blocked_content_requests
-        metric: azure_monitor.cognitive_services.content_safety_requests
-        info: "Blocked content requests on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf
-      - name: am_cognitive_services_abusive_users
-        metric: azure_monitor.cognitive_services.content_safety_abusive_users
-        info: "Abusive users detected on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf
     metrics:
       folding:
         title: Metrics
@@ -6601,6 +5625,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-vpn_gateway
       monitored_instance:
         name: Azure VPN Gateway
+        description: Monitor operational and performance metrics for Azure VPN Gateway resources through Azure Monitor.
         link: https://learn.microsoft.com/azure/vpn-gateway/
         icon_filename: azure.svg
         categories:
@@ -6633,63 +5658,6 @@ modules:
           - **Routes** -- user VPN and VNet prefix route counts
           - **Flows** -- gateway inbound/outbound flows, tunnel total flows, peak PPS, TS mismatch drops
         method_description: *method_description
-    alerts:
-      - name: am_vpn_gateway_tunnel_packet_drops
-        metric: azure_monitor.vpn_gateway.tunnel_packet_drops
-        info: "VPN Gateway tunnel packet drops on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf
-      - name: am_vpn_gateway_tunnel_ts_mismatch_drops
-        metric: azure_monitor.vpn_gateway.tunnel_ts_mismatch_drops
-        info: "VPN Gateway TS mismatch drops on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf
-      - name: am_vpn_gateway_tunnel_nat_packet_drops
-        metric: azure_monitor.vpn_gateway.tunnel_nat_packet_drops
-        info: "VPN Gateway NAT packet drops on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf
-      - name: am_vpn_gateway_bgp_peer_status
-        metric: azure_monitor.vpn_gateway.bgp_peer_status
-        info: "VPN Gateway BGP peer down on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf
-      - name: am_vpn_gateway_er_gateway_cpu
-        metric: azure_monitor.vpn_gateway.er_gateway_cpu
-        info: "VPN GW ExpressRoute CPU on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf
-      - name: am_vpn_gateway_er_gateway_active_flows
-        metric: azure_monitor.vpn_gateway.er_gateway_active_flows
-        info: "VPN GW ExpressRoute active flows on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf
-      - name: am_vpn_gateway_er_gateway_route_changes
-        metric: azure_monitor.vpn_gateway.er_gateway_route_changes
-        info: "VPN GW ExpressRoute route churn on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf
-      - name: am_vpn_gateway_er_gateway_routes_advertised
-        metric: azure_monitor.vpn_gateway.er_gateway_routes_advertised
-        info: "VPN GW ExpressRoute routes advertised on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf
-      - name: am_vpn_gateway_er_gateway_routes_learned
-        metric: azure_monitor.vpn_gateway.er_gateway_routes_learned
-        info: "VPN GW ExpressRoute routes learned on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf
-      - name: am_vpn_gateway_scalable_er_cpu
-        metric: azure_monitor.vpn_gateway.scalable_er_cpu
-        info: "VPN GW Scalable ER CPU on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf
-      - name: am_vpn_gateway_scalable_er_active_flows
-        metric: azure_monitor.vpn_gateway.scalable_er_active_flows
-        info: "VPN GW Scalable ER active flows on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf
-      - name: am_vpn_gateway_scalable_er_route_changes
-        metric: azure_monitor.vpn_gateway.scalable_er_route_changes
-        info: "VPN GW Scalable ER route churn on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf
-      - name: am_vpn_gateway_scalable_er_routes_advertised
-        metric: azure_monitor.vpn_gateway.scalable_er_routes_advertised
-        info: "VPN GW Scalable ER routes advertised on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf
-      - name: am_vpn_gateway_scalable_er_routes_learned
-        metric: azure_monitor.vpn_gateway.scalable_er_routes_learned
-        info: "VPN GW Scalable ER routes learned on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf
     metrics:
       folding:
         title: Metrics
@@ -6965,6 +5933,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-event_grid
       monitored_instance:
         name: Azure Event Grid Topic
+        description: Monitor operational and performance metrics for Azure Event Grid topics through Azure Monitor.
         link: https://learn.microsoft.com/azure/event-grid/
         icon_filename: azure.svg
         categories:
@@ -6993,31 +5962,6 @@ modules:
           - **Routing** -- matched and unmatched event routing, destination processing duration
           - **Filters** -- advanced filter evaluations
         method_description: *method_description
-    alerts:
-      - name: am_event_grid_publish_failures
-        metric: azure_monitor.event_grid.publish_rate
-        info: "Event Grid publish failures on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_grid.conf
-      - name: am_event_grid_delivery_failures
-        metric: azure_monitor.event_grid.delivery
-        info: "Event Grid delivery failures on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_grid.conf
-      - name: am_event_grid_dropped_events
-        metric: azure_monitor.event_grid.delivery
-        info: "Event Grid dropped events on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_grid.conf
-      - name: am_event_grid_dead_lettered_events
-        metric: azure_monitor.event_grid.delivery
-        info: "Event Grid dead-lettered events on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_grid.conf
-      - name: am_event_grid_unmatched_events
-        metric: azure_monitor.event_grid.routing
-        info: "Event Grid unmatched events on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_grid.conf
-      - name: am_event_grid_destination_processing_duration
-        metric: azure_monitor.event_grid.destination_processing_duration
-        info: "Event Grid destination processing duration on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_grid.conf
     metrics:
       folding:
         title: Metrics
@@ -7090,6 +6034,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-iot_hub
       monitored_instance:
         name: Azure IoT Hub
+        description: Monitor operational and performance metrics for Azure IoT Hub resources through Azure Monitor.
         link: https://learn.microsoft.com/azure/iot-hub/
         icon_filename: azure.svg
         categories:
@@ -7123,75 +6068,6 @@ modules:
           - **Event Grid** -- Event Grid deliveries, Event Grid latency
           - **Data** -- device data usage
         method_description: *method_description
-    alerts:
-      - name: am_iot_hub_d2c_telemetry_throttle
-        metric: azure_monitor.iot_hub.d2c_telemetry_throttle
-        info: "IoT Hub telemetry throttling on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf
-      - name: am_iot_hub_c2d_messages_expired
-        metric: azure_monitor.iot_hub.c2d_messages_expired
-        info: "IoT Hub C2D messages expiring on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf
-      - name: am_iot_hub_c2d_methods_failed
-        metric: azure_monitor.iot_hub.c2d_methods
-        info: "IoT Hub direct method failures on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf
-      - name: am_iot_hub_c2d_twin_read_failures
-        metric: azure_monitor.iot_hub.c2d_twin_reads
-        info: "IoT Hub backend twin read failures on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf
-      - name: am_iot_hub_c2d_twin_update_failures
-        metric: azure_monitor.iot_hub.c2d_twin_updates
-        info: "IoT Hub backend twin update failures on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf
-      - name: am_iot_hub_d2c_twin_read_failures
-        metric: azure_monitor.iot_hub.d2c_twin_reads
-        info: "IoT Hub device twin read failures on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf
-      - name: am_iot_hub_d2c_twin_update_failures
-        metric: azure_monitor.iot_hub.d2c_twin_updates
-        info: "IoT Hub device twin update failures on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf
-      - name: am_iot_hub_routing_dropped
-        metric: azure_monitor.iot_hub.routing_deliveries
-        info: "IoT Hub routing dropped messages on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf
-      - name: am_iot_hub_routing_orphaned
-        metric: azure_monitor.iot_hub.routing_deliveries
-        info: "IoT Hub routing orphaned messages on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf
-      - name: am_iot_hub_routing_invalid
-        metric: azure_monitor.iot_hub.routing_deliveries
-        info: "IoT Hub routing invalid messages on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf
-      - name: am_iot_hub_routing_latency
-        metric: azure_monitor.iot_hub.routing_latency
-        info: "IoT Hub routing latency on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf
-      - name: am_iot_hub_event_grid_latency
-        metric: azure_monitor.iot_hub.event_grid_latency
-        info: "IoT Hub Event Grid latency on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf
-      - name: am_iot_hub_jobs_failed
-        metric: azure_monitor.iot_hub.jobs_status
-        info: "IoT Hub job failures on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf
-      - name: am_iot_hub_twin_query_failures
-        metric: azure_monitor.iot_hub.twin_queries
-        info: "IoT Hub twin query failures on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf
-      - name: am_iot_hub_c2d_commands_abandoned
-        metric: azure_monitor.iot_hub.c2d_commands
-        info: "IoT Hub C2D commands abandoned on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf
-      - name: am_iot_hub_c2d_commands_rejected
-        metric: azure_monitor.iot_hub.c2d_commands
-        info: "IoT Hub C2D commands rejected on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf
-      - name: am_iot_hub_routing_delivery_latency_preview
-        metric: azure_monitor.iot_hub.routing_delivery_latency_preview
-        info: "IoT Hub routing delivery latency on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf
     metrics:
       folding:
         title: Metrics
@@ -7485,6 +6361,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-data_factory
       monitored_instance:
         name: Azure Data Factory
+        description: Monitor operational and performance metrics for Azure Data Factory resources through Azure Monitor.
         link: https://learn.microsoft.com/azure/data-factory/
         icon_filename: azure.svg
         categories:
@@ -7517,111 +6394,6 @@ modules:
           - **Airflow IR** -- CPU and memory, DAG processing, task instances, scheduler activity, triggers, pool slots
           - **Factory** -- entity count, factory size (current/max allowed)
         method_description: *method_description
-    alerts:
-      - name: am_data_factory_pipeline_failed_runs
-        metric: azure_monitor.data_factory.pipeline_runs
-        info: "Data Factory pipeline failures on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf
-      - name: am_data_factory_pipeline_cancelled_runs
-        metric: azure_monitor.data_factory.pipeline_runs
-        info: "Data Factory pipeline cancellations on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf
-      - name: am_data_factory_activity_failed_runs
-        metric: azure_monitor.data_factory.activity_runs
-        info: "Data Factory activity failures on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf
-      - name: am_data_factory_trigger_failed_runs
-        metric: azure_monitor.data_factory.trigger_runs
-        info: "Data Factory trigger failures on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf
-      - name: am_data_factory_ssis_ir_start_failures
-        metric: azure_monitor.data_factory.ssis_ir_starts
-        info: "Data Factory SSIS IR start failures on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf
-      - name: am_data_factory_ssis_ir_stop_stuck
-        metric: azure_monitor.data_factory.ssis_ir_stops
-        info: "Data Factory SSIS IR stuck stops on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf
-      - name: am_data_factory_ssis_package_failures
-        metric: azure_monitor.data_factory.ssis_package_executions
-        info: "Data Factory SSIS package failures on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf
-      - name: am_data_factory_ir_cpu
-        metric: azure_monitor.data_factory.ir_cpu
-        info: "Data Factory IR CPU on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf
-      - name: am_data_factory_ir_queue_length
-        metric: azure_monitor.data_factory.ir_queue
-        info: "Data Factory IR queue depth on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf
-      - name: am_data_factory_ir_task_pickup_delay
-        metric: azure_monitor.data_factory.ir_task_pickup_delay
-        info: "Data Factory IR task pickup delay on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf
-      - name: am_data_factory_size_utilization
-        metric: azure_monitor.data_factory.factory_size
-        info: "Data Factory size utilization on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf
-      - name: am_data_factory_entity_utilization
-        metric: azure_monitor.data_factory.entity_count
-        info: "Data Factory entity count on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf
-      - name: am_data_factory_mvnet_ir_copy_utilization
-        metric: azure_monitor.data_factory.mvnet_ir_copy_capacity
-        info: "Data Factory MVNet IR copy utilization on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf
-      - name: am_data_factory_mvnet_ir_external_utilization
-        metric: azure_monitor.data_factory.mvnet_ir_external_capacity
-        info: "Data Factory MVNet IR external utilization on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf
-      - name: am_data_factory_mvnet_ir_pipeline_utilization
-        metric: azure_monitor.data_factory.mvnet_ir_pipeline_capacity
-        info: "Data Factory MVNet IR pipeline utilization on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf
-      - name: am_data_factory_airflow_ir_cpu
-        metric: azure_monitor.data_factory.airflow_ir_cpu
-        info: "Data Factory Airflow IR CPU on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf
-      - name: am_data_factory_airflow_ir_memory
-        metric: azure_monitor.data_factory.airflow_ir_memory
-        info: "Data Factory Airflow IR memory on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf
-      - name: am_data_factory_airflow_ir_dag_errors
-        metric: azure_monitor.data_factory.airflow_ir_dag_errors
-        info: "Data Factory Airflow DAG errors on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf
-      - name: am_data_factory_airflow_ir_operator_failures
-        metric: azure_monitor.data_factory.airflow_ir_operators
-        info: "Data Factory Airflow operator failures on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf
-      - name: am_data_factory_airflow_ir_job_heartbeat_failures
-        metric: azure_monitor.data_factory.airflow_ir_jobs
-        info: "Data Factory Airflow job heartbeat failures on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf
-      - name: am_data_factory_airflow_ir_pool_starving
-        metric: azure_monitor.data_factory.airflow_ir_pool_starving
-        info: "Data Factory Airflow pool starvation on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf
-      - name: am_data_factory_airflow_ir_tasks_killed_externally
-        metric: azure_monitor.data_factory.airflow_ir_scheduler_tasks
-        info: "Data Factory Airflow tasks killed externally on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf
-      - name: am_data_factory_airflow_ir_tasks_starving
-        metric: azure_monitor.data_factory.airflow_ir_scheduler_tasks
-        info: "Data Factory Airflow scheduler starving tasks on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf
-      - name: am_data_factory_airflow_ir_task_instance_failures
-        metric: azure_monitor.data_factory.airflow_ir_task_instances
-        info: "Data Factory Airflow task failures on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf
-      - name: am_data_factory_airflow_ir_trigger_issues
-        metric: azure_monitor.data_factory.airflow_ir_trigger_issues
-        info: "Data Factory Airflow trigger issues on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf
-      - name: am_data_factory_airflow_ir_zombies
-        metric: azure_monitor.data_factory.airflow_ir_zombies
-        info: "Data Factory Airflow zombie tasks on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf
     metrics:
       folding:
         title: Metrics
@@ -7987,6 +6759,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-nat_gateway
       monitored_instance:
         name: Azure NAT Gateway
+        description: Monitor operational and performance metrics for Azure NAT Gateway resources through Azure Monitor.
         link: https://learn.microsoft.com/azure/nat-gateway/
         icon_filename: azure.svg
         categories:
@@ -8013,23 +6786,6 @@ modules:
           - **Drops** -- dropped packets
           - **Availability** -- datapath availability percentage
         method_description: *method_description
-    alerts:
-      - name: am_nat_gateway_datapath_availability
-        metric: azure_monitor.nat_gateway.datapath_availability
-        info: "NAT Gateway availability on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_nat_gateway.conf
-      - name: am_nat_gateway_dropped_packets
-        metric: azure_monitor.nat_gateway.dropped_packets
-        info: "NAT Gateway packet drops on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_nat_gateway.conf
-      - name: am_nat_gateway_snat_connections
-        metric: azure_monitor.nat_gateway.snat_connections
-        info: "NAT Gateway SNAT connections on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_nat_gateway.conf
-      - name: am_nat_gateway_total_connections
-        metric: azure_monitor.nat_gateway.total_connections
-        info: "NAT Gateway total connections on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_nat_gateway.conf
     metrics:
       folding:
         title: Metrics
@@ -8097,6 +6853,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-container_instances
       monitored_instance:
         name: Azure Container Instances
+        description: Monitor CPU, memory, and network traffic for Azure Container Instances through Azure Monitor.
         link: https://learn.microsoft.com/azure/container-instances/
         icon_filename: azure.svg
         categories:
@@ -8123,23 +6880,6 @@ modules:
           - **Memory** -- memory usage (average/max)
           - **Network** -- network traffic (received/sent)
         method_description: *method_description
-    alerts:
-      - name: am_container_instances_cpu_usage
-        metric: azure_monitor.container_instances.cpu_usage
-        info: "Container CPU on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_instances.conf
-      - name: am_container_instances_memory_usage
-        metric: azure_monitor.container_instances.memory_usage
-        info: "Container memory on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_instances.conf
-      - name: am_container_instances_network_rx
-        metric: azure_monitor.container_instances.network
-        info: "Container inbound traffic on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_instances.conf
-      - name: am_container_instances_network_tx
-        metric: azure_monitor.container_instances.network
-        info: "Container outbound traffic on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_instances.conf
     metrics:
       folding:
         title: Metrics
@@ -8192,6 +6932,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-container_registry
       monitored_instance:
         name: Azure Container Registry
+        description: Monitor image pull and push operations, storage use, and task execution for Azure Container Registry resources.
         link: https://learn.microsoft.com/azure/container-registry/
         icon_filename: azure.svg
         categories:
@@ -8219,15 +6960,6 @@ modules:
           - **Storage** -- storage used
           - **Tasks** -- task run duration, agent pool CPU time
         method_description: *method_description
-    alerts:
-      - name: am_container_registry_pull_failures
-        metric: azure_monitor.container_registry.pull_count
-        info: "ACR pull failures on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_registry.conf
-      - name: am_container_registry_push_failures
-        metric: azure_monitor.container_registry.push_count
-        info: "ACR push failures on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_registry.conf
     metrics:
       folding:
         title: Metrics
@@ -8291,6 +7023,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-application_insights
       monitored_instance:
         name: Azure Application Insights
+        description: Monitor availability, requests, dependencies, exceptions, browser timing, process health, and traces for Azure Application Insights.
         link: https://learn.microsoft.com/azure/azure-monitor/app/app-insights-overview
         icon_filename: azure.svg
         categories:
@@ -8323,63 +7056,6 @@ modules:
           - **Process** -- CPU utilization (process/processor), memory (available/private), I/O rate
           - **Traces** -- trace volume
         method_description: *method_description
-    alerts:
-      - name: am_appinsights_availability
-        metric: azure_monitor.application_insights.availability_percentage
-        info: "App Insights availability on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf
-      - name: am_appinsights_availability_duration
-        metric: azure_monitor.application_insights.availability_duration
-        info: "App Insights availability test duration on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf
-      - name: am_appinsights_failed_requests
-        metric: azure_monitor.application_insights.server_requests
-        info: "App Insights failed requests on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf
-      - name: am_appinsights_response_time
-        metric: azure_monitor.application_insights.server_response_time
-        info: "App Insights server response time on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf
-      - name: am_appinsights_failed_dependencies
-        metric: azure_monitor.application_insights.dependency_calls
-        info: "App Insights failed dependencies on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf
-      - name: am_appinsights_dependency_duration
-        metric: azure_monitor.application_insights.dependency_duration
-        info: "App Insights dependency duration on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf
-      - name: am_appinsights_exception_rate
-        metric: azure_monitor.application_insights.exception_rate
-        info: "App Insights exception rate on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf
-      - name: am_appinsights_server_exceptions
-        metric: azure_monitor.application_insights.exceptions
-        info: "App Insights server exceptions on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf
-      - name: am_appinsights_browser_page_load_time
-        metric: azure_monitor.application_insights.browser_page_load_time
-        info: "App Insights browser page load time on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf
-      - name: am_appinsights_process_cpu
-        metric: azure_monitor.application_insights.cpu_utilization
-        info: "App Insights process CPU on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf
-      - name: am_appinsights_processor_cpu
-        metric: azure_monitor.application_insights.cpu_utilization
-        info: "App Insights processor CPU on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf
-      - name: am_appinsights_http_execution_time
-        metric: azure_monitor.application_insights.http_request_execution_time
-        info: "App Insights HTTP execution time on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf
-      - name: am_appinsights_http_queue_length
-        metric: azure_monitor.application_insights.http_request_queue
-        info: "App Insights HTTP request queue on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf
-      - name: am_appinsights_page_view_load_time
-        metric: azure_monitor.application_insights.page_view_load_time
-        info: "App Insights page view load time on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf
     metrics:
       folding:
         title: Metrics
@@ -8546,6 +7222,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-express_route_circuit
       monitored_instance:
         name: Azure ExpressRoute Circuit
+        description: Monitor throughput, availability, bandwidth utilization, dropped traffic, and routes for Azure ExpressRoute Circuit resources.
         link: https://learn.microsoft.com/azure/expressroute/
         icon_filename: azure.svg
         categories:
@@ -8574,31 +7251,6 @@ modules:
           - **QoS** -- QoS dropped bits (in/out)
           - **Routes** -- FastPath routes count
         method_description: *method_description
-    alerts:
-      - name: am_express_route_circuit_arp_availability
-        metric: azure_monitor.express_route_circuit.arp_availability
-        info: "ExpressRoute ARP availability on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_circuit.conf
-      - name: am_express_route_circuit_bgp_availability
-        metric: azure_monitor.express_route_circuit.bgp_availability
-        info: "ExpressRoute BGP availability on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_circuit.conf
-      - name: am_express_route_circuit_ingress_bandwidth_utilization
-        metric: azure_monitor.express_route_circuit.bandwidth_utilization
-        info: "ExpressRoute ingress bandwidth on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_circuit.conf
-      - name: am_express_route_circuit_egress_bandwidth_utilization
-        metric: azure_monitor.express_route_circuit.bandwidth_utilization
-        info: "ExpressRoute egress bandwidth on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_circuit.conf
-      - name: am_express_route_circuit_qos_drop_in
-        metric: azure_monitor.express_route_circuit.qos_dropped_bits
-        info: "ExpressRoute QoS ingress drops on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_circuit.conf
-      - name: am_express_route_circuit_qos_drop_out
-        metric: azure_monitor.express_route_circuit.qos_dropped_bits
-        info: "ExpressRoute QoS egress drops on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_circuit.conf
     metrics:
       folding:
         title: Metrics
@@ -8676,6 +7328,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-machine_learning
       monitored_instance:
         name: Azure Machine Learning Workspace
+        description: Monitor compute, GPU, cluster, run, model, quota, storage, network, and agent activity for Azure Machine Learning workspaces.
         link: https://learn.microsoft.com/azure/machine-learning/
         icon_filename: azure.svg
         categories:
@@ -8709,67 +7362,6 @@ modules:
           - **Network** -- network traffic (in/out), InfiniBand traffic
           - **AI agents** -- agent runs, messages, tokens, tool calls, events, indexed files
         method_description: *method_description
-    alerts:
-      - name: am_ml_quota_utilization
-        metric: azure_monitor.machine_learning.quota_utilization
-        info: "ML quota utilization on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf
-      - name: am_ml_unusable_cores
-        metric: azure_monitor.machine_learning.cluster_cores
-        info: "ML unusable cores on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf
-      - name: am_ml_preempted_cores
-        metric: azure_monitor.machine_learning.cluster_cores
-        info: "ML preempted cores on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf
-      - name: am_ml_unusable_nodes
-        metric: azure_monitor.machine_learning.cluster_nodes
-        info: "ML unusable nodes on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf
-      - name: am_ml_cpu_utilization
-        metric: azure_monitor.machine_learning.cpu_utilization
-        info: "ML CPU utilization on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf
-      - name: am_ml_cpu_memory_utilization
-        metric: azure_monitor.machine_learning.cpu_memory_utilization
-        info: "ML CPU memory utilization on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf
-      - name: am_ml_gpu_utilization
-        metric: azure_monitor.machine_learning.gpu_utilization
-        info: "ML GPU utilization on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf
-      - name: am_ml_gpu_memory_utilization
-        metric: azure_monitor.machine_learning.gpu_memory_utilization
-        info: "ML GPU memory utilization on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf
-      - name: am_ml_disk_utilization
-        metric: azure_monitor.machine_learning.disk_usage
-        info: "ML disk utilization on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf
-      - name: am_ml_model_deploy_failures
-        metric: azure_monitor.machine_learning.model_deployments
-        info: "ML model deployment failures on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf
-      - name: am_ml_model_register_failures
-        metric: azure_monitor.machine_learning.model_registrations
-        info: "ML model registration failures on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf
-      - name: am_ml_failed_runs
-        metric: azure_monitor.machine_learning.run_completion
-        info: "ML failed runs on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf
-      - name: am_ml_not_responding_runs
-        metric: azure_monitor.machine_learning.run_completion
-        info: "ML not-responding runs on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf
-      - name: am_ml_run_errors
-        metric: azure_monitor.machine_learning.run_issues
-        info: "ML run errors on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf
-      - name: am_ml_storage_api_failures
-        metric: azure_monitor.machine_learning.storage_api_calls
-        info: "ML storage API failure rate on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf
     metrics:
       folding:
         title: Metrics
@@ -9016,6 +7608,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-data_explorer
       monitored_instance:
         name: Azure Data Explorer Cluster
+        description: Monitor ingestion, queries, streaming, cache, compute, exports, views, events, and cluster health for Azure Data Explorer.
         link: https://learn.microsoft.com/azure/data-explorer/
         icon_filename: azure.svg
         categories:
@@ -9050,91 +7643,6 @@ modules:
           - **Events** -- events received/processed/dropped, blobs received/processed/dropped
           - **Advanced** -- follower latency, discovery latency, weak consistency latency, partitioning percentage
         method_description: *method_description
-    alerts:
-      - name: am_data_explorer_keep_alive
-        metric: azure_monitor.data_explorer.keep_alive
-        info: "Data Explorer keep alive on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf
-      - name: am_data_explorer_cpu
-        metric: azure_monitor.data_explorer.cpu_utilization
-        info: "Data Explorer CPU on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf
-      - name: am_data_explorer_ingestion_utilization
-        metric: azure_monitor.data_explorer.utilization
-        info: "Data Explorer ingestion utilization on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf
-      - name: am_data_explorer_cache_utilization
-        metric: azure_monitor.data_explorer.utilization
-        info: "Data Explorer cache utilization on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf
-      - name: am_data_explorer_throttled_commands
-        metric: azure_monitor.data_explorer.throttled_commands
-        info: "Data Explorer throttled commands on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf
-      - name: am_data_explorer_query_duration
-        metric: azure_monitor.data_explorer.query_duration
-        info: "Data Explorer query duration on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf
-      - name: am_data_explorer_throttled_queries
-        metric: azure_monitor.data_explorer.throttled_queries
-        info: "Data Explorer throttled queries on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf
-      - name: am_data_explorer_ingestion_latency
-        metric: azure_monitor.data_explorer.ingestion_latency
-        info: "Data Explorer ingestion latency on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf
-      - name: am_data_explorer_events_dropped
-        metric: azure_monitor.data_explorer.events
-        info: "Data Explorer events dropped on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf
-      - name: am_data_explorer_blobs_dropped
-        metric: azure_monitor.data_explorer.blobs
-        info: "Data Explorer blobs dropped on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf
-      - name: am_data_explorer_ingestion_queue_length
-        metric: azure_monitor.data_explorer.ingestion_queue
-        info: "Data Explorer ingestion queue on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf
-      - name: am_data_explorer_queue_oldest_message
-        metric: azure_monitor.data_explorer.queue_oldest_message
-        info: "Data Explorer queue oldest message age on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf
-      - name: am_data_explorer_export_utilization
-        metric: azure_monitor.data_explorer.export_utilization
-        info: "Data Explorer export utilization on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf
-      - name: am_data_explorer_continuous_export_pending
-        metric: azure_monitor.data_explorer.continuous_export_pending
-        info: "Data Explorer continuous export pending on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf
-      - name: am_data_explorer_continuous_export_lateness
-        metric: azure_monitor.data_explorer.continuous_export_lateness
-        info: "Data Explorer continuous export lateness on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf
-      - name: am_data_explorer_streaming_ingest_utilization
-        metric: azure_monitor.data_explorer.streaming_ingest_utilization
-        info: "Data Explorer streaming ingest utilization on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf
-      - name: am_data_explorer_streaming_ingest_duration
-        metric: azure_monitor.data_explorer.streaming_ingest_duration
-        info: "Data Explorer streaming ingest duration on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf
-      - name: am_data_explorer_materialized_view_health
-        metric: azure_monitor.data_explorer.materialized_view_health
-        info: "Data Explorer materialized view health on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf
-      - name: am_data_explorer_materialized_view_age
-        metric: azure_monitor.data_explorer.materialized_view_age
-        info: "Data Explorer materialized view age on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf
-      - name: am_data_explorer_materialized_view_data_loss
-        metric: azure_monitor.data_explorer.materialized_view_data_loss
-        info: "Data Explorer materialized view data loss on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf
-      - name: am_data_explorer_follower_latency
-        metric: azure_monitor.data_explorer.follower_latency
-        info: "Data Explorer follower latency on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf
     metrics:
       folding:
         title: Metrics
@@ -9439,6 +7947,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-stream_analytics
       monitored_instance:
         name: Azure Stream Analytics Job
+        description: Monitor event flow, processing errors, timing, resource utilization, inputs, and functions for Azure Stream Analytics jobs.
         link: https://learn.microsoft.com/azure/stream-analytics/
         icon_filename: azure.svg
         categories:
@@ -9468,47 +7977,6 @@ modules:
           - **Input** -- input data throughput, input sources received
           - **Functions** -- function events and requests (total/failed)
         method_description: *method_description
-    alerts:
-      - name: am_stream_analytics_su_utilization
-        metric: azure_monitor.stream_analytics.resource_utilization
-        info: "Stream Analytics SU utilization on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf
-      - name: am_stream_analytics_cpu_utilization
-        metric: azure_monitor.stream_analytics.resource_utilization
-        info: "Stream Analytics CPU on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf
-      - name: am_stream_analytics_watermark_delay
-        metric: azure_monitor.stream_analytics.watermark_delay
-        info: "Stream Analytics watermark delay on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf
-      - name: am_stream_analytics_runtime_errors
-        metric: azure_monitor.stream_analytics.errors
-        info: "Stream Analytics runtime errors on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf
-      - name: am_stream_analytics_data_conversion_errors
-        metric: azure_monitor.stream_analytics.errors
-        info: "Stream Analytics conversion errors on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf
-      - name: am_stream_analytics_deserialization_errors
-        metric: azure_monitor.stream_analytics.errors
-        info: "Stream Analytics deserialization errors on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf
-      - name: am_stream_analytics_out_of_order_events
-        metric: azure_monitor.stream_analytics.event_timing
-        info: "Stream Analytics out-of-order events on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf
-      - name: am_stream_analytics_late_events
-        metric: azure_monitor.stream_analytics.event_timing
-        info: "Stream Analytics late events on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf
-      - name: am_stream_analytics_backlogged_events
-        metric: azure_monitor.stream_analytics.backlogged_events
-        info: "Stream Analytics backlog on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf
-      - name: am_stream_analytics_function_failures
-        metric: azure_monitor.stream_analytics.function_requests
-        info: "Stream Analytics ML function failures on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf
     metrics:
       folding:
         title: Metrics
@@ -9607,6 +8075,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-synapse
       monitored_instance:
         name: Azure Synapse Analytics Workspace
+        description: Monitor pipeline runs, SQL pool activity, streaming events, input throughput, and link processing for Azure Synapse Analytics workspaces.
         link: https://learn.microsoft.com/azure/synapse-analytics/
         icon_filename: azure.svg
         categories:
@@ -9636,39 +8105,6 @@ modules:
           - **Streaming I/O** -- input data throughput, input sources received
           - **Link** -- connection events, processed data volume, changed rows, processing latency, table events
         method_description: *method_description
-    alerts:
-      - name: am_synapse_streaming_resource_utilization
-        metric: azure_monitor.synapse.streaming_resource_utilization
-        info: "Synapse streaming SU utilization on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf
-      - name: am_synapse_streaming_runtime_errors
-        metric: azure_monitor.synapse.streaming_errors
-        info: "Synapse streaming runtime errors on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf
-      - name: am_synapse_streaming_data_errors
-        metric: azure_monitor.synapse.streaming_errors
-        info: "Synapse streaming data errors on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf
-      - name: am_synapse_streaming_watermark_delay
-        metric: azure_monitor.synapse.streaming_watermark_delay
-        info: "Synapse streaming watermark delay on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf
-      - name: am_synapse_streaming_late_events
-        metric: azure_monitor.synapse.streaming_event_timing
-        info: "Synapse streaming late events on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf
-      - name: am_synapse_streaming_out_of_order_events
-        metric: azure_monitor.synapse.streaming_event_timing
-        info: "Synapse streaming out-of-order events on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf
-      - name: am_synapse_streaming_backlogged_events
-        metric: azure_monitor.synapse.streaming_event_timing
-        info: "Synapse streaming backlogged events on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf
-      - name: am_synapse_link_processing_latency
-        metric: azure_monitor.synapse.link_processing_latency
-        info: "Synapse Link processing latency on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf
     metrics:
       folding:
         title: Metrics
@@ -9814,6 +8250,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-log_analytics
       monitored_instance:
         name: Azure Log Analytics Workspace
+        description: Monitor ingestion, queries, exports, and legacy agent system health for Azure Log Analytics workspaces.
         link: https://learn.microsoft.com/azure/azure-monitor/logs/
         icon_filename: azure.svg
         categories:
@@ -9842,63 +8279,6 @@ modules:
           - **Export** -- exported data (bytes/s), exported records
           - **Legacy agent** -- CPU utilization (processor/privileged/user/idle), memory (available/used/free), disk (free space/utilization/I/O/queue/latency), network (traffic/packets/errors/throughput), swap, paging, system processes, uptime, events, heartbeats, users
         method_description: *method_description
-    alerts:
-      - name: am_log_analytics_query_availability
-        metric: azure_monitor.log_analytics.query_availability
-        info: "Log Analytics query availability on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf
-      - name: am_log_analytics_ingestion_latency
-        metric: azure_monitor.log_analytics.ingestion_latency
-        info: "Log Analytics ingestion latency on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf
-      - name: am_log_analytics_query_failure_rate
-        metric: azure_monitor.log_analytics.queries
-        info: "Log Analytics query failures on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf
-      - name: am_log_analytics_export_failures
-        metric: azure_monitor.log_analytics.export_failures
-        info: "Log Analytics export failures on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf
-      - name: am_log_analytics_legacy_cpu
-        metric: azure_monitor.log_analytics.legacy_cpu_utilization
-        info: "Legacy agent CPU on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf
-      - name: am_log_analytics_legacy_memory
-        metric: azure_monitor.log_analytics.legacy_memory_utilization
-        info: "Legacy agent memory on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf
-      - name: am_log_analytics_legacy_swap
-        metric: azure_monitor.log_analytics.legacy_swap_utilization
-        info: "Legacy agent swap usage on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf
-      - name: am_log_analytics_legacy_disk_space
-        metric: azure_monitor.log_analytics.legacy_disk_space_utilization
-        info: "Legacy agent disk space on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf
-      - name: am_log_analytics_legacy_disk_inodes
-        metric: azure_monitor.log_analytics.legacy_disk_inodes
-        info: "Legacy agent inode usage on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf
-      - name: am_log_analytics_legacy_disk_read_latency
-        metric: azure_monitor.log_analytics.legacy_disk_io_latency
-        info: "Legacy agent disk read latency on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf
-      - name: am_log_analytics_legacy_disk_write_latency
-        metric: azure_monitor.log_analytics.legacy_disk_io_latency
-        info: "Legacy agent disk write latency on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf
-      - name: am_log_analytics_legacy_disk_queue
-        metric: azure_monitor.log_analytics.legacy_disk_queue
-        info: "Legacy agent disk queue on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf
-      - name: am_log_analytics_legacy_network_rx_errors
-        metric: azure_monitor.log_analytics.legacy_network_errors
-        info: "Legacy agent network RX errors on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf
-      - name: am_log_analytics_legacy_network_tx_errors
-        metric: azure_monitor.log_analytics.legacy_network_errors
-        info: "Legacy agent network TX errors on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf
     metrics:
       folding:
         title: Metrics
@@ -10188,6 +8568,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-express_route_gateway
       monitored_instance:
         name: Azure ExpressRoute Gateway
+        description: Monitor throughput, CPU, active flows, route changes, and virtual network scale for Azure ExpressRoute Gateway resources.
         link: https://learn.microsoft.com/azure/expressroute/expressroute-about-virtual-network-gateways
         icon_filename: azure.svg
         categories:
@@ -10216,27 +8597,6 @@ modules:
           - **Routes** -- routes advertised to peer, routes learned from peer, route changes
           - **Scale** -- VMs in VNet
         method_description: *method_description
-    alerts:
-      - name: am_express_route_gateway_cpu
-        metric: azure_monitor.express_route_gateway.cpu_utilization
-        info: "ExpressRoute GW CPU on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf
-      - name: am_express_route_gateway_active_flows
-        metric: azure_monitor.express_route_gateway.active_flows
-        info: "ExpressRoute GW active flows on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf
-      - name: am_express_route_gateway_route_changes
-        metric: azure_monitor.express_route_gateway.route_changes
-        info: "ExpressRoute GW route churn on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf
-      - name: am_express_route_gateway_routes_advertised
-        metric: azure_monitor.express_route_gateway.routes_advertised
-        info: "ExpressRoute GW routes advertised on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf
-      - name: am_express_route_gateway_routes_learned
-        metric: azure_monitor.express_route_gateway.routes_learned
-        info: "ExpressRoute GW routes learned on ${label:resource_name}"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf
     metrics:
       folding:
         title: Metrics

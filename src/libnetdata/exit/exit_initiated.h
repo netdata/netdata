@@ -3,7 +3,7 @@
 #ifndef NETDATA_EXIT_INITIATED_H
 #define NETDATA_EXIT_INITIATED_H
 
-#include "../common.h"
+#include "../libnetdata-base.h"
 #include "../template-enum.h"
 
 typedef enum {

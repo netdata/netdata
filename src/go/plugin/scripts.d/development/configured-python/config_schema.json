@@ -1,0 +1,33 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Synthetic queue",
+    "description": "Configure the synthetic queue example.",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "queue": {
+        "title": "Queue",
+        "description": "Name of the synthetic queue.",
+        "type": "string",
+        "minLength": 1,
+        "default": "mail"
+      },
+      "depth": {
+        "title": "Queue depth",
+        "description": "Number of jobs reported by this synthetic example.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 0
+      },
+      "warning": {
+        "title": "Warning threshold",
+        "description": "Report a warning when queue depth reaches this number of jobs.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 10
+      }
+    }
+  },
+  "uiSchema": {}
+}

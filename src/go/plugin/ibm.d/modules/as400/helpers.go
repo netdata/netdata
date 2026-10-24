@@ -1,5 +1,4 @@
 //go:build cgo
-// +build cgo
 
 package as400
 
@@ -26,7 +25,7 @@ func cleanName(name string) string {
 	return strings.ToLower(r.Replace(name))
 }
 
-func (c *Collector) logOnce(key string, format string, args ...interface{}) {
+func (c *Collector) logOnce(key string, format string, args ...any) {
 	if c.disabled[key] {
 		return
 	}
@@ -34,7 +33,7 @@ func (c *Collector) logOnce(key string, format string, args ...interface{}) {
 	c.disabled[key] = true
 }
 
-func (c *Collector) logErrorOnce(key string, format string, args ...interface{}) {
+func (c *Collector) logErrorOnce(key string, format string, args ...any) {
 	c.muErrorLog.Lock()
 	defer c.muErrorLog.Unlock()
 
@@ -243,16 +242,16 @@ func (c *Collector) parseIBMiVersion() {
 					c.versionRelease = release
 				}
 				modStr := remainder[mIdx+1:]
-				modNum := ""
+				var modNum strings.Builder
 				for _, ch := range modStr {
 					if ch >= '0' && ch <= '9' {
-						modNum += string(ch)
+						modNum.WriteString(string(ch))
 					} else {
 						break
 					}
 				}
-				if modNum != "" {
-					if mod, err := strconv.Atoi(modNum); err == nil {
+				if modNum.String() != "" {
+					if mod, err := strconv.Atoi(modNum.String()); err == nil {
 						c.versionMod = mod
 					}
 				}

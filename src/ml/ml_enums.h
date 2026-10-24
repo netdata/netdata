@@ -49,8 +49,19 @@ enum ml_worker_result {
     // Acquired a null dimension
     ML_WORKER_RESULT_NULL_ACQUIRED_DIMENSION,
 
+    // The dimension exists but cannot be used right now (its host is orphan or archived, or its chart is obsolete);
+    // unlike a null dimension, the item is requeued, because a reconnect or revival does not enqueue it again.
+    ML_WORKER_RESULT_DIMENSION_UNAVAILABLE,
+
     // Chart is under replication
     ML_WORKER_RESULT_CHART_UNDER_REPLICATION,
+
+    // This dimension is now supplied by downstream ML models; stop local requeueing
+    ML_WORKER_RESULT_DOWNSTREAM_MODEL_SUPPLIED,
+
+    // Another worker is already training this dimension; the item is requeued
+    // so the dim stays in the periodic retrain cycle.
+    ML_WORKER_RESULT_TRAINING_IN_PROGRESS,
 };
 
 const char *ml_worker_result_to_string(enum ml_worker_result tr);

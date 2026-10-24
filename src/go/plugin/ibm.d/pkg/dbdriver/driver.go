@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"slices"
 	"sync"
 )
 
@@ -161,18 +162,14 @@ func determineDriver(config *ConnectionConfig) (driver, dsn string, err error) {
 		// Auto-select best available driver
 		// Prefer ODBC if configured or for AS/400
 		if config.PreferODBC || config.SystemType == "AS400" {
-			for _, d := range available {
-				if d == "odbc" {
-					return "odbc", BuildODBCDSN(config), nil
-				}
+			if slices.Contains(available, "odbc") {
+				return "odbc", BuildODBCDSN(config), nil
 			}
 		}
 
 		// Try IBM DB2 client
-		for _, d := range available {
-			if d == "go_ibm_db" {
-				return "go_ibm_db", BuildDB2DSN(config), nil
-			}
+		if slices.Contains(available, "go_ibm_db") {
+			return "go_ibm_db", BuildDB2DSN(config), nil
 		}
 
 		// Use whatever is available

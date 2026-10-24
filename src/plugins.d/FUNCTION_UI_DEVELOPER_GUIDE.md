@@ -1,6 +1,6 @@
 # Netdata Functions: Developer Guide
 
-> **Note**: This is the practical developer guide. For the complete technical specification, see [Functions v3 Protocol Reference](/src/plugins.d/FUNCTION_UI_REFERENCE.md).
+> **Note**: This is the practical developer guide. For the complete technical specification, see [Functions v3 Protocol Reference](/src/plugins.d/FUNCTION_UI_REFERENCE.md). For topology Functions, use the dedicated [Topology Function Schema](/src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md).
 
 ## Overview
 
@@ -17,10 +17,11 @@ This guide teaches you how to create Netdata functions that provide interactive 
 - [Part 1: Simple Table Functions](#part-1-simple-table-functions) - Basic monitoring data
 - [Part 2: Log Explorer Functions](#part-2-log-explorer-functions) - Historical data with search
 - [Part 3: Complete Options Reference](#part-3-complete-options-reference) - Every option explained
+- [Topology Functions](/src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md) - Graph payloads, evidence rows, aggregation policy, and telemetry overlays
 
 ---
 
-# Part 1: Simple Table Functions
+## Part 1: Simple Table Functions
 
 Simple table functions display current system state - processes, connections, services, etc. They're perfect for "top-like" views and system monitoring.
 
@@ -123,9 +124,9 @@ Make your table more useful with these enhancements:
   "has_history": false,
   "help": "System services with CPU usage and status",
   "data": [
-    ["nginx", 25, "Running", {"rowOptions": {"severity": "normal"}}],
-    ["mysql", 67, "Stopped", {"rowOptions": {"severity": "error"}}],
-    ["redis", 91, "Running", {"rowOptions": {"severity": "warning"}}]
+    ["nginx", 25, "Running", {"severity": "normal"}],
+    ["mysql", 67, "Stopped", {"severity": "critical"}],
+    ["redis", 91, "Running", {"severity": "warning"}]
   ],
   "columns": {
     "name": {
@@ -151,7 +152,8 @@ Make your table more useful with these enhancements:
       "type": "string",
       "visualization": "pill",
       "filter": "multiselect"
-    }
+    },
+    "rowOptions": {"index": 3, "name": "Row styling", "type": "none", "visualization": "rowOptions", "visible": false}
   },
   "default_sort_column": "cpu"
 }
@@ -316,7 +318,7 @@ mysql    45%  1 process    (45% CPU, 1 process counted)
 
 ---
 
-# Part 2: Log Explorer Functions
+## Part 2: Log Explorer Functions
 
 Log explorer functions (`has_history: true`) provide advanced log analysis with full-text search, faceted filtering, time navigation, and histograms. Perfect for systemd journals, event logs, and audit trails.
 
@@ -365,11 +367,12 @@ Log explorer functions (`has_history: true`) provide advanced log analysis with 
       "type": "string",
       "full_width": true,
       "options": ["full_width", "wrap", "visible", "main_text", "fts"]
-    }
+    },
+    "rowOptions": {"index": 3, "name": "Row styling", "type": "none", "visualization": "rowOptions", "visible": false}
   },
   "data": [
-    [1697644320000000, {"rowOptions": {"severity": "error"}}, "ERROR", "Service failed"],
-    [1697644319000000, {"rowOptions": {"severity": "normal"}}, "INFO", "Service started"]
+    [1697644320000000, "ERROR", "Service failed", {"severity": "critical"}],
+    [1697644319000000, "INFO", "Service started", {"severity": "normal"}]
   ],
   "facets": [
     {
@@ -568,7 +571,7 @@ When `has_history: true`:
 
 ---
 
-# Part 3: Complete Options Reference
+## Part 3: Complete Options Reference
 
 This section documents every field type, option, and behavior for quick reference while developing.
 
@@ -708,24 +711,36 @@ if (usec) {
 
 ### Row Coloring by Severity
 
-Add row coloring by including `rowOptions` as the last element:
+Declare the hidden column under the exact key `rowOptions`, with `type: "none"` and
+`visualization: "rowOptions"`. Put a plain object such as `{"severity": "critical"}` at that column's index
+in every data row. A different column key or an extra `rowOptions` wrapper prevents the UI from finding the
+styling. This example places it at index 2:
 
 ```json
 {
+  "columns": {
+    "label": {"index": 0, "name": "Label", "type": "string"},
+    "value": {"index": 1, "name": "Value", "type": "string"},
+    "rowOptions": {"index": 2, "name": "Row styling", "type": "none", "visualization": "rowOptions", "visible": false}
+  },
   "data": [
-    ["normal data", "values", {"rowOptions": {"severity": "normal"}}],
-    ["warning data", "values", {"rowOptions": {"severity": "warning"}}],
-    ["error data", "values", {"rowOptions": {"severity": "error"}}],
-    ["notice data", "values", {"rowOptions": {"severity": "notice"}}]
+    ["normal data", "values", {"severity": "normal"}],
+    ["warning data", "values", {"severity": "warning"}],
+    ["error data", "values", {"severity": "critical"}],
+    ["notice data", "values", {"severity": "notice"}]
   ]
 }
 ```
 
 **Severity Levels:**
-- `"normal"` - Default appearance
-- `"warning"` - Yellow background
-- `"error"` - Red background  
-- `"notice"` - Blue background
+- `"normal"` - Default text
+- `"warning"` - Emphasized warning text
+- `"critical"` - Emphasized error text
+- `"notice"` - Emphasized text
+- `"debug"` - Emphasized muted text
+
+The cell renderer supports `critical`; `error` is not a styling severity. Source health strings and table
+styling are separate contracts.
 
 ## Chart and Grouping Configuration
 
@@ -794,11 +809,9 @@ buffer_rrdf_table_add_field(
     RRDF_FIELD_OPTS_VISIBLE, NULL
 );
 
-// Add row coloring
+// At the index declared by the rowOptions column, append the styling object.
 buffer_json_add_array_item_object(wb);
-buffer_json_member_add_object(wb, "rowOptions");
-buffer_json_member_add_string(wb, "severity", "error");
-buffer_json_object_close(wb);
+buffer_json_member_add_string(wb, "severity", "critical");
 buffer_json_object_close(wb);
 ```
 

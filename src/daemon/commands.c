@@ -14,14 +14,45 @@ char cmd_prefix_by_status[] = {
         CMD_PREFIX_ERROR
 };
 
+// Accessed from the command loop thread, the libuv workers, the signal thread and the shutdown
+// thread, so every read and write of THIS variable goes through __atomic_* - see commands_exit().
+// The two below have their own rules; do not read this comment as covering them.
 static cmd_init_status_t command_server_initialized = CMD_INIT_STATUS_OFF;
+
+// Written by the command loop thread before it marks the init completion, read by commands_init()
+// after completion_wait_for() returns. The completion supplies the ordering, so plain accesses
+// are correct here and atomics would add nothing.
 static int command_thread_error;
+
+// Written by commands_exit() from ANOTHER thread and read by the command loop's own condition, so
+// it must be atomic: a missed store means the loop calls uv_run() again, never exits, and
+// uv_thread_join() blocks until the shutdown watchdog aborts the process - the exact failure this
+// change exists to remove. (The loop also zeroes it during setup, which is why commands_exit()
+// waits for the init handshake before it may be touched.)
 static int command_thread_shutdown;
 static unsigned clients = 0;
 
 struct command_context {
     /* embedded client pipe structure at address 0 */
     uv_pipe_t client;
+
+    // Will a libuv callback close this handle?
+    //
+    // The shutdown teardown closes IDLE clients - ones sitting on an open connection with nothing
+    // outstanding - so that the final uv_run() can drain. It must NOT close a handle that a
+    // callback chain is going to close, because closing frees the whole context (the pipe is
+    // embedded at offset 0 and pipe_close_cb() frees it) and the later callback would then
+    // double-close it and touch freed memory.
+    //
+    // Set at BOTH points where a callback chain takes ownership, and NEVER cleared:
+    //   - when a command is queued (uv_queue_work): schedule_command() and
+    //     after_schedule_command() use the context, and the latter starts the reply write;
+    //   - when any reply write is started (send_command_reply): pipe_write_cb() closes the
+    //     handle once that write completes. This covers the invalid-command reply, which is sent
+    //     directly from parse_commands() with no work item at all.
+    // If the uv_write fails to start, send_command_reply() closes the handle itself there and
+    // then, so the flag staying set costs nothing - uv_is_closing() covers that case.
+    bool close_by_callback;
 
     uv_work_t work;
     uv_write_t write_req;
@@ -232,7 +263,6 @@ static cmd_status_t cmd_reload_labels_execute(char *args, char **message)
     (void)args;
     netdata_log_info("COMMAND: reloading host labels.");
     reload_host_labels();
-    aclk_queue_node_info(localhost, 1);
 
     BUFFER *wb = buffer_create(10, NULL);
     rrdlabels_log_to_buffer(localhost->rrdlabels, wb);
@@ -354,20 +384,84 @@ static cmd_status_t cmd_dumpconfig(char *args, char **message)
     return CMD_STATUS_SUCCESS;
 }
 
-static int remove_ephemeral_host(BUFFER *wb, RRDHOST *host, bool report_error, bool unregister)
+static int remove_ephemeral_host(BUFFER *wb, const char *machine_guid, bool report_error, bool unregister)
 {
+    rrd_rdlock();
+    RRDHOST *host = rrdhost_find_by_guid(machine_guid);
+    if (!host) {
+        rrd_rdunlock();
+        return 0;
+    }
+
     if (host == localhost) {
         if (report_error)
             buffer_sprintf(wb, "Node '%s' (machine guid: %s) is our localhost - not changing it",
                            rrdhost_hostname(host), host->machine_guid);
+        rrd_rdunlock();
         return 0;
     }
 
+    // the context-load workers (sqlite_metadata.c) hold raw RRDHOST pointers to
+    // every host carrying this flag; freeing such a host is a use-after-free
+    // (marking ephemeral without unregistering does not free it, so it may proceed)
+    if (unregister && rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)) {
+        if (report_error)
+            buffer_sprintf(wb, "Node '%s' (machine guid: %s) is busy loading contexts - try again",
+                           rrdhost_hostname(host), host->machine_guid);
+        rrd_rdunlock();
+        return -1;
+    }
+
+    bool locked = unregister ? rw_spinlock_trywrite_lock(&host->metadata_lifetime_lock)
+                             : rw_spinlock_tryread_lock(&host->metadata_lifetime_lock);
+    if (!locked) {
+        // a plugin holds the read side of a vnode for as long as it has it selected, so an online
+        // vnode fails here: report it as online, as it is reported when we get the lock
+        bool online = rrdhost_is_online(host);
+        if (report_error) {
+            if (online)
+                buffer_sprintf(wb, "Node '%s' (machine guid: %s) is online - not changing it",
+                               rrdhost_hostname(host), host->machine_guid);
+            else
+                buffer_sprintf(wb, "Node '%s' (machine guid: %s) is busy - try again",
+                               rrdhost_hostname(host), host->machine_guid);
+        }
+        rrd_rdunlock();
+        return online ? 0 : -1;
+    }
+    rrd_rdunlock();
+
+    // Every path that makes a host live (a child attaching, a plugin defining or re-enabling a vnode)
+    // holds the read side until the host is online (see metadata_lifetime_lock). So with the write side,
+    // an offline host stays offline - a reconnecting child is refused until we are done - and with the
+    // read side it stays allocated.
     if (rrdhost_is_online(host)) {
         if (report_error)
             buffer_sprintf(wb, "Node '%s' (machine guid: %s) is online - not changing it",
                            rrdhost_hostname(host), host->machine_guid);
+        if (unregister)
+            rw_spinlock_write_unlock(&host->metadata_lifetime_lock);
+        else
+            rw_spinlock_read_unlock(&host->metadata_lifetime_lock);
         return 0;
+    }
+
+    // Offline is not enough to free it: a disconnecting child's receiver clears the online flag
+    // first and keeps using the host until rrdhost_clear_receiver() sets host->receiver to NULL,
+    // while the free path waits for it only briefly. With the write side no new receiver can
+    // attach, so once host->receiver is NULL it stays NULL until we are done.
+    if (unregister) {
+        rrdhost_receiver_lock(host);
+        bool receiver_attached = host->receiver != NULL;
+        rrdhost_receiver_unlock(host);
+
+        if (receiver_attached) {
+            if (report_error)
+                buffer_sprintf(wb, "Node '%s' (machine guid: %s) is busy - try again",
+                               rrdhost_hostname(host), host->machine_guid);
+            rw_spinlock_write_unlock(&host->metadata_lifetime_lock);
+            return -1;
+        }
     }
 
     bool marked = false;
@@ -376,11 +470,29 @@ static int remove_ephemeral_host(BUFFER *wb, RRDHOST *host, bool report_error, b
         marked = true;
     }
 
-    sql_set_host_label(&host->host_id.uuid, "_is_ephemeral", "true");
+    // host->rrdlabels is the copy that matters: build_node_info() transmits it as the
+    // node's complete label set, and meta_store_host_labels() rewrites the host_label
+    // rows from it. Updating only the row below leaves the cloud believing the node is
+    // permanent, and lets a later metadata store revert that row. Update the dictionary
+    // in place - RRDLABELS is internally locked, while replacing the pointer would race
+    // readers that assume it stays valid for the lifetime of the host.
+    bool label_changed = host->rrdlabels &&
+        rrdlabels_add_changed(host->rrdlabels, HOST_LABEL_IS_EPHEMERAL, "true", RRDLABEL_SRC_CONFIG);
+    marked |= label_changed;
+
+    sql_set_host_label(&host->host_id.uuid, HOST_LABEL_IS_EPHEMERAL, "true");
     pulse_host_status(host, 0, 0);
 
-    if (marked)
+    // only a change in the transmitted labels needs an update; a host that has none in
+    // memory gets no update at all, because that would publish an empty set and drop
+    // every other label this node has
+    if (label_changed)
         send_node_info_with_wait(host);
+    else if (!host->rrdlabels)
+        nd_log_daemon(NDLP_WARNING,
+                      "Node '%s' (machine guid: %s) has no labels in memory - "
+                      "could not inform Netdata Cloud that it is ephemeral",
+                      rrdhost_hostname(host), host->machine_guid);
 
     if (unregister) {
         send_node_update_with_wait(host, 0, 0);
@@ -389,15 +501,14 @@ static int remove_ephemeral_host(BUFFER *wb, RRDHOST *host, bool report_error, b
         host->node_id = UUID_ZERO;
         buffer_sprintf(wb, "Node '%s' (machine guid: %s) has been unregistered",
                        rrdhost_hostname(host), host->machine_guid);
-        rrd_wrlock();
-        rrdhost_free___while_having_rrd_wrlock(host);
-        rrd_wrunlock();
+        rrdhost_free___consume_metadata_lifetime_writelock(host);
         return 1;
     }
 
     if (marked) {
         buffer_sprintf(wb, "Node '%s' (machine guid: %s) has been marked ephemeral",
                        rrdhost_hostname(host), host->machine_guid);
+        rw_spinlock_read_unlock(&host->metadata_lifetime_lock);
         return 1;
     }
 
@@ -406,6 +517,7 @@ static int remove_ephemeral_host(BUFFER *wb, RRDHOST *host, bool report_error, b
                        rrdhost_hostname(host), host->machine_guid);
     }
 
+    rw_spinlock_read_unlock(&host->metadata_lifetime_lock);
     return 0;
 }
 
@@ -421,12 +533,16 @@ static cmd_status_t cmd_remove_stale_node_internal(char *args, char **message, b
         goto done;
     }
 
-    RRDHOST *host = NULL;
-    host = rrdhost_find_by_guid(args);
+    char machine_guid[UUID_STR_LEN] = "";
+    rrd_rdlock();
+    RRDHOST *host = rrdhost_find_by_guid(args);
     if (!host)
         host = rrdhost_find_by_node_id(args);
+    if (host)
+        strncpyz(machine_guid, host->machine_guid, sizeof(machine_guid));
+    rrd_rdunlock();
 
-    if (!host) {
+    if (!machine_guid[0]) {
         sqlite3_stmt *res = NULL;
 
         bool report_error = strcmp(args, "ALL_NODES") != 0;
@@ -441,30 +557,36 @@ static cmd_status_t cmd_remove_stale_node_internal(char *args, char **message, b
 
         param = 0;
         int cnt = 0;
+        int busy = 0;
         while (sqlite3_step_monitored(res) == SQLITE_ROW) {
             char guid[UUID_STR_LEN];
-            uuid_unparse_lower(*(nd_uuid_t *)sqlite3_column_blob(res, 0), guid);
-            host = rrdhost_find_by_guid(guid);
-            if (host) {
-                int rc = remove_ephemeral_host(wb, host, report_error, unregister);
-                if(rc) {
-                    cnt += rc;
+            if (!sqlite3_column_uuid_unparse_lower(res, 0, guid))
+                continue;
+            int rc = remove_ephemeral_host(wb, guid, report_error, unregister);
+            if (rc > 0) {
+                cnt += rc;
+                buffer_fast_strcat(wb, "\n", 1);
+            }
+            else if (rc < 0) {
+                busy++;
+                if (report_error)
                     buffer_fast_strcat(wb, "\n", 1);
-                }
             }
         }
-        if (!cnt && buffer_strlen(wb) == 0) {
+        if (!cnt && !busy && buffer_strlen(wb) == 0) {
             if (report_error)
                 buffer_sprintf(wb, "No match for \"%s\"", args);
             else
                 buffer_sprintf(wb, "No stale nodes found");
         }
+        else if (busy && !report_error)
+            buffer_sprintf(wb, "%d node%s %s busy - try again", busy, busy == 1 ? "" : "s", busy == 1 ? "is" : "are");
     done0:
         REPORT_BIND_FAIL(res, param);
         SQLITE_FINALIZE(res);
     }
     else
-        (void) remove_ephemeral_host(wb, host, true, unregister);
+        (void) remove_ephemeral_host(wb, machine_guid, true, unregister);
 
 done:
     *message = strdupz(buffer_tostring(wb));
@@ -582,6 +704,11 @@ static void send_command_reply(struct command_context *cmd_ctx, cmd_status_t sta
     int ret;
     BUFFER *reply_string = buffer_create(128, NULL);
 
+    // From here on pipe_write_cb() owns closing this handle - see close_by_callback. This must be
+    // set for EVERY reply, not just those that came from a queued command: the invalid-command
+    // reply is sent straight from parse_commands() with no work item.
+    cmd_ctx->close_by_callback = true;
+
     char exit_status_string[MAX_EXIT_STATUS_LENGTH + 1] = {'\0', };
     unsigned reply_string_size = 0;
     uv_buf_t write_buf;
@@ -604,6 +731,9 @@ static void send_command_reply(struct command_context *cmd_ctx, cmd_status_t sta
     ret = uv_write(&cmd_ctx->write_req, (uv_stream_t *)client, &write_buf, 1, pipe_write_cb);
     if (ret) {
         netdata_log_error("uv_write(): %s", uv_strerror(ret));
+        buffer_free(reply_string);
+        uv_close((uv_handle_t *)client, pipe_close_cb);
+        --clients;
     }
 }
 
@@ -613,7 +743,7 @@ cmd_status_t execute_command(cmd_t idx, char *args, char **message)
     cmd_type_t type = command_info_array[idx].type;
 
     cmd_lock_by_type[type](idx);
-    if (command_server_initialized >= command_info_array[idx].init_status)
+    if (__atomic_load_n(&command_server_initialized, __ATOMIC_ACQUIRE) >= command_info_array[idx].init_status)
         status = command_info_array[idx].func(args, message);
     else {
         if (message)
@@ -625,6 +755,40 @@ cmd_status_t execute_command(cmd_t idx, char *args, char **message)
     return status;
 }
 
+// Command handlers dispatched to the libuv threadpool, and whether THIS thread is inside one.
+//
+// SCOPE, so the count is not over-trusted: this covers the QUEUED commands only. The signal
+// path calls execute_command(CMD_RELOAD_HEALTH / CMD_REOPEN_LOGS) directly on its own thread
+// (signal-handler.c), and CMD_EXIT is executed inline by parse_commands(); neither is counted.
+// CMD_RELOAD_HEALTH does reach SQLite (health_plugin_reload() -> ... -> sql_alert_store_config()),
+// so "no commands in flight" means no netdatacli WORK ITEM is in flight - it is not a statement
+// about every SQLite user.
+//
+// commands_exit() needs both. A handler can terminate the process from where it runs -
+// cmd_fatal_execute() calls fatal(), which runs the whole shutdown sequence on the threadpool
+// worker - and shutdown then reaches commands_exit(). Joining the command loop from there
+// deadlocks: the loop's own teardown runs uv_run(loop, UV_RUN_DEFAULT) to flush, and the work
+// request it is waiting to flush is the one this thread is still inside.
+static uint32_t commands_in_flight = 0;
+static __thread bool this_thread_runs_a_command = false;
+
+// commands_exit() has TWO callers now - the signal path and the shutdown sequence - and they
+// can run on different threads at the same time (a systemd PrepareForShutdown, an API quit, or
+// a fatal() on any thread can be inside netdata_cleanup_and_exit() when SIGTERM arrives).
+// command_server_initialized only becomes CMD_INIT_STATUS_OFF after the join completes, so it
+// cannot by itself keep two callers apart: both would pass it and both would reach
+// uv_thread_join() on the same thread, which is undefined behaviour, and then destroy the same
+// mutexes twice.
+static bool commands_exit_in_progress = false;
+
+// Has uv_thread_create() actually produced `thread`?
+//
+// This is NOT the same question as the init status. commands_init() sets CMD_INIT_STATUS_INIT
+// BEFORE it creates the thread, so the status cannot tell us whether `thread` is safe to touch,
+// and CMD_INIT_STATUS_FULL is too strict in the other direction: at INIT the loop is already
+// running and serving commands, so a shutdown there still has to drain it.
+static bool command_thread_created = false;
+
 static void after_schedule_command(uv_work_t *req, int status)
 {
     struct command_context *cmd_ctx = req->data;
@@ -634,6 +798,8 @@ static void after_schedule_command(uv_work_t *req, int status)
     send_command_reply(cmd_ctx, cmd_ctx->status, cmd_ctx->message);
     if (cmd_ctx->message)
         freez(cmd_ctx->message);
+
+    __atomic_sub_fetch(&commands_in_flight, 1, __ATOMIC_ACQ_REL);
 }
 
 static void schedule_command(uv_work_t *req)
@@ -642,7 +808,9 @@ static void schedule_command(uv_work_t *req)
     worker_is_busy(UV_EVENT_SCHEDULE_CMD);
 
     struct command_context *cmd_ctx = req->data;
+    this_thread_runs_a_command = true;
     cmd_ctx->status = execute_command(cmd_ctx->idx, cmd_ctx->args, &cmd_ctx->message);
+    this_thread_runs_a_command = false;
 
     worker_is_idle();
 }
@@ -673,6 +841,8 @@ static void parse_commands(struct command_context *cmd_ctx)
             cmd_ctx->args = lstrip;
             cmd_ctx->message = NULL;
 
+            cmd_ctx->close_by_callback = true;
+            __atomic_add_fetch(&commands_in_flight, 1, __ATOMIC_ACQ_REL);
             fatal_assert(0 == uv_queue_work(loop, &cmd_ctx->work, schedule_command, after_schedule_command));
             break;
         }
@@ -736,6 +906,7 @@ static void connection_cb(uv_stream_t *server, int status)
     /* combined allocation of client pipe and command context */
     cmd_ctx = mallocz(sizeof(*cmd_ctx));
     cmd_ctx->idx = CMD_HELP;
+    cmd_ctx->close_by_callback = false;
     client = (uv_pipe_t *)cmd_ctx;
     ret = uv_pipe_init(server->loop, client, 1);
     if (ret) {
@@ -769,6 +940,36 @@ static void connection_cb(uv_stream_t *server, int status)
 static void async_cb(uv_async_t *handle)
 {
     uv_stop(handle->loop);
+}
+
+// Close the client connections that are merely sitting there.
+//
+// The teardown below closes the listener and the async handle, then flushes with
+// uv_run(loop, UV_RUN_DEFAULT). That flush does not return while ANY handle is still active -
+// including an accepted client that connected and then sent nothing, which keeps its read
+// handle open indefinitely. Since commands_exit() joins this thread, such a client would stall
+// the whole shutdown until the 135 s watchdog SIGABRTs it - and it would also trip the
+// fatal_assert(0 == uv_loop_close(loop)) below.
+//
+// Only IDLE clients are closed here - those that never had a command dispatched. A client the
+// loop is working for is left alone: its context is freed by pipe_close_cb(), so closing it now
+// would pull the memory out from under schedule_command(), after_schedule_command(), or the
+// uv_write they start. Each closes itself in pipe_write_cb() once its reply is written, and this
+// same flush collects it.
+static void close_idle_clients_cb(uv_handle_t *handle, void *arg __maybe_unused)
+{
+    if (handle->type != UV_NAMED_PIPE || handle == (uv_handle_t *)&server_pipe)
+        return;
+
+    if (uv_is_closing(handle))
+        return;
+
+    struct command_context *cmd_ctx = (struct command_context *)handle;
+    if (cmd_ctx->close_by_callback)
+        return;
+
+    uv_close(handle, pipe_close_cb);
+    --clients;
 }
 
 static void command_thread(void *arg) {
@@ -826,17 +1027,21 @@ static void command_thread(void *arg) {
     }
 
     command_thread_error = 0;
-    command_thread_shutdown = 0;
+    __atomic_store_n(&command_thread_shutdown, 0, __ATOMIC_RELEASE);
     /* wake up initialization thread */
     completion_mark_complete(&completion);
 
-    while (command_thread_shutdown == 0) {
+    while (__atomic_load_n(&command_thread_shutdown, __ATOMIC_ACQUIRE) == 0) {
         uv_run(loop, UV_RUN_DEFAULT);
     }
     /* cleanup operations of the event loop */
     netdata_log_info("Shutting down command event loop.");
     uv_close((uv_handle_t *)&async, NULL);
+
+    /* stop accepting new connections first, then drop the idle ones, then flush */
     uv_close((uv_handle_t*)&server_pipe, NULL);
+    uv_walk(loop, close_idle_clients_cb, NULL);
+
     uv_run(loop, UV_RUN_DEFAULT); /* flush all libuv handles */
 
     netdata_log_info("Shutting down command loop complete.");
@@ -872,23 +1077,49 @@ void commands_init(void)
     int error;
 
     sanity_check();
-    if (command_server_initialized == CMD_INIT_STATUS_FULL)
+
+    // Never (re)start the command server once shutdown has begun. Without this, a SIGTERM during
+    // startup could have commands_exit() stop the loop while main() is still initializing, and
+    // the next commands_init() would bring a fresh loop up - dispatching commands that touch
+    // db_meta while the shutdown sequence is closing it.
+    if (exit_initiated_get()) {
+        netdata_log_info("Not initializing the command server: shutdown has already begun.");
+        return;
+    }
+
+    if (__atomic_load_n(&command_server_initialized, __ATOMIC_ACQUIRE) == CMD_INIT_STATUS_FULL)
         return;
 
-    if (command_server_initialized == CMD_INIT_STATUS_OFF) {
+    if (__atomic_load_n(&command_server_initialized, __ATOMIC_ACQUIRE) == CMD_INIT_STATUS_OFF) {
         netdata_log_info("Initializing command server for liveness CHECK");
-        command_server_initialized = CMD_INIT_STATUS_INIT;
+        // Re-arm, so a second init/exit cycle in one process does not latch instead of
+        // joining. sqlite_library_init() does the same for its own flags.
+        __atomic_store_n(&commands_exit_in_progress, false, __ATOMIC_RELEASE);
+        __atomic_store_n(&command_server_initialized, CMD_INIT_STATUS_INIT, __ATOMIC_RELEASE);
     }
     else {
         netdata_log_info("Initializing full command server.");
-        command_server_initialized = CMD_INIT_STATUS_FULL;
+        __atomic_store_n(&command_server_initialized, CMD_INIT_STATUS_FULL, __ATOMIC_RELEASE);
         return;
     }
 
-    for (i = 0 ; i < CMD_TOTAL_COMMANDS ; ++i) {
-        fatal_assert(0 == netdata_mutex_init(&command_lock_array[i]));
+    // Initialize the command locks ONCE per process.
+    //
+    // commands_exit() deliberately does not destroy them (another thread may hold one; see the
+    // note there), so re-running netdata_mutex_init() on an already-initialized mutex would be
+    // undefined behaviour on a second init/exit cycle. Guarding here keeps both halves safe:
+    // nothing is destroyed while it may be held, and nothing is re-initialized while it is live.
+    //
+    // Only ever reached from commands_init(), which main() calls during single-threaded startup,
+    // so a plain flag is sufficient.
+    static bool command_locks_initialized = false;
+    if (!command_locks_initialized) {
+        for (i = 0 ; i < CMD_TOTAL_COMMANDS ; ++i) {
+            fatal_assert(0 == netdata_mutex_init(&command_lock_array[i]));
+        }
+        fatal_assert(0 == netdata_rwlock_init(&exclusive_rwlock));
+        command_locks_initialized = true;
     }
-    fatal_assert(0 == netdata_rwlock_init(&exclusive_rwlock));
 
     completion_init(&completion);
     error = uv_thread_create(&thread, command_thread, NULL);
@@ -908,30 +1139,116 @@ void commands_init(void)
         goto after_error;
     }
 
+    // Publish ONLY here - after the initialization handshake, never right after
+    // uv_thread_create(). Between those two points the worker has not yet initialized `async`
+    // and `server_pipe`, and it ends its setup with `command_thread_shutdown = 0`. A
+    // commands_exit() that passed the gate in that window would (a) uv_async_send() an
+    // uninitialized handle and (b) have its `command_thread_shutdown = 1` overwritten by the
+    // worker, so the loop would never exit and uv_thread_join() would block until the shutdown
+    // watchdog aborted. Publishing after the handshake makes the gate mean "the loop is up and
+    // can be told to stop", which is what commands_exit() actually needs.
+    __atomic_store_n(&command_thread_created, true, __ATOMIC_RELEASE);
+
+    // Shutdown may have begun while we were completing that handshake (on Windows the service
+    // reports itself running before netdata_main(), so a stop can arrive during startup). The
+    // commands_exit() that ran then saw no thread and returned without stopping anything, so
+    // stop it now rather than leaving a live loop dispatching commands into a teardown.
+    if (exit_initiated_get()) {
+        netdata_log_info("Command server came up during shutdown; stopping it again.");
+        commands_exit();
+    }
+
     return;
 
 after_error:
     netdata_log_error("Failed to initialize command server. The netdata cli tool will be unable to send commands.");
-    command_server_initialized = CMD_INIT_STATUS_OFF;
+    __atomic_store_n(&command_server_initialized, CMD_INIT_STATUS_OFF, __ATOMIC_RELEASE);
 }
 
 void commands_exit(void)
 {
-    cmd_t i;
-
-    if (command_server_initialized == CMD_INIT_STATUS_OFF)
+    // Already stopped, by whichever caller got here first. Nothing to drain and nothing to
+    // suppress: that caller completed the join before setting this.
+    if (__atomic_load_n(&command_server_initialized, __ATOMIC_ACQUIRE) == CMD_INIT_STATUS_OFF)
         return;
 
-    command_thread_shutdown = 1;
+    // Two shutdown paths originate INSIDE this subsystem, and neither can join the loop:
+    //
+    //  - `netdatacli shutdown-agent`: parse_commands() executes CMD_EXIT inline rather than
+    //    through the workqueue (musl does not tolerate a libuv worker calling exit()), and
+    //    cmd_exit_execute() -> netdata_exit_gracefully() -> netdata_cleanup_and_exit() runs
+    //    the whole shutdown ON THE LOOP THREAD. Joining ourselves trips the fatal_assert below.
+    //  - `netdatacli fatal-agent` (and any handler that calls fatal()): those DO go through the
+    //    workqueue, so shutdown runs on a threadpool WORKER. That worker is not the loop
+    //    thread, so a naive thread comparison lets it through to the join - and then it
+    //    deadlocks, because the loop's teardown flushes with uv_run(loop, UV_RUN_DEFAULT) and
+    //    the request it waits on is the one this worker is still inside. Shutdown then hangs
+    //    until the watchdog SIGABRTs it.
+    //
+    // So: skip the join whenever we are the loop thread OR we are inside a command handler.
+    //
+    // Whether to suppress the SQLite teardown as well is a SEPARATE question, and must not be
+    // answered by the shape of the path. `netdatacli shutdown-agent` is the stop command used
+    // by the installer and the documented manual stop, and CMD_EXIT itself touches no SQLite;
+    // latching there unconditionally would skip the database close, PRAGMA optimize and WAL
+    // checkpoint on ordinary restarts. Latch only when a command handler is actually in flight
+    // and may be holding SQLite state - which for the fatal-agent path includes ourselves.
+    // Do not touch `thread` until it exists - but do not demand CMD_INIT_STATUS_FULL either.
+    // At CMD_INIT_STATUS_INIT the loop is already running (only help/ping/version are
+    // dispatchable, none of which touch SQLite, but the loop must still be stopped), so gating
+    // on FULL would leave it running straight through the SQLite teardown.
+    if (!__atomic_load_n(&command_thread_created, __ATOMIC_ACQUIRE)) {
+        netdata_log_info("Command server thread was never created; nothing to stop.");
+        return;
+    }
+
+    uv_thread_t self = uv_thread_self();
+    if (uv_thread_equal(&thread, &self) || this_thread_runs_a_command) {
+        uint32_t in_flight = __atomic_load_n(&commands_in_flight, __ATOMIC_ACQUIRE);
+
+        if (in_flight) {
+            sqlite_mark_teardown_unsafe(
+                "shutdown started inside the netdatacli command subsystem while a command was still "
+                "running, so the command loop cannot be drained");
+            netdata_log_info(
+                "Command server cannot be joined from this thread; %u command(s) still in flight.", in_flight);
+        }
+        else
+            netdata_log_info(
+                "Command server cannot be joined from this thread; no netdatacli command is in flight.");
+
+        return;
+    }
+
+    // Someone else is inside this function right now (see commands_exit_in_progress). We must
+    // not join a thread they are already joining, and we cannot wait for them without risking a
+    // deadlock of our own - so we fall back to the other half of the contract and suppress the
+    // teardown, because we cannot establish that the command loop was drained.
+    if (__atomic_exchange_n(&commands_exit_in_progress, true, __ATOMIC_ACQ_REL)) {
+        sqlite_mark_teardown_unsafe(
+            "another thread is already stopping the netdatacli command loop, so this one cannot "
+            "confirm it was drained");
+        return;
+    }
+
+    __atomic_store_n(&command_thread_shutdown, 1, __ATOMIC_RELEASE);
     netdata_log_info("Shutting down command server.");
     /* wake up event loop */
     fatal_assert(0 == uv_async_send(&async));
     fatal_assert(0 == uv_thread_join(&thread));
 
-    for (i = 0 ; i < CMD_TOTAL_COMMANDS ; ++i) {
-        netdata_mutex_destroy(&command_lock_array[i]);
-    }
-    netdata_rwlock_destroy(&exclusive_rwlock);
+    // Deliberately NOT destroying command_lock_array[] / exclusive_rwlock.
+    //
+    // This function used to have a single caller on the signal thread - the same thread that
+    // runs the signal path's direct execute_command() calls - so a destroy could never race a
+    // held lock. It now also runs from the shutdown sequence, which can be on a different
+    // thread (systemd PrepareForShutdown, an API quit, or any fatal()), so destroying here
+    // could tear down a mutex that the signal thread is holding inside execute_command().
+    // POSIX says that is undefined; glibc happens to return EBUSY.
+    //
+    // There is nothing to gain by destroying them: the process exits immediately after, and
+    // the OS reclaims everything. Leaking them is the safe half of the trade.
     netdata_log_info("Command server has stopped.");
-    command_server_initialized = CMD_INIT_STATUS_OFF;
+    __atomic_store_n(&command_thread_created, false, __ATOMIC_RELEASE);
+    __atomic_store_n(&command_server_initialized, CMD_INIT_STATUS_OFF, __ATOMIC_RELEASE);
 }

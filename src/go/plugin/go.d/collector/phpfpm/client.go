@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"time"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 
@@ -19,12 +21,12 @@ import (
 
 type (
 	status struct {
-		Active    int64  `json:"active processes" stm:"active"`
+		Active    int64  `json:"active processes"     stm:"active"`
 		MaxActive int64  `json:"max active processes" stm:"maxActive"`
-		Idle      int64  `json:"idle processes" stm:"idle"`
-		Requests  int64  `json:"accepted conn" stm:"requests"`
+		Idle      int64  `json:"idle processes"       stm:"idle"`
+		Requests  int64  `json:"accepted conn"        stm:"requests"`
 		Reached   int64  `json:"max children reached" stm:"reached"`
-		Slow      int64  `json:"slow requests" stm:"slow"`
+		Slow      int64  `json:"slow requests"        stm:"slow"`
 		Processes []proc `json:"processes"`
 	}
 	proc struct {
@@ -48,7 +50,7 @@ func (rd *requestDuration) UnmarshalJSON(b []byte) error {
 }
 
 type client interface {
-	getStatus() (*status, error)
+	getStatus(context.Context) (*status, error)
 }
 
 type httpClient struct {
@@ -74,8 +76,8 @@ func newHTTPClient(c *http.Client, r web.RequestConfig) (*httpClient, error) {
 	}, nil
 }
 
-func (c *httpClient) getStatus() (*status, error) {
-	req, err := web.NewHTTPRequest(c.req)
+func (c *httpClient) getStatus(ctx context.Context) (*status, error) {
+	req, err := web.NewHTTPRequest(ctx, c.req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request: %v", err)
 	}
@@ -116,7 +118,7 @@ func newSocketClient(log *logger.Logger, socket string, timeout time.Duration, f
 	}
 }
 
-func (c *socketClient) getStatus() (*status, error) {
+func (c *socketClient) getStatus(ctx context.Context) (*status, error) {
 	socket, err := fcgiclient.DialTimeout("unix", c.socket, c.timeout)
 	if err != nil {
 		return nil, fmt.Errorf("error on connecting to socket '%s': %v", c.socket, err)
@@ -175,7 +177,7 @@ func newTcpClient(log *logger.Logger, address string, timeout time.Duration, fcg
 	}
 }
 
-func (c *tcpClient) getStatus() (*status, error) {
+func (c *tcpClient) getStatus(ctx context.Context) (*status, error) {
 	client, err := fcgiclient.DialTimeout("tcp", c.address, c.timeout)
 	if err != nil {
 		return nil, fmt.Errorf("error on connecting to address '%s': %v", c.address, err)

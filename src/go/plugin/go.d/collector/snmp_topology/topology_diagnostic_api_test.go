@@ -1,0 +1,168 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package snmptopology
+
+import (
+	"bytes"
+	"io"
+	"testing"
+
+	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyv1test"
+	"github.com/stretchr/testify/require"
+)
+
+func TestDiagnosticArchiveAPIReusesArchiveReplayAndInspection(t *testing.T) {
+	scenario := newMixedL2L3ControlScenario()
+	registry, diagnostics := newTopologyScenarioReplayFixture(t, scenario)
+	completeTopologyDiagnosticArchiveFixture(&diagnostics)
+
+	var encoded bytes.Buffer
+	require.NoError(t, writeTopologyDiagnosticArchiveWithProducerVersion(&encoded, diagnostics, "v-test"))
+
+	archive, err := readTestDiagnosticArchive(
+		bytes.NewReader(encoded.Bytes()),
+		snmpdiag.DefaultReadLimits(),
+	)
+	require.NoError(t, err)
+	require.Equal(t, DiagnosticArchiveIdentity{
+		Format:               snmpdiag.Format,
+		Version:              snmpdiag.Version,
+		Kind:                 snmpdiag.KindTopology,
+		ProducerAgentVersion: "v-test",
+	}, archive.Identity())
+
+	summary, err := archive.Summary()
+	require.NoError(t, err)
+	require.Equal(t, archive.Identity(), summary.Archive)
+	require.NotEmpty(t, summary.Registrations)
+	require.Equal(t, uint64(1), summary.Registrations[0].RegistrationID)
+
+	query := testDiagnosticQuery(scenario.opts)
+	gotReplay, err := archive.Replay(query)
+	require.NoError(t, err)
+	wantReplay, ok, err := (funcDepsAdapter{registry: registry}).Snapshot(scenario.opts)
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.Equal(t, topologyv1test.NormalizeData(t, wantReplay), topologyv1test.NormalizeData(t, gotReplay))
+
+	device, err := archive.InspectDevice(query, 1)
+	require.NoError(t, err)
+	require.Equal(t, uint64(1), device.RegistrationID)
+	require.Equal(t, "present", device.Sweep.Membership.State)
+	require.Equal(t, "present", device.Observation.State)
+	require.Equal(t, "present", device.GraphIdentity.Membership.State)
+	require.NotEmpty(t, device.GraphIdentity.Candidates)
+	require.Equal(t, "present", device.TypedIdentity.Membership.State)
+	require.Equal(t, 1, device.TypedIdentity.Membership.Candidates)
+	require.Equal(t, wantReplay.Stats, device.GraphStats)
+
+	linkAt, err := archive.InspectLinkAt(query, 0)
+	require.NoError(t, err)
+	link, err := archive.InspectLink(query, linkAt.Subject)
+	require.NoError(t, err)
+	require.Equal(t, "present", link.GraphLink.Membership.State)
+	require.NotEmpty(t, link.GraphLink.Candidates)
+	require.Equal(t, "present", link.TypedLink.Membership.State)
+	require.Equal(t, 1, link.TypedLink.Membership.Candidates)
+	require.NotEmpty(t, link.Source.Contexts)
+	require.Equal(t, wantReplay.Stats, link.Stats)
+
+	require.Equal(t, 0, linkAt.GraphLink.SelectedIndex)
+	require.Equal(t, 0, linkAt.TypedLink.Row)
+}
+
+func TestDiagnosticArchiveAPIRejectsInvalidExactLinkIndexes(t *testing.T) {
+	_, diagnostics := newTopologyScenarioReplayFixture(t, newLLDPDirectScenario())
+	completeTopologyDiagnosticArchiveFixture(&diagnostics)
+
+	var encoded bytes.Buffer
+	require.NoError(t, writeTopologyDiagnosticArchive(&encoded, diagnostics))
+	archive, err := readTestDiagnosticArchive(bytes.NewReader(encoded.Bytes()), snmpdiag.DefaultReadLimits())
+	require.NoError(t, err)
+
+	query := testDiagnosticQuery(newLLDPDirectScenario().opts)
+	for _, index := range []int{-1, 1_000_000} {
+		_, err := archive.InspectLinkAt(query, index)
+		require.ErrorContains(t, err, "link index")
+	}
+}
+
+func TestDiagnosticArchiveAPIRejectsInvalidExternalSelectors(t *testing.T) {
+	_, diagnostics := newTopologyScenarioReplayFixture(t, newLLDPDirectScenario())
+	completeTopologyDiagnosticArchiveFixture(&diagnostics)
+
+	var encoded bytes.Buffer
+	require.NoError(t, writeTopologyDiagnosticArchive(&encoded, diagnostics))
+	archive, err := readTestDiagnosticArchive(bytes.NewReader(encoded.Bytes()), snmpdiag.DefaultReadLimits())
+	require.NoError(t, err)
+
+	tests := map[string]struct {
+		query   DiagnosticQueryOptions
+		subject DiagnosticLinkSubject
+		link    bool
+		want    string
+	}{
+		"map type": {
+			query: DiagnosticQueryOptions{MapType: "other"},
+			want:  "map type",
+		},
+		"inference strategy": {
+			query: DiagnosticQueryOptions{InferenceStrategy: "other"},
+			want:  "inference strategy",
+		},
+		"managed focus": {
+			query: DiagnosticQueryOptions{ManagedDeviceFocus: "hostname:router"},
+			want:  "managed device focus",
+		},
+		"empty managed focus list": {
+			query: DiagnosticQueryOptions{ManagedDeviceFocus: ","},
+			want:  "managed device focus",
+		},
+		"depth": {
+			query: DiagnosticQueryOptions{Depth: "eleven"},
+			want:  "depth",
+		},
+		"link family": {
+			query: testDiagnosticQuery(newLLDPDirectScenario().opts),
+			subject: DiagnosticLinkSubject{
+				SourceIdentity:      "actor:a",
+				DestinationIdentity: "actor:b",
+				Family:              "other",
+			},
+			link: true,
+			want: "link family",
+		},
+		"link direction": {
+			query: testDiagnosticQuery(newLLDPDirectScenario().opts),
+			subject: DiagnosticLinkSubject{
+				SourceIdentity:      "actor:a",
+				DestinationIdentity: "actor:b",
+				Family:              "lldp",
+				Direction:           "",
+			},
+			link: true,
+			want: "link direction",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			var err error
+			if tc.link {
+				_, err = archive.InspectLink(tc.query, tc.subject)
+			} else {
+				_, err = archive.Replay(tc.query)
+			}
+			require.ErrorContains(t, err, tc.want)
+		})
+	}
+}
+
+func readTestDiagnosticArchive(r io.Reader, limits snmpdiag.ReadLimits) (*DiagnosticArchive, error) {
+	d, err := snmpdiag.Read(r, limits)
+	if err != nil {
+		return nil, err
+	}
+	return InspectDiagnosticDocument(d)
+}

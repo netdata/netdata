@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-// FIXME: drop using "old_stats" in favour of "stats" (https://doc.dovecot.org/configuration_manual/stats/openmetrics/).
+// FIXME: drop using "old_stats" in favour of "stats" (https://doc.dovecot.org/2.3/configuration_manual/stats/openmetrics/).
 
 func (c *Collector) collect() (map[string]int64, error) {
 	if c.conn == nil {
@@ -31,7 +31,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 
 	mx := make(map[string]int64)
 
-	// https://doc.dovecot.org/configuration_manual/stats/old_statistics/#statistics-gathered
+	// https://doc.dovecot.org/2.3/configuration_manual/stats/old_statistics/#statistics-gathered
 	if err := c.collectExportGlobal(mx, stats); err != nil {
 		return nil, err
 	}

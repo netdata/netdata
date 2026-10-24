@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "database/rrd.h"
+#include "database/rrddim-collection.h"
+#include "daemon/unit_test_bridge.h"
 
 #ifdef ENABLE_DBENGINE
 
@@ -47,9 +49,9 @@ static inline void storage_point_check(size_t region, size_t chart, size_t dim, 
     if(roundndd(expected) != roundndd(sp.sum)) {
         if(*value_errors < DIMS * 2) {
             fprintf(stderr, " >>> DBENGINE: VALUE DOES NOT MATCH: "
-                            "region %zu, chart %zu, dimension %zu, point %zu, time %ld: "
+                            "region %zu, chart %zu, dimension %zu, point %zu, time %" PRId64 ": "
                             "expected %lld, found %f\n",
-                    region, chart, dim, point, now, expected, sp.sum);
+                    region, chart, dim, point, (int64_t)now, expected, sp.sum);
         }
 
         (*value_errors)++;
@@ -58,9 +60,9 @@ static inline void storage_point_check(size_t region, size_t chart, size_t dim, 
     if(sp.start_time_s > now || sp.end_time_s < now) {
         if(*time_errors < DIMS * 2) {
             fprintf(stderr, " >>> DBENGINE: TIMESTAMP DOES NOT MATCH: "
-                            "region %zu, chart %zu, dimension %zu, point %zu, timestamp %ld: "
-                            "expected %ld, found %ld - %ld\n",
-                    region, chart, dim, point, now, now, sp.start_time_s, sp.end_time_s);
+                            "region %zu, chart %zu, dimension %zu, point %zu, timestamp %" PRId64 ": "
+                            "expected %" PRId64 ", found %" PRId64 " - %" PRId64 "\n",
+                    region, chart, dim, point, (int64_t)now, (int64_t)now, (int64_t)sp.start_time_s, (int64_t)sp.end_time_s);
         }
 
         (*time_errors)++;
@@ -69,9 +71,9 @@ static inline void storage_point_check(size_t region, size_t chart, size_t dim, 
     if(update_every != sp.end_time_s - sp.start_time_s) {
         if(*update_every_errors < DIMS * 2) {
             fprintf(stderr, " >>> DBENGINE: UPDATE EVERY DOES NOT MATCH: "
-                            "region %zu, chart %zu, dimension %zu, point %zu, timestamp %ld: "
-                            "expected %ld, found %ld\n",
-                    region, chart, dim, point, now, update_every, sp.end_time_s - sp.start_time_s);
+                            "region %zu, chart %zu, dimension %zu, point %zu, timestamp %" PRId64 ": "
+                            "expected %" PRId64 ", found %" PRId64 "\n",
+                    region, chart, dim, point, (int64_t)now, (int64_t)update_every, (int64_t)(sp.end_time_s - sp.start_time_s));
         }
 
         (*update_every_errors)++;
@@ -86,8 +88,7 @@ static inline void rrddim_set_by_pointer_fake_time(RRDDIM *rd, collected_number 
 
     rd->collector.counter++;
 
-    collected_number v = (value >= 0) ? value : -value;
-    if(unlikely(v > rd->collector.collected.i.collected_value_max)) rrddim_set_collected_max_int(rd, v);
+    rrddim_update_collected_max_from_int(rd, value);
 }
 
 static RRDHOST *dbengine_rrdhost_find_or_create(char *name) {
@@ -120,6 +121,11 @@ static RRDHOST *dbengine_rrdhost_find_or_create(char *name) {
         0
         );
     system_tz_free(&tz);
+
+    // nothing removes hosts while these tests run
+    if (host)
+        rrdhost_pin_release(host);
+
     return host;
 }
 
@@ -181,8 +187,8 @@ static time_t test_dbengine_create_metrics(
 
     time_t update_every = REGION_UPDATE_EVERY[current_region];
     fprintf(stderr, "DBENGINE Single Region Write  to "
-                    "region %zu, from %ld to %ld, with update every %ld...\n",
-            current_region, time_start, time_start + POINTS_PER_REGION * update_every, update_every);
+                    "region %zu, from %" PRId64 " to %" PRId64 ", with update every %" PRId64 "...\n",
+            current_region, (int64_t)time_start, (int64_t)(time_start + POINTS_PER_REGION * update_every), (int64_t)update_every);
 
     // for the database to save the metrics at the right time, we need to set
     // the last data collection time to be just before the first data collection.
@@ -230,8 +236,8 @@ static size_t test_dbengine_check_metrics(
 
     time_t update_every = REGION_UPDATE_EVERY[current_region];
     fprintf(stderr, "DBENGINE Single Region Read from "
-                    "region %zu, from %ld to %ld, with update every %ld...\n",
-            current_region, time_start, time_end, update_every);
+                    "region %zu, from %" PRId64 " to %" PRId64 ", with update every %" PRId64 "...\n",
+            current_region, (int64_t)time_start, (int64_t)time_end, (int64_t)update_every);
 
     // initialize all queries
     struct storage_engine_query_handle handles[CHARTS * DIMS] = { 0 };
@@ -289,8 +295,8 @@ static size_t dbengine_test_rrdr_single_region(
 
     time_t update_every = REGION_UPDATE_EVERY[current_region];
     fprintf(stderr, "RRDR Single Region Test on "
-                    "region %zu, start time %lld, end time %lld, update every %ld, on %d dimensions...\n",
-            current_region, (long long)time_start, (long long)time_end, update_every, CHARTS * DIMS);
+                    "region %zu, start time %lld, end time %lld, update every %lld, on %d dimensions...\n",
+            current_region, (long long)time_start, (long long)time_end, (long long)update_every, CHARTS * DIMS);
 
     size_t errors = 0, value_errors = 0, time_errors = 0, update_every_errors = 0;
     long points = (time_end - time_start) / update_every;
@@ -356,6 +362,458 @@ static size_t dbengine_test_rrdr_single_region(
     return errors + value_errors + time_errors + update_every_errors;
 }
 
+static size_t test_dbengine_burst_retention_case(
+    RRDHOST *host, const char *id,
+    size_t points, size_t leading_gaps, bool flush_before_check,
+    time_t expected_first, time_t expected_last) {
+    size_t errors = 0;
+
+    fprintf(stderr, "DBENGINE Burst Retention Test: '%s', %zu points (%zu leading gaps)...\n",
+            id, points, leading_gaps);
+
+    RRDSET *st = rrdset_create(host, "netdata", id, id, "netdata", NULL, "Unit Testing", "a value", "unittest",
+                               NULL, 1, 1, RRDSET_TYPE_LINE);
+    RRDDIM *rd = rrddim_add(st, "dim", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+    // burst-store points at fixed timestamps, the way the streaming receiver
+    // stores replicated history of a newly-created chart: many points land in
+    // the open hot page before any retention reader runs
+    time_t t0 = START_TIMESTAMP;
+    for(size_t p = 0; p < points; p++) {
+        if(p < leading_gaps)
+            rrddim_store_metric(rd, (usec_t)(t0 + 1 + (time_t)p) * USEC_PER_SEC, NAN, SN_EMPTY_SLOT);
+        else
+            rrddim_store_metric(rd, (usec_t)(t0 + 1 + (time_t)p) * USEC_PER_SEC, (NETDATA_DOUBLE)(p % 10), SN_DEFAULT_FLAGS);
+    }
+
+    // gap-only cases must flush before the first retention read: pages that
+    // never received a real value are discarded at flush and must not leave
+    // any retention behind
+    if(flush_before_check) {
+        for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
+            storage_engine_store_flush(rd->tiers[tier].sch);
+    }
+
+    // this is the first retention reader; it used to stamp first_time_s from
+    // the newest hot point (sub-page bursts) or the first page flush had
+    // already stamped the page end time (multi-page bursts), hiding all
+    // earlier points of the burst from queries until a restart
+    time_t first = 0, last = 0;
+    rrdeng_metric_retention_by_id(host->db[0].si, rd->uuid, &first, &last);
+
+    if(first != expected_first) {
+        fprintf(stderr, " >>> DBENGINE: BURST RETENTION: '%s' first_entry is %" PRId64 ", expected %" PRId64 "\n",
+                id, (int64_t)first, (int64_t)expected_first);
+        errors++;
+    }
+
+    if(last != expected_last) {
+        fprintf(stderr, " >>> DBENGINE: BURST RETENTION: '%s' last_entry is %" PRId64 ", expected %" PRId64 "\n",
+                id, (int64_t)last, (int64_t)expected_last);
+        errors++;
+    }
+
+    // a second read must return the same retention (the first read must not
+    // have persisted anything different)
+    time_t first2 = 0, last2 = 0;
+    rrdeng_metric_retention_by_id(host->db[0].si, rd->uuid, &first2, &last2);
+
+    if(first2 != first || last2 != last) {
+        fprintf(stderr, " >>> DBENGINE: BURST RETENTION: '%s' retention is not stable across reads: "
+                        "%" PRId64 " - %" PRId64 ", then %" PRId64 " - %" PRId64 "\n",
+                id, (int64_t)first, (int64_t)last, (int64_t)first2, (int64_t)last2);
+        errors++;
+    }
+
+    return errors;
+}
+
+static size_t test_dbengine_burst_retention(RRDHOST *host) {
+    size_t errors = 0;
+    time_t t0 = START_TIMESTAMP;
+
+    // sub-page burst: no page flush happens while storing
+    errors += test_dbengine_burst_retention_case(host, "dbengine-burst-subpage",
+                                                 100, 0, false, t0 + 1, t0 + 100);
+
+    // multi-page burst: the first pages fill and are flushed while storing
+    errors += test_dbengine_burst_retention_case(host, "dbengine-burst-multipage",
+                                                 4000, 0, false, t0 + 1, t0 + 4000);
+
+    // leading gaps: retention starts at the page start (like journal replay
+    // registers pages with leading gaps), stamped when the first real value
+    // arrives
+    errors += test_dbengine_burst_retention_case(host, "dbengine-burst-leading-gaps",
+                                                 100, 5, false, t0 + 1, t0 + 100);
+
+    // gap-only pages: discarded at flush, so the page start must NOT be
+    // recorded as retention; what remains is the pre-existing reader
+    // fallback from latest_time_s_hot (which survives the flush - the
+    // flush's clear is filtered out by mrg_metric_set_hot_latest_time_s
+    // ignoring zero), giving first == last == the last gap time
+    errors += test_dbengine_burst_retention_case(host, "dbengine-burst-all-gaps",
+                                                 100, 100, true, t0 + 100, t0 + 100);
+
+    // gap-only pages discarded at page-full rotation: same, at capacity
+    errors += test_dbengine_burst_retention_case(host, "dbengine-burst-all-gaps-capacity",
+                                                 1100, 1100, true, t0 + 1100, t0 + 1100);
+
+    return errors;
+}
+
+typedef struct dbengine_cadence_expected_point {
+    time_t start_time_s;
+    time_t end_time_s;
+    NETDATA_DOUBLE value;
+} DBENGINE_CADENCE_EXPECTED_POINT;
+
+static RRDDIM *dbengine_cadence_test_create_metric(
+    RRDHOST *host, const char *id_prefix, int update_every) {
+    char id[128];
+    snprintfz(id, sizeof(id) - 1, "%s-%d", id_prefix, getpid());
+
+    RRDSET *st = rrdset_create(
+        host, "netdata", id, id, "netdata", NULL, "Unit Testing", "a value", "unittest",
+        NULL, 1, update_every, RRDSET_TYPE_LINE);
+    RRDDIM *rd = rrddim_add(st, "dim", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    if(!rd || rd->tiers[0].seb != STORAGE_ENGINE_BACKEND_DBENGINE ||
+       !rd->tiers[0].smh || !rd->tiers[0].sch) {
+        fprintf(stderr, " >>> DBENGINE: %s metric initialization failed\n", id);
+        return NULL;
+    }
+
+    return rd;
+}
+
+static void dbengine_cadence_test_store_point(
+    RRDDIM *rd, time_t end_time_s, NETDATA_DOUBLE value) {
+    unittest_storage_engine_store_metric(
+        rd->tiers[0].sch, (usec_t)end_time_s * USEC_PER_SEC,
+        value, value, value, 1, 0, SN_DEFAULT_FLAGS);
+}
+
+static size_t dbengine_cadence_test_query_points(
+    RRDDIM *rd,
+    time_t start_time_s,
+    time_t end_time_s,
+    const DBENGINE_CADENCE_EXPECTED_POINT *expected,
+    size_t expected_points,
+    const char *id) {
+    size_t errors = 0;
+    struct storage_engine_query_handle seqh = { 0 };
+    unittest_storage_engine_query_init(
+        rd->tiers[0].seb, rd->tiers[0].smh, &seqh,
+        start_time_s, end_time_s, STORAGE_PRIORITY_SYNCHRONOUS);
+
+    size_t points = 0;
+    bool finished = false;
+    for(size_t safety = 0; safety < 8; safety++) {
+        if(unittest_storage_engine_query_is_finished(&seqh)) {
+            finished = true;
+            break;
+        }
+
+        STORAGE_POINT sp = unittest_storage_engine_query_next_metric(&seqh);
+        if(points >= expected_points) {
+            fprintf(stderr,
+                    " >>> DBENGINE: %s returned unexpected point %zu: %jd-%jd, value %f\n",
+                    id, points, (intmax_t)sp.start_time_s, (intmax_t)sp.end_time_s, sp.sum);
+            errors++;
+            points++;
+            continue;
+        }
+
+        const DBENGINE_CADENCE_EXPECTED_POINT *ep = &expected[points];
+        if(sp.start_time_s != ep->start_time_s || sp.end_time_s != ep->end_time_s ||
+           sp.min != ep->value || sp.max != ep->value || sp.sum != ep->value ||
+           storage_point_is_gap(sp) || sp.count != 1 || sp.anomaly_count != 0 ||
+           sp.flags != SN_DEFAULT_FLAGS) {
+            fprintf(stderr,
+                    " >>> DBENGINE: %s point %zu is %jd-%jd min=%f max=%f sum=%f count=%u "
+                    "anomalies=%u flags=0x%x; expected %jd-%jd value=%f\n",
+                    id, points, (intmax_t)sp.start_time_s, (intmax_t)sp.end_time_s,
+                    sp.min, sp.max, sp.sum, sp.count, sp.anomaly_count, (unsigned)sp.flags,
+                    (intmax_t)ep->start_time_s, (intmax_t)ep->end_time_s, ep->value);
+            errors++;
+        }
+
+        points++;
+    }
+
+    if(!finished && unittest_storage_engine_query_is_finished(&seqh))
+        finished = true;
+
+    if(!finished) {
+        fprintf(stderr, " >>> DBENGINE: %s query did not finish within 8 points\n", id);
+        errors++;
+    }
+
+    if(points != expected_points) {
+        fprintf(stderr,
+                " >>> DBENGINE: %s returned %zu points, expected %zu\n",
+                id, points, expected_points);
+        errors++;
+    }
+
+    unittest_storage_engine_query_finalize(&seqh);
+    return errors;
+}
+
+static size_t test_dbengine_long_collection_cadence(RRDHOST *host) {
+    const time_t t = START_TIMESTAMP + 4000000;
+    const uint32_t update_every = 90000;
+    RRDDIM *rd = dbengine_cadence_test_create_metric(
+        host, "dbengine-long-cadence", (int)update_every);
+    if(!rd)
+        return 1;
+
+    dbengine_cadence_test_store_point(rd, t + update_every, 1);
+    dbengine_cadence_test_store_point(rd, t + 2 * update_every, 2);
+    unittest_storage_engine_store_flush(rd->tiers[0].sch);
+
+    const DBENGINE_CADENCE_EXPECTED_POINT expected[] = {
+        { t,                t + update_every,     1 },
+        { t + update_every, t + 2 * update_every, 2 },
+    };
+
+    size_t invalid_before =
+        rrdeng_get_cache_efficiency_stats().pages_invalid_update_every_fixed;
+    size_t errors = dbengine_cadence_test_query_points(
+        rd, t + update_every, t + 2 * update_every,
+        expected, _countof(expected), "long-cadence");
+    size_t invalid_after =
+        rrdeng_get_cache_efficiency_stats().pages_invalid_update_every_fixed;
+
+    if(invalid_after != invalid_before) {
+        fprintf(stderr,
+                " >>> DBENGINE: valid long-cadence query reported %zu invalid page durations, expected 0\n",
+                invalid_after - invalid_before);
+        errors++;
+    }
+
+    return errors;
+}
+
+static size_t test_dbengine_zero_page_cadence_is_repaired(RRDHOST *host) {
+    const time_t t = START_TIMESTAMP + 4250000;
+    RRDDIM *rd = dbengine_cadence_test_create_metric(host, "dbengine-zero-page-cadence", 10);
+    if(!rd)
+        return 1;
+
+    unittest_storage_engine_store_change_collection_frequency(rd->tiers[0].sch, 0);
+    dbengine_cadence_test_store_point(rd, t + 100, 1);
+    dbengine_cadence_test_store_point(rd, t + 110, 2);
+
+    size_t errors = 0;
+    struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)rd->tiers[0].sch;
+    if(!handle->pgc_page || pgc_page_data(handle->pgc_page) == PGD_EMPTY ||
+       pgd_slots_used(pgc_page_data(handle->pgc_page)) != 2 ||
+       pgc_page_start_time_s(handle->pgc_page) != t + 100 ||
+       pgc_page_end_time_s(handle->pgc_page) != t + 110 ||
+       pgc_page_update_every_s(handle->pgc_page) != 0) {
+        fprintf(stderr,
+                " >>> DBENGINE: zero-page-cadence fixture did not retain a nonempty 0-second page\n");
+        errors++;
+        goto cleanup;
+    }
+
+    const DBENGINE_CADENCE_EXPECTED_POINT expected[] = {
+        { t + 90,  t + 100, 1 },
+        { t + 100, t + 110, 2 },
+    };
+
+    size_t invalid_before =
+        rrdeng_get_cache_efficiency_stats().pages_invalid_update_every_fixed;
+    errors += dbengine_cadence_test_query_points(
+        rd, t + 100, t + 110, expected, _countof(expected), "zero-page-cadence-first");
+    size_t invalid_after_first =
+        rrdeng_get_cache_efficiency_stats().pages_invalid_update_every_fixed;
+
+    if(invalid_after_first != invalid_before + 1 ||
+       pgc_page_update_every_s(handle->pgc_page) != 10) {
+        fprintf(stderr,
+                " >>> DBENGINE: zero page cadence repairs=%zu cadence=%u, expected 1 and 10\n",
+                invalid_after_first - invalid_before,
+                pgc_page_update_every_s(handle->pgc_page));
+        errors++;
+    }
+
+    errors += dbengine_cadence_test_query_points(
+        rd, t + 100, t + 110, expected, _countof(expected), "zero-page-cadence-repeat");
+    size_t invalid_after_repeat =
+        rrdeng_get_cache_efficiency_stats().pages_invalid_update_every_fixed;
+
+    if(invalid_after_repeat != invalid_after_first) {
+        fprintf(stderr,
+                " >>> DBENGINE: repeated zero-page-cadence query reported %zu repairs, expected 0\n",
+                invalid_after_repeat - invalid_after_first);
+        errors++;
+    }
+
+cleanup:
+    unittest_storage_engine_store_flush(rd->tiers[0].sch);
+    return errors;
+}
+
+
+// The ML training scheduler orders dimensions by rrdeng_store_metric_page_time_to_close_s(): how many seconds of data
+// the current page still needs before the point that fills it and makes it flush. Verify it against the engine's own
+// page sequence, for a cadence whose pages align (1 s) and one whose pages are irregular (5 s: aligned_allocation_
+// entries() works in seconds while a page advances slots * update_every, and the max_slots / 3 floor kicks in), by
+// storing points one by one and watching when the page actually flushes. The data is dated months before the local
+// clock, so this also checks that the value depends only on the dimension's own timestamps (a lagging child).
+static time_t test_dbengine_page_close_of(STORAGE_COLLECT_HANDLE *sch, time_t last_point_s) {
+    time_t to_close = rrdeng_store_metric_page_time_to_close_s(sch);
+    return to_close < 0 ? 0 : last_point_s + to_close;
+}
+
+static size_t test_dbengine_page_close_time(RRDHOST *host) {
+    size_t errors = 0;
+    const int cadences[] = { 1, 5 };
+
+    for(size_t c = 0; c < _countof(cadences); c++) {
+        const int ue = cadences[c];
+        char prefix[64];
+        snprintfz(prefix, sizeof(prefix) - 1, "dbengine-page-close-%d", ue);
+
+        RRDDIM *rd = dbengine_cadence_test_create_metric(host, prefix, ue);
+        if(!rd)
+            return errors + 1;
+
+        STORAGE_COLLECT_HANDLE *sch = rd->tiers[0].sch;
+
+        if(rrdeng_store_metric_page_time_to_close_s(sch) != -1) {
+            fprintf(stderr, " >>> DBENGINE: page-close ue=%d: a handle without a page must report -1\n", ue);
+            errors++;
+        }
+
+        // deliberately not aligned to anything, so the first page is alignment-shortened. The data is written
+        // BEFORE the region test's time range: pages dated after it, sharing the first datafile with the first
+        // region charts, made those charts' region-0 tier-0 pages unreachable in the second verification pass
+        // (queries fell back to tier 1). Recorded as a separate observation; this test does not exercise it.
+        time_t t = START_TIMESTAMP - 10000000 + 17;
+        time_t predicted = 0;       // the close reported while the current page was open (0: no page)
+        size_t pages = 0, points = 0;
+
+        while(pages < 4 && points < 20000) {
+            dbengine_cadence_test_store_point(rd, t, (NETDATA_DOUBLE)points);
+            points++;
+
+            time_t close = test_dbengine_page_close_of(sch, t);
+
+            if(!predicted) {
+                // the point just stored opened a page
+                if(!close) {
+                    fprintf(stderr, " >>> DBENGINE: page-close ue=%d: a stored point must open a page (t=%ld)\n", ue, (long)t);
+                    errors++;
+                    break;
+                }
+                predicted = close;
+            }
+            else if(!close) {
+                // the page just flushed: the point that flushed it must be the predicted close
+                if(t != predicted) {
+                    fprintf(stderr, " >>> DBENGINE: page-close ue=%d: page %zu flushed at %ld, predicted %ld\n", ue, pages, (long)t, (long)predicted);
+                    errors++;
+                }
+                pages++;
+                predicted = 0;
+            }
+            else if(close != predicted) {
+                fprintf(stderr, " >>> DBENGINE: page-close ue=%d: close moved from %ld to %ld while the page was open\n", ue, (long)predicted, (long)close);
+                errors++;
+                predicted = close;
+            }
+
+            t += ue;
+        }
+
+        if(pages < 4) {
+            fprintf(stderr, " >>> DBENGINE: page-close ue=%d: only %zu pages flushed in %zu points\n", ue, pages, points);
+            errors++;
+        }
+
+        // an explicit flush (chart reset after a gap) leaves no page
+        dbengine_cadence_test_store_point(rd, t, 0);
+        unittest_storage_engine_store_flush(sch);
+        if(rrdeng_store_metric_page_time_to_close_s(sch) != -1) {
+            fprintf(stderr, " >>> DBENGINE: page-close ue=%d: a flushed handle must report -1\n", ue);
+            errors++;
+        }
+
+        // a collection frequency change flushes too, and the next page closes on the new cadence
+        t += ue;
+        dbengine_cadence_test_store_point(rd, t, 0);
+        unittest_storage_engine_store_change_collection_frequency(sch, ue * 2);
+        if(rrdeng_store_metric_page_time_to_close_s(sch) != -1) {
+            fprintf(stderr, " >>> DBENGINE: page-close ue=%d: a frequency change must flush the page\n", ue);
+            errors++;
+        }
+        t += ue * 2;
+        dbengine_cadence_test_store_point(rd, t, 0);
+        time_t to_close = rrdeng_store_metric_page_time_to_close_s(sch);
+        if(to_close <= 0 || (to_close % (ue * 2)) != 0) {
+            fprintf(stderr, " >>> DBENGINE: page-close ue=%d: %ld seconds to close after a frequency change to %d is not on the new cadence\n", ue, (long)to_close, ue * 2);
+            errors++;
+        }
+        unittest_storage_engine_store_flush(sch);
+    }
+
+    return errors;
+}
+
+static size_t test_dbengine_single_missing_sample_reuse(RRDHOST *host) {
+    const time_t t = START_TIMESTAMP + 2750000;
+    RRDDIM *rd = dbengine_cadence_test_create_metric(host, "dbengine-single-missing-sample", 1);
+    if(!rd)
+        return 1;
+
+    dbengine_cadence_test_store_point(rd, t + 100, 1);
+    dbengine_cadence_test_store_point(rd, t + 101, 2);
+    unittest_storage_engine_store_flush(rd->tiers[0].sch);
+    dbengine_cadence_test_store_point(rd, t + 103, 3);
+    unittest_storage_engine_store_flush(rd->tiers[0].sch);
+
+    const DBENGINE_CADENCE_EXPECTED_POINT expected[] = {
+        { t + 99, t + 100, 1 },
+        { t + 100, t + 101, 2 },
+        { t + 102, t + 103, 3 },
+    };
+    struct rrdeng_cache_efficiency_stats before = rrdeng_get_cache_efficiency_stats();
+    size_t errors = dbengine_cadence_test_query_points(
+        rd, t + 100, t + 103, expected, _countof(expected), "single-missing-sample-first");
+    struct rrdeng_cache_efficiency_stats after_first = rrdeng_get_cache_efficiency_stats();
+
+    if(after_first.prep_time_in_journal_v2_lookup.count !=
+           before.prep_time_in_journal_v2_lookup.count + 1 ||
+       after_first.queries_planned_with_gaps != before.queries_planned_with_gaps + 1) {
+        fprintf(stderr,
+                " >>> DBENGINE: first single-missing-sample query used %zu journal lookups and %zu planner gaps, "
+                "expected 1 and 1\n",
+                after_first.prep_time_in_journal_v2_lookup.count - before.prep_time_in_journal_v2_lookup.count,
+                after_first.queries_planned_with_gaps - before.queries_planned_with_gaps);
+        errors++;
+    }
+
+    errors += dbengine_cadence_test_query_points(
+        rd, t + 100, t + 103, expected, _countof(expected), "single-missing-sample-repeat");
+    struct rrdeng_cache_efficiency_stats after_repeat = rrdeng_get_cache_efficiency_stats();
+
+    if(after_repeat.prep_time_in_journal_v2_lookup.count !=
+           after_first.prep_time_in_journal_v2_lookup.count ||
+       after_repeat.queries_planned_with_gaps != after_first.queries_planned_with_gaps) {
+        fprintf(stderr,
+                " >>> DBENGINE: repeated single-missing-sample query used %zu journal lookups and %zu planner gaps, "
+                "expected 0 and 0\n",
+                after_repeat.prep_time_in_journal_v2_lookup.count -
+                    after_first.prep_time_in_journal_v2_lookup.count,
+                after_repeat.queries_planned_with_gaps - after_first.queries_planned_with_gaps);
+        errors++;
+    }
+
+    return errors;
+}
+
 int test_dbengine(void) {
     // provide enough threads to dbengine
     setenv("UV_THREADPOOL_SIZE", "48", 1);
@@ -370,6 +828,9 @@ int test_dbengine(void) {
     RRDHOST *host = dbengine_rrdhost_find_or_create("unittest-dbengine");
     if(!host)
         fatal("Failed to initialize host");
+
+    errors += test_dbengine_burst_retention(host);
+    errors += test_dbengine_page_close_time(host);
 
     RRDSET *st[CHARTS] = { 0 };
     RRDDIM *rd[CHARTS][DIMS] = { 0 };
@@ -409,6 +870,17 @@ int test_dbengine(void) {
     for (size_t current_region = 0 ; current_region < REGIONS ; current_region++) {
         errors += dbengine_test_rrdr_single_region(st, rd, current_region, time_start[current_region], time_end[current_region]);
     }
+
+    errors += test_dbengine_long_collection_cadence(host);
+    errors += test_dbengine_zero_page_cadence_is_repaired(host);
+
+#ifdef ENABLE_ML
+    // the ML training scheduler's page-close ordering, driven against this host's dbengine-backed charts;
+    // it takes the RRD read lock and stores points, so it must run before the quiesce/exit sequence below
+    errors += (size_t)ml_queue_host_order_unittest(host);
+#endif
+
+    errors += test_dbengine_single_missing_sample_reuse(host);
 
     // prevent closing the database before the test is finished
     sleep(5);

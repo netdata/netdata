@@ -6,6 +6,7 @@ modules:
       module_name: cockroachdb
       monitored_instance:
         name: CockroachDB
+        description: "Monitor CockroachDB CPU, memory, storage, network, cluster, SQL, and transaction performance metrics."
         link: https://www.cockroachlabs.com/
         icon_filename: cockroachdb.svg
         categories:
@@ -243,33 +244,12 @@ modules:
                 jobs:
                   - name: local
                     url: http://127.0.0.1:8080/_status/vars
-                
+
                   - name: remote
                     url: http://203.0.113.10:8080/_status/vars
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: cockroachdb_used_storage_capacity
-        metric: cockroachdb.storage_used_capacity_percentage
-        info: storage capacity utilization
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cockroachdb.conf
-      - name: cockroachdb_used_usable_storage_capacity
-        metric: cockroachdb.storage_used_capacity_percentage
-        info: storage usable space utilization
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cockroachdb.conf
-      - name: cockroachdb_unavailable_ranges
-        metric: cockroachdb.ranges_replication_problem
-        info: number of ranges with fewer live replicas than needed for quorum
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cockroachdb.conf
-      - name: cockroachdb_underreplicated_ranges
-        metric: cockroachdb.ranges_replication_problem
-        info: number of ranges with fewer live replicas than the replication target
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cockroachdb.conf
-      - name: cockroachdb_open_file_descriptors_limit
-        metric: cockroachdb.process_file_descriptors
-        info: "open file descriptors utilization (against softlimit)"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cockroachdb.conf
     functions:
       description: |
         This collector exposes real-time functions for interactive troubleshooting in the Live tab.

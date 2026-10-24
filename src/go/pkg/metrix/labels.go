@@ -20,10 +20,9 @@ type labelView struct {
 func (v labelView) Len() int { return len(v.items) }
 
 func (v labelView) Get(key string) (string, bool) {
-	for _, l := range v.items {
-		if l.Key == key {
-			return l.Value, true
-		}
+	i := sort.Search(len(v.items), func(i int) bool { return v.items[i].Key >= key })
+	if i < len(v.items) && v.items[i].Key == key {
+		return v.items[i].Value, true
 	}
 	return "", false
 }
@@ -69,6 +68,38 @@ func canonicalizeLabels(input map[string]string) ([]Label, string, error) {
 		b.WriteByte('\xff')
 	}
 	return labels, b.String(), nil
+}
+
+// appendCanonicalLabel appends base with extra inserted or replaced, in canonical key
+// order, to dst and writes the matching canonical labels key to key. base is not
+// modified. An empty extra key is invalid and appends nothing.
+func appendCanonicalLabel(dst []Label, key *strings.Builder, base []Label, extra Label) ([]Label, bool) {
+	if extra.Key == "" {
+		return dst, false
+	}
+	inserted := false
+	for _, label := range base {
+		if !inserted && extra.Key <= label.Key {
+			dst = appendLabelKeyed(dst, key, extra)
+			inserted = true
+			if extra.Key == label.Key {
+				continue
+			}
+		}
+		dst = appendLabelKeyed(dst, key, label)
+	}
+	if !inserted {
+		dst = appendLabelKeyed(dst, key, extra)
+	}
+	return dst, true
+}
+
+func appendLabelKeyed(dst []Label, key *strings.Builder, label Label) []Label {
+	key.WriteString(label.Key)
+	key.WriteByte('\xff')
+	key.WriteString(label.Value)
+	key.WriteByte('\xff')
+	return append(dst, label)
 }
 
 // labelsFromSet merges precompiled label sets and validates ownership/duplicates.

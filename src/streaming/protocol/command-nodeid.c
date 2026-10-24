@@ -7,12 +7,11 @@
 
 // the child disconnected from the parent, and it has to clear the parent's claim id
 void stream_sender_clear_parent_claim_id(RRDHOST *host) {
-    if (!UUIDiszero(host->aclk.claim_id_of_parent)) {
+    ND_UUID previous_claim_id;
+    if (rrdhost_claim_id_of_parent_update(host, UUID_ZERO, &previous_claim_id) && !UUIDiszero(previous_claim_id)) {
         nd_log(NDLS_DAEMON, NDLP_INFO,
                "Host '%s' [PCLAIMID] cleared parent's claim id",
                rrdhost_hostname(host));
-
-        host->aclk.claim_id_of_parent = UUID_ZERO;
     }
 }
 
@@ -31,7 +30,7 @@ void stream_receiver_send_node_and_claim_id_to_child(RRDHOST *host) {
             // the agent is not claimed or not connected, just use parent claim id
             // to allow the connection flow.
             // this may be zero and it is ok.
-            claim_id.uuid = host->aclk.claim_id_of_parent;
+            claim_id.uuid = rrdhost_claim_id_of_parent_get(host);
             uuid_unparse_lower(claim_id.uuid.uuid, claim_id.str);
         }
 
@@ -100,8 +99,9 @@ void stream_sender_get_node_and_claim_id_from_parent(struct sender_state *s, con
     // the parameters are ok
     // apply the changes
 
-    if (!UUIDeq(s->host->aclk.claim_id_of_parent, claim_id)) {
-        if(UUIDiszero(s->host->aclk.claim_id_of_parent))
+    ND_UUID previous_claim_id;
+    if (rrdhost_claim_id_of_parent_update(s->host, claim_id, &previous_claim_id)) {
+        if(UUIDiszero(previous_claim_id))
             nd_log(NDLS_DAEMON, NDLP_INFO,
                    "STREAM SND '%s' [to %s] [PCLAIMID] set parent's claim id to %s (was empty)",
                    rrdhost_hostname(s->host), s->remote_ip,
@@ -111,8 +111,6 @@ void stream_sender_get_node_and_claim_id_from_parent(struct sender_state *s, con
                    "STREAM SND '%s' [to %s] [PCLAIMID] changed parent's claim id to %s (was set)",
                    rrdhost_hostname(s->host), s->remote_ip,
                    claim_id_str ? claim_id_str : "(unset)");
-
-        s->host->aclk.claim_id_of_parent = claim_id;
     }
 
     if(!UUIDiszero(s->host->node_id) && !UUIDeq(s->host->node_id, node_id)) {

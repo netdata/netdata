@@ -3,6 +3,7 @@
 package consul
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/url"
@@ -18,14 +19,14 @@ func (c *Collector) validateConfig() error {
 	return nil
 }
 
-func (c *Collector) initHTTPClient() (*http.Client, error) {
-	return web.NewHTTPClient(c.ClientConfig)
+func (c *Collector) initHTTPClient(ctx context.Context) (*http.Client, error) {
+	return web.NewHTTPClient(ctx, c.ClientConfig)
 }
 
 const urlPathAgentMetrics = "/v1/agent/metrics"
 
-func (c *Collector) initPrometheusClient(httpClient *http.Client) (prometheus.Prometheus, error) {
-	r, err := web.NewHTTPRequest(c.RequestConfig.Copy())
+func (c *Collector) initPrometheusClient(ctx context.Context, httpClient *http.Client) (prometheus.Prometheus, error) {
+	r, err := web.NewHTTPRequest(ctx, c.RequestConfig.Copy())
 	if err != nil {
 		return nil, err
 	}

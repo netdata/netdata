@@ -5,10 +5,11 @@ package dockerfunc
 import (
 	"context"
 	"errors"
+	"net/netip"
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types"
+	typesContainer "github.com/moby/moby/api/types/container"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -40,7 +41,7 @@ func TestFuncContainers_HandleSuccess(t *testing.T) {
 	olderCreated := now.Add(-24 * time.Hour).Unix()
 
 	r := newRouter(mockDeps{
-		client: mockDockerClient{containers: []types.Container{
+		client: mockDockerClient{containers: []typesContainer.Summary{
 			{
 				ID:      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 				Image:   "postgres:16",
@@ -48,9 +49,9 @@ func TestFuncContainers_HandleSuccess(t *testing.T) {
 				Created: olderCreated,
 				Status:  "Exited (0) 4 days ago",
 				State:   "exited",
-				Ports: []types.Port{
-					{IP: "[::]", PrivatePort: 5432, PublicPort: 5432, Type: "tcp"},
-					{IP: "0.0.0.0", PrivatePort: 5432, PublicPort: 5432, Type: "tcp"},
+				Ports: []typesContainer.PortSummary{
+					{IP: netip.MustParseAddr("::"), PrivatePort: 5432, PublicPort: 5432, Type: "tcp"},
+					{IP: netip.MustParseAddr("0.0.0.0"), PrivatePort: 5432, PublicPort: 5432, Type: "tcp"},
 				},
 				Names: []string{"/postgres-dev"},
 			},
@@ -130,12 +131,20 @@ func TestFormatHelpers(t *testing.T) {
 	})
 
 	t.Run("formatPorts", func(t *testing.T) {
-		ports := []types.Port{
-			{IP: "[::]", PrivatePort: 5432, PublicPort: 5432, Type: "tcp"},
-			{IP: "0.0.0.0", PrivatePort: 5432, PublicPort: 5432, Type: "tcp"},
+		ports := []typesContainer.PortSummary{
+			{IP: netip.MustParseAddr("::"), PrivatePort: 5432, PublicPort: 5432, Type: "tcp"},
+			{IP: netip.MustParseAddr("0.0.0.0"), PrivatePort: 5432, PublicPort: 5432, Type: "tcp"},
 			{PrivatePort: 80, Type: "tcp"},
 		}
 		assert.Equal(t, "80/tcp, 0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp", formatPorts(ports))
 		assert.Equal(t, "", formatPorts(nil))
+	})
+
+	t.Run("formatPorts with invalid published IP", func(t *testing.T) {
+		ports := []typesContainer.PortSummary{
+			{IP: netip.MustParseAddr("0.0.0.0"), PrivatePort: 80, PublicPort: 8080, Type: "tcp"},
+			{PrivatePort: 80, PublicPort: 8080, Type: "tcp"},
+		}
+		assert.Equal(t, "8080->80/tcp, 0.0.0.0:8080->80/tcp", formatPorts(ports))
 	})
 }

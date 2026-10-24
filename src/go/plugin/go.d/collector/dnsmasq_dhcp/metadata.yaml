@@ -21,7 +21,7 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          This collector monitors  Dnsmasq DHCP leases databases, depending on your configuration.
+          Monitor Dnsmasq DHCP leases and utilization across configured address ranges.
           
           By default, it uses:
 
@@ -106,11 +106,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: dnsmasq_dhcp_dhcp_range_utilization
-        metric: dnsmasq_dhcp.dhcp_range_utilization
-        info: DHCP range utilization
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dnsmasq_dhcp.conf
     metrics:
       folding:
         title: Metrics

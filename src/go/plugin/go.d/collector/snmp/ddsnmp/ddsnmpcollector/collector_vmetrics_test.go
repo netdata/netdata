@@ -4,6 +4,7 @@ package ddsnmpcollector
 
 import (
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -47,7 +48,13 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 				},
 			},
 			collectedMetrics: []ddsnmp.Metric{
-				{Name: "ifHCInOctets", Value: 1000, IsTable: true, Table: "ifXTable", MetricType: ddprofiledefinition.ProfileMetricTypeGauge},
+				{
+					Name:       "ifHCInOctets",
+					Value:      1000,
+					IsTable:    true,
+					Table:      "ifXTable",
+					MetricType: ddprofiledefinition.ProfileMetricTypeGauge,
+				},
 				{Name: "ifHCInOctets", Value: 2000, IsTable: true, Table: "ifXTable"},
 				{Name: "ifHCInOctets", Value: 3000, IsTable: true, Table: "ifXTable"},
 			},
@@ -94,7 +101,13 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 			},
 			collectedMetrics: []ddsnmp.Metric{
 				// Interface 1
-				{Name: "ifInErrors", Value: 10, IsTable: true, Table: "ifTable", MetricType: ddprofiledefinition.ProfileMetricTypeRate},
+				{
+					Name:       "ifInErrors",
+					Value:      10,
+					IsTable:    true,
+					Table:      "ifTable",
+					MetricType: ddprofiledefinition.ProfileMetricTypeRate,
+				},
 				{Name: "ifOutErrors", Value: 5, IsTable: true, Table: "ifTable"},
 				// Interface 2
 				{Name: "ifInErrors", Value: 20, IsTable: true, Table: "ifTable"},
@@ -443,13 +456,13 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 							{
 								OID:  "1.3.6.1.2.1.2.2.1.8",
 								Name: "ifOperStatus",
-								Mapping: map[string]string{
+								Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 									"1": "up",
 									"2": "down",
 									"3": "testing",
 									"4": "unknown",
 									"5": "dormant",
-								},
+								}),
 							},
 						},
 					},
@@ -562,10 +575,10 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 							{
 								OID:  "1.3.6.1.2.1.2.2.1.8",
 								Name: "ifOperStatus",
-								Mapping: map[string]string{
+								Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 									"1": "up",
 									"2": "down",
-								},
+								}),
 							},
 						},
 					},
@@ -638,7 +651,10 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 			profileDef: &ddprofiledefinition.ProfileDefinition{
 				Metrics: []ddprofiledefinition.MetricsConfig{
 					{
-						Table: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.2.1.31.1.1", Name: "ifXTable"},
+						Table: ddprofiledefinition.SymbolConfig{
+							OID:  "1.3.6.1.2.1.31.1.1",
+							Name: "ifXTable",
+						},
 						Symbols: []ddprofiledefinition.SymbolConfig{
 							{OID: "1.3.6.1.2.1.31.1.1.1.6", Name: "ifHCInOctets"},
 							{OID: "1.3.6.1.2.1.31.1.1.1.10", Name: "ifHCOutOctets"},
@@ -706,13 +722,19 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 			profileDef: &ddprofiledefinition.ProfileDefinition{
 				Metrics: []ddprofiledefinition.MetricsConfig{
 					{
-						Table: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.2.1.2.2", Name: "ifTable"},
+						Table: ddprofiledefinition.SymbolConfig{
+							OID:  "1.3.6.1.2.1.2.2",
+							Name: "ifTable",
+						},
 						Symbols: []ddprofiledefinition.SymbolConfig{
 							{OID: "1.3.6.1.2.1.2.2.1.10", Name: "ifInOctets"},
 						},
 					},
 					{
-						Table: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.2.1.31.1.1", Name: "ifXTable"},
+						Table: ddprofiledefinition.SymbolConfig{
+							OID:  "1.3.6.1.2.1.31.1.1",
+							Name: "ifXTable",
+						},
 						Symbols: []ddprofiledefinition.SymbolConfig{
 							{OID: "1.3.6.1.2.1.31.1.1.1.6", Name: "ifHCInOctets"},
 						},
@@ -742,6 +764,47 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 					Name:        "ifTotalInbound",
 					MultiValue:  map[string]int64{"in": 3300}, // 100+200+1000+2000
 					Description: "Inbound traffic from two tables merged",
+				},
+			},
+		},
+
+		"composite with selected multivalue dimensions": {
+			profileDef: &ddprofiledefinition.ProfileDefinition{
+				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
+					{
+						Name: "bgpPeerAvailability",
+						Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+							{Metric: "bgpPeerAdminStatus", Table: "bgpPeerTable", As: "admin_enabled", Dim: "start"},
+							{Metric: "bgpPeerState", Table: "bgpPeerTable", As: "established", Dim: "established"},
+						},
+					},
+				},
+			},
+			collectedMetrics: []ddsnmp.Metric{
+				{
+					Name:       "bgpPeerAdminStatus",
+					IsTable:    true,
+					Table:      "bgpPeerTable",
+					MultiValue: map[string]int64{"stop": 0, "start": 1},
+				},
+				{
+					Name:    "bgpPeerState",
+					IsTable: true,
+					Table:   "bgpPeerTable",
+					MultiValue: map[string]int64{
+						"idle":        0,
+						"connect":     0,
+						"active":      0,
+						"opensent":    0,
+						"openconfirm": 0,
+						"established": 1,
+					},
+				},
+			},
+			expected: []ddsnmp.Metric{
+				{
+					Name:       "bgpPeerAvailability",
+					MultiValue: map[string]int64{"admin_enabled": 1, "established": 1},
 				},
 			},
 		},
@@ -783,7 +846,7 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
 					{
 						Name:    "ifTrafficPerInterface",
-						GroupBy: []string{"interface", "ifType"},
+						GroupBy: ddprofiledefinition.StringArray{"interface", "ifType"},
 						Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
 							{Metric: "ifHCInOctets", Table: "ifXTable", As: "in"},
 							{Metric: "ifHCOutOctets", Table: "ifXTable", As: "out"},
@@ -804,10 +867,13 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 			},
 			expected: []ddsnmp.Metric{
 				{
-					Name:       "ifTrafficPerInterface",
-					IsTable:    true,
-					Table:      "ifXTable",
-					Tags:       map[string]string{"interface": "bond0", "ifType": "ethernetCsmacd"}, // only group_by labels
+					Name:    "ifTrafficPerInterface",
+					IsTable: true,
+					Table:   "ifXTable",
+					Tags: map[string]string{
+						"interface": "bond0",
+						"ifType":    "ethernetCsmacd",
+					}, // only group_by labels
 					MultiValue: map[string]int64{"in": 0, "out": 70},
 				},
 			},
@@ -818,7 +884,7 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
 					{
 						Name:    "ifErrorsPerInterface",
-						GroupBy: []string{"interface"},
+						GroupBy: ddprofiledefinition.StringArray{"interface"},
 						Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
 							{Metric: "ifInErrors", Table: "ifTable"},
 						},
@@ -906,7 +972,7 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
 					{
 						Name:    "invalidGroupedVM",
-						GroupBy: []string{"interface"},
+						GroupBy: ddprofiledefinition.StringArray{"interface"},
 						Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
 							{Metric: "ifInOctets", Table: "ifTable", As: "in"},
 							{Metric: "ifHCInOctets", Table: "ifXTable", As: "in2"},
@@ -1026,7 +1092,7 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 					{
 						Name:    "ifTrafficPerRowHint",
 						PerRow:  true,
-						GroupBy: []string{"interface"}, // used as row-key hint
+						GroupBy: ddprofiledefinition.StringArray{"interface"}, // used as row-key hint
 						Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
 							{Metric: "ifHCInOctets", Table: "ifXTable", As: "in"},
 							{Metric: "ifHCOutOctets", Table: "ifXTable", As: "out"},
@@ -1058,6 +1124,388 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 					Table:      "ifXTable",
 					Tags:       map[string]string{"interface": "ethB", "ifType": "ethernetCsmacd", "ifIndex": "12"},
 					MultiValue: map[string]int64{"in": 1, "out": 2},
+				},
+			},
+		},
+
+		"per_row with missing key hint falls back to stable visible tags": {
+			profileDef: &ddprofiledefinition.ProfileDefinition{
+				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
+					{
+						Name:    "ifTrafficPerRowHintFallback",
+						PerRow:  true,
+						GroupBy: ddprofiledefinition.StringArray{"interface"},
+						Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+							{Metric: "ifHCInOctets", Table: "ifXTable", As: "in"},
+							{Metric: "ifHCOutOctets", Table: "ifXTable", As: "out"},
+						},
+					},
+				},
+			},
+			collectedMetrics: []ddsnmp.Metric{
+				{Name: "ifHCInOctets", Value: 5, IsTable: true, Table: "ifXTable",
+					Tags: map[string]string{"ifType": "ethernetCsmacd", "ifIndex": "11"}},
+				{Name: "ifHCOutOctets", Value: 7, IsTable: true, Table: "ifXTable",
+					Tags: map[string]string{"ifType": "ethernetCsmacd", "ifIndex": "11"}},
+			},
+			expected: []ddsnmp.Metric{
+				{
+					Name:       "ifTrafficPerRowHintFallback",
+					IsTable:    true,
+					Table:      "ifXTable",
+					Tags:       map[string]string{"ifType": "ethernetCsmacd", "ifIndex": "11"},
+					MultiValue: map[string]int64{"in": 5, "out": 7},
+				},
+			},
+		},
+
+		"per_row composite with selected multivalue dimensions": {
+			profileDef: &ddprofiledefinition.ProfileDefinition{
+				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
+					{
+						Name:    "bgpPeerAvailability",
+						PerRow:  true,
+						GroupBy: ddprofiledefinition.StringArray{"neighbor"},
+						Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+							{Metric: "bgpPeerAdminStatus", Table: "bgpPeerTable", As: "admin_enabled", Dim: "start"},
+							{Metric: "bgpPeerState", Table: "bgpPeerTable", As: "established", Dim: "established"},
+						},
+						ChartMeta: ddprofiledefinition.ChartMeta{
+							Description: "Per-peer availability",
+							Family:      "Network/Routing/BGP/Peer/Availability",
+							Unit:        "{status}",
+						},
+					},
+				},
+			},
+			collectedMetrics: []ddsnmp.Metric{
+				{
+					Name:       "bgpPeerAdminStatus",
+					IsTable:    true,
+					Table:      "bgpPeerTable",
+					Tags:       map[string]string{"neighbor": "192.0.2.1", "remote_as": "64512"},
+					MultiValue: map[string]int64{"stop": 0, "start": 1},
+				},
+				{
+					Name:    "bgpPeerState",
+					IsTable: true,
+					Table:   "bgpPeerTable",
+					Tags:    map[string]string{"neighbor": "192.0.2.1", "remote_as": "64512"},
+					MultiValue: map[string]int64{
+						"idle":        1,
+						"connect":     0,
+						"active":      0,
+						"opensent":    0,
+						"openconfirm": 0,
+						"established": 0,
+					},
+				},
+				{
+					Name:       "bgpPeerAdminStatus",
+					IsTable:    true,
+					Table:      "bgpPeerTable",
+					Tags:       map[string]string{"neighbor": "2001:db8::1", "remote_as": "64513"},
+					MultiValue: map[string]int64{"stop": 1, "start": 0},
+				},
+				{
+					Name:    "bgpPeerState",
+					IsTable: true,
+					Table:   "bgpPeerTable",
+					Tags:    map[string]string{"neighbor": "2001:db8::1", "remote_as": "64513"},
+					MultiValue: map[string]int64{
+						"idle":        1,
+						"connect":     0,
+						"active":      0,
+						"opensent":    0,
+						"openconfirm": 0,
+						"established": 0,
+					},
+				},
+			},
+			expected: []ddsnmp.Metric{
+				{
+					Name:        "bgpPeerAvailability",
+					IsTable:     true,
+					Table:       "bgpPeerTable",
+					Tags:        map[string]string{"neighbor": "192.0.2.1", "remote_as": "64512"},
+					MultiValue:  map[string]int64{"admin_enabled": 1, "established": 0},
+					Description: "Per-peer availability",
+					Family:      "Network/Routing/BGP/Peer/Availability",
+					Unit:        "{status}",
+				},
+				{
+					Name:        "bgpPeerAvailability",
+					IsTable:     true,
+					Table:       "bgpPeerTable",
+					Tags:        map[string]string{"neighbor": "2001:db8::1", "remote_as": "64513"},
+					MultiValue:  map[string]int64{"admin_enabled": 0, "established": 0},
+					Description: "Per-peer availability",
+					Family:      "Network/Routing/BGP/Peer/Availability",
+					Unit:        "{status}",
+				},
+			},
+		},
+
+		"per_row composite can group by hidden tags and emit normalized tags": {
+			profileDef: &ddprofiledefinition.ProfileDefinition{
+				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
+					{
+						Name:   "bgpPeerAvailability",
+						PerRow: true,
+						GroupBy: ddprofiledefinition.StringArray{
+							"_routing_instance",
+							"_neighbor",
+							"_address_family",
+							"_subsequent_address_family",
+						},
+						EmitTags: []ddprofiledefinition.VirtualMetricEmitTagConfig{
+							{Tag: "routing_instance", From: "_routing_instance"},
+							{Tag: "neighbor", From: "_neighbor"},
+							{Tag: "address_family", From: "_address_family"},
+							{Tag: "subsequent_address_family", From: "_subsequent_address_family"},
+							{Tag: "remote_as", From: "_remote_as"},
+						},
+						Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+							{Metric: "bgpPeerAdminStatus", Table: "hwBgpPeerTable", As: "admin_enabled", Dim: "start"},
+							{Metric: "bgpPeerState", Table: "hwBgpPeerTable", As: "established", Dim: "established"},
+						},
+						ChartMeta: ddprofiledefinition.ChartMeta{
+							Description: "Per-peer availability",
+							Family:      "Network/Routing/BGP/Peer/Availability",
+							Unit:        "{status}",
+						},
+					},
+				},
+			},
+			collectedMetrics: []ddsnmp.Metric{
+				{
+					Name:    "bgpPeerAdminStatus",
+					IsTable: true,
+					Table:   "hwBgpPeerTable",
+					Tags: map[string]string{
+						"huawei_hw_bgp_peer_vrf_name":    "blue",
+						"huawei_hw_bgp_peer_remote_addr": "192.0.2.1",
+						"_routing_instance":              "blue",
+						"_neighbor":                      "192.0.2.1",
+						"_remote_as":                     "64512",
+						"_address_family":                "ipv4",
+						"_subsequent_address_family":     "unicast",
+					},
+					MultiValue: map[string]int64{"stop": 0, "start": 1},
+				},
+				{
+					Name:    "bgpPeerState",
+					IsTable: true,
+					Table:   "hwBgpPeerTable",
+					Tags: map[string]string{
+						"huawei_hw_bgp_peer_vrf_name":    "blue",
+						"huawei_hw_bgp_peer_remote_addr": "192.0.2.1",
+						"_routing_instance":              "blue",
+						"_neighbor":                      "192.0.2.1",
+						"_remote_as":                     "64512",
+						"_address_family":                "ipv4",
+						"_subsequent_address_family":     "unicast",
+					},
+					MultiValue: map[string]int64{"idle": 0, "established": 1},
+				},
+				{
+					Name:    "bgpPeerAdminStatus",
+					IsTable: true,
+					Table:   "hwBgpPeerTable",
+					Tags: map[string]string{
+						"huawei_hw_bgp_peer_vrf_name":    "blue",
+						"huawei_hw_bgp_peer_remote_addr": "192.0.2.1",
+						"_routing_instance":              "blue",
+						"_neighbor":                      "192.0.2.1",
+						"_remote_as":                     "64512",
+						"_address_family":                "ipv6",
+						"_subsequent_address_family":     "unicast",
+					},
+					MultiValue: map[string]int64{"stop": 0, "start": 1},
+				},
+				{
+					Name:    "bgpPeerState",
+					IsTable: true,
+					Table:   "hwBgpPeerTable",
+					Tags: map[string]string{
+						"huawei_hw_bgp_peer_vrf_name":    "blue",
+						"huawei_hw_bgp_peer_remote_addr": "192.0.2.1",
+						"_routing_instance":              "blue",
+						"_neighbor":                      "192.0.2.1",
+						"_remote_as":                     "64512",
+						"_address_family":                "ipv6",
+						"_subsequent_address_family":     "unicast",
+					},
+					MultiValue: map[string]int64{"idle": 1, "established": 0},
+				},
+			},
+			expected: []ddsnmp.Metric{
+				{
+					Name:    "bgpPeerAvailability",
+					IsTable: true,
+					Table:   "hwBgpPeerTable",
+					Tags: map[string]string{
+						"routing_instance":          "blue",
+						"neighbor":                  "192.0.2.1",
+						"address_family":            "ipv4",
+						"subsequent_address_family": "unicast",
+						"remote_as":                 "64512",
+					},
+					MultiValue:  map[string]int64{"admin_enabled": 1, "established": 1},
+					Description: "Per-peer availability",
+					Family:      "Network/Routing/BGP/Peer/Availability",
+					Unit:        "{status}",
+				},
+				{
+					Name:    "bgpPeerAvailability",
+					IsTable: true,
+					Table:   "hwBgpPeerTable",
+					Tags: map[string]string{
+						"routing_instance":          "blue",
+						"neighbor":                  "192.0.2.1",
+						"address_family":            "ipv6",
+						"subsequent_address_family": "unicast",
+						"remote_as":                 "64512",
+					},
+					MultiValue:  map[string]int64{"admin_enabled": 1, "established": 0},
+					Description: "Per-peer availability",
+					Family:      "Network/Routing/BGP/Peer/Availability",
+					Unit:        "{status}",
+				},
+			},
+		},
+
+		"per_row composite can group by metric static tags": {
+			profileDef: &ddprofiledefinition.ProfileDefinition{
+				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
+					{
+						Name:   "bgpPeerUpdates",
+						PerRow: true,
+						GroupBy: ddprofiledefinition.StringArray{
+							"routing_instance",
+							"neighbor",
+							"address_family",
+							"subsequent_address_family",
+						},
+						EmitTags: []ddprofiledefinition.VirtualMetricEmitTagConfig{
+							{Tag: "routing_instance", From: "routing_instance"},
+							{Tag: "neighbor", From: "neighbor"},
+							{Tag: "address_family", From: "address_family"},
+							{Tag: "subsequent_address_family", From: "subsequent_address_family"},
+							{Tag: "remote_as", From: "remote_as"},
+						},
+						Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+							{Metric: "bgpPeerInUpdates", Table: "tBgpPeerNgOperTable", As: "received"},
+							{Metric: "bgpPeerOutUpdates", Table: "tBgpPeerNgOperTable", As: "sent"},
+						},
+						ChartMeta: ddprofiledefinition.ChartMeta{
+							Description: "Per-peer update traffic",
+							Family:      "Network/Routing/BGP/Peer/Message/Update",
+							Unit:        "{message}",
+						},
+					},
+				},
+			},
+			collectedMetrics: []ddsnmp.Metric{
+				{
+					Name:       "bgpPeerInUpdates",
+					Value:      11,
+					IsTable:    true,
+					Table:      "tBgpPeerNgOperTable",
+					MetricType: ddprofiledefinition.ProfileMetricTypeRate,
+					Tags: map[string]string{
+						"routing_instance": "Base",
+						"neighbor":         "192.0.2.1",
+						"remote_as":        "64512",
+					},
+					StaticTags: map[string]string{
+						"address_family":            "ipv4",
+						"subsequent_address_family": "unicast",
+					},
+				},
+				{
+					Name:       "bgpPeerOutUpdates",
+					Value:      12,
+					IsTable:    true,
+					Table:      "tBgpPeerNgOperTable",
+					MetricType: ddprofiledefinition.ProfileMetricTypeRate,
+					Tags: map[string]string{
+						"routing_instance": "Base",
+						"neighbor":         "192.0.2.1",
+						"remote_as":        "64512",
+					},
+					StaticTags: map[string]string{
+						"address_family":            "ipv4",
+						"subsequent_address_family": "unicast",
+					},
+				},
+				{
+					Name:       "bgpPeerInUpdates",
+					Value:      21,
+					IsTable:    true,
+					Table:      "tBgpPeerNgOperTable",
+					MetricType: ddprofiledefinition.ProfileMetricTypeRate,
+					Tags: map[string]string{
+						"routing_instance": "Base",
+						"neighbor":         "192.0.2.1",
+						"remote_as":        "64512",
+					},
+					StaticTags: map[string]string{
+						"address_family":            "ipv6",
+						"subsequent_address_family": "unicast",
+					},
+				},
+				{
+					Name:       "bgpPeerOutUpdates",
+					Value:      22,
+					IsTable:    true,
+					Table:      "tBgpPeerNgOperTable",
+					MetricType: ddprofiledefinition.ProfileMetricTypeRate,
+					Tags: map[string]string{
+						"routing_instance": "Base",
+						"neighbor":         "192.0.2.1",
+						"remote_as":        "64512",
+					},
+					StaticTags: map[string]string{
+						"address_family":            "ipv6",
+						"subsequent_address_family": "unicast",
+					},
+				},
+			},
+			expected: []ddsnmp.Metric{
+				{
+					Name:    "bgpPeerUpdates",
+					IsTable: true,
+					Table:   "tBgpPeerNgOperTable",
+					Tags: map[string]string{
+						"routing_instance":          "Base",
+						"neighbor":                  "192.0.2.1",
+						"address_family":            "ipv4",
+						"subsequent_address_family": "unicast",
+						"remote_as":                 "64512",
+					},
+					MultiValue:  map[string]int64{"received": 11, "sent": 12},
+					Description: "Per-peer update traffic",
+					Family:      "Network/Routing/BGP/Peer/Message/Update",
+					Unit:        "{message}",
+					MetricType:  ddprofiledefinition.ProfileMetricTypeRate,
+				},
+				{
+					Name:    "bgpPeerUpdates",
+					IsTable: true,
+					Table:   "tBgpPeerNgOperTable",
+					Tags: map[string]string{
+						"routing_instance":          "Base",
+						"neighbor":                  "192.0.2.1",
+						"address_family":            "ipv6",
+						"subsequent_address_family": "unicast",
+						"remote_as":                 "64512",
+					},
+					MultiValue:  map[string]int64{"received": 21, "sent": 22},
+					Description: "Per-peer update traffic",
+					Family:      "Network/Routing/BGP/Peer/Message/Update",
+					Unit:        "{message}",
+					MetricType:  ddprofiledefinition.ProfileMetricTypeRate,
 				},
 			},
 		},
@@ -1135,13 +1583,17 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 			profileDef: &ddprofiledefinition.ProfileDefinition{
 				Metrics: []ddprofiledefinition.MetricsConfig{
 					{
-						Table: ddprofiledefinition.SymbolConfig{Name: "ifXTable"},
+						Table: ddprofiledefinition.SymbolConfig{
+							Name: "ifXTable",
+						},
 						Symbols: []ddprofiledefinition.SymbolConfig{
 							{Name: "ifHCInOctets"},
 						},
 					},
 					{
-						Table: ddprofiledefinition.SymbolConfig{Name: "ifTable"},
+						Table: ddprofiledefinition.SymbolConfig{
+							Name: "ifTable",
+						},
 						Symbols: []ddprofiledefinition.SymbolConfig{
 							{Name: "ifInOctets"},
 						},
@@ -1189,7 +1641,9 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 			profileDef: &ddprofiledefinition.ProfileDefinition{
 				Metrics: []ddprofiledefinition.MetricsConfig{
 					{
-						Table: ddprofiledefinition.SymbolConfig{Name: "ifTable"},
+						Table: ddprofiledefinition.SymbolConfig{
+							Name: "ifTable",
+						},
 						Symbols: []ddprofiledefinition.SymbolConfig{
 							{Name: "ifInOctets"},
 						},
@@ -1235,14 +1689,18 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 			profileDef: &ddprofiledefinition.ProfileDefinition{
 				Metrics: []ddprofiledefinition.MetricsConfig{
 					{
-						Table: ddprofiledefinition.SymbolConfig{Name: "ifXTable"},
+						Table: ddprofiledefinition.SymbolConfig{
+							Name: "ifXTable",
+						},
 						Symbols: []ddprofiledefinition.SymbolConfig{
 							{Name: "ifHCInOctets"},
 							// ifHCOutOctets intentionally not defined/collected
 						},
 					},
 					{
-						Table: ddprofiledefinition.SymbolConfig{Name: "ifTable"},
+						Table: ddprofiledefinition.SymbolConfig{
+							Name: "ifTable",
+						},
 						Symbols: []ddprofiledefinition.SymbolConfig{
 							{Name: "ifInOctets"},
 							{Name: "ifOutOctets"},
@@ -1302,7 +1760,9 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 								{Metric: "ifInOctets", Table: "ifTable"},
 							}},
 						},
-						ChartMeta: ddprofiledefinition.ChartMeta{Description: "Total inbound"},
+						ChartMeta: ddprofiledefinition.ChartMeta{
+							Description: "Total inbound",
+						},
 					},
 				},
 			},
@@ -1315,7 +1775,9 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 			profileDef: &ddprofiledefinition.ProfileDefinition{
 				Metrics: []ddprofiledefinition.MetricsConfig{
 					{
-						Table: ddprofiledefinition.SymbolConfig{Name: "ifXTable"},
+						Table: ddprofiledefinition.SymbolConfig{
+							Name: "ifXTable",
+						},
 						Symbols: []ddprofiledefinition.SymbolConfig{
 							{Name: "ifHCInOctets"},
 							{Name: "ifHCOutOctets"},
@@ -1380,7 +1842,9 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 								{Metric: "ifHCInOctets", Table: "ifXTable"}, // preferred 64-bit
 							}},
 						},
-						ChartMeta: ddprofiledefinition.ChartMeta{Description: "Total inbound"},
+						ChartMeta: ddprofiledefinition.ChartMeta{
+							Description: "Total inbound",
+						},
 					},
 				},
 			},
@@ -1400,7 +1864,7 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 					{
 						Name:    "ifTraffic",
 						PerRow:  true,
-						GroupBy: []string{"interface"},
+						GroupBy: ddprofiledefinition.StringArray{"interface"},
 						Alternatives: []ddprofiledefinition.VirtualMetricAlternativeSourcesConfig{
 							{Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
 								{Metric: "ifHCInOctets", Table: "ifXTable", As: "in"},
@@ -1420,14 +1884,56 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 				},
 			},
 			collectedMetrics: []ddsnmp.Metric{
-				{Name: "ifHCInOctets", Value: 100, IsTable: true, Table: "ifXTable", MetricType: ddprofiledefinition.ProfileMetricTypeCounter, Tags: map[string]string{"interface": "eth0"}},
-				{Name: "ifHCOutOctets", Value: 200, IsTable: true, Table: "ifXTable", MetricType: ddprofiledefinition.ProfileMetricTypeCounter, Tags: map[string]string{"interface": "eth0"}},
-				{Name: "ifHCInOctets", Value: 300, IsTable: true, Table: "ifXTable", MetricType: ddprofiledefinition.ProfileMetricTypeCounter, Tags: map[string]string{"interface": "eth1"}},
-				{Name: "ifHCOutOctets", Value: 400, IsTable: true, Table: "ifXTable", MetricType: ddprofiledefinition.ProfileMetricTypeCounter, Tags: map[string]string{"interface": "eth1"}},
+				{
+					Name:       "ifHCInOctets",
+					Value:      100,
+					IsTable:    true,
+					Table:      "ifXTable",
+					MetricType: "counter",
+					Tags:       map[string]string{"interface": "eth0"},
+				},
+				{
+					Name:       "ifHCOutOctets",
+					Value:      200,
+					IsTable:    true,
+					Table:      "ifXTable",
+					MetricType: "counter",
+					Tags:       map[string]string{"interface": "eth0"},
+				},
+				{
+					Name:       "ifHCInOctets",
+					Value:      300,
+					IsTable:    true,
+					Table:      "ifXTable",
+					MetricType: "counter",
+					Tags:       map[string]string{"interface": "eth1"},
+				},
+				{
+					Name:       "ifHCOutOctets",
+					Value:      400,
+					IsTable:    true,
+					Table:      "ifXTable",
+					MetricType: "counter",
+					Tags:       map[string]string{"interface": "eth1"},
+				},
 
 				// 32-bit also present but must be ignored
-				{Name: "ifInOctets", Value: 1, IsTable: true, Table: "ifTable", MetricType: ddprofiledefinition.ProfileMetricTypeCounter, Tags: map[string]string{"interface": "eth0"}},
-				{Name: "ifOutOctets", Value: 2, IsTable: true, Table: "ifTable", MetricType: ddprofiledefinition.ProfileMetricTypeCounter, Tags: map[string]string{"interface": "eth0"}},
+				{
+					Name:       "ifInOctets",
+					Value:      1,
+					IsTable:    true,
+					Table:      "ifTable",
+					MetricType: "counter",
+					Tags:       map[string]string{"interface": "eth0"},
+				},
+				{
+					Name:       "ifOutOctets",
+					Value:      2,
+					IsTable:    true,
+					Table:      "ifTable",
+					MetricType: "counter",
+					Tags:       map[string]string{"interface": "eth0"},
+				},
 			},
 			expected: []ddsnmp.Metric{
 				{
@@ -1439,7 +1945,7 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 					Description: "Per-interface traffic",
 					Family:      "Network/Interface/Traffic/Total",
 					Unit:        "bit/s",
-					MetricType:  ddprofiledefinition.ProfileMetricTypeCounter,
+					MetricType:  "counter",
 				},
 				{
 					Name:        "ifTraffic",
@@ -1450,7 +1956,7 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 					Description: "Per-interface traffic",
 					Family:      "Network/Interface/Traffic/Total",
 					Unit:        "bit/s",
-					MetricType:  ddprofiledefinition.ProfileMetricTypeCounter,
+					MetricType:  "counter",
 				},
 			},
 		},
@@ -1462,7 +1968,7 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 					{
 						Name:    "ifTraffic",
 						PerRow:  true,
-						GroupBy: []string{"interface"},
+						GroupBy: ddprofiledefinition.StringArray{"interface"},
 						Alternatives: []ddprofiledefinition.VirtualMetricAlternativeSourcesConfig{
 							{Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
 								{Metric: "ifHCInOctets", Table: "ifXTable", As: "in"},
@@ -1482,10 +1988,38 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 				},
 			},
 			collectedMetrics: []ddsnmp.Metric{
-				{Name: "ifInOctets", Value: 10, IsTable: true, Table: "ifTable", MetricType: ddprofiledefinition.ProfileMetricTypeCounter, Tags: map[string]string{"interface": "eth0"}},
-				{Name: "ifOutOctets", Value: 20, IsTable: true, Table: "ifTable", MetricType: ddprofiledefinition.ProfileMetricTypeCounter, Tags: map[string]string{"interface": "eth0"}},
-				{Name: "ifInOctets", Value: 30, IsTable: true, Table: "ifTable", MetricType: ddprofiledefinition.ProfileMetricTypeCounter, Tags: map[string]string{"interface": "eth1"}},
-				{Name: "ifOutOctets", Value: 40, IsTable: true, Table: "ifTable", MetricType: ddprofiledefinition.ProfileMetricTypeCounter, Tags: map[string]string{"interface": "eth1"}},
+				{
+					Name:       "ifInOctets",
+					Value:      10,
+					IsTable:    true,
+					Table:      "ifTable",
+					MetricType: "counter",
+					Tags:       map[string]string{"interface": "eth0"},
+				},
+				{
+					Name:       "ifOutOctets",
+					Value:      20,
+					IsTable:    true,
+					Table:      "ifTable",
+					MetricType: "counter",
+					Tags:       map[string]string{"interface": "eth0"},
+				},
+				{
+					Name:       "ifInOctets",
+					Value:      30,
+					IsTable:    true,
+					Table:      "ifTable",
+					MetricType: "counter",
+					Tags:       map[string]string{"interface": "eth1"},
+				},
+				{
+					Name:       "ifOutOctets",
+					Value:      40,
+					IsTable:    true,
+					Table:      "ifTable",
+					MetricType: "counter",
+					Tags:       map[string]string{"interface": "eth1"},
+				},
 			},
 			expected: []ddsnmp.Metric{
 				{
@@ -1497,7 +2031,7 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 					Description: "Per-interface traffic",
 					Family:      "Network/Interface/Traffic/Total",
 					Unit:        "bit/s",
-					MetricType:  ddprofiledefinition.ProfileMetricTypeCounter,
+					MetricType:  "counter",
 				},
 				{
 					Name:        "ifTraffic",
@@ -1508,7 +2042,7 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 					Description: "Per-interface traffic",
 					Family:      "Network/Interface/Traffic/Total",
 					Unit:        "bit/s",
-					MetricType:  ddprofiledefinition.ProfileMetricTypeCounter,
+					MetricType:  "counter",
 				},
 			},
 		},
@@ -1526,7 +2060,15 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 }
 
 func Test_vmBuildGroupKey(t *testing.T) {
-	const sep = '\x1F'
+	encodeParts := func(parts ...string) string {
+		var b strings.Builder
+		for _, part := range parts {
+			b.WriteString(strconv.Itoa(len(part)))
+			b.WriteByte(':')
+			b.WriteString(part)
+		}
+		return b.String()
+	}
 
 	tests := map[string]struct {
 		agg     vmetricsAggregator
@@ -1535,56 +2077,84 @@ func Test_vmBuildGroupKey(t *testing.T) {
 		wantKey string
 	}{
 		"not grouped -> no key": {
-			agg:     vmetricsAggregator{grouped: false},
+			agg: vmetricsAggregator{
+				grouped: false,
+			},
 			tags:    map[string]string{"iface": "eth0"},
 			wantOK:  false,
 			wantKey: "",
 		},
 
 		"per_row + no groupBy: builds key from all non-underscore tags (k=v), sorted": {
-			agg:     vmetricsAggregator{grouped: true, perRow: true},
+			agg: vmetricsAggregator{
+				grouped: true,
+				perRow:  true,
+			},
 			tags:    map[string]string{"iface": "eth0", "_if_type": "loopback", "zone": "a"},
 			wantOK:  true,
-			wantKey: "iface=eth0" + string(sep) + "zone=a",
+			wantKey: encodeParts("iface", "eth0", "zone", "a"),
 		},
 
 		"per_row + no groupBy: all tags underscore -> no key": {
-			agg:     vmetricsAggregator{grouped: true, perRow: true},
+			agg: vmetricsAggregator{
+				grouped: true,
+				perRow:  true,
+			},
 			tags:    map[string]string{"_if_type": "loopback", "_role": "infra"},
 			wantOK:  false,
 			wantKey: "",
 		},
 
 		"per_row + groupBy: uses configured labels exactly; underscore NOT special": {
-			agg:     vmetricsAggregator{grouped: true, perRow: true, groupBy: []string{"_if_type", "iface"}},
+			agg: vmetricsAggregator{
+				grouped: true,
+				perRow:  true,
+				groupBy: []string{"_if_type", "iface"},
+			},
 			tags:    map[string]string{"iface": "eth0", "_if_type": "ethernetCsmacd"},
 			wantOK:  true,
-			wantKey: "ethernetCsmacd" + string(sep) + "eth0",
+			wantKey: encodeParts("ethernetCsmacd", "eth0"),
 		},
 
-		"per_row + groupBy: missing required tag -> no key": {
-			agg:     vmetricsAggregator{grouped: true, perRow: true, groupBy: []string{"iface", "zone"}},
+		"per_row + groupBy: missing hint falls back to stable visible-tag key": {
+			agg: vmetricsAggregator{
+				grouped: true,
+				perRow:  true,
+				groupBy: []string{"iface", "zone"},
+			},
 			tags:    map[string]string{"iface": "eth0"},
-			wantOK:  false,
-			wantKey: "",
+			wantOK:  true,
+			wantKey: encodeParts("iface", "eth0"),
 		},
 
 		"non per_row + groupBy(1): returns that label value": {
-			agg:     vmetricsAggregator{grouped: true, perRow: false, groupBy: []string{"iface"}},
+			agg: vmetricsAggregator{
+				grouped: true,
+				perRow:  false,
+				groupBy: []string{"iface"},
+			},
 			tags:    map[string]string{"iface": "eth1", "zone": "b"},
 			wantOK:  true,
 			wantKey: "eth1",
 		},
 
 		"non per_row + groupBy(2): underscore label NOT special and included": {
-			agg:     vmetricsAggregator{grouped: true, perRow: false, groupBy: []string{"_if_type", "zone"}},
+			agg: vmetricsAggregator{
+				grouped: true,
+				perRow:  false,
+				groupBy: []string{"_if_type", "zone"},
+			},
 			tags:    map[string]string{"_if_type": "ethernetCsmacd", "zone": "edge"},
 			wantOK:  true,
-			wantKey: "ethernetCsmacd" + string(sep) + "edge",
+			wantKey: encodeParts("ethernetCsmacd", "edge"),
 		},
 
 		"non per_row + groupBy: missing one value -> no key": {
-			agg:     vmetricsAggregator{grouped: true, perRow: false, groupBy: []string{"iface", "zone"}},
+			agg: vmetricsAggregator{
+				grouped: true,
+				perRow:  false,
+				groupBy: []string{"iface", "zone"},
+			},
 			tags:    map[string]string{"iface": "eth2"},
 			wantOK:  false,
 			wantKey: "",
@@ -1598,6 +2168,42 @@ func Test_vmBuildGroupKey(t *testing.T) {
 			assert.Equal(t, tc.wantKey, key, "key mismatch")
 		})
 	}
+
+	t.Run("per_row fallback encodes key-value pairs without raw-delimiter collisions", func(t *testing.T) {
+		keyA, okA := vmBuildGroupKey(map[string]string{"a=b": "c"}, &vmetricsAggregator{
+			grouped: true,
+			perRow:  true,
+		})
+		keyB, okB := vmBuildGroupKey(map[string]string{"a": "b=c"}, &vmetricsAggregator{
+			grouped: true,
+			perRow:  true,
+		})
+
+		assert.True(t, okA)
+		assert.True(t, okB)
+		assert.NotEqual(t, keyA, keyB)
+	})
+
+	t.Run("multi-label group_by encodes values without separator collisions", func(t *testing.T) {
+		sep := string(rune(0x1F))
+		agg := vmetricsAggregator{
+			grouped: true,
+			groupBy: []string{"iface", "zone"},
+		}
+
+		keyA, okA := vmBuildGroupKey(map[string]string{"iface": "a" + sep + "b", "zone": "c"}, &agg)
+		keyB, okB := vmBuildGroupKey(
+			map[string]string{"iface": "a", "zone": "b" + sep + "c"},
+			&vmetricsAggregator{
+				grouped: true,
+				groupBy: []string{"iface", "zone"},
+			},
+		)
+
+		assert.True(t, okA)
+		assert.True(t, okB)
+		assert.NotEqual(t, keyA, keyB)
+	})
 }
 
 var (
@@ -1636,8 +2242,20 @@ func Benchmark_vmBuildGroupKey(b *testing.B) {
 		{name: "PerRow_Fallback_AllTags30", perRow: true, groupBy: nil, tagCount: 30, expectKey: true},
 		{name: "GroupBy1", perRow: false, groupBy: []string{"label0"}, tagCount: 10, expectKey: true},
 		{name: "GroupBy2", perRow: false, groupBy: []string{"label0", "label1"}, tagCount: 10, expectKey: true},
-		{name: "GroupBy3", perRow: false, groupBy: []string{"label0", "label1", "label2"}, tagCount: 10, expectKey: true},
-		{name: "GroupBy2_MissingLabel", perRow: false, groupBy: []string{"label0", "missing"}, tagCount: 10, expectKey: false},
+		{
+			name:      "GroupBy3",
+			perRow:    false,
+			groupBy:   []string{"label0", "label1", "label2"},
+			tagCount:  10,
+			expectKey: true,
+		},
+		{
+			name:      "GroupBy2_MissingLabel",
+			perRow:    false,
+			groupBy:   []string{"label0", "missing"},
+			tagCount:  10,
+			expectKey: false,
+		},
 	}
 
 	for _, tc := range cases {
@@ -1680,7 +2298,9 @@ func Benchmark_CollectorAccumulate_PerRowFallback(b *testing.B) {
 
 			// Aggregator configured as: grouped, PerRow=true, no groupBy (force fallback)
 			agg := &vmetricsAggregator{
-				config:     ddprofiledefinition.VirtualMetricConfig{Name: "vm_perrow"},
+				config: ddprofiledefinition.VirtualMetricConfig{
+					Name: "vm_perrow",
+				},
 				grouped:    true,
 				perRow:     true,
 				groupBy:    nil,
@@ -1694,10 +2314,16 @@ func Benchmark_CollectorAccumulate_PerRowFallback(b *testing.B) {
 
 			// Build lookup with N sinks pointing to the SAME aggregator.
 			lookup := make(map[vmetricsSourceKey][]vmetricsSink, 1)
-			key := vmetricsSourceKey{metricName: metricName, tableName: tableName}
+			key := vmetricsSourceKey{
+				metricName: metricName,
+				tableName:  tableName,
+			}
 			sinks := make([]vmetricsSink, c.sinks)
 			for i := 0; i < c.sinks; i++ {
-				sinks[i] = vmetricsSink{agg: agg, dimIdx: int16(i)}
+				sinks[i] = vmetricsSink{
+					agg:    agg,
+					dimIdx: int16(i),
+				}
 			}
 			lookup[key] = sinks
 
@@ -1712,7 +2338,9 @@ func Benchmark_CollectorAccumulate_PerRowFallback(b *testing.B) {
 			}
 			collected := []ddsnmp.Metric{m}
 
-			collector := &vmetricsCollector{log: nil} // log unused on accumulate
+			collector := &vmetricsCollector{
+				log: nil,
+			} // log unused on accumulate
 
 			// Warm-up once so the bucket exists; we want to measure repeated key-building.
 			collector.accumulate(lookup, collected)

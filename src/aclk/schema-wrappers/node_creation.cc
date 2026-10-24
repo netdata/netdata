@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "proto/nodeinstance/create/v1/creation.pb.h"
+#include "nodeinstance/create/v1/creation.pb.h"
 #include "node_creation.h"
 
 #include "schema_wrapper_utils.h"
@@ -13,14 +13,18 @@ char *generate_node_instance_creation(size_t *len, const node_instance_creation_
 
     if (data->claim_id)
         msg.set_claim_id(data->claim_id);
-    msg.set_machine_guid(data->machine_guid);
-    msg.set_hostname(data->hostname);
+    if (data->machine_guid)
+        msg.set_machine_guid(data->machine_guid);
+    if (data->hostname)
+        msg.set_hostname(data->hostname);
     msg.set_hops(data->hops);
 
     *len = PROTO_COMPAT_MSG_SIZE(msg);
     char *bin = (char*)mallocz(*len);
-    if (bin)
-        msg.SerializeToArray(bin, *len);
+    if (!msg.SerializeToArray(bin, *len)) {
+        freez(bin);
+        return NULL;
+    }
 
     return bin;
 }

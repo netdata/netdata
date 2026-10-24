@@ -120,7 +120,6 @@ modules:
                 ```bash
                 ./perf.plugin 1 all debug
                 ```
-    alerts: []
     metrics:
       folding:
         title: Metrics

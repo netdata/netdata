@@ -1,0 +1,45 @@
+# Profile for Blue Coat ProxySG / SGOS appliances
+#
+# BLUECOAT-MIB defines the ProxySG product tree under 1.3.6.1.4.1.3417.1.1.*
+# and BLUECOAT-LICENSE-MIB exposes per-license application / feature / component
+# rows with expire type, expire date, and license state.
+
+extends:
+  - _system-base.yaml
+  - _std-if-mib.yaml
+  - _bluecoat-proxysg-licensing.yaml
+
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.3417.1.1.*
+
+metadata:
+  device:
+    fields:
+      vendor:
+        value: "Blue Coat"
+      serial_number:
+        symbol:
+          MIB: BLUECOAT-SG-PROXY-MIB
+          OID: 1.3.6.1.4.1.3417.2.11.1.4.0
+          name: sgProxySerialNumber
+      version:
+        symbol:
+          MIB: BLUECOAT-SG-PROXY-MIB
+          OID: 1.3.6.1.4.1.3417.2.11.1.3.0
+          name: sgProxyVersion
+      product_name:
+        symbol:
+          MIB: BLUECOAT-SG-PROXY-MIB
+          OID: 1.3.6.1.4.1.3417.2.11.1.2.0
+          name: sgProxySoftware
+      os_name:
+        value: "SGOS"
+      os_version:
+        symbol:
+          MIB: BLUECOAT-SG-PROXY-MIB
+          OID: 1.3.6.1.4.1.3417.2.11.1.3.0
+          name: sgProxyVersion
+      type:
+        value: "Proxy"

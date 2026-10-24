@@ -231,8 +231,13 @@ static inline bool is_forbidden_filename_char(char c) {
 char *dyncfg_escape_id_for_filename(const char *id) {
     if (id == NULL) return NULL;
 
+    size_t max_len = (SIZE_MAX - 1) / 3;
+    size_t len = strnlen(id, max_len + 1);
+    if(unlikely(len > (SIZE_MAX - 1) / 3))
+        fatal("dyncfg_escape_id_for_filename() cannot allocate escaped id for %zu bytes.", len);
+
     // Allocate memory for the worst case, where every character is escaped.
-    char *escaped = mallocz(strlen(id) * 3 + 1); // Each char can become '%XX', plus '\0'
+    char *escaped = mallocz(len * 3 + 1); // Each char can become '%XX', plus '\0'
     if (!escaped) return NULL;
 
     const char *src = id;
@@ -273,8 +278,7 @@ int dyncfg_node_find_and_call(DICTIONARY *dyncfg_nodes, const char *transaction,
     if(!function || !*function)
         return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "command received is empty");
 
-    char buf[strlen(function) + 1];
-    memcpy(buf, function, sizeof(buf));
+    CLEAN_CHAR_P *buf = strdupz(function);
 
     char *words[MAX_FUNCTION_PARAMETERS];    // an array of pointers for the words in this line
     size_t num_words = quoted_strings_splitter_whitespace(buf, words, MAX_FUNCTION_PARAMETERS);

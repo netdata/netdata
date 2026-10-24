@@ -17,9 +17,13 @@
 struct aclk_request {
     bool has_type;
     bool is_http;
+    // Heap-allocated string fields below are owned by the local instance in
+    // aclk_handle_cloud_cmd_message. On the v2 success path, msg_id and
+    // callback_topic are transferred into the query and released by
+    // aclk_query_free; on the error path the caller frees them. Any new owned
+    // field added here must extend both paths to preserve this invariant.
     char *msg_id;
     char *callback_topic;
-    char *payload;
     int version;
     int timeout;
     int min_version;
@@ -46,15 +50,6 @@ static int cloud_to_agent_parse(JSON_ENTRY *e)
             }
             if (!strcmp(e->name, "callback-topic")) {
                 data->callback_topic = e->data.string ? strdupz(e->data.string) : NULL;
-                break;
-            }
-            if (!strcmp(e->name, "payload")) {
-                if (likely(e->data.string)) {
-                    size_t len = strlen(e->data.string);
-                    data->payload = mallocz(len+1);
-                    if (!url_decode_r(data->payload, e->data.string, len + 1))
-                        strcpy(data->payload, e->data.string);
-                }
                 break;
             }
             break;
@@ -97,30 +92,21 @@ static inline int aclk_extract_v2_data(char *payload, char **data)
     return 0;
 }
 
-static inline int aclk_v2_payload_get_query(const char *payload, char **query_url)
+// the web client parses the request itself; this only refuses what the cloud must never send
+static inline int aclk_v2_payload_validate(const char *payload)
 {
-    const char *start, *end;
-
-    if(strncmp(payload, "GET /", 5) == 0 || strncmp(payload, "PUT /", 5) == 0)
-        start = payload + 4;
-    else if(strncmp(payload, "POST /", 6) == 0)
-        start = payload + 5;
-    else if(strncmp(payload, "DELETE /", 8) == 0)
-        start = payload + 7;
-    else {
+    if(strncmp(payload, "GET /", 5) != 0 && strncmp(payload, "PUT /", 5) != 0 &&
+       strncmp(payload, "POST /", 6) != 0 && strncmp(payload, "DELETE /", 8) != 0) {
         errno_clear();
         netdata_log_error("Only accepting requests that start with GET, POST, PUT, DELETE from CLOUD.");
         return 1;
     }
 
-    if(!(end = strstr(payload, HTTP_1_1 HTTP_ENDL))) {
+    if(!strstr(payload, HTTP_1_1 HTTP_ENDL)) {
         errno_clear();
         netdata_log_error("Doesn't look like HTTP GET request.");
         return 1;
     }
-
-    *query_url = mallocz((end - start) + 1);
-    strncpyz(*query_url, start, end - start);
 
     return 0;
 }
@@ -143,10 +129,8 @@ static int aclk_handle_cloud_http_request_v2(struct aclk_request *cloud_to_agent
         goto error;
     }
 
-    if (unlikely(aclk_v2_payload_get_query(query->data.http_api_v2.payload, &query->dedup_id))) {
-        netdata_log_error("Could not extract payload from query");
+    if (unlikely(aclk_v2_payload_validate(query->data.http_api_v2.payload)))
         goto error;
-    }
 
     if (unlikely(!cloud_to_agent->callback_topic)) {
         netdata_log_error("Missing callback_topic");
@@ -161,9 +145,6 @@ static int aclk_handle_cloud_http_request_v2(struct aclk_request *cloud_to_agent
     // aclk_queue_query takes ownership of data pointer
     query->callback_topic = cloud_to_agent->callback_topic;
     query->timeout = cloud_to_agent->timeout;
-    // for clarity and code readability as when we process the request
-    // it would be strange to get URL from `dedup_id`
-    query->data.http_api_v2.query = query->dedup_id;
     query->msg_id = cloud_to_agent->msg_id;
     aclk_execute_query(query);
     return 0;
@@ -204,15 +185,11 @@ int aclk_handle_cloud_cmd_message(char *payload)
         goto err_cleanup;
     }
 
-    if (likely(!aclk_handle_cloud_http_request_v2(&cloud_to_agent, payload))) {
-        // aclk_handle_cloud_request takes ownership of the pointers
-        // (to avoid copying) in case of success
+    // aclk_handle_cloud_http_request_v2 takes ownership of msg_id and callback_topic on success
+    if (likely(!aclk_handle_cloud_http_request_v2(&cloud_to_agent, payload)))
         return 0;
-    }
 
 err_cleanup:
-    if (cloud_to_agent.payload)
-        freez(cloud_to_agent.payload);
     if (cloud_to_agent.msg_id)
         freez(cloud_to_agent.msg_id);
     if (cloud_to_agent.callback_topic)
@@ -337,7 +314,7 @@ int send_alarm_configuration(const char *msg, size_t msg_len)
 int send_alarm_snapshot(const char *msg, size_t msg_len)
 {
     struct send_alarm_snapshot *sas = parse_send_alarm_snapshot(msg, msg_len);
-    if (!sas->node_id || !sas->claim_id || !sas->snapshot_uuid) {
+    if (!sas || !sas->node_id || !sas->claim_id || !sas->snapshot_uuid) {
         netdata_log_error("Error parsing SendAlarmSnapshot");
         destroy_send_alarm_snapshot(sas);
         return 1;
@@ -345,6 +322,8 @@ int send_alarm_snapshot(const char *msg, size_t msg_len)
     aclk_query_t *query = aclk_query_new(ALERT_CHECKPOINT);
     query->data.node_id = sas->node_id;     // Will be freed on query free
     query->claim_id = sas->claim_id;        // Will be freed on query free
+    sas->node_id = NULL;
+    sas->claim_id = NULL;
     query->version = 0; // force snapshot
     aclk_add_job(query);
     destroy_send_alarm_snapshot(sas);
@@ -358,7 +337,7 @@ int handle_disconnect_req(const char *msg, size_t msg_len)
         return 1;
     if (cmd->permaban) {
         netdata_log_error("Cloud Banned This Agent!");
-        aclk_disable_runtime = 1;
+        __atomic_store_n(&aclk_disable_runtime, 1, __ATOMIC_RELAXED);
     }
     netdata_log_info("Cloud requested disconnect (EC=%u, \"%s\")", (unsigned int)cmd->error_code, cmd->error_description);
     if (cmd->reconnect_after_s > 0) {
@@ -367,7 +346,7 @@ int handle_disconnect_req(const char *msg, size_t msg_len)
             "Cloud asks not to reconnect for %u seconds. We shall honor that request",
             (unsigned int)cmd->reconnect_after_s);
     }
-    disconnect_req = ACLK_CLOUD_DISCONNECT;
+    __atomic_store_n(&disconnect_req, ACLK_CLOUD_DISCONNECT, __ATOMIC_RELAXED);
     freez(cmd->error_description);
     freez(cmd);
     return 0;

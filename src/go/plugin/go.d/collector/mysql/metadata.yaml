@@ -7,6 +7,7 @@ modules:
       module_name: mysql
       monitored_instance:
         name: MySQL
+        description: "Monitor MySQL queries, connections, replication, users, InnoDB, storage, and resource performance metrics."
         link: https://www.mysql.com/
         categories:
           - data-collection.databases
@@ -35,9 +36,9 @@ modules:
           This collector monitors the health and performance of MySQL servers and collects general statistics, replication and user metrics.
         method_description: |
           It connects to the MySQL instance via a TCP or UNIX socket and executes the following commands:
-          
+
           Executed queries:
-          
+
           - `SELECT VERSION();`
           - `SHOW GLOBAL STATUS;`
           - `SHOW ENGINE INNODB STATUS;`
@@ -231,61 +232,12 @@ modules:
                 jobs:
                   - name: local
                     dsn: netdata@tcp(127.0.0.1:3306)/
-                
+
                   - name: remote
                     dsn: netconfig:password@tcp(203.0.113.0:3306)/
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: mysql_10s_slow_queries
-        metric: mysql.queries
-        info: number of slow queries in the last 10 seconds
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf
-      - name: mysql_10s_table_locks_immediate
-        metric: mysql.table_locks
-        info: number of table immediate locks in the last 10 seconds
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf
-      - name: mysql_10s_table_locks_waited
-        metric: mysql.table_locks
-        info: number of table waited locks in the last 10 seconds
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf
-      - name: mysql_10s_waited_locks_ratio
-        metric: mysql.table_locks
-        info: ratio of waited table locks over the last 10 seconds
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf
-      - name: mysql_connections
-        metric: mysql.connections_active
-        info: client connections utilization
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf
-      - name: mysql_replication
-        metric: mysql.slave_status
-        info: "replication status (0: stopped, 1: working)"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf
-      - name: mysql_replication_lag
-        metric: mysql.slave_behind
-        info: difference between the timestamp of the latest transaction processed by the SQL thread and the timestamp of the same transaction when it was processed on the master
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf
-      - name: mysql_galera_cluster_size_max_2m
-        metric: mysql.galera_cluster_size
-        info: maximum galera cluster size in the last 2 minutes starting one minute ago
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf
-      - name: mysql_galera_cluster_size
-        metric: mysql.galera_cluster_size
-        info: current galera cluster size, compared to the maximum size in the last 2 minutes
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf
-      - name: mysql_galera_cluster_state_warn
-        metric: mysql.galera_cluster_state
-        info: galera node state is either Donor/Desynced or Joined
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf
-      - name: mysql_galera_cluster_state_crit
-        metric: mysql.galera_cluster_state
-        info: galera node state is either Undefined or Joining or Error
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf
-      - name: mysql_galera_cluster_status
-        metric: mysql.galera_cluster_status
-        info: galera node is part of a nonoperational component. This occurs in cases of multiple membership changes that result in a loss of Quorum or in cases of split-brain situations.
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf
     functions:
       description: |
         This collector exposes real-time functions for interactive troubleshooting in the Live tab.
@@ -1315,6 +1267,7 @@ modules:
       id: collector-go.d.plugin-mariadb
       monitored_instance:
         name: MariaDB
+        description: "Monitor MariaDB queries, connections, replication, users, InnoDB, storage, and resource performance metrics."
         link: https://mariadb.org/
         icon_filename: mariadb.svg
         categories:
@@ -1325,6 +1278,7 @@ modules:
       id: collector-go.d.plugin-percona_mysql
       monitored_instance:
         name: Percona MySQL
+        description: "Monitor Percona MySQL queries, connections, replication, users, InnoDB, storage, and resource performance metrics."
         link: https://www.percona.com/software/mysql-database/percona-server
         icon_filename: percona.svg
         categories:

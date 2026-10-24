@@ -9,6 +9,18 @@ Netdata exports metrics to Prometheus through two methods:
 
 Before configuring either method, understand how Netdata structures its exported metrics and available capabilities. These concepts apply to both scraping and remote write methods.
 
+:::note
+
+The metric naming rules below apply to the [remote write exporter](/src/exporting/prometheus/remote_write/README.md) as well as the scraping endpoint — both use the same prefix, context, units, and suffix rules. To preview the exact metric names that remote write will send, query the `allmetrics` endpoint using the same prefix and data source configured for your remote write exporter in `exporting.conf`:
+
+```
+http://your.netdata.ip:19999/api/v1/allmetrics?format=prometheus&source=as-collected&prefix=netdata
+```
+
+Replace `as-collected` with `average` or `sum`, and `netdata` with your configured `prefix`, to match your remote write exporter's settings — the endpoint defaults to the scraping exporter's prefix, which may differ from a remote write instance configured with a custom `prefix`. The data source controls whether units appear in the metric name and which suffix is appended, exactly as described in [Netdata Data Source](#netdata-data-source).
+
+:::
+
 ### Understanding Netdata Metrics
 
 #### Charts
@@ -29,6 +41,16 @@ Each Netdata chart contains metrics called `dimensions`. All dimensions in a cha
 
 - Share the same units of measurement
 - Belong to the same contextual category (e.g., disk bandwidth contains `read` and `write` dimensions)
+
+#### Negative Values in Exported Metrics
+
+Some Netdata dimensions use a `-1` multiplier by design so that read and write appear as opposing values on the dashboard. This multiplier is applied in the RRD layer during collection and is reflected in all Prometheus data sources (`as-collected`, `average`, and `sum`), causing those dimensions to export as negative values. You can identify affected charts from the dashboard — they display read and write as stacked opposing areas.
+
+:::note
+
+To get absolute values in PromQL, use `abs()`. For example: `abs(netdata_cgroup_io_KiB_persec_average{dimension="write"})`.
+
+:::
 
 ### Netdata Data Source
 
@@ -62,7 +84,7 @@ Netdata tracks each Prometheus server's last access time to calculate averages f
 
 Like `average` but sums values instead of averaging them.
 
-**Format:** `CONTEXT_UNITS_sum{chart="CHART",family="FAMILY",dimension="DIMENSION"}`
+**Format:** `CONTEXT_sum{chart="CHART",family="FAMILY",dimension="DIMENSION"}`
 
 To change the data source, add the `source` parameter to the URL:
 
@@ -183,7 +205,7 @@ To expose them, append `variables=yes` to the URL.
 
 :::warning
 
-When enabled, `# TYPE` and `# HELP` lines repeat for every metric occurrence, violating [Prometheus specifications](https://github.com/prometheus/docs/blob/master/content/docs/instrumenting/exposition_formats.md#comments-help-text-and-type-information).
+When enabled, `# TYPE` and `# HELP` lines repeat for every metric occurrence, violating [Prometheus specifications](https://prometheus.io/docs/instrumenting/exposition_formats/#comments-help-text-and-type-information).
 
 :::
 
@@ -195,7 +217,7 @@ Control the default in `exporting.conf`:
 
 ```text
 [prometheus:exporter]
-	send names instead of ids = yes | no
+ send names instead of ids = yes | no
 ```
 
 Override via URL:
@@ -209,7 +231,7 @@ Filter metrics with this setting:
 
 ```text
 [prometheus:exporter]
-	send charts matching = *
+ send charts matching = *
 ```
 
 This accepts space-separated [simple patterns](/src/libnetdata/simple_pattern/README.md) to match charts. Pattern rules:
@@ -225,28 +247,29 @@ Netdata prefixes all metrics with `netdata_`. Change in `netdata.conf`:
 
 ```text
 [prometheus:exporter]
-	prefix = netdata
+ prefix = netdata
 ```
 
 Or append `&prefix=netdata` to the URL.
 
 ### Metric Units
 
-| Source              | Unit Behavior                             | Control                             |
-|:--------------------|:------------------------------------------|:------------------------------------|
-| `average` (default) | Adds units to names (e.g., `_KiB_persec`) | `&hideunits=yes` to hide            |
-| `as-collected`      | No units in names                         | N/A                                 |
-| All sources         | v1.12+ standardized units                 | `&oldunits=yes` for pre-v1.12 names |
+| Source              | Unit Behavior                             | Control                                                       |
+|:--------------------|:------------------------------------------|:--------------------------------------------------------------|
+| `average` (default) | Adds units to names (e.g., `_KiB_persec`) | `&hideunits=yes` to hide; `&oldunits=yes` for pre-v1.12 names |
+| `as-collected`      | No units in names                         | N/A                                                           |
+| `sum`               | No units in names                         | N/A                                                           |
 
 ### Accuracy of Average and Sum Data Sources
 
 When using `average` or `sum` sources, Netdata remembers each client's last access time to calculate values for the period since last access. This prevents data loss regardless of scrape frequency.
 
 Server identification:
-| Scenario | Method |
-|:---------|:-------|
-| Direct connection | Client IP (default) |
-| Behind proxy or NAT | Append `&server=NAME` to URL |
+
+| Scenario                  | Method                          |
+|:--------------------------|:--------------------------------|
+| Direct connection         | Client IP (default)             |
+| Behind proxy or NAT       | Append `&server=NAME` to URL    |
 | Multiple servers, same IP | Each uses unique `&server=NAME` |
 
 ### Host Labels

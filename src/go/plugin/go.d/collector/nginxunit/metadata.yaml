@@ -10,6 +10,7 @@ modules:
         categories:
           - data-collection.web-servers-and-proxies
         icon_filename: nginx.svg
+        description: 'Monitor NGINX Unit server activity and performance, including active connections, connection states, and client requests through the Status API.'
       related_resources:
         integrations:
           list: []
@@ -210,7 +211,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics

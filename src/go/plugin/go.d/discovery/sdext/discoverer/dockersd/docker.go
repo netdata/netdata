@@ -4,6 +4,7 @@ package dockersd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -14,21 +15,29 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/model"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/dockerhost"
 
-	typesContainer "github.com/docker/docker/api/types/container"
-	docker "github.com/docker/docker/client"
+	typesContainer "github.com/moby/moby/api/types/container"
+	docker "github.com/moby/moby/client"
 )
 
 func NewDiscoverer(cfg Config) (*Discoverer, error) {
-	d := &Discoverer{
-		Logger: logger.New().With(
+	return newDiscoverer(
+		cfg,
+		logger.New().With(
 			slog.String("component", "service discovery"),
 			slog.String("discoverer", "docker"),
 		),
+	)
+}
+
+func newDiscoverer(cfg Config, log *logger.Logger) (*Discoverer, error) {
+	d := &Discoverer{
+		Logger:    log,
 		cfgSource: cfg.Source,
 		newDockerClient: func(addr string) (dockerClient, error) {
-			return docker.NewClientWithOpts(docker.WithHost(addr))
+			return docker.New(docker.WithHost(addr))
 		},
 		addr:           docker.DefaultDockerHost,
 		listInterval:   time.Second * 60,
@@ -37,16 +46,14 @@ func NewDiscoverer(cfg Config) (*Discoverer, error) {
 		started:        make(chan struct{}),
 	}
 
-	if addr := dockerhost.FromEnv(); addr != "" && d.addr == docker.DefaultDockerHost {
-		d.Infof("using docker host from environment: %s ", addr)
-		d.addr = addr
-	}
-
 	if cfg.Timeout.Duration() > 0 {
 		d.timeout = cfg.Timeout.Duration()
 	}
 	if cfg.Address != "" {
 		d.addr = cfg.Address
+	} else if addr := dockerhost.FromEnv(); addr != "" {
+		d.Info("using docker host from environment")
+		d.addr = addr
 	}
 
 	return d, nil
@@ -77,14 +84,51 @@ type (
 		started chan struct{}
 	}
 	dockerClient interface {
-		NegotiateAPIVersion(context.Context)
-		ContainerList(context.Context, typesContainer.ListOptions) ([]typesContainer.Summary, error)
+		ContainerList(context.Context, docker.ContainerListOptions) (docker.ContainerListResult, error)
 		Close() error
 	}
 )
 
 func (d *Discoverer) String() string {
 	return "sd:docker"
+}
+
+func (d *Discoverer) Test(ctx context.Context) error {
+	if d == nil || ctx == nil {
+		return fmt.Errorf("invalid docker discovery test")
+	}
+	client, err := d.newDockerClient(d.addr)
+	if err != nil {
+		return dyncfg.NewPublicError(
+			"the configured Docker endpoint is invalid",
+			fmt.Errorf("create docker client: %w", err),
+		)
+	}
+	defer func() { _ = client.Close() }()
+
+	testCtx, cancel := context.WithTimeout(ctx, d.timeout)
+	defer cancel()
+	if _, err := client.ContainerList(testCtx, docker.ContainerListOptions{Limit: 1}); err != nil {
+		cause := fmt.Errorf("list docker containers: %w", err)
+		switch {
+		case errors.Is(testCtx.Err(), context.DeadlineExceeded):
+			return dyncfg.NewPublicError(
+				"the configured Docker endpoint did not respond before the timeout",
+				cause,
+			)
+		case docker.IsErrConnectionFailed(err):
+			return dyncfg.NewPublicError(
+				"cannot connect to the configured Docker endpoint",
+				cause,
+			)
+		default:
+			return dyncfg.NewPublicError(
+				"cannot query containers from the configured Docker endpoint",
+				cause,
+			)
+		}
+	}
+	return nil
 }
 
 func (d *Discoverer) Discover(ctx context.Context, in chan<- []model.TargetGroup) {
@@ -101,8 +145,6 @@ func (d *Discoverer) Discover(ctx context.Context, in chan<- []model.TargetGroup
 		}
 		d.dockerClient = client
 	}
-
-	d.dockerClient.NegotiateAPIVersion(ctx)
 
 	if err := d.listContainers(ctx, in); err != nil {
 		d.Error(err)
@@ -128,10 +170,11 @@ func (d *Discoverer) listContainers(ctx context.Context, in chan<- []model.Targe
 	listCtx, cancel := context.WithTimeout(ctx, d.timeout)
 	defer cancel()
 
-	containers, err := d.dockerClient.ContainerList(listCtx, typesContainer.ListOptions{})
+	result, err := d.dockerClient.ContainerList(listCtx, docker.ContainerListOptions{})
 	if err != nil {
 		return err
 	}
+	containers := result.Items
 
 	var tggs []model.TargetGroup
 	seen := make(map[string]bool)
@@ -171,8 +214,16 @@ func (d *Discoverer) buildTargetGroup(cntr typesContainer.Summary) model.TargetG
 	}
 
 	for netDriver, network := range cntr.NetworkSettings.Networks {
+		ipAddress := ""
+		if network.IPAddress.IsValid() {
+			ipAddress = network.IPAddress.String()
+		}
 		// container with network mode host will be discovered by local-listeners
 		for _, port := range cntr.Ports {
+			publicPortIP := ""
+			if port.IP.IsValid() {
+				publicPortIP = port.IP.String()
+			}
 			tgt := &target{
 				ID:            cntr.ID,
 				Name:          strings.TrimPrefix(cntr.Names[0], "/"),
@@ -181,11 +232,11 @@ func (d *Discoverer) buildTargetGroup(cntr typesContainer.Summary) model.TargetG
 				Labels:        model.MapAny(cntr.Labels),
 				PrivatePort:   strconv.Itoa(int(port.PrivatePort)),
 				PublicPort:    strconv.Itoa(int(port.PublicPort)),
-				PublicPortIP:  port.IP,
+				PublicPortIP:  publicPortIP,
 				PortProtocol:  port.Type,
 				NetworkMode:   cntr.HostConfig.NetworkMode,
 				NetworkDriver: netDriver,
-				IPAddress:     network.IPAddress,
+				IPAddress:     ipAddress,
 			}
 			tgt.Address = net.JoinHostPort(tgt.IPAddress, tgt.PrivatePort)
 

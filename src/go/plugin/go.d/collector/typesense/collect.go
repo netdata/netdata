@@ -3,6 +3,7 @@
 package typesense
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -26,35 +27,35 @@ type healthResponse struct {
 
 // https://typesense.org/docs/27.0/api/cluster-operations.html#api-stats
 type statsResponse struct {
-	DeleteLatencyMs             float64 `json:"delete_latency_ms" stm:"delete_latency_ms"`
-	DeleteRequestsPerSecond     float64 `json:"delete_requests_per_second" stm:"delete_requests_per_second,1000,1"`
-	ImportLatencyMs             float64 `json:"import_latency_ms" stm:"import_latency_ms"`
-	ImportRequestsPerSecond     float64 `json:"import_requests_per_second" stm:"import_requests_per_second,1000,1"`
+	DeleteLatencyMs             float64 `json:"delete_latency_ms"              stm:"delete_latency_ms"`
+	DeleteRequestsPerSecond     float64 `json:"delete_requests_per_second"     stm:"delete_requests_per_second,1000,1"`
+	ImportLatencyMs             float64 `json:"import_latency_ms"              stm:"import_latency_ms"`
+	ImportRequestsPerSecond     float64 `json:"import_requests_per_second"     stm:"import_requests_per_second,1000,1"`
 	OverloadedRequestsPerSecond float64 `json:"overloaded_requests_per_second" stm:"overloaded_requests_per_second,1000,1"`
-	PendingWriteBatches         float64 `json:"pending_write_batches" stm:"pending_write_batches"`
-	SearchLatencyMs             float64 `json:"search_latency_ms" stm:"search_latency_ms"`
-	SearchRequestsPerSecond     float64 `json:"search_requests_per_second" stm:"search_requests_per_second,1000,1"`
-	TotalRequestsPerSecond      float64 `json:"total_requests_per_second" stm:"total_requests_per_second,1000,1"`
-	WriteLatencyMs              float64 `json:"write_latency_ms" stm:"write_latency_ms"`
-	WriteRequestsPerSecond      float64 `json:"write_requests_per_second" stm:"write_requests_per_second,1000,1"`
+	PendingWriteBatches         float64 `json:"pending_write_batches"          stm:"pending_write_batches"`
+	SearchLatencyMs             float64 `json:"search_latency_ms"              stm:"search_latency_ms"`
+	SearchRequestsPerSecond     float64 `json:"search_requests_per_second"     stm:"search_requests_per_second,1000,1"`
+	TotalRequestsPerSecond      float64 `json:"total_requests_per_second"      stm:"total_requests_per_second,1000,1"`
+	WriteLatencyMs              float64 `json:"write_latency_ms"               stm:"write_latency_ms"`
+	WriteRequestsPerSecond      float64 `json:"write_requests_per_second"      stm:"write_requests_per_second,1000,1"`
 }
 
-func (c *Collector) collect() (map[string]int64, error) {
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	mx := make(map[string]int64)
 
-	if err := c.collectHealth(mx); err != nil {
+	if err := c.collectHealth(ctx, mx); err != nil {
 		return nil, err
 	}
 
-	if err := c.collectStats(mx); err != nil {
+	if err := c.collectStats(ctx, mx); err != nil {
 		return nil, err
 	}
 
 	return mx, nil
 }
 
-func (c *Collector) collectHealth(mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathHealth)
+func (c *Collector) collectHealth(ctx context.Context, mx map[string]int64) error {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathHealth)
 	if err != nil {
 		return fmt.Errorf("creating health request: %w", err)
 	}
@@ -83,12 +84,12 @@ func (c *Collector) collectHealth(mx map[string]int64) error {
 	return nil
 }
 
-func (c *Collector) collectStats(mx map[string]int64) error {
+func (c *Collector) collectStats(ctx context.Context, mx map[string]int64) error {
 	if !c.doStats || c.APIKey == "" {
 		return nil
 	}
 
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathStats)
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathStats)
 	if err != nil {
 		return fmt.Errorf("creating stats request: %w", err)
 	}

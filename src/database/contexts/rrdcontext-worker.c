@@ -4,7 +4,7 @@
 
 static struct {
     bool enabled;
-    size_t db_rotations;
+    size_t db_rotations;            // count of actual dbengine rotations only
     size_t instances_count;
     size_t active_vs_archived_percentage;
 } extreme_cardinality = {
@@ -14,11 +14,16 @@ static struct {
     .active_vs_archived_percentage = 50,
 };
 
+void rrdcontext_count_db_rotation(void) {
+    __atomic_add_fetch(&extreme_cardinality.db_rotations, 1, __ATOMIC_RELAXED);
+}
+
 static uint64_t rrdcontext_get_next_version(RRDCONTEXT *rc);
 
 static void rrdcontext_garbage_collect_for_all_hosts(void);
 
 extern usec_t rrdcontext_next_db_rotation_ut;
+extern size_t rrdcontext_full_gc_rerun_requested;
 
 // ----------------------------------------------------------------------------
 // version hash calculation
@@ -133,7 +138,12 @@ void rrdcontext_recalculate_host_retention(RRDHOST *host, RRD_FLAGS reason, bool
 }
 
 static void rrdcontext_recalculate_retention_all_hosts(void) {
-    rrdcontext_next_db_rotation_ut = 0;
+    // Don't pre-clear rrdcontext_next_db_rotation_ut here -- the caller in
+    // rrdcontext_main clears it via CAS at the end of the pass, expecting
+    // the same deadline value it observed. Pre-clearing would let a
+    // concurrent rrdcontext_request_full_gc() arm a new deadline that the
+    // caller's unconditional store-to-zero would then silently overwrite,
+    // dropping the request.
     RRDHOST *host;
     dfe_start_reentrant(rrdhost_root_index, host) {
         worker_is_busy(WORKER_JOB_RETENTION);
@@ -190,7 +200,7 @@ bool rrdmetric_update_retention(RRDMETRIC *rm) {
         min_first_time_t = 0;
 
     if(min_first_time_t > max_last_time_t) {
-        internal_error(true, "RRDMETRIC: retention of '%s' is flipped, first_time_t = %ld, last_time_t = %ld", string2str(rm->id), min_first_time_t, max_last_time_t);
+        internal_error(true, "RRDMETRIC: retention of '%s' is flipped, first_time_t = %" PRId64 ", last_time_t = %" PRId64, string2str(rm->id), (int64_t)min_first_time_t, (int64_t)max_last_time_t);
         SWAP(min_first_time_t, max_last_time_t);
     }
 
@@ -238,7 +248,7 @@ static inline bool rrdinstance_should_be_deleted(RRDINSTANCE *ri) {
     if(likely(rrd_flag_check(ri, RRD_FLAGS_PREVENTING_DELETIONS)))
         return false;
 
-    if(likely(ri->rrdset))
+    if(likely(rrdinstance_rrdset_atomic_load(ri)))
         return false;
 
     if(unlikely(dictionary_referenced_items(ri->rrdmetrics) != 0))
@@ -418,7 +428,7 @@ static void rrdinstance_post_process_updates(RRDINSTANCE *ri, bool force, RRD_FL
         worker_is_busy(WORKER_JOB_PP_INSTANCE);
 
     time_t min_first_time_t = LONG_MAX, max_last_time_t = 0;
-    size_t metrics_active = 0, metrics_deleted = 0, metrics_no_tier0 = 0;
+    size_t metrics_active = 0, metrics_no_tier0 = 0;
     bool live_retention = true, currently_collected = false;
     if(dictionary_entries(ri->rrdmetrics) > 0) {
         RRDMETRIC *rm;
@@ -438,7 +448,6 @@ static void rrdinstance_post_process_updates(RRDINSTANCE *ri, bool force, RRD_FL
                         metrics_no_tier0++;
 
                     if (unlikely((rrdmetric_should_be_deleted(rm)))) {
-                        metrics_deleted++;
                         continue;
                     }
 
@@ -536,7 +545,7 @@ static bool rrdinstance_forcefully_clear_retention(RRDCONTEXT *rc, size_t count,
     size_t metrics_deleted = 0;
     RRDINSTANCE *ri;
     dfe_start_read(rc->rrdinstances, ri) {
-        if(!rrd_flag_check(ri, RRD_FLAG_NO_TIER0_RETENTION) || rrd_flag_is_collected(ri) || ri->rrdset)
+        if(!rrd_flag_check(ri, RRD_FLAG_NO_TIER0_RETENTION) || rrd_flag_is_collected(ri) || rrdinstance_rrdset_atomic_load(ri))
             continue;
 
         size_t metrics_cleared = 0;
@@ -626,7 +635,7 @@ bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reaso
     size_t min_priority_not_collected = LONG_MAX;
     size_t min_priority = LONG_MAX;
     time_t min_first_time_t = LONG_MAX, max_last_time_t = 0;
-    size_t instances_active = 0, instances_deleted = 0, instances_no_tier0 = 0;
+    size_t instances_active = 0, instances_no_tier0 = 0;
     bool live_retention = true, currently_collected = false, hidden = true;
     if(dictionary_entries(rc->rrdinstances) > 0) {
         RRDINSTANCE *ri;
@@ -646,7 +655,6 @@ bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reaso
                         live_retention = false;
 
                     if (unlikely(rrdinstance_should_be_deleted(ri))) {
-                        instances_deleted++;
                         continue;
                     }
 
@@ -690,7 +698,7 @@ bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reaso
         dfe_done(ri);
 
         if(extreme_cardinality.enabled &&
-            extreme_cardinality.db_rotations &&
+            __atomic_load_n(&extreme_cardinality.db_rotations, __ATOMIC_RELAXED) &&
             instances_active &&
             instances_no_tier0 >= extreme_cardinality.instances_count) {
             size_t percent = (100 * instances_no_tier0 / instances_active);
@@ -945,7 +953,7 @@ bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, bool sending __maybe_
     if(unlikely(id_changed || title_changed || units_changed || family_changed || chart_type_changed || priority_changed || first_time_changed || last_time_changed || deleted_changed)) {
 
         internal_error(LOG_TRANSITIONS,
-                       "RRDCONTEXT: %s NEW VERSION '%s'%s of host '%s', version %"PRIu64", title '%s'%s, units '%s'%s, family '%s'%s, chart type '%s'%s, priority %u%s, first_time_t %ld%s, last_time_t %ld%s, deleted '%s'%s, (queued for %llu ms, expected %llu ms)",
+                       "RRDCONTEXT: %s NEW VERSION '%s'%s of host '%s', version %"PRIu64", title '%s'%s, units '%s'%s, family '%s'%s, chart type '%s'%s, priority %u%s, first_time_t %" PRId64 "%s, last_time_t %" PRId64 "%s, deleted '%s'%s, (queued for %llu ms, expected %llu ms)",
                        sending?"SENDING":"QUEUE",
                        string2str(rc->id), id_changed ? " (CHANGED)" : "",
                        rrdhost_hostname(rc->rrdhost),
@@ -955,8 +963,8 @@ bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, bool sending __maybe_
                        string2str(rc->family), family_changed ? " (CHANGED)" : "",
                        rrdset_type_name(rc->chart_type), chart_type_changed ? " (CHANGED)" : "",
                        rc->priority, priority_changed ? " (CHANGED)" : "",
-                       rc->first_time_s, first_time_changed ? " (CHANGED)" : "",
-                       (flags & RRD_FLAG_COLLECTED) ? 0 : rc->last_time_s, last_time_changed ? " (CHANGED)" : "",
+                       (int64_t)rc->first_time_s, first_time_changed ? " (CHANGED)" : "",
+                       (int64_t)((flags & RRD_FLAG_COLLECTED) ? 0 : rc->last_time_s), last_time_changed ? " (CHANGED)" : "",
                        (flags & RRD_FLAG_DELETED) ? "true" : "false", deleted_changed ? " (CHANGED)" : "",
                        sending ? (now_realtime_usec() - rc->queue.queued_ut) / USEC_PER_MS : 0,
                        sending ? (rc->queue.scheduled_dispatch_ut - rc->queue.queued_ut) / USEC_PER_MS : 0
@@ -1058,11 +1066,45 @@ void rrdcontext_main(void *ptr) {
 
         usec_t now_ut = now_realtime_usec();
 
-        if(rrdcontext_next_db_rotation_ut && now_ut > rrdcontext_next_db_rotation_ut) {
-            extreme_cardinality.db_rotations++;
+        usec_t deadline = __atomic_load_n(&rrdcontext_next_db_rotation_ut, __ATOMIC_RELAXED);
+        if(deadline && now_ut > deadline) {
+            // db_rotations is bumped by rrdcontext_count_db_rotation() from
+            // rrdcontext_db_rotation() only -- the chart-cleanup trigger
+            // (rrdcontext_request_full_gc) does NOT bump it, so the
+            // extreme-cardinality guard at line ~700 still activates only
+            // after a real dbengine rotation.
             rrdcontext_recalculate_retention_all_hosts();
             rrdcontext_garbage_collect_for_all_hosts();
-            rrdcontext_next_db_rotation_ut = 0;
+            // Clear the slot only if it still holds the deadline we
+            // processed. Two writers can race this pass:
+            //   - rrdcontext_request_full_gc() arms only when the slot is
+            //     zero, but the slot stays non-zero throughout this pass,
+            //     so any such request during the pass is coalesced into
+            //     the in-flight pass and does not arm a new deadline.
+            //   - rrdcontext_db_rotation() stores unconditionally. If it
+            //     fires during this pass, the slot now holds a fresh
+            //     deadline; the CAS here fails and that deadline drives
+            //     the next iteration.
+            __atomic_compare_exchange_n(&rrdcontext_next_db_rotation_ut,
+                                        &deadline, 0,
+                                        false,
+                                        __ATOMIC_RELAXED, __ATOMIC_RELAXED);
+
+            // If a rrdcontext_request_full_gc() landed mid-pass (its CAS
+            // failed because the slot was non-zero with an expired
+            // deadline), the host whose archive motivated it may have
+            // already been walked in this pass. Schedule a follow-up:
+            // arm a fresh deadline iff the slot is currently zero. If
+            // another path (e.g. dbengine rotation) just armed a new
+            // deadline, the CAS leaves it alone.
+            if(__atomic_exchange_n(&rrdcontext_full_gc_rerun_requested, 0, __ATOMIC_RELAXED)) {
+                usec_t expected = 0;
+                usec_t fresh = now_realtime_usec() + FULL_RETENTION_SCAN_DELAY_AFTER_DB_ROTATION_SECS * USEC_PER_SEC;
+                __atomic_compare_exchange_n(&rrdcontext_next_db_rotation_ut,
+                                            &expected, fresh,
+                                            false,
+                                            __ATOMIC_RELAXED, __ATOMIC_RELAXED);
+            }
         }
 
         size_t hub_queued_contexts_for_all_hosts = 0;
@@ -1071,6 +1113,9 @@ void rrdcontext_main(void *ptr) {
         RRDHOST *host;
         dfe_start_reentrant(rrdhost_root_index, host) {
             if(unlikely(!service_running(SERVICE_CONTEXT))) break;
+
+            // Allow timed-out deferred checkpoints to replay even if context loading is stuck.
+            rrdcontext_hub_pending_checkpoint_replay(host);
 
             if(rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))
                 continue;
@@ -1084,6 +1129,9 @@ void rrdcontext_main(void *ptr) {
 
             pp_queued_contexts_for_all_hosts += rrdcontext_queue_entries(&host->rrdctx.pp_queue);
             rrdcontext_post_process_queued_contexts(host);
+
+            // replay deferred checkpoint if post-processing drained the queue, or on timeout
+            rrdcontext_hub_pending_checkpoint_replay(host);
 
             hub_queued_contexts_for_all_hosts += rrdcontext_queue_entries(&host->rrdctx.hub_queue);
             rrdcontext_dispatch_queued_contexts_to_hub(host, now_ut);

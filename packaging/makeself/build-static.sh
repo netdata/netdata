@@ -49,7 +49,10 @@ case "${BUILDARCH}" in
     aarch64) # Baseline ARMv8 CPU
         QEMU_ARCH="aarch64"
         QEMU_CPU="cortex-a53"
-        TUNING_FLAGS="-march=armv8-a"
+        # Work around Cortex-A53 errata 835769 and 843419 (Raspberry Pi 3, ODROID-C2, ...). The builder's GCC enables
+        # neither by default, and neither QEMU nor the CI runners' ARM cores exhibit them. The 843419 fix happens at
+        # link time, so the jobs also pass $(errata_ldflags) to every final link.
+        TUNING_FLAGS="-march=armv8-a -mfix-cortex-a53-835769 -mfix-cortex-a53-843419"
         GOARM64="v8.0"
         GOARCH="arm64"
         ;;
@@ -62,6 +65,20 @@ if [ "${BUILDARCH}" != "$(uname -m)" ] && [ -z "${SKIP_EMULATION}" ]; then
 fi
 
 DOCKER_IMAGE_NAME="netdata/static-builder:v1"
+stock_env=()
+
+if [ -n "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR:-}" ]; then
+    if [ ! -d "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}" ]; then
+        echo "Could not find the topology IP intelligence stock directory: ${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}"
+        exit 1
+    fi
+
+    stock_host_dir="$(cd -- "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}" && pwd -P)"
+    stock_env=(
+        -v "${stock_host_dir}:/topology-ip-intel-stock:ro"
+        -e "NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR=/topology-ip-intel-stock"
+    )
+fi
 
 if ${docker} inspect "${DOCKER_IMAGE_NAME}" > /dev/null 2>&1; then
     if ${docker} image inspect "${DOCKER_IMAGE_NAME}" | grep -q 'Variant'; then
@@ -85,6 +102,7 @@ if [ -t 1 ]; then
     --platform "${platform}" ${EXTRA_INSTALL_FLAGS:+-e EXTRA_INSTALL_FLAGS="${EXTRA_INSTALL_FLAGS}"} \
     ${DEBUG_BUILD_INFRA:+-e DEBUG_BUILD_INFRA=1} \
     ${QEMU_CPU:+-e QEMU_CPU="${QEMU_CPU}"} \
+    "${stock_env[@]}" \
     -e TUNING_FLAGS="${TUNING_FLAGS}" ${GOARCH:+-e GOARCH="${GOARCH}"} \
     ${GOAMD64:+-e GOAMD64="${GOAMD64}"} ${GOARM:+-e GOARM="${GOARM}"} \
     ${GOARM64:+-e GOARM64="${GOARM64}"} ${GOPPC64:+-e GOPPC64="${GOPPC64}"} \
@@ -94,6 +112,7 @@ else
     -e GITHUB_ACTIONS="${GITHUB_ACTIONS}" --platform "${platform}" \
     ${EXTRA_INSTALL_FLAGS:+-e EXTRA_INSTALL_FLAGS="${EXTRA_INSTALL_FLAGS}"} \
     ${QEMU_CPU:+-e QEMU_CPU="${QEMU_CPU}"} \
+    "${stock_env[@]}" \
     -e TUNING_FLAGS="${TUNING_FLAGS}" ${GOARCH:+-e GOARCH="${GOARCH}"} \
     ${GOAMD64:+-e GOAMD64="${GOAMD64}"} ${GOARM:+-e GOARM="${GOARM}"} \
     ${GOARM64:+-e GOARM64="${GOARM64}"} ${GOPPC64:+-e GOPPC64="${GOPPC64}"} \

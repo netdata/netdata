@@ -1,0 +1,637 @@
+# DEM plugin
+
+`dem.plugin` runs native Netdata jobs for browser real user monitoring, Playwright journeys and desktop Lighthouse audits. It is experimental and built explicitly with
+`ENABLE_PLUGIN_DEM=ON` (source installer: `--enable-plugin-dem`). The integration metadata beside each collector is the
+source of operator configuration documentation. The [architecture guide](ARCHITECTURE.md) explains how the plugin
+is built, from the overall data flow to package ownership and runtime lifetimes.
+
+The stock configuration starts one loopback receiver and no sites. Configuration follows the normal Go Agent layout:
+`dem.conf` for plugin policy and `dem/receiver.conf` / `dem/rum.conf` for collectors. The receiver is a canonical single
+object (`dem:collector:receiver`); each site is an independent job (`dem:collector:rum:<name>`). Native `name` is the
+stable beacon/history key; `display_name` is presentation metadata. Renaming a site starts a new history namespace.
+
+Expose the receiver through HTTPS, configure its public URL and actual trusted proxy addresses, then install
+`<script async src="https://rum.example.org/rum/shop.js"></script>` on the configured website. Public URLs may include a
+reverse-proxy path prefix. The receiver serves the pinned Faro 2.11.0 SDK and optional tracing bundle; visitors need no
+SDK CDN connection. Client IP addresses are used for rate limiting/geolocation and are not stored.
+
+RUM and synthetic Function providers are independent of collector selection. Disabling `rum` or `journey`, selecting
+only `lighthouse`, or disabling all collectors preserves investigation of retained history while the plugin is enabled.
+Setting `enabled: no` disables the whole plugin. Handler instances belong to each framework run generation; the command
+keeps shared stores open until a clean shutdown.
+
+Six process Functions use the regular Netdata Function transport: `rum-sites`, `rum-pages`, `rum-live`, `rum-sessions`,
+`rum-errors`, and `rum-session-events`. Runtime observations include only admitted site jobs. Consumers join native
+DynCfg state to show disabled or failed configurations. Journal history remains queryable after a site stops. History range
+arguments select when the Agent originally received an observation, using inclusive Unix seconds: both endpoints include
+their entire second. Negative values are offsets from one captured now; explicit zero means epoch. With omitted bounds,
+RUM uses the 15 minutes ending at `before` (or now). Invalid or pre-epoch ranges fail.
+Delayed session promotion preserves that original receipt time, so late-saved context can change an earlier range. A
+past range shows currently retained evidence, not what was known at the time. Browser clocks do not define the native
+history axis.
+
+`rum-live` returns an opaque string `next` cursor, passed unchanged as `after` on the next request. Each event has a
+string identity combining site, runtime generation and sequence. Cursors track independent streams so a busy site cannot
+advance a quiet site's position. A replaced site's runtime starts a fresh stream. Missing Web Vitals are `null` in
+Functions and gaps in charts; an available but quiet receiver measures zero traffic. Receiver outages leave site jobs
+running with explicit ingress availability and gaps in browser product measurements.
+
+Investigation history uses pure-Go journal files under `${NETDATA_LIB_DIR}/dem/journal`, through the existing
+`systemd-journal-sdk`. Events include their session and error metadata, so investigation does not depend on a separate
+parent record. `rum-sessions` reports sessions with activity originally received in the selected range; document views, application views, errors, frustration
+counts and activity spans describe retained events in that range, rather than lifetime totals. `rum-errors` groups
+retained occurrences by fingerprint; affected-session, top-page and browser statistics are `null` until a `fingerprint`
+filter selects the group to investigate. `rum-session-events` returns the full retained and pending timeline for a
+session, ordered by Agent observation time in Unix microseconds, without range filtering. Activity-only presence records
+contribute to summaries but stay out of timelines. Session rows sort by `last_observed_us` at microsecond precision
+before limiting; first/last observations and their span describe only the selected activity. A gap between observations
+does not prove continuous presence.
+
+One process-owned retention worker applies one shared history budget across RUM, synthetic runs, disabled jobs and
+retained machine identities. Defaults are 30 days and 1 GiB; `history.max_bytes` must be at least 8 MiB. Accounting uses
+journal file lengths, including preallocation. Whole files expire after their latest saved record ages out; size pressure
+removes the oldest files sooner and can shorten the investigation window. High-volume RUM can evict older synthetic runs.
+New files span less than 24 hours of saved time. With normally advancing clocks and timely successful hourly maintenance,
+age alone can retain older records for approximately one extra day plus one hour. Existing files keep their actual spans.
+Query time ranges still use original observation/run time, so saved-time retention does not establish query coverage.
+
+The byte target is not a physical disk cap: active growth, allocation rounding and admitted appends can exceed it;
+open query readers can keep removed files allocated. Unsafe files and failed cleanup can leave excess until resolved.
+Hourly sweeps do not force archives; idle active files are sealed when needed for expiry. Valid policy edits apply at the
+next sweep. Invalid edits retain the last valid policy and report a warning and status error. Artifacts have a separate
+retention policy, defaulting to 7 days and 2 GiB.
+
+`dem-history-status` reports the effective policy, sampled file bytes/count, observation time, latest cleanup attempt,
+last successful cleanup, and separate inventory, cleanup, writer and policy reload errors. It is a read-only member
+Function available even with all collectors disabled, with no arguments, payload or time filters. Unknown or unattempted
+values are `null`; an inventory failure does not erase cleanup or writer facts. These facts help diagnose storage pressure
+and maintenance failures, but cannot explain whether an absent event expired, was sampled out or was never collected.
+Unusable history at startup still stops the plugin before Functions register; inspect process logs in that case.
+
+Queued events flush every five seconds or 500 records.
+Flushes sync pending appends; clean idle ticks skip sync. A crash can lose records still queued or
+not synced. Queue overflow and append failures count dropped records; sync failures produce a warning. Failed retention
+sweeps retry after five seconds, independently of healthy appends. An uncertain journal mutation or sync failure makes shared history unavailable until
+restart verification; subsequent reads, writes, sync and retention fail rather than expose a partial result. RUM measurements
+and enabled exports continue independently, and synthetic current diagnosis reports history errors. This is sampled
+investigation history, not a lossless event archive.
+
+Stock health templates evaluate the current LCP, INP and CLS populations once per minute. They require at least 30
+observations for that metric and complete local measurement state. More than 25% above the good threshold warns;
+more than 25% above the poor threshold is critical. Exactly 25% does not trigger. These alerts describe recent observed
+experiences: a brief poor burst can trigger, and a low-traffic metric can remain ineligible. They do not average p75
+values or establish that a problem persisted for ten minutes. Missing, stale or incomplete input is undefined, not
+recovery. Notification recovery delay does not change these evaluation semantics. Quiet traffic alone has no stock
+alarm because the Agent has no expected-traffic schedule.
+
+Customize alerts through normal Netdata health configuration, using `_collect_plugin=dem` and `_collect_job=<site>`
+chart-label filters for site-specific policies. The plugin does not generate health files or reload health configuration.
+Terminal/debug runs use private temporary journal and identity state, removed after readers and workers join; they leave
+live state untouched. Failed temporary history is preserved for investigation. An existing experimental `history.db` is not imported or deleted.
+
+New journals use `dem.journal` for active files and `dem@…journal` for finalized archives. Startup verifies preexisting
+active files before any journal reuse or archival, including retained machine directories. Finalized archives from the
+current schema and synchronized writer lifecycle avoid a full integrity scan at every restart. Unexpected archive state,
+old or partial schemas, detected index damage and quarantined `.journal~` files fail startup and remain intact for
+operator recovery; there is no automatic migration, repair or deletion. External file modification is outside this
+archive-provenance guarantee.
+
+The browser normalization, bounded aggregation, OTLP and query behavior originated in the experimental
+[Netdata digital-experience POC](https://github.com/netdata-labs/dem), commit
+`b3de4662f567dc63d33fee6201f8c2313568301b`. Its private configuration controller, scheduler, protocol emitter and root
+state reconciliation are replaced by the native Agent framework. Embedded third-party asset notices remain beside their source.
+
+## Install and verify browser collection
+
+Set receiver `public_url` to the HTTPS base visitors can reach, for example `https://rum.example.org/edge`.
+A site's `public_url` can override it. `rum-sites` offers the resulting `script_url` and HTML `snippet`; both are
+`null` when neither URL is configured. The receiver can still start and receive requests. A listener address or
+forwarded Host header never becomes an installation address; `trusted_proxies` applies to client IP provenance.
+
+Route the complete prefixed `/rum/` namespace to the receiver: the external script, SDK assets and collection POSTs.
+The browser resolves these requests relative to the external script element's URL. Use a canonical direct URL:
+a redirect of only the bootstrap does not redirect its sibling requests. Install a classic external script, including
+an asynchronously inserted external tag; copying the script body into an inline script, module or tag-manager eval
+is unsupported. Configure the tag manager to insert the external script element instead.
+
+Allow the receiver's script URLs in the site's applicable `script-src-elem` or `script-src` policy, and collection URL
+in `connect-src`. A nonce on the installed script is propagated to the SDK scripts; `strict-dynamic` trust follows
+normal browser rules. The receiver permits cross-origin embedding of its public scripts, including on cross-origin
+isolated pages. Collection still enforces the site's allowed origins. Policies requiring Trusted Types script URLs
+need deliberate website integration; the bootstrap does not create a permissive policy. Inspect browser CSP errors
+rather than infer policy from a fetched homepage. HTTPS pages require HTTPS receiver URLs.
+
+To troubleshoot, use the website's browser Network and Console panels:
+
+1. Confirm the external site script loads, then the receiver-hosted SDK (and optional tracing SDK). Browser-console
+   messages identify SDK load or initialization failures; a tracing **load** failure permits core RUM to continue.
+2. Inspect the `/rum/<site>/collect` POST and any preceding OPTIONS request. A rejected preflight can prevent the POST.
+3. Check `rum-sites` for a new accepted-payload timestamp. For a deterministic sampling check, explicitly set
+   `measure_sample_rate: 1` and use a fresh eligible browser session. A fresh session at a fractional rate may still
+   be sampled out; automation is excluded unless `bots: include` is configured.
+
+| Collection POST response | Meaning / action |
+| --- | --- |
+| 202 | Payload accepted into live processing; does not guarantee durable history or exporter delivery. |
+| 204 | Intentionally excluded bot or disabled collection. Check the current site policy. |
+| 400 | Invalid payload. Check that the installed bootstrap and served SDK belong to this receiver release. |
+| 403 | Origin refused. Compare the observed origin with the intended website before editing allowed origins. |
+| 404 | Site runtime is absent or the proxy route is wrong. Check native job state and request path. |
+| 413 | Payload exceeds the receiver body limit. |
+| 429 | Receiver rate limit reached. Check traffic and rate settings. |
+
+`rum-sites` exposes independent observations: receiver serving state, collection enabled, receiving runtime generation,
+last accepted payload and last rejected origin. Timestamps use Unix microseconds; timestamps and age fields are null when unseen. A rejected-origin observation can come from OPTIONS and can remain after successful collection.
+The rejection rate counts origin, rate and size rejections, excluding malformed payloads and bot exclusions. Silence
+is unknown; these fields do not certify website deployment, real human traffic or an outage. `/rum/ping` checks only
+whether the requesting browser can reach the receiver. Demo traffic cannot verify production installation.
+
+Runtime receipt evidence resets when the site runtime is replaced or restarted. Already-open pages can continue
+using earlier sampling/capture settings; receipt by a new runtime does not prove that page loaded its new bootstrap.
+A zero collection rate prevents new SDK loads and receiver processing. Browser-side policy changes reach pages on their next load.
+
+SDK assets have immutable byte-identified URLs; the per-site bootstrap revalidates on each load. All backends serving
+a public receiver route must serve the assets referenced by its bootstrap; coordinate routing and deployment across
+replicas. Agent builds and runtime need no SDK download. Shipped license notices are available through each asset's
+`rel="license"` response link. Source and update verification live in [the asset maintenance guide](rum/faro/assets/README.md).
+
+## Browser measurement contract
+
+A document experience starts at the initial document activation or a back-forward cache restore. The bootstrap assigns
+an activation identity before the SDK queues reports. `rum.document_views` counts these explicit activations;
+`rum.application_views` counts explicit application-view occurrences separately. SPA navigation does not create a
+new document experience. Web Vitals remain associated with the document-entry page, even if first reported after a
+route change. The application-view dimension describes route activity and errors; it does not imply route-level Web
+Vitals.
+
+Each recent document experience contributes its latest reported value for each Web Vital. Repeated CLS or INP updates
+replace that experience's earlier value instead of adding visitors to the population. SDK metric identity and increasing
+report revisions survive normalization, live queries, retained history and enabled event-log exports. A `rum-live` row
+is an observation, not an independent pageview: use its kind, experience, metric and revision fields when updating a
+visualization. Later reports retain their own user and application-view context while measurement dimensions remain
+attributed to the original document.
+
+The configured `window` uses receiver arrival time, including for delayed reports. A genuinely newer revision extends
+that metric's presence in the window; a duplicate does not. Duplicate detection retains evidence for up to 30 minutes,
+subject to capacity and runtime restart. Identified SDK session lifecycle events follow the same rule, so replay does
+not renew observed-session windows. It is best effort, not exactly-once delivery. Reports arriving after retained
+evidence expires can be counted again. Late observations are not rejected merely to claim perfect deduplication.
+Errors, console logs, spans and ordinary custom events are not covered by this identity-based replay suppression;
+repeated delivery of these records can count again and refresh observed-session activity.
+
+Population charts show retained observations, good/needs-improvement/poor counts and capacity-loss evidence. Percentiles
+are unavailable when there are no observations or the local population is incomplete. A zero CLS or zero timing is a
+valid observation. Lost-report fields conservatively remain nonzero until the latest relevant loss leaves the window;
+they can include older loss from a continuous overload episode. They are neither exact missing-window counts nor part
+of the percentile denominator. The cumulative drop diagnostic counts actual discarded reports. Restart starts fresh
+in-memory windows; retained investigation history is independent.
+
+`rum.observed_sessions` counts distinct browser session identities seen in the receipt window. It does not estimate
+people, concurrency or time on site. Page session counts use the same window. JavaScript errors are events: several can
+occur in one document, so errors divided by document views is not a failure percentage. Missing identity excludes the
+corresponding measurement and increments an invalid-measurement diagnostic; no transport-gap fallback invents views.
+
+Breakdown traffic counts and vital populations use the same current window. Top groups and the pooled complement are
+computed from current observations. `bucket=value` distinguishes a literal label named `other` from `bucket=other`.
+The Pages Function exposes all retained document-entry groups, including groups outside the chart top list; loss
+fields reveal bounded-state truncation. Percentiles cannot be averaged across time windows, groups or sites to obtain a
+combined percentile.
+
+Navigation charts report document load time and **DOMContentLoaded handler duration**. Same-site fetch timing includes
+reported same-site fetch/XHR resource entries, not all backend API requests or server availability. Resource counts
+separate same-site, cross-site and unknown ownership; host buckets mark unavailable hosts as `bucket=unknown`,
+distinct from a real host named `unknown`; duration populations include only entries with a valid present
+duration. Performance entries for DEM delivery are excluded. Browser support, sampling and delivery can all leave gaps.
+
+## Browser capture contract
+
+Core capture supports page and SPA-view activity, Web Vitals and attribution selectors, navigation/resource timing,
+uncaught exceptions and unhandled rejections with structured error frames, and the browser/OS/device, release,
+session and view dimensions used by native diagnosis. Selectors locate the element involved; they are not DOM snapshots
+or entered form values. Unsupported SDK metadata is removed before transmission and again at native normalization.
+
+| Evidence | Browser/native capture | Live and measurements | Retained native history | Optional export |
+|---|---|---|---|---|
+| Core activity, vitals, timings and errors | Enabled for collected sessions | Relevant measurements and live entries | Selected investigation entries | Supported event logs; request spans only with tracing |
+| Application user ID | Explicit `setUser` ID only | No live-feed field or measurement dimension | Per-event ID in pending/retained timelines; observed retained IDs for session lookup | No automatic ID export |
+| Country | Receiver IP lookup; default `capture.geolocation: country` | Country comparisons | Country on retained entries | Country on supported records |
+| Approximate city and coordinates | Only `capture.geolocation: city` | City and map markers | No city or coordinates | No city or coordinates |
+| Rage, dead and error clicks | Only `capture.frustration_signals: true` | Heuristic counts and activity; absent when disabled | Selected heuristic entries | Selected events when event logs are enabled |
+| Custom-event attributes | Only with event logs enabled | No arbitrary attribute dimensions | No generic attributes | Searchable event attributes |
+| Console messages | Only with event logs and `include_console_logs` enabled | No core-error substitution | No console archive | Selected console logs |
+| Browser request spans | Only with tracing enabled | Native resource timing remains independent | No span archive | Selected browser spans |
+
+`capture.geolocation` accepts `off`, `country` and `city`. Omission or `null` selects `country`; an empty string is
+invalid. Quote `'off'` in YAML because unquoted `off` is a YAML boolean. Country-only capture supplies no map coordinates. City mode provides approximate IP-derived locations,
+not browser GPS or precise visitor positions. `off` skips location lookup entirely; network IP handling for request
+admission, trusted proxies and rate limiting still operates. Client IP addresses are not stored as telemetry.
+
+Frustration signals default to false, including omission or `null`. Enabling them adds browser interaction listeners
+and heuristic evidence; repeated clicks, clicks without a detected response and clicks near an error do not prove user
+intent, frustration or causality. A disabled signal is unavailable, not a measured zero.
+
+An application-provided user ID is an explicit capture choice. IDs remain application-controlled values and are not
+hashed or anonymized by DEM. Use an internal, non-sensitive ID of at most 128 bytes and clear it on logout. IDs undergo the same bounded text
+normalization as other diagnostic strings; numeric and UUID IDs are not generalized as URL paths. Per-event attribution survives login,
+logout and user changes. The `user_id` filter matches exact stored, normalized IDs within the selected observation range.
+Original IDs changed by normalization cannot be recovered through lookup. Current configured credentials also mask
+query output, so a displayed `[REDACTED]` value is not a reliable lookup key or a unique identity.
+User names, email fields and arbitrary user attributes are not part of this identity contract.
+
+Recognized structured URL fields lose query strings, fragments and credentials; path grouping and configured `redact_paths` rules normalize
+supported URL paths. Stack source URLs retain hashed JavaScript basenames for source attribution; configured path rules
+still apply. Targeted text transformations apply to diagnostic strings before grouping, history and export. Exact
+configured-secret replacement applies to values of at least four bytes; shorter strings remain unchanged unless they
+match a credential pattern such as `token=...` or `Bearer ...`. Use strong destination credentials.
+These limited transformations are not a general anonymization, data-loss-prevention or consent system: application IDs,
+error text, selectors and explicitly exported attributes can still be identifying. Choose application instrumentation
+and optional capture settings accordingly. Sampling and the independent event-log/trace switches retain their existing
+roles; capture choices do not imply consent or reconstruct evidence that was never collected.
+
+## GeoIP sources and availability
+
+Geography is optional: browser collection continues when no usable database is available. DEM reads local MMDB files;
+Agent packaging, the topology IP intelligence downloader, or the operator owns acquisition and updates. DEM makes no
+GeoIP downloads and does not depend on a running NetFlow plugin. Some installations package the files with NetFlow;
+not every installation includes them or configures database updates.
+
+Receiver `geoip_db` selects the source:
+
+- Empty: try `topology-ip-intel/topology-ip-geo.mmdb` under the Agent cache directory, then its stock data directory.
+  Runtime `NETDATA_CACHE_DIR` and `NETDATA_STOCK_DATA_DIR` take precedence over compiled directory defaults.
+- Explicit path: use only that file, with no automatic cache or stock fallback.
+
+Supported declared database types are `Netdata-Topology-GEO`, `GeoLite2-City`, `GeoLite2-Country`, `GeoIP2-City`,
+`GeoIP2-Country`, `DBIP-City-Lite` and `DBIP-Country-Lite`. ASN and unknown/custom types are rejected. Country-only
+sources remain useful. Neither the filename nor the Netdata database type establishes city coverage.
+
+The receiver checks immediately after listener setup and every 60 seconds, including when the file is initially
+absent. It adopts accepted replacements without a restart. Automatic selection prefers an accepted current cache file,
+then an accepted current stock file; an unreadable or rejected cache file does not hide usable stock data. Only after
+current candidates fail can DEM retain the previous usable snapshot, and only if its source was not confirmed removed.
+Explicit mode can retain a previous snapshot only from its configured source. Confirmed removal revokes that snapshot;
+a detected mapped-memory fault also makes it ineligible for reuse. There is no age-based expiration.
+
+Publish each update as a complete separate file, then atomically rename it over the destination on the same filesystem.
+Atomic replacement is required for consistent lookups. Do not overwrite or truncate the active file. DEM narrowly
+contains detected mapped-memory faults, but this cannot guarantee recovery or detect torn content from every unsupported
+in-place write. Give the Netdata service account read access to the provisioned file and its parent directories.
+
+`rum-sites` exposes copied source evidence in `collector.geoip`, independently of each site's capture policy:
+
+| Field | Meaning |
+|---|---|
+| `selection` | `auto` or `explicit`, matching receiver source selection; omitted until a receiver has been published. |
+| `state` | `loaded`, `unavailable`, or `using_previous`. |
+| `source` | Active `cache`, `stock`, or `explicit` source; omitted without an active source. |
+| `database_type` | Active database's declared supported type; omitted without an active source. |
+| `build_at` | Database metadata build time; omitted when unseen. It is not provider freshness. |
+| `loaded_at` | Time the active snapshot was accepted; unchanged checks and failed refreshes do not advance it. |
+| `last_checked_at` | Most recent source check; omitted before the first check. |
+| `reason` | Bounded source-status code, with no filesystem path or raw error. Load errors are detailed in local Agent logs. |
+| `lookup_errors` | Error count for the active source generation; ordinary unmatched addresses and absent fields are not errors. |
+
+All three timestamps use Unix microseconds and are omitted when unseen. `loaded` means the declared geography format
+is supported and the reader was accepted. It does not mean every record was validated, or establish freshness,
+accuracy or coverage. Per-record decoding or invalid-field errors leave affected fields absent and increment the error
+count; they do not automatically reject the whole database. The worker publishes refresh and fault changes; receiver
+collection updates the copied lookup count, so Function status is not an instantaneous view of every lookup.
+
+Site policy still applies: country is the default, `off` skips lookup, and `city` enables approximate live-only city
+and coordinates. DEM never stores client IP addresses as telemetry, invents locations for unmatched addresses, or
+re-enriches retained history after a database update. Database availability cannot enable capture a site has disabled.
+
+## Collection and retained detail
+
+RUM has two sampling decisions, both defaulting to 100%. Omitted or `null` rates use that default; explicit zero
+means zero at that stage:
+
+- `measure_sample_rate` selects new browser sessions for collection. Received measurements and live activity describe
+  admitted traffic; counts are not scaled to estimate all visitors.
+- `investigate.sample_rate` selects a stable baseline of received sessions for native history and enabled event-log
+  and browser-trace exports. It does not reduce the received measurements or live activity further.
+- `investigate.always_keep` adds problem-triggered detail beyond that baseline. It defaults to `errors` and
+  `poor_vitals`; an explicit empty list disables these overrides. Overrides bias retained evidence toward problems,
+  so retained rows cannot establish the prevalence of failures or enforce a fixed export budget.
+
+For example, retain problem-triggered detail while measuring all received sessions:
+
+```yaml
+measure_sample_rate: 1
+investigate:
+  sample_rate: 0
+  always_keep: [errors, poor_vitals]
+```
+
+With `sample_rate: 0` and `always_keep: []`, only measurements and live activity remain, even when optional exports
+are enabled. With `measure_sample_rate: 0`, the generated bootstrap does not start the SDK, and the receiver returns
+204 for otherwise admissible collection attempts without decoding or recording them. Existing origin, size, bot and
+rate checks still apply. Intentional discard is neither accepted traffic nor a rejection/export-loss count. The
+Sites table reports `collection_disabled`. Browser measurement charts are absent; receiver diagnostics remain
+available. Quiet traffic does not raise a stock missing-beacon alarm.
+
+Already open pages can continue sending and propagating trace context until navigation. Positive collection-rate
+changes apply to new SDK sampling decisions; valid existing SDK sessions keep their earlier decision. Collection
+zero also discards those sessions at the receiver. Sampling is a cost control, not a privacy opt-out or job disablement.
+
+A configured problem promotes an identified session while it remains tracked. Native history receives the available
+preceding timeline context (up to 100 entries), the triggering beacon's generated entries, and subsequent detail.
+Each entry keeps the user, release and location observed with it; later login or navigation does not relabel earlier
+context. Poor vitals retain their name and value even without element attribution. The current beacon's entries are
+not truncated by the context ring, but normal admission and delivery bounds still apply.
+
+This is bounded evidence, not a complete session archive: only 2,000 sessions are tracked per site, inactivity
+expiry and eviction lose context and promotion state, and reload/restart starts new in-memory state. Promotion does
+not reconstruct earlier discarded logs or spans. Browser spans can arrive separately from the error that promotes a
+session, so traces can remain fragmented; a trace ID alone does not establish stored span availability.
+
+Observations without a session ID still contribute measurements. At 100% detail they qualify for supported exports
+and standalone error history; below 100%, only configured problem-triggering observations qualify. They do not
+create a synthetic session or a standalone vital timeline. Function help describes the current policy; historical
+evidence can reflect earlier settings, bounded context, retention and delivery loss.
+
+## Optional event logs and browser tracing
+
+Native RUM charts, session timelines and errors work without an OTLP receiver. Two optional features add evidence
+for deeper investigation, each disabled by default and configured independently for each site:
+
+- **Event logs** preserve searchable browser events, custom-event attributes and, when explicitly included, console
+  info, warn and error messages. Search by site, session and time in the destination's logs to inspect that evidence.
+  Console errors remain logs with severity and bounded, redacted error type/stack when supplied; actual uncaught
+  exceptions and unhandled rejections remain core RUM errors.
+- **Browser tracing** exports sampled browser request spans and propagates trace context. To follow requests into a
+  backend, instrument its services, accept propagated context, coordinate sampling and send browser and backend
+  spans to the same tracing system. Cross-origin APIs must allow trace headers in CORS. Browser spans alone show
+  browser requests; they do not establish backend execution or trace completeness.
+
+Enable local searchable events after preparing a local OTLP/gRPC receiver:
+
+```yaml
+jobs:
+  - name: shop
+    allowed_origins: [https://shop.example.org]
+    event_logs:
+      enabled: true
+      include_console_logs: true
+```
+
+For a Netdata receiver, follow [OTLP receiver setup and log verification](../../../../docs/opentelemetry/otlp-ingestion.md).
+Open that receiver node's Logs tab, select `otel-logs`, and choose `netdata-rum` in **Services**
+(`resource.attributes.service.name`). Narrow the time range and filter `resource.attributes.rum.site` by site key
+and `attributes.session.id` by session ID. Inspect `attributes.rum.type` (`console`, `event`, `error`, `pageview` or `vital`),
+the message body, `attributes.console.level`, `attributes.event.name` and `attributes.event.attr.<key>`.
+Error detail, when supplied, is in `attributes.error.type` and `attributes.error.stack`. Log access requires
+Netdata Cloud sign-in. The final frontend stage will verify this complete RUM-to-Logs workflow in the UI.
+
+Alternatively, enable browser tracing with an existing backend tracing receiver, leaving event logs disabled:
+
+```yaml
+jobs:
+  - name: shop
+    allowed_origins: [https://shop.example.org]
+    tracing:
+      enabled: true
+      propagate_to: [https://api.example.org]
+      destination:
+        endpoint: https://traces.example.org:4317
+        auth_token: ${env:TRACE_EXPORT_TOKEN}
+```
+
+Both features accept the same complete `destination` object. There is no inheritance between them. The default
+endpoint is `http://127.0.0.1:4317`; it does not enable or discover a receiver. Set `http://host:port` for plaintext or
+`https://host:port` for TLS, always with an explicit port from 1 to 65535 (bracket IPv6 addresses). The protocol is
+OTLP/gRPC, not OTLP/HTTP. Paths, URL credentials, queries, fragments and resolver targets are not supported.
+`auth_token` supplies Bearer authentication. With HTTPS, `tls_ca` selects a CA file (otherwise system roots apply),
+and paired `tls_cert` / `tls_key` files enable client certificate authentication. Files must be readable by the service.
+Destination credentials are used for collector-to-receiver authentication and are omitted from browser snippets and
+investigation results.
+
+Omitted or null feature blocks are disabled. An omitted or null destination or endpoint uses the local default;
+an explicitly empty endpoint is invalid for an enabled feature. Null booleans mean false, null auth/TLS strings mean
+empty, and null `propagate_to` means no additional origins. Disabling a feature retains its well-typed saved settings
+without checking destination, TLS or propagation semantics. Native secret references throughout the job must still
+resolve before it can start, including references in disabled features.
+
+Investigation sampling applies to exported events and spans. Later promotion of a session does not reconstruct
+previously discarded logs or spans. SDK session lifecycle events are ordinary sampled events; the exporter does not
+invent a session-start event. Native history and the export destination retain data independently, so neither is a
+complete archive of every session. A session can contain multiple traces, and event logs do not guarantee automatic
+Logs-to-Traces correlation.
+
+For an external trace receiver, look up the copied trace ID in your existing tracing system. An export endpoint URL
+is not a Netdata node identity. Correct Netdata receiver selection and direct browser-to-backend trace navigation
+remain part of the final frontend integration; backend export alone does not establish those UI flows.
+
+Export is best effort and does not block native ingestion or history when a receiver is slow or unavailable. The
+`rum.otlp` event-log and `rum.spans` browser-span charts appear only for their enabled feature, including before first
+traffic. Their diagnostic dimensions mean:
+
+| Dimension | Meaning |
+|---|---|
+| `sent` | Records accepted by the receiver, without a guarantee of queryability or durable storage. |
+| `errors` | Records whose attempted export failed or was rejected; a timeout may have an unknown delivery outcome. |
+| `dropped` | Records lost locally because a queue was full or shutdown ended before export was attempted. |
+
+Intentional disablement and sampling are not export loss. Zero traffic proves neither receiver health nor failure.
+The event-log and browser-span warnings each report the average combined rate of failed delivery and local loss
+over the last five minutes;
+they have no instance when the corresponding feature is disabled. Check the destination, authentication and TLS
+settings when they fire. Failed batches are not a durable retry archive, though future batches can succeed after
+receiver recovery.
+
+## Synthetic monitoring
+
+Each `journey` job runs one configured Playwright Test entry and its imports. Each `lighthouse` job runs one desktop
+performance lab audit. Both use native job configuration and scheduling. Stock configuration enables no browser jobs.
+Journey defaults to 900 seconds between attempts and a 120-second admitted timeout; Lighthouse defaults to 1800/180 seconds.
+One plugin-wide admission slot serializes expensive runs. Waiting time is separate from execution time; cancellation
+while waiting starts no browser. A fresh browser is created for each run.
+
+Browser jobs require Linux amd64 or arm64 and an unprivileged plugin identity. Chromium sandboxing stays enabled;
+containers need compatible namespace/seccomp support. RUM does not require a browser runtime.
+
+### Runtime setup and retirement
+
+Browser runtime delivery is experimental. DEM is disabled by default at build time. This tree provides preparation,
+execution and retirement, but no bundle builder, release artifacts or manifest installation. Development deployments
+must supply a trusted manifest and its matching bundle. Packaging and independent runtime releases are separate work;
+the current Agent-owned adapters and exact component pins are temporary. Browser jobs cannot run without those inputs.
+
+Managed mode is the default. Accepting an enabled journey or Lighthouse configuration requests its exact runtime;
+validation and disabled configurations do not download it. Preparation runs separately from website monitoring.
+An unavailable runtime leaves the monitor waiting for its dependency; it does not produce website failure measurements.
+Downloads can be disabled by the administrator:
+
+```yaml
+runtime:
+  mode: managed
+  allow_download: false
+  max_bytes: 4294967296
+  previous_retention_days: 7
+  idle_retention_days: 30
+```
+
+Managed setup reads a trusted `plugins.d/dem/runtime-<architecture>.json` manifest identifying the archive, digest,
+size limits and executable layout. The administrator must supply this file, or select an absolute `manifest_path`
+in `dem.conf`. Monitor configuration cannot choose a download URL. A checkout or package without that manifest reports
+setup unavailability; it does not guess a source or fetch a different browser.
+
+The cache defaults to `NETDATA_LIB_DIR/dem/runtime`. Its 4 GiB allowance includes preparation reservations. Known
+enabled monitors protect their runtime; every probe and browser invocation also has an independent execution pin.
+Unneeded previous generations get a 7-day grace and idle runtimes 30 days, with hourly cleanup. Storage pressure can
+shorten either grace. Protected demand and executions can exceed the allowance. If child completion cannot be proved,
+the plugin stops and retains the execution's protection; an arbitrary timeout is not permission to remove its files.
+
+This is an ordinary cache: startup cleanup or another consumer can remove an expired generation before saved monitor
+enables arrive. Online setup can download it again; offline setup reports unavailability. For guaranteed offline
+availability across that gap, use an administrator-owned preload as described below. Restart the plugin after changing
+runtime configuration; an Agent upgrade requiring a new runtime needs that exact archive available online or imported.
+
+Run administration commands as the consuming service account, with the same configuration and library directory:
+
+```sh
+dem.plugin runtime status
+dem.plugin runtime prepare
+dem.plugin runtime import --archive /absolute/path/runtime.tar.gz
+dem.plugin runtime qualify
+```
+
+`status` reports cache inventory and whether the selected archive is prepared, without downloading or launching a
+browser. `prepare` uses only the installed manifest's URL; `import` verifies an offline archive against that same trust.
+`qualify` runs a local sandboxed Playwright journey through the actual supervisor and reports qualification separately
+from preparation. It does not download missing files. `--config-dir`, `--manifest`, `--cache` and `--assets` support
+explicit installation paths; paths must be absolute. Configuration lookup follows normal plugin startup:
+`--config-dir` takes priority while retaining the selected user and stock roots; environment roots replace build
+roots, with the same installation fallbacks when neither is set. As at normal startup, terminal sessions ignore
+configuration-root environment variables; use `--config-dir` for an explicit administrator directory in that case.
+Explicit `--manifest`, `--cache` and `--allow-download` values override the loaded configuration. Cache inventory and
+maintenance errors remain separate from monitor outcomes. CLI inventory is a storage observation, not the running plugin's live preparation status.
+
+With an explicitly supplied manifest and matching bundle, the same managed store can be used in native, Docker,
+static and source-build layouts. This does not establish production delivery or qualification for those methods.
+The bundle supplies private Node, Chromium libraries, fonts and JavaScript dependencies; preparation does not install
+host packages or modify installed adapters. Persist the cache in Docker if it should survive container replacement.
+A development image can instead include a preload at its final path:
+
+```sh
+dem.plugin runtime preload --root /opt/netdata-dem-runtime --archive /absolute/path/runtime.tar.gz
+```
+
+The root must be new or empty. Use the returned `runtime.mode: preloaded` configuration:
+
+```yaml
+runtime:
+  mode: preloaded
+  preload_path: /opt/netdata-dem-runtime
+```
+
+Both modes require the installed trusted runtime manifest. If the preload command uses an explicit `--manifest`,
+its returned configuration includes that `manifest_path`. A preload must match the required bundle and remain at its
+final path; moving it or upgrading to an Agent requiring a different bundle makes it unavailable. Prepare the new
+bundle at a new final path and switch configuration after stopping all consumers of the old preload.
+
+Preloads are outside automatic retirement, and managed-cache operations refuse their roots. Keep the directory
+privately owned by the consuming service account. It may be mounted read-only for execution. Stop every consumer
+before replacing or removing its files. This supports controlled offline images and read-only deployments while
+using the same qualified bundle as managed mode. Separately installed Node, npm packages or browsers cannot be selected.
+
+`runtime status` checks prepared identity without starting a browser; `runtime qualify` tests a local sandboxed
+browser under its calling account. Qualification still needs to run under the target service's sandbox and security
+policy; a successful image build does not establish host compatibility.
+
+Configure exactly one of inline `script` or absolute `script_path` in `dem/journey.conf`. Standard named imports from
+`@playwright/test` and destructured CommonJS `require` use the real pinned package. JS/TS, mjs/mts and cjs/cts entries,
+relative helpers, hooks, fixtures, assertions and `test.step` are supported. The configured entry is selected explicitly;
+neighboring specs/configuration are not discovered. Project aliases and custom package trees are not an initial contract.
+Callable `require('@playwright/test')` shorthand and JSX/TSX are unsupported. One Chromium project/worker runs without
+retries or repetition; script retry overrides are rejected. Scripts are trusted code running under the plugin identity.
+
+```yaml
+jobs:
+  - name: checkout
+    script: |
+      import {test, expect} from '@playwright/test';
+      test('checkout loads', async ({page}) => {
+        await page.goto('https://shop.example.org/checkout');
+        await expect(page.getByRole('heading', {name: 'Checkout'})).toBeVisible();
+      });
+    screenshot_on_failure: true
+```
+
+Native secret resolution accepts named `DEM_SECRET_` environment entries through `secrets` in the journey form.
+Secrets travel to the admitted runner through private stdin and its controlled environment. Text diagnosis redacts
+known secret values and common credential patterns. Screenshots and HTML reports may contain sensitive page data;
+there is no universal image/report sanitization guarantee.
+
+A journey succeeds only when all ordinary declared tests actually pass. Unexpected failure or timeout dominates
+incomplete coverage. Skipped, expected-failure, empty or incomplete suites are inconclusive unless there is a real
+unexpected failure/timeout. Errors loading/running the monitor are execution inability. Cancellation and an interrupted
+start are distinct from a failed target. A workflow failure means a declared check failed, not proof of a service-wide outage.
+
+The static `dem_journey_failed` template warns on the latest fresh failed/timed-out observation. A new successful
+observation clears it. Unknown, inconclusive, execution error, cancellation and observations older than two native
+intervals are UNDEFINED, not recovery. Replacement/restart begins unknown until a new observation. Critical escalation
+and configurable sensitivity are left for a separate alert-policy decision. Native job status identifies unavailable dependencies; plugin logs explain runtime preparation errors.
+Functions show current execution and retained diagnosis.
+
+Lighthouse performance is a desktop lab score in points from 0 to 100; FCP, LCP, TBT and Speed Index are milliseconds,
+and CLS is dimensionless. Missing values are gaps/null, distinct from measured zero. Audit completion is separate from
+page performance. A failed optional report save marks capture unavailable and retains its diagnostic while preserving
+completed audit measurements. These lab measurements are not browser field Web Vitals; no lab-score alert threshold is
+enabled.
+
+## Synthetic diagnosis and captures
+
+Process Functions use the regular Netdata transport: `synthetics-checks` for active observations, `synthetics-runs`
+for retained history, `synthetics-run` for one run's full diagnosis, `synthetics-artifacts` for retained capture sets and
+storage status, and `synthetics-artifact` for one set's metadata or bytes.
+Use the advertised `job_id`, `run_id` and other parameters. Disabled/failed-startup jobs remain in native configuration
+status. Current-generation last success/failure and freshness do not reconstruct a historical incident. A running or
+waiting attempt does not refresh its previous result. Run summaries are capped at 2000 rows with an explicit truncation
+flag; refine the start-time range when truncated. Ranges select the attempt’s actual start using inclusive Unix seconds,
+including the entire endpoint seconds. Explicit zero means epoch, negative values are offsets from one captured now, and
+omitted bounds cover epoch through now. Run timestamps use Unix microseconds, while reporter event `at_ms` uses Unix
+milliseconds.
+
+Start and completion records share the plugin-wide journal budget with RUM. Each completion is self-contained;
+a start without a retained completion remains unknown. A selected run includes its latest retained completion even if it
+finished or was saved after the range, so outcome filtering follows phase resolution. Completion-only retained evidence
+remains queryable by its original start. A positive completion timestamp earlier than start after a wall-clock
+correction remains valid; independently measured duration is preserved. Identity drill-down ignores picker bounds and
+can show newer active evidence. History errors appear in current diagnosis. Publication is
+best effort; ambiguous append failures are never replayed, and history is not a lossless archive.
+
+Basic diagnosis includes bounded test, step, error, stdout and stderr events (500 records, 2000 characters per text),
+with dropped-event counts. Stdout/stderr use bounded stream redaction: lines longer than 2000 characters are omitted
+with a marker, and forced termination can lose buffered text. Structured test/step/error evidence remains incremental.
+There is no automatic page-console/network capture; scripts can forward diagnostics with
+Playwright APIs. Optional failure PNG screenshots and Lighthouse HTML reports are disabled by default. Enable
+`screenshot_on_failure` or `save_report` before an incident if these captures are needed. Forced browser termination
+can prevent capture. Trace, HAR, video and filmstrip are not initial capabilities.
+
+Captures live under `${NETDATA_LIB_DIR}/dem/artifacts` with one shared default allowance of seven days and 2 GiB
+for retained capture sets. Each set contains the screenshots or reports published for one run. The newest eligible
+capture for each monitor is preferred under size pressure, then older captures are removed first if even those sets
+do not fit. Age still expires preferred captures; this does not guarantee one capture per monitor or a complete incident
+history. A later Lighthouse report can replace an earlier poor-score report; a journey recovery without a screenshot
+leaves its previous failure capture eligible. Disabled or deleted monitors retain the same preference, and renaming a
+monitor creates a separate group until its old captures expire.
+
+Active or unverified workspace, unclassified files and pending deletions are reported separately and do not consume the
+retained-capture allowance. Total disk use can exceed the allowance, including growth between sweeps; sizes are logical
+file lengths, not allocated disk space. `synthetics-artifacts` reports global storage observations, effective policy,
+cleanup status and policy reload errors even when `job_id` filters its rows. Its newest-first list accepts an optional
+`limit` from 1 to 2000 and a returned `next` cursor as `before`; captures can expire between pages.
+
+Capture discovery and downloads remain available after run history expires and after a monitor is disabled or deleted.
+Capture states distinguish disabled, not needed, unavailable and published evidence. Retained history may also outlive
+its files; absent recorded files mean “expired or unavailable”. Metadata presence alone does not verify file integrity;
+fetch verifies size and digest. Capture metadata requires member-equivalent permissions. Downloads require
+administrator-equivalent permissions and are limited to 5 MiB; HTML is returned as base64 data. A capture exceeding
+5 MiB makes that run's capture publication unavailable; no partial set or truncated file is published.
+
+The runner retains admission and private files until Linux supervision proves the entire child tree is reaped.
+Unverified completion stops further admission and exits the plugin without deleting shared state. Unexpected supervisor
+loss does not prove that survivors are gone or prevent an external service restart beside them. Unverified leftover
+work is retained for operator handling; PID/time heuristics never grant permission to delete it. Terminal/debug runs
+use private storage; verified completed work is cleaned after joined shutdown, while unverified work remains protected.

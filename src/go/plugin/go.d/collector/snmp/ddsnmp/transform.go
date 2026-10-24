@@ -9,7 +9,9 @@ import (
 	"math"
 	"net"
 	"strconv"
+	"strings"
 	"text/template"
+	"time"
 
 	"github.com/Masterminds/sprig/v3"
 
@@ -326,4 +328,85 @@ func newMetricTransformFuncMap() template.FuncMap {
 	maps.Copy(fm, extra)
 
 	return fm
+}
+
+// textDateLayouts is the set of vendor-friendly date formats accepted by
+// text_date. The list is intentionally generous: vendors that publish
+// operational dates through SNMP rarely agree on a single textual format.
+// Numeric slash-only dates are intentionally excluded because dd/mm/yyyy and
+// mm/dd/yyyy are ambiguous for values like 01/02/2024.
+var textDateLayouts = []string{
+	time.RFC3339,
+	"2006-01-02 15:04:05",
+	"2006-01-02",
+	"Mon Jan 2 15:04:05 2006",
+	"Mon Jan 2 2006",
+	"Mon 2 January 2006",
+	"2 January 2006",
+	"January 2 2006",
+	"Jan 2 2006",
+	"Jan 2 2006 15:04:05",
+	"2 Jan 2006",
+	"2 Jan 2006 15:04:05",
+	"02 Jan 2006",
+	"02 Jan 2006 15:04:05",
+	"02Jan2006",
+	"2Jan2006",
+}
+
+// ParseTextDate accepts integer- and string-encoded SNMP date shapes (epoch
+// seconds, milliseconds, decimal no-value sentinels such as 0 and 4294967295,
+// and the textual layouts above) and returns the equivalent unix timestamp. It
+// is exported so the value-processor format "text_date" in
+// ddsnmpcollector/utils.go can apply the same parsing rules.
+func ParseTextDate(raw string) (int64, bool) {
+	return parseTextDate(raw)
+}
+
+// IsTextDateNoValue reports whether raw is a vendor no-timestamp sentinel
+// accepted by ParseTextDate.
+func IsTextDateNoValue(raw string) bool {
+	return isTextDateNoValue(raw)
+}
+
+func parseTextDate(raw string) (int64, bool) {
+	raw = strings.TrimSpace(raw)
+	if isTextDateNoValue(raw) {
+		return 0, false
+	}
+
+	if n, err := strconv.ParseInt(raw, 10, 64); err == nil {
+		digits := strings.TrimLeft(raw, "+-")
+		switch {
+		case len(digits) >= 12:
+			return n / 1000, true
+		default:
+			return n, true
+		}
+	}
+
+	for _, layout := range textDateLayouts {
+		if t, err := time.Parse(layout, raw); err == nil {
+			return t.Unix(), true
+		}
+	}
+	return 0, false
+}
+
+func isTextDateNoValue(raw string) bool {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return true
+	}
+
+	switch strings.ToLower(raw) {
+	case "0", "none", "n/a", "na", "perpetual", "permanent", "never", "unlimited":
+		return true
+	}
+
+	if n, err := strconv.ParseInt(raw, 10, 64); err == nil {
+		return n <= 0 || n == 4_294_967_295
+	}
+
+	return false
 }

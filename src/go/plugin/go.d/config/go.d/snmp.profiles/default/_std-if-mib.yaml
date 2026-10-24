@@ -20,11 +20,11 @@ metrics:
       name: ifTable
     symbols:
       # 32-bit octets (fallback for traffic)
-      - { OID: 1.3.6.1.2.1.2.2.1.10, name: _ifInOctets, scale_factor: 8 }
-      - { OID: 1.3.6.1.2.1.2.2.1.16, name: _ifOutOctets, scale_factor: 8 }
+      #      - { OID: 1.3.6.1.2.1.2.2.1.10, name: _ifInOctets, scale_factor: 8 }
+      #      - { OID: 1.3.6.1.2.1.2.2.1.16, name: _ifOutOctets, scale_factor: 8 }
       # 32-bit unicast packets (fallback for unicast packet rate)
-      - { OID: 1.3.6.1.2.1.2.2.1.11, name: _ifInUcastPkts }
-      - { OID: 1.3.6.1.2.1.2.2.1.17, name: _ifOutUcastPkts }
+      #      - { OID: 1.3.6.1.2.1.2.2.1.11, name: _ifInUcastPkts }
+      #      - { OID: 1.3.6.1.2.1.2.2.1.17, name: _ifOutUcastPkts }
       # 32-bit only
       - { OID: 1.3.6.1.2.1.2.2.1.14, name: _ifInErrors }
       - { OID: 1.3.6.1.2.1.2.2.1.20, name: _ifOutErrors }
@@ -128,29 +128,21 @@ virtual_metrics:
   # TOTALS (all interfaces)
   # ======================
 
-  # Traffic total (prefer 64-bit HC; fallback to 32-bit)
+  # Traffic total (64-bit HC only)
   - name: ifTotalTraffic
-    alternatives:
-      - sources:
-          - { metric: _ifHCInOctets,  table: ifXTable, as: in }
-          - { metric: _ifHCOutOctets, table: ifXTable, as: out }
-      - sources:
-          - { metric: _ifInOctets,  table: ifTable, as: in }
-          - { metric: _ifOutOctets, table: ifTable, as: out }
+    sources:
+      - { metric: _ifHCInOctets,  table: ifXTable, as: in }
+      - { metric: _ifHCOutOctets, table: ifXTable, as: out }
     chart_meta:
       description: Total traffic across all interfaces
       family: 'Network/Total/Traffic'
       unit: "bit/s"
 
-  # Unicast packets total (prefer 64-bit HC; fallback to 32-bit)
+  # Unicast packets total (64-bit HC only)
   - name: ifTotalPacketsUcast
-    alternatives:
-      - sources:
-          - { metric: _ifHCInUcastPkts,  table: ifXTable, as: in }
-          - { metric: _ifHCOutUcastPkts, table: ifXTable, as: out }
-      - sources:
-          - { metric: _ifInUcastPkts,  table: ifTable, as: in }
-          - { metric: _ifOutUcastPkts, table: ifTable, as: out }
+    sources:
+      - { metric: _ifHCInUcastPkts,  table: ifXTable, as: in }
+      - { metric: _ifHCOutUcastPkts, table: ifXTable, as: out }
     chart_meta:
       description: Total unicast packets across all interfaces
       family: 'Network/Total/Packet/Unicast'
@@ -209,33 +201,25 @@ virtual_metrics:
   # PER INTERFACE (per_row)
   # =========================
 
-  # Traffic per interface
+  # Traffic per interface (64-bit HC only)
   - name: ifTraffic
     per_row: true
     group_by: ["interface"]
-    alternatives:
-      - sources:
-          - { metric: _ifHCInOctets,  table: ifXTable, as: in }
-          - { metric: _ifHCOutOctets, table: ifXTable, as: out }
-      - sources:
-          - { metric: _ifInOctets,  table: ifTable, as: in }
-          - { metric: _ifOutOctets, table: ifTable, as: out }
+    sources:
+      - { metric: _ifHCInOctets,  table: ifXTable, as: in }
+      - { metric: _ifHCOutOctets, table: ifXTable, as: out }
     chart_meta:
       description: Traffic
       family: 'Network/Interface/Traffic/Total'
       unit: "bit/s"
 
-  # Unicast packets per interface
+  # Unicast packets per interface (64-bit HC only)
   - name: ifPacketsUcast
     per_row: true
     group_by: ["interface"]
-    alternatives:
-      - sources:
-          - { metric: _ifHCInUcastPkts,  table: ifXTable, as: in }
-          - { metric: _ifHCOutUcastPkts, table: ifXTable, as: out }
-      - sources:
-          - { metric: _ifInUcastPkts,  table: ifTable, as: in }
-          - { metric: _ifOutUcastPkts, table: ifTable, as: out }
+    sources:
+      - { metric: _ifHCInUcastPkts,  table: ifXTable, as: in }
+      - { metric: _ifHCOutUcastPkts, table: ifXTable, as: out }
     chart_meta:
       description: Unicast packets
       family: 'Network/Interface/Packet/Unicast'

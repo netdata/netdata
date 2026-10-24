@@ -74,6 +74,43 @@ We recommend using Netdata Cloud to avoid receiving duplicate alert notification
 </details>
 
 <details>
+<summary><strong>How do I centrally control or disable default stock alerts for all child nodes from the Parent, so new children do not trigger their own alerts?</strong></summary><br/>
+
+By default, each child runs its own health checks and fires its stock alerts, so every new child you stream in will alert until you change this.
+
+To manage all alerts from the Parent instead:
+
+1. **Turn off the health watchdog on the children.** In each child's `netdata.conf`, disable health so the child no longer evaluates or fires any alerts locally:
+
+   ```ini
+   [health]
+       enabled = no
+   ```
+
+   This is the alert-control part of running children in Thin Mode. Because this is a `netdata.conf` change, **restart** the child Agent to apply it — `netdatacli reload-health` only reloads `health.d/*.conf` files, not `netdata.conf`.
+
+2. **Manage the alerts on the Parent.** The Parent evaluates health checks for every streamed child by default, so you only tune or disable stock alerts once, on the Parent. To override thresholds, silence notifications, or selectively disable specific stock alerts centrally, see [Overriding Stock Alerts](/src/health/overriding-stock-alerts.md).
+
+With health disabled on the children, any new child you stream to the Parent inherits the alert policy you set on the Parent and never fires its own stock alerts. The [Feature Comparison](/docs/observability-centralization-points/metrics-centralization-points/README.md) table summarizes which features each role runs by default.
+
+<br/>
+</details>
+
+<details>
+<summary><strong>Should I configure local collectors (like httpcheck) on both Parents in an HA cluster?</strong></summary><br/>
+
+Local collectors such as `httpcheck` are synthetic checks that run on the Netdata node where they are configured. They do not run against data streamed from child nodes. Each Parent in a cluster is a full Netdata node, so a local collector only runs on the Parent where you configure it.
+
+If you configure a collector on only one Parent and that Parent goes down, the check stops entirely until that Parent recovers, even though your child metrics continue flowing through the other Parent.
+
+To make synthetic checks resilient to a Parent failure, configure the collector on both Parents. In an active-active cluster, each Parent also replicates its local collector metrics to the other, so both Parents maintain a complete copy.
+
+Be aware that each Parent evaluates alerts for its own local collectors independently. Since each Parent is a separate Netdata node, the same check configured on both produces alerts from two different nodes. This differs from child-node alerts, which Netdata Cloud can deduplicate when multiple Parents evaluate the same child (see the question above on duplicate alert notifications). Consider this trade-off when deciding whether to run the same synthetic check on both Parents.
+
+<br/>
+</details>
+
+<details>
 <summary><strong>When I have only Parents connected to Netdata Cloud, will I be able to use the Functions feature on my child nodes?</strong></summary><br/>
 
 Yes. Function requests will be received by the Parents and forwarded to the Child via their streaming connection. Function requests are propagated between parents, so this will work even if multiple levels of Netdata Parents are involved.

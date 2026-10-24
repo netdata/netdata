@@ -78,6 +78,11 @@ type Collector struct {
 
 	discovery discoveryState
 
+	tagsColumnMissingWarned   bool
+	tagsColumnMissingWarnedAt uint64
+	tagsWrongShapeWarned      bool
+	tagsWrongShapeWarnedAt    uint64
+
 	now func() time.Time
 
 	newResourceGraph   func(subscriptionID string, cred azcore.TokenCredential, cloud azcloud.Configuration) (resourceGraphClient, error)
@@ -101,6 +106,10 @@ func (c *Collector) Init(ctx context.Context) error {
 	c.runtime = nil
 	c.observations = nil
 	c.discovery = discoveryState{}
+	c.tagsColumnMissingWarned = false
+	c.tagsColumnMissingWarnedAt = 0
+	c.tagsWrongShapeWarned = false
+	c.tagsWrongShapeWarnedAt = 0
 
 	return nil
 }

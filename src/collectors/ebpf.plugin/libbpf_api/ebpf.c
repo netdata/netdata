@@ -532,7 +532,7 @@ void ebpf_update_stats(ebpf_plugin_stats_t *report, ebpf_module_t *em)
     int value;
 
     // It is not necessary to report more information.
-    if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING)
+    if (ebpf_module_enabled_get(em) > NETDATA_THREAD_EBPF_RUNNING)
         value = -1;
     else
         value = 1;
@@ -965,13 +965,8 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kv
     em->load |= EBPF_LOAD_LEGACY;
 
     *obj = bpf_object__open_file(lpath, NULL);
-    if (!*obj) {
-        *obj = NULL;
-        return NULL;
-    }
-
-    if (libbpf_get_error(*obj)) {
-        bpf_object__close(*obj);
+    // A failed open leaves nothing to close: libbpf 1.x returns NULL, older versions an error pointer.
+    if (!*obj || libbpf_get_error(*obj)) {
         *obj = NULL;
         return NULL;
     }
@@ -1090,6 +1085,19 @@ netdata_ebpf_load_mode_t epbf_convert_string_to_load_mode(const char *str)
     return EBPF_LOAD_PLAY_DICE;
 }
 
+netdata_ebpf_load_mode_t ebpf_convert_object_flavor_to_load_mode(const char *str)
+{
+    if (!strcasecmp(str, EBPF_CFG_LEGACY_PROGRAM) || !strcasecmp(str, EBPF_CFG_TRACING_PROGRAM))
+        return EBPF_LOAD_LEGACY;
+
+    if (!strcasecmp(str, EBPF_CFG_BUFFER_PROGRAM) || !strcasecmp(str, EBPF_CFG_BUFFER_RING_PROGRAM) ||
+        !strcasecmp(str, EBPF_CFG_RING_BUFFER_PROGRAM) || !strcasecmp(str, EBPF_CFG_ARENA_PROGRAM))
+        return EBPF_LOAD_PLAY_DICE;
+
+    netdata_log_error("the option %s for \"ebpf object flavor\" is not a valid option.", str);
+    return EBPF_LOAD_PLAY_DICE;
+}
+
 /**
  * Convert load mode to string
  *
@@ -1198,7 +1206,6 @@ struct btf *ebpf_parse_btf_file(const char *filename)
     struct btf *bf = btf__parse(filename, NULL);
     if (libbpf_get_error(bf)) {
         fprintf(stderr, "Cannot parse btf file");
-        btf__free(bf);
         return NULL;
     }
 
@@ -1368,6 +1375,12 @@ void ebpf_update_module_using_config(
     char *value = ebpf_convert_load_mode_to_string(modules->load & NETDATA_EBPF_LOAD_METHODS);
     const char *type_format = inicfg_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_TYPE_FORMAT, value);
     netdata_ebpf_load_mode_t load = epbf_convert_string_to_load_mode(type_format);
+    const char *object_flavor = inicfg_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_OBJECT_FLAVOR, NULL);
+    /* Apply object flavor only when type format is at its auto/default value (PLAY_DICE).
+     * A user who explicitly chose "legacy" or "co-re" keeps that choice;
+     * object flavor cannot silently revert it. */
+    if (object_flavor && !(load & (EBPF_LOAD_LEGACY | EBPF_LOAD_CORE)))
+        load = ebpf_convert_object_flavor_to_load_mode(object_flavor);
     load = ebpf_select_load_mode(btf_file, load, kver, is_rh);
     modules->load = origin | load;
 

@@ -1058,7 +1058,7 @@ int do_PerflibNetwork(int update_every, usec_t dt __maybe_unused)
 
     PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
     if (!pDataBlock)
-        return -1;
+        return 0;
 
     usec_t now_ut = now_monotonic_usec();
     do_network_interface(pDataBlock, update_every, true, now_ut);

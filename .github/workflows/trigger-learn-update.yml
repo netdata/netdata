@@ -18,14 +18,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Trigger Netdata Learn ingest workflow.
-        uses: benc-uk/workflow-dispatch@v1
+        uses: benc-uk/workflow-dispatch@d004979be141727c7a17c28f603e2facc40d0855 # v1.3.3
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
           repo: netdata/learn
           workflow: Ingest
           ref: refs/heads/master
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''

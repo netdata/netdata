@@ -7,6 +7,7 @@ modules:
       plugin_name: go.d.plugin
       monitored_instance:
         name: Elasticsearch
+        description: "Monitor Elasticsearch cluster and node health, indexing, search, storage, JVM, and resource performance metrics."
         link: https://www.elastic.co/elasticsearch/
         icon_filename: elasticsearch.svg
         categories:
@@ -32,9 +33,9 @@ modules:
           This collector monitors the performance and health of the Elasticsearch cluster.
         method_description: |
           It uses [Cluster APIs](https://www.elastic.co/guide/en/elasticsearch/reference/current/cluster.html) to collect metrics.
-          
+
           Used endpoints:
-          
+
           | Endpoint               | Description          | API                                                                                                         |
           |------------------------|----------------------|-------------------------------------------------------------------------------------------------------------|
           | `/`                    | Node info            |                                                                                                             |
@@ -265,33 +266,12 @@ modules:
                 jobs:
                   - name: local
                     url: http://127.0.0.1:9200
-                
+
                   - name: remote
                     url: http://192.0.2.1:9200
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: elasticsearch_node_indices_search_time_query
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf
-        metric: elasticsearch.node_indices_search_time
-        info: search performance is degraded, queries run slowly.
-      - name: elasticsearch_node_indices_search_time_fetch
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf
-        metric: elasticsearch.node_indices_search_time
-        info: search performance is degraded, fetches run slowly.
-      - name: elasticsearch_cluster_health_status_red
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf
-        metric: elasticsearch.cluster_health_status
-        info: cluster health status is red.
-      - name: elasticsearch_cluster_health_status_yellow
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf
-        metric: elasticsearch.cluster_health_status
-        info: cluster health status is yellow.
-      - name: elasticsearch_node_index_health_red
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf
-        metric: elasticsearch.node_index_health
-        info: node index $label:index health status is red.
     functions:
       description: |
         This collector exposes real-time functions for interactive troubleshooting in the Live tab.
@@ -408,13 +388,13 @@ modules:
           labels:
             - name: cluster_name
               description: |
-                Name of the cluster. Based on the [Cluster name setting](https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#cluster-name).
+                Name of the cluster. Based on the [Cluster name setting](https://www.elastic.co/docs/deploy-manage/deploy/self-managed/important-settings-configuration#_cluster_name_setting).
             - name: node_name
               description: |
-                Human-readable identifier for the node. Based on the [Node name setting](https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#node-name).
+                Human-readable identifier for the node. Based on the [Node name setting](https://www.elastic.co/docs/deploy-manage/deploy/self-managed/important-settings-configuration#node-name).
             - name: host
               description: |
-                Network host for the node, based on the [Network host setting](https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#network.host).
+                Network host for the node, based on the [Network host setting](https://www.elastic.co/docs/deploy-manage/deploy/self-managed/important-settings-configuration#network.host).
           metrics:
             - name: elasticsearch.node_indices_indexing
               description: Indexing Operations
@@ -449,12 +429,12 @@ modules:
                 - name: queries
                 - name: fetches
             - name: elasticsearch.node_indices_search_time
-              description: node_indices_search_time
+              description: Time Spent On Search Operations
               unit: milliseconds
               chart_type: stacked
               dimensions:
-                - name: queries
-                - name: fetches
+                - name: query
+                - name: fetch
             - name: elasticsearch.node_indices_refresh
               description: Refresh Operations
               unit: operations/s
@@ -626,7 +606,7 @@ modules:
                 - name: force_merge
                 - name: management
             - name: elasticsearch.node_cluster_communication_packets
-              description: Cluster Communication
+              description: Node Cluster Communication
               unit: pps
               chart_type: line
               dimensions:
@@ -661,7 +641,7 @@ modules:
           labels:
             - name: cluster_name
               description: |
-                Name of the cluster. Based on the [Cluster name setting](https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#cluster-name).
+                Name of the cluster. Based on the [Cluster name setting](https://www.elastic.co/docs/deploy-manage/deploy/self-managed/important-settings-configuration#_cluster_name_setting).
           metrics:
             - name: elasticsearch.cluster_health_status
               description: Cluster Status
@@ -669,8 +649,8 @@ modules:
               chart_type: line
               dimensions:
                 - name: green
-                - name: yellow
                 - name: red
+                - name: yellow
             - name: elasticsearch.cluster_number_of_nodes
               description: Cluster Nodes Count
               unit: nodes
@@ -688,7 +668,7 @@ modules:
                 - name: relocating
                 - name: initializing
                 - name: unassigned
-                - name: delayed_unaasigned
+                - name: delayed_unassigned
             - name: elasticsearch.cluster_pending_tasks
               description: Cluster Pending Tasks
               unit: tasks
@@ -730,7 +710,7 @@ modules:
             - name: elasticsearch.cluster_indices_query_cache
               description: Cluster Indices Query Cache
               unit: events/s
-              chart_type: line
+              chart_type: stacked
               dimensions:
                 - name: hit
                 - name: miss
@@ -756,7 +736,7 @@ modules:
           labels:
             - name: cluster_name
               description: |
-                Name of the cluster. Based on the [Cluster name setting](https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#cluster-name).
+                Name of the cluster. Based on the [Cluster name setting](https://www.elastic.co/docs/deploy-manage/deploy/self-managed/important-settings-configuration#_cluster_name_setting).
             - name: index
               description: Name of the index.
           metrics:
@@ -766,8 +746,8 @@ modules:
               chart_type: line
               dimensions:
                 - name: green
-                - name: yellow
                 - name: red
+                - name: yellow
             - name: elasticsearch.node_index_shards_count
               description: Index Shards Count
               unit: shards
@@ -792,6 +772,7 @@ modules:
       id: collector-go.d.plugin-opensearch
       monitored_instance:
         name: OpenSearch
+        description: "Monitor OpenSearch cluster and node health, indexing, search, storage, JVM, and resource performance metrics."
         link: https://opensearch.org/
         icon_filename: opensearch.svg
         categories:

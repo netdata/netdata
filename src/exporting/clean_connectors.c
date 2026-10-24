@@ -34,6 +34,7 @@ void clean_instance(struct instance *instance)
 {
     clean_instance_config(&instance->config);
     buffer_free(instance->labels_buffer);
+    buffer_free(instance->metric_prefix_buffer);
 
     netdata_cond_destroy(&instance->cond_var);
 }
@@ -55,6 +56,7 @@ void simple_connector_cleanup(struct instance *instance)
     buffer_free(instance->buffer);
     buffer_free(simple_connector_data->buffer);
     buffer_free(simple_connector_data->header);
+    buffer_free(simple_connector_data->response);
 
     struct simple_connector_buffer *next_buffer = simple_connector_data->first_buffer;
     for (int i = 0; i < instance->config.buffer_on_failures; i++) {

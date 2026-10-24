@@ -1,0 +1,370 @@
+//! The `NETDATA_OTEL_CFG_*` environment-variable layer of config resolution —
+//! the highest-precedence source in `mod.rs`' stock < user < env order.
+//!
+//! Names mirror the YAML keys: the dotted path upper-cased with `.` → `_`
+//! under `NETDATA_OTEL_CFG_` for the global sections (`RECEIVERS_OTLP_PROTOCOLS_`,
+//! `METRICS_`, `BASE_DIR`, `REMOTE_STORAGE_`, `AUTH_`) and `NETDATA_OTEL_CFG_{LOGS|TRACES}_{FIELD}` for per-signal
+//! tuning. Values parse like the YAML layer's overrides: integers and byte
+//! sizes (`"2GiB"`) via `FromStr`, durations (`"2 hours"`) via `humantime`.
+//!
+//! Resolution is snapshot-based and strict: the environment is scanned once,
+//! [`ConfigOverride::from_map`] resolves the snapshot, and a
+//! `NETDATA_OTEL_CFG_*` name no consumer recognizes aborts startup — the same
+//! deny-unknown contract as the YAML parser, so a typo cannot silently leave
+//! a setting at its stock default. Only `load_config` (`mod.rs`) consumes
+//! this module; the workers receive the merged effective config over IPC.
+//!
+//! `bridge::config` here is the shared `netdata-plugin/bridge` crate, whose
+//! `RotationEntry`/`RetentionEntry` shapes the per-signal values fill.
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
+use std::ffi::OsString;
+use std::path::PathBuf;
+use std::time::Duration;
+
+use anyhow::Result;
+
+use super::ConfigOverride;
+use super::metrics::MetricsOverride;
+use super::receivers::{
+    DEPRECATED_ENDPOINT_KEYS, ProtocolOverride, ReceiversOverride, TlsOverride, resolve_deprecated,
+};
+use super::signal::{
+    AuthOverride, CatalogOverride, IngestOverride, RemoteStorageOverride, SignalOverride,
+};
+
+/// A snapshot of the `NETDATA_OTEL_CFG_*` environment (name → raw value).
+/// Injecting the map instead of reading `std::env` inline keeps config
+/// resolution unit-testable. Values stay `OsString`: UTF-8 is checked only
+/// when a value is read ([`get_env`]). Every name in the snapshot must be
+/// recognized ([`EnvReader`]) — an unknown name is fatal before its value
+/// matters.
+pub(super) type EnvMap = HashMap<String, OsString>;
+
+/// Collect the `NETDATA_OTEL_CFG_*` environment into an [`EnvMap`] — the one
+/// full-environment scan in the plugin. Every other env read elsewhere in the
+/// crate (config dirs in `mod.rs`, identity via `rt::NetdataEnv` in
+/// `supervisor.rs`) targets a single named variable.
+pub(super) fn otel_env_from_process() -> EnvMap {
+    otel_env_from_iter(std::env::vars_os())
+}
+
+/// Filter an environment snapshot down to `NETDATA_OTEL_CFG_*` entries.
+/// A non-UTF-8 key cannot match the ASCII prefix and is skipped; values are
+/// kept verbatim and validated lazily on read.
+///
+/// The prefix deliberately does not own the plugin-wide `NETDATA_OTEL_`
+/// namespace: Kubernetes injects service-link variables such as
+/// `NETDATA_OTEL_SERVICE_HOST` and `NETDATA_OTEL_PORT_4317_TCP` into every pod
+/// that can see a Service named `netdata-otel`, and those must never reach the
+/// strict unknown-name check below.
+pub(super) fn otel_env_from_iter(vars: impl IntoIterator<Item = (OsString, OsString)>) -> EnvMap {
+    let mut env = EnvMap::new();
+    for (key, value) in vars {
+        let Some(key) = key.to_str() else { continue };
+        if key.starts_with("NETDATA_OTEL_CFG_") {
+            env.insert(key.to_string(), value);
+        }
+    }
+    env
+}
+
+/// An [`EnvMap`] wrapper that records every name looked up, so that after
+/// resolution the leftovers — `NETDATA_OTEL_CFG_*` names no consumer
+/// recognizes, i.e. typos — can be rejected. Consumers query their full fixed
+/// vocabulary unconditionally, so "read" equals "recognized" by construction:
+/// there is no second, hand-maintained list of accepted names to drift.
+struct EnvReader<'a> {
+    map: &'a EnvMap,
+    read: RefCell<HashSet<String>>,
+}
+
+impl<'a> EnvReader<'a> {
+    fn new(map: &'a EnvMap) -> Self {
+        Self {
+            map,
+            read: RefCell::new(HashSet::new()),
+        }
+    }
+
+    /// Look up a name, recording it as recognized whether or not it is set.
+    fn get(&self, name: &str) -> Option<&'a OsString> {
+        self.read.borrow_mut().insert(name.to_string());
+        self.map.get(name)
+    }
+
+    /// Error on any variable in the snapshot that no consumer looked up.
+    fn ensure_fully_consumed(&self) -> Result<()> {
+        let read = self.read.borrow();
+        let mut unknown: Vec<&str> = self
+            .map
+            .keys()
+            .filter(|name| !read.contains(*name))
+            .map(String::as_str)
+            .collect();
+        if unknown.is_empty() {
+            return Ok(());
+        }
+        unknown.sort_unstable();
+        anyhow::bail!(
+            "unrecognized environment variable{}: {} — NETDATA_OTEL_CFG_* names are \
+             checked strictly so a typo cannot be silently ignored",
+            if unknown.len() == 1 { "" } else { "s" },
+            unknown.join(", ")
+        );
+    }
+}
+
+/// Look up a variable, erroring only if the value we actually consume is not
+/// valid UTF-8 (matching the former `std::env::var` semantics).
+fn get_env<'a>(env: &EnvReader<'a>, name: &str) -> Result<Option<&'a str>> {
+    match env.get(name) {
+        None => Ok(None),
+        Some(value) => value
+            .to_str()
+            .map(Some)
+            .ok_or_else(|| anyhow::anyhow!("{name} contains invalid UTF-8")),
+    }
+}
+
+/// Parse a variable with `FromStr` — the integer and byte-size knobs
+/// (`u64`/`usize`/`ByteSize`, e.g. `"2GiB"`). Unset yields `Ok(None)`; a
+/// value that fails to parse is an error naming the variable and value.
+fn parse_env_var<T: std::str::FromStr>(env: &EnvReader<'_>, name: &str) -> Result<Option<T>>
+where
+    T::Err: std::fmt::Display,
+{
+    match get_env(env, name)? {
+        Some(val) => val
+            .parse::<T>()
+            .map(Some)
+            .map_err(|e| anyhow::anyhow!("invalid value for {}: '{}': {}", name, val, e)),
+        None => Ok(None),
+    }
+}
+
+/// Parse a variable as a `humantime` duration (`"2 hours"`, `"30 seconds"`) —
+/// the value form the YAML layer's `opt_humantime` accepts. Unset yields
+/// `Ok(None)`; an unparseable value is an error naming the variable.
+fn parse_env_duration(env: &EnvReader<'_>, name: &str) -> Result<Option<Duration>> {
+    match get_env(env, name)? {
+        Some(val) => humantime::parse_duration(val)
+            .map(Some)
+            .map_err(|e| anyhow::anyhow!("invalid value for {}: '{}': {}", name, val, e)),
+        None => Ok(None),
+    }
+}
+
+/// Parse a boolean env var. Accepted values are case-insensitive: `true`/`1`/`yes`
+/// and `false`/`0`/`no`; anything else is an error (this is the user-facing
+/// vocabulary for `NETDATA_OTEL_CFG_*_ENABLED` flags).
+fn parse_env_bool(env: &EnvReader<'_>, name: &str) -> Result<Option<bool>> {
+    match get_env(env, name)? {
+        Some(val) => match val.to_lowercase().as_str() {
+            "true" | "1" | "yes" => Ok(Some(true)),
+            "false" | "0" | "no" => Ok(Some(false)),
+            _ => Err(anyhow::anyhow!(
+                "invalid value for {}: '{}': expected true/false, 1/0, or yes/no",
+                name,
+                val
+            )),
+        },
+        None => Ok(None),
+    }
+}
+
+/// The env var name of a dotted YAML key: `receivers.otlp.protocols.grpc.endpoint`
+/// → `NETDATA_OTEL_CFG_RECEIVERS_OTLP_PROTOCOLS_GRPC_ENDPOINT`.
+fn env_name(key: &str) -> String {
+    format!("NETDATA_OTEL_CFG_{}", key.replace('.', "_").to_uppercase())
+}
+
+/// Look up a receiver key under its env name and, for the gRPC keys that
+/// have one, its deprecated `NETDATA_OTEL_CFG_ENDPOINT_*` name
+/// ([`DEPRECATED_ENDPOINT_KEYS`]).
+/// Same rule as the user file: the old name works with a warning, and when
+/// both are set the new one wins.
+fn get_receiver_env<'a>(env: &EnvReader<'a>, key: &str) -> Result<Option<String>> {
+    let new_name = env_name(key);
+    let new = get_env(env, &new_name)?;
+    let Some((old_key, _)) = DEPRECATED_ENDPOINT_KEYS.iter().find(|(_, new)| *new == key) else {
+        return Ok(new.map(str::to_string));
+    };
+    let old_name = env_name(old_key);
+    let old = get_env(env, &old_name)?;
+    Ok(resolve_deprecated("environment", &old_name, old, &new_name, new).map(str::to_string))
+}
+
+impl ConfigOverride {
+    /// Build the config overrides from an [`EnvMap`] snapshot of the
+    /// `NETDATA_OTEL_CFG_*` variables. Pure: reads only the provided map,
+    /// never the process env (tests build maps directly). Strictness — a name
+    /// no consumer recognizes is fatal — is [`EnvReader`]'s job, described
+    /// there. The `has_any` guards before returning collapse a section no
+    /// variable touched back to `None`, so the env layer counts as present
+    /// only where at least one variable was set.
+    pub(super) fn from_map(env: &EnvMap) -> Result<Self> {
+        let env = &EnvReader::new(env);
+        let receivers = receivers_from_map(env)?;
+        let metrics = MetricsOverride::from_map(env)?;
+        let base_dir = get_env(env, "NETDATA_OTEL_CFG_BASE_DIR")?.map(PathBuf::from);
+        let remote_storage = RemoteStorageOverride::from_map(env)?;
+        let auth = AuthOverride::from_map(env)?;
+        let logs = SignalOverride::from_map(env, "LOGS")?;
+        let traces = SignalOverride::from_map(env, "TRACES")?;
+        env.ensure_fully_consumed()?;
+
+        Ok(Self {
+            receivers,
+            // The deprecated env names were resolved by `receivers_from_map`.
+            endpoint: None,
+            metrics: if metrics.has_any() {
+                Some(metrics)
+            } else {
+                None
+            },
+            base_dir,
+            remote_storage: if remote_storage.has_any() {
+                Some(remote_storage)
+            } else {
+                None
+            },
+            auth: if auth.has_any() { Some(auth) } else { None },
+            logs: if logs.has_any() { Some(logs) } else { None },
+            traces: if traces.has_any() { Some(traces) } else { None },
+        })
+    }
+}
+
+/// Build the `receivers.otlp.protocols` override from its env vars; `None`
+/// when none is set.
+fn receivers_from_map(env: &EnvReader<'_>) -> Result<Option<ReceiversOverride>> {
+    let grpc = protocol_from_map(env, "grpc")?;
+    let http = protocol_from_map(env, "http")?;
+    Ok(ReceiversOverride::from_protocols(grpc, http))
+}
+
+fn protocol_from_map(env: &EnvReader<'_>, protocol: &str) -> Result<ProtocolOverride> {
+    let key = |field: &str| format!("receivers.otlp.protocols.{protocol}.{field}");
+    Ok(ProtocolOverride {
+        enabled: parse_env_bool(env, &env_name(&key("enabled")))?,
+        endpoint: get_receiver_env(env, &key("endpoint"))?,
+        tls: Some(TlsOverride {
+            cert_file: get_receiver_env(env, &key("tls.cert_file"))?,
+            key_file: get_receiver_env(env, &key("tls.key_file"))?,
+            client_ca_file: get_receiver_env(env, &key("tls.client_ca_file"))?,
+        }),
+    })
+}
+
+impl MetricsOverride {
+    fn from_map(env: &EnvReader<'_>) -> Result<Self> {
+        Ok(Self {
+            chart_configs_dir: get_env(env, "NETDATA_OTEL_CFG_METRICS_CHART_CONFIGS_DIR")?
+                .map(str::to_string),
+            interval_secs: parse_env_var(env, "NETDATA_OTEL_CFG_METRICS_INTERVAL_SECS")?,
+            grace_period_secs: parse_env_var(env, "NETDATA_OTEL_CFG_METRICS_GRACE_PERIOD_SECS")?,
+            expiry_duration_secs: parse_env_var(
+                env,
+                "NETDATA_OTEL_CFG_METRICS_EXPIRY_DURATION_SECS",
+            )?,
+            max_new_charts_per_request: parse_env_var(
+                env,
+                "NETDATA_OTEL_CFG_METRICS_MAX_NEW_CHARTS_PER_REQUEST",
+            )?,
+        })
+    }
+}
+
+impl RemoteStorageOverride {
+    fn from_map(env: &EnvReader<'_>) -> Result<Self> {
+        Ok(Self {
+            enabled: parse_env_bool(env, "NETDATA_OTEL_CFG_REMOTE_STORAGE_ENABLED")?,
+            uri: get_env(env, "NETDATA_OTEL_CFG_REMOTE_STORAGE_URI")?.map(str::to_string),
+            read_cache_max_size: parse_env_var(
+                env,
+                "NETDATA_OTEL_CFG_REMOTE_STORAGE_READ_CACHE_MAX_SIZE",
+            )?,
+            startup_op_timeout: parse_env_duration(
+                env,
+                "NETDATA_OTEL_CFG_REMOTE_STORAGE_STARTUP_OP_TIMEOUT",
+            )?,
+        })
+    }
+}
+
+impl AuthOverride {
+    fn from_map(env: &EnvReader<'_>) -> Result<Self> {
+        Ok(Self {
+            enabled: parse_env_bool(env, "NETDATA_OTEL_CFG_AUTH_ENABLED")?,
+        })
+    }
+}
+
+impl SignalOverride {
+    /// Build a per-signal tuning override from `NETDATA_OTEL_CFG_{PREFIX}_*`
+    /// entries in the map (`PREFIX` is `LOGS` or `TRACES`). Dirs and storage
+    /// are not per-signal and so have no per-signal env vars. Rotation and
+    /// retention are per-tenant maps in YAML; the env vars can only fill the
+    /// `default` tenant's entry.
+    fn from_map(env: &EnvReader<'_>, prefix: &str) -> Result<Self> {
+        let rotation_default = bridge::config::RotationEntry {
+            max_file_size: parse_env_var(env, &var(prefix, "ROTATION_MAX_FILE_SIZE"))?,
+            max_entries: parse_env_var(env, &var(prefix, "ROTATION_MAX_ENTRIES"))?,
+            max_file_duration: parse_env_duration(env, &var(prefix, "ROTATION_MAX_FILE_DURATION"))?,
+        };
+        let rotation_has_any = rotation_default.max_file_size.is_some()
+            || rotation_default.max_entries.is_some()
+            || rotation_default.max_file_duration.is_some();
+        let retention_default = bridge::config::RetentionEntry {
+            max_files: parse_env_var(env, &var(prefix, "RETENTION_MAX_FILES"))?,
+            max_total_size: parse_env_var(env, &var(prefix, "RETENTION_MAX_TOTAL_SIZE"))?,
+            max_age: parse_env_duration(env, &var(prefix, "RETENTION_MAX_AGE"))?,
+            horizon: parse_env_duration(env, &var(prefix, "RETENTION_HORIZON"))?,
+        };
+        let retention_has_any = retention_default.max_files.is_some()
+            || retention_default.max_total_size.is_some()
+            || retention_default.max_age.is_some()
+            || retention_default.horizon.is_some();
+        let catalog = CatalogOverride {
+            rotation_count: parse_env_var(env, &var(prefix, "CATALOG_ROTATION_COUNT"))?,
+            rotation_period: parse_env_duration(env, &var(prefix, "CATALOG_ROTATION_PERIOD"))?,
+        };
+        let ingest = IngestOverride {
+            max_age: parse_env_duration(env, &var(prefix, "INGEST_MAX_AGE"))?,
+            future_skew: parse_env_duration(env, &var(prefix, "INGEST_FUTURE_SKEW"))?,
+        };
+        Ok(Self {
+            crc_enabled: parse_env_bool(env, &var(prefix, "CRC_ENABLED"))?,
+            compression_enabled: parse_env_bool(env, &var(prefix, "COMPRESSION_ENABLED"))?,
+            rotation: if rotation_has_any {
+                let mut map = std::collections::HashMap::new();
+                map.insert("default".to_string(), rotation_default);
+                Some(map)
+            } else {
+                None
+            },
+            retention: if retention_has_any {
+                let mut map = std::collections::HashMap::new();
+                map.insert("default".to_string(), retention_default);
+                Some(map)
+            } else {
+                None
+            },
+            catalog: if catalog.has_any() {
+                Some(catalog)
+            } else {
+                None
+            },
+            ingest: if ingest.has_any() { Some(ingest) } else { None },
+            // The former plugin's journal dir stays YAML-only (`logs.journal_dir`,
+            // consumed by `resolve_legacy_journal_dir`); no env var exists for it.
+            journal_dir: None,
+        })
+    }
+}
+
+/// Build a per-signal env-var name: `NETDATA_OTEL_CFG_{PREFIX}_{SUFFIX}`.
+fn var(prefix: &str, suffix: &str) -> String {
+    format!("NETDATA_OTEL_CFG_{prefix}_{suffix}")
+}

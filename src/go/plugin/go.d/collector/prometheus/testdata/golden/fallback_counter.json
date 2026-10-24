@@ -1,0 +1,20 @@
+[
+  {
+    "context": "prometheus.test_untyped_metric",
+    "labels": {
+      "label1": "value1"
+    },
+    "dims": [
+      {
+        "name": "test_untyped_metric",
+        "algo": "incremental",
+        "value": 11
+      }
+    ],
+    "soft": {
+      "units": "metric/s",
+      "family": "test_untyped",
+      "type": "line"
+    }
+  }
+]

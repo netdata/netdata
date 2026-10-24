@@ -39,12 +39,12 @@ type Client struct {
 }
 
 // NewClient constructs a client with a freshly created HTTP transport.
-func NewClient(cfg Config) (*Client, error) {
+func NewClient(ctx context.Context, cfg Config) (*Client, error) {
 	if time.Duration(cfg.HTTPConfig.ClientConfig.Timeout) <= 0 {
 		cfg.HTTPConfig.ClientConfig.Timeout = confopt.Duration(10 * time.Second)
 	}
 
-	httpClient, err := web.NewHTTPClient(cfg.HTTPConfig.ClientConfig)
+	httpClient, err := web.NewHTTPClient(ctx, cfg.HTTPConfig.ClientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("openmetrics protocol: creating http client failed: %w", err)
 	}
@@ -88,12 +88,11 @@ func (c *Client) FetchSeries(ctx context.Context, sr selector.Selector) (prometh
 }
 
 func (c *Client) fetch(ctx context.Context) ([]byte, error) {
-	req, err := web.NewHTTPRequest(c.request)
+	req, err := web.NewHTTPRequest(ctx, c.request)
 	if err != nil {
 		return nil, fmt.Errorf("openmetrics protocol: building request failed: %w", err)
 	}
 
-	req = req.WithContext(ctx)
 	req.Header.Set("Accept", c.acceptHeader)
 	// Prefer gzip for large payloads but fall back gracefully.
 	req.Header.Set("Accept-Encoding", "gzip")

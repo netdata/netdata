@@ -21,7 +21,7 @@ Our previous PackageCloud repositories are no longer updated. All packages are n
 Our repository system follows a structured organization:
 
 ```
-repository.netdata.cloud/repos/
+repository.netdata.cloud/repos/index.html
 ├── stable/                   # Stable Netdata Agent releases
 │   ├── debian/               # For Debian-based distributions
 │   │   ├── bullseye/         # Distribution codename directories
@@ -75,8 +75,8 @@ Each distribution has:
 1. Directories for each supported release version
 2. Subdirectories for each supported CPU architecture containing the actual packages
 
-**Example:** For RHEL 9 on 64-bit x86, you'll find the stable repository at:  
-[https://repository.netdata.cloud/repos/stable/el/9/x86_64/](https://repository.netdata.cloud/repos/stable/el/9/x86_64/)
+**Example:** For RHEL 9 on 64-bit x86, you can verify the stable repository through its metadata:
+[https://repository.netdata.cloud/repos/stable/el/9/x86_64/repodata/repomd.xml](https://repository.netdata.cloud/repos/stable/el/9/x86_64/repodata/repomd.xml)
 
 ### Package Signing
 
@@ -182,6 +182,50 @@ Enabled: Yes
    sudo apt install netdata
    ```
 
+### Manual Repository Configuration (Without Config Package)
+
+<details>
+<summary>If the repoconfig package is not yet available for your distribution</summary>
+<br/>
+
+If the repository configuration package for your distribution is not available at the [repoconfig index](https://repository.netdata.cloud/repos/repoconfig/index.html) (for example, when a new Debian or Ubuntu release is not yet covered), you can configure the APT repository manually.
+
+:::tip
+
+Using [kickstart.sh](/packaging/installer/methods/kickstart.md) is the recommended way to install Netdata. It handles repository setup automatically with fallback logic when a config package is not available.
+
+:::
+
+1. Download and dearmor the GPG key:
+
+   ```bash
+   sudo curl -fL https://repository.netdata.cloud/netdatabot.gpg.key | sudo gpg --dearmor -o /usr/share/keyrings/netdata-archive-keyring.gpg
+   ```
+
+2. Create the repository configuration using Deb822 format:
+
+   ```bash
+   sudo tee /etc/apt/sources.list.d/netdata.sources <<EOF
+   Types: deb
+   URIs: http://repository.netdata.cloud/repos/stable/debian/
+   Suites: YOUR_CODENAME/
+   Signed-By: /usr/share/keyrings/netdata-archive-keyring.gpg
+   By-Hash: Yes
+   Enabled: Yes
+   EOF
+   ```
+
+   Replace `YOUR_CODENAME` with your distribution codename (for example, `trixie`). Keep the trailing slash after the codename. For Ubuntu-based systems, change `debian/` to `ubuntu/` in the `URIs` line.
+
+3. Update package lists and install Netdata:
+
+   ```bash
+   sudo apt update
+   sudo apt install netdata
+   ```
+
+</details>
+
 ## Example: Complete Installation on Ubuntu 22.04 (Jammy)
 
 <details>
@@ -222,11 +266,11 @@ You can create local mirrors of our repositories using two main approaches:
 | Method           | Use case                              | Example |
 |------------------|---------------------------------------|---------|
 | Standard tools   | For formal repository mirroring | `aptly mirror create netdata-stable http://repository.netdata.cloud/repos/stable/debian/ bullseye/` |
-| Simple mirroring | For basic HTTP mirroring | `wget --mirror https://repository.netdata.cloud/repos/` |
+| Simple mirroring | For basic HTTP mirroring | `wget --mirror https://repository.netdata.cloud/repos/index.html` |
 
 ### Mirror Root URL
 
-[https://repository.netdata.cloud/repos/](https://repository.netdata.cloud/repos/)
+[https://repository.netdata.cloud/repos/index.html](https://repository.netdata.cloud/repos/index.html)
 
 ### Important Mirroring Tips
 
@@ -251,4 +295,3 @@ There are currently no official public mirrors of our repositories. If you wish 
 Please clearly inform your users that your mirror is not officially supported by Netdata. We recommend following industry best practices for repository mirroring and security.
 
 :::
-

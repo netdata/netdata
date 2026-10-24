@@ -21,11 +21,44 @@
 void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb);
 
 int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, struct query_target *qt, time_t *latest_timestamp);
+int query_target_cancelled_response(struct query_target *qt, BUFFER *wb);
 
 void rrdr_json_group_by_labels(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options);
 
 int rrdset2value_api_v1(
         RRDSET *st
+        , BUFFER *wb
+        , NETDATA_DOUBLE *n
+        , const char *dimensions
+        , size_t points
+        , time_t after
+        , time_t before
+        , RRDR_TIME_GROUPING group_method
+        , const char *group_options
+        , time_t resampling_time
+        , uint32_t options
+        , time_t *db_after
+        , time_t *db_before
+        , size_t *db_points_read
+        , size_t *db_points_per_tier
+        , size_t *result_points_generated
+        , int *value_is_null
+        , NETDATA_DOUBLE *anomaly_rate
+        , time_t timeout
+        , size_t tier
+        , QUERY_SOURCE query_source
+        , STORAGE_PRIORITY priority
+);
+
+// Same contract as rrdset2value_api_v1 but uses a caller-provided
+// onewayalloc arena. Lets a caller that issues many back-to-back queries
+// (e.g. evaluating all alerts on one host) amortise the mmap/munmap cost
+// of owa create/destroy across the whole burst. The caller owns the owa's
+// lifetime; between calls they should invoke onewayalloc_reset() to reuse
+// query scratch. All pages are retained until destroy. `owa` must be non-NULL.
+int rrdset2value_api_v1_with_owa(
+        ONEWAYALLOC *owa
+        , RRDSET *st
         , BUFFER *wb
         , NETDATA_DOUBLE *n
         , const char *dimensions

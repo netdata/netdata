@@ -15,13 +15,13 @@ static void host_collectors(RRDHOST *host, BUFFER *wb) {
         if (!rrdset_is_available_for_viewers(st))
             continue;
 
-        sprintf(name, "%s:%s", rrdset_plugin_name(st), rrdset_module_name(st));
+        snprintfz(name, sizeof(name), "%s:%s", rrdset_plugin_name(st), rrdset_module_name(st));
 
         bool old = 0;
         bool *set = dictionary_set(dict, name, &old, sizeof(bool));
         if(!*set) {
             *set = true;
-            st->last_accessed_time_s = now;
+            rrdset_set_last_accessed_time_s(st, now);
             buffer_json_add_array_item_object(wb);
             buffer_json_member_add_string(wb, "plugin", rrdset_plugin_name(st));
             buffer_json_member_add_string(wb, "module", rrdset_module_name(st));
@@ -81,10 +81,17 @@ static void web_client_api_request_v1_info_summary_alarm_statuses(RRDHOST *host,
     size_t normal = 0, warning = 0, critical = 0;
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdhost_read(host, rc) {
-        if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
+        RRDSET *st = rrdcalc_rrdset_read_lock(rc);
+        if(unlikely(!st))
             continue;
+        if(unlikely(!st->last_collected_time.tv_sec)) {
+            rrdcalc_rrdset_read_unlock(st);
+            continue;
+        }
 
-        switch(rc->status) {
+        RRDCALC_RUNTIME_SNAPSHOT snapshot;
+        rrdcalc_runtime_snapshot_get(rc, &snapshot);
+        switch(snapshot.status) {
             case RRDCALC_STATUS_WARNING:
                 warning++;
                 break;
@@ -94,6 +101,7 @@ static void web_client_api_request_v1_info_summary_alarm_statuses(RRDHOST *host,
             default:
                 normal++;
         }
+        rrdcalc_rrdset_read_unlock(st);
     }
     foreach_rrdcalc_in_rrdhost_done(rc);
 
@@ -115,10 +123,16 @@ static int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 
     web_client_api_request_v1_info_summary_alarm_statuses(host, wb, "alarms");
 
-    rrdhost_system_info_to_json_v1(wb, host->system_info);
+    RRDLABELS *labels;
+    struct rrdhost_system_info *system_info = rrdhost_system_info_labels_snapshot(host, &labels);
+    rrdhost_system_info_to_json_v1(wb, system_info);
+    rrdhost_system_info_free(system_info);
 
-    host_labels2json(host, wb, "host_labels");
-    host_functions2json(host, wb);
+    buffer_json_member_add_object(wb, "host_labels");
+    rrdlabels_to_buffer_json_members(labels, wb);
+    buffer_json_object_close(wb);
+    rrdlabels_destroy(labels);
+    nrpc_catalog_host2json(rrdhost_nrpc_owner(host), wb);
     host_collectors(host, wb);
 
     buffer_json_member_add_boolean(wb, "cloud-enabled", true);
@@ -138,12 +152,7 @@ static int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 
     buffer_json_member_add_boolean(wb, "https-enabled", true);
 
-    buffer_json_member_add_quoted_string(wb, "buildinfo", analytics_data.netdata_buildinfo);
-    buffer_json_member_add_quoted_string(wb, "release-channel", analytics_data.netdata_config_release_channel);
-    buffer_json_member_add_quoted_string(wb, "notification-methods", analytics_data.netdata_notification_methods);
-
-    buffer_json_member_add_boolean(wb, "exporting-enabled", analytics_data.exporting_enabled);
-    buffer_json_member_add_quoted_string(wb, "exporting-connectors", analytics_data.netdata_exporting_connectors);
+    analytics_info_to_json(wb);
 
     buffer_json_member_add_uint64(wb, "allmetrics-prometheus-used", analytics_data.prometheus_hits);
     buffer_json_member_add_uint64(wb, "allmetrics-shell-used", analytics_data.shell_hits);

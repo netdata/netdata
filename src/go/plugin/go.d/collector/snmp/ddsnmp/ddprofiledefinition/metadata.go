@@ -19,30 +19,30 @@ func (mc MetadataConfig) Clone() MetadataConfig {
 // MetadataResourceConfig holds configs for a metadata resource
 type MetadataResourceConfig struct {
 	Fields map[string]MetadataField `yaml:"fields" json:"fields"`
-	IDTags MetricTagConfigList      `yaml:"id_tags,omitempty" json:"id_tags,omitempty"`
 }
 
 // Clone duplicates this MetadataResourceConfig
 func (c MetadataResourceConfig) Clone() MetadataResourceConfig {
 	return MetadataResourceConfig{
 		Fields: cloneMap(c.Fields),
-		IDTags: cloneSlice(c.IDTags),
 	}
 }
 
 // MetadataField holds configs for a metadata field
 type MetadataField struct {
-	Symbol  SymbolConfig   `yaml:"symbol,omitempty" json:"symbol"`
-	Symbols []SymbolConfig `yaml:"symbols,omitempty" json:"symbols,omitempty"`
-	Value   string         `yaml:"value,omitempty" json:"value,omitempty"`
+	Symbol    SymbolConfig   `yaml:"symbol,omitempty" json:"symbol"`
+	Symbols   []SymbolConfig `yaml:"symbols,omitempty" json:"symbols,omitempty"`
+	Value     string         `yaml:"value,omitempty" json:"value,omitempty"`
+	Consumers ConsumerSet    `yaml:"consumers,omitempty" json:"consumers,omitempty"`
 }
 
 // Clone duplicates this MetadataField
 func (c MetadataField) Clone() MetadataField {
 	return MetadataField{
-		Symbol:  c.Symbol.Clone(),
-		Symbols: cloneSlice(c.Symbols),
-		Value:   c.Value,
+		Symbol:    c.Symbol.Clone(),
+		Symbols:   cloneSlice(c.Symbols),
+		Value:     c.Value,
+		Consumers: c.Consumers.Clone(),
 	}
 }
 

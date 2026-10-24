@@ -7,6 +7,7 @@
 struct {
     aclk_query_t query_workers[MAX_QUERY_ENTRIES];
     int free_stack[MAX_QUERY_ENTRIES];
+    bool in_free_stack[MAX_QUERY_ENTRIES];
     int top;
     SPINLOCK spinlock;
 } queryPool;
@@ -17,6 +18,7 @@ __attribute__((constructor)) void init_query_pool()
     spinlock_init(&queryPool.spinlock);
     for (int i = 0; i < MAX_QUERY_ENTRIES; i++) {
         queryPool.free_stack[i] = i;
+        queryPool.in_free_stack[i] = true;
         queryPool.query_workers[i].allocated = false;
     }
     queryPool.top = MAX_QUERY_ENTRIES;
@@ -32,6 +34,7 @@ static aclk_query_t *get_query()
         return query;
     }
     int index = queryPool.free_stack[--queryPool.top];
+    queryPool.in_free_stack[index] = false;
     memset(&queryPool.query_workers[index], 0, sizeof(aclk_query_t));
     spinlock_unlock(&queryPool.spinlock);
     return &queryPool.query_workers[index];
@@ -49,6 +52,11 @@ static void return_query(aclk_query_t *query)
         spinlock_unlock(&queryPool.spinlock);
         return;  // Invalid (should not happen)
     }
+    if (unlikely(queryPool.in_free_stack[index] || queryPool.top < 0 || queryPool.top >= MAX_QUERY_ENTRIES)) {
+        spinlock_unlock(&queryPool.spinlock);
+        return;
+    }
+    queryPool.in_free_stack[index] = true;
     queryPool.free_stack[queryPool.top++] = index;
     memset(query, 0, sizeof(aclk_query_t));
     spinlock_unlock(&queryPool.spinlock);
@@ -59,6 +67,7 @@ aclk_query_t *aclk_query_new(aclk_query_type_t type)
     aclk_query_t *query = get_query();
     query->type = type;
     now_monotonic_high_precision_timeval(&query->created_tv);
+    query->created = now_realtime_usec();
     return query;
 }
 
@@ -68,8 +77,6 @@ void aclk_query_free(aclk_query_t *query)
     switch (query->type) {
         case HTTP_API_V2:
             freez(query->data.http_api_v2.payload);
-            if (query->data.http_api_v2.query != query->dedup_id)
-                freez(query->data.http_api_v2.query);
             break;
         case ALERT_START_STREAMING:
             freez(query->data.node_id);
@@ -81,6 +88,17 @@ void aclk_query_free(aclk_query_t *query)
         case CREATE_NODE_INSTANCE:
             freez(query->data.node_id);
             freez(query->machine_guid);
+            break;
+        case ALARM_PROVIDE_CFG:
+        case ALARM_SNAPSHOT:
+        case REGISTER_NODE:
+        case NODE_STATE_UPDATE:
+        case UPDATE_NODE_INFO:
+        case UPDATE_NODE_MANIFEST:
+        case UPDATE_NODE_COLLECTORS:
+        case CTX_SEND_SNAPSHOT:
+        case CTX_SEND_SNAPSHOT_UPD:
+            freez(query->data.bin_payload.payload);
             break;
         // keep following cases together
         case CTX_STOP_STREAMING:
@@ -95,7 +113,12 @@ void aclk_query_free(aclk_query_t *query)
             break;
     }
 
-    freez(query->dedup_id);
+    // Every query reaches this function on every path - executed, dropped before execution, or
+    // dropped during shutdown - so reporting the manifest outcome here covers every way a manifest
+    // can fail to reach the cloud without each of those sites having to know about it.
+    if (query->type == UPDATE_NODE_MANIFEST)
+        aclk_node_manifest_publish_result(&query->manifest);
+
     freez(query->callback_topic);
     freez(query->msg_id);
 

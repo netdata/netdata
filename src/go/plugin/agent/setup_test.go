@@ -12,7 +12,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
@@ -245,6 +244,7 @@ jobs:
 `)
 
 		agent := &Agent{
+			loadSecretStores:  secretstore.LoadFileConfigs,
 			ConfigDir:         []string{configRoot},
 			CollectorsConfDir: []string{userCollectors, stockCollectors},
 		}
@@ -285,8 +285,7 @@ func TestAgent_buildDiscoveryConf(t *testing.T) {
 			DiscoveryProviders: providers,
 		}
 
-		cfg := a.buildDiscoveryConf(enabled, nil)
-		assert.True(t, cfg.BuildContext.Policy.IsInsideK8s)
+		cfg := a.buildDiscoveryConf(enabled)
 		assert.Empty(t, cfg.Providers)
 	})
 
@@ -296,8 +295,7 @@ func TestAgent_buildDiscoveryConf(t *testing.T) {
 			DiscoveryProviders: providers,
 		}
 
-		cfg := a.buildDiscoveryConf(enabled, nil)
-		assert.False(t, cfg.BuildContext.Policy.IsInsideK8s)
+		cfg := a.buildDiscoveryConf(enabled)
 		assert.Len(t, cfg.Providers, 1)
 	})
 }
@@ -351,7 +349,7 @@ func TestAgent_buildDiscoveryConf_serviceDiscoveryGating(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			require.NotNil(t, test.agent)
 
-			cfg := test.agent.buildDiscoveryConf(enabled, nil)
+			cfg := test.agent.buildDiscoveryConf(enabled)
 			assert.Equal(t, test.wantSDDir, []string(cfg.BuildContext.Paths.ServiceDiscoveryConfigDir))
 			assert.Equal(t, test.wantWatchPath, cfg.BuildContext.Paths.CollectorsConfigWatchPath)
 		})

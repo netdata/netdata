@@ -23,7 +23,8 @@ int nsd_journal_open_files(NsdJournal **ret, const char *const *paths, int flags
 #if defined(HAVE_RUST_PROVIDER)
     return rsd_journal_open_files(ret, paths, flags);
 #else
-    return sd_journal_open_files(ret, paths, flags);
+    // sd_journal_open_files() is declared with const char ** but does not modify the array
+    return sd_journal_open_files(ret, (const char **)paths, flags);
 #endif
 }
 
@@ -141,6 +142,24 @@ void nsd_journal_restart_unique(NsdJournal *j)
     rsd_journal_restart_unique(j);
 #else
     sd_journal_restart_unique(j);
+#endif
+}
+#endif /* HAVE_SD_JOURNAL_RESTART_FIELDS */
+
+#if defined(HAVE_SD_JOURNAL_RESTART_FIELDS)
+int nsd_journal_enumerate_available_unique(NsdJournal *j, const void **data, size_t *l)
+{
+#if defined(HAVE_RUST_PROVIDER)
+    uintptr_t rust_size = 0;
+    int r = rsd_journal_enumerate_available_unique(j, data, &rust_size);
+    if (r > 0)
+        *l = (size_t) rust_size;
+
+    return r;
+#elif defined(HAVE_SD_JOURNAL_ENUMERATE_AVAILABLE_UNIQUE)
+    return sd_journal_enumerate_available_unique(j, data, l);
+#else
+    return sd_journal_enumerate_unique(j, data, l);
 #endif
 }
 #endif /* HAVE_SD_JOURNAL_RESTART_FIELDS */

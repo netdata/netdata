@@ -7,8 +7,8 @@ import (
 	"errors"
 	"testing"
 
-	typesContainer "github.com/docker/docker/api/types/container"
-	typesImage "github.com/docker/docker/api/types/image"
+	typesContainer "github.com/moby/moby/api/types/container"
+	docker "github.com/moby/moby/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -33,15 +33,15 @@ type mockDockerClient struct {
 	listErr    error
 }
 
-func (m mockDockerClient) ContainerList(ctx context.Context, opts typesContainer.ListOptions) ([]typesContainer.Summary, error) {
+func (m mockDockerClient) ContainerList(ctx context.Context, opts docker.ContainerListOptions) (docker.ContainerListResult, error) {
 	if m.listErr != nil {
-		return nil, m.listErr
+		return docker.ContainerListResult{}, m.listErr
 	}
-	return m.containers, nil
+	return docker.ContainerListResult{Items: m.containers}, nil
 }
 
-func (m mockDockerClient) ImageList(ctx context.Context, opts typesImage.ListOptions) ([]typesImage.Summary, error) {
-	return nil, nil
+func (m mockDockerClient) ImageList(ctx context.Context, opts docker.ImageListOptions) (docker.ImageListResult, error) {
+	return docker.ImageListResult{}, nil
 }
 
 func TestDockerMethods(t *testing.T) {

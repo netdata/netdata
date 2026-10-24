@@ -2,8 +2,10 @@
 
 package powervault
 
-func (c *Collector) collectPortStats() {
-	stats, err := c.client.PortStatistics()
+import "context"
+
+func (c *Collector) collectPortStats(ctx context.Context) {
+	stats, err := c.client.PortStatistics(ctx)
 	if err != nil {
 		c.Warningf("error collecting port statistics: %v", err)
 		return
@@ -18,8 +20,8 @@ func (c *Collector) collectPortStats() {
 	}
 }
 
-func (c *Collector) collectPhyStats() {
-	stats, err := c.client.PhyStatistics()
+func (c *Collector) collectPhyStats(ctx context.Context) {
+	stats, err := c.client.PhyStatistics(ctx)
 	if err != nil {
 		c.Warningf("error collecting PHY statistics: %v", err)
 		return

@@ -24,11 +24,6 @@ struct rrdengine_instance;
 #define MAX_DATAFILES (65536 * 4) /* Supports up to 64TiB for now */
 #define TARGET_DATAFILES (100)
 
-// When trying to acquire a datafile for deletion and an attempt to evict pages is completed
-// the acquire for deletion will return true after this timeout
-#define DATAFILE_DELETE_TIMEOUT_SHORT (1)
-#define DATAFILE_DELETE_TIMEOUT_LONG (120)
-
 typedef enum __attribute__ ((__packed__)) {
     DATAFILE_ACQUIRE_OPEN_CACHE = 0,
     DATAFILE_ACQUIRE_PAGE_DETAILS,
@@ -63,24 +58,25 @@ struct rrdengine_datafile {
     struct {
         SPINLOCK spinlock;
         bool populated;
+        size_t rejected_v2_size;    // its loaded journal v2 failed while populating; rebuilt from v1
     } populate_mrg;
 
     struct {
         SPINLOCK spinlock;
         size_t running;
         size_t flushed_to_open_running;
+        bool failed; // a write to this datafile failed unrecoverably - report it full to force rotation
 #ifdef OS_WINDOWS
         time_t last_sync_time;
 #endif
     } writers;
 
     struct {
-        SPINLOCK spinlock;
+        SPINLOCK_TRACKED spinlock;  // tracked: 3600s deadlock fatals here are un-triagable without holder identity
         unsigned lockers;
         unsigned lockers_by_reason[DATAFILE_ACQUIRE_MAX];
         bool available;
         bool pending_deletion;
-        time_t time_to_evict;
     } users;
 
     struct {
@@ -88,13 +84,25 @@ struct rrdengine_datafile {
         Pvoid_t epdl_per_extent;
     } extent_epdl;
 
+    // The stored slots (samples) charged to this datafile - the tier's samples
+    // counter is the sum of these. See rrdeng_datafile_samples_charge().
+    struct {
+        uint64_t charged;
+        bool estimated;             // part of the charge is an estimate (a journal v2 without a samples section)
+    } samples;
+
     uint32_t magic2;
 };
+
+// samples accounting of a datafile, see datafile.c
+void rrdeng_datafile_samples_charge(struct rrdengine_datafile *datafile, uint64_t samples);
+void rrdeng_datafile_samples_set(struct rrdengine_datafile *datafile, uint64_t samples, bool estimated);
+void rrdeng_datafile_samples_uncharge(struct rrdengine_datafile *datafile);
 
 bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason);
 void datafile_release_with_trace(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason, const char *func);
 #define datafile_release(df, reason) datafile_release_with_trace(df, reason, __FUNCTION__)
-bool datafile_acquire_for_deletion(struct rrdengine_datafile *df, bool is_shutdown);
+bool datafile_acquire_for_deletion(struct rrdengine_datafile *df);
 
 void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile);
 void datafile_list_delete_unsafe(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile);

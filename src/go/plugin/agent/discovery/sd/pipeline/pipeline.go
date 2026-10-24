@@ -7,11 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/model"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 )
 
 type DiscovererFactory func(payload DiscovererPayload, source string) ([]model.Discoverer, error)
@@ -29,10 +29,12 @@ func New(cfg Config, makeDiscoverers DiscovererFactory) (*Pipeline, error) {
 			slog.String("component", "service discovery"),
 			slog.String("pipeline", cfg.Name),
 		),
-		configDefaults: cfg.ConfigDefaults,
-		accum:          newAccumulator(),
-		discoverers:    make([]model.Discoverer, 0),
-		configs:        make(map[string]map[uint64][]confgroup.Config),
+		configDefaults:         cfg.ConfigDefaults,
+		pipelineID:             cfg.PipelineID,
+		trustDiscoveredTargets: cfg.TrustDiscoveredTargets,
+		accum:                  newAccumulator(),
+		discoverers:            make([]model.Discoverer, 0),
+		configs:                make(map[string]map[uint64][]confgroup.Config),
 	}
 
 	p.accum.Logger = p.Logger
@@ -55,17 +57,16 @@ type (
 	Pipeline struct {
 		*logger.Logger
 
-		configDefaults confgroup.Registry
-		discoverers    []model.Discoverer
-		accum          *accumulator
+		configDefaults         confgroup.Registry
+		pipelineID             string
+		trustDiscoveredTargets bool
+		discoverers            []model.Discoverer
+		accum                  *accumulator
 
 		configs map[string]map[uint64][]confgroup.Config // [targetSource][targetHash]
 
 		// new
 		svr composer
-	}
-	classificator interface {
-		classify(model.Target) model.Tags
 	}
 	composer interface {
 		compose(model.Target) []confgroup.Config
@@ -86,9 +87,46 @@ func (p *Pipeline) registerDiscoverers(conf Config, makeDiscoverers DiscovererFa
 	return nil
 }
 
+// Test runs the optional operational test of every configured discoverer.
+// The bool reports whether every discoverer provided an operational test.
+func (p *Pipeline) Test(ctx context.Context) (bool, error) {
+	// Test is a public capability boundary and rejects invalid operands.
+	if p == nil || ctx == nil {
+		return false, errors.New("service discovery pipeline: invalid test")
+	}
+	if cause := context.Cause(ctx); cause != nil {
+		return false, cause
+	}
+	fullyTested := len(p.discoverers) != 0
+	for _, discoverer := range p.discoverers {
+		testable, ok := discoverer.(dyncfg.Testable)
+		if !ok {
+			fullyTested = false
+			continue
+		}
+		if cause := context.Cause(ctx); cause != nil {
+			return false, cause
+		}
+		err := testable.Test(ctx)
+		// Caller cancellation wins even when it races a resource failure.
+		if cause := context.Cause(ctx); cause != nil {
+			return false, cause
+		}
+		if errors.Is(err, dyncfg.ErrTestUnsupported) {
+			fullyTested = false
+			continue
+		}
+		if err != nil {
+			return false, fmt.Errorf("discoverer operational test: %w", err)
+		}
+	}
+	return fullyTested, nil
+}
+
 func (p *Pipeline) Run(ctx context.Context, in chan<- []*confgroup.Group) {
 	p.Info("instance is started")
 	defer p.Info("instance is stopped")
+	ctx, cancel := context.WithCancel(ctx)
 
 	p.accum.discoverers = p.discoverers
 
@@ -96,14 +134,16 @@ func (p *Pipeline) Run(ctx context.Context, in chan<- []*confgroup.Group) {
 	done := make(chan struct{})
 
 	go func() { defer close(done); p.accum.run(ctx, updates) }()
+	defer func() {
+		// Panic recovery belongs to the runtime owner. Its reservation may only
+		// release after all children exit, including during panic unwinding.
+		cancel()
+		<-done
+	}()
 
 	for {
 		select {
 		case <-ctx.Done():
-			select {
-			case <-done:
-			case <-time.After(time.Second * 10):
-			}
 			return
 		case <-done:
 			return
@@ -112,7 +152,7 @@ func (p *Pipeline) Run(ctx context.Context, in chan<- []*confgroup.Group) {
 			if cfggs := p.processGroups(tggs); len(cfggs) > 0 {
 				select {
 				case <-ctx.Done():
-				case in <- cfggs: // FIXME: potentially stale configs if upstream cannot receive (blocking)
+				case in <- cfggs: // The SD state owner fences the runtime before forwarding.
 				}
 			}
 		}
@@ -138,7 +178,9 @@ func (p *Pipeline) processGroup(tgg model.TargetGroup) *confgroup.Group {
 		}
 		delete(p.configs, tgg.Source())
 
-		return &confgroup.Group{Source: tgg.Source()}
+		return &confgroup.Group{
+			Source: tgg.Source(),
+		}
 	}
 
 	targetsCache, ok := p.configs[tgg.Source()]
@@ -172,6 +214,9 @@ func (p *Pipeline) processGroup(tgg model.TargetGroup) *confgroup.Group {
 					cfg.SetProvider(tgg.Provider())
 					cfg.SetSource(tgg.Source())
 					cfg.SetSourceType(confgroup.TypeDiscovered)
+					// Authority comes from the pipeline, never from rendered target data.
+					cfg.SetTrustDiscoveredTargets(p.trustDiscoveredTargets)
+					cfg.SetDiscoveryPipelineID(p.pipelineID)
 					if def, ok := p.configDefaults.Lookup(cfg.Module()); ok {
 						cfg.ApplyDefaults(def)
 					}
@@ -196,7 +241,9 @@ func (p *Pipeline) processGroup(tgg model.TargetGroup) *confgroup.Group {
 	}
 
 	// TODO: deepcopy?
-	cfgGroup := &confgroup.Group{Source: tgg.Source()}
+	cfgGroup := &confgroup.Group{
+		Source: tgg.Source(),
+	}
 
 	for _, cfgs := range targetsCache {
 		cfgGroup.Configs = append(cfgGroup.Configs, cfgs...)

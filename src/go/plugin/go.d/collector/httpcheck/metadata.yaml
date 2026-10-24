@@ -182,7 +182,7 @@ modules:
               required: false
               group: Request
             - name: cookie_file
-              description: Path to cookie file. See [cookie file format](https://everything.curl.dev/http/cookies/fileformat).
+              description: Path to cookie file. See [cookie file format](https://everything.curl.dev/http/cookies/fileformat.html).
               default_value: ""
               required: false
               group: Request
@@ -207,6 +207,17 @@ modules:
             title: Config
             enabled: true
           list:
+            - name: Ceph RGW endpoint liveness
+              description: Basic unauthenticated liveness check for a Ceph RGW HTTP endpoint. This does not verify authenticated S3 operations.
+              config: |
+                jobs:
+                  - name: ceph-rgw-local
+                    url: http://127.0.0.1:8080
+                    status_accepted:
+                      - 200
+                      - 204
+                      - 403
+                      - 405
             - name: Basic
               description: A basic example configuration.
               config: |
@@ -302,31 +313,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: httpcheck_web_service_up
-        metric: httpcheck.status
-        info: "HTTP check endpoint ${label:url} liveness status"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/httpcheck.conf
-      - name: httpcheck_web_service_bad_content
-        metric: httpcheck.status
-        info: "Percentage of HTTP responses from ${label:url} with unexpected content in the last 5 minutes"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/httpcheck.conf
-      - name: httpcheck_web_service_bad_status
-        metric: httpcheck.status
-        info: "Percentage of HTTP responses from ${label:url} with unexpected status in the last 5 minutes"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/httpcheck.conf
-      - name: httpcheck_web_service_bad_header
-        metric: httpcheck.status
-        info: "Percentage of HTTP responses from ${label:url} with unexpected header in the last 5 minutes"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/httpcheck.conf
-      - name: httpcheck_web_service_timeouts
-        metric: httpcheck.status
-        info: "Percentage of timed-out HTTP requests to ${label:url} in the last 5 minutes"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/httpcheck.conf
-      - name: httpcheck_web_service_no_connection
-        metric: httpcheck.status
-        info: "Percentage of failed HTTP requests to ${label:url} in the last 5 minutes"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/httpcheck.conf
     metrics:
       folding:
         title: Metrics

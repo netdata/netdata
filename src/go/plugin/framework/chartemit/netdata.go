@@ -10,7 +10,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 )
 
+// Match the Agent's external-plugin backslash normalization. An unescaped
+// trailing backslash makes the plugins.d splitter consume the closing quote.
 var wireValueReplacer = strings.NewReplacer(
+	"\\", "/",
 	"'", "",
 	"\n", " ",
 	"\r", " ",
@@ -26,11 +29,20 @@ func sanitizeWireID(value string) string {
 }
 
 func emitChart(api *netdataapi.API, env EmitEnv, chartID string, meta chartengine.ChartMeta, obsolete bool) {
+	api.CHART(prepareChart(env, chartID, meta, obsolete))
+}
+
+func prepareChart(env EmitEnv, chartID string, meta chartengine.ChartMeta, obsolete bool) netdataapi.ChartOpts {
 	opts := ""
 	if obsolete {
 		opts = "obsolete"
+		if env.StoreFirst {
+			opts = "obsolete store_first"
+		}
+	} else if env.StoreFirst {
+		opts = "store_first"
 	}
-	api.CHART(netdataapi.ChartOpts{
+	return netdataapi.ChartOpts{
 		TypeID:      sanitizeWireID(env.TypeID),
 		ID:          sanitizeWireID(chartID),
 		Name:        "",
@@ -44,7 +56,7 @@ func emitChart(api *netdataapi.API, env EmitEnv, chartID string, meta chartengin
 		Options:     opts,
 		Plugin:      sanitizeWireValue(env.Plugin),
 		Module:      sanitizeWireValue(env.Module),
-	})
+	}
 }
 
 func emitChartLabels(api *netdataapi.API, env EmitEnv, chartLabels map[string]string) {

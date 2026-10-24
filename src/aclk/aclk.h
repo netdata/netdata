@@ -23,6 +23,14 @@ typedef enum {
     ACLK_PING_TIMEOUT = 3
 } ACLK_DISCONNECT_ACTION;
 
+// True for requests that belong to one MQTT connection and are meaningless once it is gone.
+// ACLK_RELOAD_CONF is deliberately NOT one of them: it is set from the claim path
+// (src/claim/claim.c) on another thread and must survive a reconnect, or a reclaim is silently
+// dropped and the Netdata Agent keeps running under the stale identity.
+static inline bool aclk_disconnect_action_is_connection_scoped(ACLK_DISCONNECT_ACTION action) {
+    return action == ACLK_PING_TIMEOUT || action == ACLK_CLOUD_DISCONNECT;
+}
+
 typedef enum {
     ACLK_STATUS_CONNECTED = 0,
 
@@ -46,6 +54,8 @@ typedef enum {
     ACLK_STATUS_OFFLINE_PING_TIMEOUT,
     ACLK_STATUS_OFFLINE_RELOADING_CONFIG,
     ACLK_STATUS_OFFLINE_POLL_ERROR,
+    ACLK_STATUS_OFFLINE_NO_IO_PROGRESS,
+    ACLK_STATUS_OFFLINE_CONNECT_TIMEOUT,
     ACLK_STATUS_OFFLINE_CLOSED_BY_REMOTE,
     ACLK_STATUS_OFFLINE_SOCKET_ERROR,
     ACLK_STATUS_OFFLINE_MQTT_PROTOCOL_ERROR,
@@ -57,6 +67,10 @@ typedef enum {
 extern ACLK_STATUS aclk_status;
 extern const char *aclk_cloud_base_url;
 const char *aclk_status_to_string(void);
+
+// Maps an MQTT_WSS_ERR_* code to the status reported via aclk_status_to_string() and
+// /api/v3/info. Takes a plain int so this header needs no mqtt_wss_client.h dependency.
+ACLK_STATUS aclk_status_from_mqtt_wss_rc(int rc);
 
 extern int aclk_ctx_based;
 extern int aclk_disable_runtime;
@@ -77,9 +91,6 @@ extern time_t last_disconnect_time;
 extern time_t next_connection_attempt;
 extern float last_backoff_value;
 
-extern usec_t aclk_session_us;
-extern time_t aclk_session_sec;
-
 extern time_t aclk_block_until;
 
 extern int aclk_connection_counter;
@@ -99,11 +110,12 @@ bool aclk_host_state_update_auto(RRDHOST *host);
 
 void aclk_send_node_instances();
 
-void aclk_send_bin_msg(char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname);
+// Returns 0 when the message was handed to the mqtt layer, non-zero when it was not. The message is consumed either way.
+int aclk_send_bin_msg(char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname);
 
 char *aclk_state(void);
 char *aclk_state_json(void);
-void add_aclk_host_labels(void);
+void add_aclk_host_labels(RRDLABELS *labels);
 
 struct mqtt_wss_stats aclk_statistics(void);
 void aclk_status_set(ACLK_STATUS status);

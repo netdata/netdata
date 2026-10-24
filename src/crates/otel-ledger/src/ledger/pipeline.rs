@@ -1,0 +1,429 @@
+//! The shared pipeline builder and the logs binding.
+//!
+//! [`build_pipeline`] is the signal-neutral assembly recipe: it sets up the
+//! per-signal disk dirs and tenant registries, spawns the catalog-builder
+//! worker, runs startup recovery over the substrate-shared
+//! cleaner/uploader/storage, wires the per-signal query handler (provided by the
+//! caller's `make_handler` closure), and detaches the per-pipeline worker
+//! response streams into Signal-tagged forwarders feeding the coordinator's merged
+//! channel. The caller pre-spawns the per-signal seal/index worker (it owns the
+//! concrete `Component` implementor) and hands its handle in.
+//!
+//! [`build_logs_pipeline`] is the thin logs binding: it spawns the logs
+//! [`Indexer`], builds the logs [`OtelLogsHandler`], and delegates to
+//! [`build_pipeline`]. The traces binding lives in [`super::traces_pipeline`].
+//! The reusable `Pipeline` shell and the lifecycle machinery live in
+//! `file-lifecycle`.
+//!
+//! Consumers: `Ledger::new` (`mod.rs`) calls [`build_logs_pipeline`] for logs
+//! and `build_traces_pipeline` (which delegates here) for traces.
+
+use std::sync::Arc;
+
+use bridge::config::LifecycleConfig;
+use bridge::function::{HandlerAdapter, RawFunctionHandler};
+use bridge::signals::Signal;
+use file_registry::TenantId;
+use tokio::sync::{RwLock, mpsc};
+use tokio_util::sync::CancellationToken;
+
+use crate::event::PipelineResp;
+use crate::indexer::Indexer;
+use file_lifecycle::ArgShim;
+use file_lifecycle::Pipeline;
+use file_lifecycle::catalog_builder::{CatalogBuilder, CatalogBuilderArgs};
+use file_lifecycle::chunk::ChunkCache;
+use file_lifecycle::component::ComponentHandle;
+use file_lifecycle::ipc::{
+    CleanerRequest, CleanerResponse, IndexerRequest, IndexerResponse, UploaderRequest,
+    UploaderResponse,
+};
+use file_lifecycle::recovery::{
+    drain_wal_deletes, recover_orphaned_wals, recover_retention, recover_unindexed,
+    recover_unuploaded,
+};
+use file_lifecycle::registry::TenantRegistries;
+use file_lifecycle::storage::OpendalStorage;
+
+use super::OtelLogsHandler;
+use file_lifecycle::remote_read::RemoteRead;
+
+/// Minimum records per chunk when indexing an active WAL's prefix at
+/// query time. Shared by the logs and traces handlers (the traces pipeline
+/// imports it). A fixed default for now; tuning is deferred with the rest
+/// of cache governance.
+pub(crate) const CHUNK_MIN_ENTRIES: u64 = 16_384;
+/// Maximum time startup waits on remote object storage (LIST/stat
+/// reconciliation) per tenant before proceeding to Ready. A slow/unreachable
+/// remote must not delay ingestion — on timeout the remote reconcile is skipped
+/// (local upload recovery still runs fire-and-forget, and eviction stays
+/// deferred until a later reconcile confirms the remote, so nothing is at risk).
+/// This is a phase-total cap on the two optional reconciles below; the required
+/// startup catalog sync and the catalog seeding instead take the caller's
+/// `startup_op_timeout`, which bounds each individual remote op.
+const STARTUP_REMOTE_BUDGET: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// Assemble a pipeline for any signal; the module docs describe the steps.
+///
+/// `make_handler` is invoked once with the wrapped registries to produce the
+/// signal's `(handler, arg_shim)`; the declaration is derived from the handler.
+///
+/// The shared workers (`cleaner`, `uploader`, `storage`) are injected; this
+/// function owns only the per-signal catalog builder.
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn build_pipeline<F>(
+    signal: Signal,
+    config: &LifecycleConfig,
+    own_machine: file_registry::MachineId,
+    seq_highwater_path: &std::path::Path,
+    startup_op_timeout: std::time::Duration,
+    cancel: &CancellationToken,
+    cleaner: &mut ComponentHandle<CleanerRequest, CleanerResponse>,
+    mut uploader: Option<&mut ComponentHandle<UploaderRequest, UploaderResponse>>,
+    storage: Option<&OpendalStorage>,
+    mut indexer: ComponentHandle<IndexerRequest, IndexerResponse>,
+    pipeline_tx: &mpsc::UnboundedSender<(Signal, PipelineResp)>,
+    make_handler: F,
+) -> anyhow::Result<Pipeline>
+where
+    F: FnOnce(Arc<RwLock<TenantRegistries>>) -> (Arc<dyn RawFunctionHandler>, ArgShim),
+{
+    // The numeric axis (stamped into IPC requests + recovery) and the remote-key
+    // segment (recovery keys + log lines) of this signal; the agnostic substrate
+    // helpers below take these primitives, not the `Signal` enum.
+    let pipeline_id = signal.pipeline_id();
+    let segment = signal.segment();
+
+    let wal_base_dir = config.wal.dir.clone();
+    let index_base_dir = config.index.dir.clone();
+    let catalog_base_dir = config.catalog.dir.clone();
+
+    std::fs::create_dir_all(&wal_base_dir)?;
+    std::fs::create_dir_all(&index_base_dir)?;
+    std::fs::create_dir_all(&catalog_base_dir)?;
+
+    let mut registries =
+        TenantRegistries::new(wal_base_dir, index_base_dir, catalog_base_dir.clone());
+
+    // Startup catalog diff-sync (P7): when storage is enabled, make the local
+    // catalog set complete BEFORE tenant discovery. It runs first so a local
+    // tenant that gains new catalogs sees them through `discover_tenants`'
+    // per-tenant `recover()`; remote-ONLY tenants (no local WAL/index dir) are
+    // then instantiated explicitly. Required + fail-closed: any infrastructure
+    // failure returns here (before `Ready`). NOT wrapped in STARTUP_REMOTE_BUDGET
+    // — unlike the two optional reconciles below, this phase must not be skipped.
+    if let Some(storage) = storage {
+        let remote_tenants = file_lifecycle::recovery::startup_catalog_sync(
+            storage,
+            segment,
+            own_machine,
+            &catalog_base_dir,
+            seq_highwater_path,
+            startup_op_timeout,
+        )
+        .await?;
+        registries.discover_tenants();
+        for tenant_id in remote_tenants {
+            if !registries.tenants.contains_key(&tenant_id) {
+                registries.get_or_create(&tenant_id).recover();
+            }
+        }
+    } else {
+        registries.discover_tenants();
+    }
+
+    // The log lines carry the segment so the two signals' startups stay
+    // distinguishable.
+    tracing::info!(signal = segment, "indexer spawned");
+
+    let mut catalog_builder = ComponentHandle::spawn::<CatalogBuilder>(
+        CatalogBuilderArgs {
+            catalog_base_dir: catalog_base_dir.clone(),
+            rotation_count: config.catalog.rotation_count,
+            rotation_period: config.catalog.rotation_period,
+        },
+        cancel.child_token(),
+    );
+    tracing::info!(signal = segment, "catalog builder spawned");
+
+    // Populate routing and run recovery per tenant.
+    //
+    // Recovery order matters:
+    //   1. Delete orphaned WALs (have .sfst, WAL is redundant)
+    //   2. Index unindexed WALs (no .sfst yet)
+    //   3. Drain the WAL deletes step 2 sent to the cleaner
+    //   4. Seed rotated / uploaded state from local catalog files
+    //   5. LIST remote (if enabled) → mark uploaded and
+    //      re-send uncataloged entries to the catalog builder
+    //   6. Queue uploads of un-uploaded .sfst files (fire-and-forget;
+    //      success → AddEntry, handled once the run loop starts)
+    //   7. Stat local catalogs on the remote; re-upload missing ones
+    //      (only when 5 succeeded — also seeds the eviction gate)
+    //   8. Evaluate retention (rotated state already reflects disk)
+    let mut seq_routes: Vec<(u64, TenantId)> = Vec::new();
+    for (tenant_id, registry) in registries.iter_mut() {
+        for file in registry.wal.archived_files() {
+            seq_routes.push((file.id.seq, tenant_id.clone()));
+        }
+        for file in registry.sfst.values() {
+            seq_routes.push((file.id.seq, tenant_id.clone()));
+        }
+
+        recover_orphaned_wals(registry, cleaner).await?;
+        recover_unindexed(registry, &mut indexer, cleaner).await?;
+        drain_wal_deletes(registry, cleaner).await?;
+
+        file_lifecycle::recovery::seed_from_catalog_files(
+            registry,
+            storage,
+            own_machine,
+            segment,
+            startup_op_timeout,
+        )
+        .await;
+
+        // Remote-storage recovery runs only when storage is enabled (the
+        // storage client + uploader exist). The remote LIST reconcile can fail if
+        // the remote is unreachable; when it does we still drain the local
+        // un-uploaded backlog, because `recover_unuploaded` needs no remote
+        // LIST — it scans locally-tracked SFSTs and its upload closure only
+        // logs failures (the retention guard keeps the local files). Only
+        // the LIST-dependent reconciles are skipped on an unreachable remote.
+        if let (Some(storage), Some(uploader)) = (storage, uploader.as_deref_mut()) {
+            let retention = config.index.retention.resolve(tenant_id.as_str());
+            // STARTUP_REMOTE_BUDGET bounds the reconcile so a slow/unreachable
+            // remote can't delay Ready by the full opendal retry budget; the
+            // const doc spells out what a timeout/error skips.
+            let remote_ok = match tokio::time::timeout(
+                STARTUP_REMOTE_BUDGET,
+                file_lifecycle::recovery::reconcile_remote_uploads(
+                    registry,
+                    segment,
+                    own_machine,
+                    &mut catalog_builder,
+                    storage,
+                    tenant_id,
+                    &retention,
+                    &config.ingest,
+                ),
+            )
+            .await
+            {
+                Ok(Ok(())) => true,
+                Ok(Err(e)) => {
+                    tracing::warn!(
+                        tenant = tenant_id.as_str(),
+                        "remote storage unreachable, skipping remote reconciliation: {e}"
+                    );
+                    false
+                }
+                Err(_) => {
+                    tracing::warn!(
+                        tenant = tenant_id.as_str(),
+                        "remote reconciliation exceeded {}s startup budget; skipping (uploads retry in steady state)",
+                        STARTUP_REMOTE_BUDGET.as_secs(),
+                    );
+                    false
+                }
+            };
+
+            // Fire-and-forget; runs even when the remote is unreachable.
+            recover_unuploaded(registry, segment, uploader, tenant_id);
+
+            // Catalog re-upload probes the remote per file (`stat`), so it
+            // only makes sense when the remote is reachable.
+            if remote_ok {
+                match tokio::time::timeout(
+                    STARTUP_REMOTE_BUDGET,
+                    file_lifecycle::recovery::reconcile_local_catalog_uploads(
+                        registry,
+                        pipeline_id,
+                        segment,
+                        uploader,
+                        storage,
+                        tenant_id,
+                        &retention,
+                    ),
+                )
+                .await
+                {
+                    Ok(Ok(())) => {}
+                    Ok(Err(e)) => {
+                        tracing::warn!(
+                            tenant = tenant_id.as_str(),
+                            "catalog upload reconciliation failed: {e}"
+                        );
+                    }
+                    Err(_) => {
+                        tracing::warn!(
+                            tenant = tenant_id.as_str(),
+                            "catalog reconciliation exceeded {}s startup budget; skipping",
+                            STARTUP_REMOTE_BUDGET.as_secs(),
+                        );
+                    }
+                }
+            }
+        }
+
+        let retention = config.index.retention.resolve(tenant_id.as_str());
+        recover_retention(
+            registry,
+            pipeline_id,
+            cleaner,
+            &retention,
+            // Storage is process-global: it is enabled iff the shell built a
+            // storage handle (passed in here), not a per-signal config flag.
+            storage.is_some(),
+        )
+        .await?;
+    }
+
+    tracing::info!(signal = segment, "recovery complete");
+
+    for (seq, tenant_id) in seq_routes {
+        // Routes were collected before recovery, which may have dropped the
+        // seq since: an unsealable WAL untracked as an orphan, an empty WAL
+        // whose registry entry the cleaner drain removed (its empty SFST is
+        // never tracked), or an SFST the retention pass evicted. A route to
+        // a seq with no entry would dangle for the process lifetime — route
+        // only what survived.
+        let survives = registries
+            .tenants
+            .get(&tenant_id)
+            .is_some_and(|r| r.holds_seq(seq));
+        if survives {
+            registries.route_seq_to(seq, tenant_id);
+        }
+    }
+
+    // Wrap registries for shared access between the run-loop and
+    // spawned function-handler tasks. Recovery above ran against
+    // the local owned value, so no lock contention happens until
+    // a Call arrives.
+    let registries = Arc::new(RwLock::new(registries));
+
+    let (handler, arg_shim) = make_handler(registries.clone());
+    let declaration = handler.declaration();
+
+    // Detach the per-pipeline workers' response streams into signal-tagged
+    // forwarders feeding the run-loop's single merged channel. The indexer is
+    // fully drained by recovery (`recover_unindexed` → `batch_recover` recvs
+    // every response). The catalog builder may still carry in-flight
+    // `EntryAccepted`/`Rotated` responses enqueued fire-and-forget by
+    // `reconcile_remote_uploads` (it sends `AddEntry` without recv-ing); those
+    // are not lost — `into_parts` moves the live receiver into the forwarder,
+    // which hands them to the run loop like any steady-state response.
+    //
+    // The last `spawn_forwarder` arg is the tuple-variant constructor used as
+    // `fn(T) -> PipelineResp` (`T` inferred from the receiver); adding a second
+    // field to the variant would reject the coercion at compile time.
+    let (indexer_tx, indexer_rx) = indexer.into_parts();
+    let (catalog_builder_tx, catalog_builder_rx) = catalog_builder.into_parts();
+    spawn_forwarder(
+        indexer_rx,
+        signal,
+        pipeline_tx.clone(),
+        PipelineResp::INDEXER_KIND,
+        PipelineResp::Indexer,
+    );
+    spawn_forwarder(
+        catalog_builder_rx,
+        signal,
+        pipeline_tx.clone(),
+        PipelineResp::CATALOG_BUILDER_KIND,
+        PipelineResp::CatalogBuilder,
+    );
+
+    Ok(Pipeline::new(
+        signal.spec(),
+        config.clone(),
+        registries,
+        indexer_tx,
+        catalog_builder_tx,
+        handler,
+        declaration,
+        arg_shim,
+    ))
+}
+
+/// Build the logs pipeline: spawn the logs [`Indexer`], then delegate to
+/// [`build_pipeline`] with a closure that constructs the logs
+/// [`OtelLogsHandler`] (with the chunk cache and, when storage is enabled, the
+/// remote-read cache) and the logs args→payload shim.
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn build_logs_pipeline(
+    signal: Signal,
+    config: &LifecycleConfig,
+    own_machine: file_registry::MachineId,
+    seq_highwater_path: &std::path::Path,
+    startup_op_timeout: std::time::Duration,
+    cancel: &CancellationToken,
+    cleaner: &mut ComponentHandle<CleanerRequest, CleanerResponse>,
+    uploader: Option<&mut ComponentHandle<UploaderRequest, UploaderResponse>>,
+    storage: Option<&OpendalStorage>,
+    read_cache: Option<&file_cache::FileCache>,
+    chunk_cache: Arc<ChunkCache>,
+    pipeline_tx: &mpsc::UnboundedSender<(Signal, PipelineResp)>,
+) -> anyhow::Result<Pipeline> {
+    // The logs seal: decode ng-flatten log frames into a full split-FST index.
+    let indexer = ComponentHandle::spawn::<Indexer>(
+        ng_index::build_sfst_file as crate::indexer::SealFn,
+        cancel.child_token(),
+    );
+
+    // Owned clones for the handler closure: the builder body borrows `storage`
+    // for recovery, while the handler needs its own `RemoteRead` (storage +
+    // read cache). Both are cheap Arc-backed clones.
+    let remote_storage = storage.cloned();
+    let remote_cache = read_cache.cloned();
+
+    build_pipeline(
+        signal,
+        config,
+        own_machine,
+        seq_highwater_path,
+        startup_op_timeout,
+        cancel,
+        cleaner,
+        uploader,
+        storage,
+        indexer,
+        pipeline_tx,
+        move |registries| {
+            // Remote-read capability for the query path: present only when
+            // both the storage handle and the read cache exist (remote
+            // storage enabled), so the handler can fetch evicted SFSTs back
+            // through the cache.
+            let remote = match (remote_storage, remote_cache) {
+                (Some(s), Some(c)) => Some(RemoteRead::new(s, c)),
+                _ => None,
+            };
+            let otel_handler =
+                OtelLogsHandler::new(registries, chunk_cache, CHUNK_MIN_ENTRIES, remote);
+            let handler: Arc<dyn RawFunctionHandler> = Arc::new(HandlerAdapter::new(otel_handler));
+            (handler, super::rpc::patch_args_into_payload as ArgShim)
+        },
+    )
+    .await
+}
+
+/// Forward a per-pipeline worker's responses into the shell's merged channel,
+/// tagging each with the owning `Signal`. On source-channel close (the worker task
+/// ended) it emits one [`PipelineResp::WorkerGone`] so the run-loop can treat a
+/// dead worker as fatal, then exits.
+fn spawn_forwarder<T: Send + 'static>(
+    mut rx: mpsc::UnboundedReceiver<T>,
+    signal: Signal,
+    tx: mpsc::UnboundedSender<(Signal, PipelineResp)>,
+    kind: &'static str,
+    wrap: fn(T) -> PipelineResp,
+) {
+    tokio::spawn(async move {
+        while let Some(item) = rx.recv().await {
+            if tx.send((signal, wrap(item))).is_err() {
+                return;
+            }
+        }
+        let _ = tx.send((signal, PipelineResp::WorkerGone { kind }));
+    });
+}

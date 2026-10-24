@@ -6,6 +6,7 @@ modules:
       module_name: k8s_kubelet
       monitored_instance:
         name: Kubelet
+        description: "Monitor Kubernetes Kubelet containers, pods, runtime operations, storage, and request metrics."
         link: https://kubernetes.io/docs/concepts/overview/components/#kubelet
         icon_filename: kubernetes.svg
         categories:
@@ -193,27 +194,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: kubelet_node_config_error
-        metric: k8s_kubelet.kubelet_node_config_error
-        info: "the node is experiencing a configuration-related error (0: false, 1: true)"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf
-      - name: kubelet_token_requests
-        metric: k8s_kubelet.kubelet_token_requests
-        info: "number of failed Token() requests to the alternate token source"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf
-      - name: kubelet_token_requests
-        metric: k8s_kubelet.kubelet_token_requests
-        info: "number of failed Token() requests to the alternate token source"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf
-      - name: kubelet_operations_error
-        metric: k8s_kubelet.kubelet_operations_errors
-        info: number of Docker or runtime operation errors
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf
-      - name: kubelet_operations_error
-        metric: k8s_kubelet.kubelet_operations_errors
-        info: number of Docker or runtime operation errors
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf
     metrics:
       folding:
         title: Metrics

@@ -26,15 +26,17 @@ void mcp_tool_list_alert_transitions_schema(BUFFER *buffer) {
         "Each alert name must be an exact match - no wildcards or patterns allowed. "
         "Use '" MCP_TOOL_LIST_ALL_ALERTS "' to discover available alert names. "
         "If not specified, all alerts are included. "
-        "Examples: [\"disk_space_usage\", \"cpu_iowait\", \"ram_in_use\"]");
+        "Examples: [\"disk_space_usage\", \"cpu_iowait\", \"ram_in_use\"]",
+        false);
 
     // Nodes filter
     mcp_schema_add_array_param(
         buffer, "nodes", "Filter nodes",
         "Show only alerts transitions for these nodes.\n"
-        "Use 'list_nodes' to discover available nodes.\n"
+        "Use '" MCP_TOOL_LIST_NODES "' to discover available nodes.\n"
         "If not specified, alerts transitions from all nodes are included. "
-        "Examples: [\"node1\", \"node2\"], [\"web-server-01\", \"db-server-01\"]");
+        "Examples: [\"node1\", \"node2\"], [\"web-server-01\", \"db-server-01\"]",
+        false);
     
     mcp_schema_add_array_param(
         buffer, "metrics",
@@ -43,7 +45,8 @@ void mcp_tool_list_alert_transitions_schema(BUFFER *buffer) {
         "Each metric must be an exact match - no wildcards or patterns allowed. "
         "Use '" MCP_TOOL_LIST_METRICS "' to discover available metrics. "
         "If not specified, all metrics are included. "
-        "Examples: [\"system.cpu\", \"system.load\"], [\"disk.io\", \"disk.space\"]");
+        "Examples: [\"system.cpu\", \"system.load\"], [\"disk.io\", \"disk.space\"]",
+        false);
 
     mcp_schema_add_array_param(
         buffer, "instances",
@@ -53,7 +56,8 @@ void mcp_tool_list_alert_transitions_schema(BUFFER *buffer) {
         "If no instances are specified, all instances of the metric are queried.\n"
         "Example: [\"instance1\", \"instance2\", \"instance3\"]\n."
         "IMPORTANT: when you have a choice, prefer to filter by labels instead of instances, because many monitored "
-        "components may change instance names over time.");
+        "components may change instance names over time.",
+        false);
 
     // Status filter (required multi-select enum)
     buffer_json_member_add_object(buffer, "status");
@@ -70,7 +74,8 @@ void mcp_tool_list_alert_transitions_schema(BUFFER *buffer) {
             " - UNINITIALIZED: the alert has not been initialized for the first time yet, no data available.\n"
             " - REMOVED: the alert was removed (happens during netdata shutdown, child disconnect, health reload).\n"
             "Multiple statuses can be selected. Example: [\"CRITICAL\", \"WARNING\"]");
-        
+        buffer_json_member_add_uint64(buffer, "minItems", 1);
+
         // Define items schema with enum values
         buffer_json_member_add_object(buffer, "items");
         {
@@ -95,7 +100,8 @@ void mcp_tool_list_alert_transitions_schema(BUFFER *buffer) {
         "Each classification must be an exact match - no wildcards or patterns allowed. "
         "Use '" MCP_TOOL_LIST_ALL_ALERTS "' to discover available classifications. "
         "If not specified, all classifications are included. "
-        "Examples: [\"Errors\", \"Latency\", \"Utilization\"]");
+        "Examples: [\"Errors\", \"Latency\", \"Utilization\"]",
+        false);
     
     mcp_schema_add_array_param(
         buffer, "types",
@@ -104,7 +110,8 @@ void mcp_tool_list_alert_transitions_schema(BUFFER *buffer) {
         "Each type must be an exact match - no wildcards or patterns allowed. "
         "Use '" MCP_TOOL_LIST_ALL_ALERTS "' to discover available types. "
         "If not specified, all types are included. "
-        "Examples: [\"System\", \"Web Server\", \"Database\"]");
+        "Examples: [\"System\", \"Web Server\", \"Database\"]",
+        false);
     
     mcp_schema_add_array_param(
         buffer, "components",
@@ -113,7 +120,8 @@ void mcp_tool_list_alert_transitions_schema(BUFFER *buffer) {
         "Each component must be an exact match - no wildcards or patterns allowed. "
         "Use '" MCP_TOOL_LIST_ALL_ALERTS "' to discover available components. "
         "If not specified, all components are included. "
-        "Examples: [\"Network\", \"Disk\", \"Memory\"]");
+        "Examples: [\"Network\", \"Disk\", \"Memory\"]",
+        false);
     
     mcp_schema_add_array_param(
         buffer, "roles",
@@ -122,7 +130,8 @@ void mcp_tool_list_alert_transitions_schema(BUFFER *buffer) {
         "Each role must be an exact match - no wildcards or patterns allowed. "
         "Use '" MCP_TOOL_LIST_ALL_ALERTS "' to discover available roles. "
         "If not specified, all roles are included. "
-        "Examples: [\"sysadmin\", \"webmaster\", \"dba\"]");
+        "Examples: [\"sysadmin\", \"webmaster\", \"dba\"]",
+        false);
     
     // Cardinality limit
     mcp_schema_add_cardinality_limit(
@@ -204,7 +213,7 @@ MCP_RETURN_CODE mcp_tool_list_alert_transitions_execute(MCP_CLIENT *mcpc, struct
     
     status_buffer = mcp_params_parse_array_to_pattern(params, "status", true, false, NULL, mcpc->error);
     if (buffer_strlen(mcpc->error) > 0) {
-        buffer_strcat(mcpc->error, ". You must select at least one alert status to filter by.");
+        buffer_strcat(mcpc->error, " You must select at least one alert status to filter by.");
         return MCP_RC_BAD_REQUEST;
     }
     if (status_buffer)

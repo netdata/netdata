@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Netdata RUM demo</title>
+<script async src="{{.Name}}.js"></script></head>
+<body>
+<h1>RUM demo page</h1>
+<p>This page carries the Netdata RUM bootstrap for site
+<code>{{.Name}}</code>. Open it in a real browser and the Faro web SDK reports
+web vitals (LCP, FCP, CLS, TTFB, INP) and errors to the collector.</p>
+<ul><li><a href="#" id="link" onclick="return false">A dummy link to interact with (INP)</a></li>
+<li><a href="#" id="boom" onclick="throw new Error('demo error'); return false">Throw a JS error</a></li></ul>
+</body></html>

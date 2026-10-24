@@ -1,7 +1,28 @@
+//! MIME content types for the `format` parameter of pluginsd function-result
+//! messages (`FUNCTION_RESULT_BEGIN transaction status format expires`).
+//!
+//! `from_str_or_default` maps the word to its canonical MIME name, defaulting
+//! to `text/plain` — the same mapping the agent applies to the same word with
+//! `content_type_string2id()` (`src/libnetdata/http/content_type.c`, called
+//! from `pluginsd_function_result_begin` in
+//! `src/plugins.d/pluginsd_functions.c`). The parser stores the canonical
+//! name in `FunctionResult::format`, so aliases such as `json` and unknown
+//! words are normalized before any handler sees them.
+//!
+//! The table ports the C `content_types[]` table of
+//! `src/libnetdata/http/content_type.c`. Two C entries have no Rust variant
+//! (`text/event-stream`, `application/wasm`), and `to_header_value` orders
+//! parameters differently from the C `http_header_content_type()`.
+//!
+//! Crate-private (not re-exported from `lib.rs`): `message_parser` is the
+//! only user today, so `#![allow(dead_code)]` keeps the rest of the
+//! C-compatible surface available.
 #![allow(dead_code)]
 
 use std::fmt;
 
+/// A content type recognized over the pluginsd function-result wire. Only its
+/// MIME string form travels; the canonical string is [`HttpContent::as_str`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum HttpContent {
     ApplicationJson,
@@ -35,21 +56,32 @@ pub enum HttpContent {
     Prometheus,
 }
 
+/// The properties of one content type, produced by [`HttpContent::info`].
 #[derive(Debug, Clone)]
 pub struct HttpContentInfo {
+    /// Canonical MIME name: what [`HttpContent::as_str`] and [`Display`]
+    /// return.
     pub format: &'static str,
+    /// The queried variant itself; the C table's type id, carried over.
     pub content_type: HttpContent,
+    /// Whether `; charset=<charset>` is appended by
+    /// [`HttpContent::to_header_value`] when a charset is supplied.
     pub needs_charset: bool,
+    /// Extra parameter appended between the format and the charset, if any
+    /// (only Prometheus sets one: `version=0.0.4`).
     pub options: Option<&'static str>,
 }
 
 impl HttpContent {
-    /// Get the primary format string for this content type
+    /// The canonical MIME name for this type. Aliases accepted by
+    /// [`HttpContent::from_str`] never appear in output: they normalize to the
+    /// primary name (e.g. `prometheus` to `text/plain`).
     pub fn as_str(&self) -> &'static str {
         self.info().format
     }
 
-    /// Get full information about this content type
+    /// The per-type table; `as_str`, `needs_charset` and `to_header_value`
+    /// all read it.
     pub fn info(&self) -> HttpContentInfo {
         use HttpContent::*;
         match self {
@@ -230,14 +262,14 @@ impl HttpContent {
         }
     }
 
-    /// Parse a content type from a string
+    /// Exact, case-sensitive match of a canonical MIME name or a short alias
+    /// (`prometheus`, `text`, `txt`, `json`, `html`, `xml`); `None` otherwise.
     #[allow(clippy::should_implement_trait)]
     pub fn from_str(format: &str) -> Option<Self> {
         use HttpContent::*;
 
-        // Create a static lookup table for all formats
         match format {
-            // Primary formats
+            // Canonical MIME names (the C table's primary rows)
             "application/json" => Some(ApplicationJson),
             "text/plain" => Some(TextPlain),
             "text/html" => Some(TextHtml),
@@ -267,7 +299,7 @@ impl HttpContent {
             "application/pdf" => Some(ApplicationPdf),
             "application/zip" => Some(ApplicationZip),
 
-            // Secondary formats (aliases)
+            // Short aliases (the C table's secondary rows)
             "prometheus" => Some(Prometheus),
             "text" | "txt" => Some(TextPlain),
             "json" => Some(ApplicationJson),
@@ -278,17 +310,22 @@ impl HttpContent {
         }
     }
 
-    /// Parse with a default fallback (matching the C function behavior)
+    /// [`HttpContent::from_str`] with the agent's fallback: mirrors
+    /// `content_type_string2id()` and returns `text/plain` for unknown or
+    /// empty words instead of `None`.
     pub fn from_str_or_default(format: &str) -> Self {
         Self::from_str(format).unwrap_or(HttpContent::TextPlain)
     }
 
-    /// Check if this content type needs a charset parameter
     pub fn needs_charset(&self) -> bool {
         self.info().needs_charset
     }
 
-    /// Get the full content type header value (with charset if needed)
+    /// Build a `Content-Type` header value: the canonical format, then this
+    /// type's `options` if any, then `; charset=<charset>` when the type
+    /// needs a charset and one is supplied. Unlike the C
+    /// `http_header_content_type()`, parameters go options-first and no
+    /// default charset is written when `charset` is `None`.
     pub fn to_header_value(self, charset: Option<&str>) -> String {
         let info = self.info();
         let mut result = String::from(info.format);
