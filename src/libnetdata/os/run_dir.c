@@ -175,11 +175,10 @@ bool os_run_dir_is_safe(const char *candidate, bool rw) {
             // run creates this directory as root and then chowns it - and that
             // is also the limit of what this predicate can promise: a process
             // already running as that uid owns the entry, so it can still swap
-            // the directory between here and the privileged use that follows
-            // (the temporary spawn server binds its socket here long before
-            // become_user()). What protects that use is performing it through a
-            // descriptor - os_open_dir_privileged() and fchown() - not this
-            // check.
+            // the directory between here and the privileged use that follows.
+            // What protects the daemon's ownership fix-up is performing it
+            // through a descriptor - os_open_dir_privileged() and fchown() - not
+            // this check.
             if (run_dir_owner_is_ours(st.st_uid))
                 return true;
 
