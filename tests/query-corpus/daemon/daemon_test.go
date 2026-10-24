@@ -165,11 +165,17 @@ func TestDaemonRejectsLongRuntimePathBeforeLaunch(t *testing.T) {
 	}
 	for _, name := range []string{"absolute", "relative"} {
 		t.Run(name, func(t *testing.T) {
-			root := t.TempDir()
+			root, err := filepath.Abs(t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
 			if err := os.Mkdir(filepath.Join(root, "log"), 0o700); err != nil {
 				t.Fatal(err)
 			}
-			tmpDir := filepath.Join(t.TempDir(), strings.Repeat("x", len(syscall.RawSockaddrUnix{}.Path)))
+			tmpDir, err := filepath.Abs(filepath.Join(t.TempDir(), strings.Repeat("x", len(syscall.RawSockaddrUnix{}.Path))))
+			if err != nil {
+				t.Fatal(err)
+			}
 			if err := os.Mkdir(tmpDir, 0o700); err != nil {
 				t.Fatal(err)
 			}
