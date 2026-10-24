@@ -68,6 +68,64 @@ uint64_t perflib_counter_delta(uint64_t previous, uint64_t current, bool is_32bi
     return delta < (UINT64_C(1) << 31) ? delta : 0;
 }
 
+// Interval average of a PERF_AVERAGE_TIMER/PERF_AVERAGE_BULK counter, whose base is stored in Time.
+// Returns the base delta, or 0 for an idle interval; false when the two samples cannot form an interval.
+static bool perflib_average_base_delta(const COUNTER_DATA *d, DWORD counter_type, uint64_t *base_delta)
+{
+    if (!d->updated || d->current.CounterType != counter_type || d->previous.CounterType != counter_type ||
+        d->current.Data < d->previous.Data || d->current.Time < d->previous.Time)
+        return false;
+
+    *base_delta = (uint64_t)(d->current.Time - d->previous.Time);
+
+    // An unchanged base means no operation completed; moved data without operations is inconsistent.
+    return *base_delta || d->current.Data == d->previous.Data;
+}
+
+bool perflib_average_timer_ms(const COUNTER_DATA *d, double *ms)
+{
+    uint64_t base_delta;
+    *ms = 0.0;
+
+    if (!perflib_average_base_delta(d, PERF_AVERAGE_TIMER, &base_delta) || d->current.Frequency <= 0)
+        return false;
+
+    if (base_delta)
+        *ms = ((double)(d->current.Data - d->previous.Data) * (double)MSEC_PER_SEC) /
+              ((double)d->current.Frequency * (double)base_delta);
+
+    return true;
+}
+
+bool perflib_average_bulk(const COUNTER_DATA *d, double *value)
+{
+    uint64_t base_delta;
+    *value = 0.0;
+
+    if (!perflib_average_base_delta(d, PERF_AVERAGE_BULK, &base_delta))
+        return false;
+
+    if (base_delta)
+        *value = (double)(d->current.Data - d->previous.Data) / (double)base_delta;
+
+    return true;
+}
+
+// Integer variant for byte-sized averages, where double precision would round 64-bit numerators.
+bool perflib_average_bulk_integer(const COUNTER_DATA *d, uint64_t *value)
+{
+    uint64_t base_delta;
+    *value = 0;
+
+    if (!perflib_average_base_delta(d, PERF_AVERAGE_BULK, &base_delta))
+        return false;
+
+    if (base_delta)
+        *value = (d->current.Data - d->previous.Data) / base_delta;
+
+    return true;
+}
+
 void perflib_aggregate_instance_sample(
     COUNTER_DATA *aggregate,
     const COUNTER_DATA *sample,

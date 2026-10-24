@@ -348,17 +348,16 @@ static bool exchange_ldap_time_microseconds(const COUNTER_DATA *counter, collect
     switch (counter->current.CounterType) {
         case PERF_AVERAGE_TIMER:
         case PERF_AVERAGE_BULK: {
-            if (counter->previous.CounterType != counter->current.CounterType ||
-                counter->current.Data < counter->previous.Data || counter->current.Time <= counter->previous.Time ||
-                (counter->current.CounterType == PERF_AVERAGE_TIMER && counter->current.Frequency <= 0))
+            // Both types yield milliseconds: timer ticks are converted, bulk sums are provider milliseconds.
+            // Idle intervals report 0, like the disk average charts.
+            double milliseconds;
+            bool valid = counter->current.CounterType == PERF_AVERAGE_TIMER ?
+                             perflib_average_timer_ms(counter, &milliseconds) :
+                             perflib_average_bulk(counter, &milliseconds);
+            if (!valid)
                 return false;
 
-            double scale = counter->current.CounterType == PERF_AVERAGE_TIMER ?
-                               (double)EXCHANGE_TIME_PRECISION / (double)counter->current.Frequency :
-                               1000.0;
-            double microseconds =
-                (double)(counter->current.Data - counter->previous.Data) * scale /
-                (double)(counter->current.Time - counter->previous.Time);
+            double microseconds = milliseconds * 1000.0;
             if (microseconds > (double)INT64_MAX)
                 return false;
 
