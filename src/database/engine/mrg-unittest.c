@@ -2364,16 +2364,22 @@ static int jv2_one_metric_destroy(struct jv2_one_metric *t) {
     return jv2_journal_fixture_destroy(&t->fx);
 }
 
+#ifndef NETDATA_INTERNAL_CHECKS
 // The journal v2 is mapped on demand: journalfile_v2_data_set() leaves only its fd.
 // Closing that fd makes the next mapping fail, as an mmap() failure does in production.
+// Not with internal checks: the failed mapping is an internal_fatal() there.
 static void jv2_break_next_mapping(struct rrdengine_journalfile *journalfile) {
     close(journalfile->mmap.fd);
     journalfile->mmap.fd = -1;
 }
 
+#endif
+
 static bool fd_is_open(int fd) {
     return fcntl(fd, F_GETFD) != -1;
 }
+
+#ifndef NETDATA_INTERNAL_CHECKS
 
 // A loaded journal v2 that cannot be mapped while populating the MRG is rejected like
 // one that fails its checks: its size is kept for the rebuild and for deletion. Its
@@ -2422,14 +2428,20 @@ static int mrg_jv2_rejected_on_mapping_failure_check(void) {
     }
     else {
         int saved = dup(0);
-        journalfile_close(journalfile, &t.fx.datafile);
-
-        if(!fd_is_open(0)) {
-            fprintf(stderr, "ERROR: closing a journal whose v1 is not open closed fd 0\n");
+        if(saved == -1) {
+            fprintf(stderr, "ERROR: cannot save fd 0 for the test\n");
             errors++;
-            dup2(saved, 0);
         }
-        close(saved);
+        else {
+            journalfile_close(journalfile, &t.fx.datafile);
+
+            if(!fd_is_open(0)) {
+                fprintf(stderr, "ERROR: closing a journal whose v1 is not open closed fd 0\n");
+                errors++;
+                dup2(saved, 0);
+            }
+            close(saved);
+        }
     }
 
     if(devnull == 0)
@@ -2439,6 +2451,8 @@ cleanup:
     errors += jv2_one_metric_destroy(&t);
     return errors;
 }
+
+#endif
 
 // The journal owns its v1 fd whatever its number, and closes it even when its v2 is
 // available (a v1 replayed and indexed at startup, or written while running).
@@ -2506,6 +2520,7 @@ cleanup:
     return errors;
 }
 
+#ifndef NETDATA_INTERNAL_CHECKS
 // A rejected journal v2 whose journal v1 is unusable (shorter than its superblock)
 // cannot be rebuilt: the rebuild fails and leaves the rejected v2 on disk, recorded.
 static int mrg_jv2_rebuild_with_unusable_v1_check(void) {
@@ -2529,7 +2544,7 @@ static int mrg_jv2_rebuild_with_unusable_v1_check(void) {
     jv2_break_next_mapping(journalfile);
     journalfile_v2_populate_retention_to_mrg(&t.fx.ctx, journalfile);
 
-    int v1_fd = open(v1_path, O_CREAT | O_TRUNC | O_WRONLY | O_CLOEXEC, 0644);
+    int v1_fd = open(v1_path, O_CREAT | O_TRUNC | O_WRONLY | O_CLOEXEC, 0600);
     bool v1_written = v1_fd != -1 && write(v1_fd, "x", 1) == 1;
     if(v1_fd != -1)
         close(v1_fd);
@@ -2566,11 +2581,15 @@ cleanup:
     return errors;
 }
 
+#endif
+
 static int mrg_jv2_rejected_journal_unittest(void) {
     fprintf(stderr, "\nTesting rejected journal v2 end states (mapping failure, v1 close, rebuild)...\n");
-    int errors = mrg_jv2_rejected_on_mapping_failure_check();
-    errors += mrg_jv2_close_owned_v1_check();
+    int errors = mrg_jv2_close_owned_v1_check();
+#ifndef NETDATA_INTERNAL_CHECKS
+    errors += mrg_jv2_rejected_on_mapping_failure_check();
     errors += mrg_jv2_rebuild_with_unusable_v1_check();
+#endif
     fprintf(stderr, "jv2 rejected journal test: %s\n", errors ? "FAILED" : "OK");
     return errors;
 }
