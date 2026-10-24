@@ -44,9 +44,39 @@ func TestDaemonRuntimeEnvironmentIsPrivate(t *testing.T) {
 	t.Setenv("NETDATA_RUN_DIR", parent["run"])
 	t.Setenv("NETDATA_PIPENAME", parent["pipe"])
 	seen := make(map[string]bool)
-	for _, name := range []string{"first", "second"} {
+	for _, name := range []string{"first", "second", "relative", "relative-symlink-parent"} {
 		t.Run(name, func(t *testing.T) {
-			root := t.TempDir()
+			root, err := filepath.Abs(t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			expectedParent := ""
+			if strings.HasPrefix(name, "relative") {
+				shortDir, err := os.MkdirTemp("", "qc-rel-")
+				if err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() { _ = os.RemoveAll(shortDir) })
+				t.Chdir(shortDir)
+				tmpDir := "."
+				if name == "relative-symlink-parent" {
+					if err := os.MkdirAll("target/sub", 0o700); err != nil {
+						t.Fatal(err)
+					}
+					if err := os.Symlink("target/sub", "link"); err != nil {
+						t.Fatal(err)
+					}
+					tmpDir = "link/.."
+				}
+				expectedParent, err = os.Getwd()
+				if err != nil {
+					t.Fatal(err)
+				}
+				if name == "relative-symlink-parent" {
+					expectedParent = filepath.Join(expectedParent, "target")
+				}
+				t.Setenv("TMPDIR", tmpDir)
+			}
 			if err := os.MkdirAll(filepath.Join(root, "log"), 0o755); err != nil {
 				t.Fatal(err)
 			}
@@ -67,6 +97,9 @@ func TestDaemonRuntimeEnvironmentIsPrivate(t *testing.T) {
 			if !filepath.IsAbs(run) || run == parent["run"] || seen[run] {
 				t.Fatalf("runtime path is not private to this launch: %v", got)
 			}
+			if expectedParent != "" && filepath.Dir(run) != expectedParent {
+				t.Errorf("runtime parent = %q, want selected directory %q", filepath.Dir(run), expectedParent)
+			}
 			seen[run] = true
 			want := map[string]string{"run": run, "pipe": filepath.Join(run, "netdata.pipe"), "ready": "true"}
 			if !reflect.DeepEqual(got, want) {
@@ -83,38 +116,89 @@ func TestDaemonRuntimeEnvironmentIsPrivate(t *testing.T) {
 	}
 }
 
+func TestDaemonRelativeRunDirectory(t *testing.T) {
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("QUERY_CORPUS_TEST_DAEMON_ENV", "1")
+	for _, name := range []string{"missing", "symlink-parent"} {
+		t.Run(name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			cwd, err := os.Getwd()
+			if err != nil {
+				t.Fatal(err)
+			}
+			runDir := "data"
+			want := filepath.Join(cwd, "data")
+			if name == "symlink-parent" {
+				if err := os.MkdirAll("target/sub", 0o700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Symlink("target/sub", "link"); err != nil {
+					t.Fatal(err)
+				}
+				runDir = "link/../data"
+				want = filepath.Join(cwd, "target", "data")
+			}
+			// The helper exits after reading its environment; Start must still write usable paths.
+			if _, err := Start(Options{Binary: executable, RunDir: runDir}); err == nil {
+				t.Fatal("environment helper unexpectedly became ready")
+			}
+			conf, err := os.ReadFile(filepath.Join(want, "etc", "netdata.conf"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			for key, sub := range map[string]string{"config": "etc", "cache": "cache", "lib": "lib", "log": "log", "home": "lib"} {
+				if !strings.Contains(string(conf), "    "+key+" = "+filepath.Join(want, sub)+"\n") {
+					t.Errorf("configuration does not anchor %s in %s", key, want)
+				}
+			}
+		})
+	}
+}
+
 func TestDaemonRejectsLongRuntimePathBeforeLaunch(t *testing.T) {
 	executable, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)
 	}
-	root := t.TempDir()
-	if err := os.Mkdir(filepath.Join(root, "log"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	tmpDir := filepath.Join(t.TempDir(), strings.Repeat("x", len(syscall.RawSockaddrUnix{}.Path)))
-	if err := os.Mkdir(tmpDir, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("TMPDIR", tmpDir)
-	t.Setenv("QUERY_CORPUS_TEST_DAEMON_ENV", "1")
-	d := &Daemon{Opts: Options{Binary: executable, RunDir: root}, BaseURL: "invalid://environment-test"}
-	err = d.launch()
-	if err == nil || !strings.Contains(err.Error(), "IPC socket path") || !strings.Contains(err.Error(), "TMPDIR") {
-		t.Errorf("long runtime path did not produce an actionable error: %v", err)
-	}
-	if d.process != nil || d.processPID != 0 || d.waitCh != nil {
-		t.Error("long runtime path reached child startup")
-	}
-	if _, err := os.Stat(filepath.Join(root, "log", "stdout.log")); !os.IsNotExist(err) {
-		t.Errorf("long runtime path reached log creation: %v", err)
-	}
-	entries, err := os.ReadDir(tmpDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(entries) != 0 || d.runtimeDir != "" {
-		t.Errorf("rejected launch retained runtime state: entries=%v, directory=%q", entries, d.runtimeDir)
+	for _, name := range []string{"absolute", "relative"} {
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			if err := os.Mkdir(filepath.Join(root, "log"), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			tmpDir := filepath.Join(t.TempDir(), strings.Repeat("x", len(syscall.RawSockaddrUnix{}.Path)))
+			if err := os.Mkdir(tmpDir, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			if name == "relative" {
+				t.Chdir(tmpDir)
+				t.Setenv("TMPDIR", ".")
+			} else {
+				t.Setenv("TMPDIR", tmpDir)
+			}
+			t.Setenv("QUERY_CORPUS_TEST_DAEMON_ENV", "1")
+			d := &Daemon{Opts: Options{Binary: executable, RunDir: root}, BaseURL: "invalid://environment-test"}
+			err = d.launch()
+			if err == nil || !strings.Contains(err.Error(), "IPC socket path") || !strings.Contains(err.Error(), "TMPDIR") {
+				t.Errorf("long runtime path did not produce an actionable error: %v", err)
+			}
+			if d.process != nil || d.processPID != 0 || d.waitCh != nil {
+				t.Error("long runtime path reached child startup")
+			}
+			if _, err := os.Stat(filepath.Join(root, "log", "stdout.log")); !os.IsNotExist(err) {
+				t.Errorf("long runtime path reached log creation: %v", err)
+			}
+			entries, err := os.ReadDir(tmpDir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(entries) != 0 || d.runtimeDir != "" {
+				t.Errorf("rejected launch retained runtime state: entries=%v, directory=%q", entries, d.runtimeDir)
+			}
+		})
 	}
 }
 

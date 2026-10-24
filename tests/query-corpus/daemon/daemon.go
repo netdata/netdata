@@ -201,6 +201,18 @@ func newDaemonIdentity() (hostname, streamKey string, err error) {
 	return hostname, streamKey, nil
 }
 
+func absoluteDir(dir string) (string, error) {
+	if filepath.IsAbs(dir) {
+		return dir, nil
+	}
+	// Resolve symlinks before Abs cleans '..', preserving the selected directory.
+	resolved, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Abs(resolved)
+}
+
 // Start writes the test configuration under RunDir, boots the daemon in the
 // foreground and waits until the HTTP API answers.
 func Start(o Options) (*Daemon, error) {
@@ -209,6 +221,19 @@ func Start(o Options) (*Daemon, error) {
 	}
 	if err := validateOptions(o); err != nil {
 		return nil, err
+	}
+	if !filepath.IsAbs(o.RunDir) {
+		if o.RunDir == "" {
+			o.RunDir = "."
+		}
+		if err := os.MkdirAll(o.RunDir, 0o755); err != nil {
+			return nil, fmt.Errorf("daemon: run dir: %w", err)
+		}
+		var err error
+		o.RunDir, err = absoluteDir(o.RunDir)
+		if err != nil {
+			return nil, fmt.Errorf("daemon: run dir: %w", err)
+		}
 	}
 
 	for _, sub := range []string{"etc", "cache", "lib", "log"} {
@@ -350,7 +375,11 @@ func validateRuntimeSocketPaths(runDir string) error {
 
 func (d *Daemon) launch() (err error) {
 	// Test subdirectory names can exceed Unix-socket limits; keep IPC paths short.
-	runDir, err := os.MkdirTemp("", "qc-ipc-")
+	runtimeParent, err := absoluteDir(os.TempDir())
+	if err != nil {
+		return fmt.Errorf("daemon: runtime directory: %w", err)
+	}
+	runDir, err := os.MkdirTemp(runtimeParent, "qc-ipc-")
 	if err != nil {
 		return fmt.Errorf("daemon: runtime directory: %w", err)
 	}
