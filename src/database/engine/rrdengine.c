@@ -1987,15 +1987,13 @@ void datafile_delete(
     journal_file = datafile->journalfile;
     datafile_bytes = datafile_accounted_size_get(datafile);
     journal_file_bytes = journalfile_accounted_size_get(journal_file);
-    size_t journal_v2_bytes = journalfile_v2_data_size_get(journal_file);
+    size_t journal_v2_bytes = journalfile_v2_deletion_size_get(
+        journal_file, datafile->populate_mrg.rejected_v2_size);
     if (journalfile_v2_data_available(journal_file))
         expected_journal_files |= JOURNALFILE_DELETED_V2;
-    else
-        // a journal v2 rejected at startup and not rebuilt: unmapped, but still charged
-        journal_v2_bytes = datafile->populate_mrg.rejected_v2_size;
     scheduled_bytes = 0;
 
-    scheduled_journal_files = journalfile_destroy_unsafe(journal_file, datafile);
+    scheduled_journal_files = journalfile_destroy_unsafe(journal_file, datafile, journal_v2_bytes);
     if (scheduled_journal_files & JOURNALFILE_DELETED_V1)
         scheduled_bytes += journal_file_bytes;
     if (scheduled_journal_files & JOURNALFILE_DELETED_V2)

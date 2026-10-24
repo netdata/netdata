@@ -232,6 +232,23 @@ static int dbengine_datafile_samples_unittest(void) {
     return errors;
 }
 
+static int dbengine_journal_v2_deletion_size_unittest(void) {
+    struct rrdengine_journalfile journalfile = { 0 };
+    spinlock_tracked_init(&journalfile.data_spinlock);
+    spinlock_init(&journalfile.unsafe.spinlock);
+
+    const size_t rejected_v2_size = 8192;
+    size_t bytes = journalfile_v2_deletion_size_get(&journalfile, rejected_v2_size);
+    if (bytes != rejected_v2_size) {
+        fprintf(stderr,
+                "DBENGINE: rejected journal v2 deletion size was %zu, expected %zu\n",
+                bytes, rejected_v2_size);
+        return 1;
+    }
+
+    return 0;
+}
+
 // The estimate for a metric entry of a journal v2 file without a samples section:
 // its span at its latest cadence, never below its page count.
 static int dbengine_estimated_samples_unittest(void) {
@@ -1985,6 +2002,12 @@ static int mrg_jv2_real_writer_unittest(void) {
         goto cleanup;
     }
 
+    size_t active_v2_size = journalfile_v2_data_size_get(fx.journalfile);
+    if (journalfile_v2_deletion_size_get(fx.journalfile, 8192) != active_v2_size) {
+        fprintf(stderr, "ERROR: active journal v2 deletion size did not use the mapped file size\n");
+        errors++;
+    }
+
     // Read the serialized structures back through the same mmap the reader uses.
     {
         struct journal_v2_header *j2 = journalfile_v2_data_acquire(fx.journalfile, NULL, START_TIME, END_LONG);
@@ -2486,6 +2509,7 @@ static int mrg_jv2_same_uuid_grouped_once_unittest(void) {
 
 int mrg_unittest(void) {
     int errors = dbengine_accounting_helpers_unittest();
+    errors += dbengine_journal_v2_deletion_size_unittest();
     errors += mrg_destroy_referenced_metric_unittest();
     errors += mrg_stale_peeked_id_unittest();
     errors += mrg_stale_metric_pointer_unittest();

@@ -526,6 +526,13 @@ size_t journalfile_v2_data_size_get(struct rrdengine_journalfile *journalfile) {
     return data_size;
 }
 
+size_t journalfile_v2_deletion_size_get(struct rrdengine_journalfile *journalfile, size_t rejected_v2_size) {
+    if (journalfile_v2_data_available(journalfile))
+        return journalfile_v2_data_size_get(journalfile);
+
+    return rejected_v2_size;
+}
+
 void journalfile_v2_data_set(struct rrdengine_journalfile *journalfile, int fd, void *journal_data, uint32_t journal_data_size) {
     if(unlikely(!journalfile))
         fatal("DBENGINE: JOURNALFILE: trying to set journal data without a journalfile");
@@ -652,15 +659,14 @@ int journalfile_unlink(struct rrdengine_journalfile *journalfile)
     return ret;
 }
 
-uint8_t journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)
+uint8_t journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile,
+                                   size_t journal_v2_bytes)
 {
     struct rrdengine_instance *ctx = datafile_ctx(datafile);
     int ret;
     char path[RRDENG_PATH_MAX];
     char path_v2[RRDENG_PATH_MAX];
     size_t journal_v1_bytes = journalfile_accounted_size_get(journalfile);
-    size_t journal_v2_bytes = journalfile_v2_data_size_get(journalfile);
-
     journalfile_v1_generate_path(datafile, path, sizeof(path));
     journalfile_v2_generate_path(datafile, path_v2, sizeof(path));
 

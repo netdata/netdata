@@ -309,7 +309,8 @@ int journalfile_unlink(struct rrdengine_journalfile *journalfile);
  * indicating which journal files were accepted by the asynchronous deletion
  * queue. Completion updates the on-disk accounting and deletion statistics.
  */
-uint8_t journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
+uint8_t journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile,
+                                   size_t journal_v2_bytes);
 int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
 int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile,
                      struct rrdengine_datafile *datafile);
@@ -326,6 +327,7 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
 
 bool journalfile_v2_data_available(struct rrdengine_journalfile *journalfile);
 size_t journalfile_v2_data_size_get(struct rrdengine_journalfile *journalfile);
+size_t journalfile_v2_deletion_size_get(struct rrdengine_journalfile *journalfile, size_t rejected_v2_size);
 void journalfile_v2_data_set(struct rrdengine_journalfile *journalfile, int fd, void *journal_data, uint32_t journal_data_size);
 struct journal_v2_header *journalfile_v2_data_acquire(struct rrdengine_journalfile *journalfile, size_t *data_size, time_t wanted_first_time_s, time_t wanted_last_time_s);
 struct journal_v2_header *journalfile_v2_data_acquire_with_hint(struct rrdengine_journalfile *journalfile, size_t *data_size, time_t wanted_first_time_s, time_t wanted_last_time_s, JOURNALFILE_V2_ACCESS_HINT hint);
