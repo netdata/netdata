@@ -7,12 +7,13 @@
 
 // Immutable per-tier retention summaries of fixed blocks of journal v2 files.
 //
-// Block N covers datafiles [N * 24, N * 24 + 23]. Once all 24 have a sealed
-// journal v2, a background builder merges their metric lists into one file:
-// per metric {first, last, update_every}, sorted by UUID, plus the identity of
-// every journal it was built from. At startup a summary whose 24 identities
-// match the loaded journals replaces their 24 metric-list walks; anything else
-// (missing, damaged, stale, unknown version) falls back to the per-file walk.
+// Block N covers datafiles [N * 24 + 1, N * 24 + 24] (datafiles are numbered from
+// 1). Once all 24 have a sealed journal v2, a background builder merges their
+// metric lists into one file: per metric {first, last, update_every}, sorted by
+// UUID, plus the identity of every journal it was built from. At startup a summary
+// whose 24 identities match the loaded journals replaces their 24 metric-list
+// walks; anything else (missing, damaged, stale, unknown version) falls back to the
+// per-file walk.
 
 #define RETENTION_SUMMARY_FILES_PER_BLOCK 24
 #define RETENTION_SUMMARY_PREFIX "retsum-"
@@ -54,11 +55,14 @@ struct retention_summary_header {
 
 // The per-file walk applies each file's entry with mrg_metric_expand_retention():
 // first = min, last = max, and update_every changes only when an entry raises the
-// last time AND has a non-zero update_every (single-point pages have 0). So the
-// update_every a metric ends with depends on the last time it already had: it is
-// the one of the newest entry that raised the last time with a non-zero
-// update_every. A record keeps that entry's last time too, and the loader applies
-// it first, then extends the last time - exactly what the walk would do.
+// last time (strictly: an equal last time never replaces it) AND has a non-zero
+// update_every (single-point pages have 0). So the update_every a metric ends with
+// depends on the last time it already had and on the order of the files: it is the
+// one of the newest entry that raised the last time with a non-zero update_every.
+// A record keeps that entry's last time too, and the loader applies it first, then
+// extends the last time - exactly what a walk of the 24 files in file-number order
+// would do, for any prior state. (The startup walk runs files on parallel workers,
+// so its own result for such metrics depends on their order.)
 struct retention_summary_record {
     nd_uuid_t uuid;
     uint32_t first_delta_s;

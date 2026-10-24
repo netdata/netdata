@@ -16,6 +16,19 @@ struct retention_summary_block {
 // ----------------------------------------------------------------------------
 // helpers
 
+// Blocks are numbered from the first datafile, 1: block N covers datafiles
+// N * 24 + 1 .. N * 24 + 24. A datafile numbered 0 belongs to no block.
+static uint64_t rs_block_first_fileno(uint32_t block_id) {
+    return (uint64_t)block_id * RETENTION_SUMMARY_FILES_PER_BLOCK + 1;
+}
+
+static bool rs_block_of(uint64_t fileno, uint32_t *block_id) {
+    if (!fileno || (fileno - 1) / RETENTION_SUMMARY_FILES_PER_BLOCK > UINT32_MAX)
+        return false;
+    *block_id = (uint32_t)((fileno - 1) / RETENTION_SUMMARY_FILES_PER_BLOCK);
+    return true;
+}
+
 static void rs_path(struct rrdengine_instance *ctx, uint32_t block_id, bool tmp, char *buf, size_t len) {
     snprintfz(buf, len, "%s/" RETENTION_SUMMARY_PREFIX "%10.10u%s",
               ctx->config.dbfiles_path, block_id, tmp ? RETENTION_SUMMARY_TMP_EXTENSION : RETENTION_SUMMARY_EXTENSION);
@@ -140,7 +153,9 @@ static void rs_forget_and_unlink(struct rrdengine_instance *ctx, uint32_t block_
 }
 
 void retention_summary_datafile_deleted(struct rrdengine_instance *ctx, unsigned fileno) {
-    rs_forget_and_unlink(ctx, fileno / RETENTION_SUMMARY_FILES_PER_BLOCK);
+    uint32_t block_id;
+    if (rs_block_of(fileno, &block_id))
+        rs_forget_and_unlink(ctx, block_id);
 }
 
 void retention_summary_ctx_cleanup(struct rrdengine_instance *ctx) {
@@ -533,16 +548,17 @@ bool retention_summary_build_one(struct rrdengine_instance *ctx) {
     last = (Word_t)-1;
     bool have_last = JudyLLast(ctx->datafiles.JudyL, &last, PJE0) != NULL;
 
-    if (have_first && have_last) {
+    uint32_t first_block, last_block;
+    if (have_first && have_last && rs_block_of(first ? first : 1, &first_block) && rs_block_of(last, &last_block)) {
         // newest complete block first
-        for (int64_t b = (int64_t)(last / RETENTION_SUMMARY_FILES_PER_BLOCK); b >= (int64_t)(first / RETENTION_SUMMARY_FILES_PER_BLOCK) && !found; b--) {
+        for (int64_t b = last_block; b >= (int64_t)first_block && !found; b--) {
             uint32_t candidate = (uint32_t)b;
             if (rs_known(ctx, candidate, false) || rs_known(ctx, candidate, true))
                 continue;
 
             size_t acquired = 0;
             for (size_t i = 0; i < RETENTION_SUMMARY_FILES_PER_BLOCK; i++) {
-                Word_t fileno = (Word_t)candidate * RETENTION_SUMMARY_FILES_PER_BLOCK + i;
+                Word_t fileno = (Word_t)(rs_block_first_fileno(candidate) + i);
                 Pvoid_t *PValue = JudyLGet(ctx->datafiles.JudyL, fileno, PJE0);
                 struct rrdengine_datafile *df = PValue ? *PValue : NULL;
                 if (!df || df->fileno == last_fileno || df->fileno == last_flush_fileno ||
@@ -575,17 +591,17 @@ bool retention_summary_build_one(struct rrdengine_instance *ctx) {
 
     if (rc == RS_BUILD_SKIP) {
         nd_log_daemon(NDLP_INFO,
-                      "DBENGINE: tier %d: datafiles %u-%u cannot be summarised; they will be loaded one by one",
-                      ctx->config.tier, block_id * RETENTION_SUMMARY_FILES_PER_BLOCK,
-                      block_id * RETENTION_SUMMARY_FILES_PER_BLOCK + RETENTION_SUMMARY_FILES_PER_BLOCK - 1);
+                      "DBENGINE: tier %d: datafiles %" PRIu64 "-%" PRIu64 " cannot be summarised; they will be loaded one by one",
+                      ctx->config.tier, rs_block_first_fileno(block_id),
+                      rs_block_first_fileno(block_id) + RETENTION_SUMMARY_FILES_PER_BLOCK - 1);
         rs_failed(ctx, block_id, true);
     }
     else if (rc == RS_BUILD_FAILED && ctx_is_available_for_queries(ctx)) {
         uintptr_t failures = rs_failed(ctx, block_id, false);
         nd_log_daemon(NDLP_WARNING,
-                      "DBENGINE: tier %d: building the retention summary of datafiles %u-%u failed (%zu of %d attempts)",
-                      ctx->config.tier, block_id * RETENTION_SUMMARY_FILES_PER_BLOCK,
-                      block_id * RETENTION_SUMMARY_FILES_PER_BLOCK + RETENTION_SUMMARY_FILES_PER_BLOCK - 1,
+                      "DBENGINE: tier %d: building the retention summary of datafiles %" PRIu64 "-%" PRIu64 " failed (%zu of %d attempts)",
+                      ctx->config.tier, rs_block_first_fileno(block_id),
+                      rs_block_first_fileno(block_id) + RETENTION_SUMMARY_FILES_PER_BLOCK - 1,
                       (size_t)failures, RS_MAX_FAILURES);
     }
 
@@ -653,7 +669,7 @@ static bool rs_header_valid(struct rrdengine_instance *ctx, const struct retenti
         return false;
 
     for (size_t i = 0; i < RETENTION_SUMMARY_FILES_PER_BLOCK; i++)
-        if (h->files[i].fileno != block_id * RETENTION_SUMMARY_FILES_PER_BLOCK + i)
+        if ((uint64_t)h->files[i].fileno != rs_block_first_fileno(block_id) + i)
             return false;
 
     return true;
@@ -886,7 +902,7 @@ size_t retention_summary_apply(RETENTION_SUMMARY_BLOCK *block) {
 // ----------------------------------------------------------------------------
 // unit test: summaries + per-file walk == full per-file walk
 
-#define RS_UT_FIRST_FILENO 24   // block 1: 24..47, and 48 outside a complete block
+#define RS_UT_FIRST_FILENO 1    // block 0: 1..24 (numbering starts at 1), and 25 outside a complete block
 #define RS_UT_FILES 25
 #define RS_UT_METRICS 300
 
@@ -1224,7 +1240,7 @@ int retention_summary_unittest(void) {
         rs_ut_env_destroy(&env);
         return 1;
     }
-    const uint32_t block = RS_UT_FIRST_FILENO / RETENTION_SUMMARY_FILES_PER_BLOCK;
+    const uint32_t block = (RS_UT_FIRST_FILENO - 1) / RETENTION_SUMMARY_FILES_PER_BLOCK;
 
     // the reference: every file walked, in fileno order
     rs_ut_reset(&env, false);
@@ -1235,7 +1251,7 @@ int retention_summary_unittest(void) {
     rs_ut_full_walk(&env);
     errors += rs_ut_capture_and_destroy(&env, &want_seeded);
 
-    // build: one complete block (24..47); 48 is alone in the next block
+    // build: one complete block (1..24); 25 is alone in the next block
     if (!retention_summary_build_one(env.ctx) || !rs_ut_summary_exists(&env, block)) {
         fprintf(stderr, "ERROR: retention summary test: the complete block was not summarised\n");
         errors++;
