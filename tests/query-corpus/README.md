@@ -7,6 +7,19 @@ results pass through strict typed decoders before semantic assertions.
 Explicit formatter stability cases use labeled byte or shape pins. The daemon
 contains no test hooks; storage and contexts are real.
 
+Every daemon uses private configuration, database, log and runtime directories.
+The harness overrides inherited CLI socket and runtime paths in the child
+environment, so separate daemons and concurrent corpus runs cannot replace
+another instance's CLI socket.
+
+Runtime directories are created under `TMPDIR`. Relative temporary and data
+directories are resolved to absolute paths before the daemon changes its working
+directory. Before launching a daemon, the harness checks that its CLI and main
+spawn-server socket paths fit the
+platform's Unix-socket byte limit. If a path is too long, the launch is rejected
+and its private runtime directory is removed. Set `TMPDIR` to a shorter writable
+directory; other corpus data continues to use that temporary directory too.
+
 ## The layered ladder
 
 The ladder isolates narrow query stages to control combinatorial growth.
@@ -66,6 +79,45 @@ layers; each layer declares which entries it consumes:
 `complete`, `leading-gap`, `interior-gap`, `trailing-gap` (short retention),
 `reset-flagged`, `anomalous`, `negative`, `all-zero`, `single-point`,
 `mixed-update-every`, `two-children`.
+
+## Additional regression coverage
+
+- **CASE-020 — result units:** normalized rate/gauge groups, cardinality
+  folds, raw percentage badges, and raw DB-unit preservation have separate
+  contracts. Combined view units have an independent verdict and must match
+  the exposed computed dimensions. Inputs with different raw units use distinct source contexts.
+- **CASE-023 — missing slots:** stopped instances and explicit stored gaps
+  exercise occurrence identity and sample weights at coarse, fine and partial-slot resolutions.
+- **CASE-040 — retained tier coverage and handoffs:** late-enabled tiers,
+  inverted or isolated retention, genuine gaps, partial first records,
+  changing cadence, and conventional coarse-to-fine tails. Numeric values,
+  anomaly evidence, and annotations have independent verdicts. Fixtures use
+  constants or complete records where exact arithmetic is required; the
+  shifted varying-record seam retains its documented coarse estimate bound.
+- **CASE-041 — tiered MIN/MAX:** forced tier0 controls and tier1/tier2
+  aligned, coarser, finer, and shifted grids, with sharp positive extrema
+  and empty records. Aligned value correctness, rejection of invented
+  intermediate extrema, and preservation of the overall extremum are
+  independent contracts. The fine-grid checks do not prescribe which
+  subbucket owns an extremum whose timestamp was lost during rollup.
+- **CASE-042 — full historical backfill:** a late-enabled tier backfills
+  four numeric observations across a cadence change and an explicit gap.
+  AVG/MIN/MAX, SUM, anomaly rate, and partial-data annotation have separate
+  fixture-derived expectations.
+- **CASE-043 — completed-tier publication:** aligned 60-second collection
+  tests the existing 65535-second spreading ceiling on 2.5-day tier2 records.
+  A private daemon disables pulse before boot to control chart ordering;
+  an immediate-publication chart and eventual exact-value recovery distinguish
+  delayed visibility from absent source data. Streams stay open throughout.
+- **CASE-044 — retained-tail resumption:** fine-selected automatic queries
+  must resume on newer retained values after an older tier ends. Long-gap,
+  short-gap and overlap fixtures use forced-tier controls. Gap emptiness has
+  its own verdict so missing the entire newer tail cannot pass unnoticed.
+- **CASE-035 and storage backends:** the independent
+  `CASE-035/intermediate-page-max-preserved` contract keeps intermediate-page
+  and singleton-bridge maxima across restart and repeated warmed queries. A separate signed
+  fixture checks negative values, RESET, and anomaly rates across Gorilla,
+  raw DBENGINE pages, RAM, and ALLOC while preserving the positive controls.
 
 ## Rules
 
