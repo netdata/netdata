@@ -1921,7 +1921,9 @@ static void after_populate_mrg(struct rrdengine_instance *ctx __maybe_unused, vo
 }
 
 // Rebuilds, from their journal v1, the journals v2 rejected while populating the
-// MRG. Runs before the tier is ready, so queries do not see them meanwhile.
+// MRG, except those whose v1 was already replayed in this run (see
+// journalfile_v2_reject()). Runs before the tier is ready, so queries do not see
+// them meanwhile.
 static void populate_mrg_rebuild_rejected_journals(struct rrdengine_instance *ctx) {
     // acquired, so that a rotation cannot delete them meanwhile
     struct rrdengine_datafile **rejected = NULL;
@@ -1929,7 +1931,8 @@ static void populate_mrg_rebuild_rejected_journals(struct rrdengine_instance *ct
 
     netdata_rwlock_rdlock(&ctx->datafiles.rwlock);
     for (struct rrdengine_datafile *df = get_next_datafile(NULL, ctx, true); df; df = get_next_datafile(df, ctx, true)) {
-        if (!df->populate_mrg.rejected_v2_size || !datafile_acquire(df, DATAFILE_ACQUIRE_INDEXING))
+        if (!df->populate_mrg.rejected_v2_size || df->populate_mrg.v1_replayed ||
+            !datafile_acquire(df, DATAFILE_ACQUIRE_INDEXING))
             continue;
 
         if (count == size) {

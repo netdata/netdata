@@ -618,6 +618,7 @@ struct rrdengine_journalfile *journalfile_alloc_and_init(struct rrdengine_datafi
     spinlock_tracked_init(&journalfile->data_spinlock);
     spinlock_init(&journalfile->unsafe.spinlock);
     journalfile->mmap.fd = -1;
+    journalfile->file = -1;
     datafile->journalfile = journalfile;
     return journalfile;
 }
@@ -634,14 +635,26 @@ static int close_uv_file(struct rrdengine_datafile *datafile, uv_file file)
     return ret;
 }
 
+// Closes the journal v1, if this journal holds it open. -1 means not open: 0 is a
+// valid fd.
+static int journalfile_v1_close(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)
+{
+    if (journalfile->file < 0)
+        return 0;
+
+    int ret = close_uv_file(datafile, journalfile->file);
+    journalfile->file = -1;
+    return ret;
+}
+
+// The journal v2 and the journal v1 are independent: a v1 replayed and indexed at
+// startup, or written while running, stays open next to its v2.
 int journalfile_close(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)
 {
-    if(journalfile_v2_data_available(journalfile)) {
+    if(journalfile_v2_data_available(journalfile))
         journalfile_v2_data_unmap_permanently(journalfile);
-        return 0;
-    }
 
-    return close_uv_file(datafile, journalfile->file);
+    return journalfile_v1_close(journalfile, datafile);
 }
 
 int journalfile_unlink(struct rrdengine_journalfile *journalfile)
@@ -672,8 +685,7 @@ uint8_t journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, st
     journalfile_v1_generate_path(datafile, path, sizeof(path));
     journalfile_v2_generate_path(datafile, path_v2, sizeof(path));
 
-    if (journalfile->file)
-        (void)close_uv_file(datafile, journalfile->file);
+    (void)journalfile_v1_close(journalfile, datafile);
 
     // Wait for all references to be released and unmap before deleting files.
     // This prevents SIGBUS when threads are still accessing the mmap'd data.
@@ -1281,14 +1293,48 @@ uint64_t journalfile_v2_metric_estimated_samples(const struct journal_metric_lis
     return samples > metric->entries ? samples : metric->entries;
 }
 
+// A loaded journal v2 that cannot be used: it is unmapped and its size is kept, so
+// that datafile_delete() discharges it. When its journal v1 was not replayed in this
+// run, populate_mrg_rebuild_rejected_journals() rebuilds it from the v1 before the
+// tier is ready. When it was, the v1 pages are already clean in the open cache, so a
+// second replay would index nothing: the journal v2 stays on disk for the next start.
+static void journalfile_v2_reject(struct rrdengine_journalfile *journalfile, size_t v2_size) {
+    struct rrdengine_datafile *datafile = journalfile->datafile;
+
+    if (datafile->populate_mrg.v1_replayed) {
+        // its samples came from the replay, and the open cache may still serve some
+        rrdeng_datafile_samples_set(datafile, __atomic_load_n(&datafile->samples.charged, __ATOMIC_RELAXED), true);
+        nd_log_daemon(NDLP_WARNING, "DBENGINE: tier %d: the rejected journal v2 of datafile %u is not rebuilt, "
+                      "its journal v1 was already replayed; it is loaded again on the next start",
+                      datafile_ctx(datafile)->config.tier, datafile->fileno);
+    }
+    else
+        // its samples are unknown until the journal is rebuilt
+        rrdeng_datafile_samples_set(datafile, 0, true);
+
+    journalfile_v2_data_unmap_permanently_if_indexed(journalfile);
+    datafile->populate_mrg.rejected_v2_size = v2_size;
+}
+
 void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile) {
     usec_t started_ut = now_monotonic_usec();
+
+    // the acquire zeroes the size when it cannot map the journal
+    size_t loaded_v2_size = journalfile_v2_data_size_get(journalfile);
 
     size_t data_size = 0;
     struct journal_v2_header *j2_header = journalfile_v2_data_acquire_with_hint(
         journalfile, &data_size, 0, 0, JOURNALFILE_V2_ACCESS_SEQUENTIAL_DIRECTORY);
-    if(!j2_header)
+    if(!j2_header) {
+        // no journal v2 was loaded, or the loaded one cannot be mapped
+        if (loaded_v2_size && !journalfile_v2_data_available(journalfile)) {
+            char path_v2[RRDENG_PATH_MAX];
+            journalfile_v2_generate_path(journalfile->datafile, path_v2, sizeof(path_v2));
+            nd_log_daemon(NDLP_ERR, "DBENGINE: journal v2 \"%s\" cannot be mapped; rejecting it", path_v2);
+            journalfile_v2_reject(journalfile, loaded_v2_size);
+        }
         return;
+    }
 
     uint8_t *data_start = (uint8_t *)j2_header;
 
@@ -1430,13 +1476,7 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
     journalfile_v2_data_release(journalfile);
 
     if (unlikely(failed)) {
-        // its samples are unknown until the journal is rebuilt
-        rrdeng_datafile_samples_set(journalfile->datafile, 0, true);
-        journalfile_v2_data_unmap_permanently_if_indexed(journalfile);
-
-        // its journal v1 was not replayed, because this journal v2 loaded:
-        // journalfile_v2_rebuild_from_v1() replays it before the tier is ready
-        journalfile->datafile->populate_mrg.rejected_v2_size = data_size;
+        journalfile_v2_reject(journalfile, data_size);
         return;
     }
 
@@ -2073,6 +2113,7 @@ static int journalfile_v1_replay(struct rrdengine_instance *ctx, struct rrdengin
     __atomic_store_n(&ctx->atomic.transaction_id, MAX(__atomic_load_n(&ctx->atomic.transaction_id, __ATOMIC_RELAXED), max_id + 1), __ATOMIC_RELAXED);
 
     nd_log_daemon(NDLP_DEBUG, "DBENGINE: journal file \"%s\" loaded (size:%" PRIu64 ").", path, file_size);
+    journalfile->datafile->populate_mrg.v1_replayed = true;
     return 0;
 }
 
@@ -2099,14 +2140,18 @@ bool journalfile_v2_rebuild_from_v1(struct rrdengine_instance *ctx, struct rrden
     }
 
     int ret = check_file_properties(file, &file_size, sizeof(struct rrdeng_df_sb));
-    if (!ret)
+    if (ret)
+        CLOSE_FILE(ctx, path, file, ret);
+    else {
+        // the replay hands the file to the journal, also when it fails
         ret = journalfile_v1_replay(ctx, journalfile, file, file_size, path);
+        if (ret)
+            (void)journalfile_v1_close(journalfile, datafile);
+    }
 
     if (ret) {
         nd_log_daemon(NDLP_ERR, "DBENGINE: tier %d: cannot replay \"%s\" to rebuild its rejected journal v2; "
                       "the data of this datafile will not be available", ctx->config.tier, path);
-        CLOSE_FILE(ctx, path, file, ret);
-        journalfile->file = 0;
         return false;
     }
 
@@ -2120,8 +2165,7 @@ bool journalfile_v2_rebuild_from_v1(struct rrdengine_instance *ctx, struct rrden
         false);
 
     // sealed: nothing writes to its v1 again (like a datafile whose v2 loaded)
-    (void)close_uv_file(datafile, journalfile->file);
-    journalfile->file = 0;
+    (void)journalfile_v1_close(journalfile, datafile);
 
     // the new journal v2 is charged by the migration and overwrote the rejected one
     bool rebuilt = journalfile_v2_data_available(journalfile);
@@ -2194,8 +2238,9 @@ int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfil
 
     ret = journalfile_v1_replay(ctx, journalfile, file, file_size, path);
     if (ret) {
-        error = ret;
-        goto cleanup;
+        // the replay handed the file to the journal
+        (void)journalfile_v1_close(journalfile, datafile);
+        return ret;
     }
 
     bool is_last_file = (ctx_last_fileno_get(ctx) == journalfile->datafile->fileno);
