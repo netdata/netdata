@@ -234,8 +234,8 @@ struct mqtt_ng_client {
     mqtt_ng_send_fnc_t send_fnc_ptr;
     void *user_ctx;
 
-    // time when last fragment of MQTT message was sent
-    time_t time_of_last_send;
+    // monotonic time when last fragment of MQTT message was sent
+    usec_t last_send_ut;
 
     struct mqtt_ng_parser parser;
 
@@ -246,6 +246,8 @@ struct mqtt_ng_client {
     void (*msg_callback)(const char *topic, const void *msg, size_t msglen, int qos);
 
     unsigned int ping_pending:1;
+    // monotonic time the outstanding PINGREQ was requested, 0 when no PINGRESP is awaited
+    usec_t ping_requested_ut;
     struct buffer_fragment ping_frag;
 
     struct mqtt_ng_stats stats;
@@ -1095,6 +1097,9 @@ int mqtt_ng_connect(
 
     destroy_timeout_monitor_list(client);
 
+    // a ping of the previous connection must neither be sent nor time out this one
+    mqtt_ng_ping_reset(client);
+
     spinlock_lock(&client->tx_topic_aliases.spinlock);
     // according to MQTT spec topic aliases should not be persisted
     // even if clean session is true
@@ -1703,7 +1708,19 @@ static int mqtt_ng_puback(struct mqtt_ng_client *client, uint16_t packet_id, uin
 int mqtt_ng_ping(struct mqtt_ng_client *client)
 {
     client->ping_pending = 1;
+    client->ping_requested_ut = now_monotonic_usec();
     return MQTT_NG_MSGGEN_OK;
+}
+
+usec_t mqtt_ng_ping_requested_ut(struct mqtt_ng_client *client)
+{
+    return client->ping_requested_ut;
+}
+
+void mqtt_ng_ping_reset(struct mqtt_ng_client *client)
+{
+    client->ping_pending = 0;
+    client->ping_requested_ut = 0;
 }
 
 #define MQTT_NG_CLIENT_NEED_MORE_BYTES         0x10
@@ -2333,7 +2350,7 @@ static int parse_data(struct mqtt_ng_client *client)
                         return MQTT_NG_CLIENT_PROTOCOL_ERROR;
                     }
                     parser->state = MQTT_PARSE_MQTT_PACKET_DONE;
-                    ping_timeout = 0;
+                    client->ping_requested_ut = 0;
                     break;
                 case MQTT_CPT_DISCONNECT:
                     rc = parse_disconnect_varhdr(client);
@@ -2430,7 +2447,7 @@ static int send_fragment(struct mqtt_ng_client *client) {
         return -1;
 
     if (frag->flags & BUFFER_FRAG_MQTT_PACKET_TAIL) {
-        client->time_of_last_send = time(NULL);
+        client->last_send_ut = now_monotonic_usec();
         if (frag != &client->ping_frag)
             __atomic_fetch_sub(&client->stats.tx_messages_queued, 1, __ATOMIC_RELAXED);
         __atomic_fetch_add(&client->stats.tx_messages_sent, 1, __ATOMIC_RELAXED);
@@ -3485,9 +3502,9 @@ int mqtt_ng_unittest(void)
     return errors;
 }
 
-time_t mqtt_ng_last_send_time(struct mqtt_ng_client *client)
+usec_t mqtt_ng_last_send_ut(struct mqtt_ng_client *client)
 {
-    return client->time_of_last_send;
+    return client->last_send_ut;
 }
 
 void mqtt_ng_set_max_mem(struct mqtt_ng_client *client, size_t bytes)

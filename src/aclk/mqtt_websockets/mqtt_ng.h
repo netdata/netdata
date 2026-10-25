@@ -10,7 +10,7 @@
 #define MQTT_NG_MSGGEN_MSG_TOO_BIG 3
 
 struct mqtt_ng_client;
-extern time_t ping_timeout;
+
 /* Converts integer to MQTT Variable Byte Integer as per 1.5.5 of MQTT 5 specs
  * @param input value to be converted
  * @param output pointer to memory where output will be written to. Must allow up to 4 bytes to be written.
@@ -78,7 +78,14 @@ struct mqtt_sub {
 
 int mqtt_ng_subscribe(struct mqtt_ng_client *client, struct mqtt_sub *subscriptions, size_t subscription_count);
 
+// Queues a PINGREQ and starts its response wait at the current monotonic time.
 int mqtt_ng_ping(struct mqtt_ng_client *client);
+
+// Monotonic time the outstanding PINGREQ was requested, or 0 when none is waiting for its PINGRESP.
+usec_t mqtt_ng_ping_requested_ut(struct mqtt_ng_client *client);
+
+// Forgets the outstanding PINGREQ, including one still queued for sending.
+void mqtt_ng_ping_reset(struct mqtt_ng_client *client);
 
 typedef ssize_t (*mqtt_ng_send_fnc_t)(void *user_ctx, const void* buf, size_t len);
 
@@ -100,7 +107,8 @@ int mqtt_ng_disconnect(struct mqtt_ng_client *client, uint8_t reason_code);
 
 int mqtt_ng_sync(struct mqtt_ng_client *client);
 
-time_t mqtt_ng_last_send_time(struct mqtt_ng_client *client);
+// Monotonic time the last complete MQTT message was written.
+usec_t mqtt_ng_last_send_ut(struct mqtt_ng_client *client);
 
 void mqtt_ng_set_max_mem(struct mqtt_ng_client *client, size_t bytes);
 
