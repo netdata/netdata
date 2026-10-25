@@ -96,6 +96,5 @@ void njtf_charge_existing(struct rrdengine_datafile *datafile);
 bool njtf_backfill_one(struct rrdengine_instance *ctx);
 
 int njtf_unittest(void);
-int njtf_verify_directory(void);
 
 #endif //NETDATA_JOURNALFILE_FILTER_H
