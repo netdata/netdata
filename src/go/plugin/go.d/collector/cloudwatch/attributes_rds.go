@@ -5,7 +5,6 @@ package cloudwatch
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
@@ -34,31 +33,29 @@ func fetchRDSInstanceAttributes(
 	clients *attributeClients,
 	target, region string,
 ) (map[string][]metrix.Label, error) {
+	// One timeout covers the client build and every page, like a whole
+	// resource-tag lookup.
 	ctx, cancel := withTimeout(ctx, clients.timeout)
 	defer cancel()
 	client, err := clients.rds.forTargetRegion(ctx, target, region)
 	if err != nil {
 		return nil, fmt.Errorf("build client: %w", err)
 	}
-	return describeRDSInstanceAttributes(ctx, client, clients.timeout)
+	return describeRDSInstanceAttributes(ctx, client)
 }
 
-// describeRDSInstanceAttributes pages DescribeDBInstances under one timeout. The
+// describeRDSInstanceAttributes pages DescribeDBInstances under the caller's deadline. The
 // result may include Neptune and DocumentDB instances; they never match AWS/RDS
 // instances because a DBInstanceIdentifier is unique per account and region.
 func describeRDSInstanceAttributes(
 	ctx context.Context,
 	client rdsClient,
-	timeout time.Duration,
 ) (map[string][]metrix.Label, error) {
-	cctx, cancel := withTimeout(ctx, timeout)
-	defer cancel()
-
 	out := make(map[string][]metrix.Label)
 	seenMarkers := make(map[string]struct{})
 	var marker *string
 	for {
-		response, err := client.DescribeDBInstances(cctx, &rds.DescribeDBInstancesInput{
+		response, err := client.DescribeDBInstances(ctx, &rds.DescribeDBInstancesInput{
 			Marker:     marker,
 			MaxRecords: aws.Int32(rdsDescribePageSize),
 		})

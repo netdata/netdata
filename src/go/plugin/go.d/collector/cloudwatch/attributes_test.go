@@ -158,6 +158,21 @@ func rdsAttributeCollector(
 	return c
 }
 
+// singleRDSTargetCollector wires the stock RDS profile for the "base" target in
+// account 000000000000 with the given discovered instances.
+func singleRDSTargetCollector(t *testing.T, rds rdsClient, ids ...string) (*Collector, *fullCloudWatch) {
+	t.Helper()
+	cw := &fullCloudWatch{list: map[string][]cwtypes.Metric{"AWS/RDS": rdsMetrics(ids...)}, gmdValue: 1}
+	c := rdsAttributeCollector(t, rdsProfileConfig("base"), cw,
+		map[string]string{"base": "000000000000"}, map[string]rdsClient{"base": rds})
+	return c, cw
+}
+
+// mysqlRDSInstance describes one MySQL instance, db-a.
+func mysqlRDSInstance() *fakeRDS {
+	return &fakeRDS{instances: []rdstypes.DBInstance{rdsInstance("db-a", "mysql", "8.0.35", "db.t3.micro")}}
+}
+
 // labelsByInstance returns the label set of every emitted series with the given name,
 // keyed by "<account_id>/<db_instance_identifier>".
 func labelsByInstance(c *Collector, series string) map[string]map[string]string {
@@ -288,15 +303,8 @@ func TestCollect_RDSAttributeLabels(t *testing.T) {
 }
 
 func TestCollect_RDSAttributesRefreshCadenceAndStability(t *testing.T) {
-	fake := &fakeRDS{
-		instances: []rdstypes.DBInstance{rdsInstance("db-a", "mysql", "8.0.35", "db.t3.micro")},
-	}
-	cw := &fullCloudWatch{
-		list:     map[string][]cwtypes.Metric{"AWS/RDS": rdsMetrics("db-a")},
-		gmdValue: 1,
-	}
-	c := rdsAttributeCollector(t, rdsProfileConfig("base"), cw,
-		map[string]string{"base": "000000000000"}, map[string]rdsClient{"base": fake})
+	fake := mysqlRDSInstance()
+	c, _ := singleRDSTargetCollector(t, fake, "db-a")
 	now := time.Unix(1_000_000_000, 0)
 	c.now = func() time.Time { return now }
 	collect := func() map[string]string {
@@ -532,7 +540,7 @@ func TestDescribeRDSInstanceAttributes(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			got, err := describeRDSInstanceAttributes(context.Background(), tc.rds, time.Second)
+			got, err := describeRDSInstanceAttributes(context.Background(), tc.rds)
 			if tc.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -632,15 +640,8 @@ func TestResolveAttributeProvider(t *testing.T) {
 }
 
 func TestRefreshAttributes_InvalidatesPlanOnlyOnLabelChange(t *testing.T) {
-	fake := &fakeRDS{
-		instances: []rdstypes.DBInstance{rdsInstance("db-a", "mysql", "8.0.35", "db.t3.micro")},
-	}
-	cw := &fullCloudWatch{
-		list:     map[string][]cwtypes.Metric{"AWS/RDS": rdsMetrics("db-a")},
-		gmdValue: 1,
-	}
-	c := rdsAttributeCollector(t, rdsProfileConfig("base"), cw,
-		map[string]string{"base": "000000000000"}, map[string]rdsClient{"base": fake})
+	fake := mysqlRDSInstance()
+	c, _ := singleRDSTargetCollector(t, fake, "db-a")
 	_, err := collectWithAttributes(t, c)
 	require.NoError(t, err)
 	require.False(t, c.planDirty)
@@ -683,15 +684,8 @@ func TestRefreshAttributes_InvalidatesPlanOnlyOnLabelChange(t *testing.T) {
 }
 
 func TestRefreshAttributes_ParentCancellationCommitsNothing(t *testing.T) {
-	fake := &fakeRDS{
-		instances: []rdstypes.DBInstance{rdsInstance("db-a", "mysql", "8.0.35", "db.t3.micro")},
-	}
-	cw := &fullCloudWatch{
-		list:     map[string][]cwtypes.Metric{"AWS/RDS": rdsMetrics("db-a")},
-		gmdValue: 1,
-	}
-	c := rdsAttributeCollector(t, rdsProfileConfig("base"), cw,
-		map[string]string{"base": "000000000000"}, map[string]rdsClient{"base": fake})
+	fake := mysqlRDSInstance()
+	c, _ := singleRDSTargetCollector(t, fake, "db-a")
 	_, err := collectWithAttributes(t, c)
 	require.NoError(t, err)
 	before := c.attributes
@@ -705,15 +699,8 @@ func TestRefreshAttributes_ParentCancellationCommitsNothing(t *testing.T) {
 }
 
 func TestCollect_RDSAttributeLabelsAreNonIdentityChartLabels(t *testing.T) {
-	fake := &fakeRDS{
-		instances: []rdstypes.DBInstance{rdsInstance("db-a", "mysql", "8.0.35", "db.t3.micro")},
-	}
-	cw := &fullCloudWatch{
-		list:     map[string][]cwtypes.Metric{"AWS/RDS": rdsMetrics("db-a")},
-		gmdValue: 1,
-	}
-	c := rdsAttributeCollector(t, rdsProfileConfig("base"), cw,
-		map[string]string{"base": "000000000000"}, map[string]rdsClient{"base": fake})
+	fake := mysqlRDSInstance()
+	c, _ := singleRDSTargetCollector(t, fake, "db-a")
 	now := time.Unix(1_000_000_000, 0)
 	c.now = func() time.Time { return now }
 
@@ -799,12 +786,7 @@ func TestCollect_RDSAttributeLabelsAppearOnceLookupSucceeds(t *testing.T) {
 			Code: "AccessDenied",
 		},
 	}
-	cw := &fullCloudWatch{
-		list:     map[string][]cwtypes.Metric{"AWS/RDS": rdsMetrics("db-a")},
-		gmdValue: 1,
-	}
-	c := rdsAttributeCollector(t, rdsProfileConfig("base"), cw,
-		map[string]string{"base": "000000000000"}, map[string]rdsClient{"base": fake})
+	c, _ := singleRDSTargetCollector(t, fake, "db-a")
 	now := time.Unix(1_000_000_000, 0)
 	c.now = func() time.Time { return now }
 
@@ -835,15 +817,8 @@ func TestCollect_RDSAttributesFollowDiscoveryInstall(t *testing.T) {
 	// Discovery can install a new snapshot before the attribute TTL expires (real
 	// clocks drift by the stage duration, and a late target resolution forces a
 	// rediscovery). A newly discovered instance must eventually receive labels.
-	fake := &fakeRDS{
-		instances: []rdstypes.DBInstance{rdsInstance("db-a", "mysql", "8.0.35", "db.t3.micro")},
-	}
-	cw := &fullCloudWatch{
-		list:     map[string][]cwtypes.Metric{"AWS/RDS": rdsMetrics("db-a")},
-		gmdValue: 1,
-	}
-	c := rdsAttributeCollector(t, rdsProfileConfig("base"), cw,
-		map[string]string{"base": "000000000000"}, map[string]rdsClient{"base": fake})
+	fake := mysqlRDSInstance()
+	c, cw := singleRDSTargetCollector(t, fake, "db-a")
 	now := time.Unix(1_000_000_000, 0)
 	c.now = func() time.Time { return now }
 	_, err := collectWithAttributes(t, c)

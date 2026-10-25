@@ -359,8 +359,9 @@ from the RDS control plane.
   Runner cancellation cancels its requests, and the framework joins it before cleanup.
 - **Fetch groups.** One fetch per `(target, region, provider)` that has discovered
   instances, so a job selecting RDS without RDS instances makes no call. Clients are
-  cached per `(target, region)`; pages use the API maximum `MaxRecords=100`, the job
-  `timeout`, and a duplicate-marker check. There is no aggregate page cap. The join is
+  cached per `(target, region)`; pages use the API maximum `MaxRecords=100` and a
+  duplicate-marker check, and one job `timeout` covers the client build and all pages,
+  as for a whole resource-tag lookup. There is no aggregate page cap. The join is
   exact on the instance identifier within the fetching target and region, extracted
   using each profile's own dimension layout. Requests include discovered identifiers;
   responses for other instances (undiscovered, Neptune, DocumentDB) are discarded.

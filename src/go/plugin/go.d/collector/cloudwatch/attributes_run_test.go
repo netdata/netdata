@@ -163,9 +163,7 @@ func TestCollect_RDSLookupDoesNotBlockMetricsOrQueueDuplicateBatches(t *testing.
 		},
 		gmdValue: 1,
 	}
-	fake := &heldRDS{
-		calls: make(chan heldRDSCall, 2),
-	}
+	fake := &heldRDS{calls: make(chan heldRDSCall, 2)}
 	c := rdsAttributeCollector(t, cfg, cw,
 		map[string]string{"base": "000000000000"}, map[string]rdsClient{"base": fake})
 	type result struct {
@@ -197,15 +195,8 @@ func TestCollect_RDSLookupDoesNotBlockMetricsOrQueueDuplicateBatches(t *testing.
 }
 
 func TestCollect_RDSResultUsesCurrentDiscovery(t *testing.T) {
-	cw := &fullCloudWatch{
-		list:     map[string][]cwtypes.Metric{"AWS/RDS": rdsMetrics("db-old")},
-		gmdValue: 1,
-	}
-	fake := &heldRDS{
-		calls: make(chan heldRDSCall, 2),
-	}
-	c := rdsAttributeCollector(t, rdsProfileConfig("base"), cw,
-		map[string]string{"base": "000000000000"}, map[string]rdsClient{"base": fake})
+	fake := &heldRDS{calls: make(chan heldRDSCall, 2)}
+	c, cw := singleRDSTargetCollector(t, fake, "db-old")
 	now := time.Unix(1_000_000_000, 0)
 	c.now = func() time.Time { return now }
 	_, err := collecttest.CollectScalarSeries(c)
@@ -234,15 +225,8 @@ func TestCollect_RDSResultUsesCurrentDiscovery(t *testing.T) {
 }
 
 func TestCollect_RDSSlowResultWithUnchangedDiscoveryWaitsForNextRefresh(t *testing.T) {
-	cw := &fullCloudWatch{
-		list:     map[string][]cwtypes.Metric{"AWS/RDS": rdsMetrics("db-a")},
-		gmdValue: 1,
-	}
-	fake := &heldRDS{
-		calls: make(chan heldRDSCall, 2),
-	}
-	c := rdsAttributeCollector(t, rdsProfileConfig("base"), cw,
-		map[string]string{"base": "000000000000"}, map[string]rdsClient{"base": fake})
+	fake := &heldRDS{calls: make(chan heldRDSCall, 2)}
+	c, _ := singleRDSTargetCollector(t, fake, "db-a")
 	now := time.Unix(1_000_000_000, 0)
 	c.now = func() time.Time { return now }
 	_, err := collecttest.CollectScalarSeries(c)
@@ -343,7 +327,7 @@ func TestDescribeRDSInstanceAttributes_MoreThanOneHundredPages(t *testing.T) {
 	fake := &fakeRDS{
 		pages: pages,
 	}
-	labels, err := describeRDSInstanceAttributes(context.Background(), fake, time.Second)
+	labels, err := describeRDSInstanceAttributes(context.Background(), fake)
 	require.NoError(t, err)
 	assert.Contains(t, labels, "last")
 	assert.Equal(t, 101, fake.callCount())
