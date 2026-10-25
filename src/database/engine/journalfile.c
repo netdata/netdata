@@ -262,6 +262,7 @@ static bool njfv2idx_remove_if_indexed(struct rrdengine_datafile *datafile) {
 
 static struct journal_v2_header *journalfile_v2_mounted_data_get(struct rrdengine_journalfile *journalfile, size_t *data_size) {
     struct journal_v2_header *j2_header = NULL;
+    bool mapping_failed = false;
 
     spinlock_tracked_lock(&journalfile->data_spinlock);
 
@@ -269,6 +270,11 @@ static struct journal_v2_header *journalfile_v2_mounted_data_get(struct rrdengin
         journalfile->mmap.data = nd_mmap(NULL, journalfile->mmap.size, PROT_READ, MAP_SHARED, journalfile->mmap.fd, 0);
         if (journalfile->mmap.data == MAP_FAILED) {
             internal_fatal(true, "DBENGINE: failed to re-mmap() journal file v2");
+            mapping_failed = true;
+
+            // unusable for the rest of the run, but still on disk and charged
+            __atomic_store_n(&journalfile->datafile->rejected_v2_size, journalfile->mmap.size, __ATOMIC_RELAXED);
+
             close(journalfile->mmap.fd);
             journalfile->mmap.fd = -1;
             journalfile->mmap.data = NULL;
@@ -307,6 +313,12 @@ static struct journal_v2_header *journalfile_v2_mounted_data_get(struct rrdengin
     }
 
     spinlock_tracked_unlock(&journalfile->data_spinlock);
+
+    if (unlikely(mapping_failed)) {
+        char path_v2[RRDENG_PATH_MAX];
+        journalfile_v2_generate_path(journalfile->datafile, path_v2, sizeof(path_v2));
+        nd_log_daemon(NDLP_ERR, "DBENGINE: journal v2 \"%s\" cannot be mapped; it is not used until the next start", path_v2);
+    }
 
     return j2_header;
 }
@@ -1313,26 +1325,21 @@ static void journalfile_v2_reject(struct rrdengine_journalfile *journalfile, siz
         rrdeng_datafile_samples_set(datafile, 0, true);
 
     journalfile_v2_data_unmap_permanently_if_indexed(journalfile);
-    datafile->populate_mrg.rejected_v2_size = v2_size;
+    __atomic_store_n(&datafile->rejected_v2_size, v2_size, __ATOMIC_RELAXED);
 }
 
 void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile) {
     usec_t started_ut = now_monotonic_usec();
 
-    // the acquire zeroes the size when it cannot map the journal
-    size_t loaded_v2_size = journalfile_v2_data_size_get(journalfile);
-
     size_t data_size = 0;
     struct journal_v2_header *j2_header = journalfile_v2_data_acquire_with_hint(
         journalfile, &data_size, 0, 0, JOURNALFILE_V2_ACCESS_SEQUENTIAL_DIRECTORY);
     if(!j2_header) {
-        // no journal v2 was loaded, or the loaded one cannot be mapped
-        if (loaded_v2_size && !journalfile_v2_data_available(journalfile)) {
-            char path_v2[RRDENG_PATH_MAX];
-            journalfile_v2_generate_path(journalfile->datafile, path_v2, sizeof(path_v2));
-            nd_log_daemon(NDLP_ERR, "DBENGINE: journal v2 \"%s\" cannot be mapped; rejecting it", path_v2);
-            journalfile_v2_reject(journalfile, loaded_v2_size);
-        }
+        // no journal v2 was loaded, or the loaded one cannot be mapped (the acquire
+        // recorded its size)
+        size_t rejected_v2_size = __atomic_load_n(&journalfile->datafile->rejected_v2_size, __ATOMIC_RELAXED);
+        if (rejected_v2_size)
+            journalfile_v2_reject(journalfile, rejected_v2_size);
         return;
     }
 
@@ -2113,7 +2120,6 @@ static int journalfile_v1_replay(struct rrdengine_instance *ctx, struct rrdengin
     __atomic_store_n(&ctx->atomic.transaction_id, MAX(__atomic_load_n(&ctx->atomic.transaction_id, __ATOMIC_RELAXED), max_id + 1), __ATOMIC_RELAXED);
 
     nd_log_daemon(NDLP_DEBUG, "DBENGINE: journal file \"%s\" loaded (size:%" PRIu64 ").", path, file_size);
-    journalfile->datafile->populate_mrg.v1_replayed = true;
     return 0;
 }
 
@@ -2172,8 +2178,7 @@ bool journalfile_v2_rebuild_from_v1(struct rrdengine_instance *ctx, struct rrden
     // the new journal v2 is charged by the migration and overwrote the rejected one
     bool rebuilt = journalfile_v2_data_available(journalfile);
     if (rebuilt) {
-        ctx_current_disk_space_decrease(ctx, datafile->populate_mrg.rejected_v2_size);
-        datafile->populate_mrg.rejected_v2_size = 0;
+        ctx_current_disk_space_decrease(ctx, __atomic_exchange_n(&datafile->rejected_v2_size, 0, __ATOMIC_RELAXED));
         nd_log_daemon(NDLP_NOTICE, "DBENGINE: tier %d: the rejected journal v2 of datafile %u was rebuilt from its journal v1",
                       ctx->config.tier, datafile->fileno);
         return true;
@@ -2189,8 +2194,7 @@ bool journalfile_v2_rebuild_from_v1(struct rrdengine_instance *ctx, struct rrden
         __atomic_add_fetch(&ctx->stats.journalfile_deletions, 1, __ATOMIC_RELAXED);
 
     if (removed || errno == ENOENT) {
-        ctx_current_disk_space_decrease(ctx, datafile->populate_mrg.rejected_v2_size);
-        datafile->populate_mrg.rejected_v2_size = 0;
+        ctx_current_disk_space_decrease(ctx, __atomic_exchange_n(&datafile->rejected_v2_size, 0, __ATOMIC_RELAXED));
         nd_log_daemon(NDLP_WARNING, "DBENGINE: tier %d: no journal v2 was written for datafile %u from its journal v1; "
                       "the rejected one was removed", ctx->config.tier, datafile->fileno);
     }
@@ -2244,6 +2248,7 @@ int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfil
         (void)journalfile_v1_close(journalfile, datafile);
         return ret;
     }
+    datafile->populate_mrg.v1_replayed = true;
 
     bool is_last_file = (ctx_last_fileno_get(ctx) == journalfile->datafile->fileno);
     bool has_old_data = false;

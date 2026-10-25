@@ -58,9 +58,12 @@ struct rrdengine_datafile {
     struct {
         SPINLOCK spinlock;
         bool populated;
-        size_t rejected_v2_size;    // its loaded journal v2 failed while populating; discharged on deletion
-        bool v1_replayed;           // its journal v1 was replayed in this run; a rejected v2 is then not rebuilt
+        bool v1_replayed;           // journalfile_load() replayed its journal v1; a rejected v2 is then not rebuilt
     } populate_mrg;
+
+    // its loaded journal v2 was rejected or could not be mapped: the size it is charged
+    // for, discharged when it is rebuilt, removed or deleted (atomic)
+    size_t rejected_v2_size;
 
     struct {
         SPINLOCK spinlock;

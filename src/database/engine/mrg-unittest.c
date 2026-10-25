@@ -2407,9 +2407,9 @@ static int mrg_jv2_rejected_on_mapping_failure_check(void) {
         fprintf(stderr, "ERROR: a journal v2 that cannot be mapped is still available\n");
         errors++;
     }
-    if(t.fx.datafile.populate_mrg.rejected_v2_size != loaded_size) {
+    if(t.fx.datafile.rejected_v2_size != loaded_size) {
         fprintf(stderr, "ERROR: the rejected journal v2 recorded %zu bytes, expected %zu\n",
-                t.fx.datafile.populate_mrg.rejected_v2_size, loaded_size);
+                t.fx.datafile.rejected_v2_size, loaded_size);
         errors++;
     }
     if(t.fx.datafile.samples.charged != 0 || !t.fx.datafile.samples.estimated) {
@@ -2420,7 +2420,7 @@ static int mrg_jv2_rejected_on_mapping_failure_check(void) {
 
     int devnull = -1;
     if(!fd_is_open(0))
-        devnull = open("/dev/null", O_RDONLY);  // the lowest free fd: 0
+        devnull = open("/dev/null", O_RDONLY | O_CLOEXEC);  // the lowest free fd: 0
 
     if(!fd_is_open(0)) {
         fprintf(stderr, "ERROR: cannot open fd 0 for the test\n");
@@ -2471,6 +2471,11 @@ static int mrg_jv2_close_owned_v1_check(void) {
 
     struct rrdengine_journalfile *journalfile = t.fx.journalfile;
     int v1 = open("/dev/null", O_RDONLY | O_CLOEXEC);
+    if(v1 == -1) {
+        fprintf(stderr, "ERROR: cannot open a v1 fd for the test\n");
+        errors++;
+        goto cleanup;
+    }
     journalfile->file = v1;
 
     journalfile_close(journalfile, &t.fx.datafile);
@@ -2489,10 +2494,11 @@ static int mrg_jv2_close_owned_v1_check(void) {
         errors++;
     }
 
-    // an owned fd 0 is closed like any other
-    int saved = dup(0);
+    // an owned fd 0 is closed like any other; fd 0 is left as it was found
+    bool fd0_was_open = fd_is_open(0);
+    int saved = fd0_was_open ? dup(0) : -1;
     int devnull = open("/dev/null", O_RDONLY | O_CLOEXEC);
-    if(saved == -1 || devnull == -1 || dup2(devnull, 0) != 0) {
+    if((fd0_was_open && saved == -1) || devnull == -1 || dup2(devnull, 0) != 0) {
         fprintf(stderr, "ERROR: cannot set up an owned fd 0 for the test\n");
         errors++;
     }
@@ -2512,6 +2518,8 @@ static int mrg_jv2_close_owned_v1_check(void) {
         dup2(saved, 0);
         close(saved);
     }
+    else if(!fd0_was_open && fd_is_open(0))
+        close(0);
     if(devnull != -1)
         close(devnull);
 
@@ -2521,6 +2529,46 @@ cleanup:
 }
 
 #ifndef NETDATA_INTERNAL_CHECKS
+// A journal v2 that cannot be mapped for a query is unusable for the rest of the run:
+// its size is recorded, so that datafile_delete() discharges it.
+static int mrg_jv2_query_mapping_failure_check(void) {
+    int errors = 0;
+    enum { TEST_FILENO = 16 };
+
+    struct jv2_one_metric t = { 0 };
+    if(!jv2_journal_fixture_init(&t.fx, TEST_FILENO))
+        return 0;
+
+    if(!jv2_one_metric_publish(&t)) {
+        errors++;
+        goto cleanup;
+    }
+
+    struct rrdengine_journalfile *journalfile = t.fx.journalfile;
+    size_t loaded_size = journalfile_v2_data_size_get(journalfile);
+    jv2_break_next_mapping(journalfile);
+
+    size_t data_size = 0;
+    if(journalfile_v2_data_acquire(journalfile, &data_size, 0, 0)) {
+        fprintf(stderr, "ERROR: a journal v2 that cannot be mapped was acquired\n");
+        errors++;
+        journalfile_v2_data_release(journalfile);
+    }
+    if(journalfile_v2_data_available(journalfile)) {
+        fprintf(stderr, "ERROR: a journal v2 that cannot be mapped for a query is still available\n");
+        errors++;
+    }
+    if(t.fx.datafile.rejected_v2_size != loaded_size) {
+        fprintf(stderr, "ERROR: the journal v2 that cannot be mapped for a query recorded %zu bytes, expected %zu\n",
+                t.fx.datafile.rejected_v2_size, loaded_size);
+        errors++;
+    }
+
+cleanup:
+    errors += jv2_one_metric_destroy(&t);
+    return errors;
+}
+
 // A rejected journal v2 whose journal v1 is unusable (shorter than its superblock)
 // cannot be rebuilt: the rebuild fails and leaves the rejected v2 on disk, recorded.
 static int mrg_jv2_rebuild_with_unusable_v1_check(void) {
@@ -2565,9 +2613,9 @@ static int mrg_jv2_rebuild_with_unusable_v1_check(void) {
         fprintf(stderr, "ERROR: the rejected journal v2 was removed although its v1 is unusable\n");
         errors++;
     }
-    if(t.fx.datafile.populate_mrg.rejected_v2_size != loaded_size) {
+    if(t.fx.datafile.rejected_v2_size != loaded_size) {
         fprintf(stderr, "ERROR: the rejected journal v2 records %zu bytes after the failed rebuild, expected %zu\n",
-                t.fx.datafile.populate_mrg.rejected_v2_size, loaded_size);
+                t.fx.datafile.rejected_v2_size, loaded_size);
         errors++;
     }
     if(journalfile->file != -1) {
@@ -2589,6 +2637,7 @@ static int mrg_jv2_rejected_journal_unittest(void) {
 #ifndef NETDATA_INTERNAL_CHECKS
     errors += mrg_jv2_rejected_on_mapping_failure_check();
     errors += mrg_jv2_rebuild_with_unusable_v1_check();
+    errors += mrg_jv2_query_mapping_failure_check();
 #endif
     fprintf(stderr, "jv2 rejected journal test: %s\n", errors ? "FAILED" : "OK");
     return errors;
