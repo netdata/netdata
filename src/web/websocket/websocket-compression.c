@@ -324,21 +324,22 @@ WS_DECOMPRESS_RESULT websocket_client_decompress_message(WS_CLIENT *wsc) {
         // 'offered' bytes, so the bytes written this pass are (offered - avail_out).
         wsb_set_length(&wsc->u_payload, len_before + (offered - zstrm->avail_out));
 
-        // Check if we need more output space
-        if (!success && (ret == Z_BUF_ERROR || ret == Z_OK)) {
-            if (wsb_length(&wsc->u_payload) > max_decompressed) {
-                // We produced more than max_decompressed bytes (the probe byte was used)
-                // and the message is still not complete: either a decompression bomb or a
-                // message larger than we allow. Reject it (handled by the !success path).
-                websocket_error(wsc,
-                                "Decompression aborted: %zu compressed bytes expand beyond the %zu byte limit "
-                                "(max ratio %llu:1) - possible decompression bomb",
-                                compressed_len, max_decompressed, WS_MAX_DECOMPRESSION_RATIO);
-                too_large = true;
-                break;
-            }
-            wanted_size = MIN(wanted_size * 2, cap);
+        if (wsb_length(&wsc->u_payload) > max_decompressed) {
+            // We produced more than max_decompressed bytes (the probe byte was used): either
+            // a decompression bomb or a message larger than we allow. This holds even when
+            // inflate() reports the end of a final block. Reject it (the !success path).
+            websocket_error(wsc,
+                            "Decompression aborted: %zu compressed bytes expand beyond the %zu byte limit "
+                            "(max ratio %llu:1) - possible decompression bomb",
+                            compressed_len, max_decompressed, WS_MAX_DECOMPRESSION_RATIO);
+            too_large = true;
+            success = false;
+            break;
         }
+
+        // Check if we need more output space
+        if (!success && (ret == Z_BUF_ERROR || ret == Z_OK))
+            wanted_size = MIN(wanted_size * 2, cap);
     } while (!success && retries-- > 0);
 
     if(!success) {
@@ -414,6 +415,25 @@ static bool ws_test_compress_msg(z_stream *def, const char *in, size_t in_len, W
 
     // strip the 00 00 FF FF emitted by Z_SYNC_FLUSH (the receiver re-adds it)
     wsb_set_length(out, produced - 4);
+    return true;
+}
+
+// Compress one message as a final DEFLATE block (BFINAL), as a client may: inflate() then
+// reports Z_STREAM_END for it.
+static bool ws_test_compress_final_msg(z_stream *def, const char *in, size_t in_len, WS_BUF *out) {
+    wsb_reset(out);
+    size_t bound = (size_t)deflateBound(def, (uLong)in_len) + 64;
+    wsb_resize(out, bound);
+
+    def->next_in = (Bytef *)in;
+    def->avail_in = (uInt)in_len;
+    def->next_out = (Bytef *)wsb_data(out);
+    def->avail_out = (uInt)bound;
+
+    if (deflate(def, Z_FINISH) != Z_STREAM_END)
+        return false;
+
+    wsb_set_length(out, bound - def->avail_out);
     return true;
 }
 
@@ -597,6 +617,33 @@ int websocket_compression_unittest(void) {
             }
             else if (websocket_client_decompress_message(wsc) != expected) {
                 fprintf(stderr, "  FAILED case5: %zuB message with a %zuB limit: unexpected result\n", msg_len, limit);
+                errors++;
+            }
+            freez(msg);
+            ws_test_client_destroy(wsc, &def);
+        }
+    }
+
+    // Case 6: the same limits when the message is a final DEFLATE block: inflate() returns
+    // Z_STREAM_END even when the output reached the overflow probe byte.
+    {
+        size_t limit = 64 * 1024;
+        for (size_t extra = 0; extra <= 1; extra++) {
+            z_stream def;
+            WS_CLIENT *wsc = ws_test_client_create(&wth, &def);
+            if (!wsc) { fprintf(stderr, "  FAILED setup (case 6)\n"); return 1; }
+            wsc->max_inbound_message_size = limit;
+
+            size_t msg_len = limit + extra;
+            char *msg = mallocz(msg_len);
+            ws_test_fill_incompressible(msg, msg_len);
+            WS_DECOMPRESS_RESULT expected = extra ? WS_DECOMPRESS_TOO_LARGE : WS_DECOMPRESS_OK;
+            if (!ws_test_compress_final_msg(&def, msg, msg_len, &wsc->payload)) {
+                fprintf(stderr, "  FAILED case6: test compressor error\n"); errors++;
+            }
+            else if (websocket_client_decompress_message(wsc) != expected) {
+                fprintf(stderr, "  FAILED case6: %zuB final-block message with a %zuB limit: unexpected result\n",
+                        msg_len, limit);
                 errors++;
             }
             freez(msg);

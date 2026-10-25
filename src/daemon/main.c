@@ -842,8 +842,6 @@ int netdata_main(int argc, char **argv) {
                             return unittest_run_with_rrd(nrpc_catalog_unittest);
                         else if(strcmp(optarg, "mcpfunctionaccesstest") == 0)
                             return unittest_run_with_rrd(mcp_execute_function_access_unittest);
-                        else if(strcmp(optarg, "mcpbatchtest") == 0)
-                            return mcp_jsonrpc_batch_unittest();
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);
                             unsigned history_seconds = strtoul(optarg, NULL, 0);
@@ -897,6 +895,8 @@ int netdata_main(int argc, char **argv) {
                             return rc;
                         }
 #endif
+                        else if(strcmp(optarg, "mcpbatchtest") == 0)
+                            return mcp_jsonrpc_batch_unittest();
                         else if(strcmp(optarg, "simple-pattern") == 0) {
                             if(optind + 2 > argc) {
                                 fprintf(stderr, "%s", "\nUSAGE: -W simple-pattern 'pattern' 'string'\n\n"
