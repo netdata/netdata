@@ -97,10 +97,9 @@ static void test_control_queue_full(SPAWN_SERVER *server, const char *argv0) {
     pid_t pid = spawn_server_pid(server);
 
 #if defined(OS_LINUX)
-    // A small send buffer bounds the queue, so few filler datagrams are needed;
-    // the server logs and discards each one, as they carry no descriptor. BSD and
-    // macOS bound it by the receive buffer, and a tiny send buffer there would
-    // also cap the size of the request's own datagram.
+    // A small send buffer bounds the queue. BSD and macOS bound it by the receive
+    // buffer, and a tiny send buffer there would also cap the size of the
+    // request's own datagram.
     int sndbuf = 0;
     socklen_t sndbuf_len = sizeof(sndbuf);
     int small_sndbuf = 1;
@@ -116,17 +115,25 @@ static void test_control_queue_full(SPAWN_SERVER *server, const char *argv0) {
         exit(1);
     }
 
+    // The server logs and discards each filler, as they carry no descriptor, so
+    // fill with 1 KiB datagrams (under the 2 KiB macOS limit) and top off with
+    // smaller ones until not even 1 byte fits: the request must find no room.
+    char filler[1024];
+    memset(filler, 'F', sizeof(filler));
     size_t queued = 0;
-    for(;; queued++) {
+    for(size_t size = sizeof(filler); size > 0; ) {
         if(queued > 100000) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "Control queue did not fill");
             exit(1);
         }
-        char filler = 'F';
-        if(send(server->control_fd, &filler, sizeof(filler), 0) == sizeof(filler))
+        if(send(server->control_fd, filler, size, 0) == (ssize_t)size) {
+            queued++;
             continue;
-        if(errno == EAGAIN || errno == EWOULDBLOCK || errno == ENOBUFS)
-            break;
+        }
+        if(errno == EAGAIN || errno == EWOULDBLOCK || errno == ENOBUFS) {
+            size /= 2;
+            continue;
+        }
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot fill the control queue");
         exit(1);
     }
