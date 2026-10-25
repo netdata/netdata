@@ -197,6 +197,14 @@ available for the plugin to use.
 |   `NETDATA_ERRORS_PER_PERIOD`    | The allowed number of log events per period.                                                                                                                                                                                                           | 
 | `NETDATA_SYSTEMD_JOURNAL_PATH`   | When `NETDATA_LOG_METHOD` is set to `journal`, this is the systemd-journald socket path to use.                                                                                                                                                        |
 
+Plugins that run with elevated privileges (installed setuid or setgid, or with file capabilities), such as
+`ebpf.plugin` and `ebpf-go.plugin`, do not use `NETDATA_PLUGINS_DIR`, `NETDATA_USER_CONFIG_DIR`,
+`NETDATA_STOCK_CONFIG_DIR` or `NETDATA_LOG_DIR`, because whoever starts them controls their environment. They use
+the directories Netdata was built with, which are the same ones `netdata` sets on a standard installation. A
+`[directories]` override in `netdata.conf` therefore does not move these directories for them; each one they ignore
+is logged once at startup. If you write a plugin that runs with elevated privileges, do the same: never load, read
+or execute anything from a directory named in its environment.
+
 ### The output of the plugin
 
 The plugin should output instructions for Netdata to its output (`stdout`). Since this uses pipes, please make sure you flush stdout after every iteration.
