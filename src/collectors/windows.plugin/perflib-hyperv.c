@@ -44,15 +44,12 @@ static void get_and_sanitize_instance_value(
             rrddim_set_by_pointer(p->st, p->rd_##field, (collected_number)p->field.current.Data);                    \
     } while (0)
 
-static inline NETDATA_DOUBLE hyperv_average_timer_seconds(COUNTER_DATA *counter)
+// Reports 0 when the two samples cannot form an interval.
+static inline collected_number hyperv_average_timer_usec(const COUNTER_DATA *counter)
 {
-    if (!counter->updated || counter->current.CounterType != PERF_AVERAGE_TIMER ||
-        counter->current.Data < counter->previous.Data || !counter->previous.Time ||
-        counter->current.Time <= counter->previous.Time || !counter->current.Frequency)
-        return 0;
-
-    return (((double)(counter->current.Data - counter->previous.Data) / (double)counter->current.Frequency) /
-            (double)(counter->current.Time - counter->previous.Time));
+    double ms;
+    perflib_average_timer_ms(counter, &ms);
+    return (collected_number)(ms * USEC_PER_MS);
 }
 
 #define HYPERV_MISSING_CYCLES 12
@@ -1353,12 +1350,12 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
             rrddim_set_by_pointer(
                 p->st_latency,
                 p->rd_Latency,
-                (collected_number)(hyperv_average_timer_seconds(&p->Latency) * 1000000.0));
+                hyperv_average_timer_usec(&p->Latency));
         if (p->LowerLatency.updated)
             rrddim_set_by_pointer(
                 p->st_latency,
                 p->rd_LowerLatency,
-                (collected_number)(hyperv_average_timer_seconds(&p->LowerLatency) * 1000000.0));
+                hyperv_average_timer_usec(&p->LowerLatency));
         SETP_DIM_VALUE(st_throughput, Throughput);
         SETP_DIM_VALUE(st_normalized_throughput, NormalizedThroughput);
         SETP_DIM_VALUE(st_io_quota_replenishment_rate, IOQuotaReplenishmentRate);
