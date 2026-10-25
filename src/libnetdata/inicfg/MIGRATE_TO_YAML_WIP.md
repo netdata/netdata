@@ -1174,18 +1174,6 @@ WebRTC configuration for real-time communication features
 | `ice servers` | string | Comma-separated list of ICE (Interactive Connectivity Establishment) servers for NAT traversal. Format: "stun:server:port,turn:server:port". |
 | `proxy server` | string | Proxy server configuration for WebRTC connections when behind corporate firewalls. Format: "protocol://server:port". |
 
-### Section `HTTPD_CONFIG_SECTION`
-h2o HTTP server configuration for alternative high-performance web server implementation
-
-| Key | Type | Comments |
-|-----|------|----------|
-| `bind to` | string | IP address and optional port for h2o HTTP server to bind to. Format: "IP" or "IP:PORT" (e.g., "127.0.0.1" or "0.0.0.0:19998"). Default binds to all interfaces. |
-| `enabled` | boolean | Enable/disable the h2o HTTP server as an alternative to the default web server. When enabled, h2o provides high-performance HTTP/2 support. Default is "no". |
-| `port` | number | TCP port number for the h2o HTTP server to listen on. Default is 19998. Alternative high-performance web server implementation. |
-| `ssl` | boolean | Whether to enable SSL/TLS encryption for the h2o HTTP server. When enabled, requires valid SSL certificate and key files. Default is "no". |
-| `ssl certificate` | string | Path to SSL certificate file for h2o HTTPS server. Used when SSL is enabled to provide the public certificate for encrypted connections. |
-| `ssl key` | string | Path to SSL private key file for h2o HTTPS server. Used when SSL is enabled to decrypt incoming encrypted connections. Must match the certificate. |
-
 ### Section `buf`
 Windows plugin network interface monitoring configuration. The actual section name is dynamically generated as `plugin:proc:/proc/net/dev:INTERFACE_NAME` where INTERFACE_NAME is the network interface.
 
@@ -1860,7 +1848,6 @@ Streaming configuration for parent-child node relationships
 | `gzip compression level` | number | Gzip compression level (1-9). Higher values provide better compression but use more CPU. Default is 3. 1=fastest, 9=best compression. |
 | `initial clock resync iterations` | number | Number of iterations to sync clocks between parent and child before streaming starts. Helps ensure accurate timestamps. Default is 60. |
 | `lz4 compression acceleration` | number | LZ4 compression acceleration factor (1-9). Higher values mean faster compression but lower ratio. Default is 1. 9=fastest, 1=best compression. |
-| `parent using h2o` | boolean | Set to 'yes' if parent is using H2O web server. Adjusts protocol handling for compatibility. Default is no. |
 | `reconnect delay` | duration | Delay in seconds before attempting to reconnect to the parent node after a connection failure. Default is 15 seconds. Minimum is 5 seconds. |
 | `send charts matching` | string | Pattern for selecting which charts to stream. Uses simple patterns with wildcards. Default is '*' (all charts). Example: 'system.* disk.*' |
 | `ssl skip certificate verification` | boolean | Skip SSL certificate verification when connecting to parent. WARNING: Insecure, use only for testing. Default is no. |
