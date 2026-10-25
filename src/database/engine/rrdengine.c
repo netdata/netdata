@@ -2237,10 +2237,10 @@ static struct rrdengine_datafile *release_and_aquire_next_datafile_for_indexing(
         datafile = get_first_ctx_datafile(ctx, true);
 
     while (datafile && datafile->fileno != ctx_last_fileno_get(ctx) && datafile->fileno != ctx_last_flush_fileno_get(ctx)) {
-        // a rejected journal v2 whose v1 was replayed at load: its pages are clean in
-        // the open cache, nothing to index until the next start
+        // a rejected journal v2 has no hot pages to index, unless the startup rebuild
+        // replayed its v1 and published nothing
         if(journalfile_v2_data_available(datafile->journalfile) ||
-           (datafile->populate_mrg.v1_replayed && __atomic_load_n(&datafile->rejected_v2_size, __ATOMIC_RELAXED))) {
+           (__atomic_load_n(&datafile->rejected_v2_size, __ATOMIC_RELAXED) && !datafile->rebuild_unpublished)) {
             datafile = get_next_datafile(datafile, NULL, true);
             continue;
         }
@@ -2308,6 +2308,12 @@ static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx, void 
             journalfile_migrate_to_v2_callback,
             (void *)datafile->journalfile,
             false);
+
+        // the new journal v2 replaced a rejected one the startup rebuild could not remove
+        if (journalfile_v2_data_available(datafile->journalfile)) {
+            ctx_current_disk_space_decrease(ctx, __atomic_exchange_n(&datafile->rejected_v2_size, 0, __ATOMIC_RELAXED));
+            datafile->rebuild_unpublished = false;
+        }
 
         index_once = true;
 

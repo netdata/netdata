@@ -266,7 +266,9 @@ static struct journal_v2_header *journalfile_v2_mounted_data_get(struct rrdengin
 
     spinlock_tracked_lock(&journalfile->data_spinlock);
 
-    if(!journalfile->mmap.data) {
+    // without an fd the mapping already failed: an acquirer that passed the availability
+    // check before that must not record the zeroed size
+    if(!journalfile->mmap.data && journalfile->mmap.fd != -1) {
         journalfile->mmap.data = nd_mmap(NULL, journalfile->mmap.size, PROT_READ, MAP_SHARED, journalfile->mmap.fd, 0);
         if (journalfile->mmap.data == MAP_FAILED) {
             internal_fatal(true, "DBENGINE: failed to re-mmap() journal file v2");
@@ -2187,7 +2189,9 @@ bool journalfile_v2_rebuild_from_v1(struct rrdengine_instance *ctx, struct rrden
     // No new journal v2: the v1 held no indexable pages, or writing it failed.
     // The rejected one must not fail again at every start: remove it, so that the
     // next start replays the v1 as for a missing journal v2. If it cannot be
-    // removed, datafile_delete() discharges it.
+    // removed, datafile_delete() discharges it, or the journal indexer when it
+    // indexes the replayed pages.
+    datafile->rebuild_unpublished = true;
     journalfile_v2_generate_path(datafile, path, sizeof(path));
     bool removed = unlink(path) == 0;
     if (removed)

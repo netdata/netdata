@@ -2366,11 +2366,19 @@ static int jv2_one_metric_destroy(struct jv2_one_metric *t) {
 
 #ifndef NETDATA_INTERNAL_CHECKS
 // The journal v2 is mapped on demand: journalfile_v2_data_set() leaves only its fd.
-// Closing that fd makes the next mapping fail, as an mmap() failure does in production.
+// Swapping it for an fd that cannot be mapped (/dev/null) makes the next mapping fail,
+// as an mmap() failure does in production.
 // Not with internal checks: the failed mapping is an internal_fatal() there.
-static void jv2_break_next_mapping(struct rrdengine_journalfile *journalfile) {
+static bool jv2_break_next_mapping(struct rrdengine_journalfile *journalfile) {
+    int fd = open("/dev/null", O_RDONLY | O_CLOEXEC);
+    if(fd == -1) {
+        fprintf(stderr, "ERROR: cannot open /dev/null to break the journal v2 mapping\n");
+        return false;
+    }
+
     close(journalfile->mmap.fd);
-    journalfile->mmap.fd = -1;
+    journalfile->mmap.fd = fd;
+    return true;
 }
 
 #endif
@@ -2400,7 +2408,10 @@ static int mrg_jv2_rejected_on_mapping_failure_check(void) {
     struct rrdengine_journalfile *journalfile = t.fx.journalfile;
     size_t loaded_size = journalfile_v2_data_size_get(journalfile);
 
-    jv2_break_next_mapping(journalfile);
+    if(!jv2_break_next_mapping(journalfile)) {
+        errors++;
+        goto cleanup;
+    }
     journalfile_v2_populate_retention_to_mrg(&t.fx.ctx, journalfile);
 
     if(journalfile_v2_data_available(journalfile)) {
@@ -2530,7 +2541,7 @@ cleanup:
 
 #ifndef NETDATA_INTERNAL_CHECKS
 // A journal v2 that cannot be mapped for a query is unusable for the rest of the run:
-// its size is recorded, so that datafile_delete() discharges it.
+// its size is recorded (datafile_delete() discharges it; not exercised here).
 static int mrg_jv2_query_mapping_failure_check(void) {
     int errors = 0;
     enum { TEST_FILENO = 16 };
@@ -2546,7 +2557,10 @@ static int mrg_jv2_query_mapping_failure_check(void) {
 
     struct rrdengine_journalfile *journalfile = t.fx.journalfile;
     size_t loaded_size = journalfile_v2_data_size_get(journalfile);
-    jv2_break_next_mapping(journalfile);
+    if(!jv2_break_next_mapping(journalfile)) {
+        errors++;
+        goto cleanup;
+    }
 
     size_t data_size = 0;
     if(journalfile_v2_data_acquire(journalfile, &data_size, 0, 0)) {
@@ -2560,6 +2574,21 @@ static int mrg_jv2_query_mapping_failure_check(void) {
     }
     if(t.fx.datafile.rejected_v2_size != loaded_size) {
         fprintf(stderr, "ERROR: the journal v2 that cannot be mapped for a query recorded %zu bytes, expected %zu\n",
+                t.fx.datafile.rejected_v2_size, loaded_size);
+        errors++;
+    }
+
+    // a second acquirer that passed the availability check before the mapping failed
+    // finds the journal already cleared: it must keep the recorded size
+    journalfile->v2.flags |= JOURNALFILE_FLAG_IS_AVAILABLE;
+    if(journalfile_v2_data_acquire(journalfile, &data_size, 0, 0)) {
+        fprintf(stderr, "ERROR: a journal v2 whose mapping failed was acquired again\n");
+        errors++;
+        journalfile_v2_data_release(journalfile);
+    }
+    journalfile->v2.flags &= ~JOURNALFILE_FLAG_IS_AVAILABLE;
+    if(t.fx.datafile.rejected_v2_size != loaded_size) {
+        fprintf(stderr, "ERROR: a second acquire of a journal v2 whose mapping failed left %zu bytes recorded, expected %zu\n",
                 t.fx.datafile.rejected_v2_size, loaded_size);
         errors++;
     }
@@ -2589,7 +2618,10 @@ static int mrg_jv2_rebuild_with_unusable_v1_check(void) {
 
     struct rrdengine_journalfile *journalfile = t.fx.journalfile;
     size_t loaded_size = journalfile_v2_data_size_get(journalfile);
-    jv2_break_next_mapping(journalfile);
+    if(!jv2_break_next_mapping(journalfile)) {
+        errors++;
+        goto cleanup;
+    }
     journalfile_v2_populate_retention_to_mrg(&t.fx.ctx, journalfile);
 
     int v1_fd = open(v1_path, O_CREAT | O_TRUNC | O_WRONLY | O_CLOEXEC, 0600);
