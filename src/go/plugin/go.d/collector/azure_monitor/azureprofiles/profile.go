@@ -26,7 +26,7 @@ const (
 var (
 	reResourceType     = regexp.MustCompile(`^[A-Za-z0-9._/-]+$`)
 	reIdentityID       = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
-	reResourceProperty = regexp.MustCompile(`^properties(\.[A-Za-z][A-Za-z0-9_]*)+$`)
+	reResourceProperty = regexp.MustCompile(`^properties(\.[A-Za-z][A-Za-z0-9]*)+$`)
 )
 
 // ReservedLabelNames are the labels the collector sets on every resource series.
@@ -138,7 +138,7 @@ func (p Profile) Validate(prefix, baseName string) error {
 	}
 
 	errs = append(errs, validateResourceLabels(prefix, p.ResourceLabels))
-	errs = append(errs, validateResourceStates(prefix, p.ResourceStates, seenMetricIDs))
+	errs = append(errs, validateResourceStates(prefix, p.ResourceStates, seenMetricIDs, metricSeriesNames(p.Metrics)))
 
 	if errors.Join(errs...) == nil {
 		if err := validateTemplate(prefix, baseName, p); err != nil {
@@ -229,7 +229,17 @@ func validateResourceLabels(prefix string, labels []ResourceLabel) error {
 	return errors.Join(errs...)
 }
 
-func validateResourceStates(prefix string, states []ResourceState, metricIDs map[string]struct{}) error {
+func metricSeriesNames(metrics []Metric) map[string]struct{} {
+	names := make(map[string]struct{})
+	for _, metric := range metrics {
+		for _, series := range metric.Series {
+			names[ExportedSeriesName("", metric.ID, series.Aggregation)] = struct{}{}
+		}
+	}
+	return names
+}
+
+func validateResourceStates(prefix string, states []ResourceState, metricIDs, seriesNames map[string]struct{}) error {
 	var errs []error
 	seen := map[string]struct{}{}
 	for i, state := range states {
@@ -252,6 +262,7 @@ func validateResourceStates(prefix string, states []ResourceState, metricIDs map
 			errs = append(errs, fmt.Errorf("%s: 'states' must contain at least one state", statePrefix))
 		}
 		seenOptions := map[string]struct{}{}
+		seenValues := map[string]struct{}{}
 		for j, option := range state.States {
 			optionPrefix := fmt.Sprintf("%s.states[%d]", statePrefix, j)
 			name := strings.TrimSpace(option.Name)
@@ -262,9 +273,18 @@ func validateResourceStates(prefix string, states []ResourceState, metricIDs map
 				errs = append(errs, fmt.Errorf("%s: duplicate state name %q", optionPrefix, name))
 			}
 			seenOptions[name] = struct{}{}
-			if strings.TrimSpace(option.Value) == "" {
+			value := strings.ToLower(strings.TrimSpace(option.Value))
+			if value == "" {
 				errs = append(errs, fmt.Errorf("%s: 'value' is required", optionPrefix))
+			} else if _, ok := seenValues[value]; ok {
+				errs = append(errs, fmt.Errorf("%s: duplicate state value %q", optionPrefix, option.Value))
 			}
+			seenValues[value] = struct{}{}
+			series := ExportedStateSeriesName("", id, name)
+			if _, ok := seriesNames[series]; ok {
+				errs = append(errs, fmt.Errorf("%s: series %q collides with another metric or state series", optionPrefix, strings.TrimPrefix(series, ".")))
+			}
+			seriesNames[series] = struct{}{}
 		}
 	}
 	return errors.Join(errs...)
@@ -276,6 +296,7 @@ func ExportedStateSeriesName(profileName, stateID, stateName string) string {
 }
 
 // ResourcePropertyColumn is the discovery query column that carries a resource property.
+// Property segments cannot contain underscores, so distinct properties never share a column.
 func ResourcePropertyColumn(property string) string {
 	return "nd_" + strings.ReplaceAll(strings.TrimSpace(property), ".", "_")
 }

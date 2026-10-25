@@ -3,6 +3,9 @@
 package azureprofiles
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -115,6 +118,34 @@ func TestProfile_ResourceLabelsAndStatesValidation(t *testing.T) {
 			mutate: func(p *Profile) { p.ResourceStates[0].States[0].Value = " " },
 			want:   "'value' is required",
 		},
+		"property segment with an underscore, which would share a discovery column": {
+			mutate: func(p *Profile) { p.ResourceLabels[0].Property = "properties.hardware_profile" },
+			want:   "'property' must match",
+		},
+		"two states with the same value": {
+			mutate: func(p *Profile) { p.ResourceStates[0].States[1].Value = "powerstate/RUNNING" },
+			want:   `duplicate state value "powerstate/RUNNING"`,
+		},
+		"state series colliding with a metric series": {
+			mutate: func(p *Profile) {
+				p.ResourceStates = append(p.ResourceStates, ResourceState{
+					ID:       "percentage",
+					Property: "properties.provisioningState",
+					States:   []StateOption{{Name: "cpu_average", Value: "Succeeded"}},
+				})
+			},
+			want: `series "percentage_cpu_average" collides`,
+		},
+		"state series colliding with another state series": {
+			mutate: func(p *Profile) {
+				p.ResourceStates = append(p.ResourceStates, ResourceState{
+					ID:       "power",
+					Property: "properties.provisioningState",
+					States:   []StateOption{{Name: "state_running", Value: "Succeeded"}},
+				})
+			},
+			want: `series "power_state_running" collides`,
+		},
 		"chart referencing an undeclared state": {
 			mutate: func(p *Profile) { p.ResourceStates[0].States = p.ResourceStates[0].States[:1] },
 			want:   "power_state_deallocated",
@@ -140,4 +171,31 @@ func TestNormalizeResourceLabelValue(t *testing.T) {
 
 func TestResourcePropertyColumn(t *testing.T) {
 	assert.Equal(t, "nd_properties_hardwareProfile_vmSize", ResourcePropertyColumn("properties.hardwareProfile.vmSize"))
+}
+
+func TestCatalog_ResourceProperties(t *testing.T) {
+	dir := t.TempDir()
+	appProfile := strings.NewReplacer(
+		"Microsoft.Compute/virtualMachines", "Microsoft.Web/sites",
+		"context_namespace: test_vm", "context_namespace: test_app",
+		"properties.hardwareProfile.vmSize", "properties.siteConfig.linuxFxVersion",
+	).Replace(resourceProfileYAML)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "test_vm.yaml"), []byte(resourceProfileYAML), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "test_app.yaml"), []byte(appProfile), 0o644))
+
+	catalog, err := LoadFromDirs([]DirSpec{{Path: dir, IsStock: true}})
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{
+		"properties.extended.instanceView.powerState.code",
+		"properties.hardwareProfile.vmSize",
+		"properties.serverFarmId",
+		"properties.siteConfig.linuxFxVersion",
+	}, catalog.ResourceProperties())
+	assert.Equal(t, []string{
+		"properties.extended.instanceView.powerState.code",
+		"properties.serverFarmId",
+		"properties.siteConfig.linuxFxVersion",
+	}, catalog.ResourceProperties("microsoft.web/sites"))
+	assert.Empty(t, catalog.ResourceProperties("Microsoft.Sql/servers/databases"))
 }

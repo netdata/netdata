@@ -25,6 +25,7 @@ func (c *Collector) collect(ctx context.Context) error {
 	queryBatches := c.buildQueryBatches(now)
 
 	dueInstruments := dueInstrumentsForBatches(queryBatches)
+	markResourceStatesDue(dueInstruments, c.runtime)
 	samples, err := c.collectQuerySamples(ctx, queryBatches, now)
 	if err != nil {
 		return err
@@ -82,6 +83,21 @@ func (c *Collector) collectQuerySamples(ctx context.Context, batches []queryBatc
 	}
 
 	return allSamples, nil
+}
+
+// markResourceStatesDue marks state series as reported every cycle, so a state that discovery
+// no longer returns is dropped instead of replayed from the observation cache.
+func markResourceStatesDue(dueInstruments map[string]bool, runtime *collectorRuntime) {
+	if runtime == nil {
+		return
+	}
+	for _, profile := range runtime.Profiles {
+		for _, state := range profile.ResourceStates {
+			for _, option := range state.Options {
+				dueInstruments[option.Instrument] = true
+			}
+		}
+	}
 }
 
 // resourceStateSamples reports each resource state from discovery, so resources without

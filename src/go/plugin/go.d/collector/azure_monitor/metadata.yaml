@@ -140,7 +140,7 @@ modules:
 
             | Profile key | Purpose |
             |:------------|:--------|
-            | `resource_labels` | Adds a label to every series of the resource. Each entry has `name`, `property` (a path under `properties`, for example `properties.hardwareProfile.vmSize`), and optional `value: arm_name` to keep only the last segment of an ARM resource ID. |
+            | `resource_labels` | Adds a label to every series of the resource. Each entry has `name`, `property` (a dot-separated path under `properties` whose segments contain only letters and digits, for example `properties.hardwareProfile.vmSize`), and optional `value: arm_name` to keep only the last segment of an ARM resource ID. |
             | `resource_states` | Exports one 0/1 series per state, named `<id>_<state>`, from a property such as `properties.extended.instanceView.powerState.code`. Values match case-insensitively. These series are reported even when Azure Monitor has no metric data for the resource, for example a deallocated VM. |
 
             In `discovery.mode: query`, the custom KQL must return each property as a column named `nd_` followed by the property path with dots replaced by underscores (for example `nd_properties_hardwareProfile_vmSize`). Missing columns leave the label empty and the state unreported.
@@ -1681,6 +1681,7 @@ modules:
           - **Disk cache** -- premium OS and data disk cache hit/miss rates
           - **Network** -- traffic in/out, network flows, flow creation rate
           - **Availability** -- VM availability state
+          - **Power state** -- running, stopped, deallocated, and transitional states, from Azure Resource Graph
           - **Throttling** -- cached and uncached I/O bandwidth/IOPS throttling
         method_description: *method_description
     metrics:
@@ -2798,6 +2799,8 @@ modules:
               description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
+            - name: app_service_plan
+              description: "The name of the App Service plan hosting the app, from Azure Resource Graph."
           metrics:
             - name: azure_monitor.app_service.requests
               description: Azure App Service Requests

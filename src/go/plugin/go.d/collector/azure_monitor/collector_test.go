@@ -668,6 +668,37 @@ func TestCollector_RefreshDiscoveryFailureFallsBackToLastKnownSnapshot(t *testin
 	assert.Equal(t, uint64(1), c.discovery.FetchCounter)
 }
 
+func TestCollector_DropsResourceStateWhenDiscoveryNoLongerReportsIt(t *testing.T) {
+	now := time.Date(2026, 3, 7, 12, 0, 0, 0, time.UTC)
+	rg := &mockResourceGraph{resources: []map[string]any{
+		testVirtualMachine("vm-a", "Standard_B2s", "Linux", "PowerState/running"),
+	}}
+
+	c := newTestCollectorWithMocks(rg, &mockMetricsClient{})
+	c.Config = testConfig()
+	c.Config.Profiles.ModeExact = testProfilesModeEntries("virtual_machines")
+	c.Config.Discovery.RefreshEvery = 60
+	c.now = func() time.Time { return now }
+
+	require.NoError(t, c.Init(context.Background()))
+	require.NoError(t, c.Check(context.Background()))
+
+	series, err := collecttest.CollectScalarSeries(c, metrix.ReadRaw())
+	require.NoError(t, err)
+	running, ok := seriesValue(series, "virtual_machines.power_state_running{")
+	require.True(t, ok)
+	assert.Equal(t, metrix.SampleValue(1), running)
+
+	rg.resources = []map[string]any{testVirtualMachine("vm-a", "Standard_B2s", "Linux", "")}
+	now = now.Add(10 * time.Minute)
+
+	series, err = collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	assert.Equal(t, uint64(2), c.discovery.FetchCounter)
+	_, ok = seriesValue(series, "virtual_machines.power_state_running{")
+	assert.False(t, ok)
+}
+
 func TestCollector_CollectScenarios(t *testing.T) {
 	now := time.Date(2026, 3, 7, 12, 0, 0, 0, time.UTC)
 
@@ -777,26 +808,8 @@ func TestCollector_CollectScenarios(t *testing.T) {
 				c.Config.Profiles.ModeExact = testProfilesModeEntries("virtual_machines")
 				c.now = func() time.Time { return now }
 				rg.resources = []map[string]any{
-					{
-						"id":                                   "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.Compute/virtualMachines/vm-a",
-						"name":                                 "vm-a",
-						"type":                                 "Microsoft.Compute/virtualMachines",
-						"resourceGroup":                        "rg-a",
-						"location":                             "eastus",
-						"nd_properties_hardwareProfile_vmSize": "Standard_D2s_v3",
-						"nd_properties_storageProfile_osDisk_osType":          "Linux",
-						"nd_properties_extended_instanceView_powerState_code": "PowerState/running",
-					},
-					{
-						"id":                                   "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.Compute/virtualMachines/vm-b",
-						"name":                                 "vm-b",
-						"type":                                 "Microsoft.Compute/virtualMachines",
-						"resourceGroup":                        "rg-a",
-						"location":                             "eastus",
-						"nd_properties_hardwareProfile_vmSize": "Standard_B2s",
-						"nd_properties_storageProfile_osDisk_osType":          "Windows",
-						"nd_properties_extended_instanceView_powerState_code": "powerstate/deallocated",
-					},
+					testVirtualMachine("vm-a", "Standard_D2s_v3", "Linux", "PowerState/running"),
+					testVirtualMachine("vm-b", "Standard_B2s", "Windows", "powerstate/deallocated"),
 				}
 				mx.queryResponse = azmetrics.QueryResourcesResponse{MetricResults: azmetrics.MetricResults{Values: []azmetrics.MetricData{
 					{
@@ -836,14 +849,9 @@ func TestCollector_CollectScenarios(t *testing.T) {
 				c.Config.Profiles.ModeExact = testProfilesModeEntries("app_service")
 				c.now = func() time.Time { return now }
 				rg.resources = []map[string]any{
-					{
-						"id":                         "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.Web/sites/app-a",
-						"name":                       "app-a",
-						"type":                       "Microsoft.Web/sites",
-						"resourceGroup":              "rg-a",
-						"location":                   "eastus",
+					testResource("Microsoft.Web/sites", "app-a", map[string]any{
 						"nd_properties_serverFarmId": "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.Web/serverfarms/asp-a",
-					},
+					}),
 				}
 				mx.queryResponse = azmetrics.QueryResourcesResponse{MetricResults: azmetrics.MetricResults{Values: []azmetrics.MetricData{
 					{
@@ -2864,6 +2872,27 @@ func uniqueStrings(values []string) []string {
 		out = append(out, value)
 	}
 	return out
+}
+
+// testResource is a discovery row of a resource in sub-1/rg-a/eastus, plus extra columns.
+func testResource(resourceType, name string, columns map[string]any) map[string]any {
+	row := map[string]any{
+		"id":            "/subscriptions/sub-1/resourceGroups/rg-a/providers/" + resourceType + "/" + name,
+		"name":          name,
+		"type":          resourceType,
+		"resourceGroup": "rg-a",
+		"location":      "eastus",
+	}
+	maps.Copy(row, columns)
+	return row
+}
+
+func testVirtualMachine(name, size, osType, powerState string) map[string]any {
+	return testResource("Microsoft.Compute/virtualMachines", name, map[string]any{
+		"nd_properties_hardwareProfile_vmSize":                size,
+		"nd_properties_storageProfile_osDisk_osType":          osType,
+		"nd_properties_extended_instanceView_powerState_code": powerState,
+	})
 }
 
 func seriesValue(series map[string]metrix.SampleValue, substrings ...string) (metrix.SampleValue, bool) {
