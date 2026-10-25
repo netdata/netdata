@@ -85,9 +85,10 @@ Each collection cycle (`collect.go`), in order:
 
 ## Lifecycle
 
-Framework V2: `Init` → `Check` → repeated `Collect`; there is no background
-`Run` (the collector does not implement `CollectorV2Runner`). `collector.go`
-owns the `Collector` struct and lifecycle.
+Framework V2: `Init` → `Check` → `Run` readiness → repeated `Collect`.
+`CollectorV2Runner.Run` acquires optional resource attributes alongside collection;
+readiness does not wait for those lookups. `collector.go` owns collection state and
+`attributes_run.go` owns the background worker.
 
 ```mermaid
 flowchart TD
@@ -96,12 +97,15 @@ flowchart TD
     Runtime("ensurePlan<br/>load catalog · compile rules<br/>build + cache chart template")
     Targets("ensureTargets<br/>concurrent STS GetCallerIdentity<br/>fail-soft · retry pending")
     Post("framework postCheck<br/>validate ChartTemplateYAML via chartengine")
+    Run("Run<br/>snapshot worker inputs · signal ready<br/>acquire optional metadata")
     Collect("Collect<br/>every update_every")
-    Cycle("collect cycle<br/>discover → tags → plan → schedule → execute → observe")
+    Cycle("collect cycle<br/>discover → tags → attributes → plan → schedule → execute → observe")
 
     Init --> Check
     Check --> Runtime --> Targets --> Post
-    Post --> Collect --> Cycle --> Collect
+    Post --> Run -->|ready| Collect --> Cycle --> Collect
+    Cycle -. due metadata requests .-> Run
+    Run -. completed metadata .-> Cycle
 
     classDef input fill:#eef1f4,stroke:#8b949e,color:#24292f;
     classDef sched fill:#ece2ff,stroke:#8250df,color:#3b1f6b;
@@ -111,7 +115,7 @@ flowchart TD
     class Init,Check input
     class Runtime,Targets sched
     class Post commit
-    class Collect,Cycle core
+    class Run,Collect,Cycle core
 ```
 
 - **Init** does config only (`applyDefaults`, `validate`) — no network.
@@ -122,8 +126,11 @@ flowchart TD
   first `Collect`; an unbuilt template would fail the job.
 - **Collect** runs the whole cycle (below). `ensurePlan` short-circuits once
   compiled; `ensureTargets` retries only unresolved targets.
+- **Run** owns metadata clients and remote acquisition. Collection sends due requests
+  and accepts completed results without waiting for metadata. The framework cancels
+  and joins the runner before cleanup.
 - **Cleanup** resets the collection plan, resolved targets, cached template,
-  discovery/query snapshots, client caches, and per-query observation state so a framework
+  discovery/query/attribute snapshots, worker channels, client caches, and per-query observation state so a framework
   re-Init after failed autodetection starts clean. Pending collector activity and
   its known interval-gauge keys are reset as well. The `metrix` store is created
   once in `New` and persists — it is not recreated.
