@@ -785,13 +785,28 @@ static bool spawn_server_send_control_fd(int control_fd, int request_fd) {
 #endif
         if(sent == sizeof(marker))
             return true;
-        if(sent < 0 && errno == EINTR)
+        int send_errno = sent < 0 ? errno : 0;
+        if(send_errno == EINTR)
             continue;
-        if(sent < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+
+        bool queue_full = send_errno == EAGAIN || send_errno == EWOULDBLOCK;
+#if defined(OS_MACOS) || defined(OS_FREEBSD)
+        // A full datagram queue reports ENOBUFS here, and POLLOUT does not wait for room.
+        bool no_buffers = send_errno == ENOBUFS;
+        queue_full = queue_full || no_buffers;
+#endif
+
+        if(queue_full) {
             if(now_monotonic_usec() >= deadline) {
                 errno = ETIMEDOUT;
                 break;
             }
+#if defined(OS_MACOS) || defined(OS_FREEBSD)
+            if(no_buffers) {
+                sleep_usec(10 * USEC_PER_MS);
+                continue;
+            }
+#endif
             struct pollfd pfd = { .fd = control_fd, .events = POLLOUT };
             if(poll(&pfd, 1, 100) < 0 && errno != EINTR)
                 break;

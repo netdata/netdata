@@ -52,6 +52,7 @@ typedef struct {
     const char *argv0;
     size_t index;
     int result;
+    bool done;
 } SPAWN_CONTROL_TEST_CALL;
 
 static int plugin_echo_argument(int argc, const char **argv) {
@@ -70,8 +71,10 @@ static void *test_control_concurrent_call(void *arg) {
 
     SPAWN_INSTANCE *si = spawn_server_exec(call->server, STDERR_FILENO, 0, argv, NULL, 0,
                                            SPAWN_INSTANCE_TYPE_EXEC);
-    if(!si)
+    if(!si) {
+        __atomic_store_n(&call->done, true, __ATOMIC_RELEASE);
         return NULL;
+    }
 
     close(spawn_server_instance_write_fd(si));
     spawn_server_instance_write_fd_unset(si);
@@ -84,7 +87,80 @@ static void *test_control_concurrent_call(void *arg) {
     int status = spawn_server_exec_wait(call->server, si);
     call->result = used == strlen(token) && memcmp(output, token, used) == 0 &&
                    WIFEXITED(status) && WEXITSTATUS(status) == 0;
+    __atomic_store_n(&call->done, true, __ATOMIC_RELEASE);
     return NULL;
+}
+
+// Stop the server and fill its control queue. A caller must wait for room
+// instead of failing, and complete once the server runs again.
+static void test_control_queue_full(SPAWN_SERVER *server, const char *argv0) {
+    pid_t pid = spawn_server_pid(server);
+
+#if defined(OS_LINUX)
+    // A small send buffer bounds the queue, so few filler datagrams are needed;
+    // the server logs and discards each one, as they carry no descriptor. BSD and
+    // macOS bound it by the receive buffer, and a tiny send buffer there would
+    // also cap the size of the request's own datagram.
+    int sndbuf = 0;
+    socklen_t sndbuf_len = sizeof(sndbuf);
+    int small_sndbuf = 1;
+    if(getsockopt(server->control_fd, SOL_SOCKET, SO_SNDBUF, &sndbuf, &sndbuf_len) != 0 ||
+       setsockopt(server->control_fd, SOL_SOCKET, SO_SNDBUF, &small_sndbuf, sizeof(small_sndbuf)) != 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot shrink the control send buffer");
+        exit(1);
+    }
+#endif
+
+    if(kill(pid, SIGSTOP) != 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot stop the spawn server");
+        exit(1);
+    }
+
+    size_t queued = 0;
+    for(;; queued++) {
+        if(queued > 100000) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Control queue did not fill");
+            exit(1);
+        }
+        char filler = 'F';
+        if(send(server->control_fd, &filler, sizeof(filler), 0) == sizeof(filler))
+            continue;
+        if(errno == EAGAIN || errno == EWOULDBLOCK || errno == ENOBUFS)
+            break;
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot fill the control queue");
+        exit(1);
+    }
+
+    pthread_t thread;
+    SPAWN_CONTROL_TEST_CALL call = { .server = server, .argv0 = argv0, .index = 1000 };
+    if(pthread_create(&thread, NULL, test_control_concurrent_call, &call) != 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot start the control queue test thread");
+        exit(1);
+    }
+
+    sleep_usec(300 * USEC_PER_MS);
+    bool waited = !__atomic_load_n(&call.done, __ATOMIC_ACQUIRE);
+
+    if(kill(pid, SIGCONT) != 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot resume the spawn server");
+        exit(1);
+    }
+    pthread_join(thread, NULL);
+#if defined(OS_LINUX)
+    // Linux reports twice the value that was set, and doubles what it is given.
+    sndbuf /= 2;
+    if(setsockopt(server->control_fd, SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof(sndbuf)) != 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot restore the control send buffer");
+        exit(1);
+    }
+#endif
+
+    if(!waited || !call.result) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "Request with a full control queue (%zu queued) %s", queued,
+               waited ? "failed after the server resumed" : "did not wait for room");
+        exit(1);
+    }
 }
 
 static void test_private_control_channel(int argc, const char **argv) {
@@ -128,6 +204,8 @@ static void test_private_control_channel(int argc, const char **argv) {
         spawn_server_destroy(server);
         exit(1);
     }
+
+    test_control_queue_full(server, argv[0]);
 
     pthread_t threads[SPAWN_CONTROL_CONCURRENT_CALLERS];
     SPAWN_CONTROL_TEST_CALL calls[SPAWN_CONTROL_CONCURRENT_CALLERS] = { 0 };
