@@ -74,7 +74,7 @@ func New() *Collector {
 	c.activity = newCollectorActivity(c.store)
 	c.clients = newClientCache(c.buildTargetRegionClient)
 	c.rgtaClients = newClientCache(c.buildTargetRegionRGTAClient)
-	c.rdsClients = newClientCache(c.buildTargetRegionRDSClient)
+	c.resetAttributeWorker()
 	return c
 }
 
@@ -99,7 +99,6 @@ type Collector struct {
 
 	clients     *clientCache[cloudwatchClient] // one per (target, region)
 	rgtaClients *clientCache[rgtaClient]       // one per (target, region)
-	rdsClients  *clientCache[rdsClient]        // one per (target, region)
 	discovery   discoverySnapshot
 	queryPlan   []plannedQuery
 	planDirty   bool
@@ -113,8 +112,12 @@ type Collector struct {
 	tagLabelPlans map[string][]resolvedTag // per-profile resolved tag->label plans (nil until compiled)
 	tagFetchPlan  []tagFetchGroup          // immutable discovery-derived RGTA topology (nil when invalidated)
 
-	attributes        map[attributeGroupKey]attributeGroup // control-plane attribute labels, refreshed with discovery
-	profileAttributes map[string]profileAttributes         // per-profile attribute providers (nil until compiled)
+	attributes         map[attributeGroupKey]attributeGroup // control-plane attribute labels, refreshed with discovery
+	profileAttributes  map[string]profileAttributes         // per-profile attribute providers (nil until compiled)
+	attributeRequests  chan attributeBatch
+	attributeResults   chan attributeBatch
+	attributePending   bool
+	attributeRefreshAt time.Time
 }
 
 func (c *Collector) Init(context.Context) error {
@@ -146,7 +149,6 @@ func (c *Collector) Cleanup(context.Context) {
 	c.discoverySig = ""
 	c.clients.reset()
 	c.rgtaClients.reset()
-	c.rdsClients.reset()
 	c.observations.reset()
 	c.activity.reset()
 	c.tags = tagSnapshot{}
@@ -154,6 +156,7 @@ func (c *Collector) Cleanup(context.Context) {
 	c.tagFetchPlan = nil
 	c.attributes = nil
 	c.profileAttributes = nil
+	c.resetAttributeWorker()
 }
 
 func (c *Collector) Configuration() any { return c.Config }

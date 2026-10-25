@@ -72,7 +72,8 @@ Each collection cycle (`collect.go`), in order:
    profiles, share one `ListMetrics` scan per (target, region, namespace) and
    match each participating profile against that stream (`discover.go`);
 3. resolve resource-tag membership and optional chart labels (`tags.go`), then
-   control-plane resource attribute labels such as the RDS engine (`attributes.go`);
+   accept completed background resource attribute results and queue any due refresh
+   without waiting for it (`attributes.go`, `attributes_run.go`);
 4. reuse or rebuild the stable per-series query blueprint
    (`query_plan.go`);
 5. execute the due queries in concurrent batches (`query_executor.go`);
@@ -332,7 +333,7 @@ copies selected AWS tags to **non-identity** chart labels.
 
 ## Resource Attribute Labels
 
-`attributes.go` and `attributes_rds.go` add facts CloudWatch does not publish per
+`attributes.go`, `attributes_run.go`, and `attributes_rds.go` add facts CloudWatch does not publish per
 instance. CloudWatch aggregates `AWS/RDS` separately by `EngineName` and
 `DatabaseClass` but never pairs them with `DBInstanceIdentifier`, so the engine comes
 from the RDS control plane.
@@ -344,26 +345,32 @@ from the RDS control plane.
   `rds:DescribeDBInstances` (`AWS/RDS`, `DBInstanceIdentifier`), emitting `engine`,
   `engine_version`, and `db_instance_class` from the raw AWS values; empty values are
   omitted. There is no config option and no profile-format field.
+- **Acquisition ownership.** `CollectorV2Runner.Run` signals readiness without waiting
+  for AWS and fetches optional metadata independently of `Collect`. Immutable requests
+  and results transfer through channels, with one batch outstanding at a time. The
+  runner owns RDS clients; `Collect` owns accepted labels and query-plan invalidation.
+  Runner cancellation cancels its requests, and the framework joins it before cleanup.
 - **Fetch groups.** One fetch per `(target, region, provider)` that has discovered
   instances, so a job selecting RDS without RDS instances makes no call. Clients are
-  cached per `(target, region)`; pages use `MaxRecords=100`, the job `timeout`, a
-  duplicate-marker check, and at most 100 pages (10,000 instances). The join is exact on
-  the instance identifier within the fetching target and region. The cache keeps only
-  discovered identifiers, so other instances in the response (undiscovered, Neptune,
-  DocumentDB) neither use memory nor rebuild the query plan when they change.
-- **Refresh and failure.** Groups expire after `discovery.refresh_every` and are marked
-  stale on every discovery install, so instances from a snapshot installed before the
-  group's TTL expires still get their first charts labeled. A newly resolved target's
-  groups have no state and are fetched in the same cycle. Steady-state cycles with
-  nothing due return without rebuilding the cache; candidate identifiers are built
-  only for groups being fetched. A failed group keeps its last-known labels and retries
-  at the next expiry, not every collect, which bounds calls and log volume when the
-  optional permission is missing; failures log through the hourly-limited
-  `resource attribute lookup` warning. Parent cancellation commits nothing.
-- **Presentation.** A changed label set invalidates the query plan once; chartengine
-  emits `UpdateChartLabelsAction` for the existing chart. Attribute labels are reserved
-  for profiles with a provider: `resolveTagPlan` skips a colliding `labels.resource_tags`
-  entry with a warning, because a duplicate label key panics `metrix`.
+  cached per `(target, region)`; pages use the API maximum `MaxRecords=100`, the job
+  `timeout`, and a duplicate-marker check. There is no aggregate page cap. The join is
+  exact on the instance identifier within the fetching target and region, extracted
+  using each profile's own dimension layout. Requests include discovered identifiers;
+  responses for other instances (undiscovered, Neptune, DocumentDB) are discarded.
+- **Refresh and failure.** `Collect` accepts completed results without waiting for
+  remote I/O and filters them to the current discovery snapshot, so a late response
+  cannot resurrect removed resources. Refresh uses `discovery.refresh_every`; a new
+  discovery snapshot also makes metadata due. New identifiers discovered during an
+  outstanding request cause another refresh after that request completes. A failed group
+  keeps its last-known labels and retries on this cadence rather than every collect; failures log through
+  the hourly-limited `resource attribute lookup` warning.
+- **Presentation.** Initial charts may lack attributes; a later collection applies
+  completed metadata to the same chart IDs. A changed label set invalidates the query
+  plan once; chartengine emits `UpdateChartLabelsAction` for the existing chart.
+  Explicit `labels.resource_tags` mappings reserve their output names, even when a
+  resource has no value for that tag; automatic attributes only fill unclaimed names.
+  A provider whose labels collide with profile identity labels is skipped, preserving
+  unique label keys without changing chart or query identity.
 - **Cost.** `DescribeDBInstances` is not a billed CloudWatch API and is not counted by
   the collector-activity charts, like RGTA and STS.
 
@@ -725,8 +732,9 @@ aws-eusc).
   a mutex, caching only successes (a transient credential error is retried next
   call).
 - The top-level `collect` stages run sequentially, and the per-cycle `store`
-  write is single-threaded. Discovery, resource-tag lookup, resource attribute
-  lookup, and query execution fan out within their respective stages.
+  write is single-threaded. Discovery, resource-tag lookup, and query execution fan
+  out within their respective stages. Optional resource attribute lookup runs in
+  `Run`, concurrently with these stages, and transfers immutable results to `Collect`.
 
 ## Cost Model
 
@@ -873,7 +881,7 @@ not separately document pagination billing semantics.
 - **Change scheduling, retention, correction, or gap state**: `observe.go`.
 - **Add a resource attribute provider** (for example EC2 instance type): add a
   `resourceAttributeProvider` next to `attributes_rds.go`, its narrow client and
-  `clientCache` in `clients.go`/`collector.go`, and the permission in `metadata.yaml`.
+  runner-owned `clientCache` in `attributes_run.go`, and the permission in `metadata.yaml`.
 - **Change how retained observations become metrics** (rate normalization,
   labels, float hint): `query_emit.go`.
 - **Change chart generation** (namespace or template assembly): `chart.go`, plus

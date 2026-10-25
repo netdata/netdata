@@ -16,8 +16,6 @@ import (
 const (
 	// rdsDescribePageSize is the DescribeDBInstances maximum (valid 20..100).
 	rdsDescribePageSize = 100
-	// rdsDescribeMaxPages bounds one (target, region) fetch to 10,000 instances.
-	rdsDescribeMaxPages = 100
 )
 
 // CloudWatch publishes AWS/RDS metrics per DBInstanceIdentifier, and separately
@@ -31,25 +29,35 @@ var rdsInstanceAttributes = &resourceAttributeProvider{
 	fetch:     fetchRDSInstanceAttributes,
 }
 
-func fetchRDSInstanceAttributes(ctx context.Context, c *Collector, target, region string) (map[string][]metrix.Label, error) {
-	client, err := c.rdsClients.forTargetRegion(ctx, target, region)
+func fetchRDSInstanceAttributes(
+	ctx context.Context,
+	clients *attributeClients,
+	target, region string,
+) (map[string][]metrix.Label, error) {
+	ctx, cancel := withTimeout(ctx, clients.timeout)
+	defer cancel()
+	client, err := clients.rds.forTargetRegion(ctx, target, region)
 	if err != nil {
 		return nil, fmt.Errorf("build client: %w", err)
 	}
-	return describeRDSInstanceAttributes(ctx, client, c.Timeout.Duration())
+	return describeRDSInstanceAttributes(ctx, client, clients.timeout)
 }
 
 // describeRDSInstanceAttributes pages DescribeDBInstances under one timeout. The
 // result may include Neptune and DocumentDB instances; they never match AWS/RDS
 // instances because a DBInstanceIdentifier is unique per account and region.
-func describeRDSInstanceAttributes(ctx context.Context, client rdsClient, timeout time.Duration) (map[string][]metrix.Label, error) {
+func describeRDSInstanceAttributes(
+	ctx context.Context,
+	client rdsClient,
+	timeout time.Duration,
+) (map[string][]metrix.Label, error) {
 	cctx, cancel := withTimeout(ctx, timeout)
 	defer cancel()
 
 	out := make(map[string][]metrix.Label)
 	seenMarkers := make(map[string]struct{})
 	var marker *string
-	for range rdsDescribeMaxPages {
+	for {
 		response, err := client.DescribeDBInstances(cctx, &rds.DescribeDBInstancesInput{
 			Marker:     marker,
 			MaxRecords: aws.Int32(rdsDescribePageSize),
@@ -79,5 +87,4 @@ func describeRDSInstanceAttributes(ctx context.Context, client rdsClient, timeou
 		seenMarkers[*response.Marker] = struct{}{}
 		marker = response.Marker
 	}
-	return nil, fmt.Errorf("DescribeDBInstances exceeded %d pages", rdsDescribeMaxPages)
 }

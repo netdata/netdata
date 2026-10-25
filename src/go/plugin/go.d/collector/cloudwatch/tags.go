@@ -157,7 +157,7 @@ func (c *Collector) computeTagLabelPlans() {
 		if c.plan.TagJoins[p.Name] == nil {
 			continue
 		}
-		plan, warnings := resolveTagPlan(c.Labels.ResourceTags, profileDimLabels(p.Config), profileAttributeLabels(p.Config))
+		plan, warnings := resolveTagPlan(c.Labels.ResourceTags, profileDimLabels(p.Config))
 		for _, w := range warnings {
 			c.Warningf("CloudWatch tags (profile %q): %s", p.Name, w)
 		}
@@ -210,7 +210,12 @@ func (c *Collector) refreshTags(ctx context.Context) {
 
 	failures := applyTagFetchResults(states, c.tags.groups, results, now, ttl)
 	next := mergeTagGroupSnapshots(states, now, now.Add(ttl))
-	c.warnOperationFailures(logKeyTagRefreshFailed, "resource tag lookup", " (retaining fail-closed membership and last-known labels)", failures)
+	c.warnOperationFailures(
+		logKeyTagRefreshFailed,
+		"resource tag lookup",
+		" (retaining fail-closed membership and last-known labels)",
+		failures,
+	)
 
 	changed := !next.sameEffective(c.tags)
 	c.tags = next
@@ -219,7 +224,11 @@ func (c *Collector) refreshTags(ctx context.Context) {
 	}
 }
 
-func selectDueTagGroups(groups []tagFetchGroup, previous map[tagFetchKey]tagGroupSnapshot, now time.Time) (map[tagFetchKey]tagGroupSnapshot, []tagFetchGroup) {
+func selectDueTagGroups(
+	groups []tagFetchGroup,
+	previous map[tagFetchKey]tagGroupSnapshot,
+	now time.Time,
+) (map[tagFetchKey]tagGroupSnapshot, []tagFetchGroup) {
 	states := make(map[tagFetchKey]tagGroupSnapshot, len(groups))
 	var due []tagFetchGroup
 	for _, group := range groups {
@@ -245,12 +254,19 @@ func (c *Collector) fetchTagGroups(ctx context.Context, groups []tagFetchGroup) 
 	return results
 }
 
-func applyTagFetchResults(states, previous map[tagFetchKey]tagGroupSnapshot, results []tagFetchResult, now time.Time, ttl time.Duration) []operationFailure {
+func applyTagFetchResults(
+	states, previous map[tagFetchKey]tagGroupSnapshot,
+	results []tagFetchResult,
+	now time.Time,
+	ttl time.Duration,
+) []operationFailure {
 	var failures []operationFailure
 	for _, result := range results {
 		if result.err == nil {
 			states[result.group.key] = tagGroupSnapshot{
-				membershipIDs: tagGroupMembershipIDs(result.group), members: result.members, labels: result.labels,
+				membershipIDs:   tagGroupMembershipIDs(result.group),
+				members:         result.members,
+				labels:          result.labels,
 				confirmedLabels: result.confirmedLabels,
 				lastSuccess:     now,
 				expiresAt:       now.Add(ttl),
@@ -303,9 +319,12 @@ func mergeTagGroupSnapshots(states map[tagFetchKey]tagGroupSnapshot, fetchedAt, 
 		}
 	}
 	next := tagSnapshot{
-		labels: make(map[tagCacheKey][]metrix.Label, labelCapacity), members: make(tagMembership, membershipCapacity),
-		unknown: make(map[int]struct{}, unknownCapacity), groups: states,
-		fetchedAt: fetchedAt, expiresAt: emptyExpiresAt,
+		labels:    make(map[tagCacheKey][]metrix.Label, labelCapacity),
+		members:   make(tagMembership, membershipCapacity),
+		unknown:   make(map[int]struct{}, unknownCapacity),
+		groups:    states,
+		fetchedAt: fetchedAt,
+		expiresAt: emptyExpiresAt,
 	}
 	keys := make([]tagFetchKey, 0, len(states))
 	for key := range states {
@@ -362,7 +381,10 @@ func applyTagPlan(plan []resolvedTag, tags map[string]string) []metrix.Label {
 	var out []metrix.Label
 	for _, rt := range plan {
 		if v, ok := tags[rt.awsKey]; ok {
-			out = append(out, metrix.Label{Key: rt.label, Value: v})
+			out = append(out, metrix.Label{
+				Key:   rt.label,
+				Value: v,
+			})
 		}
 	}
 	return out
@@ -370,7 +392,12 @@ func applyTagPlan(plan []resolvedTag, tags map[string]string) []metrix.Label {
 
 // tagLabelsFor returns the cached, non-identity tag labels for one discovered
 // instance, or nil when tags are off, the profile has no join, or none are cached.
-func (c *Collector) tagLabelsFor(target, account, region string, prof cwprofiles.ResolvedProfile, join *tagJoin, values []string) []metrix.Label {
+func (c *Collector) tagLabelsFor(
+	target, account, region string,
+	prof cwprofiles.ResolvedProfile,
+	join *tagJoin,
+	values []string,
+) []metrix.Label {
 	if len(c.tags.labels) == 0 {
 		return nil
 	}
@@ -381,5 +408,11 @@ func (c *Collector) tagLabelsFor(target, account, region string, prof cwprofiles
 	if !ok {
 		return nil
 	}
-	return c.tags.labels[tagCacheKey{target: target, account: account, region: region, profile: prof.Name, joinKey: jk}]
+	return c.tags.labels[tagCacheKey{
+		target:  target,
+		account: account,
+		region:  region,
+		profile: prof.Name,
+		joinKey: jk,
+	}]
 }

@@ -107,8 +107,9 @@ modules:
             them against the profile's dimensions to find the resources. Resource tag filters and labels are resolved
             with `tag:GetResources` (Resource Groups Tagging API).
           - RDS details: CloudWatch does not say which engine an RDS instance runs, so when RDS instances are
-            discovered the collector reads them with `rds:DescribeDBInstances`, on the same schedule, once per target
-            and region, and adds their engine, engine version, and instance class as chart labels.
+            discovered the collector reads them with `rds:DescribeDBInstances`, using `discovery.refresh_every`, per target
+            and region, and adds their engine, engine version, and instance class as chart labels. These lookups
+            run in the background: charts can appear before their labels, and slow lookups do not delay metric collection.
           - Collection: every `update_every` seconds (default 60) it reads the newest complete datapoint of every selected
             metric and statistic with `cloudwatch:GetMetricData`, batched, and only for series whose CloudWatch period has
             moved on since the last read. Between reads the last value is repeated at no AWS cost.
@@ -1235,8 +1236,7 @@ modules:
           - error: "`CloudWatch tags (profile \"<profile>\"): skipped tag \"<tag>\": label \"<label>\" collides with a dimension label (rename it)`"
             cause: |
               A tag selected in `labels.resource_tags` would become a label that the profile already uses for a
-              dimension (or one of the reserved `account_id` and `region` labels, or, on RDS charts, the `engine`,
-              `engine_version`, and `db_instance_class` labels; the message then says `resource attribute label`).
+              dimension (or one of the reserved `account_id` and `region` labels).
               The tag is not attached.
             fix: |
               Set `labels.resource_tags[].label` to another name for that key.
@@ -1327,7 +1327,7 @@ modules:
               `db_instance_class` labels, or keep the last values read.
             fix: |
               Allow `rds:DescribeDBInstances` for that identity (see Prerequisites). The lookup retries at the next
-              discovery refresh.
+              `discovery.refresh_every` cadence.
           - error: No charts appear although the job runs without errors
             cause: |
               CloudWatch has nothing for the selection yet. Typical reasons: the resources are idle (several services,
@@ -1442,8 +1442,10 @@ modules:
         with `labels.resource_tags` are added as labels that are not part of the chart identity, so a changed tag changes
         the label, not the chart. RDS charts likewise carry `engine` (as AWS reports it, for example `mysql`,
         `postgres`, `aurora-mysql`, `aurora-postgresql`, `mariadb`, `sqlserver-se`, `oracle-ee`), `engine_version`, and
-        `db_instance_class`, read with `rds:DescribeDBInstances`; they are missing when that permission is not
-        granted. Charts land on the job's `vnode` when one is set, otherwise on the node running the
+        `db_instance_class`, read with `rds:DescribeDBInstances`. These labels can arrive after the charts appear;
+        updates keep the same charts. Failed lookups leave labels absent or retain their last-known values. Explicit
+        `labels.resource_tags` mappings take precedence over these automatic labels, even when the tag is absent.
+        Charts land on the job's `vnode` when one is set, otherwise on the node running the
         collector; AWS resources never become separate Netdata nodes. CloudWatch publishes with a delay, so allow a few
         minutes for the first datapoints.
 
