@@ -144,7 +144,7 @@ flowchart TD
 flowchart TD
     A("ensure collection plan + target account ids")
     B("refreshDiscovery<br/>shared ListMetrics scans per compatible target scope")
-    C("refreshTags + refreshAttributes<br/>resolve filter membership + non-identity labels")
+    C("refreshTags + refreshAttributes<br/>resolve filter membership + enrichment labels")
     D("currentQueryPlan<br/>cached until target/discovery/tag/attribute inputs change")
     E("dueQueries<br/>keep stable queries with a newer eligible window")
     F("executeQueries<br/>batched · concurrent GetMetricData")
@@ -294,7 +294,8 @@ advance, or dependent tag/query invalidation.
 `tags.go`, `tag_fetch.go`, `tagjoin.go`, and `tagresolve.go` form the stage
 between discovery and query planning. Resource-tag predicates decide which
 discovered instances a rule may query. Separately, `labels.resource_tags`
-copies selected AWS tags to **non-identity** chart labels.
+copies selected AWS tags to chart labels. Stock templates treat these as presentation;
+custom templates may explicitly use them for identity or selection.
 
 - **Focused fetches.** A Resource Groups Tagging API (RGTA) client is cached per
   `{target, region}`. Policy scopes sharing target, region, and canonical predicate
@@ -310,7 +311,8 @@ copies selected AWS tags to **non-identity** chart labels.
   continue to query those series while the same series remain reserved for every other
   candidate. Freshness and retry state are fetch-group-local: failed groups retry next
   collect while successful groups keep their result until its discovery TTL expires.
-  Optional label enrichment carries last-known labels and never controls identity.
+  Optional label enrichment carries last-known labels; the template determines whether
+  explicit tag labels participate in chart identity or selection.
 - **Label resolution (`tagresolve.go`).** `resolveTagPlan` turns
   `labels.resource_tags` into a per-profile `awsKey → label` plan once. Global config
   validation rejects malformed or duplicate entries; profile-specific collisions with
@@ -332,11 +334,12 @@ copies selected AWS tags to **non-identity** chart labels.
   `enrichmentLabels` (resource attribute labels, then tag labels) travel separately
   through `plannedQuery`. `writeSample` emits `labels + enrichmentLabels` in a fresh
   slice; the stable query key uses identity labels but excludes enrichment labels,
-  so a tag or attribute change never churns query state. `chartengine` `auto_intersection` then
-  promotes the enrichment labels as non-identity chart labels—no template change. A changed
+  so a tag or attribute change never churns query state. In stock templates, `chartengine`
+  `auto_intersection` promotes enrichment labels as non-identity chart labels. A changed
   effective label set invalidates the plan once; the current plan supplies the new
-  labels and the normal numeric snapshot causes chartengine to emit a label-only
-  chart-definition update for an existing chart.
+  labels and the normal numeric snapshot produces a label-only chart-definition update.
+  Custom templates retain their explicit tag identity and selection rules. Automatic
+  attributes are withheld wherever they would affect those rules (see below).
 
 ## Resource Attribute Labels
 
