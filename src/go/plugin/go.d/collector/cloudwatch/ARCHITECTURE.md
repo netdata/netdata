@@ -378,7 +378,14 @@ from the RDS control plane.
   Explicit `labels.resource_tags` mappings reserve their output names, even when a
   resource has no value for that tag; automatic attributes only fill unclaimed names.
   A provider whose labels collide with profile identity labels is skipped, preserving
-  unique label keys without changing chart or query identity.
+  unique label keys without changing chart or query identity. `attributes_labels.go`
+  also resolves each profile's effective template with `charttpl.NormalizeGroups` and
+  `chartengine.ResolveInstanceLabelPolicy`. It withholds automatic keys consumed by
+  required/optional/wildcard chart identity, dimension `name_from_label`, or dimension
+  selector predicates. This applies across nested defaults and chart overrides;
+  wildcard exclusions make a key eligible again when no other consumer needs it.
+  The authored template and explicit tags are unchanged. If no automatic keys remain,
+  that profile contributes no metadata fetch.
 - **Cost.** `DescribeDBInstances` is not a billed CloudWatch API and is not counted by
   the collector-activity charts, like RGTA and STS.
 
@@ -853,8 +860,9 @@ not separately document pagination billing semantics.
 - **Tag filters fail closed** — unknown membership never becomes unfiltered
   collection and never allows a lower-priority rule to claim the unknown higher
   rule's selected series; disjoint series remain eligible.
-- **Tag labels are non-identity** — `labels.resource_tags` can update labels on an
-  existing chart but cannot change its identity or overwrite an identity label.
+- **Tag labels preserve explicit configuration** — stock templates treat them as
+  presentation; a user template may intentionally use them for identity or selection.
+  Tags cannot overwrite account, region or profile dimension labels.
 - **Attribute labels are non-identity and optional** — a missing permission or failed
   lookup never fails collection or changes chart identity; it only leaves the labels
   absent or last-known.

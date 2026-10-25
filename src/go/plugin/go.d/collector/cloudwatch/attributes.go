@@ -8,6 +8,7 @@ import (
 	"maps"
 	"slices"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
@@ -134,14 +135,27 @@ func (c *Collector) computeProfileAttributes() {
 		if skipped != "" {
 			c.Warningf("CloudWatch resource attributes (profile %q): %s", p.Name, skipped)
 		}
-		if ok {
-			for _, tag := range c.tagLabelPlans[p.Name] {
-				if slices.Contains(attrs.provider.labels, tag.label) {
-					attrs.excludedLabels = append(attrs.excludedLabels, tag.label)
-				}
-			}
-			out[p.Name] = attrs
+		if !ok {
+			continue
 		}
+		excluded, err := attributeTemplateExclusions(p, attrs.provider.labels)
+		if err != nil {
+			c.Warningf("CloudWatch resource attributes (profile %q): cannot establish presentation-only labels: %v", p.Name, err)
+			continue
+		}
+		attrs.excludedLabels = excluded
+		if len(excluded) > 0 {
+			c.Warningf("CloudWatch resource attributes (profile %q): skipped automatic labels used by chart identity or selection: %s", p.Name, strings.Join(excluded, ", "))
+		}
+		for _, tag := range c.tagLabelPlans[p.Name] {
+			if slices.Contains(attrs.provider.labels, tag.label) && !slices.Contains(attrs.excludedLabels, tag.label) {
+				attrs.excludedLabels = append(attrs.excludedLabels, tag.label)
+			}
+		}
+		if len(attrs.excludedLabels) == len(attrs.provider.labels) {
+			continue
+		}
+		out[p.Name] = attrs
 	}
 	c.profileAttributes = out
 }

@@ -318,6 +318,14 @@ lifecycle, dimension, presentation, and selector field. CloudWatch profiles add 
   stock profiles fails loading; a collision involving a user profile logs a warning and drops the colliding chart. The
   uniqueness check covers only explicitly set IDs.
 
+Automatic RDS attributes are presentation-only. The collector withholds any automatic key used by an effective
+`instances.by_labels` or `instances.optional_by_labels`, a dimension's `name_from_label`, or a dimension selector's
+label predicate. Inherited defaults and per-chart overrides follow the chart engine's normal rules. For example,
+`by_labels: ['*']` prevents all three automatic attributes; excluding `engine`, `engine_version`, and
+`db_instance_class` from that wildcard allows them as chart metadata. Explicit `labels.resource_tags` mappings
+keep their existing behavior, including intentional use in identity or selectors. No lookup is made for a profile
+whose automatic attributes are all withheld.
+
 Unlike charttpl's strict standalone decoding, a CloudWatch profile's template is validated structurally but unknown keys
 are ignored (see "How profiles work").
 

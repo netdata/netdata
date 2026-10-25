@@ -1247,6 +1247,16 @@ modules:
               unique, that profile gets none of the three; its charts are collected as before.
             fix: |
               Give that dimension a different `label` in the user profile; its charts then also get the RDS labels.
+          - error: "`CloudWatch resource attributes (profile \"<profile>\"): skipped automatic labels used by chart identity or selection: ...`"
+            cause: |
+              A user template uses an automatic RDS label in chart instance identity, dimension naming, or a
+              dimension selector. The collector withholds that automatic label to preserve the template's existing
+              chart IDs, dimensions and metric routing. Explicit resource-tag mappings are unchanged.
+            fix: |
+              Keep the template as it is to preserve its current behavior. To use the automatic values as metadata,
+              remove those keys from identity, dimension names and selectors; for wildcard identity, exclude them
+              with `!engine`, `!engine_version`, and `!db_instance_class`. Changing an existing identity policy can
+              itself change chart IDs.
           - error: "`load CloudWatch profiles: validate profile \"<name>\": ...`"
             when: |
               Also `unmarshal profile "<name>": ...` (invalid YAML) or `normalize profile "<name>": ...`. Every
@@ -1439,12 +1449,14 @@ modules:
         Every chart instance is one AWS resource, identified by `account_id`, `region`, and the profile's identifying
         dimensions (for example EC2 `instance_id`, or S3 `bucket_name` and `storage_type`). A dimension that is the same
         for every resource of a profile (CloudFront's `Region=Global`) is matched but not shown as a label. Tags selected
-        with `labels.resource_tags` are added as labels that are not part of the chart identity, so a changed tag changes
-        the label, not the chart. RDS charts likewise carry `engine` (as AWS reports it, for example `mysql`,
+        with `labels.resource_tags` are presentation labels in stock profiles; user templates may intentionally use
+        them for chart identity or selection. RDS charts carry `engine` (as AWS reports it, for example `mysql`,
         `postgres`, `aurora-mysql`, `aurora-postgresql`, `mariadb`, `sqlserver-se`, `oracle-ee`), `engine_version`, and
         `db_instance_class`, read with `rds:DescribeDBInstances`. These labels can arrive after the charts appear;
         updates keep the same charts. Failed lookups leave labels absent or retain their last-known values. Explicit
         `labels.resource_tags` mappings take precedence over these automatic labels, even when the tag is absent.
+        Automatic keys used by a user template for chart identity, dimension names, or selector predicates are withheld
+        so adding metadata does not change that template's behavior.
         Charts land on the job's `vnode` when one is set, otherwise on the node running the
         collector; AWS resources never become separate Netdata nodes. CloudWatch publishes with a delay, so allow a few
         minutes for the first datapoints.
