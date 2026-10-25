@@ -229,7 +229,6 @@ int mqtt_wss_client_timeout_unittest(void);
 int pgc_unittest(void);
 int mrg_unittest(void);
 int njtf_unittest(void);
-int njtf_verify_directory(void);
 int pluginsd_parser_unittest(void);
 int websocket_compression_unittest(void);
 int web_client_request_size_unittest(void);
@@ -800,10 +799,6 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "njtftest") == 0) {
                             unittest_running = true;
                             return njtf_unittest();
-                        }
-                        else if(strcmp(optarg, "njtfverify") == 0) {
-                            unittest_running = true;
-                            return njtf_verify_directory();
                         }
                         else if(strcmp(optarg, "mrgretentionbench") == 0) {
                             unittest_running = true;
