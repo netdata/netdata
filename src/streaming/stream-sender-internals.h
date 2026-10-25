@@ -5,8 +5,6 @@
 
 #include "stream.h"
 #include "stream-thread.h"
-#include "h2o-common.h"
-#include "aclk/https_client.h"
 #include "stream-parents.h"
 #include "stream-circular-buffer.h"
 
@@ -56,7 +54,6 @@ static inline bool stream_sender_parse_replay_endpoints(
 #define WORKER_SENDER_CONNECTOR_JOB_REMOVED                             2
 #define WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_BAD_HANDSHAKE            3
 #define WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_TIMEOUT                  4
-#define WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_CANT_UPGRADE_CONNECTION  5
 #define WORKER_SENDER_CONNECTOR_JOB_QUEUED_NODES                        6
 #define WORKER_SENDER_CONNECTOR_JOB_CONNECTED_NODES                     7
 #define WORKER_SENDER_CONNECTOR_JOB_FAILED_NODES                        8
@@ -91,7 +88,6 @@ struct sender_state {
     STREAM_CAPABILITIES capabilities;
     STREAM_CAPABILITIES disabled_capabilities;
     int16_t hops;
-    bool parent_using_h2o;
     WAITQ waitq;
     ND_SOCK sock;
     RRDHOST *host;
