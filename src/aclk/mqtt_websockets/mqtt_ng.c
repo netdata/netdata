@@ -868,12 +868,17 @@ static void remove_packet_from_timeout_monitor_list_unsafe(struct mqtt_ng_client
         __atomic_fetch_sub(&client->stats.packets_waiting_puback, 1, __ATOMIC_RELAXED);
 }
 
-#define PACKET_TIMEOUT_EPOCH (1704067200L)  // Jan 1, 2024 00:00:00 UTC
+// PUBACK deadlines are stored in the monitor list as monotonic seconds, so a wall-clock step can
+// neither expire them early nor postpone them. uint32_t wraps after ~136 years of uptime. A
+// deadline of 0 is always due.
+static uint32_t packet_timeout_deadline(time_t seconds)
+{
+    return (uint32_t)(now_monotonic_sec() + seconds);
+}
 
 static void add_packet_to_timeout_monitor_list(struct mqtt_ng_client *client, uint16_t packet_id)
 {
     spinlock_lock(&client->pending_packets.spinlock);
-    time_t now = now_realtime_sec();
     // Add it to the JudyL array
     uint32_t *Pvalue = (uint32_t *) JudyLIns(&client->pending_packets.JudyL, (Word_t) packet_id, PJE0);
     if (Pvalue == PJERR) {
@@ -881,7 +886,7 @@ static void add_packet_to_timeout_monitor_list(struct mqtt_ng_client *client, ui
         spinlock_unlock(&client->pending_packets.spinlock);
         return;
     }
-    *Pvalue = (uint32_t) ((now - PACKET_TIMEOUT_EPOCH) + PACKET_ACK_TIMEOUT_SECS);
+    *Pvalue = packet_timeout_deadline(PACKET_ACK_TIMEOUT_SECS);
     spinlock_unlock(&client->pending_packets.spinlock);
 
     __atomic_fetch_add(&client->stats.packets_waiting_puback, 1, __ATOMIC_RELAXED);
@@ -1314,7 +1319,7 @@ static void rearm_packet_timeout_unsafe(struct mqtt_ng_client *client, uint16_t 
 {
     uint32_t *deadline = (uint32_t *)JudyLGet(client->pending_packets.JudyL, (Word_t)packet_id, PJE0);
     if (deadline)
-        *deadline = (uint32_t)((now_realtime_sec() - PACKET_TIMEOUT_EPOCH) + seconds);
+        *deadline = packet_timeout_deadline(seconds);
 }
 
 // Resolves a packet that is waiting for its acknowledgement, either because the
@@ -1461,11 +1466,10 @@ static bool check_packet_monitor_list_for_timeouts(struct mqtt_ng_client *client
     bool first_then_next = true;
     uint32_t *Pvalue;
     Word_t packet_id = 0;
-    time_t now = now_realtime_sec();
+    time_t now = now_monotonic_sec();
 
     while ((Pvalue = (uint32_t *) JudyLFirstThenNext(client->pending_packets.JudyL, &packet_id, &first_then_next))) {
-        uint32_t expire_time_delta = *Pvalue;
-        if (now >= (PACKET_TIMEOUT_EPOCH + expire_time_delta)) {
+        if (now >= (time_t)*Pvalue) {
             if (timed_out_count < MAX_TIMED_OUT_PACKETS) {
                 timed_out_packets[timed_out_count++] = (uint16_t)packet_id;
             } else
@@ -2622,11 +2626,11 @@ int mqtt_ng_sync(struct mqtt_ng_client *client)
 
     // Check for packet timeouts and cleanup
     static time_t last_maintenance = 0;
-    if (now_realtime_sec() - last_maintenance >= PACKET_TIMEOUT_REPEAT_CHECK) {
+    if (now_monotonic_sec() - last_maintenance >= PACKET_TIMEOUT_REPEAT_CHECK) {
         // if check packet returns true then we did max cleanup, possibly there are more packets to cleanup
         // so do not update last_maintenance thus forcing check again
         if (likely(!check_packet_monitor_list_for_timeouts(client)))
-            last_maintenance = now_realtime_sec();
+            last_maintenance = now_monotonic_sec();
     }
 
     worker_is_busy(WORKER_ACLK_TRY_SEND_ALL);
@@ -3207,8 +3211,8 @@ static uint32_t *mqtt_ng_unittest_deadline_of(struct mqtt_ng_unittest_puback_ctx
     return (uint32_t *)JudyLGet(ctx->client->pending_packets.JudyL, (Word_t)ctx->packet_id, PJE0);
 }
 
-// expire the deadline instead of waiting PACKET_ACK_TIMEOUT_SECS for it: a delta of 0 puts the
-// deadline at PACKET_TIMEOUT_EPOCH, which is always in the past
+// expire the deadline instead of waiting PACKET_ACK_TIMEOUT_SECS for it: a deadline of 0 is
+// always in the past
 static bool mqtt_ng_unittest_expire_deadline(struct mqtt_ng_unittest_puback_ctx *ctx)
 {
     uint32_t *deadline = mqtt_ng_unittest_deadline_of(ctx);
@@ -3227,8 +3231,8 @@ static bool mqtt_ng_unittest_deadline_is_within_the_ack_window(struct mqtt_ng_un
     if (!deadline)
         return false;
 
-    time_t now = now_realtime_sec();
-    time_t expires_at = PACKET_TIMEOUT_EPOCH + (time_t)*deadline;
+    time_t now = now_monotonic_sec();
+    time_t expires_at = (time_t)*deadline;
     return expires_at > now && expires_at <= now + PACKET_ACK_TIMEOUT_SECS;
 }
 
