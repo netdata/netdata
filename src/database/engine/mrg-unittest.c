@@ -1609,7 +1609,7 @@ cleanup_early:
 }
 
 // The mkdtemp() template appended to the temporary directory.
-#define JV2_TMPDIR_TEMPLATE "/netdata-jv2-writer-XXXXXX"
+#define DBENGINE_UT_TMPDIR_TEMPLATE "/netdata-dbengine-ut-XXXXXX"
 
 // Longest name journalfile_v2_generate_path() appends to dbfiles_path:
 // "/" WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION_V2 is ~31 bytes.
@@ -1648,7 +1648,7 @@ static bool jv2_tmpdir_is_usable(const char *dir, size_t dst_size) {
         return false;
 
     const size_t len = strlen(dir);
-    const size_t needed = len + sizeof(JV2_TMPDIR_TEMPLATE) + JV2_JOURNAL_NAME_MAX;
+    const size_t needed = len + sizeof(DBENGINE_UT_TMPDIR_TEMPLATE) + JV2_JOURNAL_NAME_MAX;
     if(needed > dst_size || needed > RRDENG_PATH_MAX || needed > FILENAME_MAX)
         return false;
 
@@ -1675,7 +1675,7 @@ static bool jv2_tmpdir_is_usable(const char *dir, size_t dst_size) {
 // /tmp. Returns false only if neither can be used, in which case the caller skips
 // rather than fails - an unusable /tmp is an environment problem, not a defect in the
 // code under test.
-static bool jv2_make_tmpdir(char *dst, size_t dst_size) {
+bool dbengine_unittest_make_tmpdir(char *dst, size_t dst_size) {
     const char *base = getenv("TMPDIR");
 
     if(!jv2_tmpdir_is_usable(base, dst_size)) {
@@ -1692,7 +1692,7 @@ static bool jv2_make_tmpdir(char *dst, size_t dst_size) {
     while(len > 1 && base[len - 1] == '/')
         len--;
 
-    snprintfz(dst, dst_size, "%.*s" JV2_TMPDIR_TEMPLATE, (int)len, base);
+    snprintfz(dst, dst_size, "%.*s" DBENGINE_UT_TMPDIR_TEMPLATE, (int)len, base);
 
     return mkdtemp(dst) != NULL;
 }
@@ -1713,13 +1713,13 @@ struct jv2_journal_fixture {
 };
 
 // Returns false, having built nothing, when no temporary directory is usable. That is
-// an environment problem, not a defect in the code under test, and jv2_make_tmpdir()
+// an environment problem, not a defect in the code under test, and dbengine_unittest_make_tmpdir()
 // documents that its caller skips on it - so the caller reports the skip and succeeds
 // rather than failing the whole MRG unit test.
 static bool jv2_journal_fixture_init(struct jv2_journal_fixture *fx, unsigned fileno) {
     memset(fx, 0, sizeof(*fx));
 
-    if(!jv2_make_tmpdir(fx->dbpath, sizeof(fx->dbpath))) {
+    if(!dbengine_unittest_make_tmpdir(fx->dbpath, sizeof(fx->dbpath))) {
         fprintf(stderr, "SKIPPED: no usable temporary directory for the journal\n");
         return false;
     }

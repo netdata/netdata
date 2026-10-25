@@ -389,7 +389,7 @@ static RS_BUILD_RESULT rs_build_block(struct rrdengine_instance *ctx, uint32_t b
     }
     header.base_time_s = base_s;
 
-    w.fd = open(tmp_path, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0664);
+    w.fd = open(tmp_path, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, S_IRUSR | S_IWUSR);
     if (w.fd == -1 || lseek(w.fd, RETENTION_SUMMARY_HEADER_SIZE, SEEK_SET) != RETENTION_SUMMARY_HEADER_SIZE) {
         result = RS_BUILD_FAILED;
         goto cleanup;
@@ -907,7 +907,7 @@ size_t retention_summary_apply(RETENTION_SUMMARY_BLOCK *block) {
 #define RS_UT_METRICS 300
 
 struct rs_ut_env {
-    char dir[64];
+    char dir[FILENAME_MAX + 1];
     struct rrdengine_instance *ctx;
     struct rrdengine_datafile *datafiles[RS_UT_FILES];
     time_t t0;
@@ -991,7 +991,7 @@ static bool rs_ut_write_v2(const char *path, time_t hs, struct journal_metric_li
     crc = rs_crc(&h, sizeof(h));
     memcpy(buf + size - sizeof(crc), &crc, sizeof(crc));
 
-    int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0664);
+    int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, S_IRUSR | S_IWUSR);
     bool ok = fd != -1 && rs_write_full(fd, buf, size);
     if (fd != -1)
         close(fd);
@@ -1001,9 +1001,10 @@ static bool rs_ut_write_v2(const char *path, time_t hs, struct journal_metric_li
 
 static bool rs_ut_env_init(struct rs_ut_env *env) {
     memset(env, 0, sizeof(*env));
-    strncpyz(env->dir, "/tmp/netdata-retsum-XXXXXX", sizeof(env->dir) - 1);
-    if (!mkdtemp(env->dir))
+    if (!dbengine_unittest_make_tmpdir(env->dir, sizeof(env->dir))) {
+        env->dir[0] = '\0';   // tells the caller to skip
         return false;
+    }
 
     struct rrdengine_instance *ctx = env->ctx = callocz(1, sizeof(*ctx));
     ctx->config.tier = 0;
@@ -1236,6 +1237,11 @@ int retention_summary_unittest(void) {
     struct rs_ut_state want, want_seeded, got;
 
     if (!rs_ut_env_init(&env)) {
+        if (!env.dir[0]) {
+            // no usable temporary directory: an environment problem, skipped like the jv2 writer tests
+            fprintf(stderr, "SKIPPED: retention summary test: no usable temporary directory\n");
+            return 0;
+        }
         fprintf(stderr, "ERROR: retention summary test: cannot create the journal files\n");
         rs_ut_env_destroy(&env);
         return 1;
@@ -1346,7 +1352,7 @@ int retention_summary_unittest(void) {
     {
         char path[RRDENG_PATH_MAX];
         rs_path(env.ctx, block, true, path, sizeof(path));
-        int fd = open(path, O_WRONLY | O_CREAT | O_CLOEXEC, 0664);
+        int fd = open(path, O_WRONLY | O_CREAT | O_CLOEXEC, S_IRUSR | S_IWUSR);
         if (fd != -1)
             close(fd);
         rs_ut_reset(&env, false);
