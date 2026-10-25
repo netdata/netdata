@@ -203,28 +203,22 @@ static int kernel_is_rejected()
     if (!version_string_len)
         version_string_len = strlen(version_string);
 
-    // Open a file with a list of rejected kernels
-    char *config_dir = getenv("NETDATA_USER_CONFIG_DIR");
-    if (config_dir == NULL) {
-        config_dir = CONFIG_DIR;
-    }
-
+    // Open a file with a list of rejected kernels.
+    // The config directories were already resolved by ebpf_set_global_variables(),
+    // which main() calls before anything that reaches here. Reading the environment
+    // again here would reintroduce the caller supplied directory this plugin must
+    // not trust while it runs as root.
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/ebpf.d/%s", config_dir, EBPF_KERNEL_REJECT_LIST_FILE);
+    snprintfz(filename, FILENAME_MAX, "%s/ebpf.d/%s", ebpf_user_config_dir, EBPF_KERNEL_REJECT_LIST_FILE);
     FILE *kernel_reject_list = fopen(filename, "r");
 
     if (!kernel_reject_list) {
         // Keep this to have compatibility with old versions
-        snprintfz(filename, FILENAME_MAX, "%s/%s", config_dir, EBPF_KERNEL_REJECT_LIST_FILE);
+        snprintfz(filename, FILENAME_MAX, "%s/%s", ebpf_user_config_dir, EBPF_KERNEL_REJECT_LIST_FILE);
         kernel_reject_list = fopen(filename, "r");
 
         if (!kernel_reject_list) {
-            config_dir = getenv("NETDATA_STOCK_CONFIG_DIR");
-            if (config_dir == NULL) {
-                config_dir = LIBCONFIG_DIR;
-            }
-
-            snprintfz(filename, FILENAME_MAX, "%s/ebpf.d/%s", config_dir, EBPF_KERNEL_REJECT_LIST_FILE);
+            snprintfz(filename, FILENAME_MAX, "%s/ebpf.d/%s", ebpf_stock_config_dir, EBPF_KERNEL_REJECT_LIST_FILE);
             kernel_reject_list = fopen(filename, "r");
 
             if (!kernel_reject_list)

@@ -725,6 +725,9 @@ check_function_exists(nice HAVE_NICE)
 check_function_exists(recvmmsg HAVE_RECVMMSG)
 check_function_exists(getpriority HAVE_GETPRIORITY)
 check_function_exists(setenv HAVE_SETENV)
+check_function_exists(secure_getenv HAVE_SECURE_GETENV)
+check_function_exists(getauxval HAVE_GETAUXVAL)
+check_function_exists(issetugid HAVE_ISSETUGID)
 check_function_exists(strndup HAVE_STRNDUP)
 
 check_function_exists(sched_getscheduler HAVE_SCHED_GETSCHEDULER)
@@ -3426,6 +3429,7 @@ if(ENABLE_PLUGIN_EBPF)
                         CGO_LDFLAGS=${EBPF_GO_CGO_LDFLAGS}
                         GOPROXY=https://proxy.golang.org,direct
                         "${GO_EXECUTABLE}" build -buildvcs=false
+                        -ldflags "-X 'main.netdataPluginsDir=${PLUGINS_DIR}' -X 'main.netdataUserConfigDir=${CONFIG_DIR}' -X 'main.netdataStockConfigDir=${LIBCONFIG_DIR}'"
                         -tags netdata_ebpf_libbpf
                         -o "${CMAKE_BINARY_DIR}/ebpf-go.plugin"
                         "."
