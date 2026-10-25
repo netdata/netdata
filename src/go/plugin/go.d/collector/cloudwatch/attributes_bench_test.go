@@ -55,12 +55,11 @@ func BenchmarkRefreshAttributesCached(b *testing.B) {
 			}
 			// Also builds on the synchronous implementation for before/after comparison.
 			if runner, ok := any(c).(collectorapi.CollectorV2Runner); ok {
-				ctx, cancel := context.WithCancel(context.Background())
+				// b.Context is canceled before cleanup runs, which stops the runner.
 				ready, done := make(chan struct{}), make(chan error, 1)
-				go func() { done <- runner.Run(ctx, func() { close(ready) }) }()
+				go func() { done <- runner.Run(b.Context(), func() { close(ready) }) }()
 				<-ready
 				b.Cleanup(func() {
-					cancel()
 					if err := <-done; err != nil {
 						b.Error(err)
 					}

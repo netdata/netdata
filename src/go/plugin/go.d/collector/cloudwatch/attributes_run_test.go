@@ -61,12 +61,11 @@ func TestCollect_ExplicitTagPreservedWhenRDSPermissionMissing(t *testing.T) {
 
 func startAttributeRun(t *testing.T, c *Collector) {
 	t.Helper()
-	ctx, cancel := context.WithCancel(context.Background())
+	// t.Context is canceled before cleanup runs, which stops the runner.
 	ready := make(chan struct{})
 	done := make(chan error, 1)
-	go func() { done <- c.Run(ctx, func() { close(ready) }) }()
+	go func() { done <- c.Run(t.Context(), func() { close(ready) }) }()
 	t.Cleanup(func() {
-		cancel()
 		select {
 		case err := <-done:
 			assert.NoError(t, err)
