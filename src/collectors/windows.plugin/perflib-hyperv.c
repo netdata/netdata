@@ -747,7 +747,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 RRDSET_TYPE_LINE);
 
             p->rd_GPASpaceModifications =
-                rrddim_add(p->st_gpa_space_modifications, "gpa", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                rrddim_add(p->st_gpa_space_modifications, "gpa", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
             p->st_attached_devices = rrdset_create_localhost(
                 "root_partition_attached_devices",
@@ -2294,7 +2294,7 @@ static bool do_hyperv_processor(PERF_DATA_BLOCK *pDataBlock, int update_every, v
                 RRDSET_TYPE_AREA);
 
             p->rd_TotalRunTime =
-                rrddim_add(p->st_HypervisorProcessorTotal, "usage", NULL, 1, 1000000, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(p->st_HypervisorProcessorTotal, "usage", NULL, 1, 100000, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(
                 p->st_HypervisorProcessorTotal->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
 
@@ -2313,11 +2313,11 @@ static bool do_hyperv_processor(PERF_DATA_BLOCK *pDataBlock, int update_every, v
                 RRDSET_TYPE_STACKED);
 
             p->rd_GuestRunTime =
-                rrddim_add(p->st_HypervisorProcessor, "guest", NULL, 1, 1000000, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(p->st_HypervisorProcessor, "guest", NULL, 1, 100000, RRD_ALGORITHM_INCREMENTAL);
             p->rd_HypervisorRunTime =
-                rrddim_add(p->st_HypervisorProcessor, "hypervisor", NULL, 1, 1000000, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(p->st_HypervisorProcessor, "hypervisor", NULL, 1, 100000, RRD_ALGORITHM_INCREMENTAL);
             p->rd_RemoteRunTime =
-                rrddim_add(p->st_HypervisorProcessor, "remote", NULL, 1, 1000000, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(p->st_HypervisorProcessor, "remote", NULL, 1, 100000, RRD_ALGORITHM_INCREMENTAL);
 
             rrdlabels_add(p->st_HypervisorProcessor->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
