@@ -248,6 +248,8 @@ struct mqtt_ng_client {
     unsigned int ping_pending:1;
     // monotonic time the outstanding PINGREQ was requested, 0 when no PINGRESP is awaited
     usec_t ping_requested_ut;
+    // ... and completely handed to the WebSocket layer, 0 while it is still queued
+    usec_t ping_submitted_ut;
     struct buffer_fragment ping_frag;
 
     struct mqtt_ng_stats stats;
@@ -1713,6 +1715,7 @@ int mqtt_ng_ping(struct mqtt_ng_client *client)
 {
     client->ping_pending = 1;
     client->ping_requested_ut = now_monotonic_usec();
+    client->ping_submitted_ut = 0;
     return MQTT_NG_MSGGEN_OK;
 }
 
@@ -1721,10 +1724,16 @@ usec_t mqtt_ng_ping_requested_ut(struct mqtt_ng_client *client)
     return client->ping_requested_ut;
 }
 
+usec_t mqtt_ng_ping_submitted_ut(struct mqtt_ng_client *client)
+{
+    return client->ping_submitted_ut;
+}
+
 void mqtt_ng_ping_reset(struct mqtt_ng_client *client)
 {
     client->ping_pending = 0;
     client->ping_requested_ut = 0;
+    client->ping_submitted_ut = 0;
 }
 
 #define MQTT_NG_CLIENT_NEED_MORE_BYTES         0x10
@@ -2355,6 +2364,7 @@ static int parse_data(struct mqtt_ng_client *client)
                     }
                     parser->state = MQTT_PARSE_MQTT_PACKET_DONE;
                     client->ping_requested_ut = 0;
+                    client->ping_submitted_ut = 0;
                     break;
                 case MQTT_CPT_DISCONNECT:
                     rc = parse_disconnect_varhdr(client);
@@ -2452,6 +2462,8 @@ static int send_fragment(struct mqtt_ng_client *client) {
 
     if (frag->flags & BUFFER_FRAG_MQTT_PACKET_TAIL) {
         client->last_send_ut = now_monotonic_usec();
+        if (frag == &client->ping_frag && client->ping_requested_ut)
+            client->ping_submitted_ut = client->last_send_ut;
         if (frag != &client->ping_frag)
             __atomic_fetch_sub(&client->stats.tx_messages_queued, 1, __ATOMIC_RELAXED);
         __atomic_fetch_add(&client->stats.tx_messages_sent, 1, __ATOMIC_RELAXED);

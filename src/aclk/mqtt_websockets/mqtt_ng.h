@@ -78,11 +78,15 @@ struct mqtt_sub {
 
 int mqtt_ng_subscribe(struct mqtt_ng_client *client, struct mqtt_sub *subscriptions, size_t subscription_count);
 
-// Queues a PINGREQ and starts its response wait at the current monotonic time.
+// Queues a PINGREQ and records the monotonic time it was requested.
 int mqtt_ng_ping(struct mqtt_ng_client *client);
 
 // Monotonic time the outstanding PINGREQ was requested, or 0 when none is waiting for its PINGRESP.
 usec_t mqtt_ng_ping_requested_ut(struct mqtt_ng_client *client);
+
+// Monotonic time the outstanding PINGREQ was completely handed to the WebSocket layer, or 0 while
+// it is still queued (or none is outstanding).
+usec_t mqtt_ng_ping_submitted_ut(struct mqtt_ng_client *client);
 
 // Forgets the outstanding PINGREQ, including one still queued for sending.
 void mqtt_ng_ping_reset(struct mqtt_ng_client *client);

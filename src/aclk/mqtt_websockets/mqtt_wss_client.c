@@ -63,29 +63,42 @@ typedef enum {
     MQTT_WSS_PING_EXPIRED,
 } MQTT_WSS_PING_ACTION;
 
+// What the MQTT keepalive state machine looks at. All times are monotonic, 0 = never/none.
+struct mqtt_wss_ping_state {
+    bool connected;         // established and not being torn down
+    int keepalive_s;
+    usec_t last_send_ut;    // last complete MQTT message handed to the WebSocket layer
+    usec_t requested_ut;    // the outstanding PINGREQ was requested
+    usec_t submitted_ut;    // ... and completely handed to the WebSocket layer (0 = still queued)
+    usec_t last_tx_ut;      // last time SSL_write() moved bytes
+};
+
 // The MQTT keepalive state machine. mqtt_wss_service() evaluates it on every call, whatever poll()
 // returned: a link that is readable at least once per call cadence must still send its keepalive
 // and still notice an unanswered one. All times are monotonic, so a wall-clock step can neither
 // fire a bogus timeout nor postpone a real one.
 //
 // With no PINGREQ outstanding, a keepalive is due 3/4 of the keepalive interval after the last
-// complete send. With one outstanding, its PINGRESP is due PING_TIMEOUT after the request. Expiry
-// is inclusive and judged when the deadline is observed: a PINGRESP read later in that same call
-// does not save the connection. *due_ut is set to the instant this next changes (0 when
-// disconnected), for the caller to bound its poll() with.
-static MQTT_WSS_PING_ACTION mqtt_wss_ping_action(bool connected, usec_t ping_requested_ut, usec_t last_send_ut,
-                                                 int keepalive_s, usec_t now_ut, usec_t *due_ut)
+// complete send. An outstanding one expires PING_TIMEOUT after it was submitted. Until then it
+// waits behind a message still being written, which may legitimately take long on a slow link, so
+// it expires only when that write has made no progress for PING_TIMEOUT (inbound traffic does
+// not count: it keeps the no-progress watchdog quiet). Expiry is inclusive and judged when the
+// deadline is observed: a PINGRESP read later in that same call does not save the connection.
+// *due_ut is set to the instant this next changes (0 when disconnected), for the caller to bound
+// its poll() with.
+static MQTT_WSS_PING_ACTION mqtt_wss_ping_action(const struct mqtt_wss_ping_state *ps, usec_t now_ut, usec_t *due_ut)
 {
     *due_ut = 0;
-    if (!connected)
+    if (!ps->connected)
         return MQTT_WSS_PING_NONE;
 
-    if (ping_requested_ut) {
-        *due_ut = ping_requested_ut + (usec_t)PING_TIMEOUT * USEC_PER_SEC;
+    if (ps->requested_ut) {
+        usec_t since_ut = ps->submitted_ut ? ps->submitted_ut : MAX(ps->requested_ut, ps->last_tx_ut);
+        *due_ut = since_ut + (usec_t)PING_TIMEOUT * USEC_PER_SEC;
         return now_ut >= *due_ut ? MQTT_WSS_PING_EXPIRED : MQTT_WSS_PING_NONE;
     }
 
-    *due_ut = last_send_ut + (usec_t)keepalive_s * USEC_PER_SEC * 3 / 4;
+    *due_ut = ps->last_send_ut + (usec_t)ps->keepalive_s * USEC_PER_SEC * 3 / 4;
     return now_ut >= *due_ut ? MQTT_WSS_PING_SEND : MQTT_WSS_PING_NONE;
 }
 
@@ -175,6 +188,10 @@ struct mqtt_wss_client_struct {
 // before CONNACK only - wire bytes moved); drives the no-progress watchdog in
 // mqtt_wss_service() (see MQTT_WSS_IO_WATCHDOG_SECS)
     usec_t last_io_progress_ut;
+
+// monotonic time SSL_write() last moved bytes: a PINGREQ queued behind a message being written
+// expires only once that write stops progressing (see mqtt_wss_ping_action())
+    usec_t last_tx_ut;
 
 // last observed BIO byte counters, used to detect wire progress that produces no plaintext
 // (TLS/WebSocket handshake records). Reset on every connect: a new SSL object restarts them.
@@ -1117,38 +1134,55 @@ int mqtt_wss_client_timeout_unittest(void) {
     const usec_t sent_ut = 1000 * USEC_PER_SEC;
     usec_t due_ut;
 
-    MQTT_WSS_TEST(mqtt_wss_ping_action(false, sent_ut, sent_ut, keepalive_s, sent_ut + 10 * ping_budget_ut, &due_ut) ==
-                      MQTT_WSS_PING_NONE && due_ut == 0,
-                  "keepalive state machine acts before CONNACK");
-
-    MQTT_WSS_TEST(mqtt_wss_ping_action(true, 0, sent_ut, keepalive_s, sent_ut + keepalive_due_ut - 1, &due_ut) ==
-                      MQTT_WSS_PING_NONE && due_ut == sent_ut + keepalive_due_ut,
+    // idle and connected: only the keepalive cadence matters
+    const struct mqtt_wss_ping_state idle = { .connected = true, .keepalive_s = keepalive_s, .last_send_ut = sent_ut };
+    MQTT_WSS_TEST(mqtt_wss_ping_action(&idle, sent_ut + keepalive_due_ut - 1, &due_ut) == MQTT_WSS_PING_NONE &&
+                      due_ut == sent_ut + keepalive_due_ut,
                   "keepalive requested before 3/4 of the keepalive interval");
-    MQTT_WSS_TEST(mqtt_wss_ping_action(true, 0, sent_ut, keepalive_s, sent_ut + keepalive_due_ut, &due_ut) ==
-                      MQTT_WSS_PING_SEND,
+    MQTT_WSS_TEST(mqtt_wss_ping_action(&idle, sent_ut + keepalive_due_ut, &due_ut) == MQTT_WSS_PING_SEND,
                   "keepalive not requested at 3/4 of the keepalive interval");
 
-    // one ping at a time: while it is outstanding only its deadline counts, however long ago the
-    // last send was
+    // submitted ping: one at a time, expiring PING_TIMEOUT after submission (inclusive), whatever
+    // was sent or written meanwhile
     const usec_t requested_ut = sent_ut + keepalive_due_ut;
-    MQTT_WSS_TEST(mqtt_wss_ping_action(true, requested_ut, sent_ut, keepalive_s, requested_ut + ping_budget_ut - 1, &due_ut) ==
-                      MQTT_WSS_PING_NONE && due_ut == requested_ut + ping_budget_ut,
-                  "outstanding ping expired early, or a second ping was requested");
-    MQTT_WSS_TEST(mqtt_wss_ping_action(true, requested_ut, sent_ut, keepalive_s, requested_ut + ping_budget_ut, &due_ut) ==
-                      MQTT_WSS_PING_EXPIRED,
-                  "outstanding ping did not expire at its deadline (expiry is inclusive)");
-    MQTT_WSS_TEST(mqtt_wss_ping_action(true, requested_ut, requested_ut + ping_budget_ut, keepalive_s,
-                                       requested_ut + ping_budget_ut, &due_ut) == MQTT_WSS_PING_EXPIRED,
-                  "a recent send postponed the expiry of an unanswered ping");
+    const usec_t submitted_ut = requested_ut + 5 * USEC_PER_SEC;
+    struct mqtt_wss_ping_state ps = idle;
+    ps.requested_ut = requested_ut;
+    ps.submitted_ut = submitted_ut;
+    ps.last_tx_ut = submitted_ut + ping_budget_ut;
+    ps.last_send_ut = submitted_ut + ping_budget_ut;
+    MQTT_WSS_TEST(mqtt_wss_ping_action(&ps, submitted_ut + ping_budget_ut - 1, &due_ut) == MQTT_WSS_PING_NONE &&
+                      due_ut == submitted_ut + ping_budget_ut,
+                  "submitted ping expired early, or a second ping was requested");
+    MQTT_WSS_TEST(mqtt_wss_ping_action(&ps, submitted_ut + ping_budget_ut, &due_ut) == MQTT_WSS_PING_EXPIRED,
+                  "submitted ping did not expire PING_TIMEOUT after submission (expiry is inclusive)");
 
-    // once expired, or while disconnecting, the caller passes connected = false: the teardown that
-    // follows must neither expire the ping again nor send a keepalive, however overdue
-    MQTT_WSS_TEST(mqtt_wss_ping_action(false, requested_ut, sent_ut, keepalive_s,
-                                       requested_ut + 10 * ping_budget_ut, &due_ut) == MQTT_WSS_PING_NONE,
-                  "a torn-down link expired its ping again");
-    MQTT_WSS_TEST(mqtt_wss_ping_action(false, 0, sent_ut, keepalive_s, sent_ut + 10 * keepalive_due_ut, &due_ut) ==
+    // queued ping behind a message still being written: progressing writes keep it alive, a
+    // write that stalls expires it PING_TIMEOUT after its last progress
+    ps = idle;
+    ps.requested_ut = requested_ut;
+    ps.last_tx_ut = requested_ut + 10 * ping_budget_ut;
+    MQTT_WSS_TEST(mqtt_wss_ping_action(&ps, requested_ut + 10 * ping_budget_ut + ping_budget_ut - 1, &due_ut) ==
                       MQTT_WSS_PING_NONE,
-                  "a torn-down link requested a keepalive");
+                  "a ping queued behind a progressing write expired");
+    MQTT_WSS_TEST(mqtt_wss_ping_action(&ps, requested_ut + 10 * ping_budget_ut + ping_budget_ut, &due_ut) ==
+                      MQTT_WSS_PING_EXPIRED,
+                  "a ping queued behind a stalled write did not expire");
+    ps.last_tx_ut = sent_ut;
+    MQTT_WSS_TEST(mqtt_wss_ping_action(&ps, requested_ut + ping_budget_ut, &due_ut) == MQTT_WSS_PING_EXPIRED,
+                  "a queued ping with no write since its request did not expire PING_TIMEOUT after it");
+
+    // before CONNACK, after an expiry and while disconnecting the caller passes connected = false:
+    // nothing expires again and no keepalive is sent, however overdue
+    ps.connected = false;
+    MQTT_WSS_TEST(mqtt_wss_ping_action(&ps, requested_ut + 10 * ping_budget_ut, &due_ut) == MQTT_WSS_PING_NONE &&
+                      due_ut == 0,
+                  "a link that is not established expired its ping");
+    struct mqtt_wss_ping_state down = idle;
+    down.connected = false;
+    MQTT_WSS_TEST(mqtt_wss_ping_action(&down, sent_ut + 10 * keepalive_due_ut, &due_ut) == MQTT_WSS_PING_NONE &&
+                      due_ut == 0,
+                  "a link that is not established requested a keepalive");
 
     // poll() bound: honours a shorter caller timeout, bounds a longer or infinite one at the due
     // instant (rounded up), and does not wait at all once due
@@ -1194,9 +1228,15 @@ static int handle_mqtt_internal(mqtt_wss_client client)
 // is going away.
 static MQTT_WSS_PING_ACTION mqtt_wss_client_ping_action(mqtt_wss_client client, usec_t now_ut, usec_t *due_ut)
 {
-    return mqtt_wss_ping_action(client->mqtt_connected && !client->mqtt_disconnecting && !client->ping_expired,
-                                mqtt_ng_ping_requested_ut(client->mqtt),
-                                mqtt_ng_last_send_ut(client->mqtt), client->mqtt_keepalive, now_ut, due_ut);
+    const struct mqtt_wss_ping_state ps = {
+        .connected = client->mqtt_connected && !client->mqtt_disconnecting && !client->ping_expired,
+        .keepalive_s = client->mqtt_keepalive,
+        .last_send_ut = mqtt_ng_last_send_ut(client->mqtt),
+        .requested_ut = mqtt_ng_ping_requested_ut(client->mqtt),
+        .submitted_ut = mqtt_ng_ping_submitted_ut(client->mqtt),
+        .last_tx_ut = client->last_tx_ut,
+    };
+    return mqtt_wss_ping_action(&ps, now_ut, due_ut);
 }
 
 int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
@@ -1265,7 +1305,13 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
 
     switch (mqtt_wss_client_ping_action(client, now_monotonic_usec(), &ping_due_ut)) {
         case MQTT_WSS_PING_EXPIRED:
+            // a socket error reported by this same poll() is the real cause of the silence: let the
+            // drop check below report it instead of a ping timeout
+            if (client->poll_fds[POLLFD_SOCKET].revents & (POLLERR | POLLNVAL))
+                break;
+
             // the link is dead: no more keepalives on it, and drop a PINGREQ still queued for it
+            // (one already partly written is completed: MQTT has no frame boundary to abort at)
             client->ping_expired = 1;
             mqtt_ng_ping_reset(client->mqtt);
             __atomic_store_n(&disconnect_req, ACLK_PING_TIMEOUT, __ATOMIC_RELAXED);
@@ -1418,6 +1464,7 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
             spinlock_unlock(&client->stat_lock);
             rbuf_bump_tail(client->ws_client->buf_write, ret);
             client->last_io_progress_ut = now_monotonic_usec();
+            client->last_tx_ut = client->last_io_progress_ut;
             client->write_wants_read = 0;
         } else {
             int errnobkp = errno;
