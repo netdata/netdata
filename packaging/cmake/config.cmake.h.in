@@ -70,6 +70,9 @@
 #cmakedefine HAVE_NICE
 #cmakedefine HAVE_GETPRIORITY
 #cmakedefine HAVE_SETENV
+#cmakedefine HAVE_SECURE_GETENV
+#cmakedefine HAVE_GETAUXVAL
+#cmakedefine HAVE_ISSETUGID
 #cmakedefine HAVE_DLSYM
 
 #cmakedefine HAVE_LIBCURL
