@@ -3283,39 +3283,6 @@ static bool str_is_numeric(const char *s)
     return true;
 }
 
-static inline double perflib_average_timer_ms(COUNTER_DATA *d)
-{
-    if (!d->updated)
-        return 0.0;
-
-    ULONGLONG data1 = d->current.Data;
-    ULONGLONG data0 = d->previous.Data;
-    LONGLONG time1 = d->current.Time;
-    LONGLONG time0 = d->previous.Time;
-    LONGLONG freq1 = d->current.Frequency;
-
-    if (data1 >= data0 && time1 > time0 && time0 && freq1)
-        return ((double)(data1 - data0) * (double)MSEC_PER_SEC) / ((double)freq1 * (double)(time1 - time0));
-
-    return 0;
-}
-
-static inline uint64_t perflib_average_bulk(COUNTER_DATA *d)
-{
-    if (!d->updated)
-        return 0;
-
-    ULONGLONG data1 = d->current.Data;
-    ULONGLONG data0 = d->previous.Data;
-    LONGLONG time1 = d->current.Time;
-    LONGLONG time0 = d->previous.Time;
-
-    if (data1 >= data0 && time1 > time0 && time0)
-        return (data1 - data0) / (time1 - time0);
-
-    return 0;
-}
-
 static inline uint64_t perflib_idle_time_percent(COUNTER_DATA *d)
 {
     if (!d->updated)
@@ -3491,23 +3458,29 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec
 
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskSecondsPerRead) &&
             perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskSecondsPerWrite)) {
+            // Samples that cannot form an interval keep the previous behavior of reporting 0.
+            double read_ms, write_ms;
+            perflib_average_timer_ms(&d->averageDiskSecondsPerRead, &read_ms);
+            perflib_average_timer_ms(&d->averageDiskSecondsPerWrite, &write_ms);
             common_disk_await(
                 &d->disk_await,
                 device,
                 NULL,
-                perflib_average_timer_ms(&d->averageDiskSecondsPerRead),
-                perflib_average_timer_ms(&d->averageDiskSecondsPerWrite),
+                read_ms,
+                write_ms,
                 update_every,
                 physical_disk_labels,
                 d);
         }
 
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskSecondsPerTransfer)) {
+            double transfer_ms;
+            perflib_average_timer_ms(&d->averageDiskSecondsPerTransfer, &transfer_ms);
             common_disk_svctm(
                 &d->disk_svctm,
                 device,
                 NULL,
-                perflib_average_timer_ms(&d->averageDiskSecondsPerTransfer),
+                transfer_ms,
                 update_every,
                 physical_disk_labels,
                 d);
@@ -3515,12 +3488,15 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec
 
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskBytesPerRead) &&
             perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskBytesPerWrite)) {
+            uint64_t read_bytes, write_bytes;
+            perflib_average_bulk_integer(&d->averageDiskBytesPerRead, &read_bytes);
+            perflib_average_bulk_integer(&d->averageDiskBytesPerWrite, &write_bytes);
             common_disk_avgsz(
                 &d->disk_avgsz,
                 device,
                 NULL,
-                perflib_average_bulk(&d->averageDiskBytesPerRead),
-                perflib_average_bulk(&d->averageDiskBytesPerWrite),
+                read_bytes,
+                write_bytes,
                 update_every,
                 physical_disk_labels,
                 d);
