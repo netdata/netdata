@@ -1014,26 +1014,80 @@ static void ebpf_allocate_common_vectors()
 }
 
 /**
+ * Do two paths name the same directory?
+ *
+ * Only used to decide whether to tell the operator that their override was
+ * dropped, so a trailing slash - the common way to write the same directory
+ * differently - must not count as a difference. Anything subtler, like a symlinked
+ * spelling, is not worth resolving here: being wrong costs one log line.
+ */
+static bool ebpf_same_dir(const char *a, const char *b)
+{
+    size_t la = strnlen(a, FILENAME_MAX);
+    size_t lb = strnlen(b, FILENAME_MAX);
+
+    while (la > 1 && a[la - 1] == '/')
+        la--;
+
+    while (lb > 1 && b[lb - 1] == '/')
+        lb--;
+
+    return la == lb && !strncmp(a, b, la);
+}
+
+/**
+ * Resolve a directory the daemon hands us through the environment.
+ *
+ * ebpf.plugin is installed setuid root and executable by the netdata group, so the
+ * environment always reaches us from a caller with fewer privileges than we run
+ * with. Each directory resolved here is one we then load eBPF objects from, or read
+ * configuration out of, as root, so while privileged we ignore what we were handed
+ * and use the compiled-in directory instead.
+ *
+ * Note this is the normal case, not an attack: the daemon drops to its own user
+ * before spawning us, so the exec is privileged on every start. It costs nothing
+ * because the daemon derives what it exports from the same install prefix these
+ * defaults come from - the values normally match. What we no longer follow is a
+ * netdata.conf [directories] override pointing somewhere else, which is exactly the
+ * redirection we must refuse, so the operator is told when it happens.
+ *
+ * @param name        the environment variable naming the directory
+ * @param compiled_in the directory to use when the environment cannot be trusted
+ *
+ * @return the directory to use
+ */
+static char *ebpf_secure_dir_from_env(const char *name, char *compiled_in)
+{
+    char *dir = nd_secure_getenv(name);
+    if (dir && *dir)
+        return dir;
+
+    // We are privileged, so the environment was not trusted (or it was empty).
+    // Report it only when it actually changes the directory we use. The value itself
+    // is deliberately not logged: it is the part a caller controls, and it would let
+    // them write arbitrary bytes, newlines included, into our log.
+    dir = getenv(name);
+    if (dir && *dir && !ebpf_same_dir(dir, compiled_in))
+        netdata_log_error(
+            "EBPF: ignoring %s because we run with elevated privileges and it points elsewhere, using '%s'. "
+            "Relocating a directory of a setuid plugin has to be done through the installation prefix, "
+            "not through netdata.conf.",
+            name,
+            compiled_in);
+
+    return compiled_in;
+}
+
+/**
  * Set global variables reading environment variables
  */
 static void ebpf_set_global_variables()
 {
     // Get environment variables
-    ebpf_plugin_dir = getenv("NETDATA_PLUGINS_DIR");
-    if (!ebpf_plugin_dir)
-        ebpf_plugin_dir = PLUGINS_DIR;
-
-    ebpf_user_config_dir = getenv("NETDATA_USER_CONFIG_DIR");
-    if (!ebpf_user_config_dir)
-        ebpf_user_config_dir = CONFIG_DIR;
-
-    ebpf_stock_config_dir = getenv("NETDATA_STOCK_CONFIG_DIR");
-    if (!ebpf_stock_config_dir)
-        ebpf_stock_config_dir = LIBCONFIG_DIR;
-
-    ebpf_configured_log_dir = getenv("NETDATA_LOG_DIR");
-    if (!ebpf_configured_log_dir)
-        ebpf_configured_log_dir = LOG_DIR;
+    ebpf_plugin_dir = ebpf_secure_dir_from_env("NETDATA_PLUGINS_DIR", PLUGINS_DIR);
+    ebpf_user_config_dir = ebpf_secure_dir_from_env("NETDATA_USER_CONFIG_DIR", CONFIG_DIR);
+    ebpf_stock_config_dir = ebpf_secure_dir_from_env("NETDATA_STOCK_CONFIG_DIR", LIBCONFIG_DIR);
+    ebpf_configured_log_dir = ebpf_secure_dir_from_env("NETDATA_LOG_DIR", LOG_DIR);
 
     ebpf_nprocs = libbpf_num_possible_cpus();
     if (ebpf_nprocs < 1) {
@@ -2116,6 +2170,15 @@ int main(int argc, char **argv)
 
     ebpf_mutex_initialize();
 
+    // Deliberately a plain getenv(), unlike the directories above: unlike them this
+    // has no compiled-in equivalent to fall back to (it is empty by default), and
+    // ignoring it while privileged would silently stop a containerised agent from
+    // reading the host it was pointed at. verify_netdata_host_prefix() below is what
+    // stands in for that: it rejects a prefix that does not stat() as a directory or
+    // that carries a '%'. That is weaker than the treatment the directories get -
+    // it does not check who owns the path - and ebpf_pid_file() builds a root-written
+    // pid file under this prefix, so this remains a known residual to close
+    // separately, not an oversight.
     netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
     if (verify_netdata_host_prefix(true) == -1)
         ebpf_exit(1);

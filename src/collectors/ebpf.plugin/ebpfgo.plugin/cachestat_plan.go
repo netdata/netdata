@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
@@ -71,27 +70,7 @@ func (h *CachestatLegacyHandle) Close() {
 }
 
 func defaultPluginsDir() string {
-	if dir := os.Getenv("NETDATA_PLUGINS_DIR"); dir != "" {
-		return dir
-	}
-
-	executable, err := os.Executable()
-	if err != nil || executable == "" {
-		executable = os.Args[0]
-		if resolved, err := exec.LookPath(executable); err == nil {
-			executable = resolved
-		}
-	}
-	if !filepath.IsAbs(executable) {
-		if resolved, err := filepath.Abs(executable); err == nil {
-			executable = resolved
-		}
-	}
-	if resolved, err := filepath.EvalSymlinks(executable); err == nil {
-		executable = resolved
-	}
-
-	return filepath.Dir(executable)
+	return secureGetenv("NETDATA_PLUGINS_DIR", netdataPluginsDir)
 }
 
 func defaultCachestatLegacyConfig() CachestatLegacyConfig {

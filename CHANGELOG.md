@@ -243,6 +243,10 @@
 - Ci: run the Rust workspace tests when Rust code changes ([#24396](https://github.com/netdata/netdata/issues/24396))
 - Fix(go.d): keep function payload lines out of command parsing ([#24410](https://github.com/netdata/netdata/issues/24410))
 - Fix(functions): require strict JSON function payloads ([#24409](https://github.com/netdata/netdata/issues/24409))
+- Build: update installer Go archives to 1.27.3 ([#24411](https://github.com/netdata/netdata/issues/24411))
+- Treat a negative IP match as final in connection_allowed ([#24404](https://github.com/netdata/netdata/issues/24404))
+- Fix(metrix): refresh vector handles when host metadata changes ([#24415](https://github.com/netdata/netdata/issues/24415))
+- Microsoft Message Queue (Windows.plugin) ([#22102](https://github.com/netdata/netdata/issues/22102))
 
 ## [2.12.0] - 2026-09-30
 
