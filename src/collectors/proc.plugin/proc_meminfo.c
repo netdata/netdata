@@ -265,29 +265,27 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         common_mem_swap(SwapFree * 1024, SwapUsed * 1024, update_every);
         swap_configured = true;
 
-        {
-            if (unlikely(!st_mem_swap_cached)) {
-                st_mem_swap_cached = rrdset_create_localhost(
-                        "mem"
-                        , "swap_cached"
-                        , NULL
-                        , "swap"
-                        , NULL
-                        , "Swap Memory Cached in RAM"
-                        , "MiB"
-                        , PLUGIN_PROC_NAME
-                        , PLUGIN_PROC_MODULE_MEMINFO_NAME
-                        , NETDATA_CHART_PRIO_MEM_SWAP + 1
-                        , update_every
-                        , RRDSET_TYPE_AREA
-                );
+        if (unlikely(!st_mem_swap_cached)) {
+            st_mem_swap_cached = rrdset_create_localhost(
+                    "mem"
+                    , "swap_cached"
+                    , NULL
+                    , "swap"
+                    , NULL
+                    , "Swap Memory Cached in RAM"
+                    , "MiB"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_MEMINFO_NAME
+                    , NETDATA_CHART_PRIO_MEM_SWAP + 1
+                    , update_every
+                    , RRDSET_TYPE_AREA
+            );
 
-                rd_cached = rrddim_add(st_mem_swap_cached, "cached", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
-            }
-
-            rrddim_set_by_pointer(st_mem_swap_cached, rd_cached, SwapCached);
-            rrdset_done(st_mem_swap_cached);
+            rd_cached = rrddim_add(st_mem_swap_cached, "cached", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
         }
+
+        rrddim_set_by_pointer(st_mem_swap_cached, rd_cached, SwapCached);
+        rrdset_done(st_mem_swap_cached);
 
         if (is_mem_zswap_enabled && (arl_zswapped->flags & ARL_ENTRY_FLAG_FOUND)) {
             if (unlikely(!st_mem_zswap)) {
