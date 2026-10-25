@@ -1769,7 +1769,7 @@ void datafile_delete(
         expected_journal_files |= JOURNALFILE_DELETED_V2;
     else
         // a journal v2 rejected at startup and not rebuilt: unmapped, but still charged
-        journal_v2_bytes = datafile->populate_mrg.rejected_v2_size;
+        journal_v2_bytes = __atomic_load_n(&datafile->rejected_v2_size, __ATOMIC_RELAXED);
     deleted_bytes = 0;
 
     // This will delete journalfile_v2 and journalfile_v1 (returns bitmask of JOURNALFILE_DELETED_V1/V2)
@@ -1921,7 +1921,9 @@ static void after_populate_mrg(struct rrdengine_instance *ctx __maybe_unused, vo
 }
 
 // Rebuilds, from their journal v1, the journals v2 rejected while populating the
-// MRG. Runs before the tier is ready, so queries do not see them meanwhile.
+// MRG, except those whose v1 was already replayed in this run (see
+// journalfile_v2_reject()). Runs before the tier is ready, so queries do not see
+// them meanwhile.
 static void populate_mrg_rebuild_rejected_journals(struct rrdengine_instance *ctx) {
     // acquired, so that a rotation cannot delete them meanwhile
     struct rrdengine_datafile **rejected = NULL;
@@ -1929,7 +1931,8 @@ static void populate_mrg_rebuild_rejected_journals(struct rrdengine_instance *ct
 
     netdata_rwlock_rdlock(&ctx->datafiles.rwlock);
     for (struct rrdengine_datafile *df = get_next_datafile(NULL, ctx, true); df; df = get_next_datafile(df, ctx, true)) {
-        if (!df->populate_mrg.rejected_v2_size || !datafile_acquire(df, DATAFILE_ACQUIRE_INDEXING))
+        if (!__atomic_load_n(&df->rejected_v2_size, __ATOMIC_RELAXED) || df->populate_mrg.v1_replayed ||
+            !datafile_acquire(df, DATAFILE_ACQUIRE_INDEXING))
             continue;
 
         if (count == size) {
@@ -2234,7 +2237,10 @@ static struct rrdengine_datafile *release_and_aquire_next_datafile_for_indexing(
         datafile = get_first_ctx_datafile(ctx, true);
 
     while (datafile && datafile->fileno != ctx_last_fileno_get(ctx) && datafile->fileno != ctx_last_flush_fileno_get(ctx)) {
-        if(journalfile_v2_data_available(datafile->journalfile)) {
+        // a rejected journal v2 has no hot pages to index, unless the startup rebuild
+        // replayed its v1 and published nothing
+        if(journalfile_v2_data_available(datafile->journalfile) ||
+           (__atomic_load_n(&datafile->rejected_v2_size, __ATOMIC_RELAXED) && !datafile->rebuild_unpublished)) {
             datafile = get_next_datafile(datafile, NULL, true);
             continue;
         }
@@ -2302,6 +2308,12 @@ static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx, void 
             journalfile_migrate_to_v2_callback,
             (void *)datafile->journalfile,
             false);
+
+        // the new journal v2 replaced a rejected one the startup rebuild could not remove
+        if (journalfile_v2_data_available(datafile->journalfile)) {
+            ctx_current_disk_space_decrease(ctx, __atomic_exchange_n(&datafile->rejected_v2_size, 0, __ATOMIC_RELAXED));
+            datafile->rebuild_unpublished = false;
+        }
 
         index_once = true;
 
