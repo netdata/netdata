@@ -1,5 +1,8 @@
 ## [unreleased]
 
+- **2026-10-06T21:40:00+05:30**: Addressed code review feedback for MCP diagnostic prompts: eliminated code duplication in test assertions and argument definitions, restored NULL method defensive routing safety, enforced node scoping and dynamic dimension discovery instructions for `query_metrics`, removed default `system.cpu` bias in `explain_anomaly`, handled unresolved nodes with diagnostic guidance without falling back to localhost, moved `-W mcppromptstest` outside `ENABLE_DBENGINE` guard, and refined documentation accuracy. Affected files: `src/web/mcp/mcp-prompts.c`, `src/daemon/main.c`, `docs/netdata-ai/mcp/README.md`, `src/web/mcp/README.md`, `CHANGELOG.md`.
+- **2026-10-06T18:48:00+05:30**: Implemented native Model Context Protocol (MCP) diagnostic prompts (`prompts/list`, `prompts/get`) with `troubleshoot_alert` and `explain_anomaly` templates, host health-log transition resolution, 16KB bounded context enforcement, standalone unit testing (`-W mcppromptstest`), and MCP documentation updates. Affected files: `src/web/mcp/mcp-prompts.h`, `src/web/mcp/mcp-prompts.c`, `src/daemon/main.c`, `docs/netdata-ai/mcp/README.md`, `src/web/mcp/README.md`.
+
 ### Merged Pull Requests:
 
 - Sync repos (netdata, ebpf-co-re, kernel-collector) ([#24008](https://github.com/netdata/netdata/issues/24008))

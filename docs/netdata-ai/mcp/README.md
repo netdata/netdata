@@ -25,6 +25,7 @@ available observability data through MCP:
 - **Metrics Queries** - Complex aggregations and groupings with ML-powered anomaly detection
 - **Metrics Scoring** - Root cause analysis leveraging anomaly detection and metric correlations
 - **Alert History** - Complete alert transition logs and state changes
+- **Diagnostic Prompts** - Standardized troubleshooting templates (`troubleshoot_alert`, `explain_anomaly`) providing evidence-grounded incident briefings and non-destructive diagnostic next steps
 - **Function Execution** - Execute Netdata functions on any connected node (requires Netdata Parent)
 - **Log Exploration** - Access logs from any connected node (requires Netdata Parent)
 
@@ -676,3 +677,45 @@ For detailed configuration instructions for specific AI clients, see:
 - [OpenCode](/docs/netdata-ai/mcp/mcp-clients/opencode.md) - SST's terminal-based AI assistant
 
 Each guide includes specific transport support matrices and configuration examples optimized for that client.
+
+## Diagnostic Prompts
+
+The diagnostic prompts implement the MCP `prompts/list` and `prompts/get` server primitives. They are exposed through Netdata's existing MCP transports, including the HTTP/SSE/stdio bridge paths supported by the current Netdata release.
+
+### What It Is
+Standardized diagnostic templates that extract incident context from Netdata's alert engine and ML metrics, synthesize a bounded troubleshooting briefing, and direct the external AI client to perform follow-up verification using read-only Netdata MCP tools.
+
+### Available Prompts and Arguments
+
+| Prompt | Description | Arguments | Required |
+|---|---|---|---|
+| `troubleshoot_alert` | Builds an incident briefing for an alert transition or active warning/critical state | `alert`: Alert name (e.g. `cpu_iowait`, `disk_space_usage`) or numeric transition ID. Use `'last'` for most recent non-clear alert.<br>`node`: Target hostname (defaults to local host).<br>`window_minutes`: Diagnostic window in minutes (default: 15, range: 1–1440).<br>`context`: Optional operator notes to append. | `alert` is required |
+| `explain_anomaly` | Synthesizes an anomaly investigation briefing across metrics within an observation window | `context`: Target metric context (e.g. `system.cpu`). Defaults to `'all'`.<br>`node`: Target hostname (defaults to local host).<br>`window_minutes`: Observation window in minutes (default: 30, range: 1–1440). | None (all optional) |
+
+### What It Returns
+A standard MCP `messages` array containing a user message formatted in structured Markdown with:
+1. **Incident Context**: For `troubleshoot_alert`: node, alert identifier, chart, metric context, old/new status, timestamp, active duration, observed values, and configured alert info. For `explain_anomaly`: target node, metric context, and observation window.
+2. **Ambiguity Warnings**: Explicit notice if an alert name matches multiple active charts or instances.
+3. **Recommended Tool Inquiries**: Specific invocations of read-only Netdata MCP tools (`find_anomalous_metrics`, `find_correlated_metrics`, `query_metrics`) and specific process table inspection via `execute_function` processes (accesses live system information; requires MCP authorization) with exact time bounds.
+4. **Analytical Mandate**: Strict requirements for the consuming AI to distinguish empirical evidence from inference, disclose uncertainty, and avoid fabricating metrics or commands.
+
+### Privacy and Security
+- **No Agent Inference / No Outbound Calls**: The diagnostic prompt implementation does not perform LLM inference or make outbound LLM API requests from the Netdata Agent. All model inference occurs inside the operator's connected MCP client.
+- **Access Control & Authentication**: Prompts expose diagnostic information through Netdata's existing MCP interface. Access is subject to Netdata's configured MCP ACLs (`[web].allow mcp from`) and transport authentication (e.g. Bearer token / API key protection).
+- **Data Exposure**: Briefings contain metric contexts and hostnames. Alert briefings also expose alert names, summaries, configured alert info, chart IDs, and observed values; they include operator-supplied notes verbatim. The Agent does not automatically collect raw environment variables or process memory.
+- **Strict Size Ceiling**: Prompt text is clamped to 16 KiB (`MCP_PROMPT_CONTEXT_MAX_BYTES`) before JSON-RPC envelope serialization, with UTF-8 boundary enforcement and a truncation notice if exceeded.
+- **Advisory Only**: Prompts explicitly mandate non-destructive, read-only operational checks.
+
+### Limitations
+- **Local History Scope**: Alert transition data reflects the host's configured health-log retention window. If an alert transitioned outside the retention buffer, the prompt falls back to guided discovery steps.
+- **Client Transport Dependencies**: MCP prompt display depends on client capabilities. For CLI clients or IDE extensions, access depends on transport support (HTTP, SSE, WebSocket, or stdio bridge).
+
+### Testing
+Run the C unit test suite directly:
+```bash
+netdata -W mcppromptstest
+```
+or via the complete test runner:
+```bash
+netdata -W unittest
+```
