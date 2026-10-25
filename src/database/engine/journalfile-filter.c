@@ -312,7 +312,7 @@ bool njtf_build(struct rrdengine_datafile *datafile, const uint8_t *jv2, size_t 
     njtf_generate_path(datafile, path_tmp, sizeof(path_tmp), true);
 
     bool ok = false;
-    int fd = open(path_tmp, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0664);
+    int fd = open(path_tmp, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, S_IRUSR | S_IWUSR);   // as datafiles and journals
     if(fd != -1) {
         ok = njtf_write_all(fd, header_block, sizeof(header_block)) &&
              njtf_write_all(fd, payload, payload_size) &&
@@ -602,121 +602,6 @@ bool njtf_backfill_one(struct rrdengine_instance *ctx) {
 }
 
 // ----------------------------------------------------------------------------
-// verifier: every page of every journal v2 file in a directory must test positive for every hour it touches.
-// netdata -W njtfverify, with NETDATA_NJTF_VERIFY_DIR=<tier-0 dbengine directory> (and optionally
-// NETDATA_NJTF_VERIFY_MAX=<max journals>). Read-only.
-
-struct njtf_verify_state {
-    const uint8_t *payload;
-    uint32_t blocks;
-    uint64_t seed;
-    uint64_t checked;
-    uint64_t false_negatives;
-};
-
-static bool njtf_verify_metric(const uint8_t *uuid, const NJTF_RANGE *ranges, size_t count, void *data) {
-    struct njtf_verify_state *vs = data;
-    for(size_t r = 0; r < count; r++) {
-        for(uint64_t b = ranges[r].first; b <= ranges[r].last; b++) {
-            vs->checked++;
-            if(!njtf_key_test(vs->payload, njtf_key(uuid, b, vs->seed, vs->blocks)))
-                vs->false_negatives++;
-        }
-    }
-    return true;
-}
-
-int njtf_verify_directory(void) {
-    const char *dir_path = getenv("NETDATA_NJTF_VERIFY_DIR");
-    const char *max_s = getenv("NETDATA_NJTF_VERIFY_MAX");
-    size_t max = max_s ? strtoull(max_s, NULL, 10) : 0;
-    if(!dir_path) {
-        fprintf(stderr, "NJTF: set NETDATA_NJTF_VERIFY_DIR to a tier-0 dbengine directory\n");
-        return 1;
-    }
-
-    DIR *dir = opendir(dir_path);
-    if(!dir) {
-        fprintf(stderr, "NJTF: cannot open %s\n", dir_path);
-        return 1;
-    }
-
-    size_t journals = 0, with_filter = 0, identity_mismatch = 0, bad_payload = 0;
-    uint64_t checked = 0, false_negatives = 0;
-    struct dirent *de;
-    while((de = readdir(dir)) && (!max || journals < max)) {
-        size_t len = strlen(de->d_name);
-        if(len < strlen(WALFILE_EXTENSION_V2) || strcmp(de->d_name + len - strlen(WALFILE_EXTENSION_V2), WALFILE_EXTENSION_V2) != 0)
-            continue;
-
-        char jpath[FILENAME_MAX + 1], fpath[FILENAME_MAX + 1];
-        snprintfz(jpath, FILENAME_MAX, "%s/%s", dir_path, de->d_name);
-        snprintfz(fpath, FILENAME_MAX, "%.*s%s", (int)(strlen(jpath) - strlen(WALFILE_EXTENSION_V2)), jpath, NJTF_EXTENSION);
-
-        int jfd = open(jpath, O_RDONLY | O_CLOEXEC);
-        if(jfd == -1)
-            continue;
-        struct stat jst;
-        if(fstat(jfd, &jst) != 0 || jst.st_size < (off_t)NJTF_HEADER_SIZE) {
-            close(jfd);
-            continue;
-        }
-        size_t jsize = (size_t)jst.st_size;
-        uint8_t *jv2 = nd_mmap(NULL, jsize, PROT_READ, MAP_SHARED, jfd, 0);
-        close(jfd);
-        if(!jv2)
-            continue;
-        journals++;
-
-        unsigned tier = 0, fileno = 0;
-        if(sscanf(de->d_name, WALFILE_PREFIX RRDENG_FILE_NUMBER_SCAN_TMPL, &tier, &fileno) != 2)
-            tier = fileno = 0;
-
-        int ffd = open(fpath, O_RDONLY | O_CLOEXEC);
-        if(ffd != -1) {
-            struct stat fst;
-            struct njtf_header h;
-            if(fstat(ffd, &fst) == 0 && (size_t)fst.st_size >= NJTF_HEADER_SIZE &&
-               pread(ffd, &h, sizeof(h), 0) == (ssize_t)sizeof(h) && h.magic == NJTF_MAGIC &&
-               h.header_crc == njtf_header_crc(&h)) {
-                with_filter++;
-                if(!njtf_header_matches(&h, (size_t)fst.st_size, tier, fileno, jv2, jsize))
-                    identity_mismatch++;
-                else {
-                    uint8_t *map = nd_mmap(NULL, (size_t)fst.st_size, PROT_READ, MAP_SHARED, ffd, 0);
-                    if(map) {
-                        uLong crc = crc32(0L, Z_NULL, 0);
-                        crc = crc32(crc, map + NJTF_HEADER_SIZE, (uInt)((size_t)fst.st_size - NJTF_HEADER_SIZE));
-                        if((uint32_t)crc != h.payload_crc)
-                            bad_payload++;
-                        else {
-                            struct njtf_verify_state vs = { .payload = map + NJTF_HEADER_SIZE, .blocks = h.blocks, .seed = h.seed };
-                            njtf_walk_metrics(jv2, jsize, njtf_verify_metric, &vs);
-                            checked += vs.checked;
-                            false_negatives += vs.false_negatives;
-                            if(vs.false_negatives)
-                                fprintf(stderr, "NJTF: %s: %" PRIu64 " false negatives of %" PRIu64 "\n",
-                                        fpath, vs.false_negatives, vs.checked);
-                        }
-                        nd_munmap(map, (size_t)fst.st_size);
-                    }
-                }
-            }
-            close(ffd);
-        }
-
-        nd_munmap(jv2, jsize);
-    }
-    closedir(dir);
-
-    fprintf(stderr, "NJTF: %zu journals, %zu with a filter, %zu identity mismatches, %zu bad payloads, "
-                    "%" PRIu64 " metric-hours checked, %" PRIu64 " false negatives: %s\n",
-            journals, with_filter, identity_mismatch, bad_payload, checked, false_negatives,
-            (false_negatives || bad_payload) ? "FAILED" : "OK");
-    return (false_negatives || bad_payload) ? 1 : 0;
-}
-
-// ----------------------------------------------------------------------------
 // unit test: a synthetic journal v2, every page positive for every hour it touches, false positives ~1%
 
 // -W njtftest runs before the agent installs its signal handlers: route SIGBUS to protected access, like they do
@@ -916,8 +801,10 @@ int njtf_unittest(void) {
         uuid_generate_random(other);
         for(uint64_t b = njtf_bucket(start_s + 30 * 3600); b < njtf_bucket(start_s + 30 * 3600) + 5; b++) {
             tests += 2;
-            fp += njtf_key_test(payload, njtf_key(ml[i].uuid, b, 12345, blocks));
-            fp += njtf_key_test(payload, njtf_key(other, b, 12345, blocks));
+            if(njtf_key_test(payload, njtf_key(ml[i].uuid, b, 12345, blocks)))
+                fp++;
+            if(njtf_key_test(payload, njtf_key(other, b, 12345, blocks)))
+                fp++;
         }
     }
 
