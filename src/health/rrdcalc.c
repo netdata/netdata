@@ -328,7 +328,7 @@ static void rrdcalc_link_to_rrdset(RRDCALC *rc) {
     rrdset_flag_set(st, RRDSET_FLAG_HAS_RRDCALC_LINKED);
 }
 
-static void rrdcalc_unlink_from_rrdset(RRDCALC *rc, bool having_ll_wrlock) {
+static void rrdcalc_unlink_from_rrdset(RRDCALC *rc, bool having_ll_wrlock, HEALTH_ENTRY_FLAGS removed_flags) {
     RRDSET *st = rc->rrdset;
     if(!st) return;
 
@@ -347,7 +347,7 @@ static void rrdcalc_unlink_from_rrdset(RRDCALC *rc, bool having_ll_wrlock) {
                 rc->status,
                 RRDCALC_STATUS_REMOVED,
                     0,
-                    0);
+                    removed_flags);
 
             health_alarm_log_add_entry(host, ae, true);
             health_log_alert(host, ae);
@@ -463,7 +463,7 @@ static void rrdcalc_rrdhost_delete_callback(const DICTIONARY_ITEM *item __maybe_
     if(likely(host))
         rrdcalc_name_index_del(host, rc);
 
-    rrdcalc_unlink_from_rrdset(rc, thread_having_ll_wrlock);
+    rrdcalc_unlink_from_rrdset(rc, thread_having_ll_wrlock, 0);
 
     // any destruction actions that require other locks
     // have to be placed in rrdcalc_del(), because the object is actually locked for deletion
@@ -710,17 +710,22 @@ bool rrdcalc_add_from_prototype(RRDHOST *host, RRDSET *st, RRD_ALERT_PROTOTYPE *
     return ret;
 }
 
-void rrdcalc_unlink_and_delete(RRDHOST *host, RRDCALC *rc, bool having_ll_wrlock) {
+static void rrdcalc_unlink_and_delete_flagged(
+    RRDHOST *host, RRDCALC *rc, bool having_ll_wrlock, HEALTH_ENTRY_FLAGS removed_flags) {
     // remove from the name index first, while rc and host are both in hand and
     // the caller's lock state is known; the delete callback repeats this
     // defensively for any path that does not come through here
     rrdcalc_name_index_del(host, rc);
 
-    rrdcalc_unlink_from_rrdset(rc, having_ll_wrlock);
+    rrdcalc_unlink_from_rrdset(rc, having_ll_wrlock, removed_flags);
 
     thread_having_ll_wrlock = having_ll_wrlock;
     dictionary_del_advanced(host->rrdcalc_root_index, string2str(rc->key), (ssize_t)string_strlen(rc->key));
     thread_having_ll_wrlock = false;
+}
+
+void rrdcalc_unlink_and_delete(RRDHOST *host, RRDCALC *rc, bool having_ll_wrlock) {
+    rrdcalc_unlink_and_delete_flagged(host, rc, having_ll_wrlock, 0);
 }
 
 // ----------------------------------------------------------------------------
@@ -752,17 +757,23 @@ void rrdcalc_unlink_and_delete_all_rrdset_alerts(RRDSET *st) {
     dictionary_write_unlock(host->rrdcalc_root_index);
 }
 
-void rrdcalc_delete_all(RRDHOST *host) {
+static void rrdcalc_delete_all_flagged(RRDHOST *host, HEALTH_ENTRY_FLAGS removed_flags) {
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdhost_write(host, rc) {
-        rrdcalc_unlink_and_delete(host, rc, false);
+        rrdcalc_unlink_and_delete_flagged(host, rc, false, removed_flags);
     }
     foreach_rrdcalc_in_rrdhost_done(rc);
     dictionary_garbage_collect(host->rrdcalc_root_index);
 }
 
+void rrdcalc_delete_all(RRDHOST *host) {
+    rrdcalc_delete_all_flagged(host, 0);
+}
+
 void rrdcalc_child_disconnected(RRDHOST *host) {
-    rrdcalc_delete_all(host);
+    // the REMOVED transitions are flagged: a child that only restarts comes back within minutes, so they reach
+    // the cloud after ALERT_TRANSITION_DELAY_LONG instead of the delay of an alert that is really gone
+    rrdcalc_delete_all_flagged(host, HEALTH_ENTRY_FLAG_CHILD_DISCONNECTED);
 
     // We just deleted every alert of this host, so we must also ask health to re-create them when
     // the child comes back. We cannot rely on chart re-registration to do it: rrdset_conflict_callback()
