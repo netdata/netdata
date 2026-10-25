@@ -481,6 +481,7 @@ func TestCase023MCPQueryMetricsContract(t *testing.T) {
 		"CASE-023/mcp-hidden-dimension-selection",
 		"CASE-023/mcp-default-zero-options",
 		"CASE-023/mcp-invalid-options",
+		"CASE-023/mcp-invalid-numeric-options",
 	} {
 		registerContract(t, contract)
 	}
@@ -882,6 +883,11 @@ func TestCase023MCPQueryMetricsContract(t *testing.T) {
 				})
 			}
 		}
+	})
+
+	t.Run("invalid-numeric-options", func(t *testing.T) {
+		trackContract(t, "CASE-023/mcp-invalid-numeric-options")
+		requestID := 400
 		for _, group := range []string{"percentile", "trimmed-mean", "trimmed-median"} {
 			for index, value := range []string{"\x0095", "9\x005", "95\x00"} {
 				t.Run(group+"/nul-"+strconv.Itoa(index), func(t *testing.T) {

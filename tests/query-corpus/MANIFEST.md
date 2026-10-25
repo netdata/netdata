@@ -163,7 +163,8 @@ set at the end.
 | CASE-023/mcp-valid-query-values | valid MCP numeric and gap expressions return the exact percentage, occurrence and flap values, including cadence-sensitive sample and time denominators | n/a |  |
 | CASE-023/mcp-valid-query-anomaly-rates | valid MCP condition queries preserve the exact anomaly rate of their selected source dimension independently of the grouped value | n/a |  |
 | CASE-023/mcp-valid-query-annotations | valid MCP condition queries preserve the exact RESET point-annotation bitmap independently of the grouped value | n/a |  |
-| CASE-023/mcp-invalid-options | non-string, malformed or non-finite MCP condition expressions, plus NUL-bearing condition and numeric option strings, return structured -32602 INVALID_PARAMS errors | n/a |  |
+| CASE-023/mcp-invalid-options | non-string, malformed, non-finite or NUL-bearing MCP condition expressions return structured -32602 INVALID_PARAMS errors | n/a |  |
+| CASE-023/mcp-invalid-numeric-options | NUL-bearing numeric time_group_options for percentile, trimmed-mean and trimmed-median return structured -32602 INVALID_PARAMS errors | n/a |  |
 | CASE-023/weights-invalid-options | the public weights endpoint rejects a malformed expression instead of silently executing the default ==0 condition | n/a |  |
 | CASE-023/badge-invalid-options | the public badge endpoint rejects a malformed expression instead of silently rendering the default ==0 condition | n/a |  |
 | CASE-023/v1-data-invalid-options | the public v1 data endpoint rejects a malformed expression without allowing its HTTP 400 response to be cached | n/a |  |

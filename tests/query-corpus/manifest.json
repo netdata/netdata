@@ -732,7 +732,11 @@
   },
   {
     "name": "CASE-023/mcp-invalid-options",
-    "proves": "non-string, malformed or non-finite MCP condition expressions, plus NUL-bearing condition and numeric option strings, return structured -32602 INVALID_PARAMS errors"
+    "proves": "non-string, malformed, non-finite or NUL-bearing MCP condition expressions return structured -32602 INVALID_PARAMS errors"
+  },
+  {
+    "name": "CASE-023/mcp-invalid-numeric-options",
+    "proves": "NUL-bearing numeric time_group_options for percentile, trimmed-mean and trimmed-median return structured -32602 INVALID_PARAMS errors"
   },
   {
     "name": "CASE-023/weights-invalid-options",
