@@ -73,10 +73,15 @@ uint64_t perflib_counter_delta(uint64_t previous, uint64_t current, bool is_32bi
 static bool perflib_average_base_delta(const COUNTER_DATA *d, DWORD counter_type, uint64_t *base_delta)
 {
     if (!d->updated || d->current.CounterType != counter_type || d->previous.CounterType != counter_type ||
-        d->current.Data < d->previous.Data || d->current.Time < d->previous.Time)
+        d->current.Data < d->previous.Data)
         return false;
 
-    *base_delta = (uint64_t)(d->current.Time - d->previous.Time);
+    uint32_t delta = (uint32_t)d->current.Time - (uint32_t)d->previous.Time;
+    // A delta of at least half the 32-bit range is indistinguishable from a reset or stale sample.
+    if (delta >= (UINT32_C(1) << 31))
+        return false;
+
+    *base_delta = delta;
 
     // An unchanged base means no operation completed; moved data without operations is inconsistent.
     return *base_delta || d->current.Data == d->previous.Data;
