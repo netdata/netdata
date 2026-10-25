@@ -26,10 +26,11 @@ func TestSanitizeLabel(t *testing.T) {
 
 func TestResolveTagPlan(t *testing.T) {
 	tests := map[string]struct {
-		tags      []ResourceTagLabelConfig
-		dimLabels []string
-		wantPlan  []resolvedTag
-		wantWarn  int
+		tags       []ResourceTagLabelConfig
+		dimLabels  []string
+		attrLabels []string
+		wantPlan   []resolvedTag
+		wantWarn   int
 	}{
 		"empty selection disables": {
 			tags:     nil,
@@ -63,6 +64,17 @@ func TestResolveTagPlan(t *testing.T) {
 			wantPlan:  nil,
 			wantWarn:  1,
 		},
+		"collision with a resource attribute label -> skipped": {
+			tags:       []ResourceTagLabelConfig{{Key: "engine"}, {Key: "owner"}},
+			attrLabels: []string{"engine", "engine_version"},
+			wantPlan:   []resolvedTag{{"owner", "owner"}},
+			wantWarn:   1,
+		},
+		"resource attribute collision renamed -> kept": {
+			tags:       []ResourceTagLabelConfig{{Key: "engine", Label: "engine_tag"}},
+			attrLabels: []string{"engine"},
+			wantPlan:   []resolvedTag{{"engine", "engine_tag"}},
+		},
 		"survivors kept when mixed with skips": {
 			tags:      []ResourceTagLabelConfig{{Key: "owner"}, {Key: "region"}, {Key: "project"}},
 			dimLabels: []string{"instance_id"},
@@ -73,7 +85,7 @@ func TestResolveTagPlan(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			plan, warnings := resolveTagPlan(tc.tags, tc.dimLabels)
+			plan, warnings := resolveTagPlan(tc.tags, tc.dimLabels, tc.attrLabels)
 			assert.Equal(t, tc.wantPlan, plan)
 			assert.Len(t, warnings, tc.wantWarn)
 		})

@@ -28,6 +28,7 @@ const (
 	logKeyGetMetricDataTransient = "getmetricdata_transient"
 	logKeyAccountResolveFailed   = "account_resolve_failed"
 	logKeyTagRefreshFailed       = "tag_refresh_failed"
+	logKeyAttributeRefreshFailed = "attribute_refresh_failed"
 	logKeyRuleShadowed           = "rule_shadowed"
 )
 
@@ -67,11 +68,13 @@ func New() *Collector {
 		newCloudWatchClient: defaultNewCloudWatchClient,
 		newSTSClient:        defaultNewSTSClient,
 		newRGTAClient:       defaultNewRGTAClient,
+		newRDSClient:        defaultNewRDSClient,
 	}
 	c.observations = newObservationStore(c.store)
 	c.activity = newCollectorActivity(c.store)
 	c.clients = newClientCache(c.buildTargetRegionClient)
 	c.rgtaClients = newClientCache(c.buildTargetRegionRGTAClient)
+	c.rdsClients = newClientCache(c.buildTargetRegionRDSClient)
 	return c
 }
 
@@ -87,6 +90,7 @@ type Collector struct {
 	newCloudWatchClient func(cfg aws.Config) cloudwatchClient
 	newSTSClient        func(cfg aws.Config) stsClient
 	newRGTAClient       func(cfg aws.Config) rgtaClient
+	newRDSClient        func(cfg aws.Config) rdsClient
 	newCatalog          func() (cwprofiles.Catalog, error) // nil => cwprofiles.DefaultCatalog
 
 	plan              *collectionPlan
@@ -95,6 +99,7 @@ type Collector struct {
 
 	clients     *clientCache[cloudwatchClient] // one per (target, region)
 	rgtaClients *clientCache[rgtaClient]       // one per (target, region)
+	rdsClients  *clientCache[rdsClient]        // one per (target, region)
 	discovery   discoverySnapshot
 	queryPlan   []plannedQuery
 	planDirty   bool
@@ -107,6 +112,9 @@ type Collector struct {
 	tags          tagSnapshot              // resource-tag membership and label cache, refreshed with discovery
 	tagLabelPlans map[string][]resolvedTag // per-profile resolved tag->label plans (nil until compiled)
 	tagFetchPlan  []tagFetchGroup          // immutable discovery-derived RGTA topology (nil when invalidated)
+
+	attributes        map[attributeGroupKey]attributeGroup // control-plane attribute labels, refreshed with discovery
+	profileAttributes map[string]profileAttributes         // per-profile attribute providers (nil until compiled)
 }
 
 func (c *Collector) Init(context.Context) error {
@@ -138,11 +146,14 @@ func (c *Collector) Cleanup(context.Context) {
 	c.discoverySig = ""
 	c.clients.reset()
 	c.rgtaClients.reset()
+	c.rdsClients.reset()
 	c.observations.reset()
 	c.activity.reset()
 	c.tags = tagSnapshot{}
 	c.tagLabelPlans = nil
 	c.tagFetchPlan = nil
+	c.attributes = nil
+	c.profileAttributes = nil
 }
 
 func (c *Collector) Configuration() any { return c.Config }

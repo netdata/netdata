@@ -157,7 +157,7 @@ func (c *Collector) computeTagLabelPlans() {
 		if c.plan.TagJoins[p.Name] == nil {
 			continue
 		}
-		plan, warnings := resolveTagPlan(c.Labels.ResourceTags, profileDimLabels(p.Config))
+		plan, warnings := resolveTagPlan(c.Labels.ResourceTags, profileDimLabels(p.Config), profileAttributeLabels(p.Config))
 		for _, w := range warnings {
 			c.Warningf("CloudWatch tags (profile %q): %s", p.Name, w)
 		}

@@ -9,6 +9,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
+	"github.com/aws/aws-sdk-go-v2/service/rds"
 	"github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 
@@ -34,6 +35,12 @@ type rgtaClient interface {
 	GetResources(ctx context.Context, in *resourcegroupstaggingapi.GetResourcesInput, optFns ...func(*resourcegroupstaggingapi.Options)) (*resourcegroupstaggingapi.GetResourcesOutput, error)
 }
 
+// rdsClient is the narrow RDS API surface used for resource attribute labels
+// (engine, engine version, instance class) that CloudWatch does not publish.
+type rdsClient interface {
+	DescribeDBInstances(ctx context.Context, in *rds.DescribeDBInstancesInput, optFns ...func(*rds.Options)) (*rds.DescribeDBInstancesOutput, error)
+}
+
 func defaultNewCloudWatchClient(cfg aws.Config) cloudwatchClient {
 	return cloudwatch.NewFromConfig(cfg)
 }
@@ -44,6 +51,10 @@ func defaultNewSTSClient(cfg aws.Config) stsClient {
 
 func defaultNewRGTAClient(cfg aws.Config) rgtaClient {
 	return resourcegroupstaggingapi.NewFromConfig(cfg)
+}
+
+func defaultNewRDSClient(cfg aws.Config) rdsClient {
+	return rds.NewFromConfig(cfg)
 }
 
 func defaultNewAWSConfig(ctx context.Context, id awsauth.Identity, region string) (aws.Config, error) {
@@ -126,16 +137,21 @@ func (cc *clientCache[T]) reset() {
 	cc.building = make(map[clientKey]*clientBuild[T])
 }
 
-// buildTargetRegionClient constructs a CloudWatch client for one (target, region)
-// using that target's compiled auth identity. It is the clientCache's builder; the
-// cache memoizes its successful results. It reads c.newAWSConfig/c.newCloudWatchClient
-// at call time so test seams set after New() are honored.
-func (c *Collector) buildTargetRegionClient(ctx context.Context, target, region string) (cloudwatchClient, error) {
+// targetRegionAWSConfig builds the AWS config for one (target, region) using that
+// target's compiled auth identity. It reads c.newAWSConfig at call time so test
+// seams set after New() are honored.
+func (c *Collector) targetRegionAWSConfig(ctx context.Context, target, region string) (aws.Config, error) {
 	resolved, ok := c.resolvedTargetByRef(target)
 	if !ok {
-		return nil, fmt.Errorf("target %q is not resolved", target)
+		return aws.Config{}, fmt.Errorf("target %q is not resolved", target)
 	}
-	cfg, err := c.newAWSConfig(ctx, resolved.target.Identity, region)
+	return c.newAWSConfig(ctx, resolved.target.Identity, region)
+}
+
+// buildTargetRegionClient constructs a CloudWatch client for one (target, region).
+// It is the clientCache's builder; the cache memoizes its successful results.
+func (c *Collector) buildTargetRegionClient(ctx context.Context, target, region string) (cloudwatchClient, error) {
+	cfg, err := c.targetRegionAWSConfig(ctx, target, region)
 	if err != nil {
 		return nil, err
 	}
@@ -145,13 +161,18 @@ func (c *Collector) buildTargetRegionClient(ctx context.Context, target, region 
 // buildTargetRegionRGTAClient mirrors buildTargetRegionClient for the Resource
 // Groups Tagging API.
 func (c *Collector) buildTargetRegionRGTAClient(ctx context.Context, target, region string) (rgtaClient, error) {
-	resolved, ok := c.resolvedTargetByRef(target)
-	if !ok {
-		return nil, fmt.Errorf("target %q is not resolved", target)
-	}
-	cfg, err := c.newAWSConfig(ctx, resolved.target.Identity, region)
+	cfg, err := c.targetRegionAWSConfig(ctx, target, region)
 	if err != nil {
 		return nil, err
 	}
 	return c.newRGTAClient(cfg), nil
+}
+
+// buildTargetRegionRDSClient mirrors buildTargetRegionClient for the RDS API.
+func (c *Collector) buildTargetRegionRDSClient(ctx context.Context, target, region string) (rdsClient, error) {
+	cfg, err := c.targetRegionAWSConfig(ctx, target, region)
+	if err != nil {
+		return nil, err
+	}
+	return c.newRDSClient(cfg), nil
 }

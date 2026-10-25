@@ -77,8 +77,9 @@ func (c *Collector) ensureTargets(ctx context.Context) error {
 		resolved := resolvedTarget{target: target, accountID: result.accountID}
 		c.resolvedByRef[target.Name] = resolved
 		c.invalidateQueryPlan()
-		c.markDiscoveryStale() // discover the newly-resolved account this cycle, not after refresh_every
-		c.markTagsStale()      // and fetch its tags this cycle, so its first charts are created tagged
+		c.markDiscoveryStale()  // discover the newly-resolved account this cycle, not after refresh_every
+		c.markTagsStale()       // and fetch its tags this cycle, so its first charts are created tagged
+		c.markAttributesStale() // likewise for resource attribute labels
 		c.Infof("CloudWatch: target %q resolved successfully", target.Name)
 	}
 	c.warnOperationFailures(logKeyAccountResolveFailed, "account resolution", " (will retry next cycle)", failures)

@@ -106,6 +106,9 @@ modules:
             selected service with `cloudwatch:ListMetrics`, once per target, region, and CloudWatch namespace, and matches
             them against the profile's dimensions to find the resources. Resource tag filters and labels are resolved
             with `tag:GetResources` (Resource Groups Tagging API).
+          - RDS details: CloudWatch does not say which engine an RDS instance runs, so when RDS instances are
+            discovered the collector reads them with `rds:DescribeDBInstances`, on the same schedule, once per target
+            and region, and adds their engine, engine version, and instance class as chart labels.
           - Collection: every `update_every` seconds (default 60) it reads the newest complete datapoint of every selected
             metric and statistic with `cloudwatch:GetMetricData`, batched, and only for series whose CloudWatch period has
             moved on since the last read. Between reads the last value is repeated at no AWS cost.
@@ -131,6 +134,7 @@ modules:
           | `cloudwatch:ListMetrics` | Any selected profile has an identifying dimension and therefore needs discovery. An all-constant profile such as `billing_total` is queried directly and does not need it. |
           | `sts:AssumeRole` | A target sets `assume_role`; grant it on the credential source's identity for that role ARN. |
           | `tag:GetResources` | Resource tag filters (`rule_defaults.filters.resource_tags`, `rules[].filters.resource_tags`) or resource tag labels (`labels.resource_tags`) are configured. |
+          | `rds:DescribeDBInstances` | RDS instances are collected (the `rds` profile is a default). It adds the `engine`, `engine_version`, and `db_instance_class` labels to RDS charts. Without it those labels are missing; collection is not affected. |
 
           The collector also calls `sts:GetCallerIdentity` for account attribution, but [AWS does not require an explicit
           permission grant for that operation](https://docs.aws.amazon.com/STS/latest/APIReference/API_GetCallerIdentity.html).
@@ -206,7 +210,7 @@ modules:
             (the billable unit, per account and region), *GetMetricData Profile Metric Request Estimates* (the same split
             per profile for ranking; estimates are computed per profile and do not add up to the total), and
             *GetMetricData Query Items* (submitted queries, for plan tuning). They count only `ListMetrics` and
-            `GetMetricData`, not STS or tag lookups, and they are inputs for cost visibility, not an invoice.
+            `GetMetricData`, not STS, tag, or RDS lookups, and they are inputs for cost visibility, not an invoice.
 
             **Reducing the cost**
 
@@ -248,6 +252,8 @@ modules:
                 `"Resource": "*"` is already the least privilege for these read actions
                 ([AWS reference](https://docs.aws.amazon.com/service-authorization/latest/reference/list_amazoncloudwatch.html)).
               - Add `tag:GetResources` (also `"Resource": "*"`) when you use resource tag filters or labels.
+              - Add `rds:DescribeDBInstances` (also `"Resource": "*"`) so RDS charts carry the `engine`,
+                `engine_version`, and `db_instance_class` labels.
               - Add `sts:AssumeRole` on each role ARN a target assumes, and let the role's trust policy allow this identity.
               - A job that selects only the `billing_total` profile can omit `cloudwatch:ListMetrics`.
 
@@ -1014,16 +1020,17 @@ modules:
           - error: "`AWS request failed (code=AccessDeniedException, status=403, request_id=...)`"
             when: |
               Logged as part of a `CloudWatch <operation> failed for N target/region operation(s)` warning, where the
-              operation is `account resolution`, `discovery`, `GetMetricData`, `query client creation`, or
-              `resource tag lookup`. The codes `AccessDenied`, `NotAuthorized`, and `Forbidden` mean the same.
+              operation is `account resolution`, `discovery`, `GetMetricData`, `query client creation`,
+              `resource tag lookup`, or `resource attribute lookup`. The codes `AccessDenied`, `NotAuthorized`, and `Forbidden` mean the same.
             cause: |
               The IAM identity behind the named target is not allowed the AWS action that operation uses:
               `cloudwatch:ListMetrics` for discovery, `cloudwatch:GetMetricData` for reads, `tag:GetResources` for tag
-              lookups, or `sts:AssumeRole` when the target assumes a role. The collector never prints the AWS message
+              lookups, `rds:DescribeDBInstances` for RDS attribute lookups, or `sts:AssumeRole` when the target assumes
+              a role. The collector never prints the AWS message
               itself, only the code, HTTP status, and request id.
             fix: |
               Attach the policy from Prerequisites to that identity, adding `tag:GetResources` if the job uses tag
-              filters or labels. For a target with `assume_role`, allow `sts:AssumeRole` on the role ARN for the source
+              filters or labels and `rds:DescribeDBInstances` for RDS engine labels. For a target with `assume_role`, allow `sts:AssumeRole` on the role ARN for the source
               identity and let the role's trust policy accept it. The next discovery refresh or collection cycle retries
               automatically.
           - error: "`AWS request failed (code=ExpiredToken, status=403, request_id=...)`"
@@ -1228,7 +1235,9 @@ modules:
           - error: "`CloudWatch tags (profile \"<profile>\"): skipped tag \"<tag>\": label \"<label>\" collides with a dimension label (rename it)`"
             cause: |
               A tag selected in `labels.resource_tags` would become a label that the profile already uses for a
-              dimension (or one of the reserved `account_id` and `region` labels). The tag is not attached.
+              dimension (or one of the reserved `account_id` and `region` labels, or, on RDS charts, the `engine`,
+              `engine_version`, and `db_instance_class` labels; the message then says `resource attribute label`).
+              The tag is not attached.
             fix: |
               Set `labels.resource_tags[].label` to another name for that key.
           - error: "`load CloudWatch profiles: validate profile \"<name>\": ...`"
@@ -1304,6 +1313,14 @@ modules:
               Follow the `AWS request ...` message inside the lookup failure (usually a missing `tag:GetResources`
               permission or a timeout on a large tagged estate; raise `timeout` for the latter). Collection resumes on
               the next successful lookup.
+          - error: "`CloudWatch resource attribute lookup failed for N target/region operation(s): ... (retaining last-known attribute labels; collection is unaffected)`"
+            cause: |
+              `rds:DescribeDBInstances` failed for that target and region, usually because the identity lacks the
+              permission. RDS charts are still collected; they lack the `engine`, `engine_version`, and
+              `db_instance_class` labels, or keep the last values read.
+            fix: |
+              Allow `rds:DescribeDBInstances` for that identity (see Prerequisites). The lookup retries at the next
+              discovery refresh.
           - error: No charts appear although the job runs without errors
             cause: |
               CloudWatch has nothing for the selection yet. Typical reasons: the resources are idle (several services,
@@ -1416,7 +1433,10 @@ modules:
         dimensions (for example EC2 `instance_id`, or S3 `bucket_name` and `storage_type`). A dimension that is the same
         for every resource of a profile (CloudFront's `Region=Global`) is matched but not shown as a label. Tags selected
         with `labels.resource_tags` are added as labels that are not part of the chart identity, so a changed tag changes
-        the label, not the chart. Charts land on the job's `vnode` when one is set, otherwise on the node running the
+        the label, not the chart. RDS charts likewise carry `engine` (as AWS reports it, for example `mysql`,
+        `postgres`, `aurora-mysql`, `aurora-postgresql`, `mariadb`, `sqlserver-se`, `oracle-ee`), `engine_version`, and
+        `db_instance_class`, read with `rds:DescribeDBInstances`; they are missing when that permission is not
+        granted. Charts land on the job's `vnode` when one is set, otherwise on the node running the
         collector; AWS resources never become separate Netdata nodes. CloudWatch publishes with a delay, so allow a few
         minutes for the first datapoints.
 

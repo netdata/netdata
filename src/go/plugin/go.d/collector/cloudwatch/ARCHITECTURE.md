@@ -71,7 +71,8 @@ Each collection cycle (`collect.go`), in order:
 2. use compiler-created instances for all-constant profiles; for dynamic
    profiles, share one `ListMetrics` scan per (target, region, namespace) and
    match each participating profile against that stream (`discover.go`);
-3. resolve resource-tag membership and optional chart labels (`tags.go`);
+3. resolve resource-tag membership and optional chart labels (`tags.go`), then
+   control-plane resource attribute labels such as the RDS engine (`attributes.go`);
 4. reuse or rebuild the stable per-series query blueprint
    (`query_plan.go`);
 5. execute the due queries in concurrent batches (`query_executor.go`);
@@ -135,8 +136,8 @@ flowchart TD
 flowchart TD
     A("ensure collection plan + target account ids")
     B("refreshDiscovery<br/>shared ListMetrics scans per compatible target scope")
-    C("refreshTags<br/>resolve filter membership + non-identity labels")
-    D("currentQueryPlan<br/>cached until target/discovery/tag inputs change")
+    C("refreshTags + refreshAttributes<br/>resolve filter membership + non-identity labels")
+    D("currentQueryPlan<br/>cached until target/discovery/tag/attribute inputs change")
     E("dueQueries<br/>keep stable queries with a newer eligible window")
     F("executeQueries<br/>batched · concurrent GetMetricData")
     G("apply outcomes + emit<br/>write gauges · re-emit retained")
@@ -319,14 +320,49 @@ copies selected AWS tags to **non-identity** chart labels.
   A default-selected profile without a safe association is skipped when filtering is
   effective; explicitly including one is a config error unless that rule disables or
   replaces the filter. Labels-only use remains best-effort for unsupported profiles.
-- **Emission split.** Identity `labels` (`{account_id, region, <dims>}`) and `tagLabels`
-  travel separately through `plannedQuery`. `writeSample` emits `labels + tagLabels`
-  in a fresh slice; the stable query key uses identity labels but excludes tag labels,
-  so a tag change never churns query state. `chartengine` `auto_intersection` then
-  promotes the tag labels as non-identity chart labels—no template change. A changed
+- **Emission split.** Identity `labels` (`{account_id, region, <dims>}`) and
+  `enrichmentLabels` (resource attribute labels, then tag labels) travel separately
+  through `plannedQuery`. `writeSample` emits `labels + enrichmentLabels` in a fresh
+  slice; the stable query key uses identity labels but excludes enrichment labels,
+  so a tag or attribute change never churns query state. `chartengine` `auto_intersection` then
+  promotes the enrichment labels as non-identity chart labels—no template change. A changed
   effective label set invalidates the plan once; the current plan supplies the new
   labels and the normal numeric snapshot causes chartengine to emit a label-only
   chart-definition update for an existing chart.
+
+## Resource Attribute Labels
+
+`attributes.go` and `attributes_rds.go` add facts CloudWatch does not publish per
+instance. CloudWatch aggregates `AWS/RDS` separately by `EngineName` and
+`DatabaseClass` but never pairs them with `DBInstanceIdentifier`, so the engine comes
+from the RDS control plane.
+
+- **Providers.** `resourceAttributeProviders` is a Go registry keyed by CloudWatch
+  namespace and an identifying join dimension. A profile (stock or user) gets a provider
+  when its namespace matches and the join dimension is identifying; a constant join
+  dimension describes an aggregate and gets none. The only provider is
+  `rds:DescribeDBInstances` (`AWS/RDS`, `DBInstanceIdentifier`), emitting `engine`,
+  `engine_version`, and `db_instance_class` from the raw AWS values; empty values are
+  omitted. There is no config option and no profile-format field.
+- **Fetch groups.** One fetch per `(target, region, provider)` that has discovered
+  instances, so a job selecting RDS without RDS instances makes no call. Clients are
+  cached per `(target, region)`; pages use `MaxRecords=100`, the job `timeout`, a
+  duplicate-marker check, and at most 100 pages (10,000 instances). The join is exact on
+  the instance identifier within the fetching target and region. The cache keeps only
+  discovered identifiers, so other instances in the response (undiscovered, Neptune,
+  DocumentDB) neither use memory nor rebuild the query plan when they change.
+- **Refresh and failure.** Groups expire after `discovery.refresh_every` and are marked
+  stale on every discovery install and target resolution, so new instances and targets
+  get their first charts labeled. A failed group keeps its last-known labels and retries
+  at the next expiry, not every collect, which bounds calls and log volume when the
+  optional permission is missing; failures log through the hourly-limited
+  `resource attribute lookup` warning. Parent cancellation commits nothing.
+- **Presentation.** A changed label set invalidates the query plan once; chartengine
+  emits `UpdateChartLabelsAction` for the existing chart. Attribute labels are reserved
+  for profiles with a provider: `resolveTagPlan` skips a colliding `labels.resource_tags`
+  entry with a warning, because a duplicate label key panics `metrix`.
+- **Cost.** `DescribeDBInstances` is not a billed CloudWatch API and is not counted by
+  the collector-activity charts, like RGTA and STS.
 
 ## Journey Of One Stable Query
 
@@ -407,7 +443,7 @@ stable query independently:
   one day.
 - Its stable key includes execution target, region, structural AWS query, final
   series identity, and effective policy. Rule name, scope order, request ID,
-  batch membership, and mutable tag labels are excluded. Equivalent rule-only
+  batch membership, and mutable tag and attribute labels are excluded. Equivalent rule-only
   ownership transfers preserve state; target/query/identity/policy changes do not.
 
 ## Scheduling And State Transitions
@@ -676,8 +712,8 @@ aws-eusc).
 
 ## Concurrency
 
-- `apiConcurrency` (5) bounds ListMetrics discovery, RGTA fetch groups, and
-  GetMetricData chunk execution via `conc/pool`. `maxQueriesPerRequest` (500) is
+- `apiConcurrency` (5) bounds ListMetrics discovery, RGTA fetch groups, resource
+  attribute fetch groups, and GetMetricData chunk execution via `conc/pool`. `maxQueriesPerRequest` (500) is
   the AWS request ceiling; the datapoint budget may reduce actual batch width.
   Both are internal constants, not config.
 - ListMetrics discovery first pages and continuation pages use separate bounded
@@ -686,8 +722,8 @@ aws-eusc).
   a mutex, caching only successes (a transient credential error is retried next
   call).
 - The top-level `collect` stages run sequentially, and the per-cycle `store`
-  write is single-threaded. Discovery, resource-tag lookup, and query execution
-  fan out within their respective stages.
+  write is single-threaded. Discovery, resource-tag lookup, resource attribute
+  lookup, and query execution fan out within their respective stages.
 
 ## Cost Model
 
@@ -771,7 +807,7 @@ metric-store commit therefore carries its work into the next successful frame. O
 a series is known, a successful cached interval with no real AWS work publishes zero.
 Cleanup, job replacement, and process restart reset the pending activity and known
 keys. SDK invocation counts cover CloudWatch `ListMetrics` and `GetMetricData`, not
-Resource Groups Tagging API, STS, or credential-provider calls. These metrics are
+Resource Groups Tagging API, RDS, STS, or credential-provider calls. These metrics are
 cost inputs, not an AWS invoice: AWS owns the billing rules, may change them, and does
 not separately document pagination billing semantics.
 
@@ -800,6 +836,9 @@ not separately document pagination billing semantics.
   rule's selected series; disjoint series remain eligible.
 - **Tag labels are non-identity** — `labels.resource_tags` can update labels on an
   existing chart but cannot change its identity or overwrite an identity label.
+- **Attribute labels are non-identity and optional** — a missing permission or failed
+  lookup never fails collection or changes chart identity; it only leaves the labels
+  absent or last-known.
 - **Compiled configuration** — operator-facing credentials, targets, and ordered
   rules are validated and expanded once. Discovery, tag-label presentation,
   `limits.max_instances`, `limits.max_discovery_groups`, `timeout`, `vnode`, and the framework's
@@ -829,6 +868,9 @@ not separately document pagination billing semantics.
   `query_response.go`.
 - **Change execution orchestration**: `query_executor.go`.
 - **Change scheduling, retention, correction, or gap state**: `observe.go`.
+- **Add a resource attribute provider** (for example EC2 instance type): add a
+  `resourceAttributeProvider` next to `attributes_rds.go`, its narrow client and
+  `clientCache` in `clients.go`/`collector.go`, and the permission in `metadata.yaml`.
 - **Change how retained observations become metrics** (rate normalization,
   labels, float hint): `query_emit.go`.
 - **Change chart generation** (namespace or template assembly): `chart.go`, plus
