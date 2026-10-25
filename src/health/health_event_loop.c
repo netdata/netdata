@@ -380,11 +380,8 @@ static void do_eval_expression(
 // transitions queued for after a delay, and a snapshot Cloud requested for it still has to be sent.
 // Nothing is marked or drained while transitions are still being saved; a transition saved after a snapshot
 // reaches the cloud through alert_queue. On an idle host this costs a few atomic loads (the queue is read only
-// when a row can be due).
-// A snapshot of a host that is not collecting waits until all its queued transitions are due: the snapshot is built
-// from the health log, where a disconnected child's alerts are already REMOVED, so sending it earlier would clear
-// them in the cloud before the delay that lets a restarting child come back unnoticed. The queue is read for this
-// only while a snapshot is pending; the held host keeps draining its due rows meanwhile.
+// when a row can be due). A snapshot marked ready here may still be held by the ACLK pass (alert_snapshot_held());
+// the host keeps draining its due rows meanwhile.
 static void health_alert_queue_service(RRDHOST *host) {
     int32_t pending = __atomic_load_n(&host->health.pending_transitions, __ATOMIC_RELAXED);
     if (pending)
@@ -392,10 +389,7 @@ static void health_alert_queue_service(RRDHOST *host) {
 
     if (!__atomic_load_n(&host->health.pending_transitions, __ATOMIC_RELAXED)) {
         struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
-        bool hold_snapshot = aclk_host_config && !rrdhost_flag_check(host, RRDHOST_FLAG_COLLECTOR_ONLINE) &&
-                             aclk_alert_snapshot_state_get(aclk_host_config) == ACLK_ALERT_SNAPSHOT_PENDING &&
-                             alert_queue_has_rows_not_due(host, now_realtime_sec());
-        if (aclk_host_config && !hold_snapshot && aclk_alert_snapshot_mark_ready(aclk_host_config)) {
+        if (aclk_host_config && aclk_alert_snapshot_mark_ready(aclk_host_config)) {
             rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
         } else {
             worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_QUEUE);

@@ -788,27 +788,15 @@ void alert_queue_next_due_lower(RRDHOST *host, time_t when)
 #define SQL_ALERT_PENDING_QUEUE_NOT_DUE                                                                                \
     "SELECT 1 FROM alert_queue WHERE host_id = @host_id AND date_scheduled > @now LIMIT 1"
 
-// True while the host has an alert_queue row that is not due yet. The gate cannot answer this: it is the earliest due
-// time only, and a row left due by a drain hides the later ones. It does tell an empty queue (nd_time_t_max()), so the
-// queue is read only for a host with queued rows. A failed read answers false, so a snapshot is never held by it.
-bool alert_queue_has_rows_not_due(RRDHOST *host, time_t now)
+// True while the host has an alert_queue row that is not due yet. The next-due gate cannot answer this: it is the
+// earliest due time only, a row left due by a drain hides the later ones, and a drain sets it to nd_time_t_max() while
+// it runs, so the queue itself is read. A failed read answers false, so a snapshot is never held by it.
+static bool alert_queue_has_rows_not_due(RRDHOST *host, time_t now)
 {
-    if (__atomic_load_n(&host->health.alert_queue_next_due_s, __ATOMIC_ACQUIRE) == nd_time_t_max())
-        return false;
-
-    static __thread sqlite3_stmt *compiled_res = NULL;
     sqlite3_stmt *res = NULL;
 
-    if (is_health_thread) {
-        if (!compiled_res) {
-            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_ALERT_PENDING_QUEUE_NOT_DUE, &compiled_res))
-                return false;
-        }
-        res = compiled_res;
-    } else {
-        if (!PREPARE_STATEMENT(db_meta, SQL_ALERT_PENDING_QUEUE_NOT_DUE, &res))
-            return false;
-    }
+    if (!PREPARE_STATEMENT(db_meta, SQL_ALERT_PENDING_QUEUE_NOT_DUE, &res))
+        return false;
 
     bool not_due = false;
     int param = 0;
@@ -820,11 +808,24 @@ bool alert_queue_has_rows_not_due(RRDHOST *host, time_t now)
 
 done:
     REPORT_BIND_FAIL(res, param);
-    if (is_health_thread)
-        SQLITE_RESET(res);
-    else
-        SQLITE_FINALIZE(res);
+    SQLITE_FINALIZE(res);
     return not_due;
+}
+
+// A snapshot of a host that is not collecting waits until all its queued transitions are due: the snapshot is built
+// from the health log, where a disconnected child's alerts are already REMOVED, so sending it earlier would clear them
+// in the cloud before the delay that lets a restarting child come back unnoticed. Transitions still being saved hold
+// it too: their alert_queue rows are written before pending_transitions drops, so a REMOVED the health log already
+// shows is either still being saved or queued.
+static bool alert_snapshot_held(RRDHOST *host)
+{
+    if (rrdhost_flag_check(host, RRDHOST_FLAG_COLLECTOR_ONLINE))
+        return false;
+
+    if (__atomic_load_n(&host->health.pending_transitions, __ATOMIC_ACQUIRE))
+        return true;
+
+    return alert_queue_has_rows_not_due(host, now_realtime_sec());
 }
 
 // the earliest date_scheduled queued for the host, nd_time_t_max() when nothing is
@@ -1064,13 +1065,17 @@ void aclk_push_alert_events_for_all_hosts(void)
             rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
             if (snapshot_state == ACLK_ALERT_SNAPSHOT_PENDING)
                 continue;
+            // checked before the rebuild so a held snapshot is not rebuilt on every pass, and again after it: the
+            // REMOVED transitions of a child that disconnected meanwhile may already be in the rebuilt table
+            if (alert_snapshot_held(host))
+                continue;
             // the snapshot itself is rebuilt from the health log, not from what is still queued, so rows the
             // health thread has not drained yet cannot make it stale; the flag is already set on this path for
             // the remainder
             (void)commit_alert_events(host);
             // the flag is already set on this path, so a deferred or failed rebuild is retried on the next pass,
             // and the snapshot is only sent from a rebuilt table
-            if (!rebuild_host_alert_version_table(host))
+            if (!rebuild_host_alert_version_table(host) || alert_snapshot_held(host))
                 continue;
             send_alert_snapshot_to_cloud(host);
             aclk_host_config->snapshot_count++;
@@ -1624,6 +1629,31 @@ done:
     return count;
 }
 
+static time_t aq_pending_due(nd_uuid_t *host_id, int64_t health_log_id)
+{
+    sqlite3_stmt *res = NULL;
+    time_t due = 0;
+
+    if (!PREPARE_STATEMENT(
+            db_meta,
+            "SELECT date_scheduled FROM alert_queue WHERE host_id = @host_id AND health_log_id = @health_log_id",
+            &res))
+        return 0;
+
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_id, sizeof(*host_id), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, health_log_id));
+
+    param = 0;
+    if (sqlite3_step_monitored(res) == SQLITE_ROW)
+        due = (time_t)sqlite3_column_int64(res, 0);
+
+done:
+    REPORT_BIND_FAIL(res, param);
+    SQLITE_FINALIZE(res);
+    return due;
+}
+
 // A failed seed used to surface as a confusing queue-state mismatch three assertions later, so every
 // bind/step in the fixtures reports itself with its rc and the sqlite message.
 #define AQ_SQL(expr, what)                                                                                             \
@@ -1845,7 +1875,7 @@ int alert_queue_unittest(void)
     }
 
     // --- the pending queue is read only when something in it can be due (health.alert_queue_next_due_s).
-    // The health loop calls process_alert_pending_queue() for every host every second; an idle host must not
+    // The health loop calls process_alert_pending_queue() for every host on every pass; an idle host must not
     // reach SQLite, and no queued row may be stranded by that.
     {
         RRDHOST *h = callocz(1, sizeof(*h));
@@ -1955,38 +1985,83 @@ int alert_queue_unittest(void)
             "delay: the flag changes only the delay of REMOVED");
     }
 
-    // --- a snapshot of a host that is not collecting waits while the host has rows that are not due yet
+    // --- a REMOVED of a disconnected child takes its own due time, not the earlier one of the transition it replaces;
+    // every other transition keeps the earlier due time, so a reconnect overwrites a queued REMOVED as soon as it is due
+    {
+        RRDHOST *h = callocz(1, sizeof(*h));
+        uuid_generate(h->host_id.uuid);
+        h->aclk_host_config = callocz(1, sizeof(*h->aclk_host_config));
+        h->health.alert_queue_next_due_s = nd_time_t_max();
+        nd_uuid_t *hid = &h->host_id.uuid;
+        time_t now = now_realtime_sec();
+
+        (void)db_execute(db_meta, "DELETE FROM alert_queue", NULL);
+
+        // raised just before the disconnect, not drained yet
+        insert_alert_queue(h, 31, 6001, 31, RRDCALC_STATUS_CLEAR, RRDCALC_STATUS_WARNING, 0, now);
+        AQ_CHECK(aq_pending_due(hid, 31) == now, "replace: the raise is due at once");
+
+        insert_alert_queue(
+            h, 31, 6002, 31, RRDCALC_STATUS_WARNING, RRDCALC_STATUS_REMOVED, HEALTH_ENTRY_FLAG_CHILD_DISCONNECTED, now);
+        AQ_CHECK(
+            aq_pending_due(hid, 31) == now + ALERT_TRANSITION_DELAY_LONG,
+            "replace: the REMOVED of a disconnect keeps its long delay (due in %lld s)",
+            (long long)(aq_pending_due(hid, 31) - now));
+
+        // the child is back: the reconnect transition is due at once again
+        insert_alert_queue(h, 31, 6003, 31, RRDCALC_STATUS_REMOVED, RRDCALC_STATUS_WARNING, 0, now);
+        AQ_CHECK(aq_pending_due(hid, 31) == now, "replace: the reconnect overwrites the REMOVED and is due at once");
+
+        // any other REMOVED keeps the earlier due time
+        insert_alert_queue(h, 31, 6004, 31, RRDCALC_STATUS_WARNING, RRDCALC_STATUS_REMOVED, 0, now);
+        AQ_CHECK(aq_pending_due(hid, 31) == now, "replace: another REMOVED keeps the earlier due time");
+
+        (void)db_execute(db_meta, "DELETE FROM alert_queue", NULL);
+        freez(h->aclk_host_config);
+        freez(h);
+    }
+
+    // --- a snapshot of a host that is not collecting is held while the host has rows that are not due yet, or
+    // transitions still being saved
     {
         RRDHOST *h = callocz(1, sizeof(*h));
         uuid_generate(h->host_id.uuid);
         nd_uuid_t *hid = &h->host_id.uuid;
-        time_t *gate = &h->health.alert_queue_next_due_s;
 
         (void)db_execute(db_meta, "DELETE FROM alert_queue", NULL);
         (void)db_execute(db_meta, "DELETE FROM aclk_queue", NULL);
 
-        *gate = nd_time_t_max();
-        AQ_CHECK(!alert_queue_has_rows_not_due(h, now_realtime_sec()), "not due: an empty queue holds nothing");
+        h->health.alert_queue_next_due_s = nd_time_t_max();
+        AQ_CHECK(!alert_snapshot_held(h), "held: an empty queue holds nothing");
 
-        // a row persisted by a previous run is found although the gate of a new host is 0
-        AQ_SQL(aq_pending_seed(hid, 21, 5001, 600) ? SQLITE_DONE : SQLITE_ERROR, "not due seed 21");
-        *gate = 0;
-        AQ_CHECK(alert_queue_has_rows_not_due(h, now_realtime_sec()), "not due: a row due later holds the snapshot");
+        // the gate is nd_time_t_max() while a drain runs, and 0 on a new host with rows persisted by a previous run:
+        // neither hides a row due later
+        AQ_SQL(aq_pending_seed(hid, 21, 5001, 600) ? SQLITE_DONE : SQLITE_ERROR, "held seed 21");
+        AQ_CHECK(alert_snapshot_held(h), "held: a row due later holds the snapshot while the gate is max");
+        h->health.alert_queue_next_due_s = 0;
+        AQ_CHECK(alert_snapshot_held(h), "held: a row due later holds the snapshot while the gate is 0");
 
-        // a due row (e.g. left behind by a drain, gate due) does not hide the row due later
-        AQ_SQL(aq_pending_seed(hid, 22, 5002, 0) ? SQLITE_DONE : SQLITE_ERROR, "not due seed 22");
-        *gate = now_realtime_sec();
-        AQ_CHECK(
-            alert_queue_has_rows_not_due(h, now_realtime_sec()),
-            "not due: a due row does not release the snapshot while a row due later is queued");
+        rrdhost_flag_set(h, RRDHOST_FLAG_COLLECTOR_ONLINE);
+        AQ_CHECK(!alert_snapshot_held(h), "held: a collecting host is never held");
+        rrdhost_flag_clear(h, RRDHOST_FLAG_COLLECTOR_ONLINE);
+
+        // a due row (e.g. left behind by a drain) does not hide the row due later
+        AQ_SQL(aq_pending_seed(hid, 22, 5002, 0) ? SQLITE_DONE : SQLITE_ERROR, "held seed 22");
+        h->health.alert_queue_next_due_s = now_realtime_sec();
+        AQ_CHECK(alert_snapshot_held(h), "held: a due row does not release the snapshot while a row due later is queued");
 
         // the due row drains, the later one still holds; once only due rows are left, nothing holds
         (void)process_alert_pending_queue(h);
         AQ_CHECK(
-            aq_pending_rows(hid) == 1 && alert_queue_has_rows_not_due(h, now_realtime_sec()),
-            "not due: after the drain the row due later still holds the snapshot");
+            aq_pending_rows(hid) == 1 && alert_snapshot_held(h),
+            "held: after the drain the row due later still holds the snapshot");
         (void)db_execute(db_meta, "UPDATE alert_queue SET date_scheduled = UNIXEPOCH() - 1", NULL);
-        AQ_CHECK(!alert_queue_has_rows_not_due(h, now_realtime_sec()), "not due: a due row releases the snapshot");
+        AQ_CHECK(!alert_snapshot_held(h), "held: a due row releases the snapshot");
+
+        // a REMOVED still being saved is not in the queue yet
+        h->health.pending_transitions = 1;
+        AQ_CHECK(alert_snapshot_held(h), "held: transitions still being saved hold the snapshot");
+        h->health.pending_transitions = 0;
 
         (void)db_execute(db_meta, "DELETE FROM alert_queue", NULL);
         (void)db_execute(db_meta, "DELETE FROM aclk_queue", NULL);

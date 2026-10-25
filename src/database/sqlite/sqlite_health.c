@@ -163,9 +163,13 @@ int calculate_delay(RRDCALC_STATUS old_status, RRDCALC_STATUS new_status, uint32
     "  VALUES (@host_id, @health_log_id, @unique_id, @alarm_id, @new_status, @delay)"                                  \
     " ON CONFLICT (host_id, health_log_id, alarm_id)"                                                                  \
     " DO UPDATE SET status = excluded.status, unique_id = excluded.unique_id, "                                        \
-    " date_scheduled = MIN(date_scheduled, excluded.date_scheduled)"
+    " date_scheduled = CASE WHEN @replace_due THEN excluded.date_scheduled"                                            \
+    "   ELSE MIN(date_scheduled, excluded.date_scheduled) END"
 
-static void insert_alert_queue(
+// A transition replaces the one still queued for the alert, and keeps the earlier due time of the two, so a
+// reconnect overwrites a queued REMOVED as soon as it is due. A REMOVED of a disconnected child takes its own due time
+// instead: inheriting the due time of a transition queued just before the disconnect would cut its delay short.
+void insert_alert_queue(
     RRDHOST *host,
     uint64_t health_log_id,
     int64_t unique_id,
@@ -205,6 +209,12 @@ static void insert_alert_queue(
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, alarm_id));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, new_status));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, submit_delay));
+    SQLITE_BIND_FAIL(
+        done,
+        sqlite3_bind_int(
+            res,
+            ++param,
+            new_status == RRDCALC_STATUS_REMOVED && (flags & HEALTH_ENTRY_FLAG_CHILD_DISCONNECTED)));
 
     param = 0;
     rc = sqlite3_step_monitored(res);
