@@ -1,142 +1,10 @@
 #include "libnetdata/libnetdata.h"
 #include "spawn_server_internals.h"
 
-#if defined(OS_FREEBSD) || defined(OS_MACOS)
-#include <sys/sysctl.h>
-#endif
-
 #define ENV_VAR_KEY "SPAWN_TESTER"
 #define ENV_VAR_VALUE "1234567890"
 
 size_t warnings = 0;
-
-#if defined(SPAWN_SERVER_VERSION_NOFORK)
-#define SPAWN_SERVER_BACKLOG_TEST_CONNECTIONS 64
-
-static size_t test_listener_backlog_cap(void) {
-    size_t cap = SOMAXCONN;
-
-#if defined(OS_LINUX)
-    char buffer[32];
-    if(read_txt_file("/proc/sys/net/core/somaxconn", buffer, sizeof(buffer)) == 0) {
-        size_t kernel_cap = str2ull(buffer, NULL);
-        if(kernel_cap && kernel_cap < cap)
-            cap = kernel_cap;
-    }
-#elif defined(OS_FREEBSD) || defined(OS_MACOS)
-    int kernel_cap;
-    size_t kernel_cap_size = sizeof(kernel_cap);
-    if(sysctlbyname("kern.ipc.somaxconn", &kernel_cap, &kernel_cap_size, NULL, 0) == 0 && kernel_cap > 0 &&
-       (size_t)kernel_cap < cap)
-        cap = (size_t)kernel_cap;
-#endif
-
-    return cap;
-}
-
-static void test_listener_backlog_cleanup(SPAWN_SERVER *server, int *clients, size_t clients_count) {
-    // SIGTERM restarts the server's blocked recvmsg() (SA_RESTART), while
-    // spawn_server_destroy() waits for it without a timeout. SIGKILL the
-    // dedicated test server before destruction so cleanup cannot hang.
-    if(server && spawn_server_pid(server) > 0)
-        (void)kill(spawn_server_pid(server), SIGKILL);
-
-    for(size_t i = 0; i < clients_count; i++)
-        if(clients[i] != -1)
-            close(clients[i]);
-
-    if(server)
-        spawn_server_destroy(server);
-}
-
-static void test_listener_backlog(SPAWN_SERVER *server) {
-    const size_t configured_cap =
-        SOMAXCONN < SPAWN_SERVER_BACKLOG_TEST_CONNECTIONS ? (size_t)SOMAXCONN : SPAWN_SERVER_BACKLOG_TEST_CONNECTIONS;
-    const size_t kernel_cap = test_listener_backlog_cap();
-    const size_t connections = kernel_cap < configured_cap ? kernel_cap : configured_cap;
-    size_t historical_backlog_admission = 5;
-#if defined(OS_MACOS)
-    historical_backlog_admission = 3 * historical_backlog_admission / 2;
-#endif
-    int clients[SPAWN_SERVER_BACKLOG_TEST_CONNECTIONS];
-    struct sockaddr_un server_addr = {
-        .sun_family = AF_UNIX,
-    };
-
-    for(size_t i = 0; i < connections; i++)
-        clients[i] = -1;
-
-    if(connections <= historical_backlog_admission) {
-        test_listener_backlog_cleanup(server, clients, connections);
-        nd_log(NDLS_COLLECTORS, NDLP_WARNING,
-               "Skipping spawn-server backlog test: runtime listener cap %zu cannot distinguish the historical admission capacity of %zu.",
-               kernel_cap, historical_backlog_admission);
-        return;
-    }
-
-    if(strlen(server->path) >= sizeof(server_addr.sun_path)) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-               "Cannot test spawn-server backlog: socket path '%s' is too long.", server->path);
-        test_listener_backlog_cleanup(server, clients, connections);
-        exit(1);
-    }
-
-    strncpyz(server_addr.sun_path, server->path, sizeof(server_addr.sun_path) - 1);
-
-    // Keep every client idle. The server blocks in its untimed first recvmsg(),
-    // so the remaining connections exercise the listener's pending queue. If
-    // request reception becomes timed or asynchronous, replace this mechanism:
-    // otherwise listen(..., 5) can drain and make this regression test pass.
-    for(size_t i = 0; i < connections; i++) {
-        clients[i] = socket(AF_UNIX, SOCK_STREAM, 0);
-        if(clients[i] == -1) {
-            int error = errno;
-            test_listener_backlog_cleanup(server, clients, connections);
-
-            nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                   "Cannot create spawn-server backlog test client %zu/%zu: %s (%d).",
-                   i + 1, connections, strerror(error), error);
-            exit(1);
-        }
-
-        if(sock_setnonblock(clients[i], true) != 1) {
-            int error = errno;
-            test_listener_backlog_cleanup(server, clients, connections);
-
-            nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                   "Cannot make spawn-server backlog test client %zu/%zu nonblocking: %s (%d).",
-                   i + 1, connections, strerror(error), error);
-            exit(1);
-        }
-
-        if(connect(clients[i], (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
-            int error = errno;
-
-            // AF_UNIX stream connect() completes synchronously on every supported platform, so an
-            // in-progress result is unreachable today. Accept it anyway: it means the listener queued
-            // the connection, which is what this test asserts - never a backlog rejection.
-            if(error == EINPROGRESS || error == EALREADY)
-                continue;
-
-            test_listener_backlog_cleanup(server, clients, connections);
-
-            if(error != EAGAIN && error != EWOULDBLOCK && error != ECONNREFUSED) {
-                nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                       "Cannot connect spawn-server backlog test client %zu/%zu: %s (%d).",
-                       i + 1, connections, strerror(error), error);
-                exit(1);
-            }
-
-            nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                   "Spawn-server listener rejected backlog test connection %zu/%zu: %s (%d).",
-                   i + 1, connections, strerror(error), error);
-            exit(1);
-        }
-    }
-
-    test_listener_backlog_cleanup(server, clients, connections);
-}
-#endif
 
 void child_check_environment(void) {
     const char *s = getenv(ENV_VAR_KEY);
@@ -175,6 +43,128 @@ void child_check_fds(void) {
 
     errno_clear();
 }
+
+#if defined(SPAWN_SERVER_VERSION_NOFORK)
+#define SPAWN_CONTROL_CONCURRENT_CALLERS 24
+
+typedef struct {
+    SPAWN_SERVER *server;
+    const char *argv0;
+    size_t index;
+    int result;
+} SPAWN_CONTROL_TEST_CALL;
+
+static int plugin_echo_argument(int argc, const char **argv) {
+    child_check_fds();
+    child_check_environment();
+    if(argc != 3)
+        return 1;
+    return fputs(argv[2], stdout) == EOF ? 1 : 0;
+}
+
+static void *test_control_concurrent_call(void *arg) {
+    SPAWN_CONTROL_TEST_CALL *call = arg;
+    char token[32], output[sizeof(token)] = { 0 };
+    snprintfz(token, sizeof(token), "request-%zu", call->index);
+    const char *argv[] = { call->argv0, "plugin-echo-argument", token, NULL };
+
+    SPAWN_INSTANCE *si = spawn_server_exec(call->server, STDERR_FILENO, 0, argv, NULL, 0,
+                                           SPAWN_INSTANCE_TYPE_EXEC);
+    if(!si)
+        return NULL;
+
+    close(spawn_server_instance_write_fd(si));
+    spawn_server_instance_write_fd_unset(si);
+    size_t used = 0;
+    ssize_t bytes;
+    while(used < sizeof(output) &&
+          (bytes = read(spawn_server_instance_read_fd(si), output + used, sizeof(output) - used)) > 0)
+        used += (size_t)bytes;
+
+    int status = spawn_server_exec_wait(call->server, si);
+    call->result = used == strlen(token) && memcmp(output, token, used) == 0 &&
+                   WIFEXITED(status) && WEXITSTATUS(status) == 0;
+    return NULL;
+}
+
+static void test_private_control_channel(int argc, const char **argv) {
+    SPAWN_SERVER *server = spawn_server_create(SPAWN_SERVER_OPTION_EXEC, "test-control", NULL, argc, argv);
+    if(!server) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot create private-channel test server");
+        exit(1);
+    }
+
+    // A forked descendant has a copy of the descriptor, but the public API
+    // must reject it as a caller of this server.
+    pid_t child = fork();
+    if(child == 0) {
+        const char *args[] = { argv[0], "plugin-echo-and-exit", NULL };
+        SPAWN_INSTANCE *si = spawn_server_exec(server, STDERR_FILENO, 0, args, NULL, 0,
+                                               SPAWN_INSTANCE_TYPE_EXEC);
+        _exit(!si && errno == EPERM ? 0 : 1);
+    }
+    int status;
+    if(child < 0 || waitpid(child, &status, 0) != child || !WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Forked child was allowed to submit a spawn request");
+        spawn_server_destroy(server);
+        exit(1);
+    }
+
+    // An extra transferred FD is invalid. The server must discard the entire
+    // datagram, close its received copies, and remain able to process requests.
+    char marker = 'R';
+    int bad_fds[2] = { STDIN_FILENO, STDIN_FILENO };
+    char control[CMSG_SPACE(sizeof(bad_fds))] __attribute__((aligned(sizeof(size_t))));
+    struct iovec iov = { .iov_base = &marker, .iov_len = sizeof(marker) };
+    struct msghdr msg = { .msg_iov = &iov, .msg_iovlen = 1,
+                          .msg_control = control, .msg_controllen = sizeof(control) };
+    struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
+    cmsg->cmsg_level = SOL_SOCKET;
+    cmsg->cmsg_type = SCM_RIGHTS;
+    cmsg->cmsg_len = CMSG_LEN(sizeof(bad_fds));
+    memcpy(CMSG_DATA(cmsg), bad_fds, sizeof(bad_fds));
+    if(sendmsg(server->control_fd, &msg, 0) != sizeof(marker)) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot send malformed control test message");
+        spawn_server_destroy(server);
+        exit(1);
+    }
+
+    pthread_t threads[SPAWN_CONTROL_CONCURRENT_CALLERS];
+    SPAWN_CONTROL_TEST_CALL calls[SPAWN_CONTROL_CONCURRENT_CALLERS] = { 0 };
+    for(size_t i = 0; i < SPAWN_CONTROL_CONCURRENT_CALLERS; i++) {
+        calls[i] = (SPAWN_CONTROL_TEST_CALL){ .server = server, .argv0 = argv[0], .index = i };
+        if(pthread_create(&threads[i], NULL, test_control_concurrent_call, &calls[i]) != 0) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot start private-channel test thread %zu", i);
+            exit(1);
+        }
+    }
+    for(size_t i = 0; i < SPAWN_CONTROL_CONCURRENT_CALLERS; i++) {
+        pthread_join(threads[i], NULL);
+        if(!calls[i].result) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Private-channel request %zu failed or received another result", i);
+            exit(1);
+        }
+    }
+
+    // Requests must fail promptly when the forked server is already gone.
+    pid_t server_pid = spawn_server_pid(server);
+    if(kill(server_pid, SIGKILL) != 0 || waitpid(server_pid, &status, 0) != server_pid) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot stop private-channel test server");
+        exit(1);
+    }
+    server->server_pid = 0; // already reaped; destroy must not signal a recycled PID
+    const char *args[] = { argv[0], "plugin-echo-and-exit", NULL };
+    SPAWN_INSTANCE *si = spawn_server_exec(server, STDERR_FILENO, 0, args, NULL, 0,
+                                           SPAWN_INSTANCE_TYPE_EXEC);
+    if(si) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Spawn request succeeded after server death");
+        spawn_server_exec_wait(server, si);
+        exit(1);
+    }
+
+    spawn_server_destroy(server);
+}
+#endif
 
 // --------------------------------------------------------------------------------------------------------------------
 
@@ -587,7 +577,7 @@ static int plugin_stream_until_pipe_breaks(void) {
 }
 
 // spawn_server_destroy() SIGTERMs the server then waits for it with an unbounded waitpid(), and
-// SA_RESTART can restart the server's blocked recvmsg() - see test_listener_backlog_cleanup().
+// A broken server can leave a request read blocked; kill the dedicated test server first.
 // Dedicated test servers are therefore SIGKILLed first so cleanup cannot hang.
 static void test_server_destroy(SPAWN_SERVER *server) {
     if(server && spawn_server_pid(server) > 0)
@@ -993,6 +983,11 @@ int main(int argc, const char **argv) {
     if(argc > 1 && strcmp(argv[1], "plugin-echo-and-exit") == 0)
         return plugin_echo_and_exit();
 
+#if defined(SPAWN_SERVER_VERSION_NOFORK)
+    if(argc > 1 && strcmp(argv[1], "plugin-echo-argument") == 0)
+        return plugin_echo_argument(argc, (const char **)argv);
+#endif
+
     if(argc > 1 && strcmp(argv[1], "plugin-close-to-stop") == 0)
         return plugin_close_to_stop();
 
@@ -1016,13 +1011,8 @@ int main(int argc, const char **argv) {
 #endif
 
 #if defined(SPAWN_SERVER_VERSION_NOFORK)
-    fprintf(stderr, "\n\nTESTING spawn-server listener backlog\n\n");
-    SPAWN_SERVER *backlog_server = spawn_server_create(SPAWN_SERVER_OPTION_EXEC, NULL, NULL, argc, argv);
-    if(!backlog_server) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot create spawn server for backlog test");
-        exit(1);
-    }
-    test_listener_backlog(backlog_server);
+    fprintf(stderr, "\n\nTESTING private control channel\n\n");
+    test_private_control_channel(argc, argv);
 #endif
 
     fprintf(stderr, "\n\nTESTING fds\n\n");
