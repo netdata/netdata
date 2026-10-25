@@ -102,10 +102,25 @@ type attributeGroup struct {
 type attributeFetch struct {
 	key      attributeGroupKey
 	provider *resourceAttributeProvider
-	// candidates are the discovered join-dimension values; the cache keeps only
-	// these, so unrelated resources in the region neither use memory nor rebuild
-	// the query plan when they change.
-	candidates map[string]struct{}
+	dimIndex int
+	// instances are the discovered instances of every scope sharing the group;
+	// read-only views into the discovery snapshot.
+	instances [][]collectionInstance
+}
+
+// candidates returns the discovered join-dimension values. The cache keeps only
+// these, so unrelated resources in the region neither use memory nor rebuild the
+// query plan when they change. It is built only for groups being fetched.
+func (f attributeFetch) candidates() map[string]struct{} {
+	out := make(map[string]struct{})
+	for _, instances := range f.instances {
+		for _, inst := range instances {
+			if f.dimIndex < len(inst.DimensionValues) {
+				out[inst.DimensionValues[f.dimIndex]] = struct{}{}
+			}
+		}
+	}
+	return out
 }
 
 type attributeFetchResult struct {
@@ -152,13 +167,9 @@ func (c *Collector) activeAttributeFetches() []attributeFetch {
 		if !ok {
 			i = len(out)
 			index[key] = i
-			out = append(out, attributeFetch{key: key, provider: attrs.provider, candidates: make(map[string]struct{})})
+			out = append(out, attributeFetch{key: key, provider: attrs.provider, dimIndex: attrs.dimIndex})
 		}
-		for _, inst := range instances {
-			if attrs.dimIndex < len(inst.DimensionValues) {
-				out[i].candidates[inst.DimensionValues[attrs.dimIndex]] = struct{}{}
-			}
-		}
+		out[i].instances = append(out[i].instances, instances)
 	}
 	sort.Slice(out, func(i, j int) bool { return lessAttributeGroupKey(out[i].key, out[j].key) })
 	return out
@@ -213,8 +224,9 @@ func (c *Collector) refreshAttributes(ctx context.Context) {
 			})
 		} else {
 			labels := results[i].labels
+			candidates := fetch.candidates()
 			maps.DeleteFunc(labels, func(id string, _ []metrix.Label) bool {
-				_, ok := fetch.candidates[id]
+				_, ok := candidates[id]
 				return !ok
 			})
 			if !sameAttributeLabels(state.labels, labels) {
@@ -252,8 +264,9 @@ func sameAttributeLabels(a, b map[string][]metrix.Label) bool {
 }
 
 // markAttributesStale forces the next refreshAttributes to re-fetch every group, so
-// newly discovered instances and newly resolved targets get their first charts
-// with attribute labels.
+// instances from a newly installed discovery snapshot get their first charts with
+// attribute labels even when the group's TTL has not expired. A newly resolved
+// target needs no hook: its groups have no state and are fetched immediately.
 func (c *Collector) markAttributesStale() {
 	for key, group := range c.attributes {
 		group.expiresAt = time.Time{}

@@ -1240,6 +1240,13 @@ modules:
               The tag is not attached.
             fix: |
               Set `labels.resource_tags[].label` to another name for that key.
+          - error: "`CloudWatch resource attributes (profile \"<profile>\"): skipped rds:DescribeDBInstances labels: label \"<label>\" collides with an identity label`"
+            cause: |
+              A user profile for `AWS/RDS` names one of its dimension labels `engine`, `engine_version`, or
+              `db_instance_class`, the labels the collector adds from `rds:DescribeDBInstances`. To keep chart labels
+              unique, that profile gets none of the three; its charts are collected as before.
+            fix: |
+              Give that dimension a different `label` in the user profile; its charts then also get the RDS labels.
           - error: "`load CloudWatch profiles: validate profile \"<name>\": ...`"
             when: |
               Also `unmarshal profile "<name>": ...` (invalid YAML) or `normalize profile "<name>": ...`. Every

@@ -352,8 +352,11 @@ from the RDS control plane.
   discovered identifiers, so other instances in the response (undiscovered, Neptune,
   DocumentDB) neither use memory nor rebuild the query plan when they change.
 - **Refresh and failure.** Groups expire after `discovery.refresh_every` and are marked
-  stale on every discovery install and target resolution, so new instances and targets
-  get their first charts labeled. A failed group keeps its last-known labels and retries
+  stale on every discovery install, so instances from a snapshot installed before the
+  group's TTL expires still get their first charts labeled. A newly resolved target's
+  groups have no state and are fetched in the same cycle. Steady-state cycles with
+  nothing due return without rebuilding the cache; candidate identifiers are built
+  only for groups being fetched. A failed group keeps its last-known labels and retries
   at the next expiry, not every collect, which bounds calls and log volume when the
   optional permission is missing; failures log through the hourly-limited
   `resource attribute lookup` warning. Parent cancellation commits nothing.

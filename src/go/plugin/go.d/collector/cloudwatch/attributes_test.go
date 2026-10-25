@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"reflect"
 	"slices"
 	"sync"
 	"testing"
@@ -482,7 +483,8 @@ func TestRefreshAttributes_InvalidatesPlanOnlyOnLabelChange(t *testing.T) {
 	c.refreshAttributes(context.Background())
 	assert.Equal(t, 5, fake.callCount(), "nothing due: no call")
 	assert.False(t, c.planDirty)
-	assert.Equal(t, before, c.attributes)
+	assert.Equal(t, reflect.ValueOf(before).Pointer(), reflect.ValueOf(c.attributes).Pointer(),
+		"nothing due: the cache map is kept, not rebuilt")
 }
 
 func TestRefreshAttributes_ParentCancellationCommitsNothing(t *testing.T) {
@@ -587,4 +589,65 @@ func TestCollect_RDSAttributeLabelsAppearOnceLookupSucceeds(t *testing.T) {
 	assert.Equal(t, map[string]map[string]string{
 		"000000000000/db-a": rdsLabels("000000000000", "db-a", "engine", "mysql", "engine_version", "8.0.35", "db_instance_class", "db.t3.micro"),
 	}, labelsByInstance(c, rdsCPUSeries))
+}
+
+func TestCollect_RDSAttributesFollowDiscoveryInstall(t *testing.T) {
+	// Discovery can install a new snapshot before the attribute TTL expires (real
+	// clocks drift by the stage duration, and a late target resolution forces a
+	// rediscovery). A newly discovered instance must still be labeled on its first plan.
+	fake := &fakeRDS{instances: []rdstypes.DBInstance{rdsInstance("db-a", "mysql", "8.0.35", "db.t3.micro")}}
+	cw := &fullCloudWatch{list: map[string][]cwtypes.Metric{"AWS/RDS": rdsMetrics("db-a")}, gmdValue: 1}
+	c := rdsAttributeCollector(t, rdsProfileConfig("base"), cw,
+		map[string]string{"base": "000000000000"}, map[string]rdsClient{"base": fake})
+	now := time.Unix(1_000_000_000, 0)
+	c.now = func() time.Time { return now }
+	_, err := collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+
+	now = now.Add(100 * time.Second)
+	cw.mu.Lock()
+	cw.list["AWS/RDS"] = rdsMetrics("db-a", "db-new")
+	cw.mu.Unlock()
+	fake.set([]rdstypes.DBInstance{
+		rdsInstance("db-a", "mysql", "8.0.35", "db.t3.micro"),
+		rdsInstance("db-new", "postgres", "16.3", "db.t3.micro"),
+	}, nil)
+	c.markDiscoveryStale()
+	_, err = collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]map[string]string{
+		"000000000000/db-a":   rdsLabels("000000000000", "db-a", "engine", "mysql", "engine_version", "8.0.35", "db_instance_class", "db.t3.micro"),
+		"000000000000/db-new": rdsLabels("000000000000", "db-new", "engine", "postgres", "engine_version", "16.3", "db_instance_class", "db.t3.micro"),
+	}, labelsByInstance(c, rdsCPUSeries))
+	assert.Equal(t, 2, fake.callCount())
+}
+
+func TestCollect_RDSAttributesLateResolvedTargetLabeledOnFirstPlan(t *testing.T) {
+	cw := &fullCloudWatch{list: map[string][]cwtypes.Metric{"AWS/RDS": rdsMetrics("db-a")}, gmdValue: 1}
+	first := &fakeRDS{instances: []rdstypes.DBInstance{rdsInstance("db-a", "mysql", "8.0.35", "db.t3.micro")}}
+	second := &fakeRDS{instances: []rdstypes.DBInstance{rdsInstance("db-a", "postgres", "16.3", "db.m6g.large")}}
+	c := rdsAttributeCollector(t, rdsProfileConfig("first", "second"), cw,
+		map[string]string{"first": "111111111111"}, map[string]rdsClient{"first": first, "second": second})
+	secondSTS := &seqSTS{accounts: []string{"", "222222222222"}, failAt: map[int]bool{0: true}}
+	c.newSTSClient = func(cfg aws.Config) stsClient {
+		if cfg.AppID == "second" {
+			return secondSTS
+		}
+		return &fakeSTS{account: "111111111111"}
+	}
+	now := time.Unix(1_000_000_000, 0)
+	c.now = func() time.Time { return now }
+
+	_, err := collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	require.Len(t, labelsByInstance(c, rdsCPUSeries), 1, "only the resolved target collects")
+
+	now = now.Add(time.Minute)
+	_, err = collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]map[string]string{
+		"111111111111/db-a": rdsLabels("111111111111", "db-a", "engine", "mysql", "engine_version", "8.0.35", "db_instance_class", "db.t3.micro"),
+		"222222222222/db-a": rdsLabels("222222222222", "db-a", "engine", "postgres", "engine_version", "16.3", "db_instance_class", "db.m6g.large"),
+	}, labelsByInstance(c, rdsCPUSeries), "the late target's first charts carry its attributes")
+	assert.Equal(t, 1, second.callCount())
 }
