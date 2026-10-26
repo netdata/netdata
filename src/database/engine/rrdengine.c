@@ -306,7 +306,7 @@ static void after_work_standard_callback(uv_work_t* req, int status) {
     worker_is_idle();
 }
 
-static bool work_dispatch(struct rrdengine_instance *ctx, void *data, struct completion *completion, enum rrdeng_opcode opcode, work_cb do_work_cb, after_work_cb do_after_work_cb) {
+static void work_dispatch(struct rrdengine_instance *ctx, void *data, struct completion *completion, enum rrdeng_opcode opcode, work_cb do_work_cb, after_work_cb do_after_work_cb) {
     struct rrdeng_work *work_request = NULL;
 
     internal_fatal(rrdeng_main.tid != gettid_cached(), "work_dispatch() can only be run from the event loop thread");
@@ -321,17 +321,15 @@ static bool work_dispatch(struct rrdengine_instance *ctx, void *data, struct com
     work_request->after_work_cb = do_after_work_cb;
     work_request->opcode = opcode;
 
-    if(uv_queue_work(&rrdeng_main.loop, &work_request->req, work_standard_worker, after_work_standard_callback)) {
-        internal_fatal(true, "DBENGINE: cannot queue work");
-        work_done(work_request);
-        return false;
-    }
+    // libuv fails only for a NULL work callback; the callers have no way to undo what they
+    // started for this work, so a failure here would leave it waiting forever
+    int ret = uv_queue_work(&rrdeng_main.loop, &work_request->req, work_standard_worker, after_work_standard_callback);
+    if(ret)
+        fatal("DBENGINE: cannot queue work for opcode %d: %s", (int)opcode, uv_strerror(ret));
 
     __atomic_add_fetch(&rrdeng_main.work_cmd.atomics.dispatched, 1, __ATOMIC_RELAXED);
     rrdeng_main.work_cmd.outstanding++;
     rrdeng_main.work_cmd.outstanding_by_opcode[opcode]++;
-
-    return true;
 }
 
 // ----------------------------------------------------------------------------
@@ -2413,8 +2411,7 @@ static void extent_waiter_dispatch(struct rrdeng_cmd *cmd) {
     }
 
     rrdeng_main.extent_waiters.running++;
-    if(!work_dispatch(cmd->ctx, NULL, cmd->completion, cmd->opcode, do_work_cb, do_after_work_cb))
-        rrdeng_main.extent_waiters.running--;
+    work_dispatch(cmd->ctx, NULL, cmd->completion, cmd->opcode, do_work_cb, do_after_work_cb);
 }
 
 static void extent_waiter_dispatch_or_defer(struct rrdeng_cmd *cmd) {
@@ -2611,9 +2608,6 @@ static void timer_per_sec_cb(uv_timer_t *handle __maybe_unused)
     worker_set_metric(RRDENG_WORKS_DISPATCHED, (NETDATA_DOUBLE)__atomic_load_n(&rrdeng_main.work_cmd.atomics.dispatched, __ATOMIC_RELAXED));
     worker_set_metric(RRDENG_WORKS_EXECUTING, (NETDATA_DOUBLE)__atomic_load_n(&rrdeng_main.work_cmd.atomics.executing, __ATOMIC_RELAXED));
 
-    // normally dispatched when a waiter finishes; this only covers a failed dispatch
-    extent_waiters_dispatch_deferred();
-
     rrdeng_enq_cmd(NULL, RRDENG_OPCODE_FLUSH_MAIN, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
     rrdeng_enq_cmd(NULL, RRDENG_OPCODE_CLEANUP, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 
@@ -2623,8 +2617,6 @@ static void timer_per_sec_cb(uv_timer_t *handle __maybe_unused)
 // while the event loop drains its pool work at shutdown, wakes it up so that it can check its deadline
 static void timer_shutdown_drain_cb(uv_timer_t *handle __maybe_unused)
 {
-    // normally dispatched when a waiter finishes; this only covers a failed dispatch
-    extent_waiters_dispatch_deferred();
 }
 
 static size_t dbengine_cmd_queue_waiting(void) {
@@ -2940,11 +2932,7 @@ void dbengine_event_loop(void* arg) {
                         !rrdeng_main.extent_waiters.deferred && extent_waiters_slot_available()) {
                         rrdeng_main.flushes_running++;
                         rrdeng_main.extent_waiters.running++;
-                        if(!work_dispatch(NULL, NULL, NULL, opcode, cache_flush_tp_worker, after_do_cache_flush)) {
-                            // no after-work callback will run
-                            rrdeng_main.flushes_running--;
-                            rrdeng_main.extent_waiters.running--;
-                        }
+                        work_dispatch(NULL, NULL, NULL, opcode, cache_flush_tp_worker, after_do_cache_flush);
                     }
                     break;
                 }
