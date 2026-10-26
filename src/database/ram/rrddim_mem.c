@@ -419,9 +419,9 @@ static inline void rrddim_fill_the_gap(STORAGE_COLLECT_HANDLE *sch, time_t now_c
         size_t current_entry = rrddim_metric_handle_current_entry_load(mh);
         time_t now_store_s = last_stored_s + update_every_s;
 
-        // fill the dimension
+        // fill only the missed intervals; the caller stores the sample at now_collect_s
         size_t c;
-        for(c = 0; c < entries && now_store_s <= now_collect_s ; now_store_s += update_every_s, c++) {
+        for(c = 0; c < entries && now_store_s < now_collect_s ; now_store_s += update_every_s, c++) {
             rrddim_metric_handle_slot_store(mh, current_entry++, empty);
 
             if(unlikely(current_entry >= entries))
