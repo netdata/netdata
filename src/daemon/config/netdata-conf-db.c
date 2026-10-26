@@ -267,6 +267,11 @@ void netdata_conf_dbengine_init(const char *hostname) {
         else
             snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine-tier%zu", netdata_configured_cache_dir, tier);
 
+        // a tier counts as created only when rrdeng_init() runs for it and succeeds
+        tiers_init[tier].tier = tier;
+        tiers_init[tier].ret = -1;
+        strncpyz(tiers_init[tier].path, dbenginepath, FILENAME_MAX);
+
         int ret = mkdir(dbenginepath, 0775);
         if (ret != 0 && errno != EEXIST) {
             nd_log(NDLS_DAEMON, NDLP_CRIT, "DBENGINE on '%s': cannot create directory '%s'", hostname, dbenginepath);
@@ -283,10 +288,7 @@ void netdata_conf_dbengine_init(const char *hostname) {
             dbengineconfig, new_dbengine_defaults ? storage_tiers_retention_time_s[tier] : 0);
 
         tiers_init[tier].disk_space_mb = (int) disk_space_mb;
-        tiers_init[tier].tier = tier;
         tiers_init[tier].retention_seconds = (size_t) storage_tiers_retention_time_s[tier];
-        strncpyz(tiers_init[tier].path, dbenginepath, FILENAME_MAX);
-        tiers_init[tier].ret = 0;
 
         if(parallel_initialization) {
             char tag[NETDATA_THREAD_TAG_MAX + 1];
