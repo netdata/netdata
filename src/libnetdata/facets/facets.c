@@ -163,7 +163,6 @@ typedef enum {
     FACET_KEY_VALUE_EMPTY       = (1 << 1),
     FACET_KEY_VALUE_UNSAMPLED   = (1 << 2),
     FACET_KEY_VALUE_ESTIMATED   = (1 << 3),
-    FACET_KEY_VALUE_COPIED      = (1 << 4),
 } FACET_KEY_VALUE_FLAGS;
 
 #define facet_key_value_updated(k) ((k)->current_value.flags & FACET_KEY_VALUE_UPDATED)
@@ -171,7 +170,6 @@ typedef enum {
 #define facet_key_value_unsampled(k) ((k)->current_value.flags & FACET_KEY_VALUE_UNSAMPLED)
 #define facet_key_value_estimated(k) ((k)->current_value.flags & FACET_KEY_VALUE_ESTIMATED)
 #define facet_key_value_empty_or_unsampled_or_estimated(k) ((k)->current_value.flags & (FACET_KEY_VALUE_EMPTY|FACET_KEY_VALUE_UNSAMPLED|FACET_KEY_VALUE_ESTIMATED))
-#define facet_key_value_copied(k) ((k)->current_value.flags & FACET_KEY_VALUE_COPIED)
 
 struct facet_key {
     FACETS *facets;
@@ -198,9 +196,7 @@ struct facet_key {
     struct {
         FACETS_HASH hash;
         FACET_KEY_VALUE_FLAGS flags;
-        const char *raw;
-        uint32_t raw_len;
-        BUFFER *b;
+        BUFFER *b;          // owned copy: callers' pointers may be invalid once the add returns
         FACET_VALUE *v;
     } current_value;
 
@@ -432,18 +428,11 @@ static inline void FACETS_VALUES_INDEX_DESTROY(FACET_KEY *k) {
 }
 
 static inline const char *facets_key_get_value(FACET_KEY *k) {
-    return facet_key_value_copied(k) ? buffer_tostring(k->current_value.b) : k->current_value.raw;
+    return buffer_tostring(k->current_value.b);
 }
 
 static inline uint32_t facets_key_get_value_length(FACET_KEY *k) {
-    return facet_key_value_copied(k) ? buffer_strlen(k->current_value.b) : k->current_value.raw_len;
-}
-
-static inline void facets_key_value_copy_to_buffer(FACET_KEY *k) {
-    if(!facet_key_value_copied(k)) {
-        buffer_contents_replace(k->current_value.b, k->current_value.raw, k->current_value.raw_len);
-        k->current_value.flags |= FACET_KEY_VALUE_COPIED;
-    }
+    return buffer_strlen(k->current_value.b);
 }
 
 static const char *facets_value_dup(const char *s, uint32_t len) {
@@ -2002,10 +1991,7 @@ static inline void facets_key_set_unsampled_value(FACETS *facets, FACET_KEY *k) 
 
     // no need to copy the UNSET value
     // empty values are exported as empty
-    k->current_value.raw = NULL;
-    k->current_value.raw_len = 0;
-    k->current_value.b->len = 0;
-    k->current_value.flags &= ~FACET_KEY_VALUE_COPIED;
+    buffer_flush(k->current_value.b);
 
     if(unlikely(k->values.enabled))
         FACET_VALUE_ADD_UNSAMPLED_VALUE_TO_INDEX(k);
@@ -2025,10 +2011,7 @@ static inline void facets_key_set_empty_value(FACETS *facets, FACET_KEY *k) {
 
     // no need to copy the UNSET value
     // empty values are exported as empty
-    k->current_value.raw = NULL;
-    k->current_value.raw_len = 0;
-    k->current_value.b->len = 0;
-    k->current_value.flags &= ~FACET_KEY_VALUE_COPIED;
+    buffer_flush(k->current_value.b);
 
     if(unlikely(k->values.enabled))
         FACET_VALUE_ADD_EMPTY_VALUE_TO_INDEX(k);
@@ -2048,7 +2031,6 @@ static inline void facets_key_check_value(FACETS *facets, FACET_KEY *k) {
 
     if(k->transform.cb && !k->transform.view_only) {
         facets->operations.values.transformed++;
-        facets_key_value_copy_to_buffer(k);
         k->transform.cb(facets, k->current_value.b, FACETS_TRANSFORM_VALUE, k->transform.data);
     }
 
@@ -2058,7 +2040,6 @@ static inline void facets_key_check_value(FACETS *facets, FACET_KEY *k) {
 
     if(facets->query && !facet_key_value_empty_or_unsampled_or_estimated(k) && ((k->options & FACET_KEY_OPTION_FTS) || facets->options & FACETS_OPTION_ALL_KEYS_FTS)) {
         facets->operations.fts.searches++;
-        facets_key_value_copy_to_buffer(k);
         switch(simple_pattern_matches_extract(facets->query, buffer_tostring(k->current_value.b), NULL, 0)) {
             case SP_MATCHED_POSITIVE:
                 facets->current_row.keys_matched_by_query_positive++;
@@ -2083,8 +2064,7 @@ static inline void facets_key_check_value(FACETS *facets, FACET_KEY *k) {
 
 void facets_add_key_value(FACETS *facets, const char *key, const char *value) {
     FACET_KEY *k = facets_register_key_name(facets, key, 0);
-    k->current_value.raw = value;
-    k->current_value.raw_len = strlen(value);
+    buffer_contents_replace(k->current_value.b, value, strlen(value));
 
     facets_key_check_value(facets, k);
 }
@@ -2095,8 +2075,9 @@ void facets_add_key_value_length(FACETS *facets, const char *key, size_t key_len
         return;
 
     FACET_KEY *k = facets_register_key_name_length(facets, key, key_len, 0);
-    k->current_value.raw = value;
-    k->current_value.raw_len = value_len;
+
+    // copy now: providers like sd_journal reuse the value's memory before the row is finished
+    buffer_contents_replace(k->current_value.b, value, value_len);
 
     facets_key_check_value(facets, k);
 }
@@ -2337,9 +2318,7 @@ static inline void facets_reset_key(FACET_KEY *k) {
     k->key_values_selected_in_row = 0;
     k->current_value.flags = FACET_KEY_VALUE_NONE;
     k->current_value.hash = FACETS_HASH_ZERO;
-    k->current_value.raw = NULL;
-    k->current_value.raw_len = 0;
-    k->current_value.b->len = 0;
+    buffer_flush(k->current_value.b);
     k->current_value.v = NULL;
 }
 
@@ -3091,4 +3070,122 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
         buffer_json_object_close(wb); // fts
     }
     buffer_json_object_close(wb); // items
+}
+
+// ----------------------------------------------------------------------------
+// unittest
+
+static const char *facets_unittest_row_value(FACETS *facets, usec_t usec, const char *key, size_t *len) {
+    for(FACET_ROW *row = facets->base; row ; row = row->next) {
+        if(row->usec != usec)
+            continue;
+
+        FACET_ROW_KEY_VALUE *rkv = dictionary_get(row->dict, key);
+        if(!rkv || rkv->empty)
+            return NULL;
+
+        *len = buffer_strlen(rkv->wb);
+        return buffer_tostring(rkv->wb);
+    }
+
+    return NULL;
+}
+
+static int facets_unittest_check(FACETS *facets, const char *test, usec_t usec, const char *key, const char *expected, size_t expected_len) {
+    size_t len = 0;
+    const char *value = facets_unittest_row_value(facets, usec, key, &len);
+
+    if(!value || len != expected_len || memcmp(value, expected, len) != 0) {
+        fprintf(stderr, "FACETS: %s: row %llu key '%s' has %zu bytes starting with '%.20s', expected %zu bytes starting with '%.20s'\n",
+                test, (unsigned long long)usec, key, value ? len : 0, value ? value : "(missing)", expected_len, expected);
+        return 1;
+    }
+
+    return 0;
+}
+
+int facets_unittest(void) {
+    int errors = 0;
+    char expected[10000];
+
+    fprintf(stderr, "\nTesting facets...\n");
+
+    {
+        // the provider reuses one buffer for every field of the entry (sd_journal decompression buffer)
+        FACETS *facets = facets_create(10, 0, NULL, NULL, NULL);
+        facets_rows_begin(facets);
+
+        char buf[4000];
+        memset(buf, 'A', sizeof(buf));
+        facets_add_key_value_length(facets, "MESSAGE", 7, buf, sizeof(buf));
+        memset(buf, 'B', sizeof(buf));
+        facets_add_key_value_length(facets, "ZDATA", 5, buf, sizeof(buf));
+        facets_row_finished(facets, 1000);
+
+        memset(expected, 'A', sizeof(buf));
+        errors += facets_unittest_check(facets, "reused provider buffer", 1000, "MESSAGE", expected, sizeof(buf));
+        memset(expected, 'B', sizeof(buf));
+        errors += facets_unittest_check(facets, "reused provider buffer", 1000, "ZDATA", expected, sizeof(buf));
+
+        facets_destroy(facets);
+    }
+
+    {
+        // the provider frees the value before the row is finished (sd_journal reallocating its buffer)
+        FACETS *facets = facets_create(10, 0, NULL, NULL, NULL);
+        facets_rows_begin(facets);
+
+        char *value = mallocz(100);
+        memset(value, 'C', 100);
+        facets_add_key_value_length(facets, "MESSAGE", 7, value, 100);
+        memset(value, 'X', 100);
+        freez(value);
+        facets_add_key_value(facets, "OTHER", "y");
+        facets_row_finished(facets, 1000);
+
+        memset(expected, 'C', 100);
+        errors += facets_unittest_check(facets, "freed provider buffer", 1000, "MESSAGE", expected, 100);
+
+        facets_destroy(facets);
+    }
+
+    {
+        // a later row with a larger value for the same key, and a later row with a smaller one
+        FACETS *facets = facets_create(10, 0, NULL, NULL, NULL);
+        facets_rows_begin(facets);
+
+        char buf[sizeof(expected)];
+        size_t sizes[] = { 10, sizeof(buf), 5 };
+        for(size_t i = 0; i < sizeof(sizes) / sizeof(sizes[0]) ; i++) {
+            memset(buf, 'a' + (int)i, sizes[i]);
+            facets_add_key_value_length(facets, "MESSAGE", 7, buf, sizes[i]);
+            facets_row_finished(facets, 3000 - i * 1000);
+            memset(buf, 'Z', sizeof(buf));
+        }
+
+        for(size_t i = 0; i < sizeof(sizes) / sizeof(sizes[0]) ; i++) {
+            memset(expected, 'a' + (int)i, sizes[i]);
+            errors += facets_unittest_check(facets, "growing and shrinking values", 3000 - i * 1000, "MESSAGE", expected, sizes[i]);
+        }
+
+        facets_destroy(facets);
+    }
+
+    {
+        // a repeated key in one entry: the full text search and the row must see the last value
+        FACETS *facets = facets_create(10, FACETS_OPTION_ALL_KEYS_FTS, NULL, NULL, NULL);
+        facets_set_query(facets, "second");
+        facets_rows_begin(facets);
+
+        facets_add_key_value(facets, "KEY", "first");
+        facets_add_key_value(facets, "KEY", "second");
+        facets_row_finished(facets, 1000);
+
+        errors += facets_unittest_check(facets, "repeated key with full text search", 1000, "KEY", "second", 6);
+
+        facets_destroy(facets);
+    }
+
+    fprintf(stderr, "facets unittest: %s (%d errors)\n", errors ? "FAILED" : "OK", errors);
+    return errors ? 1 : 0;
 }
