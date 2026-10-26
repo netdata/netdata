@@ -46,7 +46,7 @@ DOCKER_PKGCONFIG_PATH := $(DOCKER_BUILD_STAGING)/lib/pkgconfig:$(DOCKER_BUILD_ST
 
 # Docker configuration
 
-DOCKER := $(or $(shell command -v docker 2>/dev/null),$(shell command -v podman 2>/dev/null))
+DOCKER := $(or $(shell command -v podman 2>/dev/null),$(shell command -v docker 2>/dev/null))
 
 ifeq ($(strip $(DOCKER)),)
     $(error Either Docker or Podman are required for static builds.)
