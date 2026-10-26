@@ -8,7 +8,7 @@
     "avg_pkt_rx_ps": 100000.0,
     "avg_pkt_tx_ps": 50000.0,
     "avg_pkt_rx_crc_error_ps": 0.5,
-    "avg_pkt_rx_no_buffer_error_ps": 0.0,
-    "avg_pkt_tx_error_ps": 0.0
+    "avg_pkt_rx_no_buffer_error_ps": 0.25,
+    "avg_pkt_tx_error_ps": 0.75
   }
 ]
