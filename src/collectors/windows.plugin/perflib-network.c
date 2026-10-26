@@ -585,6 +585,8 @@ struct network_interface {
 
 static DICTIONARY *physical_interfaces = NULL, *virtual_interfaces = NULL;
 static netdata_mutex_t network_interfaces_mutex;
+static usec_t network_last_snapshot_ut;
+static usec_t network_snapshot_ttl_ut;
 
 static void network_interface_init(struct network_interface *d)
 {
@@ -1143,6 +1145,7 @@ static void network_function_add_rows(
     DICTIONARY *interfaces,
     bool physical,
     const struct netdata_win_network_interface *adapters,
+    usec_t current_snapshot_ut,
     struct network_function_maxima *maxima)
 {
     struct network_interface *d;
@@ -1150,18 +1153,30 @@ static void network_function_add_rows(
     {
         const char *name = d_dfe.name;
         const struct netdata_win_network_interface *adapter = network_adapter_for_name(adapters, name);
-        double speed = rrddim_get_last_stored_value(d->speed.rd, &maxima->speed, 1000.0);
-        double traffic_in = rrddim_get_last_stored_value(d->traffic.rd_received, &maxima->traffic_in, 1000.0);
-        double traffic_out = rrddim_get_last_stored_value(d->traffic.rd_sent, &maxima->traffic_out, 1000.0);
+        bool seen = current_snapshot_ut && d->last_collected == current_snapshot_ut;
+        bool traffic_valid = seen && d->traffic.received.updated && d->traffic.sent.updated;
+        bool packets_valid = seen && d->packets.received.updated && d->packets.sent.updated;
+        bool drops_valid = seen && d->discards.received.updated && d->discards.outbound.updated;
+        double speed = seen && d->speed.current_bandwidth.updated ?
+                           rrddim_get_last_stored_value(d->speed.rd, &maxima->speed, 1000.0) :
+                           NAN;
+        double traffic_in =
+            traffic_valid ? rrddim_get_last_stored_value(d->traffic.rd_received, &maxima->traffic_in, 1000.0) : NAN;
+        double traffic_out =
+            traffic_valid ? rrddim_get_last_stored_value(d->traffic.rd_sent, &maxima->traffic_out, 1000.0) : NAN;
         double traffic_total = NAN;
         if (!isnan(traffic_in) && !isnan(traffic_out)) {
             traffic_total = traffic_in + traffic_out;
             maxima->traffic_total = MAX(maxima->traffic_total, traffic_total);
         }
-        double packets_in = rrddim_get_last_stored_value(d->packets.rd_received, &maxima->packets_in, 1000.0);
-        double packets_out = rrddim_get_last_stored_value(d->packets.rd_sent, &maxima->packets_out, 1000.0);
-        double drops_in = rrddim_get_last_stored_value(d->discards.rd_received, &maxima->drops_in, 1.0);
-        double drops_out = rrddim_get_last_stored_value(d->discards.rd_outbound, &maxima->drops_out, 1.0);
+        double packets_in =
+            packets_valid ? rrddim_get_last_stored_value(d->packets.rd_received, &maxima->packets_in, 1000.0) : NAN;
+        double packets_out =
+            packets_valid ? rrddim_get_last_stored_value(d->packets.rd_sent, &maxima->packets_out, 1000.0) : NAN;
+        double drops_in =
+            drops_valid ? rrddim_get_last_stored_value(d->discards.rd_received, &maxima->drops_in, 1.0) : NAN;
+        double drops_out =
+            drops_valid ? rrddim_get_last_stored_value(d->discards.rd_outbound, &maxima->drops_out, 1.0) : NAN;
 
         buffer_json_add_array_item_array(wb);
         buffer_json_add_array_item_string(wb, name);
@@ -1182,7 +1197,8 @@ static void network_function_add_rows(
         buffer_json_add_array_item_double(wb, drops_out);
         buffer_json_add_array_item_string(wb, adapter ? adapter->friendly_name : NULL);
         buffer_json_add_array_item_object(wb);
-        buffer_json_member_add_string(wb, "severity", drops_in + drops_out > 0 ? "warning" : "normal");
+        if (!isnan(drops_in) && !isnan(drops_out))
+            buffer_json_member_add_string(wb, "severity", drops_in + drops_out > 0 ? "warning" : "normal");
         buffer_json_object_close(wb);
         buffer_json_array_close(wb);
     }
@@ -1267,8 +1283,13 @@ static int network_function_interfaces(
     buffer_json_member_add_array(wb, "data");
 
     netdata_mutex_lock(&network_interfaces_mutex);
-    network_function_add_rows(wb, physical_interfaces, true, adapters, &maxima);
-    network_function_add_rows(wb, virtual_interfaces, false, adapters, &maxima);
+    usec_t now_ut = now_monotonic_usec();
+    usec_t current_snapshot_ut = network_last_snapshot_ut && now_ut >= network_last_snapshot_ut &&
+                                         now_ut - network_last_snapshot_ut <= network_snapshot_ttl_ut ?
+                                     network_last_snapshot_ut :
+                                     0;
+    network_function_add_rows(wb, physical_interfaces, true, adapters, current_snapshot_ut, &maxima);
+    network_function_add_rows(wb, virtual_interfaces, false, adapters, current_snapshot_ut, &maxima);
     netdata_mutex_unlock(&network_interfaces_mutex);
 
     netdata_win_network_interfaces_free(adapters);
@@ -1406,12 +1427,20 @@ int do_PerflibNetwork(int update_every, usec_t dt __maybe_unused)
     }
 
     DWORD id = RegistryFindIDByName("Network Interface");
-    if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND)
+    if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND) {
+        netdata_mutex_lock(&network_interfaces_mutex);
+        network_last_snapshot_ut = 0;
+        netdata_mutex_unlock(&network_interfaces_mutex);
         return -1;
+    }
 
     PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
-    if (!pDataBlock)
+    if (!pDataBlock) {
+        netdata_mutex_lock(&network_interfaces_mutex);
+        network_last_snapshot_ut = 0;
+        netdata_mutex_unlock(&network_interfaces_mutex);
         return 0;
+    }
 
     if (!function_registered) {
         nrpc_method_register_builtin(&(struct nrpc_builtin_desc){
@@ -1431,7 +1460,7 @@ int do_PerflibNetwork(int update_every, usec_t dt __maybe_unused)
     usec_t now_ut = now_monotonic_usec();
     netdata_mutex_lock(&network_interfaces_mutex);
     do_network_interface(pDataBlock, update_every, true, now_ut);
-    do_network_interface(pDataBlock, update_every, false, now_ut);
+    network_last_snapshot_ut = 0;
     netdata_mutex_unlock(&network_interfaces_mutex);
 
     struct network_protocol *tcp4 = NULL, *tcp6 = NULL;
@@ -1451,5 +1480,20 @@ int do_PerflibNetwork(int update_every, usec_t dt __maybe_unused)
         tcp46.packets.sent.current.Data += tcp6->packets.sent.current.Data;
         protocol_packets_chart_update(&tcp46, update_every);
     }
+
+    // Perflib only guarantees objects explicitly requested by the query.
+    DWORD adapter_id = RegistryFindIDByName("Network Adapter");
+    if (adapter_id != PERFLIB_REGISTRY_NAME_NOT_FOUND) {
+        pDataBlock = perflibGetPerformanceData(adapter_id);
+        if (pDataBlock) {
+            netdata_mutex_lock(&network_interfaces_mutex);
+            do_network_interface(pDataBlock, update_every, false, now_ut);
+            netdata_mutex_unlock(&network_interfaces_mutex);
+        }
+    }
+    netdata_mutex_lock(&network_interfaces_mutex);
+    network_last_snapshot_ut = now_ut;
+    network_snapshot_ttl_ut = (usec_t)update_every * 2 * USEC_PER_SEC;
+    netdata_mutex_unlock(&network_interfaces_mutex);
     return 0;
 }
