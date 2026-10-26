@@ -26,7 +26,7 @@ func (c *Collector) collect(ctx context.Context) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	statesObserved := c.observeResourceStates(now)
+	statesObserved := c.observeResourceStates(c.now())
 	if err != nil && !statesObserved {
 		return err
 	}

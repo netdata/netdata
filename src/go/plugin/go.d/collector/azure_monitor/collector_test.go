@@ -2498,6 +2498,7 @@ func (m *mockResourceGraph) setResources(resources []map[string]any) {
 }
 
 type mockMetricsClient struct {
+	onQuery        func()
 	mu             sync.Mutex
 	queryResponse  azmetrics.QueryResourcesResponse
 	queryResponses map[string]azmetrics.QueryResourcesResponse
@@ -2522,6 +2523,9 @@ type metricsQueryCall struct {
 func (m *mockMetricsClient) QueryResources(ctx context.Context, subscriptionID string, _ string, metricNames []string, _ azmetrics.ResourceIDList, opts *azmetrics.QueryResourcesOptions) (azmetrics.QueryResourcesResponse, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.onQuery != nil {
+		m.onQuery()
+	}
 	m.count++
 	m.subs = append(m.subs, subscriptionID)
 	var startTime, endTime, interval, aggregation string

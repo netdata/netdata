@@ -311,3 +311,44 @@ func TestCollector_CancellationDoesNotPublishResourceStates(t *testing.T) {
 	cancel()
 	require.ErrorIs(t, c.Collect(ctx), context.Canceled)
 }
+
+func TestCollector_StateExpiresDuringMonitorQuery(t *testing.T) {
+	for _, failed := range []bool{false, true} {
+		name := "Monitor success"
+		if failed {
+			name = "Monitor failure"
+		}
+		t.Run(name, func(t *testing.T) {
+			start := time.Date(2026, 10, 26, 12, 0, 0, 0, time.UTC)
+			now := start
+			rg := &mockResourceGraph{resources: []map[string]any{testVirtualMachine("vm-a", "Standard_B2s", "Linux", "PowerState/running")}}
+			mx := &mockMetricsClient{onQuery: func() { now = start.Add(61 * time.Second) }}
+			if failed {
+				mx.queryErr = errors.New("Monitor unavailable")
+			}
+			c := newTestCollectorWithMocks(rg, mx)
+			c.Config = testConfig()
+			c.Config.Profiles.ModeExact = testProfilesModeEntries("virtual_machines")
+			c.Config.Discovery.RefreshEvery = 60
+			c.now = func() time.Time { return now }
+			require.NoError(t, c.Init(context.Background()))
+			require.NoError(t, c.Check(context.Background()))
+			now = start.Add(59 * time.Second)
+			mx.queryResponse = azmetrics.QueryResourcesResponse{MetricResults: azmetrics.MetricResults{Values: []azmetrics.MetricData{{
+				ResourceID: new("/subscriptions/sub-1/resourcegroups/rg-a/providers/microsoft.compute/virtualmachines/vm-a"),
+				Values:     []azmetrics.Metric{metricWithAvg("Percentage CPU", now, 25)},
+			}}}}
+			series, err := collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
+			require.Equal(t, 1, rg.calls(), "expiry must not trigger extra discovery polling")
+			if failed {
+				require.ErrorContains(t, err, "all Azure Monitor batch queries failed")
+				return
+			}
+			require.NoError(t, err)
+			_, ok := seriesValue(series, "virtual_machines.power_state{")
+			require.False(t, ok, "state must still be valid when it is emitted")
+			_, ok = seriesValue(series, "virtual_machines.percentage_cpu_average{")
+			require.True(t, ok)
+		})
+	}
+}
