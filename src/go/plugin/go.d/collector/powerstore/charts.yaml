@@ -311,7 +311,7 @@ groups:
             options:
               float: true
       - id: appliance_cpu
-        title: Appliance IO Workload CPU Utilization
+        title: Appliance Peak IO Workload CPU Utilization
         context: appliance_cpu
         units: percentage
         algorithm: absolute
@@ -537,7 +537,7 @@ groups:
             options:
               float: true
       - id: node_logins
-        title: Node Current Logins
+        title: Node Average Logins
         context: node_logins
         units: logins
         algorithm: absolute

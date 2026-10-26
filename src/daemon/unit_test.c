@@ -4,6 +4,7 @@
 #include "web/api/formatters/rrd2json.h"
 #include "web/api/queries/query-internal.h"
 #include "database/contexts/rrdcontext-internal.h"
+#include "unit_test_bridge.h"
 #ifdef OS_WINDOWS
 #include "win_system-info.h"
 #endif
@@ -1583,6 +1584,98 @@ static int test_incremental_sum_lookup_respects_update_every(void) {
     default_rrd_memory_mode = old_default_rrd_memory_mode;
     nd_profile.update_every = old_update_every;
     return rc;
+}
+
+static RRDSET *ram_gap_chart(const char *name, RRDDIM **rd) {
+    RRDSET *st = rrdset_create_localhost(
+        "netdata", name, name, "netdata", NULL, "Unit Testing", "value", "unittest", NULL, 1,
+        10, RRDSET_TYPE_LINE);
+    *rd = rrddim_add(st, "value", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    return st;
+}
+
+// Stores aligned points straight into the ram engine, as streaming and replication do: one per interval from 0 to
+// last (value = interval + 1), except the missed ranges. Then reads back every interval the ring still holds: each
+// must have its own value, or be empty when it was missed.
+static int ram_gap_check(const char *name, RRDSET *st, RRDDIM *rd, size_t last, const size_t (*missed)[2], size_t missed_count) {
+    const time_t update_every = st->update_every;
+    const time_t base_s = 200000000;
+    const size_t entries = st->db.entries;
+
+    for(size_t at = 0; at <= last; at++) {
+        bool skip = false;
+        for(size_t m = 0; m < missed_count; m++)
+            if(at >= missed[m][0] && at <= missed[m][1]) skip = true;
+        if(skip) continue;
+
+        NETDATA_DOUBLE v = (NETDATA_DOUBLE)(at + 1);
+        unittest_storage_engine_store_metric(
+            rd->tiers[0].sch, (base_s + (time_t)at * update_every) * USEC_PER_SEC, v, v, v, 1, 0, SN_DEFAULT_FLAGS);
+    }
+
+    size_t first = (last + 1 > entries) ? last + 1 - entries : 0, errors = 0, points = 0;
+    struct storage_engine_query_handle seqh;
+    unittest_storage_engine_query_init(
+        rd->tiers[0].seb, rd->tiers[0].smh, &seqh, base_s + (time_t)first * update_every,
+        base_s + (time_t)last * update_every, STORAGE_PRIORITY_SYNCHRONOUS);
+
+    for(size_t at = first; !unittest_storage_engine_query_is_finished(&seqh); at++) {
+        STORAGE_POINT sp = unittest_storage_engine_query_next_metric(&seqh);
+        points++;
+
+        bool stored = true;
+        for(size_t m = 0; m < missed_count; m++)
+            if(at >= missed[m][0] && at <= missed[m][1]) stored = false;
+
+        // compare with what the ring can hold: storage numbers round some integers
+        NETDATA_DOUBLE expected = unpack_storage_number(pack_storage_number((NETDATA_DOUBLE)(at + 1), SN_DEFAULT_FLAGS));
+        bool ok = sp.end_time_s == base_s + (time_t)at * update_every &&
+                  (stored ? sp.sum == expected : isnan(sp.sum));
+        if(!ok) {
+            fprintf(stderr, "%s: interval %zu (end %" PRId64 ") holds " NETDATA_DOUBLE_FORMAT ", expected %s\n",
+                    name, at, (int64_t)sp.end_time_s, sp.sum, stored ? "its own value" : "empty");
+            errors++;
+        }
+    }
+    unittest_storage_engine_query_finalize(&seqh);
+
+    if(points != last - first + 1) {
+        fprintf(stderr, "%s: read %zu points, expected %zu\n", name, points, last - first + 1);
+        errors++;
+    }
+
+    rrdset_free(st);
+    return errors ? 1 : 0;
+}
+
+static int test_ram_engine_gap_fills_only_missed_intervals(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    int rc = 0;
+    RRDDIM *rd;
+    RRDSET *st;
+
+    // two gaps: each one must not shift the values before it
+    st = ram_gap_chart("unittest-ram-gap-two-gaps", &rd);
+    const size_t two_gaps[][2] = { { 4, 5 }, { 9, 9 } };
+    rc += ram_gap_check("unittest-ram-gap-two-gaps", st, rd, 12, two_gaps, _countof(two_gaps));
+
+    // the largest gap that still takes the fill path (one interval below the ring size): the first point survives
+    st = ram_gap_chart("unittest-ram-gap-ring-sized", &rd);
+    size_t entries = st->db.entries;
+    const size_t ring_sized[][2] = { { 1, entries - 2 } };
+    rc += ram_gap_check("unittest-ram-gap-ring-sized", st, rd, entries - 1, ring_sized, _countof(ring_sized));
+
+    // gaps before and after the ring wraps around
+    st = ram_gap_chart("unittest-ram-gap-wrap", &rd);
+    const size_t wrap[][2] = { { entries - 3, entries - 2 }, { entries + 5, entries + 5 }, { entries + 10, entries + 12 } };
+    rc += ram_gap_check("unittest-ram-gap-wrap", st, rd, entries + 20, wrap, _countof(wrap));
+
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    return rc ? 1 : 0;
 }
 
 static int test_rrdmetric_algorithm_follows_rrddim(void) {
@@ -3516,6 +3609,9 @@ int run_all_mockup_tests(void)
         return 1;
 #endif
     if(test_incremental_sum_lookup_respects_update_every())
+        return 1;
+
+    if(test_ram_engine_gap_fills_only_missed_intervals())
         return 1;
 
     if(test_rrdmetric_algorithm_follows_rrddim())

@@ -972,6 +972,39 @@ static size_t test_dbengine_single_missing_sample_reuse(RRDHOST *host) {
     return errors;
 }
 
+static size_t test_dbengine_datafile_names(void) {
+    static const struct {
+        const char *name;
+        bool valid;
+        unsigned fileno;
+    } cases[] = {
+        { "datafile-1-0000000001.ndf", true, 1 },
+        { "datafile-1-4294967295.ndf", true, 4294967295U },
+        { "datafile-1-0000000001.ndf.bak", false, 0 },
+        { "datafile-1-0000000001.ndf~", false, 0 },
+        { "datafile-1-0000000001.ndfx", false, 0 },
+        { "datafile-1-0000000001.xyz", false, 0 },
+        { "datafile-1-0000000001", false, 0 },
+        { "datafile-1-1.ndf", false, 0 },
+        { "datafile-2-0000000001.ndf", false, 0 },
+        { "journalfile-1-0000000001.njf", false, 0 },
+    };
+
+    size_t errors = 0;
+    for (size_t i = 0; i < _countof(cases); i++) {
+        unsigned fileno = 0;
+        bool valid = datafile_name_parse(cases[i].name, &fileno);
+        if (valid != cases[i].valid || (valid && fileno != cases[i].fileno)) {
+            fprintf(stderr, " >>> DBENGINE: datafile name '%s' parsed as %s (fileno %u), expected %s (fileno %u)\n",
+                    cases[i].name, valid ? "valid" : "invalid", fileno,
+                    cases[i].valid ? "valid" : "invalid", cases[i].fileno);
+            errors++;
+        }
+    }
+
+    return errors;
+}
+
 int test_dbengine(void) {
     // provide enough threads to dbengine
     setenv("UV_THREADPOOL_SIZE", "48", 1);
@@ -987,6 +1020,7 @@ int test_dbengine(void) {
     if(!host)
         fatal("Failed to initialize host");
 
+    errors += test_dbengine_datafile_names();
     errors += test_dbengine_burst_retention(host);
     errors += test_dbengine_page_close_time(host);
 
@@ -1043,12 +1077,19 @@ int test_dbengine(void) {
     // prevent closing the database before the test is finished
     sleep(5);
 
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)host->db[0].si;
     rrd_wrlock();
-    rrdeng_quiesce((struct rrdengine_instance *)host->db[0].si);
-    rrdeng_flush_all((struct rrdengine_instance *)host->db[0].si);
-    rrdeng_exit((struct rrdengine_instance *)host->db[0].si);
-    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_SHUTDOWN_EVLOOP, NULL, NULL, STORAGE_PRIORITY_BEST_EFFORT, NULL, NULL);
+    rrdeng_quiesce(ctx);
+    rrdeng_flush_all(ctx);
+    rrdeng_exit(ctx);
+    host->db[0].si = NULL;
     rrd_wrunlock();
+
+    // free the ctx only after the event loop finished its work: after-work callbacks use it
+    if(dbengine_shutdown())
+        freez(ctx);
+    else
+        errors++;
 
     return (int)(errors + value_errors + time_errors);
 }

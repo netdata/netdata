@@ -264,8 +264,14 @@ void netdata_conf_dbengine_init(const char *hostname) {
         else
             snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine-tier%zu", netdata_configured_cache_dir, tier);
 
+        // a tier counts as created only when rrdeng_init() runs for it and succeeds
+        tiers_init[tier].tier = tier;
+        tiers_init[tier].ret = -1;
+
         // UCRT64's mkdir() requires a native Windows path; translate once here.
         os_translate_path(native_dbenginepath, dbenginepath, sizeof(native_dbenginepath));
+        // Pass the native path so rrdeng_init() file operations also use the correct form.
+        strncpyz(tiers_init[tier].path, native_dbenginepath, FILENAME_MAX);
 
         int ret = mkdir(native_dbenginepath, 0775);
         if (ret != 0 && errno != EEXIST) {
@@ -283,11 +289,7 @@ void netdata_conf_dbengine_init(const char *hostname) {
             dbengineconfig, new_dbengine_defaults ? storage_tiers_retention_time_s[tier] : 0);
 
         tiers_init[tier].disk_space_mb = (int) disk_space_mb;
-        tiers_init[tier].tier = tier;
         tiers_init[tier].retention_seconds = (size_t) storage_tiers_retention_time_s[tier];
-        // Pass the native path so rrdeng_init() file operations also use the correct form.
-        strncpyz(tiers_init[tier].path, native_dbenginepath, FILENAME_MAX);
-        tiers_init[tier].ret = 0;
 
         if(parallel_initialization) {
             char tag[NETDATA_THREAD_TAG_MAX + 1];
@@ -411,12 +413,11 @@ void netdata_conf_section_db(void) {
         struct dirent *de;
         while ((de = readdir(dir))) {
             // Validate the name exactly as dbengine generates and scans it
-            // ("datafile-<tier>-<fileno>.ndf"), using the same sscanf template as
-            // scan_data_files(). Requiring both numeric fields to parse means an
-            // unrelated *.ndf entry is not mistaken for persisted data.
-            unsigned int df_tier, df_fileno;
-            if (sscanf(de->d_name, DATAFILE_PREFIX RRDENG_FILE_NUMBER_SCAN_TMPL DATAFILE_EXTENSION,
-                       &df_tier, &df_fileno) == 2) {
+            // ("datafile-1-<fileno>.ndf"), with the same check as scan_data_files(),
+            // so an unrelated *.ndf entry or a copy such as *.ndf.bak is not
+            // mistaken for persisted data.
+            unsigned df_fileno;
+            if (datafile_name_parse(de->d_name, &df_fileno)) {
                 dbengine_datafiles_present = true;
                 break;
             }

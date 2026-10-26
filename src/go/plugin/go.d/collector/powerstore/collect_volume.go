@@ -22,10 +22,10 @@ func (c *Collector) collectVolumes(ctx context.Context) {
 				c.Warningf("error collecting volume %s perf metrics: %v", id, err)
 			} else if len(pm) > 0 {
 				last := pm[len(pm)-1]
-				c.mx.volume.perf.readIops.WithLabelValues(name).Observe(last.ReadIops)
-				c.mx.volume.perf.writeIops.WithLabelValues(name).Observe(last.WriteIops)
-				c.mx.volume.perf.readBandwidth.WithLabelValues(name).Observe(last.ReadBandwidth)
-				c.mx.volume.perf.writeBandwidth.WithLabelValues(name).Observe(last.WriteBandwidth)
+				c.mx.volume.perf.readIops.WithLabelValues(name).Observe(last.AvgReadIops)
+				c.mx.volume.perf.writeIops.WithLabelValues(name).Observe(last.AvgWriteIops)
+				c.mx.volume.perf.readBandwidth.WithLabelValues(name).Observe(last.AvgReadBandwidth)
+				c.mx.volume.perf.writeBandwidth.WithLabelValues(name).Observe(last.AvgWriteBandwidth)
 				c.mx.volume.perf.avgReadLatency.WithLabelValues(name).Observe(last.AvgReadLatency)
 				c.mx.volume.perf.avgWriteLatency.WithLabelValues(name).Observe(last.AvgWriteLatency)
 				c.mx.volume.perf.avgLatency.WithLabelValues(name).Observe(last.AvgLatency)

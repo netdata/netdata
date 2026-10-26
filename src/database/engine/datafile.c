@@ -252,6 +252,20 @@ void generate_datafilepath(struct rrdengine_datafile *datafile, char *str, size_
                     datafile_ctx(datafile)->config.dbfiles_path, datafile->tier, datafile->fileno);
 }
 
+// true only for the exact name generate_datafilepath() writes; sscanf() alone also
+// accepts other extensions, trailing text and unpadded numbers
+bool datafile_name_parse(const char *name, unsigned *fileno)
+{
+    unsigned tier;
+    if (sscanf(name, DATAFILE_PREFIX RRDENG_FILE_NUMBER_SCAN_TMPL DATAFILE_EXTENSION, &tier, fileno) != 2 || tier != 1)
+        return false;
+
+    char expected[RRDENG_PATH_MAX];
+    (void) snprintfz(expected, sizeof(expected), DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION,
+                     tier, *fileno);
+    return strcmp(name, expected) == 0;
+}
+
 int close_data_file(struct rrdengine_datafile *datafile)
 {
     struct rrdengine_instance *ctx = datafile_ctx(datafile);
@@ -446,14 +460,12 @@ static int scan_data_files(struct rrdengine_instance *ctx)
     bool validate_files = true;
     int scanned_datafiles = 0;
     for (matched_files = 0 ; UV_EOF != uv_fs_scandir_next(&req, &dent) ; ) {
-        ret = sscanf(dent.name, DATAFILE_PREFIX RRDENG_FILE_NUMBER_SCAN_TMPL DATAFILE_EXTENSION, &tier, &fileno);
-
         // This is a datafile
-        if (2 == ret) {
+        if (datafile_name_parse(dent.name, &fileno)) {
             max_seen_fileno = MAX(max_seen_fileno, fileno);
             scanned_datafiles++;
             if (matched_files < MAX_DATAFILES) {
-                datafile = datafile_alloc_and_init(ctx, tier, fileno);
+                datafile = datafile_alloc_and_init(ctx, 1, fileno);
                 datafiles[matched_files++] = datafile;
             }
             Pvoid_t *Pvalue = JudyLIns(&datafiles_JudyL, (Word_t)fileno, PJE0);
