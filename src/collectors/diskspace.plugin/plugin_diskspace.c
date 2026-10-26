@@ -548,8 +548,43 @@ static bool should_exclude_zfs(const char *filesystem, const char *mount_point, 
     return excluded;
 }
 
-static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
+// the filesystems (major:minor) collected in the current iteration
+static struct {
+    uint64_t *devs;
+    size_t used;
+    size_t size;
+} collected_devs = { 0 };
+
+static inline uint64_t collected_devs_key(unsigned long major, unsigned long minor) {
+    return ((uint64_t)major << 32) | (uint64_t)(minor & 0xFFFFFFFF);
+}
+
+static inline bool collected_devs_contains(unsigned long major, unsigned long minor) {
+    uint64_t key = collected_devs_key(major, minor);
+    for(size_t i = 0; i < collected_devs.used; i++)
+        if(collected_devs.devs[i] == key)
+            return true;
+
+    return false;
+}
+
+static inline void collected_devs_add(unsigned long major, unsigned long minor) {
+    if(collected_devs_contains(major, minor))
+        return;
+
+    if(collected_devs.used == collected_devs.size) {
+        collected_devs.size = collected_devs.size ? collected_devs.size * 2 : 64;
+        collected_devs.devs = reallocz(collected_devs.devs, collected_devs.size * sizeof(*collected_devs.devs));
+    }
+
+    collected_devs.devs[collected_devs.used++] = collected_devs_key(major, minor);
+}
+
+// returns true when the mount point is collected (or handed to the slow thread),
+// false when configuration, read-only state or the ZFS heuristics skip it
+static inline bool do_disk_space_stats(struct mountinfo *mi, int update_every) {
     const char *disk = mi->persistent_id;
+    bool collected = false;
 
     usec_t slow_timeout = MAX_STAT_USEC * update_every;
 
@@ -665,6 +700,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
     struct mount_point_metadata *m = dictionary_acquired_item_value(item);
     if (m->slow) {
         add_basic_mountinfo(&slow_mountinfo_tmp_root, mi);
+        collected = true;
         goto cleanup;
     }
 
@@ -686,6 +722,9 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
     // Check if this ZFS dataset has a cached exclusion decision (skip statvfs entirely)
     if (zfs_dataset_cached_excluded(mi->filesystem, mi->mount_point, mi->mount_source))
         goto cleanup;
+
+    // from here on the mount point is collected, even when statvfs() fails this time
+    collected = true;
 
     usec_t start_time = now_monotonic_high_precision_usec();
     struct statvfs buff_statvfs;
@@ -710,8 +749,10 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
     zfs_cache_pool_capacity(mi->filesystem, mi->mount_source, &buff_statvfs);
 
     // Check if this ZFS mount should be excluded (capacity-based heuristic)
-    if (should_exclude_zfs(mi->filesystem, mi->mount_point, mi->mount_source, &buff_statvfs))
+    if (should_exclude_zfs(mi->filesystem, mi->mount_point, mi->mount_source, &buff_statvfs)) {
+        collected = false;
         goto cleanup;
+    }
 
     m->shown_error = false;
 
@@ -725,6 +766,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
 cleanup:
     dictionary_acquired_item_release(dict_mountpoints, item);
+    return collected;
 }
 
 static inline void do_slow_disk_space_stats(struct basic_mountinfo *mi, int update_every) {
@@ -861,6 +903,10 @@ static void diskspace_main_cleanup(void *ptr) {
     // Free the mountpoints dictionary
     dictionary_destroy(dict_mountpoints);
     dict_mountpoints = NULL;
+
+    freez(collected_devs.devs);
+    collected_devs.devs = NULL;
+    collected_devs.used = collected_devs.size = 0;
 
     simple_pattern_free(excluded_mountpoints);
     excluded_mountpoints = NULL;
@@ -1186,19 +1232,34 @@ void diskspace_main(void *ptr) {
         free_basic_mountinfo_list(slow_mountinfo_tmp_root);
         slow_mountinfo_tmp_root = NULL;
 
-        struct mountinfo *mi;
-        for(mi = disk_mountinfo_root; mi; mi = mi->next) {
-            if(unlikely(mi->flags & (MOUNTINFO_IS_DUMMY | MOUNTINFO_IS_BIND)))
-                continue;
+        // A filesystem mounted more than once is charted once: mountinfo keeps one of its mounts and marks the
+        // others as BIND. The kept one is collected first; a BIND mount is collected only when no mount of
+        // its filesystem has been collected, e.g. because the kept one is excluded by path or disabled.
+        collected_devs.used = 0;
 
-            // exclude mounts made by ProtectHome and ProtectSystem systemd hardening options
-            // https://github.com/netdata/netdata/issues/11498#issuecomment-950982878
-            if(mi->flags & MOUNTINFO_READONLY && mi->flags & MOUNTINFO_IS_IN_SYSD_PROTECTED_LIST && !strcmp(mi->root, mi->mount_point))
-                continue;
+        for(int pass = 0; pass < 2 && service_running(SERVICE_COLLECTORS); pass++) {
+            for(struct mountinfo *mi = disk_mountinfo_root; mi; mi = mi->next) {
+                if(unlikely(mi->flags & MOUNTINFO_IS_DUMMY))
+                    continue;
 
-            worker_is_busy(WORKER_JOB_MOUNTPOINT);
-            do_disk_space_stats(mi, update_every);
-            if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
+                bool is_bind = (mi->flags & MOUNTINFO_IS_BIND);
+                if(is_bind != (pass == 1))
+                    continue;
+
+                // exclude mounts made by ProtectHome and ProtectSystem systemd hardening options
+                // https://github.com/netdata/netdata/issues/11498#issuecomment-950982878
+                if(mi->flags & MOUNTINFO_READONLY && mi->flags & MOUNTINFO_IS_IN_SYSD_PROTECTED_LIST && !strcmp(mi->root, mi->mount_point))
+                    continue;
+
+                if(is_bind && collected_devs_contains(mi->major, mi->minor))
+                    continue;
+
+                worker_is_busy(WORKER_JOB_MOUNTPOINT);
+                if(do_disk_space_stats(mi, update_every))
+                    collected_devs_add(mi->major, mi->minor);
+
+                if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
+            }
         }
         netdata_mutex_unlock(&slow_mountinfo_mutex);
 
