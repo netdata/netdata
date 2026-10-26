@@ -2987,7 +2987,8 @@ void dbengine_event_loop(void* arg) {
                 }
 
                 case RRDENG_OPCODE_JOURNAL_FILTER: {
-                    if(!rrdeng_main.journal_filter_running) {
+                    // never while draining at shutdown
+                    if(!rmain->shutdown && !rrdeng_main.journal_filter_running) {
                         rrdeng_main.journal_filter_running++;
                         work_dispatch(NULL, NULL, NULL, opcode, journal_filter_tp_worker, after_journal_filter);
                     }
