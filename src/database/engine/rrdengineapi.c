@@ -48,8 +48,15 @@ static inline void initialize_single_ctx(struct rrdengine_instance *ctx) {
     rw_spinlock_init(&ctx->njfv2idx.spinlock);
 }
 
-// frees a context rrdeng_init() allocated for its caller - never one of multidb_ctx[]
+// frees a context rrdeng_init() allocated for its caller; the static multidb_ctx[] are never freed
 void rrdeng_ctx_free(struct rrdengine_instance *ctx) {
+    for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
+        if(ctx == multidb_ctx[tier]) {
+            internal_fatal(true, "DBENGINE: tried to free the static context of tier %zu", tier);
+            return;
+        }
+    }
+
     netdata_rwlock_destroy(&ctx->datafiles.rwlock);
     freez(ctx);
 }
