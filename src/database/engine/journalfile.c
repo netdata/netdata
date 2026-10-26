@@ -752,8 +752,7 @@ int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengi
         // This path may be retried with the same fileno. Remove the failed
         // journal synchronously so an asynchronous deletion cannot race the
         // next creation attempt and delete its replacement.
-        (void)close_uv_file(datafile, journalfile->file);
-        journalfile->file = 0;
+        (void)journalfile_v1_close(journalfile, datafile);
         uv_fs_t unlink_req;
         if (uv_fs_unlink(NULL, &unlink_req, path, NULL) < 0)
             netdata_log_error("DBENGINE: failed to remove incomplete journal '%s'", path);
