@@ -220,6 +220,7 @@ groups:
         title: IPsec Tunnel State
         context: ipsec.tunnel.state
         units: state
+        type: stacked
         instances:
           by_labels: [tunnel, tunnel_id]
         dimensions:
@@ -228,6 +229,7 @@ groups:
         title: IPsec Gateway State
         context: ipsec.gateway.state
         units: state
+        type: stacked
         label_promotion: [ike_version]
         instances:
           by_labels: [gateway]
