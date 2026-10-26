@@ -2878,7 +2878,7 @@ void dbengine_event_loop(void* arg) {
 
         do {
             worker_is_busy(RRDENG_OPCODE_MAX);
-            cmd = rrdeng_deq_cmd(RRDENG_OPCODE_NOOP);
+            cmd = rrdeng_deq_cmd(false);
             opcode = cmd.opcode;
 
             worker_is_busy(opcode);
