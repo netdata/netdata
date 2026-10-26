@@ -322,6 +322,8 @@ func TestCollector_Collect_VolumeStatsChartLifecycle(t *testing.T) {
 
 	data := volumeStats("data", 1000, 600, 300, 100, 40, 60)
 	cache := volumeStats("cache", 2000, 500, 1500, 200, 20, 180)
+	// a name containing "space" must not be mistaken for the "_space_" metric suffix
+	space := volumeStats("my.space", 3000, 300, 2700, 300, 30, 270)
 
 	// chart ID => state of each chart with that ID, in creation order; removed charts stay in the list until the
 	// job runtime prunes them, so a re-added PVC has a removed and an active entry
@@ -341,12 +343,14 @@ func TestCollector_Collect_VolumeStatsChartLifecycle(t *testing.T) {
 		}
 		return states
 	}
-	allCharts := func(dataState, cacheState []string) map[string][]string {
+	allCharts := func(dataState, cacheState, spaceState []string) map[string][]string {
 		return map[string][]string{
-			"pvc_app_data_space_usage":        dataState,
-			"pvc_app_data_space_utilization":  dataState,
-			"pvc_app_cache_space_usage":       cacheState,
-			"pvc_app_cache_space_utilization": cacheState,
+			"pvc_app_data_space_usage":           dataState,
+			"pvc_app_data_space_utilization":     dataState,
+			"pvc_app_cache_space_usage":          cacheState,
+			"pvc_app_cache_space_utilization":    cacheState,
+			"pvc_app_my_space_space_usage":       spaceState,
+			"pvc_app_my_space_space_utilization": spaceState,
 		}
 	}
 
@@ -357,26 +361,26 @@ func TestCollector_Collect_VolumeStatsChartLifecycle(t *testing.T) {
 		wantCharts map[string][]string
 	}{
 		{
-			name:       "both PVCs",
-			series:     slices.Concat(data, cache),
-			wantPVCs:   []string{"app_cache", "app_data"},
-			wantCharts: allCharts([]string{"active"}, []string{"active"}),
+			name:       "all PVCs",
+			series:     slices.Concat(data, cache, space),
+			wantPVCs:   []string{"app_cache", "app_data", "app_my_space"},
+			wantCharts: allCharts([]string{"active"}, []string{"active"}, []string{"active"}),
 		},
 		{
 			name:       "cache disappears",
-			series:     data,
-			wantPVCs:   []string{"app_data"},
-			wantCharts: allCharts([]string{"active"}, []string{"removed"}),
+			series:     slices.Concat(data, space),
+			wantPVCs:   []string{"app_data", "app_my_space"},
+			wantCharts: allCharts([]string{"active"}, []string{"removed"}, []string{"active"}),
 		},
 		{
 			name:       "all disappear",
-			wantCharts: allCharts([]string{"removed"}, []string{"removed"}),
+			wantCharts: allCharts([]string{"removed"}, []string{"removed"}, []string{"removed"}),
 		},
 		{
 			name:       "cache reappears",
 			series:     cache,
 			wantPVCs:   []string{"app_cache"},
-			wantCharts: allCharts([]string{"removed"}, []string{"removed", "active"}),
+			wantCharts: allCharts([]string{"removed"}, []string{"removed", "active"}, []string{"removed"}),
 		},
 	}
 
@@ -393,7 +397,10 @@ func TestCollector_Collect_VolumeStatsChartLifecycle(t *testing.T) {
 
 		var pvcs []string
 		for key := range pvcMetricsOf(mx) {
-			pvc, _, _ := strings.Cut(strings.TrimPrefix(key, "pvc_"), "_space")
+			// the PVC ID ends at the last "_space_": the ID itself may contain it
+			end := strings.LastIndex(key, "_space_")
+			require.Positive(t, end, key)
+			pvc := key[len("pvc_"):end]
 			if !slices.Contains(pvcs, pvc) {
 				pvcs = append(pvcs, pvc)
 			}
