@@ -141,7 +141,7 @@ func TestRawGraphQLClient(t *testing.T) {
 				require.NotNil(t, device.Interfaces[0].Info)
 				require.Equal(
 					t,
-					int64(100000),
+					float64(100000),
 					derefZero(device.Interfaces[0].Info.UpstreamBandwidth),
 				)
 				require.NotEmpty(t, device.InterfacesLinkState)

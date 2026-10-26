@@ -18,6 +18,9 @@ type accountMetricsResult struct {
 }
 
 func (c *Collector) collectMetrics(ctx context.Context, sites map[string]*siteState) error {
+	for _, site := range sites {
+		site.MetricsCollection = "unavailable"
+	}
 	ids := append([]string(nil), c.discovery.siteIDs...)
 	if len(ids) == 0 {
 		for id := range sites {
@@ -41,7 +44,19 @@ func (c *Collector) collectMetrics(ctx context.Context, sites map[string]*siteSt
 			c.Debugf("accountMetrics query failed for site_id=%s, error_class=%s", result.siteID, classifyCatoError(result.err))
 			continue
 		}
-		for _, issue := range mergeMetrics(result.res, sites) {
+		issues := mergeMetrics(result.res, sites)
+		if site := sites[result.siteID]; site != nil {
+			for _, raw := range result.res.GetAccountMetrics().GetSites() {
+				if derefZero(raw.GetID()) == result.siteID {
+					site.MetricsCollection = "observed"
+					if len(issues) > 0 {
+						site.MetricsCollection = "partial"
+					}
+					break
+				}
+			}
+		}
+		for _, issue := range issues {
 			c.logNormalizationIssue(normalizationSurfaceMetrics, issue)
 		}
 	}
