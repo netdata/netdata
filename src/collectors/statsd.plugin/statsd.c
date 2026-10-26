@@ -141,6 +141,9 @@ typedef struct statsd_metric {
     RRDDIM *rd_value;               // the dimension of this metric value
     RRDDIM *rd_count;               // the dimension for the number of events received
     bool private_chart_counted;     // counted in statsd.private_charts, until the metric is deleted
+    bool linked_to_app;             // app chart dimensions point into this metric, it is never deleted
+
+    // the two above are written only by the flush thread, receivers update 'options' without atomics
 
     // linking, used for walking through all metrics
     struct statsd_metric *next_useful;
@@ -2166,6 +2169,7 @@ static inline void link_metric_to_app_dimension(STATSD_APP *app, STATSD_METRIC *
 
     chart->dimensions_linked_count++;
     m->options |= STATSD_METRIC_OPTION_USED_IN_APPS;
+    m->linked_to_app = true;
     netdata_log_debug(D_STATSD, "metric '%s' of type %u linked with app '%s', chart '%s', dimension '%s', algorithm '%s'", m->name, m->type, app->name, chart->id, dim->name, rrd_algorithm_name(dim->algorithm));
 }
 
@@ -2435,7 +2439,7 @@ static inline void statsd_flush_index_metrics(STATSD_INDEX *index, void (*flush_
         flush_metric(m);
 
         // metrics used in app charts are kept, the app chart dimensions point into them
-        if((m->options & STATSD_METRIC_OPTION_OBSOLETE) && !(m->options & STATSD_METRIC_OPTION_USED_IN_APPS)) {
+        if((m->options & STATSD_METRIC_OPTION_OBSOLETE) && !m->linked_to_app) {
             if(m_prev)
                 m_prev->next_useful = m_next;
             else
