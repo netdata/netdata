@@ -171,6 +171,7 @@ systemd_unit_allows_capability() {
 }
 
 check_systemd_capability_bounding_set() {
+    echo ">>> Checking systemd service capability bounding set."
     command -v getcap >/dev/null 2>&1 || return 0
 
     systemd_unit="$(find_netdata_systemd_unit)"
@@ -245,16 +246,19 @@ case $? in
     2) exit 3 ;;
 esac
 
+echo ">>> Checking /api/v1/info endpoint"
 curl -sfS http://127.0.0.1:19999/api/v1/info > /tmp/response || exit 1
-
-cat /tmp/response
 
 jq '.version' /tmp/response || exit 1
 
-curl -sfS http://127.0.0.1:19999/index.html || exit 1
-curl -sfS http://127.0.0.1:19999/v0/index.html || exit 1
-curl -sfS http://127.0.0.1:19999/v1/index.html || exit 1
-curl -sfS http://127.0.0.1:19999/v2/index.html || exit 1
+echo ">>> Checking /index.html"
+curl -sfS http://127.0.0.1:19999/index.html -o /dev/null|| exit 1
+echo ">>> Checking /v0/index.html"
+curl -sfS http://127.0.0.1:19999/v0/index.html -o /dev/null || exit 1
+echo ">>> Checking /v1/index.html"
+curl -sfS http://127.0.0.1:19999/v1/index.html -o /dev/null || exit 1
+echo ">>> Checking /v2/index.html"
+curl -sfS http://127.0.0.1:19999/v2/index.html -o /dev/null || exit 1
 
 NETDATA_LIBEXEC_PARTS="
 plugins.d/apps.plugin
@@ -287,12 +291,14 @@ if [ -d "${NETDATA_LIBEXEC_PREFIX}" ]; then
             continue
         fi
 
+        echo ">>> Checking permissions on ${part}"
         if [ ! -x "${NETDATA_LIBEXEC_PREFIX}/${part}" ]; then
             success=0
             echo "!!! ${NETDATA_LIBEXEC_PREFIX}/${part} is missing"
         fi
     done
 
+    echo ">>> Checking eBPF permissions"
     ebpf_plugin="${NETDATA_LIBEXEC_PREFIX}/plugins.d/ebpf.plugin"
     ebpf_go_plugin="${NETDATA_LIBEXEC_PREFIX}/plugins.d/ebpf-go.plugin"
     if [ -f "${ebpf_plugin}" ] && [ -f "${ebpf_go_plugin}" ]; then
