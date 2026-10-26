@@ -54,6 +54,31 @@ state where one stage changes another stage's inputs.
 - **Cross-cutting surfaces**: CASE regressions plus selector, option,
   anomaly-bit, rate, reset, update-every, and weights contracts complement
   the numbered layers.
+  CASE-040 independently checks late-enabled fine-to-coarse handoffs,
+  conventional coarse-to-fine tails on aligned 4-second output rows,
+  missed seam collections, retained islands, empty retention gaps,
+  post-gap coarse read-ahead, partial initial records, isolated head/tail
+  rows, shifted constant intervals, anomaly metadata, historical head
+  cadence, supported boundary/post-gap rows, and young-metric work budgets.
+  Its original normal-tier cases are single-tier controls; actual
+  conventional coverage requires reads from both tiers and does not establish
+  correctness of wider live-tail rows. Exact contracts assert fixture truth
+  and remain failing while the engine violates it. The partial-record fixture
+  places its largest value in the fine prefix omitted by the first coarse
+  record, so MAX independently detects prefix loss.
+  The shifted-seam contract follows a ruled coarse-estimate envelope: the
+  estimate stays between neighboring coarse-record averages derived from
+  the input, rather than choosing interpolation weights. Its fine control
+  still checks exact raw truth. The existing fixture yields bounds 200 and
+  10400/43; this admits ordinary coarse blending and rejects amplification
+  from the single fine spike. Engine anchoring remains a separate fix.
+  Retained fine data at the restart-hole boundaries (rows 720 and 1320) is
+  asserted under a separate red contract from wholly empty gap rows; this
+  limitation is not accepted as correct NULL output.
+  Remaining engine and harness work is tracked in
+  [the query follow-up issue](https://github.com/netdata/netdata/issues/24116),
+  with the unaligned RAM/ALLOC island-boundary regression tracked separately
+  in [issue 24115](https://github.com/netdata/netdata/issues/24115).
 - **Cloud boundary**: this repository does not run `cloud-charts-service` or
   `DataV2Aggregator`; the manifest's Cloud column is reserved for external
   replay and status tracking.
