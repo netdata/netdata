@@ -11,8 +11,6 @@
 #  - IS_NETDATA_STATIC_BINARY
 #  - NETDATA_CONFIGURE_OPTIONS
 #  - REINSTALL_OPTIONS
-#  - NETDATA_TARBALL_URL
-#  - NETDATA_TARBALL_CHECKSUM_URL
 #  - NETDATA_TARBALL_CHECKSUM
 #  - NETDATA_PREFIX
 #  - NETDATA_LIB_DIR
@@ -20,9 +18,10 @@
 # Optional environment options:
 #
 #  - TMPDIR (set to a usable temporary directory)
-#  - NETDATA_BASE_URL (set the base url for downloading the dist tarball)
+#  - NETDATA_BASE_URL (legacy release/repository base URL override)
+#  - NETDATA_ARTIFACT_URL_PREFIX (override the release artifact directory)
 
-# Next unused error code: U002A
+# Next unused error code: U002E
 
 set -e
 
@@ -32,6 +31,7 @@ NETDATA_STABLE_BASE_URL="${NETDATA_BASE_URL:-https://github.com/netdata/netdata/
 NETDATA_NIGHTLY_BASE_URL="${NETDATA_BASE_URL:-https://github.com/netdata/netdata-nightlies/releases}"
 NETDATA_STABLE_REPO_URL="${NETDATA_BASE_URL:-https://repository.netdata.cloud/repos/stable}"
 NETDATA_NIGHTLY_REPO_URL="${NETDATA_BASE_URL:-https://repository.netdata.cloud/repos/edge}"
+RELEASE_ARTIFACT_URL_PREFIX="https://artifacts.netdata.cloud"
 NETDATA_DEFAULT_ACCEPT_MAJOR_VERSIONS="1 2"
 
 # Following variables are intended to be overridden by the updater config file.
@@ -857,7 +857,7 @@ self_update() {
     create_exec_tmp_directory
     cd "${ndtmpdir}" || exit 1
 
-    if _safe_download "https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-updater.sh" ./netdata-updater.sh; then
+    if _safe_download "${RELEASE_ARTIFACT_URL_PREFIX}/installer/netdata-updater.sh" ./netdata-updater.sh; then
       chmod +x ./netdata-updater.sh || exit 1
       export ENVIRONMENT_FILE="${ENVIRONMENT_FILE}"
 
@@ -942,11 +942,27 @@ parse_version() {
 
 get_latest_tag() {
   if [ -z "${_latest_tag}" ]; then
-    case "${1}" in
-      stable) _latest_tag="$(get_netdata_latest_tag "${NETDATA_STABLE_BASE_URL}")" ;;
-      nightly) _latest_tag="$(get_netdata_latest_tag "${NETDATA_NIGHTLY_BASE_URL}")" ;;
-      *) warning "Unknown release channel ${1}, updating may not work correctly" ; _latest_tag="" ;;
-    esac
+    # A selected Manifest source also supplies Version. Do not silently compare
+    # against a different release source if its metadata cannot be downloaded.
+    if [ "${NETDATA_MANIFEST_INSTALL:-0}" -eq 1 ]; then
+      download "${NETDATA_TARBALL_URL_PREFIX}/Version" "${ndtmpdir}/Version"
+      _latest_tag="$(cat "${ndtmpdir}/Version")"
+      [ -n "${_latest_tag}" ] || fatal "Release Version file is empty" U002B
+    elif [ -z "${NETDATA_BASE_URL}" ] && [ -z "${NETDATA_OFFLINE_INSTALL_SOURCE}" ] &&
+         { [ "${1}" = stable ] || [ "${1}" = nightly ]; }; then
+      create_exec_tmp_directory
+      if _safe_download "${NETDATA_ARTIFACT_URL_PREFIX:-${RELEASE_ARTIFACT_URL_PREFIX}/${1}/latest}/Version" "${ndtmpdir}/Version"; then
+        _latest_tag="$(cat "${ndtmpdir}/Version")"
+      fi
+    fi
+
+    if [ -z "${_latest_tag}" ]; then
+      case "${1}" in
+        stable) _latest_tag="$(get_netdata_latest_tag "${NETDATA_STABLE_BASE_URL}")" ;;
+        nightly) _latest_tag="$(get_netdata_latest_tag "${NETDATA_NIGHTLY_BASE_URL}")" ;;
+        *) warning "Unknown release channel ${1}, updating may not work correctly" ; _latest_tag="" ;;
+      esac
+    fi
   fi
 
   echo "${_latest_tag}"
@@ -976,7 +992,8 @@ get_current_version() {
 }
 
 get_latest_version() {
-  parse_version "$(get_latest_tag "${RELEASE_CHANNEL}")"
+  latest_tag="$(get_latest_tag "${RELEASE_CHANNEL}")" || return 1
+  parse_version "${latest_tag}"
 }
 
 update_available() {
@@ -986,7 +1003,7 @@ update_available() {
   fi
 
   current_version="$(get_current_version)"
-  latest_version="$(get_latest_version)"
+  latest_version="$(get_latest_version)" || fatal "Unable to determine latest version" U002B
 
   info "Current Version: ${current_version}"
   info "Latest Version: ${latest_version}"
@@ -1025,38 +1042,90 @@ update_available() {
 }
 
 set_tarball_urls() {
-  filename="netdata-latest.tar"
+  case "${1}" in
+    stable|nightly) ;;
+    *) fatal "Unknown release channel ${1}, unable to update" U0029 ;;
+  esac
 
-  if [ "$2" = "yes" ]; then
-    if [ -e /opt/netdata/etc/netdata/.install-type ]; then
-      # shellcheck disable=SC1091
-      . /opt/netdata/etc/netdata/.install-type
-      [ -z "${PREBUILT_ARCH:-}" ] && PREBUILT_ARCH="$(uname -m)"
-      filename="netdata-${PREBUILT_ARCH}-latest.gz.run"
-    else
-      filename="netdata-x86_64-latest.gz.run"
+  archive_base_name="netdata-latest.tar"
+  if [ "${2}" = yes ]; then
+    sysarch="${PREBUILT_ARCH:-$(uname -m)}"
+    archive_base_name="netdata-${sysarch}-latest.gz.run"
+  fi
+
+  NETDATA_MANIFEST_INSTALL=0
+  prefix_set=0
+  if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
+    path="$(cd "${NETDATA_OFFLINE_INSTALL_SOURCE}" && pwd)" || fatal "Invalid offline install source" U002A
+    NETDATA_TARBALL_URL_PREFIX="file://${path}"
+    prefix_set=1
+  elif [ -n "${NETDATA_ARTIFACT_URL_PREFIX}" ]; then
+    NETDATA_TARBALL_URL_PREFIX="${NETDATA_ARTIFACT_URL_PREFIX}"
+    prefix_set=1
+  elif [ -z "${NETDATA_BASE_URL}" ]; then
+    NETDATA_TARBALL_URL_PREFIX="${RELEASE_ARTIFACT_URL_PREFIX}/${1}/latest"
+  else
+    # Preserve the legacy override used by existing local mirrors and CI.
+    NETDATA_TARBALL_URL_PREFIX=""
+  fi
+
+  if [ -n "${NETDATA_TARBALL_URL_PREFIX}" ] &&
+     check_for_remote_file "${NETDATA_TARBALL_URL_PREFIX}/Manifest"; then
+    NETDATA_MANIFEST_INSTALL=1
+  elif [ "${prefix_set}" -eq 0 ]; then
+    case "${1}" in
+      stable) release_base="${NETDATA_STABLE_BASE_URL}" ;;
+      nightly) release_base="${NETDATA_NIGHTLY_BASE_URL}" ;;
+    esac
+    latest="$(get_netdata_latest_tag "${release_base}")"
+    [ -n "${latest}" ] || fatal "Unable to determine latest release" U0029
+    _latest_tag="${latest}"
+    NETDATA_TARBALL_URL_PREFIX="${release_base}/download/${latest}"
+    if check_for_remote_file "${NETDATA_TARBALL_URL_PREFIX}/Manifest"; then
+      NETDATA_MANIFEST_INSTALL=1
     fi
   fi
 
-  export archive_base_name="${filename}"
+  NETDATA_TARBALL_CHECKSUM_URL="${NETDATA_TARBALL_URL_PREFIX}/sha256sums.txt"
+}
 
-  if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
-    path="$(cd "${NETDATA_OFFLINE_INSTALL_SOURCE}" || exit 1; pwd)"
-    export NETDATA_TARBALL_URL="file://${path}/${filename}"
-    export NETDATA_TARBALL_CHECKSUM_URL="file://${path}/sha256sums.txt"
+# Like kickstart, prefer a versioned entry over a latest alias.
+manifest_archive_name() {
+  archive_info="$(grep -E "${1}" ./Manifest || true)"
+  if [ "$(echo "${archive_info}" | wc -l)" -gt 1 ]; then
+    archive_info="$(echo "${archive_info}" | grep -v '.*-latest.*' | tail -n 1)"
+  fi
+  echo "${archive_info}" | awk '{ print $1 }'
+}
+
+fetch_release_metadata() {
+  if [ "${NETDATA_MANIFEST_INSTALL}" -eq 1 ]; then
+    download "${NETDATA_TARBALL_URL_PREFIX}/Manifest" ./Manifest
   else
-    latest="$(get_latest_tag "${1}")"
-    [ -z "${latest}" ] && fatal "Unknown release channel ${1}, unable to update" U0029
-    case "${1}" in
-      stable)
-        export NETDATA_TARBALL_URL="${NETDATA_STABLE_BASE_URL}/download/${latest}/${filename}"
-        export NETDATA_TARBALL_CHECKSUM_URL="${NETDATA_STABLE_BASE_URL}/download/${latest}/sha256sums.txt"
-        ;;
-      nightly)
-        export NETDATA_TARBALL_URL="${NETDATA_NIGHTLY_BASE_URL}/download/${latest}/${filename}"
-        export NETDATA_TARBALL_CHECKSUM_URL="${NETDATA_NIGHTLY_BASE_URL}/download/${latest}/sha256sums.txt"
-        ;;
-    esac
+    download "${NETDATA_TARBALL_CHECKSUM_URL}" ./sha256sums.txt
+  fi
+}
+
+# Verify the selected file, using the same filename/size/SHA256 contract as
+# kickstart. Exact field matching avoids treating filenames as regular expressions.
+verify_manifest() {
+  required_file="${1}"
+  [ -n "${required_file}" ] && [ -r "${required_file}" ] ||
+    fatal "Release archive is missing or unreadable" U002B
+
+  if [ "${NETDATA_MANIFEST_INSTALL}" -eq 1 ]; then
+    file_info="$(awk -v name="${required_file}" '$1 == name { print $2, $3 }' ./Manifest)"
+    file_size="$(echo "${file_info}" | awk '{ print $1 }')"
+    file_hash="$(echo "${file_info}" | awk '{ print $2 }')"
+    actual_size="$(wc -c < "${required_file}" | tr -d ' ')"
+    [ "${actual_size}" = "${file_size}" ] ||
+      fatal "Invalid or missing Manifest size for ${required_file}" U002C
+  else
+    file_hash="$(awk -v name="${required_file}" '{ f = $2; sub(/^\*/, "", f); sub(/^\.\//, "", f); if (f == name) print $1 }' ./sha256sums.txt)"
+  fi
+
+  if [ -z "${file_hash}" ] || ! echo "${file_hash} *${required_file}" | safe_sha256sum -c - >&3 2>&3; then
+    fatal "Archive checksum validation failed for ${required_file}. Leaving archive in ${ndtmpdir}. Retry later in case an older copy was cached upstream." U002D
   fi
 }
 
@@ -1072,13 +1141,20 @@ update_build() {
   install_build_dependencies
 
   if update_available; then
-    download "${NETDATA_TARBALL_CHECKSUM_URL}" "${ndtmpdir}/sha256sum.txt" >&3 2>&3
+    fetch_release_metadata >&3 2>&3
 
     archive_name=""
 
-    if [ -n "${zstd}" ]; then
-      if _safe_download "${NETDATA_TARBALL_URL}.zst" "${ndtmpdir}/${archive_base_name}.zst"; then
-        archive_name="${archive_base_name}.zst"
+    zstd_name="${archive_base_name}.zst"
+    gzip_name="${archive_base_name}.gz"
+    if [ "${NETDATA_MANIFEST_INSTALL}" -eq 1 ]; then
+      zstd_name="$(manifest_archive_name '^netdata-.*\.tar\.zst ')"
+      gzip_name="$(manifest_archive_name '^netdata-.*\.tar\.gz ')"
+    fi
+
+    if [ -n "${zstd}" ] && [ -n "${zstd_name}" ]; then
+      if _safe_download "${NETDATA_TARBALL_URL_PREFIX}/${zstd_name}" "${ndtmpdir}/${zstd_name}"; then
+        archive_name="${zstd_name}"
         decompress="${zstd} -dc"
       else
         warning "Failed to download zstd compressed source archive, trying gzip compressed source archive as a fallback."
@@ -1086,25 +1162,23 @@ update_build() {
     fi
 
     if [ -z "${archive_name}" ]; then
-      if download "${NETDATA_TARBALL_URL}.gz" "${ndtmpdir}/${archive_base_name}.gz"; then
-        archive_name="${archive_base_name}.gz"
+      [ -n "${gzip_name}" ] || fatal "No usable source archive in Manifest" U002B
+      if download "${NETDATA_TARBALL_URL_PREFIX}/${gzip_name}" "${ndtmpdir}/${gzip_name}"; then
+        archive_name="${gzip_name}"
         decompress="$(command -v gzip 2>/dev/null) -dc"
       fi
     fi
 
-    if [ -n "${NETDATA_TARBALL_CHECKSUM}" ] &&
-      grep "${NETDATA_TARBALL_CHECKSUM}" sha256sum.txt >&3 2>&3 &&
-      [ "$NETDATA_FORCE_UPDATE" != "1" ]; then
+    verify_manifest "${archive_name}"
+    NEW_CHECKSUM="$(safe_sha256sum "${archive_name}" 2> /dev/null | cut -d' ' -f1)"
+    if [ "${NETDATA_TARBALL_CHECKSUM}" = "${NEW_CHECKSUM}" ] &&
+       [ "$NETDATA_FORCE_UPDATE" != "1" ]; then
       info "Newest version is already installed"
     else
-      if ! grep "${archive_name}" sha256sum.txt | safe_sha256sum -c - >&3 2>&3; then
-        fatal "Tarball checksum validation failed. Stopping netdata upgrade and leaving tarball in ${ndtmpdir}\nUsually this is a result of an older copy of the tarball or checksum file being cached somewhere upstream and can be resolved by retrying in an hour." U0008
-      fi
-      NEW_CHECKSUM="$(safe_sha256sum "${archive_name}" 2> /dev/null | cut -d' ' -f1)"
       ${decompress} "${archive_name}" | tar -xf - >&3 2>&3
       rm "${archive_name}" >&3 2>&3
       if [ -z "$path_version" ]; then
-        latest_tag="$(get_latest_tag)"
+        latest_tag="$(get_latest_tag "${RELEASE_CHANNEL:-nightly}")" || fatal "Unable to determine source version" U002B
         path_version="$(echo "${latest_tag}" | cut -f 1 -d "-")"
       fi
       cd "$(find . -maxdepth 1 -type d -name "netdata-${path_version}*" | head -n 1)" || fatal "Failed to switch to build directory" U0017
@@ -1190,13 +1264,14 @@ update_static() {
   cd "${ndtmpdir}" || fatal "Failed to change current working directory to ${ndtmpdir}" U0019
 
   if update_available; then
-    sysarch="${PREBUILT_ARCH}"
-    [ -z "$sysarch" ] && sysarch="$(uname -m)"
-    download "${NETDATA_TARBALL_CHECKSUM_URL}" "${ndtmpdir}/sha256sum.txt"
-    download "${NETDATA_TARBALL_URL}" "${ndtmpdir}/netdata-${sysarch}-latest.gz.run"
-    if ! grep "netdata-${sysarch}-latest.gz.run" "${ndtmpdir}/sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
-      fatal "Static binary checksum validation failed. Stopping netdata installation and leaving binary in ${ndtmpdir}\nUsually this is a result of an older copy of the file being cached somewhere and can be resolved by simply retrying in an hour." U000A
+    fetch_release_metadata
+    archive_name="${archive_base_name}"
+    if [ "${NETDATA_MANIFEST_INSTALL}" -eq 1 ]; then
+      archive_name="$(manifest_archive_name "^netdata-${sysarch}-.*\\.run ")"
+      [ -n "${archive_name}" ] || fatal "No static archive for ${sysarch} in Manifest" U002B
     fi
+    download "${NETDATA_TARBALL_URL_PREFIX}/${archive_name}" "${ndtmpdir}/${archive_name}"
+    verify_manifest "${archive_name}"
 
     if [ -e /opt/netdata/etc/netdata/.install-type ] ; then
       install_type="$(cat /opt/netdata/etc/netdata/.install-type)"
@@ -1206,7 +1281,7 @@ update_static() {
 
     # Do not pass any options other than the accept, for now
     # shellcheck disable=SC2086
-    if sh "${ndtmpdir}/netdata-${sysarch}-latest.gz.run" --accept -- ${REINSTALL_OPTIONS} >&3 2>&3; then
+    if sh "${ndtmpdir}/${archive_name}" --accept -- ${REINSTALL_OPTIONS} >&3 2>&3; then
       rm -r "${ndtmpdir}"
     else
       info "NOTE: did not remove: ${ndtmpdir}"
@@ -1456,8 +1531,11 @@ update_binpkg() {
     fi
   fi
 
+  # Keep ownership of metadata downloads outside command substitutions so the
+  # EXIT trap can clean them up even when updater self-update was skipped.
+  create_exec_tmp_directory
   current_version="$(get_current_version)"
-  latest_version="$(get_latest_version)"
+  latest_version="$(get_latest_version)" || fatal "Unable to determine latest version" U002B
 
   if [ "${RELEASE_CHANNEL}" != "none" ] && [ "${current_version}" -ne 0 ] && [ "${latest_version}" -ne 0 ]; then
     if [ "${current_version}" -lt "${latest_version}" ] && [ "${initial_version}" -eq "${current_version}" ]; then
@@ -1627,7 +1705,7 @@ case "${INSTALL_TYPE}" in
       ;;
     *-static*)
       validate_environment_file
-      set_tarball_urls "${RELEASE_CHANNEL:-nightly}" "${IS_NETDATA_STATIC_BINARY}"
+      set_tarball_urls "${RELEASE_CHANNEL:-nightly}" yes
       update_static && exit 0
       ;;
     *binpkg*) update_binpkg && exit 0 ;;
