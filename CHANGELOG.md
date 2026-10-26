@@ -243,6 +243,18 @@
 - Ci: run the Rust workspace tests when Rust code changes ([#24396](https://github.com/netdata/netdata/issues/24396))
 - Fix(go.d): keep function payload lines out of command parsing ([#24410](https://github.com/netdata/netdata/issues/24410))
 - Fix(functions): require strict JSON function payloads ([#24409](https://github.com/netdata/netdata/issues/24409))
+- Build: update installer Go archives to 1.27.3 ([#24411](https://github.com/netdata/netdata/issues/24411))
+- Treat a negative IP match as final in connection_allowed ([#24404](https://github.com/netdata/netdata/issues/24404))
+- Fix(metrix): refresh vector handles when host metadata changes ([#24415](https://github.com/netdata/netdata/issues/24415))
+- Microsoft Message Queue (Windows.plugin) ([#22102](https://github.com/netdata/netdata/issues/22102))
+- Fix(ebpf): use compiled-in directories when the plugin runs with elevated privileges ([#24412](https://github.com/netdata/netdata/issues/24412))
+- Pluginsd: hold a reference to an obsolete scope chart ([#24338](https://github.com/netdata/netdata/issues/24338))
+- Exchange (windows.plugin) ([#22117](https://github.com/netdata/netdata/issues/22117))
+- Dbengine: close only the journal files a journal owns, and reject unmappable journals v2 ([#24419](https://github.com/netdata/netdata/issues/24419))
+- Streaming: remove the h2o upgrade path from the sender ([#24426](https://github.com/netdata/netdata/issues/24426))
+- Aclk: MQTT keepalive starved by traffic and tied to the wall clock ([#24427](https://github.com/netdata/netdata/issues/24427))
+- Rrd_fix: Fix windows issue when having 32 bit interval ([#24429](https://github.com/netdata/netdata/issues/24429))
+- Feat(go.d/cloudwatch): add RDS engine, engine version and instance class labels ([#24430](https://github.com/netdata/netdata/issues/24430))
 
 ## [2.12.0] - 2026-09-30
 

@@ -4,6 +4,9 @@
 #ifdef OS_WINDOWS
 void sync_uv_file_data(uv_file file)
 {
+    if (file < 0)
+        return;
+
     uv_fs_t req;
     (void) uv_fs_fsync(NULL, &req, file, NULL);
     uv_fs_req_cleanup(&req);

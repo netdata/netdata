@@ -3758,13 +3758,12 @@ No query parameters
 54. ✅ `protobuf` - boolean - Protobuf support
 55. ✅ `webrtc` - boolean - WebRTC support
 56. ✅ `native_https` - boolean - Native HTTPS support
-57. ✅ `h2o` - boolean - H2O web server support
-58. ✅ `mqtt` - boolean - MQTT support
-59. ✅ `ml` - boolean - Machine learning support
+57. ✅ `mqtt` - boolean - MQTT support
+58. ✅ `ml` - boolean - Machine learning support
 
 ### VERIFICATION SUMMARY
 **Parameters Verified:** 0
-**Response Fields Verified:** 59
+**Response Fields Verified:** 58
 **Security:** `HTTP_ACL_NODES` + `HTTP_ACCESS_ANONYMOUS_DATA`
 **Dual-Agent Agreement:** ✅ Agent confirmed comprehensive agent info structure
 

@@ -20,6 +20,7 @@ func (c *Collector) collect(ctx context.Context) error {
 		return err
 	}
 	c.refreshTags(ctx)
+	c.refreshAttributes(ctx)
 
 	plan, err := c.currentQueryPlan()
 	if err != nil {

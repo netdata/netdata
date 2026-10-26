@@ -906,15 +906,15 @@ HTTP_VALIDATION http_request_validate(struct web_client *w) {
 
                 char c = *ue;
                 *ue = '\0';
-                bool decoded = web_client_decode_path_and_query_string(w, encoded_url);
+                HTTP_VALIDATION decoded = web_client_decode_path_and_query_string(w, encoded_url);
                 *ue = c;
 
-                if(unlikely(!decoded)) {
+                if(unlikely(decoded != HTTP_VALIDATION_OK)) {
                     w->header_parse_tries = 0;
                     w->header_parse_last_size = 0;
                     w->header_parse_expected_size = 0;
                     web_client_disable_wait_receive(w);
-                    return HTTP_VALIDATION_URI_TOO_LONG;
+                    return decoded;
                 }
 
                 if ( (web_client_check_conn_tcp(w)) && (netdata_ssl_web_server_ctx) ) {
@@ -2208,9 +2208,9 @@ static bool web_client_ensure_url_decode_buffer(struct web_client *w, const char
     return true;
 }
 
-bool web_client_decode_path_and_query_string(struct web_client *w, const char *path_and_query_string) {
+HTTP_VALIDATION web_client_decode_path_and_query_string(struct web_client *w, const char *path_and_query_string) {
     if(unlikely(!web_client_ensure_url_decode_buffer(w, path_and_query_string)))
-        return false;
+        return HTTP_VALIDATION_URI_TOO_LONG;
 
     char *buffer = w->url_decode_buffer;
 
@@ -2229,7 +2229,9 @@ bool web_client_decode_path_and_query_string(struct web_client *w, const char *p
     if(w->mode == HTTP_REQUEST_MODE_STREAM) {
         // in stream mode, there is no path
 
-        url_decode_r(buffer, path_and_query_string, w->url_decode_buffer_size);
+        if(unlikely(!url_decode_r(buffer, path_and_query_string, w->url_decode_buffer_size)))
+            return HTTP_VALIDATION_MALFORMED_URL;
+
         buffer_strcat(w->url_query_string_decoded, buffer);
     }
     else {
@@ -2239,7 +2241,8 @@ bool web_client_decode_path_and_query_string(struct web_client *w, const char *p
         // dictionary and decode each of the parameters individually.
         // OR: in url_query_string_decoded use as separator a control character that cannot appear in the URL.
 
-        url_decode_r(buffer, path_and_query_string, w->url_decode_buffer_size);
+        if(unlikely(!url_decode_r(buffer, path_and_query_string, w->url_decode_buffer_size)))
+            return HTTP_VALIDATION_MALFORMED_URL;
 
         char *question_mark_start = strchr(buffer, '?');
         if (question_mark_start) {
@@ -2268,7 +2271,7 @@ bool web_client_decode_path_and_query_string(struct web_client *w, const char *p
             web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_IS_MCP);
     }
 
-    return true;
+    return HTTP_VALIDATION_OK;
 }
 
 void web_client_reuse_from_cache(struct web_client *w) {
