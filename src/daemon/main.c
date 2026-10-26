@@ -214,6 +214,7 @@ int help(int exitcode) {
     } while(0)
 
 int buffer_unittest(void);
+int url_unittest(void);
 int ringbuffer_unittest(void);
 int onewayalloc_unittest(void);
 int log_stack_unittest(void);
@@ -510,6 +511,7 @@ int netdata_main(int argc, char **argv) {
                             if (unit_test_buffer()) return 1;
                             if (unit_test_str2ld()) return 1;
                             if (buffer_unittest()) return 1;
+                            if (url_unittest()) return 1;
                             if (api_v1_allmetrics_json_unittest()) return 1;
                             if (exporting_json_connector_unittest()) return 1;
                             if (exporting_graphite_unittest()) return 1;
