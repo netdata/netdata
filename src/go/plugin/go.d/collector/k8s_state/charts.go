@@ -1009,7 +1009,7 @@ func (c *Collector) addPVCCharts(ps *pvcState) {
 	charts := pvcChartsTmpl.Copy()
 
 	for _, chart := range *charts {
-		chart.ID = fmt.Sprintf(chart.ID, replaceDots(ps.id()))
+		chart.ID = fmt.Sprintf(chart.ID, ps.chartID())
 		chart.Labels = []collectorapi.Label{
 			{Key: labelKeyClusterID, Value: c.kubeClusterID, Source: collectorapi.LabelSourceK8s},
 			{Key: labelKeyClusterName, Value: c.kubeClusterName, Source: collectorapi.LabelSourceK8s},
@@ -1027,7 +1027,8 @@ func (c *Collector) addPVCCharts(ps *pvcState) {
 }
 
 func (c *Collector) removePVCCharts(ps *pvcState) {
-	c.removeCharts("pvc", ps.id())
+	// chartID has no dots, so replaceDots in isObjectChart leaves it unchanged.
+	c.removeCharts("pvc", ps.chartID())
 }
 
 func (c *Collector) removeCharts(kind, id string) {

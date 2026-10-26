@@ -128,7 +128,8 @@ func (d *kubeDiscovery) canListWatchPVCs(ctx context.Context) bool {
 		resp, err := d.client.AuthorizationV1().SelfSubjectAccessReviews().Create(ctx, review, metav1.CreateOptions{})
 		if err != nil {
 			d.Warningf("PersistentVolumeClaim metrics disabled: cannot check if the service account can %s "+
-				"persistentvolumeclaims: %v", verb, err)
+				"persistentvolumeclaims: %v (the check runs only at startup, restart the collector to retry)",
+				verb, err)
 			return false
 		}
 		if !resp.Status.Allowed {
@@ -138,7 +139,8 @@ func (d *kubeDiscovery) canListWatchPVCs(ctx context.Context) bool {
 
 	if len(denied) > 0 {
 		d.Warningf("PersistentVolumeClaim metrics disabled: the service account cannot %s persistentvolumeclaims "+
-			"(grant them in the ClusterRole)", strings.Join(denied, "/"))
+			"(grant them in the ClusterRole and restart the collector, the check runs only at startup)",
+			strings.Join(denied, "/"))
 		return false
 	}
 
