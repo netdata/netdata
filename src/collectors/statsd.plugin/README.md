@@ -466,7 +466,7 @@ Example of a timer metric chart:
 
 For performance reasons, Netdata limits private charts. The `max private charts hard limit` (default: 1000) controls this. Metrics above this limit can still be used in synthetic charts.
 
-For ephemeral metrics, set `set charts as obsolete after` in the `[statsd]` section. When a metric receives no data for that long, its private chart is marked obsolete and the metric is removed. If the metric arrives again later, it is created again together with its private chart. Obsolete charts are deleted after `cleanup obsolete charts after` in the `[db]` section.
+For ephemeral metrics, set `set charts as obsolete after` in the `[statsd]` section. When a metric that has a private chart receives no data for that long, the chart is marked obsolete and the metric is removed. Metrics without a private chart (not matched by `create private charts for metrics matching`, or over `max private charts hard limit`) are never removed. If the metric arrives again later, it is created again together with its private chart. Obsolete charts are deleted after `cleanup obsolete charts after` in the `[db]` section.
 
 Metrics used in synthetic charts are not removed, because the synthetic charts keep using them: only their private chart is marked obsolete. A synthetic chart dimension that matches metrics by pattern therefore keeps every metric name it has matched.
 
