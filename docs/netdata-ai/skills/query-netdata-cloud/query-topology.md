@@ -24,10 +24,25 @@ Known producer families:
 | `topology:network-connections` | Network Viewer plugin | process, endpoint, socket evidence |
 | `topology:streaming` | Netdata streaming subsystem | parent/child streaming graph |
 | `topology:snmp` | SNMP topology collector | L2 devices, interfaces, endpoints, adjacencies |
-| `topology:vsphere` | vSphere collector (planned) | inventory and virtualization relationships |
+| `topology:vsphere` | vSphere collector | inventory and virtualization relationships |
+| `topology:cato_networks` | Cato Networks collector | sites, devices, interface tunnels, PoPs and BGP peers |
 
 Always start with an info request to discover the parameters supported by the
 Agent version you are querying.
+
+## Cato Networks instances and labels
+
+Query `topology:cato_networks` with `info:true` first. When `required_params`
+contains `__job`, select an advertised instance through
+`selections.__job: ["INSTANCE_ID"]` for the data request. Do not assume a site
+vnode hosts the Function; discover the collector's reachable Agent.
+
+In payloads with actor-label support, `data.tables.actor.actor_labels` contains
+the metadata and each actor type's `presentation.modal.labels` declares its
+display recipe. Graph names instead come from actor columns selected by
+`presentation.label_policy`; missing metadata labels and missing graph names
+are different symptoms. Count incident graph links to investigate isolated
+actors: `parent_identity` alone is not an explicit edge in `data.links`.
 
 ## Network-connections grouping
 

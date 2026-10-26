@@ -16,6 +16,11 @@ const (
 	topologyLayer  = "network"
 )
 
+type topologySite struct {
+	*siteState
+	devices []deviceState
+}
+
 func buildTopology(
 	accountID string,
 	sites map[string]*siteState,
@@ -28,7 +33,7 @@ func buildTopology(
 	interfaces := topologyv1.NewTableBuilder(catoTopologyInterfaceColumns()...)
 
 	actorIndexes := make(map[string]int, len(order)*2)
-	popSeen := make(map[string]bool)
+	topologySites := make([]topologySite, 0, len(order))
 
 	for _, siteID := range order {
 		site := sites[siteID]
@@ -36,24 +41,24 @@ func buildTopology(
 			continue
 		}
 
+		view := topologySite{
+			siteState: site,
+			devices:   topologyDevices(site.Devices),
+		}
+		topologySites = append(topologySites, view)
 		siteActorID := catoSiteActorID(site.ID)
 		siteActorIndex := addSiteActor(actors, stringsDict, accountID, site, siteActorID)
 		actorIndexes[siteActorID] = siteActorIndex
-		deviceActors := addDeviceTopology(actors, links, stringsDict, actorIndexes, popSeen, accountID, site)
-		addInterfaceTopologyTable(interfaces, siteActorIndex, deviceActors, site)
-
-		if len(deviceActors) == 0 && site.PopName != "" {
-			popActorID := catoPopActorID(site.PopName)
-			if !popSeen[site.PopName] {
-				popSeen[site.PopName] = true
-				actorIndexes[popActorID] = addPopActor(actors, stringsDict, accountID, site.PopName, popActorID)
-			}
-			addSitePopLink(links, stringsDict, site, siteActorIndex, actorIndexes[popActorID])
-		}
+		addDeviceTopology(actors, links, stringsDict, actorIndexes, accountID, view, siteActorIndex)
+		addInterfaceTopology(actors, links, interfaces, stringsDict, actorIndexes, accountID, view)
 
 		addBGPPeerTopology(actors, links, stringsDict, actorIndexes, site, siteActorIndex)
 	}
 
+	labels, err := buildCatoTopologyLabels(stringsDict, accountID, topologySites, actorIndexes)
+	if err != nil {
+		return nil, fmt.Errorf("actor labels table: %w", err)
+	}
 	actorTable, err := actors.Table()
 	if err != nil {
 		return nil, fmt.Errorf("actors table: %w", err)
@@ -90,6 +95,10 @@ func buildTopology(
 		Links:        linkTable,
 		Tables: &topologyv1.DetailTables{
 			Actor: map[string]topologyv1.DetailTable{
+				catofunc.ActorTableLabels: {
+					Type:  catofunc.ActorTableLabels,
+					Table: labels,
+				},
 				catofunc.ActorTableInterfaces: {
 					Type:  catofunc.ActorTableInterfaces,
 					Table: interfaceTable,
@@ -101,6 +110,7 @@ func buildTopology(
 			"links": links.Rows(),
 		},
 	}
+	data.Notifications = catoTopologyNotifications(sites, order)
 	return data, nil
 }
 
@@ -111,32 +121,24 @@ func addSiteActor(
 	site *siteState,
 	siteActorID string,
 ) int {
-	return table.Add(
-		dict.Ref(catofunc.ActorTypeSite),
-		dict.Ref(topologyLayer),
-		siteActorID,
-		site.Name,
-		site.Description,
-		accountID,
-		site.ID,
-		"",
-		site.PopName,
-		"",
-		"",
-		site.ConnectivityStatus,
-		site.OperationalStatus,
-		site.SiteType,
-		site.ConnectionType,
-		site.CountryCode,
-		site.CountryName,
-		site.Region,
-		optionalInt64(site.HostCount),
-		nil,
-		"",
-		"",
-		"",
-		nil,
-	)
+	return (topologyActorRow{
+		Type:               catofunc.ActorTypeSite,
+		Layer:              topologyLayer,
+		ID:                 siteActorID,
+		DisplayName:        site.Name,
+		Description:        site.Description,
+		AccountID:          accountID,
+		SiteID:             site.ID,
+		PopName:            site.PopName,
+		ConnectivityStatus: site.ConnectivityStatus,
+		OperationalStatus:  site.OperationalStatus,
+		SiteType:           site.SiteType,
+		ConnectionType:     site.ConnectionType,
+		CountryCode:        site.CountryCode,
+		CountryName:        site.CountryName,
+		Region:             site.Region,
+		HostCount:          site.HostCount,
+	}).addTo(table, dict)
 }
 
 func addPopActor(
@@ -144,73 +146,54 @@ func addPopActor(
 	dict *topologyv1.StringDictionary,
 	accountID, popName, popActorID string,
 ) int {
-	return table.Add(
-		dict.Ref(catofunc.ActorTypePop),
-		dict.Ref(topologyLayer),
-		popActorID,
-		popName,
-		"",
-		accountID,
-		"",
-		"",
-		popName,
-		"",
-		"",
-		"",
-		"",
-		"",
-		"",
-		"",
-		"",
-		"",
-		nil,
-		nil,
-		"",
-		"",
-		"",
-		nil,
-	)
+	return (topologyActorRow{
+		Type:        catofunc.ActorTypePop,
+		Layer:       topologyLayer,
+		ID:          popActorID,
+		DisplayName: popName,
+		AccountID:   accountID,
+		PopName:     popName,
+	}).addTo(table, dict)
 }
 
 func addSitePopLink(
 	table *topologyv1.TableBuilder,
 	dict *topologyv1.StringDictionary,
-	site *siteState,
 	siteActor, popActor int,
 ) {
-	table.Add(
-		dict.Ref(catofunc.LinkTypeTunnel),
-		siteActor,
-		popActor,
-		dict.Ref("cato"),
-		dict.Ref(site.ConnectivityStatus),
-		dict.Ref("bidirectional"),
-		1,
-		trafficMetricValue(site.Metrics, trafficMetricBytesUpstreamMax, site.Metrics.BytesUpstreamMax),
-		trafficMetricValue(site.Metrics, trafficMetricBytesDownstreamMax, site.Metrics.BytesDownstreamMax),
-		trafficMetricValue(site.Metrics, trafficMetricLostUpstreamPercent, site.Metrics.LostUpstreamPercent),
-		trafficMetricValue(site.Metrics, trafficMetricRTTMS, site.Metrics.RTTMS),
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-	)
+	(topologyLinkRow{
+		Type:          catofunc.LinkTypePopAssociation,
+		SrcActor:      siteActor,
+		DstActor:      popActor,
+		Protocol:      "cato",
+		State:         "unknown",
+		Direction:     "bidirectional",
+		EvidenceCount: 1,
+		SiteActor:     siteActor,
+		Observation:   "Site reported PoP",
+	}).addTo(table, dict)
 }
 
 func addDeviceTopology(
 	actors, links *topologyv1.TableBuilder,
 	dict *topologyv1.StringDictionary,
 	actorIndexes map[string]int,
-	popSeen map[string]bool,
 	accountID string,
-	site *siteState,
-) map[string]int {
-	deviceActors := make(map[string]int, len(site.Devices))
+	site topologySite,
+	siteActor int,
+) {
+	for _, dev := range site.devices {
+		deviceID := stableDeviceID(dev)
+		deviceActorID := catoDeviceActorID(site.ID, deviceID)
+		deviceActor := addDeviceActor(actors, dict, accountID, site.siteState, dev, deviceID, deviceActorID)
+		actorIndexes[deviceActorID] = deviceActor
+		addOwnershipLink(links, dict, siteActor, deviceActor)
+	}
+}
 
-	sortedDevices := append([]deviceState(nil), site.Devices...)
-	sort.Slice(sortedDevices, func(i, j int) bool {
+func topologyDevices(devices []deviceState) []deviceState {
+	sortedDevices := append([]deviceState(nil), devices...)
+	sort.SliceStable(sortedDevices, func(i, j int) bool {
 		leftName := deviceDisplayName(sortedDevices[i])
 		rightName := deviceDisplayName(sortedDevices[j])
 		if leftName != rightName {
@@ -219,32 +202,35 @@ func addDeviceTopology(
 		return stableDeviceID(sortedDevices[i]) < stableDeviceID(sortedDevices[j])
 	})
 
+	seen := make(map[string]bool, len(sortedDevices))
+	unique := sortedDevices[:0]
 	for _, dev := range sortedDevices {
-		deviceID := stableDeviceID(dev)
-		if deviceID == "" {
+		id := stableDeviceID(dev)
+		if id == "" || seen[id] {
 			continue
 		}
-		deviceActorID := catoDeviceActorID(site.ID, deviceID)
-		deviceActor := addDeviceActor(actors, dict, accountID, site, dev, deviceID, deviceActorID)
-		actorIndexes[deviceActorID] = deviceActor
-		deviceActors[deviceID] = deviceActor
-
-		popName := dev.LastPopName
-		if popName == "" {
-			popName = site.PopName
-		}
-		if popName == "" {
-			continue
-		}
-		popActorID := catoPopActorID(popName)
-		if !popSeen[popName] {
-			popSeen[popName] = true
-			actorIndexes[popActorID] = addPopActor(actors, dict, accountID, popName, popActorID)
-		}
-		addDevicePopLink(links, dict, dev, deviceActor, actorIndexes[popActorID])
+		seen[id] = true
+		unique = append(unique, dev)
 	}
+	return unique
+}
 
-	return deviceActors
+func topologyDeviceName(site *siteState, dev deviceState) string {
+	name := normalizeName(dev.Name)
+	if name != "" && name != normalizeName(dev.ID) && name != normalizeName(dev.SocketSerial) &&
+		name != normalizeName(dev.Identifier) && name != normalizeName(dev.SocketID) {
+		return name
+	}
+	role := normalizeStatus(dev.HaRole)
+	if role == "none" || role == "unknown" {
+		role = "device"
+	}
+	identity := "ID " + stableDeviceID(dev)
+	if serial := normalizeName(dev.SocketSerial); serial != "" {
+		identity = "serial " + serial
+	}
+	// Keep identity visible when the graph shortens long site context.
+	return identity + " · " + role + " · " + firstNonEmpty(site.Name, "Site "+site.ID)
 }
 
 func addDeviceActor(
@@ -255,67 +241,46 @@ func addDeviceActor(
 	dev deviceState,
 	deviceID, deviceActorID string,
 ) int {
-	displayName := deviceDisplayName(dev)
-	if displayName == "" {
-		displayName = deviceID
-	}
+	displayName := topologyDeviceName(site, dev)
 	popName := dev.LastPopName
 	if popName == "" {
 		popName = site.PopName
 	}
-	return table.Add(
-		dict.Ref(catofunc.ActorTypeDevice),
-		dict.Ref(topologyLayer),
-		deviceActorID,
-		displayName,
-		"",
-		accountID,
-		site.ID,
-		deviceID,
-		popName,
-		"",
-		"",
-		firstNonEmpty(optionalBoolState(dev.Connected, "connected", "disconnected"), "unknown"),
-		"",
-		"",
-		"",
-		"",
-		"",
-		"",
-		nil,
-		optionalBool(dev.Connected),
-		dev.HaRole,
-		dev.SocketSerial,
-		dev.SocketVersion,
-		dev.InternalIP,
-	)
+	return (topologyActorRow{
+		Type:               catofunc.ActorTypeDevice,
+		Layer:              topologyLayer,
+		ID:                 deviceActorID,
+		DisplayName:        displayName,
+		AccountID:          accountID,
+		SiteID:             site.ID,
+		DeviceID:           deviceID,
+		PopName:            popName,
+		ConnectivityStatus: firstNonEmpty(optionalBoolState(dev.Connected, "connected", "disconnected"), "unknown"),
+		Connected:          dev.Connected,
+		HARole:             dev.HaRole,
+		SocketSerial:       dev.SocketSerial,
+		SocketVersion:      dev.SocketVersion,
+		InternalIP:         new(dev.InternalIP),
+	}).addTo(table, dict)
 }
 
 func addDevicePopLink(
 	table *topologyv1.TableBuilder,
 	dict *topologyv1.StringDictionary,
 	dev deviceState,
-	deviceActor, popActor int,
+	deviceActor, popActor, siteActor int,
 ) {
-	table.Add(
-		dict.Ref(catofunc.LinkTypeTunnel),
-		deviceActor,
-		popActor,
-		dict.Ref("cato"),
-		dict.Ref(firstNonEmpty(optionalBoolState(dev.Connected, "connected", "disconnected"), "unknown")),
-		dict.Ref("bidirectional"),
-		1,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-	)
+	(topologyLinkRow{
+		Type:          catofunc.LinkTypePopAssociation,
+		SrcActor:      deviceActor,
+		DstActor:      popActor,
+		Protocol:      "cato",
+		State:         "unknown",
+		Direction:     "bidirectional",
+		EvidenceCount: 1,
+		SiteActor:     siteActor,
+		Observation:   associationObservation(dev),
+	}).addTo(table, dict)
 }
 
 func addBGPPeerTopology(
@@ -353,32 +318,18 @@ func addBGPPeerActor(
 	if displayName == "" {
 		displayName = peer.RemoteASN
 	}
-	return table.Add(
-		dict.Ref(catofunc.ActorTypeBGPPeer),
-		dict.Ref(topologyLayer),
-		peerActorID,
-		displayName,
-		"",
-		"",
-		site.ID,
-		"",
-		site.PopName,
-		peer.RemoteIP,
-		peer.RemoteASN,
-		peer.BGPSession,
-		"",
-		"",
-		"",
-		"",
-		"",
-		"",
-		int64(0),
-		nil,
-		"",
-		"",
-		"",
-		nil,
-	)
+	return (topologyActorRow{
+		Type:               catofunc.ActorTypeBGPPeer,
+		Layer:              topologyLayer,
+		ID:                 peerActorID,
+		DisplayName:        displayName,
+		SiteID:             site.ID,
+		PopName:            site.PopName,
+		RemoteIP:           peer.RemoteIP,
+		RemoteASN:          peer.RemoteASN,
+		ConnectivityStatus: peer.BGPSession,
+		HostCount:          new(int64(0)),
+	}).addTo(table, dict)
 }
 
 func addBGPLink(
@@ -387,88 +338,172 @@ func addBGPLink(
 	siteActor, peerActor int,
 	peer bgpPeerState,
 ) {
-	table.Add(
-		dict.Ref(catofunc.LinkTypeBGP),
-		siteActor,
-		peerActor,
-		dict.Ref("bgp"),
-		dict.Ref(peer.BGPSession),
-		dict.Ref("bidirectional"),
-		1,
-		nil,
-		nil,
-		nil,
-		nil,
-		peer.RoutesCount,
-		peer.RoutesCountLimit,
-		peer.RoutesCountLimitExceeded,
-		peer.RIBOutRoutes,
-		peer.IncomingState,
-		peer.OutgoingState,
-	)
+	(topologyLinkRow{
+		Type:                    catofunc.LinkTypeBGP,
+		SrcActor:                siteActor,
+		DstActor:                peerActor,
+		Protocol:                "bgp",
+		State:                   peer.BGPSession,
+		Direction:               "bidirectional",
+		EvidenceCount:           1,
+		Routes:                  new(peer.RoutesCount),
+		RoutesLimit:             new(peer.RoutesCountLimit),
+		RoutesLimitExceeded:     new(peer.RoutesCountLimitExceeded),
+		RIBOutRoutes:            new(peer.RIBOutRoutes),
+		IncomingConnectionState: new(peer.IncomingState),
+		OutgoingConnectionState: new(peer.OutgoingState),
+		SiteActor:               siteActor,
+		Observation:             "BGP status",
+		LocalIP:                 nullableString(peer.LocalIP),
+		LocalASN:                nullableString(peer.LocalASN),
+	}).addTo(table, dict)
 }
 
-func addInterfaceTopologyTable(
-	interfaces *topologyv1.TableBuilder,
-	siteActor int,
-	deviceActors map[string]int,
-	site *siteState,
+func addInterfaceTopology(
+	actors, links, interfaces *topologyv1.TableBuilder,
+	dict *topologyv1.StringDictionary,
+	actorIndexes map[string]int,
+	accountID string,
+	site topologySite,
 ) {
+	siteActor := actorIndexes[catoSiteActorID(site.ID)]
 	ifaceKeys := make([]string, 0, len(site.Interfaces))
-	for key := range site.Interfaces {
-		ifaceKeys = append(ifaceKeys, key)
+	for key, iface := range site.Interfaces {
+		if iface != nil && !iface.Aggregate {
+			ifaceKeys = append(ifaceKeys, key)
+		}
 	}
 	sort.Slice(ifaceKeys, func(i, j int) bool {
-		left := site.Interfaces[ifaceKeys[i]]
-		right := site.Interfaces[ifaceKeys[j]]
-		var leftName, rightName string
-		if left != nil {
-			leftName = left.Name
-		}
-		if right != nil {
-			rightName = right.Name
-		}
-		if leftName != rightName {
-			return leftName < rightName
+		left, right := site.Interfaces[ifaceKeys[i]], site.Interfaces[ifaceKeys[j]]
+		if left.Name != right.Name {
+			return left.Name < right.Name
 		}
 		return ifaceKeys[i] < ifaceKeys[j]
 	})
+	hasTunnel := make(map[int]bool)
 	for _, key := range ifaceKeys {
 		iface := site.Interfaces[key]
-		if iface == nil {
+		actor := siteActor
+		if devActor, ok := actorIndexes[catoDeviceActorID(site.ID, iface.DeviceID)]; ok {
+			actor = devActor
+		}
+		var link *int
+		var popActor *int
+		if iface.PopName != "" {
+			pop := ensurePopActor(actors, dict, actorIndexes, accountID, iface.PopName)
+			popActor = new(pop)
+			link = new(addInterfacePopLink(links, dict, actor, pop, siteActor, iface))
+			hasTunnel[actor] = true
+		}
+		connected, known := interfaceConnected(iface)
+		var connectedValue *bool
+		if known {
+			connectedValue = new(connected)
+		}
+		(topologyInterfaceRow{
+			Actor:                 actor,
+			ID:                    iface.ID,
+			Name:                  iface.Name,
+			Type:                  iface.Type,
+			Connected:             connectedValue,
+			PopName:               iface.PopName,
+			TunnelRemoteIP:        iface.TunnelRemoteIP,
+			TunnelUptime:          iface.TunnelUptime,
+			UpstreamBandwidth:     iface.UpstreamBandwidth,
+			DownstreamBandwidth:   iface.DownstreamBandwidth,
+			TunnelConnected:       iface.Connected,
+			LinkUp:                iface.LinkUp,
+			Link:                  link,
+			SiteActor:             siteActor,
+			PopActor:              popActor,
+			RTTMS:                 trafficMetricValue(iface.Metrics, trafficMetricRTTMS, iface.Metrics.RTTMS),
+			LostUpstreamPercent:   trafficMetricValue(iface.Metrics, trafficMetricLostUpstreamPercent, iface.Metrics.LostUpstreamPercent),
+			LostDownstreamPercent: trafficMetricValue(iface.Metrics, trafficMetricLostDownstreamPercent, iface.Metrics.LostDownstreamPercent),
+			JitterUpstreamMS:      trafficMetricValue(iface.Metrics, trafficMetricJitterUpstreamMS, iface.Metrics.JitterUpstreamMS),
+			JitterDownstreamMS:    trafficMetricValue(iface.Metrics, trafficMetricJitterDownstreamMS, iface.Metrics.JitterDownstreamMS),
+			LastMileLatencyMS:     trafficMetricValue(iface.Metrics, trafficMetricLastMileLatencyMS, iface.Metrics.LastMileLatencyMS),
+			LastMileLossPercent:   trafficMetricValue(iface.Metrics, trafficMetricLastMilePacketLossPercent, iface.Metrics.LastMilePacketLossPercent),
+			TunnelState:           firstNonEmpty(optionalBoolState(iface.Connected, "Connected", "Disconnected"), "Unknown"),
+			PhysicalLinkState:     firstNonEmpty(optionalBoolState(iface.LinkUp, "Up", "Down"), "Unknown"),
+		}).addTo(interfaces)
+	}
+	// Summary destinations are a fallback, not additional observed tunnels.
+	devices := site.devices
+	for _, dev := range devices {
+		actor, ok := actorIndexes[catoDeviceActorID(site.ID, stableDeviceID(dev))]
+		popName := firstNonEmpty(dev.LastPopName, site.PopName)
+		if !ok || hasTunnel[actor] || popName == "" {
 			continue
 		}
-		actor := siteActor
-		if iface.DeviceID != "" {
-			if devActor, ok := deviceActors[iface.DeviceID]; ok {
-				actor = devActor
-			}
-		}
-		connected, connectedKnown := interfaceConnected(iface)
-		var connectedValue any
-		if connectedKnown {
-			connectedValue = connected
-		}
-		interfaces.Add(
-			actor,
-			iface.ID,
-			iface.Name,
-			iface.Type,
-			connectedValue,
-			iface.PopName,
-			iface.TunnelRemoteIP,
-			optionalInt64(iface.TunnelUptime),
-			iface.UpstreamBandwidth,
-			iface.DownstreamBandwidth,
-		)
+		pop := ensurePopActor(actors, dict, actorIndexes, accountID, popName)
+		addDevicePopLink(links, dict, dev, actor, pop, siteActor)
+	}
+	if len(devices) == 0 && !hasTunnel[siteActor] && site.PopName != "" {
+		pop := ensurePopActor(actors, dict, actorIndexes, accountID, site.PopName)
+		addSitePopLink(links, dict, siteActor, pop)
 	}
 }
 
-func trafficMetricValue(metrics trafficMetrics, metric trafficMetricPresence, value float64) any {
+func ensurePopActor(
+	actors *topologyv1.TableBuilder,
+	dict *topologyv1.StringDictionary,
+	indexes map[string]int,
+	accountID, name string,
+) int {
+	id := catoPopActorID(name)
+	if row, ok := indexes[id]; ok {
+		return row
+	}
+	row := addPopActor(actors, dict, accountID, name, id)
+	indexes[id] = row
+	return row
+}
+
+func addOwnershipLink(links *topologyv1.TableBuilder, dict *topologyv1.StringDictionary, site, device int) {
+	(topologyLinkRow{
+		Type:          catofunc.LinkTypeOwnership,
+		SrcActor:      site,
+		DstActor:      device,
+		State:         "known",
+		Direction:     "parent_to_child",
+		EvidenceCount: 1,
+		SiteActor:     site,
+		Observation:   "Site membership",
+	}).addTo(links, dict)
+}
+
+func addInterfacePopLink(
+	links *topologyv1.TableBuilder,
+	dict *topologyv1.StringDictionary,
+	owner, pop, site int,
+	iface *interfaceState,
+) int {
+	// Physical link-up does not establish a tunnel to the reported PoP.
+	state := firstNonEmpty(optionalBoolState(iface.Connected, "connected", "disconnected"), "unknown")
+	return (topologyLinkRow{
+		Type:                tunnelLinkType(iface.Connected),
+		SrcActor:            owner,
+		DstActor:            pop,
+		Protocol:            "cato",
+		State:               state,
+		Direction:           "bidirectional",
+		EvidenceCount:       1,
+		BytesUpstreamMax:    trafficMetricValue(iface.Metrics, trafficMetricBytesUpstreamMax, iface.Metrics.BytesUpstreamMax),
+		BytesDownstreamMax:  trafficMetricValue(iface.Metrics, trafficMetricBytesDownstreamMax, iface.Metrics.BytesDownstreamMax),
+		LostUpstreamPercent: trafficMetricValue(iface.Metrics, trafficMetricLostUpstreamPercent, iface.Metrics.LostUpstreamPercent),
+		RTTMS:               trafficMetricValue(iface.Metrics, trafficMetricRTTMS, iface.Metrics.RTTMS),
+		InterfaceID:         new(iface.ID),
+		InterfaceName:       new(iface.Name),
+		SiteActor:           site,
+		Observation:         "Observed interface",
+	}).addTo(links, dict)
+}
+
+func trafficMetricValue(metrics trafficMetrics, metric trafficMetricPresence, value float64) *float64 {
 	if !metrics.has(metric) {
 		return nil
 	}
-	return value
+	return new(value)
 }
 
 func optionalBoolState(value *bool, trueState, falseState string) string {
@@ -476,20 +511,6 @@ func optionalBoolState(value *bool, trueState, falseState string) string {
 		return ""
 	}
 	return boolState(*value, trueState, falseState)
-}
-
-func optionalBool(value *bool) any {
-	if value == nil {
-		return nil
-	}
-	return *value
-}
-
-func optionalInt64(value *int64) any {
-	if value == nil {
-		return nil
-	}
-	return *value
 }
 
 func catoSiteActorID(siteID string) string {
@@ -513,6 +534,9 @@ func catoTopologyTypes() topologyv1.TypeRegistry {
 		ActorTypes: catofunc.TopologyActorTypes(),
 		LinkTypes:  catofunc.TopologyLinkTypes(),
 		TableTypes: map[string]topologyv1.TableType{
+			catofunc.ActorTableLabels: {
+				Role: "actor_inventory", Owner: "actor", Aggregation: "set", Columns: catoTopologyLabelColumns(),
+			},
 			catofunc.ActorTableInterfaces: {
 				Role:        "actor_detail",
 				Owner:       "actor",
@@ -537,111 +561,79 @@ func catoTopologyTypes() topologyv1.TypeRegistry {
 	}
 }
 
-func catoTopologyActorColumns() []topologyv1.Column {
-	return []topologyv1.Column{
-		topologyv1.NewColumn("type", "string_ref", topologyv1.WithDictionary("strings")),
-		topologyv1.NewColumn("layer", "string_ref", topologyv1.WithDictionary("strings")),
-		topologyv1.NewColumn("id", "string", topologyv1.WithRole("identity")),
-		topologyv1.NewColumn("display_name", "string"),
-		topologyv1.NewColumn("description", "string"),
-		topologyv1.NewColumn("account_id", "string", topologyv1.WithRole("merge_identity")),
-		topologyv1.NewColumn("site_id", "string", topologyv1.WithRole("merge_identity")),
-		topologyv1.NewColumn("device_id", "string", topologyv1.WithRole("merge_identity")),
-		topologyv1.NewColumn("pop_name", "string", topologyv1.WithRole("merge_identity")),
-		topologyv1.NewColumn("remote_ip", "ip", topologyv1.WithRole("merge_identity")),
-		topologyv1.NewColumn("remote_asn", "string", topologyv1.WithRole("merge_identity")),
-		topologyv1.NewColumn("connectivity_status", "string"),
-		topologyv1.NewColumn("operational_status", "string"),
-		topologyv1.NewColumn("site_type", "string"),
-		topologyv1.NewColumn("connection_type", "string"),
-		topologyv1.NewColumn("country_code", "string"),
-		topologyv1.NewColumn("country_name", "string"),
-		topologyv1.NewColumn("region", "string"),
-		topologyv1.NewColumn("host_count", "uint", topologyv1.WithNullable(), topologyv1.WithAggregation("sum")),
-		topologyv1.NewColumn("connected", "bool", topologyv1.WithNullable()),
-		topologyv1.NewColumn("ha_role", "string"),
-		topologyv1.NewColumn("socket_serial", "string"),
-		topologyv1.NewColumn("socket_version", "string"),
-		topologyv1.NewColumn("internal_ip", "ip", topologyv1.WithNullable()),
+func tunnelLinkType(connected *bool) string {
+	if connected == nil {
+		return catofunc.LinkTypeTunnelUnknown
 	}
+	if !*connected {
+		return catofunc.LinkTypeTunnelDisconnected
+	}
+	return catofunc.LinkTypeTunnel
 }
-
-func catoTopologyLinkColumns() []topologyv1.Column {
-	return []topologyv1.Column{
-		topologyv1.NewColumn("type", "string_ref", topologyv1.WithDictionary("strings")),
-		topologyv1.NewColumn("src_actor", "actor_ref"),
-		topologyv1.NewColumn("dst_actor", "actor_ref"),
-		topologyv1.NewColumn("protocol", "string_ref", topologyv1.WithDictionary("strings")),
-		topologyv1.NewColumn("state", "string_ref", topologyv1.WithDictionary("strings")),
-		topologyv1.NewColumn("direction", "string_ref", topologyv1.WithDictionary("strings")),
-		topologyv1.NewColumn("evidence_count", "uint", topologyv1.WithAggregation("sum")),
-		topologyv1.NewColumn(
-			"bytes_upstream_max",
-			"float",
-			topologyv1.WithNullable(),
-			topologyv1.WithRole("metric"),
-			topologyv1.WithAggregation("max"),
-		),
-		topologyv1.NewColumn(
-			"bytes_downstream_max",
-			"float",
-			topologyv1.WithNullable(),
-			topologyv1.WithRole("metric"),
-			topologyv1.WithAggregation("max"),
-		),
-		topologyv1.NewColumn(
-			"lost_upstream_percent",
-			"float",
-			topologyv1.WithNullable(),
-			topologyv1.WithRole("metric"),
-			topologyv1.WithAggregation("avg"),
-		),
-		topologyv1.NewColumn(
-			"rtt_ms",
-			"float",
-			topologyv1.WithNullable(),
-			topologyv1.WithRole("metric"),
-			topologyv1.WithUnit("ms"),
-			topologyv1.WithAggregation("avg"),
-		),
-		topologyv1.NewColumn(
-			"routes",
-			"int",
-			topologyv1.WithNullable(),
-			topologyv1.WithRole("metric"),
-			topologyv1.WithAggregation("sum"),
-		),
-		topologyv1.NewColumn(
-			"routes_limit",
-			"int",
-			topologyv1.WithNullable(),
-			topologyv1.WithRole("metric"),
-			topologyv1.WithAggregation("max"),
-		),
-		topologyv1.NewColumn("routes_limit_exceeded", "bool", topologyv1.WithNullable()),
-		topologyv1.NewColumn(
-			"rib_out_routes",
-			"int",
-			topologyv1.WithNullable(),
-			topologyv1.WithRole("metric"),
-			topologyv1.WithAggregation("sum"),
-		),
-		topologyv1.NewColumn("incoming_connection_state", "string", topologyv1.WithNullable()),
-		topologyv1.NewColumn("outgoing_connection_state", "string", topologyv1.WithNullable()),
+func associationObservation(dev deviceState) string {
+	if dev.LastPopName != "" {
+		return "Device last reported PoP"
 	}
+	return "Site reported PoP; device tunnel unobserved"
 }
-
-func catoTopologyInterfaceColumns() []topologyv1.Column {
-	return []topologyv1.Column{
-		topologyv1.NewColumn("actor", "actor_ref"),
-		topologyv1.NewColumn("id", "string"),
-		topologyv1.NewColumn("name", "string"),
-		topologyv1.NewColumn("type", "string"),
-		topologyv1.NewColumn("connected", "bool", topologyv1.WithNullable()),
-		topologyv1.NewColumn("pop_name", "string"),
-		topologyv1.NewColumn("tunnel_remote_ip", "ip"),
-		topologyv1.NewColumn("tunnel_uptime", "duration", topologyv1.WithNullable()),
-		topologyv1.NewColumn("upstream_bandwidth", "int"),
-		topologyv1.NewColumn("downstream_bandwidth", "int"),
+func nullableString(s string) *string {
+	if s == "" {
+		return nil
 	}
+	return new(s)
+}
+func catoTopologyNotifications(sites map[string]*siteState, order []string) []topologyv1.Notification {
+	notices := []topologyv1.Notification{
+		{
+			Severity: "info",
+			Code:     "cato_access_scope",
+			Message:  "Access topology for the selected sites: site membership, observed WAN tunnels, reported PoP associations and BGP adjacencies. Cato backbone and end-to-end reachability are not represented. Separate PoP groups do not imply isolation. Upstream means site to Cato; downstream means Cato to site. Missing values mean not observed.",
+		},
+	}
+	var snapshot, metrics, bgp int
+	for _, id := range order {
+		if site := sites[id]; site != nil {
+			if site.SnapshotCollection != "observed" {
+				snapshot++
+			}
+			if site.MetricsCollection != "observed" {
+				metrics++
+			}
+			if site.BGPCollection != "observed" && site.BGPCollection != "empty" &&
+				site.BGPCollection != "empty_cached" {
+				bgp++
+			}
+		}
+	}
+	if snapshot > 0 {
+		notices = append(notices, topologyv1.Notification{
+			Severity: "warning",
+			Code:     "cato_snapshot_coverage",
+			Message: fmt.Sprintf(
+				"Inventory observations are unavailable for %d selected sites. Missing devices and tunnels do not mean they were removed. Open site details for inventory collection status.",
+				snapshot,
+			),
+		})
+	}
+	if metrics > 0 {
+		notices = append(notices, topologyv1.Notification{
+			Severity: "warning",
+			Code:     "cato_metrics_coverage",
+			Message: fmt.Sprintf(
+				"Metrics are incomplete or unavailable for %d selected sites. Open site details for collection status; missing measurements do not mean zero.",
+				metrics,
+			),
+		})
+	}
+	if bgp > 0 {
+		notices = append(notices, topologyv1.Notification{
+			Severity: "warning",
+			Code:     "cato_bgp_coverage",
+			Message: fmt.Sprintf(
+				"BGP observations are incomplete or unavailable for %d selected sites. Missing peers do not mean no BGP is configured. Open site details for collection status.",
+				bgp,
+			),
+		})
+	}
+	return notices
 }
