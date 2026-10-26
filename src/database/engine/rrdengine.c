@@ -2634,6 +2634,10 @@ static size_t dbengine_cmd_queue_waiting(void) {
     return waiting;
 }
 
+static bool dbengine_shutdown_drain_expired(usec_t started_ut) {
+    return rrdeng_main.shutdown && now_monotonic_usec() - started_ut >= DBENGINE_SHUTDOWN_DRAIN_TIMEOUT_UT;
+}
+
 static void dbengine_shutdown_drain_gave_up(usec_t started_ut) {
     char outstanding[512] = "";
     size_t len = 0;
@@ -2895,7 +2899,8 @@ void dbengine_event_loop(void* arg) {
                 case RRDENG_OPCODE_QUERY:;
 #if defined(OS_WINDOWS)
                     static int max_timeout_count = 0;
-                    if (uv_hrtime() - last_async_callback > 1000UL * NSEC_PER_MSEC) {
+                    // not while draining at shutdown: the async handle is closed when the drain ends
+                    if (!rmain->shutdown && uv_hrtime() - last_async_callback > 1000UL * NSEC_PER_MSEC) {
                         if (++max_timeout_count > 30) {
                             netdata_log_error("DBENGINE: async callback timeout detected, re-initializing the async handle");
                             __atomic_store_n(&rmain->async_ready, false, __ATOMIC_RELEASE);
@@ -3051,7 +3056,7 @@ void dbengine_event_loop(void* arg) {
             if (opcode != RRDENG_OPCODE_NOOP)
                 uv_run(&rmain->loop, UV_RUN_NOWAIT);
 
-        } while (opcode != RRDENG_OPCODE_NOOP);
+        } while (opcode != RRDENG_OPCODE_NOOP && !dbengine_shutdown_drain_expired(drain_started_ut));
 
         if (unlikely(rmain->shutdown)) {
             if (!rmain->work_cmd.outstanding && !rmain->extent_waiters.deferred && !dbengine_cmd_queue_waiting()) {
@@ -3059,7 +3064,7 @@ void dbengine_event_loop(void* arg) {
                 break;
             }
 
-            if (now_monotonic_usec() - drain_started_ut >= DBENGINE_SHUTDOWN_DRAIN_TIMEOUT_UT) {
+            if (dbengine_shutdown_drain_expired(drain_started_ut)) {
                 dbengine_shutdown_drain_gave_up(drain_started_ut);
                 break;
             }

@@ -1043,12 +1043,18 @@ int test_dbengine(void) {
     // prevent closing the database before the test is finished
     sleep(5);
 
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)host->db[0].si;
     rrd_wrlock();
-    rrdeng_quiesce((struct rrdengine_instance *)host->db[0].si);
-    rrdeng_flush_all((struct rrdengine_instance *)host->db[0].si);
-    rrdeng_exit((struct rrdengine_instance *)host->db[0].si);
-    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_SHUTDOWN_EVLOOP, NULL, NULL, STORAGE_PRIORITY_BEST_EFFORT, NULL, NULL);
+    rrdeng_quiesce(ctx);
+    rrdeng_flush_all(ctx);
+    rrdeng_exit(ctx);
+    host->db[0].si = NULL;
     rrd_wrunlock();
+
+    // free the ctx only after the event loop finished its work: after-work callbacks use it
+    if(!dbengine_shutdown())
+        errors++;
+    freez(ctx);
 
     return (int)(errors + value_errors + time_errors);
 }

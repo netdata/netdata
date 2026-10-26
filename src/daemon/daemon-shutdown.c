@@ -177,10 +177,8 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
 static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exit_when_done) {
     exit_initiated_set(reason);
 
-#ifdef ENABLE_DBENGINE
     // false when dbengine work may still be running after its event loop stopped
     bool dbengine_drained __maybe_unused = true;
-#endif
 
     // don't recurse (due to a fatal, while exiting)
     static bool run = false;
@@ -431,39 +429,40 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     watcher_thread_stop();
 
 #if defined(FSANITIZE_ADDRESS)
-    fprintf(stderr, "\n");
-
-    fprintf(stderr, "Stopping spawn server...\n");
-    netdata_main_spawn_server_cleanup();
-
-    fprintf(stderr, "Freeing all RRDHOSTs...\n");
-    mcp_functions_registry_cleanup();
-    rrdhost_free_all();
-    dyncfg_shutdown();
-    nrpc_inflight_calls_destroy();
-    nrpc_registries_destroy();
-    health_plugin_destroy();
-    cgroup_netdev_link_destroy();
-    bearer_tokens_destroy();
-
-    // Deferred from ml_stop_threads(): the ML training queue must outlive every
-    // collector that can reach ml_queue_push(), and the collector stop above is
-    // time-bounded. Safe here, after rrdhost_free_all() removed all producers.
-    ml_workers_free();
-
-    fprintf(stderr, "Cleaning up destroyed dictionaries...\n");
-    size_t dictionaries_referenced = cleanup_destroyed_dictionaries(true);
-    if(dictionaries_referenced)
-        fprintf(stderr, "WARNING: There are %zu dictionaries with references in them, that cannot be destroyed.\n",
-                dictionaries_referenced);
-                
-    // Always report dictionary allocations during ASAN builds
-    dictionary_print_still_allocated_stacktraces();
-
-#ifdef ENABLE_DBENGINE
+    // a worker still running would use what the teardown frees
     if(!dbengine_drained)
-        fprintf(stderr, "WARNING: dbengine work may still be running, not destroying its caches, MRG and files.\n");
+        fprintf(stderr, "\nWARNING: dbengine work may still be running, skipping the teardown.\n");
     else {
+        fprintf(stderr, "\n");
+
+        fprintf(stderr, "Stopping spawn server...\n");
+        netdata_main_spawn_server_cleanup();
+
+        fprintf(stderr, "Freeing all RRDHOSTs...\n");
+        mcp_functions_registry_cleanup();
+        rrdhost_free_all();
+        dyncfg_shutdown();
+        nrpc_inflight_calls_destroy();
+        nrpc_registries_destroy();
+        health_plugin_destroy();
+        cgroup_netdev_link_destroy();
+        bearer_tokens_destroy();
+
+        // Deferred from ml_stop_threads(): the ML training queue must outlive every
+        // collector that can reach ml_queue_push(), and the collector stop above is
+        // time-bounded. Safe here, after rrdhost_free_all() removed all producers.
+        ml_workers_free();
+
+        fprintf(stderr, "Cleaning up destroyed dictionaries...\n");
+        size_t dictionaries_referenced = cleanup_destroyed_dictionaries(true);
+        if(dictionaries_referenced)
+            fprintf(stderr, "WARNING: There are %zu dictionaries with references in them, that cannot be destroyed.\n",
+                    dictionaries_referenced);
+                
+        // Always report dictionary allocations during ASAN builds
+        dictionary_print_still_allocated_stacktraces();
+
+    #ifdef ENABLE_DBENGINE
         // destroy the caches in reverse order (extent and open depend on main cache)
         fprintf(stderr, "Destroying extent cache (PGC)...\n");
         pgc_destroy(extent_cache, false);
@@ -485,35 +484,35 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
                 memset(multidb_ctx[tier], 0, sizeof(*multidb_ctx[tier]));
             }
         }
+    #endif
+
+        fprintf(stderr, "Destroying UUIDMap...\n");
+        size_t uuid_referenced = uuidmap_destroy();
+        if(uuid_referenced)
+            fprintf(stderr, "WARNING: UUIDMAP had %zu UUIDs referenced.\n",
+                uuid_referenced);
+
+        fprintf(stderr, "Freeing configuration resources...\n");
+        claim_config_free();
+        exporting_config_free();
+        stream_config_free();
+        inicfg_free(&cloud_config);
+        inicfg_free(&netdata_config);
+
+        fprintf(stderr, "Cleaning up worker utilization...\n");
+        worker_utilization_cleanup();
+
+        alerts_by_x_cleanup();
+        size_t strings_referenced = string_destroy();
+        if(strings_referenced)
+            fprintf(stderr, "WARNING: STRING has %zu strings still allocated.\n",
+                    strings_referenced);
+
+        rrdlabels_aral_destroy(true);
+        fprintf(stderr, "RRDLABELS remaining in registry: %d.\n", rrdlabels_registry_count());
+
+        fprintf(stderr, "All done, exiting...\n");
     }
-#endif
-
-    fprintf(stderr, "Destroying UUIDMap...\n");
-    size_t uuid_referenced = uuidmap_destroy();
-    if(uuid_referenced)
-        fprintf(stderr, "WARNING: UUIDMAP had %zu UUIDs referenced.\n",
-            uuid_referenced);
-
-    fprintf(stderr, "Freeing configuration resources...\n");
-    claim_config_free();
-    exporting_config_free();
-    stream_config_free();
-    inicfg_free(&cloud_config);
-    inicfg_free(&netdata_config);
-
-    fprintf(stderr, "Cleaning up worker utilization...\n");
-    worker_utilization_cleanup();
-
-    alerts_by_x_cleanup();
-    size_t strings_referenced = string_destroy();
-    if(strings_referenced)
-        fprintf(stderr, "WARNING: STRING has %zu strings still allocated.\n",
-                strings_referenced);
-
-    rrdlabels_aral_destroy(true);
-    fprintf(stderr, "RRDLABELS remaining in registry: %d.\n", rrdlabels_registry_count());
-
-    fprintf(stderr, "All done, exiting...\n");
 #endif
 
     if(!exit_when_done) {

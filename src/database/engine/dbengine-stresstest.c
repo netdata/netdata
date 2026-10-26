@@ -203,8 +203,11 @@ void generate_dbengine_dataset(unsigned history_seconds)
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)host->db[0].si;
     rrdeng_quiesce(ctx);
     rrdeng_exit(ctx);
-    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_SHUTDOWN_EVLOOP, NULL, NULL, STORAGE_PRIORITY_BEST_EFFORT, NULL, NULL);
     host->db[0].si = NULL;
+
+    // free the ctx only after the event loop finished its work: after-work callbacks use it
+    dbengine_shutdown();
+    freez(ctx);
 
     // free the host we generated into, not localhost
     rrd_wrlock();
@@ -468,16 +471,19 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
         freez(query_threads[i]);
     }
     freez(query_threads);
-    // same teardown as generate_dbengine_dataset() above: rrdeng_exit() frees the
-    // ctx under unittest_running, so clear the host's pointer to it, and release
-    // the host we created before the caller tears the shared libraries down
+    // same teardown as generate_dbengine_dataset() above, and release the host we
+    // created before the caller tears the shared libraries down
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)host->db[0].si;
     rrd_wrlock();
-    rrdeng_quiesce((struct rrdengine_instance *)host->db[0].si);
-    rrdeng_exit((struct rrdengine_instance *)host->db[0].si);
-    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_SHUTDOWN_EVLOOP, NULL, NULL, STORAGE_PRIORITY_BEST_EFFORT, NULL, NULL);
+    rrdeng_quiesce(ctx);
+    rrdeng_exit(ctx);
     host->db[0].si = NULL;
     rrdhost_free___while_having_rrd_wrlock(host);
     rrd_wrunlock();
+
+    // free the ctx only after the event loop finished its work: after-work callbacks use it
+    dbengine_shutdown();
+    freez(ctx);
 }
 
 #endif
