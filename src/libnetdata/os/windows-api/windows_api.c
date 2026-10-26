@@ -96,9 +96,11 @@ int netdata_win_network_interfaces_get(struct netdata_win_network_interface **in
 {
     *interfaces = NULL;
     PIP_ADAPTER_ADDRESSES adapters = NULL;
+    // Addresses are not consumed; skipping them keeps the snapshot small.
     int status = netdata_win_get_adapter_addresses(
         AF_UNSPEC,
-        GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER | GAA_FLAG_INCLUDE_ALL_INTERFACES,
+        GAA_FLAG_SKIP_UNICAST | GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER |
+            GAA_FLAG_INCLUDE_ALL_INTERFACES,
         16 * 1024 * 1024,
         &adapters);
     if (status != 1)

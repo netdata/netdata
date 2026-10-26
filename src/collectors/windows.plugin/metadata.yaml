@@ -841,6 +841,7 @@ modules:
             matched uniquely to a Windows adapter. A missing value is shown as unavailable, not as a down state.
         performance_impact:
           description: |
+            Each collection cycle queries the 'Network Adapter' Perflib object separately from 'Network Interface'.
             The live interface table queries the Windows adapter API on demand. It does not add an adapter API call
             to each chart collection cycle.
     setup:
