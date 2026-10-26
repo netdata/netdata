@@ -804,9 +804,12 @@ dimensions:
 > There are three ways to name a dimension — pick **exactly one**:
 > - `name` — static name you choose (e.g., `name: read`).
 > - `name_from_label` — dynamic name from a label value (e.g., `name_from_label: method` → dimensions "GET", "POST", ...).
-> - **Omit both** — the engine infers the name automatically for histogram buckets (`le`), summary quantiles (`quantile`), and statesets.
+> - **Omit both** — the engine infers the name automatically for histogram buckets (`le`), summary quantiles (`quantile`), and statesets whose metric name ends in `_state`, `_status`, or `_mode` (or whose final name segment is `state`, `status`, or `mode`).
 >
 > `name` and `name_from_label` are mutually exclusive. Duplicate static `name` values within the same chart are rejected.
+
+For a native stateset with another metric name, set `name_from_label` to its full metric name. For example,
+`selector: vm.phase` with `name_from_label: vm.phase` names dimensions from the states emitted by that metric.
 
 #### aggregation
 

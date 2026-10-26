@@ -13,7 +13,6 @@ import (
 type collectorRuntime struct {
 	Profiles               []*profileRuntime
 	ChartTemplateYAML      string
-	Instruments            map[string]*instrumentRuntime
 	WorkloadResourceTagKey string
 }
 
@@ -24,7 +23,16 @@ type profileRuntime struct {
 	MetricNamespace string
 	Filters         *ResourceFiltersConfig
 	Metrics         []*metricRuntime
+	ResourceLabels  []azureprofiles.ResourceLabel
+	ResourceStates  []*resourceStateRuntime
 	Template        charttpl.Group
+}
+
+type resourceStateRuntime struct {
+	Name     string
+	Property string
+	States   []string
+	Values   map[string]string
 }
 
 type metricRuntime struct {
@@ -39,24 +47,6 @@ type seriesRuntime struct {
 	Aggregation string
 	Kind        string
 	Instrument  string
-}
-
-type instrumentRuntime struct {
-	Kind    string
-	Gauge   metrix.SnapshotGaugeVec
-	Counter metrix.SnapshotCounterVec
-}
-
-func (i *instrumentRuntime) observe(scope metrix.HostScope, labelValues []string, value float64) {
-	if i == nil {
-		return
-	}
-	switch i.Kind {
-	case azureprofiles.SeriesKindCounter:
-		i.Counter.WithHostScope(scope).WithLabelValues(labelValues...).ObserveTotal(value)
-	default:
-		i.Gauge.WithHostScope(scope).WithLabelValues(labelValues...).Observe(value)
-	}
 }
 
 type discoveryState struct {
@@ -85,6 +75,7 @@ type resourceInfo struct {
 	ResourceGroup  string
 	Region         string
 	Tags           []resourceTag
+	Properties     map[string]string
 	HostScope      metrix.HostScope
 }
 
@@ -106,20 +97,11 @@ type queryBatch struct {
 
 type metricSample struct {
 	Instrument string
-	Kind       string
-	Labels     metrix.Labels
-	Scope      metrix.HostScope
+	Resource   resourceIdentity
 	Value      float64
 }
 
 type queryBatchResult struct {
 	Samples []metricSample
 	Err     error
-}
-
-type lastObservation struct {
-	instrument  string
-	scope       metrix.HostScope
-	labelValues []string
-	value       float64
 }
