@@ -64,6 +64,17 @@ DOCKER_ARGS := $(DOCKER_ARGS) --rm -i \
                $(if $(DEBUG_BUILD_INFRA),-e DEBUG_BUILD_INFRA=1) \
                $(NULL)
 
+# Fakeroot configuration
+
+FAKEROOT := $(shell command -v fakeroot 2>/dev/null)
+
+ifeq ($(strip $(FAKEROOT)),)
+    $(error Fakeroot is required for static builds.)
+endif
+
+FAKEROOT_DIR := $(TARGET_STAGING)/fakeroot
+FAKEROOT_DOCKER_DIR := $(DOCKER_STAGING)/fakeroot
+
 # component configuration
 
 define set_paths
@@ -315,11 +326,15 @@ $(TARGET_STAMPS): | $(TARGET_WORKDIR)
 $(TARGET_STAGING):
 	mkdir -p $@
 
+$(FAKEROOT_DIR): | $(TARGET_STAGING)
+	rm -rf $@
+	mkdir -p $@
+
 $(TARGET_INSTALL): | $(TARGET_STAGING)
 	rm -rf $@
 	mkdir -p $@
 
-dirs: $(TARGET_CACHE) $(TARGET_WORKDIR) $(TARGET_STAMPS) $(TARGET_STAGING) $(TARGET_INSTALL)
+dirs: $(TARGET_CACHE) $(TARGET_WORKDIR) $(TARGET_STAMPS) $(TARGET_STAGING) $(FAKEROOT_DIR) $(TARGET_INSTALL)
 
 /proc/sys/fs/binfmt_misc/qemu-$(QEMU_ARCH): /proc/sys/fs/binfmt_misc
 	$(DOCKER) run --rm --privileged $(QEMU_SETUP) --install "$(QEMU_ARCH)"
@@ -593,9 +608,10 @@ $(CURL_STAGING): prepare $(CURL_BUILD)
 	fi
 	touch $@
 
-$(TARGET_INSTALL)/bin/curl: $(TARGET_INSTALL) $(CURL_STAGING)
-	mkdir -p $(TARGET_INSTALL)/bin
-	cp -a --reflink=auto $(TARGET_BUILD_STAGING)/bin/curl $@
+$(TARGET_INSTALL)/bin/curl: $(FAKEROOT_DIR) $(TARGET_INSTALL) $(CURL_STAGING)
+	scripts/fakeroot-wrapper.sh $(FAKEROOT_DIR) mkdir -p $(TARGET_INSTALL)/bin
+	scripts/fakeroot-wrapper.sh $(FAKEROOT_DIR) cp -a --reflink=auto $(TARGET_BUILD_STAGING)/bin/curl $@
+	scripts/fakeroot-wrapper.sh $(FAKEROOT_DIR) chmod +x $@
 
 curl: $(TARGET_INSTALL)/bin/curl
 
@@ -668,6 +684,8 @@ $(TARGET_INSTALL)/bin/bash: prepare $(TARGET_INSTALL) $(BASH_BUILD)
 		-e PKG_CONFIG_PATH="$(DOCKER_PKGCONFIG_PATH)" \
 		-w $(DOCKER_WORKDIR)/bash \
 		$(BUILDER) \
+		$(NETDATA_SOURCE_DIR)/packaging/static/scripts/fakeroot-wrapper.sh \
+		$(FAKEROOT_DOCKER_DIR) \
 		/usr/bin/make install
 	if [ ! -f $(BASH_CACHE_HIT) ]; then \
 		rm -rf $(BASH_CACHE_PATH) && \
@@ -715,6 +733,8 @@ $(IOPING_BUILD): prepare $(IOPING_CONFIG)
 $(TARGET_INSTALL)/usr/libexec/netdata/plugins.d/ioping: prepare $(TARGET_INSTALL) $(IOPING_BUILD)
 	mkdir -p $(@D)
 	$(DOCKER) run $(DOCKER_ARGS) $(BUILDER) \
+		$(NETDATA_SOURCE_DIR)/packaging/static/scripts/fakeroot-wrapper.sh \
+		$(FAKEROOT_DOCKER_DIR) \
 		/usr/bin/install -o root -g root -m 4750 $(DOCKER_WORKDIR)/ioping/ioping $(DOCKER_INSTALL)/usr/libexec/netdata/plugins.d/
 	if [ ! -f $(IOPING_CACHE_HIT) ]; then \
 		rm -rf $(IOPING_CACHE_PATH) && \
@@ -776,11 +796,13 @@ $(NETDATA_INSTALL): prepare $(TARGET_INSTALL) $(NETDATA_BUILD)
 		-e PKG_CONFIG="pkg-config --static" \
 		-e PKG_CONFIG_PATH="$(DOCKER_PKGCONFIG_PATH)" \
 		$(BUILDER) \
+		$(NETDATA_SOURCE_DIR)/packaging/static/scripts/fakeroot-wrapper.sh \
+		$(FAKEROOT_DOCKER_DIR) \
 		/bin/sh $(NETDATA_SOURCE_DIR)/packaging/static/scripts/install-staging-tree.sh $(NETDATA_BUILD_DIR) /$(NETDATA_PREFIX) $(DOCKER_INSTALL)
-	mv $(TARGET_INSTALL)/bin/netdata $(TARGET_INSTALL)/bin/srv/netdata
-	cp -a --reflink=auto $(MAKEFILE_DIR)/wrapper.sh $(TARGET_INSTALL)/bin/netdata
-	rm -f $(TARGET_INSTALL)/etc/.install-type
-	rm -f $(TARGET_INSTALL)/etc/netdata/netdata.conf
+	scripts/fakeroot-wrapper.sh $(FAKEROOT_DIR) mv $(TARGET_INSTALL)/bin/netdata $(TARGET_INSTALL)/bin/srv/netdata
+	scripts/fakeroot-wrapper.sh $(FAKEROOT_DIR) cp -a --reflink=auto $(MAKEFILE_DIR)/wrapper.sh $(TARGET_INSTALL)/bin/netdata
+	scripts/fakeroot-wrapper.sh $(FAKEROOT_DIR) rm -f $(TARGET_INSTALL)/etc/.install-type
+	scripts/fakeroot-wrapper.sh $(FAKEROOT_DIR) rm -f $(TARGET_INSTALL)/etc/netdata/netdata.conf
 	touch $@
 
 netdata: $(NETDATA_INSTALL)
@@ -829,42 +851,48 @@ $(TARGET_STAMPS)/ca-certs.stamp: $(NETDATA_INSTALL)
 	rm -f $@ $(TARGET_INSTALL)/usr/share/ssl
 	$(DOCKER) run $(DOCKER_ARGS) \
 		$(BUILDER) \
+		$(NETDATA_SOURCE_DIR)/packaging/static/scripts/fakeroot-wrapper.sh \
+		$(FAKEROOT_DOCKER_DIR) \
 		cp -a --reflink=auto /etc/ssl $(DOCKER_INSTALL)/usr/share/ssl
 	touch $@
 
-$(TARGET_INSTALL)/etc/.install-type: $(NETDATA_INSTALL)
-	echo INSTALL_TYPE='manual-static' >> $@
-	echo PREBUILT_ARCH='$(BUILDARCH)' >> $@
+install-type: install-type.in
+	sed -e 's|BUILDARCH|$(BUILDARCH)|' < $< > $@
 
-%/.keep: | runtime-check
-	mkdir -p $(@D)
-	touch $@
+$(TARGET_INSTALL)/etc/.install-type: install-type $(FAKEROOT_DIR) $(NETDATA_INSTALL)
+	scripts/fakeroot-wrapper.sh $(FAKEROOT_DIR) cp --reflink=auto $< $@
 
-$(TARGET_INSTALL)/system/functions.sh: $(SRCDIR)/packaging/installer/functions.sh
-	mkdir -p $(@D)
-	cp -a --reflink=auto $< $@
+%/.keep: $(FAKEROOT_DIR) | runtime-check
+	scripts/fakeroot-wrapper.sh $(FAKEROOT_DIR) mkdir -p $(@D)
+	scripts/fakeroot-wrapper.sh $(FAKEROOT_DIR) touch $@
 
-$(TARGET_INSTALL)/system/post-installer.sh: $(SRCDIR)/packaging/static/installer/post-installer.sh
-	mkdir -p $(@D)
-	cp -a --reflink=auto $< $@
+$(TARGET_INSTALL)/system/functions.sh: $(SRCDIR)/packaging/installer/functions.sh $(FAKEROOT_DIR)
+	scripts/fakeroot-wrapper.sh $(FAKEROOT_DIR) mkdir -p $(@D)
+	scripts/fakeroot-wrapper.sh $(FAKEROOT_DIR) cp -a --reflink=auto $< $@
 
-$(TARGET_INSTALL)/system/install-or-update.sh: $(SRCDIR)/packaging/static/installer/install-or-update.sh
-	mkdir -p $(@D)
-	cp -a --reflink=auto $< $@
+$(TARGET_INSTALL)/system/post-installer.sh: $(SRCDIR)/packaging/static/installer/post-installer.sh $(FAKEROOT_DIR)
+	scripts/fakeroot-wrapper.sh $(FAKEROOT_DIR) mkdir -p $(@D)
+	scripts/fakeroot-wrapper.sh $(FAKEROOT_DIR) cp -a --reflink=auto $< $@
+
+$(TARGET_INSTALL)/system/install-or-update.sh: $(SRCDIR)/packaging/static/installer/install-or-update.sh $(FAKEROOT_DIR)
+	scripts/fakeroot-wrapper.sh $(FAKEROOT_DIR) mkdir -p $(@D)
+	scripts/fakeroot-wrapper.sh $(FAKEROOT_DIR) cp -a --reflink=auto $< $@
 
 makeself.lsm: makeself.lsm.in
 	sed -e 's|NETDATA_VERSION|$(VERSION)|' < $< > $@
 
 $(ARCHIVES)/netdata-$(BUILDARCH)-$(VERSION).gz.run: $(ARCHIVE_DEPS)
 	mkdir -p $(@D)
-	rm -f $@
+	scripts/fakeroot-wrapper.sh $(FAKEROOT_DIR) rm -f $@
+	scripts/fakeroot-wrapper.sh $(FAKEROOT_DIR) \
 	$(MAKEFILE_DIR)/makeself/makeself.sh \
 		--gzip --complevel 9 \
 		$(MAKESELF_OPTS)
 
 $(ARCHIVES)/netdata-$(BUILDARCH)-$(VERSION).zstd.run: $(ARCHIVE_DEPS)
 	mkdir -p $(@D)
-	rm -f $@
+	scripts/fakeroot-wrapper.sh $(FAKEROOT_DIR) rm -f $@
+	scripts/fakeroot-wrapper.sh $(FAKEROOT_DIR) \
 	$(MAKEFILE_DIR)/makeself/makeself.sh \
 		--zstd --complevel 19 \
 		$(MAKESELF_OPTS)
