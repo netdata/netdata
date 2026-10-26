@@ -206,8 +206,8 @@ void generate_dbengine_dataset(unsigned history_seconds)
     host->db[0].si = NULL;
 
     // free the ctx only after the event loop finished its work: after-work callbacks use it
-    dbengine_shutdown();
-    freez(ctx);
+    if(dbengine_shutdown())
+        freez(ctx);
 
     // free the host we generated into, not localhost
     rrd_wrlock();
@@ -482,8 +482,8 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
     rrd_wrunlock();
 
     // free the ctx only after the event loop finished its work: after-work callbacks use it
-    dbengine_shutdown();
-    freez(ctx);
+    if(dbengine_shutdown())
+        freez(ctx);
 }
 
 #endif

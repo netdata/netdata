@@ -2860,11 +2860,12 @@ void dbengine_event_loop(void* arg) {
 
     usec_t drain_started_ut = 0;
     size_t cpus = netdata_conf_cpus();
-    uv_sem_t sem;
-    uv_sem_init(&sem, (unsigned int) cpus);
+    // not on this thread's stack: pool workers still running after a drain that gave up may use it
+    uv_sem_t *sem = mallocz(sizeof(*sem));
+    uv_sem_init(sem, (unsigned int) cpus);
     struct mrg_load_thread *mlt = callocz(cpus, sizeof(*mlt));
     for (size_t i = 0; i < cpus; i++) {
-        mlt[i].sem = &sem;
+        mlt[i].sem = sem;
     }
 
 #if defined(OS_WINDOWS)
@@ -3082,7 +3083,8 @@ void dbengine_event_loop(void* arg) {
     // pool work that is still running may use them
     if (rmain->drained) {
         freez(mlt);
-        uv_sem_destroy(&sem);
+        uv_sem_destroy(sem);
+        freez(sem);
     }
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "Shutting down dbengine thread");

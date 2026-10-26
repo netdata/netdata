@@ -1052,9 +1052,10 @@ int test_dbengine(void) {
     rrd_wrunlock();
 
     // free the ctx only after the event loop finished its work: after-work callbacks use it
-    if(!dbengine_shutdown())
+    if(dbengine_shutdown())
+        freez(ctx);
+    else
         errors++;
-    freez(ctx);
 
     return (int)(errors + value_errors + time_errors);
 }
