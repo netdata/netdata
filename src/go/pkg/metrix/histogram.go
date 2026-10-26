@@ -19,12 +19,20 @@ type snapshotHistogramInstrument struct {
 	base    []LabelSet
 }
 
+func (i *snapshotHistogramInstrument) hostScope() HostScope {
+	return i.scope
+}
+
 // statefulHistogramInstrument writes observed samples into maintained histogram state.
 type statefulHistogramInstrument struct {
 	backend meterBackend
 	desc    *instrumentDescriptor
 	scope   HostScope
 	base    []LabelSet
+}
+
+func (i *statefulHistogramInstrument) hostScope() HostScope {
+	return i.scope
 }
 
 // stagedHistogram holds one in-cycle histogram sample for a single series identity.

@@ -513,16 +513,13 @@ func commitGraphMutation(graph *dyncfg.Graph, mutation dyncfg.GraphMutation) (re
 	return nil
 }
 
-func composeAfterApply(first, second func()) func() {
-	if first == nil {
-		return second
-	}
-	if second == nil {
-		return first
-	}
+func composeAfterApply(effects ...func()) func() {
 	return func() {
-		first()
-		second()
+		for _, effect := range effects {
+			if effect != nil {
+				effect()
+			}
+		}
 	}
 }
 

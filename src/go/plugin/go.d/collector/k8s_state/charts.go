@@ -473,8 +473,7 @@ func (c *Collector) addNodeCharts(ns *nodeState) {
 }
 
 func (c *Collector) removeNodeCharts(ns *nodeState) {
-	prefix := fmt.Sprintf("node_%s", replaceDots(ns.id()))
-	c.removeCharts(prefix)
+	c.removeCharts("node", ns.id())
 }
 
 var (
@@ -665,9 +664,8 @@ func (c *Collector) addPodCharts(ps *podState) {
 }
 
 func (c *Collector) updatePodChartsNodeLabel(ps *podState) {
-	prefix := fmt.Sprintf("pod_%s", replaceDots(ps.id()))
 	for _, c := range *c.Charts() {
-		if strings.HasPrefix(c.ID, prefix) {
+		if isObjectChart(c.ID, "pod", ps.id()) {
 			updateNodeLabel(c, ps.nodeName)
 			c.MarkNotCreated()
 		}
@@ -684,8 +682,7 @@ func updateNodeLabel(c *collectorapi.Chart, nodeName string) {
 }
 
 func (c *Collector) removePodCharts(ps *podState) {
-	prefix := fmt.Sprintf("pod_%s", replaceDots(ps.id()))
-	c.removeCharts(prefix)
+	c.removeCharts("pod", ps.id())
 }
 
 var (
@@ -857,8 +854,7 @@ func (c *Collector) addDeploymentCharts(rs *deploymentState) {
 }
 
 func (c *Collector) removeDeploymentCharts(st *deploymentState) {
-	prefix := fmt.Sprintf("deployment_%s", replaceDots(st.id()))
-	c.removeCharts(prefix)
+	c.removeCharts("deployment", st.id())
 }
 
 var (
@@ -989,8 +985,7 @@ func (c *Collector) addCronJobCharts(st *cronJobState) {
 }
 
 func (c *Collector) removeCronJobCharts(st *cronJobState) {
-	prefix := fmt.Sprintf("cronjob_%s", replaceDots(st.id()))
-	c.removeCharts(prefix)
+	c.removeCharts("cronjob", st.id())
 }
 
 var (
@@ -1032,18 +1027,26 @@ func (c *Collector) addPVCCharts(ps *pvcState) {
 }
 
 func (c *Collector) removePVCCharts(ps *pvcState) {
-	// The trailing dot ends the chart type, so "pvc_default_data" does not also remove "pvc_default_data-old".
-	prefix := fmt.Sprintf("pvc_%s.", replaceDots(ps.id()))
-	c.removeCharts(prefix)
+	c.removeCharts("pvc", ps.id())
 }
 
-func (c *Collector) removeCharts(prefix string) {
+func (c *Collector) removeCharts(kind, id string) {
 	for _, c := range *c.Charts() {
-		if strings.HasPrefix(c.ID, prefix) {
+		if isObjectChart(c.ID, kind, id) {
 			c.MarkRemove()
 			c.MarkNotCreated()
 		}
 	}
+}
+
+// isObjectChart reports whether chartID belongs to the object: "<kind>_<id>.<chart>", or for pods also
+// "pod_<id>_container_<name>.<chart>". The end marker keeps "x-1" from matching the charts of "x-10".
+func isObjectChart(chartID, kind, id string) bool {
+	prefix := kind + "_" + replaceDots(id)
+	if strings.HasPrefix(chartID, prefix+".") {
+		return true
+	}
+	return kind == "pod" && strings.HasPrefix(chartID, prefix+"_container_")
 }
 
 var discoveryStatusChart = collectorapi.Chart{

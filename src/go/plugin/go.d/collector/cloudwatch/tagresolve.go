@@ -35,18 +35,8 @@ func sanitizeLabel(key string) string {
 	return b.String()
 }
 
-// resolveTagPlan turns the job's validated tag-label configuration into the ordered set of
-// (AWS key -> label) that survive for a profile whose identity dimension labels are
-// dimLabels. Profile-specific collisions are non-fatal: the entry is skipped and
-// described in warnings because tag labels are optional enrichment.
-//
-// Job-level validation has already rejected duplicate AWS keys and emitted labels.
-// At this profile-specific stage, an entry is skipped only when its target label
-// equals a reserved identity label (account_id, region) or one of the profile's
-// dimension labels, which would duplicate an emitted label key and panic metrix.
-//
-// The surviving plan is the same for every instance of the profile; only the tag
-// VALUES differ per resource, applied at cache-build time.
+// resolveTagPlan preserves configured tag labels except where they collide with
+// identity labels. Automatic resource attributes yield to this explicit plan.
 func resolveTagPlan(tags []ResourceTagLabelConfig, dimLabels []string) (plan []resolvedTag, warnings []string) {
 	if len(tags) == 0 {
 		return nil, nil
@@ -64,10 +54,16 @@ func resolveTagPlan(tags []ResourceTagLabelConfig, dimLabels []string) (plan []r
 			label = sanitizeLabel(awsKey)
 		}
 		if kind, ok := reserved[label]; ok {
-			warnings = append(warnings, fmt.Sprintf("skipped tag %q: label %q collides with a %s label (rename it)", awsKey, label, kind))
+			warnings = append(
+				warnings,
+				fmt.Sprintf("skipped tag %q: label %q collides with a %s label (rename it)", awsKey, label, kind),
+			)
 			continue
 		}
-		plan = append(plan, resolvedTag{awsKey: awsKey, label: label})
+		plan = append(plan, resolvedTag{
+			awsKey: awsKey,
+			label:  label,
+		})
 	}
 	return plan, warnings
 }

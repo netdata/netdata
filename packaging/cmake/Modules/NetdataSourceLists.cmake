@@ -778,6 +778,7 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/perflib-iis-extra.c
         src/collectors/windows.plugin/perflib-hyperv.c
         src/collectors/windows.plugin/perflib-exchange.c
+        src/collectors/windows.plugin/perflib-msmq.c
         src/collectors/windows.plugin/perflib-numa.c
         src/collectors/windows.plugin/perflib-asp.c
 )

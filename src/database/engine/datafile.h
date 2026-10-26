@@ -58,7 +58,18 @@ struct rrdengine_datafile {
     struct {
         SPINLOCK spinlock;
         bool populated;
+        bool v1_replayed;           // journalfile_load() replayed its journal v1; a rejected v2 is then not rebuilt
+                                    // (written only at load, before any reader runs)
     } populate_mrg;
+
+    // its loaded journal v2 was rejected or could not be mapped: the size it is charged
+    // for, discharged when it is rebuilt, removed or deleted (atomic)
+    size_t rejected_v2_size;
+
+    // the startup rebuild replayed the journal v1 of its rejected v2 but published no new one:
+    // the replayed pages are still hot, so the journal indexer retries it (other rejected
+    // journals v2 have nothing to index until the next start)
+    bool rebuild_unpublished;
 
     struct {
         SPINLOCK spinlock;

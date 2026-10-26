@@ -52,16 +52,17 @@ func TestRestartObserverFollowsOnlyItsAcceptedActivation(t *testing.T) {
 	controller := &DynCfgJobController{}
 	reserved := lifecycle.ResourceIdentity{ID: "module_job", Generation: 2}
 	installed := lifecycle.ResourceIdentity{ID: reserved.ID, Generation: 4}
-	token := acceptedActivationToken{run: 1, generation: 3, uid: "config"}
-	other := acceptedActivationToken{run: 1, generation: 5, uid: "config"}
+	token := acceptedActivationToken{run: 1, generation: 3, uid: "config", work: candidateWorkToken{Run: 1, Intent: 2, Attempt: 3, Candidate: candidateKey{Source: "config"}}}
+	other := token
+	other.work.Intent++
 	receipt := &restartReceipt{result: make(chan lifecycle.SealedResult, 1)}
 	require.NoError(t, controller.restartObservers.register(reserved, receipt))
 	controller.deferRestartToActivation(reserved, token)
 	controller.installActivationRestart(other, installed)
-	controller.retireActivationRestart(other)
 	require.Empty(t, receipt.result)
+	// Reconstruction changes physical attempt without changing the observed intent.
+	token.work.Attempt++
 	controller.installActivationRestart(token, installed)
-	controller.retireActivationRestart(token)
 	controller.retireRestart(reserved)
 	require.Empty(t, receipt.result)
 	success := adoptedResult(dyncfg.CommandRestart, dyncfg.StatusRunning, jobFailure{})
@@ -74,13 +75,12 @@ func TestRestartObserverFollowsOnlyItsAcceptedActivation(t *testing.T) {
 func TestRestartObserverDetachesPendingActivation(t *testing.T) {
 	controller := &DynCfgJobController{}
 	identity := lifecycle.ResourceIdentity{ID: "module_job", Generation: 2}
-	token := acceptedActivationToken{run: 1, generation: 3, uid: "config"}
+	token := acceptedActivationToken{run: 1, generation: 3, uid: "config", work: candidateWorkToken{Run: 1, Intent: 2, Attempt: 3, Candidate: candidateKey{Source: "config"}}}
 	receipt := &restartReceipt{result: make(chan lifecycle.SealedResult, 1)}
 	require.NoError(t, controller.restartObservers.register(identity, receipt))
 	controller.deferRestartToActivation(identity, token)
 	controller.restartObservers.detach(receipt)
 	controller.installActivationRestart(token, identity)
-	controller.retireActivationRestart(token)
 	require.Empty(t, receipt.result)
 	require.Empty(t, controller.restartObservers.entries)
 	require.Empty(t, controller.restartObservers.activations)

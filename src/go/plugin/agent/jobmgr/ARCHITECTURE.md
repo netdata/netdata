@@ -124,7 +124,8 @@ flowchart LR
 
 A useful mental split for the rest of this document:
 
-- The **kernel** decides *what happens and in what order*.
+- The **kernel** orders commands and owns their resource/claim lifetime. The collector controller chooses which
+  configuration an enabled job may attempt.
 - **Adapters** (`functions`, `joboutput`, `secrets`, `discovery`) know *how* to do the collector-specific work, behind
   narrow ports.
 - **`lifecycle`** provides the neutral machinery the kernel delegates to (UID ownership, tasks, permits, framing, run
@@ -135,9 +136,10 @@ A useful mental split for the rest of this document:
 
 ## The Concurrency Model
 
-This is the core idea. Job Manager does almost no locking in its business logic. Instead, **one goroutine — the
-`CommandKernel` run loop — owns all mutable orchestration state** and is the only thing allowed to change it.
-Everything else either hands work in over a channel or does blocking work off to the side and reports back.
+The ordering boundary is **one goroutine — the `CommandKernel` run loop — which owns mutable command-ordering
+state** and is the only thing allowed to change it.
+Adapters prepare domain transitions off-loop and apply them through the owning resource lane. Blocking work runs
+separately and reports its exact outcome back through a command.
 
 Think of an **air-traffic control tower with a single controller**:
 
@@ -251,8 +253,8 @@ Which mechanism each command surface uses:
 | Accepted SecretStore acquisition | Outside the resource lane; short completion transaction | `secrets/pending.go` |
 | Collector UPDATE and RESTART preflight | Claim yield on `dyncfg:jobs`; RESTART observation uses an independent invocation lane | `composition/dyncfg.go`, `joboutput/dyncfg_restart.go` |
 | Collector ADD, disabled UPDATE, ENABLE, DISABLE and REMOVE | Short transaction; ENABLE arms accepted activation | `joboutput/dyncfg_prepare.go` |
-| Discovered job reconciliation | Claim yield on `dyncfg:jobs` | `joboutput/discovery.go` |
-| Autodetection retry | Short transaction arms accepted activation | `joboutput/discovery.go` |
+| Collector source inventory and candidate outcomes | Short controller transactions; probes run outside the resource lane and graph claim | `composition/discovery.go`, `joboutput/candidate_execution.go` |
+| Autodetection deadline | Short transaction asks the controller to choose eligible work | `joboutput/candidate_execution.go` |
 | Dependent pause/resume children of a Store change | Short acknowledged transactions | `joboutput/secret_restart.go` |
 
 ### Who owns what
@@ -434,8 +436,9 @@ Attempt keys are built so a long or hostile name cannot exceed containment's int
 
 ## Jobs
 
-A **job** is one running collector instance: a module plus a resolved config. Jobs are created from stock/user config
-files at startup, from discovery, or from DynCfg commands, and are retried after a failed autodetection.
+A **job identity** is a module plus a job name. Its controller admits one configuration at a time, and at most one
+installed runtime may collect for it. Stock/user files, discovery and DynCfg commands supply configurations; the
+controller owns activation and recovery.
 
 ### The config validation boundary
 
@@ -454,7 +457,7 @@ Failure granularity is deliberate:
 | --- | --- |
 | Invalid decoded file entry | Reported and skipped |
 | YAML structural/type error | May reject its containing file, without stopping Job Manager |
-| Invalid dynamic proposal | Typed proposal rejection quarantines that exact config revision; lower-priority and sibling proposals continue |
+| Invalid source proposal | Quarantine its exact membership; consider alternatives under incumbent/source-priority rules |
 
 Strict constructor/controller checks remain as defensive invariant enforcement: programmatic state that bypasses a
 production producer is still rejected rather than silently normalized or recovered after admission.
@@ -468,7 +471,7 @@ boundary that owns its lifecycle:
 
 | Configuration domain | Identity | Where the winner is enforced |
 | --- | --- | --- |
-| Collector job | canonical `FullName` (module + job name) | discovery selection, then again before the collector graph changes |
+| Collector job | canonical `FullName` (module + job name) | the per-job candidate controller, applied with the collector graph transaction |
 | SecretStore | exposed `kind:name` | initial/pending selection and the Store generation transaction |
 | Service discovery | exposed config key | before materialization and pipeline start |
 | Configured vnode | vnode name | startup files seed the live registry; a DynCfg upsert replaces that name |
@@ -484,47 +487,116 @@ override and does not immediately reactivate a masked lower-priority source.
 
 ### Collector source-priority event flow
 
-One collector-job identity has one selected desired configuration. A lower source may remain known to discovery while
-a higher source owns the graph, but it is not allowed to probe or run.
+One public collector/job name can have several distinct configurations. `discovery/inventory.go` reports one immutable
+observation batch per affected `FullName` for each Apply call. The batch retains ordered versions, candidate/source
+membership lifetimes, source-slot presence, and passive or automatic source policy. It does not select a runtime.
+Identical observations do not create new intent. Malformed replacements preserve per-identity retention; source
+presence distinguishes rejection from genuine removal.
 
-```mermaid
-flowchart TD
-    Event("Config event for one module/job")
-    Select("Select highest source priority")
-    Lane("Serialize on that job identity")
-    Recheck{"Higher-priority graph<br/>owner exists?"}
-    Noop("Acknowledge source state<br/>no Check · graph unchanged")
-    Probe("Prepare and Check<br/>selected config")
-    Commit("Commit selected outcome")
+`composition/discovery.go` translates a complete batch into one short job-lane transaction. The controller folds its
+observations privately and reconciles source authority once against the final inventory. Intermediate inventories
+cannot release Init/Check, even when a lower-priority source sorts before a higher-priority source in that same batch.
+True disappearance/re-addition still cuts the old lifetime, including equal-UID re-addition; candidate introduction
+and disappearance order still determines whether an admitted sibling supersedes a historical grant. These are
+ordered source facts, not permission to execute each intermediate state.
 
-    Event --> Select --> Lane --> Recheck
-    Recheck -->|"yes"| Noop
-    Recheck -->|"no"| Probe --> Commit
+Delivery acknowledges the whole batch, not a passed Check or started collector. Failed delivery replays that immutable
+batch before later batches for the same name. A compact receipt covers the ordered history as well as the final
+inventory, so conflicting replay cannot change admission provenance. Different names deliver independently; a blocked
+probe cannot hold up their inventory delivery. Adapters do not import one another.
 
-    classDef ext fill:#dbeafe,stroke:#2563eb,color:#0b1021;
-    classDef core fill:#fef3c7,stroke:#d97706,color:#0b1021;
-    classDef quiet fill:#f3f4f6,stroke:#6b7280,color:#0b1021;
-    class Event ext;
-    class Select,Lane,Recheck,Probe,Commit core;
-    class Noop quiet;
-```
+`joboutput/candidate_controller.go` owns one continuation record per job:
+
+| Controller fact | Purpose |
+| --- | --- |
+| Applied inventory and consumed source cursor | Current source authority and sticky source decisions, including masked choices |
+| Committed binding | One admitted raw config, source provenance, health and listedness exposed through DynCfg |
+| Enablement and intent generation | Distinguish passive, enabled and disabled lifetimes independently of health |
+| Candidate ledger and finite pass | Admission grants, initial attempts, failure classification and per-candidate retry deadlines |
+| Outstanding proposal/work and deadline token | Revoke stale execution without depending on config UID equality |
+
+The highest owning source tier masks lower tiers even after operational failure. Alternatives span source slots at
+that tier. An eligible current selection is preferred; remaining candidates use config UID order with source identity
+as a tie-breaker. A finite pass tries each member at most once. Initial sibling attempts do not wait for a failed
+candidate's retry cadence, including when its cadence is zero or its error forbids retrying that same config.
+
+Every retained Active or Proposal MUST pass the same capability and membership-authority check used by execution.
+One membership occupies at most one role. A distinct predecessor Active and successor Proposal may coexist, with the
+Proposal owning physical execution. Rejection or authority withdrawal reconciles both slots before occupancy can
+suppress progress or coalesce ENABLE. Binding/source admission grants remain separate from executable work validity.
+Resume delivery follows the same Proposal-before-Active execution priority. Framework blocks belong to Active;
+resuming a tentative Proposal cannot consume that predecessor state or admit the Proposal before validation.
+
+Passive daemon discovery admits one logical job as `accepted` without Init/Check; ENABLE starts the search.
+Automatic source mode first checks a tentative proposal while preserving an incumbent. Invalid proposals quarantine
+their exact membership. A genuine source proposal retains its persistent-source acceptance boundary, including
+source-specific Failed/removal. Ordinary alternative probes keep failures, waits and retry grants private: they do
+not replace the public binding or its resource demand. The current binding owns an admission independently of
+historical retry grants. New source revisions can supersede obsolete retry-only candidates, but cannot revoke the
+unchanged binding or its retry deadline. Replacing the binding releases that protection; source-lifetime removal and
+trust withdrawal independently revoke both public and historical authority during inventory folding. A successful
+checked alternative uses the existing handoff; runtime readiness closes automatic alternative search.
+
+Failed, blocked and waiting candidate outcomes apply the controller's public binding decision through
+`prepareCandidateDecision`, including dependency and physical-release waits. A private wait commits its recovery
+state and registers its wake-up without requiring a listed binding or changing the incumbent's lifecycle diagnostics.
+Dependency arrival resumes that exact candidate; source withdrawal revokes it before a later notification can restart it.
 
 Common event sequences:
 
 | Event | Outcome |
 | --- | --- |
-| DynCfg config is checking; a lower source arrives | Work for that job identity is serialized. If DynCfg establishes graph ownership, the lower reconciliation becomes a no-op before `Check`. |
-| Higher source is `Accepted`, `Running`, `Failed`, or `Disabled` | Its graph record still owns the identity. A lower source cannot replace it merely because it is not running. |
-| Higher proposal is invalid or rejected before graph mutation | It never becomes the owner. That exact source revision is skipped until its record changes, and the selected valid lower source may proceed in the same reconciliation. |
-| An acknowledged source publishes a rejected replacement | The incumbent remains the graph owner against same/lower sources while that authoritative source still has a record. A strictly higher valid source may replace it; a real removal of the incumbent source may remove it. |
-| A stale pending attempt or retry becomes runnable | It revalidates the source winner, desired config, token, and graph state. If any changed, it becomes a no-op. |
-| DynCfg `test` runs | It uses a separate, memory-only attempt identity. It never owns the graph and never masks another source. |
-| DynCfg override is removed | The override and its runtime, if running, are removed. A masked lower source is **not** activated automatically; it needs a later source-state transition that produces a new reconciliation. An unchanged masked candidate is not installed merely because DynCfg disappeared. |
+| Higher source is Accepted, Running, Failed, or Disabled | Lower sources remain observed but cannot probe or take ownership. |
+| Admitted source proposes only rejected replacements | Its admitted incumbent and authorized recovery survive while that source slot remains; real removal or an accepted replacement revokes them. |
+| Owning discovered pipeline withdraws trust | Its trusted execution and recovery authority are revoked during inventory folding, independently of metadata admission. Invalid metadata cannot acquire an exposed binding. |
+| An admitted sibling fails and another sibling is adopted | Other still-authorized admission grants retain their immutable config and deadlines; sibling adoption alone is not source replacement. |
+| Enabled search has no active attempt and a new eligible sibling arrives | The controller can open a finite pass without resetting prior deadlines or repeating every failed member. Passive, disabled, blocked and readiness-closed searches do not start siblings. |
+| A delayed worker or deadline completes | The lane rechecks its exact run, intent and work/schedule capability; stale work cannot adopt, publish or re-enable. |
+| DynCfg TEST or a rejected edit probes another config | That config never acquires the admitted binding or source authority. |
+| DynCfg override is removed | Its intent/runtime are revoked. The consumed lower-source cursor remains, so unchanged masked sources and irrelevant sibling events do not automatically restore it. |
 
-Here, "no-op" means **do not execute the collector**. Discovery may still remember the lower candidate as source
-state.
+The last row preserves the existing override-removal boundary tracked by issue #23302. A meaningful later source
+change may reconcile, but this continuation model does not add automatic restoration. A masked cursor retains only
+observation identity, priority and source lifetime. Source selection carries those history facts separately from its
+optional executable ledger member. A protected cursor can outlive that member: it preserves consumed source authority
+but cannot construct a collector or create an admission grant. Existing authorized recovery continues independently.
+Removal of the actual admitted source is checked independently of that cursor.
 
-`plugin/framework/confgroup/config.go`, `discovery/decision.go`, `joboutput/discovery.go`, `joboutput/pending_job.go`.
+Admission of a newly introduced source membership supersedes retained grants that disappeared at or before that
+revision of the same source lifetime. Admitting a preexisting surviving sibling preserves those grants. Membership
+introduction and disappearance are source facts; later retries and enablement transitions do not rewrite that provenance.
+
+Source policy lives in `joboutput/candidate_controller.go`; `joboutput/candidate_execution.go` applies decisions and
+releases execution effects after commit. `joboutput/accepted_activation.go` retains contained execution, dependency
+waits and physical-release waits. It does not own another desired-config queue.
+
+Source reconciliation separates arbitration from recovery. Arbitration consumes source history and selects or
+proposes ownership; every exit then reconciles the surviving continuation's execution and deadline. A protected
+interactive DynCfg binding or masked source choice cannot bypass this recovery step. Grant withdrawal changes only
+the affected candidate's authority and retry facts; it does not reset the job's finite pass or another owner's wake.
+Revoked pass members are skipped while surviving members keep their position ahead of later arrivals.
+
+### Exposed collector binding
+
+The single DynCfg collector/name describes one logical job and its admitted configuration. Raw GET, CONFIG source
+metadata, health and stored-config command targets MUST refer to that same binding. Trying another endpoint does
+not admit it: unsuccessful alternatives retain private recovery grants and deadlines without replacing the public
+configuration, source cursor or resource-intent owner. If all endpoints fail, the logical binding remains stable.
+Failure of that binding updates its health, subject to the existing failed-stock visibility policy.
+
+A successfully checked alternative or genuine accepted source replacement can update the binding. CONFIG CREATE is
+needed when the public source metadata changes, an unlisted job becomes visible, or a genuine passive source
+replacement needs normal daemon policy. Enabled handoffs with unchanged source metadata need only STATUS because
+GET reads the committed raw payload. Failed stock removal can leave enabled controller recovery
+alive while the public job is unlisted. A later successfully admitted alternative recreates its binding and metadata.
+
+GET reads the exposed graph binding and preserves unresolved raw references without Init/Check.
+Inner RESTART selects and pins the exposed stored config in its resource lane; its outer response observer uses an
+independent invocation lane. SCHEMA comes from the module registry. USERCONFIG and TEST use caller payloads. Tentative
+proposals, rejected edits and late old outcomes cannot acquire exposure.
+
+`joboutput/{dyncfg_jobs,dyncfg_prepare,dyncfg_restart,candidate_execution}.go` and `composition/dyncfg.go` own these
+command and projection boundaries.
 
 ### Candidate lifecycle
 
@@ -539,13 +611,14 @@ Two different guarantees apply during replacement:
 
 A proposal rejected before it establishes desired state leaves the incumbent unchanged. Preflight identity contention
 rejects interactive UPDATE; contention after its accepted retirement becomes an activation wait. Unaccepted discovery
-replacements retain source-priority pending work. ENABLE and accepted replacements use the activation owner below.
+replacements remain tentative controller proposals with an exact predecessor. ENABLE and accepted replacements release
+controller-authorized work through the executor below.
 
 ```mermaid
 flowchart TD
-    Cmd("UPDATE preflight / selected discovery<br/>accepted activation attempt")
+    Cmd("UPDATE preflight / source proposal<br/>controller-authorized activation")
     Stage("Process-owned candidate<br/>clone · secrets · construct · Init")
-    AutoD{"Check + post-check<br/>yield global jobs claim"}
+    AutoD{"Check + post-check<br/>off-loop / yielded claim"}
     Functions("Stage job Functions<br/>from initialized collector")
     Keep("Reject / supersede / busy<br/>incumbent unchanged")
     Reserve("Reserve inactive<br/>run permit")
@@ -555,7 +628,8 @@ flowchart TD
     Live("Install Activating + Accepted<br/>publish Running after readiness")
     Wait("Accepted: wait for physical release")
     RetireFailed("Retire incumbent")
-    Fail("Commit Failed / removed<br/>schedule retry by source policy")
+    Fail("Commit Failed / removed<br/>record candidate recovery")
+    Next("Controller chooses eligible<br/>sibling or due retry")
 
     Cmd --> Stage
     Stage -->|"busy / proposal rejected"| Keep
@@ -570,14 +644,14 @@ flowchart TD
     Promote -->|"acquired"| Attach --> Live
     AutoD -->|"discovery / accepted: failed"| RetireFailed --> Fail
     Promote -->|"old runtime retained"| Wait
-    Wait -. "identity released" .-> Stage
-    Fail -. "configured retry due" .-> Stage
+    Wait -. "identity released" .-> Promote
+    Fail --> Next --> Stage
 
     classDef ext fill:#dbeafe,stroke:#2563eb,color:#0b1021;
     classDef core fill:#fef3c7,stroke:#d97706,color:#0b1021;
     classDef job fill:#dcfce7,stroke:#16a34a,color:#0b1021;
     class Cmd ext;
-    class AutoD,Functions,Reserve,Retire,RetireFailed,Promote,Attach core;
+    class AutoD,Functions,Reserve,Retire,RetireFailed,Promote,Attach,Next core;
     class Stage,Keep,Live,Wait,Fail job;
 ```
 
@@ -596,7 +670,7 @@ flowchart TD
      admitted after a cut.
    - A normal detection failure commits `StatusFailed` or stock removal for background activation. Interactive UPDATE
      rejects it. Missing named dependencies and physical contention after acceptance retain enabled intent; unaccepted
-     discovery replacement keeps its source-specific pending path.
+     discovery replacement retains its token-scoped tentative proposal.
    - **One bad collector cannot dirty Job Manager.** A normal `Init`, `Check`, validation, or Function-staging failure
      is isolated to that candidate once rejection cleanup completes. Only a *failed or unprovable* cleanup retains
      process ownership and fails the run closed.
@@ -682,8 +756,11 @@ Transactions admitted while another transaction temporarily owns the current res
 retirement authority remains fenced.
 
 A typed `runtimeStartupFailure` carries an operational startup outcome into that settlement transaction. The graph
-becomes `failed`, diagnostic snapshots retain the reason, and configured startup retry policy applies. Stock configs
-remain visible after runtime startup failure. Failure after readiness retains the existing manual restart policy.
+becomes `failed`, diagnostic snapshots retain the reason, and the controller applies the candidate's startup recovery
+policy or advances its open same-tier pass. Stock configs remain visible after runtime startup failure. Readiness
+closes sibling search even if failure is observed before the Running publication. Failure after readiness requires an
+explicit command; neither a timer nor a sibling arrival reopens that search. Settlement uses `ManagedRun.AfterReady`,
+not graph status, to preserve this boundary.
 Mixed ownership, cleanup, graph, or panic errors still fail closed; they are not hidden by an operational error elsewhere
 in the error tree. Startup does not delay the earlier UPDATE/ENABLE acceptance reply.
 
@@ -725,26 +802,38 @@ the plugin restarts. Echo replies update status or record rejection without repl
   permits replacement and returns `202` with `accepted`; predecessor physical cleanup and new runtime readiness do not
   hold the reply. The accepted replacement has no incumbent fallback. An identical running DynCfg payload retains its
   current runtime and returns `200`.
-- **ENABLE.** Running is already satisfied (`200`). Other stored configurations accept enabled intent (`202`) through
-  a short transaction. If the collector declares a configuration-intent resource owner, new acquisition authority
-  first requires pure raw validation (`400` for malformed input, `503` if validation is unavailable). Construction,
-  readiness and resulting health settle afterward. Repeated ENABLE coalesces.
+- **ENABLE.** An already-enabled job preserves its intent independently of health and caller provenance, returning
+  `202` while health is Accepted and `200` otherwise, including Failed. Repeated policy notifications preserve its
+  public configuration, active work, finite pass, retry deadlines and exact/source scope. Passive or disabled
+  configurations accept enabled intent (`202`) through a short transaction. That actual transition starts a fresh
+  same-tier alternative search for source-owned jobs; DynCfg-owned config remains exact.
+  Changed enabled identities with a configuration-intent resource owner first require pure raw validation and a
+  resource reservation. Construction, readiness and health settle afterward. Explicit RESTART targets the stored
+  configuration when an immediate recovery attempt is needed.
 - **Other mutations.** Disabled UPDATE, DISABLE and REMOVE return `200` when applied. Runtime quarantine discovered
   after an accepted UPDATE is reported through later failed status and diagnostics; the mutation reply remains `202`.
-- **Informative commands.** TEST preserves its validation/error codes. RESTART runs a response-free resource transaction
-  from an independent Function invocation lane, then observes the exact activation token and installed generation. It
+- **Informative commands.** TEST preserves its validation/error codes and never adopts its payload. RESTART probes
+  the exposed stored config only; it cannot sweep source siblings on failure. It runs a response-free resource transaction
+  from an independent Function invocation lane, then observes the accepted continuation and exact installed generation. It
   returns `200` only after readiness/publication commits, or the classified failure. Stop/replacement invalidates the
   receipt; a later retry cannot satisfy it. Caller timeout/cancellation detaches observation without undoing adoption.
+- **Restart observation ownership.** Pending observation follows `{run, intent, candidate}` across fresh physical
+  attempts. Executor replacement, dependency waits and preflight interruption do not settle it. Committed controller
+  transitions complete classified terminal outcomes before retry effects, or retire observation when its semantic
+  authority disappears. Successful installation moves the receipt to the exact runtime identity. Run stop drains both
+  pending and installed observations, including interrupted continuations with no executor.
 - **Retirement.** A mutation rolled back before graph commit returns `503`; unapplied work cannot claim acceptance.
 
 Health is reported through CONFIG status and lifecycle diagnostics. `TestDynCfgJobMutationAdoptionAndRestartPreflight`
 covers plugin mutation outcomes; composition RESTART tests exercise the outer reply, blocked startup, concurrent disable,
-cancellation, and deadlines through the actual kernel.
+cancellation, and deadlines through the actual kernel. `composition/candidate_echo_test.go` feeds automatic daemon
+replies through real Function ingress; candidate-only tests cannot detect a CREATE/ENABLE feedback loop.
 
 ### Accepted-job activation
 
-`accepted` covers passive registration and enabled work that is staging, waiting, or starting. The activation index and
-current resource distinguish enabled intent; a passive registration never starts merely because a dependency appears.
+`accepted` covers passive registration and enabled work that is staging, waiting, or starting. The candidate controller
+owns enablement; the graph and executor registry are projections. A passive registration never starts merely because
+a dependency appears.
 
 Collectors with `JobConfigIntentOwner` reserve resources only after structural validation of each changed enabled
 identity. This admission gate covers discovery, Enable and failure adoption, independently of missing dependencies
@@ -758,32 +847,53 @@ mutations remain serialized while unrelated graph work can proceed. Unchanged id
 repeat validation callbacks. Retirement calls the intent owner's Prepare with a zero next identity, then Commit to
 release intent. Retirement preparation, Commit and Abort perform bounded in-memory ownership changes. The owner may
 queue physical cleanup on its maintenance worker; cleanup failures remain visible through owner health and final
-joined close. Operational failure/retry retains valid intent. The owning discovery pipeline can still
-revoke trust with an invalid postimage; that Failed adoption retires both the incumbent and acquisition intent.
+joined close. Operational failure/retry retains valid intent. An owning discovery pipeline's trust withdrawal
+retires the trusted binding and acquisition intent during inventory commit, even when replacement metadata is invalid.
 
-If admission validation or reservation is busy or times out, discovery retains unaccepted desired work until that
+If admission validation or reservation is busy or times out, the controller retains unaccepted work until that
 exact admission attempt releases, preserving the incumbent. A quarantined admission identity rejects that revision.
 Interactive commands reject unavailable admission without changing state. Neither path grants acquisition before
 validation completes. No dependency lookup, reference resolution, Init or Check is part of this admission proof.
 
-- A short accepted mutation arms `{run epoch, config UID, activation generation}` only after commit. The worker builds
-  and probes outside the Function request, graph claim, and resource lane. Fresh construction waits for predecessor
-  runtime release as well as any Store resume gate, so expected retirement does not discard a successful probe.
-  Acknowledged terminal submission retains authority until its actual outcome is known.
-- Missing named vnode/Store dependencies retain `accepted` independent of retry settings. Registration precedes lookup;
-  a buffered wake remains queued across failed lookup and terminal acknowledgment. Post-commit dependency events wake
-  only affected enabled jobs. Runtime identity contention waits for physical release without polling.
-- Successful staging installs an Activating generation while retaining `accepted`. Exact runtime readiness/failure
-  transactions settle health separately. Operational preparation failure keeps existing source-specific stock removal
-  and configured retry/manual policy. Timer retries re-read committed state and arm the same activation owner.
-- Store rotation pauses enabled current intent, quiesces the old generation, commits/restores the Store, then resumes
-  the exact paused token. The child command does not probe or await startup. Deadline recovery holds only that resume
-  capability; disable/remove/replacement invalidates it. Dependency impact lists exclude passive accepted jobs.
-- Disable, removal, replacement, and run stop revoke publication authority. Late workers cannot emit stale status or
-  restore an old payload. Function Detach revokes catalog/wire admission promptly; Finalize drains admitted callbacks
-  before collector cleanup. The process-owned runtime identity remains occupied through physical cleanup.
-- Unaccepted discovery replacements retain their source-priority pending path. Committed jobs do not use a second
-  config-bearing recovery queue. Unexpected terminal submission, application, or cleanup failures fail the run closed.
+Resource intent follows the admitted raw binding independently of public listing. Hidden Failed stock retains enabled
+resource demand; admitted replacement transfers it, while disable, removal and trust revocation retire it. The resource
+index retains identities and owners only and cannot select candidates or schedule retries.
+
+- Controller work carries `{run epoch, intent generation, attempt sequence, candidate incarnation}`. A tentative
+  proposal also pins its predecessor intent. Short lane transactions commit the controller and graph together before
+  releasing work. The executor builds/probes outside the Function request, graph claim and resource lane.
+- Fresh construction waits for predecessor runtime release and any Store resume gate. Checked stages transfer
+  ownership across acceptance without repeating Init/Check. Executor registrations and transport command UIDs remain
+  distinct from policy tokens, so a handoff cannot reuse a still-active command UID.
+- Missing named vnode/Store/runtime dependencies and physical contention retain revocable waits; they do not consume a
+  candidate retry or permit sibling work around an occupied identity. Dependency registration precedes lookup and
+  post-commit events wake only affected enabled intent. Containment/quarantine remains framework failure with its
+  existing origin-specific release/retry policy, not evidence that another endpoint should be tried.
+- Successful staging installs an Activating generation under Accepted. Exact live readiness/failure transactions
+  settle health and the continuation separately. Operational failure preserves source-specific stock removal and
+  per-candidate retry/manual policy; readiness closes alternative search.
+- Store rotation pauses the exact committed config under a fresh exact intent, quiesces the old generation,
+  commits/restores the Store, then requests a token-scoped controller resume. A pending RESTART observation of that
+  predecessor transfers to the paused intent before its executor or installed runtime retires. Child commands do not
+  probe or await startup. Deadline
+  recovery retains only that scoped resume; disable/remove/replacement revokes it. Passive jobs are excluded.
+- Interactive preflight can interrupt physical execution without changing the predecessor's logical recovery facts.
+  Every terminal non-adoption path retains an acknowledged predecessor-scoped resume obligation, including rejection,
+  cancellation, deadline, disposal and aborted acceptance. Delivery outlives the request context and waits for its
+  acknowledgment outside the originating lane, avoiding a command waiting behind itself.
+- A rejected or withdrawn source proposal also restores an interrupted admitted predecessor when no runtime owns it.
+  The resume rechecks the surviving exact token in the job lane; a queued DISABLE or removal revokes that permission.
+- Disable, removal, supersession and run stop revoke work and publication authority. Late workers cannot publish stale
+  status or restore old payloads. Function Detach revokes admission promptly; Finalize drains admitted callbacks before
+  collector cleanup. The process-owned runtime identity remains occupied through physical cleanup.
+
+There is no independent desired-config pending queue. The controller retains source selection, admission grants and
+recovery facts; the executor retains physical handles and exact completion ownership. Unexpected current delivery,
+application or cleanup failure fails the run closed. Pure retired/stopped outcomes settle quietly.
+
+`joboutput/{candidate_controller,candidate_execution,accepted_activation,candidate_resume,secret_restart}.go` own
+these transitions.
+
 
 ### Job generations and fencing
 
@@ -809,15 +919,32 @@ Job Manager orchestrates both collector contracts identically; only the runtime 
 
 ### Autodetection retries
 
-Timed retry scheduling uses one per-run map, heap and dispatcher, with no timer or goroutine per retry entry
-(`joboutput/autodetection_retry.go`, `joboutput/scheduler.go`):
+The controller records each candidate's own retry eligibility and absolute logical deadline. A finite pass contains
+pending initial candidates plus retries due when that pass opens; each member is attempted at most once. New arrivals
+and newly due work wait for the next finite pass rather than extending the active pass indefinitely. An operational
+failure is not permanent proposal rejection. Zero cadence, permanent failures, and unclassified Init failures prevent automatic
+retry of that candidate, while eligible siblings may still receive their initial attempts.
 
-- The process's 1-second tick advances a **logical clock**.
-- When an entry is due, the dispatcher submits a short transaction that rechecks the committed config and retry token,
-  changes the graph to `accepted`, and arms accepted activation after commit (`joboutput/discovery.go`). It retains
-  retry-token authority until that transaction settles.
-- Accepted activation owns subsequent construction, dependency waits and physical-release waits. Success, replacement,
-  disable, removal or shutdown settles or revokes the corresponding retry and activation authority.
+`joboutput/autodetection_retry.go` retains one earliest wake per job in the existing per-run map, heap and dispatcher:
+
+- The process's one-second tick advances a logical clock.
+- Heap entries carry job identity, due time and `{run epoch, intent generation, schedule generation}` only; they store
+  no config and cannot select a candidate.
+- A due wake submits a short lane transaction in `joboutput/candidate_execution.go`. The controller checks the capability and
+  enabled/open search, chooses eligible work, and commits its state before releasing an executor effect. Waiting for
+  a collector's Check never blocks deadline delivery for an unrelated job.
+- Identical inventory, sibling changes and rejected proposals do not reset another candidate's cooldown. An actual
+  enablement transition resets attempt facts; disable/removal/supersession/run retirement revokes old deadline capabilities.
+- Exact DynCfg recovery uses its admitted binding; source alternatives use the admitted continuation's tier. While
+  a higher-source proposal is pending, its predecessor keeps its own recovery scope until admission. Removing a
+  historical earliest grant recomputes the surviving deadline even when the proposal prevents immediate execution.
+  An unchanged deadline retains its wake capability. A consumed due wake is not rearmed while a proposal blocks
+  execution; candidate due facts remain available when the proposal resolves.
+- Passive, disabled, readiness-closed and manual-stop continuations have no ordinary wake. Framework retry keeps
+  its authorized Active candidate's exact deadline; dependency waits and quarantine cannot start sibling recovery.
+  The pending-proposal deadline scan runs during source reconciliation, outside readiness and wake settlement.
+- Readiness closes automatic recovery, including after-ready failure observed before Running publication. Exact
+  RESTART and dependency resume stay pinned to their stored config rather than opening sibling search.
 
 ## Secrets
 
@@ -844,9 +971,24 @@ itself authority. It also stamps `__discovery_pipeline_id__` from the manager-ow
 target source text. Enabled discovered trust and its pipeline ID participate in `confgroup.Config.Hash` so changing
 the setting or trusted owner reconciles jobs even when their other values are unchanged. Absent/false trust stamps
 preserve the default hash. Cloning and graph payload serialization preserve both stamps.
-When opting out makes a literal field invalid, discovery commits the replacement as failed and removes the old
-trusted runtime and its dependencies only if both configs carry the same nonempty pipeline ID. Invalid proposals
-from a different or unidentified pipeline retain ordinary rejection behavior, preserving the trusted incumbent.
+Permission withdrawal belongs to the controller's inventory ingress, before executable metadata admission. A newly
+observed discovered membership with false trust and a nonempty pipeline ID revokes that pipeline's current and
+historical trusted memberships, work and retry grants. If it owns the exposed binding, the same transaction removes
+that binding, runtime, dependencies and acquisition intent. Metadata quarantine cannot bypass this withdrawal.
+Invalid metadata remains unpublishable; a metadata-valid replacement whose literal preparation fails can subsequently
+be exposed as Failed/manual source revocation. Unrelated or unidentified pipelines cannot withdraw the incumbent's
+permission. Historical-only withdrawal preserves an unrelated exposed binding and its remaining recovery deadlines.
+Those deadlines belong to the surviving continuation, including an interactive exact DynCfg override; source masking
+cannot skip recovery projection before executor effects commit.
+
+The controller consumes permission facts by membership incarnation against the preceding complete inventory, including
+each ordered observation in a batch. Repeated full snapshots cannot reapply an old opt-out against a later legitimate
+grant. A withdrawn trusted membership stays fenced while observed, so ENABLE, exact commands, resume and stale runtime
+outcomes cannot restore it; its fence is pruned on absence. A fresh incarnation follows ordinary source arbitration.
+Protected cursor history and the source-revoked manual hold preserve existing masking: withdrawal does not itself open
+automatic sibling search or a lower source tier. A valid replacement in the protected slot or real source removal can
+reconcile normally. Outcome processing classifies preparation failure from recorded withdrawal provenance; it does
+not independently withdraw permission. That provenance expires on admission or loss of its source lifetime.
 Rejected discovered candidates are scoped by pipeline ID too, so a competing candidate's rejection cannot suppress
 a later opt-out from the actual owner, even when their untrusted hashes match.
 
@@ -1417,9 +1559,9 @@ attempt until it releases.
 | `jobmgr/lifecycle` | Neutral authorities: UID, operation, task, long-lived permit, frame, run, shutdown budget, resource, transaction, on-loop ownership funnel |
 | `jobmgr/containment` | Process-lifetime attempts, per-identity exclusion, logical cuts, retained-work census |
 | `jobmgr/functions` | Function ingress, stable handler bundles, routing catalog, invocation containment, publication |
-| `jobmgr/joboutput` | Collector staging, installed runtimes, output fencing, DynCfg jobs, retries, vnodes |
+| `jobmgr/joboutput` | Per-job candidate policy and exposed bindings, contained execution, installed runtimes, output fencing, deadline dispatch and vnodes |
 | `jobmgr/secrets` | Secret dependency index, store command adapter, Store materialization, pending retries, dependent-restart transaction |
-| `jobmgr/discovery` | Discovery add/remove decisions and the configured-vnode authority |
+| `jobmgr/discovery` | Versioned source inventories with membership lifetimes, ordered delivery, and configured-vnode authority |
 | `jobmgr/composition` | The only assembler; process construction and run-generation rotation |
 | `plugin/framework/functions` | Passive Function values and the stdin input capsule |
 | `plugin/framework/dyncfg` | The dynamic-configuration `Graph` |
@@ -1449,10 +1591,11 @@ black-box tests rather than an exact private-type or source-file manifest.
 | Goal | Start here |
 | --- | --- |
 | Add or change a Function surface, routing, or publication | `functions/` (catalog, controller, publication, protocol) |
-| Change how a collector job is built, started, stopped, or retried | `joboutput/` (factory, generation, transaction, scheduler, autodetection_retry) |
+| Change collector source selection, enablement or retry policy | `joboutput/{candidate_controller,candidate_execution}.go` |
+| Change collector execution, lifecycle or deadline transport | `joboutput/` (factory, generation, transaction, accepted_activation, candidate_resume, autodetection_retry) |
 | Change secret reference syntax or resolution | `plugin/agent/secrets/resolver` |
 | Change how a secret store commits or restarts dependents | `plugin/agent/secrets/secretstore`, `secrets/` (store_stage, restart, transaction, dependency, pending) |
-| Change discovery add/remove decisions or configured vnodes | `discovery/` (decision, vnode), `composition/{discovery,vnodes}.go` |
+| Change source observations or configured vnodes | `discovery/` (inventory, vnode), `composition/{discovery,vnodes}.go`; collector selection belongs to the job controller |
 | Change the ordering model (lanes, claims, staging, acceptance, deadlines) | `kernel*.go`, `claim_authority.go`, `lifecycle/` |
 | Change process-lifetime containment, same-identity exclusion, or retained-work accounting | `containment/authority.go`, `process_attempt.go` |
 | Change how the process is assembled, reloaded, or shut down | `composition/` (process, run, public) |

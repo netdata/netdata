@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	catosdk "github.com/catonetworks/cato-go-sdk"
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
@@ -395,6 +396,93 @@ func TestSDKClient(t *testing.T) {
 			client, err := newSDKAPIClient(cfg, server.Client())
 			require.NoError(t, err)
 			tc.check(t, client, calls)
+		})
+	}
+}
+
+func TestSDKClientAccountMetrics(t *testing.T) {
+	tests := map[string]struct {
+		groupInterfaces *bool
+	}{
+		"default grouping": {},
+		"group interfaces": {groupInterfaces: new(true)},
+		"split interfaces": {groupInterfaces: new(false)},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			var request rawGraphQLRequest
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				require.Equal(t, http.MethodPost, r.Method)
+				require.Equal(t, "12345", r.Header.Get("x-account-id"))
+				require.Equal(t, "secret", r.Header.Get("x-api-key"))
+				require.NoError(t, json.NewDecoder(r.Body).Decode(&request))
+				w.Header().Set("Content-Type", "application/json")
+				_, err := io.WriteString(w, `{"data":{"accountMetrics":{"sites":[{"id":"1001","interfaces":[{"name":"WAN 1","metrics":{"rtt":15},"timeseries":[{"label":"bytesUpstreamMax","data":[[1,6008],[2,7168]]}]}]}]}}}`)
+				require.NoError(t, err)
+			}))
+			defer server.Close()
+
+			cfg := Config{
+				AccountID: "12345",
+				APIKey:    "secret",
+			}
+			cfg.URL = server.URL
+			client, err := newSDKAPIClient(cfg, server.Client())
+			require.NoError(t, err)
+
+			metrics, err := client.AccountMetrics(context.Background(), "12345", []string{"1001", "1002"}, "last.PT10M", 3, tc.groupInterfaces)
+			require.NoError(t, err)
+
+			var groupInterfaces any
+			if tc.groupInterfaces != nil {
+				groupInterfaces = *tc.groupInterfaces
+			}
+			require.Equal(t, "accountMetrics", request.OperationName)
+			require.Equal(t, map[string]any{
+				"accountID":            "12345",
+				"id":                   nil,
+				"siteIDs":              []any{"1001", "1002"},
+				"ids":                  []any{},
+				"userIDs":              []any{},
+				"timeFrame":            "last.PT10M",
+				"buckets":              float64(3),
+				"groupInterfaces":      groupInterfaces,
+				"groupDevices":         nil,
+				"toRate":               nil,
+				"perSecond":            nil,
+				"withMissingData":      nil,
+				"useDefaultSizeBucket": nil,
+				"types":                []any{},
+				"labels": []any{
+					"bytesUpstreamMax", "bytesDownstreamMax", "lostUpstreamPcnt", "lostDownstreamPcnt",
+					"jitterUpstream", "jitterDownstream", "packetsDiscardedUpstream", "packetsDiscardedDownstream",
+					"rtt", "lastMileLatency", "lastMilePacketLoss",
+				},
+			}, request.Variables)
+			require.Equal(t, &catosdk.AccountMetrics{
+				AccountMetrics: &catosdk.AccountMetrics_AccountMetrics{
+					Sites: []*catosdk.AccountMetrics_AccountMetrics_Sites{
+						{
+							ID: new("1001"),
+							Interfaces: []*catosdk.AccountMetrics_AccountMetrics_Sites_Interfaces{
+								{
+									Name: new("WAN 1"),
+									Metrics: &catosdk.AccountMetrics_AccountMetrics_Sites_Interfaces_Metrics{
+										Rtt: new(int64(15)),
+									},
+									Timeseries: []*catosdk.AccountMetrics_AccountMetrics_Sites_Interfaces_Timeseries{
+										{
+											Label: "bytesUpstreamMax",
+											Data:  [][]float64{{1, 6008}, {2, 7168}},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}, metrics)
 		})
 	}
 }

@@ -36,6 +36,11 @@ int api_v1_function(RRDHOST *host, struct web_client *w, char *url) {
     if(!function || !*function)
         return nrpc_call_error(wb, "No function given to execute.", HTTP_RESP_BAD_REQUEST);
 
+    // reject early what the plugins.d framing would refuse later
+    const char *reason = w->payload ? functions_payload_validate(buffer_tostring(w->payload), buffer_strlen(w->payload)) : NULL;
+    if(reason)
+        return nrpc_call_error(wb, reason, HTTP_RESP_BAD_REQUEST);
+
     char transaction[UUID_COMPACT_STR_LEN];
     uuid_unparse_lower_compact(w->transaction, transaction);
 

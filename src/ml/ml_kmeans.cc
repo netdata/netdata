@@ -39,7 +39,7 @@ ml_kmeans_init(ml_kmeans_t *kmeans)
     kmeans->cluster_centers.reserve(2);
     kmeans->cluster_centers.clear();
     kmeans->min_dist = std::numeric_limits<calculated_number_t>::max();
-    kmeans->max_dist = std::numeric_limits<calculated_number_t>::min();
+    kmeans->max_dist = 0.0;
 }
 
 void
@@ -48,8 +48,10 @@ ml_kmeans_train(ml_kmeans_t *kmeans, const std::vector<DSample> &preprocessed_fe
     kmeans->after = after;
     kmeans->before = before;
 
+    // Distances are never negative, so max_dist starts at 0: when every
+    // distance is 0 the bounds end up equal and the model is flat.
     kmeans->min_dist = std::numeric_limits<calculated_number_t>::max();
-    kmeans->max_dist  = std::numeric_limits<calculated_number_t>::min();
+    kmeans->max_dist = 0.0;
 
     kmeans->cluster_centers.clear();
 
@@ -85,19 +87,39 @@ ml_kmeans_train(ml_kmeans_t *kmeans, const std::vector<DSample> &preprocessed_fe
     }
 }
 
+// A model is flat when its spread (max_dist - min_dist) is below this
+// fraction of max_dist. Most often the spread is zero or a few ULP of
+// rounding, because every training point sat on a centre (zeros plus one
+// repeated spike), so every point had the same mean distance to the centres.
+// Dividing by such a spread makes the score jump to 100 on any tiny wobble,
+// so a flat model has no usable scale. Measured on a large parent,
+// rounding-only spreads stay below ~1e-11 of max_dist and real ones start
+// above ~1e-8.
+#define ML_KMEANS_FLAT_RELATIVE_SPREAD 1e-9
+
+// Returns NaN when the model is flat: it abstains, and the dimension's other
+// models decide whether a sample is anomalous.
 calculated_number_t
 ml_kmeans_anomaly_score(const ml_kmeans_inlined_t *inlined_km, const DSample &DS)
 {
+    calculated_number_t spread = inlined_km->max_dist - inlined_km->min_dist;
+    if (inlined_km->max_dist == inlined_km->min_dist ||
+        (spread > 0.0 && spread < ML_KMEANS_FLAT_RELATIVE_SPREAD * std::abs(inlined_km->max_dist)))
+        return std::numeric_limits<calculated_number_t>::quiet_NaN();
+
+    // Training used to start max_dist at DBL_MIN, so a model whose distances
+    // were all 0 was stored in ml.db as (0, DBL_MIN) instead of (0, 0): treat
+    // it as flat too. Streamed models print DBL_MIN as 0 and arrive as (0, 0).
+    if (inlined_km->min_dist == 0.0 && inlined_km->max_dist == std::numeric_limits<calculated_number_t>::min())
+        return std::numeric_limits<calculated_number_t>::quiet_NaN();
+
     calculated_number_t mean_dist = 0.0;
     for (const auto &CC: inlined_km->cluster_centers)
         mean_dist += dlib::length(CC - DS);
 
     mean_dist /= inlined_km->cluster_centers.size();
 
-    if (inlined_km->max_dist == inlined_km->min_dist)
-        return 0.0;
-
-    calculated_number_t anomaly_score = 100.0 * std::abs((mean_dist - inlined_km->min_dist) / (inlined_km->max_dist - inlined_km->min_dist));
+    calculated_number_t anomaly_score = 100.0 * std::abs((mean_dist - inlined_km->min_dist) / spread);
     return (anomaly_score > 100.0) ? 100.0 : anomaly_score;
 }
 

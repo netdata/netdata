@@ -18,7 +18,7 @@
 #
 # A subdirectory has its own scope, so no VARIABLE set below is visible to the
 # root unless the export block at the end of this file hands it back. That
-# applies to the source lists and the WEVT_* paths as much as to the six
+# applies to the source lists and the WEVT_* paths as much as to the seven
 # exported names: a future root consumer of any of them reads an empty value and
 # gets no error.
 #
@@ -46,6 +46,7 @@ endif()
 
 if(NOT OS_FREEBSD)
     list(APPEND LIBNETDATA_FILES ${LIBNETDATA_STACKTRACE_FILES})
+    set(HAVE_STACKTRACE True)
 endif()
 
 list(APPEND LIBNETDATA_FILES ${INICFG_FILES})
@@ -355,10 +356,10 @@ set_target_properties(spawn-tester PROPERTIES
 #
 # A subdirectory gets its own variable scope, so everything the root still
 # reads has to be handed back explicitly. Every consumer is named below, so
-# this list can be checked rather than trusted - a seventh consumer added
+# this list can be checked rather than trusted - an eighth consumer added
 # elsewhere fails silently unless it is added here too.
 #
-# All six are read by packaging/cmake/config.cmake.h.in, each as a
+# All seven are read by packaging/cmake/config.cmake.h.in, each as a
 # #cmakedefine of the same name, and reach the build through config.h, which
 # NetdataSystemFiles.cmake generates from the root after this directory. A
 # missing export costs no error: config.h emits #undef and the feature
@@ -370,3 +371,4 @@ set(ENABLE_BROTLI  "${ENABLE_BROTLI}"  PARENT_SCOPE)
 set(HAVE_WEL       "${HAVE_WEL}"       PARENT_SCOPE)
 set(HAVE_ETW       "${HAVE_ETW}"       PARENT_SCOPE)
 set(HAVE_LIBUNWIND "${HAVE_LIBUNWIND}" PARENT_SCOPE)
+set(HAVE_STACKTRACE "${HAVE_STACKTRACE}" PARENT_SCOPE)
