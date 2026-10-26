@@ -95,6 +95,17 @@ static inline bool json_parse_false(LOG_JSON_STATE *js) {
     }
 }
 
+static inline bool json_number_append(LOG_JSON_STATE *js, char **d, const char **s, size_t *remaining, const char *part) {
+    if (*remaining < 2) {
+        snprintf(js->msg, sizeof(js->msg), "JSON PARSER: truncated %s at position %u", part, js->pos);
+        return false;
+    }
+
+    *(*d)++ = *(*s)++;
+    (*remaining)--;
+    return true;
+}
+
 static inline bool json_parse_number(LOG_JSON_STATE *js) {
     static __thread char value[8192];
 
@@ -104,54 +115,38 @@ static inline bool json_parse_number(LOG_JSON_STATE *js) {
     size_t remaining = sizeof(value) - 1; // Reserve space for null terminator
 
     // Optional minus sign
-    if (*s == '-') {
-        *d++ = *s++;
-        remaining--;
-    }
+    if (*s == '-' && !json_number_append(js, &d, &s, &remaining, "number value"))
+        return false;
 
     // Digits before decimal point
     while (*s >= '0' && *s <= '9') {
-        if (remaining < 2) {
-            snprintf(js->msg, sizeof(js->msg), "JSON PARSER: truncated number value at position %u", js->pos);
+        if (!json_number_append(js, &d, &s, &remaining, "number value"))
             return false;
-        }
-        *d++ = *s++;
-        remaining--;
     }
 
     // Decimal point and fractional part
     if (*s == '.') {
-        *d++ = *s++;
-        remaining--;
+        if (!json_number_append(js, &d, &s, &remaining, "fractional part"))
+            return false;
 
         while (*s >= '0' && *s <= '9') {
-            if (remaining < 2) {
-                snprintf(js->msg, sizeof(js->msg), "JSON PARSER: truncated fractional part at position %u", js->pos);
+            if (!json_number_append(js, &d, &s, &remaining, "fractional part"))
                 return false;
-            }
-            *d++ = *s++;
-            remaining--;
         }
     }
 
     // Exponent part
     if (*s == 'e' || *s == 'E') {
-        *d++ = *s++;
-        remaining--;
+        if (!json_number_append(js, &d, &s, &remaining, "exponent"))
+            return false;
 
         // Optional sign in exponent
-        if (*s == '+' || *s == '-') {
-            *d++ = *s++;
-            remaining--;
-        }
+        if ((*s == '+' || *s == '-') && !json_number_append(js, &d, &s, &remaining, "exponent"))
+            return false;
 
         while (*s >= '0' && *s <= '9') {
-            if (remaining < 2) {
-                snprintf(js->msg, sizeof(js->msg), "JSON PARSER: truncated exponent at position %u", js->pos);
+            if (!json_number_append(js, &d, &s, &remaining, "exponent"))
                 return false;
-            }
-            *d++ = *s++;
-            remaining--;
         }
     }
 
@@ -167,32 +162,31 @@ static inline bool json_parse_number(LOG_JSON_STATE *js) {
     }
 }
 
-static inline void copy_newline(LOG_JSON_STATE *js __maybe_unused, char **d, size_t *remaining) {
-    if(*remaining > 3) {
-        *(*d)++ = '\\';
-        *(*d)++ = 'n';
-        (*remaining) -= 2;
-    }
-}
+// newlines and tabs are written as the two characters \n and \t
+static inline bool copy_escaped(char **d, size_t *remaining, char c) {
+    if(*remaining < 3) return false; // +1 for the null
 
-static inline void copy_tab(LOG_JSON_STATE *js __maybe_unused, char **d, size_t *remaining) {
-    if(*remaining > 3) {
-        *(*d)++ = '\\';
-        *(*d)++ = 't';
-        (*remaining) -= 2;
-    }
+    *(*d)++ = '\\';
+    *(*d)++ = c;
+    (*remaining) -= 2;
+    return true;
 }
 
 static inline bool encode_utf8(unsigned codepoint, char **d, size_t *remaining) {
+    if (codepoint >= 0xD800 && codepoint <= 0xDFFF)
+        // UTF-16 surrogates are not characters
+        return false;
+
     if (codepoint <= 0x7F) {
         // 1-byte sequence
-        if (*remaining < 2) return false; // +1 for the null
         if(codepoint == '\n')
-            copy_newline(NULL, d, remaining);
-        else if(codepoint == '\t')
-            copy_tab(NULL, d, remaining);
-        else
-            *(*d)++ = (char)codepoint;
+            return copy_escaped(d, remaining, 'n');
+
+        if(codepoint == '\t')
+            return copy_escaped(d, remaining, 't');
+
+        if (*remaining < 2) return false; // +1 for the null
+        *(*d)++ = (char)codepoint;
         (*remaining)--;
     }
     else if (codepoint <= 0x7FF) {
@@ -227,54 +221,42 @@ static inline bool encode_utf8(unsigned codepoint, char **d, size_t *remaining) 
 }
 
 size_t parse_surrogate(const char *s, char *d, size_t *remaining) {
-    if (s[0] != '\\' || (s[1] != 'u' && s[1] != 'U')) {
+    if (s[0] != '\\' || s[1] != 'u') {
         return 0; // Not a valid Unicode escape sequence
     }
 
-    char hex[9] = {0}; // Buffer for the hexadecimal value
+    char hex[5] = {0}; // Buffer for the hexadecimal value
     unsigned codepoint;
 
-    if (s[1] == 'u') {
-        // Handle \uXXXX
-        if (!isxdigit((uint8_t)s[2]) || !isxdigit((uint8_t)s[3]) || !isxdigit((uint8_t)s[4]) ||
-            !isxdigit((uint8_t)s[5])) {
-            return 0; // Not a valid \uXXXX sequence
-        }
-
-        hex[0] = s[2];
-        hex[1] = s[3];
-        hex[2] = s[4];
-        hex[3] = s[5];
-        codepoint = (unsigned)strtoul(hex, NULL, 16);
-
-        if (codepoint >= 0xD800 && codepoint <= 0xDBFF) {
-            // Possible start of surrogate pair
-            if (s[6] == '\\' && s[7] == 'u' && isxdigit((uint8_t)s[8]) && isxdigit((uint8_t)s[9]) &&
-                isxdigit((uint8_t)s[10]) && isxdigit((uint8_t)s[11])) {
-                // Valid low surrogate
-                unsigned low_surrogate = strtoul(&s[8], NULL, 16);
-                if (low_surrogate < 0xDC00 || low_surrogate > 0xDFFF) {
-                    return 0; // Invalid low surrogate
-                }
-                codepoint = 0x10000 + ((codepoint - 0xD800) << 10) + (low_surrogate - 0xDC00);
-                return encode_utf8(codepoint, &d, remaining) ? 12 : 0; // \uXXXX\uXXXX
-            }
-        }
-
-        // Single \uXXXX
-        return encode_utf8(codepoint, &d, remaining) ? 6 : 0;
+    // Handle \uXXXX
+    if (!isxdigit((uint8_t)s[2]) || !isxdigit((uint8_t)s[3]) || !isxdigit((uint8_t)s[4]) ||
+        !isxdigit((uint8_t)s[5])) {
+        return 0; // Not a valid \uXXXX sequence
     }
-    else {
-        // Handle \UXXXXXXXX
-        for (int i = 2; i < 10; i++) {
-            if (!isxdigit((uint8_t)s[i])) {
-                return 0; // Not a valid \UXXXXXXXX sequence
+
+    hex[0] = s[2];
+    hex[1] = s[3];
+    hex[2] = s[4];
+    hex[3] = s[5];
+    codepoint = (unsigned)strtoul(hex, NULL, 16);
+
+    if (codepoint >= 0xD800 && codepoint <= 0xDBFF) {
+        // Possible start of surrogate pair
+        if (s[6] == '\\' && s[7] == 'u' && isxdigit((uint8_t)s[8]) && isxdigit((uint8_t)s[9]) &&
+            isxdigit((uint8_t)s[10]) && isxdigit((uint8_t)s[11])) {
+            // Valid low surrogate
+            char low_hex[5] = { s[8], s[9], s[10], s[11], '\0' };
+            unsigned low_surrogate = (unsigned)strtoul(low_hex, NULL, 16);
+            if (low_surrogate < 0xDC00 || low_surrogate > 0xDFFF) {
+                return 0; // Invalid low surrogate
             }
-            hex[i - 2] = s[i];
+            codepoint = 0x10000 + ((codepoint - 0xD800) << 10) + (low_surrogate - 0xDC00);
+            return encode_utf8(codepoint, &d, remaining) ? 12 : 0; // \uXXXX\uXXXX
         }
-        codepoint = (unsigned)strtoul(hex, NULL, 16);
-        return encode_utf8(codepoint, &d, remaining) ? 10 : 0; // \UXXXXXXXX
     }
+
+    // Single \uXXXX
+    return encode_utf8(codepoint, &d, remaining) ? 6 : 0;
 }
 
 static inline bool json_parse_string(LOG_JSON_STATE *js) {
@@ -298,12 +280,12 @@ static inline bool json_parse_string(LOG_JSON_STATE *js) {
 
             switch (*s) {
                 case 'n':
-                    copy_newline(js, &d, &remaining);
-                    s++;
-                    continue;
-
                 case 't':
-                    copy_tab(js, &d, &remaining);
+                    if(!copy_escaped(&d, &remaining, *s)) {
+                        snprintf(js->msg, sizeof(js->msg),
+                                 "JSON PARSER: truncated string value at position %u", js->pos);
+                        return false;
+                    }
                     s++;
                     continue;
 
