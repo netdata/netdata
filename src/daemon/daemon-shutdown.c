@@ -177,6 +177,11 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
 static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exit_when_done) {
     exit_initiated_set(reason);
 
+#ifdef ENABLE_DBENGINE
+    // false when dbengine work may still be running after its event loop stopped
+    bool dbengine_drained __maybe_unused = true;
+#endif
+
     // don't recurse (due to a fatal, while exiting)
     static bool run = false;
     if(run) {
@@ -329,7 +334,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 
             freez(th);
 
-            dbengine_shutdown();
+            dbengine_drained = dbengine_shutdown();
             watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
         }
         else {
@@ -456,25 +461,29 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     dictionary_print_still_allocated_stacktraces();
 
 #ifdef ENABLE_DBENGINE
-    // destroy the caches in reverse order (extent and open depend on main cache)
-    fprintf(stderr, "Destroying extent cache (PGC)...\n");
-    pgc_destroy(extent_cache, false);
-    fprintf(stderr, "Destroying open cache (PGC)...\n");
-    pgc_destroy(open_cache, false);
-    fprintf(stderr, "Destroying main cache (PGC)...\n");
-    pgc_destroy(main_cache, false);
+    if(!dbengine_drained)
+        fprintf(stderr, "WARNING: dbengine work may still be running, not destroying its caches, MRG and files.\n");
+    else {
+        // destroy the caches in reverse order (extent and open depend on main cache)
+        fprintf(stderr, "Destroying extent cache (PGC)...\n");
+        pgc_destroy(extent_cache, false);
+        fprintf(stderr, "Destroying open cache (PGC)...\n");
+        pgc_destroy(open_cache, false);
+        fprintf(stderr, "Destroying main cache (PGC)...\n");
+        pgc_destroy(main_cache, false);
 
-    fprintf(stderr, "Destroying metrics registry (MRG)...\n");
-    size_t metrics_referenced = mrg_destroy(main_mrg);
-    if(metrics_referenced)
-        fprintf(stderr, "WARNING: MRG had %zu metrics referenced.\n",
-            metrics_referenced);
+        fprintf(stderr, "Destroying metrics registry (MRG)...\n");
+        size_t metrics_referenced = mrg_destroy(main_mrg);
+        if(metrics_referenced)
+            fprintf(stderr, "WARNING: MRG had %zu metrics referenced.\n",
+                metrics_referenced);
 
-    for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
-        if(multidb_ctx[tier]) {
-            fprintf(stderr, "Finalizing data files for tier %zu...\n", tier);
-            finalize_rrd_files(multidb_ctx[tier]);
-            memset(multidb_ctx[tier], 0, sizeof(*multidb_ctx[tier]));
+        for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
+            if(multidb_ctx[tier]) {
+                fprintf(stderr, "Finalizing data files for tier %zu...\n", tier);
+                finalize_rrd_files(multidb_ctx[tier]);
+                memset(multidb_ctx[tier], 0, sizeof(*multidb_ctx[tier]));
+            }
         }
     }
 #endif
