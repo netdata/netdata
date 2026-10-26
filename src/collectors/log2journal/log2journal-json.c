@@ -220,7 +220,7 @@ static inline bool encode_utf8(unsigned codepoint, char **d, size_t *remaining) 
     return true;
 }
 
-size_t parse_surrogate(const char *s, char *d, size_t *remaining) {
+static size_t parse_surrogate(const char *s, char *d, size_t *remaining) {
     if (s[0] != '\\' || s[1] != 'u') {
         return 0; // Not a valid Unicode escape sequence
     }
@@ -305,6 +305,12 @@ static inline bool json_parse_string(LOG_JSON_STATE *js) {
                             continue;
                         }
                         else {
+                            // not a valid escape, keep it as text
+                            if(remaining < 2) {
+                                snprintf(js->msg, sizeof(js->msg),
+                                         "JSON PARSER: truncated string value at position %u", js->pos);
+                                return false;
+                            }
                             *d++ = '\\';
                             remaining--;
                             c = *s++;
