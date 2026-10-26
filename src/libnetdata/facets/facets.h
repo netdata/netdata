@@ -138,8 +138,6 @@ void facets_add_possible_value_name_to_key(FACETS *facets, const char *key, size
 
 void facets_sort_and_reorder_keys(FACETS *facets);
 usec_t facets_row_oldest_ut(FACETS *facets);
-
-int facets_unittest(void);
 usec_t facets_row_newest_ut(FACETS *facets);
 uint32_t facets_rows(FACETS *facets);
 
@@ -154,5 +152,7 @@ void facets_row_bin_data_set(FACETS *facets, void (*cleanup_cb)(void *data), voi
 void *facets_row_bin_data_get(FACETS *facets __maybe_unused, FACET_ROW *row);
 
 void facets_use_hashes_for_ids(FACETS *facets, bool set);
+
+int facets_unittest(void);
 
 #endif

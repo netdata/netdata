@@ -2034,10 +2034,6 @@ static inline void facets_key_check_value(FACETS *facets, FACET_KEY *k) {
         k->transform.cb(facets, k->current_value.b, FACETS_TRANSFORM_VALUE, k->transform.data);
     }
 
-//    bool found = false;
-//    if(strstr(buffer_tostring(k->current_value), "fprintd") != NULL)
-//        found = true;
-
     if(facets->query && !facet_key_value_empty_or_unsampled_or_estimated(k) && ((k->options & FACET_KEY_OPTION_FTS) || facets->options & FACETS_OPTION_ALL_KEYS_FTS)) {
         facets->operations.fts.searches++;
         switch(simple_pattern_matches_extract(facets->query, buffer_tostring(k->current_value.b), NULL, 0)) {
