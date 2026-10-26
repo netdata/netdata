@@ -20,12 +20,20 @@ type snapshotSummaryInstrument struct {
 	base    []LabelSet
 }
 
+func (i *snapshotSummaryInstrument) hostScope() HostScope {
+	return i.scope
+}
+
 // statefulSummaryInstrument writes observed samples into maintained summary state.
 type statefulSummaryInstrument struct {
 	backend meterBackend
 	desc    *instrumentDescriptor
 	scope   HostScope
 	base    []LabelSet
+}
+
+func (i *statefulSummaryInstrument) hostScope() HostScope {
+	return i.scope
 }
 
 // stagedSummary holds one in-cycle summary sample for a single series identity.

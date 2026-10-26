@@ -2664,7 +2664,7 @@ Per dimension:
 2. ✅ `timeout` - integer, optional - Execution timeout in seconds
 
 #### Request Body:
-3. ✅ `payload` - string/JSON, optional - Function-specific input data (Content-Type: text/plain or application/json)
+3. ✅ `payload` - JSON, optional - Function-specific input data; must be a strict JSON document (non-JSON payloads are rejected with HTTP 400)
 
 #### Derived/Internal Parameters (from function name parsing):
 4. ✅ `node_id` - UUID (derived from function name pattern)
@@ -2672,7 +2672,7 @@ Per dimension:
 6. ✅ `instance` - string (derived from function name pattern)
 7. ✅ `source` - string (local, global, or node-specific)
 8. ✅ `transaction` - UUID (internally generated for tracking)
-9. ✅ `content_type` - string (from request Content-Type header)
+9. ✅ `content_type` - string (always `application/json` when forwarded to plugins)
 10. ✅ `progress` - boolean (internally managed execution state)
 11. ✅ `cancellable` - boolean (function capability flag)
 
@@ -3758,13 +3758,12 @@ No query parameters
 54. ✅ `protobuf` - boolean - Protobuf support
 55. ✅ `webrtc` - boolean - WebRTC support
 56. ✅ `native_https` - boolean - Native HTTPS support
-57. ✅ `h2o` - boolean - H2O web server support
-58. ✅ `mqtt` - boolean - MQTT support
-59. ✅ `ml` - boolean - Machine learning support
+57. ✅ `mqtt` - boolean - MQTT support
+58. ✅ `ml` - boolean - Machine learning support
 
 ### VERIFICATION SUMMARY
 **Parameters Verified:** 0
-**Response Fields Verified:** 59
+**Response Fields Verified:** 58
 **Security:** `HTTP_ACL_NODES` + `HTTP_ACCESS_ANONYMOUS_DATA`
 **Dual-Agent Agreement:** ✅ Agent confirmed comprehensive agent info structure
 

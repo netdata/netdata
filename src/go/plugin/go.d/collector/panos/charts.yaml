@@ -209,6 +209,7 @@ groups:
         title: IPsec Tunnel SA Remaining Lifetime
         context: ipsec.tunnel.sa_lifetime
         units: seconds
+        aggregation: max
         label_promotion: [protocol, encryption]
         instances:
           by_labels: [tunnel, gateway, remote, tunnel_id]

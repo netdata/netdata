@@ -30,6 +30,18 @@ so the configuration owner can reject the original invalid name. Literal escapes
 validation unchanged. Parsing must never turn either into a different configuration's identity. Payload bytes are
 independent of command tokenization. Wire test fixtures must use the daemon's literal quoting rather than Go `%q`.
 
+## Payload framing
+
+The existing wire protocol ends a payload at an exact `FUNCTION_PAYLOAD_END` line. Until that marker, all other
+lines are body data, including valid `FUNCTION`, `FUNCTION_PAYLOAD`, `FUNCTION_CANCEL`, `FUNCTION_PROGRESS`, and
+`QUIT` commands. Commands cannot interleave with a payload. Rejected payload headers with an identifiable UID and
+oversized bodies are drained through the marker before reporting their rejection and reading the next command.
+An unterminated payload is a protocol error; a command-looking body line cannot resynchronize the parser.
+
+This preserves the existing sentinel framing and LF/CRLF separator handling. It does not make the protocol an
+arbitrary-byte transport: a body line equal to the end marker still terminates the payload. Removing that ambiguity
+requires a coordinated producer/consumer protocol change.
+
 ## Input ownership
 
 `InputCapsule` owns only the payload currently being parsed. A complete call is transferred to `Consumer`; a partial
@@ -40,7 +52,7 @@ The capsule:
 - bounds command lines, payload bodies, and nesting-independent input storage;
 - grows its one process-owned payload geometrically up to the body limit;
 - rejects malformed or oversized input without transferring partial data;
-- treats cancellation and quit as control events;
+- treats cancellation and quit as control events only outside a payload;
 - never invokes collector code directly.
 
 ## Concurrency

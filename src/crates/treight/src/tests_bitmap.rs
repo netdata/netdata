@@ -17,11 +17,20 @@
 //!   tree; boolean short-circuits against them return identity results,
 //!   `and` with a full operand copying the other side's tree bytes into
 //!   `out`.
+//! - An inverted `is_empty` holds only for a stored tree of the whole
+//!   universe: rejected on blob length, counted when the length matches
+//!   (a same-length tree can still miss values), up to depth 7; the
+//!   full-tree length equals `estimate_data_size` over the universe.
 //! - A double `complement()` round-trips to the original set.
+//! - `from_range` holds exactly the range, follows the half-universe
+//!   complement rule, and stores the same bytes as the direct builder
+//!   over the stored set, exhaustively in small universes, at large ones
+//!   up to `u32::MAX`, and as a proptest.
 //!
 //! The raw tree layer itself is pinned in tests_raw.rs; the roaring
 //! bridge in tests_roaring.rs (feature `roaring`).
 use crate::*;
+use proptest::prelude::*;
 
 // ── single-bitmap queries ─────────────────────────────────────────
 
@@ -111,6 +120,242 @@ fn test_bitmap_empty_full() {
     assert_eq!(bm.len(&empty_data), 64);
     for i in 0..64 {
         assert!(bm.contains(&empty_data, i));
+    }
+}
+
+/// The full-tree length `is_empty` compares against equals the builder's
+/// size for the whole universe: the empty universe, both sides of every
+/// depth boundary up to 7, and a few sizes between.
+#[test]
+fn test_full_tree_len_matches_estimate() {
+    let mut universes = vec![0u32, 100, 1000, 30_000, 1_000_000];
+    for depth in 1..=7u32 {
+        let top = 1u32 << (3 * depth);
+        universes.extend([top - 1, top, top + 1]);
+    }
+    for u in universes {
+        assert_eq!(
+            crate::bitmap::full_tree_len(u),
+            estimate_data_size(u, 0..u),
+            "u={u}"
+        );
+    }
+}
+
+/// An inverted bitmap is empty only when its stored tree holds the whole
+/// universe. `is_empty` rejects any other blob length without walking, but
+/// a tree of the full tree's length can still miss values (a leaf keeps
+/// another bit), so that case must fall through to the count. Pinned at
+/// every depth up to 7, on and between the depth boundaries, together with
+/// `and`/`or`, which consult `is_empty` for their short-circuits.
+#[test]
+fn test_bitmap_inverted_is_empty() {
+    let universes = [
+        1, 2, 7, 8, 9, 16, 63, 64, 65, 100, 511, 512, 513, 4095, 4096, 4097, 32768, 32769, 262_144,
+        262_145, 2_097_152,
+    ];
+    for u in universes {
+        let mut full_data = Vec::new();
+        let full = Bitmap::from_sorted_iter_complemented(0..u, u, &mut full_data);
+        assert!(full.is_empty(&full_data), "u={u}: every value stored");
+        assert_eq!(full.len(&full_data), 0, "u={u}");
+
+        if u < 2 {
+            continue;
+        }
+
+        // Value 0 shares its leaf with value 1, so the blob keeps its length.
+        let mut same_len = Vec::new();
+        let one = Bitmap::from_sorted_iter_complemented(1..u, u, &mut same_len);
+        assert_eq!(same_len.len(), full_data.len(), "u={u}");
+        assert!(
+            !one.is_empty(&same_len),
+            "u={u}: same length, value 0 missing"
+        );
+        assert_eq!(one.len(&same_len), 1, "u={u}");
+
+        let mut zero_data = Vec::new();
+        let zero = Bitmap::from_sorted_iter([0].into_iter(), u, &mut zero_data);
+        let mut out = Vec::new();
+        let and = one.and(&same_len, &zero, &zero_data, &mut out);
+        assert!(
+            !and.is_empty(&out) && and.contains(&out, 0) && and.len(&out) == 1,
+            "u={u}: and"
+        );
+        let mut out = Vec::new();
+        let and = full.and(&full_data, &zero, &zero_data, &mut out);
+        assert!(
+            and.is_empty(&out),
+            "u={u}: and with an empty inverted operand"
+        );
+        let mut out = Vec::new();
+        let or = full.or(&full_data, &one, &same_len, &mut out);
+        assert!(
+            or.contains(&out, 0) && or.len(&out) == 1,
+            "u={u}: or with an empty inverted operand"
+        );
+
+        if u > 8 {
+            // A whole leaf missing: a shorter blob, rejected on length.
+            let mut short = Vec::new();
+            let eight = Bitmap::from_sorted_iter_complemented(8..u, u, &mut short);
+            assert!(short.len() < full_data.len(), "u={u}");
+            assert!(!eight.is_empty(&short), "u={u}: first leaf missing");
+            assert_eq!(eight.len(&short), 8, "u={u}");
+        }
+    }
+}
+
+// ── from_range: density-aware construction ────────────────────────
+
+/// The stored set `from_range(start..end)` must produce, per its
+/// half-universe rule: the range itself, or its complement
+/// `[0, start) ∪ [end, universe)` when the range covers more than half
+/// the universe. Returns (stored bytes, inverted) built by the direct
+/// builder — the byte reference for the tests below.
+fn from_range_reference(start: u32, end: u32, universe: u32) -> (Vec<u8>, bool) {
+    let mut data = Vec::new();
+    if start >= end {
+        return (data, false);
+    }
+    if (end - start) as u64 > universe as u64 / 2 {
+        RawBitmap::from_sorted_iter((0..start).chain(end..universe), universe, &mut data);
+        (data, true)
+    } else {
+        RawBitmap::from_sorted_iter(start..end, universe, &mut data);
+        (data, false)
+    }
+}
+
+/// Assert `bm` holds exactly `start..end`: the count over the whole
+/// universe and inside the range both equal the range length.
+fn assert_holds_range(bm: &Bitmap, data: &[u8], start: u32, end: u32, label: &str) {
+    let want = end.saturating_sub(start) as u64;
+    assert_eq!(bm.len(data), want, "{label}: len");
+    assert_eq!(
+        bm.range_cardinality(data, start..end.max(start)),
+        want,
+        "{label}: range_cardinality"
+    );
+}
+
+/// For every start..end in universes at each level boundary: the set is
+/// exactly the range, `is_inverted` follows the half-universe rule, and
+/// the stored bytes equal the direct builder's over the stored set.
+#[test]
+fn test_bitmap_from_range_exhaustive() {
+    for universe in [1u32, 2, 7, 8, 9, 63, 64, 65, 100, 511, 512, 513] {
+        for start in 0..=universe {
+            for end in start..=universe {
+                let label = format!("universe={universe} range={start}..{end}");
+                let mut data = Vec::new();
+                let bm = Bitmap::from_range(start..end, universe, &mut data);
+                assert_holds_range(&bm, &data, start, end, &label);
+                assert_eq!(
+                    (data, bm.is_inverted()),
+                    from_range_reference(start, end, universe),
+                    "{label}"
+                );
+            }
+        }
+    }
+}
+
+/// The same pin at large universes, including the 11-level `u32::MAX`
+/// tree: direct ranges, one-piece complements (a range touching either
+/// end) and two-piece complements.
+#[test]
+fn test_bitmap_from_range_large_universes() {
+    let cases: [(u32, u32, u32); 8] = [
+        (1 << 24, 12_345, 112_345),
+        (1 << 24, 5, (1 << 24) - 7),
+        (1 << 24, 0, (1 << 24) - 70_000),
+        (1 << 24, 70_000, 1 << 24),
+        (u32::MAX, (1 << 30) - 3, (1 << 30) + 70_000),
+        (u32::MAX, 0, u32::MAX - 5),
+        (u32::MAX, 10, u32::MAX),
+        (u32::MAX, 40_000, u32::MAX - 40_000),
+    ];
+    for (universe, start, end) in cases {
+        let label = format!("universe={universe} range={start}..{end}");
+        let mut data = Vec::new();
+        let bm = Bitmap::from_range(start..end, universe, &mut data);
+        assert_holds_range(&bm, &data, start, end, &label);
+        assert_eq!(
+            (data, bm.is_inverted()),
+            from_range_reference(start, end, universe),
+            "{label}"
+        );
+    }
+}
+
+/// Bound forms normalize to a half-open range: inclusive ends widen by
+/// one, unbounded ends span the universe, ends past it clamp, and empty
+/// or reversed ranges yield the empty set. The whole universe is the
+/// inverted empty tree: zero stored bytes.
+#[test]
+fn test_bitmap_from_range_bounds() {
+    let u = 64;
+
+    let mut data = Vec::new();
+    let bm = Bitmap::from_range(5..=10, u, &mut data);
+    assert_holds_range(&bm, &data, 5, 11, "5..=10");
+
+    let mut data = Vec::new();
+    let bm = Bitmap::from_range(..10, u, &mut data);
+    assert_holds_range(&bm, &data, 0, 10, "..10");
+
+    let mut data = Vec::new();
+    let bm = Bitmap::from_range(60.., u, &mut data);
+    assert_holds_range(&bm, &data, 60, 64, "60..");
+
+    let mut data = Vec::new();
+    let bm = Bitmap::from_range(10..1000, u, &mut data);
+    assert_holds_range(&bm, &data, 10, 64, "10..1000");
+    assert!(bm.is_inverted());
+
+    let mut data = Vec::new();
+    let bm = Bitmap::from_range(.., u, &mut data);
+    assert_holds_range(&bm, &data, 0, 64, "..");
+    assert!(bm.is_inverted() && data.is_empty());
+
+    let mut data = Vec::new();
+    let bm = Bitmap::from_range(10..10, u, &mut data);
+    assert!(bm.is_empty(&data) && !bm.is_inverted() && data.is_empty());
+
+    // The reversed range is deliberate: `start > end` is empty, not a
+    // panic or a wraparound.
+    #[allow(clippy::reversed_empty_ranges)]
+    let reversed = 20..10;
+    let mut data = Vec::new();
+    let bm = Bitmap::from_range(reversed, u, &mut data);
+    assert!(bm.is_empty(&data) && data.is_empty());
+}
+
+proptest! {
+    /// Generated windows at every tree depth, sized so the stored set
+    /// stays small: direct ranges up to 20,000 values, and complements
+    /// whose two pieces hold up to 20,000 values together.
+    #[test]
+    fn bitmap_from_range_matches_reference(
+        universe in crate::tests_raw::arb_universe(),
+        start_frac in 0.0f64..=1.0,
+        len in 0u32..=20_000,
+        complement in any::<bool>(),
+        head in 0u32..=10_000,
+        tail in 0u32..=10_000,
+    ) {
+        let (start, end) = if complement {
+            let start = head.min(universe);
+            (start, universe.saturating_sub(tail).max(start))
+        } else {
+            let start = (universe as f64 * start_frac) as u32;
+            (start, start.saturating_add(len).min(universe))
+        };
+        let mut data = Vec::new();
+        let bm = Bitmap::from_range(start..end, universe, &mut data);
+        prop_assert_eq!(bm.len(&data), (end - start) as u64);
+        prop_assert_eq!((data, bm.is_inverted()), from_range_reference(start, end, universe));
     }
 }
 

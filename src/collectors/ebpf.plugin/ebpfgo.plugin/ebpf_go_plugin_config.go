@@ -100,15 +100,8 @@ func loadCollectorConfigFiles(legacyFile string) (pluginConfigFile, bool, error)
 }
 
 func pluginConfigRoots() (userRoot, stockRoot string) {
-	userRoot = os.Getenv("NETDATA_USER_CONFIG_DIR")
-	if userRoot == "" {
-		userRoot = "/etc/netdata"
-	}
-
-	stockRoot = os.Getenv("NETDATA_STOCK_CONFIG_DIR")
-	if stockRoot == "" {
-		stockRoot = "/usr/lib/netdata/conf.d"
-	}
+	userRoot = secureGetenv("NETDATA_USER_CONFIG_DIR", netdataUserConfigDir)
+	stockRoot = secureGetenv("NETDATA_STOCK_CONFIG_DIR", netdataStockConfigDir)
 
 	return userRoot, stockRoot
 }

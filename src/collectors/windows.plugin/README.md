@@ -38,6 +38,7 @@ To change a setting, remove the comment symbol (`#`) from the beginning of the l
         # PerflibADCS = yes
         # PerflibADFS = yes
         # PerflibExchange = yes
+        # PerflibMSMQ = yes
         # PerflibNUMA = yes
         # PerflibASP = yes
 ```
@@ -64,3 +65,27 @@ and `HyperV` threads:
 [plugin:windows:PerflibHyperV]
         #update every = 15s
 ```
+
+## PerflibMSMQ
+
+`PerflibMSMQ` collects queue and journal message/byte counts. By default, it charts up to 100 queues individually and
+sums the remaining queues into an `Other (aggregated)` series. Configure it in `[plugin:windows:PerflibMSMQ]`:
+
+```ini
+[plugin:windows:PerflibMSMQ]
+    queues to chart individually = *
+    max individually charted queues = 100
+```
+
+The selector accepts comma or pipe separated case-insensitive simple patterns. Windows queue paths can be pasted
+verbatim; prefix a comma or pipe with `\` to match that character literally. A leading `\!` matches a literal `!`
+instead of negating the pattern. The selector treats `*` as a wildcard; backslashes elsewhere are treated as Windows
+path separators. Matching queue names are selected in case-insensitive alphabetical order; the cap may be set to `0`
+to aggregate all queues. A negative-only selector such as `!*temp*` selects no queues for individual charts, so all
+queues go to `Other`; an empty selector has the same result. Append `*` (`!*temp*,*`) to select every queue except
+those matching `*temp*`.
+
+Perflib may not report a newly created queue until it becomes active, such as after a message is sent. Selectors match
+the raw Perflib instance name. The `queue` chart label is sanitized for display; for example,
+`host\private$\name` appears as `host/private_/name`. Use the original queue path in the selector rather than copying
+the displayed label.

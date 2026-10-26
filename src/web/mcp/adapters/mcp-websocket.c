@@ -110,64 +110,23 @@ void mcp_websocket_on_message(struct websocket_server_client *wsc, const char *m
         return;
     }
 
+    BUFFER *response = NULL;
     if (json_object_is_type(request, json_type_array)) {
-        size_t len = json_object_array_length(request);
-        BUFFER **responses = NULL;
-        size_t responses_used = 0;
-        size_t responses_size = 0;
-
-        for (size_t i = 0; i < len; i++) {
-            struct json_object *req_item = json_object_array_get_idx(request, i);
-            BUFFER *resp_item = mcp_jsonrpc_process_single_request(mcpc, req_item, NULL);
-            if (resp_item) {
-                if (responses_used == responses_size) {
-                    size_t new_size = responses_size ? responses_size * 2 : 4;
-                    BUFFER **tmp = reallocz(responses, new_size * sizeof(*tmp));
-                    if (!tmp) {
-                        buffer_free(resp_item);
-                        continue;
-                    }
-                    responses = tmp;
-                    responses_size = new_size;
-                }
-                responses[responses_used++] = resp_item;
-            }
-        }
-
-        if (!len) {
-            BUFFER *response = mcp_jsonrpc_process_single_request(mcpc, NULL, NULL);
-            if (response) {
-                mcp_websocket_send_payload(wsc, response);
-                buffer_free(response);
-            }
-        } else if (responses_used > 0) {
-            size_t total_len = 2; // brackets
-            for (size_t i = 0; i < responses_used; i++)
-                total_len += buffer_strlen(responses[i]) + (i ? 1 : 0);
-
-            BUFFER *batch = buffer_create(total_len + 32, NULL);
-            buffer_fast_strcat(batch, "[", 1);
-            for (size_t i = 0; i < responses_used; i++) {
-                if (i)
-                    buffer_fast_strcat(batch, ",", 1);
-                const char *resp_text = buffer_tostring(responses[i]);
-                size_t resp_len = buffer_strlen(responses[i]);
-                buffer_fast_strcat(batch, resp_text, resp_len);
-            }
+        // the responses are collected into one JSON array message
+        BUFFER *batch = buffer_create(1024, NULL);
+        response = mcp_jsonrpc_process_batch(mcpc, request, mcp_jsonrpc_batch_emit_array, batch);
+        if (!response && buffer_strlen(batch)) {
             buffer_fast_strcat(batch, "]", 1);
             mcp_websocket_send_payload(wsc, batch);
-            buffer_free(batch);
         }
+        buffer_free(batch);
+    }
+    else
+        response = mcp_jsonrpc_process_single_request(mcpc, request, NULL);
 
-        for (size_t i = 0; i < responses_used; i++)
-            buffer_free(responses[i]);
-        freez(responses);
-    } else {
-        BUFFER *response = mcp_jsonrpc_process_single_request(mcpc, request, NULL);
-        if (response) {
-            mcp_websocket_send_payload(wsc, response);
-            buffer_free(response);
-        }
+    if (response) {
+        mcp_websocket_send_payload(wsc, response);
+        buffer_free(response);
     }
 
     json_object_put(request);
