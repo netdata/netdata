@@ -413,21 +413,24 @@ func TestCollector_ChartTemplateYAML(t *testing.T) {
 	require.NoError(t, err)
 }
 
+type collectStep struct {
+	name        string
+	setup       func(*Collector, *mockAPIClient)
+	wantErr     string
+	wantMetrics map[string]metrix.SampleValue
+	wantMissing []string
+	wantLog     []string
+	notWantLog  []string
+	check       func(*testing.T, *Collector, *mockAPIClient, map[string]metrix.SampleValue)
+}
+
+type collectScenario struct {
+	prepare func(*Collector, *mockAPIClient)
+	steps   []collectStep
+}
+
 func TestCollector_Collect(t *testing.T) {
-	type collectStep struct {
-		name        string
-		setup       func(*Collector, *mockAPIClient)
-		wantErr     string
-		wantMetrics map[string]metrix.SampleValue
-		wantMissing []string
-		wantLog     []string
-		notWantLog  []string
-		check       func(*testing.T, *Collector, *mockAPIClient, map[string]metrix.SampleValue)
-	}
-	tests := map[string]struct {
-		prepare func(*Collector, *mockAPIClient)
-		steps   []collectStep
-	}{
+	tests := map[string]collectScenario{
 		"read-only telemetry and legacy BGP": {
 			prepare: func(c *Collector, api *mockAPIClient) {
 				api.responses = map[string][]byte{
@@ -1744,224 +1747,6 @@ func TestCollector_Collect(t *testing.T) {
 				},
 			},
 		},
-		"IPsec tunnel and gateway state with every tunnel established": {
-			steps: []collectStep{
-				{
-					name: "all tunnels active and all gateways up",
-					wantMetrics: mergeMetrics(
-						ipsecTunnelStateMetrics("branch-a", "1", "active"),
-						ipsecTunnelStateMetrics("branch-a-2", "2", "active"),
-						ipsecTunnelStateMetrics("branch-b", "5", "active"),
-						ipsecTunnelStateMetrics("branch-b-2", "6", "active"),
-						ipsecTunnelStateMetrics("branch-d", "3", "active"),
-						ipsecTunnelStateMetrics("branch-c", "4", "active"),
-						ipsecGatewayStateMetrics("gw-branch-a", "ikev1", "up"),
-						ipsecGatewayStateMetrics("gw-branch-b", "ikev1", "up"),
-						ipsecGatewayStateMetrics("gw-branch-c", "ikev2", "up"),
-						ipsecGatewayStateMetrics("gw-branch-d", "ikev2", "up"),
-					),
-					check: func(t *testing.T, c *Collector, _ *mockAPIClient, _ map[string]metrix.SampleValue) {
-						collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
-					},
-				},
-			},
-		},
-		"IPsec standby firewall with tunnels that have no SA": {
-			prepare: func(_ *Collector, api *mockAPIClient) {
-				api.responses = map[string][]byte{
-					ipsecSACommand:      dataIPSecSAPartial,
-					ipsecFlowCommand:    dataIPSecFlowPartial,
-					ipsecIKESACommand:   dataIPSecIKESAPartial,
-					ipsecGatewayCommand: dataIPSecGateway,
-				}
-			},
-			steps: []collectStep{
-				{
-					name: "configured tunnels without an SA are inactive and their gateways are down",
-					wantMetrics: mergeMetrics(
-						map[string]metrix.SampleValue{
-							metricKey("ipsec_tunnels_active", nil): 2,
-							metricKey("ipsec_tunnel_sa_lifetime", ipsecLabels("branch-d", "gw-branch-d", "198.51.100.40", "3", "ESP", "G256")): 5145,
-						},
-						ipsecTunnelStateMetrics("branch-a", "1", "inactive"),
-						ipsecTunnelStateMetrics("branch-a-2", "2", "inactive"),
-						ipsecTunnelStateMetrics("branch-b", "5", "inactive"),
-						ipsecTunnelStateMetrics("branch-b-2", "6", "inactive"),
-						ipsecTunnelStateMetrics("branch-d", "3", "active"),
-						ipsecTunnelStateMetrics("branch-c", "4", "active"),
-						ipsecGatewayStateMetrics("gw-branch-a", "ikev1", "down"),
-						ipsecGatewayStateMetrics("gw-branch-b", "ikev1", "down"),
-						ipsecGatewayStateMetrics("gw-branch-c", "ikev2", "up"),
-						ipsecGatewayStateMetrics("gw-branch-d", "ikev2", "up"),
-					),
-					wantMissing: []string{
-						metricKey("ipsec_tunnel_sa_lifetime", ipsecLabels("branch-a", "gw-branch-a", "198.51.100.10", "1", "ESP", "A256")),
-					},
-				},
-			},
-		},
-		"IPsec empty IKE SA list marks every gateway down": {
-			prepare: func(_ *Collector, api *mockAPIClient) {
-				// Captured from a gateway-filtered show vpn ike-sa for a gateway with no SA.
-				api.responses = map[string][]byte{ipsecIKESACommand: dataIPSecIKESAEmpty}
-			},
-			steps: []collectStep{
-				{
-					name: "no SAs is a valid response, not a gap",
-					wantMetrics: mergeMetrics(
-						ipsecGatewayStateMetrics("gw-branch-a", "ikev1", "down"),
-						ipsecGatewayStateMetrics("gw-branch-b", "ikev1", "down"),
-						ipsecGatewayStateMetrics("gw-branch-c", "ikev2", "down"),
-						ipsecGatewayStateMetrics("gw-branch-d", "ikev2", "down"),
-					),
-				},
-			},
-		},
-		"IPsec unexpected IKE SA payload leaves gateway state as a gap": {
-			prepare: func(_ *Collector, api *mockAPIClient) {
-				api.responses = map[string][]byte{
-					ipsecIKESACommand: []byte(`<response status="success"><result><error>IKE SA query failed.</error></result></response>`),
-				}
-			},
-			steps: []collectStep{
-				{
-					name: "gateways are not reported down when the SA list cannot be read",
-					wantMetrics: mergeMetrics(
-						ipsecTunnelStateMetrics("branch-a", "1", "active"),
-					),
-					wantMissing: []string{
-						stateMetricKey("ipsec_gateway_state", "down", ipsecGatewayLabels("gw-branch-a", "ikev1")),
-						stateMetricKey("ipsec_gateway_state", "up", ipsecGatewayLabels("gw-branch-a", "ikev1")),
-					},
-					wantLog: []string{"unexpected element <error>"},
-				},
-			},
-		},
-		"IPsec IKE SA query failure leaves gateway state as a gap": {
-			prepare: func(_ *Collector, api *mockAPIClient) {
-				api.errors = map[string]error{ipsecIKESACommand: errors.New("transport failed")}
-			},
-			steps: []collectStep{
-				{
-					name: "gateways are not reported down when the SA list is unavailable",
-					wantMetrics: mergeMetrics(
-						ipsecTunnelStateMetrics("branch-a", "1", "active"),
-					),
-					wantMissing: []string{
-						stateMetricKey("ipsec_gateway_state", "down", ipsecGatewayLabels("gw-branch-a", "ikev1")),
-						stateMetricKey("ipsec_gateway_state", "up", ipsecGatewayLabels("gw-branch-a", "ikev1")),
-					},
-					wantLog: []string{"ipsec gateway metricset: IPsec IKE SA query API call: transport failed"},
-				},
-			},
-		},
-		"IPsec gateway query failure does not affect tunnel state": {
-			prepare: func(_ *Collector, api *mockAPIClient) {
-				api.errors = map[string]error{ipsecGatewayCommand: errors.New("transport failed")}
-			},
-			steps: []collectStep{
-				{
-					name:        "tunnel state commits without gateway state",
-					wantMetrics: ipsecTunnelStateMetrics("branch-a", "1", "active"),
-					wantMissing: []string{
-						stateMetricKey("ipsec_gateway_state", "up", ipsecGatewayLabels("gw-branch-a", "ikev1")),
-					},
-					wantLog:    []string{"ipsec gateway metricset: IPsec gateway query API call: transport failed"},
-					notWantLog: []string{"IKE SA query"},
-				},
-			},
-		},
-		"IPsec flow entries with unrecognized or missing fields": {
-			prepare: func(_ *Collector, api *mockAPIClient) {
-				api.responses = map[string][]byte{
-					ipsecFlowCommand: []byte(
-						`<response status="success"><result><IPSec>` +
-							`<entry><name>branch-a</name><id>1</id><state>init</state></entry>` +
-							`<entry><name>branch-b</name><id>2</id></entry>` +
-							`<entry><id>3</id><state>active</state></entry>` +
-							`<entry><name>branch-d</name><state>Active</state></entry>` +
-							`</IPSec></result></response>`,
-					),
-				}
-			},
-			steps: []collectStep{
-				{
-					name: "unrecognized state is unknown and incomplete entries are gaps",
-					wantMetrics: mergeMetrics(
-						ipsecTunnelStateMetrics("branch-a", "1", "unknown"),
-						ipsecTunnelStateMetrics("branch-d", "unknown", "active"),
-					),
-					wantMissing: []string{
-						stateMetricKey("ipsec_tunnel_state", "active", ipsecTunnelStateLabels("branch-b", "2")),
-						stateMetricKey("ipsec_tunnel_state", "inactive", ipsecTunnelStateLabels("branch-b", "2")),
-						stateMetricKey("ipsec_tunnel_state", "active", ipsecTunnelStateLabels("unknown", "3")),
-					},
-					wantLog: []string{
-						"IPsec tunnel branch-b state: missing status",
-						"IPsec flow entry: missing tunnel name",
-					},
-				},
-			},
-		},
-		"IPsec gateway matching and IKE version": {
-			prepare: func(_ *Collector, api *mockAPIClient) {
-				api.responses = map[string][]byte{
-					ipsecGatewayCommand: []byte(
-						`<response status="success"><result><entries>` +
-							`<entry><id>1</id><name>gw-branch-a</name><v1/></entry>` +
-							`<entry><name>gw-branch-b</name><v2/></entry>` +
-							`<entry><id>3</id><name>gw-branch-c</name><v1/><v2/></entry>` +
-							`<entry><id>4</id><name>gw-branch-d</name></entry>` +
-							`<entry><id>5</id></entry>` +
-							`</entries></result></response>`,
-					),
-					ipsecIKESACommand: []byte(
-						`<response status="success"><result>` +
-							`<entry><gwid>1</gwid><name>renamed</name></entry>` +
-							`<entry><name>gw-branch-b</name></entry>` +
-							`</result></response>`,
-					),
-				}
-			},
-			steps: []collectStep{
-				{
-					name: "match by ID or by name, and only a single configured IKE version is reported",
-					wantMetrics: mergeMetrics(
-						ipsecGatewayStateMetrics("gw-branch-a", "ikev1", "up"),
-						ipsecGatewayStateMetrics("gw-branch-b", "ikev2", "up"),
-						ipsecGatewayStateMetrics("gw-branch-c", "unknown", "down"),
-						ipsecGatewayStateMetrics("gw-branch-d", "unknown", "down"),
-					),
-					wantLog: []string{"IPsec gateway entry: missing gateway name"},
-				},
-			},
-		},
-		"missing IPsec flow and gateway payloads are partial success": {
-			prepare: func(_ *Collector, api *mockAPIClient) {
-				api.responses = map[string][]byte{
-					ipsecFlowCommand:    []byte(`<response status="success"><result></result></response>`),
-					ipsecGatewayCommand: []byte(`<response status="success"><result></result></response>`),
-				}
-			},
-			steps: []collectStep{
-				{
-					name: "system commits and IPsec state metrics are absent",
-					wantMetrics: map[string]metrix.SampleValue{
-						metricKey("system_uptime", systemLabels()): 183845,
-					},
-					wantMissing: []string{
-						stateMetricKey("ipsec_tunnel_state", "active", ipsecTunnelStateLabels("branch-a", "1")),
-						stateMetricKey("ipsec_gateway_state", "up", ipsecGatewayLabels("gw-branch-a", "ikev1")),
-					},
-					wantLog: []string{
-						"ipsec tunnel state metricset",
-						"expected <IPSec>",
-						"ipsec gateway metricset",
-						"expected <entries>",
-					},
-				},
-			},
-		},
 		"all metricsets fail": {
 			prepare: func(_ *Collector, api *mockAPIClient) {
 				api.errors = allCommandErrors(errors.New("api error"))
@@ -1980,38 +1765,41 @@ func TestCollector_Collect(t *testing.T) {
 	}
 
 	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			collr := New()
-			var logBuf bytes.Buffer
-			collr.Logger = logger.NewWithWriter(&logBuf)
-			api := &mockAPIClient{}
-			collr.apiClient = api
-			if tc.prepare != nil {
-				tc.prepare(collr, api)
+		t.Run(name, func(t *testing.T) { runCollectScenario(t, tc) })
+	}
+}
+
+func runCollectScenario(t *testing.T, tc collectScenario) {
+	t.Helper()
+	collr := New()
+	var logBuf bytes.Buffer
+	collr.Logger = logger.NewWithWriter(&logBuf)
+	api := &mockAPIClient{}
+	collr.apiClient = api
+	if tc.prepare != nil {
+		tc.prepare(collr, api)
+	}
+
+	for _, step := range tc.steps {
+		t.Run(step.name, func(t *testing.T) {
+			if step.setup != nil {
+				step.setup(collr, api)
 			}
 
-			for _, step := range tc.steps {
-				t.Run(step.name, func(t *testing.T) {
-					if step.setup != nil {
-						step.setup(collr, api)
-					}
-
-					logBuf.Reset()
-					mx, err := collecttest.CollectScalarSeries(collr, metrix.ReadFlatten())
-					logOutput := logBuf.String()
-					if step.wantErr != "" {
-						require.ErrorContains(t, err, step.wantErr)
-						assertExpectedLogs(t, logOutput, step.wantLog, step.notWantLog)
-						return
-					}
-					require.NoError(t, err)
-					assertExpectedMetrics(t, mx, step.wantMetrics)
-					assertMissingMetrics(t, mx, step.wantMissing)
-					assertExpectedLogs(t, logOutput, step.wantLog, step.notWantLog)
-					if step.check != nil {
-						step.check(t, collr, api, mx)
-					}
-				})
+			logBuf.Reset()
+			mx, err := collecttest.CollectScalarSeries(collr, metrix.ReadFlatten())
+			logOutput := logBuf.String()
+			if step.wantErr != "" {
+				require.ErrorContains(t, err, step.wantErr)
+				assertExpectedLogs(t, logOutput, step.wantLog, step.notWantLog)
+				return
+			}
+			require.NoError(t, err)
+			assertExpectedMetrics(t, mx, step.wantMetrics)
+			assertMissingMetrics(t, mx, step.wantMissing)
+			assertExpectedLogs(t, logOutput, step.wantLog, step.notWantLog)
+			if step.check != nil {
+				step.check(t, collr, api, mx)
 			}
 		})
 	}
@@ -2861,17 +2649,15 @@ func TestParseReadOnlyTelemetry(t *testing.T) {
 			assert.Equal(t, "branch-a", tunnels[0].Name)
 		},
 		"ipsec flow": func(t *testing.T) {
-			tunnels, found, err := parseVPNFlow(dataIPSecFlowPartial)
+			tunnels, err := parseVPNFlow(dataIPSecFlowPartial)
 			require.NoError(t, err)
-			assert.True(t, found)
 			require.Len(t, tunnels, 6)
 			assert.Equal(t, vpnFlowTunnel{Name: "branch-a", ID: "1", State: "inactive"}, tunnels[0])
 			assert.Equal(t, vpnFlowTunnel{Name: "branch-c", ID: "4", State: "active"}, tunnels[5])
 		},
 		"ipsec gateway": func(t *testing.T) {
-			gateways, found, err := parseVPNGateways(dataIPSecGateway)
+			gateways, err := parseVPNGateways(dataIPSecGateway)
 			require.NoError(t, err)
-			assert.True(t, found)
 			require.Len(t, gateways, 4)
 			assert.Equal(t, "ikev1", ipsecIKEVersion(gateways[0]))
 			assert.Equal(t, "ikev2", ipsecIKEVersion(gateways[3]))

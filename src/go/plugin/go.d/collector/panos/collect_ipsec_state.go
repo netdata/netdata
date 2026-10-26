@@ -44,6 +44,7 @@ type vpnGatewayProtocol struct{}
 
 type vpnIKESAResult struct {
 	Entries []vpnIKESA `xml:"entry"`
+	Text    string     `xml:",chardata"`
 	// Other collects any child that is not an <entry>, such as an <error> element.
 	Other []vpnUnexpectedElement `xml:",any"`
 }
@@ -65,12 +66,9 @@ func (c *Collector) collectIPSecTunnelStateMetrics(ctx context.Context) (bool, e
 		return false, fmt.Errorf("ipsec tunnel state metricset: %s API call: %w", panosCommandName(ipsecFlowCommand), err)
 	}
 
-	tunnels, found, err := parseVPNFlow(body)
+	tunnels, err := parseVPNFlow(body)
 	if err != nil {
 		return false, fmt.Errorf("ipsec tunnel state metricset: %s response: %w", panosCommandName(ipsecFlowCommand), err)
-	}
-	if !found {
-		return false, fmt.Errorf("ipsec tunnel state metricset: %s response: %w", panosCommandName(ipsecFlowCommand), missingPANOSResultError{expected: "<IPSec>"})
 	}
 
 	var errs []error
@@ -101,12 +99,9 @@ func (c *Collector) collectIPSecGatewayMetrics(ctx context.Context) (bool, error
 		return false, fmt.Errorf("ipsec gateway metricset: %s API call: %w", panosCommandName(ipsecGatewayCommand), err)
 	}
 
-	gateways, found, err := parseVPNGateways(body)
+	gateways, err := parseVPNGateways(body)
 	if err != nil {
 		return false, fmt.Errorf("ipsec gateway metricset: %s response: %w", panosCommandName(ipsecGatewayCommand), err)
-	}
-	if !found {
-		return false, fmt.Errorf("ipsec gateway metricset: %s response: %w", panosCommandName(ipsecGatewayCommand), missingPANOSResultError{expected: "<entries>"})
 	}
 	if len(gateways) == 0 {
 		return false, nil
@@ -122,17 +117,27 @@ func (c *Collector) collectIPSecGatewayMetrics(ctx context.Context) (bool, error
 	if err != nil {
 		return false, fmt.Errorf("ipsec gateway metricset: %s response: %w", panosCommandName(ipsecIKESACommand), err)
 	}
+	byID := make(map[string]bool, len(sas))
+	byName := make(map[string]bool, len(sas))
+	for _, sa := range sas {
+		if sa.GatewayID != "" {
+			byID[sa.GatewayID] = true
+		}
+		if sa.Name != "" {
+			byName[sa.Name] = true
+		}
+	}
 
 	var errs []error
 	var hasMetrics bool
 	for _, gateway := range gateways {
-		if strings.TrimSpace(gateway.Name) == "" {
+		if gateway.Name == "" {
 			errs = append(errs, errors.New("IPsec gateway entry: missing gateway name"))
 			continue
 		}
 		observeStateSetVec(
 			c.metrics.ipsec.gatewayState,
-			boolState(gatewayHasIKESA(gateway, sas), "up", "down"),
+			boolState(byID[gateway.ID] || byName[gateway.Name], "up", "down"),
 			ipsecGatewayLabelValues(gateway)...,
 		)
 		hasMetrics = true
@@ -140,41 +145,31 @@ func (c *Collector) collectIPSecGatewayMetrics(ctx context.Context) (bool, error
 	return hasMetrics, errors.Join(errs...)
 }
 
-func gatewayHasIKESA(gateway vpnGateway, sas []vpnIKESA) bool {
-	id, name := strings.TrimSpace(gateway.ID), strings.TrimSpace(gateway.Name)
-	for _, sa := range sas {
-		if id != "" && id == strings.TrimSpace(sa.GatewayID) {
-			return true
-		}
-		if name == strings.TrimSpace(sa.Name) {
-			return true
-		}
-	}
-	return false
-}
-
-// parseVPNFlow returns the tunnels in a show vpn flow response. found is false when the
-// response has no <IPSec> section, so an unrecognized payload is not read as zero tunnels.
-func parseVPNFlow(body []byte) ([]vpnFlowTunnel, bool, error) {
+func parseVPNFlow(body []byte) ([]vpnFlowTunnel, error) {
 	var result vpnFlowResult
 	if err := decodePANOSResult(body, "PAN-OS IPsec flow response", &result); err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	if result.IPSec == nil {
-		return nil, false, nil
+		return nil, missingPANOSResultError{expected: "<IPSec>"}
 	}
-	return result.IPSec.Entries, true, nil
+	return result.IPSec.Entries, nil
 }
 
-func parseVPNGateways(body []byte) ([]vpnGateway, bool, error) {
+func parseVPNGateways(body []byte) ([]vpnGateway, error) {
 	var result vpnGatewayResult
 	if err := decodePANOSResult(body, "PAN-OS IPsec gateway response", &result); err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	if result.Entries == nil {
-		return nil, false, nil
+		return nil, missingPANOSResultError{expected: "<entries>"}
 	}
-	return result.Entries.Entries, true, nil
+	for i := range result.Entries.Entries {
+		gateway := &result.Entries.Entries[i]
+		gateway.ID = strings.TrimSpace(gateway.ID)
+		gateway.Name = strings.TrimSpace(gateway.Name)
+	}
+	return result.Entries.Entries, nil
 }
 
 // parseVPNIKESAs returns the IKE SAs in a show vpn ike-sa response. An empty result is a
@@ -188,6 +183,18 @@ func parseVPNIKESAs(body []byte) ([]vpnIKESA, error) {
 	if len(result.Other) > 0 {
 		return nil, fmt.Errorf("parse PAN-OS IPsec IKE SA response result: unexpected element <%s>", result.Other[0].XMLName.Local)
 	}
+	if strings.TrimSpace(result.Text) != "" {
+		return nil, errors.New("parse PAN-OS IPsec IKE SA response result: unexpected text")
+	}
+	for i := range result.Entries {
+		sa := &result.Entries[i]
+		sa.GatewayID = strings.TrimSpace(sa.GatewayID)
+		sa.Name = strings.TrimSpace(sa.Name)
+		if sa.GatewayID == "" && sa.Name == "" {
+			// An unidentifiable SA can belong to any gateway, so absence cannot establish down.
+			return nil, errors.New("parse PAN-OS IPsec IKE SA response result: entry has no gateway identity")
+		}
+	}
 	return result.Entries, nil
 }
 
@@ -199,6 +206,8 @@ func normalizeIPSecTunnelState(state string) string {
 		return "active"
 	case "inactive":
 		return "inactive"
+	case "init":
+		return "init"
 	default:
 		return "unknown"
 	}
