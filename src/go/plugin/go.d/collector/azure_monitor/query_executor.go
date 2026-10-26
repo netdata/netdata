@@ -13,7 +13,6 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	azcloud "github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
 	"github.com/Azure/azure-sdk-for-go/sdk/monitor/query/azmetrics"
-	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 )
 
 type queryExecutor struct {
@@ -103,7 +102,7 @@ func (e *queryExecutor) executeQueryBatch(ctx context.Context, batch queryBatch,
 		return nil, err
 	}
 
-	return samplesFromQueryResponse(resp.Values, batch.Profile.Name, queryBatchMetricIndex(batch.Metrics), resourceByID), nil
+	return samplesFromQueryResponse(resp.Values, batch.Profile, queryBatchMetricIndex(batch.Metrics), resourceByID), nil
 }
 
 func queryBatchMetricIndex(metrics []*metricRuntime) map[string]*metricRuntime {
@@ -148,19 +147,19 @@ func effectiveQueryOffset(queryOffsetSeconds int, batchTimeGrainEvery time.Durat
 	return offset
 }
 
-func samplesFromQueryResponse(metricData []azmetrics.MetricData, profileName string, metricToRuntime map[string]*metricRuntime, resourceByID map[string]resourceInfo) []metricSample {
+func samplesFromQueryResponse(metricData []azmetrics.MetricData, profile *profileRuntime, metricToRuntime map[string]*metricRuntime, resourceByID map[string]resourceInfo) []metricSample {
 	samples := make([]metricSample, 0, len(metricData))
 	for _, data := range metricData {
 		resource, ok := resourceByID[stringsLowerTrim(derefOrZero(data.ResourceID))]
 		if !ok {
 			continue
 		}
-		samples = append(samples, samplesFromMetricValues(data.Values, resource.HostScope, resourceLabels(resource, profileName), metricToRuntime)...)
+		samples = append(samples, samplesFromMetricValues(data.Values, resourceIdentityFor(resource, profile.Name), metricToRuntime)...)
 	}
 	return samples
 }
 
-func samplesFromMetricValues(metrics []azmetrics.Metric, scope metrix.HostScope, labels metrix.Labels, metricToRuntime map[string]*metricRuntime) []metricSample {
+func samplesFromMetricValues(metrics []azmetrics.Metric, resource resourceIdentity, metricToRuntime map[string]*metricRuntime) []metricSample {
 	samples := make([]metricSample, 0, len(metrics))
 	for _, metric := range metrics {
 		runtimeMetric, ok := metricToRuntime[stringsLowerTrim(derefOrZero(metric.Name.Value))]
@@ -174,26 +173,12 @@ func samplesFromMetricValues(metrics []azmetrics.Metric, scope metrix.HostScope,
 			}
 			samples = append(samples, metricSample{
 				Instrument: series.Instrument,
-				Kind:       series.Kind,
-				Labels:     labels,
-				Scope:      scope,
+				Resource:   resource,
 				Value:      value,
 			})
 		}
 	}
 	return samples
-}
-
-func resourceLabels(resource resourceInfo, profileName string) metrix.Labels {
-	return metrix.Labels{
-		"resource_uid":    resource.UID,
-		"subscription_id": resource.SubscriptionID,
-		"resource_name":   resource.Name,
-		"resource_group":  resource.ResourceGroup,
-		"region":          resource.Region,
-		"resource_type":   resource.Type,
-		"profile":         profileName,
-	}
 }
 
 func (e *queryExecutor) getMetricsClient(region string) (metricsQueryClient, error) {

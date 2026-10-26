@@ -25,10 +25,7 @@ func buildChartTemplate(profiles []cwprofiles.ResolvedProfile) (string, error) {
 func buildChartSpec(profiles []cwprofiles.ResolvedProfile) charttpl.Spec {
 	groups := make([]charttpl.Group, 0, len(profiles)+1)
 	for _, rp := range profiles {
-		group := rp.Config.Template.Clone()
-		series := profileSeries(rp.Name, rp.Config)
-		group.Metrics = slices.Sorted(maps.Keys(series))
-		groups = append(groups, group)
+		groups = append(groups, profileChartGroup(rp))
 	}
 	groups = append(groups, activityChartGroup())
 
@@ -37,6 +34,12 @@ func buildChartSpec(profiles []cwprofiles.ResolvedProfile) charttpl.Spec {
 		ContextNamespace: cwprofiles.ContextNamespace,
 		Groups:           groups,
 	}
+}
+
+func profileChartGroup(profile cwprofiles.ResolvedProfile) charttpl.Group {
+	group := profile.Config.Template.Clone()
+	group.Metrics = slices.Sorted(maps.Keys(profileSeries(profile.Name, profile.Config)))
+	return group
 }
 
 func activityChartGroup() charttpl.Group {

@@ -89,7 +89,7 @@ int web_client_request_size_unittest(void)
         w->url_decode_buffer_size == 0, "new client URL decode capacity is %zu, expected 0", w->url_decode_buffer_size);
 
     const char small_target[] = "/api/v1/info?value=a%20b";
-    WEB_CLIENT_TEST(web_client_decode_path_and_query_string(w, small_target), "small target was rejected");
+    WEB_CLIENT_TEST(web_client_decode_path_and_query_string(w, small_target) == HTTP_VALIDATION_OK, "small target was rejected");
     WEB_CLIENT_TEST(
         w->url_decode_buffer_size == NETDATA_WEB_REQUEST_URL_DECODE_INITIAL_SIZE,
         "small target capacity is %zu, expected %zu",
@@ -101,6 +101,31 @@ int web_client_request_size_unittest(void)
         strcmp(buffer_tostring(w->url_query_string_decoded), "?value=a b") == 0,
         "small target query decoded incorrectly");
 
+    WEB_CLIENT_TEST(
+        web_client_decode_path_and_query_string(w, "/api/v1/info%zz") == HTTP_VALIDATION_MALFORMED_URL,
+        "malformed percent escape in the path was accepted");
+    WEB_CLIENT_TEST(
+        web_client_decode_path_and_query_string(w, "/api/v1/info?value=%C3xA9") == HTTP_VALIDATION_MALFORMED_URL,
+        "malformed UTF-8 escape in the query was accepted");
+    WEB_CLIENT_TEST(
+        web_client_decode_path_and_query_string(w, "/api/v1/info?value=%C0%AF") == HTTP_VALIDATION_MALFORMED_URL,
+        "overlong UTF-8 in the query was accepted");
+    WEB_CLIENT_TEST(
+        web_client_decode_path_and_query_string(w, small_target) == HTTP_VALIDATION_OK, "small target was rejected after a malformed one");
+
+    HTTP_REQUEST_MODE original_mode = w->mode;
+    w->mode = HTTP_REQUEST_MODE_STREAM;
+    WEB_CLIENT_TEST(
+        web_client_decode_path_and_query_string(w, "key=abc&hostname=a%zz") == HTTP_VALIDATION_MALFORMED_URL,
+        "malformed percent escape in a stream request was accepted");
+    WEB_CLIENT_TEST(
+        web_client_decode_path_and_query_string(w, "key=abc&hostname=a%20b") == HTTP_VALIDATION_OK,
+        "valid stream request was rejected");
+    WEB_CLIENT_TEST(
+        strcmp(buffer_tostring(w->url_query_string_decoded), "key=abc&hostname=a b") == 0,
+        "stream request decoded incorrectly");
+    w->mode = original_mode;
+
     char *retained = w->url_decode_buffer;
     web_client_reuse_from_cache(w);
     WEB_CLIENT_TEST(w->url_decode_buffer == retained, "cached 4 KiB buffer was not retained");
@@ -109,7 +134,7 @@ int web_client_request_size_unittest(void)
         "cached 4 KiB capacity was not retained");
 
     char *target = web_client_test_target(NETDATA_WEB_REQUEST_URL_DECODE_CACHE_MAX_SIZE - 1);
-    WEB_CLIENT_TEST(web_client_decode_path_and_query_string(w, target), "target fitting 64 KiB was rejected");
+    WEB_CLIENT_TEST(web_client_decode_path_and_query_string(w, target) == HTTP_VALIDATION_OK, "target fitting 64 KiB was rejected");
     WEB_CLIENT_TEST(
         w->url_decode_buffer_size == NETDATA_WEB_REQUEST_URL_DECODE_CACHE_MAX_SIZE,
         "target fitting 64 KiB grew to %zu",
@@ -120,7 +145,7 @@ int web_client_request_size_unittest(void)
 
     freez(target);
     target = web_client_test_target(NETDATA_WEB_REQUEST_URL_DECODE_CACHE_MAX_SIZE);
-    WEB_CLIENT_TEST(web_client_decode_path_and_query_string(w, target), "target requiring 128 KiB was rejected");
+    WEB_CLIENT_TEST(web_client_decode_path_and_query_string(w, target) == HTTP_VALIDATION_OK, "target requiring 128 KiB was rejected");
     WEB_CLIENT_TEST(
         w->url_decode_buffer_size == 2 * NETDATA_WEB_REQUEST_URL_DECODE_CACHE_MAX_SIZE,
         "target requiring 128 KiB grew to %zu",
@@ -136,7 +161,7 @@ int web_client_request_size_unittest(void)
 
     freez(target);
     target = web_client_test_target(NETDATA_WEB_REQUEST_MAX_SIZE - 1);
-    WEB_CLIENT_TEST(web_client_decode_path_and_query_string(w, target), "largest fitting target was rejected");
+    WEB_CLIENT_TEST(web_client_decode_path_and_query_string(w, target) == HTTP_VALIDATION_OK, "largest fitting target was rejected");
     WEB_CLIENT_TEST(
         w->url_decode_buffer_size == NETDATA_WEB_REQUEST_MAX_SIZE,
         "largest fitting target capacity is %zu",
@@ -145,7 +170,7 @@ int web_client_request_size_unittest(void)
     char *maximum_buffer = w->url_decode_buffer;
     freez(target);
     target = web_client_test_target(NETDATA_WEB_REQUEST_MAX_SIZE);
-    WEB_CLIENT_TEST(!web_client_decode_path_and_query_string(w, target), "oversized target was accepted");
+    WEB_CLIENT_TEST(web_client_decode_path_and_query_string(w, target) == HTTP_VALIDATION_URI_TOO_LONG, "oversized target was accepted");
     WEB_CLIENT_TEST(w->url_decode_buffer == maximum_buffer, "oversized target replaced the 1 MiB buffer");
     WEB_CLIENT_TEST(
         w->url_decode_buffer_size == NETDATA_WEB_REQUEST_MAX_SIZE,
@@ -157,7 +182,8 @@ int web_client_request_size_unittest(void)
     WEB_CLIENT_TEST(
         w->url_decode_buffer_size == 0, "trimmed 1 MiB buffer retained capacity %zu", w->url_decode_buffer_size);
     WEB_CLIENT_TEST(
-        !web_client_decode_path_and_query_string(w, target), "oversized target with NULL scratch buffer was accepted");
+        web_client_decode_path_and_query_string(w, target) == HTTP_VALIDATION_URI_TOO_LONG,
+        "oversized target with NULL scratch buffer was accepted");
     WEB_CLIENT_TEST(!w->url_decode_buffer, "oversized target allocated scratch before failing");
 
     freez(target);

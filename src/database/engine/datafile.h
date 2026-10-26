@@ -58,8 +58,18 @@ struct rrdengine_datafile {
     struct {
         SPINLOCK spinlock;
         bool populated;
-        size_t rejected_v2_size;    // its loaded journal v2 failed while populating; rebuilt from v1
+        bool v1_replayed;           // journalfile_load() replayed its journal v1; a rejected v2 is then not rebuilt
+                                    // (written only at load, before any reader runs)
     } populate_mrg;
+
+    // its loaded journal v2 was rejected or could not be mapped: the size it is charged
+    // for, discharged when it is rebuilt, removed or deleted (atomic)
+    size_t rejected_v2_size;
+
+    // the startup rebuild replayed the journal v1 of its rejected v2 but published no new one:
+    // the replayed pages are still hot, so the journal indexer retries it (other rejected
+    // journals v2 have nothing to index until the next start)
+    bool rebuild_unpublished;
 
     struct {
         SPINLOCK spinlock;
@@ -107,6 +117,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df);
 void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile);
 void datafile_list_delete_unsafe(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile);
 void generate_datafilepath(struct rrdengine_datafile *datafile, char *str, size_t maxlen);
+bool datafile_name_parse(const char *name, unsigned *fileno);
 int close_data_file(struct rrdengine_datafile *datafile);
 int unlink_data_file(struct rrdengine_datafile *datafile);
 int destroy_data_file_unsafe(struct rrdengine_datafile *datafile);

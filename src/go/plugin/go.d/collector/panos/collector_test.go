@@ -37,6 +37,7 @@ var (
 	dataEnvironment, _         = os.ReadFile("testdata/environment.xml")
 	dataLicenses, _            = os.ReadFile("testdata/licenses.xml")
 	dataIPSecSA, _             = os.ReadFile("testdata/ipsec_sa.xml")
+	dataIPSecSAPartial, _      = os.ReadFile("testdata/ipsec_sa_partial.xml")
 )
 
 func Test_testDataIsValid(t *testing.T) {
@@ -52,6 +53,7 @@ func Test_testDataIsValid(t *testing.T) {
 		"dataEnvironment":         dataEnvironment,
 		"dataLicenses":            dataLicenses,
 		"dataIPSecSA":             dataIPSecSA,
+		"dataIPSecSAPartial":      dataIPSecSAPartial,
 	} {
 		require.NotNil(t, data, name)
 	}
@@ -1706,121 +1708,6 @@ func TestCollector_Collect(t *testing.T) {
 				},
 			},
 		},
-		"malformed IPsec lifetime preserves active tunnel count": {
-			prepare: func(_ *Collector, api *mockAPIClient) {
-				api.responses = map[string][]byte{
-					ipsecSACommand: []byte(
-						`<response status="success"><result><ntun>1</ntun><entries><entry><name>branch-a</name><gateway>gw-branch-a</gateway><remote>198.51.100.10</remote><remain>soon</remain><tid>66</tid></entry></entries></result></response>`,
-					),
-				}
-			},
-			steps: []collectStep{
-				{
-					name:        "bad tunnel lifetime is omitted",
-					wantMetrics: map[string]metrix.SampleValue{metricKey("ipsec_tunnels_active", nil): 1},
-					wantMissing: []string{
-						metricKey(
-							"ipsec_tunnel_sa_lifetime",
-							ipsecLabels("branch-a", "gw-branch-a", "198.51.100.10", "66", "unknown", "unknown"),
-						),
-					},
-					wantLog: []string{`IPsec tunnel branch-a remain: invalid integer`},
-				},
-			},
-		},
-		"IPsec summary-only response uses ntun": {
-			prepare: func(_ *Collector, api *mockAPIClient) {
-				api.responses = map[string][]byte{
-					ipsecSACommand: []byte(`<response status="success"><result><ntun>2</ntun></result></response>`),
-				}
-			},
-			steps: []collectStep{
-				{
-					name:        "active count commits without tunnel instances",
-					wantMetrics: map[string]metrix.SampleValue{metricKey("ipsec_tunnels_active", nil): 2},
-					wantMissing: []string{
-						metricKey(
-							"ipsec_tunnel_sa_lifetime",
-							ipsecLabels("unknown", "unknown", "unknown", "unknown", "unknown", "unknown"),
-						),
-					},
-				},
-			},
-		},
-		"IPsec count mismatch is partial success": {
-			prepare: func(_ *Collector, api *mockAPIClient) {
-				api.responses = map[string][]byte{
-					ipsecSACommand: []byte(
-						`<response status="success"><result><ntun>2</ntun><entries><entry><name>branch-a</name><gateway>gw-branch-a</gateway><remote>198.51.100.10</remote><remain>60</remain><tid>66</tid></entry></entries></result></response>`,
-					),
-				}
-			},
-			steps: []collectStep{
-				{
-					name: "count and tunnel metrics commit",
-					wantMetrics: map[string]metrix.SampleValue{
-						metricKey("ipsec_tunnels_active", nil): 2,
-						metricKey("ipsec_tunnel_sa_lifetime", ipsecLabels("branch-a", "gw-branch-a", "198.51.100.10", "66", "unknown", "unknown")): 60,
-					},
-					wantLog: []string{"IPsec active tunnel count mismatch: ntun=2 entries=1"},
-				},
-			},
-		},
-		"IPsec entries-only response infers active count": {
-			prepare: func(_ *Collector, api *mockAPIClient) {
-				api.responses = map[string][]byte{
-					ipsecSACommand: []byte(
-						`<response status="success"><result><entries><entry><name>branch-a</name><gateway>gw-branch-a</gateway><remote>198.51.100.10</remote><remain>60</remain><tid>66</tid></entry></entries></result></response>`,
-					),
-				}
-			},
-			steps: []collectStep{
-				{
-					name: "entries length becomes active tunnel count",
-					wantMetrics: map[string]metrix.SampleValue{
-						metricKey("ipsec_tunnels_active", nil): 1,
-						metricKey("ipsec_tunnel_sa_lifetime", ipsecLabels("branch-a", "gw-branch-a", "198.51.100.10", "66", "unknown", "unknown")): 60,
-					},
-				},
-			},
-		},
-		"malformed IPsec active count is partial failure": {
-			prepare: func(_ *Collector, api *mockAPIClient) {
-				api.responses = map[string][]byte{
-					ipsecSACommand: []byte(`<response status="success"><result><ntun>two</ntun></result></response>`),
-				}
-			},
-			steps: []collectStep{
-				{
-					name: "system commits and IPsec active count is omitted",
-					wantMetrics: map[string]metrix.SampleValue{
-						metricKey("system_uptime", systemLabels()): 183845,
-					},
-					wantMissing: []string{metricKey("ipsec_tunnels_active", nil)},
-					wantLog:     []string{`IPsec active tunnel count: invalid integer`},
-				},
-			},
-		},
-		"missing IPsec payload is partial success": {
-			prepare: func(_ *Collector, api *mockAPIClient) {
-				api.responses = map[string][]byte{
-					ipsecSACommand: []byte(`<response status="success"><result></result></response>`),
-				}
-			},
-			steps: []collectStep{
-				{
-					name: "system commits and IPsec metrics are absent",
-					wantMetrics: map[string]metrix.SampleValue{
-						metricKey("system_uptime", systemLabels()): 183845,
-					},
-					wantMissing: []string{metricKey("ipsec_tunnels_active", nil)},
-					wantLog: []string{
-						"ipsec metricset",
-						"expected <ntun> or <entries>",
-					},
-				},
-			},
-		},
 		"all metricsets fail": {
 			prepare: func(_ *Collector, api *mockAPIClient) {
 				api.errors = allCommandErrors(errors.New("api error"))
@@ -2714,13 +2601,10 @@ func TestParseReadOnlyTelemetry(t *testing.T) {
 			assert.Equal(t, "Threat Prevention", licenses[0].Feature)
 		},
 		"ipsec": func(t *testing.T) {
-			ipsecPayload, err := parseIPSecTunnels(dataIPSecSA)
+			tunnels, err := parseIPSecTunnels(dataIPSecSA)
 			require.NoError(t, err)
-			assert.True(t, ipsecPayload.found)
-			assert.True(t, ipsecPayload.entriesFound)
-			assert.Equal(t, int64(2), ipsecPayload.activeCount)
-			require.Len(t, ipsecPayload.tunnels, 2)
-			assert.Equal(t, "branch-a", ipsecPayload.tunnels[0].Name)
+			require.Len(t, tunnels, 2)
+			assert.Equal(t, "branch-a", tunnels[0].Name)
 		},
 	}
 

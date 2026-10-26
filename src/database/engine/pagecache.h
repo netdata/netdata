@@ -12,10 +12,13 @@ extern struct pgc *extent_cache;
 
 /* Forward declarations */
 struct rrdengine_instance;
+struct pgc_page;
 
 #define INVALID_TIME (0)
 
 extern struct rrdeng_cache_efficiency_stats rrdeng_cache_efficiency_stats;
+
+bool open_cache_page_is_of_metric(struct pgc_page *page, UUIDMAP_ID uuid_id);
 
 struct page_descr_with_data {
     UUIDMAP_ID uuid_id;
