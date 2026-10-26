@@ -52,10 +52,7 @@ template:
       context: power_state
       units: state
       dimensions:
-        - selector: power_state_running
-          name: running
-        - selector: power_state_deallocated
-          name: deallocated
+        - selector: power_state
 `
 
 func loadResourceProfile(t *testing.T, mutate func(*Profile)) Profile {
@@ -78,7 +75,7 @@ func TestProfile_ResourceLabelsAndStatesAreValid(t *testing.T) {
 		"properties.serverFarmId",
 		"properties.extended.instanceView.powerState.code",
 	}, profile.ResourceProperties())
-	assert.Equal(t, "test_vm.power_state_running", profile.Template.Charts[1].Dimensions[0].Selector)
+	assert.Equal(t, "test_vm.power_state", profile.Template.Charts[1].Dimensions[0].Selector)
 }
 
 func TestProfile_ResourceLabelsAndStatesValidation(t *testing.T) {
@@ -106,9 +103,9 @@ func TestProfile_ResourceLabelsAndStatesValidation(t *testing.T) {
 			mutate: func(p *Profile) { p.ResourceLabels[1].Value = "upper" },
 			want:   "'value' must be one of",
 		},
-		"state id colliding with a metric id": {
-			mutate: func(p *Profile) { p.ResourceStates[0].ID = "percentage_cpu" },
-			want:   "collides with a metric id",
+		"state id colliding with a metric series": {
+			mutate: func(p *Profile) { p.ResourceStates[0].ID = "percentage_cpu_average" },
+			want:   "collides with a metric series",
 		},
 		"state without options": {
 			mutate: func(p *Profile) { p.ResourceStates[0].States = nil },
@@ -126,29 +123,13 @@ func TestProfile_ResourceLabelsAndStatesValidation(t *testing.T) {
 			mutate: func(p *Profile) { p.ResourceStates[0].States[1].Value = "powerstate/RUNNING" },
 			want:   `duplicate state value "powerstate/RUNNING"`,
 		},
-		"state series colliding with a metric series": {
-			mutate: func(p *Profile) {
-				p.ResourceStates = append(p.ResourceStates, ResourceState{
-					ID:       "percentage",
-					Property: "properties.provisioningState",
-					States:   []StateOption{{Name: "cpu_average", Value: "Succeeded"}},
-				})
-			},
-			want: `series "percentage_cpu_average" collides`,
-		},
-		"state series colliding with another state series": {
-			mutate: func(p *Profile) {
-				p.ResourceStates = append(p.ResourceStates, ResourceState{
-					ID:       "power",
-					Property: "properties.provisioningState",
-					States:   []StateOption{{Name: "state_running", Value: "Succeeded"}},
-				})
-			},
-			want: `series "power_state_running" collides`,
+		"duplicate state id": {
+			mutate: func(p *Profile) { p.ResourceStates = append(p.ResourceStates, p.ResourceStates[0]) },
+			want:   `duplicate state id "power_state"`,
 		},
 		"chart referencing an undeclared state": {
-			mutate: func(p *Profile) { p.ResourceStates[0].States = p.ResourceStates[0].States[:1] },
-			want:   "power_state_deallocated",
+			mutate: func(p *Profile) { p.Template.Charts[1].Dimensions[0].Selector = "undefined_state" },
+			want:   "undefined_state",
 		},
 	}
 

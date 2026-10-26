@@ -57,7 +57,7 @@ type ResourceLabel struct {
 	Value    string `yaml:"value,omitempty" json:"value,omitempty"`
 }
 
-// ResourceState exports one 0/1 series per state, from an Azure Resource Graph property
+// ResourceState exports an enum stateset from an Azure Resource Graph property
 // of each resource. It reports state even when Azure Monitor has no metric data for it.
 type ResourceState struct {
 	ID       string        `yaml:"id" json:"id,omitempty"`
@@ -138,7 +138,7 @@ func (p Profile) Validate(prefix, baseName string) error {
 	}
 
 	errs = append(errs, validateResourceLabels(prefix, p.ResourceLabels))
-	errs = append(errs, validateResourceStates(prefix, p.ResourceStates, seenMetricIDs, metricSeriesNames(p.Metrics)))
+	errs = append(errs, validateResourceStates(prefix, p.ResourceStates, metricSeriesNames(p.Metrics)))
 
 	if errors.Join(errs...) == nil {
 		if err := validateTemplate(prefix, baseName, p); err != nil {
@@ -239,7 +239,7 @@ func metricSeriesNames(metrics []Metric) map[string]struct{} {
 	return names
 }
 
-func validateResourceStates(prefix string, states []ResourceState, metricIDs, seriesNames map[string]struct{}) error {
+func validateResourceStates(prefix string, states []ResourceState, seriesNames map[string]struct{}) error {
 	var errs []error
 	seen := map[string]struct{}{}
 	for i, state := range states {
@@ -251,8 +251,8 @@ func validateResourceStates(prefix string, states []ResourceState, metricIDs, se
 		if _, ok := seen[id]; ok {
 			errs = append(errs, fmt.Errorf("%s: duplicate state id %q", statePrefix, id))
 		}
-		if _, ok := metricIDs[strings.ToLower(id)]; ok {
-			errs = append(errs, fmt.Errorf("%s: id %q collides with a metric id", statePrefix, id))
+		if _, ok := seriesNames[ExportedStateName("", id)]; ok {
+			errs = append(errs, fmt.Errorf("%s: id %q collides with a metric series", statePrefix, id))
 		}
 		seen[id] = struct{}{}
 		if !IsValidResourceProperty(state.Property) {
@@ -280,19 +280,14 @@ func validateResourceStates(prefix string, states []ResourceState, metricIDs, se
 				errs = append(errs, fmt.Errorf("%s: duplicate state value %q", optionPrefix, option.Value))
 			}
 			seenValues[value] = struct{}{}
-			series := ExportedStateSeriesName("", id, name)
-			if _, ok := seriesNames[series]; ok {
-				errs = append(errs, fmt.Errorf("%s: series %q collides with another metric or state series", optionPrefix, strings.TrimPrefix(series, ".")))
-			}
-			seriesNames[series] = struct{}{}
 		}
 	}
 	return errors.Join(errs...)
 }
 
-// ExportedStateSeriesName is the series of one state option, valued 1 when the resource is in it.
-func ExportedStateSeriesName(profileName, stateID, stateName string) string {
-	return strings.TrimSpace(profileName) + "." + strings.TrimSpace(stateID) + "_" + strings.TrimSpace(stateName)
+// ExportedStateName is the native stateset metric for one resource property.
+func ExportedStateName(profileName, stateID string) string {
+	return strings.TrimSpace(profileName) + "." + strings.TrimSpace(stateID)
 }
 
 // ResourcePropertyColumn is the discovery query column that carries a resource property.
@@ -402,9 +397,7 @@ func visibleMetricsForProfile(baseName string, profile Profile) map[string]struc
 		}
 	}
 	for _, state := range profile.ResourceStates {
-		for _, option := range state.States {
-			visible[ExportedStateSeriesName(baseName, state.ID, option.Name)] = struct{}{}
-		}
+		visible[ExportedStateName(baseName, state.ID)] = struct{}{}
 	}
 	return visible
 }

@@ -12,6 +12,7 @@ import (
 	azcloud "github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
 	"github.com/Azure/azure-sdk-for-go/sdk/monitor/query/azmetrics"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resourcegraph/armresourcegraph"
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/azure_monitor/azureprofiles"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
 )
@@ -45,7 +46,7 @@ func (c *Collector) initInstruments(runtime *collectorRuntime) error {
 			if _, ok := runtime.Instruments[name]; ok {
 				return
 			}
-			inst := &instrumentRuntime{Kind: kind}
+			inst := &instrumentRuntime{Kind: kind, LabelKeys: p.LabelKeys}
 			if kind == azureprofiles.SeriesKindCounter {
 				inst.Counter = vec.Counter(name)
 			} else {
@@ -60,9 +61,11 @@ func (c *Collector) initInstruments(runtime *collectorRuntime) error {
 			}
 		}
 		for _, state := range p.ResourceStates {
-			for _, option := range state.Options {
-				register(option.Instrument, azureprofiles.SeriesKindGauge)
-			}
+			state.Instrument = vec.StateSet(state.Name,
+				metrix.WithStateSetStates(state.States...), metrix.WithStateSetMode(metrix.ModeEnum))
+		}
+		if c.Discovery.RefreshEvery == 0 && len(p.ResourceStates) > 0 {
+			c.Warningf("profile %q resource states are disabled because discovery.refresh_every is zero", p.Name)
 		}
 	}
 

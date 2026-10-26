@@ -474,20 +474,7 @@ template:
       units: state
       algorithm: absolute
       dimensions:
-        - selector: power_state_running
-          name: running
-        - selector: power_state_stopped
-          name: stopped
-        - selector: power_state_deallocated
-          name: deallocated
-        - selector: power_state_starting
-          name: starting
-        - selector: power_state_stopping
-          name: stopping
-        - selector: power_state_deallocating
-          name: deallocating
-        - selector: power_state_unknown
-          name: unknown
+        - selector: power_state
     - id: am_azure_virtual_machines__network_traffic
       title: Azure Virtual Machine Network Traffic
       context: network_traffic

@@ -683,19 +683,19 @@ func TestCollector_DropsResourceStateWhenDiscoveryNoLongerReportsIt(t *testing.T
 	require.NoError(t, c.Init(context.Background()))
 	require.NoError(t, c.Check(context.Background()))
 
-	series, err := collecttest.CollectScalarSeries(c, metrix.ReadRaw())
+	series, err := collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
 	require.NoError(t, err)
-	running, ok := seriesValue(series, "virtual_machines.power_state_running{")
+	running, ok := seriesValue(series, "virtual_machines.power_state{", `virtual_machines.power_state="running"`)
 	require.True(t, ok)
 	assert.Equal(t, metrix.SampleValue(1), running)
 
 	rg.resources = []map[string]any{testVirtualMachine("vm-a", "Standard_B2s", "Linux", "")}
 	now = now.Add(10 * time.Minute)
 
-	series, err = collecttest.CollectScalarSeries(c)
+	series, err = collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
 	require.NoError(t, err)
 	assert.Equal(t, uint64(2), c.discovery.FetchCounter)
-	_, ok = seriesValue(series, "virtual_machines.power_state_running{")
+	_, ok = seriesValue(series, "virtual_machines.power_state{", `virtual_machines.power_state="running"`)
 	assert.False(t, ok)
 }
 
@@ -835,7 +835,7 @@ func TestCollector_CollectScenarios(t *testing.T) {
 				}
 				for name, want := range states {
 					parts := strings.Fields(name)
-					got, ok := seriesValue(series, "virtual_machines.power_state_"+parts[1]+"{", `resource_name="`+parts[0]+`"`)
+					got, ok := seriesValue(series, "virtual_machines.power_state{", `virtual_machines.power_state="`+parts[1]+`"`, `resource_name="`+parts[0]+`"`)
 					require.Truef(t, ok, "missing power state series for %s", name)
 					assert.Equalf(t, want, got, "power state %s", name)
 				}
@@ -957,7 +957,7 @@ func TestCollector_CollectScenarios(t *testing.T) {
 
 			require.NoError(t, c.Init(context.Background()))
 
-			series, err := collecttest.CollectScalarSeries(c, metrix.ReadRaw())
+			series, err := collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
 			tc.check(t, series, err, rg, mx)
 		})
 	}
@@ -2093,261 +2093,6 @@ func TestCollector_AutoModeEntriesStayDormantAcrossRefresh(t *testing.T) {
 	assert.NotContains(t, c.discovery.ByProfile, "sql_database")
 	assert.Contains(t, rg.lastQuery(), "Microsoft.DBforPostgreSQL/flexibleServers")
 	assert.NotContains(t, rg.lastQuery(), "Microsoft.Sql/servers/databases")
-}
-
-func TestObservationState_PruneStaleResources_RemovesOldProfileMembership(t *testing.T) {
-	resource := resourceInfo{
-		SubscriptionID: "sub-1",
-		UID:            "uid-a",
-		Name:           "db-a",
-		ResourceGroup:  "rg-a",
-		Region:         "eastus",
-		Type:           "Microsoft.Sql/servers/databases",
-	}
-	labels := labelValues(resourceLabels(resource, "sql_database"))
-	key := sampleObservationKey("sql.cpu", metrix.HostScope{}, labels)
-
-	state := &observationState{
-		accumulators: map[observationKey]float64{
-			key: 10,
-		},
-		lastObserved: map[observationKey]lastObservation{
-			key: {
-				instrument:  "sql.cpu",
-				labelValues: append([]string(nil), labels...),
-				value:       10,
-			},
-		},
-	}
-
-	state.pruneStaleResources(map[string][]resourceInfo{
-		"postgres_flexible": {resource},
-	})
-
-	assert.Empty(t, state.lastObserved)
-	assert.Empty(t, state.accumulators)
-}
-
-func TestObservationState_PruneStaleResources_RemovesLabelChurnForSameResource(t *testing.T) {
-	oldResource := resourceInfo{
-		SubscriptionID: "sub-1",
-		UID:            "uid-a",
-		Name:           "db-a",
-		ResourceGroup:  "rg-a",
-		Region:         "eastus",
-		Type:           "Microsoft.Sql/servers/databases",
-	}
-	newResource := oldResource
-	newResource.Name = "db-a-renamed"
-
-	labels := labelValues(resourceLabels(oldResource, "sql_database"))
-	key := sampleObservationKey("sql.cpu", metrix.HostScope{}, labels)
-
-	state := &observationState{
-		accumulators: map[observationKey]float64{
-			key: 10,
-		},
-		lastObserved: map[observationKey]lastObservation{
-			key: {
-				instrument:  "sql.cpu",
-				labelValues: append([]string(nil), labels...),
-				value:       10,
-			},
-		},
-	}
-
-	state.pruneStaleResources(map[string][]resourceInfo{
-		"sql_database": {newResource},
-	})
-
-	assert.Empty(t, state.lastObserved)
-	assert.Empty(t, state.accumulators)
-}
-
-func TestObservationState_PruneStaleResources_RespectsScopeBoundary(t *testing.T) {
-	scopeA, unsafeValue := workloadHostScope(resourceInfo{Tags: []resourceTag{{Key: "workload", Value: "api"}}}, "workload")
-	require.Empty(t, unsafeValue)
-	scopeB, unsafeValue := workloadHostScope(resourceInfo{Tags: []resourceTag{{Key: "workload", Value: "worker"}}}, "workload")
-	require.Empty(t, unsafeValue)
-
-	resource := resourceInfo{
-		SubscriptionID: "sub-1",
-		UID:            "uid-a",
-		Name:           "db-a",
-		ResourceGroup:  "rg-a",
-		Region:         "eastus",
-		Type:           "Microsoft.Sql/servers/databases",
-		HostScope:      scopeA,
-	}
-	labels := labelValues(resourceLabels(resource, "sql_database"))
-	keyA := sampleObservationKey("sql.cpu", scopeA, labels)
-	keyB := sampleObservationKey("sql.cpu", scopeB, labels)
-
-	state := &observationState{
-		accumulators: map[observationKey]float64{
-			keyA: 10,
-			keyB: 20,
-		},
-		lastObserved: map[observationKey]lastObservation{
-			keyA: {
-				instrument:  "sql.cpu",
-				scope:       scopeA,
-				labelValues: append([]string(nil), labels...),
-				value:       10,
-			},
-			keyB: {
-				instrument:  "sql.cpu",
-				scope:       scopeB,
-				labelValues: append([]string(nil), labels...),
-				value:       20,
-			},
-		},
-	}
-
-	state.pruneStaleResources(map[string][]resourceInfo{
-		"sql_database": {resource},
-	})
-
-	assert.Contains(t, state.lastObserved, keyA)
-	assert.NotContains(t, state.lastObserved, keyB)
-	assert.Contains(t, state.accumulators, keyA)
-	assert.NotContains(t, state.accumulators, keyB)
-}
-
-func TestObservationState_CounterAccumulatorFollowsScopeMobility(t *testing.T) {
-	scopes := map[string]metrix.HostScope{}
-	for _, workload := range []string{"api", "worker", "batch"} {
-		scope, unsafeValue := workloadHostScope(resourceInfo{Tags: []resourceTag{{Key: "workload", Value: workload}}}, "workload")
-		require.Empty(t, unsafeValue)
-		scopes[workload] = scope
-	}
-
-	store := metrix.NewCollectorStore()
-	managed, ok := metrix.AsCycleManagedStore(store)
-	require.True(t, ok)
-	cycle := managed.CycleController()
-	vec := store.Write().SnapshotMeter("").Vec("resource_uid", "subscription_id", "resource_name", "resource_group", "region", "resource_type", "profile")
-	state := &observationState{
-		instruments: map[string]*instrumentRuntime{
-			"sql.transactions": {
-				Kind:    azureprofiles.SeriesKindCounter,
-				Counter: vec.Counter("sql.transactions"),
-			},
-		},
-		accumulators: make(map[observationKey]float64),
-		lastObserved: make(map[observationKey]lastObservation),
-	}
-
-	baseResource := resourceInfo{
-		SubscriptionID: "sub-1",
-		UID:            "uid-a",
-		Name:           "db-a",
-		ResourceGroup:  "rg-a",
-		Region:         "eastus",
-		Type:           "Microsoft.Sql/servers/databases",
-	}
-	steps := map[string]struct {
-		path []struct {
-			workload string
-			value    float64
-		}
-	}{
-		"a to b to c to a": {
-			path: []struct {
-				workload string
-				value    float64
-			}{
-				{workload: "api", value: 5},
-				{workload: "worker", value: 7},
-				{workload: "batch", value: 11},
-				{workload: "api", value: 13},
-			},
-		},
-	}
-
-	for name, tc := range steps {
-		t.Run(name, func(t *testing.T) {
-			for _, step := range tc.path {
-				scope := scopes[step.workload]
-				resource := baseResource
-				resource.HostScope = scope
-				labels := labelValues(resourceLabels(resource, "sql_database"))
-
-				state.pruneStaleResources(map[string][]resourceInfo{"sql_database": {resource}})
-				cycle.BeginCycle()
-				observed := state.observeSamples([]metricSample{{
-					Instrument: "sql.transactions",
-					Kind:       azureprofiles.SeriesKindCounter,
-					Scope:      scope,
-					Labels:     resourceLabels(resource, "sql_database"),
-					Value:      step.value,
-				}})
-				state.reobserveCachedObservations(map[string]bool{}, observed)
-				require.NoError(t, cycle.CommitCycleSuccess())
-
-				key := sampleObservationKey("sql.transactions", scope, labels)
-				require.Len(t, state.accumulators, 1)
-				assert.Equal(t, step.value, state.accumulators[key])
-				assert.Contains(t, state.lastObserved, key)
-			}
-		})
-	}
-}
-
-func TestObservationState_ReobserveUsesStoredScope(t *testing.T) {
-	scope, unsafeValue := workloadHostScope(resourceInfo{Tags: []resourceTag{{Key: "workload", Value: "api"}}}, "workload")
-	require.Empty(t, unsafeValue)
-
-	store := metrix.NewCollectorStore()
-	managed, ok := metrix.AsCycleManagedStore(store)
-	require.True(t, ok)
-	cycle := managed.CycleController()
-	vec := store.Write().SnapshotMeter("").Vec("resource_uid", "subscription_id", "resource_name", "resource_group", "region", "resource_type", "profile")
-	labels := []string{"uid-a", "sub-1", "db-a", "rg-a", "eastus", "Microsoft.Sql/servers/databases", "sql_database"}
-
-	state := &observationState{
-		instruments: map[string]*instrumentRuntime{
-			"sql.cpu": {
-				Kind:  azureprofiles.SeriesKindGauge,
-				Gauge: vec.Gauge("sql.cpu"),
-			},
-		},
-		accumulators: make(map[observationKey]float64),
-		lastObserved: map[observationKey]lastObservation{
-			sampleObservationKey("sql.cpu", scope, labels): {
-				instrument:  "sql.cpu",
-				scope:       scope,
-				labelValues: append([]string(nil), labels...),
-				value:       42,
-			},
-		},
-	}
-
-	cycle.BeginCycle()
-	state.reobserveCachedObservations(map[string]bool{}, map[observationKey]bool{})
-	require.NoError(t, cycle.CommitCycleSuccess())
-
-	_, ok = store.Read(metrix.ReadRaw()).Value("sql.cpu", metrix.Labels{
-		"resource_uid":    "uid-a",
-		"subscription_id": "sub-1",
-		"resource_name":   "db-a",
-		"resource_group":  "rg-a",
-		"region":          "eastus",
-		"resource_type":   "Microsoft.Sql/servers/databases",
-		"profile":         "sql_database",
-	})
-	assert.False(t, ok)
-
-	_, ok = store.Read(metrix.ReadRaw(), metrix.ReadHostScope(scope.ScopeKey)).Value("sql.cpu", metrix.Labels{
-		"resource_uid":    "uid-a",
-		"subscription_id": "sub-1",
-		"resource_name":   "db-a",
-		"resource_group":  "rg-a",
-		"region":          "eastus",
-		"resource_type":   "Microsoft.Sql/servers/databases",
-		"profile":         "sql_database",
-	})
-	assert.True(t, ok)
 }
 
 func TestConfig_ValidateDiscoveryContracts(t *testing.T) {

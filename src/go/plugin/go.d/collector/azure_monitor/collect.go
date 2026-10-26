@@ -6,10 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
-
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/azure_monitor/azureprofiles"
 )
 
 func (c *Collector) collect(ctx context.Context) error {
@@ -25,12 +22,14 @@ func (c *Collector) collect(ctx context.Context) error {
 	queryBatches := c.buildQueryBatches(now)
 
 	dueInstruments := dueInstrumentsForBatches(queryBatches)
-	markResourceStatesDue(dueInstruments, c.runtime)
 	samples, err := c.collectQuerySamples(ctx, queryBatches, now)
-	if err != nil {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	statesObserved := c.observeResourceStates(now)
+	if err != nil && !statesObserved {
 		return err
 	}
-	samples = append(samples, resourceStateSamples(c.runtime, c.discovery.ByProfile)...)
 
 	observedThisCycle := c.observations.observeSamples(samples)
 	c.observations.reobserveCachedObservations(dueInstruments, observedThisCycle)
@@ -49,11 +48,11 @@ func (c *Collector) refreshCollectResources(ctx context.Context) (bool, error) {
 		if c.discovery.FetchedAt.IsZero() {
 			return false, fmt.Errorf("resource discovery: %w", err)
 		}
-		c.Warningf("resource discovery refresh failed, continuing with last known discovery snapshot: %v", err)
+		c.Limit("discovery:refresh", 1, time.Hour).Warningf("resource discovery refresh failed, retaining inventory without stale resource states: %v", err)
 		resources = c.discovery.Resources
 	}
 	if c.discovery.FetchCounter != prevFetchCounter {
-		c.observations.pruneStaleResources(c.discovery.ByProfile)
+		c.observations.reconcileResources(c.discovery.ByProfile)
 	}
 	return len(resources) > 0, nil
 }
@@ -72,7 +71,7 @@ func (c *Collector) collectQuerySamples(ctx context.Context, batches []queryBatc
 	for _, res := range results {
 		if res.Err != nil {
 			errCount++
-			c.Warningf("collection batch failed: %v", res.Err)
+			c.Limit("metrics:batch", 1, time.Hour).Warningf("collection batch failed: %v", res.Err)
 			continue
 		}
 		allSamples = append(allSamples, res.Samples...)
@@ -83,57 +82,4 @@ func (c *Collector) collectQuerySamples(ctx context.Context, batches []queryBatc
 	}
 
 	return allSamples, nil
-}
-
-// markResourceStatesDue marks state series as reported every cycle, so a state that discovery
-// no longer returns is dropped instead of replayed from the observation cache.
-func markResourceStatesDue(dueInstruments map[string]bool, runtime *collectorRuntime) {
-	if runtime == nil {
-		return
-	}
-	for _, profile := range runtime.Profiles {
-		for _, state := range profile.ResourceStates {
-			for _, option := range state.Options {
-				dueInstruments[option.Instrument] = true
-			}
-		}
-	}
-}
-
-// resourceStateSamples reports each resource state from discovery, so resources without
-// Azure Monitor data (for example deallocated VMs) are still counted in their state.
-func resourceStateSamples(runtime *collectorRuntime, byProfile map[string][]resourceInfo) []metricSample {
-	if runtime == nil {
-		return nil
-	}
-
-	var samples []metricSample
-	for _, profile := range runtime.Profiles {
-		if len(profile.ResourceStates) == 0 {
-			continue
-		}
-		for _, resource := range byProfile[profile.Name] {
-			labels := profileResourceLabels(resource, profile)
-			for _, state := range profile.ResourceStates {
-				current := resource.Properties[state.Property]
-				if current == "" {
-					continue
-				}
-				for _, option := range state.Options {
-					value := 0.0
-					if strings.EqualFold(current, option.Value) {
-						value = 1
-					}
-					samples = append(samples, metricSample{
-						Instrument: option.Instrument,
-						Kind:       azureprofiles.SeriesKindGauge,
-						Labels:     labels,
-						Scope:      resource.HostScope,
-						Value:      value,
-					})
-				}
-			}
-		}
-	}
-	return samples
 }

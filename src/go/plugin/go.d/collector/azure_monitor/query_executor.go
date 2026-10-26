@@ -175,7 +175,6 @@ func samplesFromMetricValues(metrics []azmetrics.Metric, scope metrix.HostScope,
 			}
 			samples = append(samples, metricSample{
 				Instrument: series.Instrument,
-				Kind:       series.Kind,
 				Labels:     labels,
 				Scope:      scope,
 				Value:      value,

@@ -31,14 +31,11 @@ type profileRuntime struct {
 }
 
 type resourceStateRuntime struct {
-	ID       string
-	Property string
-	Options  []*stateOptionRuntime
-}
-
-type stateOptionRuntime struct {
-	Value      string
-	Instrument string
+	Name       string
+	Property   string
+	States     []string
+	Values     map[string]string
+	Instrument metrix.SnapshotStateSetVec
 }
 
 type metricRuntime struct {
@@ -56,9 +53,10 @@ type seriesRuntime struct {
 }
 
 type instrumentRuntime struct {
-	Kind    string
-	Gauge   metrix.SnapshotGaugeVec
-	Counter metrix.SnapshotCounterVec
+	Kind      string
+	LabelKeys []string
+	Gauge     metrix.SnapshotGaugeVec
+	Counter   metrix.SnapshotCounterVec
 }
 
 func (i *instrumentRuntime) observe(scope metrix.HostScope, labelValues []string, value float64) {
@@ -121,7 +119,6 @@ type queryBatch struct {
 
 type metricSample struct {
 	Instrument string
-	Kind       string
 	Labels     metrix.Labels
 	Scope      metrix.HostScope
 	Value      float64
@@ -133,7 +130,6 @@ type queryBatchResult struct {
 }
 
 type lastObservation struct {
-	instrument  string
 	scope       metrix.HostScope
 	labelValues []string
 	value       float64

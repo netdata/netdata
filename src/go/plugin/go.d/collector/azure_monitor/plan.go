@@ -134,14 +134,14 @@ func buildProfileRuntime(resolved azureprofiles.ResolvedProfile, entry ProfileEn
 
 	for _, state := range resolved.Config.ResourceStates {
 		sr := &resourceStateRuntime{
-			ID:       stringsTrim(state.ID),
+			Name:     azureprofiles.ExportedStateName(profileName, state.ID),
 			Property: stringsTrim(state.Property),
+			Values:   make(map[string]string, len(state.States)),
 		}
 		for _, option := range state.States {
-			sr.Options = append(sr.Options, &stateOptionRuntime{
-				Value:      stringsTrim(option.Value),
-				Instrument: azureprofiles.ExportedStateSeriesName(profileName, sr.ID, option.Name),
-			})
+			name := stringsTrim(option.Name)
+			sr.States = append(sr.States, name)
+			sr.Values[stringsLowerTrim(option.Value)] = name
 		}
 		out.ResourceStates = append(out.ResourceStates, sr)
 	}
@@ -173,9 +173,7 @@ func profileMetricsList(p *profileRuntime) []string {
 		}
 	}
 	for _, state := range p.ResourceStates {
-		for _, option := range state.Options {
-			list = append(list, option.Instrument)
-		}
+		list = append(list, state.Name)
 	}
 	sort.Strings(list)
 	return list

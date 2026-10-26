@@ -141,9 +141,11 @@ modules:
             | Profile key | Purpose |
             |:------------|:--------|
             | `resource_labels` | Adds a label to every series of the resource. Each entry has `name`, `property` (a dot-separated path under `properties` whose segments contain only letters and digits, for example `properties.hardwareProfile.vmSize`), and optional `value: arm_name` to keep only the last segment of an ARM resource ID. |
-            | `resource_states` | Exports one 0/1 series per state, named `<id>_<state>`, from a property such as `properties.extended.instanceView.powerState.code`. Values match case-insensitively. These series are reported even when Azure Monitor has no metric data for the resource, for example a deallocated VM. |
+            | `resource_states` | Exports one enum metric named `<profile>.<id>` from a property such as `properties.extended.instanceView.powerState.code`. Each `states` entry maps a `name` to an Azure `value`, matched case-insensitively. A chart dimension with `selector: <id>` and no `name` expands into one 0/1 dimension per state. Missing or unrecognized values produce no state observation. |
 
             In `discovery.mode: query`, the custom KQL must return each property as a column named `nd_` followed by the property path with dots replaced by underscores (for example `nd_properties_hardwareProfile_vmSize`). Missing columns leave the label empty and the state unreported.
+
+            Resource-state charts refresh with discovery (every 300 seconds by default). They remain available when Azure Monitor metrics fail, provided the discovery snapshot is still valid. If a scheduled discovery refresh fails, state charts show gaps until discovery succeeds again; ordinary metrics continue using the last known resource inventory. Setting `discovery.refresh_every: 0` disables resource-state output as well as rediscovery.
           folding:
             title: Config options
             enabled: true
@@ -221,7 +223,7 @@ modules:
               required: false
               group: Authentication
             - name: discovery.refresh_every
-              description: "How often to refresh the discovered resources, in seconds. Zero disables rediscovery after startup."
+              description: "How often to refresh resources and their states, in seconds. Zero disables rediscovery after startup and disables resource-state charts."
               default_value: 300
               required: false
               group: Discovery
@@ -1681,7 +1683,7 @@ modules:
           - **Disk cache** -- premium OS and data disk cache hit/miss rates
           - **Network** -- traffic in/out, network flows, flow creation rate
           - **Availability** -- VM availability state
-          - **Power state** -- running, stopped, deallocated, and transitional states, from Azure Resource Graph
+          - **Power state** -- running, stopped, deallocated, and transitional states, refreshed through Azure Resource Graph at `discovery.refresh_every`. State charts are disabled when this interval is zero and show gaps when a scheduled refresh fails.
           - **Throttling** -- cached and uncached I/O bandwidth/IOPS throttling
         method_description: *method_description
     metrics:
