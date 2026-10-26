@@ -95,8 +95,9 @@ static inline bool json_parse_false(LOG_JSON_STATE *js) {
     }
 }
 
+// remaining excludes the null terminator
 static inline bool json_number_append(LOG_JSON_STATE *js, char **d, const char **s, size_t *remaining, const char *part) {
-    if (*remaining < 2) {
+    if (!*remaining) {
         snprintf(js->msg, sizeof(js->msg), "JSON PARSER: truncated %s at position %u", part, js->pos);
         return false;
     }
@@ -456,6 +457,9 @@ static inline bool json_parse_value(LOG_JSON_STATE *js) {
 
         case '[':
             return json_parse_array(js);
+
+        default:
+            break;
     }
 
     snprintf(js->msg, sizeof(js->msg),
