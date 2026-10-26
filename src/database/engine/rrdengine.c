@@ -2679,24 +2679,22 @@ static void dbengine_initialize_structures(void) {
 bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx __maybe_unused) {
     static bool spawned = false;
     static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
+    int ret;
 
     spinlock_lock(&spinlock);
 
     if(!spawned) {
-        int ret;
-
         ret = uv_loop_init(&rrdeng_main.loop);
         if (ret) {
             netdata_log_error("DBENGINE: uv_loop_init(): %s", uv_strerror(ret));
-            return false;
+            goto failed;
         }
         rrdeng_main.loop.data = &rrdeng_main;
 
         ret = uv_async_init(&rrdeng_main.loop, &rrdeng_main.async, async_cb);
         if (ret) {
             netdata_log_error("DBENGINE: uv_async_init(): %s", uv_strerror(ret));
-            fatal_assert(0 == uv_loop_close(&rrdeng_main.loop));
-            return false;
+            goto close_loop;
         }
         rrdeng_main.async.data = &rrdeng_main;
 #if defined(OS_WINDOWS)
@@ -2706,17 +2704,13 @@ bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx __maybe_unused) {
         ret = uv_timer_init(&rrdeng_main.loop, &rrdeng_main.timer);
         if (ret) {
             netdata_log_error("DBENGINE: uv_timer_init(): %s", uv_strerror(ret));
-            uv_close((uv_handle_t *)&rrdeng_main.async, NULL);
-            fatal_assert(0 == uv_loop_close(&rrdeng_main.loop));
-            return false;
+            goto close_async;
         }
 
         ret = uv_timer_init(&rrdeng_main.loop, &rrdeng_main.retention_timer);
         if (ret) {
             netdata_log_error("DBENGINE: uv_timer_init(): %s", uv_strerror(ret));
-            uv_close((uv_handle_t *)&rrdeng_main.async, NULL);
-            fatal_assert(0 == uv_loop_close(&rrdeng_main.loop));
-            return false;
+            goto close_timer;
         }
 
         rrdeng_main.timer.data = &rrdeng_main;
@@ -2724,19 +2718,36 @@ bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx __maybe_unused) {
 
         dbengine_initialize_structures();
 
-        int retries = 0;
         rrdeng_main.thread = nd_thread_create("DBEV", NETDATA_THREAD_OPTION_DEFAULT, dbengine_event_loop, &rrdeng_main);
 
         fatal_assert(0 != rrdeng_main.thread);
-
-        if (retries)
-            nd_log_daemon(NDLP_WARNING, "DBENGINE thread was created after %d attempts", retries);
 
         spawned = true;
     }
 
     spinlock_unlock(&spinlock);
     return true;
+
+close_timer:
+    uv_close((uv_handle_t *)&rrdeng_main.timer, NULL);
+
+close_async:
+#if defined(OS_WINDOWS)
+    rrdeng_main.async_ready = false;
+#endif
+    uv_close((uv_handle_t *)&rrdeng_main.async, NULL);
+
+    // closing is asynchronous: run the close callbacks, so that the loop can be closed
+    uv_run(&rrdeng_main.loop, UV_RUN_NOWAIT);
+
+close_loop:
+    ret = uv_loop_close(&rrdeng_main.loop);
+    if (ret)
+        netdata_log_error("DBENGINE: uv_loop_close(): %s", uv_strerror(ret));
+
+failed:
+    spinlock_unlock(&spinlock);
+    return false;
 }
 
 static inline void worker_dispatch_extent_read(struct rrdeng_cmd cmd, bool from_worker) {
