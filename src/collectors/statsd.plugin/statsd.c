@@ -394,8 +394,20 @@ static void dictionary_metric_delete_callback(const DICTIONARY_ITEM *item, void 
     STATSD_METRIC *m = (STATSD_METRIC *)value;
 
     if(m->type == STATSD_METRIC_TYPE_HISTOGRAM || m->type == STATSD_METRIC_TYPE_TIMER) {
-        freez(m->histogram.ext);
-        m->histogram.ext = NULL;
+        if(m->histogram.ext) {
+            freez(m->histogram.ext->values);
+            netdata_mutex_destroy(&m->histogram.ext->mutex);
+            freez(m->histogram.ext);
+            m->histogram.ext = NULL;
+        }
+    }
+    else if(m->type == STATSD_METRIC_TYPE_SET) {
+        dictionary_destroy(m->set.dict);
+        m->set.dict = NULL;
+    }
+    else if(m->type == STATSD_METRIC_TYPE_DICTIONARY) {
+        dictionary_destroy(m->dictionary.dict);
+        m->dictionary.dict = NULL;
     }
 
     freez(m->units);
@@ -403,23 +415,20 @@ static void dictionary_metric_delete_callback(const DICTIONARY_ITEM *item, void 
     freez(m->dimname);
 }
 
-static inline STATSD_METRIC *statsd_find_or_add_metric(STATSD_INDEX *index, const char *name) {
+static inline STATSD_METRIC *statsd_find_or_add_metric(STATSD_INDEX *index, const char *name, const DICTIONARY_ITEM **item) {
     netdata_log_debug(D_STATSD, "searching for metric '%s' under '%s'", name, index->name);
 
-#ifdef STATSD_MULTITHREADED
-    // avoid the write lock of dictionary_set() for existing metrics
-    STATSD_METRIC *m = dictionary_get(index->dict, name);
-    if(!m) m = dictionary_set(index->dict, name, NULL, sizeof(STATSD_METRIC));
-#else
-    // no locks here, go faster
     // this will call the dictionary_metric_insert_callback() if an item
     // is inserted, otherwise it will return the existing one.
     // We used the flag DICT_OPTION_DONT_OVERWRITE_VALUE to support this.
-    STATSD_METRIC *m = dictionary_set(index->dict, name, NULL, sizeof(STATSD_METRIC));
-#endif
+    // The caller holds the item until it is done with the metric: the flush thread
+    // may delete an idle metric meanwhile, and a held item is freed on its release.
+    *item = dictionary_set_and_acquire_item(index->dict, name, NULL, sizeof(STATSD_METRIC));
+    if(unlikely(!*item))
+        return NULL;
 
     index->events++;
-    return m;
+    return dictionary_acquired_item_value(*item);
 }
 
 
@@ -690,52 +699,67 @@ static void statsd_process_metric(const char *name, const char *value, const cha
     if(unlikely(!name || !*name)) return;
     if(unlikely(!type || !*type)) type = "m";
 
-    STATSD_METRIC *m = NULL;
+    STATSD_INDEX *index;
 
     char t0 = type[0], t1 = type[1];
-    if(unlikely(t0 == 'g' && t1 == '\0')) {
-        statsd_process_gauge(
-            m = statsd_find_or_add_metric(&statsd.gauges, name),
-            value, sampling);
-    }
-    else if(unlikely((t0 == 'c' || t0 == 'C') && t1 == '\0')) {
+    if(unlikely(t0 == 'g' && t1 == '\0'))
+        index = &statsd.gauges;
+    else if(unlikely((t0 == 'c' || t0 == 'C') && t1 == '\0'))
         // etsy/statsd uses 'c'
         // brubeck     uses 'C'
-        statsd_process_counter(
-            m = statsd_find_or_add_metric(&statsd.counters, name),
-            value, sampling);
-    }
-    else if(unlikely(t0 == 'm' && t1 == '\0')) {
-        statsd_process_meter(
-            m = statsd_find_or_add_metric(&statsd.meters, name),
-            value, sampling);
-    }
-    else if(unlikely(t0 == 'h' && t1 == '\0')) {
-        statsd_process_histogram(
-            m = statsd_find_or_add_metric(&statsd.histograms, name),
-            value, sampling);
-    }
-    else if(unlikely(t0 == 's' && t1 == '\0')) {
-        statsd_process_set(
-            m = statsd_find_or_add_metric(&statsd.sets, name),
-            value);
-    }
-    else if(unlikely(t0 == 'd' && t1 == '\0')) {
-        statsd_process_dictionary(
-            m = statsd_find_or_add_metric(&statsd.dictionaries, name),
-            value);
-    }
-    else if(unlikely(t0 == 'm' && t1 == 's' && type[2] == '\0')) {
-        statsd_process_timer(
-            m = statsd_find_or_add_metric(&statsd.timers, name),
-            value, sampling);
-    }
+        index = &statsd.counters;
+    else if(unlikely(t0 == 'm' && t1 == '\0'))
+        index = &statsd.meters;
+    else if(unlikely(t0 == 'h' && t1 == '\0'))
+        index = &statsd.histograms;
+    else if(unlikely(t0 == 's' && t1 == '\0'))
+        index = &statsd.sets;
+    else if(unlikely(t0 == 'd' && t1 == '\0'))
+        index = &statsd.dictionaries;
+    else if(unlikely(t0 == 'm' && t1 == 's' && type[2] == '\0'))
+        index = &statsd.timers;
     else {
         statsd.unknown_types++;
         netdata_log_error("STATSD: metric '%s' with value '%s' is sent with unknown metric type '%s'", name, value?value:"", type);
+        return;
     }
 
-    if(m && tags && *tags) {
+    const DICTIONARY_ITEM *item;
+    STATSD_METRIC *m = statsd_find_or_add_metric(index, name, &item);
+    if(unlikely(!m))
+        return;
+
+    switch(index->type) {
+        case STATSD_METRIC_TYPE_GAUGE:
+            statsd_process_gauge(m, value, sampling);
+            break;
+
+        case STATSD_METRIC_TYPE_COUNTER:
+            statsd_process_counter(m, value, sampling);
+            break;
+
+        case STATSD_METRIC_TYPE_METER:
+            statsd_process_meter(m, value, sampling);
+            break;
+
+        case STATSD_METRIC_TYPE_HISTOGRAM:
+            statsd_process_histogram(m, value, sampling);
+            break;
+
+        case STATSD_METRIC_TYPE_SET:
+            statsd_process_set(m, value);
+            break;
+
+        case STATSD_METRIC_TYPE_DICTIONARY:
+            statsd_process_dictionary(m, value);
+            break;
+
+        case STATSD_METRIC_TYPE_TIMER:
+            statsd_process_timer(m, value, sampling);
+            break;
+    }
+
+    if(tags && *tags) {
         const char *s = tags;
         while(*s) {
             const char *tagkey = NULL, *tagvalue = NULL;
@@ -776,6 +800,8 @@ static void statsd_process_metric(const char *name, const char *value, const cha
             }
         }
     }
+
+    dictionary_acquired_item_release(index->dict, item);
 }
 
 static inline size_t statsd_process(char *buffer, size_t size, int require_newlines) {
@@ -1877,6 +1903,7 @@ static inline void metric_check_obsoletion(STATSD_METRIC *m) {
         if(m->st) {
             rrdset_is_obsolete___safe_from_collector_thread(m->st);
             m->st = NULL;
+            statsd.private_charts--;
         }
 
         m->options |= STATSD_METRIC_OPTION_OBSOLETE;
@@ -2377,20 +2404,25 @@ static inline void statsd_flush_index_metrics(STATSD_INDEX *index, void (*flush_
     }
     dfe_done(m);
 
-    // flush all the unuseful metrics
-    STATSD_METRIC *m_prev;
-    for(m_prev = m = index->first_useful; m ; m = m->next_useful) {
+    // flush all the useful metrics, and delete the obsolete ones
+    STATSD_METRIC *m_prev = NULL, *m_next;
+    for(m = index->first_useful; m ; m = m_next) {
+        m_next = m->next_useful;
         flush_metric(m);
-        if (m->options & STATSD_METRIC_OPTION_OBSOLETE) {
-            if (m == index->first_useful)
-                index->first_useful = m->next_useful;
+
+        // metrics used in app charts are kept, the app chart dimensions point into them
+        if((m->options & STATSD_METRIC_OPTION_OBSOLETE) && !(m->options & STATSD_METRIC_OPTION_USED_IN_APPS)) {
+            if(m_prev)
+                m_prev->next_useful = m_next;
             else
-                m_prev->next_useful = m->next_useful;
-            dictionary_del(index->dict, m->name);
+                index->first_useful = m_next;
+
             index->useful--;
-            index->metrics--;
-            statsd.private_charts--;
-        } else
+
+            if(dictionary_del(index->dict, m->name))
+                __atomic_fetch_sub(&index->metrics, 1, __ATOMIC_RELAXED);
+        }
+        else
             m_prev = m;
     }
 }
