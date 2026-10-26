@@ -23,10 +23,13 @@ func (c *Collector) updatePVCState(r resource) {
 		ps = newPVCState()
 		c.state.pvcs[r.source()] = ps
 
-		ps.uid = string(pvc.UID)
 		ps.name = pvc.Name
 		ps.namespace = pvc.Namespace
 	}
+
+	// The PVC was created again before the next collection removed the entry. Keep the entry and its chart: a new
+	// entry would add the same chart ID again, which is rejected while the chart exists.
+	ps.deleted = false
 
 	ps.requested, ps.hasRequested = storageBytes(pvc.Spec.Resources.Requests)
 	ps.capacity, ps.hasCapacity = storageBytes(pvc.Status.Capacity)

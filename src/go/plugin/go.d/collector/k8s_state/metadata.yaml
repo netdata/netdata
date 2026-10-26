@@ -39,7 +39,10 @@ modules:
         exclude: []
       multi_instance: false
       additional_permissions:
-        description: ""
+        description: |
+          PVC metrics need `list` and `watch` on `persistentvolumeclaims` in all namespaces. The official Netdata Helm chart grants them from the release that adds PVC metrics; with your own ClusterRole, add them.
+
+          Without them the PVC metrics are skipped with one warning and all other metrics work. The permissions are checked once, at startup, so permissions granted later take effect after the collector is restarted.
       default_behavior:
         auto_detection:
           description: ""
@@ -494,7 +497,10 @@ modules:
                 - name: OOMKilled
                 - name: Other
         - name: persistentvolumeclaim
-          description: These metrics refer to PersistentVolumeClaims and are collected only when the service account can `list` and `watch` `persistentvolumeclaims` in all namespaces; otherwise they are skipped. `requested` is the storage the PVC asks for and `capacity` is the size of the volume it got. `requested_capacity_diff` is `requested` minus `capacity`, calculated from the same PVC object. It is positive while the volume is smaller than requested (an expansion is pending or failed), 0 when the sizes are equal, and negative when the volume is larger than requested. A value that is not known is not reported, it is a gap and not 0. For example, a Pending PVC has no `capacity` yet, so it has no `requested_capacity_diff` either.
+          description: |
+            These metrics refer to the PersistentVolumeClaim.
+
+            `requested` is the storage the PVC asks for and `capacity` is the size of the volume it got. `requested_capacity_diff` is `requested` minus `capacity`: positive while the volume is smaller than requested (an expansion is pending or failed), 0 when the sizes are equal, negative when the volume is larger than requested. A value that is not known is a gap, not 0: a Pending PVC has no `capacity` yet, so it has no `requested_capacity_diff` either.
           labels:
             - name: k8s_cluster_id
               description: Cluster ID. This is equal to the kube-system namespace UID.

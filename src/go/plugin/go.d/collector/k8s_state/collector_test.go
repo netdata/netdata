@@ -1115,7 +1115,7 @@ func TestCollector_Collect(t *testing.T) {
 				}
 			},
 		},
-		"PVC resize stays pending until the capacity catches up": {
+		"PVC requested_capacity_diff stays positive until the capacity catches up": {
 			create: func(t *testing.T) testCase {
 				ctx := context.Background()
 				client := fake.NewClientset(newPVC("healthy", "8Gi", "8Gi"), newPVC("stuck", "8Gi", "8Gi"))
@@ -1154,7 +1154,8 @@ func TestCollector_Collect(t *testing.T) {
 						"pvc_default_stuck_requested_capacity_diff":   2147483648,
 					}
 
-					// The shortfall is reported on every collection while the volume is not expanded.
+					// The positive requested_capacity_diff is reported on every collection while the volume is not
+					// expanded.
 					for range 2 {
 						mx := collr.Collect(ctx)
 						assert.Equal(t, expected, mx)
@@ -1231,6 +1232,194 @@ func TestCollector_Collect(t *testing.T) {
 						"pvc_default_data.capacity":     true,
 						"pvc_default_data-old.capacity": false,
 					}, obsolete)
+					collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+				}
+
+				return testCase{
+					client: client,
+					steps:  []testCaseStep{step1, step2},
+				}
+			},
+		},
+		"PVCs with dots in the name": {
+			create: func(t *testing.T) testCase {
+				ctx := context.Background()
+				dotted := newPVC("data.0", "10Gi", "10Gi")
+				dashed := newPVC("data-0", "20Gi", "20Gi") // "data.0" with the dot replaced by a dash
+				client := fake.NewClientset(dotted, dashed)
+				allowPVCAccess(client, "list", "watch")
+
+				step1 := func(t *testing.T, collr *Collector) {
+					mx := collr.Collect(ctx)
+					expected := map[string]int64{
+						"discovery_node_discoverer_state":            1,
+						"discovery_pod_discoverer_state":             1,
+						"pvc_default_data-0_capacity":                21474836480,
+						"pvc_default_data-0_requested":               21474836480,
+						"pvc_default_data-0_requested_capacity_diff": 0,
+						"pvc_default_data.0_capacity":                10737418240,
+						"pvc_default_data.0_requested":               10737418240,
+						"pvc_default_data.0_requested_capacity_diff": 0,
+					}
+
+					assert.Equal(t, expected, mx)
+					assert.Equal(t,
+						len(pvcChartsTmpl)*2+
+							len(baseCharts),
+						len(*collr.Charts()),
+					)
+					assert.Equal(t, map[string]string{
+						"pvc_default_data_0.capacity": "default/data.0",
+						"pvc_default_data-0.capacity": "default/data-0",
+					}, pvcChartLabels(collr.Charts()))
+					assert.Equal(t, 0, calcObsoleteCharts(*collr.Charts()))
+					collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+
+					pvcs := client.CoreV1().PersistentVolumeClaims(corev1.NamespaceDefault)
+					_ = pvcs.Delete(ctx, dotted.Name, metav1.DeleteOptions{})
+				}
+
+				step2 := func(t *testing.T, collr *Collector) {
+					mx := collr.Collect(ctx)
+					expected := map[string]int64{
+						"discovery_node_discoverer_state":            1,
+						"discovery_pod_discoverer_state":             1,
+						"pvc_default_data-0_capacity":                21474836480,
+						"pvc_default_data-0_requested":               21474836480,
+						"pvc_default_data-0_requested_capacity_diff": 0,
+					}
+
+					assert.Equal(t, expected, mx)
+					assert.Equal(t,
+						len(pvcChartsTmpl)*2+
+							len(baseCharts),
+						len(*collr.Charts()),
+					)
+					// Only the chart of the deleted PVC is obsoleted, the other one keeps its values.
+					obsolete := make(map[string]bool)
+					for _, chart := range *collr.Charts() {
+						obsolete[chart.ID] = chart.Obsolete
+					}
+					assert.Equal(t, map[string]bool{
+						discoveryStatusChart.ID:       false,
+						"pvc_default_data_0.capacity": true,
+						"pvc_default_data-0.capacity": false,
+					}, obsolete)
+					collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+				}
+
+				return testCase{
+					client: client,
+					steps:  []testCaseStep{step1, step2},
+				}
+			},
+		},
+		"PVC in a non-default namespace": {
+			create: func(t *testing.T) testCase {
+				client := fake.NewClientset(
+					newPVCInNamespace("team-a", "data.0", "30Gi", "30Gi"),
+					newPVC("data.0", "10Gi", "10Gi"), // the same name in the default namespace
+				)
+				allowPVCAccess(client, "list", "watch")
+
+				step1 := func(t *testing.T, collr *Collector) {
+					mx := collr.Collect(context.Background())
+					expected := map[string]int64{
+						"discovery_node_discoverer_state":            1,
+						"discovery_pod_discoverer_state":             1,
+						"pvc_default_data.0_capacity":                10737418240,
+						"pvc_default_data.0_requested":               10737418240,
+						"pvc_default_data.0_requested_capacity_diff": 0,
+						"pvc_team-a_data.0_capacity":                 32212254720,
+						"pvc_team-a_data.0_requested":                32212254720,
+						"pvc_team-a_data.0_requested_capacity_diff":  0,
+					}
+
+					assert.Equal(t, expected, mx)
+					assert.Equal(t,
+						len(pvcChartsTmpl)*2+
+							len(baseCharts),
+						len(*collr.Charts()),
+					)
+					assert.Equal(t, map[string]string{
+						"pvc_default_data_0.capacity": "default/data.0",
+						"pvc_team-a_data_0.capacity":  "team-a/data.0",
+					}, pvcChartLabels(collr.Charts()))
+
+					chart := collr.Charts().Get("pvc_team-a_data_0.capacity")
+					require.NotNil(t, chart)
+					assert.Equal(t, []collectorapi.Label{
+						{Key: "k8s_cluster_id", Value: collr.kubeClusterID, Source: collectorapi.LabelSourceK8s},
+						{Key: "k8s_cluster_name", Value: collr.kubeClusterName, Source: collectorapi.LabelSourceK8s},
+						{Key: "k8s_namespace", Value: "team-a", Source: collectorapi.LabelSourceK8s},
+						{Key: "k8s_pvc_name", Value: "data.0", Source: collectorapi.LabelSourceK8s},
+					}, chart.Labels)
+					var dimIDs []string
+					for _, dim := range chart.Dims {
+						dimIDs = append(dimIDs, dim.ID)
+					}
+					assert.Equal(t, []string{
+						"pvc_team-a_data.0_requested",
+						"pvc_team-a_data.0_capacity",
+						"pvc_team-a_data.0_requested_capacity_diff",
+					}, dimIDs)
+					assert.Equal(t, 0, calcObsoleteCharts(*collr.Charts()))
+					collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+				}
+
+				return testCase{
+					client: client,
+					steps:  []testCaseStep{step1},
+				}
+			},
+		},
+		"delete and re-create a PVC between two collections": {
+			create: func(t *testing.T) testCase {
+				ctx := context.Background()
+				client := fake.NewClientset(newPVC("data", "10Gi", "10Gi"))
+				allowPVCAccess(client, "list", "watch")
+				pvcs := client.CoreV1().PersistentVolumeClaims(corev1.NamespaceDefault)
+				source := pvcSource(corev1.NamespaceDefault, "data")
+
+				step1 := func(t *testing.T, collr *Collector) {
+					mx := collr.Collect(ctx)
+					expected := map[string]int64{
+						"discovery_node_discoverer_state":          1,
+						"discovery_pod_discoverer_state":           1,
+						"pvc_default_data_capacity":                10737418240,
+						"pvc_default_data_requested":               10737418240,
+						"pvc_default_data_requested_capacity_diff": 0,
+					}
+
+					assert.Equal(t, expected, mx)
+					collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+
+					// Wait for the delete to reach the state first, else both events collapse into one update.
+					require.NoError(t, pvcs.Delete(ctx, "data", metav1.DeleteOptions{}))
+					requirePVCState(t, collr, source, func(ps *pvcState) bool { return ps.deleted })
+
+					_, err := pvcs.Create(ctx, newPVC("data", "20Gi", "20Gi"), metav1.CreateOptions{})
+					require.NoError(t, err)
+					requirePVCState(t, collr, source, func(ps *pvcState) bool { return ps.requested == 21474836480 })
+				}
+
+				step2 := func(t *testing.T, collr *Collector) {
+					mx := collr.Collect(ctx)
+					expected := map[string]int64{
+						"discovery_node_discoverer_state":          1,
+						"discovery_pod_discoverer_state":           1,
+						"pvc_default_data_capacity":                21474836480,
+						"pvc_default_data_requested":               21474836480,
+						"pvc_default_data_requested_capacity_diff": 0,
+					}
+
+					assert.Equal(t, expected, mx)
+					assert.Equal(t,
+						len(pvcChartsTmpl)+
+							len(baseCharts),
+						len(*collr.Charts()),
+					)
+					assert.Equal(t, 0, calcObsoleteCharts(*collr.Charts()))
 					collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 				}
 
@@ -1367,6 +1556,8 @@ func TestKubeDiscovery_canListWatchPVCs(t *testing.T) {
 			}
 			assert.Equal(t, 1, strings.Count(logs.String(), "PersistentVolumeClaim metrics disabled"))
 			assert.Contains(t, logs.String(), test.wantWarning)
+			assert.Contains(t, logs.String(), "restart the collector")
+			assert.Contains(t, logs.String(), "the check runs only at startup")
 		})
 	}
 }
@@ -1538,6 +1729,30 @@ func startCollectors(t *testing.T, clients ...kubernetes.Interface) []*Collector
 	return collrs
 }
 
+// requirePVCState waits until the state entry of the PVC source satisfies cond, i.e. the discoverer applied the event.
+func requirePVCState(t *testing.T, collr *Collector, source string, cond func(*pvcState) bool) {
+	t.Helper()
+
+	require.Eventually(t, func() bool {
+		collr.state.Lock()
+		defer collr.state.Unlock()
+
+		ps, ok := collr.state.pvcs[source]
+		return ok && cond(ps)
+	}, 5*time.Second, 10*time.Millisecond, "the PVC state did not reach the expected value")
+}
+
+// pvcChartLabels returns "<namespace>/<name>" of the PVC by the ID of every PVC chart.
+func pvcChartLabels(charts *collectorapi.Charts) map[string]string {
+	labels := make(map[string]string)
+	for _, c := range *charts {
+		if name := chartLabelValue(c, labelKeyPVCName); name != "" {
+			labels[c.ID] = chartLabelValue(c, labelKeyNamespace) + "/" + name
+		}
+	}
+	return labels
+}
+
 func newNode(name string) *corev1.Node {
 	return &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1680,10 +1895,14 @@ func newDeployment(name string) *appsv1.Deployment {
 // newPVC creates a PVC in the default namespace. An empty requested has no storage request, an empty capacity
 // leaves the PVC Pending (no status.capacity).
 func newPVC(name, requested, capacity string) *corev1.PersistentVolumeClaim {
+	return newPVCInNamespace(corev1.NamespaceDefault, name, requested, capacity)
+}
+
+func newPVCInNamespace(namespace, name, requested, capacity string) *corev1.PersistentVolumeClaim {
 	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              name,
-			Namespace:         corev1.NamespaceDefault,
+			Namespace:         namespace,
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 		},
 		Status: corev1.PersistentVolumeClaimStatus{
