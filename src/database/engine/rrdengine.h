@@ -661,7 +661,11 @@ static inline int journal_metric_uuid_compare(const void *key, const void *metri
 uint64_t rrdeng_get_used_disk_space(struct rrdengine_instance *ctx, bool having_lock);
 void rrdeng_calculate_tier_disk_space_percentage(void);
 uint64_t rrdeng_get_directory_free_bytes_space(struct rrdengine_instance *ctx);
-void dbengine_shutdown();
+// the event loop waits this long at shutdown for the work it gave to the libuv pool
+#define DBENGINE_SHUTDOWN_DRAIN_TIMEOUT_UT (10 * USEC_PER_SEC)
+
+// false when the event loop exited with pool work still running
+bool dbengine_shutdown(void);
 size_t datafile_count(struct rrdengine_instance *ctx, bool with_lock);
 struct rrdengine_datafile *get_first_ctx_datafile(struct rrdengine_instance *ctx, bool with_lock);
 struct rrdengine_datafile *get_last_ctx_datafile(struct rrdengine_instance *ctx, bool with_lock);

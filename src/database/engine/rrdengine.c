@@ -41,7 +41,8 @@ struct rrdeng_main {
     uv_timer_t timer;
     uv_timer_t retention_timer;
     pid_t tid;
-    bool shutdown;
+    bool shutdown;                      // draining the pool work before the event loop exits
+    bool drained;                       // the event loop exited with no pool work left
 
     size_t flushes_running;
     size_t evict_main_running;
@@ -75,6 +76,10 @@ struct rrdeng_main {
             size_t dispatched;
             size_t executing;
         } atomics;
+
+        // event loop thread only: counted from dispatch until the after-work callback has run
+        size_t outstanding;
+        size_t outstanding_by_opcode[RRDENG_OPCODE_MAX];
     } work_cmd;
 
     struct {
@@ -286,13 +291,17 @@ static void work_standard_worker(uv_work_t *req) {
 
 static void after_work_standard_callback(uv_work_t* req, int status) {
     struct rrdeng_work *work_request = req->data;
+    enum rrdeng_opcode opcode = work_request->opcode;
 
-    worker_is_busy(RRDENG_OPCODE_MAX + work_request->opcode);
+    worker_is_busy(RRDENG_OPCODE_MAX + opcode);
 
     if(work_request->after_work_cb)
         work_request->after_work_cb(work_request->ctx, work_request->data, work_request->completion, req, status);
 
     work_done(work_request);
+
+    rrdeng_main.work_cmd.outstanding--;
+    rrdeng_main.work_cmd.outstanding_by_opcode[opcode]--;
 
     worker_is_idle();
 }
@@ -319,6 +328,8 @@ static bool work_dispatch(struct rrdengine_instance *ctx, void *data, struct com
     }
 
     __atomic_add_fetch(&rrdeng_main.work_cmd.atomics.dispatched, 1, __ATOMIC_RELAXED);
+    rrdeng_main.work_cmd.outstanding++;
+    rrdeng_main.work_cmd.outstanding_by_opcode[opcode]++;
 
     return true;
 }
@@ -2609,6 +2620,45 @@ static void timer_per_sec_cb(uv_timer_t *handle __maybe_unused)
     worker_is_idle();
 }
 
+// while the event loop drains its pool work at shutdown, wakes it up so that it can check its deadline
+static void timer_shutdown_drain_cb(uv_timer_t *handle __maybe_unused)
+{
+    // normally dispatched when a waiter finishes; this only covers a failed dispatch
+    extent_waiters_dispatch_deferred();
+}
+
+static size_t dbengine_cmd_queue_waiting(void) {
+    spinlock_lock(&rrdeng_main.cmd_queue.unsafe.spinlock);
+    size_t waiting = rrdeng_main.cmd_queue.unsafe.waiting;
+    spinlock_unlock(&rrdeng_main.cmd_queue.unsafe.spinlock);
+    return waiting;
+}
+
+static bool dbengine_shutdown_drain_expired(usec_t started_ut) {
+    return rrdeng_main.shutdown && now_monotonic_usec() - started_ut >= DBENGINE_SHUTDOWN_DRAIN_TIMEOUT_UT;
+}
+
+static void dbengine_shutdown_drain_gave_up(usec_t started_ut) {
+    char outstanding[512] = "";
+    size_t len = 0;
+    for(size_t op = 0; op < RRDENG_OPCODE_MAX && len < sizeof(outstanding) ; op++) {
+        if(rrdeng_main.work_cmd.outstanding_by_opcode[op])
+            len += snprintfz(&outstanding[len], sizeof(outstanding) - len, " opcode %zu: %zu",
+                             op, rrdeng_main.work_cmd.outstanding_by_opcode[op]);
+    }
+
+    nd_log_daemon(NDLP_ERR,
+                  "DBENGINE: gave up waiting for the event loop work to finish after %.2f seconds: "
+                  "%zu outstanding (%zu executing),%s; %zu commands waiting, %s deferred extent waiters. "
+                  "The work left running is not waited for.",
+                  (double)(now_monotonic_usec() - started_ut) / USEC_PER_SEC,
+                  rrdeng_main.work_cmd.outstanding,
+                  __atomic_load_n(&rrdeng_main.work_cmd.atomics.executing, __ATOMIC_RELAXED),
+                  outstanding,
+                  dbengine_cmd_queue_waiting(),
+                  rrdeng_main.extent_waiters.deferred ? "with" : "no");
+}
+
 static void dbengine_initialize_structures(void) {
     pgd_init_arals();
     pgc_and_mrg_initialize();
@@ -2808,20 +2858,21 @@ void dbengine_event_loop(void* arg) {
     fatal_assert(0 == uv_timer_start(&rmain->timer, timer_per_sec_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
     fatal_assert(0 == uv_timer_start(&rmain->retention_timer, retention_timer_cb, TIMER_PERIOD_MS * 60, TIMER_PERIOD_MS * 60));
 
-    bool shutdown = false;
+    usec_t drain_started_ut = 0;
     size_t cpus = netdata_conf_cpus();
-    uv_sem_t sem;
-    uv_sem_init(&sem, (unsigned int) cpus);
+    // not on this thread's stack: pool workers still running after a drain that gave up may use it
+    uv_sem_t *sem = mallocz(sizeof(*sem));
+    uv_sem_init(sem, (unsigned int) cpus);
     struct mrg_load_thread *mlt = callocz(cpus, sizeof(*mlt));
     for (size_t i = 0; i < cpus; i++) {
-        mlt[i].sem = &sem;
+        mlt[i].sem = sem;
     }
 
 #if defined(OS_WINDOWS)
     last_async_callback = uv_hrtime();
 #endif
 
-    while (likely(!shutdown)) {
+    while (true) {
         worker_is_idle();
         uv_run(&rmain->loop, UV_RUN_ONCE);
 
@@ -2849,7 +2900,8 @@ void dbengine_event_loop(void* arg) {
                 case RRDENG_OPCODE_QUERY:;
 #if defined(OS_WINDOWS)
                     static int max_timeout_count = 0;
-                    if (uv_hrtime() - last_async_callback > 1000UL * NSEC_PER_MSEC) {
+                    // not while draining at shutdown: the async handle is closed when the drain ends
+                    if (!rmain->shutdown && uv_hrtime() - last_async_callback > 1000UL * NSEC_PER_MSEC) {
                         if (++max_timeout_count > 30) {
                             netdata_log_error("DBENGINE: async callback timeout detected, re-initializing the async handle");
                             __atomic_store_n(&rmain->async_ready, false, __ATOMIC_RELEASE);
@@ -2927,9 +2979,10 @@ void dbengine_event_loop(void* arg) {
                     // journals and then in the open cache, and indexing moves pages from the open cache to a new
                     // journal - in between, rotation would see neither and delete metrics that have data
                     // (needs_indexing stays set, so the end of the rotation schedules it again);
-                    // claimed atomically: the startup rebuild of rejected journals claims it too
+                    // claimed atomically: the startup rebuild of rejected journals claims it too;
+                    // never while draining at shutdown
                     bool not_indexing = false;
-                    if (NOT_DELETING_FILES(ctx) && ctx_is_available_for_queries(ctx) &&
+                    if (!rmain->shutdown && NOT_DELETING_FILES(ctx) && ctx_is_available_for_queries(ctx) &&
                         __atomic_compare_exchange_n(&ctx->atomic.migration_to_v2_running, &not_indexing, true, false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)) {
                         __atomic_store_n(&ctx->atomic.needs_indexing, false, __ATOMIC_RELAXED);
                         work_dispatch(ctx, datafile, NULL, opcode, journal_v2_indexing_tp_worker, after_journal_v2_indexing);
@@ -2940,8 +2993,9 @@ void dbengine_event_loop(void* arg) {
                 case RRDENG_OPCODE_DATABASE_ROTATE: {
                     struct rrdengine_instance *ctx = cmd.ctx;
                     ctx->datafiles.pending_rotate = false;
-                    // never while indexing, see RRDENG_OPCODE_JOURNAL_INDEX (the end of indexing schedules it again)
-                    if (NOT_DELETING_FILES(ctx) && NOT_INDEXING_FILES(ctx) && datafile_count(ctx, false) > 2 &&
+                    // never while indexing, see RRDENG_OPCODE_JOURNAL_INDEX (the end of indexing schedules it again);
+                    // never while draining at shutdown
+                    if (!rmain->shutdown && NOT_DELETING_FILES(ctx) && NOT_INDEXING_FILES(ctx) && datafile_count(ctx, false) > 2 &&
                         rrdeng_ctx_tier_cap_exceeded(ctx)) {
                         __atomic_store_n(&ctx->atomic.now_deleting_files, true, __ATOMIC_RELAXED);
                         work_dispatch(ctx, NULL, NULL, opcode, database_rotate_tp_worker, after_database_rotate);
@@ -2975,14 +3029,16 @@ void dbengine_event_loop(void* arg) {
                     break;
 
                 case RRDENG_OPCODE_SHUTDOWN_EVLOOP: {
-                    uv_close((uv_handle_t *)&rmain->async, NULL);
-
-                    (void) uv_timer_stop(&rmain->timer);
-                    uv_close((uv_handle_t *)&rmain->timer, NULL);
-
+                    // stop the periodic work, and keep serving commands until the work already given to
+                    // the libuv pool has finished, including its after-work callback (checked below)
                     (void) uv_timer_stop(&rmain->retention_timer);
                     uv_close((uv_handle_t *)&rmain->retention_timer, NULL);
-                    shutdown = true;
+
+                    (void) uv_timer_stop(&rmain->timer);
+                    fatal_assert(0 == uv_timer_start(&rmain->timer, timer_shutdown_drain_cb, 50, 50));
+
+                    rmain->shutdown = true;
+                    drain_started_ut = now_monotonic_usec();
                     break;
                 }
 
@@ -3001,23 +3057,53 @@ void dbengine_event_loop(void* arg) {
             if (opcode != RRDENG_OPCODE_NOOP)
                 uv_run(&rmain->loop, UV_RUN_NOWAIT);
 
-        } while (opcode != RRDENG_OPCODE_NOOP);
+        } while (opcode != RRDENG_OPCODE_NOOP && !dbengine_shutdown_drain_expired(drain_started_ut));
+
+        if (unlikely(rmain->shutdown)) {
+            if (!rmain->work_cmd.outstanding && !rmain->extent_waiters.deferred && !dbengine_cmd_queue_waiting()) {
+                rmain->drained = true;
+                break;
+            }
+
+            if (dbengine_shutdown_drain_expired(drain_started_ut)) {
+                dbengine_shutdown_drain_gave_up(drain_started_ut);
+                break;
+            }
+        }
     }
-    freez(mlt);
-    uv_sem_destroy(&sem);
+
+    (void) uv_timer_stop(&rmain->timer);
+    uv_close((uv_handle_t *)&rmain->timer, NULL);
+#if defined(OS_WINDOWS)
+    __atomic_store_n(&rmain->async_ready, false, __ATOMIC_RELEASE);
+#endif
+    uv_close((uv_handle_t *)&rmain->async, NULL);
+    uv_run(&rmain->loop, UV_RUN_NOWAIT);
+
+    // pool work that is still running may use them
+    if (rmain->drained) {
+        freez(mlt);
+        uv_sem_destroy(sem);
+        freez(sem);
+    }
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "Shutting down dbengine thread");
-    (void) uv_loop_close(&rmain->loop);
+    int rc = uv_loop_close(&rmain->loop);
+    if (rc)
+        nd_log_daemon(NDLP_ERR, "DBENGINE: cannot close the event loop: %s", uv_strerror(rc));
     worker_unregister();
 }
 
-void dbengine_shutdown()
+bool dbengine_shutdown(void)
 {
     rrdeng_enq_cmd(NULL, RRDENG_OPCODE_SHUTDOWN_EVLOOP, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 
     int rc = nd_thread_join(rrdeng_main.thread);
-    if (rc)
+    if (rc) {
         nd_log_daemon(NDLP_ERR, "DBENGINE: Failed to join thread, error %s", uv_err_name(rc));
-    else
-        nd_log_daemon(NDLP_INFO, "DBENGINE: thread shutdown completed");
+        return false;
+    }
+
+    nd_log_daemon(NDLP_INFO, "DBENGINE: thread shutdown completed");
+    return rrdeng_main.drained;
 }
