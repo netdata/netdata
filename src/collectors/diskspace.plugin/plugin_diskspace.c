@@ -438,20 +438,33 @@ static void zfs_cache_pool_capacity(const char *filesystem, const char *mount_so
     dictionary_set(zfs_cache, mount_source, &new_entry, sizeof(new_entry));
 }
 
-// Check if a ZFS dataset has a cached exclusion decision that's still valid
-// Returns: true if cached as excluded (skip statvfs), false otherwise
-static bool zfs_dataset_cached_excluded(const char *filesystem, const char *mount_point, const char *mount_source) {
-    // Quick checks that don't need cache
+// A ZFS dataset the exclusion rules apply to: not a pool (datasets have '/' in mount_source),
+// not the root mount, and not inside an LXC container (it sees virtualized mounts)
+static bool zfs_is_excludable_dataset(const char *filesystem, const char *mount_point, const char *mount_source) {
     if (!filesystem || strcmp(filesystem, "zfs") != 0)
         return false;
-    if (!zfs_datasets_heuristic || !zfs_cache)
-        return false;
-    if (zfs_inside_lxc_container)
-        return false;
+
     if (mount_point && strcmp(mount_point, "/") == 0)
         return false;
-    if (!mount_source || !mount_source[0] || !strchr(mount_source, '/'))
-        return false;  // not a dataset
+
+    if (zfs_inside_lxc_container)
+        return false;
+
+    return mount_source && mount_source[0] && strchr(mount_source, '/');
+}
+
+// Check if a ZFS dataset is known to be excluded before statvfs(): by path when the heuristic is disabled,
+// or by a cached exclusion decision that is still valid
+// Returns: true if excluded (skip statvfs), false otherwise
+static bool zfs_dataset_excluded_before_statvfs(const char *filesystem, const char *mount_point, const char *mount_source) {
+    if (!zfs_is_excludable_dataset(filesystem, mount_point, mount_source))
+        return false;
+
+    if (!zfs_datasets_heuristic)
+        return excluded_zfs_datasets_pattern && simple_pattern_matches(excluded_zfs_datasets_pattern, mount_point);
+
+    if (!zfs_cache)
+        return false;
 
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(zfs_cache, mount_source);
     if (!item)
@@ -473,21 +486,8 @@ static bool zfs_dataset_cached_excluded(const char *filesystem, const char *moun
 // Determine if a ZFS mount should be excluded and cache the decision
 // Returns: true if should exclude, false if should keep
 static bool should_exclude_zfs(const char *filesystem, const char *mount_point, const char *mount_source, struct statvfs *buff) {
-    // 1. Not ZFS → keep
-    if (!filesystem || strcmp(filesystem, "zfs") != 0)
-        return false;
-
-    // 2. Root mount → always keep
-    if (mount_point && strcmp(mount_point, "/") == 0)
-        return false;
-
-    // 3. Inside LXC container → keep all (container sees virtualized mounts)
-    if (zfs_inside_lxc_container)
-        return false;
-
-    // 4. Not a dataset (it's a pool) → keep
-    // Dataset = has '/' in mount_source, Pool = no '/'
-    if (!mount_source || !mount_source[0] || !strchr(mount_source, '/'))
+    // 1-4. Not ZFS, root mount, inside LXC, or a pool → keep
+    if (!zfs_is_excludable_dataset(filesystem, mount_point, mount_source))
         return false;
 
     // 5. Heuristic disabled → use pattern matching (default "!*" excludes nothing)
@@ -698,8 +698,9 @@ static inline bool do_disk_space_stats(struct mountinfo *mi, int update_every) {
          m->do_space != CONFIG_BOOLEAN_YES &&
          m->do_inodes != CONFIG_BOOLEAN_YES) ||
 
-        // Check if this ZFS dataset has a cached exclusion decision (skip statvfs entirely)
-        zfs_dataset_cached_excluded(mi->filesystem, mi->mount_point, mi->mount_source);
+        // Check if this ZFS dataset is excluded by path or by a cached decision (skip statvfs entirely);
+        // a slow mount must not count as collected when its slow thread would not chart it
+        zfs_dataset_excluded_before_statvfs(mi->filesystem, mi->mount_point, mi->mount_source);
 
     if (m->slow) {
         // the slow thread keeps its mount points alive, even the ones it does not collect
