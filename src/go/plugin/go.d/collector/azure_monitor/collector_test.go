@@ -1304,7 +1304,7 @@ template:
 	assert.Equal(t, []string{"UsedCapacity"}, byInterval["PT5M"].MetricNames)
 }
 
-func TestSamplesFromQueryResponse_UsesResourceHostScope(t *testing.T) {
+func TestSamplesFromQueryResponse_UsesResourceIdentity(t *testing.T) {
 	now := time.Date(2026, 3, 7, 12, 0, 0, 0, time.UTC)
 	scope, unsafeValue := workloadHostScope(resourceInfo{Tags: []resourceTag{{Key: "workload", Value: "api"}}}, "workload")
 	require.Empty(t, unsafeValue)
@@ -1353,10 +1353,7 @@ func TestSamplesFromQueryResponse_UsesResourceHostScope(t *testing.T) {
 			)
 
 			require.Len(t, samples, 1)
-			assert.Equal(t, tc.scope, samples[0].Scope)
-			if tc.scope.IsDefault() {
-				assert.True(t, samples[0].Scope.IsDefault())
-			}
+			assert.Equal(t, resourceIdentity{ScopeKey: tc.scope.ScopeKey, Profile: "postgres_flexible", UID: "uid-a"}, samples[0].Resource)
 		})
 	}
 }

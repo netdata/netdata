@@ -17,13 +17,13 @@ func (c *Collector) observeResourceStates(now time.Time) bool {
 			continue
 		}
 		for _, resource := range c.discovery.ByProfile[profile.Name] {
-			values := labelValues(profile.LabelKeys, profileResourceLabels(resource, profile))
+			owner := c.observations.resources[resourceIdentityFor(resource, profile.Name)]
 			for _, state := range profile.ResourceStates {
 				active, ok := state.Values[stringsLowerTrim(resource.Properties[state.Property])]
 				if !ok {
 					continue
 				}
-				state.Instrument.WithHostScope(resource.HostScope).WithLabelValues(values...).Enable(active)
+				owner.observeState(state, active)
 				observed = true
 			}
 		}

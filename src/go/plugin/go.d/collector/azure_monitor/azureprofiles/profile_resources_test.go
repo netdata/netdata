@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
@@ -179,4 +180,57 @@ func TestCatalog_ResourceProperties(t *testing.T) {
 		"properties.siteConfig.linuxFxVersion",
 	}, catalog.ResourceProperties("microsoft.web/sites"))
 	assert.Empty(t, catalog.ResourceProperties("Microsoft.Sql/servers/databases"))
+}
+
+func TestProfile_RejectsUncompilableTemplate(t *testing.T) {
+	profile := loadResourceProfile(t, func(p *Profile) { p.Template.Charts[0].Dimensions[0].Name = "" })
+	require.ErrorContains(t, profile.Validate("test_vm", "test_vm"), "name inference requires inferable selector")
+}
+
+func TestProfile_StateDimensionNaming(t *testing.T) {
+	for _, selector := range []string{"phase", "test_vm.phase", `phase{region="eastus"}`} {
+		t.Run(selector, func(t *testing.T) {
+			profile := loadResourceProfile(t, func(p *Profile) {
+				p.ResourceStates[0].ID = "phase"
+				p.Template.Charts[1].Dimensions[0].Selector = selector
+				// Nested chart groups follow the same normalization contract.
+				p.Template.Groups = []charttpl.Group{{Family: "State", Charts: p.Template.Charts[1:]}}
+				p.Template.Charts = p.Template.Charts[:1]
+			})
+			require.NoError(t, profile.Validate("test_vm", "test_vm"))
+			assert.Equal(t, "test_vm.phase", profile.Template.Groups[0].Charts[0].Dimensions[0].NameFromLabel)
+		})
+	}
+	for _, field := range []string{"name", "name_from_label"} {
+		t.Run("explicit "+field, func(t *testing.T) {
+			profile := loadResourceProfile(t, func(p *Profile) {
+				dim := &p.Template.Charts[1].Dimensions[0]
+				if field == "name" {
+					dim.Name = "custom"
+				} else {
+					dim.NameFromLabel = "resource_name"
+				}
+			})
+			require.NoError(t, profile.Validate("test_vm", "test_vm"))
+			dim := profile.Template.Charts[1].Dimensions[0]
+			if field == "name" {
+				assert.Equal(t, "custom", dim.Name)
+				assert.Empty(t, dim.NameFromLabel)
+			} else {
+				assert.Equal(t, "resource_name", dim.NameFromLabel)
+			}
+		})
+	}
+}
+
+func TestCatalog_UncompilableOverrideFallsBackToStock(t *testing.T) {
+	stock, custom := t.TempDir(), t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(stock, "test_vm.yaml"), []byte(resourceProfileYAML), 0o644))
+	invalid := strings.ReplaceAll(resourceProfileYAML, "          name: average\n", "")
+	require.NoError(t, os.WriteFile(filepath.Join(custom, "test_vm.yaml"), []byte(invalid), 0o644))
+	catalog, err := LoadFromDirs([]DirSpec{{Path: custom}, {Path: stock, IsStock: true}})
+	require.NoError(t, err)
+	profile, ok := catalog.Get("test_vm")
+	require.True(t, ok)
+	assert.Equal(t, "average", profile.Template.Charts[0].Dimensions[0].Name)
 }

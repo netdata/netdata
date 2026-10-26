@@ -5,7 +5,9 @@ package azure_monitor
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +15,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/monitor/query/azmetrics"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/azure_monitor/azureprofiles"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/stretchr/testify/require"
@@ -351,4 +354,174 @@ func TestCollector_StateExpiresDuringMonitorQuery(t *testing.T) {
 			require.True(t, ok)
 		})
 	}
+}
+
+func TestCollector_ArbitraryResourceStateIDs(t *testing.T) {
+	for _, id := range []string{"phase", "power", "lifecycle", "provisioning_state"} {
+		t.Run(id, func(t *testing.T) {
+			data, err := os.ReadFile("../../config/go.d/azure_monitor.profiles/default/virtual_machines.yaml")
+			require.NoError(t, err)
+			catalog := mustLoadStockCatalog(t, map[string]string{"vm_custom.yaml": strings.ReplaceAll(string(data), "power_state", id)})
+			c := newTestCollectorWithMocks(&mockResourceGraph{resources: []map[string]any{testVirtualMachine("vm-a", "Standard_B2s", "Linux", "PowerState/running")}}, &mockMetricsClient{})
+			c.loadProfileCatalog = func() (azureprofiles.Catalog, error) { return catalog, nil }
+			c.Config = testConfig()
+			c.Config.Profiles.ModeExact = testProfilesModeEntries("vm_custom")
+			require.NoError(t, c.Init(context.Background()))
+			require.NoError(t, c.Check(context.Background()))
+			source, err := collectorapi.NewChartTemplateSource(c)
+			require.NoError(t, err)
+			_, err = source.Capture()
+			require.NoError(t, err, "accepted profiles must compile through the production template adapter")
+			series, err := collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
+			require.NoError(t, err)
+			require.Len(t, series, 7)
+			collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
+		})
+	}
+}
+
+func TestCollector_InstrumentOwnershipRetiresHistory(t *testing.T) {
+	for _, scenario := range []string{"metadata changes", "scope changes", "state metadata changes", "departed state resources"} {
+		t.Run(scenario, func(t *testing.T) {
+			now := time.Date(2026, 10, 26, 12, 0, 0, 0, time.UTC)
+			rg, mx := &mockResourceGraph{}, &mockMetricsClient{}
+			setResource := func(i int) {
+				if scenario == "departed state resources" {
+					if i >= 200 {
+						rg.setResources(nil)
+						return
+					}
+					rg.setResources([]map[string]any{testVirtualMachine(fmt.Sprintf("vm-%d", i), "Standard_B2s", "Linux", "PowerState/deallocated")})
+					return
+				}
+				if i >= 200 {
+					i = 199
+				}
+				if scenario == "state metadata changes" {
+					rg.setResources([]map[string]any{testVirtualMachine("vm-a", fmt.Sprintf("Standard_%d", i), "Linux", "PowerState/running")})
+					return
+				}
+				plan, scope := "plan-a", "worker"
+				if scenario == "metadata changes" {
+					plan = fmt.Sprintf("plan-%d", i)
+				} else {
+					scope = fmt.Sprintf("worker-%d", i)
+				}
+				rg.setResources([]map[string]any{testResource("Microsoft.Web/sites", "app-a", map[string]any{
+					"nd_properties_serverFarmId": "/plans/" + plan,
+					"tags":                       map[string]any{"workload": scope},
+				})})
+			}
+			setResource(0)
+			c := newTestCollectorWithMocks(rg, mx)
+			c.Config = testConfig()
+			c.Config.Discovery.RefreshEvery = 60
+			c.Config.Profiles.ModeExact = testProfilesModeEntries("app_service")
+			if scenario == "scope changes" {
+				c.Config.VirtualNodes = &VirtualNodesConfig{ByResourceTag: "workload"}
+			}
+			if scenario == "departed state resources" || scenario == "state metadata changes" {
+				c.Config.Profiles.ModeExact = testProfilesModeEntries("virtual_machines")
+			}
+			c.now = func() time.Time { return now }
+			require.NoError(t, c.Init(context.Background()))
+			require.NoError(t, c.Check(context.Background()))
+			for i := range 400 {
+				setResource(i)
+				mx.queryResponse = appServiceResponse(now)
+				scope := ""
+				if scenario == "scope changes" {
+					host, _ := workloadHostScope(resourceInfo{Tags: []resourceTag{{Key: "workload", Value: fmt.Sprintf("worker-%d", min(i, 199))}}}, "workload")
+					scope = host.ScopeKey
+				}
+				series, err := collecttest.CollectScalarSeries(c, metrix.ReadFlatten(), metrix.ReadHostScope(scope))
+				require.NoError(t, err)
+				if scenario == "departed state resources" && i >= 200 {
+					require.Empty(t, series)
+				} else if scenario == "departed state resources" || scenario == "state metadata changes" {
+					require.Len(t, series, 7)
+					if scenario == "state metadata changes" {
+						value, ok := seriesValue(series, "virtual_machines.power_state{", fmt.Sprintf(`vm_size="Standard_%d"`, min(i, 199)), `virtual_machines.power_state="running"`)
+						require.True(t, ok)
+						require.Equal(t, metrix.SampleValue(1), value)
+					}
+				} else {
+					require.Len(t, series, 2)
+					value, ok := seriesValue(series, "app_service.requests_total{")
+					require.True(t, ok)
+					total := (i + 1) * 10
+					if scenario == "scope changes" {
+						total = max(1, i-198) * 10
+					}
+					require.Equal(t, metrix.SampleValue(total), value)
+				}
+				now = now.Add(time.Minute)
+			}
+			want := 2
+			if scenario == "departed state resources" {
+				want = 0
+			} else if scenario == "state metadata changes" {
+				want = 1
+			}
+			require.Equal(t, want, retainedInstrumentHandles(c.runtime, c.observations), "handles must follow active membership, not historical labels/resources/scopes")
+		})
+	}
+}
+
+// Count actual retained handles, including handles hidden inside framework Vec caches.
+// Stop at instruments and other framework objects so the store's independent retention
+// does not contaminate the collector ownership measurement.
+func retainedInstrumentHandles(roots ...any) int {
+	seen := map[uintptr]bool{}
+	count := 0
+	var visit func(reflect.Value)
+	visit = func(v reflect.Value) {
+		if !v.IsValid() {
+			return
+		}
+		if v.Kind() == reflect.Interface {
+			if !v.IsNil() {
+				visit(v.Elem())
+			}
+			return
+		}
+		if v.Kind() == reflect.Pointer {
+			if v.IsNil() || seen[v.Pointer()] {
+				return
+			}
+			seen[v.Pointer()] = true
+			visit(v.Elem())
+			return
+		}
+		if v.Type().PkgPath() == "github.com/netdata/netdata/go/plugins/pkg/metrix" {
+			switch v.Type().Name() {
+			case "snapshotGaugeInstrument", "snapshotCounterInstrument", "snapshotStateSetInstrument":
+				count++
+				return
+			}
+			if v.Kind() == reflect.Struct && (strings.HasSuffix(v.Type().Name(), "Vec") || strings.HasPrefix(v.Type().Name(), "vecCache[")) {
+				visit(v.FieldByName("cache"))
+			}
+			return
+		}
+		switch v.Kind() {
+		case reflect.Struct:
+			for i := range v.NumField() {
+				visit(v.Field(i))
+			}
+		case reflect.Map:
+			iter := v.MapRange()
+			for iter.Next() {
+				visit(iter.Value())
+			}
+		case reflect.Slice, reflect.Array:
+			for i := range v.Len() {
+				visit(v.Index(i))
+			}
+		}
+	}
+	for _, root := range roots {
+		visit(reflect.ValueOf(root))
+	}
+	return count
 }

@@ -12,7 +12,6 @@ import (
 	azcloud "github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
 	"github.com/Azure/azure-sdk-for-go/sdk/monitor/query/azmetrics"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resourcegraph/armresourcegraph"
-	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/azure_monitor/azureprofiles"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
 )
@@ -29,47 +28,6 @@ type initProfileSelection struct {
 	Names     []string
 	AutoNames []string
 	Entries   map[string]ProfileEntryConfig
-}
-
-func (c *Collector) initInstruments(runtime *collectorRuntime) error {
-	if runtime == nil {
-		return errors.New("nil collector runtime")
-	}
-
-	if runtime.Instruments == nil {
-		runtime.Instruments = make(map[string]*instrumentRuntime)
-	}
-
-	for _, p := range runtime.Profiles {
-		vec := c.store.Write().SnapshotMeter("").Vec(p.LabelKeys...)
-		register := func(name, kind string) {
-			if _, ok := runtime.Instruments[name]; ok {
-				return
-			}
-			inst := &instrumentRuntime{Kind: kind, LabelKeys: p.LabelKeys}
-			if kind == azureprofiles.SeriesKindCounter {
-				inst.Counter = vec.Counter(name)
-			} else {
-				inst.Gauge = vec.Gauge(name)
-			}
-			runtime.Instruments[name] = inst
-		}
-
-		for _, m := range p.Metrics {
-			for _, series := range m.Series {
-				register(series.Instrument, series.Kind)
-			}
-		}
-		for _, state := range p.ResourceStates {
-			state.Instrument = vec.StateSet(state.Name,
-				metrix.WithStateSetStates(state.States...), metrix.WithStateSetMode(metrix.ModeEnum))
-		}
-		if c.Discovery.RefreshEvery == 0 && len(p.ResourceStates) > 0 {
-			c.Warningf("profile %q resource states are disabled because discovery.refresh_every is zero", p.Name)
-		}
-	}
-
-	return nil
 }
 
 func (c *Collector) prepareInitResult() (*initResult, error) {
@@ -130,14 +88,17 @@ func (c *Collector) ensureBootstrapped(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("build collector runtime: %w", err)
 	}
-	if err := c.initInstruments(runtime); err != nil {
-		return err
+	for _, profile := range runtime.Profiles {
+		if c.Discovery.RefreshEvery == 0 && len(profile.ResourceStates) > 0 {
+			c.Warningf("profile %q resource states are disabled because discovery.refresh_every is zero", profile.Name)
+		}
 	}
 	now := c.now()
 
 	c.runtime = runtime
-	c.observations = newObservationState(runtime)
+	c.observations = newObservationState(runtime, c.store.Write().SnapshotMeter(""))
 	c.discovery = buildDiscoveryState(fetched.Resources, runtime, now, c.Discovery.RefreshEvery, 1, fetched)
+	c.observations.reconcileResources(c.discovery.ByProfile)
 	c.warnDiscoveryScopeFallbacks(c.discovery, runtime)
 
 	return nil

@@ -120,17 +120,14 @@ func buildProfileRuntime(resolved azureprofiles.ResolvedProfile, entry ProfileEn
 		return out.Metrics[i].ID < out.Metrics[j].ID
 	})
 
-	labelNames := make([]string, 0, len(resolved.Config.ResourceLabels))
 	for _, label := range resolved.Config.ResourceLabels {
 		name := stringsTrim(label.Name)
-		labelNames = append(labelNames, name)
 		out.ResourceLabels = append(out.ResourceLabels, azureprofiles.ResourceLabel{
 			Name:     name,
 			Property: stringsTrim(label.Property),
 			Value:    azureprofiles.NormalizeResourceLabelValue(label.Value),
 		})
 	}
-	out.LabelKeys = labelKeysFor(labelNames)
 
 	for _, state := range resolved.Config.ResourceStates {
 		sr := &resourceStateRuntime{

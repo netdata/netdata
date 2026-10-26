@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 )
 
@@ -84,7 +86,11 @@ type MetricSeries struct {
 
 func (p *Profile) Normalize(baseName string) error {
 	visibleMetrics := visibleMetricsForProfile(baseName, *p)
-	normalizeGroupSelectors(baseName, visibleMetrics, &p.Template)
+	stateMetrics := make(map[string]struct{}, len(p.ResourceStates))
+	for _, state := range p.ResourceStates {
+		stateMetrics[ExportedStateName(baseName, state.ID)] = struct{}{}
+	}
+	normalizeGroupSelectors(baseName, visibleMetrics, stateMetrics, &p.Template)
 	return nil
 }
 
@@ -383,7 +389,11 @@ func validateTemplate(prefix, baseName string, profile Profile) error {
 		ContextNamespace: "azure_monitor",
 		Groups:           []charttpl.Group{root},
 	}
-	if err := spec.Validate(); err != nil {
+	yaml, err := spec.MarshalTemplate()
+	if err != nil {
+		return fmt.Errorf("%s.template: %w", prefix, err)
+	}
+	if _, err := chartengine.NewTemplateSetYAML([]byte(yaml)); err != nil {
 		return fmt.Errorf("%s.template: %w", prefix, err)
 	}
 	return nil
@@ -402,26 +412,41 @@ func visibleMetricsForProfile(baseName string, profile Profile) map[string]struc
 	return visible
 }
 
-func normalizeGroupSelectors(baseName string, visible map[string]struct{}, group *charttpl.Group) {
+func normalizeGroupSelectors(baseName string, visible, states map[string]struct{}, group *charttpl.Group) {
 	if group == nil {
 		return
 	}
 
 	for i := range group.Charts {
-		normalizeChartSelectors(baseName, visible, &group.Charts[i])
+		normalizeChartSelectors(baseName, visible, states, &group.Charts[i])
 	}
 	for i := range group.Groups {
-		normalizeGroupSelectors(baseName, visible, &group.Groups[i])
+		normalizeGroupSelectors(baseName, visible, states, &group.Groups[i])
 	}
 }
 
-func normalizeChartSelectors(baseName string, visible map[string]struct{}, chart *charttpl.Chart) {
+func normalizeChartSelectors(baseName string, visible, states map[string]struct{}, chart *charttpl.Chart) {
 	if chart == nil {
 		return
 	}
 
 	for i := range chart.Dimensions {
-		chart.Dimensions[i].Selector = normalizeSelector(baseName, visible, chart.Dimensions[i].Selector)
+		dim := &chart.Dimensions[i]
+		dim.Selector = normalizeSelector(baseName, visible, dim.Selector)
+		if strings.TrimSpace(dim.Name) != "" || strings.TrimSpace(dim.NameFromLabel) != "" {
+			continue
+		}
+		selector, err := metrixselector.ParseCompiled(dim.Selector)
+		if err != nil {
+			continue // Validation reports malformed selectors.
+		}
+		names := selector.Meta().MetricNames
+		if len(names) == 1 {
+			if _, ok := states[names[0]]; ok {
+				// Native statesets expose the selected state under the full metric name.
+				dim.NameFromLabel = names[0]
+			}
+		}
 	}
 }
 

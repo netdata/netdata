@@ -31,8 +31,8 @@ func (c *Collector) collect(ctx context.Context) error {
 		return err
 	}
 
-	observedThisCycle := c.observations.observeSamples(samples)
-	c.observations.reobserveCachedObservations(dueInstruments, observedThisCycle)
+	c.observations.observeSamples(samples)
+	c.observations.reobserveCachedObservations(dueInstruments)
 
 	return nil
 }
@@ -51,7 +51,7 @@ func (c *Collector) refreshCollectResources(ctx context.Context) (bool, error) {
 		c.Limit("discovery:refresh", 1, time.Hour).Warningf("resource discovery refresh failed, retaining inventory without stale resource states: %v", err)
 		resources = c.discovery.Resources
 	}
-	if c.discovery.FetchCounter != prevFetchCounter {
+	if c.discovery.FetchCounter != prevFetchCounter || c.observations.resources == nil {
 		c.observations.reconcileResources(c.discovery.ByProfile)
 	}
 	return len(resources) > 0, nil
