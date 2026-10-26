@@ -140,6 +140,7 @@ typedef struct statsd_metric {
     RRDSET *st;                     // the private chart of this metric
     RRDDIM *rd_value;               // the dimension of this metric value
     RRDDIM *rd_count;               // the dimension for the number of events received
+    bool private_chart_counted;     // counted in statsd.private_charts, until the metric is deleted
 
     // linking, used for walking through all metrics
     struct statsd_metric *next_useful;
@@ -1632,8 +1633,10 @@ static inline RRDSET *statsd_private_rrdset_create(
         , int update_every
         , RRDSET_TYPE chart_type
 ) {
-    if(!m->st)
+    if(!m->private_chart_counted) {
+        m->private_chart_counted = true;
         statsd.private_charts++;
+    }
 
     RRDSET *st = rrdset_create_custom(
             localhost         // host
@@ -1894,17 +1897,38 @@ static inline void statsd_private_chart_timer_or_histogram(STATSD_METRIC *m, con
 // --------------------------------------------------------------------------------------------------------------------
 // statsd flush metrics
 
+static inline void statsd_private_chart_release(STATSD_METRIC *m) {
+    rrdset_is_obsolete___safe_from_collector_thread(m->st);
+    m->st = NULL;
+
+    // the obsolete chart and its dimensions are freed later, a revived metric creates them again
+    m->rd_value = NULL;
+    m->rd_count = NULL;
+
+    if(m->type == STATSD_METRIC_TYPE_HISTOGRAM || m->type == STATSD_METRIC_TYPE_TIMER) {
+        m->histogram.ext->rd_min = NULL;
+        m->histogram.ext->rd_max = NULL;
+        m->histogram.ext->rd_percentile = NULL;
+        m->histogram.ext->rd_median = NULL;
+        m->histogram.ext->rd_stddev = NULL;
+    }
+    else if(m->type == STATSD_METRIC_TYPE_DICTIONARY && m->dictionary.dict) {
+        STATSD_METRIC_DICTIONARY_ITEM *t;
+        dfe_start_read(m->dictionary.dict, t) {
+            t->rd = NULL;
+        }
+        dfe_done(t);
+    }
+}
+
 static inline void metric_check_obsoletion(STATSD_METRIC *m) {
     if(!(m->options & STATSD_METRIC_OPTION_OBSOLETE) &&
         statsd.set_obsolete_after &&
         (m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED) &&
         m->last_collected + (time_t)statsd.set_obsolete_after < now_realtime_sec()) {
 
-        if(m->st) {
-            rrdset_is_obsolete___safe_from_collector_thread(m->st);
-            m->st = NULL;
-            statsd.private_charts--;
-        }
+        if(m->st)
+            statsd_private_chart_release(m);
 
         m->options |= STATSD_METRIC_OPTION_OBSOLETE;
     }
@@ -2418,6 +2442,9 @@ static inline void statsd_flush_index_metrics(STATSD_INDEX *index, void (*flush_
                 index->first_useful = m_next;
 
             index->useful--;
+
+            if(m->private_chart_counted)
+                statsd.private_charts--;
 
             if(dictionary_del(index->dict, m->name))
                 __atomic_fetch_sub(&index->metrics, 1, __ATOMIC_RELAXED);
