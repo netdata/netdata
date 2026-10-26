@@ -255,6 +255,7 @@ packaging/static/cache
 packaging/static/staging
 packaging/static/work
 packaging/static/makeself.lsm
+packaging/static/install-type
 
 # Rust related stuff
 corrosion/
