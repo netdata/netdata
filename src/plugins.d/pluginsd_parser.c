@@ -298,10 +298,10 @@ static void pluginsd_vnode_stale_check_cb(RRDHOST *host, void *data) {
 // Expires the vnodes this plugin stopped feeding, and drops the ones that are gone.
 static void pluginsd_vnodes_stale_check(PARSER *parser) {
     time_t now = now_realtime_sec();
-    if(parser->user.vnodes.last_host_stale_check >= now)
+    if(parser->user.vnodes.last_host_stale_check > now)
         return;
 
-    uint32_t min_check_interval = UINT_MAX;
+    uint32_t min_check_interval = 0;
 
     // keys whose host is gone: JudyLDel() is not safe inside JudyLFirstThenNext(), so they are
     // collected here and deleted after the walk
@@ -334,7 +334,8 @@ static void pluginsd_vnodes_stale_check(PARSER *parser) {
         if (!t.stale_after_seconds)
             continue;
 
-        min_check_interval = MIN(min_check_interval, t.stale_after_seconds);
+        if(!min_check_interval || t.stale_after_seconds < min_check_interval)
+            min_check_interval = t.stale_after_seconds;
 
         if(t.expired) {
             // one atomic clear: both bits describe the same transition (we stopped collecting
@@ -354,10 +355,10 @@ static void pluginsd_vnodes_stale_check(PARSER *parser) {
         pluginsd_vnodes_index_del(parser, gone[i]);
     freez(gone);
 
-    if (min_check_interval == UINT_MAX)
+    if (!min_check_interval)
         min_check_interval = 60;
 
-    parser->user.vnodes.last_host_stale_check = now_realtime_sec() + min_check_interval;
+    parser->user.vnodes.last_host_stale_check = nd_time_t_add_saturating(now_realtime_sec(), min_check_interval);
 }
 
 // A host has exactly one writer. For a vnode that writer is the local collector that defines it.
@@ -490,6 +491,8 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
     }
 
     labels_changed |= pluginsd_update_host_ephemerality(host);
+    // Transfer the timeout before cleanup resets the temporary definition state.
+    host->node_stale_after_seconds = parser->user.host_define.node_stale_after_seconds;
     pluginsd_host_define_cleanup(parser);
 
     if(labels_changed)
@@ -506,12 +509,18 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
         schedule_node_state_update(host, 100);
 
     rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_UPDATE);
+    time_t now = now_realtime_sec();
     uint32_t *Pvalue = pluginsd_vnodes_index_add(parser, host->machine_guid);
     if (Pvalue)
-        *Pvalue = (uint32_t) (now_realtime_sec() - VNODE_BASE_EPOCH);
+        *Pvalue = (uint32_t) (now - VNODE_BASE_EPOCH);
     else
         nd_log_daemon(NDLP_ERR, "VNODE: Cannot track virtual host \"%s\" for staleness - JudyLIns error", rrdhost_hostname(host));
-    host->node_stale_after_seconds = parser->user.host_define.node_stale_after_seconds;
+    if(host->node_stale_after_seconds) {
+        // A new or reduced timeout must not wait for the previously cached scan deadline.
+        time_t next_check = nd_time_t_add_saturating(now, host->node_stale_after_seconds);
+        if(parser->user.vnodes.last_host_stale_check > next_check)
+            parser->user.vnodes.last_host_stale_check = next_check;
+    }
     nd_log_daemon(NDLP_INFO, "VNODE: Configuring node stale after %u seconds for host \"%s\"", host->node_stale_after_seconds, rrdhost_hostname(host));
 
     return PARSER_RC_OK;

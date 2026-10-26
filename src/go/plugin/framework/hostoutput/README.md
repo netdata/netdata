@@ -40,8 +40,9 @@ independent of vnode cleanup suppression.
 Configured `stale_after` is a duration in whole seconds, with a maximum of 4294967295 seconds from the plugins.d
 protocol's unsigned 32-bit timeout. Omission preserves legacy label configuration; explicit zero disables the
 timeout. An explicit value overrides `_node_stale_after_seconds`, which remains the wire representation consumed
-by Netdata. The existing C parser's reset-before-copy defect is a separate fix; Go propagation tests do not prove
-end-to-end host staleness until that parser ordering is corrected.
+by Netdata. The C parser commits that timeout with the host definition and clears its temporary state afterward.
+The `netdata -W pluginsd-vnodes` regression suite covers timeout replacement, inactivity, scan scheduling and
+reactivation through the plugins.d protocol; Go tests cover configuration and label propagation.
 
 ## Collector roles
 
