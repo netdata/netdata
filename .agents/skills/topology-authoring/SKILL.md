@@ -155,6 +155,8 @@ owners before design, while review checks the resulting contracts and evidence. 
   logs, docs, SOWs, or review artifacts (`src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#streaming-shape`).
 - Sparse grouping columns: test that a consumer keeps actor identity for null or empty grouping keys instead of
   merging every null row into one bucket.
+- Parallel-link tests MUST hold endpoints and type/state constant while varying only the grouping identity.
+  Cover ID-bearing interfaces with equal names and name-only interfaces; removing a required `group_key` must fail.
 - Fail explicitly on any size or row limit; never truncate a topology and present it as complete.
 - Validators need negative tests: missing label-policy columns, non-display label columns, a missing port-bullet
   source table, bad highlight-path columns, an invalid token, and a modal projection over a missing source. A producer

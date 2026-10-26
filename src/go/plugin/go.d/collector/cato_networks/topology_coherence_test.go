@@ -24,11 +24,24 @@ func TestTopologyObservedConnections(t *testing.T) {
 					{ID: "backup", Name: "Backup", Connected: new(false), LastPopName: "Fallback PoP"},
 				},
 				Interfaces: map[string]*interfaceState{
-					"wan1": {ID: "wan1", Name: "WAN 1", DeviceID: "socket", PopName: "New PoP", Connected: connected, LinkUp: new(true)},
+					"wan1": {
+						ID:        "wan1",
+						Name:      "WAN 1",
+						DeviceID:  "socket",
+						PopName:   "New PoP",
+						Connected: connected,
+						LinkUp:    new(true),
+					},
 					"wan2": {ID: "wan2", Name: "WAN 2", DeviceID: "socket", PopName: "Other PoP", Connected: new(true)},
 				},
 			}
-			data := mustBuildTopology(t, "account", map[string]*siteState{site.ID: site}, []string{site.ID}, fixedCatoTestNow())
+			data := mustBuildTopology(
+				t,
+				"account",
+				map[string]*siteState{site.ID: site},
+				[]string{site.ID},
+				fixedCatoTestNow(),
+			)
 			validateCatoTopologyV1Data(t, data)
 			actors := topologyTableRows(t, data.Actors, data.Dictionaries)
 			links := topologyTableRows(t, data.Links, data.Dictionaries)
@@ -43,8 +56,12 @@ func TestTopologyObservedConnections(t *testing.T) {
 				"Socket -> New PoP": map[string]string{"connected": "cato_tunnel", "disconnected": "cato_tunnel_disconnected", "unknown": "cato_tunnel_unknown"}[name] + ":" + name, "Socket -> Other PoP": "cato_tunnel:connected",
 				"Backup -> Fallback PoP": "cato_pop_association:unknown",
 			}, got)
-			interfaces := topologyTableRows(t, data.Tables.Actor[catofunc.ActorTableInterfaces].Table, data.Dictionaries)
-			require.Equal(t, optionalBool(connected), interfaces[0]["tunnel_connected"])
+			interfaces := topologyTableRows(
+				t,
+				data.Tables.Actor[catofunc.ActorTableInterfaces].Table,
+				data.Dictionaries,
+			)
+			require.Equal(t, optionalValue(connected), interfaces[0]["tunnel_connected"])
 			require.Equal(t, true, interfaces[0]["link_up"])
 			link := links[interfaces[0]["link"].(int)]
 			require.Equal(t, "wan1", link["interface_id"])
@@ -62,7 +79,15 @@ func TestTopologyActorLabels(t *testing.T) {
 		CountryName: "France",
 		HostCount:   new(int64(0)),
 		Devices: []deviceState{
-			{ID: "socket", Name: "Socket", SocketSerial: "SERIAL", SocketVersion: "1.0", HaRole: "primary", Connected: new(false), LastPopName: "PoP"},
+			{
+				ID:            "socket",
+				Name:          "Socket",
+				SocketSerial:  "SERIAL",
+				SocketVersion: "1.0",
+				HaRole:        "primary",
+				Connected:     new(false),
+				LastPopName:   "PoP",
+			},
 		},
 		BGPPeers: []bgpPeerState{{RemoteIP: "192.0.2.10", RemoteASN: "64512"}},
 	}
@@ -174,10 +199,31 @@ func TestTopologyInterfaceOwnersAndFallback(t *testing.T) {
 		interfaces map[string]*interfaceState
 		want       map[string]string
 	}{
-		"site fallback":                      {want: map[string]string{"Office -> Summary": "cato_pop_association:unknown"}},
-		"unresolved owner":                   {interfaces: map[string]*interfaceState{"wan": {ID: "wan", Name: "WAN", DeviceID: "missing", PopName: "Observed", Connected: new(false)}}, want: map[string]string{"Office -> Observed": "cato_tunnel_disconnected:disconnected"}},
-		"unknown owner alongside device":     {devices: []deviceState{{ID: "socket", Name: "Socket"}}, interfaces: map[string]*interfaceState{"wan": {ID: "wan", DeviceID: "missing", PopName: "Observed"}}, want: map[string]string{"Office -> Observed": "cato_tunnel_unknown:unknown", "Socket -> Summary": "cato_pop_association:unknown"}},
-		"nil and destinationless interfaces": {devices: []deviceState{{ID: "socket", Name: "Socket"}}, interfaces: map[string]*interfaceState{"nil": nil, "wan": {ID: "wan", DeviceID: "socket", Connected: new(true)}}, want: map[string]string{"Socket -> Summary": "cato_pop_association:unknown"}},
+		"site fallback": {
+			want: map[string]string{"Office -> Summary": "cato_pop_association:unknown"},
+		},
+		"unresolved owner": {
+			interfaces: map[string]*interfaceState{
+				"wan": {ID: "wan", Name: "WAN", DeviceID: "missing", PopName: "Observed", Connected: new(false)},
+			},
+			want: map[string]string{"Office -> Observed": "cato_tunnel_disconnected:disconnected"},
+		},
+		"unknown owner alongside device": {
+			devices:    []deviceState{{ID: "socket", Name: "Socket"}},
+			interfaces: map[string]*interfaceState{"wan": {ID: "wan", DeviceID: "missing", PopName: "Observed"}},
+			want: map[string]string{
+				"Office -> Observed": "cato_tunnel_unknown:unknown",
+				"Socket -> Summary":  "cato_pop_association:unknown",
+			},
+		},
+		"nil and destinationless interfaces": {
+			devices: []deviceState{{ID: "socket", Name: "Socket"}},
+			interfaces: map[string]*interfaceState{
+				"nil": nil,
+				"wan": {ID: "wan", DeviceID: "socket", Connected: new(true)},
+			},
+			want: map[string]string{"Socket -> Summary": "cato_pop_association:unknown"},
+		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -189,7 +235,13 @@ func TestTopologyInterfaceOwnersAndFallback(t *testing.T) {
 				Devices:            tc.devices,
 				Interfaces:         tc.interfaces,
 			}
-			data := mustBuildTopology(t, "account", map[string]*siteState{"site": site}, []string{"site"}, fixedCatoTestNow())
+			data := mustBuildTopology(
+				t,
+				"account",
+				map[string]*siteState{"site": site},
+				[]string{"site"},
+				fixedCatoTestNow(),
+			)
 			validateCatoTopologyV1Data(t, data)
 			actors := topologyTableRows(t, data.Actors, data.Dictionaries)
 			links := topologyTableRows(t, data.Links, data.Dictionaries)
@@ -218,10 +270,17 @@ func TestTopologyParallelInterfacesPreserveMeasurements(t *testing.T) {
 		},
 		Devices: []deviceState{{ID: "socket", Name: "Socket"}},
 		Interfaces: map[string]*interfaceState{
-			"a": {ID: "a", Name: "WAN A", DeviceID: "socket", PopName: "PoP", Connected: new(true), Metrics: trafficMetrics{
-				present: trafficMetricRTTMS,
-				RTTMS:   0,
-			}},
+			"a": {
+				ID:        "a",
+				Name:      "WAN A",
+				DeviceID:  "socket",
+				PopName:   "PoP",
+				Connected: new(true),
+				Metrics: trafficMetrics{
+					present: trafficMetricRTTMS,
+					RTTMS:   0,
+				},
+			},
 			"b": {ID: "b", Name: "WAN B", DeviceID: "socket", PopName: "PoP", Connected: new(false)},
 		},
 	}
@@ -240,15 +299,30 @@ func TestTopologyParallelInterfacesPreserveMeasurements(t *testing.T) {
 }
 
 // Cloud keys links by endpoints/type plus the producer-declared group keys.
-// Name-only interfaces are valid when the upstream omits their ID.
+// Hold endpoints and type constant so only the declared interface identity separates the links.
 func TestTopologyParallelInterfaceGrouping(t *testing.T) {
-	for name, ids := range map[string][2]string{"with IDs": {"a", "b"}, "name only": {"", ""}} {
+	for name, tc := range map[string]struct {
+		ids   [2]string
+		names [2]string
+	}{
+		"distinct IDs with the same name": {ids: [2]string{"a", "b"}, names: [2]string{"WAN", "WAN"}},
+		"name only":                       {names: [2]string{"WAN A", "WAN B"}},
+	} {
 		t.Run(name, func(t *testing.T) {
-			site := &siteState{ID: "site", Interfaces: map[string]*interfaceState{
-				"a": {ID: ids[0], Name: "WAN A", PopName: "PoP", Connected: new(true)},
-				"b": {ID: ids[1], Name: "WAN B", PopName: "PoP", Connected: new(false)},
-			}}
-			data := mustBuildTopology(t, "account", map[string]*siteState{"site": site}, []string{"site"}, fixedCatoTestNow())
+			site := &siteState{
+				ID: "site",
+				Interfaces: map[string]*interfaceState{
+					"a": {ID: tc.ids[0], Name: tc.names[0], PopName: "PoP", Connected: new(true)},
+					"b": {ID: tc.ids[1], Name: tc.names[1], PopName: "PoP", Connected: new(true)},
+				},
+			}
+			data := mustBuildTopology(
+				t,
+				"account",
+				map[string]*siteState{"site": site},
+				[]string{"site"},
+				fixedCatoTestNow(),
+			)
 			validateCatoTopologyV1Data(t, data)
 			rows := topologyTableRows(t, data.Links, data.Dictionaries)
 			require.Len(t, rows, 2)

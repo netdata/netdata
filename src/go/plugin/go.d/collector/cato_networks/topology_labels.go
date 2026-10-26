@@ -10,7 +10,12 @@ import (
 	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 )
 
-func buildCatoTopologyLabels(dict *topologyv1.StringDictionary, accountID string, sites map[string]*siteState, order []string, indexes map[string]int) (topologyv1.Table, error) {
+func buildCatoTopologyLabels(
+	dict *topologyv1.StringDictionary,
+	accountID string,
+	sites []topologySite,
+	indexes map[string]int,
+) (topologyv1.Table, error) {
 	table := topologyv1.NewTableBuilder(catoTopologyLabelColumns()...)
 	add := func(actor int, key, value, kind string) {
 		value = strings.TrimSpace(value)
@@ -27,13 +32,9 @@ func buildCatoTopologyLabels(dict *topologyv1.StringDictionary, accountID string
 		add(actor, "country_name", site.CountryName, "location")
 		add(actor, "region", site.Region, "location")
 	}
-	for _, id := range order {
-		site := sites[id]
-		if site == nil {
-			continue
-		}
+	for _, site := range sites {
 		actor := indexes[catoSiteActorID(site.ID)]
-		siteContext(actor, site)
+		siteContext(actor, site.siteState)
 		add(actor, "name", site.Name, "identity")
 		add(actor, "description", site.Description, "metadata")
 		add(actor, "pop_name", site.PopName, "metadata")
@@ -47,13 +48,13 @@ func buildCatoTopologyLabels(dict *topologyv1.StringDictionary, accountID string
 		if site.HostCount != nil {
 			add(actor, "host_count", strconv.FormatInt(*site.HostCount, 10), "metadata")
 		}
-		for _, dev := range topologyDevices(site.Devices) {
+		for _, dev := range site.devices {
 			actor, ok := indexes[catoDeviceActorID(site.ID, stableDeviceID(dev))]
 			if !ok {
 				continue
 			}
-			siteContext(actor, site)
-			add(actor, "name", topologyDeviceName(site, dev), "identity")
+			siteContext(actor, site.siteState)
+			add(actor, "name", topologyDeviceName(site.siteState, dev), "identity")
 			add(actor, "source_name", dev.Name, "metadata")
 			add(actor, "device_id", stableDeviceID(dev), "identity")
 			add(actor, "identifier", dev.Identifier, "identity")
@@ -74,7 +75,7 @@ func buildCatoTopologyLabels(dict *topologyv1.StringDictionary, accountID string
 				continue
 			}
 			seen[actor] = true
-			siteContext(actor, site)
+			siteContext(actor, site.siteState)
 			add(actor, "remote_ip", peer.RemoteIP, "identity")
 			add(actor, "remote_asn", peer.RemoteASN, "identity")
 			add(actor, "bgp_session", peer.BGPSession, "status")

@@ -110,6 +110,7 @@ func TopologyActorTypes() map[string]topologyv1.ActorType {
 				LabelPolicy: &topologyv1.LabelPolicy{
 					Columns: []string{"display_name", "pop_name"},
 				},
+				Modal: catoPopModal(),
 			},
 		},
 		ActorTypeBGPPeer: {
@@ -159,14 +160,6 @@ func TopologyActorTypes() map[string]topologyv1.ActorType {
 		modal.MiniTopology = &topologyv1.ModalMiniTopologyPresentation{
 			Enabled: new(true),
 			Depth:   1,
-		}
-		if id == ActorTypePop {
-			section := catoDeviceModal().Sections[0]
-			section.ID = "attached_wans"
-			section.Label = "Attached WANs"
-			section.OwnerFilter.ActorColumn = "pop_actor"
-			section.Columns = append([]topologyv1.ModalColumn{catoActorRefColumn("site", "Site", "site_actor"), catoActorRefColumn("device", "Device / owner", "actor")}, section.Columns...)
-			modal.Sections = append(modal.Sections, section)
 		}
 		if id != ActorTypeBGPPeer {
 			modal.Sections = append(modal.Sections, catoConnectionsSection())
@@ -219,7 +212,10 @@ func TopologyLinkTypes() map[string]topologyv1.LinkType {
 				Arrow:     "none",
 				Hover: &topologyv1.HoverPresentation{
 					Fields: []topologyv1.PresentationField{
-						{Key: "observation", Label: "Evidence"}, {Key: "interface_name", Label: "Interface"}, {Key: "interface_id", Label: "Interface ID"}, {Key: "state", Label: "Tunnel state"},
+						{Key: "observation", Label: "Evidence"},
+						{Key: "interface_name", Label: "Interface"},
+						{Key: "interface_id", Label: "Interface ID"},
+						{Key: "state", Label: "Tunnel state"},
 					},
 				},
 			},
@@ -294,79 +290,102 @@ func TopologyPresentation() *topologyv1.Presentation {
 }
 
 func catoSiteModal() *topologyv1.ModalPresentation {
-	modal := catoDeviceModal()
-	modal.Sections[0].Label = "Site WANs (all devices)"
-	modal.Sections[0].OwnerFilter.ActorColumn = "site_actor"
-	modal.Sections[0].Columns = append([]topologyv1.ModalColumn{catoActorRefColumn("device", "Device / owner", "actor")}, modal.Sections[0].Columns...)
-	modal.Sections = append(modal.Sections, topologyv1.ModalSection{
-		ID:    "devices",
-		Label: "Site devices",
-		Order: 2,
-		Source: topologyv1.ModalSource{
-			Kind: "links",
+	return &topologyv1.ModalPresentation{
+		Sections: []topologyv1.ModalSection{
+			catoWANSection(ActorTableInterfaces, "Site WANs (all devices)", "site_actor",
+				catoActorRefColumn("device", "Device / owner", "actor")),
+			{
+				ID:    "devices",
+				Label: "Site devices",
+				Order: 2,
+				Source: topologyv1.ModalSource{
+					Kind: "links",
+				},
+				OwnerFilter: &topologyv1.ModalOwnerFilter{
+					Mode:        "actor_column",
+					ActorColumn: "src_actor",
+				},
+				RowFilters: []topologyv1.ModalRowFilter{{Column: "observation", Op: "eq", Value: "Site membership"}},
+				Columns: []topologyv1.ModalColumn{
+					catoActorRefColumn("device", "Device", "dst_actor"),
+					catoDeviceLabelColumn("ha_role", "HA role"),
+					catoDeviceLabelColumn("connected", "Device connected"),
+					catoDeviceLabelColumn("socket_serial", "Serial"),
+					catoDeviceLabelColumn("socket_version", "Version"),
+				},
+				EmptyLabel: "No devices reported for this site.",
+			},
 		},
-		OwnerFilter: &topologyv1.ModalOwnerFilter{
-			Mode:        "actor_column",
-			ActorColumn: "src_actor",
-		},
-		RowFilters: []topologyv1.ModalRowFilter{{Column: "observation", Op: "eq", Value: "Site membership"}},
-		Columns:    []topologyv1.ModalColumn{catoActorRefColumn("device", "Device", "dst_actor"), catoDeviceLabelColumn("ha_role", "HA role"), catoDeviceLabelColumn("connected", "Device connected"), catoDeviceLabelColumn("socket_serial", "Serial"), catoDeviceLabelColumn("socket_version", "Version")},
-		EmptyLabel: "No devices reported for this site.",
-	})
-	return modal
+	}
 }
 
 func catoDeviceModal() *topologyv1.ModalPresentation {
 	return &topologyv1.ModalPresentation{
-		MiniTopology: &topologyv1.ModalMiniTopologyPresentation{
-			Depth: 1,
-		},
-		Sections: []topologyv1.ModalSection{
-			{
-				ID:         ActorTableInterfaces,
-				Label:      "WAN interfaces",
-				Order:      1,
-				EmptyLabel: "No interface observations available. This does not establish that no WAN is configured.",
-				Source: topologyv1.ModalSource{
-					Kind:  "actor_table",
-					Table: ActorTableInterfaces,
-				},
-				OwnerFilter: &topologyv1.ModalOwnerFilter{
-					Mode:        "actor_column",
-					ActorColumn: "actor",
-				},
-				Columns: []topologyv1.ModalColumn{
-					modalDirectColumn("name", "Name", "name", "text"),
+		Sections: []topologyv1.ModalSection{catoWANSection(ActorTableInterfaces, "WAN interfaces", "actor")},
+	}
+}
 
-					modalDirectColumn("tunnel_state", "Tunnel state", "tunnel_state", "badge"),
-					modalDirectColumn("physical_link_state", "Physical link", "physical_link_state", "badge"),
-					modalDirectColumn("pop_name", "PoP", "pop_name", "text"),
-					modalExpandedColumn("tunnel_remote_ip", "Remote IP", "tunnel_remote_ip", "text"),
-					modalExpandedColumn("tunnel_uptime", "Uptime", "tunnel_uptime", "duration"),
-					modalExpandedColumn("upstream_bandwidth", "Configured upstream limit (Mbps)", "upstream_bandwidth", "number"),
-					modalExpandedColumn("downstream_bandwidth", "Configured downstream limit (Mbps)", "downstream_bandwidth", "number"),
-					modalDirectColumn("rtt_ms", "RTT (ms)", "rtt_ms", "number"),
-					modalDirectColumn("lost_upstream_percent", "Upstream loss (%)", "lost_upstream_percent", "number"),
-					modalDirectColumn("lost_downstream_percent", "Downstream loss (%)", "lost_downstream_percent", "number"),
-					modalExpandedColumn("jitter_upstream_ms", "Upstream jitter (ms)", "jitter_upstream_ms", "number"),
-					modalExpandedColumn("jitter_downstream_ms", "Downstream jitter (ms)", "jitter_downstream_ms", "number"),
-					modalExpandedColumn("last_mile_latency_ms", "Last-mile latency (ms)", "last_mile_latency_ms", "number"),
-					modalExpandedColumn("last_mile_loss_percent", "Last-mile loss (%)", "last_mile_loss_percent", "number"),
-				},
-				Sort: &topologyv1.ModalSort{
-					Column:    "name",
-					Direction: "asc",
-				},
-			},
+func catoPopModal() *topologyv1.ModalPresentation {
+	return &topologyv1.ModalPresentation{
+		Sections: []topologyv1.ModalSection{
+			catoWANSection("attached_wans", "Attached WANs", "pop_actor",
+				catoActorRefColumn("site", "Site", "site_actor"),
+				catoActorRefColumn("device", "Device / owner", "actor")),
+		},
+	}
+}
+
+func catoWANSection(id, label, ownerColumn string, identityColumns ...topologyv1.ModalColumn) topologyv1.ModalSection {
+	return topologyv1.ModalSection{
+		ID:         id,
+		Label:      label,
+		Order:      1,
+		EmptyLabel: "No interface observations available. This does not establish that no WAN is configured.",
+		Source: topologyv1.ModalSource{
+			Kind:  "actor_table",
+			Table: ActorTableInterfaces,
+		},
+		OwnerFilter: &topologyv1.ModalOwnerFilter{
+			Mode:        "actor_column",
+			ActorColumn: ownerColumn,
+		},
+		Columns: append(identityColumns, []topologyv1.ModalColumn{
+			modalDirectColumn("name", "Name", "name", "text"),
+
+			modalDirectColumn("tunnel_state", "Tunnel state", "tunnel_state", "badge"),
+			modalDirectColumn("physical_link_state", "Physical link", "physical_link_state", "badge"),
+			modalDirectColumn("pop_name", "PoP", "pop_name", "text"),
+			modalExpandedColumn("tunnel_remote_ip", "Remote IP", "tunnel_remote_ip", "text"),
+			modalExpandedColumn("tunnel_uptime", "Uptime", "tunnel_uptime", "duration"),
+			modalExpandedColumn(
+				"upstream_bandwidth",
+				"Configured upstream limit (Mbps)",
+				"upstream_bandwidth",
+				"number",
+			),
+			modalExpandedColumn(
+				"downstream_bandwidth",
+				"Configured downstream limit (Mbps)",
+				"downstream_bandwidth",
+				"number",
+			),
+			modalDirectColumn("rtt_ms", "RTT (ms)", "rtt_ms", "number"),
+			modalDirectColumn("lost_upstream_percent", "Upstream loss (%)", "lost_upstream_percent", "number"),
+			modalDirectColumn("lost_downstream_percent", "Downstream loss (%)", "lost_downstream_percent", "number"),
+			modalExpandedColumn("jitter_upstream_ms", "Upstream jitter (ms)", "jitter_upstream_ms", "number"),
+			modalExpandedColumn("jitter_downstream_ms", "Downstream jitter (ms)", "jitter_downstream_ms", "number"),
+			modalExpandedColumn("last_mile_latency_ms", "Last-mile latency (ms)", "last_mile_latency_ms", "number"),
+			modalExpandedColumn("last_mile_loss_percent", "Last-mile loss (%)", "last_mile_loss_percent", "number"),
+		}...),
+		Sort: &topologyv1.ModalSort{
+			Column:    "name",
+			Direction: "asc",
 		},
 	}
 }
 
 func catoBGPPeerModal() *topologyv1.ModalPresentation {
 	return &topologyv1.ModalPresentation{
-		MiniTopology: &topologyv1.ModalMiniTopologyPresentation{
-			Depth: 1,
-		},
 		Sections: []topologyv1.ModalSection{
 			{
 				ID:    "links",
@@ -393,8 +412,18 @@ func catoBGPPeerModal() *topologyv1.ModalPresentation {
 					},
 					modalDirectColumn("local_ip", "Local IP", "local_ip", "text"),
 					modalDirectColumn("local_asn", "Local ASN", "local_asn", "text"),
-					modalDirectColumn("incoming_connection_state", "Incoming connection", "incoming_connection_state", "badge"),
-					modalDirectColumn("outgoing_connection_state", "Outgoing connection", "outgoing_connection_state", "badge"),
+					modalDirectColumn(
+						"incoming_connection_state",
+						"Incoming connection",
+						"incoming_connection_state",
+						"badge",
+					),
+					modalDirectColumn(
+						"outgoing_connection_state",
+						"Outgoing connection",
+						"outgoing_connection_state",
+						"badge",
+					),
 					modalDirectColumn("protocol", "Protocol", "protocol", "badge"),
 					modalDirectColumn("state", "State", "state", "badge"),
 					modalDirectColumn("routes", "Routes", "routes", "number"),
@@ -524,5 +553,9 @@ func modalExpandedColumn(id, label, source, cell string) topologyv1.ModalColumn 
 }
 
 func catoIdentificationField(key, label string) topologyv1.ModalLabelIdentificationField {
-	return topologyv1.ModalLabelIdentificationField{Key: key, Label: label, MaxValues: 1}
+	return topologyv1.ModalLabelIdentificationField{
+		Key:       key,
+		Label:     label,
+		MaxValues: 1,
+	}
 }
