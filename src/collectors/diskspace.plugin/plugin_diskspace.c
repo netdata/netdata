@@ -549,35 +549,25 @@ static bool should_exclude_zfs(const char *filesystem, const char *mount_point, 
 }
 
 // the filesystems (major:minor) collected in the current iteration
-static struct {
-    uint64_t *devs;
-    size_t used;
-    size_t size;
-} collected_devs = { 0 };
+static Pvoid_t collected_devs_judyl = NULL;
 
-static inline uint64_t collected_devs_key(unsigned long major, unsigned long minor) {
-    return ((uint64_t)major << 32) | (uint64_t)(minor & 0xFFFFFFFF);
+static inline Word_t collected_devs_key(unsigned long major, unsigned long minor) {
+    // major and minor are 12 and 20 bits in the kernel's dev_t
+    return (Word_t)((major << 20) | (minor & 0xFFFFF));
 }
 
 static inline bool collected_devs_contains(unsigned long major, unsigned long minor) {
-    uint64_t key = collected_devs_key(major, minor);
-    for(size_t i = 0; i < collected_devs.used; i++)
-        if(collected_devs.devs[i] == key)
-            return true;
-
-    return false;
+    return JudyLGet(collected_devs_judyl, collected_devs_key(major, minor), PJE0) != NULL;
 }
 
 static inline void collected_devs_add(unsigned long major, unsigned long minor) {
-    if(collected_devs_contains(major, minor))
-        return;
+    Pvoid_t *PValue = JudyLIns(&collected_devs_judyl, collected_devs_key(major, minor), PJE0);
+    if(PValue && PValue != PJERR)
+        *PValue = (void *)1;
+}
 
-    if(collected_devs.used == collected_devs.size) {
-        collected_devs.size = collected_devs.size ? collected_devs.size * 2 : 64;
-        collected_devs.devs = reallocz(collected_devs.devs, collected_devs.size * sizeof(*collected_devs.devs));
-    }
-
-    collected_devs.devs[collected_devs.used++] = collected_devs_key(major, minor);
+static inline void collected_devs_reset(void) {
+    (void)JudyLFreeArray(&collected_devs_judyl, PJE0);
 }
 
 // returns true when the mount point is collected (or handed to the slow thread),
@@ -698,29 +688,29 @@ static inline bool do_disk_space_stats(struct mountinfo *mi, int update_every) {
     }
 
     struct mount_point_metadata *m = dictionary_acquired_item_value(item);
+
+    bool skip =
+        (m->do_space == CONFIG_BOOLEAN_NO && m->do_inodes == CONFIG_BOOLEAN_NO) ||
+
+        (mi->flags & MOUNTINFO_READONLY &&
+         !(mi->flags & MOUNTINFO_IS_IN_SYSD_PROTECTED_LIST) &&
+         !m->collected &&
+         m->do_space != CONFIG_BOOLEAN_YES &&
+         m->do_inodes != CONFIG_BOOLEAN_YES) ||
+
+        // Check if this ZFS dataset has a cached exclusion decision (skip statvfs entirely)
+        zfs_dataset_cached_excluded(mi->filesystem, mi->mount_point, mi->mount_source);
+
     if (m->slow) {
+        // the slow thread keeps its mount points alive, even the ones it does not collect
         add_basic_mountinfo(&slow_mountinfo_tmp_root, mi);
-        collected = true;
+        collected = !skip;
         goto cleanup;
     }
 
     m->updated = true;
 
-    if(unlikely(m->do_space == CONFIG_BOOLEAN_NO && m->do_inodes == CONFIG_BOOLEAN_NO)) {
-        goto cleanup;
-    }
-
-    if (unlikely(
-            mi->flags & MOUNTINFO_READONLY &&
-            !(mi->flags & MOUNTINFO_IS_IN_SYSD_PROTECTED_LIST) &&
-            !m->collected &&
-            m->do_space != CONFIG_BOOLEAN_YES &&
-            m->do_inodes != CONFIG_BOOLEAN_YES)) {
-        goto cleanup;
-    }
-
-    // Check if this ZFS dataset has a cached exclusion decision (skip statvfs entirely)
-    if (zfs_dataset_cached_excluded(mi->filesystem, mi->mount_point, mi->mount_source))
+    if (unlikely(skip))
         goto cleanup;
 
     // from here on the mount point is collected, even when statvfs() fails this time
@@ -904,9 +894,7 @@ static void diskspace_main_cleanup(void *ptr) {
     dictionary_destroy(dict_mountpoints);
     dict_mountpoints = NULL;
 
-    freez(collected_devs.devs);
-    collected_devs.devs = NULL;
-    collected_devs.used = collected_devs.size = 0;
+    collected_devs_reset();
 
     simple_pattern_free(excluded_mountpoints);
     excluded_mountpoints = NULL;
@@ -1235,7 +1223,7 @@ void diskspace_main(void *ptr) {
         // A filesystem mounted more than once is charted once: mountinfo keeps one of its mounts and marks the
         // others as BIND. The kept one is collected first; a BIND mount is collected only when no mount of
         // its filesystem has been collected, e.g. because the kept one is excluded by path or disabled.
-        collected_devs.used = 0;
+        collected_devs_reset();
 
         for(int pass = 0; pass < 2 && service_running(SERVICE_COLLECTORS); pass++) {
             for(struct mountinfo *mi = disk_mountinfo_root; mi; mi = mi->next) {
