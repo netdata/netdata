@@ -2584,7 +2584,8 @@ static ssize_t query_scope_foreach_host_parallel(SIMPLE_PATTERN *scope_hosts_sp,
         num_threads = active_hosts;
     }
 
-    if (num_threads <= 1 || active_hosts <= 1) {
+    // the parallel jobs run on the dbengine event loop, which exists only when a dbengine tier is in use
+    if (num_threads <= 1 || active_hosts <= 1 || !dbengine_enabled) {
         // Fall back to single-threaded processing
         freez(qwd->hosts_array);
         return query_scope_foreach_host(scope_hosts_sp, hosts_sp,
