@@ -191,8 +191,8 @@ at lower resolution. Over a window long enough to read that older data,
 `percentage-of-time` always measures against the **selected duration**, not
 against the part of it that was collected. When gaps remain separately represented
 in storage, uncollected time does not enter the numerator for a numeric condition.
-A metric with one matching sample and the rest of the window missing answers a small percentage,
-not 100%. A condition such as `==gap` or `==null` includes uncollected time in
+In that case, a metric with one matching sample and the rest of the window missing
+answers a small percentage, not 100%. A condition such as `==gap` or `==null` includes uncollected time in
 the numerator instead. That is what makes it usable for availability.
 
 `percentage-of-samples` does NOT estimate: it treats each stored point as one
