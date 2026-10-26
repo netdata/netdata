@@ -1087,7 +1087,7 @@ int test_dbengine(void) {
 
     // free the ctx only after the event loop finished its work: after-work callbacks use it
     if(dbengine_shutdown())
-        freez(ctx);
+        rrdeng_ctx_free(ctx);
     else
         errors++;
 

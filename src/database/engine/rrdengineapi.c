@@ -48,6 +48,12 @@ static inline void initialize_single_ctx(struct rrdengine_instance *ctx) {
     rw_spinlock_init(&ctx->njfv2idx.spinlock);
 }
 
+// frees a context rrdeng_init() allocated for its caller - never one of multidb_ctx[]
+void rrdeng_ctx_free(struct rrdengine_instance *ctx) {
+    netdata_rwlock_destroy(&ctx->datafiles.rwlock);
+    freez(ctx);
+}
+
 __attribute__((constructor)) void initialize_multidb_ctx(void) {
     multidb_ctx[0] = &multidb_ctx_storage_tier0;
     multidb_ctx[1] = &multidb_ctx_storage_tier1;
@@ -1269,10 +1275,9 @@ int rrdeng_init(
         return 0;
     }
 
-    if (unittest_running) {
-        freez(ctx);
-        if (ctxp)
-            *ctxp = NULL;
+    if (ctxp) {
+        rrdeng_ctx_free(ctx);
+        *ctxp = NULL;
     }
 
     rrd_stat_atomic_add(&global_stats.rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);
