@@ -2,6 +2,8 @@
 
 #include "windows_plugin.h"
 #include "windows-internals.h"
+#include "libnetdata/os/windows-api/windows_api.h"
+#include "nrpc/nrpc.h"
 
 #define ADD_PACKET_IF_KEY(p, packets, pDataBlock, pObjectType, counter)                                                \
     do {                                                                                                               \
@@ -544,6 +546,12 @@ struct network_interface {
     } errors;
 
     struct {
+        COUNTER_DATA received;
+        RRDSET *st;
+        RRDDIM *rd_received;
+    } unknown_protocol_packets;
+
+    struct {
         COUNTER_DATA length;
         RRDSET *st;
         RRDDIM *rd;
@@ -576,6 +584,7 @@ struct network_interface {
 };
 
 static DICTIONARY *physical_interfaces = NULL, *virtual_interfaces = NULL;
+static netdata_mutex_t network_interfaces_mutex;
 
 static void network_interface_init(struct network_interface *d)
 {
@@ -588,6 +597,7 @@ static void network_interface_init(struct network_interface *d)
     d->discards.outbound.key = "Packets Outbound Discarded";
     d->errors.received.key = "Packets Received Errors";
     d->errors.outbound.key = "Packets Outbound Errors";
+    d->unknown_protocol_packets.received.key = "Packets Received Unknown";
     d->queue.length.key = "Output Queue Length";
     d->chimney.connections.key = "Offloaded Connections";
     d->rsc.connections.key = "TCP Active RSC Connections";
@@ -605,6 +615,7 @@ static void network_interface_cleanup(struct network_interface *d)
     rrdset_is_obsolete___safe_from_collector_thread(d->speed.st);
     rrdset_is_obsolete___safe_from_collector_thread(d->discards.st);
     rrdset_is_obsolete___safe_from_collector_thread(d->errors.st);
+    rrdset_is_obsolete___safe_from_collector_thread(d->unknown_protocol_packets.st);
     rrdset_is_obsolete___safe_from_collector_thread(d->queue.st);
     rrdset_is_obsolete___safe_from_collector_thread(d->chimney.st);
     rrdset_is_obsolete___safe_from_collector_thread(d->rsc.st_connections);
@@ -621,6 +632,8 @@ void dict_interface_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *
 
 static void initialize(void)
 {
+    netdata_mutex_init(&network_interfaces_mutex);
+
     physical_interfaces = dictionary_create_advanced(
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct network_interface));
 
@@ -655,13 +668,18 @@ static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, 
     uint64_t total_received = 0, total_sent = 0;
 
     PERF_INSTANCE_DEFINITION *pi = NULL;
+    bool complete = true;
     for (LONG i = 0; i < pObjectType->NumInstances; i++) {
         pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
-        if (!pi)
+        if (!pi) {
+            complete = false;
             break;
+        }
 
-        if (!getInstanceName(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer)))
-            strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
+        if (!getInstanceName(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer))) {
+            complete = false;
+            continue;
+        }
 
         if (strcasecmp(windows_shared_buffer, "_Total") == 0)
             continue;
@@ -680,10 +698,6 @@ static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, 
 
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->traffic.received) &&
             perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->traffic.sent)) {
-            if (d->traffic.received.current.Data == 0 && d->traffic.sent.current.Data == 0)
-                // this interface has not received or sent any traffic yet
-                continue;
-
             if (unlikely(!d->traffic.st)) {
                 d->traffic.st = rrdset_create_localhost(
                     "net",
@@ -760,7 +774,7 @@ static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, 
                     "kilobits/s",
                     PLUGIN_WINDOWS_NAME,
                     "PerflibNetwork",
-                    NETDATA_CHART_PRIO_FIRST_NET_IFACE + 10,
+                    NETDATA_CHART_PRIO_FIRST_NET_IFACE + 2,
                     update_every,
                     RRDSET_TYPE_LINE);
 
@@ -837,6 +851,34 @@ static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, 
             rrddim_set_by_pointer(
                 d->discards.st, d->discards.rd_outbound, (collected_number)d->discards.outbound.current.Data);
             rrdset_done(d->discards.st);
+        }
+
+        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->unknown_protocol_packets.received)) {
+            if (unlikely(!d->unknown_protocol_packets.st)) {
+                d->unknown_protocol_packets.st = rrdset_create_localhost(
+                    "net_unknown_protocol_packets",
+                    windows_shared_buffer,
+                    NULL,
+                    windows_shared_buffer,
+                    "net.unknown_protocol_packets",
+                    "Packets Received with Unknown Protocol",
+                    "packets/s",
+                    PLUGIN_WINDOWS_NAME,
+                    "PerflibNetwork",
+                    NETDATA_CHART_PRIO_FIRST_NET_IFACE + 11,
+                    update_every,
+                    RRDSET_TYPE_LINE);
+
+                add_interface_labels(d->unknown_protocol_packets.st, windows_shared_buffer, physical);
+                d->unknown_protocol_packets.rd_received =
+                    rrddim_add(d->unknown_protocol_packets.st, "inbound", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            }
+
+            rrddim_set_by_pointer(
+                d->unknown_protocol_packets.st,
+                d->unknown_protocol_packets.rd_received,
+                (collected_number)d->unknown_protocol_packets.received.current.Data);
+            rrdset_done(d->unknown_protocol_packets.st);
         }
 
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->queue.length)) {
@@ -998,7 +1040,7 @@ static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, 
         }
     }
 
-    if (physical) {
+    if (physical && complete) {
         static RRDSET *st = NULL;
         static RRDDIM *rd_received = NULL, *rd_sent = NULL;
 
@@ -1026,8 +1068,8 @@ static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, 
         rrdset_done(st);
     }
 
-    // cleanup
-    {
+    // An incomplete snapshot cannot establish that an interface disappeared.
+    if (complete) {
         struct network_interface *d;
         dfe_start_write(dict, d)
         {
@@ -1043,9 +1085,320 @@ static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, 
     return true;
 }
 
+#define FUNCTION_NETWORK_INTERFACES_HELP                                                                               \
+    "Shows current Windows network interface traffic, packets, drops, and operational state."
+
+struct network_function_maxima {
+    double speed;
+    double traffic_in;
+    double traffic_out;
+    double traffic_total;
+    double packets_in;
+    double packets_out;
+    double drops_in;
+    double drops_out;
+};
+
+static bool network_adapter_name_matches(const char *description, const char *name)
+{
+    for (; *description && *name; description++, name++) {
+        char normalized = *description;
+        switch (normalized) {
+            case '(':
+                normalized = '[';
+                break;
+            case ')':
+                normalized = ']';
+                break;
+            case '#':
+            case '/':
+            case '\\':
+                normalized = '_';
+                break;
+            default:
+                break;
+        }
+        if (normalized != *name)
+            return false;
+    }
+    return !*description && !*name;
+}
+
+static const struct netdata_win_network_interface *
+network_adapter_for_name(const struct netdata_win_network_interface *adapters, const char *name)
+{
+    const struct netdata_win_network_interface *match = NULL;
+    for (const struct netdata_win_network_interface *adapter = adapters; adapter; adapter = adapter->next) {
+        if (!network_adapter_name_matches(adapter->description, name))
+            continue;
+        if (match)
+            return NULL; // A normalized description is not a unique identity.
+        match = adapter;
+    }
+    return match;
+}
+
+static void network_function_add_rows(
+    BUFFER *wb,
+    DICTIONARY *interfaces,
+    bool physical,
+    const struct netdata_win_network_interface *adapters,
+    struct network_function_maxima *maxima)
+{
+    struct network_interface *d;
+    dfe_start_read(interfaces, d)
+    {
+        const char *name = d_dfe.name;
+        const struct netdata_win_network_interface *adapter = network_adapter_for_name(adapters, name);
+        double speed = rrddim_get_last_stored_value(d->speed.rd, &maxima->speed, 1000.0);
+        double traffic_in = rrddim_get_last_stored_value(d->traffic.rd_received, &maxima->traffic_in, 1000.0);
+        double traffic_out = rrddim_get_last_stored_value(d->traffic.rd_sent, &maxima->traffic_out, 1000.0);
+        double traffic_total = NAN;
+        if (!isnan(traffic_in) && !isnan(traffic_out)) {
+            traffic_total = traffic_in + traffic_out;
+            maxima->traffic_total = MAX(maxima->traffic_total, traffic_total);
+        }
+        double packets_in = rrddim_get_last_stored_value(d->packets.rd_received, &maxima->packets_in, 1000.0);
+        double packets_out = rrddim_get_last_stored_value(d->packets.rd_sent, &maxima->packets_out, 1000.0);
+        double drops_in = rrddim_get_last_stored_value(d->discards.rd_received, &maxima->drops_in, 1.0);
+        double drops_out = rrddim_get_last_stored_value(d->discards.rd_outbound, &maxima->drops_out, 1.0);
+
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, name);
+        buffer_json_add_array_item_string(wb, physical ? "physical" : "virtual");
+        buffer_json_add_array_item_string(wb, "host");
+        buffer_json_add_array_item_string(wb, NULL); // No physical carrier source is collected.
+        buffer_json_add_array_item_string(wb, adapter ? adapter->oper_status : NULL);
+        buffer_json_add_array_item_string(wb, NULL); // Duplex is unavailable from the chosen API.
+        buffer_json_add_array_item_double(wb, speed);
+        buffer_json_add_array_item_double(wb, adapter && adapter->mtu ? adapter->mtu : NAN);
+        buffer_json_add_array_item_double(wb, traffic_in);
+        buffer_json_add_array_item_double(wb, traffic_out);
+        buffer_json_add_array_item_double(wb, traffic_total);
+        buffer_json_add_array_item_double(wb, packets_in);
+        buffer_json_add_array_item_double(wb, packets_out);
+        buffer_json_add_array_item_double(wb, NAN); // Multicast is not collected per interface.
+        buffer_json_add_array_item_double(wb, drops_in);
+        buffer_json_add_array_item_double(wb, drops_out);
+        buffer_json_add_array_item_string(wb, adapter ? adapter->friendly_name : NULL);
+        buffer_json_add_array_item_object(wb);
+        buffer_json_member_add_string(wb, "severity", drops_in + drops_out > 0 ? "warning" : "normal");
+        buffer_json_object_close(wb);
+        buffer_json_array_close(wb);
+    }
+    dfe_done(d);
+}
+
+static void network_function_add_text_column(
+    BUFFER *wb,
+    size_t *id,
+    const char *name,
+    const char *description,
+    RRDF_FIELD_OPTIONS options)
+{
+    buffer_rrdf_table_add_field(
+        wb,
+        (*id)++,
+        name,
+        description,
+        RRDF_FIELD_TYPE_STRING,
+        RRDF_FIELD_VISUAL_VALUE,
+        RRDF_FIELD_TRANSFORM_NONE,
+        0,
+        NULL,
+        NAN,
+        RRDF_FIELD_SORT_ASCENDING,
+        NULL,
+        RRDF_FIELD_SUMMARY_COUNT,
+        RRDF_FIELD_FILTER_MULTISELECT,
+        options,
+        NULL);
+}
+
+static void network_function_add_number_column(
+    BUFFER *wb,
+    size_t *id,
+    const char *name,
+    const char *description,
+    const char *units,
+    double max,
+    RRDF_FIELD_VISUAL visual,
+    RRDF_FIELD_OPTIONS options)
+{
+    buffer_rrdf_table_add_field(
+        wb,
+        (*id)++,
+        name,
+        description,
+        RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+        visual,
+        RRDF_FIELD_TRANSFORM_NUMBER,
+        visual == RRDF_FIELD_VISUAL_VALUE ? 0 : 2,
+        units,
+        max,
+        RRDF_FIELD_SORT_DESCENDING,
+        NULL,
+        visual == RRDF_FIELD_VISUAL_BAR ? RRDF_FIELD_SUMMARY_SUM : RRDF_FIELD_SUMMARY_COUNT,
+        RRDF_FIELD_FILTER_NONE,
+        options,
+        NULL);
+}
+
+static int network_function_interfaces(
+    BUFFER *wb,
+    const char *function __maybe_unused,
+    BUFFER *payload __maybe_unused,
+    const char *source __maybe_unused)
+{
+    struct netdata_win_network_interface *adapters = NULL;
+    if (netdata_win_network_interfaces_get(&adapters) < 0)
+        return nrpc_call_error(wb, "failed to enumerate Windows network adapters", HTTP_RESP_INTERNAL_SERVER_ERROR);
+
+    struct network_function_maxima maxima = {0};
+    buffer_flush(wb);
+    wb->content_type = CT_APPLICATION_JSON;
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+    buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(localhost));
+    buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
+    buffer_json_member_add_string(wb, "type", "table");
+    buffer_json_member_add_time_t(wb, "update_every", 1);
+    buffer_json_member_add_boolean(wb, "has_history", false);
+    buffer_json_member_add_string(wb, "help", FUNCTION_NETWORK_INTERFACES_HELP);
+    buffer_json_member_add_array(wb, "data");
+
+    netdata_mutex_lock(&network_interfaces_mutex);
+    network_function_add_rows(wb, physical_interfaces, true, adapters, &maxima);
+    network_function_add_rows(wb, virtual_interfaces, false, adapters, &maxima);
+    netdata_mutex_unlock(&network_interfaces_mutex);
+
+    netdata_win_network_interfaces_free(adapters);
+    buffer_json_array_close(wb);
+    buffer_json_member_add_object(wb, "columns");
+    size_t id = 0;
+    network_function_add_text_column(
+        wb,
+        &id,
+        "Interface",
+        "Network Interface Name",
+        RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY);
+    network_function_add_text_column(
+        wb, &id, "Type", "Network Interface Type", RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY);
+    network_function_add_text_column(
+        wb, &id, "UsedBy", "Interface owner", RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY);
+    network_function_add_text_column(
+        wb, &id, "PhState", "Physical carrier state, if available", RRDF_FIELD_OPTS_UNIQUE_KEY);
+    network_function_add_text_column(
+        wb, &id, "OpState", "Operational state", RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY);
+    network_function_add_text_column(wb, &id, "Duplex", "Duplex mode, if available", RRDF_FIELD_OPTS_UNIQUE_KEY);
+    network_function_add_number_column(
+        wb, &id, "Speed", "Link speed", "Mbit", maxima.speed, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_OPTS_VISIBLE);
+    network_function_add_number_column(
+        wb, &id, "MTU", "Maximum transmission unit", "Octets", NAN, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_OPTS_VISIBLE);
+    network_function_add_number_column(
+        wb, &id, "In", "Traffic received", "Mbit", maxima.traffic_in, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_OPTS_VISIBLE);
+    network_function_add_number_column(
+        wb, &id, "Out", "Traffic sent", "Mbit", maxima.traffic_out, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_OPTS_VISIBLE);
+    network_function_add_number_column(
+        wb,
+        &id,
+        "Total",
+        "Traffic received and sent",
+        "Mbit",
+        maxima.traffic_total,
+        RRDF_FIELD_VISUAL_BAR,
+        RRDF_FIELD_OPTS_NONE);
+    network_function_add_number_column(
+        wb, &id, "PktsIn", "Received packets", "Kpps", maxima.packets_in, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_OPTS_VISIBLE);
+    network_function_add_number_column(
+        wb, &id, "PktsOut", "Sent packets", "Kpps", maxima.packets_out, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_OPTS_VISIBLE);
+    network_function_add_number_column(
+        wb,
+        &id,
+        "McastIn",
+        "Multicast received packets, if available",
+        "Kpps",
+        NAN,
+        RRDF_FIELD_VISUAL_BAR,
+        RRDF_FIELD_OPTS_NONE);
+    network_function_add_number_column(
+        wb,
+        &id,
+        "DropsIn",
+        "Dropped inbound packets",
+        "Drops",
+        maxima.drops_in,
+        RRDF_FIELD_VISUAL_BAR,
+        RRDF_FIELD_OPTS_VISIBLE);
+    network_function_add_number_column(
+        wb,
+        &id,
+        "DropsOut",
+        "Dropped outbound packets",
+        "Drops",
+        maxima.drops_out,
+        RRDF_FIELD_VISUAL_BAR,
+        RRDF_FIELD_OPTS_VISIBLE);
+    network_function_add_text_column(wb, &id, "FriendlyName", "Windows adapter friendly name", RRDF_FIELD_OPTS_VISIBLE);
+    buffer_rrdf_table_add_field(
+        wb,
+        id,
+        "rowOptions",
+        "rowOptions",
+        RRDF_FIELD_TYPE_NONE,
+        RRDR_FIELD_VISUAL_ROW_OPTIONS,
+        RRDF_FIELD_TRANSFORM_NONE,
+        0,
+        NULL,
+        NAN,
+        RRDF_FIELD_SORT_FIXED,
+        NULL,
+        RRDF_FIELD_SUMMARY_COUNT,
+        RRDF_FIELD_FILTER_NONE,
+        RRDF_FIELD_OPTS_DUMMY,
+        NULL);
+    buffer_json_object_close(wb);
+    buffer_json_member_add_string(wb, "default_sort_column", "Total");
+
+    buffer_json_member_add_object(wb, "charts");
+    const char *chart_names[] = {"Traffic", "Packets", "Drops"};
+    const char *chart_columns[][2] = {{"In", "Out"}, {"PktsIn", "PktsOut"}, {"DropsIn", "DropsOut"}};
+    for (size_t i = 0; i < _countof(chart_names); i++) {
+        buffer_json_member_add_object(wb, chart_names[i]);
+        buffer_json_member_add_string(wb, "name", chart_names[i]);
+        buffer_json_member_add_string(wb, "type", "stacked-bar");
+        buffer_json_member_add_array(wb, "columns");
+        buffer_json_add_array_item_string(wb, chart_columns[i][0]);
+        buffer_json_add_array_item_string(wb, chart_columns[i][1]);
+        buffer_json_array_close(wb);
+        buffer_json_object_close(wb);
+    }
+    buffer_json_object_close(wb);
+
+    buffer_json_member_add_array(wb, "default_charts");
+    buffer_json_add_array_item_array(wb);
+    buffer_json_add_array_item_string(wb, "Traffic");
+    buffer_json_add_array_item_string(wb, "Interface");
+    buffer_json_array_close(wb);
+    buffer_json_array_close(wb);
+
+    buffer_json_member_add_object(wb, "group_by");
+    buffer_json_member_add_object(wb, "Type");
+    buffer_json_member_add_string(wb, "name", "Type");
+    buffer_json_member_add_array(wb, "columns");
+    buffer_json_add_array_item_string(wb, "Type");
+    buffer_json_array_close(wb);
+    buffer_json_object_close(wb);
+    buffer_json_object_close(wb);
+
+    buffer_json_member_add_time_t(wb, "expires", now_realtime_sec() + 1);
+    buffer_json_finalize(wb);
+    return HTTP_RESP_OK;
+}
+
 int do_PerflibNetwork(int update_every, usec_t dt __maybe_unused)
 {
     static bool initialized = false;
+    static bool function_registered = false;
 
     if (unlikely(!initialized)) {
         initialize();
@@ -1060,9 +1413,26 @@ int do_PerflibNetwork(int update_every, usec_t dt __maybe_unused)
     if (!pDataBlock)
         return 0;
 
+    if (!function_registered) {
+        nrpc_method_register_builtin(&(struct nrpc_builtin_desc){
+            .owner = rrdhost_nrpc_owner(localhost),
+            .name = "network-interfaces",
+            .help = FUNCTION_NETWORK_INTERFACES_HELP,
+            .tags = "top",
+            .timeout_s = 10,
+            .priority = NRPC_PRIORITY_DEFAULT,
+            .version = NRPC_VERSION_DEFAULT,
+            .access = HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE,
+            .handler = network_function_interfaces,
+        });
+        function_registered = true;
+    }
+
     usec_t now_ut = now_monotonic_usec();
+    netdata_mutex_lock(&network_interfaces_mutex);
     do_network_interface(pDataBlock, update_every, true, now_ut);
     do_network_interface(pDataBlock, update_every, false, now_ut);
+    netdata_mutex_unlock(&network_interfaces_mutex);
 
     struct network_protocol *tcp4 = NULL, *tcp6 = NULL;
     for (size_t i = 0; networks[i].protocol; i++) {

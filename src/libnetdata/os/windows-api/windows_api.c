@@ -9,6 +9,141 @@
 #include <string.h>
 #include <stdbool.h>
 
+static int netdata_win_get_adapter_addresses(ULONG family, ULONG flags, ULONG max_length, PIP_ADAPTER_ADDRESSES *result)
+{
+    ULONG length = 15000;
+    *result = NULL;
+
+    for (unsigned attempt = 0; attempt < 3; attempt++) {
+        if (max_length && length > max_length)
+            return -1;
+
+        PIP_ADAPTER_ADDRESSES adapters = malloc(length);
+        if (!adapters)
+            return -1;
+
+        DWORD rc = GetAdaptersAddresses(family, flags, NULL, adapters, &length);
+        if (rc == NO_ERROR) {
+            *result = adapters;
+            return 1;
+        }
+
+        free(adapters);
+        if (rc == ERROR_NO_DATA)
+            return 0;
+        if (rc != ERROR_BUFFER_OVERFLOW)
+            return -1;
+    }
+
+    return -1;
+}
+
+static char *netdata_win_utf16_to_utf8(const WCHAR *value)
+{
+    if (!value)
+        return NULL;
+
+    int bytes = WideCharToMultiByte(CP_UTF8, 0, value, -1, NULL, 0, NULL, NULL);
+    if (bytes <= 0)
+        return NULL;
+
+    char *text = malloc((size_t)bytes);
+    if (!text)
+        return NULL;
+
+    if (!WideCharToMultiByte(CP_UTF8, 0, value, -1, text, bytes, NULL, NULL)) {
+        free(text);
+        return NULL;
+    }
+
+    return text;
+}
+
+static const char *netdata_win_oper_status(IF_OPER_STATUS status)
+{
+    switch (status) {
+        case IfOperStatusUp:
+            return "up";
+        case IfOperStatusDown:
+            return "down";
+        case IfOperStatusTesting:
+            return "testing";
+        case IfOperStatusUnknown:
+            return "unknown";
+        case IfOperStatusDormant:
+            return "dormant";
+        case IfOperStatusNotPresent:
+            return "notpresent";
+        case IfOperStatusLowerLayerDown:
+            return "lowerlayerdown";
+        default:
+            return NULL;
+    }
+}
+
+void netdata_win_network_interfaces_free(struct netdata_win_network_interface *interfaces)
+{
+    while (interfaces) {
+        struct netdata_win_network_interface *next = interfaces->next;
+        free(interfaces->description);
+        free(interfaces->friendly_name);
+        free(interfaces);
+        interfaces = next;
+    }
+}
+
+int netdata_win_network_interfaces_get(struct netdata_win_network_interface **interfaces)
+{
+    *interfaces = NULL;
+    PIP_ADAPTER_ADDRESSES adapters = NULL;
+    int status = netdata_win_get_adapter_addresses(
+        AF_UNSPEC,
+        GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER | GAA_FLAG_INCLUDE_ALL_INTERFACES,
+        16 * 1024 * 1024,
+        &adapters);
+    if (status != 1)
+        return status;
+
+    struct netdata_win_network_interface **tail = interfaces;
+    unsigned int count = 0;
+    for (PIP_ADAPTER_ADDRESSES aa = adapters; aa; aa = aa->Next) {
+        if (++count > 4096) {
+            status = -1;
+            break;
+        }
+
+        if (!aa->Description)
+            continue;
+
+        struct netdata_win_network_interface *entry = calloc(1, sizeof(*entry));
+        if (!entry) {
+            status = -1;
+            break;
+        }
+
+        entry->description = netdata_win_utf16_to_utf8(aa->Description);
+        entry->friendly_name = netdata_win_utf16_to_utf8(aa->FriendlyName);
+        if (!entry->description || (aa->FriendlyName && !entry->friendly_name)) {
+            free(entry->description);
+            free(entry->friendly_name);
+            free(entry);
+            status = -1;
+            break;
+        }
+
+        entry->oper_status = netdata_win_oper_status(aa->OperStatus);
+        entry->mtu = aa->Mtu;
+        *tail = entry;
+        tail = &entry->next;
+    }
+
+    free(adapters);
+    if (status != 1) {
+        netdata_win_network_interfaces_free(*interfaces);
+        *interfaces = NULL;
+    }
+    return status;
+}
 
 // Caller owns both strings. Return 1 for a complete tuple, 0 for successful
 // absence, and -1 for failure; no failed probe can poison a process-wide cache.
@@ -23,23 +158,14 @@ int netdata_win_default_network(char **iface, char **ipaddr)
     if (rc != NO_ERROR)
         return -1;
 
-    ULONG length = 15000;
     PIP_ADAPTER_ADDRESSES adapters = NULL;
-    for (unsigned attempt = 0; attempt < 3; attempt++) {
-        free(adapters);
-        adapters = malloc(length);
-        if (!adapters)
-            return -1;
-        rc = GetAdaptersAddresses(AF_INET, GAA_FLAG_INCLUDE_PREFIX, NULL, adapters, &length);
-        if (rc != ERROR_BUFFER_OVERFLOW)
-            break;
-    }
+    int snapshot_status = netdata_win_get_adapter_addresses(AF_INET, GAA_FLAG_INCLUDE_PREFIX, 0, &adapters);
     int result = -1;
-    if (rc == ERROR_NO_DATA) {
+    if (snapshot_status == 0) {
         result = 0;
         goto done;
     }
-    if (rc != NO_ERROR)
+    if (snapshot_status != 1)
         goto done;
 
     for (PIP_ADAPTER_ADDRESSES aa = adapters; aa; aa = aa->Next) {
@@ -54,12 +180,8 @@ int netdata_win_default_network(char **iface, char **ipaddr)
             result = -1;
             if (!aa->FriendlyName)
                 goto done;
-            // FriendlyName is UTF-16; conversion must not depend on the process locale.
-            int size = WideCharToMultiByte(CP_UTF8, 0, aa->FriendlyName, -1, NULL, 0, NULL, NULL);
-            if (size <= 1)
-                goto done;
-            *iface = malloc(size);
-            if (!*iface || !WideCharToMultiByte(CP_UTF8, 0, aa->FriendlyName, -1, *iface, size, NULL, NULL))
+            *iface = netdata_win_utf16_to_utf8(aa->FriendlyName);
+            if (!*iface || !**iface)
                 goto done;
             char address[INET_ADDRSTRLEN];
             struct sockaddr_in *sa = (struct sockaddr_in *)ua->Address.lpSockaddr;
