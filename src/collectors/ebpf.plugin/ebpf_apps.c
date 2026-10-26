@@ -364,7 +364,7 @@ ebpf_pid_data_t *ebpf_find_or_create_pid_data(pid_t pid)
 
 ebpf_pid_data_t *ebpf_pids_link_list = NULL; // global list of all processes running
 
-size_t ebpf_all_pids_count = 0;        // the number of processes running read from /proc
+size_t ebpf_all_pids_count = 0;        // the number of processes running read from /proc (atomic: read by module threads)
 size_t ebpf_hash_table_pids_count = 0; // the number of tasks in our hash tables
 
 struct ebpf_target *apps_groups_default_target = NULL, // the default target
@@ -618,7 +618,7 @@ static inline int ebpf_collect_data_for_pid(pid_t pid)
         return 0;
     }
 
-    ebpf_pid_data_t *p = ebpf_get_pid_data((uint32_t)pid, 0, NULL, NETDATA_EBPF_PIDS_PROC_FILE);
+    ebpf_pid_data_t *p = ebpf_get_pid_data((uint32_t)pid);
     read_proc_pid_stat(p);
 
     // check its parent pid
@@ -796,8 +796,7 @@ void ebpf_del_pid_entry(pid_t pid)
     if (p->prev)
         p->prev->next = p->next;
 
-    if ((p->thread_collecting & NETDATA_EBPF_PIDS_PROC_FILE) || p->has_proc_file)
-        ebpf_all_pids_count--;
+    __atomic_sub_fetch(&ebpf_all_pids_count, 1, __ATOMIC_RELAXED);
 
     rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
     netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(&ebpf_judy_pid.index.JudyLArray, p->pid);
@@ -820,7 +819,7 @@ static void ebpf_cleanup_exited_pids()
     for (p = ebpf_pids_link_list; p;) {
         ebpf_pid_data_t *next = p->next;
         if (!p->has_proc_file) {
-            ebpf_reset_specific_pid_data(p);
+            ebpf_del_pid_entry(p->pid);
         }
         p = next;
     }
@@ -904,7 +903,7 @@ void ebpf_parse_proc_files()
 
         if (kill(pids->pid, 0) == -1 && errno == ESRCH) {
             ebpf_pid_data_t *next = pids->next;
-            ebpf_reset_specific_pid_data(pids);
+            ebpf_del_pid_entry(pids->pid);
             pids = next;
             continue;
         }

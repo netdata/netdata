@@ -1462,7 +1462,7 @@ void ebpf_send_statistic_data()
     ebpf_write_end_chart();
 
     ebpf_write_begin_chart(NETDATA_MONITORING_FAMILY, "monitoring_pid", "");
-    write_chart_dimension("user", ebpf_all_pids_count);
+    write_chart_dimension("user", __atomic_load_n(&ebpf_all_pids_count, __ATOMIC_RELAXED));
     write_chart_dimension("kernel", ebpf_hash_table_pids_count);
     ebpf_write_end_chart();
 
