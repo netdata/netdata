@@ -41,9 +41,10 @@ func normalizeSnapshot(
 			connType = derefZero(info.ConnType)
 		}
 		site := &siteState{
-			ID:          siteID,
-			Name:        siteDisplayName(siteID, siteNames, infoName, ""),
-			Description: description,
+			SnapshotCollection: "observed",
+			ID:                 siteID,
+			Name:               siteDisplayName(siteID, siteNames, infoName, ""),
+			Description:        description,
 			ConnectivityStatus: normalizeSnapshotConnectivity(
 				raw.ConnectivityStatus,
 				raw.DegradedStatus,
@@ -152,8 +153,8 @@ func normalizeSnapshotInterface(raw *accountSnapshotInterface) interfaceState {
 		if iface.Name == "" {
 			iface.Name = derefZero(info.Name)
 		}
-		iface.UpstreamBandwidth = derefZero(info.UpstreamBandwidth)
-		iface.DownstreamBandwidth = derefZero(info.DownstreamBandwidth)
+		iface.UpstreamBandwidth = info.UpstreamBandwidth
+		iface.DownstreamBandwidth = info.DownstreamBandwidth
 	}
 	return iface
 }
