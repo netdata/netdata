@@ -42,7 +42,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Unix validation tools
-        run: sudo apt-get update && sudo apt-get install -y busybox gawk mawk
+        run: sudo sh .github/scripts/ci-package.sh apt-get update && sudo sh .github/scripts/ci-package.sh apt-get install -y busybox gawk mawk
 
       - name: Parse and run fixture suites
         env:
