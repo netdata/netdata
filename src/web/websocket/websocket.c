@@ -111,6 +111,7 @@ WS_CLIENT *websocket_client_create(void) {
     wsc->connected_t = now_realtime_sec();
     wsc->last_activity_t = wsc->connected_t;
     wsc->max_outbound_frame_size = WS_MAX_OUTGOING_FRAME_SIZE; // Default value
+    wsc->max_inbound_message_size = WS_MAX_DECOMPRESSED_SIZE; // protocols may lower it at handshake
 
     // initialize callbacks to NULL
     wsc->on_connect = NULL;

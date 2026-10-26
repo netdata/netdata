@@ -426,6 +426,9 @@ short int websocket_handle_handshake(struct web_client *w) {
             websocket_client_free(wsc);
             return HTTP_RESP_PRECOND_FAIL;
         }
+
+        // MCP requests are small: accept the same request size as MCP over HTTP
+        wsc->max_inbound_message_size = NETDATA_WEB_REQUEST_MAX_SIZE;
     }
     else if (unlikely(!http_can_access_dashboard(w))) {
         freez(accept_key);
