@@ -2253,7 +2253,7 @@ try_static_install() {
       return 2
     fi
 
-    if [ "$(echo "${archive_info}" | wc -l)" -gt 1 ]; then
+    if [ "$(echo "${archive_info}" | grep -vc ".*-latest.*")" -gt 0 ]; then
       archive_info="$(echo "${archive_info}" | grep -v ".*-latest.*" | tail -n 1)"
     fi
 
