@@ -2246,15 +2246,15 @@ try_static_install() {
       fatal "Unable to download release manifest file. ${BADNET_MSG}" F0526
     fi
 
-    archive_info="$(grep -E "^netdata-${SYSARCH}-.*\\.run " ./Manifest)"
+    archive_info="$(grep -E "^netdata-${SYSARCH}-.*\\.gz\\.run " ./Manifest)"
 
     if [ -z "${archive_info}" ]; then
       warning "Could not find a ${SELECTED_RELEASE_CHANNEL} static build for ${SYSARCH} CPUs."
       return 2
     fi
 
-    if [ "$(echo "${archive_info}" | grep -vc ".*-latest.*")" -gt 0 ]; then
-      archive_info="$(echo "${archive_info}" | grep -v ".*-latest.*" | tail -n 1)"
+    if [ "$(echo "${archive_info}" | grep -vc ".*-latest\\.gz.*")" -gt 0 ]; then
+      archive_info="$(echo "${archive_info}" | grep -v ".*-latest\\.gz.*" | tail -n 1)"
     fi
 
     archive_name="$(echo "${archive_info}" | awk '{ print $1 }')"
