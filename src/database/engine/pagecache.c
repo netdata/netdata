@@ -18,7 +18,7 @@ bool open_cache_page_is_of_metric(PGC_PAGE *page, UUIDMAP_ID uuid_id) {
 static void main_cache_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused)
 {
     // Release storage associated with the page
-    pgd_free(entry.data);
+    pgd_free(entry.data, PGD_FREE_SITE_MAIN_CACHE_EVICT);
 }
 
 static void main_cache_flush_dirty_page_init_callback(PGC *cache __maybe_unused, Word_t section) {
