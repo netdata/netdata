@@ -934,6 +934,10 @@ static void test_dbengine_page_phase_closes(RRDDIM *rd, STORAGE_METRICS_GROUP *s
     for(size_t k = 0; k < PAGE_PHASE_POSITIONS; k++) {
         time_t t = base + (time_t)((writer * PAGE_PHASE_POSITIONS + k) * max_slots + k * (max_slots / 3)) * ue;
         STORAGE_COLLECT_HANDLE *sch = rrdeng_store_metric_init(rd->tiers[0].smh, ue, smg);
+        if(!sch) {
+            phases[k] = -1;
+            continue;
+        }
         rrdeng_store_metric_next(sch, (usec_t)t * USEC_PER_SEC, 1, 1, 1, 1, 0, SN_DEFAULT_FLAGS);
         time_t to_close = rrdeng_store_metric_page_time_to_close_s(sch);
         phases[k] = to_close < 0 ? -1 : (t + to_close) % cycle_s;
@@ -1017,6 +1021,14 @@ static size_t test_dbengine_page_phase_seed(RRDHOST *host) {
     // charts spread over the slots: no flush bursts
     ND_UUID host_id = { 0 };
     host_id.uuid[0] = 1;
+
+    // the same chart id on another host is another identity
+    ND_UUID other_host_id = host_id;
+    other_host_id.uuid[15] = 1;
+    if(rrdset_storage_phase_seed(&host_id, "system.cpu") == rrdset_storage_phase_seed(&other_host_id, "system.cpu")) {
+        fprintf(stderr, " >>> DBENGINE: page-phase: the seed ignores the host\n");
+        errors++;
+    }
     size_t per_slot[max_slots];
     memset(per_slot, 0, sizeof(per_slot));
     size_t used = 0, worst = 0;
