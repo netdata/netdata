@@ -50,7 +50,7 @@ type jobPolicy struct {
 var allowedJobPolicyKeys = map[string]struct{}{
 	"name": {}, "app": {}, "selector": {}, "relabeling": {},
 	"fallback_type": {}, "expected_prefix": {},
-	"max_time_series": {}, "max_time_series_per_metric": {},
+	"max_input_series": {}, "max_output_series_per_context": {},
 	"future_inputs": {},
 }
 
@@ -86,11 +86,11 @@ func loadJobPolicy(path string) (jobPolicy, error) {
 		return jobPolicy{}, fmt.Errorf("decode job policy %q: %w", path, err)
 	}
 
-	if policy.MaxTS < 0 {
-		return jobPolicy{}, fmt.Errorf("job policy: max_time_series must be non-negative")
+	if policy.MaxInputSeries < 0 {
+		return jobPolicy{}, fmt.Errorf("job policy: max_input_series must be non-negative")
 	}
-	if policy.MaxTSPerMetric < 0 {
-		return jobPolicy{}, fmt.Errorf("job policy: max_time_series_per_metric must be non-negative")
+	if policy.MaxOutputSeriesPerContext < 0 {
+		return jobPolicy{}, fmt.Errorf("job policy: max_output_series_per_context must be non-negative")
 	}
 	if err := validateFutureInputs(policy.FutureInputs); err != nil {
 		return jobPolicy{}, fmt.Errorf("job policy: %w", err)
@@ -170,16 +170,16 @@ func applyJobPolicyMode(
 	}
 
 	return effectiveJobReport{
-		Name:                 coll.Name,
-		App:                  coll.Application,
-		SelectorAllow:        slices.Clone(coll.Selector.Allow),
-		SelectorDeny:         slices.Clone(coll.Selector.Deny),
-		RelabelBlocks:        len(coll.Relabeling),
-		FallbackGauge:        slices.Clone(coll.FallbackType.Gauge),
-		FallbackCounter:      slices.Clone(coll.FallbackType.Counter),
-		ExpectedPrefix:       coll.ExpectedPrefix,
-		MaxTimeSeries:        coll.MaxTS,
-		MaxSeriesPerMetric:   coll.MaxTSPerMetric,
-		DeclaredFutureInputs: len(policy.FutureInputs),
+		Name:                      coll.Name,
+		App:                       coll.Application,
+		SelectorAllow:             slices.Clone(coll.Selector.Allow),
+		SelectorDeny:              slices.Clone(coll.Selector.Deny),
+		RelabelBlocks:             len(coll.Relabeling),
+		FallbackGauge:             slices.Clone(coll.FallbackType.Gauge),
+		FallbackCounter:           slices.Clone(coll.FallbackType.Counter),
+		ExpectedPrefix:            coll.ExpectedPrefix,
+		MaxInputSeries:            coll.MaxInputSeries,
+		MaxOutputSeriesPerContext: coll.MaxOutputSeriesPerContext,
+		DeclaredFutureInputs:      len(policy.FutureInputs),
 	}
 }
