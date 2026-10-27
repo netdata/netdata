@@ -1,0 +1,6 @@
+# a not_empty rewrite can use the value it rewrites
+pattern: json
+rewrite:
+  - key: X
+    not_empty: '${X}'
+    value: '${X}sfx'

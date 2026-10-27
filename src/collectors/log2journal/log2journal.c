@@ -173,23 +173,28 @@ static inline size_t replace_evaluate_to_buffer(LOG_JOB *jb, HASHED_KEY *k __may
 static inline void replace_evaluate(LOG_JOB *jb, HASHED_KEY *k, REPLACE_PATTERN *rp) {
     HASHED_KEY *ht_key = get_key_from_hashtable(jb, k);
 
-    // set it to empty value
-    k->value.len = 0;
+    // build the new value in the temporary TEXT, the pattern may use the key's current value
+    jb->rewrites.tmp.len = 0;
 
     for(REPLACE_NODE *node = rp->nodes; node != NULL; node = node->next) {
         if(node->is_variable) {
             if(hashed_keys_match(&node->name, &jb->line.key))
-                txt_l2j_append(&ht_key->value, jb->line.trimmed, jb->line.trimmed_len);
+                txt_l2j_append(&jb->rewrites.tmp, jb->line.trimmed, jb->line.trimmed_len);
 
             else {
                 HASHED_KEY *ktmp = get_key_from_hashtable_with_char_ptr(jb, node->name.key);
                 if(ktmp->value.len)
-                    txt_l2j_append(&ht_key->value, ktmp->value.txt, ktmp->value.len);
+                    txt_l2j_append(&jb->rewrites.tmp, ktmp->value.txt, ktmp->value.len);
             }
         }
         else
-            txt_l2j_append(&ht_key->value, node->name.key, node->name.len);
+            txt_l2j_append(&jb->rewrites.tmp, node->name.key, node->name.len);
     }
+
+    // swap the values of the temporary TEXT and the key value
+    TXT_L2J tmp = ht_key->value;
+    ht_key->value = jb->rewrites.tmp;
+    jb->rewrites.tmp = tmp;
 }
 
 static inline void replace_evaluate_from_pcre2(LOG_JOB *jb, HASHED_KEY *k, REPLACE_PATTERN *rp, SEARCH_PATTERN *sp) {
@@ -330,6 +335,21 @@ static inline void log_job_process_rewrites(LOG_JOB *jb) {
     }
 }
 
+static inline void reset_key_for_next_line(HASHED_KEY *k) {
+    if(k->value.len) {
+        k->value.txt[0] = '\0';
+        k->value.len = 0;
+    }
+
+    k->flags &= ~(HK_VALUE_REWRITTEN | HK_VALUE_FROM_LOG);
+}
+
+static inline void reset_all_fields(LOG_JOB *jb) {
+    SIMPLE_HASHTABLE_SORTED_FOREACH_READ_ONLY(&jb->hashtable, kptr, HASHED_KEY, _KEY) {
+        reset_key_for_next_line(SIMPLE_HASHTABLE_SORTED_FOREACH_READ_ONLY_VALUE(kptr));
+    }
+}
+
 static inline void send_all_fields(LOG_JOB *jb) {
     SIMPLE_HASHTABLE_SORTED_FOREACH_READ_ONLY(&jb->hashtable, kptr, HASHED_KEY, _KEY) {
         HASHED_KEY *k = SIMPLE_HASHTABLE_SORTED_FOREACH_READ_ONLY_VALUE(kptr);
@@ -354,13 +374,9 @@ static inline void send_all_fields(LOG_JOB *jb) {
 
             if(k->flags & HK_FILTERED_INCLUDED)
                 printf("%s=%.*s\n", k->key, (int)k->value.len, k->value.txt);
-
-            // reset it for the next round
-            k->value.txt[0] = '\0';
-            k->value.len = 0;
         }
 
-        k->flags &= ~(HK_VALUE_REWRITTEN | HK_VALUE_FROM_LOG);
+        reset_key_for_next_line(k);
     }
 }
 
@@ -530,9 +546,12 @@ int log_job_run(LOG_JOB *jb) {
             else if(pcre2)
                 l2j_log("%s", pcre2_parser_error(pcre2));
 
-            if(!jb_send_unmatched_line(jb, line))
+            if(!jb_send_unmatched_line(jb, line)) {
                 // just logging to stderr, not sending unmatched lines
+                // the parser may have stored some fields of this line before failing
+                reset_all_fields(jb);
                 continue;
+            }
         }
 
         jb_inject_filename(jb);
