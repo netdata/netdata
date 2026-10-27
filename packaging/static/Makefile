@@ -855,7 +855,7 @@ tests: $(TEST_DEPS)
 # Archive rules
 
 $(TARGET_STAMPS)/ca-certs.stamp: $(NETDATA_INSTALL)
-	rm -f $@ $(TARGET_INSTALL)/usr/share/ssl
+	rm -rf $@ $(TARGET_INSTALL)/usr/share/ssl
 	$(DOCKER) run $(DOCKER_ARGS) \
 		$(BUILDER) \
 		$(NETDATA_SOURCE_DIR)/packaging/static/scripts/fakeroot-wrapper.sh \
