@@ -200,3 +200,29 @@ func BenchmarkContextLimitNewCharts(b *testing.B) {
 		}
 	}
 }
+
+// One raw context may have many chart instances. Measure normalization with the
+// same admitted/omitted work so accounting cannot hide per-instance allocations.
+func BenchmarkContextLimitContextIdentity(b *testing.B) {
+	for _, n := range []int{1000, 10000} {
+		for _, alias := range []bool{false, true} {
+			b.Run(fmt.Sprintf("instances_%d/alias_%t", n, alias), func(b *testing.B) {
+				reader := benchmarkAggregationReader(b, n, n)
+				template := strings.ReplaceAll(benchAggregationTemplateYAML, "AGGREGATION", "sum")
+				if alias {
+					template = strings.ReplaceAll(template, "bench.metric", "bench.'metric")
+				}
+				e := newContextLimitEngine(b, 1000, template)
+				if _, err := buildPlan(e, reader); err != nil {
+					b.Fatal(err)
+				}
+				b.ReportAllocs()
+				for b.Loop() {
+					if _, err := buildPlan(e, reader); err != nil {
+						b.Fatal(err)
+					}
+				}
+			})
+		}
+	}
+}

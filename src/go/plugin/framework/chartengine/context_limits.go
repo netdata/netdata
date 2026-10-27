@@ -5,6 +5,8 @@ package chartengine
 import (
 	"fmt"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 )
 
 // Count after routing has resolved ownership and aggregation, before lifecycle
@@ -14,11 +16,29 @@ func (ctx *planBuildContext) enforceContextLimit(limit int) map[string]int {
 		return nil
 	}
 	counts := make(map[string]int)
+	var aliases map[string]string
 	overLimit := false
 	for _, chart := range ctx.chartsByID {
 		if chart.observedCount > 0 {
-			count := counts[chart.meta.Context] + chart.observedCount
-			counts[chart.meta.Context] = count
+			context := chart.meta.Context
+			count, known := counts[context]
+			// counts contains only published keys. A known raw key is already
+			// canonical; memoize changed keys once per distinct context as well.
+			if !known {
+				var aliased bool
+				if context, aliased = aliases[chart.meta.Context]; !aliased {
+					context = netdataapi.SanitizeWireValue(chart.meta.Context)
+					if context != chart.meta.Context {
+						if aliases == nil {
+							aliases = make(map[string]string)
+						}
+						aliases[chart.meta.Context] = context
+					}
+				}
+				count = counts[context]
+			}
+			count += chart.observedCount
+			counts[context] = count
 			overLimit = overLimit || count > limit
 		}
 	}
@@ -26,7 +46,11 @@ func (ctx *planBuildContext) enforceContextLimit(limit int) map[string]int {
 		return counts
 	}
 	for id, chart := range ctx.chartsByID {
-		count := counts[chart.meta.Context]
+		context := chart.meta.Context
+		if alias, ok := aliases[context]; ok {
+			context = alias
+		}
+		count := counts[context]
 		if count <= limit {
 			continue
 		}
@@ -45,7 +69,7 @@ func (ctx *planBuildContext) enforceContextLimit(limit int) map[string]int {
 			Reason:             PlanRouteReasonContextSeriesLimit,
 			ChartTemplateID:    chart.templateID,
 			ChartID:            id,
-			Context:            chart.meta.Context,
+			Context:            context,
 			ContextSeriesCount: count,
 			ContextSeriesLimit: limit,
 		})

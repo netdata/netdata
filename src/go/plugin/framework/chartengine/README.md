@@ -334,8 +334,11 @@ zero disables the limit, and negative values are rejected. Engines default to di
 own default through `CollectorV2EnginePolicy.EnginePolicy()`. Both native and static template providers bind this
 policy through `ChartTemplateSource` before their first publication.
 
-The limit counts distinct currently observed `(chart ID, dimension ID)` pairs across all charts in one resolved
-context, after routing, ownership and aggregation. Equality is admitted. Exceeding the limit omits that entire context;
+The limit counts distinct currently observed `(chart ID, dimension ID)` pairs across all charts in one published
+context, after routing, ownership and aggregation. Context keys use the same wire normalization as the emitter;
+different authored names that normalize to one published context share its budget and transition reporting.
+Raw metadata remains available for inspection and authoring diagnostics. Equality is admitted. Exceeding the limit
+omits that entire context;
 other contexts retain their complete inputs. Hidden and non-finite-valued dimensions count, while quiet historical
 dimensions do not. Automatic fallback and counter raw companions follow the same rule in their respective contexts.
 The check precedes authored lifecycle caps; those caps cannot make an oversized context appear to fit.
@@ -489,7 +492,8 @@ with retained/output cardinality. Unit allocation envelopes guard these properti
 development-machine trends, not CI limits.
 
 Output admission reuses each candidate chart's distinct observed count: O(candidate charts + contexts) work and
-O(contexts) additional state per attempt, with no second dimension set or source scan. Disabled limits allocate no
+O(contexts) additional state per attempt, with no second dimension set or source scan. Changed raw context aliases
+are normalized once in a temporary map; canonical-only contexts need no alias map. Disabled limits allocate no
 admission maps. `BenchmarkContextLimitFanIn` compares fixed-output populations at increasing fan-in;
 `BenchmarkContextLimitManyContexts` measures context growth and `BenchmarkContextLimitRejectedDetail` measures
 omission while preserving rollups. Rejected detail still incurs routing/aggregation cost; it is not early aggregation.

@@ -29,7 +29,7 @@ func PrepareHostInfo(info netdataapi.HostInfo) (netdataapi.HostInfo, error) {
 	if hostname == "" {
 		return netdataapi.HostInfo{}, fmt.Errorf("chartemit: host hostname is required")
 	}
-	if sanitizeWireValue(hostname) != hostname {
+	if netdataapi.SanitizeWireValue(hostname) != hostname {
 		return netdataapi.HostInfo{}, fmt.Errorf("chartemit: host hostname contains unsupported characters")
 	}
 
@@ -63,7 +63,7 @@ func normalizeHostInfoLabels(in map[string]string) map[string]string {
 		if sKey == "" {
 			continue
 		}
-		out[sKey] = sanitizeWireValue(labels[key])
+		out[sKey] = netdataapi.SanitizeWireValue(labels[key])
 	}
 	return out
 }

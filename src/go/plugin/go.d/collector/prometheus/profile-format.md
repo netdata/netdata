@@ -464,9 +464,10 @@ The same limits apply with profiles, without profiles, to automatic fallback cha
   the store's later synthesized bucket does not add to input. Exceeding the limit rejects the whole attempt before
   any family is written; no partial totals are published.
 - `max_output_series_per_context` defaults to `1000`. After routing and aggregation, the chart engine counts
-  distinct current `(chart ID, dimension ID)` pairs across all charts in each resolved context within one job/host
-  scope. Hidden and unavailable-valued dimensions count when currently observed; quiet historical dimensions do
-  not. Exceeding the limit omits the whole context, independently of other contexts. A summary view retains its
+  distinct current `(chart ID, dimension ID)` pairs across all charts in each published context within one job/host
+  scope. Context names use the emitter's wire normalization, so authored aliases of one published context share one
+  budget and omission/recovery report. Hidden and unavailable-valued dimensions count when currently observed;
+  quiet historical dimensions do not. Exceeding the limit omits the whole context, independently of other contexts. A summary view retains its
   complete inputs even if a detailed view is omitted. Limits are evaluated before optional template lifecycle caps.
 
 Equality is admitted. Zero disables the corresponding limit; negative values are invalid. Later collection or

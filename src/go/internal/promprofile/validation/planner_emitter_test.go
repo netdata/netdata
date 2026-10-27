@@ -171,6 +171,18 @@ template:
 		len(result.report.ContextCollisions[0].RawContextFingerprints) != 2 {
 		t.Fatalf("expected two distinct raw contexts to collapse: %#v", result.report.ContextCollisions)
 	}
+	limited := runValidation(t, profile, twoValueGaugesDump, "max_output_series_per_context: 1\n")
+	requireFinding(t, limited, "context_series_limit")
+	if len(limited.report.ContextSeriesOmissions) != 1 {
+		t.Fatalf("expected one published-context omission: %#v", limited.report.ContextSeriesOmissions)
+	}
+	omission := limited.report.ContextSeriesOmissions[0]
+	if omission.Context != "prometheus.app.shared" || omission.ObservedSeries != 2 || omission.Limit != 1 {
+		t.Fatalf("unexpected published-context admission facts: %#v", omission)
+	}
+	if len(limited.report.Charts) != 0 {
+		t.Fatalf("aliased context was partly published: %#v", limited.report.Charts)
+	}
 }
 
 func TestInspectEmittedPlanAssociatesContextsInEmitterOrder(t *testing.T) {
