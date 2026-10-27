@@ -816,9 +816,8 @@ cleanup:
 
 // The ML training scheduler orders dimensions by rrdeng_store_metric_page_time_to_close_s(): how many seconds of data
 // the current page still needs before the point that fills it and makes it flush. Verify it against the engine's own
-// page sequence, for a cadence whose pages align (1 s) and one whose pages are irregular (5 s: aligned_allocation_
-// entries() works in seconds while a page advances slots * update_every, and the max_slots / 3 floor kicks in), by
-// storing points one by one and watching when the page actually flushes. The data is dated months before the local
+// page sequence, for a cadence of 1 s and one of 5 s (the first page is shortened to the chart's slot, down to the
+// max_slots / 3 floor), by storing points one by one and watching when the page actually flushes. The data is dated months before the local
 // clock, so this also checks that the value depends only on the dimension's own timestamps (a lagging child).
 static time_t test_dbengine_page_close_of(STORAGE_COLLECT_HANDLE *sch, time_t last_point_s) {
     time_t to_close = rrdeng_store_metric_page_time_to_close_s(sch);
@@ -920,76 +919,99 @@ static size_t test_dbengine_page_close_time(RRDHOST *host) {
     return errors;
 }
 
-// The page phase of a chart (the slot of absolute time its pages close at) must depend only on the chart's identity:
+// The page phase of a chart (the slot of the page cycle its pages close at) must depend only on the chart's identity:
 // a restart creates new metrics groups, and their pages must close exactly where the previous process closed them,
-// or data written before the restart is packed into extents in an order nothing reads in after it. A writer with a
-// fresh group of the chart's identity must close its pages exactly where the chart's own writer does, at three
-// positions a third of a page cycle apart (one of them may hit the max_slots / 3 floor). Every point goes to its own
-// page cycle, so the pages of the writers never collide on the shared metric.
+// or data written before the restart is packed into extents in an order nothing reads in after it. For each cadence,
+// writers on one metric with the chart's own group, a fresh group of the same identity and a group of another
+// identity each open a page at three positions a third of a page cycle apart, every point in its own page cycle so
+// the pages never collide. A page must close at the same phase of the cycle (max_slots points) wherever it started,
+// except where the max_slots / 3 floor stretches a first page (at most one of the three positions).
 #define PAGE_PHASE_POSITIONS 3
 
-static void test_dbengine_page_phase_closes(RRDDIM *rd, STORAGE_METRICS_GROUP *smg, size_t max_slots, time_t base,
-                                            size_t writer, time_t closes[PAGE_PHASE_POSITIONS]) {
+static void test_dbengine_page_phase_closes(RRDDIM *rd, STORAGE_METRICS_GROUP *smg, size_t max_slots, int ue,
+                                            time_t base, size_t writer, time_t phases[PAGE_PHASE_POSITIONS]) {
+    const time_t cycle_s = (time_t)max_slots * ue;
     for(size_t k = 0; k < PAGE_PHASE_POSITIONS; k++) {
-        time_t t = base + (time_t)((writer * PAGE_PHASE_POSITIONS + k) * max_slots + k * (max_slots / 3));
-        STORAGE_COLLECT_HANDLE *sch = rrdeng_store_metric_init(rd->tiers[0].smh, 1, smg);
+        time_t t = base + (time_t)((writer * PAGE_PHASE_POSITIONS + k) * max_slots + k * (max_slots / 3)) * ue;
+        STORAGE_COLLECT_HANDLE *sch = rrdeng_store_metric_init(rd->tiers[0].smh, ue, smg);
         rrdeng_store_metric_next(sch, (usec_t)t * USEC_PER_SEC, 1, 1, 1, 1, 0, SN_DEFAULT_FLAGS);
-        closes[k] = rrdeng_store_metric_page_time_to_close_s(sch);
+        time_t to_close = rrdeng_store_metric_page_time_to_close_s(sch);
+        phases[k] = to_close < 0 ? -1 : (t + to_close) % cycle_s;
         rrdeng_store_metric_finalize(sch);
     }
 }
 
 static size_t test_dbengine_page_phase_seed(RRDHOST *host) {
     size_t errors = 0;
-    RRDDIM *rd = dbengine_cadence_test_create_metric(host, "dbengine-page-phase", 1);
-    if(!rd)
-        return 1;
+    const int cadences[] = { 1, 5, 60 };
 
-    RRDSET *st = rd->rrdset;
     STORAGE_INSTANCE *si = host->db[0].si;
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
     const size_t max_slots = tier_page_size[ctx->config.tier] / CTX_POINT_SIZE_BYTES(ctx);
     const time_t base = START_TIMESTAMP - 20000000;
 
-    uint64_t seed = rrdset_storage_phase_seed(&host->host_id, rrdset_id(st));
-    if(((struct pg_alignment *)st->smg[0])->seed != seed) {
-        fprintf(stderr, " >>> DBENGINE: page-phase: the chart's metrics group is not seeded from its identity\n");
-        errors++;
-    }
+    for(size_t c = 0; c < _countof(cadences); c++) {
+        const int ue = cadences[c];
+        char prefix[64];
+        snprintfz(prefix, sizeof(prefix) - 1, "dbengine-page-phase-%d", ue);
 
-    // another chart identity on a different slot
-    uint64_t other_seed = seed;
-    for(size_t i = 0; other_seed % max_slots == seed % max_slots; i++) {
-        char id[64];
-        snprintfz(id, sizeof(id) - 1, "netdata.dbengine-page-phase-other-%zu", i);
-        other_seed = rrdset_storage_phase_seed(&host->host_id, id);
-    }
+        RRDDIM *rd = dbengine_cadence_test_create_metric(host, prefix, ue);
+        if(!rd)
+            return errors + 1;
 
-    STORAGE_METRICS_GROUP *same = rrdeng_metrics_group_get(si, seed);
-    STORAGE_METRICS_GROUP *other = rrdeng_metrics_group_get(si, other_seed);
-
-    time_t own_closes[PAGE_PHASE_POSITIONS], same_closes[PAGE_PHASE_POSITIONS], other_closes[PAGE_PHASE_POSITIONS];
-    test_dbengine_page_phase_closes(rd, st->smg[0], max_slots, base, 0, own_closes);
-    test_dbengine_page_phase_closes(rd, same, max_slots, base, 1, same_closes);
-    test_dbengine_page_phase_closes(rd, other, max_slots, base, 2, other_closes);
-
-    rrdeng_metrics_group_release(si, same);
-    rrdeng_metrics_group_release(si, other);
-
-    bool other_differs = false;
-    for(size_t k = 0; k < PAGE_PHASE_POSITIONS; k++) {
-        if(own_closes[k] <= 0 || same_closes[k] != own_closes[k]) {
-            fprintf(stderr, " >>> DBENGINE: page-phase: at position %zu a new metrics group of the same chart closes "
-                            "its page in %ld s, the chart's own writer in %ld s\n",
-                    k, (long)same_closes[k], (long)own_closes[k]);
+        RRDSET *st = rd->rrdset;
+        uint64_t seed = rrdset_storage_phase_seed(&host->host_id, rrdset_id(st));
+        if(((struct pg_alignment *)st->smg[0])->seed != seed) {
+            fprintf(stderr, " >>> DBENGINE: page-phase ue=%d: the chart's metrics group is not seeded from its identity\n", ue);
             errors++;
         }
-        if(other_closes[k] != own_closes[k])
-            other_differs = true;
-    }
-    if(!other_differs) {
-        fprintf(stderr, " >>> DBENGINE: page-phase: another chart closes its pages where this chart does\n");
-        errors++;
+
+        // another chart identity on a different slot
+        uint64_t other_seed = seed;
+        for(size_t i = 0; other_seed % max_slots == seed % max_slots; i++) {
+            char id[64];
+            snprintfz(id, sizeof(id) - 1, "netdata.dbengine-page-phase-other-%zu", i);
+            other_seed = rrdset_storage_phase_seed(&host->host_id, id);
+        }
+
+        STORAGE_METRICS_GROUP *same = rrdeng_metrics_group_get(si, seed);
+        STORAGE_METRICS_GROUP *other = rrdeng_metrics_group_get(si, other_seed);
+
+        time_t own[PAGE_PHASE_POSITIONS], fresh[PAGE_PHASE_POSITIONS], another[PAGE_PHASE_POSITIONS];
+        test_dbengine_page_phase_closes(rd, st->smg[0], max_slots, ue, base, 0, own);
+        test_dbengine_page_phase_closes(rd, same, max_slots, ue, base, 1, fresh);
+        test_dbengine_page_phase_closes(rd, other, max_slots, ue, base, 2, another);
+
+        rrdeng_metrics_group_release(si, same);
+        rrdeng_metrics_group_release(si, other);
+
+        bool other_differs = false;
+        size_t agreeing = 0;
+        for(size_t k = 0; k < PAGE_PHASE_POSITIONS; k++) {
+            if(own[k] < 0 || fresh[k] != own[k]) {
+                fprintf(stderr, " >>> DBENGINE: page-phase ue=%d: at position %zu a new metrics group of the same chart "
+                                "closes its page at phase %ld s, the chart's own writer at %ld s\n",
+                        ue, k, (long)fresh[k], (long)own[k]);
+                errors++;
+            }
+            if(another[k] != own[k])
+                other_differs = true;
+
+            size_t same_phase = 0;
+            for(size_t j = 0; j < PAGE_PHASE_POSITIONS; j++)
+                same_phase += own[j] == own[k];
+            if(same_phase > agreeing)
+                agreeing = same_phase;
+        }
+        if(agreeing < PAGE_PHASE_POSITIONS - 1) {
+            fprintf(stderr, " >>> DBENGINE: page-phase ue=%d: pages close at phases %ld, %ld, %ld s, depending on where "
+                            "they started\n", ue, (long)own[0], (long)own[1], (long)own[2]);
+            errors++;
+        }
+        if(!other_differs) {
+            fprintf(stderr, " >>> DBENGINE: page-phase ue=%d: another chart closes its pages where this chart does\n", ue);
+            errors++;
+        }
     }
 
     // charts spread over the slots: no flush bursts
