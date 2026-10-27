@@ -1124,7 +1124,79 @@ modules:
           parameters: []
           returns:
             description: "One row per charted interface; unavailable values are empty."
-            columns: []
+            columns:
+              - name: Interface
+                type: string
+                unit: ""
+                description: "Perflib network interface name."
+              - name: Type
+                type: string
+                unit: ""
+                description: "Physical or virtual interface."
+              - name: UsedBy
+                type: string
+                unit: ""
+                description: "Interface owner."
+              - name: PhState
+                type: string
+                unit: ""
+                description: "Physical carrier state, currently unavailable."
+                visibility: hidden
+              - name: OpState
+                type: string
+                unit: ""
+                description: "Current Windows adapter operational state, when matched."
+              - name: Duplex
+                type: string
+                unit: ""
+                description: "Duplex mode, currently unavailable."
+                visibility: hidden
+              - name: Speed
+                type: number
+                unit: Mbit
+                description: "Link speed."
+              - name: MTU
+                type: number
+                unit: Octets
+                description: "Maximum transmission unit."
+              - name: In
+                type: number
+                unit: Mbit
+                description: "Traffic received."
+              - name: Out
+                type: number
+                unit: Mbit
+                description: "Traffic sent."
+              - name: Total
+                type: number
+                unit: Mbit
+                description: "Traffic received and sent."
+                visibility: hidden
+              - name: PktsIn
+                type: number
+                unit: Kpps
+                description: "Received packets."
+              - name: PktsOut
+                type: number
+                unit: Kpps
+                description: "Sent packets."
+              - name: McastIn
+                type: number
+                unit: Kpps
+                description: "Multicast received packets, currently unavailable."
+                visibility: hidden
+              - name: DropsIn
+                type: number
+                unit: Drops
+                description: "Dropped inbound packets."
+              - name: DropsOut
+                type: number
+                unit: Drops
+                description: "Dropped outbound packets."
+              - name: FriendlyName
+                type: string
+                unit: ""
+                description: "Windows adapter friendly name, when matched."
           performance: "Queries the Windows adapter API when the table is opened."
           security: "Requires signed-in, same-space access because adapter friendly names can contain user-entered text."
           availability: "Available after the Windows network collector successfully reads Perflib data."

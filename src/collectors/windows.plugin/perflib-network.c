@@ -1460,8 +1460,6 @@ int do_PerflibNetwork(int update_every, usec_t dt __maybe_unused)
     usec_t now_ut = now_monotonic_usec();
     netdata_mutex_lock(&network_interfaces_mutex);
     do_network_interface(pDataBlock, update_every, true, now_ut);
-    network_last_snapshot_ut = 0;
-    netdata_mutex_unlock(&network_interfaces_mutex);
 
     struct network_protocol *tcp4 = NULL, *tcp6 = NULL;
     for (size_t i = 0; networks[i].protocol; i++) {
@@ -1485,13 +1483,9 @@ int do_PerflibNetwork(int update_every, usec_t dt __maybe_unused)
     DWORD adapter_id = RegistryFindIDByName("Network Adapter");
     if (adapter_id != PERFLIB_REGISTRY_NAME_NOT_FOUND) {
         pDataBlock = perflibGetPerformanceData(adapter_id);
-        if (pDataBlock) {
-            netdata_mutex_lock(&network_interfaces_mutex);
+        if (pDataBlock)
             do_network_interface(pDataBlock, update_every, false, now_ut);
-            netdata_mutex_unlock(&network_interfaces_mutex);
-        }
     }
-    netdata_mutex_lock(&network_interfaces_mutex);
     network_last_snapshot_ut = now_ut;
     network_snapshot_ttl_ut = (usec_t)update_every * 2 * USEC_PER_SEC;
     netdata_mutex_unlock(&network_interfaces_mutex);
