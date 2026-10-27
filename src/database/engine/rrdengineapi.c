@@ -96,8 +96,9 @@ static inline bool rrdeng_page_alignment_release(struct pg_alignment *pa) {
 }
 
 // charts call this
-STORAGE_METRICS_GROUP *rrdeng_metrics_group_get(STORAGE_INSTANCE *si __maybe_unused, nd_uuid_t *uuid __maybe_unused) {
+STORAGE_METRICS_GROUP *rrdeng_metrics_group_get(STORAGE_INSTANCE *si __maybe_unused, uint64_t seed) {
     struct pg_alignment *pa = callocz(1, sizeof(struct pg_alignment));
+    pa->seed = seed;
     rrdeng_page_alignment_acquire(pa);
     return (STORAGE_METRICS_GROUP *)pa;
 }
@@ -471,9 +472,11 @@ static PGD *rrdeng_alloc_new_page_data(struct rrdeng_collect_handle *handle, use
     size_t max_size = tier_page_size[ctx->config.tier];
     size_t max_slots = max_size / CTX_POINT_SIZE_BYTES(ctx);
 
+    // the slot comes from the chart's identity, not from anything of this process, so a restart keeps every
+    // chart's page phase: data written before it stays packed into extents in the order pages close after it
     size_t slots = aligned_allocation_entries(
             max_slots,
-            indexing_partition((Word_t) handle->alignment, max_slots),
+            handle->alignment ? handle->alignment->seed % max_slots : 0,
             (time_t) (point_in_time_ut / USEC_PER_SEC)
     );
 
