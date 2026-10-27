@@ -499,8 +499,10 @@ value/label work. A shared attempt-local marker avoids allocating a value for ev
 replacement creates fresh chart state; no early cutoff uses provisional totals across a context. Fresh candidate maps
 need no rollback records, while mutations of borrowed published caches remain journaled.
 
-Previously omitted contexts defer label work. If a context fits again, the existing label reconciliation pass rebuilds
-its current labels and membership before materialization. Recovery can therefore replay routes once; admission itself
-does not add a pass. `BenchmarkContextLimitInstances` covers many small charts and `BenchmarkContextLimitRecoveryCycle`
+With a limit enabled, new chart candidates defer label work until they pass admission and lifecycle caps. The existing
+label reconciliation pass then builds their current labels and membership before materialization. First publication,
+new-chart churn and host reset can therefore replay routes once. Published charts retain ordinary membership detection
+and cached labels through omission/recovery; admission itself does not add a pass.
+`BenchmarkContextLimitInstances` covers many small charts and `BenchmarkContextLimitRecoveryCycle`
 includes repeated growth and recovery. Candidate sizing follows the pre-admission population to avoid repeated cold
 chart-state allocations for omitted contexts.

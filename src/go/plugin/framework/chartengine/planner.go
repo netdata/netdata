@@ -184,19 +184,18 @@ type chartState struct {
 }
 
 type planBuildContext struct {
-	out                   *Plan
-	reader                metrix.Reader
-	collectMeta           metrix.CollectMeta
-	buildCycle            uint64
-	prog                  *program.Program
-	cache                 *routeCache
-	routeCacheEnabled     bool
-	routeObserver         func(PlanRouteDiagnostic)
-	outputLimit           int
-	overLimitEntry        *dimBuildEntry
-	previousContextCounts map[string]int
-	index                 matchIndex
-	flat                  metrix.Reader
+	out               *Plan
+	reader            metrix.Reader
+	collectMeta       metrix.CollectMeta
+	buildCycle        uint64
+	prog              *program.Program
+	cache             *routeCache
+	routeCacheEnabled bool
+	routeObserver     func(PlanRouteDiagnostic)
+	outputLimit       int
+	overLimitEntry    *dimBuildEntry
+	index             matchIndex
+	flat              metrix.Reader
 
 	seenInfer  map[inferredDimensionKey]struct{}
 	chartsByID map[string]*chartState
@@ -428,24 +427,23 @@ func (e *Engine) preparePlanBuildContext(
 		seenInfer = make(map[inferredDimensionKey]struct{}, hint)
 	}
 	return &planBuildContext{
-		out:                   out,
-		reader:                reader,
-		collectMeta:           collectMeta,
-		buildCycle:            buildCycle,
-		prog:                  prog,
-		cache:                 cache,
-		routeCacheEnabled:     e.state.cfg.routeObserver == nil,
-		routeObserver:         e.state.templateSet.diagnosticObserver(e.state.cfg.routeObserver),
-		outputLimit:           e.state.cfg.maxOutputSeriesPerContext,
-		previousContextCounts: e.state.outputContextCounts,
-		index:                 index,
-		flat:                  reader,
-		seenInfer:             seenInfer,
-		chartsByID:            make(map[string]*chartState, chartsCap),
-		chartStates:           make([]chartState, 0, e.state.hints.chartsByID),
-		values:                make([]UpdateDimensionValue, 0, e.state.hints.values),
-		materialized:          materialized,
-		materializedByID:      materialized.charts,
+		out:               out,
+		reader:            reader,
+		collectMeta:       collectMeta,
+		buildCycle:        buildCycle,
+		prog:              prog,
+		cache:             cache,
+		routeCacheEnabled: e.state.cfg.routeObserver == nil,
+		routeObserver:     e.state.templateSet.diagnosticObserver(e.state.cfg.routeObserver),
+		outputLimit:       e.state.cfg.maxOutputSeriesPerContext,
+		index:             index,
+		flat:              reader,
+		seenInfer:         seenInfer,
+		chartsByID:        make(map[string]*chartState, chartsCap),
+		chartStates:       make([]chartState, 0, e.state.hints.chartsByID),
+		values:            make([]UpdateDimensionValue, 0, e.state.hints.values),
+		materialized:      materialized,
+		materializedByID:  materialized.charts,
 	}, nil
 }
 
@@ -810,7 +808,7 @@ func (ctx *planBuildContext) accumulateRoute(
 			meta:            route.Meta,
 			lifecycle:       route.Lifecycle,
 			labelTracker:    newChartLabelTracker(previousPresentation),
-			deferredLabels:  ctx.outputLimit > 0 && ctx.previousContextCounts[route.Meta.Context] > ctx.outputLimit,
+			deferredLabels:  ctx.outputLimit > 0 && previousPresentation == nil,
 			entries:         entries,
 			entriesOwner:    entriesOwner,
 			currentBuildSeq: ctx.buildCycle,
@@ -1087,10 +1085,9 @@ func (e *Engine) reconcileChangedChartLabels(ctx *planBuildContext) error {
 		if chart == nil || chart.observedCount == 0 {
 			continue
 		}
-		// Previously omitted contexts usually remain omitted. Build their labels
-		// only after they fit again, using the existing label-reconciliation pass.
+		// New candidates may be omitted. Build their labels only after admission;
+		// published charts retain ordinary membership detection and cached labels.
 		if chart.deferredLabels {
-			chart.labelTracker = newChartLabelTracker(nil)
 			needsReplay = true
 			continue
 		}

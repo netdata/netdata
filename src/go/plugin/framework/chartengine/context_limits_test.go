@@ -508,7 +508,7 @@ func TestContextLimitRecoveryRebuildsLabelsAndMembership(t *testing.T) {
 			reader := newCountingMutableLabelReader(t, cycle(2, "new"))
 			attempt, err := e.PreparePlan(reader)
 			require.NoError(t, err)
-			assert.Equal(t, 2, reader.iterations, "recovery replays labels after admission")
+			assert.Equal(t, 1, reader.iterations, "published charts use ordinary membership detection on recovery")
 			aborted := attempt.Plan()
 			attempt.Abort()
 			assert.Equal(t, "old", e.state.materialized.charts["detail"].presentation.labelValues["zone"])
@@ -542,4 +542,64 @@ func TestContextLimitRejectedDetailAllocationEnvelope(t *testing.T) {
 	// Map growth needs a small number of allocations. Rejected dimensions must
 	// not allocate one value/label accumulator each on every collection.
 	assert.LessOrEqual(t, allocs, float64(200))
+}
+
+func TestContextLimitRecoveryAllocationEnvelope(t *testing.T) {
+	const template = `
+version: v1
+groups:
+  - family: Work
+    metrics: [work]
+    charts:
+      - id: detail
+        title: Detail
+        context: work.detail
+        units: tasks
+        instances: {by_labels: [client]}
+        dimensions:
+          - selector: work
+            name: tasks
+`
+	e := newContextLimitEngine(t, 100, template)
+	small := contextLimitCycle(t, metrix.NewCollectorStore(), 100, 0, 1)
+	large := contextLimitCycle(t, metrix.NewCollectorStore(), 1000, 0, 1)
+	_, err := buildPlan(e, small)
+	require.NoError(t, err)
+	allocs := testing.AllocsPerRun(10, func() {
+		for _, reader := range []metrix.Reader{large, small} {
+			if _, err := buildPlan(e, reader); err != nil {
+				t.Fatal(err)
+			}
+		}
+	})
+	// Repeated growth must not rebuild labels for every never-published chart.
+	// Candidate maps/values and scratch reconstruction remain O(candidate charts).
+	assert.LessOrEqual(t, allocs, float64(8000))
+}
+
+func TestContextLimitNewChartLabelsAfterCapsAndAbort(t *testing.T) {
+	template := strings.ReplaceAll(contextLimitYAML, "instances: {by_labels: [model]}",
+		"instances: {by_labels: [model]}\n        lifecycle: {max_instances: 1}")
+	reader := contextLimitCycle(t, metrix.NewCollectorStore(), 3, 0, 1)
+	want, err := buildPlan(newContextLimitEngine(t, 0, template), reader)
+	require.NoError(t, err)
+	for _, diagnostics := range []bool{false, true} {
+		t.Run(fmt.Sprint(diagnostics), func(t *testing.T) {
+			var opts []Option
+			if diagnostics {
+				opts = append(opts, WithPlanRouteDiagnosticObserver(func(PlanRouteDiagnostic) {}))
+			}
+			e := newContextLimitEngine(t, 3, template, opts...)
+			counted := newCountingMutableLabelReader(t, reader)
+			attempt, err := e.PreparePlan(counted)
+			require.NoError(t, err)
+			assert.Equal(t, 2, counted.iterations, "new admitted charts build labels after caps")
+			assert.Equal(t, want, attempt.Plan())
+			attempt.Abort()
+			assert.Empty(t, e.state.materialized.charts)
+			plan, err := buildPlan(e, reader)
+			require.NoError(t, err)
+			assert.Equal(t, want, plan)
+		})
+	}
 }

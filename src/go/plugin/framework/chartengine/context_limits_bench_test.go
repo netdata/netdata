@@ -132,8 +132,8 @@ func BenchmarkContextLimitRejectedDetail(b *testing.B) {
 }
 
 // Every operation includes both growth past the output budget and recovery.
-// Recovery must reconcile labels again; this includes that cost instead of
-// measuring only the cheaper repeated-omission case.
+// This includes scratch reconstruction and reporting instead of measuring only
+// the cheaper repeated-omission case. Published label membership remains reusable.
 func BenchmarkContextLimitRecoveryCycle(b *testing.B) {
 	for _, limit := range []int{0, 1000} {
 		b.Run(fmt.Sprintf("limit_%d", limit), func(b *testing.B) {
@@ -160,5 +160,43 @@ func BenchmarkContextLimitRecoveryCycle(b *testing.B) {
 				}
 			}
 		})
+	}
+}
+
+// Enabled limits defer labels for new candidates until admission. Measure the
+// extra replay on first publication and when 10 of 1,000 charts are new.
+func BenchmarkContextLimitNewCharts(b *testing.B) {
+	for _, existing := range []int{0, 990} {
+		for _, limit := range []int{0, 1000} {
+			b.Run(fmt.Sprintf("existing_%d/limit_%d", existing, limit), func(b *testing.B) {
+				reader := benchmarkAggregationReader(b, 1000, 1000)
+				previous := benchmarkAggregationReader(b, existing, existing)
+				e, err := New(WithRuntimeStore(nil), WithRuntimePlannerMode(), WithEnginePolicy(EnginePolicy{MaxOutputSeriesPerContext: &limit}))
+				if err != nil {
+					b.Fatal(err)
+				}
+				if err := e.LoadYAML([]byte(strings.ReplaceAll(benchAggregationTemplateYAML, "AGGREGATION", "sum")), 1); err != nil {
+					b.Fatal(err)
+				}
+				if _, err := buildPlan(e, reader); err != nil {
+					b.Fatal(err)
+				}
+				b.ReportAllocs()
+				b.ResetTimer()
+				for range b.N {
+					b.StopTimer()
+					e.ResetMaterialized()
+					if existing > 0 {
+						if _, err := buildPlan(e, previous); err != nil {
+							b.Fatal(err)
+						}
+					}
+					b.StartTimer()
+					if _, err := buildPlan(e, reader); err != nil {
+						b.Fatal(err)
+					}
+				}
+			})
+		}
 	}
 }

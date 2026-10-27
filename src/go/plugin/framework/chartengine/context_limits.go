@@ -14,10 +14,16 @@ func (ctx *planBuildContext) enforceContextLimit(limit int) map[string]int {
 		return nil
 	}
 	counts := make(map[string]int)
+	overLimit := false
 	for _, chart := range ctx.chartsByID {
 		if chart.observedCount > 0 {
-			counts[chart.meta.Context] += chart.observedCount
+			count := counts[chart.meta.Context] + chart.observedCount
+			counts[chart.meta.Context] = count
+			overLimit = overLimit || count > limit
 		}
+	}
+	if !overLimit {
+		return counts
 	}
 	for id, chart := range ctx.chartsByID {
 		count := counts[chart.meta.Context]
