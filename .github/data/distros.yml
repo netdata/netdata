@@ -104,6 +104,8 @@ include:
       arches:
         - x86_64
         - aarch64
+    test:
+      skip-local-build: true
 
   - &centos_stream
     distro: centos-stream
@@ -124,6 +126,7 @@ include:
         - aarch64
     test:
       ebpf-core: true
+      skip-local-build: true
   - <<: *centos_stream
     base_image: 'quay.io/centos/centos:stream9'
     version: '9'
@@ -156,6 +159,7 @@ include:
         - arm64
     test:
       ebpf-core: true
+      skip-local-build: true
   - <<: *debian
     version: "12"
     base_image: debian:bookworm
@@ -167,8 +171,6 @@ include:
         - amd64
         - armhf
         - arm64
-    test:
-      ebpf-core: true
 
   - &fedora
     distro: fedora
@@ -188,6 +190,7 @@ include:
         - aarch64
     test:
       ebpf-core: true
+      skip-local-build: true
   - <<: *fedora
     version: "43"
     packages:
@@ -195,6 +198,7 @@ include:
       repo_distro: fedora/43
     test:
       ebpf-core: true
+      skip-local-build: true
 
   - &opensuse
     distro: opensuse
@@ -215,6 +219,7 @@ include:
         - aarch64
     test:
       ebpf-core: true
+      skip-local-build: true
   - <<: *opensuse
     version: "16.0"
     base_image: opensuse/leap:16.0
@@ -247,17 +252,11 @@ include:
     packages:
       <<: *oracle_packages
       repo_distro: ol/9
-    test:
-      ebpf-core: true
-      skip-local-build: false
   - <<: *oracle
     version: "8"
     packages:
       <<: *oracle_packages
       repo_distro: ol/8
-    test:
-      ebpf-core: true
-      skip-local-build: false
 
   - &rocky
     distro: rockylinux
@@ -282,6 +281,7 @@ include:
         - aarch64
     test:
       ebpf-core: true
+      skip-local-build: true
   - <<: *rocky
     version: "9"
     base_image: rockylinux:9
@@ -326,6 +326,7 @@ include:
         - arm64
     test:
       ebpf-core: true
+      skip-local-build: true
   - <<: *ubuntu
     version: "24.04"
     packages:
