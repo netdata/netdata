@@ -340,6 +340,7 @@ struct netdata_ebpf_dcstat_runtime *netdata_dcstat_runtime_open_mode(const char 
         rt->kind = NETDATA_DCSTAT_RUNTIME_LEGACY;
         rt->flavor = dcstat_runtime_flavor_from_path(path);
         struct bpf_object *obj = bpf_object__open_file(path, NULL);
+        // A failed open leaves nothing to close: libbpf 1.x returns NULL, older versions an error pointer
         if (!obj || libbpf_get_error(obj)) {
             freez(rt);
             return NULL;
