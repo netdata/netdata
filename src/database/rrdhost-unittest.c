@@ -2,6 +2,10 @@
 
 #include "rrd.h"
 
+// defined in the registry module (registry/registry.h); declared here to avoid pulling the
+// whole registry public header into this database-side test.
+int regenerate_guid(const char *guid, char *result);
+
 #define RRDHOST_TEST(condition, ...)                                                                                   \
     do {                                                                                                               \
         if (!(condition)) {                                                                                            \
@@ -103,6 +107,45 @@ int rrdhost_machine_guid_unittest(void)
             "guid '%s' should be %s",
             validity[i].guid ? validity[i].guid : "(null)",
             validity[i].valid ? "accepted" : "rejected");
+    }
+
+    // Regression: regenerate_guid() (used by the registry person/machine GUID handlers and the
+    // management API key check) rejected only uuid_parse_flexi()'s -1 code. Every other failure
+    // (-2 .. -7, e.g. a non-hex or too-short string) was treated as success, so uuid_unparse_lower()
+    // formatted the uninitialized nd_uuid_t and returned a GUID made of stack bytes. A failed parse
+    // must leave the result untouched and return -1.
+    struct {
+        const char *guid;
+        int expected_rc;
+    } regen[] = {
+        { canonical, 0 },
+        { compact, 0 },
+        { "00000000-0000-0000-0000-00000000000A", 0 },
+        { "hello", -1 },
+        { "x", -1 },
+        { "00000000-0000-0000-0000-00000000000", -1 },  // one hex digit short
+        { "00000000-0000-0000-0000-00000000000g", -1 }, // non-hex digit
+        { "0000-0000-0000-0000-0000-0000-00000000", -1 }, // too many hyphens
+    };
+
+    for (size_t i = 0; i < sizeof(regen) / sizeof(regen[0]); i++) {
+        char result[GUID_LEN + 1];
+        memset(result, 'Z', sizeof(result));
+        result[GUID_LEN] = '\0';
+
+        int rc = regenerate_guid(regen[i].guid, result);
+
+        RRDHOST_TEST(
+            rc == regen[i].expected_rc,
+            "regenerate_guid('%s') returned %d, expected %d",
+            regen[i].guid, rc, regen[i].expected_rc);
+
+        // on failure the buffer must not have been written from an uninitialized uuid
+        if (regen[i].expected_rc == -1)
+            RRDHOST_TEST(
+                result[0] == 'Z',
+                "regenerate_guid('%s') wrote to the result buffer on a failed parse",
+                regen[i].guid);
     }
 
     fprintf(stderr, "%s() %s\n", __FUNCTION__, errors ? "FAILED" : "passed");
