@@ -1153,7 +1153,7 @@ modules:
                 visibility: hidden
               - name: Speed
                 type: number
-                unit: Mbit
+                unit: Mbit/s
                 description: "Link speed."
               - name: MTU
                 type: number
@@ -1161,15 +1161,15 @@ modules:
                 description: "Maximum transmission unit."
               - name: In
                 type: number
-                unit: Mbit
+                unit: Mbit/s
                 description: "Traffic received."
               - name: Out
                 type: number
-                unit: Mbit
+                unit: Mbit/s
                 description: "Traffic sent."
               - name: Total
                 type: number
-                unit: Mbit
+                unit: Mbit/s
                 description: "Traffic received and sent."
                 visibility: hidden
               - name: PktsIn

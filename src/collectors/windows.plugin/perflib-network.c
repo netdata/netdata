@@ -1312,19 +1312,19 @@ static int network_function_interfaces(
         wb, &id, "OpState", "Operational state", RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY);
     network_function_add_text_column(wb, &id, "Duplex", "Duplex mode, if available", RRDF_FIELD_OPTS_UNIQUE_KEY);
     network_function_add_number_column(
-        wb, &id, "Speed", "Link speed", "Mbit", maxima.speed, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_OPTS_VISIBLE);
+        wb, &id, "Speed", "Link speed", "Mbit/s", maxima.speed, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_OPTS_VISIBLE);
     network_function_add_number_column(
         wb, &id, "MTU", "Maximum transmission unit", "Octets", NAN, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_OPTS_VISIBLE);
     network_function_add_number_column(
-        wb, &id, "In", "Traffic received", "Mbit", maxima.traffic_in, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_OPTS_VISIBLE);
+        wb, &id, "In", "Traffic received", "Mbit/s", maxima.traffic_in, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_OPTS_VISIBLE);
     network_function_add_number_column(
-        wb, &id, "Out", "Traffic sent", "Mbit", maxima.traffic_out, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_OPTS_VISIBLE);
+        wb, &id, "Out", "Traffic sent", "Mbit/s", maxima.traffic_out, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_OPTS_VISIBLE);
     network_function_add_number_column(
         wb,
         &id,
         "Total",
         "Traffic received and sent",
-        "Mbit",
+        "Mbit/s",
         maxima.traffic_total,
         RRDF_FIELD_VISUAL_BAR,
         RRDF_FIELD_OPTS_NONE);
