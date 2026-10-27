@@ -172,6 +172,13 @@ ARCHIVE_DEPS := $(NETDATA_INSTALL) \
 MAKESELF_OPTS = --notemp \
                 --needroot \
                 --sha256 \
+                --tar-format pax \
+                --tar-extra --sort=name \
+                --tar-extra --no-acls \
+                --tar-extra --no-selinux \
+                --tar-extra --no-xattrs \
+                --tar-extra --pax-option='delete=atime,delete=ctime' \
+                --tar-extra --numeric-owner \
                 --lsm $(MAKEFILE_DIR)/makeself.lsm \
                 --license $(MAKEFILE_DIR)/makeself-license.txt \
                 --help-header $(MAKEFILE_DIR)/makeself-help-header.txt \
