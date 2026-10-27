@@ -3,6 +3,8 @@
 #ifndef NETDATA_WINDOWS_API_H
 #define NETDATA_WINDOWS_API_H
 
+#include "libnetdata/libnetdata-platform-fwd.h"
+
 #if defined(OS_WINDOWS)
 
 #include <stdbool.h>

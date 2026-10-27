@@ -1,6 +1,6 @@
 # Windows network collector: parity and correctness review
 
-- **Status:** Approved implementation is committed locally on `win_net` in `c6dd6fddbe` and `eee1fd26e3`. Windows build and runtime validation remain unavailable.
+- **Status:** Approved implementation is committed locally on `win_net` in `c6dd6fddbe` and `eee1fd26e3`. Windows CI found a header-guard compile failure on 2026-10-27; the fix is local and a CI rerun is pending. Windows runtime validation remains unavailable.
 - **Tracking:** `.agents/sow/q/current/SOW-20261026-windows-network-parity.md` records the approved design, review, and validation. The local SOW is not committed.
 - **Comparison source:** `prometheus-community/windows_exporter @ 7b55600d6eac6cf56367afe0af92c652feaaa71c`, `internal/collector/net/{net.go,types.go,AGENTS.md}`.
 - **Evidence limit:** Code and static checks establish the implementation. Physical and virtual provider availability, Perflib-to-adapter matching, operational-state transitions, and collection cost still need observation on Windows.
@@ -56,7 +56,7 @@ The Linux `network-interfaces` Function provided the table and chart-value prece
 - `python3 -m unittest integrations.tests.test_collector_metadata integrations.tests.test_health_alerts integrations.tests.test_descriptions`: **77 passed**.
 - `python3 integrations/gen_docs_integrations.py --check`: **passed**, 1639 integration pages.
 - `clang-format --dry-run --Werror` on the changed C/header files and `git diff --check`: **passed**.
-- A Windows build and executable regression test were unavailable because this checkout has no Windows SDK/MinGW headers or Windows host. Source-level checks cannot establish runtime adapter identity matching, provider availability, state transitions, or the extra per-cycle `Network Adapter` query cost.
+- Windows CI compilation failed in `windows_api.c` because its header tested `OS_WINDOWS` before loading the project platform definitions, leaving the new interface struct undefined. A focused C compile check reproduced the failure; adding `libnetdata-platform-fwd.h` to the header makes that check pass. This checkout still has no Windows SDK/MinGW headers or Windows host, so the full Windows build and executable regression tests await CI. Source-level checks cannot establish runtime adapter identity matching, provider availability, state transitions, or the extra per-cycle `Network Adapter` query cost.
 
 On Windows, verify active, idle, disconnected, disabled, physical, and Hyper-V virtual adapters. Compare the two Perflib instance lists with `GetAdaptersAddresses` and `Get-NetAdapter`; test duplicate descriptions, counter gaps, adapter removal/re-add, and Function access. Measure the additional Perflib query at the one-second default collection interval.
 
