@@ -343,16 +343,16 @@ The MSI uninstall removes the Netdata binaries and the Windows service, but it d
 If installation fails, rerun the MSI from an Administrator command prompt with verbose logging enabled:
 
 ```cmd
-msiexec /i netdata-x64.msi /l*v "C:\Path\To\install_log.txt"
+msiexec /i "netdata-x64.msi" /l*v "C:\Path\To\install_log.txt"
 ```
 
 - Replace `C:\Path\To\install_log.txt` with a file in an existing directory you can write to. `msiexec` does not create missing directories.
-- Use the full path to the downloaded MSI if it is not in the current directory.
+- Use the full path to the downloaded MSI if it is not in the current directory. Keep the quotes, because the path may contain spaces.
 - The command opens the installation wizard and writes diagnostic details to the log file, even when the installation fails.
 - If you install silently, add the same `/l*v` option to your existing command:
 
   ```cmd
-  msiexec /qn /i netdata-x64.msi TOKEN="<YOUR_TOKEN>" /l*v "C:\Path\To\install_log.txt"
+  msiexec /qn /i "netdata-x64.msi" TOKEN="<YOUR_TOKEN>" /l*v "C:\Path\To\install_log.txt"
   ```
 
 To find the failure, open the log and search for `Return value 3`. The lines just above it show the step that failed and the error message.
