@@ -152,9 +152,30 @@ static void http_header_x_forwarded_host(struct web_client *w, const char *v, si
 }
 
 static void http_header_x_forwarded_for(struct web_client *w, const char *v, size_t len) {
-    if(len)
-        strncpyz(w->user_auth.forwarded_for, v,
-                 (len < sizeof(w->user_auth.forwarded_for) - 1 ? len : sizeof(w->user_auth.forwarded_for) - 1));
+    // X-Forwarded-For is a comma separated list of addresses, the first one being the client.
+    // The stored value is serialized into the comma separated key=value source string of
+    // function calls and quoted into the FUNCTION lines sent to plugins and children,
+    // so keep only the first entry, and only when it is an IPv4 or IPv6 address.
+    const char *e = v, *end = v + len;
+    while(e < end && *e != ',')
+        e++;
+
+    while(e > v && isspace((uint8_t)e[-1]))
+        e--;
+
+    size_t address_len = (size_t)(e - v);
+    if(!address_len || address_len >= sizeof(w->user_auth.forwarded_for))
+        return;
+
+    char buffer[INET6_ADDRSTRLEN];
+    memcpy(buffer, v, address_len);
+    buffer[address_len] = '\0';
+
+    unsigned char address[sizeof(struct in6_addr)];
+    if(inet_pton(AF_INET, buffer, address) != 1 && inet_pton(AF_INET6, buffer, address) != 1)
+        return;
+
+    memcpy(w->user_auth.forwarded_for, buffer, address_len + 1);
 }
 
 static void http_header_x_transaction_id(struct web_client *w, const char *v, size_t len) {
