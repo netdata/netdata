@@ -2,7 +2,11 @@
 
 package postgres
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
+import (
+	"database/sql"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
+)
 
 type pgMetrics struct {
 	srvMetrics
@@ -154,10 +158,15 @@ type replSlotMetrics struct {
 }
 
 type tableMetrics struct {
-	name       string
-	parentName string
-	db         string
-	schema     string
+	charts                                        []*collectorapi.Chart
+	owner                                         *sql.DB
+	oid                                           uint32
+	ioUpdated, sampled, ioSampled, hasBloatCharts bool
+	bloatValid, nullValid                         bool
+	name                                          string
+	parentName                                    string
+	db                                            string
+	schema                                        string
 
 	updated                  bool
 	hasCharts                bool
@@ -208,11 +217,16 @@ type tableMetrics struct {
 }
 
 type indexMetrics struct {
-	name        string
-	db          string
-	schema      string
-	table       string
-	parentTable string
+	charts         []*collectorapi.Chart
+	owner          *sql.DB
+	oid            uint32
+	hasBloatCharts bool
+	bloatValid     bool
+	name           string
+	db             string
+	schema         string
+	table          string
+	parentTable    string
 
 	updated   bool
 	hasCharts bool
@@ -229,3 +243,22 @@ type indexMetrics struct {
 type incDelta struct{ prev, last int64 }
 
 func (pc *incDelta) delta() int64 { return pc.last - pc.prev }
+
+// Unknown I/O pairs stay unavailable until a complete source observation.
+func newTableMetrics(owner *sql.DB, oid uint32, name, db, schema string) *tableMetrics {
+	return &tableMetrics{
+		owner:         owner,
+		oid:           oid,
+		name:          name,
+		db:            db,
+		schema:        schema,
+		heapBlksRead:  incDelta{last: -1},
+		heapBlksHit:   incDelta{last: -1},
+		idxBlksRead:   incDelta{last: -1},
+		idxBlksHit:    incDelta{last: -1},
+		toastBlksRead: incDelta{last: -1},
+		toastBlksHit:  incDelta{last: -1},
+		tidxBlksRead:  incDelta{last: -1},
+		tidxBlksHit:   incDelta{last: -1},
+	}
+}

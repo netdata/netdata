@@ -168,19 +168,19 @@
       },
       "collect_databases_matching": {
         "title": "Database selector",
-        "description": "Configuration for monitoring specific databases using [Netdata simple patterns](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#readme). If left empty, no database metrics will be collected.",
+        "description": "Select additional databases for table/index metrics using [Netdata simple patterns](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#readme). The DSN database is always included; an empty selector disables additional connections. Server and database-level metrics remain available.",
         "type": "string"
       },
       "max_db_tables": {
         "title": "Table limit",
-        "description": "Table metrics will not be collected for databases that have more tables than the limit. Set to 0 for no limit.",
+        "description": "Maximum tables monitored per database, including the DSN database. Above this limit, select TOP tables by recent row activity. Set to 0 for no limit.",
         "type": "integer",
         "minimum": 0,
         "default": 50
       },
       "max_db_indexes": {
         "title": "Index limit",
-        "description": "Index metrics will not be collected for databases that have more indexes than the limit. Set to 0 for no limit.",
+        "description": "Maximum indexes monitored per database, including the DSN database. Above this limit, select TOP indexes by recent index scans, independently of table selection. Set to 0 for no limit.",
         "type": "integer",
         "minimum": 0,
         "default": 250
@@ -289,12 +289,15 @@
           ]
         },
         {
-          "title": "Database stats",
+          "title": "Limits",
           "fields": [
             "max_db_tables",
-            "max_db_indexes",
-            "collect_databases_matching"
+            "max_db_indexes"
           ]
+        },
+        {
+          "title": "Filters",
+          "fields": ["collect_databases_matching"]
         },
         {
           "title": "Histograms",
