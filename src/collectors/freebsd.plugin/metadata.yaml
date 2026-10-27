@@ -2614,7 +2614,7 @@ modules:
       module_name: getifaddrs
       monitored_instance:
         name: getifaddrs
-        description: "Monitor FreeBSD network interface traffic, packets, errors, drops, and collision events."
+        description: "Monitor FreeBSD network interface traffic, packets, errors, drops, collision events, link state, speed, duplex, and MTU."
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.networking
@@ -2627,8 +2627,8 @@ modules:
       keywords: []
     overview:
       data_collection:
-        metrics_description: "Collect traffic per network interface."
-        method_description: "The plugin calls `getifaddrs` function to collect necessary data."
+        metrics_description: "Collect traffic and link information per network interface and expose the `network-interfaces` Function table. Unavailable link readings appear as unknown or null."
+        method_description: "The plugin uses `getifaddrs` for interface and address counters and `SIOCGIFMEDIA` for validated media state. Media fields may be unavailable for some interfaces."
       supported_platforms:
         include: []
         exclude: []
@@ -2696,12 +2696,32 @@ modules:
               description: Enable or disable collisions for all interface metric.
               default_value: auto
               required: false
+            - name: speed for all interfaces
+              description: Enable speed charts where the active media and line rate are available.
+              default_value: auto
+              required: false
+            - name: duplex for all interfaces
+              description: Enable duplex state charts. Unknown is shown when the media does not report duplex.
+              default_value: auto
+              required: false
+            - name: operstate for all interfaces
+              description: Enable operational state charts derived from administrative and link state.
+              default_value: auto
+              required: false
+            - name: carrier for all interfaces
+              description: Enable physical link state charts where the kernel reports a known link state.
+              default_value: auto
+              required: false
+            - name: mtu for all interfaces
+              description: Enable interface MTU charts where the kernel reports an MTU.
+              default_value: auto
+              required: false
             - name: disable by default interfaces matching
               description: Do not display data for intterfaces listed.
               default_value: lo*
               required: false
             - name: set physical interfaces for system.net
-              description: Do not show network traffic for listed interfaces.
+              description: Include matching interfaces in the physical-interface aggregates and classify them as physical in the network-interfaces Function.
               default_value: igb* ix* cxl* em* ixl* ixlv* bge* ixgbe* vtnet* vmx* re* igc* dwc*
               required: false
         examples:
@@ -2755,7 +2775,11 @@ modules:
                 - name: sent
         - name: network device
           description: ""
-          labels: []
+          labels:
+            - name: interface_type
+              description: "`real` when the interface matches the configured physical-interface pattern; otherwise `unknown`."
+            - name: device
+              description: "The network interface name."
           metrics:
             - name: net.net
               description: Bandwidth
@@ -2793,6 +2817,41 @@ modules:
               chart_type: line
               dimensions:
                 - name: collisions
+            - name: net.speed
+              description: Interface Speed, available only with valid active media and a reported line rate
+              unit: "kilobits/s"
+              chart_type: line
+              dimensions:
+                - name: speed
+            - name: net.duplex
+              description: Interface Duplex State
+              unit: "state"
+              chart_type: line
+              dimensions:
+                - name: full
+                - name: half
+                - name: unknown
+            - name: net.operstate
+              description: Interface Operational State. FreeBSD reports only up, down, or unknown; the additional Linux states are not emitted
+              unit: "state"
+              chart_type: line
+              dimensions:
+                - name: up
+                - name: down
+                - name: unknown
+            - name: net.carrier
+              description: Interface Physical Link State, available only for a known kernel link state
+              unit: "state"
+              chart_type: line
+              dimensions:
+                - name: up
+                - name: down
+            - name: net.mtu
+              description: Interface MTU
+              unit: "octets"
+              chart_type: line
+              dimensions:
+                - name: mtu
   - meta:
       plugin_name: freebsd.plugin
       module_name: getmntinfo

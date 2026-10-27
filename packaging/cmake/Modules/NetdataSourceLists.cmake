@@ -363,6 +363,7 @@ set(INTERNAL_COLLECTORS_FILES
         src/collectors/common-contexts/power-supply.h
         src/collectors/common-contexts/hw-sensors.h
         src/collectors/common-contexts/hw-sensors-function.h
+        src/collectors/common-contexts/network-interfaces-function.h
 )
 
 set(PLUGINSD_PLUGIN_FILES
