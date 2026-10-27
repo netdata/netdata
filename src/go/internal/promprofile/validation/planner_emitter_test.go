@@ -171,6 +171,18 @@ template:
 		len(result.report.ContextCollisions[0].RawContextFingerprints) != 2 {
 		t.Fatalf("expected two distinct raw contexts to collapse: %#v", result.report.ContextCollisions)
 	}
+	limited := runValidation(t, profile, twoValueGaugesDump, "max_output_series_per_context: 1\n")
+	requireFinding(t, limited, "context_series_limit")
+	if len(limited.report.ContextSeriesOmissions) != 1 {
+		t.Fatalf("expected one published-context omission: %#v", limited.report.ContextSeriesOmissions)
+	}
+	omission := limited.report.ContextSeriesOmissions[0]
+	if omission.Context != "prometheus.app.shared" || omission.ObservedSeries != 2 || omission.Limit != 1 {
+		t.Fatalf("unexpected published-context admission facts: %#v", omission)
+	}
+	if len(limited.report.Charts) != 0 {
+		t.Fatalf("aliased context was partly published: %#v", limited.report.Charts)
+	}
 }
 
 func TestInspectEmittedPlanAssociatesContextsInEmitterOrder(t *testing.T) {
@@ -435,5 +447,43 @@ func TestPlanRouteSummaryCountsDistinctSeries(t *testing.T) {
 	scanned, autogen, unmatched := summary.counts()
 	if scanned != 3 || autogen != 1 || unmatched != 1 {
 		t.Fatalf("unexpected route counts: scanned=%d autogen=%d unmatched=%d", scanned, autogen, unmatched)
+	}
+}
+
+func TestValidateProfileReportsWholeContextSeriesOmission(t *testing.T) {
+	dump := "# TYPE app_value gauge\napp_value{instance=\"a\"} 1\napp_value{instance=\"b\"} 2\n"
+	result := runValidation(t, singleInstanceValueGaugeProfile, dump, "max_output_series_per_context: 1\n")
+	requireFinding(t, result, "context_series_limit")
+	if len(result.report.ContextSeriesOmissions) != 1 {
+		t.Fatalf("expected one omitted context: %#v", result.report.ContextSeriesOmissions)
+	}
+	omission := result.report.ContextSeriesOmissions[0]
+	if omission.Context == "" || omission.ObservedSeries != 2 || omission.Limit != 1 {
+		t.Fatalf("unexpected omission: %#v", omission)
+	}
+	if len(result.report.Charts) != 0 {
+		t.Fatalf("rejected context published charts: %#v", result.report.Charts)
+	}
+	for _, limit := range []int{0, 2} {
+		result := runValidation(t, singleInstanceValueGaugeProfile, dump, fmt.Sprintf("max_output_series_per_context: %d\n", limit))
+		if len(result.report.ContextSeriesOmissions) != 0 || result.exitCode != 0 {
+			t.Fatalf("limit %d should admit context: %s", limit, result.stdout)
+		}
+	}
+}
+
+func TestValidateProfileAppliesOutputLimitToFutureProbes(t *testing.T) {
+	job := `
+max_output_series_per_context: 1
+future_inputs:
+  - name: app_future
+    labels: {instance: a}
+  - name: app_future
+    labels: {instance: b}
+`
+	result := runValidation(t, singleInstanceValueGaugeProfile, "# TYPE app_value gauge\napp_value{instance=\"current\"} 1\n", job)
+	requireFinding(t, result, "future_context_series_limit")
+	if len(result.report.ContextSeriesOmissions) != 0 {
+		t.Fatalf("future rejection contaminated current omissions: %#v", result.report.ContextSeriesOmissions)
 	}
 }

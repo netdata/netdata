@@ -70,6 +70,13 @@ shape. Older V2 collectors can supply local patterns, but check for stale style 
   than once, including after partial `Init` / `Check` setup.
 - `Check()` MUST stay a cheap detection path: no reservation, no remote side
   effect, no state it must later release.
+- A collector needing an output budget per context SHOULD supply
+  `EnginePolicy.MaxOutputSeriesPerContext` through `CollectorV2EnginePolicy`; use the shared planner's
+  post-aggregation admission and commit-time reporting rather than pruning collector input families or enabling
+  route diagnostics in production. Input admission remains a separate collector policy. Units, lifecycle and
+  reporting are defined in `src/go/plugin/framework/chartengine/README.md#output-limit-per-context`.
+  Admission and reporting use the published context identity from the same wire normalization as chartemit;
+  raw authoring strings can alias and MUST NOT receive separate output budgets.
 - Cleanup either honors the caller's context or uses a detached best-effort
   context with a fixed budget that does not scale with public request or retry
   settings; trace that deadline through every cleanup I/O and keep unfinished
