@@ -234,7 +234,7 @@ services:
         description: 'Set `id: snmp` so the rendered job inherits the `snmp` module name automatically, or include `module: snmp` explicitly inside the `config_template` (required when `id` is anything else, e.g. `cisco`).'
   template_variables:
     description: |
-      Available inside both `match` expressions and `config_template` bodies. All variables are strings; empty values render as the empty string.
+      Available inside both `match` expressions and `config_template` bodies. All variables are strings. System description, contact, name, location, and organization are normalized to single-line text without control characters. This normalization does not replace YAML serialization: build the job with `dict` and serialize it with `toYaml` as shown below.
     list:
       - name: '.IPAddress'
         type: 'string'
@@ -300,25 +300,27 @@ services:
           - id: snmp
             match: '{{ true }}'
             config_template: |
-              {{- if .SysInfo.Name }}
-              name: {{ .SysInfo.Name }}-ip-{{ .IPAddress }}
-              {{- else }}
-              name: ip-{{ .IPAddress }}
-              {{- end }}
-              hostname: {{ .IPAddress }}
-              options:
-                version: {{ .Credential.Version }}
-              {{- if eq .Credential.Version "1" "2" "2c" }}
-              community: {{ .Credential.Community }}
-              {{- else }}
-              user:
-                name: {{ .Credential.UserName }}
-                level: {{ .Credential.SecurityLevel }}
-                auth_proto: {{ .Credential.AuthProtocol }}
-                auth_key: {{ .Credential.AuthPassphrase }}
-                priv_proto: {{ .Credential.PrivacyProtocol }}
-                priv_key: {{ .Credential.PrivacyPassphrase }}
-              {{- end }}
+              {{- $job := dict -}}
+              {{- if .SysInfo.Name -}}
+              {{- $_ := set $job "name" (printf "%s-ip-%s" .SysInfo.Name .IPAddress) -}}
+              {{- else -}}
+              {{- $_ := set $job "name" (printf "ip-%s" .IPAddress) -}}
+              {{- end -}}
+              {{- $_ := set $job "hostname" .IPAddress -}}
+              {{- $_ := set $job "options" (dict "version" .Credential.Version) -}}
+              {{- if eq .Credential.Version "1" "2" "2c" -}}
+              {{- $_ := set $job "community" .Credential.Community -}}
+              {{- else -}}
+              {{- $_ := set $job "user" (dict
+                "name" .Credential.UserName
+                "level" .Credential.SecurityLevel
+                "auth_proto" .Credential.AuthProtocol
+                "auth_key" .Credential.AuthPassphrase
+                "priv_proto" .Credential.PrivacyProtocol
+                "priv_key" .Credential.PrivacyPassphrase
+              ) -}}
+              {{- end -}}
+              {{ $job | toYaml -}}
       - name: 'Skip rule for management VIPs'
         description: |
           Drop devices whose `sysName` starts with `vip-` so they are not monitored. A skip rule is a rule with **no** `config_template`. Place it before the catch-all so its match wins first. (The second rule below is the [Default catch-all rule](#default-catch-all-rule) — paste its full body in place of the placeholder comment.)
@@ -340,22 +342,24 @@ services:
           - id: cisco
             match: '{{ glob .SysInfo.Vendor "Cisco*" }}'
             config_template: |
-              module: snmp
-              name: cisco-{{ .SysInfo.Name }}-{{ .IPAddress }}
-              hostname: {{ .IPAddress }}
-              options:
-                version: {{ .Credential.Version }}
-              {{- if eq .Credential.Version "1" "2" "2c" }}
-              community: {{ .Credential.Community }}
-              {{- else }}
-              user:
-                name: {{ .Credential.UserName }}
-                level: {{ .Credential.SecurityLevel }}
-                auth_proto: {{ .Credential.AuthProtocol }}
-                auth_key: {{ .Credential.AuthPassphrase }}
-                priv_proto: {{ .Credential.PrivacyProtocol }}
-                priv_key: {{ .Credential.PrivacyPassphrase }}
-              {{- end }}
+              {{- $job := dict -}}
+              {{- $_ := set $job "module" "snmp" -}}
+              {{- $_ := set $job "name" (printf "cisco-%s-%s" .SysInfo.Name .IPAddress) -}}
+              {{- $_ := set $job "hostname" .IPAddress -}}
+              {{- $_ := set $job "options" (dict "version" .Credential.Version) -}}
+              {{- if eq .Credential.Version "1" "2" "2c" -}}
+              {{- $_ := set $job "community" .Credential.Community -}}
+              {{- else -}}
+              {{- $_ := set $job "user" (dict
+                "name" .Credential.UserName
+                "level" .Credential.SecurityLevel
+                "auth_proto" .Credential.AuthProtocol
+                "auth_key" .Credential.AuthPassphrase
+                "priv_proto" .Credential.PrivacyProtocol
+                "priv_key" .Credential.PrivacyPassphrase
+              ) -}}
+              {{- end -}}
+              {{ $job | toYaml -}}
 
           - id: skip-cisco-from-catchall
             match: '{{ glob .SysInfo.Vendor "Cisco*" }}'
@@ -371,13 +375,14 @@ services:
           - id: hp-printer
             match: '{{ and (eq .SysInfo.Category "printer") (glob .SysInfo.Vendor "HP*" "Hewlett*") }}'
             config_template: |
-              module: snmp
-              name: printer-{{ .SysInfo.Name }}-{{ .IPAddress }}
-              hostname: {{ .IPAddress }}
-              update_every: 30
-              options:
-                version: {{ .Credential.Version }}
-              community: {{ .Credential.Community }}
+              {{- dict
+                "module" "snmp"
+                "name" (printf "printer-%s-%s" .SysInfo.Name .IPAddress)
+                "hostname" .IPAddress
+                "update_every" 30
+                "options" (dict "version" .Credential.Version)
+                "community" .Credential.Community
+              | toYaml -}}
 verify:
   description: 'After enabling the discoverer, confirm it is finding devices and producing jobs.'
   checks:

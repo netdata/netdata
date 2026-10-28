@@ -197,9 +197,9 @@
             },
             "config_template": {
               "title": "Config template",
-              "description": "**Uses the same fields as match expression**. Go template that generates the data collection job configuration in YAML format. **Must include 'module' and 'name' fields**, plus any module-specific settings.",
+              "description": "Go template that builds a job with dict, or multiple jobs with list, and serializes the result with toYaml. The module defaults to the rule ID when omitted.",
               "type": "string",
-              "default": "{{- if .SysInfo.Name }}\nname: {{ .SysInfo.Name }}-ip-{{ .IPAddress }}\n{{- else }}\nname: ip-{{ .IPAddress }}\n{{- end }}\nhostname: {{ .IPAddress }}\noptions:\n  version: {{ .Credential.Version }}\n{{- if eq .Credential.Version \"1\" \"2\" \"2c\" }}\ncommunity: {{ .Credential.Community }}\n{{- else }}\nuser:\n  name: {{ .Credential.UserName }}\n  level: {{ .Credential.SecurityLevel }}\n  auth_proto: {{ .Credential.AuthProtocol }}\n  auth_key: {{ .Credential.AuthPassphrase }}\n  priv_proto: {{ .Credential.PrivacyProtocol }}\n  priv_key: {{ .Credential.PrivacyPassphrase }}\n{{- end }}"
+              "default": "{{- $job := dict -}}\n{{- if .SysInfo.Name -}}\n{{- $_ := set $job \"name\" (printf \"%s-ip-%s\" .SysInfo.Name .IPAddress) -}}\n{{- else -}}\n{{- $_ := set $job \"name\" (printf \"ip-%s\" .IPAddress) -}}\n{{- end -}}\n{{- $_ := set $job \"hostname\" .IPAddress -}}\n{{- $_ := set $job \"options\" (dict \"version\" .Credential.Version) -}}\n{{- if eq .Credential.Version \"1\" \"2\" \"2c\" -}}\n{{- $_ := set $job \"community\" .Credential.Community -}}\n{{- else -}}\n{{- $_ := set $job \"user\" (dict\n  \"name\" .Credential.UserName\n  \"level\" .Credential.SecurityLevel\n  \"auth_proto\" .Credential.AuthProtocol\n  \"auth_key\" .Credential.AuthPassphrase\n  \"priv_proto\" .Credential.PrivacyProtocol\n  \"priv_key\" .Credential.PrivacyPassphrase\n) -}}\n{{- end -}}\n{{ $job | toYaml -}}\n"
             }
           },
           "required": [
@@ -283,7 +283,7 @@
         },
         "config_template": {
           "ui:widget": "textarea",
-          "ui:placeholder": "{{- if .SysInfo.Name }}\nname: {{ .SysInfo.Name }}-ip-{{ .IPAddress }}\n{{- else }}\nname: ip-{{ .IPAddress }}\n{{- end }}\nhostname: {{ .IPAddress }}\noptions:\n  version: {{ .Credential.Version }}\n{{- if eq .Credential.Version \"1\" \"2\" \"2c\" }}\ncommunity: {{ .Credential.Community }}\n{{- else }}\nuser:\n  name: {{ .Credential.UserName }}\n  level: {{ .Credential.SecurityLevel }}\n  auth_proto: {{ .Credential.AuthProtocol }}\n  auth_key: {{ .Credential.AuthPassphrase }}\n  priv_proto: {{ .Credential.PrivacyProtocol }}\n  priv_key: {{ .Credential.PrivacyPassphrase }}\n{{- end }}"
+          "ui:placeholder": "{{- $job := dict -}}\n{{- if .SysInfo.Name -}}\n{{- $_ := set $job \"name\" (printf \"%s-ip-%s\" .SysInfo.Name .IPAddress) -}}\n{{- else -}}\n{{- $_ := set $job \"name\" (printf \"ip-%s\" .IPAddress) -}}\n{{- end -}}\n{{- $_ := set $job \"hostname\" .IPAddress -}}\n{{- $_ := set $job \"options\" (dict \"version\" .Credential.Version) -}}\n{{- if eq .Credential.Version \"1\" \"2\" \"2c\" -}}\n{{- $_ := set $job \"community\" .Credential.Community -}}\n{{- else -}}\n{{- $_ := set $job \"user\" (dict\n  \"name\" .Credential.UserName\n  \"level\" .Credential.SecurityLevel\n  \"auth_proto\" .Credential.AuthProtocol\n  \"auth_key\" .Credential.AuthPassphrase\n  \"priv_proto\" .Credential.PrivacyProtocol\n  \"priv_key\" .Credential.PrivacyPassphrase\n) -}}\n{{- end -}}\n{{ $job | toYaml -}}\n"
         }
       },
       "ui:help": "- Match discovered SNMP devices and generate collector configurations.\n- Each rule specifies match criteria and a config template.\n- When a device matches, a data collection job is created.\n- The **default service rule** is sufficient for most cases. It creates an SNMP data collection job for each discovered device and handles both SNMPv2 and SNMPv3."

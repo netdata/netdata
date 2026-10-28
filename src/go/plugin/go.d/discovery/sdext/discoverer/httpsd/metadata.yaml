@@ -125,7 +125,7 @@ setup:
               - id: passthrough
                 match: '{{ true }}'
                 config_template: |
-                  {{ .Item | toYaml }}
+                  {{ .Item | toYaml -}}
         - name: 'Array of bare URLs → httpcheck'
           description: |
             The endpoint returns `[ "https://a/health", "https://b/health" ]`. Map each URL to an `httpcheck` job.
@@ -139,8 +139,7 @@ setup:
               - id: httpcheck
                 match: '{{ kindIs "string" .Item }}'
                 config_template: |
-                  name: {{ .TUID }}
-                  url: {{ .Item }}
+                  {{ dict "name" .TUID "url" .Item | toYaml -}}
         - name: 'Array of objects with custom shape'
           description: |
             The endpoint returns `[ { "name": "api", "url": "https://api.example.com/health" }, … ]`.
@@ -153,8 +152,7 @@ setup:
               - id: httpcheck
                 match: '{{ and (kindIs "map" .Item) (hasKey .Item "url") }}'
                 config_template: |
-                  name: {{ .Item.name }}
-                  url: {{ .Item.url }}
+                  {{ dict "name" .Item.name "url" .Item.url | toYaml -}}
         - name: 'Bearer-token authentication'
           description: 'Authenticate against the source-of-truth endpoint using a bearer token from a file.'
           config: |
@@ -169,7 +167,7 @@ setup:
               - id: passthrough
                 match: '{{ true }}'
                 config_template: |
-                  {{ .Item | toYaml }}
+                  {{ .Item | toYaml -}}
 services:
   description: |
     A `services:` rule turns each fetched item into one or more collector jobs. The HTTP discoverer is unique among SD discoverers in that the target's data shape is **defined by the upstream endpoint**, not by this discoverer — `.Item` is whatever JSON/YAML element the endpoint returned.
@@ -211,7 +209,7 @@ services:
           - id: passthrough
             match: '{{ true }}'
             config_template: |
-              {{ .Item | toYaml }}
+              {{ .Item | toYaml -}}
       - name: 'Array of strings → httpcheck (curated)'
         description: |
           Endpoint serves `[ "https://a/health", "https://b/health" ]`. Use `kindIs "string"` to gate the rule, then map each string to an `httpcheck` job. `id: httpcheck` makes the module infer automatically.
@@ -219,8 +217,7 @@ services:
           - id: httpcheck
             match: '{{ kindIs "string" .Item }}'
             config_template: |
-              name: {{ .TUID }}
-              url: {{ .Item }}
+              {{ dict "name" .TUID "url" .Item | toYaml -}}
       - name: 'Array of objects → httpcheck (curated)'
         description: |
           Endpoint serves `[ { "name": "api", "url": "https://api/health" }, … ]`. Type-check that the item is a map and has a `url` key, then map fields into the rendered job.
@@ -228,8 +225,7 @@ services:
           - id: httpcheck
             match: '{{ and (kindIs "map" .Item) (hasKey .Item "url") }}'
             config_template: |
-              name: {{ .Item.name }}
-              url: {{ .Item.url }}
+              {{ dict "name" .Item.name "url" .Item.url | toYaml -}}
       - name: 'Multiple modules from one endpoint'
         description: |
           Your endpoint mixes shapes — some items target `httpcheck`, some target `prometheus`. Use `hasKey` to discriminate, with each rule producing its own module's jobs.
@@ -237,14 +233,12 @@ services:
           - id: prometheus
             match: '{{ and (kindIs "map" .Item) (hasKey .Item "metrics_url") }}'
             config_template: |
-              name: {{ .Item.name }}
-              url: {{ .Item.metrics_url }}
+              {{ dict "name" .Item.name "url" .Item.metrics_url | toYaml -}}
 
           - id: httpcheck
             match: '{{ and (kindIs "map" .Item) (hasKey .Item "health_url") }}'
             config_template: |
-              name: {{ .Item.name }}
-              url: {{ .Item.health_url }}
+              {{ dict "name" .Item.name "url" .Item.health_url | toYaml -}}
 verify:
   description: 'After enabling the discoverer, confirm the endpoint is reachable and items are being parsed.'
   checks:

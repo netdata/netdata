@@ -104,8 +104,7 @@ setup:
               - id: nginx
                 match: '{{ match "sp" .Image "nginx nginx:*" }}'
                 config_template: |
-                  name: docker_{{.Name}}
-                  url: http://{{.Address}}/stub_status
+                  {{ dict "name" (printf "docker_%s" .Name) "url" (printf "http://%s/stub_status" .Address) | toYaml -}}
         - name: 'Remote daemon over TCP'
           description: 'Point the discoverer at a remote Docker daemon. TLS is not yet wired into the discoverer; either expose the daemon on a trusted internal network or use a stunnel/socat proxy.'
           config: |
@@ -120,8 +119,7 @@ setup:
               - id: redis
                 match: '{{ match "sp" .Image "redis redis:* */redis */redis:*" }}'
                 config_template: |
-                  name: docker_{{.Name}}
-                  address: redis://@{{.Address}}
+                  {{ dict "name" (printf "docker_%s" .Name) "address" (printf "redis://@%s" .Address) | toYaml -}}
 services:
   description: |
     A `services:` rule turns each discovered container target into one or more collector jobs. Most rules match on `.Image` (using the `match "sp"` simple-pattern helper for the typical `image image:* */image */image:*` family), some also gate on `.PrivatePort`, and a few use `.Labels` to honor user intent.
@@ -200,14 +198,12 @@ services:
           - id: nginx
             match: '{{ match "sp" .Image "nginx nginx:*" }}'
             config_template: |
-              - name: docker_{{.Name}}
-                url: http://{{.Address}}/stub_status
-              - name: docker_{{.Name}}
-                url: http://{{.Address}}/basic_status
-              - name: docker_{{.Name}}
-                url: http://{{.Address}}/nginx_status
-              - name: docker_{{.Name}}
-                url: http://{{.Address}}/status
+              {{- list
+                (dict "name" (printf "docker_%s" .Name) "url" (printf "http://%s/stub_status" .Address))
+                (dict "name" (printf "docker_%s" .Name) "url" (printf "http://%s/basic_status" .Address))
+                (dict "name" (printf "docker_%s" .Name) "url" (printf "http://%s/nginx_status" .Address))
+                (dict "name" (printf "docker_%s" .Name) "url" (printf "http://%s/status" .Address))
+              | toYaml -}}
       - name: 'Postgres — explicit module override'
         description: |
           When the rule `id` is something other than the target module name, set `module:` explicitly inside the rendered job.
@@ -215,9 +211,11 @@ services:
           - id: postgres
             match: '{{ or (eq .PrivatePort "5432") (match "sp" .Image "postgres postgres:* */postgres */postgres:* */postgresql */postgresql:*") }}'
             config_template: |
-              module: postgres
-              name: docker_{{.Name}}
-              dsn: postgres://netdata:postgres@{{.Address}}/postgres
+              {{- dict
+                "module" "postgres"
+                "name" (printf "docker_%s" .Name)
+                "dsn" (printf "postgres://netdata:postgres@%s/postgres" .Address)
+              | toYaml -}}
       - name: 'Label-driven custom matching'
         description: |
           Use container labels to override behaviour without changing rules — e.g. opt a container in or out of monitoring, or pick a non-default endpoint. The example below requires the operator to set the label `netdata.go.d/module=mymodule` on the container.
@@ -225,9 +223,11 @@ services:
           - id: label-routed
             match: '{{ and (hasKey .Labels "netdata.go.d/module") (eq (index .Labels "netdata.go.d/module") "mymodule") }}'
             config_template: |
-              module: mymodule
-              name: docker_{{.Name}}
-              url: http://{{.Address}}/metrics
+              {{- dict
+                "module" "mymodule"
+                "name" (printf "docker_%s" .Name)
+                "url" (printf "http://%s/metrics" .Address)
+              | toYaml -}}
 verify:
   description: 'After enabling the discoverer, confirm it is finding containers and producing jobs.'
   checks:

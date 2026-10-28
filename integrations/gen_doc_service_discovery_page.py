@@ -194,8 +194,7 @@ services:
                 "`match` and `glob` are case-sensitive.",
                 "`match \"re\" ...` is unanchored. Use `^...$` to require a full-string match.",
                 "There is **no** standalone `regexp` or `regex` helper. Use `match \"re\"` (or sprig's `regexFind` / `regexMatch`) for regex matching.",
-                "`match` and `glob` return the **string** `\"true\"` or `\"false\"`, not a Go bool. The rule engine compares the trimmed template output against the literal `\"true\"`, so a top-level `match: '{{ glob .X \"foo*\" }}'` works directly.",
-                "**Composing with `if` / `and` / `or` is a footgun**: in Go templates a non-empty string is truthy, so both `\"true\"` *and* `\"false\"` evaluate truthy under `if`. `{{ if glob .X \"foo*\" }}` is therefore **wrong**. Either wrap each result with `eq ... \"true\"` to get a real bool, or use an explicit `if-then-true` block:\n  ```\n  match: '{{ if and (eq (glob .Vendor \"Cisco*\") \"true\") (eq .Category \"router\") }}true{{ end }}'\n  ```",
+                "`match` and `glob` return booleans and can be composed with `if`, `and`, and `or`. The rule engine compares the rendered match template with the literal text `true`.",
             ],
         },
     },
@@ -204,6 +203,9 @@ services:
         "intro": [
             "By default, discovered jobs treat `${env:...}`, `${file:...}`, `${cmd:...}`, and `${store:...}` as literal text, even when a reference comes from an operator-authored discovery rule or credential. A pipeline with `trust_discovered_targets: yes` allows these references in all its generated collector jobs. Alternatively, adopt an individual collector job through Dynamic Configuration and review its complete configuration before saving.",
             "When a template rule matches, its `config_template` is executed with the target as the dot context. The rendered output is parsed as YAML to produce one or more collector jobs.",
+            "Build each job with `dict`, assemble string values with `printf`, and serialize the complete job with `toYaml`. Use `list` for multiple jobs. This preserves names, credentials, IPv6 addresses, and other values containing YAML punctuation or line breaks. Keep numbers and booleans typed, for example `(atoi .Port)` for a numeric port. End the final serialization action with `-}}` so template whitespace does not append to a value ending in newlines.",
+            "For conditional fields, create a fresh job dictionary with `{{- $job := dict -}}` and assign fields with `{{- $_ := set $job \"key\" VALUE -}}`. Assigning the result to `$_` prevents `set` from printing the dictionary. Finish with `{{ $job | toYaml -}}`.",
+            "Existing user files and saved Dynamic Configuration rules are not rewritten during an upgrade. Update rules that interpolate raw target text to the dictionary pattern below. Metadata normalization and adding literal quotes around template expressions do not replace serialization.",
         ],
         "rules": [
             {
@@ -212,11 +214,11 @@ services:
             },
             {
                 "name": "Sequence of maps → one job per element",
-                "description": "If the rendered YAML is a sequence (top-level YAML `-` items), one job is created per element. Use this for multi-job rules. Example: a `net_listeners` rule that emits both a TCP and a Unix-socket MySQL job from the same target —\n\n  ```yaml\n  - id: mysql\n    match: '{{ or (eq .Port \"3306\") (eq .Comm \"mysqld\") }}'\n    config_template: |\n      - name: local\n        dsn: netdata@unix(/var/run/mysqld/mysqld.sock)/\n      - name: local\n        dsn: netdata@tcp({{.Address}})/\n  ```",
+                "description": "If the rendered YAML is a sequence, one job is created per element. Build the sequence with `list` and serialize it once. This local-listener rule emits Unix-socket and TCP MySQL jobs in order:\n\n  ```yaml\n  - id: mysql\n    match: '{{ or (eq .Port \"3306\") (eq .Comm \"mysqld\") }}'\n    config_template: |\n      {{- list\n        (dict \"name\" \"local\" \"dsn\" \"netdata@unix(/var/run/mysqld/mysqld.sock)/\")\n        (dict \"name\" \"local\" \"dsn\" (printf \"netdata@tcp(%s)/\" .Address))\n      | toYaml -}}\n  ```",
             },
             {
                 "name": "Module inference from rule `id`",
-                "description": "If the rendered job map has no `module:` key, the rule's `id` is used as the module name. Set `id: snmp` (or `docker`, `http`, …) to omit `module:` from your template; otherwise include `module:` explicitly.",
+                "description": "If the rendered job map has no `module` key, the rule's `id` is used as the module name. Use the collector module name, such as `snmp` or `prometheus`, as the rule ID to omit `module` from the dictionary; otherwise set it explicitly.",
             },
             {
                 "name": "`id` uniqueness",
@@ -264,7 +266,7 @@ services:
             },
             {
                 "name": "YAML parse error after rendering",
-                "description": "`failed to parse services[N] template data` means the rendered output is not valid YAML. Common cause: a discovered string field contains a colon, hash, or other YAML special character. Serialize complete dynamic values with `toYaml`, for example `name: {{ .X | toYaml }}`. Adding quotes around raw template text does not escape embedded quotes or newlines.",
+                "description": "`failed to parse services[N] template data` means the rendered output is not valid YAML. Common cause: raw target text contains a colon, hash, or line break. Build and serialize the complete job, for example `{{ dict \"name\" .Name \"url\" .Address | toYaml -}}`. Do not concatenate raw values into YAML or splice serialized multiline scalars into a larger document.",
             },
         ],
     },
