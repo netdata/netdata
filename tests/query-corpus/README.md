@@ -14,9 +14,8 @@ another instance's CLI socket.
 
 Runtime directories are created under `TMPDIR`. Relative temporary and data
 directories are resolved to absolute paths before the daemon changes its working
-directory. Before launching a daemon, the harness checks that its CLI and main
-spawn-server socket paths fit the
-platform's Unix-socket byte limit. If a path is too long, the launch is rejected
+directory. Before launching a daemon, the harness checks that its CLI socket path
+fits the platform's Unix-socket byte limit. If a path is too long, the launch is rejected
 and its private runtime directory is removed. Set `TMPDIR` to a shorter writable
 directory; other corpus data continues to use that temporary directory too.
 
