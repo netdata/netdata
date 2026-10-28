@@ -16,7 +16,7 @@ echo "::group::>>> Pre-Update Netdata Build Info"
 echo "::endgroup::"
 echo "::group::>>> Updating Netdata..."
 export NETDATA_BASE_URL="http://localhost:8080" # Pull the tarball from the local web server.
-echo 'NETDATA_ACCEPT_MAJOR_VERSIONS="1 9999"' > /etc/netdata/netdata-updater.conf
+echo 'NETDATA_ACCEPT_MAJOR_VERSIONS="1 9999"' > /opt/netdata/etc/netdata/netdata-updater.conf
 timeout 3600 sh -x packaging/installer/netdata-updater.sh --force-update --not-running-from-cron --no-updater-self-update
 ret="$?"
 echo "::endgroup::"
