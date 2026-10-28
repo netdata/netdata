@@ -215,7 +215,8 @@ func serializationTarget(value, version, body string) *discoverySerializationTar
 	tgt.Credential.Community, tgt.Credential.UserName, tgt.Credential.SecurityLevel = value, value, value
 	tgt.Credential.AuthProtocol, tgt.Credential.AuthPassphrase = value, value
 	tgt.Credential.PrivacyProtocol, tgt.Credential.PrivacyPassphrase = value, value
-	if strings.Contains(body, ".Item.") || strings.HasPrefix(strings.TrimSpace(body), "{{ .Item |") {
+	if strings.Contains(body, ".Item.") || strings.HasPrefix(strings.TrimSpace(body), "{{ .Item |") ||
+		strings.Contains(body, "{{ job .Item }}") {
 		tgt.Item = map[string]any{"name": value, "url": value, "metrics_url": value, "health_url": value, "module": "httpcheck"}
 	} else {
 		tgt.Item = value

@@ -170,6 +170,7 @@ class ServiceDiscoveryClaimsTest(unittest.TestCase):
 
     def test_template_module_names(self):
         for template in ('module: hdfs', '- module: hdfs',
+                         '{{ job "module" "hdfs" "url" .Address }}',
                          '{{ dict "module" "hdfs" "url" .Address | toYaml -}}',
                          '{{- $_ := set $job "module" "hdfs" -}}'):
             with self.subTest(template=template):

@@ -159,7 +159,7 @@
             },
             "config_template": {
               "title": "Config template",
-              "description": "Go template that builds a job with dict, or multiple jobs with list, and serializes the result with toYaml. The module defaults to the rule ID when omitted.",
+              "description": "Go template that creates jobs with the job helper. Pass key/value pairs or a prepared map; call job once per job. The module defaults to the rule ID when omitted.",
               "type": "string"
             }
           },
@@ -285,7 +285,7 @@
         },
         "config_template": {
           "ui:widget": "textarea",
-          "ui:placeholder": "{{ dict \"name\" .TUID \"module\" \"httpcheck\" \"url\" .Item | toYaml -}}\n"
+          "ui:placeholder": "{{ job \"name\" .TUID \"module\" \"httpcheck\" \"url\" .Item }}\n"
         }
       },
       "ui:help": "- Match fetched HTTP discovery items and generate collector configurations.\n- Generated job configs must include `name` and `module`; `module` is the collector name, for example `httpcheck` or `ping`.\n- If a generated config omits `module`, the rule ID is used as `module`; rely on this only for curated rules where the rule ID is the intended collector.\n- `.Item` contains the fetched item. String items expose the string as `.Item`; object items expose fields under `.Item`."

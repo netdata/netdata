@@ -217,14 +217,14 @@ setup:
                 match: '{{ true }}'
 services:
   description: |
-    A `services:` rule turns each discovered SNMP device into one or more `snmp` collector jobs. Each rule has an `id`, a Go-template `match` expression that decides whether the rule applies to the device, and an optional `config_template` that renders the collector job YAML when the rule matches.
+    A `services:` rule turns each discovered SNMP device into one or more `snmp` collector jobs. Each rule has an `id`, a Go-template `match` expression that decides whether the rule applies to the device, and an optional `config_template` that creates collector jobs when the rule matches.
 
     The default rule shipped with Netdata (`{{ true }}`) creates one job per discovered device and handles both SNMPv2 and SNMPv3 — most users never change it. Customise rules when you want vendor-specific configs (Cisco vs. Juniper, printers vs. routers), per-VLAN overrides, or multiple jobs per device.
 
-    The shared rule model — function reference (sprig + Netdata helpers `match`, `glob`, `promPort`, `toYaml`), `config_template` rendering rules, and the strict-missing-key error semantics — lives on the [Service Discovery](/src/collectors/SERVICE-DISCOVERY.md) hub page. The notes below are SNMP-specific.
+    The shared rule model — function reference (sprig + Netdata helpers `match`, `glob`, `promPort`, `job`), `config_template` rendering rules, and the strict-missing-key error semantics — lives on the [Service Discovery](/src/collectors/SERVICE-DISCOVERY.md) hub page. The notes below are SNMP-specific.
   evaluation:
     description: |
-      Quick reference — see [Rule evaluation semantics](/src/collectors/SERVICE-DISCOVERY.md#rule-evaluation-semantics) on the hub page for the full model (sequence-output multi-job rendering, module inference from `id`, `missingkey=error`, ordering recommendations).
+      Quick reference — see [Rule evaluation semantics](/src/collectors/SERVICE-DISCOVERY.md#rule-evaluation-semantics) on the hub page for the full model (multiple `job` calls, module inference from `id`, `missingkey=error`, ordering recommendations).
     list:
       - name: 'Skip rule (no config_template)'
         description: 'A matching rule with no `config_template` drops the device immediately — no job, no further rule evaluation. Use it to exclude devices the catch-all would otherwise pick up. Place **before** any template rule.'
@@ -234,7 +234,7 @@ services:
         description: 'Set `id: snmp` so the rendered job inherits the `snmp` module name automatically, or include `module: snmp` explicitly inside the `config_template` (required when `id` is anything else, e.g. `cisco`).'
   template_variables:
     description: |
-      Available inside both `match` expressions and `config_template` bodies. All variables are strings. System description, contact, name, location, and organization are normalized to single-line text without control characters. This normalization does not replace YAML serialization: build the job with `dict` and serialize it with `toYaml` as shown below.
+      Available inside both `match` expressions and `config_template` bodies. All variables are strings. System description, contact, name, location, and organization are normalized to single-line text without control characters. Use the `job` helper to create collector jobs with automatic encoding, as shown below; normalization alone does not make raw YAML interpolation safe.
     list:
       - name: '.IPAddress'
         type: 'string'
@@ -300,27 +300,27 @@ services:
           - id: snmp
             match: '{{ true }}'
             config_template: |
-              {{- $job := dict -}}
-              {{- if .SysInfo.Name -}}
-              {{- $_ := set $job "name" (printf "%s-ip-%s" .SysInfo.Name .IPAddress) -}}
-              {{- else -}}
-              {{- $_ := set $job "name" (printf "ip-%s" .IPAddress) -}}
-              {{- end -}}
-              {{- $_ := set $job "hostname" .IPAddress -}}
-              {{- $_ := set $job "options" (dict "version" .Credential.Version) -}}
-              {{- if eq .Credential.Version "1" "2" "2c" -}}
-              {{- $_ := set $job "community" .Credential.Community -}}
-              {{- else -}}
-              {{- $_ := set $job "user" (dict
+              {{ $job := dict
+                "name" (printf "ip-%s" .IPAddress)
+                "hostname" .IPAddress
+                "options" (dict "version" .Credential.Version)
+              }}
+              {{ if .SysInfo.Name }}
+              {{ $_ := set $job "name" (printf "%s-ip-%s" .SysInfo.Name .IPAddress) }}
+              {{ end }}
+              {{ if eq .Credential.Version "1" "2" "2c" }}
+              {{ $_ := set $job "community" .Credential.Community }}
+              {{ else }}
+              {{ $_ := set $job "user" (dict
                 "name" .Credential.UserName
                 "level" .Credential.SecurityLevel
                 "auth_proto" .Credential.AuthProtocol
                 "auth_key" .Credential.AuthPassphrase
                 "priv_proto" .Credential.PrivacyProtocol
                 "priv_key" .Credential.PrivacyPassphrase
-              ) -}}
-              {{- end -}}
-              {{ $job | toYaml -}}
+              ) }}
+              {{ end }}
+              {{ job $job }}
       - name: 'Skip rule for management VIPs'
         description: |
           Drop devices whose `sysName` starts with `vip-` so they are not monitored. A skip rule is a rule with **no** `config_template`. Place it before the catch-all so its match wins first. (The second rule below is the [Default catch-all rule](#default-catch-all-rule) — paste its full body in place of the placeholder comment.)
@@ -342,24 +342,20 @@ services:
           - id: cisco
             match: '{{ glob .SysInfo.Vendor "Cisco*" }}'
             config_template: |
-              {{- $job := dict -}}
-              {{- $_ := set $job "module" "snmp" -}}
-              {{- $_ := set $job "name" (printf "cisco-%s-%s" .SysInfo.Name .IPAddress) -}}
-              {{- $_ := set $job "hostname" .IPAddress -}}
-              {{- $_ := set $job "options" (dict "version" .Credential.Version) -}}
-              {{- if eq .Credential.Version "1" "2" "2c" -}}
-              {{- $_ := set $job "community" .Credential.Community -}}
-              {{- else -}}
-              {{- $_ := set $job "user" (dict
+              {{ $job := dict "module" "snmp" "name" (printf "cisco-%s-%s" .SysInfo.Name .IPAddress) "hostname" .IPAddress "options" (dict "version" .Credential.Version) }}
+              {{ if eq .Credential.Version "1" "2" "2c" }}
+              {{ $_ := set $job "community" .Credential.Community }}
+              {{ else }}
+              {{ $_ := set $job "user" (dict
                 "name" .Credential.UserName
                 "level" .Credential.SecurityLevel
                 "auth_proto" .Credential.AuthProtocol
                 "auth_key" .Credential.AuthPassphrase
                 "priv_proto" .Credential.PrivacyProtocol
                 "priv_key" .Credential.PrivacyPassphrase
-              ) -}}
-              {{- end -}}
-              {{ $job | toYaml -}}
+              ) }}
+              {{ end }}
+              {{ job $job }}
 
           - id: skip-cisco-from-catchall
             match: '{{ glob .SysInfo.Vendor "Cisco*" }}'
@@ -375,14 +371,14 @@ services:
           - id: hp-printer
             match: '{{ and (eq .SysInfo.Category "printer") (glob .SysInfo.Vendor "HP*" "Hewlett*") }}'
             config_template: |
-              {{- dict
+              {{ job
                 "module" "snmp"
                 "name" (printf "printer-%s-%s" .SysInfo.Name .IPAddress)
                 "hostname" .IPAddress
                 "update_every" 30
                 "options" (dict "version" .Credential.Version)
                 "community" .Credential.Community
-              | toYaml -}}
+              }}
 verify:
   description: 'After enabling the discoverer, confirm it is finding devices and producing jobs.'
   checks:
@@ -430,6 +426,6 @@ troubleshooting:
         description: |
           The discoverer creates jobs but does not run them — the `snmp` collector does. Check the `snmp` collector log and the rendered job YAML in the agent's debug output. Common causes:
 
-          - The rendered `config_template` produces invalid YAML for some discovered field values (for example, unescaped colons in `sysName`). Build the complete job with `dict` and serialize it with `toYaml`. End the final serialization action with `-}}`, as shown in the examples above.
+          - The rendered `config_template` produces invalid YAML for some discovered field values (for example, unescaped colons in `sysName`). Use the `job` helper for automatic encoding, as shown in the examples above. Legacy templates that interpolate values into YAML need this migration.
           - Module name mismatch — the rule `id` (or explicit `module:` field) does not match `snmp`.
           - SNMPv3 credentials succeeded for `system` MIB during discovery but the collector cannot read other OIDs (different VACM view); confirm with `snmpwalk` against the device.

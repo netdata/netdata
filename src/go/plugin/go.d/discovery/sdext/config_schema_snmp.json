@@ -197,9 +197,9 @@
             },
             "config_template": {
               "title": "Config template",
-              "description": "Go template that builds a job with dict, or multiple jobs with list, and serializes the result with toYaml. The module defaults to the rule ID when omitted.",
+              "description": "Go template that creates jobs with the job helper. Pass key/value pairs or a prepared map; call job once per job. The module defaults to the rule ID when omitted.",
               "type": "string",
-              "default": "{{- $job := dict -}}\n{{- if .SysInfo.Name -}}\n{{- $_ := set $job \"name\" (printf \"%s-ip-%s\" .SysInfo.Name .IPAddress) -}}\n{{- else -}}\n{{- $_ := set $job \"name\" (printf \"ip-%s\" .IPAddress) -}}\n{{- end -}}\n{{- $_ := set $job \"hostname\" .IPAddress -}}\n{{- $_ := set $job \"options\" (dict \"version\" .Credential.Version) -}}\n{{- if eq .Credential.Version \"1\" \"2\" \"2c\" -}}\n{{- $_ := set $job \"community\" .Credential.Community -}}\n{{- else -}}\n{{- $_ := set $job \"user\" (dict\n  \"name\" .Credential.UserName\n  \"level\" .Credential.SecurityLevel\n  \"auth_proto\" .Credential.AuthProtocol\n  \"auth_key\" .Credential.AuthPassphrase\n  \"priv_proto\" .Credential.PrivacyProtocol\n  \"priv_key\" .Credential.PrivacyPassphrase\n) -}}\n{{- end -}}\n{{ $job | toYaml -}}\n"
+              "default": "{{ $job := dict\n  \"name\" (printf \"ip-%s\" .IPAddress)\n  \"hostname\" .IPAddress\n  \"options\" (dict \"version\" .Credential.Version)\n}}\n{{ if .SysInfo.Name }}\n{{ $_ := set $job \"name\" (printf \"%s-ip-%s\" .SysInfo.Name .IPAddress) }}\n{{ end }}\n{{ if eq .Credential.Version \"1\" \"2\" \"2c\" }}\n{{ $_ := set $job \"community\" .Credential.Community }}\n{{ else }}\n{{ $_ := set $job \"user\" (dict\n  \"name\" .Credential.UserName\n  \"level\" .Credential.SecurityLevel\n  \"auth_proto\" .Credential.AuthProtocol\n  \"auth_key\" .Credential.AuthPassphrase\n  \"priv_proto\" .Credential.PrivacyProtocol\n  \"priv_key\" .Credential.PrivacyPassphrase\n) }}\n{{ end }}\n{{ job $job }}\n"
             }
           },
           "required": [
@@ -283,7 +283,7 @@
         },
         "config_template": {
           "ui:widget": "textarea",
-          "ui:placeholder": "{{- $job := dict -}}\n{{- if .SysInfo.Name -}}\n{{- $_ := set $job \"name\" (printf \"%s-ip-%s\" .SysInfo.Name .IPAddress) -}}\n{{- else -}}\n{{- $_ := set $job \"name\" (printf \"ip-%s\" .IPAddress) -}}\n{{- end -}}\n{{- $_ := set $job \"hostname\" .IPAddress -}}\n{{- $_ := set $job \"options\" (dict \"version\" .Credential.Version) -}}\n{{- if eq .Credential.Version \"1\" \"2\" \"2c\" -}}\n{{- $_ := set $job \"community\" .Credential.Community -}}\n{{- else -}}\n{{- $_ := set $job \"user\" (dict\n  \"name\" .Credential.UserName\n  \"level\" .Credential.SecurityLevel\n  \"auth_proto\" .Credential.AuthProtocol\n  \"auth_key\" .Credential.AuthPassphrase\n  \"priv_proto\" .Credential.PrivacyProtocol\n  \"priv_key\" .Credential.PrivacyPassphrase\n) -}}\n{{- end -}}\n{{ $job | toYaml -}}\n"
+          "ui:placeholder": "{{ $job := dict\n  \"name\" (printf \"ip-%s\" .IPAddress)\n  \"hostname\" .IPAddress\n  \"options\" (dict \"version\" .Credential.Version)\n}}\n{{ if .SysInfo.Name }}\n{{ $_ := set $job \"name\" (printf \"%s-ip-%s\" .SysInfo.Name .IPAddress) }}\n{{ end }}\n{{ if eq .Credential.Version \"1\" \"2\" \"2c\" }}\n{{ $_ := set $job \"community\" .Credential.Community }}\n{{ else }}\n{{ $_ := set $job \"user\" (dict\n  \"name\" .Credential.UserName\n  \"level\" .Credential.SecurityLevel\n  \"auth_proto\" .Credential.AuthProtocol\n  \"auth_key\" .Credential.AuthPassphrase\n  \"priv_proto\" .Credential.PrivacyProtocol\n  \"priv_key\" .Credential.PrivacyPassphrase\n) }}\n{{ end }}\n{{ job $job }}\n"
         }
       },
       "ui:help": "- Match discovered SNMP devices and generate collector configurations.\n- Each rule specifies match criteria and a config template.\n- When a device matches, a data collection job is created.\n- The **default service rule** is sufficient for most cases. It creates an SNMP data collection job for each discovered device and handles both SNMPv2 and SNMPv3."

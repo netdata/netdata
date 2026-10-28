@@ -239,10 +239,10 @@ services:
           - id: prometheus
             match: '{{ and (hasKey .Annotations "prometheus.io/scrape") (eq (index .Annotations "prometheus.io/scrape") "true") }}'
             config_template: |
-              {{- dict
+              {{ job
                 "name" (printf "%s_%s_%s" .Namespace .Name .ContName)
                 "url" (printf "http://%s%s" .Address (index .Annotations "prometheus.io/path" | default "/metrics"))
-              | toYaml -}}
+              }}
       - name: 'Service-role: monitor each metrics-endpoint Service'
         description: |
           Run with `role: service`. Match Services that carry a `metrics-endpoint` component label.
@@ -250,7 +250,7 @@ services:
           - id: prometheus
             match: '{{ and (hasKey .Labels "app.kubernetes.io/component") (eq (index .Labels "app.kubernetes.io/component") "metrics-endpoint") }}'
             config_template: |
-              {{ dict "name" (printf "%s_%s" .Namespace .Name) "url" (printf "http://%s/metrics" .Address) | toYaml -}}
+              {{ job "name" (printf "%s_%s" .Namespace .Name) "url" (printf "http://%s/metrics" .Address) }}
       - name: 'Image-driven: nginx pods'
         description: |
           Match nginx-image pods on a known port. Use `match "sp"` for the four-form image family.
@@ -258,7 +258,7 @@ services:
           - id: nginx
             match: '{{ and (eq .Port "80") (match "sp" .Image "nginx nginx:* */nginx */nginx:*") }}'
             config_template: |
-              {{ dict "name" (printf "%s_%s" .Namespace .Name) "url" (printf "http://%s/stub_status" .Address) | toYaml -}}
+              {{ job "name" (printf "%s_%s" .Namespace .Name) "url" (printf "http://%s/stub_status" .Address) }}
 verify:
   description: 'After enabling the discoverer, confirm it is watching the API and producing targets.'
   checks:
