@@ -481,6 +481,7 @@ func TestCase023MCPQueryMetricsContract(t *testing.T) {
 		"CASE-023/mcp-hidden-dimension-selection",
 		"CASE-023/mcp-default-zero-options",
 		"CASE-023/mcp-invalid-options",
+		"CASE-023/mcp-invalid-numeric-options",
 	} {
 		registerContract(t, contract)
 	}
@@ -646,6 +647,7 @@ func TestCase023MCPQueryMetricsContract(t *testing.T) {
 			"after":             after,
 			"before":            before,
 			"points":            1,
+			"time_group":        "max",
 			"tier":              0,
 			"group_by":          []string{"dimension"},
 			"aggregation":       "average",
@@ -865,6 +867,9 @@ func TestCase023MCPQueryMetricsContract(t *testing.T) {
 				{name: "positive-infinity", value: "+Inf"},
 				{name: "negative-infinity", value: "-Inf"},
 				{name: "overflow-to-infinity", value: "1e309"},
+				{name: "leading-nul", value: "\x00>1"},
+				{name: "interior-nul", value: ">\x001"},
+				{name: "trailing-nul", value: ">1\x00"},
 			}
 			for _, invalid := range invalidOptions {
 				t.Run(group.name+"/"+invalid.name+"-options", func(t *testing.T) {
@@ -875,6 +880,23 @@ func TestCase023MCPQueryMetricsContract(t *testing.T) {
 					response := c023MCPCall(t, requestID, session(t).Session, arguments)
 					requestID++
 					c023MCPAssertOptionsError(t, response.Document, group.name)
+				})
+			}
+		}
+	})
+
+	t.Run("invalid-numeric-options", func(t *testing.T) {
+		trackContract(t, "CASE-023/mcp-invalid-numeric-options")
+		requestID := 400
+		for _, group := range []string{"percentile", "trimmed-mean", "trimmed-median"} {
+			for index, value := range []string{"\x0095", "9\x005", "95\x00"} {
+				t.Run(group+"/nul-"+strconv.Itoa(index), func(t *testing.T) {
+					arguments := baseArguments(standardContext, "bool", fixture.T0, standard.LastT())
+					arguments["time_group"] = group
+					arguments["time_group_options"] = value
+					response := c023MCPCall(t, requestID, session(t).Session, arguments)
+					requestID++
+					c023MCPAssertOptionsError(t, response.Document, group)
 				})
 			}
 		}

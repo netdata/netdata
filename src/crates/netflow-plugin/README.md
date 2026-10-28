@@ -36,6 +36,71 @@ Function output includes volatile fields such as collection timestamps and runti
 statistics. Test harnesses should normalize those fields before comparing fixture
 outputs.
 
+## Startup facet diagnostics
+
+The plugin logs the facet-cache path, whether it loaded the cache, its version,
+and the number of indexed archived paths. Each reconciliation attempt logs its
+inventory source (`registry` or `disk`), active and archived path counts, files to
+scan, and whether it must rebuild archived facets. Completion and rejection logs
+include elapsed milliseconds. For journald, use `journalctl -o verbose` or
+`journalctl -o json` to include these structured fields. Add
+`--namespace=<name>` if the Agent uses a separate systemd journal namespace.
+The rejection cause is also included in the message shown by default output.
+
+A rejected attempt reports one of these causes:
+
+- **Topology generation changed:** journal lifecycle events changed the runtime
+  state during the scan. The log gives the planned and current generations.
+- **Archived rebuild became required:** the runtime needs a rebuild that was not
+  in the scan plan.
+- **Existing path missing from an inventory:** the log names the journal, its
+  expected classification, whether the plan lists it as active or archived,
+  and whether an active scan succeeded. A cached archived entry can move to
+  active only after a successful active scan and an archived-facet rebuild.
+- **Cached archive not successfully scanned:** a rebuild could not read a
+  previously indexed journal that still exists. The plugin keeps the cached
+  values and reports the journal path instead of discarding its contribution.
+  An incomplete scan, including a corrupt entry during ICMP facet scanning,
+  also rejects the replacement.
+
+Retries use a fresh disk inventory. If all three attempts are rejected, the
+final error includes the last rejection cause and attempt context. Keep the
+preceding warnings too: different attempts can fail for different reasons.
+
+If a cached journal cannot be scanned, preserve both the journal and the cache.
+Check the preceding scan warning for its full error chain. If it reports a
+permission or storage-access error, restore access for the Agent service account
+and restart the plugin. If it reports corrupt data, or the cause remains unclear,
+collect the startup logs and ask the maintainers for recovery guidance. Do not
+delete the cache or journal to bypass the rejection.
+
+An offline query without `--no-persist` can classify a live journal as archived
+and save that classification in the shared cache. After an unclean stop, the
+writer can reopen that journal as active. Startup scans it and rebuilds the
+archived facet index to recover the classification on the first attempt. If a
+required scan fails, the cache is preserved and the error identifies the path.
+Use `--no-persist` for diagnostic queries against live data. A successful offline
+query does not validate writer startup.
+
+When stdout is a pipe, as it is under the Agent, startup sends a keepalive
+immediately and every 60 seconds, starting before configuration and cache loading.
+A separate thread maintains these keepalives even when initialization blocks the
+executor. It stops before the runtime starts normal publication; Functions and
+charts remain unpublished until listeners are ready. Manual runs with stdout connected to a terminal do not send startup
+keepalives. The worker reports a keepalive write failure immediately and cancels
+startup. Facet scans check cancellation; a blocking filesystem call must return
+before startup can stop safely. No further startup phase begins after cancellation
+is observed.
+
+The Agent's minimum idle timeout is 120 seconds. Its
+`buffered reader not OK (-7)` log identifies a read timeout, which is different
+from a facet reconciliation rejection. Compare scan timestamps with both the
+plugin and Agent logs, including the configured systemd journal namespace,
+before rotation removes the failure window.
+
+Journal lifecycle behavior comes from the published `systemd-journal-sdk-*`
+dependencies in `Cargo.toml`, not the similarly named in-tree journal crates.
+
 ## Configuration
 
 When running under Netdata, config is loaded from `netflow.yaml` in:

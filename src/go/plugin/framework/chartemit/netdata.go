@@ -10,22 +10,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 )
 
-// Match the Agent's external-plugin backslash normalization. An unescaped
-// trailing backslash makes the plugins.d splitter consume the closing quote.
-var wireValueReplacer = strings.NewReplacer(
-	"\\", "/",
-	"'", "",
-	"\n", " ",
-	"\r", " ",
-	"\x00", "",
-)
-
-func sanitizeWireValue(value string) string {
-	return wireValueReplacer.Replace(value)
-}
-
 func sanitizeWireID(value string) string {
-	return sanitizeWireValue(strings.TrimSpace(value))
+	return netdataapi.SanitizeWireValue(strings.TrimSpace(value))
 }
 
 func emitChart(api *netdataapi.API, env EmitEnv, chartID string, meta chartengine.ChartMeta, obsolete bool) {
@@ -46,16 +32,16 @@ func prepareChart(env EmitEnv, chartID string, meta chartengine.ChartMeta, obsol
 		TypeID:      sanitizeWireID(env.TypeID),
 		ID:          sanitizeWireID(chartID),
 		Name:        "",
-		Title:       sanitizeWireValue(meta.Title),
-		Units:       sanitizeWireValue(meta.Units),
-		Family:      sanitizeWireValue(meta.Family),
-		Context:     sanitizeWireValue(meta.Context),
+		Title:       netdataapi.SanitizeWireValue(meta.Title),
+		Units:       netdataapi.SanitizeWireValue(meta.Units),
+		Family:      netdataapi.SanitizeWireValue(meta.Family),
+		Context:     netdataapi.SanitizeWireValue(meta.Context),
 		ChartType:   string(meta.Type),
 		Priority:    meta.Priority,
 		UpdateEvery: env.UpdateEvery,
 		Options:     opts,
-		Plugin:      sanitizeWireValue(env.Plugin),
-		Module:      sanitizeWireValue(env.Module),
+		Plugin:      netdataapi.SanitizeWireValue(env.Plugin),
+		Module:      netdataapi.SanitizeWireValue(env.Module),
 	}
 }
 
@@ -85,16 +71,16 @@ func emitChartLabels(api *netdataapi.API, env EmitEnv, chartLabels map[string]st
 		if sKey == "" {
 			continue
 		}
-		api.CLABEL(sKey, sanitizeWireValue(env.JobLabels[key]), labelSourceConf)
+		api.CLABEL(sKey, netdataapi.SanitizeWireValue(env.JobLabels[key]), labelSourceConf)
 	}
 	for _, key := range chartKeys {
 		sKey := sanitizeWireID(key)
 		if sKey == "" {
 			continue
 		}
-		api.CLABEL(sKey, sanitizeWireValue(chartLabels[key]), labelSourceAuto)
+		api.CLABEL(sKey, netdataapi.SanitizeWireValue(chartLabels[key]), labelSourceAuto)
 	}
 	if strings.TrimSpace(env.JobName) != "" {
-		api.CLABEL(collectJobReservedLabel, sanitizeWireValue(env.JobName), labelSourceAuto)
+		api.CLABEL(collectJobReservedLabel, netdataapi.SanitizeWireValue(env.JobName), labelSourceAuto)
 	}
 }

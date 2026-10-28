@@ -117,6 +117,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df);
 void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile);
 void datafile_list_delete_unsafe(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile);
 void generate_datafilepath(struct rrdengine_datafile *datafile, char *str, size_t maxlen);
+bool datafile_name_parse(const char *name, unsigned *fileno);
 int close_data_file(struct rrdengine_datafile *datafile);
 int unlink_data_file(struct rrdengine_datafile *datafile);
 int destroy_data_file_unsafe(struct rrdengine_datafile *datafile);

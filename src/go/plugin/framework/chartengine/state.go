@@ -15,10 +15,12 @@ type engineState struct {
 	matchIndex   matchIndex
 	routeCache   *routeCache
 	materialized materializedState
-	engineEpoch  uint64
-	commitSeq    uint64
-	nextAttempt  uint64
-	outstanding  uint64
+	// outputContextCounts belongs to the last committed non-reset population.
+	outputContextCounts map[string]int
+	engineEpoch         uint64
+	commitSeq           uint64
+	nextAttempt         uint64
+	outstanding         uint64
 	// buildToken is unique per plan build; it marks objects a build created or recorded.
 	buildToken uint64
 	hints      plannerSizingHints

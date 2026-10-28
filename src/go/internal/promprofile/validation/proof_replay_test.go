@@ -108,7 +108,7 @@ modules:
                     name: primary
                     url: http://127.0.0.1:9090/metrics
                     expected_prefix: app_
-                    max_time_series: 100
+                    max_input_series: 100
                   - <<: *base
                     name: secondary
                     url: http://127.0.0.1:9091/metrics
@@ -124,7 +124,7 @@ modules:
 	if err != nil {
 		t.Fatal(err)
 	}
-	if job["name"] != "secondary" || job["expected_prefix"] != "app_" || job["max_time_series"] != 100 ||
+	if job["name"] != "secondary" || job["expected_prefix"] != "app_" || job["max_input_series"] != 100 ||
 		job["url"] != nil {
 		t.Fatalf("resolved job = %#v", job)
 	}

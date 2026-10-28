@@ -2476,7 +2476,8 @@ static void weights_foreach_host(struct query_weights_data *qwd)
     if (qwd->hosts_count < num_threads)
         num_threads = qwd->hosts_count;
 
-    if (num_threads > 1) {
+    // the parallel jobs run on the dbengine event loop, which exists only when a dbengine tier is in use
+    if (num_threads > 1 && dbengine_enabled) {
         weights_foreach_host_parallel(qwd, num_threads);
         return;
     }

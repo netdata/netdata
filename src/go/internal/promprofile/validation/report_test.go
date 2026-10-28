@@ -117,6 +117,7 @@ func TestWriteTextReportIncludesDetailedDiagnostics(t *testing.T) {
 		Selector: "app_missing",
 		Name:     "missing",
 	}}
+	r.ContextSeriesOmissions = []contextSeriesOmissionReport{{Context: "app.value", ObservedSeries: 2, Limit: 1}}
 	r.DimensionLosses = []dimensionMaterializationLossReport{{
 		Path:               "template.charts[2]",
 		ObservedDimensions: 3,
@@ -161,6 +162,8 @@ func TestWriteTextReportIncludesDetailedDiagnostics(t *testing.T) {
 		`template.charts[0] title="Dead chart"`,
 		"Dead authored dimensions:",
 		`selector="app_missing" name="missing"`,
+		"Contexts omitted by output series limit:",
+		`context="app.value" observed=2 limit=1`,
 		"Dimension materialization losses:",
 		`observed=3 planned=2 cause="dimension lifecycle cap"`,
 		"Rendered chart ID collisions:",

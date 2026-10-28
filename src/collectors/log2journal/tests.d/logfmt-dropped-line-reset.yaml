@@ -1,0 +1,2 @@
+# a line that fails to parse is dropped with the fields it stored
+pattern: logfmt
