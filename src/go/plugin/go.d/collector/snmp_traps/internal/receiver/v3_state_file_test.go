@@ -15,9 +15,13 @@ import (
 
 func initEngineStateFile(name, path string) error {
 	if name == "engine-boots" {
-		return (&engineBoots{path: path}).init()
+		return (&engineBoots{
+			path: path,
+		}).init()
 	}
-	return (&localEngineID{path: path}).init("")
+	return (&localEngineID{
+		path: path,
+	}).init("")
 }
 
 func TestEngineStateRejectsSymlinks(t *testing.T) {
@@ -251,24 +255,6 @@ func TestEngineStateRejectsNonRegularFiles(t *testing.T) {
 				})
 			}
 		})
-	}
-}
-
-func TestOpenEngineStateFileDoesNotFollowSymlink(t *testing.T) {
-	dir := t.TempDir()
-	target := filepath.Join(dir, "target")
-	require.NoError(t, os.WriteFile(target, []byte("synthetic contents"), 0600))
-	path := filepath.Join(dir, "state")
-	if err := os.Symlink(target, path); err != nil {
-		t.Skipf("symlinks unavailable: %v", err)
-	}
-	// Exercise the open separately: an Lstat check alone cannot protect a raced-in link.
-	f, err := openEngineStateFile(path)
-	if err == nil {
-		defer f.Close()
-		info, err := f.Stat()
-		require.NoError(t, err)
-		assert.False(t, info.Mode().IsRegular(), "must open the link itself, never its regular-file target")
 	}
 }
 

@@ -5,11 +5,10 @@ package receiver
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -46,7 +45,7 @@ func engineStatePathExistsChecked(path string) (bool, error) {
 		}
 		return true, nil
 	}
-	if os.IsNotExist(err) {
+	if errors.Is(err, os.ErrNotExist) {
 		parent := filepath.Dir(path)
 		info, parentErr := os.Stat(parent)
 		if parentErr != nil {
@@ -84,11 +83,16 @@ type engineBoots struct {
 }
 
 func newEngineBoots(paths engineStatePaths) (*engineBoots, error) {
-	if err := os.MkdirAll(paths.dir, 0750); err != nil {
+	if err := safefile.EnsureDir(paths.dir, safefile.Mode{
+		Perm: 0750,
+	}); err != nil {
 		return nil, fmt.Errorf("engine-boots: create directory %s: %w", paths.dir, err)
 	}
 
-	eb := &engineBoots{path: paths.engineBoots, startedAt: time.Now()}
+	eb := &engineBoots{
+		path:      paths.engineBoots,
+		startedAt: time.Now(),
+	}
 	if err := eb.init(); err != nil {
 		return nil, err
 	}
@@ -96,9 +100,9 @@ func newEngineBoots(paths engineStatePaths) (*engineBoots, error) {
 }
 
 func (eb *engineBoots) init() error {
-	data, err := readEngineStateFile(eb.path)
+	data, err := safefile.ReadNoFollow(eb.path, safefile.MaxSize)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			eb.value = 1
 			eb.valid = true
 			return eb.persist()
@@ -167,11 +171,15 @@ type localEngineID struct {
 }
 
 func newLocalEngineID(paths engineStatePaths, configuredHex string) (*localEngineID, error) {
-	if err := os.MkdirAll(paths.dir, 0750); err != nil {
+	if err := safefile.EnsureDir(paths.dir, safefile.Mode{
+		Perm: 0750,
+	}); err != nil {
 		return nil, fmt.Errorf("local-engine-id: create directory %s: %w", paths.dir, err)
 	}
 
-	lid := &localEngineID{path: paths.localEngineID}
+	lid := &localEngineID{
+		path: paths.localEngineID,
+	}
 	if err := lid.init(configuredHex); err != nil {
 		return nil, err
 	}
@@ -190,9 +198,9 @@ func (lid *localEngineID) init(configuredHex string) error {
 		return lid.persist()
 	}
 
-	data, err := readEngineStateFile(lid.path)
+	data, err := safefile.ReadNoFollow(lid.path, safefile.MaxSize)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			return lid.generate()
 		}
 		return fmt.Errorf("local-engine-id: read %s: %w", lid.path, err)
@@ -236,105 +244,14 @@ func (lid *localEngineID) persist() error {
 	return persistEngineStateFile("local-engine-id", lid.path, []byte(hexStr+"\n"))
 }
 
-func checkEngineStateFile(path string) error {
-	info, err := os.Lstat(path)
-	if err != nil {
-		return err
-	}
-	if !info.Mode().IsRegular() {
-		return &os.PathError{Op: "stat", Path: path, Err: safefile.ErrNotRegular}
-	}
-	return nil
-}
-
-func readEngineStateFile(path string) (data []byte, err error) {
-	// Reject known special files before opening; the no-follow open and descriptor
-	// check below also protect against replacing the leaf after this check.
-	if err := checkEngineStateFile(path); err != nil {
-		return nil, err
-	}
-	f, err := openEngineStateFile(path)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if closeErr := f.Close(); err == nil && closeErr != nil {
-			data, err = nil, closeErr
-		}
-	}()
-	info, err := f.Stat()
-	if err != nil {
-		return nil, err
-	}
-	if !info.Mode().IsRegular() {
-		return nil, &os.PathError{Op: "read", Path: path, Err: safefile.ErrNotRegular}
-	}
-	// State contains at most 64 hex digits or 10 decimal digits plus whitespace.
-	// Use the existing safe-file bound to avoid consuming arbitrary large files.
-	if info.Size() > safefile.MaxSize {
-		return nil, &os.PathError{Op: "read", Path: path, Err: safefile.ErrTooLarge}
-	}
-	data, err = io.ReadAll(io.LimitReader(f, safefile.MaxSize+1))
-	if err != nil {
-		return nil, err
-	}
-	if int64(len(data)) > safefile.MaxSize {
-		return nil, &os.PathError{Op: "read", Path: path, Err: safefile.ErrTooLarge}
-	}
-	return data, nil
-}
-
 func persistEngineStateFile(label, path string, data []byte) error {
-	if err := checkEngineStateFile(path); err != nil && !os.IsNotExist(err) {
+	if err := safefile.Replace(path, data, safefile.Mode{
+		Perm: 0640,
+	}); err != nil {
 		return fmt.Errorf("%s: persist %s: %w", label, path, err)
 	}
-	// A fresh name avoids blocking startup on a temp orphaned by an interrupted
-	// write. O_EXCL still refuses existing files, including dangling symlinks.
-	// Keep the original descriptor through write and fsync.
-	tmpPath := path + "." + rand.Text() + ".tmp"
-	f, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0640)
-	if err != nil {
-		return fmt.Errorf("%s: create temp %s: %w", label, tmpPath, err)
-	}
-	renamed := false
-	defer func() {
-		_ = f.Close()
-		if !renamed {
-			_ = os.Remove(tmpPath)
-		}
-	}()
-	if _, err := f.Write(data); err != nil {
-		return fmt.Errorf("%s: write %s: %w", label, tmpPath, err)
-	}
-	syncErr := f.Sync()
-	closeErr := f.Close()
-	if syncErr != nil {
-		return fmt.Errorf("%s: fsync %s: %w", label, tmpPath, syncErr)
-	}
-	if closeErr != nil {
-		return fmt.Errorf("%s: close %s after fsync: %w", label, tmpPath, closeErr)
-	}
-
-	if err := os.Rename(tmpPath, path); err != nil {
-		return fmt.Errorf("%s: rename %s -> %s: %w", label, tmpPath, path, err)
-	}
-	renamed = true
-	// Windows does not support opening directories for fsync.
-	if runtime.GOOS == "windows" {
-		return nil
-	}
-	dirPath := filepath.Dir(path)
-	dir, err := os.Open(dirPath)
-	if err != nil {
-		return fmt.Errorf("%s: open directory for fsync %s: %w", label, dirPath, err)
-	}
-	syncErr = dir.Sync()
-	closeErr = dir.Close()
-	if syncErr != nil {
-		return fmt.Errorf("%s: fsync directory %s: %w", label, dirPath, syncErr)
-	}
-	if closeErr != nil {
-		return fmt.Errorf("%s: close directory %s after fsync: %w", label, dirPath, closeErr)
+	if err := safefile.SyncDir(filepath.Dir(path)); err != nil {
+		return fmt.Errorf("%s: sync directory: %w", label, err)
 	}
 	return nil
 }

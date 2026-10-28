@@ -8,13 +8,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 
+	"github.com/netdata/netdata/go/plugins/pkg/safefile"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/filelock"
 )
 
@@ -28,7 +27,7 @@ var (
 	ErrFingerprintMismatch  = errors.New("s3check journal fingerprint mismatch")
 	ErrStateTooLarge        = errors.New("s3check journal state is too large")
 	ErrPublicationUncertain = errors.New("s3check journal publication is uncertain")
-	syncDirectory           = syncDir
+	syncDirectory           = safefile.SyncDir
 )
 
 type envelope struct {
@@ -40,8 +39,8 @@ type envelope struct {
 
 // Journal persists one job owner's recovery state and owns its lifetime lock.
 // Loading is read-only; Save and Clear require the caller to hold the lock.
-// Its root is Agent-owned storage; permission hardening is not a security
-// boundary against a local actor that can replace path components.
+// State and directory leaves reject symlinks; temporary files are exclusive and
+// randomized. Directory ancestry must remain trusted and stable during use.
 type Journal struct {
 	path        string
 	ownerID     string
@@ -120,21 +119,15 @@ func (j *Journal) Load(dst any) (bool, error) {
 	if dst == nil {
 		return false, errors.New("journal load destination is nil")
 	}
-	file, err := os.Open(j.path)
+	raw, err := safefile.ReadNoFollow(j.path, maxStateBytes)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return false, nil
 		}
-		return false, fmt.Errorf("open s3check journal: %w", err)
-	}
-	defer file.Close() //nolint:errcheck // The bounded read leaves no recovery action for Close.
-
-	raw, err := io.ReadAll(io.LimitReader(file, maxStateBytes+1))
-	if err != nil {
+		if errors.Is(err, safefile.ErrTooLarge) {
+			return false, ErrStateTooLarge
+		}
 		return false, fmt.Errorf("read s3check journal: %w", err)
-	}
-	if len(raw) > maxStateBytes {
-		return false, ErrStateTooLarge
 	}
 
 	var env envelope
@@ -252,9 +245,7 @@ func (j *Journal) Clear() error {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("remove s3check journal: %w", err)
 	}
-	if err := os.Remove(j.path + ".tmp"); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return j.afterClearMutation(removed, fmt.Errorf("remove s3check temporary journal: %w", err))
-	}
+
 	dir := filepath.Dir(j.path)
 	if _, err := os.Stat(dir); errors.Is(err, os.ErrNotExist) {
 		return nil
@@ -270,38 +261,16 @@ func (j *Journal) afterClearMutation(removed bool, err error) error {
 	return j.publicationErr
 }
 
-func writeAtomic(path string, raw []byte) (retErr error) {
+func writeAtomic(path string, raw []byte) error {
 	dir := filepath.Dir(path)
 	if err := ensurePrivateDir(dir, false); err != nil {
 		return err
 	}
-	tmpPath := path + ".tmp"
-	file, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
-	if err != nil {
-		return fmt.Errorf("create s3check temporary journal: %w", err)
-	}
-	defer func() {
-		if retErr != nil {
-			_ = os.Remove(tmpPath)
-		}
-	}()
-	if err := file.Chmod(0o600); err != nil {
-		_ = file.Close()
-		return fmt.Errorf("restrict s3check temporary journal: %w", err)
-	}
-	if _, err := file.Write(raw); err != nil {
-		_ = file.Close()
-		return fmt.Errorf("write s3check temporary journal: %w", err)
-	}
-	if err := file.Sync(); err != nil {
-		_ = file.Close()
-		return fmt.Errorf("sync s3check temporary journal: %w", err)
-	}
-	if err := file.Close(); err != nil {
-		return fmt.Errorf("close s3check temporary journal: %w", err)
-	}
-	if err := os.Rename(tmpPath, path); err != nil {
-		return fmt.Errorf("publish s3check journal: %w", err)
+	if err := safefile.Replace(path, raw, safefile.Mode{
+		Perm:  0600,
+		Exact: true,
+	}); err != nil {
+		return fmt.Errorf("replace s3check journal: %w", err)
 	}
 	if err := syncDirectory(dir); err != nil {
 		return fmt.Errorf("%w after replacing state: %v", ErrPublicationUncertain, err)
@@ -315,12 +284,13 @@ func ensurePrivateDir(dir string, syncParent bool) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return fmt.Errorf("create s3check journal directory: %w", err)
+	if err := safefile.EnsureDir(dir, safefile.Mode{
+		Perm:  0700,
+		Exact: true,
+	}); err != nil {
+		return fmt.Errorf("prepare s3check journal directory: %w", err)
 	}
-	if err := os.Chmod(dir, 0o700); err != nil {
-		return fmt.Errorf("restrict s3check journal directory: %w", err)
-	}
+
 	parent := filepath.Dir(dir)
 	if syncParent && (len(parents) == 0 || parents[0] != parent) {
 		parents = append([]string{parent}, parents...)
@@ -342,7 +312,10 @@ func ensurePrivateDir(dir string, syncParent bool) error {
 func privateDirSyncTargets(dir string) (parents []string, modeChanged bool, err error) {
 	current := dir
 	for {
-		info, statErr := os.Stat(current)
+		info, statErr := os.Lstat(current)
+		if current != dir {
+			info, statErr = os.Stat(current)
+		}
 		if statErr == nil {
 			if !info.IsDir() {
 				return nil, false, fmt.Errorf("s3check journal path %q is not a directory", current)
@@ -362,23 +335,4 @@ func privateDirSyncTargets(dir string) (parents []string, modeChanged bool, err 
 		parents = append(parents, parent)
 		current = parent
 	}
-}
-
-func syncDir(dir string) error {
-	if runtime.GOOS == "windows" {
-		return nil
-	}
-	handle, err := os.Open(dir)
-	if err != nil {
-		return fmt.Errorf("open s3check journal directory: %w", err)
-	}
-	syncErr := handle.Sync()
-	closeErr := handle.Close()
-	if syncErr != nil {
-		return fmt.Errorf("sync s3check journal directory: %w", syncErr)
-	}
-	if closeErr != nil {
-		return fmt.Errorf("close s3check journal directory: %w", closeErr)
-	}
-	return nil
 }
