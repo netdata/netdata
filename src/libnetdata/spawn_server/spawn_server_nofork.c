@@ -1500,17 +1500,34 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name
     server->id = __atomic_add_fetch(&spawn_server_id, 1, __ATOMIC_RELAXED);
     os_uuid_generate_random(server->magic.uuid);
 
-    // os_run_dir() already validates the candidate (including NETDATA_RUN_DIR) and
-    // refuses a symlinked run dir. Never fall back to /tmp directly: the socket
-    // name is predictable, so a world-writable directory would let any local user
-    // pre-plant it.
-    const char *runtime_directory = os_run_dir(true);
-    if(!runtime_directory || !*runtime_directory) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-               "SPAWN SERVER: cannot get a usable run directory for the '%s' spawn server socket",
-               (name && *name) ? name : "unnamed");
-        goto cleanup;
+    const char *runtime_directory = getenv("NETDATA_RUN_DIR");
+    if(!runtime_directory || !*runtime_directory)
+        runtime_directory = os_run_dir(true);
+
+    if (runtime_directory) {
+        struct stat statbuf;
+
+        if(!*runtime_directory)
+            // it is empty
+                runtime_directory = NULL;
+
+        else if (stat(runtime_directory, &statbuf) == 0 && S_ISDIR(statbuf.st_mode)) {
+            // it exists and it is a directory
+
+            if (access(runtime_directory, W_OK) != 0) {
+                // it is not writable by us
+                nd_log(NDLS_COLLECTORS, NDLP_ERR, "Runtime directory '%s' is not writable, falling back to '/tmp'", runtime_directory);
+                runtime_directory = NULL;
+            }
+        }
+        else {
+            // it does not exist
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Runtime directory '%s' does not exist, falling back to '/tmp'", runtime_directory);
+            runtime_directory = NULL;
+        }
     }
+    if(!runtime_directory)
+        runtime_directory = "/tmp";
 
     char path[1024];
     int path_length;

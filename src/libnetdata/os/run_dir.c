@@ -15,10 +15,10 @@ static char *superseded_run_dir = NULL;
 static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
 
 // A process that cannot get a run directory usually keeps asking. Nothing retries
-// on a timer, but spawn_popen_run_argv() re-creates the spawn server on every
-// popen() for as long as it has none, and every attempt walks the same candidates
-// and refuses them for the same reasons. The explanation is worth printing once;
-// printing it per popen() buries the rest of the log.
+// on a timer, but callers ask again on every connection or request for as long as
+// they have none, and every attempt walks the same candidates and refuses them for
+// the same reasons. The explanation is worth printing once; printing it per call
+// buries the rest of the log.
 // Deliberately not a cached failure: the candidates are re-examined, so a run
 // directory that appears later is still picked up. Only the reporting stops.
 // Advisory: a race can duplicate or drop a line, never change what is returned.
@@ -142,7 +142,7 @@ bool os_run_dir_is_safe(const char *candidate, bool rw) {
         return true;
 
     // The leaf's own mode matters as much as its parent's: everything netdata
-    // puts here (the spawn server sockets, netdata.pipe) is created and used
+    // puts here (its sockets, netdata.pipe) is created and used
     // while still root, so a directory every local user can write into lets any
     // of them pre-plant or swap those names. This is what refuses
     // NETDATA_RUN_DIR=/tmp, which the parent check alone accepts (/tmp's parent
