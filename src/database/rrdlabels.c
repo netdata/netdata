@@ -546,7 +546,12 @@ void rrdlabels_get_value_strdup_or_null(RRDLABELS *labels, char **value, const c
 
 void rrdlabels_get_value_to_buffer_or_unset(RRDLABELS *labels, BUFFER *wb, const char *key, const char *unset)
 {
-    if(!labels || !key || !wb) return;
+    if(!key || !wb) return;
+
+    if(!labels) {
+        buffer_strcat(wb, unset);
+        return;
+    }
 
     STRING *this_key = string_strdupz(key);
     RRDLABEL *lb;
