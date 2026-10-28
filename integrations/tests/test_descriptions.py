@@ -503,7 +503,8 @@ REVIEWED_DESCRIPTION_TARGETS = {
         "Monitor the current FreeBSD CPU scaling frequency through sysctl."
     ),
     "freebsd.plugin-getifaddrs-getifaddrs": (
-        "Monitor FreeBSD network interface traffic, packets, errors, drops, and collision events."
+        "Monitor FreeBSD network interface traffic, packets, errors, drops, collision events, link state, speed, "
+        "duplex, and MTU."
     ),
     "freebsd.plugin-kern.ipc.sem-kern.ipc.sem": (
         "Monitor FreeBSD System V IPC semaphore set and semaphore counts."
