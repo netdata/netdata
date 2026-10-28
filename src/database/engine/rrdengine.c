@@ -49,6 +49,7 @@ struct rrdeng_main {
     size_t evict_open_running;
     size_t evict_extent_running;
     size_t cleanup_running;
+    size_t journal_filter_running;
 
     // pool threads that may wait for an EXTENT_WRITE - owned by the event loop thread
     // see extent_waiters_max() for why they are bounded
@@ -103,6 +104,7 @@ struct rrdeng_main {
         .flushes_running = 0,
         .evict_main_running = 0,
         .cleanup_running = 0,
+        .journal_filter_running = 0,
         .extent_waiters = {
                 .running = 0,
                 .deferred = NULL,
@@ -2497,6 +2499,27 @@ static void after_cleanup(struct rrdengine_instance *ctx __maybe_unused, void *d
     rrdeng_main.cleanup_running--;
 }
 
+static void after_journal_filter(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
+    rrdeng_main.journal_filter_running--;
+}
+
+// Give existing tier-0 journals their time filters, one journal at a time, for up to a second per run.
+// New journals get theirs when they are indexed (journalfile_migrate_to_v2_callback).
+static void *journal_filter_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
+    struct rrdengine_instance *ctx0 = multidb_ctx[0];
+    if(!dbengine_journal_time_filters || !ctx0 || !ctx_is_available_for_queries(ctx0))
+        return data;
+
+    worker_is_busy(UV_EVENT_DBENGINE_JOURNAL_FILTER);
+
+    usec_t until_ut = now_monotonic_usec() + USEC_PER_SEC;
+    while(njtf_backfill_one(ctx0) && ctx_is_available_for_queries(ctx0) && now_monotonic_usec() < until_ut)
+        ;
+
+    worker_is_idle();
+    return data;
+}
+
 static void *cleanup_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
     worker_is_busy(UV_EVENT_DBENGINE_BUFFERS_CLEANUP);
 
@@ -2616,6 +2639,10 @@ static void timer_per_sec_cb(uv_timer_t *handle __maybe_unused)
 
     rrdeng_enq_cmd(NULL, RRDENG_OPCODE_FLUSH_MAIN, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
     rrdeng_enq_cmd(NULL, RRDENG_OPCODE_CLEANUP, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+
+    static size_t journal_filter_ticks = 0;
+    if(++journal_filter_ticks % 5 == 0 && dbengine_journal_time_filters)
+        rrdeng_enq_cmd(NULL, RRDENG_OPCODE_JOURNAL_FILTER, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 
     worker_is_idle();
 }
@@ -2825,6 +2852,7 @@ void dbengine_event_loop(void* arg) {
     worker_register_job_name(RRDENG_OPCODE_SHUTDOWN_EVLOOP,                          "dbengine shutdown");
     worker_register_job_name(RRDENG_OPCODE_PARALLEL_WEIGHT,                          "parallel weight");
     worker_register_job_name(RRDENG_OPCODE_MRG_LOAD,                                 "mrg tier load");
+    worker_register_job_name(RRDENG_OPCODE_JOURNAL_FILTER,                           "journal filter");
 
 
     worker_register_job_name(RRDENG_OPCODE_MAX,                                      "get opcode");
@@ -2841,6 +2869,7 @@ void dbengine_event_loop(void* arg) {
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_CTX_QUIESCE,          "ctx quiesce cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_PARALLEL_WEIGHT,      "parallel weight cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_MRG_LOAD,             "mrg tier load cb");
+    worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_JOURNAL_FILTER,       "journal filter cb");
 
     // special jobs
     worker_register_job_name(RRDENG_RETENTION_TIMER_CB,                              "retention timer");
@@ -2966,6 +2995,16 @@ void dbengine_event_loop(void* arg) {
                     if(!rrdeng_main.cleanup_running) {
                         rrdeng_main.cleanup_running++;
                         work_dispatch(NULL, NULL, NULL, opcode, cleanup_tp_worker, after_cleanup);
+                    }
+                    break;
+                }
+
+                case RRDENG_OPCODE_JOURNAL_FILTER: {
+                    // never while draining at shutdown
+                    if(!rmain->shutdown && !rrdeng_main.journal_filter_running) {
+                        rrdeng_main.journal_filter_running++;
+                        if(!work_dispatch(NULL, NULL, NULL, opcode, journal_filter_tp_worker, after_journal_filter))
+                            rrdeng_main.journal_filter_running--; // no after-work callback will run
                     }
                     break;
                 }
