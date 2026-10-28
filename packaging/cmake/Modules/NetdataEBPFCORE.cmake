@@ -13,8 +13,8 @@ set(ebpf-co-re_SOURCE_DIR "${CMAKE_BINARY_DIR}/ebpf-co-re")
 function(netdata_fetch_ebpf_co_re)
     ExternalProject_Add(
         ebpf-co-re
-        URL https://github.com/netdata/ebpf-co-re/releases/download/v1.8.0.1/netdata-ebpf-co-re-glibc-v1.8.0.1.tar.xz
-        URL_HASH SHA256=2da1cf462df8b2605149e3994823100d8131071f181231976250226e7a8b784e
+        URL https://github.com/netdata/ebpf-co-re/releases/download/v1.8.0.2/netdata-ebpf-co-re-glibc-v1.8.0.2.tar.xz
+        URL_HASH SHA256=1f2e5a4cc9643eab9f39796ab2b124476a88976b48ff1c5539fdfd0e2b2548aa
         SOURCE_DIR "${ebpf-co-re_SOURCE_DIR}"
         CONFIGURE_COMMAND ""
         BUILD_COMMAND ""
