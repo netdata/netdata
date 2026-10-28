@@ -162,7 +162,13 @@ DIR_SIZE dir_size_multiple(const char **paths, int num_paths, SIMPLE_PATTERN *pa
 #if !defined(OS_WINDOWS)
 #include <fcntl.h>
 
+#if defined(OS_LINUX)
+// deeper than the old walk could go on a 1 MiB stack (12.8 KiB per level)
 #define DIR_SIZE_UT_DEEP 500
+#else
+// FILENAME_MAX is 1024 and the default fd limit is 256 on macOS and FreeBSD
+#define DIR_SIZE_UT_DEEP 100
+#endif
 
 static int dir_size_ut_write(int dirfd, const char *name, size_t bytes) {
     int fd = openat(dirfd, name, O_CREAT | O_WRONLY | O_TRUNC, 0600);
@@ -201,18 +207,20 @@ static void dir_size_ut_rm(int dirfd, const char *name) {
 struct dir_size_ut_job {
     const char *path;
     SIMPLE_PATTERN *pattern;
+    size_t max_depth;
     DIR_SIZE result;
 };
 
 static void dir_size_ut_thread(void *arg) {
     struct dir_size_ut_job *job = arg;
-    job->result = dir_size(job->path, job->pattern, 0);
+    job->result = dir_size(job->path, job->pattern, job->max_depth);
 }
 
 // run dir_size() on a thread with the default nd_thread stack, as the agent does
-static DIR_SIZE dir_size_ut_run(const char *path, const char *pattern) {
+static DIR_SIZE dir_size_ut_run_depth(const char *path, const char *pattern, size_t max_depth) {
     struct dir_size_ut_job job = {
         .path = path,
+        .max_depth = max_depth,
         .pattern = pattern ? simple_pattern_create(pattern, " ", SIMPLE_PATTERN_EXACT, false) : NULL,
     };
     ND_THREAD *t = nd_thread_create("DIRSIZETEST", NETDATA_THREAD_OPTION_DEFAULT, dir_size_ut_thread, &job);
@@ -220,6 +228,10 @@ static DIR_SIZE dir_size_ut_run(const char *path, const char *pattern) {
     else job.result.errors = (size_t)-1;
     simple_pattern_free(job.pattern);
     return job.result;
+}
+
+static DIR_SIZE dir_size_ut_run(const char *path, const char *pattern) {
+    return dir_size_ut_run_depth(path, pattern, 0);
 }
 
 #define DIR_SIZE_UT_CHECK(cond, msg) do {                                           \
@@ -285,6 +297,11 @@ int dir_size_unittest(void) {
     DIR_SIZE_UT_CHECK(r.directories == 1 + 1 + DIR_SIZE_UT_DEEP + long_dirs, "total directories");
     DIR_SIZE_UT_CHECK(r.depth == DIR_SIZE_UT_DEEP, "deepest level");
     DIR_SIZE_UT_CHECK(r.errors == 1, "the file whose path does not fit is an error");
+
+    // max_depth 1: the root and its subdirectories, nothing deeper
+    r = dir_size_ut_run_depth(root, NULL, 1);
+    DIR_SIZE_UT_CHECK(r.bytes == 10 + 20 + 30 && r.files == 3, "max depth 1 counts the files of the first level");
+    DIR_SIZE_UT_CHECK(r.depth == 1 && r.directories == 1 + 3, "max depth 1 enters only the first level");
 
     r = dir_size_ut_run(root, "*.db");
     DIR_SIZE_UT_CHECK(r.bytes == 10 + 20 && r.files == 2, "pattern on paths relative to the root");
