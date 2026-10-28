@@ -76,31 +76,6 @@ jobs:
             echo 'run=false' >> "${GITHUB_OUTPUT}"
           fi
 
-  libressl-checks:
-    name: LibreSSL
-    needs:
-      - file-check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Skip Check
-        id: skip
-        if: needs.file-check.outputs.run != 'true'
-        run: echo "SKIPPED"
-      - name: Checkout
-        if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          submodules: recursive
-      - name: Build
-        if: needs.file-check.outputs.run == 'true'
-        run: >
-          docker run -v "$PWD":/netdata -w /netdata alpine:latest /bin/sh -c
-          'apk add bash;
-          ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata;
-          apk del openssl openssl-dev;
-          apk add libressl libressl-dev protobuf-dev;
-          ./netdata-installer.sh --disable-telemetry --dont-start-it --dont-wait --one-time-build --disable-go;'
-
   clang-checks:
     name: Clang
     needs:

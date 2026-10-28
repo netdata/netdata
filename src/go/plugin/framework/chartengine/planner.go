@@ -169,12 +169,13 @@ func runningAverage(current, value metrix.SampleValue, observations uint64) metr
 }
 
 type chartState struct {
-	templateID   string
-	chartID      string
-	meta         program.ChartMeta
-	lifecycle    program.LifecyclePolicy
-	labelTracker chartLabelTracker
-	entries      map[string]*dimBuildEntry
+	templateID     string
+	chartID        string
+	meta           program.ChartMeta
+	lifecycle      program.LifecyclePolicy
+	labelTracker   chartLabelTracker
+	deferredLabels bool
+	entries        map[string]*dimBuildEntry
 	// entriesOwner is the materialized chart whose scratch map entries is, if any.
 	entriesOwner    *materializedChartState
 	unownedDeletes  int // cap deletions from entries while it has no owner
@@ -191,6 +192,8 @@ type planBuildContext struct {
 	cache             *routeCache
 	routeCacheEnabled bool
 	routeObserver     func(PlanRouteDiagnostic)
+	outputLimit       int
+	overLimitEntry    *dimBuildEntry
 	index             matchIndex
 	flat              metrix.Reader
 
@@ -311,6 +314,8 @@ func (e *Engine) buildPlan(
 	}
 
 	phaseStartedAt = time.Now()
+	candidateChartCount := len(ctx.chartsByID)
+	journal.contextCounts = ctx.enforceContextLimit(e.state.cfg.maxOutputSeriesPerContext)
 	removeByCapDims, removeByCapCharts := enforceLifecycleCapsWithObserver(
 		ctx.collectMeta.LastSuccessSeq,
 		ctx.chartsByID,
@@ -365,7 +370,7 @@ func (e *Engine) buildPlan(
 	sample.actionRemoveChart = actionCounts.actionRemoveChart
 	sample.buildSuccess = true
 	e.warnChartIDCollisions(ctx)
-	e.state.hints.chartsByID = len(ctx.chartsByID)
+	e.state.hints.chartsByID = candidateChartCount
 	e.state.hints.seenInfer = len(ctx.seenInfer)
 	e.state.hints.actions = len(out.Actions)
 	e.state.hints.values = len(ctx.values)
@@ -430,6 +435,7 @@ func (e *Engine) preparePlanBuildContext(
 		cache:             cache,
 		routeCacheEnabled: e.state.cfg.routeObserver == nil,
 		routeObserver:     e.state.templateSet.diagnosticObserver(e.state.cfg.routeObserver),
+		outputLimit:       e.state.cfg.maxOutputSeriesPerContext,
 		index:             index,
 		flat:              reader,
 		seenInfer:         seenInfer,
@@ -611,7 +617,24 @@ func (ctx *planBuildContext) visitPlanSeries(
 	for _, route := range routes {
 		if ctx.scan.replayLabels {
 			chart := ctx.chartsByID[route.ChartID]
-			if chart == nil || chart.templateID != route.ChartTemplateID || !chart.labelTracker.needsReplay() {
+			if chart == nil || chart.templateID != route.ChartTemplateID {
+				continue
+			}
+			if chart.deferredLabels {
+				if chart.labelTracker.observeMembership(identity, route.DimensionKeyLabel) {
+					policy := labelPolicyForTemplate(ctx.index, chart.templateID, route.Autogen)
+					if policy == nil {
+						ctx.scan.err = fmt.Errorf("chartengine: missing label policy for chart template %q", chart.templateID)
+						return
+					}
+					if err := chart.labelTracker.observeDuringScan(policy, labels, route.DimensionKeyLabel); err != nil {
+						ctx.scan.err = err
+						return
+					}
+				}
+				continue
+			}
+			if !chart.labelTracker.needsReplay() {
 				continue
 			}
 			if err := chart.labelTracker.observeReplay(labels, route.DimensionKeyLabel); err != nil {
@@ -635,6 +658,18 @@ func (ctx *planBuildContext) newChartState() *chartState {
 		return &ctx.chartStates[len(ctx.chartStates)-1]
 	}
 	return new(chartState)
+}
+
+// Fresh build-owned maps need no rollback records. Borrowed published caches do.
+func (cs *chartState) putBuildEntry(j *planJournal, name string, entry *dimBuildEntry) {
+	if cs.entriesOwner != nil {
+		j.putEntry(cs.entries, name, entry)
+		return
+	}
+	if j != nil {
+		entry.journalToken = j.token
+	}
+	cs.entries[name] = entry
 }
 
 // adoptedScratchEntries returns the scratch map the chart takes from this build: a map
@@ -773,6 +808,7 @@ func (ctx *planBuildContext) accumulateRoute(
 			meta:            route.Meta,
 			lifecycle:       route.Lifecycle,
 			labelTracker:    newChartLabelTracker(previousPresentation),
+			deferredLabels:  ctx.outputLimit > 0 && previousPresentation == nil,
 			entries:         entries,
 			entriesOwner:    entriesOwner,
 			currentBuildSeq: ctx.buildCycle,
@@ -785,45 +821,54 @@ func (ctx *planBuildContext) accumulateRoute(
 	sortKey := histogramBucketDimensionSortKey(route, seriesMeta, labels)
 
 	entry, exists := cs.entries[route.DimensionName]
-	if !exists {
-		entry = &dimBuildEntry{}
-		ctx.journal.putEntry(cs.entries, route.DimensionName, entry)
-	} else {
-		ctx.journal.touchEntry(entry)
-	}
-	if entry.seenSeq != cs.currentBuildSeq {
-		entry.seenSeq = cs.currentBuildSeq
-		entry.observations = 1
-		entry.value = value
-		entry.dimensionState = dimensionState{
-			hidden:      route.Hidden,
-			float:       route.Float,
-			static:      route.Static,
-			order:       route.DimensionIndex,
-			sortKey:     sortKey,
-			aggregation: route.Aggregation,
-			algorithm:   compactDimensionAlgorithm(route.Algorithm),
-			multiplier:  route.Multiplier,
-			divisor:     route.Divisor,
-		}
+	observed := exists && entry.seenSeq == cs.currentBuildSeq
+	if !observed {
 		cs.observedCount++
-	} else {
-		if entry.hidden != route.Hidden {
-			// First-observed hidden flag wins within one build; conflicting routes are ignored.
-		}
-		if entry.float != route.Float {
-			// First-observed float flag wins within one build; conflicting routes are ignored.
-		}
-		entry.aggregate(value)
 	}
-
-	if cs.labelTracker.observeMembership(identity, route.DimensionKeyLabel) {
-		policy := labelPolicyForTemplate(index, route.ChartTemplateID, route.Autogen)
-		if policy == nil {
-			return fmt.Errorf("chartengine: route references unknown chart template %q", route.ChartTemplateID)
+	// Once this chart alone exceeds the budget it cannot survive in its context.
+	// Keep exact distinct identities, but stop allocating values and reconciling
+	// labels that will be discarded. Ownership replacement creates a fresh chart.
+	if ctx.outputLimit > 0 && cs.observedCount > ctx.outputLimit {
+		if !observed {
+			if ctx.overLimitEntry == nil {
+				ctx.overLimitEntry = &dimBuildEntry{seenSeq: cs.currentBuildSeq}
+			}
+			cs.putBuildEntry(ctx.journal, route.DimensionName, ctx.overLimitEntry)
 		}
-		if err := cs.labelTracker.observeDuringScan(policy, labels, route.DimensionKeyLabel); err != nil {
-			return err
+	} else {
+		if !exists {
+			entry = &dimBuildEntry{}
+			cs.putBuildEntry(ctx.journal, route.DimensionName, entry)
+		} else {
+			ctx.journal.touchEntry(entry)
+		}
+		if !observed {
+			entry.seenSeq = cs.currentBuildSeq
+			entry.observations = 1
+			entry.value = value
+			entry.dimensionState = dimensionState{
+				hidden:      route.Hidden,
+				float:       route.Float,
+				static:      route.Static,
+				order:       route.DimensionIndex,
+				sortKey:     sortKey,
+				aggregation: route.Aggregation,
+				algorithm:   compactDimensionAlgorithm(route.Algorithm),
+				multiplier:  route.Multiplier,
+				divisor:     route.Divisor,
+			}
+		} else {
+			// First-observed dimension options win conflicting routes in one build.
+			entry.aggregate(value)
+		}
+		if !cs.deferredLabels && cs.labelTracker.observeMembership(identity, route.DimensionKeyLabel) {
+			policy := labelPolicyForTemplate(index, route.ChartTemplateID, route.Autogen)
+			if policy == nil {
+				return fmt.Errorf("chartengine: route references unknown chart template %q", route.ChartTemplateID)
+			}
+			if err := cs.labelTracker.observeDuringScan(policy, labels, route.DimensionKeyLabel); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -1037,7 +1082,16 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 func (e *Engine) reconcileChangedChartLabels(ctx *planBuildContext) error {
 	needsReplay := false
 	for _, chart := range ctx.chartsByID {
-		if chart == nil || chart.observedCount == 0 || !chart.labelTracker.finishMembership() {
+		if chart == nil || chart.observedCount == 0 {
+			continue
+		}
+		// New candidates may be omitted. Build their labels only after admission;
+		// published charts retain ordinary membership detection and cached labels.
+		if chart.deferredLabels {
+			needsReplay = true
+			continue
+		}
+		if !chart.labelTracker.finishMembership() {
 			continue
 		}
 		if chart.labelTracker.needsReplay() {

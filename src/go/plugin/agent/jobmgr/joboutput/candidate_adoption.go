@@ -81,21 +81,30 @@ func (dcjc *DynCfgJobController) prepareCandidateAdoption(
 		adoption.release()
 		return nil, &candidatePreflightError{cause: err}
 	}
+	if reply.candidate == nil {
+		reply.candidate, err = dcjc.candidates.prepareAdoptExact(config, true, dyncfg.StatusAccepted, true, 0, dcjc.scheduler.retries.now())
+		if err != nil {
+			adoption.release()
+			return nil, err
+		}
+	}
+	reply.retainedCandidate = true
 	spec, err := dcjc.configModules.newAcceptedActivationSpec(config)
 	if err != nil {
 		adoption.release()
 		return nil, err
 	}
+	spec.work = reply.candidate.after.Active
 	handoff := func() {
 		stage := adoption.stage
 		adoption.stage = nil
-		dcjc.scheduler.accepted.armWithGate(spec,
-			dcjc.activationRelease(scope.ID, jobmgr.ProcessAttemptJobRuntime), nil, stage)
+		dcjc.scheduler.accepted.startExecution(spec,
+			dcjc.activationRelease(scope.ID, jobmgr.ProcessAttemptJobRuntime), stage)
 	}
-	prepared, err := dcjc.prepareMutationWithRetryAfterApplyAndFallback(
+	prepared, err := dcjc.prepareMutationAfterApplyAndFallback(
 		ctx,
 		scope, current, nil, permit, resourceRemovalDisposition(current), postimage, reply, cleanup,
-		autoDetectionRetryToken{}, composeAfterApply(afterApply, handoff),
+		composeAfterApply(afterApply, handoff),
 		preparedJobConfigLifecycle{
 			identity: result.candidate.jobConfigIdentity,
 			snapshot: result.candidate.jobConfigSnapshot,

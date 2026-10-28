@@ -67,8 +67,8 @@
     }
   },
   "expected_prefix": "ok",
-  "max_time_series": 123,
-  "max_time_series_per_metric": 123,
+  "max_input_series": 123,
+  "max_output_series_per_context": 123,
   "fallback_type": {
     "gauge": [
       "ok"

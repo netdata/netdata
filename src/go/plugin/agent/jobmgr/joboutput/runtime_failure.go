@@ -23,6 +23,7 @@ func runtimeFailureFor(resources ConstructedJob, err *jobruntime.RunFailure, sta
 	failure.class = err.Class()
 	failure.retry = failure.retry && err.Retryable()
 	failure.runtime = true
+	failure.afterReady = err.AfterReady()
 	failure.diagnosticFailure = jobConfigFailure(err, stage)
 	failure.diagnosticFailure.Reason = err.Reason()
 	failure.jobConfigLifecycle = resources.jobConfigSnapshot

@@ -200,7 +200,9 @@ static void insert_alert_queue(
 
     param = 0;
     rc = sqlite3_step_monitored(res);
-    if (rc != SQLITE_DONE)
+    if (rc == SQLITE_DONE)
+        alert_queue_next_due_lower(host, submit_delay);
+    else
         error_report(
             "HEALTH [%s]: Failed to execute insert_alert_queue, rc = %d", rrdhost_hostname(host), rc);
 

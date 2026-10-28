@@ -62,9 +62,26 @@ void pluginsd_keywords_init(PARSER *parser, PARSER_REPERTOIRE repertoire) {
         pluginsd_calls_init(parser);
 }
 
+// The references of an ended scope and of an unused chart lookup are kept until the keyword returns, because the
+// keyword may still use the chart after its scope ends (END, REPLAY_END).
+void pluginsd_keyword_chart_refs_release(PARSER *parser) {
+    rrdset_acquired_release(parser->user.st_ref.lookup);
+    parser->user.st_ref.lookup = NULL;
+
+    rrdset_acquired_release(parser->user.st_ref.released);
+    parser->user.st_ref.released = NULL;
+}
+
 void parser_destroy(PARSER *parser) {
     if (unlikely(!parser))
         return;
+
+    // 0. the chart references; a parser destroyed mid-scope still holds its scope's, so the scope ends first,
+    //    while that reference keeps the chart
+    pluginsd_clear_scope_chart(parser, "PARSER DESTROY", NULL);
+    pluginsd_keyword_chart_refs_release(parser);
+    rrdset_acquired_release(parser->user.st_ref.scope);
+    parser->user.st_ref.scope = NULL;
 
     // 1. a RESULT_BEGIN..END span cut short by death: release the stashed
     //    item (forcing a 2xx code to 503 - a truncated stream must not report
@@ -91,12 +108,22 @@ void parser_destroy(PARSER *parser) {
     //    sweep answer every caller still waiting on this plugin
     pluginsd_calls_cleanup(parser);
 
+    // the pin of the host a plugin has selected (pluginsd_select_host()): released only now, after the
+    // functions drain above, and on every path that destroys the parser. Streaming parsers never
+    // hold one - their host is set at creation and they have no HOST keyword.
+    if(parser->user.host_pin)
+        pluginsd_select_host(parser, NULL, false, "PARSER DESTROY");
+
     // 4. free the parser, THEN drop the transport's base ref: survivors
     //    (registry entries, dyncfg nodes, in-flight-call pins) keep holding a valid
     //    but dead transport until they release it; its destructor never
     //    touches the parser
     struct nrpc_transport *transport = parser->inflight.transport;
     parser->inflight.transport = NULL;
+
+    // the vnode index owns an interned STRING per machine guid; pluginsd_process() drains it on a
+    // plugin's normal teardown, this releases it on every other path
+    pluginsd_vnodes_index_destroy(parser);
 
     freez(parser);
 

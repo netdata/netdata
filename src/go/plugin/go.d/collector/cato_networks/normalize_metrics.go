@@ -38,10 +38,11 @@ func mergeMetrics(metrics *catosdk.AccountMetrics, sites map[string]*siteState) 
 				iface.Name = "all"
 			}
 			if strings.EqualFold(iface.Name, "all") {
+				iface.Aggregate = iface.ID == ""
 				site.Metrics, _ = mergeRawInterfaceTrafficMetrics(site.Metrics, rawIface)
 			}
 			key := interfaceKey(iface.ID, iface.Name)
-			resolveMetricInterfaceDevice(site, &iface)
+			matchedDevice := resolveMetricInterfaceDevice(site, &iface)
 			if iface.ID == "" && iface.DeviceID != "" {
 				key = snapshotInterfaceKey(iface.DeviceID, iface.ID, iface.Name)
 			}
@@ -50,13 +51,22 @@ func mergeMetrics(metrics *catosdk.AccountMetrics, sites map[string]*siteState) 
 				site.Interfaces[key] = &iface
 				continue
 			}
-			if iface.DeviceID == "" {
+			if !matchedDevice && existing.DeviceID != "" {
+				// An unmatched socket ID must not displace a known inventory owner.
 				iface.DeviceID = existing.DeviceID
+				iface.DeviceName = existing.DeviceName
 			}
 			if iface.DeviceName == "" {
 				iface.DeviceName = existing.DeviceName
 			}
 			existing.Metrics = iface.Metrics
+			existing.Aggregate = iface.Aggregate
+			if existing.UpstreamBandwidth == nil {
+				existing.UpstreamBandwidth = iface.UpstreamBandwidth
+			}
+			if existing.DownstreamBandwidth == nil {
+				existing.DownstreamBandwidth = iface.DownstreamBandwidth
+			}
 			existing.DeviceID = iface.DeviceID
 			existing.DeviceName = iface.DeviceName
 			existing.DeviceSocketID = iface.DeviceSocketID
@@ -88,8 +98,8 @@ func normalizeMetricsInterface(
 		if iface.Name == "" {
 			iface.Name = derefZero(info.GetName())
 		}
-		iface.UpstreamBandwidth = derefZero(info.GetUpstreamBandwidth())
-		iface.DownstreamBandwidth = derefZero(info.GetDownstreamBandwidth())
+		iface.UpstreamBandwidth = info.GetUpstreamBandwidthMbpsPrecision()
+		iface.DownstreamBandwidth = info.GetDownstreamBandwidthMbpsPrecision()
 	}
 	if socket := raw.GetSocketInfo(); socket != nil {
 		iface.DeviceSocketID = derefZero(socket.GetID())

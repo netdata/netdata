@@ -375,6 +375,6 @@ func TestPrivateLinkServiceProfiles_ResourceTagsJoinParentService(t *testing.T) 
 	require.NoError(t, err)
 	require.Len(t, queries, 36, "one service instance exports eight series; four detailed children export seven each")
 	for _, query := range queries {
-		assert.Equal(t, "platform", labelValue(query.tagLabels, "owner"), query.seriesName)
+		assert.Equal(t, "platform", labelValue(query.enrichmentLabels, "owner"), query.seriesName)
 	}
 }

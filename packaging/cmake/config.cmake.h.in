@@ -68,6 +68,9 @@
 #cmakedefine HAVE_NICE
 #cmakedefine HAVE_GETPRIORITY
 #cmakedefine HAVE_SETENV
+#cmakedefine HAVE_SECURE_GETENV
+#cmakedefine HAVE_GETAUXVAL
+#cmakedefine HAVE_ISSETUGID
 #cmakedefine HAVE_DLSYM
 
 #cmakedefine HAVE_LIBICONV
@@ -87,6 +90,7 @@
 #cmakedefine HAVE_TM_GMTOFF
 
 #cmakedefine HAVE_LIBBACKTRACE
+#cmakedefine HAVE_STACKTRACE
 #cmakedefine HAVE_LIBUNWIND
 #cmakedefine HAVE_BACKTRACE
 #cmakedefine HAVE_CLOSE_RANGE

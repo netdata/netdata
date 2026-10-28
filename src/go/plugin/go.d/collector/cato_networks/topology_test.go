@@ -88,7 +88,7 @@ func TestBuildTopology(t *testing.T) {
 
 				rows := topologyTableRows(t, data.Links, data.Dictionaries)
 				require.Len(t, rows, 1)
-				require.Equal(t, catofunc.LinkTypeTunnel, rows[0]["type"])
+				require.Equal(t, catofunc.LinkTypePopAssociation, rows[0]["type"])
 				require.Nil(t, rows[0]["bytes_upstream_max"])
 				require.Nil(t, rows[0]["bytes_downstream_max"])
 				require.Nil(t, rows[0]["lost_upstream_percent"])

@@ -23,7 +23,6 @@ import (
 const seriesCacheRetentionCycles = 10
 
 type metricFamilyWriterPolicy struct {
-	maxTSPerMetric        int
 	isFallbackTypeGauge   matcher.Matcher
 	isFallbackTypeCounter matcher.Matcher
 	observePipeline       PipelineDiagnosticObserver
@@ -290,11 +289,6 @@ func (w *metricFamilyWriter) metricFamilySkipReason(mf *prompkg.MetricFamily) Pi
 	// Info exposition is gauge-valued; preserve an explicit non-gauge type when an exporter reuses the suffix.
 	if mf.Type() == commonmodel.MetricTypeGauge && strings.HasSuffix(mf.Name(), "_info") {
 		return PipelineReasonInfoFamily
-	}
-	if w.policy.maxTSPerMetric > 0 && len(mf.Metrics()) > w.policy.maxTSPerMetric {
-		w.Debugf("metric '%s' num of time series (%d) > limit (%d), skipping it",
-			mf.Name(), len(mf.Metrics()), w.policy.maxTSPerMetric)
-		return PipelineReasonSeriesLimit
 	}
 	return ""
 }

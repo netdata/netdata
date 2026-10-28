@@ -52,6 +52,10 @@ char *url_encode(const char *str) {
     return pbuf;
 }
 
+static inline bool url_is_hex_digit(char c) {
+    return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+}
+
 /**
  *  Percentage escape decode
  *
@@ -62,7 +66,7 @@ char *url_encode(const char *str) {
  *  @return The character decoded on success and 0 otherwise
  */
 char url_percent_escape_decode(const char *s) {
-    if(likely(s[0] && s[1] && s[2]))
+    if(likely(s[0] == '%' && url_is_hex_digit(s[1]) && url_is_hex_digit(s[2])))
         return (char)(((uint8_t)from_hex(s[1]) << 4) | (uint8_t)from_hex(s[2]));
     return 0;
 }
@@ -402,4 +406,41 @@ inline char *url_find_protocol(char *s, const char *end) {
     }
 
     return s;
+}
+
+int url_unittest(void) {
+    static const struct {
+        const char *url;
+        const char *decoded; // NULL when decoding must fail
+    } tests[] = {
+        { "plain",      "plain" },
+        { "a+b",        "a b" },
+        { "%41",        "A" },
+        { "%2Fapi%2f",  "/api/" },
+        { "%C3%A9",     "\xC3\xA9" },
+        { "%C3xA9",     NULL },     // continuation byte without '%'
+        { "%1g",        NULL },     // non-hex digit
+        { "%zz",        NULL },
+        { "%4",         NULL },     // truncated escape
+        { "%00",        NULL },
+        { "%C3%28",     NULL },     // invalid continuation byte
+        { "%E2%82",     NULL },     // truncated multibyte character
+        { "%C0%AF",     NULL },     // overlong encoding
+    };
+
+    int errors = 0;
+    for(size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
+        char out[64];
+        const char *got = url_decode_r(out, tests[i].url, sizeof(out));
+
+        bool ok = tests[i].decoded ? (got && strcmp(got, tests[i].decoded) == 0) : (got == NULL);
+        if(!ok) {
+            fprintf(stderr, "URL: decoding '%s' gave '%s', expected '%s'\n",
+                    tests[i].url, got ? got : "(failure)", tests[i].decoded ? tests[i].decoded : "(failure)");
+            errors++;
+        }
+    }
+
+    fprintf(stderr, "URL: %zu decode tests, %d failed\n", sizeof(tests) / sizeof(tests[0]), errors);
+    return errors;
 }

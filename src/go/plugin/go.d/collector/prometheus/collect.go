@@ -33,26 +33,27 @@ func (c *Collector) collect(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	if err := c.admitInput(mfs); err != nil {
+		return err
+	}
 	if typesBound {
 		c.writer.writeBoundMetricFamilies(mfs)
 	} else {
 		c.writer.writeMetricFamilies(mfs)
 	}
+	c.inputAdmissionSucceeded(mfs)
 	return nil
 }
 
-// check probes the endpoint and enforces the startup gates the V1 collector applied once:
-// the expected-prefix guard and the total time-series limit. Unlike V1 these are read-only
-// (V1 mutated Config to make them one-shot); they run only at Check, i.e. autodetection.
+// check probes the endpoint, validates input admission and writable metrics, and
+// installs a runtime only after all startup checks succeed.
 func (c *Collector) check(ctx context.Context) error {
 	candidate, mfs, typesBound, err := c.checkRuntimeCandidate(ctx)
 	if err != nil {
 		return err
 	}
-	if c.MaxTS > 0 {
-		if n := calcMetrics(mfs); n > c.MaxTS {
-			return fmt.Errorf("'%s' num of time series (%d) > limit (%d)", c.URL, n, c.MaxTS)
-		}
+	if err := c.admitInput(mfs); err != nil {
+		return err
 	}
 	var writable int
 	if typesBound {
@@ -69,6 +70,7 @@ func (c *Collector) check(ctx context.Context) error {
 	}
 	candidate.chartTemplate = tmpl
 	c.runtime = candidate
+	c.inputAdmissionSucceeded(mfs)
 	return nil
 }
 
@@ -234,10 +236,38 @@ func hasPrefix(mfs prometheus.MetricFamilies, prefix string) bool {
 	return false
 }
 
-func calcMetrics(mfs prometheus.MetricFamilies) int {
+// countInputSeries counts assembled components, including distributions that the
+// writer may later skip. Count/sum slots are charged even when absent in input.
+func countInputSeries(mfs prometheus.MetricFamilies) int {
 	var n int
 	for _, mf := range mfs {
-		n += len(mf.Metrics())
+		for _, m := range mf.Metrics() {
+			switch {
+			case m.Histogram() != nil:
+				n += len(m.Histogram().Buckets()) + 2
+			case m.Summary() != nil:
+				n += len(m.Summary().Quantiles()) + 2
+			default:
+				n++
+			}
+		}
 	}
 	return n
+}
+
+func (c *Collector) admitInput(mfs prometheus.MetricFamilies) error {
+	if c.MaxInputSeries > 0 {
+		if n := countInputSeries(mfs); n > c.MaxInputSeries {
+			c.inputRejected = true
+			return fmt.Errorf("input admission rejected: %d input series exceeds max_input_series limit %d", n, c.MaxInputSeries)
+		}
+	}
+	return nil
+}
+
+func (c *Collector) inputAdmissionSucceeded(mfs prometheus.MetricFamilies) {
+	if c.inputRejected {
+		c.Infof("input admission resumed: %d input series admitted (max_input_series limit %d; 0 disables the limit)", countInputSeries(mfs), c.MaxInputSeries)
+		c.inputRejected = false
+	}
 }

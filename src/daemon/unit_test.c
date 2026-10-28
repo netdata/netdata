@@ -4,6 +4,7 @@
 #include "web/api/formatters/rrd2json.h"
 #include "web/api/queries/query-internal.h"
 #include "database/contexts/rrdcontext-internal.h"
+#include "unit_test_bridge.h"
 #ifdef OS_WINDOWS
 #include "win_system-info.h"
 #endif
@@ -1585,6 +1586,98 @@ static int test_incremental_sum_lookup_respects_update_every(void) {
     return rc;
 }
 
+static RRDSET *ram_gap_chart(const char *name, RRDDIM **rd) {
+    RRDSET *st = rrdset_create_localhost(
+        "netdata", name, name, "netdata", NULL, "Unit Testing", "value", "unittest", NULL, 1,
+        10, RRDSET_TYPE_LINE);
+    *rd = rrddim_add(st, "value", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    return st;
+}
+
+// Stores aligned points straight into the ram engine, as streaming and replication do: one per interval from 0 to
+// last (value = interval + 1), except the missed ranges. Then reads back every interval the ring still holds: each
+// must have its own value, or be empty when it was missed.
+static int ram_gap_check(const char *name, RRDSET *st, RRDDIM *rd, size_t last, const size_t (*missed)[2], size_t missed_count) {
+    const time_t update_every = st->update_every;
+    const time_t base_s = 200000000;
+    const size_t entries = st->db.entries;
+
+    for(size_t at = 0; at <= last; at++) {
+        bool skip = false;
+        for(size_t m = 0; m < missed_count; m++)
+            if(at >= missed[m][0] && at <= missed[m][1]) skip = true;
+        if(skip) continue;
+
+        NETDATA_DOUBLE v = (NETDATA_DOUBLE)(at + 1);
+        unittest_storage_engine_store_metric(
+            rd->tiers[0].sch, (base_s + (time_t)at * update_every) * USEC_PER_SEC, v, v, v, 1, 0, SN_DEFAULT_FLAGS);
+    }
+
+    size_t first = (last + 1 > entries) ? last + 1 - entries : 0, errors = 0, points = 0;
+    struct storage_engine_query_handle seqh;
+    unittest_storage_engine_query_init(
+        rd->tiers[0].seb, rd->tiers[0].smh, &seqh, base_s + (time_t)first * update_every,
+        base_s + (time_t)last * update_every, STORAGE_PRIORITY_SYNCHRONOUS);
+
+    for(size_t at = first; !unittest_storage_engine_query_is_finished(&seqh); at++) {
+        STORAGE_POINT sp = unittest_storage_engine_query_next_metric(&seqh);
+        points++;
+
+        bool stored = true;
+        for(size_t m = 0; m < missed_count; m++)
+            if(at >= missed[m][0] && at <= missed[m][1]) stored = false;
+
+        // compare with what the ring can hold: storage numbers round some integers
+        NETDATA_DOUBLE expected = unpack_storage_number(pack_storage_number((NETDATA_DOUBLE)(at + 1), SN_DEFAULT_FLAGS));
+        bool ok = sp.end_time_s == base_s + (time_t)at * update_every &&
+                  (stored ? sp.sum == expected : isnan(sp.sum));
+        if(!ok) {
+            fprintf(stderr, "%s: interval %zu (end %" PRId64 ") holds " NETDATA_DOUBLE_FORMAT ", expected %s\n",
+                    name, at, (int64_t)sp.end_time_s, sp.sum, stored ? "its own value" : "empty");
+            errors++;
+        }
+    }
+    unittest_storage_engine_query_finalize(&seqh);
+
+    if(points != last - first + 1) {
+        fprintf(stderr, "%s: read %zu points, expected %zu\n", name, points, last - first + 1);
+        errors++;
+    }
+
+    rrdset_free(st);
+    return errors ? 1 : 0;
+}
+
+static int test_ram_engine_gap_fills_only_missed_intervals(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    int rc = 0;
+    RRDDIM *rd;
+    RRDSET *st;
+
+    // two gaps: each one must not shift the values before it
+    st = ram_gap_chart("unittest-ram-gap-two-gaps", &rd);
+    const size_t two_gaps[][2] = { { 4, 5 }, { 9, 9 } };
+    rc += ram_gap_check("unittest-ram-gap-two-gaps", st, rd, 12, two_gaps, _countof(two_gaps));
+
+    // the largest gap that still takes the fill path (one interval below the ring size): the first point survives
+    st = ram_gap_chart("unittest-ram-gap-ring-sized", &rd);
+    size_t entries = st->db.entries;
+    const size_t ring_sized[][2] = { { 1, entries - 2 } };
+    rc += ram_gap_check("unittest-ram-gap-ring-sized", st, rd, entries - 1, ring_sized, _countof(ring_sized));
+
+    // gaps before and after the ring wraps around
+    st = ram_gap_chart("unittest-ram-gap-wrap", &rd);
+    const size_t wrap[][2] = { { entries - 3, entries - 2 }, { entries + 5, entries + 5 }, { entries + 10, entries + 12 } };
+    rc += ram_gap_check("unittest-ram-gap-wrap", st, rd, entries + 20, wrap, _countof(wrap));
+
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    return rc ? 1 : 0;
+}
+
 static int test_rrdmetric_algorithm_follows_rrddim(void) {
     fprintf(stderr, "%s() running...\n", __FUNCTION__);
 
@@ -2027,6 +2120,151 @@ static int test_rrdset_free_does_not_collect_name_index_per_chart(void) {
                 __FUNCTION__, dictionary_pending_deletes(names));
         rc = 1;
     }
+
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    return rc;
+}
+
+// The new chart must still own its instance and its metric after the old chart is destroyed.
+static int relinked_chart_check(const char *function, RRDSET *st, RRDDIM *rd) {
+    int rc = 0;
+
+    RRDINSTANCE *ri = st->rrdcontexts.rrdinstance ? rrdinstance_acquired_value(st->rrdcontexts.rrdinstance) : NULL;
+    if(!ri || rrdinstance_rrdset_atomic_load(ri) != st) {
+        fprintf(stderr, "%s: the re-created chart lost its instance\n", function);
+        rc = 1;
+    }
+    else if(rrd_flag_check(ri, RRD_FLAG_OWN_LABELS)) {
+        fprintf(stderr, "%s: the instance of the re-created chart no longer uses its labels\n", function);
+        rc = 1;
+    }
+    else if(dictionary_acquired_item_references((DICTIONARY_ITEM *)st->rrdcontexts.rrdinstance) != 1) {
+        // the old chart must have released its reference, once
+        fprintf(stderr, "%s: the instance has %zu references, expected only the re-created chart's\n", function,
+                dictionary_acquired_item_references((DICTIONARY_ITEM *)st->rrdcontexts.rrdinstance));
+        rc = 1;
+    }
+
+    if(rd) {
+        RRDMETRIC *rm = rd->rrdcontexts.rrdmetric ? rrdmetric_acquired_value(rd->rrdcontexts.rrdmetric) : NULL;
+        if(!rm || rrdmetric_rrddim_atomic_load(rm) != rd) {
+            fprintf(stderr, "%s: the re-created dimension lost its metric\n", function);
+            rc = 1;
+        }
+        else if(dictionary_acquired_item_references((DICTIONARY_ITEM *)rd->rrdcontexts.rrdmetric) != 1) {
+            fprintf(stderr, "%s: the metric has %zu references, expected only the re-created dimension's\n", function,
+                    dictionary_acquired_item_references((DICTIONARY_ITEM *)rd->rrdcontexts.rrdmetric));
+            rc = 1;
+        }
+    }
+
+    return rc;
+}
+
+static RRDSET *relinked_chart_create(const char *id) {
+    RRDSET *st = rrdset_create_localhost(
+        "netdata", id, id, "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1, nd_profile.update_every, RRDSET_TYPE_LINE);
+    rrddim_add(st, "d", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    return st;
+}
+
+// A freed chart is destroyed when its last index entry goes, and the name index keeps its deleted entries
+// until the next collection, so a chart re-created with the same id (a systemd unit that comes back)
+// takes over the instance while the old chart still exists. Here the name insert of the new chart
+// destroys the old one, which must leave the instance to the new chart.
+static int test_rrdset_recreated_chart_keeps_its_instance(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    rrdset_free(relinked_chart_create("unittest-relink-name"));
+    RRDSET *st = relinked_chart_create("unittest-relink-name");
+    int rc = relinked_chart_check(__FUNCTION__, st, rrddim_find(st, "d", false));
+    rrdset_free(st);
+
+    dictionary_garbage_collect(localhost->rrdset_root_index_name);
+    dictionary_garbage_collect(localhost->rrdset_root_index);
+
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    return rc;
+}
+
+// A reference held across the re-creation destroys the old chart after the new one has its dimensions,
+// so the metrics have moved to the new dimensions too and must stay with them.
+static int test_rrdset_recreated_dimension_keeps_its_metric(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    int rc = 0;
+    RRDSET *old = relinked_chart_create("unittest-relink-ref");
+    RRDSET_ACQUIRED *rsa = rrdset_find_and_acquire(localhost, rrdset_id(old), true);
+    rrdset_free(old);
+    RRDSET *st = relinked_chart_create("unittest-relink-ref");
+    if(rsa)
+        rrdset_acquired_release(rsa);
+    else {
+        fprintf(stderr, "%s: could not acquire the old chart\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    // what the obsolete charts cleanup does: this destroys the old chart
+    dictionary_garbage_collect(localhost->rrdset_root_index_name);
+    dictionary_garbage_collect(localhost->rrdset_root_index);
+    rc += relinked_chart_check(__FUNCTION__, st, rrddim_find(st, "d", false));
+    rrdset_free(st);
+
+    dictionary_garbage_collect(localhost->rrdset_root_index_name);
+    dictionary_garbage_collect(localhost->rrdset_root_index);
+
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    return rc ? 1 : 0;
+}
+
+// A chart that changes context moves to a new instance; the old instance it still owns is marked deleted
+// and its metrics are released by the dimensions that still own them.
+static int test_rrdset_context_switch_releases_old_instance(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    int rc = 0;
+    RRDSET *st = rrdset_create_localhost(
+        "netdata", "unittest-relink-ctx", NULL, "netdata", "unittest.relink_a",
+        "Unit Testing", "x", "unittest", NULL, 1, nd_profile.update_every, RRDSET_TYPE_LINE);
+    rrddim_add(st, "d", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+    RRDINSTANCE_ACQUIRED *ria_old = rrdinstance_acquired_dup(st->rrdcontexts.rrdinstance);
+
+    RRDSET *st2 = rrdset_create_localhost(
+        "netdata", "unittest-relink-ctx", NULL, "netdata", "unittest.relink_b",
+        "Unit Testing", "x", "unittest", NULL, 1, nd_profile.update_every, RRDSET_TYPE_LINE);
+
+    RRDINSTANCE *ri_old = rrdinstance_acquired_value(ria_old);
+    if(st2 != st) {
+        fprintf(stderr, "%s: changing the context created a new chart\n", __FUNCTION__);
+        rc = 1;
+    }
+    else if(rrdinstance_acquired_value(st->rrdcontexts.rrdinstance) == ri_old) {
+        fprintf(stderr, "%s: the chart did not move to a new instance\n", __FUNCTION__);
+        rc = 1;
+    }
+    else if(rrdinstance_rrdset_atomic_load(ri_old) != NULL || !rrd_flag_check(ri_old, RRD_FLAG_DELETED)) {
+        fprintf(stderr, "%s: the old instance is still linked or not deleted\n", __FUNCTION__);
+        rc = 1;
+    }
+    else
+        rc = relinked_chart_check(__FUNCTION__, st, rrddim_find(st, "d", false));
+
+    rrdinstance_release(ria_old);
+    rrdset_free(st);
+
+    dictionary_garbage_collect(localhost->rrdset_root_index_name);
+    dictionary_garbage_collect(localhost->rrdset_root_index);
 
     default_rrd_memory_mode = old_default_rrd_memory_mode;
     return rc;
@@ -3325,6 +3563,9 @@ int run_all_mockup_tests(void)
     if(test_incremental_sum_lookup_respects_update_every())
         return 1;
 
+    if(test_ram_engine_gap_fills_only_missed_intervals())
+        return 1;
+
     if(test_rrdmetric_algorithm_follows_rrddim())
         return 1;
 
@@ -3347,6 +3588,15 @@ int run_all_mockup_tests(void)
         return 1;
 
     if(test_rrdset_free_does_not_collect_name_index_per_chart())
+        return 1;
+
+    if(test_rrdset_recreated_chart_keeps_its_instance())
+        return 1;
+
+    if(test_rrdset_recreated_dimension_keeps_its_metric())
+        return 1;
+
+    if(test_rrdset_context_switch_releases_old_instance())
         return 1;
 
     if(test_health_acquire_keeps_obsolete_chart_unaccessed())

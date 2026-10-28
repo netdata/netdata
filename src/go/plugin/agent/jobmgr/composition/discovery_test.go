@@ -133,12 +133,12 @@ func TestDiscoverySupervisorReturnsContainedPanic(t *testing.T) {
 			groups: []*confgroup.Group{{Source: "source", Configs: []confgroup.Config{config}}},
 		},
 	)
-	decisions, err := jobmgrdiscovery.NewDecisionIndex(
-		jobmgrdiscovery.DecisionConfig{
+	inventory, err := jobmgrdiscovery.NewInventoryIndex(
+		jobmgrdiscovery.InventoryConfig{
 			Generation: 1,
 			Commands:   discoveryTestCommands{},
-			Plan: func(jobmgrdiscovery.DiscoveredChange) (jobmgr.WorkPlan, error) {
-				panic("decision panic")
+			Plan: func(jobmgrdiscovery.SourceInventoryBatch) (jobmgr.WorkPlan, error) {
+				panic("inventory panic")
 			},
 		},
 	)
@@ -149,7 +149,7 @@ func TestDiscoverySupervisorReturnsContainedPanic(t *testing.T) {
 	go func() {
 		providerErr <- pipeline.RunProvider(ctx, "provider")
 	}()
-	err = runDiscoverySupervisor(ctx, pipeline, decisions)
+	err = runDiscoverySupervisor(ctx, pipeline, inventory)
 	require.ErrorIs(t, err, lifecycle.ErrTaskPanic)
 	cancel()
 
@@ -218,11 +218,11 @@ func TestRunGenerationOwnsFrozenDiscoveryChildren(t *testing.T) {
 func newPublicationTestDiscovery(t *testing.T, discoverer agentdiscovery.Discoverer) *preparedDiscovery {
 	t.Helper()
 	pipeline := newDiscoveryTestPipeline(t, discoverer)
-	decisions, err := jobmgrdiscovery.NewDecisionIndex(
-		jobmgrdiscovery.DecisionConfig{
+	inventory, err := jobmgrdiscovery.NewInventoryIndex(
+		jobmgrdiscovery.InventoryConfig{
 			Generation: 1,
 			Commands:   discoveryTestCommands{},
-			Plan: func(jobmgrdiscovery.DiscoveredChange) (jobmgr.WorkPlan, error) {
+			Plan: func(jobmgrdiscovery.SourceInventoryBatch) (jobmgr.WorkPlan, error) {
 				return jobmgr.WorkPlan{}, nil
 			},
 		},
@@ -240,7 +240,7 @@ func newPublicationTestDiscovery(t *testing.T, discoverer agentdiscovery.Discove
 	}
 	permit, err := tasks.IssueLongLivedPermit(identity, plan)
 	require.NoError(t, err)
-	prepared, err := newPreparedDiscovery(pipeline, decisions, tasks, identity, permit)
+	prepared, err := newPreparedDiscovery(pipeline, inventory, tasks, identity, permit)
 	require.NoError(t, err)
 	return prepared
 }

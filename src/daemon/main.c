@@ -214,6 +214,7 @@ int help(int exitcode) {
     } while(0)
 
 int buffer_unittest(void);
+int url_unittest(void);
 int ringbuffer_unittest(void);
 int onewayalloc_unittest(void);
 int log_stack_unittest(void);
@@ -246,6 +247,7 @@ int nrpc_registry_unittest(void);
 int pluginsd_functions_unittest(void);
 int nrpc_catalog_unittest(void);
 int mcp_execute_function_access_unittest(void);
+int mcp_jsonrpc_batch_unittest(void);
 int eval_unittest(void);
 int duration_unittest(void);
 int statistical_unittest(void);
@@ -510,6 +512,7 @@ int netdata_main(int argc, char **argv) {
                             if (unit_test_buffer()) return 1;
                             if (unit_test_str2ld()) return 1;
                             if (buffer_unittest()) return 1;
+                            if (url_unittest()) return 1;
                             if (api_v1_allmetrics_json_unittest()) return 1;
                             if (exporting_json_connector_unittest()) return 1;
                             if (exporting_graphite_unittest()) return 1;
@@ -564,6 +567,7 @@ int netdata_main(int argc, char **argv) {
                             if (pluginsd_functions_unittest()) return 1;
                             if (nrpc_catalog_unittest()) return 1;
                             if (mcp_execute_function_access_unittest()) return 1;
+                            if (mcp_jsonrpc_batch_unittest()) return 1;
                             if (eval_unittest()) return 1;
                             if (duration_unittest()) return 1;
                             if (statistical_unittest()) return 1;
@@ -580,7 +584,7 @@ int netdata_main(int argc, char **argv) {
                             if (mrg_unittest()) return 1;
 #endif
                             if (paths_unittest()) return 1;
-#ifdef HAVE_LIBBACKTRACE
+#ifdef HAVE_STACKTRACE
                             if (stacktrace_unittest()) return 1;
 #endif
                             if (test_cmd_pool_fifo()) return 1;
@@ -731,7 +735,7 @@ int netdata_main(int argc, char **argv) {
                             errors += sqlite_lease_teardown_unittest();
                             return errors ? 1 : 0;
                         }
-#ifdef HAVE_LIBBACKTRACE
+#ifdef HAVE_STACKTRACE
                         else if(strcmp(optarg, "stacktracetest") == 0) {
                             unittest_running = true;
                             return stacktrace_unittest();
@@ -893,6 +897,8 @@ int netdata_main(int argc, char **argv) {
                             return rc;
                         }
 #endif
+                        else if(strcmp(optarg, "mcpbatchtest") == 0)
+                            return mcp_jsonrpc_batch_unittest();
                         else if(strcmp(optarg, "simple-pattern") == 0) {
                             if(optind + 2 > argc) {
                                 fprintf(stderr, "%s", "\nUSAGE: -W simple-pattern 'pattern' 'string'\n\n"

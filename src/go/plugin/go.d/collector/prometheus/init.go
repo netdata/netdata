@@ -14,6 +14,12 @@ import (
 )
 
 func (c *Collector) validateConfig() error {
+	if c.MaxInputSeries < 0 {
+		return errors.New("max_input_series must not be negative")
+	}
+	if c.MaxOutputSeriesPerContext < 0 {
+		return errors.New("max_output_series_per_context must not be negative")
+	}
 	if c.URL == "" {
 		return errors.New("'url' can not be empty")
 	}

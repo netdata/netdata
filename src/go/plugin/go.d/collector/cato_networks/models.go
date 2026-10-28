@@ -16,6 +16,10 @@ type siteState struct {
 	Region             string
 	HostCount          *int64
 
+	SnapshotCollection string
+	MetricsCollection  string
+	BGPCollection      string
+
 	Metrics    trafficMetrics
 	Interfaces map[string]*interfaceState
 	Devices    []deviceState
@@ -36,6 +40,7 @@ type deviceState struct {
 }
 
 type interfaceState struct {
+	Aggregate           bool
 	ID                  string
 	Name                string
 	DeviceID            string
@@ -47,8 +52,8 @@ type interfaceState struct {
 	PopName             string
 	TunnelRemoteIP      string
 	TunnelUptime        *int64
-	UpstreamBandwidth   int64
-	DownstreamBandwidth int64
+	UpstreamBandwidth   *float64
+	DownstreamBandwidth *float64
 	LinkUp              *bool
 	Metrics             trafficMetrics
 }

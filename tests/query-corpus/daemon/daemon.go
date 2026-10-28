@@ -41,6 +41,9 @@ type Options struct {
 	StorageTiers     int    // defaults to 3
 	DBEnginePageType string // empty keeps the stock Gorilla default; also accepts gorilla or raw
 	StreamMemoryMode string // empty defaults to dbengine; also accepts ram or alloc
+	// DisablePulse prevents internal chart creation when a dedicated fixture
+	// needs deterministic chart construction order from the first boot.
+	DisablePulse bool
 	// TierRetentionMB caps a tier's dbengine disk quota (index = tier), so
 	// its oldest datafiles rotate out while the tiers above keep more
 	// history — the plan-switching scenario. Retention TIME knobs are
@@ -72,6 +75,7 @@ type Daemon struct {
 	process         daemonProcess
 	processPID      int
 	waitCh          chan error
+	runtimeDir      string
 
 	// Tests shorten these bounds; zero selects the production defaults.
 	termTimeout time.Duration
@@ -197,6 +201,18 @@ func newDaemonIdentity() (hostname, streamKey string, err error) {
 	return hostname, streamKey, nil
 }
 
+func absoluteDir(dir string) (string, error) {
+	if filepath.IsAbs(dir) {
+		return dir, nil
+	}
+	// Resolve symlinks before Abs cleans '..', preserving the selected directory.
+	resolved, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Abs(resolved)
+}
+
 // Start writes the test configuration under RunDir, boots the daemon in the
 // foreground and waits until the HTTP API answers.
 func Start(o Options) (*Daemon, error) {
@@ -205,6 +221,19 @@ func Start(o Options) (*Daemon, error) {
 	}
 	if err := validateOptions(o); err != nil {
 		return nil, err
+	}
+	if !filepath.IsAbs(o.RunDir) {
+		if o.RunDir == "" {
+			o.RunDir = "."
+		}
+		if err := os.MkdirAll(o.RunDir, 0o755); err != nil {
+			return nil, fmt.Errorf("daemon: run dir: %w", err)
+		}
+		var err error
+		o.RunDir, err = absoluteDir(o.RunDir)
+		if err != nil {
+			return nil, fmt.Errorf("daemon: run dir: %w", err)
+		}
 	}
 
 	for _, sub := range []string{"etc", "cache", "lib", "log"} {
@@ -291,6 +320,10 @@ func startAttempt(o Options, hostname, streamKey string) (*Daemon, error) {
 		extraDB += fmt.Sprintf("    dbengine page type = %s\n", o.DBEnginePageType)
 	}
 	conf := fmt.Sprintf(netdataConfTemplate, o.RunDir, hostname, o.Port, o.StorageTiers, step, extraDB)
+	if o.DisablePulse {
+		conf = strings.Replace(conf, "[plugins]\n", "[plugins]\n    netdata pulse = no\n", 1)
+		conf += "\n[pulse]\n    extended = no\n"
+	}
 	confPath := filepath.Join(o.RunDir, "etc", "netdata.conf")
 	if err := os.WriteFile(confPath, []byte(conf), 0o644); err != nil {
 		return nil, fmt.Errorf("daemon: write netdata.conf: %w", err)
@@ -312,9 +345,57 @@ func startAttempt(o Options, hostname, streamKey string) (*Daemon, error) {
 	return d, nil
 }
 
-func (d *Daemon) launch() error {
+func (d *Daemon) cleanupRuntime() error {
+	if d.runtimeDir == "" {
+		return nil
+	}
+	err := os.RemoveAll(d.runtimeDir)
+	if err == nil {
+		d.runtimeDir = ""
+	}
+	return err
+}
+
+func validateRuntimeSocketPaths(runDir string) error {
+	maxPathBytes := len(syscall.RawSockaddrUnix{}.Path) - 1
+	// main.c starts the init/plugins spawn servers; external collectors are disabled.
+	// The spawn server appends to NETDATA_RUN_DIR without cleaning its path.
+	for _, path := range []string{
+		filepath.Join(runDir, "netdata.pipe"),
+		runDir + "/netdata-spawn-init.sock",
+		runDir + "/netdata-spawn-plugins.sock",
+	} {
+		if len(path) > maxPathBytes {
+			return fmt.Errorf("daemon: IPC socket path %q is %d bytes, exceeds the %d-byte Unix-socket limit; set TMPDIR to a shorter directory",
+				path, len(path), maxPathBytes)
+		}
+	}
+	return nil
+}
+
+func (d *Daemon) launch() (err error) {
+	// Test subdirectory names can exceed Unix-socket limits; keep IPC paths short.
+	runtimeParent, err := absoluteDir(os.TempDir())
+	if err != nil {
+		return fmt.Errorf("daemon: runtime directory: %w", err)
+	}
+	runDir, err := os.MkdirTemp(runtimeParent, "qc-ipc-")
+	if err != nil {
+		return fmt.Errorf("daemon: runtime directory: %w", err)
+	}
+	d.runtimeDir = runDir
+	defer func() {
+		if err != nil && d.process == nil {
+			err = errors.Join(err, d.cleanupRuntime())
+		}
+	}()
+	if err := validateRuntimeSocketPaths(runDir); err != nil {
+		return err
+	}
 	confPath := filepath.Join(d.Opts.RunDir, "etc", "netdata.conf")
 	cmd := exec.Command(d.Opts.Binary, "-D", "-c", confPath)
+	// CLI startup unlinks its socket, so inherited runtime paths must never reach a test daemon.
+	cmd.Env = append(os.Environ(), "NETDATA_RUN_DIR="+runDir, "NETDATA_PIPENAME="+filepath.Join(runDir, "netdata.pipe"))
 	stdout, err := os.Create(filepath.Join(d.Opts.RunDir, "log", "stdout.log"))
 	if err != nil {
 		return fmt.Errorf("daemon: stdout log: %w", err)
@@ -420,7 +501,12 @@ func startupLogShowsBindCollision(runDir string) bool {
 }
 
 // Stop terminates the daemon gracefully, escalating to SIGKILL.
-func (d *Daemon) Stop() error {
+func (d *Daemon) Stop() (err error) {
+	defer func() {
+		if d.process == nil {
+			err = errors.Join(err, d.cleanupRuntime())
+		}
+	}()
 	if d.process == nil {
 		return nil
 	}

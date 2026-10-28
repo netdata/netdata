@@ -428,7 +428,7 @@ int become_daemon(int dont_fork, const char *user) {
         // the child
         gettid_uncached();
         nd_initialize_signals(false);
-#ifdef HAVE_LIBBACKTRACE
+#ifdef HAVE_STACKTRACE
         stacktrace_flush();
 #endif
 
@@ -453,7 +453,7 @@ int become_daemon(int dont_fork, const char *user) {
         // the child
         gettid_uncached();
         nd_initialize_signals(false);
-#ifdef HAVE_LIBBACKTRACE
+#ifdef HAVE_STACKTRACE
         stacktrace_flush();
 #endif
     }

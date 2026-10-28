@@ -8,6 +8,13 @@ PGC *open_cache = NULL;
 PGC *extent_cache = NULL;
 struct rrdeng_cache_efficiency_stats rrdeng_cache_efficiency_stats = {};
 
+// an open-cache page is found by a bare METRIC pointer that can outlive its metric, and the address can be reused by
+// a new metric: the uuidmap id stored with the page says which metric the page really belongs to
+bool open_cache_page_is_of_metric(PGC_PAGE *page, UUIDMAP_ID uuid_id) {
+    struct extent_io_data *xio = (struct extent_io_data *)pgc_page_custom_data(open_cache, page);
+    return xio->uuid_id == uuid_id;
+}
+
 static void main_cache_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused)
 {
     // Release storage associated with the page
@@ -345,7 +352,7 @@ static void pgc_inject_gap(struct rrdengine_instance *ctx, METRIC *metric, time_
             .data = PGD_EMPTY,
     };
 
-    if(page_entry.start_time_s >= page_entry.end_time_s)
+    if(page_entry.start_time_s > page_entry.end_time_s)
         return;
 
     PGC_PAGE *page = pgc_page_add_and_acquire(main_cache, page_entry, NULL);
@@ -410,7 +417,7 @@ static ALWAYS_INLINE_HOT size_t list_has_time_gaps(
             dt_s = pd->update_every_s;
 
         if(populate_gaps && pd->first_time_s > now_s)
-            pgc_inject_gap(ctx, metric, now_s, pd->first_time_s);
+            pgc_inject_gap(ctx, metric, now_s, nd_time_t_add_saturating(pd->first_time_s, -1));
 
         now_s = pd->last_time_s + dt_s;
         if(now_s > wanted_end_time_s) {

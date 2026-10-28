@@ -19,18 +19,18 @@ func (o *observationStore) emit(plan []plannedQuery) int {
 		if query.rate {
 			value /= query.policy.Period.Seconds()
 		}
-		writeSample(meter, query.seriesName, query.labels, query.tagLabels, value)
+		writeSample(meter, query.seriesName, query.labels, query.enrichmentLabels, value)
 		written++
 	}
 	return written
 }
 
-func writeSample(meter metrix.SnapshotMeter, seriesName string, labels, tagLabels []metrix.Label, value float64) {
+func writeSample(meter metrix.SnapshotMeter, seriesName string, labels, enrichmentLabels []metrix.Label, value float64) {
 	all := labels
-	if len(tagLabels) > 0 {
-		all = make([]metrix.Label, 0, len(labels)+len(tagLabels))
+	if len(enrichmentLabels) > 0 {
+		all = make([]metrix.Label, 0, len(labels)+len(enrichmentLabels))
 		all = append(all, labels...)
-		all = append(all, tagLabels...)
+		all = append(all, enrichmentLabels...)
 	}
 	meter.WithLabels(all...).Gauge(seriesName, metrix.WithFloat(true)).Observe(value)
 }
