@@ -25,7 +25,7 @@ ${GITHUB_ACTIONS+echo "::endgroup::"}
 # Always run: it keeps a cached file that matches the pin and replaces any other.
 ${GITHUB_ACTIONS+echo "::group::Fetching MSYS2 files"}
 "${repo_root}/packaging/windows/fetch-msys2-installer.py" base /msys2-base.tar.zst
-"${repo_root}/packaging/windows/fetch-msys2-installer.py" runtime /msys2-runtime.pkg.tar.zst
+"${repo_root}/packaging/windows/fetch-msys2-installer.py" packages /msys2-packages
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
 ${GITHUB_ACTIONS+echo "::group::Licenses"}
@@ -44,23 +44,62 @@ cp -R /opt/netdata/msys64/* /opt/netdata/ || exit 1
 cp "${repo_root}/packaging/windows/copy_files.ps1" /opt/netdata/usr/libexec/netdata/ || exit 1
 rm -rf /opt/netdata/msys64/
 
-check_msys2_runtime() {
-    local expected="$1" hint="$2" version
-    version="$(strings -el /opt/netdata/usr/bin/msys-2.0.dll | grep -A1 '^FileVersion$' | tail -n 1 || true)"
-    if [ "${version}" != "${expected}" ]; then
-        echo "Bundled msys-2.0.dll is '${version}', expected '${expected}'. ${hint}" >&2
-        exit 1
-    fi
-}
+${GITHUB_ACTIONS+echo "::endgroup::"}
 
-# The installer's msys2-runtime 3.6.10 carries 8fbd980844 ("Cygwin: open: Unlock fdtab before open_with_arch()")
-# without its upstream fixes, and netdata dies at startup with an access violation inside msys-2.0.dll. Replace the DLL
-# with the one from the msys2-runtime 3.6.11 package, which has them. The versions below follow the pins in
-# fetch-msys2-installer.py; if the installer pin moves to another runtime, revisit the override.
-check_msys2_runtime "3.6.10-c770e1b9fa537fff9287c1fd40ebc84ac498fcb6" \
-    "The MSYS2 installer pin no longer bundles msys2-runtime 3.6.10; update or drop the runtime override."
-tar -xf /msys2-runtime.pkg.tar.zst -C /opt/netdata/ usr/bin/msys-2.0.dll || exit 1
-check_msys2_runtime "3.6.11-00eb8435b1c498e9211c7a7cee01584d76bd5f21" "The msys2-runtime DLL was not installed."
+# The installer base is a snapshot: upgrade it with the packages pinned in fetch-msys2-installer.py, so the MSI ships
+# the fixes MSYS2 published after it.
+${GITHUB_ACTIONS+echo "::group::Upgrading MSYS2 packages"}
+install_msys2_packages() {
+    local root=/opt/netdata pkgdir=/msys2-packages pkg name version installed hook hookdir
+    local -a pacman_root=(--root "${root}" --dbpath "${root}/var/lib/pacman")
+    local -A pinned=()
+
+    for pkg in "${pkgdir}"/*.pkg.tar.zst; do
+        name="$(pacman -Qp "${pkg}")"
+        version="${name#* }"
+        name="${name% *}"
+        if ! installed="$(pacman -Q "${pacman_root[@]}" "${name}")"; then
+            echo "The MSYS2 base does not have ${name}; the pins only upgrade packages it bundles." >&2
+            exit 1
+        fi
+        installed="${installed#* }"
+        if [ "$(vercmp "${installed}" "${version}")" -ge 0 ]; then
+            echo "The MSYS2 base has ${name} ${installed}, not older than the pin ${version}; drop the pin." >&2
+            exit 1
+        fi
+        pinned["${name}"]="${version}"
+    done
+
+    # There is no chroot on MSYS2, so pacman would run the tree's hooks against the build host: override each with one
+    # that never triggers.
+    hookdir="$(mktemp -d)"
+    for hook in "${root}"/usr/share/libalpm/hooks/*.hook; do
+        cat > "${hookdir}/${hook##*/}" << 'HOOK'
+[Trigger]
+Type = Path
+Operation = Install
+Target = netdata-disabled-hook
+
+[Action]
+When = PreTransaction
+Exec = /usr/bin/true
+HOOK
+    done
+
+    pacman -U "${pacman_root[@]}" --cachedir "${pkgdir}" --hookdir "${hookdir}" --logfile "${hookdir}/pacman.log" \
+        --noconfirm "${pkgdir}"/*.pkg.tar.zst
+    rm -rf "${hookdir}"
+
+    for name in "${!pinned[@]}"; do
+        installed="$(pacman -Q "${pacman_root[@]}" "${name}")"
+        if [ "${installed#* }" != "${pinned[${name}]}" ]; then
+            echo "Bundled ${installed}, expected ${name} ${pinned[${name}]}." >&2
+            exit 1
+        fi
+    done
+    pacman -Qkk "${pacman_root[@]}" "${!pinned[@]}"
+}
+install_msys2_packages
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
 ${GITHUB_ACTIONS+echo "::group::Configure Editor"}
