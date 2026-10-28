@@ -682,8 +682,10 @@ int nd_thread_stack_size_unittest(void) {
     }
 
     nd_thread_set_stack_size(saved);
+    fprintf(stderr, "thread stack size unittest %s\n", errors ? "FAILED" : "OK");
+#else
+    fprintf(stderr, "thread stack size unittest skipped: it needs pthread_getattr_np()\n");
 #endif
 
-    fprintf(stderr, "thread stack size unittest %s\n", errors ? "FAILED" : "OK");
     return errors;
 }
