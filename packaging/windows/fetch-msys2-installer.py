@@ -105,7 +105,8 @@ def main() -> None:
     target = Path(sys.argv[2])
 
     if sys.argv[1] == 'base':
-        fetch_pinned(*BASE, target)
+        url, sha256 = BASE
+        fetch_pinned(url, sha256, target)
         return
 
     target.mkdir(parents=True, exist_ok=True)
