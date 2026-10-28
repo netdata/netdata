@@ -42,7 +42,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Unix validation tools
-        run: sudo apt-get update && sudo apt-get install -y busybox gawk mawk shellcheck
+        run: sudo apt-get update && sudo apt-get install -y busybox gawk mawk
 
       - name: Parse and run fixture suites
         env:
@@ -64,7 +64,7 @@ jobs:
             "$TEST_SHELL" packaging/installer/netdata-support-bundle --selftest
             export SUPPORT_BUNDLE_TEST_SHELL="$TEST_SHELL"
           fi
-          python3 -m unittest packaging/installer/tests/test_support_bundle.py -v
+          python3 -m unittest discover packaging/installer/tests test_support_bundle.py -v
 
   posix-e2e:
     name: Support Bundle POSIX end-to-end bundle
@@ -189,7 +189,7 @@ jobs:
           set -eu
           sh -n packaging/installer/netdata-support-bundle
           sh packaging/installer/netdata-support-bundle --selftest
-          python3 -m unittest packaging/installer/tests/test_support_bundle.py -v
+          python3 -m unittest discover packaging/installer/tests test_support_bundle.py -v
 
   powershell-core:
     name: Support Bundle PowerShell 7 sanitization
@@ -345,7 +345,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Run install state tests
         run:
-          python3 -m unittest packaging/installer/tests/test_install_state.py -v
+          python3 -m unittest discover packaging/installer/tests test_install_state.py -v
 
   prepare-fleet:
     name: Prepare Fleet
@@ -354,7 +354,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Run prepare fleet tests
         run:
-          python3 -m unittest packaging/installer/tests/test_prepare_fleet.py -v
+          python3 -m unittest discover packaging/installer/tests test_prepare_fleet.py -v
 
   snmp-diagnostics:
     name: SNMP diagnostics
@@ -363,4 +363,4 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Run SNMP diagnostics tests
         run:
-          python3 -m unittest packaging/installer/tests/test_snmp_diagnostics.py -v
+          python3 -m unittest discover packaging/installer/tests test_snmp_diagnostics.py -v
