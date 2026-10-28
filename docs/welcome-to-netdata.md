@@ -320,7 +320,7 @@ Based on extensive real-world deployments and independent academic validation, N
 
 :::info
 
-The [University of Amsterdam study](https://twitter.com/IMalavolta/status/1734208439096676680) found Netdata to be the most energy-efficient monitoring solution, with the lowest CPU overhead, memory usage, and execution time impact among compared tools.
+The [University of Amsterdam study](https://www.ivanomalavolta.com/files/papers/ICSOC_2023.pdf) found Netdata to have best-in-class resource consumption, with no impact on the monitored workloads.
 
 For more information, see [Netdata's impact on resources](/docs/netdata-agent/sizing-netdata-agents/README.md).
 

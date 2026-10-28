@@ -54,7 +54,7 @@ Once you pass ~500 nodes, you’re naturally in the multi-million metrics/s rang
 **Conference:** ICSOC 2023 (International Conference on Service-Oriented Computing)<br/>
 **DOI:** 10.1007/978-3-031-48421-6_13
 
-**Finding:** **Netdata is the most energy-efficient monitoring solution**, with CPU and RAM impact close to the no-monitoring baseline and no impact on execution time - even while collecting data every second and running anomaly detection at the edge.
+**Finding:** **Netdata has best-in-class resource consumption, with no impact on the monitored workloads** - even while collecting data every second and running anomaly detection at the edge.
 
 ### Head-to-Head: Netdata vs Prometheus (2025)
 
@@ -319,7 +319,7 @@ Since Netdata evaluates alerts at the edge, it allows you to specify scripts to 
 <details>
 <summary><strong>Is Netdata really energy-efficient?</strong></summary><br/>
 
-Yes. A peer-reviewed 2023 study (ICSOC, University of Amsterdam) found Netdata to be the most energy-efficient tool, with CPU and RAM impact close to the no-monitoring baseline and no impact on execution time, even at 1-second collection.
+Yes. A peer-reviewed 2023 study (ICSOC, University of Amsterdam) found Netdata to have best-in-class resource consumption, with no impact on the monitored workloads, even at 1-second collection.
 
 </details>
 
