@@ -52,7 +52,7 @@ static void dir_size_walk(DIR_SIZE_WALK *w, size_t len, size_t depth) {
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
             continue;
 
-        size_t name_len = strlen(entry->d_name);
+        size_t name_len = strnlen(entry->d_name, FILENAME_MAX + 1);
         if (len + sep + name_len > FILENAME_MAX) {
             // the path does not fit; count it instead of truncating it
             w->result->errors++;
