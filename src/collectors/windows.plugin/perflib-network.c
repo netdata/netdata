@@ -584,6 +584,7 @@ struct network_interface {
 };
 
 static DICTIONARY *physical_interfaces = NULL, *virtual_interfaces = NULL;
+static SIMPLE_PATTERN *disabled_interfaces = NULL;
 static netdata_mutex_t network_interfaces_mutex;
 static usec_t network_last_snapshot_ut;
 static usec_t network_snapshot_ttl_ut;
@@ -636,6 +637,12 @@ static void initialize(void)
 {
     netdata_mutex_init(&network_interfaces_mutex);
 
+    disabled_interfaces = simple_pattern_create(
+        inicfg_get(&netdata_config, "plugin:windows:PerflibNetwork", "disable by default interfaces matching", ""),
+        NULL,
+        SIMPLE_PATTERN_EXACT,
+        true);
+
     physical_interfaces = dictionary_create_advanced(
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct network_interface));
 
@@ -658,8 +665,20 @@ static bool is_physical_interface(const char *name)
     return d ? true : false;
 }
 
+static bool network_interface_has_charts(const struct network_interface *d)
+{
+    return d->traffic.st || d->packets.st || d->speed.st || d->discards.st || d->errors.st ||
+           d->unknown_protocol_packets.st || d->queue.st || d->chimney.st || d->rsc.st_connections ||
+           d->rsc.st_packets || d->rsc.st_exceptions || d->rsc.st_average_packet_size;
+}
+
+// Consecutive cycles with an unreadable instance name before the snapshot is trusted again.
+#define NETWORK_UNNAMED_INSTANCE_TOLERANCE_CYCLES 60
+
 static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, bool physical, usec_t now_ut)
 {
+    static size_t unnamed_cycles[2] = {0, 0};
+
     DICTIONARY *dict = physical ? physical_interfaces : virtual_interfaces;
 
     PERF_OBJECT_TYPE *pObjectType =
@@ -670,7 +689,7 @@ static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, 
     uint64_t total_received = 0, total_sent = 0;
 
     PERF_INSTANCE_DEFINITION *pi = NULL;
-    bool complete = true;
+    bool complete = true, unnamed = false;
     for (LONG i = 0; i < pObjectType->NumInstances; i++) {
         pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
         if (!pi) {
@@ -679,7 +698,7 @@ static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, 
         }
 
         if (!getInstanceName(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer))) {
-            complete = false;
+            unnamed = true;
             continue;
         }
 
@@ -698,8 +717,20 @@ static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, 
             d->collected_metadata = true;
         }
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->traffic.received) &&
-            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->traffic.sent)) {
+        bool received_valid = perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->traffic.received);
+        bool sent_valid = perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->traffic.sent);
+        bool traffic_valid = received_valid && sent_valid;
+        if (traffic_valid) {
+            total_received += d->traffic.received.current.Data;
+            total_sent += d->traffic.sent.current.Data;
+        }
+
+        if (simple_pattern_matches(disabled_interfaces, windows_shared_buffer) ||
+            (!network_interface_has_charts(d) &&
+             (!traffic_valid || (!d->traffic.received.current.Data && !d->traffic.sent.current.Data))))
+            continue;
+
+        if (traffic_valid) {
             if (unlikely(!d->traffic.st)) {
                 d->traffic.st = rrdset_create_localhost(
                     "net",
@@ -725,9 +756,6 @@ static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, 
                 d->traffic.chart_var_speed = rrdvar_chart_variable_add_and_acquire(d->traffic.st, "nic_speed_max");
                 rrdvar_chart_variable_set(d->traffic.st, d->traffic.chart_var_speed, NAN);
             }
-
-            total_received += d->traffic.received.current.Data;
-            total_sent += d->traffic.sent.current.Data;
 
             rrddim_set_by_pointer(
                 d->traffic.st, d->traffic.rd_received, (collected_number)d->traffic.received.current.Data);
@@ -1042,6 +1070,18 @@ static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, 
         }
     }
 
+    // A transient name failure must not delete an interface or undercount the aggregate; a persistent
+    // one must not stall them forever, so trust the snapshot again after a bounded number of cycles.
+    size_t *unnamed_count = &unnamed_cycles[physical ? 1 : 0];
+    *unnamed_count = unnamed ? *unnamed_count + 1 : 0;
+    if (*unnamed_count == NETWORK_UNNAMED_INSTANCE_TOLERANCE_CYCLES)
+        collector_error(
+            "PerflibNetwork: '%s' instance names unreadable for %d cycles; resuming cleanup and totals without them",
+            physical ? "Network Interface" : "Network Adapter",
+            NETWORK_UNNAMED_INSTANCE_TOLERANCE_CYCLES);
+    if (unnamed && *unnamed_count < NETWORK_UNNAMED_INSTANCE_TOLERANCE_CYCLES)
+        complete = false;
+
     if (physical && complete) {
         static RRDSET *st = NULL;
         static RRDDIM *rd_received = NULL, *rd_sent = NULL;
@@ -1131,10 +1171,22 @@ network_adapter_for_name(const struct netdata_win_network_interface *adapters, c
 {
     const struct netdata_win_network_interface *match = NULL;
     for (const struct netdata_win_network_interface *adapter = adapters; adapter; adapter = adapter->next) {
-        if (!network_adapter_name_matches(adapter->description, name))
+        if (!adapter->description || !*adapter->description ||
+            !network_adapter_name_matches(adapter->description, name))
             continue;
         if (match)
             return NULL; // A normalized description is not a unique identity.
+        match = adapter;
+    }
+    if (match)
+        return match;
+
+    for (const struct netdata_win_network_interface *adapter = adapters; adapter; adapter = adapter->next) {
+        if ((adapter->description && *adapter->description) || !adapter->friendly_name ||
+            strcmp(adapter->friendly_name, name))
+            continue;
+        if (match)
+            return NULL; // A friendly name is not a unique identity.
         match = adapter;
     }
     return match;
@@ -1152,6 +1204,8 @@ static void network_function_add_rows(
     dfe_start_read(interfaces, d)
     {
         const char *name = d_dfe.name;
+        if (simple_pattern_matches(disabled_interfaces, name))
+            continue;
         const struct netdata_win_network_interface *adapter = network_adapter_for_name(adapters, name);
         bool seen = current_snapshot_ut && d->last_collected == current_snapshot_ut;
         bool traffic_valid = seen && d->traffic.received.updated && d->traffic.sent.updated;
@@ -1479,12 +1533,14 @@ int do_PerflibNetwork(int update_every, usec_t dt __maybe_unused)
         protocol_packets_chart_update(&tcp46, update_every);
     }
 
-    // Perflib only guarantees objects explicitly requested by the query.
-    DWORD adapter_id = RegistryFindIDByName("Network Adapter");
-    if (adapter_id != PERFLIB_REGISTRY_NAME_NOT_FOUND) {
-        pDataBlock = perflibGetPerformanceData(adapter_id);
-        if (pDataBlock)
-            do_network_interface(pDataBlock, update_every, false, now_ut);
+    // Some providers include Network Adapter in the first query.
+    if (!do_network_interface(pDataBlock, update_every, false, now_ut)) {
+        DWORD adapter_id = RegistryFindIDByName("Network Adapter");
+        if (adapter_id != PERFLIB_REGISTRY_NAME_NOT_FOUND) {
+            pDataBlock = perflibGetPerformanceData(adapter_id);
+            if (pDataBlock)
+                do_network_interface(pDataBlock, update_every, false, now_ut);
+        }
     }
     network_last_snapshot_ut = now_ut;
     network_snapshot_ttl_ut = (usec_t)update_every * 2 * USEC_PER_SEC;

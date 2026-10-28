@@ -821,9 +821,10 @@ modules:
       data_collection:
         metrics_description: |
           Monitor Windows network interface traffic, packets, speed, errors, drops, and offload activity in charts.
-          A live interface table also shows current operational state and the adapter's friendly name when Windows can match it to a charted interface.
+          A live interface table also shows current operational state and the adapter's friendly name when Windows can match it to a discovered interface.
         method_description: |
-          It queries the 'Network Interface' and 'Network Adapter' Perflib objects for charts. The live interface table
+          It queries the 'Network Interface' Perflib object and uses its 'Network Adapter' data when present, querying
+          'Network Adapter' separately when absent. The live interface table
           queries the Windows adapter API when opened and combines that result with the latest collected chart values.
       supported_platforms:
         include: ["windows"]
@@ -839,9 +840,13 @@ modules:
           description: |
             Operational state and friendly name are unavailable in the live table when a Perflib instance cannot be
             matched uniquely to a Windows adapter. A missing value is shown as unavailable, not as a down state.
+            Per-interface charts start after the first received or sent byte; the live table can show idle interfaces
+            before their charts start. Existing charts continue through later zero-byte counter values.
+            When Windows cannot read an interface instance name, the aggregate bandwidth chart and removal of vanished
+            interfaces pause for up to 60 collection cycles; after that they continue without the unnamed instance.
         performance_impact:
           description: |
-            Each collection cycle queries the 'Network Adapter' Perflib object separately from 'Network Interface'.
+            A separate 'Network Adapter' Perflib query runs only when the 'Network Interface' result lacks that object.
             The live interface table queries the Windows adapter API on demand. It does not add an adapter API call
             to each chart collection cycle.
     setup:
@@ -861,6 +866,12 @@ modules:
             - name: update every
               description: Data collection frequency.
               default_value: 1
+              required: false
+            - name: disable by default interfaces matching
+              description: |
+                Space-separated, case-sensitive interface-name patterns excluded from per-interface charts and the
+                live interface table. The physical network aggregate still includes these interfaces.
+              default_value: ""
               required: false
         examples:
           folding:
@@ -1118,12 +1129,13 @@ modules:
         - id: network-interfaces
           name: Network Interfaces
           description: |
-            Shows charted physical and virtual interfaces with current traffic, packet, drop, speed, and operational
-            state values. Friendly names and state are shown only when the Windows adapter description uniquely matches
-            the Perflib instance name. Physical carrier state, duplex, and multicast packets are unavailable.
+            Shows discovered physical and virtual interfaces with current traffic, packet, drop, speed, and operational
+            state values. Friendly names and state are shown only when a Windows adapter description or an empty-description
+            adapter's friendly name uniquely matches the Perflib instance name. Physical carrier state, duplex, and
+            multicast packets are unavailable.
           parameters: []
           returns:
-            description: "One row per charted interface; unavailable values are empty."
+            description: "One row per discovered, non-excluded interface; unavailable values are empty."
             columns:
               - name: Interface
                 type: string
