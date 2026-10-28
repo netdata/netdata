@@ -1208,7 +1208,6 @@ int main(int argc, char **argv)
     if(argc > 1 && strcmp(argv[1], "--test") == 0) {
         netdata_mutex_init(&stdout_mutex);
         nd_log_initialize_for_external_plugins("network-viewer.plugin");
-        netdata_threads_init_for_external_plugins(0);
         cached_sid_username_init();
 
         const char *function = NULL;
@@ -1280,7 +1279,6 @@ int main(int argc, char **argv)
 
     netdata_mutex_init(&stdout_mutex);
     nd_log_initialize_for_external_plugins("network-viewer.plugin");
-    netdata_threads_init_for_external_plugins(0);
 
     PerflibNamesRegistryInitialize();
     netdata_mutex_init(&nv_collect_mutex);

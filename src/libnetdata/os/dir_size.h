@@ -44,4 +44,6 @@ DIR_SIZE dir_size(const char *path, SIMPLE_PATTERN *pattern, size_t max_depth);
  */
 DIR_SIZE dir_size_multiple(const char **paths, int num_paths, SIMPLE_PATTERN *pattern, size_t max_depth);
 
+int dir_size_unittest(void);
+
 #endif //NETDATA_DIR_SIZE_H

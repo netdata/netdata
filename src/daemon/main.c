@@ -509,6 +509,8 @@ int netdata_main(int argc, char **argv) {
                             if (rrdhost_machine_guid_unittest()) return 1;
                             if (stream_conf_unittest()) return 1;
                             if (unit_test_static_threads()) return 1;
+                            if (nd_thread_stack_size_unittest()) return 1;
+                            if (dir_size_unittest()) return 1;
                             if (unit_test_buffer()) return 1;
                             if (unit_test_str2ld()) return 1;
                             if (buffer_unittest()) return 1;
@@ -1131,6 +1133,9 @@ int netdata_main(int argc, char **argv) {
     nd_log_limits_unlimited();
     nd_log_initialize();
 
+    // after all command line options are applied, before the daemon starts its threads
+    netdata_conf_section_global_stack_size();
+
     // ----------------------------------------------------------------------------------------------------------------
     // this MUST be before anything else - to load the old status file before saving a new one
 
@@ -1346,11 +1351,6 @@ int netdata_main(int argc, char **argv) {
     delta_startup_time("dyncfg");
 
     dyncfg_init(true);
-
-    // ----------------------------------------------------------------------------------------------------------------
-    delta_startup_time("threads after fork");
-
-    netdata_conf_reset_stack_size();
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("registry");

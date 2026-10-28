@@ -2127,7 +2127,6 @@ int main(int argc, char **argv)
 #endif
 
     nd_log_initialize_for_external_plugins(NETDATA_EBPF_PLUGIN_NAME);
-    netdata_threads_init_for_external_plugins(0);
 
     libjudy_malloc_init();
 
