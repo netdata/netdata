@@ -6,13 +6,13 @@ on:
     branches:
       - master
     paths:
-      - '.github/workflows/netdata-support-bundle.yml'
+      - '.github/workflows/installer-tests.yml'
       - '.github/ISSUE_TEMPLATE/BUG_REPORT.yml'
       - 'packaging/installer/**'
       - 'src/go/plugin/go.d/collector/snmp_topology/testdata/*.zst'
   pull_request:
     paths:
-      - '.github/workflows/netdata-support-bundle.yml'
+      - '.github/workflows/installer-tests.yml'
       - '.github/ISSUE_TEMPLATE/BUG_REPORT.yml'
       - 'packaging/installer/**'
       - 'src/go/plugin/go.d/collector/snmp_topology/testdata/*.zst'
