@@ -232,7 +232,7 @@ int rrdcontext_foreach_instance_with_rrdset_in_context(RRDHOST *host, const char
     int ret = 0;
     RRDINSTANCE *ri;
     dfe_start_read(rc->rrdinstances, ri) {
-        RRDSET_ACQUIRED *rsa = rrdinstance_rrdset_acquire(ri);
+        RRDSET_ACQUIRED *rsa = rrdinstance_rrdset_acquire((RRDINSTANCE_ACQUIRED *)ri_dfe.item);
         if(rsa) {
             int r = callback(rrdset_acquired_to_rrdset(rsa), data);
             rrdset_acquired_release(rsa);

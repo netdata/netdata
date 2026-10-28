@@ -54,7 +54,7 @@ bool rrdcontext_matches_alert(struct rrdcontext_to_json_v2_data *ctl, RRDCONTEXT
     size_t matches = 0;
     RRDINSTANCE *ri;
     dfe_start_read(rc->rrdinstances, ri) {
-        RRDSET_ACQUIRED *rsa = rrdinstance_rrdset_acquire(ri);
+        RRDSET_ACQUIRED *rsa = rrdinstance_rrdset_acquire((RRDINSTANCE_ACQUIRED *)ri_dfe.item);
         if(rsa) {
             RRDSET *st = rrdset_acquired_to_rrdset(rsa);
             rw_spinlock_read_lock(&st->alerts.spinlock);

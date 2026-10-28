@@ -368,7 +368,7 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
             ? true : false;
 
     if(timeframe_matches) {
-        RRDSET_ACQUIRED *rsa = rrdinstance_rrdset_acquire(ri);
+        RRDSET_ACQUIRED *rsa = rrdinstance_rrdset_acquire(qi->ria);
         if(rsa) {
             rrdset_set_last_accessed_time_s(rrdset_acquired_to_rrdset(rsa), qtl->start_s);
             rrdset_acquired_release(rsa);
