@@ -673,9 +673,10 @@ int nd_thread_stack_size_unittest(void) {
 
         // musl adds the TLS area to the stack it reports, and glibc may give
         // a thread the cached stack of an exited one, up to 4 times bigger
-        size_t max_got = expected + 64 * 1024;
 #ifdef __GLIBC__
-        max_got = 4 * expected + 64 * 1024;
+        size_t max_got = 4 * expected + 64 * 1024;
+#else
+        size_t max_got = expected + 64 * 1024;
 #endif
         if(nd_thread_stack_size() != expected || got < expected || got > max_got) {
             fprintf(stderr, "thread stack size unittest FAILED: asked %zu bytes, configured %zu, thread got %zu, expected %zu\n",
