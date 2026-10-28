@@ -32,7 +32,8 @@ export LC_ALL=C
 attempt=1
 while :; do
     if [ "$1" = go ]; then
-        "$@" -json >"$log" 2>&1
+        # Keep stderr diagnostics out of the structured JSON stdout.
+        "$@" -json >"$log"
     else
         "$@" >"$log" 2>&1
     fi
