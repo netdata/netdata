@@ -304,10 +304,11 @@ catch-all `0.0.0.0/0` trusted-relay prefix draws a startup warning, because any 
   construction — constructing the counter speculatively burns a boot count) and `local-engine-id` (configured value
   wins; a corrupt persisted file is a **hard startup error**, never silently regenerated, because peers cache it).
   State-file leaves must be regular files, not symlinks; reads validate the opened descriptor and are bounded by
-  `safefile.MaxSize`. File validation errors never include persisted contents. Writes exclusively create the `.tmp`
-  sibling and retain that descriptor through write and fsync before rename and directory fsync (the latter is skipped
-  on Windows). A pre-existing `.tmp` is a startup error and is preserved; remove it only after verifying that no
-  writer owns it. Persistence cleans up its own failed temporary writes; startup rollback removes newly created state.
+  `safefile.MaxSize`. File validation errors never include persisted contents. Writes exclusively create a randomized
+  `<state-file>.<random>.tmp` sibling with mode `0640` subject to umask, and retain that descriptor through write and
+  fsync before rename and directory fsync (the latter is skipped on Windows). Legacy and randomized temporary files
+  left by interrupted writes are preserved and do not block startup. Persistence cleans up its own failed temporary
+  writes; startup rollback removes newly created state.
   These checks protect file leaves; the state directory and its ancestors must remain trusted.
 - The shared gosnmp security table needs an extra lock (`tableMu`) around decode because dynamic registration can
   mutate the per-username credential list that `UnmarshalTrap` iterates.

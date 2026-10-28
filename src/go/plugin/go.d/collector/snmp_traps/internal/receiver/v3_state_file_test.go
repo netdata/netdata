@@ -60,32 +60,46 @@ func TestEngineStateRejectsSymlinks(t *testing.T) {
 	}
 }
 
-func TestEngineStateTempCollisionPreservesFiles(t *testing.T) {
+func TestEngineStatePersistencePreservesForeignTemps(t *testing.T) {
 	for _, name := range []string{"engine-boots", "local-engine-id"} {
 		t.Run(name, func(t *testing.T) {
-			for caseName, symlink := range map[string]bool{"regular": false, "symlink": true} {
+			for caseName, tc := range map[string]struct {
+				suffix  string
+				symlink bool
+			}{
+				"legacy file":        {suffix: ".tmp"},
+				"legacy symlink":     {suffix: ".tmp", symlink: true},
+				"randomized file":    {suffix: ".orphan.tmp"},
+				"randomized symlink": {suffix: ".orphan.tmp", symlink: true},
+			} {
 				t.Run(caseName, func(t *testing.T) {
 					dir := t.TempDir()
 					path := filepath.Join(dir, name)
-					tmpPath := path + ".tmp"
+					tmpPath := path + tc.suffix
 					const original = "existing state\n"
 					const sentinel = "pre-existing temp contents\n"
 					require.NoError(t, os.WriteFile(path, []byte(original), 0640))
 					target := tmpPath
-					if symlink {
+					if tc.symlink {
 						target = filepath.Join(dir, "target")
 						if err := os.Symlink(target, tmpPath); err != nil {
 							t.Skipf("symlinks unavailable: %v", err)
 						}
 					}
 					require.NoError(t, os.WriteFile(target, []byte(sentinel), 0600))
-					require.Error(t, persistEngineStateFile(name, path, []byte("new state\n")))
+					require.NoError(t, persistEngineStateFile(name, path, []byte("new state\n")))
 					data, err := os.ReadFile(target)
 					require.NoError(t, err)
 					assert.Equal(t, sentinel, string(data))
+					info, err := os.Lstat(tmpPath)
+					require.NoError(t, err)
+					assert.Equal(t, tc.symlink, info.Mode()&os.ModeSymlink != 0)
 					data, err = os.ReadFile(path)
 					require.NoError(t, err)
-					assert.Equal(t, original, string(data))
+					assert.Equal(t, "new state\n", string(data))
+					temps, err := filepath.Glob(path + "*.tmp")
+					require.NoError(t, err)
+					assert.Equal(t, []string{tmpPath}, temps)
 				})
 			}
 		})
@@ -119,6 +133,8 @@ func TestPrepareV3RollbackPreservesForeignTemp(t *testing.T) {
 			root := t.TempDir()
 			paths := newEngineStatePaths(root, "job")
 			require.NoError(t, os.MkdirAll(paths.dir, 0750))
+			const invalidBoots = "not-a-number\n"
+			require.NoError(t, os.WriteFile(paths.engineBoots, []byte(invalidBoots), 0640))
 			tmpPath := filepath.Join(paths.dir, name+".tmp")
 			const sentinel = "pre-existing temporary file"
 			require.NoError(t, os.WriteFile(tmpPath, []byte(sentinel), 0600))
@@ -127,13 +143,74 @@ func TestPrepareV3RollbackPreservesForeignTemp(t *testing.T) {
 				USMUsers:          []USMUser{{Username: "testuser", EngineID: testEngineIDHex, AuthProto: "none", PrivProto: "none"}},
 				EngineIDWhitelist: []string{testEngineIDHex},
 			}), nil)
-			require.Error(t, recv.PrepareV3(root, "job"))
+			require.ErrorContains(t, recv.PrepareV3(root, "job"), "engine-boots: invalid value")
 			data, err := os.ReadFile(tmpPath)
 			require.NoError(t, err)
 			assert.Equal(t, sentinel, string(data))
-			for _, path := range []string{paths.engineBoots, paths.localEngineID} {
-				_, err := os.Lstat(path)
-				assert.True(t, os.IsNotExist(err), "%s: %v", path, err)
+			_, err = os.Lstat(paths.localEngineID)
+			assert.True(t, os.IsNotExist(err))
+			data, err = os.ReadFile(paths.engineBoots)
+			require.NoError(t, err)
+			assert.Equal(t, invalidBoots, string(data))
+			temps, err := filepath.Glob(filepath.Join(paths.dir, "*.tmp"))
+			require.NoError(t, err)
+			assert.Equal(t, []string{tmpPath}, temps)
+		})
+	}
+}
+
+func TestPrepareV3RecoversOrphanedTemps(t *testing.T) {
+	for _, name := range []string{"engine-boots", "local-engine-id"} {
+		t.Run(name, func(t *testing.T) {
+			for caseName, randomized := range map[string]bool{"legacy": false, "randomized": true} {
+				t.Run(caseName, func(t *testing.T) {
+					root := t.TempDir()
+					paths := newEngineStatePaths(root, "job")
+					policy := NewPolicy(PolicyConfig{
+						Versions:          []string{"v3"},
+						USMUsers:          []USMUser{{Username: "testuser", EngineID: testEngineIDHex, AuthProto: "none", PrivProto: "none"}},
+						EngineIDWhitelist: []string{testEngineIDHex},
+					})
+					recv := New(policy, nil)
+					require.NoError(t, recv.PrepareV3(root, "job"))
+					recv.CommitPreparedState()
+					engineID := recv.localEngineID.hexString()
+
+					// Reconstruct the on-disk state after interruption before rename.
+					var f *os.File
+					var err error
+					if randomized {
+						f, err = os.CreateTemp(paths.dir, name+".*.tmp")
+					} else {
+						f, err = os.OpenFile(filepath.Join(paths.dir, name+".tmp"), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0640)
+					}
+					require.NoError(t, err)
+					t.Cleanup(func() { _ = f.Close() })
+					const orphanContents = "unfinished state write\n"
+					_, err = f.WriteString(orphanContents)
+					require.NoError(t, err)
+					require.NoError(t, f.Sync())
+					require.NoError(t, f.Close())
+
+					for _, boots := range []string{"2\n", "3\n"} {
+						recv = New(policy, nil)
+						require.NoError(t, recv.PrepareV3(root, "job"))
+						recv.CommitPreparedState()
+						assert.Equal(t, engineID, recv.localEngineID.hexString())
+						for path, want := range map[string]string{
+							paths.engineBoots:   boots,
+							paths.localEngineID: engineID + "\n",
+							f.Name():            orphanContents,
+						} {
+							data, err := os.ReadFile(path)
+							require.NoError(t, err)
+							assert.Equal(t, want, string(data))
+						}
+						temps, err := filepath.Glob(filepath.Join(paths.dir, "*.tmp"))
+						require.NoError(t, err)
+						assert.Equal(t, []string{f.Name()}, temps)
+					}
+				})
 			}
 		})
 	}
@@ -215,8 +292,9 @@ func TestPrepareV3StateRoundTrip(t *testing.T) {
 			data, err := os.ReadFile(path)
 			require.NoError(t, err)
 			assert.Equal(t, want, string(data))
-			_, err = os.Lstat(path + ".tmp")
-			assert.True(t, os.IsNotExist(err))
+			temps, err := filepath.Glob(path + "*.tmp")
+			require.NoError(t, err)
+			assert.Empty(t, temps)
 		}
 	}
 }

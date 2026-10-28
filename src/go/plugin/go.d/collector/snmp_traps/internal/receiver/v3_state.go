@@ -288,9 +288,10 @@ func persistEngineStateFile(label, path string, data []byte) error {
 	if err := checkEngineStateFile(path); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("%s: persist %s: %w", label, path, err)
 	}
-	tmpPath := path + ".tmp"
-	// O_EXCL refuses existing files, including dangling symlinks. Keep this
-	// descriptor through write and fsync instead of reopening the temporary path.
+	// A fresh name avoids blocking startup on a temp orphaned by an interrupted
+	// write. O_EXCL still refuses existing files, including dangling symlinks.
+	// Keep the original descriptor through write and fsync.
+	tmpPath := path + "." + rand.Text() + ".tmp"
 	f, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0640)
 	if err != nil {
 		return fmt.Errorf("%s: create temp %s: %w", label, tmpPath, err)
