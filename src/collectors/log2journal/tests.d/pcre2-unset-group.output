@@ -1,0 +1,10 @@
+LEVEL=INFO
+MESSAGE=started|
+
+CODE=42
+LEVEL=ERROR
+MESSAGE=disk|failed
+
+LEVEL=WARN
+MESSAGE=low-memory
+
