@@ -361,8 +361,8 @@ modules:
           description: |
             These metrics refer to a PersistentVolumeClaim mounted on this node, one instance per PVC.
 
-            - A chart is created only while the kubelet reports real data for it. The kubelet reports 0 for values a volume does not provide, so volumes without filesystem statistics (for example block volumes) have no PVC charts.
-            - `reserved` is the space the filesystem holds back (capacity minus used minus available, usually root-reserved blocks). It is never negative: if a storage driver reports more used and available space than capacity, `reserved` is 0.
+            - A chart is created only while the kubelet reports real data for it. The kubelet reports 0 for values a volume does not provide, so volumes without filesystem statistics (for example block volumes) have no PVC charts, and volumes without inode accounting (for example SMB shares) have no inode chart.
+            - `reserved` is the space or inodes the filesystem holds back (capacity minus used minus available, usually root-reserved blocks). It is never negative: if a storage driver reports more used and available space than capacity, `reserved` is 0.
             - Space utilization is used / (used + available), like `df`.
             - A PVC mounted on several nodes (for example ReadWriteMany or ReadOnlyMany) is reported by each of them. Aggregate PVC charts across nodes with `max`, not `sum`.
             - `local` volumes (for example the default class of the `local-path` provisioner) report the usage of the whole host filesystem that holds them, so they show the same values on a node. `hostPath` volumes report no usage, so they get no PVC charts.
@@ -386,3 +386,11 @@ modules:
               chart_type: line
               dimensions:
                 - name: utilization
+            - name: k8s_kubelet.pvc_inodes_usage
+              description: PVC Inodes Usage
+              unit: inodes
+              chart_type: stacked
+              dimensions:
+                - name: available
+                - name: used
+                - name: reserved

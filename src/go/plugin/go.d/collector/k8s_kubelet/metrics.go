@@ -118,9 +118,10 @@ type volumeManagerPlugin struct {
 // It must equal the multiplier in pvcSpaceMetrics.Utilization's stm tag.
 const pvcUtilizationPrecision = 100
 
-// pvcMetrics holds the values of a PVC.
+// pvcMetrics holds the values of a PVC; a nil group means the kubelet has no data for it.
 type pvcMetrics struct {
-	Space *pvcSpaceMetrics `stm:"space"`
+	Space  *pvcSpaceMetrics  `stm:"space"`
+	Inodes *pvcInodesMetrics `stm:"inodes"`
 }
 
 type pvcSpaceMetrics struct {
@@ -128,4 +129,10 @@ type pvcSpaceMetrics struct {
 	Used        mtx.Gauge `stm:"used"`
 	Reserved    mtx.Gauge `stm:"reserved"`
 	Utilization mtx.Gauge `stm:"utilization,100"`
+}
+
+type pvcInodesMetrics struct {
+	Available mtx.Gauge `stm:"available"`
+	Used      mtx.Gauge `stm:"used"`
+	Reserved  mtx.Gauge `stm:"reserved"`
 }

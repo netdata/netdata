@@ -100,8 +100,12 @@ const (
 	pvcSeenCapacity = 1 << iota
 	pvcSeenUsed
 	pvcSeenAvailable
+	pvcSeenInodes
+	pvcSeenInodesUsed
+	pvcSeenInodesFree
 
-	pvcSeenSpace = pvcSeenCapacity | pvcSeenUsed | pvcSeenAvailable
+	pvcSeenSpace     = pvcSeenCapacity | pvcSeenUsed | pvcSeenAvailable
+	pvcSeenAllInodes = pvcSeenInodes | pvcSeenInodesUsed | pvcSeenInodesFree
 )
 
 // pvcStats holds the kubelet_volume_stats_* values of a PVC; seen tells a reported 0 from a missing series.
@@ -109,13 +113,18 @@ type pvcStats struct {
 	namespace, name string
 	seen            int
 
-	capacity, used, available float64
+	capacity, used, available      float64
+	inodes, inodesUsed, inodesFree float64
 }
 
-// The kubelet reports 0 for values a volume does not provide (no filesystem stats for block volumes), so 0 totals mean
-// "no data", not an empty or full volume.
+// The kubelet reports 0 for values a volume does not provide (no filesystem stats for block volumes, no inodes on
+// SMB shares), so 0 totals mean "no data", not an empty or full volume.
 func (s *pvcStats) hasSpace() bool {
 	return s.seen&pvcSeenSpace == pvcSeenSpace && s.capacity > 0 && s.used+s.available > 0
+}
+
+func (s *pvcStats) hasInodes() bool {
+	return s.seen&pvcSeenAllInodes == pvcSeenAllInodes && s.inodes > 0
 }
 
 func (c *Collector) collectVolumeStats(raw prometheus.Series, mx *metrics) {
@@ -130,6 +139,9 @@ func (c *Collector) collectVolumeStats(raw prometheus.Series, mx *metrics) {
 		"kubelet_volume_stats_capacity_bytes",
 		"kubelet_volume_stats_used_bytes",
 		"kubelet_volume_stats_available_bytes",
+		"kubelet_volume_stats_inodes",
+		"kubelet_volume_stats_inodes_used",
+		"kubelet_volume_stats_inodes_free",
 	)
 
 	for _, metric := range series {
@@ -157,27 +169,48 @@ func (c *Collector) collectVolumeStats(raw prometheus.Series, mx *metrics) {
 		case "kubelet_volume_stats_available_bytes":
 			st.available = metric.Value
 			st.seen |= pvcSeenAvailable
+		case "kubelet_volume_stats_inodes":
+			st.inodes = metric.Value
+			st.seen |= pvcSeenInodes
+		case "kubelet_volume_stats_inodes_used":
+			st.inodesUsed = metric.Value
+			st.seen |= pvcSeenInodesUsed
+		case "kubelet_volume_stats_inodes_free":
+			st.inodesFree = metric.Value
+			st.seen |= pvcSeenInodesFree
 		}
 	}
 
 	withSpace := make(map[string]*pvcStats)
+	withInodes := make(map[string]*pvcStats)
 
 	for id, st := range stats {
-		if !st.hasSpace() {
-			continue
-		}
-		withSpace[id] = st
+		var pvc pvcMetrics
 
 		// reserved is clamped at 0: drivers whose used + available exceed capacity would draw a negative area
-		space := &pvcSpaceMetrics{}
-		space.Available.Set(st.available)
-		space.Used.Set(st.used)
-		space.Reserved.Set(max(0, st.capacity-st.used-st.available))
-		space.Utilization.Set(st.used / (st.used + st.available) * 100)
-		mx.PVC[id] = &pvcMetrics{Space: space}
+		if st.hasSpace() {
+			withSpace[id] = st
+			pvc.Space = &pvcSpaceMetrics{}
+			pvc.Space.Available.Set(st.available)
+			pvc.Space.Used.Set(st.used)
+			pvc.Space.Reserved.Set(max(0, st.capacity-st.used-st.available))
+			pvc.Space.Utilization.Set(st.used / (st.used + st.available) * 100)
+		}
+		if st.hasInodes() {
+			withInodes[id] = st
+			pvc.Inodes = &pvcInodesMetrics{}
+			pvc.Inodes.Available.Set(st.inodesFree)
+			pvc.Inodes.Used.Set(st.inodesUsed)
+			pvc.Inodes.Reserved.Set(max(0, st.inodes-st.inodesUsed-st.inodesFree))
+		}
+
+		if pvc.Space != nil || pvc.Inodes != nil {
+			mx.PVC[id] = &pvc
+		}
 	}
 
 	c.updatePVCCharts(c.collectedPVCSpace, pvcSpaceChartsTmpl, withSpace)
+	c.updatePVCCharts(c.collectedPVCInodes, pvcInodesChartsTmpl, withInodes)
 }
 
 // updatePVCCharts adds the charts of PVCs that have data and removes the charts of PVCs that no longer have it.

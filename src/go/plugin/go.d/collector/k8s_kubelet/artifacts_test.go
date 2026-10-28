@@ -25,6 +25,7 @@ func TestArtifacts(t *testing.T) {
 		*charts.Copy(),
 		Charts{volumeManager},
 		*pvcSpaceChartsTmpl.Copy(),
+		*pvcInodesChartsTmpl.Copy(),
 	))
 	require.NoError(t, err)
 
