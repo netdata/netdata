@@ -47,11 +47,13 @@ static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_
         UUIDMAP_ID uuid_id = (UUIDMAP_ID)entries_array[Index].metric_id;
         METRIC *metric = mrg_metric_get_and_acquire_by_id(main_mrg, uuid_id, (Word_t)ctx);
         if(unlikely(!metric)) {
-            // The metric is gone, so this page's data can no longer be referenced by
-            // anything and must not go into the journal - the same rule the journal v2
-            // migration applies when its metric has disappeared. Dropping it leaks nothing:
-            // the page still owns its PGD and the caller marks every page of this batch
-            // clean once we return, so main_cache_free_clean_page_callback() frees it.
+            // The metric is gone, so this page must not go into the journal - the same rule
+            // the journal v2 migration applies when its metric has disappeared. Dropping it
+            // leaks nothing: the page still owns its PGD and the caller marks every page of
+            // this batch clean once we return, so main_cache_free_clean_page_callback() frees
+            // it on eviction. Until then it stays indexed: if the same uuid is re-created in
+            // this tier while its uuidmap entry is still alive, the new metric gets the same
+            // id and can find it - it is that uuid's own data, never another metric's.
             dropped++;
             continue;
         }
