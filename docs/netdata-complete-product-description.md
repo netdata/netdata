@@ -1066,7 +1066,7 @@ Netdata Cloud availability: at least 99.5% monthly availability during the subsc
 
 - Open source with a large community: 80,000+ GitHub stars, 690+ contributors
 - Netdata Cloud SaaS serves more than 100,000 reachable nodes
-- University of Amsterdam study (ICSOC 2023) of monitoring tools: Netdata was found to have best-in-class resource consumption, with no impact on the monitored workloads
+- University of Amsterdam study (ICSOC 2023) of monitoring tools: Netdata was found to be the most energy-efficient tool, with best-in-class resource consumption and no impact on the monitored workloads
 - Customers across technology, financial services, education, government, healthcare, hosting and cloud, gaming and digital media, retail, logistics, manufacturing, transportation and automotive (38 published case studies)
 
 ### Standard figures
