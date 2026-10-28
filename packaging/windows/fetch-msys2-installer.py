@@ -111,8 +111,8 @@ def main() -> None:
     target.mkdir(parents=True, exist_ok=True)
     pinned = {url.rsplit('/', 1)[1] for url, _ in PACKAGES}
 
-    # Leave only the pinned packages: package-windows.sh installs everything in the directory.
-    for path in target.iterdir():
+    # Leave only the pinned packages: package-windows.sh installs every package in the directory.
+    for path in target.glob('*.pkg.tar.zst'):
         if path.name not in pinned:
             print(f'>>> Removing {path}, it is not pinned')
             path.unlink()
