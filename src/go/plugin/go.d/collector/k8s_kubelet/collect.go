@@ -155,7 +155,10 @@ func (c *Collector) collectVolumeStats(raw prometheus.Series, mx *metrics) {
 		id := pvcID(namespace, pvc)
 		st, ok := stats[id]
 		if !ok {
-			st = &pvcStats{namespace: namespace, name: pvc}
+			st = &pvcStats{
+				namespace: namespace,
+				name:      pvc,
+			}
 			stats[id] = st
 		}
 
