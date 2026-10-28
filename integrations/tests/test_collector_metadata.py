@@ -61,7 +61,7 @@ INLINE_CODE = re.compile(r'`[^`\n]*`')
 CODE_SPAN = re.compile(r'(?<!`)(`+)(?!`)(.+?)(?<!`)\1(?!`)', re.S)
 # A backtick preceded by an odd run of backslashes is an escaped literal, not a delimiter; keep the even part.
 ESCAPED_BACKTICK = re.compile(r'(?<!\\)((?:\\\\)*)\\`')
-# Stock templates use literal module names, either in YAML or as dict/set arguments.
+# Stock templates use literal module names, either in YAML or as job/dict/set arguments.
 TEMPLATE_MODULE = re.compile(r'^\s*(?:-\s*)?module:\s*(\w+)|"module"\s+"(\w+)"', re.M)
 
 
