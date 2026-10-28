@@ -8,13 +8,6 @@ PGC *open_cache = NULL;
 PGC *extent_cache = NULL;
 struct rrdeng_cache_efficiency_stats rrdeng_cache_efficiency_stats = {};
 
-// an open-cache page is found by a bare METRIC pointer that can outlive its metric, and the address can be reused by
-// a new metric: the uuidmap id stored with the page says which metric the page really belongs to
-bool open_cache_page_is_of_metric(PGC_PAGE *page, UUIDMAP_ID uuid_id) {
-    struct extent_io_data *xio = (struct extent_io_data *)pgc_page_custom_data(open_cache, page);
-    return xio->uuid_id == uuid_id;
-}
-
 static void main_cache_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused)
 {
     // Release storage associated with the page
@@ -36,13 +29,41 @@ static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_
      struct rrdengine_instance *ctx = (struct rrdengine_instance *) entries_array[0].section;
 
     struct page_descr_with_data *base = NULL;
+    size_t dropped = 0;
 
     for (size_t Index = 0 ; Index < entries; Index++) {
+        // metric_id is a UUIDMAP_ID (mrg_metric_id()), and it is NOT a reference: the
+        // metric can be deleted between a page becoming dirty and this flush - see
+        // rrdeng_metric_retention_delete_by_id(), which clears retention precisely so the
+        // metric WILL be freed. So resolve it, non-fatally: uuidmap_dup() on a dead id
+        // fatals, which is the crash this replaces.
+        //
+        // The lookup MUST be section-aware. A uuidmap entry is referenced once per TIER
+        // (metric_add_and_acquire() -> uuidmap_create()), while deletion is per tier, so the
+        // entry staying alive only proves SOME tier still has this uuid - not that this one
+        // does. Resolving by (id, section) is the same check journal v2 migration makes.
+        // Then take the uuidmap reference the descriptor owns, while we still hold a live
+        // METRIC, and release the metric.
+        UUIDMAP_ID uuid_id = (UUIDMAP_ID)entries_array[Index].metric_id;
+        METRIC *metric = mrg_metric_get_and_acquire_by_id(main_mrg, uuid_id, (Word_t)ctx);
+        if(unlikely(!metric)) {
+            // The metric is gone, so this page's data can no longer be referenced by
+            // anything and must not go into the journal - the same rule the journal v2
+            // migration applies when its metric has disappeared. Dropping it leaks nothing:
+            // the page still owns its PGD and the caller marks every page of this batch
+            // clean once we return, so main_cache_free_clean_page_callback() frees it.
+            dropped++;
+            continue;
+        }
+
+        UUIDMAP_ID descr_uuid_id = mrg_metric_uuidmap_id_dup(main_mrg, metric);
+        mrg_metric_release(main_mrg, metric);
+
         time_t start_time_s = entries_array[Index].start_time_s;
         time_t end_time_s = entries_array[Index].end_time_s;
         struct page_descr_with_data *descr = page_descriptor_get();
 
-        descr->uuid_id = mrg_metric_uuidmap_id_dup(main_mrg, (METRIC *) entries_array[Index].metric_id);
+        descr->uuid_id = descr_uuid_id;
         descr->metric_id = entries_array[Index].metric_id;
         descr->start_time_ut = start_time_s * USEC_PER_SEC;
         descr->end_time_ut = end_time_s * USEC_PER_SEC;
@@ -53,6 +74,24 @@ static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_
         descr->page_length = pgd_disk_footprint(descr->pgd);
 
         DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(base, descr, link.prev, link.next);
+    }
+
+    if(unlikely(dropped)) {
+        nd_log_limit_static_thread_var(erl, 10, 0);
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_NOTICE,
+                     "DBENGINE: dropped %zu of %zu pages from a flush batch of tier %d: "
+                     "their metrics were deleted while the pages were waiting to be flushed",
+                     dropped, entries, ctx->config.tier);
+    }
+
+    if(unlikely(!base)) {
+        // Every page of this batch was dropped, so there is no extent write to enqueue.
+        // main_cache_flush_dirty_page_init_callback() incremented
+        // extents_currently_being_flushed once for this batch, and it is decremented per
+        // COMPLETED extent write - so with nothing enqueued we must undo it here, or
+        // datafile rotation (datafile.c) and shutdown (rrdengine.c) wait on it forever.
+        __atomic_sub_fetch(&ctx->atomic.extents_currently_being_flushed, 1, __ATOMIC_RELAXED);
+        return;
     }
 
     struct completion completion;
@@ -344,7 +383,7 @@ static void pgc_inject_gap(struct rrdengine_instance *ctx, METRIC *metric, time_
     PGC_ENTRY page_entry = {
             .hot = false,
             .section = (Word_t)ctx,
-            .metric_id = (Word_t)metric,
+            .metric_id = mrg_metric_id(main_mrg, metric),
             .start_time_s = MAX(start_time_s, db_first_time_s),
             .end_time_s = MIN(end_time_s, db_last_time_s),
             .update_every_s = 0,
@@ -618,12 +657,11 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_inst
                     .block = OFFSET_TO_BLOCK(extent_list[extent_index].datafile_offset),
                     .bytes = extent_list[extent_index].datafile_size,
                     .fileno = datafile->fileno,
-                    // Every open-cache page must carry its metric's id, so that
-                    // journal-v2 indexing can resolve the metric without
-                    // dereferencing page->metric_id. Pages added here are clean
-                    // rather than hot, so the indexer does not walk them today -
-                    // but leaving the identity field zero would make that an
-                    // invisible dependency on queue placement.
+                    // Every open-cache page carries its metric's uuidmap id here,
+                    // because journal-v2 indexing groups pages by this field. Pages
+                    // added here are clean rather than hot, so the indexer does not
+                    // walk them today - but leaving the identity field zero would make
+                    // that an invisible dependency on queue placement.
                     .uuid_id = mrg_metric_uuidmap_id(main_mrg, metric),
                 };
 
@@ -1254,4 +1292,141 @@ void pgc_and_mrg_initialize(void)
             0
     );
     pgc_set_dynamic_target_cache_size_callback(extent_cache, dynamic_extent_cache_size);
+}
+
+// ----------------------------------------------------------------------------
+// unittest
+
+// Regression test for the defect fixed by keying the PGC page index on the metric's
+// UUIDMAP_ID instead of a bare METRIC pointer.
+//
+// A dirty page can outlive its METRIC: rrdeng_metric_retention_delete_by_id() clears
+// retention precisely so metric_release() frees the metric, and the page's flush happens
+// later, on a libuv worker. The flush callback must therefore
+//
+//   (a) resolve the metric NON-FATALLY - uuidmap_dup() on a dead id fatals, which is the
+//       fleet crash this replaced (18 events / 12 agents / 30 days, all on UV_WORKER);
+//   (b) resolve it SECTION-AWARE - a uuidmap entry is referenced once per tier, so the
+//       entry surviving proves only that SOME tier still has this uuid;
+//   (c) drop the page when its metric is gone; and
+//   (d) hand back the extents_currently_being_flushed increment that
+//       main_cache_flush_dirty_page_init_callback() makes once per batch, when dropping
+//       leaves nothing to write - otherwise datafile rotation and shutdown wait on that
+//       counter forever.
+//
+// No FSANITIZE_ADDRESS guard is needed: the point of the fix is that nothing reads the
+// freed METRIC, so there is nothing for ASAN to trap.
+int pagecache_flush_drop_unittest(void) {
+    fprintf(stderr, "\nTesting the dirty-flush drop path for a deleted metric...\n");
+    int errors = 0;
+
+    static struct rrdengine_instance test_ctx = { 0 };
+    const Word_t section = (Word_t)&test_ctx;
+
+    MRG *saved_main_mrg = main_mrg;
+    MRG *mrg = mrg_create_for_unittest();
+    if(!mrg) {
+        fprintf(stderr, "ERROR: cannot create the test MRG\n");
+        return 1;
+    }
+    main_mrg = mrg;
+
+    nd_uuid_t uuid;
+    uuid_generate_random(uuid);
+
+    bool added = false;
+    MRG_ENTRY entry = {
+        .uuid = &uuid,
+        .section = section,
+        .first_time_s = 0,
+        .last_time_s = 0,           // no retention, so a release can delete it
+        .latest_update_every_s = 0,
+    };
+
+    METRIC *metric = mrg_metric_add_and_acquire(mrg, entry, &added);
+    if(!metric) {
+        fprintf(stderr, "ERROR: cannot add the test metric\n");
+        main_mrg = saved_main_mrg;
+        (void)mrg_destroy(mrg);
+        return 1;
+    }
+
+    // this is exactly what a cache page carries as its key
+    const UUIDMAP_ID id = (UUIDMAP_ID)mrg_metric_id(mrg, metric);
+    if(!id) {
+        fprintf(stderr, "ERROR: mrg_metric_id() returned 0; ids start at 1 per partition\n");
+        errors++;
+    }
+
+    // 1. while the metric is alive, the section-aware resolve must find it
+    METRIC *found = mrg_metric_get_and_acquire_by_id(mrg, id, section);
+    if(!found) {
+        fprintf(stderr, "ERROR: a live metric did not resolve by (id, section)\n");
+        errors++;
+    }
+    else
+        mrg_metric_release(mrg, found);
+
+    // 2. delete it exactly the way rrdeng_metric_retention_delete_by_id() does:
+    //    zero the retention so the release cannot keep it, then release.
+    mrg_metric_clear_retention(mrg, metric);
+    if(!mrg_metric_release(mrg, metric)) {
+        fprintf(stderr, "ERROR: the metric survived the release; the rest of this test "
+                        "would not exercise a dead id\n");
+        errors++;
+    }
+
+    // 3. the resolve must now MISS. This is the check that replaced dereferencing a bare
+    //    METRIC pointer, which at this point would be reading freed memory whose first 16
+    //    bytes ARAL has overwritten with its free-list header.
+    METRIC *gone = mrg_metric_get_and_acquire_by_id(mrg, id, section);
+    if(gone) {
+        fprintf(stderr, "ERROR: a deleted metric still resolves by (id, section)\n");
+        errors++;
+        mrg_metric_release(mrg, gone);
+    }
+
+    // 4. drive the real callback with a one-page batch for that dead metric, simulating the
+    //    single increment the init callback makes per batch.
+    __atomic_store_n(&test_ctx.atomic.extents_currently_being_flushed, 1, __ATOMIC_RELAXED);
+
+    PGC_ENTRY entries[1] = {
+        {
+            .section = section,
+            .metric_id = (Word_t)id,
+            .start_time_s = 1,
+            .end_time_s = 2,
+            .size = 0,
+            .data = NULL,
+            .update_every_s = 1,
+            .hot = false,
+            .custom_data = NULL,
+        }
+    };
+
+    // never dereferenced: the drop happens before the callback touches pages_array
+    PGC_PAGE *pages[1] = { NULL };
+
+    // If the fix regresses, this call fatals here rather than returning.
+    main_cache_flush_dirty_page_callback(NULL, entries, pages, 1);
+
+    // 5. nothing was written, so the batch's increment must have been handed back
+    unsigned remaining = __atomic_load_n(&test_ctx.atomic.extents_currently_being_flushed,
+                                         __ATOMIC_RELAXED);
+    if(remaining != 0) {
+        fprintf(stderr, "ERROR: extents_currently_being_flushed is %u, expected 0 - "
+                        "datafile rotation and shutdown would hang waiting for it\n",
+                remaining);
+        errors++;
+    }
+
+    main_mrg = saved_main_mrg;
+    (void)mrg_destroy(mrg);
+
+    if(errors)
+        fprintf(stderr, "PAGECACHE: dirty-flush drop test FAILED with %d error(s)\n", errors);
+    else
+        fprintf(stderr, "PAGECACHE: dirty-flush drop test PASSED\n");
+
+    return errors;
 }
