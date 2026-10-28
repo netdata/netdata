@@ -268,7 +268,7 @@ You can find the StatsD configuration in `/etc/netdata/netdata.conf`:
 	# udp messages to process at once = 10
 	# create private charts for metrics matching = *
 	# max private charts hard limit = 1000
-	# cleanup obsolete charts after = 0
+	# set charts as obsolete after = 0
 	# private charts memory mode = save
 	# private charts history = 3996
 	# histograms and timers percentile (percentThreshold) = 95.00000
@@ -466,7 +466,9 @@ Example of a timer metric chart:
 
 For performance reasons, Netdata limits private charts. The `max private charts hard limit` (default: 1000) controls this. Metrics above this limit can still be used in synthetic charts.
 
-For ephemeral metrics, use `set charts as obsolete after` and `cleanup obsolete charts after` to automatically clean up charts that haven't received data recently.
+For ephemeral metrics, set `set charts as obsolete after` in the `[statsd]` section. When a metric that has a private chart receives no data for that long, the chart is marked obsolete and the metric is removed. Metrics without a private chart (not matched by `create private charts for metrics matching`, or over `max private charts hard limit`) are never removed. If the metric arrives again later, it is created again together with its private chart. Obsolete charts are deleted after `cleanup obsolete charts after` in the `[db]` section.
+
+Metrics used in synthetic charts are not removed, because the synthetic charts keep using them: only their private chart is marked obsolete. A synthetic chart dimension that matches metrics by pattern therefore keeps every metric name it has matched.
 
 ### Synthetic StatsD Charts
 
