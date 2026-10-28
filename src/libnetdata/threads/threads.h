@@ -75,9 +75,18 @@ int nd_thread_has_tag(void);
 #define THREAD_TAG_STREAM_RECEIVER "RCVR"
 #define THREAD_TAG_STREAM_SENDER "SNDR"
 
-size_t netdata_threads_init(void);
-void netdata_threads_set_stack_size(size_t stacksize);
-void netdata_threads_init_for_external_plugins(size_t stacksize);
+// stack size of the threads created by nd_thread_create() (not applied on Windows)
+// the deepest threads measured use about 160 KiB; sanitizer builds need several times more
+#ifdef FSANITIZE_ADDRESS
+#define ND_THREAD_STACK_SIZE_DEFAULT (8 * 1024 * 1024)
+#else
+#define ND_THREAD_STACK_SIZE_DEFAULT (1 * 1024 * 1024)
+#endif
+#define ND_THREAD_STACK_SIZE_MIN (1 * 1024 * 1024)
+
+void nd_thread_set_stack_size(size_t stack_size);
+size_t nd_thread_stack_size(void);
+int nd_thread_stack_size_unittest(void);
 
 ND_THREAD *nd_thread_create(const char *tag, NETDATA_THREAD_OPTIONS options, void (*start_routine) (void *), void *arg);
 int nd_thread_join(ND_THREAD * nti);
