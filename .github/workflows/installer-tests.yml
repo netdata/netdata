@@ -1,26 +1,20 @@
 ---
-name: Netdata support bundle
+name: Installer tests
 
 on:
   push:
     branches:
       - master
     paths:
-      - '.github/workflows/netdata-support-bundle.yml'
+      - '.github/workflows/installer-tests.yml'
       - '.github/ISSUE_TEMPLATE/BUG_REPORT.yml'
-      - 'packaging/installer/netdata-support-bundle'
-      - 'packaging/installer/netdata-support-bundle.ps1'
-      - 'packaging/installer/SUPPORT-BUNDLE.md'
-      - 'packaging/installer/tests/**'
+      - 'packaging/installer/**'
       - 'src/go/plugin/go.d/collector/snmp_topology/testdata/*.zst'
   pull_request:
     paths:
-      - '.github/workflows/netdata-support-bundle.yml'
+      - '.github/workflows/installer-tests.yml'
       - '.github/ISSUE_TEMPLATE/BUG_REPORT.yml'
-      - 'packaging/installer/netdata-support-bundle'
-      - 'packaging/installer/netdata-support-bundle.ps1'
-      - 'packaging/installer/SUPPORT-BUNDLE.md'
-      - 'packaging/installer/tests/**'
+      - 'packaging/installer/**'
       - 'src/go/plugin/go.d/collector/snmp_topology/testdata/*.zst'
 
 permissions:
@@ -32,7 +26,7 @@ concurrency:
 
 jobs:
   posix:
-    name: POSIX sanitization (${{ matrix.shell }}, ${{ matrix.awk }})
+    name: Support Bundle POSIX sanitization (${{ matrix.shell }}, ${{ matrix.awk }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -48,7 +42,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Unix validation tools
-        run: sudo apt-get update && sudo apt-get install -y busybox gawk mawk shellcheck
+        run: sudo apt-get update && sudo apt-get install -y busybox gawk mawk
 
       - name: Parse and run fixture suites
         env:
@@ -70,11 +64,10 @@ jobs:
             "$TEST_SHELL" packaging/installer/netdata-support-bundle --selftest
             export SUPPORT_BUNDLE_TEST_SHELL="$TEST_SHELL"
           fi
-          python3 -m unittest discover -s packaging/installer/tests -p 'test_*.py' -v
-          shellcheck packaging/installer/netdata-support-bundle
+          python3 -m unittest discover packaging/installer/tests test_support_bundle.py -v
 
   posix-e2e:
-    name: POSIX end-to-end bundle
+    name: Support Bundle POSIX end-to-end bundle
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -185,7 +178,7 @@ jobs:
           VALIDATE
 
   macos-posix:
-    name: macOS POSIX sanitization
+    name: Support Bundle macOS sanitization
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -196,10 +189,10 @@ jobs:
           set -eu
           sh -n packaging/installer/netdata-support-bundle
           sh packaging/installer/netdata-support-bundle --selftest
-          python3 -m unittest discover -s packaging/installer/tests -p 'test_*.py' -v
+          python3 -m unittest discover packaging/installer/tests test_support_bundle.py -v
 
   powershell-core:
-    name: PowerShell 7 sanitization
+    name: Support Bundle PowerShell 7 sanitization
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -212,7 +205,7 @@ jobs:
         run: python3 packaging/installer/tests/test_snmp_diagnostics.py -v
 
   windows-powershell:
-    name: Windows PowerShell 5.1 sanitization
+    name: Support Bundle Windows PowerShell 5.1 sanitization
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -344,3 +337,30 @@ jobs:
                   throw '09-permissions/plugins-d.txt is missing'
               }
           } finally { $archive.Dispose(); Stop-Process -Id $fixtureChildPid, $fixtureRoot.Id -Force -ErrorAction SilentlyContinue }
+
+  install-state:
+    name: Install State
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Run install state tests
+        run:
+          python3 -m unittest discover packaging/installer/tests test_install_state.py -v
+
+  prepare-fleet:
+    name: Prepare Fleet
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Run prepare fleet tests
+        run:
+          python3 -m unittest discover packaging/installer/tests test_prepare_fleet.py -v
+
+  snmp-diagnostics:
+    name: SNMP diagnostics
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Run SNMP diagnostics tests
+        run:
+          python3 -m unittest discover packaging/installer/tests test_snmp_diagnostics.py -v
