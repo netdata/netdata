@@ -38,19 +38,10 @@ if [ ! -f "/cloud.txt" ]; then
 fi
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
-${GITHUB_ACTIONS+echo "::group::Copy Files"}
-tar -xf /msys2-base.tar.zst -C /opt/netdata/ || exit 1
-cp -R /opt/netdata/msys64/* /opt/netdata/ || exit 1
-cp "${repo_root}/packaging/windows/copy_files.ps1" /opt/netdata/usr/libexec/netdata/ || exit 1
-rm -rf /opt/netdata/msys64/
-
-${GITHUB_ACTIONS+echo "::endgroup::"}
-
 # The installer base is a snapshot: upgrade it with the packages pinned in fetch-msys2-installer.py, so the MSI ships
 # the fixes MSYS2 published after it.
-${GITHUB_ACTIONS+echo "::group::Upgrading MSYS2 packages"}
 install_msys2_packages() {
-    local root=/opt/netdata pkgdir=/msys2-packages pkg name version installed hook hookdir
+    local root=/opt/netdata/msys64 pkgdir=/msys2-packages pkg name version installed hook hookdir
     local -a pacman_root=(--root "${root}" --dbpath "${root}/var/lib/pacman")
     local -A pinned=()
 
@@ -67,11 +58,15 @@ install_msys2_packages() {
             echo "The MSYS2 base has ${name} ${installed}, not older than the pin ${version}; drop the pin." >&2
             exit 1
         fi
+        # There is no chroot on MSYS2, so pacman would run install scripts against the build host.
+        if tar -tf "${pkg}" .INSTALL > /dev/null 2>&1; then
+            echo "${name} ${version} has an install script, which pacman would run on the build host; review it." >&2
+            exit 1
+        fi
         pinned["${name}"]="${version}"
     done
 
-    # There is no chroot on MSYS2, so pacman would run the tree's hooks against the build host: override each with one
-    # that never triggers.
+    # For the same reason, override each of the tree's hooks with one that never triggers.
     hookdir="$(mktemp -d)"
     for hook in "${root}"/usr/share/libalpm/hooks/*.hook; do
         cat > "${hookdir}/${hook##*/}" << 'HOOK'
@@ -88,6 +83,10 @@ HOOK
 
     pacman -U "${pacman_root[@]}" --cachedir "${pkgdir}" --hookdir "${hookdir}" --logfile "${hookdir}/pacman.log" \
         --noconfirm "${pkgdir}"/*.pkg.tar.zst
+    if grep -F "[ALPM] running '" "${hookdir}/pacman.log" >&2; then
+        echo "pacman ran hooks against the build host." >&2
+        exit 1
+    fi
     rm -rf "${hookdir}"
 
     for name in "${!pinned[@]}"; do
@@ -99,7 +98,17 @@ HOOK
     done
     pacman -Qkk "${pacman_root[@]}" "${!pinned[@]}"
 }
+
+${GITHUB_ACTIONS+echo "::group::Copy Files"}
+# Upgrade the freshly unpacked base, and replace the package database a previous run left in /opt/netdata, so pacman
+# never sees two versions of a package.
+rm -rf /opt/netdata/msys64/
+tar -xf /msys2-base.tar.zst -C /opt/netdata/ || exit 1
 install_msys2_packages
+rm -rf /opt/netdata/var/lib/pacman/local/
+cp -R /opt/netdata/msys64/* /opt/netdata/ || exit 1
+cp "${repo_root}/packaging/windows/copy_files.ps1" /opt/netdata/usr/libexec/netdata/ || exit 1
+rm -rf /opt/netdata/msys64/
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
 ${GITHUB_ACTIONS+echo "::group::Configure Editor"}
