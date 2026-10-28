@@ -280,6 +280,11 @@ static inline bool json_parse_string(LOG_JSON_STATE *js) {
             s++;
 
             switch (*s) {
+                case '\0':
+                    // a trailing backslash - keep it, do not step over the terminator
+                    c = '\\';
+                    break;
+
                 case 'n':
                 case 't':
                     if(!copy_escaped(&d, &remaining, *s)) {
@@ -376,8 +381,18 @@ static inline bool json_parse_key_and_push(LOG_JSON_STATE *js) {
 
         if (*s == '\\') {
             s++;
-            c = (char)((*s == 'u') ? '_' : journal_key_characters_map[(unsigned char)*s]);
-            s += (*s == 'u') ? 5 : 1;
+
+            if(!*s)
+                c = journal_key_characters_map[(unsigned char)'\\'];
+            else if(*s == 'u') {
+                // skip \uXXXX, without stepping over the terminator of a truncated escape
+                c = '_';
+                s++;
+                for(int i = 0; i < 4 && *s; i++)
+                    s++;
+            }
+            else
+                c = journal_key_characters_map[(unsigned char)*s++];
         }
         else
             c = journal_key_characters_map[(unsigned char)*s++];
