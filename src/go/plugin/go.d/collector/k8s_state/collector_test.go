@@ -141,6 +141,7 @@ func TestCollector_Cleanup(t *testing.T) {
 		prepare   func() *Collector
 		doInit    bool
 		doCollect bool
+		wantPVC   bool
 	}{
 		"before init": {
 			doInit:    false,
@@ -169,6 +170,18 @@ func TestCollector_Cleanup(t *testing.T) {
 				return collr
 			},
 		},
+		"after collect with the PVC discoverer": {
+			doInit:    true,
+			doCollect: true,
+			wantPVC:   true,
+			prepare: func() *Collector {
+				client := fake.NewClientset()
+				allowPVCAccess(client, "list", "watch")
+				collr := New()
+				collr.newKubeClient = func() (kubernetes.Interface, error) { return client, nil }
+				return collr
+			},
+		},
 	}
 
 	for name, test := range tests {
@@ -183,10 +196,27 @@ func TestCollector_Cleanup(t *testing.T) {
 				time.Sleep(collr.initDelay)
 			}
 
+			// The PVC discoverer is optional: without it stopped() would pass without checking it.
+			var pvcd *pvcDiscoverer
+			if test.doCollect {
+				kd, ok := collr.discoverer.(*kubeDiscovery)
+				require.True(t, ok)
+				require.True(t, kd.ready()) // also makes kd.discoverers safe to read
+				for _, d := range kd.discoverers {
+					if v, ok := d.(*pvcDiscoverer); ok {
+						pvcd = v
+					}
+				}
+				require.Equal(t, test.wantPVC, pvcd != nil)
+			}
+
 			assert.NotPanics(t, func() { collr.Cleanup(context.Background()) })
 			time.Sleep(time.Second)
 			if test.doCollect {
 				assert.True(t, collr.discoverer.stopped())
+			}
+			if pvcd != nil {
+				assert.True(t, pvcd.stopped())
 			}
 		})
 	}
@@ -1426,6 +1456,95 @@ func TestCollector_Collect(t *testing.T) {
 				return testCase{
 					client: client,
 					steps:  []testCaseStep{step1, step2},
+				}
+			},
+		},
+		"delete a PVC, collect, then re-create it": {
+			create: func(t *testing.T) testCase {
+				ctx := context.Background()
+				client := fake.NewClientset(newPVC("data", "10Gi", "10Gi"))
+				allowPVCAccess(client, "list", "watch")
+				pvcs := client.CoreV1().PersistentVolumeClaims(corev1.NamespaceDefault)
+				source := pvcSource(corev1.NamespaceDefault, "data")
+				chartID := "pvc_default_data.capacity"
+
+				// obsoleteFlags returns Obsolete of every chart with the ID, in order. The job runtime drops a removed
+				// chart after emitting it, the test has no runtime, so the old chart stays before the re-created one.
+				obsoleteFlags := func(collr *Collector) []bool {
+					var flags []bool
+					for _, chart := range *collr.Charts() {
+						if chart.ID == chartID {
+							flags = append(flags, chart.Obsolete)
+						}
+					}
+					return flags
+				}
+
+				step1 := func(t *testing.T, collr *Collector) {
+					mx := collr.Collect(ctx)
+					expected := map[string]int64{
+						"discovery_node_discoverer_state":          1,
+						"discovery_pod_discoverer_state":           1,
+						"pvc_default_data_capacity":                10737418240,
+						"pvc_default_data_requested":               10737418240,
+						"pvc_default_data_requested_capacity_diff": 0,
+					}
+
+					assert.Equal(t, expected, mx)
+					assert.Equal(t, []bool{false}, obsoleteFlags(collr))
+					collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+
+					require.NoError(t, pvcs.Delete(ctx, "data", metav1.DeleteOptions{}))
+					requirePVCState(t, collr, source, func(ps *pvcState) bool { return ps.deleted })
+				}
+
+				step2 := func(t *testing.T, collr *Collector) {
+					mx := collr.Collect(ctx)
+					expected := map[string]int64{
+						"discovery_node_discoverer_state": 1,
+						"discovery_pod_discoverer_state":  1,
+					}
+
+					assert.Equal(t, expected, mx)
+					assert.Equal(t,
+						len(pvcChartsTmpl)+
+							len(baseCharts),
+						len(*collr.Charts()),
+					)
+					assert.Equal(t, []bool{true}, obsoleteFlags(collr))
+					assert.Equal(t, len(pvcChartsTmpl), calcObsoleteCharts(*collr.Charts()))
+
+					// The collection removed the state entry, so the next event creates a new one.
+					_, err := pvcs.Create(ctx, newPVC("data", "20Gi", "20Gi"), metav1.CreateOptions{})
+					require.NoError(t, err)
+					requirePVCState(t, collr, source, func(ps *pvcState) bool { return ps.requested == 21474836480 })
+				}
+
+				step3 := func(t *testing.T, collr *Collector) {
+					mx := collr.Collect(ctx)
+					expected := map[string]int64{
+						"discovery_node_discoverer_state":          1,
+						"discovery_pod_discoverer_state":           1,
+						"pvc_default_data_capacity":                21474836480,
+						"pvc_default_data_requested":               21474836480,
+						"pvc_default_data_requested_capacity_diff": 0,
+					}
+
+					assert.Equal(t, expected, mx)
+					assert.Equal(t,
+						len(pvcChartsTmpl)*2+
+							len(baseCharts),
+						len(*collr.Charts()),
+					)
+					// The old chart stays obsolete, the re-created one is active.
+					assert.Equal(t, []bool{true, false}, obsoleteFlags(collr))
+					assert.Equal(t, len(pvcChartsTmpl), calcObsoleteCharts(*collr.Charts()))
+					collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+				}
+
+				return testCase{
+					client: client,
+					steps:  []testCaseStep{step1, step2, step3},
 				}
 			},
 		},

@@ -14,7 +14,11 @@ import (
 // The Kubernetes Cluster State page documents every chart the collector can create (but the hidden discovery state
 // chart), and the stock alerts read documented dimensions.
 func TestArtifacts(t *testing.T) {
-	read := func(path string) []byte { data, err := os.ReadFile(path); require.NoError(t, err); return data }
+	read := func(path string) []byte {
+		data, err := os.ReadFile(path)
+		require.NoError(t, err)
+		return data
+	}
 	metadata := read("metadata.yaml")
 	health := read("../../../../../health/health.d/k8sstate.conf")
 
