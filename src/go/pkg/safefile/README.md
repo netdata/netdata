@@ -11,6 +11,11 @@ Neither contract changes process authority. Use `pkg/credentialfile` for configu
 | `EnsureDir(path, mode)` | Create missing directories and verify the final directory without following its leaf symlink; exact permissions normally use its descriptor. |
 | `SyncDir(path)` | Verify and fsync the directory; Windows verifies but skips fsync. |
 
+Parent checks for `ReadNoFollow` and `Replace` inspect directory metadata without opening it for reading. Named-child
+access requires search permission; replacement also requires write permission. Neither operation changes directory
+permissions. Directory chmod and fsync use verified handles. This separation keeps read-only startup able to inspect
+ownership before active takeover repairs permissions, including when the state file is absent.
+
 `Mode{Perm: 0640}` respects umask on creation and preserves existing directory permissions.
 `Mode{Perm: 0600, Exact: true}` applies that mode through the file descriptor, overriding umask.
 When an owned Unix directory cannot be opened for reading, exact mode uses no-follow chmod relative to a verified

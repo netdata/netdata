@@ -150,22 +150,14 @@ func replace(path string, data []byte, mode Mode, rename func(string, string) er
 func openDir(path string, writable bool) (*os.File, error) {
 	path = filepath.Clean(path)
 	// Reject known special objects before open, then verify the opened descriptor.
-	info, err := os.Lstat(path)
-	if err != nil {
+	if err := checkDir(path); err != nil {
 		return nil, err
-	}
-	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
-		return nil, &os.PathError{
-			Op:   "open directory",
-			Path: path,
-			Err:  os.ErrInvalid,
-		}
 	}
 	file, err := openDirectoryNoFollow(path, writable)
 	if err != nil {
 		return nil, err
 	}
-	info, err = file.Stat()
+	info, err := file.Stat()
 	if err == nil && (!info.IsDir() || info.Mode()&os.ModeSymlink != 0) {
 		err = &os.PathError{
 			Op:   "open directory",
@@ -181,11 +173,21 @@ func openDir(path string, writable bool) (*os.File, error) {
 }
 
 func checkDir(path string) error {
-	dir, err := openDir(path, false)
+	// Named-child operations need search access, not directory-read access.
+	// This metadata preflight relies on the documented stable ancestry boundary.
+	path = filepath.Clean(path)
+	info, err := os.Lstat(path)
 	if err != nil {
 		return err
 	}
-	return dir.Close()
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return &os.PathError{
+			Op:   "inspect directory",
+			Path: path,
+			Err:  os.ErrInvalid,
+		}
+	}
+	return nil
 }
 
 // EnsureDir creates missing directories and verifies the final directory without
