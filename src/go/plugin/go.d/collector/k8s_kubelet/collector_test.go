@@ -341,6 +341,39 @@ func TestCollector_Collect_VolumeStats(t *testing.T) {
 	}
 }
 
+// The utilization chart Div (pvcUtilizationPrecision) must match the multiplier in pvcSpaceMetrics.Utilization's stm
+// tag, or the chart renders the percentage scaled.
+func TestCollector_Collect_VolumeStatsUtilizationPrecision(t *testing.T) {
+	tests := map[string]struct {
+		series []volumeStatsSeries
+		want   float64
+	}{
+		"quarter used":       {series: volumeStats("data", 1000, 250, 750, 0, 0, 0), want: 25},
+		"two decimal places": {series: volumeStats("data", 1000, 600, 300, 0, 0, 0), want: 66.66},
+		"full":               {series: volumeStats("data", 1000, 1000, 0, 0, 0, 0), want: 100},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			collr, setScrape := newVolumeStatsCollector(t)
+			setScrape(test.series)
+
+			mx := collr.Collect(context.Background())
+			require.NotNil(t, mx)
+
+			chart := collr.Charts().Get("pvc_app_data_space_utilization")
+			require.NotNil(t, chart)
+			require.Len(t, chart.Dims, 1)
+			dim := chart.Dims[0]
+			require.Positive(t, dim.Div)
+			value, ok := mx[dim.ID]
+			require.True(t, ok, dim.ID)
+
+			assert.Equal(t, test.want, float64(value)/float64(dim.Div))
+		})
+	}
+}
+
 func TestCollector_Collect_VolumeStatsChartLifecycle(t *testing.T) {
 	collr, setScrape := newVolumeStatsCollector(t)
 
