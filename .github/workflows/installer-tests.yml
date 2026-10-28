@@ -14,7 +14,7 @@ on:
     paths:
       - '.github/workflows/netdata-support-bundle.yml'
       - '.github/ISSUE_TEMPLATE/BUG_REPORT.yml'
-      - 'packaging/installer/tests/**'
+      - 'packaging/installer/**'
       - 'src/go/plugin/go.d/collector/snmp_topology/testdata/*.zst'
 
 permissions:
