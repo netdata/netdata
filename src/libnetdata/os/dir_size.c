@@ -262,7 +262,7 @@ int dir_size_unittest(void) {
     deep = MIN(deep, (FILENAME_MAX - strlen(root) - 16) / 2);
     struct rlimit rl;
     if(getrlimit(RLIMIT_NOFILE, &rl) == 0 && rl.rlim_cur != RLIM_INFINITY)
-        deep = MIN(deep, rl.rlim_cur > 128 ? (size_t)(rl.rlim_cur - 64) / 2 : 32);
+        deep = MIN(deep, (size_t)rl.rlim_cur / 4);
 
     int fd = dup(rootfd);
     for(size_t i = 0; i < deep && fd != -1; i++) {
