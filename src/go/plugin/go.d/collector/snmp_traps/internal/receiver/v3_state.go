@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -13,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/pkg/safefile"
 )
 
 const (
@@ -36,8 +39,11 @@ func newEngineStatePaths(root, jobName string) engineStatePaths {
 }
 
 func engineStatePathExistsChecked(path string) (bool, error) {
-	_, err := os.Stat(path)
+	info, err := os.Lstat(path)
 	if err == nil {
+		if info.Mode()&os.ModeSymlink != 0 {
+			return false, fmt.Errorf("%s is a symbolic link", path)
+		}
 		return true, nil
 	}
 	if os.IsNotExist(err) {
@@ -60,11 +66,9 @@ func engineStatePathExistsChecked(path string) (bool, error) {
 func cleanupCreatedEngineState(paths engineStatePaths, removeEngineBoots, removeLocalEngineID, removeDir bool) {
 	if removeEngineBoots {
 		_ = os.Remove(paths.engineBoots)
-		_ = os.Remove(paths.engineBoots + ".tmp")
 	}
 	if removeLocalEngineID {
 		_ = os.Remove(paths.localEngineID)
-		_ = os.Remove(paths.localEngineID + ".tmp")
 	}
 	if removeDir {
 		_ = os.Remove(paths.dir)
@@ -92,7 +96,7 @@ func newEngineBoots(paths engineStatePaths) (*engineBoots, error) {
 }
 
 func (eb *engineBoots) init() error {
-	data, err := os.ReadFile(eb.path)
+	data, err := readEngineStateFile(eb.path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			eb.value = 1
@@ -105,13 +109,13 @@ func (eb *engineBoots) init() error {
 	s := strings.TrimSpace(string(data))
 	v, err := strconv.ParseInt(s, 10, 64)
 	if err != nil {
-		return fmt.Errorf("engine-boots: parse value in %s: %w", eb.path, err)
+		return fmt.Errorf("engine-boots: invalid value in %s", eb.path)
 	}
 	if v < 1 {
-		return fmt.Errorf("engine-boots: value %d in %s must be >= 1", v, eb.path)
+		return fmt.Errorf("engine-boots: invalid value in %s: must be >= 1", eb.path)
 	}
 	if v >= maxSnmpEngineBoots {
-		return fmt.Errorf("engine-boots: value %d in %s reached RFC3414 maximum %d", v, eb.path, maxSnmpEngineBoots)
+		return fmt.Errorf("engine-boots: invalid value in %s: reached RFC3414 maximum", eb.path)
 	}
 
 	eb.value = v + 1
@@ -186,7 +190,7 @@ func (lid *localEngineID) init(configuredHex string) error {
 		return lid.persist()
 	}
 
-	data, err := os.ReadFile(lid.path)
+	data, err := readEngineStateFile(lid.path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return lid.generate()
@@ -197,7 +201,7 @@ func (lid *localEngineID) init(configuredHex string) error {
 	hexStr := strings.TrimSpace(string(data))
 	raw, err := parseEngineIDHex(hexStr)
 	if err != nil {
-		return fmt.Errorf("local-engine-id: persisted value in %s: %w", lid.path, err)
+		return fmt.Errorf("local-engine-id: invalid value in %s", lid.path)
 	}
 	lid.value = raw
 	lid.valid = true
@@ -232,16 +236,74 @@ func (lid *localEngineID) persist() error {
 	return persistEngineStateFile("local-engine-id", lid.path, []byte(hexStr+"\n"))
 }
 
-func persistEngineStateFile(label, path string, data []byte) error {
-	tmpPath := path + ".tmp"
-
-	if err := os.WriteFile(tmpPath, data, 0640); err != nil {
-		return fmt.Errorf("%s: write %s: %w", label, tmpPath, err)
-	}
-
-	f, err := os.OpenFile(tmpPath, os.O_RDWR, 0)
+func checkEngineStateFile(path string) error {
+	info, err := os.Lstat(path)
 	if err != nil {
-		return fmt.Errorf("%s: open temp for fsync %s: %w", label, tmpPath, err)
+		return err
+	}
+	if !info.Mode().IsRegular() {
+		return &os.PathError{Op: "stat", Path: path, Err: safefile.ErrNotRegular}
+	}
+	return nil
+}
+
+func readEngineStateFile(path string) (data []byte, err error) {
+	// Reject known special files before opening; the no-follow open and descriptor
+	// check below also protect against replacing the leaf after this check.
+	if err := checkEngineStateFile(path); err != nil {
+		return nil, err
+	}
+	f, err := openEngineStateFile(path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if closeErr := f.Close(); err == nil && closeErr != nil {
+			data, err = nil, closeErr
+		}
+	}()
+	info, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, &os.PathError{Op: "read", Path: path, Err: safefile.ErrNotRegular}
+	}
+	// State contains at most 64 hex digits or 10 decimal digits plus whitespace.
+	// Use the existing safe-file bound to avoid consuming arbitrary large files.
+	if info.Size() > safefile.MaxSize {
+		return nil, &os.PathError{Op: "read", Path: path, Err: safefile.ErrTooLarge}
+	}
+	data, err = io.ReadAll(io.LimitReader(f, safefile.MaxSize+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > safefile.MaxSize {
+		return nil, &os.PathError{Op: "read", Path: path, Err: safefile.ErrTooLarge}
+	}
+	return data, nil
+}
+
+func persistEngineStateFile(label, path string, data []byte) error {
+	if err := checkEngineStateFile(path); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("%s: persist %s: %w", label, path, err)
+	}
+	tmpPath := path + ".tmp"
+	// O_EXCL refuses existing files, including dangling symlinks. Keep this
+	// descriptor through write and fsync instead of reopening the temporary path.
+	f, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0640)
+	if err != nil {
+		return fmt.Errorf("%s: create temp %s: %w", label, tmpPath, err)
+	}
+	renamed := false
+	defer func() {
+		_ = f.Close()
+		if !renamed {
+			_ = os.Remove(tmpPath)
+		}
+	}()
+	if _, err := f.Write(data); err != nil {
+		return fmt.Errorf("%s: write %s: %w", label, tmpPath, err)
 	}
 	syncErr := f.Sync()
 	closeErr := f.Close()
@@ -255,6 +317,7 @@ func persistEngineStateFile(label, path string, data []byte) error {
 	if err := os.Rename(tmpPath, path); err != nil {
 		return fmt.Errorf("%s: rename %s -> %s: %w", label, tmpPath, path, err)
 	}
+	renamed = true
 	// Windows does not support opening directories for fsync.
 	if runtime.GOOS == "windows" {
 		return nil
