@@ -54,9 +54,38 @@ inline RRDLABELS *rrdinstance_acquired_labels(RRDINSTANCE_ACQUIRED *ria) {
     return rrdinstance_labels(ri);
 }
 
-inline RRDSET *rrdinstance_acquired_rrdset(RRDINSTANCE_ACQUIRED *ria) {
-    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
-    return rrdinstance_rrdset_atomic_load(ri);
+// ri->rrdset is a raw back-pointer that holds no reference on the chart: holding the instance keeps the
+// INSTANCE alive, not the CHART, and the obsolete-chart cleanup frees the chart while such a holder still
+// uses it. So consumers must never dereference ri->rrdset - they acquire the chart by id instead.
+// rrdset_acquire() has no side effects (it does not touch last_accessed), so it never keeps an obsolete
+// chart from being freed. The identity check makes the result authoritative: it succeeds only when the
+// acquired chart is the one currently linked to THIS instance. The instance side is the link that is
+// published first and cleared first, and it is the atomic one.
+RRDSET_ACQUIRED *rrdinstance_rrdset_acquire(RRDINSTANCE *ri) {
+    // archived instance: no chart to look up (only compared, never dereferenced)
+    if(!rrdinstance_rrdset_atomic_load(ri))
+        return NULL;
+
+    RRDSET_ACQUIRED *rsa = rrdset_acquire(ri->rc->rrdhost, string2str(ri->id));
+    if(unlikely(!rsa))
+        return NULL;
+
+    if(unlikely(rrdinstance_rrdset_atomic_load(ri) != rrdset_acquired_to_rrdset(rsa))) {
+        rrdset_acquired_release(rsa);
+        return NULL;
+    }
+
+    return rsa;
+}
+
+RRDSET_ACQUIRED *rrdinstance_acquired_rrdset_acquire(RRDINSTANCE_ACQUIRED *ria) {
+    RRDSET_ACQUIRED *rsa = rrdinstance_rrdset_acquire(rrdinstance_acquired_value(ria));
+
+    // these callers are queries: they keep a queried chart from being freed, as they always did
+    if(rsa)
+        rrdset_touch_last_accessed_time_s(rrdset_acquired_to_rrdset(rsa));
+
+    return rsa;
 }
 
 inline RRDHOST *rrdinstance_acquired_rrdhost(RRDINSTANCE_ACQUIRED *ria) {

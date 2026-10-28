@@ -318,6 +318,8 @@ static ALWAYS_INLINE void rrdinstance_rrdset_atomic_store(RRDINSTANCE *ri, RRDSE
     __atomic_store_n(&ri->rrdset, st, __ATOMIC_RELEASE);
 }
 
+RRDSET_ACQUIRED *rrdinstance_rrdset_acquire(RRDINSTANCE *ri);
+
 typedef struct rrdcontext {
     uint64_t version;
 
