@@ -162,13 +162,11 @@ DIR_SIZE dir_size_multiple(const char **paths, int num_paths, SIMPLE_PATTERN *pa
 #if !defined(OS_WINDOWS)
 #include <fcntl.h>
 
-#if defined(OS_LINUX)
-// deeper than the old walk could go on a 1 MiB stack (12.8 KiB per level)
+#include <sys/resource.h>
+
+// deeper than the old walk could go on a 1 MiB stack (12.8 KiB per level);
+// the test uses fewer levels when the paths or the open directories would not fit
 #define DIR_SIZE_UT_DEEP 500
-#else
-// FILENAME_MAX is 1024 and the default fd limit is 256 on macOS and FreeBSD
-#define DIR_SIZE_UT_DEEP 100
-#endif
 
 static int dir_size_ut_write(int dirfd, const char *name, size_t bytes) {
     int fd = openat(dirfd, name, O_CREAT | O_WRONLY | O_TRUNC, 0600);
@@ -259,9 +257,15 @@ int dir_size_unittest(void) {
     errors += (dir_size_ut_write(subfd, "c.txt", 30) != 0);
     close(subfd);
 
-    // root/d/d/.../d/deep.txt (40): DIR_SIZE_UT_DEEP levels deep
+    // root/d/d/.../d/deep.txt (40): deep levels; the walk and the cleanup keep one directory open per level
+    size_t deep = DIR_SIZE_UT_DEEP;
+    deep = MIN(deep, (FILENAME_MAX - strlen(root) - 16) / 2);
+    struct rlimit rl;
+    if(getrlimit(RLIMIT_NOFILE, &rl) == 0 && rl.rlim_cur != RLIM_INFINITY)
+        deep = MIN(deep, rl.rlim_cur > 128 ? (size_t)(rl.rlim_cur - 64) / 2 : 32);
+
     int fd = dup(rootfd);
-    for(size_t i = 0; i < DIR_SIZE_UT_DEEP && fd != -1; i++) {
+    for(size_t i = 0; i < deep && fd != -1; i++) {
         int next = dir_size_ut_mkdir_open(fd, "d");
         close(fd);
         fd = next;
@@ -294,8 +298,8 @@ int dir_size_unittest(void) {
     DIR_SIZE r = dir_size_ut_run(root, NULL);
     DIR_SIZE_UT_CHECK(r.bytes == 10 + 20 + 30 + 40, "total bytes");
     DIR_SIZE_UT_CHECK(r.files == 4, "total files");
-    DIR_SIZE_UT_CHECK(r.directories == 1 + 1 + DIR_SIZE_UT_DEEP + long_dirs, "total directories");
-    DIR_SIZE_UT_CHECK(r.depth == DIR_SIZE_UT_DEEP, "deepest level");
+    DIR_SIZE_UT_CHECK(r.directories == 1 + 1 + deep + long_dirs, "total directories");
+    DIR_SIZE_UT_CHECK(r.depth == deep, "deepest level");
     DIR_SIZE_UT_CHECK(r.errors == 1, "the file whose path does not fit is an error");
 
     // max_depth 1: the root and its subdirectories, nothing deeper
