@@ -32,7 +32,7 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          This collector monitors Kubernetes Nodes, Pods and Containers.
+          This collector monitors Kubernetes Nodes, Pods, Containers, Deployments, CronJobs and PersistentVolumeClaims.
         method_description: ""
       supported_platforms:
         include: []
@@ -40,9 +40,23 @@ modules:
       multi_instance: false
       additional_permissions:
         description: |
-          PVC metrics need `list` and `watch` on `persistentvolumeclaims` in all namespaces. The official Netdata Helm chart grants them from the release that adds PVC metrics; with your own ClusterRole, add them.
+          The collector reads cluster state from the Kubernetes API with the permissions below, granted cluster-wide (all namespaces). It only reads cluster objects; the access review is a query that stores nothing.
 
-          Without them the PVC metrics are skipped with one warning and all other metrics work. The permissions are checked once, at startup, so permissions granted later take effect after the collector is restarted.
+          | Resource | API group | Verbs | Used for |
+          |:---------|:----------|:------|:---------|
+          | `nodes` | core (`""`) | `list`, `watch` | Node metrics. |
+          | `pods` | core (`""`) | `list`, `watch` | Pod and container metrics, and the pod and container counts of each Node. |
+          | `deployments` | `apps` | `list`, `watch` | Deployment metrics. |
+          | `cronjobs` | `batch` | `list`, `watch` | CronJob metrics. |
+          | `jobs` | `batch` | `list`, `watch` | The Job runs behind the CronJob metrics (status, failure reason, duration). |
+          | `persistentvolumeclaims` | core (`""`) | `list`, `watch` | PVC metrics. Optional, see below. |
+          | `namespaces` | core (`""`) | `get` | The UID of the `kube-system` Namespace, used as the `k8s_cluster_id` label. Without it the label is empty and a warning is logged. |
+          | `selfsubjectaccessreviews` | `authorization.k8s.io` | `create` | A check at startup that the `persistentvolumeclaims` permissions are granted. The default `system:basic-user` ClusterRole gives it to every authenticated account. |
+          | `/version` (non-resource URL) | n/a | `get` | The connection check when the job starts. The default `system:public-info-viewer` ClusterRole gives it to every account. |
+
+          The official Netdata Helm chart grants every row down to `namespaces` (`persistentvolumeclaims` from the release that adds PVC metrics). With your own ClusterRole, add those rows; the last two are allowed by the default Kubernetes ClusterRoles.
+
+          Without the `persistentvolumeclaims` permissions the PVC metrics are skipped with one warning and all other metrics work. They are checked once, at startup, so permissions granted later take effect after the collector is restarted.
       default_behavior:
         auto_detection:
           description: ""
@@ -496,7 +510,7 @@ modules:
                 - name: Evicted
                 - name: OOMKilled
                 - name: Other
-        - name: persistentvolumeclaim
+        - name: persistent volume claim
           description: |
             These metrics refer to the PersistentVolumeClaim.
 
