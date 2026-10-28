@@ -158,22 +158,24 @@ NETDATA_CMAKE_OPTS := -DSTATIC_BUILD=On \
 
 # archive build options
 ARCHIVE_DEPS := $(NETDATA_INSTALL) \
-                curl \
-                bash \
-                ioping \
                 tests \
                 makeself.lsm \
                 makeself-license.txt \
                 makeself-help-header.txt \
                 makeself/makeself.sh \
                 $(TARGET_STAMPS)/ca-certs.stamp \
+                $(TARGET_INSTALL)/bin/bash \
+                $(TARGET_INSTALL)/bin/curl \
+                $(TARGET_INSTALL)/bin/c_rehash \
+                $(TARGET_INSTALL)/bin/openssl \
                 $(TARGET_INSTALL)/etc/.install-type \
-                $(TARGET_INSTALL)/var/cache/netdata/.keep \
-                $(TARGET_INSTALL)/var/lib/netdata/.keep \
-                $(TARGET_INSTALL)/var/log/netdata/.keep \
                 $(TARGET_INSTALL)/system/functions.sh \
                 $(TARGET_INSTALL)/system/post-installer.sh \
                 $(TARGET_INSTALL)/system/install-or-update.sh \
+                $(TARGET_INSTALL)/usr/libexec/netdata/plugins.d/ioping \
+                $(TARGET_INSTALL)/var/cache/netdata/.keep \
+                $(TARGET_INSTALL)/var/lib/netdata/.keep \
+                $(TARGET_INSTALL)/var/log/netdata/.keep \
                 $(NULL)
 MAKESELF_OPTS = --notemp \
                 --needroot \
@@ -439,6 +441,16 @@ $(OPENSSL_STAGING): prepare $(OPENSSL_BUILD)
 	fi
 	touch $@
 
+$(TARGET_INSTALL)/bin/openssl: $(FAKEROOT_DIR) $(TARGET_INSTALL) $(OPENSSL_STAGING)
+	scripts/fakeroot-wrapper.sh $(FAKEROOT_DIR) mkdir -p $(@D)
+	scripts/fakeroot-wrapper.sh $(FAKEROOT_DIR) cp -a --reflink=auto $(TARGET_BUILD_STAGING)/bin/openssl $@
+	scripts/fakeroot-wrapper.sh $(FAKEROOT_DIR) chmod +x $@
+
+$(TARGET_INSTALL)/bin/c_rehash: $(FAKEROOT_DIR) $(TARGET_INSTALL) $(OPENSSL_STAGING)
+	scripts/fakeroot-wrapper.sh $(FAKEROOT_DIR) mkdir -p $(@D)
+	scripts/fakeroot-wrapper.sh $(FAKEROOT_DIR) cp -a --reflink=auto $(TARGET_BUILD_STAGING)/bin/c_rehash $@
+	scripts/fakeroot-wrapper.sh $(FAKEROOT_DIR) chmod +x $@
+
 openssl: $(OPENSSL_STAGING)
 
 # libnetfilter_acct rules
@@ -628,7 +640,7 @@ $(CURL_STAGING): prepare $(CURL_BUILD)
 	touch $@
 
 $(TARGET_INSTALL)/bin/curl: $(FAKEROOT_DIR) $(TARGET_INSTALL) $(CURL_STAGING)
-	scripts/fakeroot-wrapper.sh $(FAKEROOT_DIR) mkdir -p $(TARGET_INSTALL)/bin
+	scripts/fakeroot-wrapper.sh $(FAKEROOT_DIR) mkdir -p $(@D)
 	scripts/fakeroot-wrapper.sh $(FAKEROOT_DIR) cp -a --reflink=auto $(TARGET_BUILD_STAGING)/bin/curl $@
 	scripts/fakeroot-wrapper.sh $(FAKEROOT_DIR) chmod +x $@
 
