@@ -52,7 +52,13 @@ ifeq ($(strip $(DOCKER)),)
     $(error Either Docker or Podman are required for static builds.)
 endif
 
-BUILDER := netdata/static-builder:v1
+ifdef BUILDER
+    CUSTOM_BUILDER := 1
+else
+    CUSTOM_BUILDER := 0
+endif
+
+BUILDER ?= netdata/static-builder:v1
 QEMU_SETUP := tonistiigi/binfmt:master
 DOCKER_ARGS := $(DOCKER_ARGS) --rm -i \
                -a stdin -a stdout -a stderr \
@@ -286,6 +292,12 @@ endif
 
 BUILDER_STATUS := $(shell $(MAKEFILE_DIR)/scripts/docker-image-status.py $(DOCKER) $(BUILDER) $(PLATFORM))
 
+ifeq ($(strip $(BUILDER_STATUS)),MISMATCH)
+    ifeq ($(CUSTOM_BUILDER),1)
+        $(error Specified builder image does not have the correct platform for the requested build)
+    endif
+endif
+
 # general rules
 
 .PHONY: clean clean-workdir clean-staging clean-all \
@@ -350,7 +362,7 @@ docker-image:
 	if [ "$(BUILDER_STATUS)" = "MISMATCH" ] ; then \
 		"$(DOCKER)" image rm "$(BUILDER)" ; \
 	fi
-	if [ "$(BUILDER_STATUS)" != "OK" ] ; then \
+	if [ "$(BUILDER_STATUS)" != "OK" ] && [ "$(CUSTOM_BUILDER)" -eq 0 ] ; then \
 		$(DOCKER) pull --platform "$(PLATFORM)" "$(BUILDER)" ; \
 	fi
 
