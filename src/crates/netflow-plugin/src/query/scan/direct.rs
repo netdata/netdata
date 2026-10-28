@@ -1,5 +1,11 @@
 use super::*;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum JournalScanReadErrors {
+    RecoverReadableEntries,
+    RequireComplete,
+}
+
 pub(crate) fn build_prefilter_matches(prefilter_pairs: &[(String, String)]) -> Vec<Vec<u8>> {
     prefilter_pairs
         .iter()
@@ -32,6 +38,7 @@ where
         span_index,
         prefilter_matches,
         purpose,
+        JournalScanReadErrors::RecoverReadableEntries,
         &mut checkpoint,
         |file_path, journal, timestamp_usec, data_offsets, decompress_buf, _checkpoint| {
             on_entry(
@@ -55,6 +62,7 @@ pub(crate) fn scan_journal_files_forward_with_checkpoint<C, F>(
     span_index: usize,
     prefilter_matches: &[Vec<u8>],
     purpose: &str,
+    read_errors: JournalScanReadErrors,
     checkpoint: &mut C,
     mut on_entry: F,
 ) -> Result<ScanCounts>
@@ -83,16 +91,20 @@ where
 
     for (registry_file, file_path) in files {
         checkpoint()?;
-        // Journal read failures below are treated per journald semantics: a
-        // torn tail (power loss mid-write) makes everything from the tear
-        // onward unrecoverable, but must not fail the whole scan — that would
-        // turn one damaged file into a startup (rebuild) or query outage.
-        // Only caller-side errors (cancellation checkpoints, the on_entry
-        // closure) abort the scan.
+        // Queries and raw recovery can use readable prefixes. Cache replacement
+        // requires complete scans so a damaged entry cannot erase cached values.
         let journal =
             match JournalFile::<Mmap>::open(&registry_file, FACET_CACHE_JOURNAL_WINDOW_SIZE) {
                 Ok(journal) => journal,
                 Err(err) => {
+                    if read_errors == JournalScanReadErrors::RequireComplete {
+                        return Err(err).with_context(|| {
+                            format!(
+                                "failed to open journal {} during {purpose}",
+                                file_path.display()
+                            )
+                        });
+                    }
                     tracing::warn!(
                         "skipping unreadable journal file {} during {}: {}",
                         file_path.display(),
@@ -133,6 +145,14 @@ where
             let has_entry = match cursor.step(&journal, JournalDirection::Forward) {
                 Ok(has_entry) => has_entry,
                 Err(err) => {
+                    if read_errors == JournalScanReadErrors::RequireComplete {
+                        return Err(err).with_context(|| {
+                            format!(
+                                "incomplete journal scan of {} during {purpose}",
+                                file_path.display()
+                            )
+                        });
+                    }
                     tracing::warn!(
                         "treating torn or unreadable entry in {} as end of file during {}: {}",
                         file_path.display(),
@@ -156,6 +176,14 @@ where
             let (entry_offset, timestamp_usec) = match read_entry() {
                 Ok(read) => read,
                 Err(err) => {
+                    if read_errors == JournalScanReadErrors::RequireComplete {
+                        return Err(err).with_context(|| {
+                            format!(
+                                "incomplete journal scan of {} during {purpose}",
+                                file_path.display()
+                            )
+                        });
+                    }
                     tracing::warn!(
                         "treating torn or unreadable entry in {} as end of file during {}: {}",
                         file_path.display(),
@@ -173,6 +201,14 @@ where
             }
             data_offsets.clear();
             if let Err(err) = journal.entry_data_object_offsets(entry_offset, &mut data_offsets) {
+                if read_errors == JournalScanReadErrors::RequireComplete {
+                    return Err(err).with_context(|| {
+                        format!(
+                            "failed to read entry data offsets in {} during {purpose}",
+                            file_path.display()
+                        )
+                    });
+                }
                 tracing::warn!(
                     "treating torn or unreadable entry in {} as end of file during {}: {}",
                     file_path.display(),
@@ -616,6 +652,7 @@ mod tests {
             0,
             &prefilter_matches,
             "test filtered cursor cancellation",
+            JournalScanReadErrors::RecoverReadableEntries,
             &mut checkpoint,
             |_file_path, _journal, _timestamp_usec, _data_offsets, _decompress_buf, _checkpoint| {
                 seen_any = true;
