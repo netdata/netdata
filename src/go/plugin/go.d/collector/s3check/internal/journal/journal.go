@@ -302,6 +302,18 @@ func ensurePrivateDir(dir string, syncParent bool) error {
 		return err
 	}
 	for _, parent := range parents {
+		// Ancestors are trusted and may be symlinks (for example a relocated varlib).
+		// Resolve those links before the shared helper verifies the sync target's leaf.
+		info, err := os.Lstat(parent)
+		if err != nil {
+			return err
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			parent, err = filepath.EvalSymlinks(parent)
+			if err != nil {
+				return err
+			}
+		}
 		if err := syncDirectory(parent); err != nil {
 			return err
 		}

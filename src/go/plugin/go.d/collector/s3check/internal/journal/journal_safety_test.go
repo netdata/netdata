@@ -177,3 +177,26 @@ func TestSavePrePublicationFailureKeepsStateAndAllowsRetry(t *testing.T) {
 		Pending: []string{"new"},
 	}))
 }
+
+func TestJournalAllowsTrustedSymlinkParent(t *testing.T) {
+	target := t.TempDir()
+	parent := filepath.Join(t.TempDir(), "varlib")
+	if err := os.Symlink(target, parent); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	j, err := New(filepath.Join(parent, "s3check"), "agent", "job", testFingerprint)
+	require.NoError(t, err)
+	locked, err := j.TryLock()
+	require.NoError(t, err)
+	require.True(t, locked)
+	t.Cleanup(j.Unlock)
+	require.NoError(t, j.Save(testState{
+		Pending: []string{"owned"},
+	}))
+	var state testState
+	found, err := j.Load(&state)
+	require.NoError(t, err)
+	assert.True(t, found)
+	assert.Equal(t, []string{"owned"}, state.Pending)
+	require.NoError(t, j.Clear())
+}

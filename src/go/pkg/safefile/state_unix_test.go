@@ -50,3 +50,35 @@ func TestReplaceModeHonorsUmaskUnlessExact(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, os.FileMode(0640), info.Mode().Perm())
 }
+
+func TestEnsureDirExactRepairsPermissions(t *testing.T) {
+	for _, mode := range []os.FileMode{0300, 0000} {
+		t.Run(mode.String(), func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "state")
+			require.NoError(t, os.Mkdir(path, 0700))
+			require.NoError(t, os.Chmod(path, mode))
+			t.Cleanup(func() { _ = os.Chmod(path, 0700) })
+			require.NoError(t, EnsureDir(path, Mode{
+				Perm:  0700,
+				Exact: true,
+			}))
+			info, err := os.Stat(path)
+			require.NoError(t, err)
+			assert.Equal(t, os.FileMode(0700), info.Mode().Perm())
+		})
+	}
+}
+
+func TestEnsureDirExactOverridesUmask(t *testing.T) {
+	parent := t.TempDir()
+	old := syscall.Umask(0400)
+	defer syscall.Umask(old)
+	path := filepath.Join(parent, "state")
+	require.NoError(t, EnsureDir(path, Mode{
+		Perm:  0700,
+		Exact: true,
+	}))
+	info, err := os.Stat(path)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0700), info.Mode().Perm())
+}

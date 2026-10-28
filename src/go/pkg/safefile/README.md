@@ -8,11 +8,14 @@ Neither contract changes process authority. Use `pkg/credentialfile` for configu
 | `Open`, `Read` | Follow symlinks, then verify the opened object is regular. `Read` accepts at most `MaxSize` (1 MiB). |
 | `ReadNoFollow(path, limit)` | Refuse symlink/special file leaves and a symlinked immediate parent. Verify the opened descriptor and enforce the caller's byte limit, including growth during reading. |
 | `Replace(path, data, mode)` | Verify the parent and existing destination leaf; exclusively create a randomized sibling, write, fsync, close and rename it. Never truncate an existing temp or sweep foreign temps. |
-| `EnsureDir(path, mode)` | Create missing directories and verify the final directory without following its leaf symlink; exact permissions use its descriptor. |
+| `EnsureDir(path, mode)` | Create missing directories and verify the final directory without following its leaf symlink; exact permissions normally use its descriptor. |
 | `SyncDir(path)` | Verify and fsync the directory; Windows verifies but skips fsync. |
 
 `Mode{Perm: 0640}` respects umask on creation and preserves existing directory permissions.
 `Mode{Perm: 0600, Exact: true}` applies that mode through the file descriptor, overriding umask.
+When an owned Unix directory cannot be opened for reading, exact mode uses no-follow chmod relative to a verified
+parent, then reopens and verifies the directory. A concurrent replacement leaf can itself be chmodded by that fallback;
+its symlink target is never followed. Linux kernels lacking fchmodat2 require `/proc/self/fd` for this fallback.
 Windows permission semantics remain those of `os.File.Chmod`, not Unix access-control semantics.
 
 `Replace` deliberately stops at rename. A successful call means the replacement is visible; callers MUST then call

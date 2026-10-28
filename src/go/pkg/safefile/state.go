@@ -189,7 +189,8 @@ func checkDir(path string) error {
 }
 
 // EnsureDir creates missing directories and verifies the final directory without
-// following its leaf symlink. Exact mode changes use the verified descriptor.
+// following its leaf symlink. Exact mode normally uses the target descriptor;
+// unreadable Unix directories use a no-follow chmod relative to a verified parent.
 // It does not sync directory entries; ancestry must be trusted and stable.
 func EnsureDir(path string, mode Mode) error {
 	path = filepath.Clean(path)
@@ -197,6 +198,14 @@ func EnsureDir(path string, mode Mode) error {
 		return err
 	}
 	dir, err := openDir(path, mode.Exact)
+	if mode.Exact && errors.Is(err, os.ErrPermission) {
+		// Some owned directories can be chmodded but not opened for reading.
+		// Repair without following the leaf, then verify the opened directory again.
+		if err := repairDirectoryMode(path, mode.Perm); err != nil {
+			return err
+		}
+		dir, err = openDir(path, mode.Exact)
+	}
 	if err != nil {
 		return err
 	}
