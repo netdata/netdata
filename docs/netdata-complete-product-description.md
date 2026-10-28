@@ -988,12 +988,31 @@ Netdata exchanges data with other systems through exporting connectors, Promethe
 | Plan | Price | For | Highlights |
 |---|---|---|---|
 | **Community** | $0 | Personal, non-commercial use | Up to 5 active connected nodes, 1 custom dashboard per Room |
-| **Homelab** | $90/year or $10/month | Personal, non-commercial use | No hard limit on nodes (fair usage policy), no limit on custom dashboards |
-| **Business** | $4.50/node/month billed yearly; $6/node/month billed monthly | Freelancers, professionals, businesses of all sizes | All features: Netdata AI, all roles (RBAC), enterprise SSO (Okta, OpenID Connect), SCIM, enterprise notification integrations, Netdata Cloud MCP, centralized configuration management, no limit on custom dashboards, audit events in the events feed |
-| **Enterprise On-Prem** | Custom, from 200 node licenses | Air-gapped facilities, critical infrastructure | Everything in Business, running on customer infrastructure; priority support plans |
+| **Homelab** | $90/year or $10/month | Personal, non-commercial use | No limit on custom dashboards ([Homelab plan](https://www.netdata.cloud/homelab/)) |
+| **Business** | From $7/node/month billed yearly; $8.75/node/month billed monthly (5-node minimum) | Freelancers, professionals, businesses of all sizes | Products priced individually (below); AI conversations, all roles (RBAC), enterprise SSO (Okta, OpenID Connect), SCIM, enterprise notification integrations, Netdata Cloud MCP, centralized configuration management, no limit on custom dashboards, audit events in the events feed |
+| **Enterprise** | Custom | Fleets above 500 nodes, on-premise deployments at any size (air-gapped facilities, critical infrastructure) | Everything in Business; commitment and multi-year discounts; custom quotas for logs, traces, flows and AI; on-premise deployment; AI Co-SRE; priority support plans |
 | **Open-source Agent** | Free (Agent GPL v3+; dashboard NCUL1) | Self-hosted, any use | Complete Agent and Parents, no limit on metrics, local dashboards |
 
-Community and Homelab are for personal, non-commercial use only. Freelancers, professionals and businesses use the open-source Agent or the Business plan. A 14-day Business trial with no limit on nodes is available on sign-up. Volume discounts are available for larger deployments.
+Community and Homelab are for personal, non-commercial use only. Freelancers, professionals and businesses use the open-source Agent or the Business plan. A 14-day Business trial with no limit on nodes is available on sign-up.
+
+### Business products
+
+Prices are per month, in USD, excluding taxes. The billing choice (annual subscription or monthly pay as you go) applies to the whole account.
+
+| Product | Annual | Monthly | Included each month | Beyond included |
+|---|---|---|---|---|
+| **Infrastructure** | $7/node | $8.75/node | Metrics and system logs (Logs Monitoring) with no volume charge, checks, AI conversations (fair use); adds 20M application log events to the pooled log quota | $0.10 per 1M log events ($0.125 monthly) |
+| **APM** (includes Infrastructure) | $15/node | $18.75/node | Adds 25M application log events and 25M trace spans to the pooled quotas | $0.10 per 1M log events or trace spans ($0.125 monthly) |
+| **Network Device Monitoring** (SNMP) | $2/device | $2.50/device | SNMP monitoring and topology; adds 2M syslog events to the pooled log quota | Pooled log rate |
+| **NetFlow Monitoring** | $200 | $250 | 5,000 flows/sec, any number of exporters | $40 per 1,000 flows/sec ($50 monthly) |
+| **Real User Monitoring** | From $250 (500K sessions) | $0.625 per 1K sessions, no minimum | Annual: 500,000 sessions | $0.50 per 1K sessions |
+| **Synthetic Browser Tests** | From $250 (125K runs) | $2.50 per 1K runs, no minimum | Annual: 125,000 runs | $2 per 1K runs |
+| **AI Investigations** | From $300 (100 investigations) | $6 per investigation, no minimum | Annual: 100 investigations | $6 per investigation |
+| **AI Co-SRE** | Custom | Custom | Autonomous SRE agent, quoted separately | |
+
+- **Pooled quotas:** each node's log and trace quotas are shared across the account; logs and traces are counted separately, and only usage above the pooled quota is charged.
+- **Annual volume discounts** on Infrastructure and APM nodes combined: 5% for nodes 51-100, 10% for 101-200, 20% for 201-500 (each band discounted separately). Above 500 nodes, Enterprise pricing applies.
+- **Monthly pay as you go** bills Real User Monitoring, Synthetic Browser Tests and AI Investigations by actual usage; NetFlow Monitoring keeps its 5,000 flows/sec minimum.
 
 Netdata is also available on [AWS Marketplace](https://aws.amazon.com/marketplace/seller-profile?id=seller-5bbjpj3csb4mw): Netdata Cloud as a pay-as-you-go subscription or an annual contract (SaaS), Netdata Cloud On-Prem (Helm chart, bring your own license) and the Netdata Agent for EKS (Helm chart, free).
 
@@ -1001,10 +1020,9 @@ Netdata is also available on [AWS Marketplace](https://aws.amazon.com/marketplac
 
 - **Billable node:** each running Netdata Agent connected to Netdata Cloud, plus each virtual node. Sub-entities a collector discovers (hosts and VMs behind a hypervisor, cloud resources, containers) are labeled instances of the collecting Agent's node and are not billed separately; an explicit virtual node attached to a collector job adds one node for that job. Collectors that create a virtual node per resource (e.g., one per SNMP device by default, or Azure workload virtual nodes) bill each such virtual node. Containers on a monitored host are included at no extra cost.
 - **Active nodes only:** offline and stale nodes (history still queryable on Parents) are not billed.
-- **P90 billing:** daily, the node count at the 90th percentile of time-weighted usage; monthly, the 90th percentile of daily values (the top 3 days of a 30-day month are excluded). Short spikes and occasional high-usage days do not increase the bill.
-- **Not billed:** metrics volume, Logs Monitoring (querying logs in place), users, data retention, containers.
-- **Free Preview:** Logs Management (collecting, storing and indexing logs), Traces (OpenTelemetry trace storage and the Traces explorer), Network Flows (NetFlow, IPFIX, sFlow) and Digital Experience Monitoring (RUM, synthetic journeys, Lighthouse audits) are in Free Preview.
-- **Netdata AI:** usage measured in AI credits — one credit per investigation or report, fractional credits for smaller actions (conversations, alert creation and suggestion); alert explanations consume no credits. Business includes 10 AI credits per month; the 14-day trial includes 10 AI credits; additional credits are purchased in the app.
+- **P90 billing (nodes and flow rates):** daily, the node count at the 90th percentile of time-weighted usage; monthly, the 90th percentile of daily values (the top 3 days of a 30-day month are excluded). Short spikes and occasional high-usage days do not increase the bill.
+- **Not billed:** metrics volume, Logs Monitoring (querying logs in place), users, data retention, containers, and API, uptime and other checks run from your own nodes.
+- **Netdata AI:** Business includes AI conversations for every user, subject to fair use. AI Investigations are bought pay as you go or as an annual subscription bundle (see Business products); there are no AI credits to manage.
 - **Windows:** Windows Agents count as nodes like any other Agent; their local dashboard follows the same plan rules as on Linux.
 - **Plan-gated features:** Netdata Cloud MCP, enterprise notification integrations (all Cloud integrations except Discord, personal email and the mobile app), additional roles, SSO and SCIM require a paid plan.
 
