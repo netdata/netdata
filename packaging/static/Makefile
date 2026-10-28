@@ -157,25 +157,28 @@ NETDATA_CMAKE_OPTS := -DSTATIC_BUILD=On \
                       $(NULL)
 
 # archive build options
-ARCHIVE_DEPS := $(NETDATA_INSTALL) \
-                tests \
+MANIFEST_DEPS := $(NETDATA_INSTALL) \
+                 tests \
+                 $(TARGET_STAMPS)/ca-certs.stamp \
+                 $(TARGET_INSTALL)/bin/bash \
+                 $(TARGET_INSTALL)/bin/curl \
+                 $(TARGET_INSTALL)/bin/c_rehash \
+                 $(TARGET_INSTALL)/bin/openssl \
+                 $(TARGET_INSTALL)/etc/.install-type \
+                 $(TARGET_INSTALL)/system/functions.sh \
+                 $(TARGET_INSTALL)/system/post-installer.sh \
+                 $(TARGET_INSTALL)/system/install-or-update.sh \
+                 $(TARGET_INSTALL)/usr/libexec/netdata/plugins.d/ioping \
+                 $(TARGET_INSTALL)/var/cache/netdata/.keep \
+                 $(TARGET_INSTALL)/var/lib/netdata/.keep \
+                 $(TARGET_INSTALL)/var/log/netdata/.keep \
+                 $(NULL)
+ARCHIVE_DEPS := $(NMANIFEST_DEPS) \
                 makeself.lsm \
                 makeself-license.txt \
                 makeself-help-header.txt \
                 makeself/makeself.sh \
-                $(TARGET_STAMPS)/ca-certs.stamp \
-                $(TARGET_INSTALL)/bin/bash \
-                $(TARGET_INSTALL)/bin/curl \
-                $(TARGET_INSTALL)/bin/c_rehash \
-                $(TARGET_INSTALL)/bin/openssl \
-                $(TARGET_INSTALL)/etc/.install-type \
-                $(TARGET_INSTALL)/system/functions.sh \
-                $(TARGET_INSTALL)/system/post-installer.sh \
-                $(TARGET_INSTALL)/system/install-or-update.sh \
-                $(TARGET_INSTALL)/usr/libexec/netdata/plugins.d/ioping \
-                $(TARGET_INSTALL)/var/cache/netdata/.keep \
-                $(TARGET_INSTALL)/var/lib/netdata/.keep \
-                $(TARGET_INSTALL)/var/log/netdata/.keep \
+                $(TARGET_INSTALL)/system/package-manifest \
                 $(NULL)
 MAKESELF_OPTS = --notemp \
                 --needroot \
@@ -908,6 +911,10 @@ $(TARGET_INSTALL)/system/post-installer.sh: $(SRCDIR)/packaging/static/installer
 $(TARGET_INSTALL)/system/install-or-update.sh: $(SRCDIR)/packaging/static/installer/install-or-update.sh $(FAKEROOT_DIR)
 	scripts/fakeroot-wrapper.sh $(FAKEROOT_DIR) mkdir -p $(@D)
 	scripts/fakeroot-wrapper.sh $(FAKEROOT_DIR) cp -a --reflink=auto $< $@
+
+$(TARGET_INSTALL)/system/package-manifest: $(MANIFEST_DEPS)
+	scripts/fakeroot-wrapper.sh $(FAKEROOT_DIR) mkdir -p $(@D)
+	find . \( -path ./var/lib/netdata -o -path ./var/cache/netdata -o -path ./var/log/netdata \) -prune -o -print | LC_ALL=C sort > $@
 
 makeself.lsm: makeself.lsm.in
 	sed -e 's|NETDATA_VERSION|$(VERSION)|' < $< > $@
