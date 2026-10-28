@@ -852,7 +852,7 @@ Global system-wide configuration settings
 | `cpu cores` | number | Number of CPU cores Netdata should use for calculations and thread spawning |
 | `glibc malloc arena max for plugins` | number | Maximum malloc arenas for external plugins to prevent memory fragmentation |
 | `glibc malloc arena max for netdata` | number | Maximum malloc arenas for the netdata process itself to control memory usage |
-| `pthread stack size` | size | Stack size for pthread threads (e.g., "8MB") |
+| `pthread stack size` | size | Stack size of the threads created by Netdata (default "1MiB", minimum "1MiB") |
 | `libuv worker threads` | number | Number of libuv worker threads for async I/O operations |
 | `host access prefix` | string | Host access prefix for generating URLs (e.g., chroot prefix) |
 | `hostname` | string | Hostname for this Netdata instance (overrides system hostname) |
