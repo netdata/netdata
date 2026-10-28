@@ -1017,7 +1017,7 @@ Support by plan:
 - Business: Email/ticket support during business hours with SLA
 - Enterprise: 24/7 availability, dedicated support team, phone support
 
-Netdata Cloud availability: 99.5% monthly availability commitment (Service Terms, Service Level Commitment).
+Netdata Cloud availability: at least 99.5% monthly availability during the subscription term, per the Service Terms' Service Level Commitment (excludes Scheduled Downtime and Other Causes).
 
 **Professional Services:**
 - Implementation assistance
@@ -1066,7 +1066,7 @@ Netdata Cloud availability: 99.5% monthly availability commitment (Service Terms
 
 - Open source with a large community: 80,000+ GitHub stars, 690+ contributors
 - Netdata Cloud SaaS serves more than 100,000 reachable nodes
-- University of Amsterdam study (ICSOC 2023) of monitoring tools on Docker-based systems (Netdata, Prometheus, ELK, Zipkin): Netdata had the lowest CPU and RAM overhead, the lowest energy use and the lowest impact on the monitored applications
+- University of Amsterdam study (ICSOC 2023) of monitoring tools on Docker-based systems (Netdata, Prometheus, ELK, Zipkin): Netdata was the most energy-efficient tool among those tested, with CPU and RAM impact close to the no-monitoring baseline and no statistically significant effect on execution time
 - Customers across technology, financial services, education, government, healthcare, hosting and cloud, gaming and digital media, retail, logistics, manufacturing, transportation and automotive (38 published case studies)
 
 ### Standard figures
