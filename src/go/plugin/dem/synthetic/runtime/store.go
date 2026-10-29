@@ -50,7 +50,11 @@ type Config struct {
 }
 
 func DefaultConfig(path string) Config {
-	return Config{Path: path, MaxBytes: DefaultMaxBytes, PreviousRetention: DefaultPreviousRetention}
+	return Config{
+		Path:              path,
+		MaxBytes:          DefaultMaxBytes,
+		PreviousRetention: DefaultPreviousRetention,
+	}
 }
 
 // Store coordinates durable installation, process consumers and execution pins.
@@ -94,47 +98,26 @@ func Open(config Config) (*Store, error) {
 	if !filepath.IsAbs(config.Path) {
 		return nil, errors.New("runtime store requires an absolute path")
 	}
-	if err := os.MkdirAll(config.Path, 0700); err != nil {
-		return nil, err
-	}
-	path, err := filepath.EvalSymlinks(config.Path)
+	path, root, err := openStoreRoot(config.Path)
 	if err != nil {
 		return nil, err
 	}
-	if err := privateDirectory(path); err != nil {
-		return nil, err
+	s := &Store{
+		completedUses:   make(map[string]bool),
+		releasingOwners: make(map[io.Closer]struct{}),
+		config:          config,
+		path:            path,
+		root:            root,
+		now:             time.Now,
+		boot:            hostBoot(),
 	}
-	root, err := os.OpenRoot(path)
-	if err != nil {
-		return nil, err
-	}
-	s := &Store{completedUses: make(map[string]bool), releasingOwners: make(map[io.Closer]struct{}), config: config, path: path, root: root, now: time.Now, boot: hostBoot()}
 	if err := requireManaged(root); err != nil {
-		root.Close()
-		return nil, err
-	}
-	if err := ensureLock(root, "coordination.lock"); err != nil {
-		root.Close()
-		return nil, err
-	}
-	if err := ensureLock(root, "installation.lock"); err != nil {
 		root.Close()
 		return nil, err
 	}
 	s.syncSelection = func() error { return syncDirectory(root, ".") }
 	s.lock = flock.New(filepath.Join(path, "coordination.lock"))
-	err = s.withLock(func() error {
-		for _, dir := range []string{"generations", "claims", "uses", "staging", "trash", "initializing"} {
-			if err := root.Mkdir(dir, 0700); err != nil && !errors.Is(err, os.ErrExist) {
-				return err
-			}
-			info, err := root.Lstat(dir)
-			if err != nil || !info.IsDir() {
-				return fmt.Errorf("invalid runtime store directory: %s", dir)
-			}
-		}
-		return syncDirectory(root, ".")
-	})
+	err = s.withLock(func() error { return validateStoreLayout(root) })
 	if err != nil {
 		s.Close()
 		return nil, err
@@ -215,11 +198,14 @@ func readJSON(root *os.Root, name string, value any) error {
 	decoder := json.NewDecoder(f)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(value); err != nil {
-		return err
+		return metadataDecodeError(name, err)
 	}
 	var extra any
 	if err := decoder.Decode(&extra); err != io.EOF {
-		return errors.New("trailing runtime metadata")
+		if err != nil {
+			return metadataDecodeError(name, err)
+		}
+		return damagedMetadata(name, errors.New("trailing runtime metadata"))
 	}
 	return nil
 }
@@ -264,14 +250,21 @@ func loadGeneration(root *os.Root, id string) (generation, error) {
 	if errors.Is(err, os.ErrNotExist) {
 		return g, ErrUnavailable
 	}
-	if err != nil || !info.IsDir() {
+	if err != nil {
+		return g, err
+	}
+	if !info.IsDir() {
 		return g, errors.New("invalid generation directory")
 	}
-	if err := readJSON(root, filepath.Join(name, "prepared.json"), &g); err != nil {
+	metadata := filepath.Join(name, "prepared.json")
+	if err := readJSON(root, metadata, &g); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			err = damagedMetadata(metadata, err)
+		}
 		return g, err
 	}
 	if err := g.Manifest.Validate(); err != nil || g.Manifest.Archive.SHA256 != id || g.LastUsed.IsZero() {
-		return g, errors.New("invalid prepared generation metadata")
+		return g, damagedMetadata(metadata, errors.New("invalid prepared generation metadata"))
 	}
 	return g, nil
 }
@@ -294,10 +287,15 @@ func preparedPaths(root *os.Root, path string, m Manifest) (Paths, error) {
 		return Paths{}, err
 	}
 	if !sameManifest(g.Manifest, m) {
-		return Paths{}, errors.New("prepared runtime manifest differs from installed requirement")
+		return Paths{}, damagedMetadata("selection.json", errors.New("prepared runtime manifest differs from installed requirement"))
 	}
 	base := filepath.Join(path, "generations", m.Archive.SHA256)
-	return Paths{EntryPoint: filepath.Join(base, m.Layout.EntryPoint), Node: filepath.Join(base, m.Layout.Node), Dependencies: filepath.Join(base, m.Layout.Dependencies), Browser: filepath.Join(base, "chrome")}, nil
+	return Paths{
+		EntryPoint:   filepath.Join(base, m.Layout.EntryPoint),
+		Node:         filepath.Join(base, m.Layout.Node),
+		Dependencies: filepath.Join(base, m.Layout.Dependencies),
+		Browser:      filepath.Join(base, "chrome"),
+	}, nil
 }
 
 func checkContext(ctx context.Context) error {

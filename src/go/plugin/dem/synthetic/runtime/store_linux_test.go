@@ -116,11 +116,13 @@ func TestStorePressureReclaimsSoftGrace(t *testing.T) {
 
 func TestFailedImportAndReadOnlyInspection(t *testing.T) {
 	s, _ := testStore(t)
+	baseline, err := s.Inspect()
+	require.NoError(t, err)
 	m, archive := bundleFixture(t, "broken")
 	file := filepath.Join(t.TempDir(), "truncated")
 	require.NoError(t, os.WriteFile(file, archive[:len(archive)-1], 0600))
 	require.Error(t, s.importUnselected(context.Background(), m, file))
-	_, err := s.beginUse(m)
+	_, err = s.beginUse(m)
 	require.ErrorIs(t, err, ErrUnavailable)
 	require.NoError(t, s.Sweep())
 	for _, parent := range []string{"uses", "claims", "staging", "trash", "initializing", "generations"} {
@@ -130,7 +132,7 @@ func TestFailedImportAndReadOnlyInspection(t *testing.T) {
 	}
 	status, err := s.Inspect()
 	require.NoError(t, err)
-	require.Zero(t, status.UsedBytes)
+	require.Equal(t, baseline.UsedBytes, status.UsedBytes, "failed import leaves only initialized store metadata")
 }
 
 func TestPersistentSupervisorCompletionReleasesPin(t *testing.T) {
@@ -189,6 +191,8 @@ func TestReservationReusesPublishedGeneration(t *testing.T) {
 
 func TestConcurrentPreparationAccountingAndReuse(t *testing.T) {
 	s, _ := testStore(t)
+	baseline, err := s.Inspect()
+	require.NoError(t, err)
 	other, err := Open(s.config)
 	require.NoError(t, err)
 	defer other.Close()
@@ -224,7 +228,7 @@ func TestConcurrentPreparationAccountingAndReuse(t *testing.T) {
 	require.NoError(t, err)
 	require.Positive(t, status.PreparingBytes)
 	require.GreaterOrEqual(t, status.UsedBytes+status.ReservedBytes, needed)
-	require.Equal(t, status.UsedBytes, status.ProtectedBytes)
+	require.Equal(t, status.UsedBytes-baseline.UsedBytes, status.ProtectedBytes)
 	require.Zero(t, status.ReclaimableBytes)
 	require.ErrorIs(t, other.importUnselected(context.Background(), m, "/must-not-open"), ErrPreparing)
 	require.NoError(t, other.Sweep())
@@ -236,7 +240,7 @@ func TestConcurrentPreparationAccountingAndReuse(t *testing.T) {
 	require.NoError(t, err)
 	require.Zero(t, status.ReservedBytes)
 	require.Zero(t, status.ProtectedBytes)
-	require.Equal(t, status.UsedBytes, status.ReclaimableBytes)
+	require.Equal(t, status.UsedBytes-baseline.UsedBytes, status.ReclaimableBytes)
 }
 
 type resumeReader struct {
@@ -257,6 +261,8 @@ func (r *resumeReader) Read(p []byte) (int, error) {
 
 func TestAllowanceExplainsProtectedGenerationBytes(t *testing.T) {
 	s, _ := testStore(t)
+	baseline, err := s.Inspect()
+	require.NoError(t, err)
 	s.config.MaxBytes = 128 << 10
 	m := importFixture(t, s, strings.Repeat("a", 80<<10))
 	claim, err := s.testProcessClaim(m.Archive.SHA256)
@@ -273,7 +279,7 @@ func TestAllowanceExplainsProtectedGenerationBytes(t *testing.T) {
 	require.GreaterOrEqual(t, allowance.Status.ProcessBytes, m.Archive.ExpandedBytes)
 	require.Equal(t, allowance.Status.ProcessBytes, allowance.Status.ExecutionBytes)
 	require.Equal(t, allowance.Status.ExecutionBytes, allowance.Status.UncertainBytes)
-	require.Equal(t, allowance.Status.UsedBytes, allowance.Status.ProtectedBytes)
+	require.Equal(t, allowance.Status.UsedBytes-baseline.UsedBytes, allowance.Status.ProtectedBytes)
 	require.Zero(t, allowance.Status.ReclaimableBytes)
 }
 

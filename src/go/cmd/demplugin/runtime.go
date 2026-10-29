@@ -28,19 +28,19 @@ func runRuntimeCommand(ctx context.Context, args []string, stdout, stderr io.Wri
 		return false, nil
 	}
 	if len(args) < 2 {
-		return true, errors.New("usage: dem.plugin runtime {install|update|uninstall|preload|status|qualify} [flags]")
+		return true, errors.New("usage: dem.plugin runtime {install|update|repair|uninstall|preload|status|qualify} [flags]")
 	}
 	command := args[1]
 	switch command {
-	case "install", "update", "uninstall", "preload", "status", "qualify":
+	case "install", "update", "repair", "uninstall", "preload", "status", "qualify":
 	default:
 		return true, fmt.Errorf("unknown runtime command %q", command)
 	}
-	preparing := command == "install" || command == "update" || command == "preload"
+	preparing := command == "install" || command == "update" || command == "repair" || command == "preload"
 	flags := flag.NewFlagSet("runtime "+command, flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	configDir := flags.String("config-dir", "", "directory containing administrator dem.conf")
-	manifest := flags.String("manifest", "", "administrator-trusted release descriptor (required for install/update/preload)")
+	manifest := flags.String("manifest", "", "administrator-trusted release descriptor (required for install/update/repair/preload)")
 	cache := flags.String("cache", "", "managed installation directory")
 	root := flags.String("root", "", "preload final root (must be new or empty; never move it)")
 	archive := flags.String("archive", "", "offline archive checked against the trusted release descriptor")
@@ -59,13 +59,13 @@ func runRuntimeCommand(ctx context.Context, args []string, stdout, stderr io.Wri
 	}
 	if preparing {
 		if !filepath.IsAbs(*manifest) {
-			return true, errors.New("install/update/preload requires an absolute --manifest path")
+			return true, errors.New("install/update/repair/preload requires an absolute --manifest path")
 		}
 		if (*archive != "") == *allowDownload {
-			return true, errors.New("provide either --archive or --allow-download for install/update/preload")
+			return true, errors.New("provide either --archive or --allow-download for install/update/repair/preload")
 		}
 	} else if *manifest != "" || *archive != "" || *allowDownload {
-		return true, errors.New("--manifest, --archive and --allow-download are only valid for install/update/preload")
+		return true, errors.New("--manifest, --archive and --allow-download are only valid for install/update/repair/preload")
 	}
 	if *archive != "" && !filepath.IsAbs(*archive) {
 		return true, errors.New("--archive must be absolute")
@@ -93,6 +93,9 @@ func runRuntimeCommand(ctx context.Context, args []string, stdout, stderr io.Wri
 		cfg.CachePath = *cache
 	}
 	report := runtimeCommandReport{Command: command, Mode: cfg.Mode, State: "unavailable", DownloadAllowed: *allowDownload, ManifestPath: *manifest}
+	if command == "repair" {
+		report.State = "unknown"
+	}
 	defer func() {
 		if retErr != nil {
 			report.SetupError = retErr.Error()
@@ -103,7 +106,7 @@ func runRuntimeCommand(ctx context.Context, args []string, stdout, stderr io.Wri
 	}()
 	if cfg.Mode == "preloaded" && command != "preload" {
 		if command != "status" && command != "qualify" {
-			return true, errors.New("install/update/uninstall require runtime.mode: managed")
+			return true, errors.New("install/update/repair/uninstall require runtime.mode: managed")
 		}
 		handle := dem.OpenRuntime(cfg, "")
 		defer func() {
@@ -132,8 +135,13 @@ func runRuntimeCommand(ctx context.Context, args []string, stdout, stderr io.Wri
 		if err != nil {
 			return true, err
 		}
-		report.Runtime = releaseIdentity(*trusted)
-		report.Generation = trusted.Archive.SHA256
+		if command == "repair" {
+			report.Candidate = releaseIdentity(*trusted)
+			report.CandidateState = "requested"
+		} else {
+			report.Runtime = releaseIdentity(*trusted)
+			report.Generation = trusted.Archive.SHA256
+		}
 	}
 	varlib := os.Getenv("NETDATA_LIB_DIR")
 	if varlib == "" {
@@ -159,26 +167,43 @@ func runRuntimeCommand(ctx context.Context, args []string, stdout, stderr io.Wri
 	report.CachePath = storeConfig.Path
 	if !preparing {
 		if _, err := os.Stat(storeConfig.Path); err != nil {
+			if command == "status" && !errors.Is(err, os.ErrNotExist) {
+				report.State = "unknown"
+			}
 			return true, fmt.Errorf("runtime installation: %w", err)
 		}
 	}
 	store, err := runtime.Open(storeConfig)
 	if err != nil {
+		if command == "status" {
+			report.State = "unknown"
+		}
 		return true, err
 	}
 	sealed := false
 	defer func() {
-		if !sealed {
+		if !sealed && command != "status" {
 			status, err := store.Inspect()
 			report.Storage = &status
 			report.StorageError = errorString(err)
+			if command == "repair" {
+				report.selectedInstallation(status)
+				if retErr != nil {
+					report.Notice = "Repair failed; selected installation state is shown separately from candidate progress. A cleared selection is not restored. Stop and drain all consumers before retrying repair."
+				}
+			}
 		}
 		if !errors.Is(retErr, ndexec.ErrTreeNotDrained) {
 			retErr = errors.Join(retErr, store.Close())
 		}
 	}()
 	if preparing {
-		candidate, err := store.BeginInstall(ctx, *trusted)
+		var candidate *runtime.Candidate
+		if command == "repair" {
+			candidate, err = store.BeginRepair(ctx, *trusted)
+		} else {
+			candidate, err = store.BeginInstall(ctx, *trusted)
+		}
 		if err != nil {
 			return true, err
 		}
@@ -195,7 +220,11 @@ func runRuntimeCommand(ctx context.Context, args []string, stdout, stderr io.Wri
 		if err != nil {
 			return true, err
 		}
-		report.State = "prepared"
+		if command == "repair" {
+			report.CandidateState = "prepared"
+		} else {
+			report.State = "prepared"
+		}
 		report.Qualification, err = qualifyRuntime(ctx, adminRuntimeSource{candidate})
 		if err != nil {
 			return true, err
@@ -215,6 +244,9 @@ func runRuntimeCommand(ctx context.Context, args []string, stdout, stderr io.Wri
 			}
 			report.Notice = "Runtime installed and selected. Running DEM processes keep their acquired release; restart DEM to activate this selection."
 		}
+		if command == "repair" {
+			report.CandidateState = "selected"
+		}
 		report.State = "installed"
 		return true, nil
 	}
@@ -226,16 +258,16 @@ func runRuntimeCommand(ctx context.Context, args []string, stdout, stderr io.Wri
 		report.State = "uninstalled"
 	case "status":
 		status, err := store.Inspect()
+		report.Storage = &status
+		report.StorageError = errorString(err)
+		report.selectedInstallation(status)
+		report.Notice = "Selected installation is shown; already running DEM processes may retain an older release until restart. Metadata damage requires explicit repair after stopping and draining consumers."
 		if err != nil {
 			return true, err
 		}
 		if status.Selected == nil {
 			return true, runtime.ErrUnavailable
 		}
-		report.Runtime = releaseIdentity(*status.Selected)
-		report.Generation = status.Selected.Archive.SHA256
-		report.State = "installed"
-		report.Notice = "Selected installation is shown; already running DEM processes may retain an older release until restart."
 	case "qualify":
 		consumer, err := store.AcquireSelected()
 		if err != nil {
@@ -268,6 +300,8 @@ type runtimeCommandReport struct {
 	CachePath       string                     `json:"cache_path,omitempty"`
 	Generation      string                     `json:"generation,omitempty"`
 	Runtime         *synthetic.RuntimeIdentity `json:"runtime,omitempty"`
+	Candidate       *synthetic.RuntimeIdentity `json:"candidate,omitempty"`
+	CandidateState  string                     `json:"candidate_state,omitempty"`
 	SetupError      string                     `json:"setup_error,omitempty"`
 	Storage         *runtime.Status            `json:"storage,omitempty"`
 	StorageError    string                     `json:"storage_error,omitempty"`
@@ -275,6 +309,25 @@ type runtimeCommandReport struct {
 	PreloadedConfig map[string]any             `json:"preloaded_config,omitempty"`
 	PreloadPath     string                     `json:"preload_path,omitempty"`
 	Notice          string                     `json:"notice,omitempty"`
+}
+
+// selectedInstallation reports executable selection independently of a candidate
+// and of damage to unrelated retained generations.
+func (r *runtimeCommandReport) selectedInstallation(status runtime.Status) {
+	r.Runtime = nil
+	r.Generation = ""
+	r.State = "unavailable"
+	if status.Selected != nil {
+		r.Runtime = releaseIdentity(*status.Selected)
+		r.Generation = status.Selected.Archive.SHA256
+		r.State = "installed"
+	}
+	if status.SelectionError != "" {
+		r.State = "damaged"
+	}
+	if status.InventoryError != "" {
+		r.State = "unknown"
+	}
 }
 
 func errorString(err error) string {

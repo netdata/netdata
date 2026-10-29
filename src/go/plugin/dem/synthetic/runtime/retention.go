@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
@@ -22,6 +21,8 @@ type reservation struct {
 
 type inventory struct {
 	selected           *Manifest
+	selectionError     error
+	generationErrors   map[string]error
 	generations        map[string]generation
 	processes          map[string]int
 	candidates         map[string]int
@@ -42,34 +43,42 @@ type inventory struct {
 // uncertain bytes are a subset of execution bytes. PreparingBytes and TrashBytes
 // describe written workspace, not extra disk usage.
 type Status struct {
-	Selected              *Manifest `json:"selected,omitempty"`
-	SelectedBytes         int64     `json:"selected_bytes"`
-	ProcessClaims         int       `json:"process_claims"`
-	UsedBytes             int64     `json:"used_bytes"`
-	ReservedBytes         int64     `json:"reserved_bytes"`
-	LimitBytes            int64     `json:"limit_bytes"`
-	ProtectedBytes        int64     `json:"protected_bytes"`
-	ReclaimableBytes      int64     `json:"reclaimable_bytes"`
-	CandidateBytes        int64     `json:"candidate_bytes"`
-	CandidateClaims       int       `json:"candidate_claims"`
-	ProcessBytes          int64     `json:"process_bytes"`
-	ExecutionBytes        int64     `json:"execution_bytes"`
-	UncertainBytes        int64     `json:"uncertain_bytes"`
-	PreparingBytes        int64     `json:"preparing_bytes"`
-	TrashBytes            int64     `json:"trash_bytes"`
-	ProcessGenerations    int       `json:"process_generations"`
-	ExecutionPins         int       `json:"execution_pins"`
-	UncertainPins         int       `json:"uncertain_pins"`
-	BootRecoveryAvailable bool      `json:"boot_recovery_available"`
-	CleanupError          string    `json:"cleanup_error,omitempty"`
+	SelectionError        string            `json:"selection_error,omitempty"`
+	GenerationErrors      map[string]string `json:"generation_errors,omitempty"`
+	InventoryError        string            `json:"inventory_error,omitempty"`
+	Selected              *Manifest         `json:"selected,omitempty"`
+	SelectedBytes         int64             `json:"selected_bytes"`
+	ProcessClaims         int               `json:"process_claims"`
+	UsedBytes             int64             `json:"used_bytes"`
+	ReservedBytes         int64             `json:"reserved_bytes"`
+	LimitBytes            int64             `json:"limit_bytes"`
+	ProtectedBytes        int64             `json:"protected_bytes"`
+	ReclaimableBytes      int64             `json:"reclaimable_bytes"`
+	CandidateBytes        int64             `json:"candidate_bytes"`
+	CandidateClaims       int               `json:"candidate_claims"`
+	ProcessBytes          int64             `json:"process_bytes"`
+	ExecutionBytes        int64             `json:"execution_bytes"`
+	UncertainBytes        int64             `json:"uncertain_bytes"`
+	PreparingBytes        int64             `json:"preparing_bytes"`
+	TrashBytes            int64             `json:"trash_bytes"`
+	ProcessGenerations    int               `json:"process_generations"`
+	ExecutionPins         int               `json:"execution_pins"`
+	UncertainPins         int               `json:"uncertain_pins"`
+	BootRecoveryAvailable bool              `json:"boot_recovery_available"`
+	CleanupError          string            `json:"cleanup_error,omitempty"`
 }
 
-func (s *Store) inventoryLocked(reconcile bool) (inventory, error) {
-	inv := inventory{generations: make(map[string]generation), processes: make(map[string]int), candidates: make(map[string]int), preparing: make(map[string]int), uses: make(map[string]int), uncertain: make(map[string]int), reservations: make(map[string]reservation), protectedRecords: make(map[string]bool), reclaimableRecords: make(map[string]bool)}
-	var err error
-	inv.selected, err = s.selectedLocked(reconcile)
-	if err != nil {
-		return inv, err
+func (s *Store) ownershipInventoryLocked(reconcile bool) (inventory, error) {
+	inv := inventory{
+		generations:        make(map[string]generation),
+		processes:          make(map[string]int),
+		candidates:         make(map[string]int),
+		preparing:          make(map[string]int),
+		uses:               make(map[string]int),
+		uncertain:          make(map[string]int),
+		reservations:       make(map[string]reservation),
+		protectedRecords:   make(map[string]bool),
+		reclaimableRecords: make(map[string]bool),
 	}
 	// Live completion proof also survives a successful rename followed by a
 	// failed directory sync. Retry these names even if enumeration cannot see
@@ -196,37 +205,25 @@ func (s *Store) inventoryLocked(reconcile bool) (inventory, error) {
 		inv.protectedRecords[name] = true
 		inv.preparing[r.Generation]++
 	}
-	generations, err := s.childDirectories("generations")
-	if err != nil {
-		return inv, err
-	}
-	now := s.now().UTC()
-	for _, name := range generations {
-		id := filepath.Base(name)
-		g, err := s.loadGeneration(id)
-		if err != nil {
-			return inv, err
-		}
-		changed := false
-		if inv.protected(id) {
-			changed = !g.Unneeded.IsZero()
-			g.Unneeded = time.Time{}
-		} else if g.Unneeded.IsZero() {
-			g.Unneeded = now
-			changed = true
-		}
-		if changed && reconcile {
-			if err := saveJSON(s.root, filepath.Join(name, "prepared.json"), g); err != nil {
-				return inv, err
-			}
-		}
-		inv.generations[id] = g
-	}
 	return inv, nil
 }
 
 func (s *Store) statusLocked(inv inventory) (Status, error) {
-	status := Status{Selected: inv.selected, LimitBytes: s.config.MaxBytes, ProcessGenerations: len(inv.processes), BootRecoveryAvailable: s.boot.Verified}
+	status := Status{
+		Selected:              inv.selected,
+		LimitBytes:            s.config.MaxBytes,
+		ProcessGenerations:    len(inv.processes),
+		BootRecoveryAvailable: s.boot.Verified,
+	}
+	if inv.selectionError != nil {
+		status.SelectionError = inv.selectionError.Error()
+	}
+	if len(inv.generationErrors) > 0 {
+		status.GenerationErrors = make(map[string]string, len(inv.generationErrors))
+		for id, err := range inv.generationErrors {
+			status.GenerationErrors[id] = err.Error()
+		}
+	}
 	if err := errors.Join(inv.cleanupError, s.cleanupError); err != nil {
 		status.CleanupError = err.Error()
 	}
@@ -279,7 +276,7 @@ func (s *Store) statusLocked(inv inventory) (Status, error) {
 		if inv.uncertain[id] > 0 {
 			status.UncertainBytes += size
 		}
-		if inv.protected(id) {
+		if inv.protected(id) || inv.selectionError != nil || inv.generationErrors[id] != nil {
 			status.ProtectedBytes += size
 		} else {
 			status.ReclaimableBytes += size
@@ -295,15 +292,25 @@ func (s *Store) statusLocked(inv inventory) (Status, error) {
 // Inspect is read-only. It never executes programs, starts preparation or
 // changes persisted grace deadlines.
 func (s *Store) Inspect() (Status, error) {
-	var status Status
+	status := Status{
+		LimitBytes:            s.config.MaxBytes,
+		BootRecoveryAvailable: s.boot.Verified,
+	}
 	err := s.withLock(func() error {
-		inv, err := s.inventoryLocked(false)
+		inv, err := s.inspectInventoryLocked(false)
 		if err != nil {
+			status.InventoryError = err.Error()
 			return err
 		}
 		status, err = s.statusLocked(inv)
-		return err
+		if err != nil {
+			status.InventoryError = err.Error()
+		}
+		return errors.Join(err, inv.damageError())
 	})
+	if err != nil && status.SelectionError == "" && len(status.GenerationErrors) == 0 && status.InventoryError == "" {
+		status.InventoryError = err.Error()
+	}
 	return status, err
 }
 

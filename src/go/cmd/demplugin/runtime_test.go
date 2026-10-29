@@ -43,7 +43,7 @@ func TestRuntimeDispatchAndBadArguments(t *testing.T) {
 	}
 }
 func TestRuntimeMissingManifestNeverInitializesCache(t *testing.T) {
-	for _, command := range []string{"install", "update", "preload"} {
+	for _, command := range []string{"install", "update", "repair", "preload"} {
 		t.Run(command, func(t *testing.T) {
 			root := t.TempDir()
 			cache := filepath.Join(root, "cache")
@@ -55,7 +55,11 @@ func TestRuntimeMissingManifestNeverInitializesCache(t *testing.T) {
 			}
 			report, err := runtimeCommand(t, args...)
 			require.Error(t, err)
-			assert.Equal(t, "unavailable", report.State)
+			if command == "repair" {
+				assert.Equal(t, "unknown", report.State)
+			} else {
+				assert.Equal(t, "unavailable", report.State)
+			}
 			assert.NotEmpty(t, report.SetupError)
 			require.Nil(t, report.Qualification)
 			_, err = os.Stat(cache)
@@ -85,12 +89,32 @@ func TestRuntimePreloadedCommandsRequirePreparedBundle(t *testing.T) {
 		assert.Equal(t, "unavailable", report.State)
 		require.Nil(t, report.Qualification)
 	}
-	for _, command := range []string{"install", "update", "uninstall"} {
+	for _, command := range []string{"install", "update", "repair", "uninstall"} {
 		args := []string{"runtime", command, "--config-dir", dir}
 		if command != "uninstall" {
 			args = append(args, "--archive", "/unused", "--manifest", "/unused.json")
 		}
 		_, err := runtimeCommand(t, args...)
 		require.ErrorContains(t, err, "mode: managed")
+	}
+}
+
+func TestRuntimeRepairRequiresTrustedExplicitInput(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		flags   []string
+		message string
+	}{
+		{"missing manifest", nil, "absolute --manifest"},
+		{"relative manifest", []string{"--manifest", "relative.json"}, "absolute --manifest"},
+		{"no archive", []string{"--manifest", "/trusted.json"}, "either --archive or --allow-download"},
+		{"two sources", []string{"--manifest", "/trusted.json", "--archive", "/runtime.tar.gz", "--allow-download"}, "either --archive or --allow-download"},
+		{"relative archive", []string{"--manifest", "/trusted.json", "--archive", "runtime.tar.gz"}, "--archive must be absolute"},
+		{"preload root", []string{"--manifest", "/trusted.json", "--allow-download", "--root", "/preload"}, "--root is only valid for preload"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := runtimeCommand(t, append([]string{"runtime", "repair"}, tc.flags...)...)
+			require.ErrorContains(t, err, tc.message)
+		})
 	}
 }

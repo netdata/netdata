@@ -956,16 +956,30 @@ Fixed startup selection (`synthetic/runtimehost`):
 
 Explicit installation and protection (`synthetic/runtime`):
 
-- Administrator commands hold candidate protection and serialize installation, update and uninstall. Install/update
-  verify and prepare the trusted archive, qualify both a sandboxed journey and Lighthouse, then publish the selection.
+- Fresh/empty stores publish a complete private layout atomically, including an explicit uninstalled selection.
+  Reopening validates existing safety namespaces/locks and reconciles ancestor-directory durability; it never recreates
+  missing ownership structure in a nonempty store. A missing selection record or field is damage, not an uninstall.
+- Interrupted bootstrap can leave a small unpublished sibling directory containing only initial metadata, never payloads.
+  Published store roots and lock identities are preserved after uncertain publication.
+- Administrator commands hold candidate protection and serialize installation, update, repair and uninstall.
+  Install/update/repair verify and prepare the trusted archive, qualify both a sandboxed journey and Lighthouse,
+  then publish the selection.
 - Selected installation, process claims, candidates and each invocation's durable use pin protect files independently.
   Preparation reservations account for workspace. The selected release never expires for inactivity; process and
   execution protection keep older releases safe after an update.
 - Unprotected old releases can retire; the most recently used gets a seven-day soft grace, which pressure can shorten.
   Protected files may prevent a new installation within the configured allowance.
-- Uninstall refuses live consumers, preparation and unresolved executions across all generations. It durably clears
-  selection before retiring files. Publication uncertainty is reconciled before admission, another mutation or cleanup;
-  invalid persisted metadata stops those operations rather than being treated as an absent installation.
+- Diagnostic inventory separates executable metadata validity from independent ownership evidence. Status reports
+  selection and generation damage with available bytes and owners; incomplete ownership or I/O inspection is explicit.
+  Execution still requires a valid selected release; ordinary installation and automatic retirement do not repair metadata.
+- Repair and uninstall refuse live consumers, candidates, preparation and unresolved executions across all generations.
+  Complete ownership evidence permits removing generations even when executable metadata is damaged. Missing safety
+  structure and operational I/O errors still block removal; neither command recreates lost ownership evidence.
+- Repair retires damaged generations plus the requested generation, then uses ordinary import/download, qualification
+  and selection. It durably clears a damaged selection or one being rebuilt before retirement. A healthy different
+  selection remains protected; other unselected generations remain subject to ordinary retention.
+- Uninstall durably clears selection before retiring all generations. Publication uncertainty is reconciled before
+  admission, another mutation or cleanup. Neither repair nor uninstall replaces the store root or its locks.
 - The runner acquires a use before inspecting runtime files, passes its completion handle to `nd-run`, and releases it
   after supervised drainage and local reader joins.
 - Completed preparation releases its local claim and staging locks before coordinated record reclamation.
@@ -974,7 +988,11 @@ Explicit installation and protection (`synthetic/runtime`):
 - Cleanup health survives coordination failures and cannot be cleared by an older sweep.
 - Unknown execution completion retains protection across process restart. A positively verified host reboot may
   release the old execution pin, because its children cannot remain alive.
-- CLI preparation and qualification errors preserve the previous selection and do not produce website observations.
+- Install/update preparation and qualification errors preserve the previous selection. Repair errors preserve a healthy
+  different selection, but cannot restore a cleared selection. Retrying repair is supported after the reported problem
+  is resolved; successful repair requires a DEM restart. CLI errors do not produce website observations.
+- Repair reports candidate identity/progress separately from the final selected installation. A damaged old generation
+  does not make a healthy selection unavailable in status output. Uncertain inventory is reported as unknown.
 
 Protected preloads and shutdown:
 

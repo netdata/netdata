@@ -469,12 +469,12 @@ dem.plugin runtime status
 dem.plugin runtime qualify
 ```
 
-Install and update verify the archive, prepare its private paths, then run both a local sandboxed journey and
+Install, update and repair verify the archive, prepare its private paths, then run both a local sandboxed journey and
 Lighthouse audit before selecting the release. A descriptor must come from a trusted administrator source;
 the archive does not authenticate its own descriptor. `qualify` repeats these checks for the selected release.
 It tests the calling account and environment, not a different service's AppArmor, SELinux or container policy.
 
-**Restart DEM after installation or update, including the first installation.** Each process keeps the runtime it
+**Restart DEM after installation, update or repair, including the first installation.** Each process keeps the runtime it
 acquired at startup. A process started without a runtime stays unavailable until restarted. Runtime releases can
 update their components without an Agent upgrade while preserving execution contract 1. Runs record the actual
 release version, archive digest and execution contract for investigation.
@@ -489,6 +489,31 @@ Uninstall refuses while any generation has a running consumer or unresolved exec
 intact. If child completion cannot be proved, execution protection remains; neither a timeout nor a missing PID allows
 removal. A failed selection write after publication reports uncertainty; inspection/reconciliation establishes the
 selected state before cleanup proceeds. A successful update does not replace files used by running processes.
+
+If selection or generation metadata is damaged, `status` still reports the available inventory and identifies the
+metadata errors, with a nonzero exit status. A healthy selected release remains identified even when an older release
+is damaged. Incomplete ownership or storage inspection is reported as unknown, not as an empty installation.
+
+Stop all DEM and standalone consumers and let their executions drain before repairing the managed store:
+
+```sh
+dem.plugin runtime repair --manifest /absolute/path/manifest.json --archive /absolute/path/runtime.tar.gz
+# Alternatively, use the trusted descriptor URL with --allow-download.
+```
+
+Repair removes damaged generations and rebuilds the requested release, including a same-release reinstall. It uses
+the same trusted descriptor, service account, store and browser qualification as install. A healthy selection of a
+different release stays selected if repair fails; ordinary retention still applies to other unselected releases.
+If repair clears the selection being rebuilt, failed preparation or qualification leaves it unavailable. The old
+selection cannot be rolled back; correct the reported problem and retry repair, then restart DEM after success.
+The command reports candidate progress separately from the final selected installation.
+
+Repair and uninstall can handle damaged executable metadata only when independent ownership records prove removal
+is safe. They refuse active consumers, preparation, unresolved executions, missing safety structure and storage access
+errors. There is no force-delete option; dead PIDs and timeouts do not prove execution completion. Do not manually
+edit selection records or remove generation directories. Repair applies only to private managed stores; immutable,
+administrator-owned preloads must be replaced through their separate lifecycle. Arbitrary external deletion of
+individual ownership records or copying a live store is outside this recovery guarantee.
 
 The store defaults to `NETDATA_LIB_DIR/dem/runtime`; override `cache_path` in `dem.conf` or `--cache` for administration.
 Use the same installation directory and service account for the CLI and running plugin. `--config-dir` selects an

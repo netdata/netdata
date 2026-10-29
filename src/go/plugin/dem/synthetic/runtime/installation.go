@@ -37,18 +37,31 @@ func (s *Store) selectedLocked(reconcile bool) (*Manifest, error) {
 			return nil, err
 		}
 	}
-	var record selection
+	m, err := s.readSelection()
+	if err != nil || m == nil {
+		return m, err
+	}
+	if _, err := s.prepared(*m); err != nil {
+		if errors.Is(err, ErrUnavailable) {
+			err = damagedMetadata("selection.json", err)
+		}
+		return nil, err
+	}
+	return m, nil
+}
+
+func (s *Store) readSelection() (*Manifest, error) {
+	// Only an explicit null means uninstalled. Missing fields or a missing
+	// record must not silently discard an installed release's protection.
+	record := selection{Manifest: &Manifest{}}
 	if err := readJSON(s.root, "selection.json", &record); errors.Is(err, os.ErrNotExist) {
-		return nil, nil
+		return nil, damagedMetadata("selection.json", err)
 	} else if err != nil {
 		return nil, err
 	}
 	if record.Manifest != nil {
 		if err := record.Manifest.Validate(); err != nil {
-			return nil, err
-		}
-		if _, err := s.prepared(*record.Manifest); err != nil {
-			return nil, err
+			return nil, damagedMetadata("selection.json", err)
 		}
 	}
 	return record.Manifest, nil
@@ -57,11 +70,15 @@ func (s *Store) selectedLocked(reconcile bool) (*Manifest, error) {
 func (s *Store) selectLocked(m *Manifest) error {
 	// Split publication from directory sync so the caller can distinguish a failed
 	// write from a visible selection whose durability is not yet known.
-	if err := publishJSON(s.root, "selection.json", selection{Manifest: m}); err != nil {
+	if err := publishJSON(s.root, "selection.json", selection{
+		Manifest: m,
+	}); err != nil {
 		return err
 	}
 	if err := s.syncSelection(); err != nil {
-		return &SelectionError{Err: err}
+		return &SelectionError{
+			Err: err,
+		}
 	}
 	return nil
 }
@@ -104,7 +121,11 @@ func (s *Store) AcquireSelected() (*Consumer, error) {
 		}
 		owner, err := s.claimLocked(m.Archive.SHA256, "process")
 		if err == nil {
-			consumer = &Consumer{store: s, manifest: *m, claim: owner}
+			consumer = &Consumer{
+				store:    s,
+				manifest: *m,
+				claim:    owner,
+			}
 		}
 		return err
 	})
@@ -137,6 +158,17 @@ func (s *Store) lockInstallation(ctx context.Context) (*flock.Flock, error) {
 }
 
 func (s *Store) BeginInstall(ctx context.Context, m Manifest) (*Candidate, error) {
+	return s.beginCandidate(ctx, m, false)
+}
+
+// BeginRepair rebuilds the requested release and retires damaged generations.
+// It requires every consumer and execution to be drained, and holds installer
+// exclusion through qualification/publication. It never resets ownership proof.
+func (s *Store) BeginRepair(ctx context.Context, m Manifest) (*Candidate, error) {
+	return s.beginCandidate(ctx, m, true)
+}
+
+func (s *Store) beginCandidate(ctx context.Context, m Manifest, repair bool) (*Candidate, error) {
 	if err := m.Validate(); err != nil {
 		return nil, err
 	}
@@ -146,12 +178,20 @@ func (s *Store) BeginInstall(ctx context.Context, m Manifest) (*Candidate, error
 	}
 	var consumer *Consumer
 	err = s.withLock(func() error {
-		if _, err := s.selectedLocked(true); err != nil {
+		if repair {
+			if err := s.repairLocked(m); err != nil {
+				return err
+			}
+		} else if _, err := s.selectedLocked(true); err != nil {
 			return err
 		}
 		owner, err := s.claimLocked(m.Archive.SHA256, "candidate")
 		if err == nil {
-			consumer = &Consumer{store: s, manifest: m, claim: owner}
+			consumer = &Consumer{
+				store:    s,
+				manifest: m,
+				claim:    owner,
+			}
 		}
 		return err
 	})
@@ -161,7 +201,10 @@ func (s *Store) BeginInstall(ctx context.Context, m Manifest) (*Candidate, error
 		}
 		return nil, errors.Join(err, s.releaseOwner(operation))
 	}
-	return &Candidate{Consumer: consumer, operation: operation}, nil
+	return &Candidate{
+		Consumer:  consumer,
+		operation: operation,
+	}, nil
 }
 
 func (c *Candidate) Import(ctx context.Context, archive string) error {
@@ -228,11 +271,11 @@ func (s *Store) Uninstall(ctx context.Context) (result error) {
 	}
 	defer func() { result = errors.Join(result, s.releaseOwner(operation)) }()
 	err = s.withLock(func() error {
-		inv, err := s.inventoryLocked(true)
+		inv, err := s.inspectInventoryLocked(true)
 		if err != nil {
 			return err
 		}
-		if len(inv.processes) > 0 || len(inv.candidates) > 0 || len(inv.uses) > 0 || len(inv.reservations) > 0 {
+		if inv.inUse() {
 			return ErrInUse
 		}
 		if err := s.selectLocked(nil); err != nil {
@@ -249,4 +292,34 @@ func (s *Store) Uninstall(ctx context.Context) (result error) {
 		return err
 	}
 	return s.flushTrash()
+}
+
+func (s *Store) repairLocked(m Manifest) error {
+	inv, err := s.inspectInventoryLocked(true)
+	if err != nil {
+		return err
+	}
+	if inv.inUse() {
+		return ErrInUse
+	}
+	// A same-release rebuild cannot leave its old selection admitting startup
+	// consumers while those paths are retired. Preserve healthy other selections.
+	if inv.selectionError != nil || (inv.selected != nil && inv.selected.Archive.SHA256 == m.Archive.SHA256) {
+		if err := s.selectLocked(nil); err != nil {
+			return err
+		}
+	}
+	for id := range inv.generations {
+		if id != m.Archive.SHA256 && inv.generationErrors[id] == nil {
+			continue
+		}
+		if err := s.removeOwned(filepath.Join("generations", id)); err != nil {
+			return fmt.Errorf("runtime repair cleanup pending: %w", err)
+		}
+	}
+	return nil
+}
+
+func (inv inventory) inUse() bool {
+	return len(inv.processes) > 0 || len(inv.candidates) > 0 || len(inv.uses) > 0 || len(inv.reservations) > 0
 }
