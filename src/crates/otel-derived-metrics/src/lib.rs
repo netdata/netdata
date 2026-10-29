@@ -1,6 +1,7 @@
 //! Charts the OTel plugin derives itself, outside OTLP metrics ingestion:
-//! per-service request rate, errors and duration from spans, and the plugin's
-//! own ingest outcomes and derivation health (self-monitoring).
+//! per-service request rate, errors and duration from spans, per-service log
+//! records by severity, and the plugin's own ingest outcomes and derivation
+//! health (self-monitoring).
 //!
 //! [`DerivedMetrics`] owns one `netdata_plugin_metrics::Store` per chart
 //! family, each behind its own mutex, so recording from export requests never
@@ -10,10 +11,12 @@
 //! twice. The ingestor calls [`DerivedMetrics::emit`] once per second; the
 //! chunks it returns travel to the supervisor as chart data.
 
+mod logs;
 mod plugin;
 mod services;
 
-use netdata_plugin_metrics::{Batch, Stats, Store};
+use netdata_plugin_metrics::{Batch, Family, Stats, Store};
+use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use otel_bridge::config::DerivedMetricsConfig;
 use otel_bridge::signals::Signal;
@@ -27,33 +30,72 @@ pub const MAX_CHUNK_BYTES: usize = 1 << 20;
 /// The spans of one export request, recorded but not yet counted.
 pub struct SpansBatch(Batch);
 
+/// The log records of one export request, recorded but not yet counted.
+pub struct LogsBatch(Batch);
+
+/// The store of one per-service family and its counts at the previous tick,
+/// to chart per-second changes.
 struct ServiceStore {
-    services: services::Services,
     store: Mutex<Store>,
-    /// Store counts at the previous tick, to chart per-second changes.
     reported: Mutex<Stats>,
 }
 
+impl ServiceStore {
+    fn new(family: &Family) -> Self {
+        Self {
+            store: Mutex::new(Store::new(family.clone())),
+            reported: Mutex::new(Stats::default()),
+        }
+    }
+
+    fn commit(&self, batch: Batch) {
+        if !batch.is_empty() {
+            self.store.lock().unwrap().merge(batch, unix_now());
+        }
+    }
+
+    /// Render the finished slots into `chunks`; returns the counts before and
+    /// after.
+    fn emit(&self, now: u64, chunks: &mut Vec<Vec<u8>>) -> (Stats, Stats) {
+        let current = {
+            let mut store = self.store.lock().unwrap();
+            chunks.extend(store.emit(now, MAX_CHUNK_BYTES));
+            store.stats()
+        };
+        let previous = std::mem::replace(&mut *self.reported.lock().unwrap(), current);
+        (previous, current)
+    }
+}
+
+struct Enabled {
+    services: services::Services,
+    service_store: ServiceStore,
+    logs: logs::ServiceLogs,
+    logs_store: ServiceStore,
+}
+
 pub struct DerivedMetrics {
-    services: Option<ServiceStore>,
+    enabled: Option<Enabled>,
     plugin: plugin::Plugin,
     plugin_store: Mutex<Store>,
 }
 
 impl DerivedMetrics {
     pub fn new(config: &DerivedMetricsConfig) -> Self {
-        let services = config.enabled.then(|| {
+        let enabled = config.enabled.then(|| {
             let services = services::Services::new(config.max_services);
-            ServiceStore {
-                store: Mutex::new(Store::new(services.family.clone())),
+            let logs = logs::ServiceLogs::new(config.max_services);
+            Enabled {
+                service_store: ServiceStore::new(&services.family),
                 services,
-                reported: Mutex::new(Stats::default()),
+                logs_store: ServiceStore::new(&logs.family),
+                logs,
             }
         });
         let plugin = plugin::Plugin::new(config.enabled);
         let plugin_store = Mutex::new(Store::new(plugin.family.clone()));
         Self {
-            services,
+            enabled,
             plugin,
             plugin_store,
         }
@@ -62,8 +104,8 @@ impl DerivedMetrics {
     /// A batch for the spans of one export request; `None` when derived
     /// metrics are disabled.
     pub fn spans_batch(&self) -> Option<SpansBatch> {
-        let services = self.services.as_ref()?;
-        Some(SpansBatch(Batch::new(&services.services.family)))
+        let enabled = self.enabled.as_ref()?;
+        Some(SpansBatch(Batch::new(&enabled.services.family)))
     }
 
     /// Record the requests among the spans of `request`, a normalized group
@@ -74,17 +116,42 @@ impl DerivedMetrics {
         tenant: &str,
         request: &ExportTraceServiceRequest,
     ) {
-        if let Some(services) = &self.services {
-            services.services.record(&mut batch.0, tenant, request);
+        if let Some(enabled) = &self.enabled {
+            enabled.services.record(&mut batch.0, tenant, request);
         }
     }
 
     /// Count a batch once its spans are durable.
     pub fn commit_spans(&self, batch: SpansBatch) {
-        if let Some(services) = &self.services {
-            if !batch.0.is_empty() {
-                services.store.lock().unwrap().merge(batch.0, unix_now());
-            }
+        if let Some(enabled) = &self.enabled {
+            enabled.service_store.commit(batch.0);
+        }
+    }
+
+    /// A batch for the log records of one export request; `None` when
+    /// derived metrics are disabled.
+    pub fn logs_batch(&self) -> Option<LogsBatch> {
+        let enabled = self.enabled.as_ref()?;
+        Some(LogsBatch(Batch::new(&enabled.logs.family)))
+    }
+
+    /// Record the log records of `request`, a normalized group of an export
+    /// request of `tenant`.
+    pub fn record_logs(
+        &self,
+        batch: &mut LogsBatch,
+        tenant: &str,
+        request: &ExportLogsServiceRequest,
+    ) {
+        if let Some(enabled) = &self.enabled {
+            enabled.logs.record(&mut batch.0, tenant, request);
+        }
+    }
+
+    /// Count a batch once its log records are durable.
+    pub fn commit_logs(&self, batch: LogsBatch) {
+        if let Some(enabled) = &self.enabled {
+            enabled.logs_store.commit(batch.0);
         }
     }
 
@@ -100,17 +167,15 @@ impl DerivedMetrics {
     /// most [`MAX_CHUNK_BYTES`].
     pub fn emit(&self, now: u64) -> Vec<Vec<u8>> {
         let mut chunks = Vec::new();
-        if let Some(services) = &self.services {
-            let stats = {
-                let mut store = services.store.lock().unwrap();
-                chunks.extend(store.emit(now, MAX_CHUNK_BYTES));
-                store.stats()
-            };
-            let previous = std::mem::replace(&mut *services.reported.lock().unwrap(), stats);
-            let batch = self
-                .plugin
-                .derivation(Signal::Traces, &previous, &stats, now);
-            self.plugin_store.lock().unwrap().merge(batch, now);
+        if let Some(enabled) = &self.enabled {
+            for (signal, store) in [
+                (Signal::Traces, &enabled.service_store),
+                (Signal::Logs, &enabled.logs_store),
+            ] {
+                let (previous, current) = store.emit(now, &mut chunks);
+                let batch = self.plugin.derivation(signal, &previous, &current, now);
+                self.plugin_store.lock().unwrap().merge(batch, now);
+            }
         }
         chunks.extend(self.plugin_store.lock().unwrap().emit(now, MAX_CHUNK_BYTES));
         chunks

@@ -436,6 +436,7 @@ modules:
               chart_type: line
               dimensions:
                 - name: traces
+                - name: logs
             - name: netdata.otel.derived_adjusted_records
               description: |
                 Records counted in a different time slot or chart set: late (older than the open time slots), future (newer than the current time), or overflowed (from a service over the maximum number of services).
@@ -445,15 +446,19 @@ modules:
                 - name: traces_late
                 - name: traces_future
                 - name: traces_overflowed
+                - name: logs_late
+                - name: logs_future
+                - name: logs_overflowed
             - name: netdata.otel.derived_expired_services
               description: Services whose derived charts were removed after 15 minutes without data.
               unit: services/s
               chart_type: line
               dimensions:
                 - name: traces
+                - name: logs
         - name: service
           description: |
-            These metrics are made from the spans of each service. A request is a span that starts a trace, or a span of kind SERVER or CONSUMER. A request failed when its span status is ERROR. A request counts at the time it ends. The charts show data with a delay of 10 seconds, so that spans that arrive late are still counted in the correct second. Spans sampled with an OpenTelemetry sampling threshold (`ot=th` in the trace state) count for the number of spans that they represent.
+            These metrics are made from the spans and log records of each service. A request is a span that starts a trace, or a span of kind SERVER or CONSUMER. A request failed when its span status is ERROR. A request counts at the time it ends. Spans sampled with an OpenTelemetry sampling threshold (`ot=th` in the trace state) count for the number of spans that they represent. A log record counts at its own time, in the severity range of its severity number; a record without a severity number counts as `unspecified`. The charts show data with a delay of 10 seconds, so that data that arrives late is still counted in the correct second.
           labels:
             - name: resource.attributes.service.name
               description: The `service.name` resource attribute, or `unknown_service` when it is not set.
@@ -500,3 +505,15 @@ modules:
                 - name: "7.5"
                 - name: "10"
                 - name: "+Inf"
+            - name: otel_service.log_records
+              description: Log records of the service, by severity.
+              unit: records/s
+              chart_type: stacked
+              dimensions:
+                - name: fatal
+                - name: error
+                - name: warn
+                - name: info
+                - name: debug
+                - name: trace
+                - name: unspecified

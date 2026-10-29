@@ -14,7 +14,8 @@ const LATE: usize = 0;
 const FUTURE: usize = 1;
 const OVERFLOWED: usize = 2;
 
-/// Charts of the derivation of one signal's per-service metrics.
+/// Cells of the derivation health of one signal's per-service metrics.
+#[derive(Clone, Copy)]
 struct Derivation {
     services: Gauge,
     adjusted: Counter,
@@ -25,8 +26,18 @@ pub(crate) struct Plugin {
     pub(crate) family: Family,
     spans: Counter,
     log_records: Counter,
-    traces: Option<Derivation>,
+    /// Traces, then logs; `None` when derived metrics are disabled.
+    derivations: Option<[Derivation; 2]>,
 }
+
+fn signal_index(signal: Signal) -> usize {
+    match signal {
+        Signal::Traces => 0,
+        Signal::Logs => 1,
+    }
+}
+
+const SIGNALS: [&str; 2] = ["traces", "logs"];
 
 impl Plugin {
     pub(crate) fn new(derived_enabled: bool) -> Self {
@@ -59,12 +70,22 @@ impl Plugin {
                 log_records.rate("rejected", REJECTED),
             ],
         });
-        let traces = derived_enabled.then(|| {
-            let traces = Derivation {
+        let derivations = derived_enabled.then(|| {
+            let derivations = [(); 2].map(|()| Derivation {
                 services: b.gauge(),
                 adjusted: b.counter(3),
                 expired: b.counter(1),
-            };
+            });
+            let mut services = Vec::new();
+            let mut adjusted = Vec::new();
+            let mut expired = Vec::new();
+            for (d, signal) in derivations.iter().zip(SIGNALS) {
+                services.push(d.services.value(signal));
+                adjusted.push(d.adjusted.rate(&format!("{signal}_late"), LATE));
+                adjusted.push(d.adjusted.rate(&format!("{signal}_future"), FUTURE));
+                adjusted.push(d.adjusted.rate(&format!("{signal}_overflowed"), OVERFLOWED));
+                expired.push(d.expired.rate(signal, 0));
+            }
             b.chart(ChartSpec {
                 id: "derived_services",
                 title: "Services with derived charts",
@@ -73,7 +94,7 @@ impl Plugin {
                 context: "netdata.otel.derived_services",
                 chart_type: ChartType::Line,
                 priority: 150_010,
-                dimensions: vec![traces.services.value("traces")],
+                dimensions: services,
             });
             b.chart(ChartSpec {
                 id: "derived_adjusted_records",
@@ -83,11 +104,7 @@ impl Plugin {
                 context: "netdata.otel.derived_adjusted_records",
                 chart_type: ChartType::Stacked,
                 priority: 150_011,
-                dimensions: vec![
-                    traces.adjusted.rate("traces_late", LATE),
-                    traces.adjusted.rate("traces_future", FUTURE),
-                    traces.adjusted.rate("traces_overflowed", OVERFLOWED),
-                ],
+                dimensions: adjusted,
             });
             b.chart(ChartSpec {
                 id: "derived_expired_services",
@@ -97,15 +114,15 @@ impl Plugin {
                 context: "netdata.otel.derived_expired_services",
                 chart_type: ChartType::Line,
                 priority: 150_012,
-                dimensions: vec![traces.expired.rate("traces", 0)],
+                dimensions: expired,
             });
-            traces
+            derivations
         });
         Self {
             family: b.build(),
             spans,
             log_records,
-            traces,
+            derivations,
         }
     }
 
@@ -132,11 +149,8 @@ impl Plugin {
         now: u64,
     ) -> Batch {
         let mut batch = Batch::new(&self.family);
-        let derivation = match signal {
-            Signal::Traces => self.traces.as_ref(),
-            Signal::Logs => None,
-        };
-        if let Some(d) = derivation {
+        if let Some(derivations) = &self.derivations {
+            let d = derivations[signal_index(signal)];
             let delta = |current: u64, previous: u64| current.saturating_sub(previous) as f64;
             let instance = batch.instance(Labels::new());
             batch
@@ -211,7 +225,11 @@ mod tests {
         );
         let out = String::from_utf8(store.emit(101, usize::MAX).concat()).unwrap();
         netdata_plugin_protocol::validate_chart_stream(out.as_bytes()).unwrap();
-        assert!(out.contains("BEGIN otel_plugin.derived_services 1000000\nSET traces = 3\n"));
+        assert!(
+            out.contains(
+                "BEGIN otel_plugin.derived_services 1000000\nSET traces = 3\nSET logs =\n"
+            )
+        );
         assert!(
             out.contains("SET traces_late = 2\nSET traces_future = 1\nSET traces_overflowed = 4\n")
         );

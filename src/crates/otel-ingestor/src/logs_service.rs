@@ -678,15 +678,27 @@ impl NetdataLogsService {
         };
         let mut out_of_window: usize = 0;
         let mut prepared = Vec::with_capacity(accepted.len());
+        // Derived metrics see each stream after normalization (kept records,
+        // resolved times) and are counted only once the records are durable.
+        let mut derived_batch = self.derived.as_ref().and_then(|d| d.logs_batch());
         for s in accepted {
             let request = ExportLogsServiceRequest {
                 resource_logs: s.group.resource_logs,
             };
-            let frame = ng_flatten::prepare_log_frame(request, fallback_base_ns, Some(bounds))
-                .map_err(|e| {
-                    tracing::error!(%e, "failed to encode flattened frame");
-                    Status::internal("flatten encode error")
-                })?;
+            let frame = ng_flatten::prepare_log_frame_with(
+                request,
+                fallback_base_ns,
+                Some(bounds),
+                |request| {
+                    if let (Some(derived), Some(batch)) = (&self.derived, derived_batch.as_mut()) {
+                        derived.record_logs(batch, tenant_id.as_str(), request);
+                    }
+                },
+            )
+            .map_err(|e| {
+                tracing::error!(%e, "failed to encode flattened frame");
+                Status::internal("flatten encode error")
+            })?;
             out_of_window += frame.rejected;
             // Every record in this stream fell outside the ingestion window:
             // nothing to write. Skip it (the write path below assumes each
@@ -796,6 +808,9 @@ impl NetdataLogsService {
             // borrows it, so clone here — the last use of the id in this
             // request either way.
             self.sender.send_events(tenant_id.clone(), events);
+        }
+        if let (Some(derived), Some(batch)) = (&self.derived, derived_batch) {
+            derived.commit_logs(batch);
         }
 
         Ok(ExportLogsServiceResponse {
@@ -1541,6 +1556,80 @@ mod tests {
                 .contains_key(&TenantId::default_tenant()),
             "the in-window record must still be written",
         );
+    }
+
+    #[tokio::test]
+    async fn derived_metrics_count_stored_records_by_severity() {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+        let derived = Arc::new(DerivedMetrics::new(
+            &otel_bridge::config::DerivedMetricsConfig::default(),
+        ));
+        let tmp = tempfile::tempdir().unwrap();
+        let mut service = test_service_with_ingest(
+            tmp.path().to_path_buf(),
+            otel_bridge::config::IngestConfig {
+                max_age: std::time::Duration::from_secs(3600),
+                future_skew: std::time::Duration::from_secs(60),
+            },
+        );
+        service.set_derived_metrics(Arc::clone(&derived));
+        let mut r = rl(Some("prod"), Some("api"), 3);
+        r.scope_logs[0].log_records[0].time_unix_nano = now;
+        r.scope_logs[0].log_records[0].severity_number = 17;
+        r.scope_logs[0].log_records[1].time_unix_nano = now;
+        r.scope_logs[0].log_records[1].severity_number = 9;
+        // Too old: rejected, not counted for the service.
+        r.scope_logs[0].log_records[2].time_unix_nano = now - 2 * 3600 * 1_000_000_000;
+        service
+            .export_logs(
+                &TenantId::default_tenant(),
+                ExportLogsServiceRequest {
+                    resource_logs: vec![r],
+                },
+            )
+            .await
+            .unwrap();
+
+        // The WAL cannot be created: nothing counted.
+        let blocked = tmp.path().join("not-a-dir");
+        std::fs::write(&blocked, b"").unwrap();
+        let mut service = test_service(blocked);
+        service.set_derived_metrics(Arc::clone(&derived));
+        let mut r = rl(Some("prod"), Some("api"), 4);
+        for record in &mut r.scope_logs[0].log_records {
+            record.time_unix_nano = now;
+            record.severity_number = 17;
+        }
+        assert!(
+            service
+                .export_logs(
+                    &TenantId::default_tenant(),
+                    ExportLogsServiceRequest {
+                        resource_logs: vec![r],
+                    },
+                )
+                .await
+                .is_err()
+        );
+
+        let out = String::from_utf8(derived.emit(now / 1_000_000_000 + 13).concat()).unwrap();
+        netdata_plugin_protocol::validate_chart_stream(out.as_bytes()).unwrap();
+        let sum = |dimension: &str| -> f64 {
+            let prefix = format!("SET {dimension} = ");
+            out.lines()
+                .filter_map(|l| l.strip_prefix(&prefix))
+                .map(|v| v.parse::<f64>().unwrap())
+                .sum()
+        };
+        assert_eq!(sum("error"), 1.0);
+        assert_eq!(sum("info"), 1.0);
+        assert_eq!(sum("accepted"), 2.0);
+        assert_eq!(sum("rejected"), 1.0);
+        assert!(out.contains("CLABEL 'resource.attributes.service.namespace' 'prod' 1"));
+        assert!(out.contains("'otel_service.log_records'"));
     }
 
     #[tokio::test]
