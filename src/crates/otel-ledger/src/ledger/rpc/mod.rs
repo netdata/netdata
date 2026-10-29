@@ -89,7 +89,7 @@ pub(crate) fn patch_args_into_payload(args: &[String], payload: Option<&[u8]>) -
 /// PRESENCE of the literal `info` token synthesizes the strict `{"info": {}}`
 /// selector regardless of any other tokens; anything else synthesizes
 /// NOTHING — a traces GET data call reaches the bridge with no payload,
-/// which it deserializes from `{}` (`netdata-plugin/bridge/src/function.rs`
+/// which it deserializes from `{}` (`otel-bridge/src/function.rs`
 /// `HandlerAdapter::handle_raw`) into the selector-less
 /// `TracesMode::Functions` default view (every param has a serde
 /// default, `last` via a custom `default_limit` fn), silently dropping

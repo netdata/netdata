@@ -37,8 +37,8 @@ Path conventions: internal C plugins → `src/collectors/<name>.plugin/`; Go orc
 - **ibm.d** (CGO, IBM-vendor workloads) — use the ibm.d framework with `go generate` after touching `contexts.yaml`. See
   `src/go/plugin/ibm.d/AGENTS.md`. Don't reach for ibm.d for non-IBM CGO needs — the framework is shaped around vendor
   drivers; CGO outside the IBM ecosystem is a design discussion.
-- **Rust SDK** at `src/crates/netdata-plugin/` — modules `bridge/`, `protocol/`, `rt/`, `charts-derive/`, `schema/`,
-  `types/`, `error/`. Documentation lives in `lib.rs` doc-comments — there is no README. New Rust crates go into the
+- **Rust SDK** at `src/crates/netdata-plugin/` — modules `protocol/`, `rt/`, `charts-derive/`, `schema/`, `types/`,
+  `error/`. Documentation lives in `lib.rs` doc-comments — there is no README. New Rust crates go into the
   `src/crates/Cargo.toml` workspace. Reference impl: `src/crates/netflow-plugin/`. When to call
   `PluginRuntime::run()` at startup: its doc-comment and `src/plugins.d/README.md#operation`.
 - **Internal C plugins** — mirror an adjacent collector under `src/collectors/<name>.plugin/`; reuse `src/libnetdata/`.

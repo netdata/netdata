@@ -20,7 +20,7 @@ members = [
     "netdata-plugin/rt",
     "netdata-plugin/schema",
     "netdata-plugin/types",
-    "netdata-plugin/bridge",
+    "otel-bridge",
     "netdata-plugin/charts-derive",
 
     # Netdata OTEL workspace members
@@ -82,7 +82,7 @@ hdrhistogram = { version = "7.5" }
 hyper-util = "0.1"
 indexmap = "2.9"
 journal-log-writer = { path = "journal-log-writer" }
-bridge = { path = "netdata-plugin/bridge" }
+bridge = { path = "otel-bridge" }
 netdata-plugin-charts-derive = { path = "netdata-plugin/charts-derive" }
 netdata-plugin-rt = { path = "netdata-plugin/rt" }
 netdata-plugin-types = { path = "netdata-plugin/types" }

@@ -475,7 +475,7 @@ than copying go.d wiring or applying the new-go.d V2 mandate to it.
 | Topology Function schema & guide | topology actors, links, evidence, overlays | `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json`, `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md`, `src/plugins.d/FUNCTION_TOPOLOGY_IMPLEMENTATION_SCOPE.md` |
 | Functions validator | E2E + schema validation | `src/go/tools/functions-validation/README.md` |
 | ibm.d framework | starting `ibm.d` work | `src/go/plugin/ibm.d/AGENTS.md`, `src/go/plugin/ibm.d/framework/README.md` |
-| Rust plugin SDK | new Rust plugin | `src/crates/netdata-plugin/` (`rt/`, `protocol/`, `bridge/`, `charts-derive/`, `schema/`, `types/`, `error/`) |
+| Rust plugin SDK | new Rust plugin | `src/crates/netdata-plugin/` (`rt/`, `protocol/`, `charts-derive/`, `schema/`, `types/`, `error/`) |
 | Rust NetFlow plugin | NetFlow / sFlow / IPFIX work | `src/crates/netflow-plugin/` |
 | OTEL ingestion mappings | per-metric YAML routing | `src/crates/otel-ingestor/` (configs under `configs/otel.d/v1/metrics/`) |
 | SNMP profiles | adding/extending an SNMP profile or trap profile | `.agents/skills/collectors-snmp-profiles/SKILL.md`, `.agents/skills/collectors-snmp-trap-profiles/SKILL.md`; format spec: `src/go/plugin/go.d/collector/snmp/profile-format.md` |

@@ -46,7 +46,7 @@ type LegacyLogsResponseBody = netdata::JournalResponse;
 /// (`netdata-plugin/rt/src/lib.rs` `handle_function_call`), but the
 /// logs UI issues this function the same GET way, and the bridge builds the
 /// typed request from the payload alone
-/// (`netdata-plugin/bridge/src/function.rs` `HandlerAdapter::handle_raw`) —
+/// (`otel-bridge/src/function.rs` `HandlerAdapter::handle_raw`) —
 /// so without this translation GET args would never reach `JournalRequest`.
 /// Returns `None` when there are no args or a payload already exists (the
 /// caller then keeps the original).

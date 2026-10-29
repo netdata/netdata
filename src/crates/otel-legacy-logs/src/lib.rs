@@ -247,7 +247,7 @@ impl LegacyLogs {
     /// Handle a `Call`: unknown function names get an inline 404 result; known
     /// ones spawn a function-handler task. The bridge engine owns JSON
     /// (de)serialization, progress reporting, and cancellation
-    /// (`netdata-plugin/bridge/src/function.rs` `HandlerAdapter`).
+    /// (`otel-bridge/src/function.rs` `HandlerAdapter`).
     fn dispatch_function_call(
         &mut self,
         transaction: String,

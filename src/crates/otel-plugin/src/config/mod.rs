@@ -377,7 +377,7 @@ fn validate_listener(prefix: &str, listener: &ProtocolConfig) -> Result<()> {
 /// enabled, each enabled one must pass [`validate_listener`], and two enabled
 /// listeners must not overlap (two listeners cannot bind one socket); and each
 /// signal's retention must satisfy the catalog-horizon invariant
-/// (`netdata-plugin/bridge/src/config.rs` `RetentionPolicy::validate`).
+/// (`otel-bridge/src/config.rs` `RetentionPolicy::validate`).
 fn validate(config: &PluginConfig) -> Result<()> {
     if config.base_dir.as_os_str().is_empty() {
         anyhow::bail!("base_dir must be set (the mandatory root for all signal storage)");

@@ -14,7 +14,7 @@
 //! a setting at its stock default. Only `load_config` (`mod.rs`) consumes
 //! this module; the workers receive the merged effective config over IPC.
 //!
-//! `bridge::config` here is the shared `netdata-plugin/bridge` crate, whose
+//! `bridge::config` here is the `bridge` crate (`otel-bridge/`), whose
 //! `RotationEntry`/`RetentionEntry` shapes the per-signal values fill.
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};

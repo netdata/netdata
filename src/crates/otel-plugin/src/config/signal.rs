@@ -2,7 +2,7 @@
 //! global `remote_storage`/`auth` sections of otel.yaml — the shapes both
 //! override layers fill: the user YAML (parsed in `mod.rs`) and the
 //! `NETDATA_OTEL_CFG_*` environment (built in `env.rs`). The target types come
-//! from `bridge::config`, the shared `netdata-plugin/bridge` crate.
+//! from `bridge::config`, the `bridge` crate (`otel-bridge/`).
 //!
 //! Per-signal sections carry tuning only — no dirs (derived from `base_dir`) and
 //! no storage (global) — and there is no per-signal on/off. The same

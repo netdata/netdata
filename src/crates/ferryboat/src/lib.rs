@@ -147,7 +147,7 @@
 //! so enum variant order, field shapes, and the compression flag are
 //! cross-process contracts: both ends of a link must be built from the same
 //! type definitions and the same builder settings. The supervisor↔worker
-//! message contracts live in `netdata-plugin/bridge/src/lib.rs`; the socket
+//! message contracts live in `otel-bridge/src/lib.rs`; the socket
 //! lifecycle (bind, accept, stale-file removal, pipe instance handling) in
 //! `transport/unix.rs` and `transport/windows.rs`.
 //!
