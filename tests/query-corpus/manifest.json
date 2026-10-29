@@ -421,6 +421,14 @@
     "proves": "jsonwrap-v2 per-dimension anomaly arrays: view.dimensions.sts.arp = mean of the plotted rows' anomaly rates, db.dimensions.sts.arp = anomaly rate of the fetched db points; stored NAN gap points are excluded from BOTH counts"
   },
   {
+    "name": "L5/anomaly-statistics-percentage",
+    "proves": "options=percentage changes the plotted values only: view.dimensions.sts.arp stays the mean of the plotted rows' anomaly rates"
+  },
+  {
+    "name": "L5/summary-node-duration",
+    "proves": "jsonwrap-v2 summary.nodes[].st.ms reports every queried node's query time, the last (or only) node included: present, positive and within timings.total_ms"
+  },
+  {
     "name": "L5/multi-key-group-by",
     "proves": "multi-key group_by: groups are attribute TUPLES, ids join in the FIXED engine order (dimension, instance, label, node, context, units) regardless of request order; instance drops @node when node is in the mask; selected and percentage-of-instance collapse rules; avg alias; unknown aggregation silently parses to average"
   },

@@ -319,3 +319,43 @@ func TestAnomalyBitTierRates(t *testing.T) {
 		}
 	}
 }
+
+// TestAnomalyStsArraysPercentage: options=percentage rescales the VALUES to
+// a share of the row total; it does not touch the anomaly rates, so the
+// view.dimensions.sts.arp of the plain query (the mean of the plotted rows'
+// anomaly rates) holds unchanged.
+func TestAnomalyStsArraysPercentage(t *testing.T) {
+	trackContract(t, "L5/anomaly-statistics-percentage")
+
+	ch := abFixture()
+	pushLiveBurst(t, "anom-sts-pct", guid(13100), ch)
+	if _, err := td.WaitRetention("anom-sts-pct", abContext, ch.FirstT(), ch.LastT(), 15*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	params := daemon.DataParams(abContext, fixture.T0, fixture.T0+60, 60)
+	params.Set("options", "jsonwrap|percentage")
+	doc, err := td.DataV3("anom-sts-pct", params)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// aa: 10 anomalous rows of 55 present; bb: 20 of 60
+	wantView := map[string]float64{
+		"aa": 100.0 * 10 / 55,
+		"bb": 100.0 * 20 / 60,
+	}
+	view, viewOK := strictDimensionStats(t, doc, "view", keys2(wantView), []string{"arp"})
+	if !viewOK {
+		t.Errorf("view anomaly statistics are malformed")
+	}
+	for id, want := range wantView {
+		got, ok := view[id]["arp"]
+		if !ok {
+			t.Errorf("view sts arp missing for %q (have %v)", id, view[id])
+			continue
+		}
+		if !tierValueMatch(got, want, 1e-9) {
+			t.Errorf("view arp[%s] = %v, want %v", id, got, want)
+		}
+	}
+}
