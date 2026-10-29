@@ -1448,7 +1448,8 @@ jobs:
         if: needs.file-check.outputs.run == 'true' && matrix.name == 'macos-15-M1'
         timeout-minutes: 5
         run: |
-          ./tests/spawn-server-tests.sh
+          sudo cmake --build "${NETDATA_BUILD_DIR:-./build}" --target spawn-tester || exit 1
+          ./tests/spawn-server-tests.sh || exit 1
       - name: Test Agent start up
         id: test-agent
         if: needs.file-check.outputs.run == 'true'
