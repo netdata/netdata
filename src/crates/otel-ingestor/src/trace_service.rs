@@ -376,12 +376,24 @@ impl NetdataTracesService {
         };
         let mut out_of_window: usize = 0;
         let mut prepared = Vec::with_capacity(groups.len());
+        // Derived metrics see each group after normalization (kept spans,
+        // resolved times) and are counted only once the spans are durable.
+        let mut derived_batch = self.derived.as_ref().and_then(|d| d.spans_batch());
         for g in groups {
-            let frame = ng_flatten::prepare_trace_frame(g.request, fallback_base_ns, Some(bounds))
-                .map_err(|e| {
-                    tracing::error!(%e, "failed to encode flattened trace frame");
-                    Status::internal("flatten encode error")
-                })?;
+            let frame = ng_flatten::prepare_trace_frame_with(
+                g.request,
+                fallback_base_ns,
+                Some(bounds),
+                |request| {
+                    if let (Some(derived), Some(batch)) = (&self.derived, derived_batch.as_mut()) {
+                        derived.record_spans(batch, tenant_id.as_str(), request);
+                    }
+                },
+            )
+            .map_err(|e| {
+                tracing::error!(%e, "failed to encode flattened trace frame");
+                Status::internal("flatten encode error")
+            })?;
             out_of_window += frame.rejected;
             // Every span in this group fell outside the ingestion window:
             // nothing to write for it.
@@ -492,6 +504,9 @@ impl NetdataTracesService {
 
         for observation in observations {
             observation.commit();
+        }
+        if let (Some(derived), Some(batch)) = (&self.derived, derived_batch) {
+            derived.commit_spans(batch);
         }
 
         Ok(ExportTraceServiceResponse {
@@ -632,6 +647,72 @@ mod tests {
         fn commit(self: Box<Self>) {
             self.committed.lock().unwrap().push(self.tenant);
         }
+    }
+
+    /// Sums every `SET <dimension> = <value>` line of a rendered stream.
+    fn sum_of(out: &str, dimension: &str) -> f64 {
+        let prefix = format!("SET {dimension} = ");
+        out.lines()
+            .filter_map(|l| l.strip_prefix(&prefix))
+            .map(|v| v.parse::<f64>().unwrap())
+            .sum()
+    }
+
+    #[tokio::test]
+    async fn derived_metrics_count_stored_spans_only() {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+        let tenant = TenantId::default_tenant();
+        let derived = Arc::new(DerivedMetrics::new(
+            &otel_bridge::config::DerivedMetricsConfig::default(),
+        ));
+        let tmp = tempfile::tempdir().unwrap();
+
+        // Stored: three root spans count as three requests.
+        let mut service = test_service(tmp.path().to_path_buf());
+        service.set_derived_metrics(Arc::clone(&derived));
+        service
+            .export_traces(&tenant, spans_req(3, now))
+            .await
+            .unwrap();
+
+        // Outside the ingestion window: rejected, not requests.
+        let mut service = test_service_with_ingest(
+            tmp.path().to_path_buf(),
+            otel_bridge::config::IngestConfig {
+                max_age: std::time::Duration::from_secs(60),
+                future_skew: std::time::Duration::from_secs(60),
+            },
+        );
+        service.set_derived_metrics(Arc::clone(&derived));
+        service
+            .export_traces(&tenant, spans_req(2, now - 7_200_000_000_000))
+            .await
+            .unwrap();
+
+        // The WAL cannot be created: nothing counted, so a retry is not
+        // counted twice.
+        let blocked = tmp.path().join("not-a-dir");
+        std::fs::write(&blocked, b"").unwrap();
+        let mut service = test_service(blocked);
+        service.set_derived_metrics(Arc::clone(&derived));
+        assert!(
+            service
+                .export_traces(&tenant, spans_req(5, now))
+                .await
+                .is_err()
+        );
+
+        // Past the services' 10 s lateness.
+        let out = String::from_utf8(derived.emit(now / 1_000_000_000 + 13).concat()).unwrap();
+        netdata_plugin_protocol::validate_chart_stream(out.as_bytes()).unwrap();
+        assert_eq!(sum_of(&out, "success"), 3.0);
+        assert_eq!(sum_of(&out, "error"), 0.0);
+        assert!(out.contains("CLABEL 'resource.attributes.service.name' 'unknown_service' 1"));
+        assert_eq!(sum_of(&out, "accepted"), 3.0);
+        assert_eq!(sum_of(&out, "rejected"), 2.0);
     }
 
     #[tokio::test]

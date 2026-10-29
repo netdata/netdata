@@ -381,9 +381,22 @@ pub struct PreparedTraceFrame {
 /// sanitized keys) — one owner for the message text too; the counts are
 /// still returned for callers that want them.
 pub fn prepare_trace_frame(
+    req: ExportTraceServiceRequest,
+    fallback_base_ns: u64,
+    bounds: Option<TimeBounds>,
+) -> Result<PreparedTraceFrame, bincode::error::EncodeError> {
+    prepare_trace_frame_with(req, fallback_base_ns, bounds, |_| {})
+}
+
+/// [`prepare_trace_frame`] that also shows the request to `visit` once, after
+/// normalization and before flattening, when at least one span was kept:
+/// `visit` sees exactly the stored population with resolved timestamps
+/// (out-of-window spans removed). The OTel ingestor derives its metrics here.
+pub fn prepare_trace_frame_with(
     mut req: ExportTraceServiceRequest,
     fallback_base_ns: u64,
     bounds: Option<TimeBounds>,
+    visit: impl FnOnce(&ExportTraceServiceRequest),
 ) -> Result<PreparedTraceFrame, bincode::error::EncodeError> {
     let norm = normalize_trace_request(&mut req, fallback_base_ns, bounds);
     // Nothing to flatten or encode without kept spans: callers skip writing
@@ -401,6 +414,7 @@ pub fn prepare_trace_frame(
             rejected: norm.rejected,
         });
     }
+    visit(&req);
     if norm.bad_ids.any() {
         tracing::warn!(
             bad_trace_ids = norm.bad_ids.trace,

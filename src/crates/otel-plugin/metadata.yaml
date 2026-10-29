@@ -430,3 +430,73 @@ modules:
               dimensions:
                 - name: accepted
                 - name: rejected
+            - name: netdata.otel.derived_services
+              description: Services that have their own derived charts, the overflow chart set included.
+              unit: services
+              chart_type: line
+              dimensions:
+                - name: traces
+            - name: netdata.otel.derived_adjusted_records
+              description: |
+                Records counted in a different time slot or chart set: late (older than the open time slots), future (newer than the current time), or overflowed (from a service over the maximum number of services).
+              unit: records/s
+              chart_type: stacked
+              dimensions:
+                - name: traces_late
+                - name: traces_future
+                - name: traces_overflowed
+            - name: netdata.otel.derived_expired_services
+              description: Services whose derived charts were removed after 15 minutes without data.
+              unit: services/s
+              chart_type: line
+              dimensions:
+                - name: traces
+        - name: service
+          description: |
+            These metrics are made from the spans of each service. A request is a span that starts a trace, or a span of kind SERVER or CONSUMER. A request failed when its span status is ERROR. A request counts at the time it ends. The charts show data with a delay of 10 seconds, so that spans that arrive late are still counted in the correct second. Spans sampled with an OpenTelemetry sampling threshold (`ot=th` in the trace state) count for the number of spans that they represent.
+          labels:
+            - name: resource.attributes.service.name
+              description: The `service.name` resource attribute, or `unknown_service` when it is not set.
+            - name: resource.attributes.service.namespace
+              description: The `service.namespace` resource attribute. Not present when it is not set.
+            - name: resource.attributes.deployment.environment.name
+              description: The `deployment.environment.name` resource attribute, or the older `deployment.environment`. Not present when neither is set.
+            - name: tenant
+              description: The tenant of the sender (`default` when tenant authentication is disabled).
+            - name: otel.metric.overflow
+              description: Set to `true` only on the chart set that holds the services over `derived_metrics.max_services`.
+          metrics:
+            - name: otel_service.requests
+              description: Requests of the service, by outcome.
+              unit: requests/s
+              chart_type: stacked
+              dimensions:
+                - name: success
+                - name: error
+            - name: otel_service.request_duration
+              description: Average and maximum request duration.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: avg
+                - name: max
+            - name: otel_service.request_duration_histogram
+              description: Requests by duration. Each dimension is the upper limit of a duration bucket, in seconds.
+              unit: requests/s
+              chart_type: heatmap
+              dimensions:
+                - name: "0.005"
+                - name: "0.01"
+                - name: "0.025"
+                - name: "0.05"
+                - name: "0.075"
+                - name: "0.1"
+                - name: "0.25"
+                - name: "0.5"
+                - name: "0.75"
+                - name: "1"
+                - name: "2.5"
+                - name: "5"
+                - name: "7.5"
+                - name: "10"
+                - name: "+Inf"

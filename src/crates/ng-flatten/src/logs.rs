@@ -411,9 +411,22 @@ pub struct PreparedLogFrame {
 /// sanitized keys) — one owner for the message text too; the counts are still
 /// returned for callers that want them.
 pub fn prepare_log_frame(
+    req: ExportLogsServiceRequest,
+    fallback_base_ns: u64,
+    bounds: Option<TimeBounds>,
+) -> Result<PreparedLogFrame, bincode::error::EncodeError> {
+    prepare_log_frame_with(req, fallback_base_ns, bounds, |_| {})
+}
+
+/// [`prepare_log_frame`] that also shows the request to `visit` once, after
+/// normalization and before flattening, when at least one record was kept:
+/// `visit` sees exactly the stored population with resolved timestamps
+/// (out-of-window records removed). The OTel ingestor derives its metrics here.
+pub fn prepare_log_frame_with(
     mut req: ExportLogsServiceRequest,
     fallback_base_ns: u64,
     bounds: Option<TimeBounds>,
+    visit: impl FnOnce(&ExportLogsServiceRequest),
 ) -> Result<PreparedLogFrame, bincode::error::EncodeError> {
     let norm = normalize_log_request(&mut req, fallback_base_ns, bounds);
     // Nothing to flatten or encode without kept records; callers skip writing
@@ -431,6 +444,7 @@ pub fn prepare_log_frame(
             rejected: norm.rejected,
         });
     }
+    visit(&req);
     if norm.bad_ids.any() {
         tracing::warn!(
             bad_trace_ids = norm.bad_ids.trace,

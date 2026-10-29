@@ -10,6 +10,7 @@ workspace = true
 [dependencies]
 netdata-plugin-metrics = { workspace = true }
 otel-bridge = { workspace = true }
+opentelemetry-proto = { workspace = true }
 
 [dev-dependencies]
 netdata-plugin-protocol = { workspace = true, features = ["test-support"] }

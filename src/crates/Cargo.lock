@@ -3687,6 +3687,7 @@ version = "0.1.3"
 dependencies = [
  "netdata-plugin-metrics",
  "netdata-plugin-protocol",
+ "opentelemetry-proto",
  "otel-bridge",
 ]
 
@@ -3703,6 +3704,7 @@ dependencies = [
  "flatten-otel",
  "http",
  "http-body-util",
+ "netdata-plugin-protocol",
  "netdata-plugin-types",
  "ng-flatten",
  "opentelemetry-proto",

@@ -52,6 +52,7 @@ uuid = { workspace = true }
 
 [dev-dependencies]
 bytesize = { workspace = true }
+netdata-plugin-protocol = { workspace = true, features = ["test-support"] }
 # TLS listener tests: certificates generated per run, the test client config,
 # and the process crypto provider the otel-plugin binary installs at startup.
 rcgen = { workspace = true }
