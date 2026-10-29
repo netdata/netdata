@@ -76,6 +76,91 @@ web_client_test_payload_request(const char *method, size_t payload_length, size_
     return request;
 }
 
+int web_client_registry_cookie_unittest(void)
+{
+    fprintf(stderr, "\n%s() running...\n", __FUNCTION__);
+
+#define REGISTRY_COOKIE_TEST_OURS   "b5dd255b-a36c-44ad-a598-115c1e06b964"
+#define REGISTRY_COOKIE_TEST_OTHER  "38992aab-c97a-490c-b9f7-660b0d78965b"
+
+    static const struct {
+        const char *request;
+        const char *expected;
+    } cases[] = {
+        {
+            "GET /api/v1/registry?action=hello HTTP/1.1\r\n"
+            "Cookie: netdata_registry_id=" REGISTRY_COOKIE_TEST_OURS "\r\n\r\n",
+            REGISTRY_COOKIE_TEST_OURS,
+        },
+        {
+            "GET /api/v1/registry?action=access&x=netdata_registry_id=" REGISTRY_COOKIE_TEST_OTHER " HTTP/1.1\r\n"
+            "Cookie: netdata_registry_id=" REGISTRY_COOKIE_TEST_OURS "\r\n\r\n",
+            REGISTRY_COOKIE_TEST_OURS,
+        },
+        {
+            "GET /api/v1/registry?action=access&x=netdata_registry_id=" REGISTRY_COOKIE_TEST_OTHER " HTTP/1.1\r\n\r\n",
+            "",
+        },
+        {
+            "GET /api/v1/registry?action=access HTTP/1.1\r\n"
+            "Referer: http://example.com/?netdata_registry_id=" REGISTRY_COOKIE_TEST_OTHER "\r\n\r\n",
+            "",
+        },
+        {
+            "GET /api/v1/registry?action=access HTTP/1.1\r\n"
+            "Cookie: a=1; netdata_registry_id=" REGISTRY_COOKIE_TEST_OURS "; b=2\r\n\r\n",
+            REGISTRY_COOKIE_TEST_OURS,
+        },
+        {
+            "GET /api/v1/registry?action=access HTTP/1.1\r\n"
+            "Cookie: other_netdata_registry_id=" REGISTRY_COOKIE_TEST_OTHER "\r\n\r\n",
+            "",
+        },
+        {
+            "GET /api/v1/registry?action=access HTTP/1.1\r\n"
+            "Cookie: netdata_registry_id=" REGISTRY_COOKIE_TEST_OURS "; netdata_registry_id=" REGISTRY_COOKIE_TEST_OTHER "\r\n\r\n",
+            REGISTRY_COOKIE_TEST_OURS,
+        },
+        {
+            "GET /api/v1/registry?action=access HTTP/1.1\r\n"
+            "Cookie: a=1\r\n"
+            "Cookie: netdata_registry_id=" REGISTRY_COOKIE_TEST_OURS "\r\n\r\n",
+            REGISTRY_COOKIE_TEST_OURS,
+        },
+    };
+
+    int errors = 0;
+    size_t memory_accounting = 0;
+    struct web_client *w = web_client_create(&memory_accounting);
+
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        web_client_reuse_from_cache(w);
+        buffer_flush(w->response.data);
+        buffer_strcat(w->response.data, cases[i].request);
+
+        WEB_CLIENT_TEST(http_request_validate(w) == HTTP_VALIDATION_OK, "case %zu: request did not validate", i);
+        WEB_CLIENT_TEST(
+            strcmp(w->auth.registry_person_guid, cases[i].expected) == 0,
+            "case %zu: registry cookie is '%s', expected '%s'",
+            i,
+            w->auth.registry_person_guid,
+            cases[i].expected);
+    }
+
+    web_client_free(w);
+    WEB_CLIENT_TEST(memory_accounting == 0, "web client leaked %zu accounted bytes", memory_accounting);
+
+#undef REGISTRY_COOKIE_TEST_OURS
+#undef REGISTRY_COOKIE_TEST_OTHER
+
+    if (errors)
+        fprintf(stderr, "%s() failed with %d error(s)\n", __FUNCTION__, errors);
+    else
+        fprintf(stderr, "%s() passed\n", __FUNCTION__);
+
+    return errors;
+}
+
 int web_client_request_size_unittest(void)
 {
     fprintf(stderr, "\n%s() running...\n", __FUNCTION__);

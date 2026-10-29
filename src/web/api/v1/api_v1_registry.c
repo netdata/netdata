@@ -41,13 +41,9 @@ int api_v1_registry(RRDHOST *host, struct web_client *w, char *url) {
 
     netdata_log_debug(D_WEB_CLIENT, "%llu: API v1 registry with URL '%s'", w->id, url);
 
-    // TODO
-    // The browser may send multiple cookies with our id
-
     char person_guid[UUID_STR_LEN] = "";
-    char *cookie = strstr(w->response.data->buffer, NETDATA_REGISTRY_COOKIE_NAME "=");
-    if(cookie)
-        strncpyz(person_guid, &cookie[sizeof(NETDATA_REGISTRY_COOKIE_NAME)], UUID_STR_LEN - 1);
+    if(w->auth.registry_person_guid[0])
+        strncpyz(person_guid, w->auth.registry_person_guid, UUID_STR_LEN - 1);
     else if(!extract_bearer_token_from_request(w, person_guid, sizeof(person_guid)))
         person_guid[0] = '\0';
 
