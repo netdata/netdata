@@ -869,8 +869,12 @@ static inline bool query_instance_matches_labels(
 
     RRDINSTANCE_LABELS_REF lref = rrdinstance_acquired_labels_acquire(ria);
 
+    // labels that cannot be read right now (the chart is going away or moving to another context) match nothing:
+    // pattern_array_label_match() would accept them unchecked
     bool matched = true;
-    if (chart_label_key_sp && rrdlabels_match_simple_pattern_parsed(lref.labels, chart_label_key_sp, '\0', NULL) != SP_MATCHED_POSITIVE)
+    if (!lref.labels)
+        matched = false;
+    else if (chart_label_key_sp && rrdlabels_match_simple_pattern_parsed(lref.labels, chart_label_key_sp, '\0', NULL) != SP_MATCHED_POSITIVE)
         matched = false;
     else if (labels_pa)
         matched = pattern_array_label_match(labels_pa, lref.labels, ':', NULL);
