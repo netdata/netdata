@@ -147,14 +147,14 @@ async fn main() {
                 WorkerKind::Ledger { .. } => "otel-plugin/ledger",
                 WorkerKind::LegacyLogs { .. } => "otel-plugin/legacy-logs",
             };
-            rt::init_tracing_with_identifier(syslog_id);
+            netdata_plugin_rt::init_tracing_with_identifier(syslog_id);
             if let Err(e) = run_worker(kind).await {
                 tracing::error!("{e:#}");
                 std::process::exit(1);
             }
         }
         None => {
-            rt::init_tracing_with_identifier("otel-plugin");
+            netdata_plugin_rt::init_tracing_with_identifier("otel-plugin");
             if let Err(e) = supervisor::run().await {
                 tracing::error!("{e:#}");
                 std::process::exit(1);

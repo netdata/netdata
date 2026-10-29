@@ -24,7 +24,7 @@
 //! lines). Cancellation is keyed on the same transaction id via the drivers'
 //! per-transaction token maps.
 //!
-//! The `rt` crate carries an independent copy of this engine for plugins that
+//! The `netdata-plugin-rt` crate carries an independent copy of this engine for plugins that
 //! speak pluginsd directly on stdin/stdout (the netflow plugin); the two are
 //! not wired together.
 

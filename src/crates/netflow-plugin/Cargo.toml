@@ -75,7 +75,7 @@ thiserror = { workspace = true }
 fst = { workspace = true }
 rmp-serde = { workspace = true }
 
-rt = { workspace = true }
+netdata-plugin-rt = { workspace = true }
 netdata-plugin-error = { workspace = true }
 netdata-plugin-protocol = { workspace = true }
 

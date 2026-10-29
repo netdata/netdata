@@ -1,5 +1,5 @@
 use super::{charts, facet_runtime, ingest, plugin_config, query, tiering};
-use rt::PluginRuntime;
+use netdata_plugin_rt::PluginRuntime;
 use std::env;
 use std::fs;
 use std::future::Future;

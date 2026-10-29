@@ -62,7 +62,7 @@ pub trait ChartDimensions {
 /// # Example
 ///
 /// ```ignore
-/// use rt::NetdataChart;
+/// use netdata_plugin_rt::NetdataChart;
 /// use schemars::JsonSchema;
 ///
 /// #[derive(JsonSchema, NetdataChart, Default, Clone, PartialEq)]

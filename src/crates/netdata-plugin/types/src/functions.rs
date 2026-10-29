@@ -3,7 +3,7 @@
 //! The six structs below are the Function protocol's data model, shared across
 //! the netdata-plugin crates: netdata-plugin-protocol maps them onto the wire
 //! (`tokio_codec` encodes, `message_parser` decodes, hand-rolled rather than
-//! via the serde derives), the `rt` and `otel-bridge` engines run a [`FunctionCall`]
+//! via the serde derives), the `netdata-plugin-rt` and `otel-bridge` engines run a [`FunctionCall`]
 //! through a `FunctionHandler` into a [`FunctionResult`], and the otel plugin's
 //! supervisor forwards worker declarations and results to the agent. The agent
 //! side of every contract here is the `pluginsd_function*()` and
@@ -150,7 +150,7 @@ pub struct FunctionProgressRequest {
 /// A progress report, plugin-to-agent. Wire:
 /// `FUNCTION_PROGRESS transaction done all`, all three words required.
 /// done/all are cumulative unit counts of one call, not increments and not
-/// percentages; each engine picks the scale (rt reports raw counters, otel-bridge
+/// percentages; each engine picks the scale (netdata-plugin-rt reports raw counters, otel-bridge
 /// reports percent as done/100). The agent drops zero-valued updates
 /// (query_progress_functions_update in src/libnetdata/query_progress).
 #[derive(Debug, Clone, Serialize, Deserialize)]

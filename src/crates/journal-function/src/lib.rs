@@ -12,8 +12,8 @@
 //! journal-registry is consumed only for the re-export (nothing else in the
 //! crate references it). netdata also builds directly on journal-core and
 //! journal-index types (the `journal-core`/`journal-index` deps in
-//! `Cargo.toml`), and `charts` registers on the plugin runtime `rt` (the
-//! `rt` dep in `Cargo.toml`, imported at the top of `charts.rs`).
+//! `Cargo.toml`), and `charts` registers on the plugin runtime `netdata-plugin-rt` (the
+//! `netdata-plugin-rt` dep in `Cargo.toml`, imported at the top of `charts.rs`).
 //!
 //! Consumers: otel-legacy-logs is the only in-tree dependent
 //! (the `journal-function` dep in `otel-legacy-logs/Cargo.toml`) and its

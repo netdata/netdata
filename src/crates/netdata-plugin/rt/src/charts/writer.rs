@@ -16,7 +16,7 @@
 //!
 //! Update cadence is the batch scheduler's decision, not this module's:
 //! BEGIN/SET/END are re-emitted on every tick even when values did not
-//! change, so every sample interval carries a datapoint. That is rt's own
+//! change, so every sample interval carries a datapoint. That is netdata-plugin-rt's own
 //! choice — the agent obsoletes a plugin's charts only when the plugin exits,
 //! not when updates go quiet.
 //!

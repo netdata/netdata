@@ -2545,8 +2545,8 @@ dependencies = [
  "journal-engine",
  "journal-index",
  "journal-registry",
+ "netdata-plugin-rt",
  "nix",
- "rt",
  "schemars",
  "serde",
  "serde_json",
@@ -3050,6 +3050,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "netdata-plugin-rt"
+version = "0.1.3"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "console-subscriber",
+ "futures",
+ "itoa",
+ "netdata-plugin-charts-derive",
+ "netdata-plugin-error",
+ "netdata-plugin-protocol",
+ "netdata-plugin-schema",
+ "parking_lot",
+ "schemars",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tracing-futures",
+ "tracing-journald",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "netdata-plugin-schema"
 version = "0.1.3"
 dependencies = [
@@ -3102,6 +3127,7 @@ dependencies = [
  "memmap2",
  "netdata-plugin-error",
  "netdata-plugin-protocol",
+ "netdata-plugin-rt",
  "netflow_parser",
  "netgauze-bgp-pkt",
  "netgauze-bmp-pkt",
@@ -3114,7 +3140,6 @@ dependencies = [
  "reqwest",
  "rmp-serde",
  "roaring 0.11.2",
- "rt",
  "rustc-hash",
  "schemars",
  "serde",
@@ -3785,12 +3810,12 @@ dependencies = [
  "file-registry",
  "humantime",
  "netdata-plugin-protocol",
+ "netdata-plugin-rt",
  "netdata-plugin-types",
  "otel-bridge",
  "otel-ingestor",
  "otel-ledger",
  "otel-legacy-logs",
- "rt",
  "rustls",
  "serde",
  "serde_json",
@@ -4731,31 +4756,6 @@ dependencies = [
  "bytemuck",
  "byteorder",
  "serde",
-]
-
-[[package]]
-name = "rt"
-version = "0.1.3"
-dependencies = [
- "async-trait",
- "bytes",
- "console-subscriber",
- "futures",
- "itoa",
- "netdata-plugin-charts-derive",
- "netdata-plugin-error",
- "netdata-plugin-protocol",
- "netdata-plugin-schema",
- "parking_lot",
- "schemars",
- "serde",
- "serde_json",
- "tokio",
- "tokio-util",
- "tracing",
- "tracing-futures",
- "tracing-journald",
- "tracing-subscriber",
 ]
 
 [[package]]

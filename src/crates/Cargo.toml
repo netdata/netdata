@@ -72,9 +72,9 @@ collapsible_if = "allow"
 netdata-plugin-charts-derive = { path = "netdata-plugin/charts-derive" }
 netdata-plugin-error = { path = "netdata-plugin/error" }
 netdata-plugin-protocol = { path = "netdata-plugin/protocol" }
+netdata-plugin-rt = { path = "netdata-plugin/rt" }
 netdata-plugin-schema = { path = "netdata-plugin/schema" }
 netdata-plugin-types = { path = "netdata-plugin/types" }
-rt = { path = "netdata-plugin/rt" }
 
 # Internal crates: OTel plugin.
 ferryboat = { path = "ferryboat" }

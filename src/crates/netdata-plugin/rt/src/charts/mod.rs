@@ -33,7 +33,7 @@ mod tracker;
 mod writer;
 
 // Public API. lib.rs re-exports this list at the crate root (all but ChartWriter,
-// plus the `NetdataChart` derive macro), so downstream code imports from `rt`.
+// plus the `NetdataChart` derive macro), so downstream code imports from `netdata-plugin-rt`.
 pub use chart_trait::{ChartDimensions, InstancedChart, NetdataChart};
 pub use handle::ChartHandle;
 pub use metadata::{ChartMetadata, ChartType, DimensionAlgorithm, DimensionMetadata};

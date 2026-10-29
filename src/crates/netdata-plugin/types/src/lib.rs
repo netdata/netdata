@@ -21,7 +21,7 @@
 //!
 //! All submodules are private; the re-exports below are the whole public API.
 //! Direct consumers: netdata-plugin-protocol, netdata-plugin-schema, otel-bridge,
-//! otel-plugin, otel-ledger, otel-ingestor and otel-legacy-logs; `rt` reads
+//! otel-plugin, otel-ledger, otel-ingestor and otel-legacy-logs; `netdata-plugin-rt` reads
 //! the structs through netdata-plugin-protocol's re-exports.
 mod config;
 mod dyncfg_cmds;

@@ -138,7 +138,7 @@ impl From<std::io::Error> for Error {
 /// per command. The enum covers the whole framing-layer vocabulary, but
 /// `MessageParser::process_command` consumes only the function/payload/quit
 /// subset and drops the rest: chart commands are recognized here and ignored
-/// there (rt emits chart text as raw bytes via
+/// there (netdata-plugin-rt emits chart text as raw bytes via
 /// `transport::MessageWriter::write_raw`, and the agent parses it — see
 /// `src/plugins.d/pluginsd_parser.c`).
 pub enum Command<'a> {

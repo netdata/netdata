@@ -35,7 +35,7 @@
 //! Chart-protocol text (CHART/DIMENSION/BEGIN/SET/END, ...) and bare keywords
 //! such as `PLUGIN_KEEPALIVE` and `TRUST_DURATIONS` are outside the message
 //! model: consumers write them verbatim with [`MessageWriter::write_raw`] (the
-//! `rt` chart registry and the otel-plugin supervisor do this).
+//! `netdata-plugin-rt` chart registry and the otel-plugin supervisor do this).
 //!
 //! Parsing direction is fixed when the parser is built and never re-checked
 //! against what arrives: feed a [`MessageReader`] the agent→plugin stream and
@@ -58,7 +58,7 @@
 //! - `transport` provides [`MessageReader`]/[`MessageWriter`], the framed
 //!   I/O layer.
 //!
-//! Consumers: the `rt` plugin runtime (netflow-plugin, journal-function) runs
+//! Consumers: the `netdata-plugin-rt` plugin runtime (netflow-plugin, journal-function) runs
 //! its event loop on these types; the otel-plugin supervisor drives the
 //! agent's stdin/stdout directly and relays over IPC to its `otel-ingestor`,
 //! `otel-ledger` and `otel-legacy-logs` workers, which build the same payload

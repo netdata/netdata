@@ -40,14 +40,14 @@ pub(crate) use traces::OtelTracesHandler;
 
 /// The logs pipeline's GET shim (its `arg_shim`, installed by
 /// [`build_pipeline`](super::pipeline::build_pipeline)): replicate the
-/// rt-level GET shim (`netdata-plugin/rt/src/lib.rs` `handle_function_call`)
+/// netdata-plugin-rt GET shim (`netdata-plugin/rt/src/lib.rs` `handle_function_call`)
 /// for query-string calls — synthesize a JSON payload with an `info`
 /// flag (true iff the literal token is in the args) plus parsed
 /// `after:`/`before:` windows. Divergence: tokens parse as u32, the
 /// request fields' width ([`after`](logs::wire::OtelLogsRequest::after) /
 /// [`before`](logs::wire::OtelLogsRequest::before)), so an out-of-range
 /// token skips like a non-numeric one instead of synthesizing a number
-/// the deserializer would reject (the rt shim parses u64). Returns
+/// the deserializer would reject (the netdata-plugin-rt shim parses u64). Returns
 /// `None` when there is nothing to synthesize — no args, or the call
 /// already carries a payload (a POST body) — and the caller
 /// (`rpc/dispatch.rs` `dispatch_function_call`) keeps the original.

@@ -657,7 +657,7 @@ impl Drop for SocketGuard {
 /// Uses `$NETDATA_RUN_DIR/otel-plugin/` when running under the Netdata
 /// agent, falling back to `/tmp` for standalone execution.
 fn socket_dir() -> anyhow::Result<std::path::PathBuf> {
-    let env = rt::NetdataEnv::from_environment();
+    let env = netdata_plugin_rt::NetdataEnv::from_environment();
     let dir = match env.run_dir {
         Some(run_dir) => run_dir.join("otel-plugin"),
         None => std::path::PathBuf::from("/tmp"),
@@ -718,7 +718,7 @@ where
 /// agent quits; workers are shut down on both the graceful and error paths.
 pub async fn run() -> anyhow::Result<()> {
     tracing::info!("starting otel-plugin");
-    let nd_env = rt::NetdataEnv::from_environment();
+    let nd_env = netdata_plugin_rt::NetdataEnv::from_environment();
     match serde_json::to_string(&nd_env) {
         Ok(json) => tracing::info!("netdata environment: {json}"),
         Err(e) => tracing::warn!("failed to serialize netdata environment: {e}"),

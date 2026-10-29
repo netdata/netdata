@@ -35,7 +35,7 @@ pub(crate) use api::{
     flows_required_params,
 };
 
-use rt::PluginRuntime;
+use netdata_plugin_rt::PluginRuntime;
 use std::io::{IsTerminal, Write};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
@@ -78,7 +78,7 @@ fn main() {
     let glibc_arena_max = memory_allocator::limit_glibc_arenas_for_process();
 
     println!("TRUST_DURATIONS 1");
-    rt::init_tracing_with_identifier("netflow-plugin");
+    netdata_plugin_rt::init_tracing_with_identifier("netflow-plugin");
 
     #[cfg(all(target_os = "linux", target_env = "gnu"))]
     match glibc_arena_max {

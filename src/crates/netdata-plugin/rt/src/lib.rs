@@ -38,7 +38,7 @@
 //! use async_trait::async_trait;
 //! use netdata_plugin_error::Result;
 //! use netdata_plugin_protocol::FunctionDeclaration;
-//! use rt::{FunctionCallContext, FunctionHandler, PluginRuntime};
+//! use netdata_plugin_rt::{FunctionCallContext, FunctionHandler, PluginRuntime};
 //! use serde::{Deserialize, Serialize};
 //!
 //! #[derive(Deserialize)]
@@ -418,7 +418,7 @@ type FunctionFuture = BoxFuture<'static, (String, FunctionResult)>;
 /// use async_trait::async_trait;
 /// use netdata_plugin_error::Result;
 /// use netdata_plugin_protocol::FunctionDeclaration;
-/// use rt::{FunctionCallContext, FunctionHandler};
+/// use netdata_plugin_rt::{FunctionCallContext, FunctionHandler};
 /// use serde::{Deserialize, Serialize};
 ///
 /// #[derive(Deserialize)]
@@ -705,7 +705,7 @@ pub type StdPluginRuntime = PluginRuntime<tokio::io::Stdin, tokio::io::Stdout>;
 /// # Example
 ///
 /// ```no_run
-/// use rt::PluginRuntime;
+/// use netdata_plugin_rt::PluginRuntime;
 ///
 /// #[tokio::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -770,7 +770,7 @@ where
     /// # Example
     ///
     /// ```no_run
-    /// use rt::PluginRuntime;
+    /// use netdata_plugin_rt::PluginRuntime;
     /// use tokio::net::TcpStream;
     ///
     /// #[tokio::main]

@@ -41,7 +41,10 @@ pub(crate) struct NetflowCharts {
 }
 
 impl NetflowCharts {
-    pub(crate) fn new<R, W>(runtime: &mut rt::PluginRuntime<R, W>, config: &ChartsConfig) -> Self
+    pub(crate) fn new<R, W>(
+        runtime: &mut netdata_plugin_rt::PluginRuntime<R, W>,
+        config: &ChartsConfig,
+    ) -> Self
     where
         R: AsyncRead + Unpin + Send + 'static,
         W: AsyncWrite + Unpin + Send + 'static,

@@ -24,6 +24,6 @@ journal-core = { workspace = true }
 journal-index = { workspace = true }
 journal-engine = { workspace = true }
 journal-registry = { workspace = true }
-rt = { workspace = true }
+netdata-plugin-rt = { workspace = true }
 
 allocative = { workspace = true, optional = true }

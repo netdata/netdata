@@ -4,7 +4,7 @@ use crate::facet_runtime::FacetRuntime;
 use crate::memory_allocator::AllocatorMemorySample;
 use crate::plugin_config::{MemoryDiagnosticsConfig, PluginConfig};
 use crate::tiering::TierFlowIndexStore;
-use rt::PluginRuntime;
+use netdata_plugin_rt::PluginRuntime;
 
 #[test]
 fn chart_metadata_uses_honest_contexts_and_units() {

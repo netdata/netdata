@@ -1,15 +1,15 @@
 //! The `NetdataChart` derive macro: `netdata-plugin-charts-derive` is a
 //! proc-macro crate whose only export is the `#[derive(NetdataChart)]` macro
 //! below. It carries no runtime code, and its only direct Cargo dependent is
-//! `rt` (`src/crates/netdata-plugin/rt`), which re-exports the macro at its
+//! `netdata-plugin-rt` (`src/crates/netdata-plugin/rt`), which re-exports the macro at its
 //! crate root so downstream chart structs (netflow-plugin,
 //! journal-function) never depend on this crate directly.
 //!
 //! On a named-field struct the derive generates:
 //!
 //! ```ignore
-//! impl rt::charts::ChartDimensions for <Struct> {
-//!     fn write_dimensions(&self, __writer: &mut rt::charts::ChartWriter) {
+//! impl netdata_plugin_rt::charts::ChartDimensions for <Struct> {
+//!     fn write_dimensions(&self, __writer: &mut netdata_plugin_rt::charts::ChartWriter) {
 //!         __writer.write_dimension("<field name>", self.<field> as i64);
 //!         // ... one call per non-instance field, in declaration order
 //!     }
@@ -21,29 +21,29 @@
 //! the macro reads, matched as a substring of a field attribute's rendered
 //! tokens — are the instance fields and are never written. The rest of the
 //! `x-chart-*` / `x-dimension-*` vocabulary is schemars metadata the macro
-//! ignores; rt's `NetdataChart::chart_metadata()` reads it from the generated
+//! ignores; netdata-plugin-rt's `NetdataChart::chart_metadata()` reads it from the generated
 //! JSON schema instead (rt/src/charts/chart_trait.rs). Two known consequences:
 //!
 //! - `x-dimension-hidden` does not drop the SET: a hidden field still emits a
 //!   `write_dimension`, while the extractor gives it no DIMENSION line (see
 //!   the `ChartDimensions` docs in chart_trait.rs).
-//! - The emitted impl hardcodes the `rt::charts::...` paths, so the deriving
-//!   crate must depend on the `rt` crate under that unaliased name.
+//! - The emitted impl hardcodes the `netdata_plugin_rt::charts::...` paths, so the deriving
+//!   crate must depend on the `netdata-plugin-rt` crate under that unaliased name.
 //!
-//! rt re-exports the `NetdataChart` trait and this derive macro under one
+//! netdata-plugin-rt re-exports the `NetdataChart` trait and this derive macro under one
 //! name (derive macros and traits live in different namespaces) next to a
 //! blanket impl that turns any `JsonSchema + ChartDimensions` type into a
 //! `NetdataChart`; derive `schemars::JsonSchema` alongside this macro and
-//! import both from `rt`. The macro declares no helper attributes, so the
+//! import both from `netdata-plugin-rt`. The macro declares no helper attributes, so the
 //! schemars annotations stay on the type for `chart_metadata()` to consume.
 
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{Data, DeriveInput, Fields, parse_macro_input};
 
-/// Derive macro for `NetdataChart`: generates the `rt::charts::ChartDimensions`
-/// impl and writes dimension values straight to the `rt::charts::ChartWriter`
-/// with no JSON serialization. On the rt side the blanket impl over
+/// Derive macro for `NetdataChart`: generates the `netdata_plugin_rt::charts::ChartDimensions`
+/// impl and writes dimension values straight to the `netdata_plugin_rt::charts::ChartWriter`
+/// with no JSON serialization. On the netdata-plugin-rt side the blanket impl over
 /// `JsonSchema + ChartDimensions` also provides the `NetdataChart` trait, and
 /// the trait and this derive macro are re-exported under the same name.
 ///
@@ -61,14 +61,14 @@ use syn::{Data, DeriveInput, Fields, parse_macro_input};
 /// mentions the marker (a doc comment is a `#[doc = ...]` attribute). The
 /// instance field is never written. No other annotation is consumed: the
 /// field name is the dimension id verbatim, so `x-dimension-name` never
-/// changes the id (rt's extractor applies it to the DIMENSION line's name)
+/// changes the id (netdata-plugin-rt's extractor applies it to the DIMENSION line's name)
 /// and `x-dimension-hidden` does not drop the SET — the SET then names a
 /// dimension with no DIMENSION line (see the `ChartDimensions` docs in
-/// rt's chart_trait.rs).
+/// netdata-plugin-rt's chart_trait.rs).
 ///
 /// # Output
 ///
-/// Inside `impl rt::charts::ChartDimensions for <Struct>`, one
+/// Inside `impl netdata_plugin_rt::charts::ChartDimensions for <Struct>`, one
 /// `__writer.write_dimension("<field name>", self.<field> as i64);` per
 /// non-instance field, in declaration order. Field types must be castable to
 /// `i64`; the chart sampler places the SETs between the chart's BEGIN and
@@ -149,8 +149,8 @@ pub fn derive_netdata_chart(input: TokenStream) -> TokenStream {
     });
 
     let expanded = quote! {
-        impl rt::charts::ChartDimensions for #name {
-            fn write_dimensions(&self, __writer: &mut rt::charts::ChartWriter) {
+        impl netdata_plugin_rt::charts::ChartDimensions for #name {
+            fn write_dimensions(&self, __writer: &mut netdata_plugin_rt::charts::ChartWriter) {
                 #(#dimension_writes)*
             }
         }

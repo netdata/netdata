@@ -10,7 +10,7 @@
 //! The `format!`-based `emit_*` helpers below render the same commands into
 //! strings. Nothing in this repository calls them — the registry path writes
 //! through `ChartWriter` buffers instead — but they remain public crate API
-//! (`rt::ChartMetadata`). The two paths differ only in trailing fields:
+//! (`netdata_plugin_rt::ChartMetadata`). The two paths differ only in trailing fields:
 //! `ChartWriter::begin_chart` appends the update interval in microseconds and
 //! `ChartWriter::end_chart` the collection timestamp, both of which the agent
 //! treats as optional, and the string `DIMENSION` line always carries the

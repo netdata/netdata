@@ -23,7 +23,7 @@ netdata-plugin-types = { workspace = true }
 otel-ledger = { workspace = true }
 otel-ingestor = { workspace = true }
 otel-legacy-logs = { workspace = true }
-rt = { workspace = true }
+netdata-plugin-rt = { workspace = true }
 # Process-level TLS crypto provider selection (see `main`).
 rustls = { workspace = true }
 sfsq-cli = { workspace = true }

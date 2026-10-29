@@ -34,7 +34,7 @@
 //! promotion / invalidation lifecycle some dimensions name has no feed
 //! there today.
 
-use rt::{ChartHandle, NetdataChart, StdPluginRuntime};
+use netdata_plugin_rt::{ChartHandle, NetdataChart, StdPluginRuntime};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;

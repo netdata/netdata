@@ -1,5 +1,5 @@
 [package]
-name = "rt"
+name = "netdata-plugin-rt"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

@@ -2,7 +2,7 @@ use crate::tiering::TierKind;
 use anyhow::{Context, Result};
 use bytesize::ByteSize;
 use clap::{Parser, ValueEnum};
-use rt::NetdataEnv;
+use netdata_plugin_rt::NetdataEnv;
 use serde::de;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;

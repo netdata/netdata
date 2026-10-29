@@ -44,7 +44,7 @@
 //! lenient: an unparsable command list becomes the empty `DynCfgCmds` set.
 //!
 //! Direct consumers (grep-verified): otel-legacy-logs takes the `HttpAccess`
-//! re-export (src/crates/otel-legacy-logs/src/handler.rs); otel-bridge and rt
+//! re-export (src/crates/otel-legacy-logs/src/handler.rs); otel-bridge and netdata-plugin-rt
 //! declare the workspace dependency but reference nothing from this crate in
 //! their current sources; nothing outside the crate calls `netdata_schema()`
 //! except examples/simple_usage.rs.

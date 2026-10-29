@@ -1,5 +1,5 @@
 use super::*;
-use rt::ProgressState;
+use netdata_plugin_rt::ProgressState;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio_util::sync::CancellationToken;
 
