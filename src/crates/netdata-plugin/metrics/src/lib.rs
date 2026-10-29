@@ -21,8 +21,10 @@
 //! Contracts the store keeps for the agent:
 //! - every chart is defined (with its labels) before its first update, and
 //!   re-defined when an instance returns after it was marked obsolete;
-//! - `END` times are strictly increasing per chart: slots are emitted in
-//!   order, each once, after the family's lateness;
+//! - slots are rendered in order, each once, after the family's lateness,
+//!   and each update is placed at its slot's end (`END <t> 0 1` on charts
+//!   defined with `store_first`), so points sit at the time of their records
+//!   rather than the time they were rendered;
 //! - an instance idle for the expiry time gets its charts marked obsolete;
 //! - every dimension is a float, so no value is truncated;
 //! - output comes in chunks under a byte budget, split only between whole
@@ -35,4 +37,4 @@ mod store;
 pub use batch::{Batch, InstanceRef, Record};
 pub use family::{ChartSpec, Counter, Dimension, Family, FamilyBuilder, Gauge, Histogram, Labels};
 pub use netdata_plugin_protocol::ChartType;
-pub use store::{Stats, Store};
+pub use store::{MAX_BACKLOG_SLOTS, Stats, Store};

@@ -7,6 +7,7 @@
 //! decides at merge time whether a slot is still open.
 
 use crate::family::{Counter, Family, Gauge, Histogram, Labels};
+use std::collections::HashMap;
 
 /// A handle to an instance within one [`Batch`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -27,6 +28,7 @@ pub(crate) struct BatchInstance {
 pub struct Batch {
     family: Family,
     pub(crate) instances: Vec<BatchInstance>,
+    index: HashMap<Labels, usize>,
 }
 
 impl Batch {
@@ -34,6 +36,7 @@ impl Batch {
         Self {
             family: family.clone(),
             instances: Vec::new(),
+            index: HashMap::new(),
         }
     }
 
@@ -45,14 +48,16 @@ impl Batch {
     /// Callers look an instance up once per group of records (for example
     /// once per OTLP resource), not per record.
     pub fn instance(&mut self, labels: Labels) -> InstanceRef {
-        if let Some(i) = self.instances.iter().position(|inst| inst.labels == labels) {
+        if let Some(&i) = self.index.get(&labels) {
             return InstanceRef(i);
         }
+        let i = self.instances.len();
+        self.index.insert(labels.clone(), i);
         self.instances.push(BatchInstance {
             labels,
             slots: Vec::new(),
         });
-        InstanceRef(self.instances.len() - 1)
+        InstanceRef(i)
     }
 
     /// Start one record of `instance` at `unix_seconds` (the event's own
@@ -93,7 +98,11 @@ pub struct Record<'a> {
 impl Record<'_> {
     /// Add `weight` to value `index` of `counter`.
     pub fn add(&mut self, counter: Counter, index: usize, weight: f64) -> &mut Self {
-        debug_assert!(index < counter.len);
+        assert!(
+            index < counter.len,
+            "counter index {index} out of {}",
+            counter.len
+        );
         self.cells[counter.base + index] += weight;
         self
     }

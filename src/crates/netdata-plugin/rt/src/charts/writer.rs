@@ -77,7 +77,11 @@ impl ChartWriter {
                 family: &metadata.family,
                 context: &metadata.context,
                 chart_type: metadata.chart_type,
-                priority: metadata.priority,
+                // The agent reads the priority as an `int`.
+                priority: metadata
+                    .priority
+                    .clamp(i64::from(i32::MIN), i64::from(i32::MAX))
+                    as i32,
                 update_every: metadata.update_every,
                 options: ChartOptions::default(),
             },

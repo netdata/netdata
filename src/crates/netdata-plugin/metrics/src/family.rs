@@ -3,7 +3,7 @@
 //! A slot of an instance is a flat array of `f64` cells. Each cell has a merge
 //! rule, so two partial slots (two requests, or a request and the store)
 //! combine by cell: sums add, maxima keep the larger value, gauges keep the
-//! newer value. Instruments are typed handles to ranges of cells; chart
+//! value merged last. Instruments are typed handles to ranges of cells; chart
 //! dimensions read cells when a slot is rendered.
 
 use netdata_plugin_protocol::{ChartType, is_valid_dimension_id};
@@ -12,6 +12,10 @@ use std::sync::Arc;
 /// The agent keeps at most this many bytes of a label value
 /// (`RRDLABELS_MAX_VALUE_LENGTH`, `src/database/rrdlabels.h`).
 const MAX_LABEL_VALUE_BYTES: usize = 800;
+
+/// The agent keeps at most this many bytes of a label key
+/// (`RRDLABELS_MAX_NAME_LENGTH`).
+const MAX_LABEL_KEY_BYTES: usize = 200;
 
 /// How a cell combines two partial values of the same slot.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -119,7 +123,7 @@ impl Histogram {
     /// The largest observed value of the slot; no value when nothing was
     /// observed.
     pub fn maximum(&self, id: &str) -> Dimension {
-        Dimension::new(id, Value::Last(self.max_cell()))
+        Dimension::new(id, Value::Cell(self.max_cell()))
     }
 }
 
@@ -131,7 +135,7 @@ pub struct Gauge {
 
 impl Gauge {
     pub fn value(&self, id: &str) -> Dimension {
-        Dimension::new(id, Value::Last(self.cell))
+        Dimension::new(id, Value::Cell(self.cell))
     }
 }
 
@@ -146,7 +150,7 @@ pub(crate) enum Value {
         denominator: usize,
     },
     /// The cell as is; no value while it is unset.
-    Last(usize),
+    Cell(usize),
 }
 
 /// One dimension of a chart template. Its id is also its display name.
@@ -176,15 +180,18 @@ pub struct ChartSpec {
     pub family: &'static str,
     pub context: &'static str,
     pub chart_type: ChartType,
-    pub priority: i64,
+    /// Dashboard order; lower comes first.
+    pub priority: i32,
     pub dimensions: Vec<Dimension>,
 }
 
 /// The labels that identify an instance and are attached to its charts.
 ///
-/// Two equal label lists are the same instance. Empty values are left out
-/// (the agent would store them as `[none]`), and values are cut to the
-/// agent's label value limit at a character boundary.
+/// Two equal label lists are the same instance. Values that are empty once
+/// the agent trims them (whitespace and control characters only) are left
+/// out, because the agent would store them as `[none]`; values are cut to
+/// the agent's label value limit at a character boundary. Keys come from
+/// code: each must be non-empty, within the agent's key limit, and unique.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct Labels(pub(crate) Vec<(String, String)>);
 
@@ -193,9 +200,17 @@ impl Labels {
         Self::default()
     }
 
-    /// Add a label, unless `value` is empty.
+    /// Add a label, unless `value` is blank.
     pub fn push(&mut self, key: &str, value: &str) {
-        if value.is_empty() {
+        assert!(
+            !key.is_empty() && key.len() <= MAX_LABEL_KEY_BYTES,
+            "invalid label key {key:?}"
+        );
+        assert!(
+            self.0.iter().all(|(k, _)| k != key),
+            "duplicate label key {key:?}"
+        );
+        if value.chars().all(|c| c.is_whitespace() || c.is_control()) {
             return;
         }
         let mut end = value.len().min(MAX_LABEL_VALUE_BYTES);
@@ -334,6 +349,19 @@ impl FamilyBuilder {
             "chart {} has no dimensions",
             spec.id
         );
+        assert!(
+            self.charts.iter().all(|c| c.id != spec.id),
+            "duplicate chart id {:?}",
+            spec.id
+        );
+        for (i, dim) in spec.dimensions.iter().enumerate() {
+            assert!(
+                spec.dimensions[..i].iter().all(|d| d.id != dim.id),
+                "duplicate dimension id {:?} in chart {}",
+                dim.id,
+                spec.id
+            );
+        }
         self.charts.push(spec);
     }
 

@@ -95,8 +95,8 @@ pub use chart::validate_chart_stream;
 pub use chart::{
     ChartLine, ChartOptions, ChartType, DimensionAlgorithm, DimensionLine, DimensionOptions,
     LabelSource, is_valid_chart_id, is_valid_dimension_id, write_begin, write_chart, write_clabel,
-    write_clabel_commit, write_dimension, write_end, write_quoted, write_set_empty,
-    write_set_float, write_set_int,
+    write_clabel_commit, write_dimension, write_end, write_end_timed, write_quoted,
+    write_set_empty, write_set_float, write_set_int,
 };
 /// [`MessageWriter::send`] encodes every variant to its keyword line(s),
 /// except `Quit` and `FunctionProgressRequest`, which are inbound-only and

@@ -248,7 +248,7 @@ mod tests {
         let mut batch = Batch::new(&services.family);
         services.record(&mut batch, "default", request);
         store.merge(batch, 100);
-        let out = String::from_utf8(store.emit(200, usize::MAX).concat()).unwrap();
+        let out = String::from_utf8(store.emit(110, usize::MAX).concat()).unwrap();
         netdata_plugin_protocol::validate_chart_stream(out.as_bytes()).unwrap();
         out
     }
@@ -281,7 +281,7 @@ mod tests {
         let success = values(&out, "success");
         let error = values(&out, "error");
         // The instance's first rendered slot is the one its spans ended in.
-        assert!(out.contains("SET success = 2\nSET error = 1\nEND 96\n"));
+        assert!(out.contains("SET success = 2\nSET error = 1\nEND 96 0 1\n"));
         assert_eq!(success[0], "2");
         assert_eq!(error[0], "1");
         assert_eq!(values(&out, "avg")[0], "0.5");

@@ -195,10 +195,10 @@ mod tests {
         let out = String::from_utf8(store.emit(101, usize::MAX).concat()).unwrap();
         netdata_plugin_protocol::validate_chart_stream(out.as_bytes()).unwrap();
         assert!(out.contains(
-            "BEGIN otel_plugin.spans 1000000\nSET accepted = 7\nSET rejected = 2\nEND 101\n"
+            "BEGIN otel_plugin.spans 1000000\nSET accepted = 7\nSET rejected = 2\nEND 101 0 1\n"
         ));
         assert!(out.contains(
-            "BEGIN otel_plugin.log_records 1000000\nSET accepted = 3\nSET rejected = 0\nEND 101\n"
+            "BEGIN otel_plugin.log_records 1000000\nSET accepted = 3\nSET rejected = 0\nEND 101 0 1\n"
         ));
         assert!(out.contains("'netdata.otel.spans'"));
         assert!(!out.contains("derived"));

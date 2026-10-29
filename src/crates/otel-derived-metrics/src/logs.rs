@@ -163,7 +163,7 @@ mod tests {
         assert!(out.contains("CLABEL 'resource.attributes.service.name' 'checkout' 1\n"));
         assert!(out.contains(
             "SET fatal = 1\nSET error = 2\nSET warn = 0\nSET info = 1\nSET debug = 0\n\
-             SET trace = 0\nSET unspecified = 1\nEND 96\n"
+             SET trace = 0\nSET unspecified = 1\nEND 96 0 1\n"
         ));
     }
 }

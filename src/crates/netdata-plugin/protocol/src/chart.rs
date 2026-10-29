@@ -58,8 +58,7 @@ pub enum DimensionAlgorithm {
     /// Store the value as-is.
     #[default]
     Absolute,
-    /// Store the rate of change since the previous value (counters). The agent
-    /// discards a dimension's first collected value.
+    /// Store the rate of change since the previous value (counters).
     Incremental,
     /// Store the value as a percentage of the row total.
     PercentageOfAbsoluteRow,
@@ -136,8 +135,8 @@ pub struct ChartLine<'a> {
     pub family: &'a str,
     pub context: &'a str,
     pub chart_type: ChartType,
-    /// Dashboard order; lower comes first.
-    pub priority: i64,
+    /// Dashboard order; lower comes first. The agent reads it as an `int`.
+    pub priority: i32,
     /// Collection interval in seconds.
     pub update_every: u64,
     pub options: ChartOptions,
@@ -180,7 +179,7 @@ pub fn write_chart(buf: &mut impl BufMut, chart: &ChartLine<'_>) {
     buf.put_u8(b' ');
     buf.put_slice(chart.chart_type.as_str().as_bytes());
     buf.put_u8(b' ');
-    write_i64(buf, chart.priority);
+    write_i64(buf, i64::from(chart.priority));
     buf.put_u8(b' ');
     write_u64(buf, chart.update_every);
     let options = chart.options;
@@ -266,8 +265,8 @@ pub fn write_set_int(buf: &mut impl BufMut, dimension_id: &str, value: i64) {
 
 /// Write `SET <dimension_id> = <value>` for a dimension declared with
 /// [`DimensionOptions::float`]. The value is the shortest decimal that
-/// round-trips (never exponent notation, which the agent cannot parse). A
-/// non-finite value is written as an empty `SET`: no value this update.
+/// round-trips, in plain notation like go.d writes it. A non-finite value is
+/// written as an empty `SET`: no value this update.
 pub fn write_set_float(buf: &mut impl BufMut, dimension_id: &str, value: f64) {
     if !value.is_finite() {
         write_set_empty(buf, dimension_id);
@@ -290,11 +289,30 @@ pub fn write_set_empty(buf: &mut impl BufMut, dimension_id: &str) {
 }
 
 /// Write `END <unix_seconds>`, closing the update opened by [`write_begin`].
-/// The agent stores the point at this time; 0 makes it use its own clock.
+///
+/// The agent uses this time only to place a chart's first point; after that
+/// it advances the chart by the `BEGIN` durations, re-synced to its own wall
+/// clock whenever the chart is (re)defined (`RRDSET_FLAG_SYNC_CLOCK`,
+/// `src/database/rrdset-collection.c`). That suits plugins that collect "now".
+/// For updates of past times use [`write_end_timed`].
 pub fn write_end(buf: &mut impl BufMut, unix_seconds: u64) {
     buf.put_slice(b"END ");
     write_u64(buf, unix_seconds);
     buf.put_u8(b'\n');
+}
+
+/// Write `END <unix_seconds> 0 1`: close the update and make the agent place
+/// it at `unix_seconds`. The third word asks the agent to derive the time
+/// since the previous update from this time, which is how its internal
+/// collectors finish an update (`rrdset_done` → `rrdset_timed_done` with the
+/// pending flag, `src/database/rrdset-collection.c`). Times must increase per
+/// chart. Combine with [`ChartOptions::store_first`], so the chart's clock is
+/// aligned to whole seconds and the first point is kept: then each update is
+/// stored exactly at its time, without interpolation.
+pub fn write_end_timed(buf: &mut impl BufMut, unix_seconds: u64) {
+    buf.put_slice(b"END ");
+    write_u64(buf, unix_seconds);
+    buf.put_slice(b" 0 1\n");
 }
 
 /// Write `text` as one single-quoted field the agent splits back into the
@@ -323,8 +341,10 @@ pub fn write_quoted(buf: &mut impl BufMut, text: &str) {
     buf.put_u8(b'\'');
 }
 
-/// True when `id` is a valid chart id: `type.id` with both parts non-empty
-/// and no byte the agent's splitter treats as a separator or quote.
+/// True when `id` is a valid chart id: `type.id` with both parts non-empty,
+/// no byte the agent's splitter treats as a separator or quote, and not
+/// starting with `SLOT:` (the agent would read the word as a slot number,
+/// `pluginsd_parse_rrd_slot`).
 pub fn is_valid_chart_id(id: &str) -> bool {
     match id.split_once('.') {
         Some((kind, rest)) => !kind.is_empty() && !rest.is_empty() && is_plain_word(id),
@@ -333,14 +353,17 @@ pub fn is_valid_chart_id(id: &str) -> bool {
 }
 
 /// True when `id` is a valid dimension id: non-empty, with no byte the
-/// agent's splitter treats as a separator or quote.
+/// agent's splitter treats as a separator or quote, and not starting with
+/// `SLOT:`.
 pub fn is_valid_dimension_id(id: &str) -> bool {
     !id.is_empty() && is_plain_word(id)
 }
 
 fn is_plain_word(word: &str) -> bool {
-    word.bytes()
-        .all(|b| !matches!(b, b'\'' | b'"' | b'\\' | b'=' | 0x00..=0x20 | 0x7f))
+    !word.starts_with("SLOT:")
+        && word
+            .bytes()
+            .all(|b| !matches!(b, b'\'' | b'"' | b'\\' | b'=' | 0x00..=0x20 | 0x7f))
 }
 
 fn write_set_prefix(buf: &mut impl BufMut, dimension_id: &str) {
@@ -404,6 +427,8 @@ mod validate {
     struct ChartState {
         int_dimensions: HashSet<String>,
         float_dimensions: HashSet<String>,
+        /// Last defined with the `obsolete` option.
+        obsolete: bool,
         last_end: Option<u64>,
     }
 
@@ -417,79 +442,88 @@ mod validate {
         /// After `BEGIN`: `SET` lines until `END`.
         Update {
             chart: String,
+            set: HashSet<String>,
         },
     }
 
-    /// Split one line exactly like the agent's `quoted_strings_splitter`
-    /// with `isspace_map_pluginsd`: separators are space, `\t`, `\r`, `\n`,
-    /// `\f`, `\v` and `=` outside quotes; a word may open with `'` or `"`
-    /// and closes at the same quote; a backslash keeps itself and the next
-    /// byte. The crate's `WordIterator` differs on purpose (see its docs),
-    /// so the validator carries its own port.
-    fn agent_words(line: &[u8]) -> Vec<Vec<u8>> {
-        let is_space = |b: u8| matches!(b, b' ' | b'\t' | b'\r' | b'\n' | 0x0c | 0x0b | b'=');
+    /// Split one line (without its `\n`) the way the agent's
+    /// `quoted_strings_splitter` with `isspace_map_pluginsd` splits it:
+    /// separators are space, `\t`, `\r`, `\f`, `\v` and `=` outside quotes; a
+    /// word may open with `'` or `"` and closes at the same quote; a backslash
+    /// keeps itself and the next byte. The agent splits the line with its
+    /// `\n` still attached and stops at a NUL, so a line ending inside a
+    /// quote or in a backslash, or holding a NUL, would read differently
+    /// there: those are errors here. The crate's `WordIterator` differs on
+    /// purpose (see its docs), so the validator carries its own port.
+    fn agent_words(line: &[u8]) -> Result<Vec<Vec<u8>>, &'static str> {
+        if line.contains(&0) {
+            return Err("NUL byte");
+        }
+        let is_space = |b: u8| matches!(b, b' ' | b'\t' | b'\r' | 0x0c | 0x0b | b'=');
         let mut words = Vec::new();
         let mut i = 0;
-        while i < line.len() && is_space(line[i]) {
-            i += 1;
-        }
-        if i == line.len() {
-            return words;
-        }
+        let skip_to_word = |i: &mut usize, quote: &mut u8| {
+            while *i < line.len() && is_space(line[*i]) {
+                *i += 1;
+            }
+            if *i < line.len() && (line[*i] == b'\'' || line[*i] == b'"') {
+                *quote = line[*i];
+                *i += 1;
+            }
+        };
         let mut quote = 0u8;
-        let mut word = Vec::new();
-        if line[i] == b'\'' || line[i] == b'"' {
-            quote = line[i];
-            i += 1;
+        skip_to_word(&mut i, &mut quote);
+        if i == line.len() {
+            return if quote == 0 {
+                Ok(words)
+            } else {
+                Err("unterminated quote")
+            };
         }
+        let mut word = Vec::new();
         while i < line.len() {
             let b = line[i];
-            if b == b'\\' && i + 1 < line.len() {
+            if b == b'\\' {
+                if i + 1 == line.len() {
+                    return Err("trailing backslash");
+                }
                 word.extend_from_slice(&line[i..i + 2]);
                 i += 2;
-            } else if quote != 0 && b == quote {
-                // The C code turns the closing quote into a separator.
+            } else if (quote != 0 && b == quote) || (quote == 0 && is_space(b)) {
+                // The C code turns a closing quote into a separator.
                 quote = 0;
-                words.push(std::mem::take(&mut word));
                 i += 1;
-                while i < line.len() && is_space(line[i]) {
-                    i += 1;
-                }
-                if i < line.len() && (line[i] == b'\'' || line[i] == b'"') {
-                    quote = line[i];
-                    i += 1;
-                }
-                if i == line.len() {
-                    return words;
-                }
-            } else if quote == 0 && is_space(b) {
                 words.push(std::mem::take(&mut word));
-                while i < line.len() && is_space(line[i]) {
-                    i += 1;
-                }
-                if i < line.len() && (line[i] == b'\'' || line[i] == b'"') {
-                    quote = line[i];
-                    i += 1;
-                }
+                skip_to_word(&mut i, &mut quote);
                 if i == line.len() {
-                    return words;
+                    return if quote == 0 {
+                        Ok(words)
+                    } else {
+                        Err("unterminated quote")
+                    };
                 }
             } else {
                 word.push(b);
                 i += 1;
             }
         }
+        if quote != 0 {
+            return Err("unterminated quote");
+        }
         words.push(word);
-        words
+        Ok(words)
     }
 
     /// Check a chart-protocol byte stream against the agent's grammar: every
-    /// line `\n`-terminated; known keywords with the expected word counts
-    /// (as the agent splits them); valid ids; `DIMENSION`/`CLABEL` only after
-    /// `CHART`; `CLABEL_COMMIT` only after a `CLABEL`; `SET` only inside
-    /// `BEGIN`..`END` and only for a declared dimension, with decimal values
-    /// only on float dimensions; strictly increasing `END` times per chart.
-    /// Returns the first problem with its 1-based line number.
+    /// line `\n`-terminated and split as the agent splits it; known keywords
+    /// with the expected word counts; valid ids; `int` priority and
+    /// update_every; `DIMENSION`/`CLABEL` only after `CHART`;
+    /// `CLABEL_COMMIT` only after a `CLABEL`; `BEGIN` only for a defined chart
+    /// that is not obsolete; `SET` only inside `BEGIN`..`END`, once per
+    /// dimension, only for a declared dimension, with decimal values only on
+    /// float dimensions; `END <t>` or `END <t> 0 1` with `t` strictly
+    /// increasing per chart. Returns the first problem with its 1-based line
+    /// number.
     pub fn validate_chart_stream(stream: &[u8]) -> Result<(), String> {
         let Some(body) = stream.strip_suffix(b"\n") else {
             return if stream.is_empty() {
@@ -502,13 +536,13 @@ mod validate {
         let mut scope = Scope::None;
         for (index, line) in body.split(|&b| b == b'\n').enumerate() {
             let fail = |msg: String| Err(format!("line {}: {msg}", index + 1));
-            if line.contains(&b'\r') {
-                return fail("carriage return".to_string());
-            }
-            let words: Vec<String> = agent_words(line)
-                .into_iter()
-                .map(|w| String::from_utf8_lossy(&w).into_owned())
-                .collect();
+            let words: Vec<String> = match agent_words(line) {
+                Ok(words) => words
+                    .into_iter()
+                    .map(|w| String::from_utf8_lossy(&w).into_owned())
+                    .collect(),
+                Err(problem) => return fail(problem.to_string()),
+            };
             let Some((keyword, args)) = words.split_first() else {
                 return fail("empty line".to_string());
             };
@@ -527,10 +561,13 @@ mod validate {
                     if !["line", "area", "stacked", "heatmap"].contains(&args[6].as_str()) {
                         return fail(format!("unknown chart type {:?}", args[6]));
                     }
-                    if args[7].parse::<i64>().is_err() || args[8].parse::<u64>().is_err() {
-                        return fail("priority or update_every is not an integer".to_string());
+                    if args[7].parse::<i32>().is_err()
+                        || args[8].parse::<i32>().map_or(true, |u| u <= 0)
+                    {
+                        return fail("priority or update_every is not a valid int".to_string());
                     }
-                    charts.entry(id.clone()).or_default();
+                    let state = charts.entry(id.clone()).or_default();
+                    state.obsolete = args.get(9).is_some_and(|o| o.contains("obsolete"));
                     scope = Scope::Definition {
                         chart: id.clone(),
                         labels: 0,
@@ -587,15 +624,20 @@ mod validate {
                     if args.len() != 2 || args[1].parse::<u64>().is_err() {
                         return fail("BEGIN needs a chart id and microseconds".to_string());
                     }
-                    if !charts.contains_key(&args[0]) {
-                        return fail(format!("BEGIN for undefined chart {:?}", args[0]));
+                    match charts.get(&args[0]) {
+                        None => return fail(format!("BEGIN for undefined chart {:?}", args[0])),
+                        Some(state) if state.obsolete => {
+                            return fail(format!("BEGIN for obsolete chart {:?}", args[0]));
+                        }
+                        Some(_) => {}
                     }
                     scope = Scope::Update {
                         chart: args[0].clone(),
+                        set: HashSet::new(),
                     };
                 }
                 "SET" => {
-                    let Scope::Update { chart } = &scope else {
+                    let Scope::Update { chart, set } = &mut scope else {
                         return fail("SET outside BEGIN..END".to_string());
                     };
                     // The agent reads `SET <dimension> = <value>` as two or
@@ -604,7 +646,10 @@ mod validate {
                         return fail("SET must read SET <dimension> = [value]".to_string());
                     }
                     let id = &args[0];
-                    let state = &charts[chart];
+                    if !set.insert(id.clone()) {
+                        return fail(format!("second SET for {id:?} in one update"));
+                    }
+                    let state = &charts[chart.as_str()];
                     let value = args.get(1);
                     if state.float_dimensions.contains(id) {
                         if value.is_some_and(|v| v.parse::<f64>().map_or(true, |f| !f.is_finite()))
@@ -620,11 +665,13 @@ mod validate {
                     }
                 }
                 "END" => {
-                    let Scope::Update { chart } = &scope else {
+                    let Scope::Update { chart, .. } = &scope else {
                         return fail("END without BEGIN".to_string());
                     };
-                    let Some(time) = args.first().and_then(|t| t.parse::<u64>().ok()) else {
-                        return fail("END needs a timestamp".to_string());
+                    let timed = args.len() == 3 && args[1] == "0" && args[2] == "1";
+                    let time = args.first().and_then(|t| t.parse::<u64>().ok());
+                    let (Some(time), true) = (time, args.len() == 1 || timed) else {
+                        return fail("END must read END <time> or END <time> 0 1".to_string());
                     };
                     let state = charts.get_mut(chart).expect("checked by BEGIN");
                     if state.last_end.is_some_and(|last| time <= last) {
@@ -636,7 +683,7 @@ mod validate {
                 other => return fail(format!("unexpected keyword {other:?}")),
             }
         }
-        if let Scope::Update { chart } = scope {
+        if let Scope::Update { chart, .. } = scope {
             return Err(format!("stream ends inside BEGIN..END of {chart:?}"));
         }
         Ok(())
@@ -645,19 +692,25 @@ mod validate {
     #[cfg(test)]
     #[test]
     fn splits_like_the_agent() {
-        let words = |s: &str| -> Vec<String> {
-            agent_words(s.as_bytes())
-                .into_iter()
-                .map(|w| String::from_utf8(w).unwrap())
-                .collect()
+        let words = |s: &str| -> Result<Vec<String>, &'static str> {
+            agent_words(s.as_bytes()).map(|words| {
+                words
+                    .into_iter()
+                    .map(|w| String::from_utf8(w).unwrap())
+                    .collect()
+            })
         };
-        assert_eq!(words("SET d = 1"), ["SET", "d", "1"]);
-        assert_eq!(words("SET d ="), ["SET", "d"]);
-        assert_eq!(words("A type=float"), ["A", "type", "float"]);
-        assert_eq!(words("A 'type=float x'"), ["A", "type=float x"]);
-        assert_eq!(words("A '' 'b'"), ["A", "", "b"]);
-        assert_eq!(words("A 'it\"s' b"), ["A", "it\"s", "b"]);
-        assert_eq!(words(r"A 'x\' b'"), ["A", r"x\' b"]);
+        assert_eq!(words("SET d = 1").unwrap(), ["SET", "d", "1"]);
+        assert_eq!(words("SET d =").unwrap(), ["SET", "d"]);
+        assert_eq!(words("A type=float").unwrap(), ["A", "type", "float"]);
+        assert_eq!(words("A 'type=float x'").unwrap(), ["A", "type=float x"]);
+        assert_eq!(words("A '' 'b'").unwrap(), ["A", "", "b"]);
+        assert_eq!(words("A 'it\"s' b").unwrap(), ["A", "it\"s", "b"]);
+        assert_eq!(words(r"A 'x\' b'").unwrap(), ["A", r"x\' b"]);
+        assert_eq!(words("SET d = '"), Err("unterminated quote"));
+        assert_eq!(words("A 'b"), Err("unterminated quote"));
+        assert_eq!(words(r"A 'b\"), Err("trailing backslash"));
+        assert_eq!(words("A\0B"), Err("NUL byte"));
     }
 }
 
@@ -773,6 +826,7 @@ mod tests {
             }),
             "BEGIN a.b 1000000\nSET x = -3\nSET y = 0.1\nSET z =\nSET w =\nEND 1700000000\n"
         );
+        assert_eq!(line(|b| write_end_timed(b, 7)), "END 7 0 1\n");
     }
 
     #[test]
@@ -809,6 +863,8 @@ mod tests {
         assert!(is_valid_dimension_id("+Inf"));
         assert!(!is_valid_dimension_id(""));
         assert!(!is_valid_dimension_id("a=b"));
+        assert!(!is_valid_dimension_id("SLOT:1"));
+        assert!(!is_valid_chart_id("SLOT:1.a"));
     }
 
     mod validator {
@@ -838,7 +894,7 @@ mod tests {
             write_end(&mut b, 10);
             write_begin(&mut b, "otel_service.requests_x", 1_000_000);
             write_set_empty(&mut b, "ok");
-            write_end(&mut b, 11);
+            write_end_timed(&mut b, 11);
             b
         }
 
@@ -886,6 +942,27 @@ mod tests {
                 ),
                 ("CHART a.b '' 't' 'u' 'f' 'c' line 1 1", "newline"),
                 ("CHART a.b '' 't' 'u' 'f' 'c' bar 1 1\n", "chart type"),
+                (
+                    "CHART a.b '' 't' 'u' 'f' 'c' line 99999999999 1\n",
+                    "valid int",
+                ),
+                (
+                    "CHART SLOT:1 '' 't' 'u' 'f' 'c' line 1 1\n",
+                    "invalid chart id",
+                ),
+                (
+                    "CHART a.b '' 't' 'u' 'f' 'c' line 1 1 'obsolete'\nBEGIN a.b 1\n",
+                    "obsolete chart",
+                ),
+                (
+                    "CHART a.b '' 't' 'u' 'f' 'c' line 1 1\nDIMENSION d 'd' absolute 1 1\n\
+                     BEGIN a.b 1\nSET d = 1\nSET d = 2\nEND 1\n",
+                    "second SET",
+                ),
+                (
+                    "CHART a.b '' 't' 'u' 'f' 'c' line 1 1\nBEGIN a.b 1\nEND 1 0\n",
+                    "END must read",
+                ),
             ];
             for (stream, expected) in cases {
                 let err = validate_chart_stream(stream.as_bytes()).expect_err(stream);
