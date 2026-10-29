@@ -46,8 +46,8 @@ Facts every rule below relies on (`integrations/templates/overview/collector.md`
   headings as-is.
 - Field text is Markdown rendered by Docusaurus on Learn. Paragraphs, lists, tables, inline code, fenced code, links,
   and `:::` admonitions (`note`, `tip`, `caution`) pass through the generator untouched.
-- Some empty fields are not empty on the page. `auto_detection`, `limits`, and `performance_impact` render a template
-  placeholder sentence that asserts something about the collector (see `overview.md`). An empty field is a claim.
+- Empty `auto_detection` and `performance_impact` fields render placeholder claims (see `overview.md`). Collector
+  pages omit the Limits section when its description is empty; this does not assert that collection is unlimited.
 - The first sentence of `metrics_description` supplies the catalog row. Page meta descriptions have separate
   override-first resolution and length rules in `integrations-lifecycle/description-authoring.md`.
 - Generated pages under `integrations/` and the `README.md` symlink are outputs. Fix the source; never edit them.
@@ -142,8 +142,9 @@ complete the validation and preview before committing:
    reader stopping after its first paragraph.
 3. No field is over-scoped: no headings, at most two or three bold captions, at most one admonition, no glossary
    before the reader knows what the collector does. Apply the explicit cost carve-out in `overview.md` when relevant.
-4. Empty `auto_detection`, `limits`, or `performance_impact` only where the placeholder sentence is true. A collector
-   covered by a service-discovery rule, or with a cardinality cap or a metered API, fills them.
+4. Empty `auto_detection` or `performance_impact` only where the placeholder sentence is true. Document actionable
+   operator limits explicitly even though an empty limits field renders nothing. A collector covered by a
+   service-discovery rule, or with a cardinality cap or a metered API, fills the corresponding field.
 5. No irrelevant implementation mechanics; unfamiliar operator terms defined at first use; no developer links
    (`ARCHITECTURE.md`, source code). The test is per sentence, not per field: ask what the operator does differently
    for having read it. "Nothing" means it belongs to another field, to `ARCHITECTURE.md`, or nowhere — see the worked
