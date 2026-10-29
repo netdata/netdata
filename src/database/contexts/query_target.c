@@ -368,9 +368,11 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
             ? true : false;
 
     if(timeframe_matches) {
-        RRDSET *st = rrdinstance_rrdset_atomic_load(ri);
-        if(st)
-            rrdset_set_last_accessed_time_s(st, qtl->start_s);
+        RRDSET_ACQUIRED *rsa = rrdinstance_rrdset_acquire(qi->ria);
+        if(rsa) {
+            rrdset_set_last_accessed_time_s(rrdset_acquired_to_rrdset(rsa), qtl->start_s);
+            rrdset_acquired_release(rsa);
+        }
 
         if (qt->query.used == qt->query.size) {
             size_t old_mem = qt->query.size * sizeof(*qt->query.array);
@@ -385,6 +387,12 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
 
         qm->status = options;
         qm->values_stored_as_rates = values_stored_as_rates;
+
+        // carried on the dimension flags so it survives group-by: the units
+        // a result dimension deserves depend on whether EVERY metric behind
+        // it was integrated from a rate into a volume
+        if(!values_stored_as_rates)
+            qm->status |= RRDR_DIMENSION_NOT_RATE;
 
         qm->link.query_node_id = qn->slot;
         qm->link.query_context_id = qc->slot;
@@ -641,22 +649,6 @@ inline STRING *query_instance_name_fqdn(
     }
 
     return qi->name_fqdn;
-}
-
-RRDSET_ACQUIRED *rrdinstance_acquired_rrdset_acquire(RRDINSTANCE_ACQUIRED *ria) {
-    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
-    RRDSET_ACQUIRED *rsa = rrdset_find_and_acquire(ri->rc->rrdhost, string2str(ri->id), true);
-    if(unlikely(!rsa))
-        return NULL;
-
-    RRDSET *st = rrdset_acquired_to_rrdset(rsa);
-
-    if(unlikely(st->rrdcontexts.rrdinstance != ria)) {
-        rrdset_acquired_release(rsa);
-        return NULL;
-    }
-
-    return rsa;
 }
 
 const char *rrdcontext_acquired_units(RRDCONTEXT_ACQUIRED *rca) {

@@ -763,11 +763,12 @@ static int mrg_stale_peeked_id_unittest(void) {
     return errors;
 }
 
-// Locks in the contract that pgc_open_cache_to_journal_v2() depends on when it
-// casts a PGC page's bare metric_id back to a METRIC *.
+// Locks in the contract that any holder of a bare METRIC pointer depends on.
 //
-// PGC pages store metric_id = (Word_t)metric WITHOUT holding an MRG reference,
-// so that pointer can outlive the METRIC. Two things then matter:
+// No cache keys on a METRIC address any more - PGC's page->metric_id is the
+// metric's UUIDMAP_ID (mrg_metric_id()) - so this is no longer about PGC. It
+// still matters for ANY code that keeps a METRIC * without holding a reference:
+// such a pointer can outlive the METRIC, and two things then follow:
 //
 //   1. mrg_metric_dup() CANNOT reject such a pointer. ARAL writes its free-list
 //      header over the first 16 bytes of a freed element, which on 64bit
@@ -823,9 +824,9 @@ static int mrg_stale_metric_pointer_unittest(void) {
         return 1;
     }
 
-    // Keep the raw pointer exactly the way a PGC page keeps page->metric_id:
-    // as a bare value, with no reference behind it.
-    METRIC *stale = (METRIC *)(uintptr_t)mrg_metric_id(mrg, metric);
+    // Keep the raw pointer the way PGC pages kept page->metric_id before it became the
+    // uuidmap id: as a bare value, with no reference behind it.
+    METRIC *stale = metric;
 
     // Delete it. From here on `stale` points into the MRG partition ARAL's
     // free list - this is the situation a page with a stale metric_id is in.
@@ -941,6 +942,97 @@ static PGC *jv2_test_cache_create(const char *name) {
         PGC_OPTIONS_DEFAULT, 1, sizeof(struct extent_io_data));
 }
 
+// A deleted metric's cache pages must never be found by a different metric.
+//
+// Rotation deletes a metric while its clean main-cache pages stay in the cache (they are not
+// retention, and nothing evicts them). When the page key was the METRIC address, ARAL handed the
+// freed slot to the next metric of the partition and that metric found the old pages as its own.
+// The key is the uuidmap id now, and ids are never reused while the map lives.
+static int mrg_page_key_not_reused_unittest(void) {
+    fprintf(stderr, "\nTesting a deleted metric's pages are not found by a new metric...\n");
+    int errors = 0;
+
+    const Word_t section = (Word_t)&test_ctx_0;
+    MRG *mrg = mrg_create_for_unittest();
+    PGC *cache = jv2_test_cache_create("page-key-reuse-test");
+
+    nd_uuid_t old_uuid, new_uuid;
+    uuid_generate_random(old_uuid);
+
+    // the same MRG partition, so the new metric can get the freed slot
+    do {
+        uuid_generate_random(new_uuid);
+    } while(uuid_to_uuidmap_partition(new_uuid) != uuid_to_uuidmap_partition(old_uuid));
+
+    bool added = false;
+    MRG_ENTRY entry = {
+        .uuid = &old_uuid,
+        .section = section,
+        .first_time_s = 0,
+        .last_time_s = 0,
+        .latest_update_every_s = 0,
+    };
+    METRIC *old_metric = mrg_metric_add_and_acquire(mrg, entry, &added);
+    Word_t old_key = mrg_metric_id(mrg, old_metric);
+    METRIC *new_metric = NULL;
+    Word_t new_key = 0;
+
+    // a clean page of the old metric
+    struct extent_io_data xio = { 0 };
+    bool page_added = false;
+    PGC_PAGE *page = pgc_page_add_and_acquire(cache, (PGC_ENTRY){
+        .section = section,
+        .metric_id = old_key,
+        .start_time_s = 100,
+        .end_time_s = 200,
+        .size = 4096,
+        .data = NULL,
+        .update_every_s = 1,
+        .hot = false,
+        .custom_data = (uint8_t *)&xio,
+    }, &page_added);
+
+    if(!page || !page_added) {
+        fprintf(stderr, "ERROR: cannot add the old metric's page\n");
+        errors++;
+        goto cleanup;
+    }
+    pgc_page_release(cache, page);
+
+    if(!mrg_metric_release_and_delete(mrg, old_metric)) {
+        fprintf(stderr, "ERROR: the old metric was not deleted\n");
+        errors++;
+        goto cleanup;
+    }
+
+    entry.uuid = &new_uuid;
+    new_metric = mrg_metric_add_and_acquire(mrg, entry, &added);
+    new_key = mrg_metric_id(mrg, new_metric);
+
+    if(new_key == old_key) {
+        fprintf(stderr, "ERROR: the new metric got the deleted metric's page key\n");
+        errors++;
+    }
+
+    page = pgc_page_get_and_acquire(cache, section, new_key, 0, PGC_SEARCH_FIRST);
+    if(page) {
+        fprintf(stderr, "ERROR: the new metric found the deleted metric's page (start %ld)\n",
+                (long)pgc_page_start_time_s(page));
+        errors++;
+        pgc_page_release(cache, page);
+    }
+
+    mrg_metric_release(mrg, new_metric);
+
+cleanup:
+    pgc_destroy(cache, false);
+    (void)mrg_destroy(mrg);
+
+    fprintf(stderr, "Testing a deleted metric's pages are not found by a new metric: %s\n",
+            errors ? "FAILED" : "OK");
+    return errors;
+}
+
 static int mrg_jv2_stale_metric_not_dereferenced_unittest(void) {
 #if defined(FSANITIZE_ADDRESS)
     fprintf(stderr, "\nTesting jv2 does not dereference a stale METRIC... SKIPPED (FSANITIZE_ADDRESS)\n");
@@ -984,7 +1076,7 @@ static int mrg_jv2_stale_metric_not_dereferenced_unittest(void) {
         return 1;
     }
 
-    METRIC *stale = (METRIC *)(uintptr_t)mrg_metric_id(mrg, metric);
+    METRIC *stale = metric;
 
     // The id the open-cache page will carry. Captured while the metric is still
     // alive, exactly as pgc_open_add_hot_page() does in production. After the
@@ -1019,7 +1111,7 @@ static int mrg_jv2_stale_metric_not_dereferenced_unittest(void) {
     __atomic_store_n(&stale->refcount, (REFCOUNT)PLANTED, __ATOMIC_RELAXED);
 
     // 4. a hot page in the section/datafile the indexer will walk, carrying the
-    //    stale pointer as its metric_id - the production layout.
+    //    stale pointer as its metric_id - the pre-fix layout.
     struct extent_io_data xio = {
         .fileno = TEST_FILENO,
         .block = 4096,
@@ -1345,7 +1437,7 @@ static int jv2_make_two_pointers_one_uuid(MRG *mrg, Word_t section, struct jv2_t
         jv2_two_pointers_undo(mrg, out);
         return 1;
     }
-    out->stale_ptr = (METRIC *)(uintptr_t)mrg_metric_id(mrg, first);
+    out->stale_ptr = first;
 
     // delete it; `pinned` keeps the uuid (and therefore the id) alive
     if(!mrg_metric_release_and_delete(mrg, first)) {
@@ -1383,7 +1475,7 @@ static int jv2_make_two_pointers_one_uuid(MRG *mrg, Word_t section, struct jv2_t
     }
     out->shared_id = mrg_metric_uuidmap_id(mrg, out->live);
 
-    METRIC *new_ptr = (METRIC *)(uintptr_t)mrg_metric_id(mrg, out->live);
+    METRIC *new_ptr = out->live;
     if(new_ptr == out->stale_ptr) {
         // ARAL handed back the same slot, so there is no "two pointers, one uuid"
         // situation. Not a product defect - an inconclusive run, and better reported
@@ -1408,11 +1500,18 @@ static int jv2_make_two_pointers_one_uuid(MRG *mrg, Word_t section, struct jv2_t
 // Two open-cache pages for the SAME uuid but with DIFFERENT page->metric_id
 // values must be indexed as ONE metric.
 //
-// This happens in production when a metric is deleted and re-created for the
-// same uuid: the new METRIC gets a new pointer, while older open-cache pages
-// still carry the old one. The uuidmap id survives the deletion whenever
-// something else still references that uuid - another tier's METRIC for the same
-// dimension, for instance - so both pages legitimately carry the same uuid_id.
+// This USED to happen in production, while page->metric_id was a bare METRIC
+// pointer: a metric deleted and re-created for the same uuid got a new pointer,
+// while older open-cache pages still carried the old one. The uuidmap id survives
+// the deletion whenever something else still references that uuid - another tier's
+// METRIC for the same dimension, for instance - so both pages legitimately carried
+// the same uuid_id.
+//
+// It can no longer arise from a production caller: page->metric_id IS the uuidmap
+// id now (mrg_metric_id()), so both incarnations share one key. This test injects
+// the divergence by hand to keep the indexer honest, because the property it locks
+// in - group by uuid, never by whatever PGC uses as its index key - is what makes
+// the journal correct regardless of how that key is chosen.
 //
 // It matters because journal v2 wants one entry per uuid:
 // journalfile_migrate_to_v2_callback() builds and sorts a uuid list, and its
@@ -1422,9 +1521,9 @@ static int jv2_make_two_pointers_one_uuid(MRG *mrg, Word_t section, struct jv2_t
 // Keying JudyL_metrics by page->metric_id produces two groups here. Keying it by
 // the page's uuid_id produces one.
 //
-// Note this only became reachable once metrics were resolved by id: while the
-// indexer dereferenced page->metric_id, the older page failed to resolve and was
-// skipped, so the duplicate could not form.
+// Note the divergence only became reachable at all once metrics were resolved by
+// id: while the indexer dereferenced page->metric_id, the older page failed to
+// resolve and was skipped, so the duplicate could not form.
 // start_old / start_new are the two pages' start times, and expected_pages is how
 // many pages the indexer should end up with. Distinct start times => both pages
 // are indexed. IDENTICAL start times => the two pages collide inside the single
@@ -1457,7 +1556,7 @@ static int mrg_jv2_same_uuid_grouped_once_check(
         goto cleanup_early;
     }
     old_ptr = tp.stale_ptr;
-    new_ptr = (METRIC *)(uintptr_t)mrg_metric_id(mrg, tp.live);
+    new_ptr = tp.live;
     shared_id = tp.shared_id;
     pinned = tp.pinned;
     second = tp.live;
@@ -1709,7 +1808,6 @@ struct jv2_journal_fixture {
     Word_t section;
     MRG *mrg;
     MRG *saved_main_mrg;
-    bool published;                 // set by jv2_journal_fixture_publish() on activation
 };
 
 // Returns false, having built nothing, when no temporary directory is usable. That is
@@ -1764,8 +1862,7 @@ static bool jv2_journal_fixture_init(struct jv2_journal_fixture *fx, unsigned fi
 }
 
 // Runs the real writer over the cache's hot pages of this fixture's section and
-// datafile. Returns true once the v2 journal is activated; only then may the
-// fixture's teardown close it.
+// datafile. Returns true once the v2 journal is activated.
 static bool jv2_journal_fixture_publish(struct jv2_journal_fixture *fx, PGC *cache) {
     pgc_open_cache_to_journal_v2(cache, fx->section, fx->datafile.fileno, 1,
                                  journalfile_migrate_to_v2_callback, fx->journalfile, true);
@@ -1775,7 +1872,6 @@ static bool jv2_journal_fixture_publish(struct jv2_journal_fixture *fx, PGC *cac
         return false;
     }
 
-    fx->published = true;
     return true;
 }
 
@@ -1793,10 +1889,9 @@ static int jv2_journal_fixture_destroy(struct jv2_journal_fixture *fx) {
         errors++;
     }
 
-    // journalfile_close() removes the datafile from ctx.njfv2idx and unmaps the file;
-    // only valid once activation succeeded, otherwise it would close an unset uv_file.
-    if(fx->published)
-        journalfile_close(fx->journalfile, &fx->datafile);
+    // journalfile_close() removes the datafile from ctx.njfv2idx and unmaps the file,
+    // and closes only what is still open
+    journalfile_close(fx->journalfile, &fx->datafile);
     freez(fx->journalfile);
 
     netdata_rwlock_destroy(&fx->datafile.extent_rwlock);
@@ -2318,6 +2413,367 @@ static int mrg_jv2_samples_section_unittest(void) {
     return errors;
 }
 
+// A journal v2 of one metric published by the real writer, for the rejection and
+// close tests. The test owns the cache, page and metric until jv2_one_metric_destroy().
+struct jv2_one_metric {
+    struct jv2_journal_fixture fx;
+    PGC *cache;
+    nd_uuid_t uuid;
+    METRIC *metric;
+    PGC_PAGE *page;
+};
+
+// Builds on an initialized fixture. Returns true once the journal v2 is published.
+static bool jv2_one_metric_publish(struct jv2_one_metric *t) {
+    t->cache = jv2_test_cache_create("jv2-rejected-test");
+
+    uuid_generate(t->uuid);
+    MRG_ENTRY entry = {
+        .uuid = &t->uuid, .section = t->fx.section,
+        .first_time_s = 100, .last_time_s = 100, .latest_update_every_s = 1,
+    };
+    bool added;
+    t->metric = mrg_metric_add_and_acquire(t->fx.mrg, entry, &added);
+
+    struct extent_io_data xio = {
+        .fileno = t->fx.datafile.fileno, .block = 4096, .bytes = 4096,
+        .uuid_id = mrg_metric_uuidmap_id(t->fx.mrg, t->metric),
+    };
+    t->page = pgc_page_add_and_acquire(t->cache, (PGC_ENTRY){
+        .section = t->fx.section, .metric_id = mrg_metric_id(t->fx.mrg, t->metric),
+        .start_time_s = 100, .end_time_s = 200, .size = 4096, .data = &t->fx.datafile,
+        .update_every_s = 1, .hot = true, .custom_data = (uint8_t *)&xio,
+    }, &added);
+
+    if(!t->page || !added) {
+        fprintf(stderr, "ERROR: cannot add the hot page\n");
+        return false;
+    }
+
+    return jv2_journal_fixture_publish(&t->fx, t->cache);
+}
+
+static int jv2_one_metric_destroy(struct jv2_one_metric *t) {
+    if(t->page)
+        pgc_page_release(t->cache, t->page);
+    if(t->cache)
+        pgc_destroy(t->cache, false);
+    if(t->metric)
+        mrg_metric_release_and_delete(t->fx.mrg, t->metric);
+    return jv2_journal_fixture_destroy(&t->fx);
+}
+
+#ifndef NETDATA_INTERNAL_CHECKS
+// The journal v2 is mapped on demand: journalfile_v2_data_set() leaves only its fd.
+// Swapping it for an fd that cannot be mapped (/dev/null) makes the next mapping fail,
+// as an mmap() failure does in production.
+// Not with internal checks: the failed mapping is an internal_fatal() there.
+static bool jv2_break_next_mapping(struct rrdengine_journalfile *journalfile) {
+    int fd = open("/dev/null", O_RDONLY | O_CLOEXEC);
+    if(fd == -1) {
+        fprintf(stderr, "ERROR: cannot open /dev/null to break the journal v2 mapping\n");
+        return false;
+    }
+
+    close(journalfile->mmap.fd);
+    journalfile->mmap.fd = fd;
+    return true;
+}
+
+#endif
+
+static bool fd_is_open(int fd) {
+    return fcntl(fd, F_GETFD) != -1;
+}
+
+#ifndef NETDATA_INTERNAL_CHECKS
+
+// A loaded journal v2 that cannot be mapped while populating the MRG is rejected like
+// one that fails its checks: its size is kept for the rebuild and for deletion. Its
+// journal v1 is not open, so closing the journal must not close fd 0.
+static int mrg_jv2_rejected_on_mapping_failure_check(void) {
+    int errors = 0;
+    enum { TEST_FILENO = 13 };
+
+    struct jv2_one_metric t = { 0 };
+    if(!jv2_journal_fixture_init(&t.fx, TEST_FILENO))
+        return 0;
+
+    if(!jv2_one_metric_publish(&t)) {
+        errors++;
+        goto cleanup;
+    }
+
+    struct rrdengine_journalfile *journalfile = t.fx.journalfile;
+    size_t loaded_size = journalfile_v2_data_size_get(journalfile);
+
+    if(!jv2_break_next_mapping(journalfile)) {
+        errors++;
+        goto cleanup;
+    }
+    journalfile_v2_populate_retention_to_mrg(&t.fx.ctx, journalfile);
+
+    if(journalfile_v2_data_available(journalfile)) {
+        fprintf(stderr, "ERROR: a journal v2 that cannot be mapped is still available\n");
+        errors++;
+    }
+    if(t.fx.datafile.rejected_v2_size != loaded_size) {
+        fprintf(stderr, "ERROR: the rejected journal v2 recorded %zu bytes, expected %zu\n",
+                t.fx.datafile.rejected_v2_size, loaded_size);
+        errors++;
+    }
+    if(t.fx.datafile.samples.charged != 0 || !t.fx.datafile.samples.estimated) {
+        fprintf(stderr, "ERROR: the rejected journal v2 left %" PRIu64 " samples (estimated %d), expected 0 (estimated 1)\n",
+                t.fx.datafile.samples.charged, t.fx.datafile.samples.estimated);
+        errors++;
+    }
+
+    int devnull = -1;
+    if(!fd_is_open(0))
+        devnull = open("/dev/null", O_RDONLY | O_CLOEXEC);  // the lowest free fd: 0
+
+    if(!fd_is_open(0)) {
+        fprintf(stderr, "ERROR: cannot open fd 0 for the test\n");
+        errors++;
+    }
+    else {
+        int saved = dup(0);
+        if(saved == -1) {
+            fprintf(stderr, "ERROR: cannot save fd 0 for the test\n");
+            errors++;
+        }
+        else {
+            journalfile_close(journalfile, &t.fx.datafile);
+
+            if(!fd_is_open(0)) {
+                fprintf(stderr, "ERROR: closing a journal whose v1 is not open closed fd 0\n");
+                errors++;
+                dup2(saved, 0);
+            }
+            close(saved);
+        }
+    }
+
+    if(devnull != -1)
+        close(devnull);
+
+cleanup:
+    errors += jv2_one_metric_destroy(&t);
+    return errors;
+}
+
+#endif
+
+// The journal owns its v1 fd whatever its number, and closes it even when its v2 is
+// available (a v1 replayed and indexed at startup, or written while running).
+static int mrg_jv2_close_owned_v1_check(void) {
+    int errors = 0;
+    enum { TEST_FILENO = 14 };
+
+    struct jv2_one_metric t = { 0 };
+    if(!jv2_journal_fixture_init(&t.fx, TEST_FILENO))
+        return 0;
+
+    if(!jv2_one_metric_publish(&t)) {
+        errors++;
+        goto cleanup;
+    }
+
+    struct rrdengine_journalfile *journalfile = t.fx.journalfile;
+    int v1 = open("/dev/null", O_RDONLY | O_CLOEXEC);
+    if(v1 == -1) {
+        fprintf(stderr, "ERROR: cannot open a v1 fd for the test\n");
+        errors++;
+        goto cleanup;
+    }
+    journalfile->file = v1;
+
+    journalfile_close(journalfile, &t.fx.datafile);
+
+    if(fd_is_open(v1)) {
+        fprintf(stderr, "ERROR: closing a journal with an available v2 left its v1 fd open\n");
+        errors++;
+        close(v1);
+    }
+    if(journalfile->file != -1) {
+        fprintf(stderr, "ERROR: the closed journal still holds v1 fd %d\n", (int)journalfile->file);
+        errors++;
+    }
+    if(journalfile_v2_data_available(journalfile)) {
+        fprintf(stderr, "ERROR: the closed journal still has its v2 available\n");
+        errors++;
+    }
+
+    // an owned fd 0 is closed like any other; fd 0 is left as it was found
+    bool fd0_was_open = fd_is_open(0);
+    int saved = fd0_was_open ? dup(0) : -1;
+    int devnull = open("/dev/null", O_RDONLY | O_CLOEXEC);
+    if((fd0_was_open && saved == -1) || devnull == -1 || dup2(devnull, 0) != 0) {
+        fprintf(stderr, "ERROR: cannot set up an owned fd 0 for the test\n");
+        errors++;
+    }
+    else {
+        journalfile->file = 0;
+        journalfile_close(journalfile, &t.fx.datafile);
+        if(fd_is_open(0)) {
+            fprintf(stderr, "ERROR: closing a journal that owns fd 0 left it open\n");
+            errors++;
+        }
+        if(journalfile->file != -1) {
+            fprintf(stderr, "ERROR: the closed journal still holds v1 fd %d\n", (int)journalfile->file);
+            errors++;
+        }
+    }
+    if(saved != -1) {
+        dup2(saved, 0);
+        close(saved);
+    }
+    else if(!fd0_was_open && fd_is_open(0))
+        close(0);
+    if(devnull > 0)
+        close(devnull);
+
+cleanup:
+    errors += jv2_one_metric_destroy(&t);
+    return errors;
+}
+
+#ifndef NETDATA_INTERNAL_CHECKS
+// A journal v2 that cannot be mapped for a query is unusable for the rest of the run:
+// its size is recorded (datafile_delete() discharges it; not exercised here).
+static int mrg_jv2_query_mapping_failure_check(void) {
+    int errors = 0;
+    enum { TEST_FILENO = 16 };
+
+    struct jv2_one_metric t = { 0 };
+    if(!jv2_journal_fixture_init(&t.fx, TEST_FILENO))
+        return 0;
+
+    if(!jv2_one_metric_publish(&t)) {
+        errors++;
+        goto cleanup;
+    }
+
+    struct rrdengine_journalfile *journalfile = t.fx.journalfile;
+    size_t loaded_size = journalfile_v2_data_size_get(journalfile);
+    if(!jv2_break_next_mapping(journalfile)) {
+        errors++;
+        goto cleanup;
+    }
+
+    size_t data_size = 0;
+    if(journalfile_v2_data_acquire(journalfile, &data_size, 0, 0)) {
+        fprintf(stderr, "ERROR: a journal v2 that cannot be mapped was acquired\n");
+        errors++;
+        journalfile_v2_data_release(journalfile);
+    }
+    if(journalfile_v2_data_available(journalfile)) {
+        fprintf(stderr, "ERROR: a journal v2 that cannot be mapped for a query is still available\n");
+        errors++;
+    }
+    if(t.fx.datafile.rejected_v2_size != loaded_size) {
+        fprintf(stderr, "ERROR: the journal v2 that cannot be mapped for a query recorded %zu bytes, expected %zu\n",
+                t.fx.datafile.rejected_v2_size, loaded_size);
+        errors++;
+    }
+
+    // a second acquirer that passed the availability check before the mapping failed
+    // finds the journal already cleared: it must keep the recorded size
+    journalfile->v2.flags |= JOURNALFILE_FLAG_IS_AVAILABLE;
+    if(journalfile_v2_data_acquire(journalfile, &data_size, 0, 0)) {
+        fprintf(stderr, "ERROR: a journal v2 whose mapping failed was acquired again\n");
+        errors++;
+        journalfile_v2_data_release(journalfile);
+    }
+    journalfile->v2.flags &= ~JOURNALFILE_FLAG_IS_AVAILABLE;
+    if(t.fx.datafile.rejected_v2_size != loaded_size) {
+        fprintf(stderr, "ERROR: a second acquire of a journal v2 whose mapping failed left %zu bytes recorded, expected %zu\n",
+                t.fx.datafile.rejected_v2_size, loaded_size);
+        errors++;
+    }
+
+cleanup:
+    errors += jv2_one_metric_destroy(&t);
+    return errors;
+}
+
+// A rejected journal v2 whose journal v1 is unusable (shorter than its superblock)
+// cannot be rebuilt: the rebuild fails and leaves the rejected v2 on disk, recorded.
+static int mrg_jv2_rebuild_with_unusable_v1_check(void) {
+    int errors = 0;
+    enum { TEST_FILENO = 15 };
+
+    struct jv2_one_metric t = { 0 };
+    if(!jv2_journal_fixture_init(&t.fx, TEST_FILENO))
+        return 0;
+
+    char v1_path[FILENAME_MAX + 1];
+    journalfile_v1_generate_path(&t.fx.datafile, v1_path, sizeof(v1_path));
+
+    if(!jv2_one_metric_publish(&t)) {
+        errors++;
+        goto cleanup;
+    }
+
+    struct rrdengine_journalfile *journalfile = t.fx.journalfile;
+    size_t loaded_size = journalfile_v2_data_size_get(journalfile);
+    if(!jv2_break_next_mapping(journalfile)) {
+        errors++;
+        goto cleanup;
+    }
+    journalfile_v2_populate_retention_to_mrg(&t.fx.ctx, journalfile);
+
+    int v1_fd = open(v1_path, O_CREAT | O_TRUNC | O_WRONLY | O_CLOEXEC, 0600);
+    bool v1_written = v1_fd != -1 && write(v1_fd, "x", 1) == 1;
+    if(v1_fd != -1)
+        close(v1_fd);
+    if(!v1_written) {
+        fprintf(stderr, "ERROR: cannot write the short journal v1\n");
+        errors++;
+        goto cleanup;
+    }
+
+    if(journalfile_v2_rebuild_from_v1(&t.fx.ctx, journalfile)) {
+        fprintf(stderr, "ERROR: a journal v2 was rebuilt from an unusable journal v1\n");
+        errors++;
+    }
+
+    char v2_path[FILENAME_MAX + 1];
+    journalfile_v2_generate_path(&t.fx.datafile, v2_path, sizeof(v2_path));
+    if(access(v2_path, F_OK) != 0) {
+        fprintf(stderr, "ERROR: the rejected journal v2 was removed although its v1 is unusable\n");
+        errors++;
+    }
+    if(t.fx.datafile.rejected_v2_size != loaded_size) {
+        fprintf(stderr, "ERROR: the rejected journal v2 records %zu bytes after the failed rebuild, expected %zu\n",
+                t.fx.datafile.rejected_v2_size, loaded_size);
+        errors++;
+    }
+    if(journalfile->file != -1) {
+        fprintf(stderr, "ERROR: the failed rebuild left v1 fd %d in the journal\n", (int)journalfile->file);
+        errors++;
+    }
+
+cleanup:
+    unlink(v1_path);
+    errors += jv2_one_metric_destroy(&t);
+    return errors;
+}
+
+#endif
+
+static int mrg_jv2_rejected_journal_unittest(void) {
+    fprintf(stderr, "\nTesting rejected journal v2 end states (mapping failure, v1 close, rebuild)...\n");
+    int errors = mrg_jv2_close_owned_v1_check();
+#ifndef NETDATA_INTERNAL_CHECKS
+    errors += mrg_jv2_rejected_on_mapping_failure_check();
+    errors += mrg_jv2_rebuild_with_unusable_v1_check();
+    errors += mrg_jv2_query_mapping_failure_check();
+#endif
+    fprintf(stderr, "jv2 rejected journal test: %s\n", errors ? "FAILED" : "OK");
+    return errors;
+}
+
 static int mrg_jv2_same_uuid_grouped_once_unittest(void) {
     // distinct start times: one group, both pages kept
     int errors = mrg_jv2_same_uuid_grouped_once_check(
@@ -2365,10 +2821,12 @@ int mrg_unittest(void) {
     errors += mrg_destroy_referenced_metric_unittest();
     errors += mrg_stale_peeked_id_unittest();
     errors += mrg_stale_metric_pointer_unittest();
+    errors += mrg_page_key_not_reused_unittest();
     errors += mrg_jv2_stale_metric_not_dereferenced_unittest();
     errors += mrg_jv2_same_uuid_grouped_once_unittest();
     errors += mrg_jv2_real_writer_unittest();
     errors += mrg_jv2_samples_section_unittest();
+    errors += mrg_jv2_rejected_journal_unittest();
     errors += mrg_uuid_lookup_delete_race_unittest();
 
     // Use mrg_create_for_unittest to avoid pre-loaded metrics that block deletion

@@ -74,6 +74,7 @@ int rrdeng_init(
 void rrdeng_readiness_wait(struct rrdengine_instance *ctx);
 
 int rrdeng_exit(struct rrdengine_instance *ctx);
+void rrdeng_ctx_free(struct rrdengine_instance *ctx);
 void rrdeng_quiesce(struct rrdengine_instance *ctx);
 void rrdeng_flush_dirty(struct rrdengine_instance *ctx);
 void rrdeng_flush_all(struct rrdengine_instance *ctx);
@@ -83,7 +84,7 @@ bool rrdeng_metric_retention_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id, time_t *
 bool rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *si, nd_uuid_t *dim_uuid, time_t *first_entry_s, time_t *last_entry_s);
 void rrdeng_metric_retention_delete_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id);
 
-extern STORAGE_METRICS_GROUP *rrdeng_metrics_group_get(STORAGE_INSTANCE *si, nd_uuid_t *uuid);
+extern STORAGE_METRICS_GROUP *rrdeng_metrics_group_get(STORAGE_INSTANCE *si, uint64_t seed);
 extern void rrdeng_metrics_group_release(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg);
 
 typedef struct rrdengine_size_statistics {

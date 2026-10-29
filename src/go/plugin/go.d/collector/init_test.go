@@ -22,7 +22,9 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-var serviceModulePattern = regexp.MustCompile(`(?m)^\s*(?:-\s*)?module:\s*([A-Za-z0-9_.-]+)\s*$`)
+// Stock rules name modules in legacy YAML or as literal job/dict/set arguments.
+var serviceModulePattern = regexp.MustCompile(`(?m)^\s*(?:-\s*)?module:\s*([A-Za-z0-9_.-]+)\s*$|"module"\s+"([A-Za-z0-9_.-]+)"`)
+var servicePassThroughPattern = regexp.MustCompile(`^\s*{{-?\s*(?:job\s+\.Item|\.Item\s*\|\s*toYaml)\s*-?}}\s*$`)
 
 func TestStockServiceDiscoveryRulesTargetRegisteredCollectors(t *testing.T) {
 	registry, _ := NewRegistry(t.TempDir())
@@ -41,7 +43,7 @@ func TestStockServiceDiscoveryRulesTargetRegisteredCollectors(t *testing.T) {
 			if strings.TrimSpace(rule.ConfigTemplate) == "" {
 				continue
 			}
-			if strings.Contains(rule.ConfigTemplate, "toYaml") {
+			if servicePassThroughPattern.MatchString(rule.ConfigTemplate) {
 				// Pass-through templates provide the complete job, including module,
 				// from the discovered item.
 				continue
@@ -49,11 +51,15 @@ func TestStockServiceDiscoveryRulesTargetRegisteredCollectors(t *testing.T) {
 
 			modules := serviceModulePattern.FindAllStringSubmatch(rule.ConfigTemplate, -1)
 			if len(modules) == 0 {
-				modules = [][]string{{"", rule.ID}}
+				modules = [][]string{{"", rule.ID, ""}}
 			}
 			for _, match := range modules {
-				_, ok := registry.Lookup(match[1])
-				assert.Truef(t, ok, "%s service rule %q targets unregistered collector %q", filepath.Base(file), rule.ID, match[1])
+				module := match[1]
+				if module == "" {
+					module = match[2]
+				}
+				_, ok := registry.Lookup(module)
+				assert.Truef(t, ok, "%s service rule %q targets unregistered collector %q", filepath.Base(file), rule.ID, module)
 			}
 		}
 	}

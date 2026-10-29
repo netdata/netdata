@@ -71,7 +71,9 @@ Each collection cycle (`collect.go`), in order:
 2. use compiler-created instances for all-constant profiles; for dynamic
    profiles, share one `ListMetrics` scan per (target, region, namespace) and
    match each participating profile against that stream (`discover.go`);
-3. resolve resource-tag membership and optional chart labels (`tags.go`);
+3. resolve resource-tag membership and optional chart labels (`tags.go`), then
+   accept completed background resource attribute results and queue any due refresh
+   without waiting for it (`attributes.go`, `attributes_run.go`);
 4. reuse or rebuild the stable per-series query blueprint
    (`query_plan.go`);
 5. execute the due queries in concurrent batches (`query_executor.go`);
@@ -83,9 +85,10 @@ Each collection cycle (`collect.go`), in order:
 
 ## Lifecycle
 
-Framework V2: `Init` → `Check` → repeated `Collect`; there is no background
-`Run` (the collector does not implement `CollectorV2Runner`). `collector.go`
-owns the `Collector` struct and lifecycle.
+Framework V2: `Init` → `Check` → `Run` readiness → repeated `Collect`.
+`CollectorV2Runner.Run` acquires optional resource attributes alongside collection;
+readiness does not wait for those lookups. `collector.go` owns collection state and
+`attributes_run.go` owns the background worker.
 
 ```mermaid
 flowchart TD
@@ -94,12 +97,15 @@ flowchart TD
     Runtime("ensurePlan<br/>load catalog · compile rules<br/>build + cache chart template")
     Targets("ensureTargets<br/>concurrent STS GetCallerIdentity<br/>fail-soft · retry pending")
     Post("framework postCheck<br/>validate ChartTemplateYAML via chartengine")
+    Run("Run<br/>snapshot worker inputs · signal ready<br/>acquire optional metadata")
     Collect("Collect<br/>every update_every")
-    Cycle("collect cycle<br/>discover → tags → plan → schedule → execute → observe")
+    Cycle("collect cycle<br/>discover → tags → attributes → plan → schedule → execute → observe")
 
     Init --> Check
     Check --> Runtime --> Targets --> Post
-    Post --> Collect --> Cycle --> Collect
+    Post --> Run -->|ready| Collect --> Cycle --> Collect
+    Cycle -. due metadata requests .-> Run
+    Run -. completed metadata .-> Cycle
 
     classDef input fill:#eef1f4,stroke:#8b949e,color:#24292f;
     classDef sched fill:#ece2ff,stroke:#8250df,color:#3b1f6b;
@@ -109,7 +115,7 @@ flowchart TD
     class Init,Check input
     class Runtime,Targets sched
     class Post commit
-    class Collect,Cycle core
+    class Run,Collect,Cycle core
 ```
 
 - **Init** does config only (`applyDefaults`, `validate`) — no network.
@@ -120,8 +126,11 @@ flowchart TD
   first `Collect`; an unbuilt template would fail the job.
 - **Collect** runs the whole cycle (below). `ensurePlan` short-circuits once
   compiled; `ensureTargets` retries only unresolved targets.
+- **Run** owns metadata clients and remote acquisition. Collection sends due requests
+  and accepts completed results without waiting for metadata. The framework cancels
+  and joins the runner before cleanup.
 - **Cleanup** resets the collection plan, resolved targets, cached template,
-  discovery/query snapshots, client caches, and per-query observation state so a framework
+  discovery/query/attribute snapshots, worker channels, client caches, and per-query observation state so a framework
   re-Init after failed autodetection starts clean. Pending collector activity and
   its known interval-gauge keys are reset as well. The `metrix` store is created
   once in `New` and persists — it is not recreated.
@@ -135,8 +144,8 @@ flowchart TD
 flowchart TD
     A("ensure collection plan + target account ids")
     B("refreshDiscovery<br/>shared ListMetrics scans per compatible target scope")
-    C("refreshTags<br/>resolve filter membership + non-identity labels")
-    D("currentQueryPlan<br/>cached until target/discovery/tag inputs change")
+    C("refreshTags + refreshAttributes<br/>resolve filter membership + enrichment labels")
+    D("currentQueryPlan<br/>cached until target/discovery/tag/attribute inputs change")
     E("dueQueries<br/>keep stable queries with a newer eligible window")
     F("executeQueries<br/>batched · concurrent GetMetricData")
     G("apply outcomes + emit<br/>write gauges · re-emit retained")
@@ -285,7 +294,8 @@ advance, or dependent tag/query invalidation.
 `tags.go`, `tag_fetch.go`, `tagjoin.go`, and `tagresolve.go` form the stage
 between discovery and query planning. Resource-tag predicates decide which
 discovered instances a rule may query. Separately, `labels.resource_tags`
-copies selected AWS tags to **non-identity** chart labels.
+copies selected AWS tags to chart labels. Stock templates treat these as presentation;
+custom templates may explicitly use them for identity or selection.
 
 - **Focused fetches.** A Resource Groups Tagging API (RGTA) client is cached per
   `{target, region}`. Policy scopes sharing target, region, and canonical predicate
@@ -301,7 +311,8 @@ copies selected AWS tags to **non-identity** chart labels.
   continue to query those series while the same series remain reserved for every other
   candidate. Freshness and retry state are fetch-group-local: failed groups retry next
   collect while successful groups keep their result until its discovery TTL expires.
-  Optional label enrichment carries last-known labels and never controls identity.
+  Optional label enrichment carries last-known labels; the template determines whether
+  explicit tag labels participate in chart identity or selection.
 - **Label resolution (`tagresolve.go`).** `resolveTagPlan` turns
   `labels.resource_tags` into a per-profile `awsKey → label` plan once. Global config
   validation rejects malformed or duplicate entries; profile-specific collisions with
@@ -319,14 +330,67 @@ copies selected AWS tags to **non-identity** chart labels.
   A default-selected profile without a safe association is skipped when filtering is
   effective; explicitly including one is a config error unless that rule disables or
   replaces the filter. Labels-only use remains best-effort for unsupported profiles.
-- **Emission split.** Identity `labels` (`{account_id, region, <dims>}`) and `tagLabels`
-  travel separately through `plannedQuery`. `writeSample` emits `labels + tagLabels`
-  in a fresh slice; the stable query key uses identity labels but excludes tag labels,
-  so a tag change never churns query state. `chartengine` `auto_intersection` then
-  promotes the tag labels as non-identity chart labels—no template change. A changed
+- **Emission split.** Identity `labels` (`{account_id, region, <dims>}`) and
+  `enrichmentLabels` (resource attribute labels, then tag labels) travel separately
+  through `plannedQuery`. `writeSample` emits `labels + enrichmentLabels` in a fresh
+  slice; the stable query key uses identity labels but excludes enrichment labels,
+  so a tag or attribute change never churns query state. In stock templates, `chartengine`
+  `auto_intersection` promotes enrichment labels as non-identity chart labels. A changed
   effective label set invalidates the plan once; the current plan supplies the new
-  labels and the normal numeric snapshot causes chartengine to emit a label-only
-  chart-definition update for an existing chart.
+  labels and the normal numeric snapshot produces a label-only chart-definition update.
+  Custom templates retain their explicit tag identity and selection rules. Automatic
+  attributes are withheld wherever they would affect those rules (see below).
+
+## Resource Attribute Labels
+
+`attributes.go`, `attributes_run.go`, and `attributes_rds.go` add facts CloudWatch does not publish per
+instance. CloudWatch aggregates `AWS/RDS` separately by `EngineName` and
+`DatabaseClass` but never pairs them with `DBInstanceIdentifier`, so the engine comes
+from the RDS control plane.
+
+- **Providers.** `resourceAttributeProviders` is a Go registry keyed by CloudWatch
+  namespace and an identifying join dimension. A profile (stock or user) gets a provider
+  when its namespace matches and the join dimension is identifying; a constant join
+  dimension describes an aggregate and gets none. The only provider is
+  `rds:DescribeDBInstances` (`AWS/RDS`, `DBInstanceIdentifier`), emitting `engine`,
+  `engine_version`, and `db_instance_class` from the raw AWS values; empty values are
+  omitted. There is no config option and no profile-format field.
+- **Acquisition ownership.** `CollectorV2Runner.Run` signals readiness without waiting
+  for AWS and fetches optional metadata independently of `Collect`. Immutable requests
+  and results transfer through channels, with one batch outstanding at a time. The
+  runner owns RDS clients; `Collect` owns accepted labels and query-plan invalidation.
+  Runner cancellation cancels its requests, and the framework joins it before cleanup.
+- **Fetch groups.** One fetch per `(target, region, provider)` that has discovered
+  instances, so a job selecting RDS without RDS instances makes no call. Clients are
+  cached per `(target, region)`; pages use the API maximum `MaxRecords=100` and a
+  duplicate-marker check, and one job `timeout` covers the client build and all pages,
+  as for a whole resource-tag lookup. There is no aggregate page cap. The join is
+  exact on the instance identifier within the fetching target and region, extracted
+  using each profile's own dimension layout. Requests include discovered identifiers;
+  responses for other instances (undiscovered, Neptune, DocumentDB) are discarded.
+- **Refresh and failure.** `Collect` accepts completed results without waiting for
+  remote I/O and filters them to the current discovery snapshot, so a late response
+  cannot resurrect removed resources. Refresh uses `discovery.refresh_every`; a new
+  discovery snapshot also makes metadata due. New identifiers discovered during an
+  outstanding request cause another refresh after that request completes. A failed group
+  keeps its last-known labels and retries on this cadence rather than every collect; failures log through
+  the hourly-limited `resource attribute lookup` warning.
+- **Presentation.** Initial charts may lack attributes; a later collection applies
+  completed metadata to the same chart IDs. A changed label set invalidates the query
+  plan once; chartengine emits `UpdateChartLabelsAction` for the existing chart.
+  Explicit `labels.resource_tags` mappings reserve their output names, even when a
+  resource has no value for that tag; automatic attributes only fill unclaimed names.
+  A provider whose labels collide with profile identity labels is skipped, preserving
+  unique label keys without changing chart or query identity. `attributes_labels.go`
+  also resolves each profile's effective template with `charttpl.NormalizeGroups` and
+  `chartengine.ResolveInstanceLabelPolicy`. It withholds automatic keys consumed by
+  required/optional/wildcard chart identity, dimension `name_from_label`, or dimension
+  selector predicates. This applies across nested defaults and chart overrides;
+  wildcard exclusions make a key eligible again when no other consumer needs it.
+  The authored template and explicit tags are unchanged. If no automatic keys remain,
+  that profile contributes no metadata fetch.
+- **Cost.** `DescribeDBInstances` is not a billed CloudWatch API and is not counted by
+  the collector-activity charts, like RGTA and STS.
 
 ## Journey Of One Stable Query
 
@@ -407,7 +471,7 @@ stable query independently:
   one day.
 - Its stable key includes execution target, region, structural AWS query, final
   series identity, and effective policy. Rule name, scope order, request ID,
-  batch membership, and mutable tag labels are excluded. Equivalent rule-only
+  batch membership, and mutable tag and attribute labels are excluded. Equivalent rule-only
   ownership transfers preserve state; target/query/identity/policy changes do not.
 
 ## Scheduling And State Transitions
@@ -676,8 +740,8 @@ aws-eusc).
 
 ## Concurrency
 
-- `apiConcurrency` (5) bounds ListMetrics discovery, RGTA fetch groups, and
-  GetMetricData chunk execution via `conc/pool`. `maxQueriesPerRequest` (500) is
+- `apiConcurrency` (5) bounds ListMetrics discovery, RGTA fetch groups, resource
+  attribute fetch groups, and GetMetricData chunk execution via `conc/pool`. `maxQueriesPerRequest` (500) is
   the AWS request ceiling; the datapoint budget may reduce actual batch width.
   Both are internal constants, not config.
 - ListMetrics discovery first pages and continuation pages use separate bounded
@@ -686,8 +750,9 @@ aws-eusc).
   a mutex, caching only successes (a transient credential error is retried next
   call).
 - The top-level `collect` stages run sequentially, and the per-cycle `store`
-  write is single-threaded. Discovery, resource-tag lookup, and query execution
-  fan out within their respective stages.
+  write is single-threaded. Discovery, resource-tag lookup, and query execution fan
+  out within their respective stages. Optional resource attribute lookup runs in
+  `Run`, concurrently with these stages, and transfers immutable results to `Collect`.
 
 ## Cost Model
 
@@ -771,7 +836,7 @@ metric-store commit therefore carries its work into the next successful frame. O
 a series is known, a successful cached interval with no real AWS work publishes zero.
 Cleanup, job replacement, and process restart reset the pending activity and known
 keys. SDK invocation counts cover CloudWatch `ListMetrics` and `GetMetricData`, not
-Resource Groups Tagging API, STS, or credential-provider calls. These metrics are
+Resource Groups Tagging API, RDS, STS, or credential-provider calls. These metrics are
 cost inputs, not an AWS invoice: AWS owns the billing rules, may change them, and does
 not separately document pagination billing semantics.
 
@@ -798,8 +863,12 @@ not separately document pagination billing semantics.
 - **Tag filters fail closed** — unknown membership never becomes unfiltered
   collection and never allows a lower-priority rule to claim the unknown higher
   rule's selected series; disjoint series remain eligible.
-- **Tag labels are non-identity** — `labels.resource_tags` can update labels on an
-  existing chart but cannot change its identity or overwrite an identity label.
+- **Tag labels preserve explicit configuration** — stock templates treat them as
+  presentation; a user template may intentionally use them for identity or selection.
+  Tags cannot overwrite account, region or profile dimension labels.
+- **Attribute labels are non-identity and optional** — a missing permission or failed
+  lookup never fails collection or changes chart identity; it only leaves the labels
+  absent or last-known.
 - **Compiled configuration** — operator-facing credentials, targets, and ordered
   rules are validated and expanded once. Discovery, tag-label presentation,
   `limits.max_instances`, `limits.max_discovery_groups`, `timeout`, `vnode`, and the framework's
@@ -829,6 +898,9 @@ not separately document pagination billing semantics.
   `query_response.go`.
 - **Change execution orchestration**: `query_executor.go`.
 - **Change scheduling, retention, correction, or gap state**: `observe.go`.
+- **Add a resource attribute provider** (for example EC2 instance type): add a
+  `resourceAttributeProvider` next to `attributes_rds.go`, its narrow client and
+  runner-owned `clientCache` in `attributes_run.go`, and the permission in `metadata.yaml`.
 - **Change how retained observations become metrics** (rate normalization,
   labels, float hint): `query_emit.go`.
 - **Change chart generation** (namespace or template assembly): `chart.go`, plus

@@ -188,6 +188,12 @@ func writeTextReport(w io.Writer, r Report) error {
 			fmt.Fprintf(&b, "  - %s selector=%q name=%q\n", item.Path, item.Selector, item.Name)
 		}
 	}
+	if len(r.ContextSeriesOmissions) > 0 {
+		fmt.Fprintln(&b, "\nContexts omitted by output series limit:")
+		for _, item := range r.ContextSeriesOmissions {
+			fmt.Fprintf(&b, "  - context=%q observed=%d limit=%d\n", item.Context, item.ObservedSeries, item.Limit)
+		}
+	}
 	if len(r.DimensionLosses) > 0 {
 		fmt.Fprintln(&b, "\nDimension materialization losses:")
 		for _, item := range r.DimensionLosses {

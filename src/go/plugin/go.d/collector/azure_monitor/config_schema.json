@@ -45,7 +45,7 @@
         "properties": {
           "refresh_every": {
             "title": "Discovery every",
-            "description": "How often to refresh the discovered resources, in seconds. Zero disables rediscovery after startup.",
+            "description": "How often to refresh resources and their states, in seconds. Zero disables rediscovery after startup and disables resource-state charts.",
             "type": "integer",
             "minimum": 0,
             "default": 300

@@ -70,11 +70,13 @@ func TestChartTemplateSourceCaptureAndFixedPolicy(t *testing.T) {
 	assert.Equal(t, 1, static.calls)
 	initial, err := chartengine.NewTemplateSet(chartengine.TemplateSetSpec{})
 	require.NoError(t, err)
+	outputLimit := 1000
 	collector := &policyTemplateFixture{
 		dynamicTemplateFixture: &dynamicTemplateFixture{
 			set: initial,
 		},
 		policy: chartengine.EnginePolicy{
+			MaxOutputSeriesPerContext: &outputLimit,
 			Autogen: &chartengine.AutogenPolicy{
 				Enabled: true,
 			},
@@ -89,6 +91,7 @@ func TestChartTemplateSourceCaptureAndFixedPolicy(t *testing.T) {
 	assert.Same(t, first, second)
 	assert.Equal(t, 2, collector.calls)
 	assert.Equal(t, 1, collector.policyCalls)
+	assert.Equal(t, 1000, *first.GlobalPolicy().MaxOutputSeriesPerContext)
 	// The captured override masks later raw policy changes.
 	collector.set, err = chartengine.NewTemplateSet(chartengine.TemplateSetSpec{
 		Policy: chartengine.EnginePolicy{

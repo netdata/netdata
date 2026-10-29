@@ -214,6 +214,7 @@ int help(int exitcode) {
     } while(0)
 
 int buffer_unittest(void);
+int url_unittest(void);
 int ringbuffer_unittest(void);
 int onewayalloc_unittest(void);
 int log_stack_unittest(void);
@@ -227,6 +228,7 @@ int https_client_timeout_unittest(void);
 int mqtt_wss_client_timeout_unittest(void);
 int pgc_unittest(void);
 int mrg_unittest(void);
+int pagecache_flush_drop_unittest(void);
 int pluginsd_parser_unittest(void);
 int websocket_compression_unittest(void);
 int web_client_request_size_unittest(void);
@@ -246,6 +248,7 @@ int nrpc_registry_unittest(void);
 int pluginsd_functions_unittest(void);
 int nrpc_catalog_unittest(void);
 int mcp_execute_function_access_unittest(void);
+int mcp_jsonrpc_batch_unittest(void);
 int eval_unittest(void);
 int duration_unittest(void);
 int statistical_unittest(void);
@@ -320,6 +323,14 @@ static int unittest_run_with_rrd(int (*test_fn)(void)) {
         rc = test_fn();
 
     unittest_libs_shutdown();
+    return rc;
+}
+
+static int health_config_unittest_with_dyncfg(void) {
+    nrpc_inflight_calls_create();
+    dyncfg_init(false);
+    int rc = health_config_unittest();
+    dyncfg_shutdown();
     return rc;
 }
 
@@ -510,6 +521,7 @@ int netdata_main(int argc, char **argv) {
                             if (unit_test_buffer()) return 1;
                             if (unit_test_str2ld()) return 1;
                             if (buffer_unittest()) return 1;
+                            if (url_unittest()) return 1;
                             if (api_v1_allmetrics_json_unittest()) return 1;
                             if (exporting_json_connector_unittest()) return 1;
                             if (exporting_graphite_unittest()) return 1;
@@ -564,6 +576,7 @@ int netdata_main(int argc, char **argv) {
                             if (pluginsd_functions_unittest()) return 1;
                             if (nrpc_catalog_unittest()) return 1;
                             if (mcp_execute_function_access_unittest()) return 1;
+                            if (mcp_jsonrpc_batch_unittest()) return 1;
                             if (eval_unittest()) return 1;
                             if (duration_unittest()) return 1;
                             if (statistical_unittest()) return 1;
@@ -578,6 +591,7 @@ int netdata_main(int argc, char **argv) {
                             if (uuidmap_unittest()) return 1;
 #ifdef ENABLE_DBENGINE
                             if (mrg_unittest()) return 1;
+                            if (pagecache_flush_drop_unittest()) return 1;
 #endif
                             if (paths_unittest()) return 1;
 #ifdef HAVE_STACKTRACE
@@ -790,6 +804,10 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return mrg_unittest();
                         }
+                        else if(strcmp(optarg, "pagecachetest") == 0) {
+                            unittest_running = true;
+                            return pagecache_flush_drop_unittest();
+                        }
                         else if(strcmp(optarg, "mrgretentionbench") == 0) {
                             unittest_running = true;
                             return mrg_retention_benchmark();
@@ -818,10 +836,8 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return duration_unittest();
                         }
-                        else if(strcmp(optarg, "healthconfigtest") == 0) {
-                            unittest_running = true;
-                            return health_config_unittest();
-                        }
+                        else if(strcmp(optarg, "healthconfigtest") == 0)
+                            return unittest_run_with_rrd(health_config_unittest_with_dyncfg);
                         else if(strcmp(optarg, "dyncfgtest") == 0)
                             return unittest_run_with_rrd(dyncfg_unittest);
                         else if(strcmp(optarg, "functionsaccesstest") == 0)
@@ -893,6 +909,8 @@ int netdata_main(int argc, char **argv) {
                             return rc;
                         }
 #endif
+                        else if(strcmp(optarg, "mcpbatchtest") == 0)
+                            return mcp_jsonrpc_batch_unittest();
                         else if(strcmp(optarg, "simple-pattern") == 0) {
                             if(optind + 2 > argc) {
                                 fprintf(stderr, "%s", "\nUSAGE: -W simple-pattern 'pattern' 'string'\n\n"

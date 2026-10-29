@@ -253,6 +253,7 @@ struct rrdeng_collect_handle {
     usec_t page_start_time_ut;
     usec_t page_end_time_ut;
     usec_t update_every_ut;
+    time_t hot_time_s;                        // the hot time this handle stored in the MRG and has not cleared yet
 };
 
 struct rrdeng_query_handle {
@@ -327,11 +328,14 @@ struct extent_io_data {
 
     // The metric this page belongs to, as a uuidmap id.
     //
-    // This exists so journal-v2 indexing never has to dereference the page's
-    // metric_id, which is a bare METRIC pointer with no reference behind it and
-    // can therefore be stale. Resolving the id through the MRG index is an
-    // indexed lookup that cannot touch freed memory; a dead metric simply
-    // misses. NOT a uuidmap reference - see mrg_metric_uuidmap_id().
+    // It originally existed so journal-v2 indexing never had to dereference the
+    // page's metric_id, which used to be a bare METRIC pointer. That reason is
+    // gone: page->metric_id is now the same uuidmap id (mrg_metric_id()). This
+    // field is therefore currently a duplicate of it, kept because journal-v2
+    // reads it here and the extent descriptor already carries it.
+    //
+    // NOT a uuidmap reference - see mrg_metric_uuidmap_id(). Resolve it with an
+    // indexed lookup that is allowed to miss; a deleted metric's id goes dead.
     UUIDMAP_ID uuid_id;
 };
 
@@ -660,7 +664,11 @@ static inline int journal_metric_uuid_compare(const void *key, const void *metri
 uint64_t rrdeng_get_used_disk_space(struct rrdengine_instance *ctx, bool having_lock);
 void rrdeng_calculate_tier_disk_space_percentage(void);
 uint64_t rrdeng_get_directory_free_bytes_space(struct rrdengine_instance *ctx);
-void dbengine_shutdown();
+// the event loop waits this long at shutdown for the work it gave to the libuv pool
+#define DBENGINE_SHUTDOWN_DRAIN_TIMEOUT_UT (10 * USEC_PER_SEC)
+
+// false when the event loop exited with pool work still running
+bool dbengine_shutdown(void);
 size_t datafile_count(struct rrdengine_instance *ctx, bool with_lock);
 struct rrdengine_datafile *get_first_ctx_datafile(struct rrdengine_instance *ctx, bool with_lock);
 struct rrdengine_datafile *get_last_ctx_datafile(struct rrdengine_instance *ctx, bool with_lock);

@@ -13,6 +13,8 @@
 //!   over generated sets.
 //! - `estimate_data_size` equals the real appended blob length — the
 //!   treight-vs-roaring size comparison input.
+//! - `RawBitmap::from_range` and `Bitmap::from_range` hold what
+//!   roaring's `insert_range` holds.
 //! - Set-algebra identities hold on treight blobs directly:
 //!   commutativity, empty identities, `a − a` = `a ⊕ a` = ∅,
 //!   intersection ⊆ union.
@@ -123,6 +125,29 @@ proptest! {
         let mut data = Vec::new();
         let _raw = RawBitmap::from_sorted_iter(vals.iter().copied(), universe, &mut data);
         prop_assert_eq!(est, data.len());
+    }
+
+    /// `from_range` holds what roaring's `insert_range` holds, checked
+    /// over every value of the universe: `RawBitmap` directly, and
+    /// `Bitmap` in whichever representation it picks.
+    #[test]
+    fn from_range_matches_roaring(
+        universe in 1u32..=MAX_UNIVERSE,
+        a in 0u32..=MAX_UNIVERSE,
+        b in 0u32..=MAX_UNIVERSE,
+    ) {
+        let start = a.min(b).min(universe);
+        let end = a.max(b).min(universe);
+        let mut roaring = RoaringBitmap::new();
+        roaring.insert_range(start..end);
+
+        let mut data = Vec::new();
+        let raw = RawBitmap::from_range(start..end, universe, &mut data);
+        prop_assert_eq!(raw.iter(&data).collect::<Vec<_>>(), roaring.iter().collect::<Vec<_>>());
+
+        let mut data = Vec::new();
+        let bm = Bitmap::from_range(start..end, universe, &mut data);
+        prop_assert_eq!(bm.iter(&data).collect::<Vec<_>>(), roaring.iter().collect::<Vec<_>>());
     }
 }
 

@@ -325,7 +325,7 @@ void rrd2rrdr_convert_values_to_percentage_of_total(RRDR *r) {
             .count = count,
             .min = min,
             .max = max,
-            .anomaly_count = (size_t)(ars * (NETDATA_DOUBLE)count),
+            .anomaly_count = (size_t)(ars * RRDR_DVIEW_ANOMALY_COUNT_MULTIPLIER / 100.0),
         };
     }
 }

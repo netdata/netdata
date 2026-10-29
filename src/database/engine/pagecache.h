@@ -12,6 +12,7 @@ extern struct pgc *extent_cache;
 
 /* Forward declarations */
 struct rrdengine_instance;
+struct pgc_page;
 
 #define INVALID_TIME (0)
 
@@ -36,6 +37,7 @@ struct page_descr_with_data {
 
 struct pg_alignment {
     uint32_t refcount;
+    uint64_t seed;      // the chart's identity hash: picks the slot of absolute time its pages close at
 };
 
 struct rrdeng_query_handle;
@@ -57,5 +59,7 @@ void pgc_open_add_hot_page(
     struct rrdengine_datafile *datafile,
     uint64_t extent_offset,
     unsigned extent_size);
+
+int pagecache_flush_drop_unittest(void);
 
 #endif /* NETDATA_PAGECACHE_H */

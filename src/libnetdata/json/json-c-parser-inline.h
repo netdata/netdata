@@ -14,6 +14,14 @@
 // helper: convert a bool to JSONC_REQUIRED / JSONC_OPTIONAL
 #define JSONC_REQUIRE_IF(cond) ((cond) ? JSONC_REQUIRED : JSONC_OPTIONAL)
 
+static inline bool jsonc_string_has_embedded_nul(json_object *value) {
+    if(!json_object_is_type(value, json_type_string))
+        return false;
+
+    const char *text = json_object_get_string(value);
+    return text && memchr(text, '\0', (size_t)json_object_get_string_len(value)) != NULL;
+}
+
 #define JSONC_INTEGER_DESTINATION_IS_UNSIGNED(dst) _Generic((dst), \
     unsigned char: true,                                             \
     unsigned short: true,                                            \

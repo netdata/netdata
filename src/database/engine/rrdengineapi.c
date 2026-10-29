@@ -48,6 +48,19 @@ static inline void initialize_single_ctx(struct rrdengine_instance *ctx) {
     rw_spinlock_init(&ctx->njfv2idx.spinlock);
 }
 
+// frees a context rrdeng_init() allocated for its caller; the static multidb_ctx[] are never freed
+void rrdeng_ctx_free(struct rrdengine_instance *ctx) {
+    for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
+        if(ctx == multidb_ctx[tier]) {
+            internal_fatal(true, "DBENGINE: tried to free the static context of tier %zu", tier);
+            return;
+        }
+    }
+
+    netdata_rwlock_destroy(&ctx->datafiles.rwlock);
+    freez(ctx);
+}
+
 __attribute__((constructor)) void initialize_multidb_ctx(void) {
     multidb_ctx[0] = &multidb_ctx_storage_tier0;
     multidb_ctx[1] = &multidb_ctx_storage_tier1;
@@ -96,8 +109,9 @@ static inline bool rrdeng_page_alignment_release(struct pg_alignment *pa) {
 }
 
 // charts call this
-STORAGE_METRICS_GROUP *rrdeng_metrics_group_get(STORAGE_INSTANCE *si __maybe_unused, nd_uuid_t *uuid __maybe_unused) {
+STORAGE_METRICS_GROUP *rrdeng_metrics_group_get(STORAGE_INSTANCE *si __maybe_unused, uint64_t seed) {
     struct pg_alignment *pa = callocz(1, sizeof(struct pg_alignment));
+    pa->seed = seed;
     rrdeng_page_alignment_acquire(pa);
     return (STORAGE_METRICS_GROUP *)pa;
 }
@@ -328,11 +342,24 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *smh, uin
     return (STORAGE_COLLECT_HANDLE *)handle;
 }
 
+// nothing this handle collected is waiting to be stored: clear the hot time it stored, unless a duplicate writer of
+// the metric has stored another one since
+static void rrdeng_store_metric_clear_hot_time(struct rrdeng_collect_handle *handle) {
+    if(!handle->hot_time_s)
+        return;
+
+    mrg_metric_clear_hot_latest_time_s(main_mrg, handle->metric, handle->hot_time_s);
+    handle->hot_time_s = 0;
+}
+
 void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *sch) {
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)sch;
 
-    if (unlikely(!handle->pgc_page))
+    if (unlikely(!handle->pgc_page)) {
+        // a page-full flush already released the page, but storing its last point set the hot time again
+        rrdeng_store_metric_clear_hot_time(handle);
         return;
+    }
 
     if(pgd_is_empty(handle->page_data))
         pgc_page_to_clean_evict_or_release(main_cache, handle->pgc_page);
@@ -345,7 +372,7 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *sch) {
         pgc_page_hot_to_dirty_and_release(main_cache, handle->pgc_page, false);
     }
 
-    mrg_metric_set_hot_latest_time_s(main_mrg, handle->metric, 0);
+    rrdeng_store_metric_clear_hot_time(handle);
 
     __atomic_store_n(&handle->pgc_page, NULL, __ATOMIC_RELAXED);
     handle->page_flags = 0;
@@ -434,9 +461,11 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
     timing_step(TIMING_STEP_DBENGINE_CREATE_NEW_PAGE);
 }
 
-static size_t aligned_allocation_entries(size_t max_slots, size_t target_slot, time_t now_s) {
+// the points a new page needs to close at the target slot of the page cycle; slots count points, so the position
+// is the point's index (time / update every): in seconds, a page of a slower cadence closes wherever it started
+static size_t aligned_allocation_entries(size_t max_slots, size_t target_slot, time_t point_index) {
     size_t slots = target_slot;
-    size_t pos = (now_s % max_slots);
+    size_t pos = (point_index % max_slots);
 
     if(pos > slots)
         slots += max_slots - pos;
@@ -458,10 +487,16 @@ static PGD *rrdeng_alloc_new_page_data(struct rrdeng_collect_handle *handle, use
     size_t max_size = tier_page_size[ctx->config.tier];
     size_t max_slots = max_size / CTX_POINT_SIZE_BYTES(ctx);
 
+    time_t update_every_s = (time_t)(handle->update_every_ut / USEC_PER_SEC);
+    if(update_every_s < 1)
+        update_every_s = 1;
+
+    // the slot comes from the chart's identity, not from anything of this process, so a restart keeps every
+    // chart's page phase: data written before it stays packed into extents in the order pages close after it
     size_t slots = aligned_allocation_entries(
             max_slots,
-            indexing_partition((Word_t) handle->alignment, max_slots),
-            (time_t) (point_in_time_ut / USEC_PER_SEC)
+            handle->alignment ? handle->alignment->seed % max_slots : 0,
+            (time_t) (point_in_time_ut / USEC_PER_SEC) / update_every_s
     );
 
     if(slots < max_slots / 3)
@@ -554,7 +589,8 @@ static ALWAYS_INLINE_HOT void rrdeng_store_metric_append_point(STORAGE_COLLECT_H
     timing_step(TIMING_STEP_DBENGINE_PAGE_FIN);
 
     // update the metric information
-    mrg_metric_set_hot_latest_time_s(main_mrg, handle->metric, (time_t) (point_in_time_ut / USEC_PER_SEC));
+    if(mrg_metric_set_hot_latest_time_s(main_mrg, handle->metric, (time_t) (point_in_time_ut / USEC_PER_SEC)))
+        handle->hot_time_s = (time_t) (point_in_time_ut / USEC_PER_SEC);
 
     timing_step(TIMING_STEP_DBENGINE_MRG_UPDATE);
 }
@@ -1255,10 +1291,9 @@ int rrdeng_init(
         return 0;
     }
 
-    if (unittest_running) {
-        freez(ctx);
-        if (ctxp)
-            *ctxp = NULL;
+    if (ctxp) {
+        rrdeng_ctx_free(ctx);
+        *ctxp = NULL;
     }
 
     rrd_stat_atomic_add(&global_stats.rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);
@@ -1301,9 +1336,6 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
 
     completion_wait_for(&completion);
     completion_destroy(&completion);
-
-    if(unittest_running)
-        freez(ctx);
 
     rrd_stat_atomic_add(&global_stats.rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);
     return 0;
@@ -1517,6 +1549,81 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
 }
 
 struct rrdeng_cache_efficiency_stats rrdeng_get_cache_efficiency_stats(void) {
-    // FIXME - make cache efficiency stats atomic
-    return rrdeng_cache_efficiency_stats;
+    // the writers update these fields atomically, so copy each field atomically;
+    // every field takes one 64-byte slot: a new field changes the size and fails this check until it is copied below
+    BUILD_BUG_ON(sizeof(struct rrdeng_cache_efficiency_stats) != 54 * 64);
+
+    struct rrdeng_cache_efficiency_stats stats = { 0 };
+
+#define STAT_COPY(field) stats.field = __atomic_load_n(&rrdeng_cache_efficiency_stats.field, __ATOMIC_RELAXED)
+    STAT_COPY(queries_planned_with_gaps);
+    STAT_COPY(queries_executed_with_gaps);
+    STAT_COPY(currently_running_queries);
+    STAT_COPY(pages_total);
+    STAT_COPY(pages_to_load_from_disk);
+    STAT_COPY(extents_loaded_from_disk);
+    STAT_COPY(pages_meta_source_main_cache);
+    STAT_COPY(pages_meta_source_open_cache);
+    STAT_COPY(pages_meta_source_journal_v2);
+    STAT_COPY(page_next_wait_failed);
+    STAT_COPY(page_next_wait_loaded);
+    STAT_COPY(page_next_nowait_failed);
+    STAT_COPY(page_next_nowait_loaded);
+    STAT_COPY(pages_data_source_main_cache);
+    STAT_COPY(pages_data_source_main_cache_at_pass4);
+    STAT_COPY(pages_data_source_disk);
+    STAT_COPY(pages_data_source_extent_cache);
+    STAT_COPY(pages_load_ok_loaded_but_cache_hit_while_inserting);
+    STAT_COPY(pages_load_extent_merged);
+    STAT_COPY(pages_load_ok_uncompressed);
+    STAT_COPY(pages_load_ok_compressed);
+    STAT_COPY(pages_load_fail_invalid_page_in_extent);
+    STAT_COPY(pages_load_fail_cant_mmap_extent);
+    STAT_COPY(pages_load_fail_datafile_not_available);
+    STAT_COPY(pages_load_fail_unroutable);
+    STAT_COPY(pages_load_fail_not_found);
+    STAT_COPY(pages_load_fail_invalid_extent);
+    STAT_COPY(pages_load_fail_cancelled);
+    STAT_COPY(prep_time_to_route_sync.count);
+    STAT_COPY(prep_time_to_route_sync.usec);
+    STAT_COPY(prep_time_to_route_syncfirst.count);
+    STAT_COPY(prep_time_to_route_syncfirst.usec);
+    STAT_COPY(prep_time_to_route_async.count);
+    STAT_COPY(prep_time_to_route_async.usec);
+    STAT_COPY(prep_time_in_main_cache_lookup.count);
+    STAT_COPY(prep_time_in_main_cache_lookup.usec);
+    STAT_COPY(prep_time_in_open_cache_lookup.count);
+    STAT_COPY(prep_time_in_open_cache_lookup.usec);
+    STAT_COPY(prep_time_in_journal_v2_lookup.count);
+    STAT_COPY(prep_time_in_journal_v2_lookup.usec);
+    STAT_COPY(prep_time_in_pass4_lookup.count);
+    STAT_COPY(prep_time_in_pass4_lookup.usec);
+    STAT_COPY(query_time_init.count);
+    STAT_COPY(query_time_init.usec);
+    STAT_COPY(query_time_wait_for_prep.count);
+    STAT_COPY(query_time_wait_for_prep.usec);
+    STAT_COPY(query_time_to_slow_disk_next_page.count);
+    STAT_COPY(query_time_to_slow_disk_next_page.usec);
+    STAT_COPY(query_time_to_fast_disk_next_page.count);
+    STAT_COPY(query_time_to_fast_disk_next_page.usec);
+    STAT_COPY(query_time_to_slow_preload_next_page.count);
+    STAT_COPY(query_time_to_slow_preload_next_page.usec);
+    STAT_COPY(query_time_to_fast_preload_next_page.count);
+    STAT_COPY(query_time_to_fast_preload_next_page.usec);
+    STAT_COPY(pages_zero_time_skipped);
+    STAT_COPY(pages_past_time_skipped);
+    STAT_COPY(pages_overlapping_skipped);
+    STAT_COPY(pages_invalid_size_skipped);
+    STAT_COPY(pages_invalid_update_every_fixed);
+    STAT_COPY(pages_invalid_entries_fixed);
+    STAT_COPY(journal_v2_mapped);
+    STAT_COPY(journal_v2_unmapped);
+    STAT_COPY(datafile_creation_started);
+    STAT_COPY(datafile_deletion_started);
+    STAT_COPY(datafile_deletion_spin);
+    STAT_COPY(journal_v2_indexing_started);
+    STAT_COPY(metrics_retention_started);
+#undef STAT_COPY
+
+    return stats;
 }

@@ -446,7 +446,7 @@ Netdata provides network performance monitoring covering network devices (SNMP),
   - [Static exporter, interface and network metadata](/src/crates/netflow-plugin/integrations/static_metadata.md) (names, roles, sites, regions, tenants); classifiers
   - SRv6 and VXLAN [decapsulation](/src/crates/netflow-plugin/integrations/decapsulation.md)
 - [Four storage tiers](/docs/npm/network-flows/retention-querying.md) (raw, 1-minute, 5-minute, 1-hour) with independent retention
-- [Network Flows dashboard](/docs/npm/network-flows/visualization/overview.md) (Function `flows:netflow`): Sankey, table, time-series, country/state/city maps, 3D globe; facets on any field (including CIDR), regex search, group by up to 10 fields, top-N talkers by bytes or packets, shareable views
+- [Network Flows dashboard](/docs/npm/network-flows/visualization/overview.md) (Function `flows:netflow`): Sankey, table, time-series, country/state/city maps (down to street-level granularity, depending on the GeoIP database), 3D globe; facets on any field (including CIDR), regex search, group by up to 10 fields, top-N talkers by bytes or packets, shareable views
 - [50,000–100,000 flow records/s per Agent](/docs/npm/network-flows/sizing-capacity.md)
 
 **[SNMP traps](/docs/npm/snmp-traps/README.md)** — go.d `snmp_traps`
@@ -757,13 +757,13 @@ Netdata applies unsupervised machine learning to every metric it collects, on th
 - Parent clusters train once and share models; Children stream trained models to Parents, which skip retraining
 
 **Netdata AI** (Netdata Cloud)
-- **[Conversations (Ask AI)](/docs/netdata-ai/conversations.md):** chat about the infrastructure from anywhere in the UI, with up to five attached context items (charts, alerts, nodes), report mode and sharing
-- **[Troubleshoot with AI / Investigations](/docs/netdata-ai/investigations/index.md):** automated troubleshooting and root-cause analysis for any question or time range; custom and scheduled investigations (daily, weekly, monthly); results in about two minutes, with email notification
-- **[Insights reports](/docs/ml-ai/ai-insights.md):** Infrastructure Summary, Anomaly Analysis, Capacity Planning, Performance Optimization; scheduled reports; PDF export
-- **[Alert AI](/docs/netdata-ai/alerts-automation/alerts-automation.md):** alert investigation reports, AI alert explanations, AI-generated and AI-suggested alert definitions, and alert evaluation against historical data before deployment
+- **[AI Conversations](/docs/netdata-ai/conversations.md):** chat about the infrastructure from anywhere in the UI, with up to five attached context items (charts, alerts, nodes), report mode and sharing
+- **[AI Investigations](/docs/netdata-ai/investigations/index.md):** automated troubleshooting and root-cause analysis for any question or time range; custom and scheduled investigations (daily, weekly, monthly); results in about two minutes, with email notification
+- **[AI Investigations reports](/docs/ml-ai/ai-insights.md):** Infrastructure Summary, Anomaly Analysis, Capacity Planning, Performance Optimization; scheduled reports; PDF export
+- **[AI for alerts](/docs/netdata-ai/alerts-automation/alerts-automation.md):** alert investigation reports, AI alert explanations, AI-generated and AI-suggested alert definitions, and alert evaluation against historical data before deployment
 - **[Infrastructure Knowledge and AI Memory](/docs/netdata-ai/infrastructure-knowledge.md):** a versioned description of the infrastructure (generated from the infrastructure, from a template or written) and remembered facts that ground AI answers in the customer's environment
 - **[MCP Connections](/docs/netdata-ai/mcp/mcp-connections.md):** Netdata AI connects to external MCP servers — GitHub, Atlassian (Jira, Confluence, Bitbucket), PagerDuty and custom HTTPS MCP servers — to combine monitoring data with code, tickets and incidents
-- **AI Co-Engineer (AI Co-SRE):** the next version of Netdata AI, a fully autonomous AI engineer that watches over the infrastructure. The Netdata website presents Netdata AI under this name.
+- **AI Co-SRE:** the next version of Netdata AI, a fully autonomous SRE agent that works 24/7 on the infrastructure; custom pricing.
 
 **[MCP servers](/docs/netdata-ai/mcp/README.md)** (for any AI assistant)
 - **Agent and Parent MCP server:** Streamable HTTP (`/mcp`), SSE (`/sse`) and WebSocket transports; `nd-mcp` bridge for stdio-only clients
@@ -987,13 +987,32 @@ Netdata exchanges data with other systems through exporting connectors, Promethe
 
 | Plan | Price | For | Highlights |
 |---|---|---|---|
-| **Community** | $0 | Personal, non-commercial use | Up to 5 active connected nodes, 1 custom dashboard per Room |
-| **Homelab** | $90/year or $10/month | Personal, non-commercial use | No hard limit on nodes (fair usage policy), no limit on custom dashboards |
-| **Business** | $4.50/node/month billed yearly; $6/node/month billed monthly | Freelancers, professionals, businesses of all sizes | All features: Netdata AI, all roles (RBAC), enterprise SSO (Okta, OpenID Connect), SCIM, enterprise notification integrations, Netdata Cloud MCP, centralized configuration management, no limit on custom dashboards, audit events in the events feed |
-| **Enterprise On-Prem** | Custom, from 200 node licenses | Air-gapped facilities, critical infrastructure | Everything in Business, running on customer infrastructure; priority support plans |
+| **Community** | $0 | Anyone getting started | Up to 5 active connected nodes, 1 custom dashboard per Room |
+| **Homelab** | $90/year or $10/month | Personal, non-commercial use | No limit on custom dashboards ([Homelab plan](https://www.netdata.cloud/homelab/)) |
+| **Business** | From $7/node/month billed yearly; $8.75/node/month billed monthly (5-node minimum) | Freelancers, professionals, businesses of all sizes | Products priced individually (below); AI conversations, all roles (RBAC), enterprise SSO (Okta, OpenID Connect), SCIM, enterprise notification integrations, Netdata Cloud MCP, centralized configuration management, no limit on custom dashboards, audit events in the events feed |
+| **Enterprise** | Custom | Fleets above 500 nodes, on-premise deployments at any size (air-gapped facilities, critical infrastructure) | Everything in Business; commitment and multi-year discounts; custom quotas for logs, traces, flows and AI; on-premise deployment; AI Co-SRE; priority support plans |
 | **Open-source Agent** | Free (Agent GPL v3+; dashboard NCUL1) | Self-hosted, any use | Complete Agent and Parents, no limit on metrics, local dashboards |
 
-Community and Homelab are for personal, non-commercial use only. Freelancers, professionals and businesses use the open-source Agent or the Business plan. A 14-day Business trial with no limit on nodes is available on sign-up.
+Homelab is for personal, non-commercial use only. Beyond 5 nodes, freelancers, professionals and businesses use the open-source Agent or the Business plan. A 14-day Business trial with no limit on nodes is available on sign-up.
+
+### Business products
+
+Prices are per month, in USD, excluding taxes. The billing choice (annual subscription or monthly pay as you go) applies to the whole account.
+
+| Product | Annual | Monthly | Included each month | Beyond included |
+|---|---|---|---|---|
+| **Infrastructure** | $7/node | $8.75/node | Metrics and system logs (Logs Monitoring) with no volume charge, checks, AI conversations (fair use); adds 20M application log events to the pooled log quota | $0.10 per 1M log events ($0.125 monthly) |
+| **APM** (includes Infrastructure) | $15/node | $18.75/node | Adds 25M application log events and 25M trace spans to the pooled quotas | $0.10 per 1M log events or trace spans ($0.125 monthly) |
+| **Network Device Monitoring** (SNMP) | $2/device | $2.50/device | SNMP monitoring and topology; adds 2M syslog events to the pooled log quota | Pooled log rate |
+| **NetFlow Monitoring** | $200 | $250 | 5,000 flows/sec, any number of exporters | $40 per 1,000 flows/sec ($50 monthly) |
+| **Real User Monitoring** | From $250 (500K sessions) | $0.625 per 1K sessions, no minimum | Annual: 500,000 sessions | $0.50 per 1K sessions |
+| **Synthetic Browser Tests** | From $250 (125K runs) | $2.50 per 1K runs, no minimum | Annual: 125,000 runs | $2 per 1K runs |
+| **AI Investigations** | From $300 (100 investigations) | $6 per investigation, no minimum | Annual: 100 investigations | $6 per investigation |
+| **AI Co-SRE** | Custom | Custom | Autonomous SRE agent, quoted separately | |
+
+- **Pooled quotas:** each node's log and trace quotas are shared across the account; logs and traces are counted separately, and only usage above the pooled quota is charged.
+- **Annual volume discounts** on Infrastructure and APM nodes combined: 5% for nodes 51-100, 10% for 101-200, 20% for 201-500 (each band discounted separately). Above 500 nodes, Enterprise pricing applies.
+- **Monthly pay as you go** bills Real User Monitoring, Synthetic Browser Tests and AI Investigations by actual usage; NetFlow Monitoring keeps its 5,000 flows/sec minimum.
 
 Netdata is also available on [AWS Marketplace](https://aws.amazon.com/marketplace/seller-profile?id=seller-5bbjpj3csb4mw): Netdata Cloud as a pay-as-you-go subscription or an annual contract (SaaS), Netdata Cloud On-Prem (Helm chart, bring your own license) and the Netdata Agent for EKS (Helm chart, free).
 
@@ -1001,10 +1020,9 @@ Netdata is also available on [AWS Marketplace](https://aws.amazon.com/marketplac
 
 - **Billable node:** each running Netdata Agent connected to Netdata Cloud, plus each virtual node. Sub-entities a collector discovers (hosts and VMs behind a hypervisor, cloud resources, containers) are labeled instances of the collecting Agent's node and are not billed separately; an explicit virtual node attached to a collector job adds one node for that job. Collectors that create a virtual node per resource (e.g., one per SNMP device by default, or Azure workload virtual nodes) bill each such virtual node. Containers on a monitored host are included at no extra cost.
 - **Active nodes only:** offline and stale nodes (history still queryable on Parents) are not billed.
-- **P90 billing:** daily, the node count at the 90th percentile of time-weighted usage; monthly, the 90th percentile of daily values (the top 3 days of a 30-day month are excluded). Short spikes and occasional high-usage days do not increase the bill.
-- **Not billed:** metrics volume, Logs Monitoring (querying logs in place), users, data retention, containers.
-- **Free Preview:** Logs Management (collecting, storing and indexing logs) and Digital Experience Monitoring (RUM, synthetic journeys, Lighthouse audits) are in Free Preview.
-- **Netdata AI:** usage measured in AI credits — one credit per investigation or report, fractional credits for smaller actions (conversations, alert creation and suggestion); alert explanations consume no credits. Business includes 10 AI credits per month; the 14-day trial includes 10 AI credits; additional credits are purchased in the app.
+- **P90 billing (nodes and flow rates):** daily, the node count at the 90th percentile of time-weighted usage; monthly, the 90th percentile of daily values (the top 3 days of a 30-day month are excluded). Short spikes and occasional high-usage days do not increase the bill.
+- **Not billed:** metrics volume, System Logs Monitoring (querying logs in place), users, data retention, containers, and API, uptime and other checks run from your own nodes.
+- **Netdata AI:** Business includes AI conversations for every user, subject to fair use. AI Investigations are bought pay as you go or as an annual subscription bundle (see Business products).
 - **Windows:** Windows Agents count as nodes like any other Agent; their local dashboard follows the same plan rules as on Linux.
 - **Plan-gated features:** exploring Network Flows (NetFlow, IPFIX, sFlow) and Traces (the Traces explorer over OpenTelemetry traces) requires a paid plan or an active trial; collection and storage on the Agent are not restricted. Netdata Cloud MCP, enterprise notification integrations (all Cloud integrations except Discord, personal email and the mobile app), additional roles, SSO and SCIM require a paid plan.
 
@@ -1016,6 +1034,8 @@ Support by plan:
 - Community: public forums, GitHub and Discord (all plans include community support)
 - Business: Email/ticket support during business hours with SLA
 - Enterprise: 24/7 availability, dedicated support team, phone support
+
+Netdata Cloud availability: at least 99.5% monthly availability during the subscription term, per the Service Terms' Service Level Commitment (excludes Scheduled Downtime and Other Causes).
 
 **Professional Services:**
 - Implementation assistance
@@ -1064,6 +1084,7 @@ Support by plan:
 
 - Open source with a large community: 80,000+ GitHub stars, 690+ contributors
 - Netdata Cloud SaaS serves more than 100,000 reachable nodes
+- University of Amsterdam study (ICSOC 2023) of monitoring tools: Netdata was found to be the most energy-efficient tool, with best-in-class resource consumption and no impact on the monitored workloads
 - Customers across technology, financial services, education, government, healthcare, hosting and cloud, gaming and digital media, retail, logistics, manufacturing, transportation and automotive (38 published case studies)
 
 ### Standard figures

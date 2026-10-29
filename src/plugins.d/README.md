@@ -197,6 +197,13 @@ available for the plugin to use.
 |   `NETDATA_ERRORS_PER_PERIOD`    | The allowed number of log events per period.                                                                                                                                                                                                           | 
 | `NETDATA_SYSTEMD_JOURNAL_PATH`   | When `NETDATA_LOG_METHOD` is set to `journal`, this is the systemd-journald socket path to use.                                                                                                                                                        |
 
+`ebpf.plugin` and `ebpf-go.plugin` run with elevated privileges, so whoever starts them controls their environment.
+They do not use `NETDATA_PLUGINS_DIR`, `NETDATA_USER_CONFIG_DIR`, `NETDATA_STOCK_CONFIG_DIR` or `NETDATA_LOG_DIR`;
+they use the directories Netdata was built with, which are the same ones `netdata` sets on a standard installation.
+A `[directories]` override in `netdata.conf` therefore does not move these directories for them; each one they ignore
+is logged once at startup. If you write a plugin that runs with elevated privileges, do the same: never load, read or
+execute anything from a directory named in its environment.
+
 ### The output of the plugin
 
 The plugin should output instructions for Netdata to its output (`stdout`). Since this uses pipes, please make sure you flush stdout after every iteration.
@@ -530,15 +537,17 @@ When the function to be called is to receive a payload of parameters, the call l
 
 ```
 FUNCTION_PAYLOAD transaction_id timeout "name and parameters of the function as one quoted parameter" "user permissions value" "source of request" "content/type"
-body of the payload, formatted according to content/type
-FUNCTION PAYLOAD END
+body of the payload, a JSON document
+FUNCTION_PAYLOAD_END
 ```
 
 In this case, Netdata will send:
 
 - A line starting with `FUNCTION_PAYLOAD` together with the required metadata for the function, like the transaction id, the function name and its parameters, the timeout and the content type. This line ends with a newline.
-- Then, the payload itself (which may or may not have newlines in it). The payload should be parsed according to the content type parameter.
+- Then, the payload itself: a JSON document, which may or may not have newlines in it.
 - Finally, a line starting with `FUNCTION_PAYLOAD_END`, so it is expected like `\nFUNCTION_PAYLOAD_END\n`.
+
+The payload is not escaped or length-prefixed, so Netdata only sends payloads that are a single strict JSON document (RFC 8259: double-quoted strings without raw control characters, no comments, nothing but whitespace after the document) that do not contain the text `FUNCTION_PAYLOAD_END` anywhere and have no line starting (after spaces, tabs or carriage returns) with a quoted plugins.d keyword (`"FUNCTION"`, `"FUNCTION_PAYLOAD"`, `"FUNCTION_CANCEL"`, `"FUNCTION_PROGRESS"` or `"QUIT"`), and always labels them `application/json`. An empty payload means no payload block and is accepted. Any other payload is refused with HTTP 400. Plugins must treat the payload as opaque data: only a line that is exactly `FUNCTION_PAYLOAD_END` ends it, and no other line inside it is a command.
 
 Note 1: The plugins.d protocol allows parameters without single or double quotes if they don't contain spaces. However, the plugin should be able to parse parameters even if they are enclosed in single or double quotes. If the first character of a parameter is a single quote, its last character should also be a single quote too, and similarly for double quotes.
 
@@ -745,7 +754,7 @@ or (for commands: `update`, `add` and `test`):
 
 ```
 FUNCTION_PAYLOAD transaction_id timeout "config id command" "user permissions value" "source string" "content/type"
-body of the payload formatted according to content/type
+body of the payload, a JSON document
 FUNCTION_PAYLOAD_END
 ```
 

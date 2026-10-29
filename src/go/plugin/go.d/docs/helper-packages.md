@@ -125,6 +125,17 @@ credential-file boundary.
 This boundary covers explicit native credential-file options. SDK default credential chains and database DSN processing
 retain their existing behavior.
 
+## Collector-owned State Files
+
+Use `src/go/pkg/safefile` for no-follow bounded reads, randomized exclusive replacement, verified directory creation
+and descriptor-based permission changes. Its configured-input `Open`/`Read` APIs retain symlink following; state uses
+`ReadNoFollow`. See [the API and durability contract](../../../pkg/safefile/README.md).
+
+`Replace` syncs the temporary file and renames it; the caller MUST sync the directory afterwards. A failure after
+rename means publication is visible but durability is uncertain, which recovery code must distinguish from an
+unpublished write. Parsing, ownership, lifetime locks and parent-directory durability remain the caller's policy.
+State directory ancestry must remain trusted and stable; these helpers are not a privilege boundary.
+
 ## Prometheus Endpoints
 
 Use `src/go/pkg/prometheus` when the upstream endpoint exposes Prometheus text format.

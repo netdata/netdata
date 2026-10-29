@@ -21,6 +21,24 @@ static void pluginsd_calls_insert_cb(const DICTIONARY_ITEM *item, void *func, vo
     if(rc != 0)
         netdata_log_error("PLUGINSD: FUNCTION '%s': cannot parse the transaction UUID (the wire name of the call_id)", string2str(pf->function));
 
+    if(pf->payload && buffer_strlen(pf->payload)) {
+        // every route to a plugin or child passes here, so this is the last line of
+        // defense against payloads that would inject protocol commands
+        const char *reason = functions_payload_validate(buffer_tostring(pf->payload), buffer_strlen(pf->payload));
+        if(reason) {
+            pf->sent_successfully = false;
+            pf->code = HTTP_RESP_BAD_REQUEST;
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "PLUGINSD: FUNCTION '%s': refusing to send it to the plugin: %s",
+                   string2str(pf->function), reason);
+            nrpc_call_error(pf->result_body_wb, reason, pf->code);
+            return;
+        }
+
+        // validated as JSON, so label it as such - plugins must not pick another decoder
+        pf->payload->content_type = CT_APPLICATION_JSON;
+    }
+
     CLEAN_BUFFER *buffer = buffer_create(1024, NULL);
     if(pf->payload && buffer_strlen(pf->payload)) {
         buffer_sprintf(

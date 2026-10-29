@@ -453,6 +453,29 @@ dimension, presentation, and selector field. Prometheus profiles add these rules
 - **Every group that contains charts must list the metrics its selectors reference in its `metrics` list** (or inherit
   them from an ancestor group). A selector on a metric outside the group's declared scope fails validation.
 
+## Input and output limits
+
+The same limits apply with profiles, without profiles, to automatic fallback charts, and to raw counter companion charts:
+
+- `max_input_series` defaults to `10000`. Check and every Collect count the final assembled input after the job
+  selector and job/profile relabeling, before writer eligibility. Each scalar counts once. Each histogram counts
+  its stored buckets plus two count/sum slots; each summary counts its quantiles plus two count/sum slots. The two
+  slots count even when an incomplete distribution will later be skipped. A supplied `+Inf` bucket counts once;
+  the store's later synthesized bucket does not add to input. Exceeding the limit rejects the whole attempt before
+  any family is written; no partial totals are published.
+- `max_output_series_per_context` defaults to `1000`. After routing and aggregation, the chart engine counts
+  distinct current `(chart ID, dimension ID)` pairs across all charts in each published context within one job/host
+  scope. Context names use the emitter's wire normalization, so authored aliases of one published context share one
+  budget and omission/recovery report. Hidden and unavailable-valued dimensions count when currently observed;
+  quiet historical dimensions do not. Exceeding the limit omits the whole context, independently of other contexts. A summary view retains its
+  complete inputs even if a detailed view is omitted. Limits are evaluated before optional template lifecycle caps.
+
+Equality is admitted. Zero disables the corresponding limit; negative values are invalid. Later collection or
+configured startup retry attempts reconsider input. Ordinary logs distinguish input rejection/recovery from committed
+output omission/resumption; an input admission recovery does not promise chart publication. These limits protect
+writer/planner work and current output populations; they do not bound download, parser memory, the number of contexts,
+or total retained storage. Defaults are starting points, not resource-safety guarantees.
+
 ## Selecting profiles in job configuration
 
 The job's `profiles.mode` controls which catalog profiles apply:
