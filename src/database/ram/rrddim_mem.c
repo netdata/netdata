@@ -17,7 +17,7 @@ static void __attribute__((destructor)) destroy_lock(void) {
 // ----------------------------------------------------------------------------
 // metrics groups
 
-STORAGE_METRICS_GROUP *rrddim_metrics_group_get(STORAGE_INSTANCE *si __maybe_unused, nd_uuid_t *uuid __maybe_unused) {
+STORAGE_METRICS_GROUP *rrddim_metrics_group_get(STORAGE_INSTANCE *si __maybe_unused, uint64_t seed __maybe_unused) {
     return NULL;
 }
 

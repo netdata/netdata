@@ -446,7 +446,7 @@ Netdata provides network performance monitoring covering network devices (SNMP),
   - [Static exporter, interface and network metadata](/src/crates/netflow-plugin/integrations/static_metadata.md) (names, roles, sites, regions, tenants); classifiers
   - SRv6 and VXLAN [decapsulation](/src/crates/netflow-plugin/integrations/decapsulation.md)
 - [Four storage tiers](/docs/npm/network-flows/retention-querying.md) (raw, 1-minute, 5-minute, 1-hour) with independent retention
-- [Network Flows dashboard](/docs/npm/network-flows/visualization/overview.md) (Function `flows:netflow`): Sankey, table, time-series, country/state/city maps, 3D globe; facets on any field (including CIDR), regex search, group by up to 10 fields, top-N talkers by bytes or packets, shareable views
+- [Network Flows dashboard](/docs/npm/network-flows/visualization/overview.md) (Function `flows:netflow`): Sankey, table, time-series, country/state/city maps (down to street-level granularity, depending on the GeoIP database), 3D globe; facets on any field (including CIDR), regex search, group by up to 10 fields, top-N talkers by bytes or packets, shareable views
 - [50,000–100,000 flow records/s per Agent](/docs/npm/network-flows/sizing-capacity.md)
 
 **[SNMP traps](/docs/npm/snmp-traps/README.md)** — go.d `snmp_traps`
@@ -993,7 +993,7 @@ Netdata exchanges data with other systems through exporting connectors, Promethe
 | **Enterprise On-Prem** | Custom, from 200 node licenses | Air-gapped facilities, critical infrastructure | Everything in Business, running on customer infrastructure; priority support plans |
 | **Open-source Agent** | Free (Agent GPL v3+; dashboard NCUL1) | Self-hosted, any use | Complete Agent and Parents, no limit on metrics, local dashboards |
 
-Community and Homelab are for personal, non-commercial use only. Freelancers, professionals and businesses use the open-source Agent or the Business plan. A 14-day Business trial with no limit on nodes is available on sign-up.
+Community and Homelab are for personal, non-commercial use only. Freelancers, professionals and businesses use the open-source Agent or the Business plan. A 14-day Business trial with no limit on nodes is available on sign-up. Volume discounts are available for larger deployments.
 
 Netdata is also available on [AWS Marketplace](https://aws.amazon.com/marketplace/seller-profile?id=seller-5bbjpj3csb4mw): Netdata Cloud as a pay-as-you-go subscription or an annual contract (SaaS), Netdata Cloud On-Prem (Helm chart, bring your own license) and the Netdata Agent for EKS (Helm chart, free).
 
@@ -1016,6 +1016,8 @@ Support by plan:
 - Community: public forums, GitHub and Discord (all plans include community support)
 - Business: Email/ticket support during business hours with SLA
 - Enterprise: 24/7 availability, dedicated support team, phone support
+
+Netdata Cloud availability: at least 99.5% monthly availability during the subscription term, per the Service Terms' Service Level Commitment (excludes Scheduled Downtime and Other Causes).
 
 **Professional Services:**
 - Implementation assistance
@@ -1064,6 +1066,7 @@ Support by plan:
 
 - Open source with a large community: 80,000+ GitHub stars, 690+ contributors
 - Netdata Cloud SaaS serves more than 100,000 reachable nodes
+- University of Amsterdam study (ICSOC 2023) of monitoring tools: Netdata was found to be the most energy-efficient tool, with best-in-class resource consumption and no impact on the monitored workloads
 - Customers across technology, financial services, education, government, healthcare, hosting and cloud, gaming and digital media, retail, logistics, manufacturing, transportation and automotive (38 published case studies)
 
 ### Standard figures
