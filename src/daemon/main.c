@@ -536,11 +536,11 @@ int netdata_main(int argc, char **argv) {
                             if (ws_client_unittest()) return 1;
                             if (mqtt_ng_unittest()) return 1;
                             if (aclk_http_msg_unittest()) return 1;
-                            if (https_client_chunked_unittest()) return 1;
                             // summed, not short-circuited: this is the path CI runs, so one
                             // failing suite must not hide the others
                             if (aclk_timeout_unittest() + aclk_backoff_unittest() +
-                                https_client_timeout_unittest() + mqtt_wss_client_timeout_unittest()) return 1;
+                                https_client_timeout_unittest() + https_client_chunked_unittest() +
+                                mqtt_wss_client_timeout_unittest()) return 1;
 #ifdef OS_WINDOWS
                             if (unit_test_windows_os_version()) return 1;
                             if (unit_test_windows_virt_normalize()) return 1;

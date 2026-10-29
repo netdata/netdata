@@ -303,8 +303,9 @@ static inline void chunked_response_buffer_grow_by(http_parse_ctx *parse_ctx, si
 }
 
 // The chunked responses this client receives are small JSON documents (OTP challenge and
-// password, /env). The cap is checked before every allocation, so a chunk size from the
-// peer can never make us ask for more than this.
+// password, /env). The cap bounds the payload and is checked before every allocation, so a
+// chunk size from the peer can never make us ask for more; the buffer holds one more byte,
+// the terminating NUL.
 #define HTTPS_MAX_CHUNKED_RESPONSE_SIZE (1024 * 1024)
 
 // Parse a chunk-size line (RFC 9112, 7.1): one or more hex digits, then optional whitespace
@@ -1289,7 +1290,7 @@ static http_parse_rc chunked_test_body(const char *body, size_t len, size_t *wri
     chunked_test_start(&ctx, &buf);
 
     http_parse_rc rc = chunked_test_feed(&ctx, buf, body, len);
-    if (rc == HTTP_PARSE_SUCCESS && payload)
+    if (rc == HTTP_PARSE_SUCCESS && payload && payload_size)
         strncpyz(payload, ctx.chunked_response, payload_size - 1);
     *written = ctx.chunked_response_written;
 
@@ -1313,7 +1314,7 @@ int https_client_chunked_unittest(void) {
     HTTPS_CHUNKED_TEST(chunked_test_body(over_cap, sizeof(over_cap) - 1, &written, NULL, 0) == HTTP_PARSE_ERROR,
                        "a chunk bigger than the response cap was accepted");
 
-    // the cap holds across chunks too: 33 chunks of 32 KiB go past 1 MiB
+    // the cap holds across chunks too: 32 chunks of 32 KiB fill 1 MiB, the 33rd is refused
     {
         http_parse_ctx ctx;
         rbuf_t buf;
@@ -1349,7 +1350,7 @@ int https_client_chunked_unittest(void) {
         { " 1a\r\n",                5, "a chunk size with leading whitespace was accepted" },
         { "1\0\r\n",               4, "a chunk size line with a NUL was accepted" },
         { "\r\n",                   2, "an empty chunk size line was accepted" },
-        { "3\r\nabc\r\n\r\n",  10, "a body ending without a zero-size chunk was accepted" },
+        { "3\r\nabc\r\n\r\n",  10, "a body ended by an empty line instead of a zero-size chunk was accepted" },
     };
     for (size_t i = 0; i < sizeof(malformed) / sizeof(malformed[0]); i++)
         HTTPS_CHUNKED_TEST(chunked_test_body(malformed[i].body, malformed[i].len, &written, NULL, 0) == HTTP_PARSE_ERROR,
