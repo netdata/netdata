@@ -42,8 +42,8 @@ type ClientConfig struct {
 	ForceHTTP2 bool `yaml:"force_http2,omitempty" json:"force_http2"`
 }
 
-// NewHTTPClient returns a configured standard client. TLS credential reads are
-// scoped to construction and require no caller-owned file reader.
+// NewHTTPClient returns a configured client with bounded response bodies. TLS
+// credential reads are scoped to construction and require no caller-owned reader.
 func NewHTTPClient(ctx context.Context, cfg ClientConfig) (*http.Client, error) {
 	var transport http.RoundTripper
 	var err error
@@ -51,22 +51,34 @@ func NewHTTPClient(ctx context.Context, cfg ClientConfig) (*http.Client, error) 
 	if cfg.ForceHTTP2 {
 		transport, err = newHTTP2Transport(ctx, cfg)
 	} else {
-		transport, err = newHTTPTransport(ctx, cfg)
+		transport, err = NewHTTPTransport(ctx, cfg)
 	}
 	if err != nil {
 		return nil, err
 	}
 
-	client := &http.Client{
-		Timeout:       cfg.Timeout.Duration(),
-		Transport:     transport,
-		CheckRedirect: redirectFunc(cfg.NotFollowRedirect),
-	}
-
-	return client, nil
+	return NewHTTPClientWithTransport(cfg, transport), nil
 }
 
-func newHTTPTransport(ctx context.Context, cfg ClientConfig) (*http.Transport, error) {
+// NewHTTPClientWithTransport applies the client policies and response-body bound
+// to a supplied transport. Configure its dialing/TLS before calling this function.
+// A nil transport uses http.DefaultTransport, as with a standard http.Client.
+func NewHTTPClientWithTransport(cfg ClientConfig, transport http.RoundTripper) *http.Client {
+	if transport == nil {
+		transport = http.DefaultTransport
+	}
+	return &http.Client{
+		Timeout:       cfg.Timeout.Duration(),
+		Transport:     &responseLimitTransport{base: transport},
+		CheckRedirect: redirectFunc(cfg.NotFollowRedirect),
+	}
+}
+
+// NewHTTPTransport builds a raw HTTP/1 transport with the shared TLS, proxy and
+// timeout configuration. It does not limit bodies. Use NewHTTPClient normally;
+// this builder supports pre-wrap customization and SDKs requiring *http.Transport.
+// ForceHTTP2 is selected by NewHTTPClient and is not applied by this builder.
+func NewHTTPTransport(ctx context.Context, cfg ClientConfig) (*http.Transport, error) {
 	tlsConfig, err := tlscfg.NewTLSConfig(ctx, cfg.TLSConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error on creating TLS config: %w", err)

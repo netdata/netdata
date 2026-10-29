@@ -104,6 +104,7 @@ func (c *Client) fetch(ctx context.Context) ([]byte, error) {
 		}
 		return nil, fmt.Errorf("openmetrics protocol: request failed: %w", err)
 	}
+	resp.Body = web.LimitResponseBody(resp.Body)
 	defer web.CloseBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
@@ -118,7 +119,7 @@ func (c *Client) fetch(ctx context.Context) ([]byte, error) {
 			return nil, fmt.Errorf("openmetrics protocol: creating gzip reader failed: %w", err)
 		}
 		defer gz.Close()
-		reader = gz
+		reader = web.LimitResponseReader(gz)
 	}
 
 	buf := bytes.Buffer{}

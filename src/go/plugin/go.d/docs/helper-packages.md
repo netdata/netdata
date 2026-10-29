@@ -79,7 +79,7 @@ Why:
 
 - `web.HTTPConfig` embeds `web.RequestConfig` and `web.ClientConfig` so HTTP collectors expose the same option surface;
 - `web.NewHTTPClient(ctx, c.ClientConfig)` applies timeout, TLS, proxy, redirect, and HTTP/2
-  behavior consistently;
+  behavior consistently, with a 64 MiB response-body ceiling;
 - `web.NewHTTPRequest(ctx, c.RequestConfig)` and
   `web.NewHTTPRequestWithPath(ctx, c.RequestConfig, path)` apply user agent,
   authentication, headers, body, and safe path joining.
@@ -95,6 +95,28 @@ type Config struct {
 Use `src/go/pkg/tlscfg` directly only when the collector is not HTTP-based but still needs TLS, such as Redis or
 x509-style checks. HTTP collectors should get TLS behavior through `web.HTTPConfig`.
 
+### HTTP response limits
+
+`web.NewHTTPClient` limits bytes read from each response to `web.MaxResponseBodySize` (64 MiB), returning
+`web.ErrResponseTooLarge` on overflow. The limit is internal and has no configuration override. Exactly 64 MiB is
+accepted. It applies to the body returned by the transport, including automatic gzip decompression, without changing
+headers or content. A parser that stops early can succeed; cleanup is bounded but does not validate unread content.
+This is not a bound on decoded objects, retained buffer capacity, aggregate jobs or total process memory.
+
+When accepting an arbitrary HTTP client, bound its response with `web.LimitResponseBody` before deferring
+`web.CloseBody`. An explicit decompressor MUST also wrap its output with `web.LimitResponseReader`; a bound on the
+compressed input alone does not stop expansion. Keep these limits before any full-body allocation. Existing stricter
+protocol limits remain valid.
+
+For custom HTTP/1 dialing, build with `web.NewHTTPTransport`, configure the transport, then call
+`web.NewHTTPClientWithTransport`. That assembly applies the response limit, timeout and redirect policy; TLS, proxy
+and protocol selection belong to the supplied transport. Do not assert or unwrap the transport of a bounded client.
+
+SDK coverage depends on supported injection points. Cato's supplied client bounds explicit gzip before SDK parsing;
+Redfish retains its stricter acquisition policy. Pango requires a concrete `*http.Transport`, so PAN-OS uses the raw
+builder and is outside the shared response-size guarantee. Independently constructed cloud, vSphere and Kubernetes
+SDK clients are also outside this guarantee; a lifetime byte cap is inappropriate for Kubernetes watch streams.
+
 ### Configured credential and TLS files
 
 HTTP helpers handle credential files internally. `web.NewHTTPClient(ctx, cfg)` returns a standard `*http.Client`;
@@ -104,7 +126,7 @@ Keep `web.DoHTTP(client)` response/parsing helpers per use; their `OnNokCode` ca
 
 Each configured file operation uses its own reduced-authority helper on Unix. Requests without a bearer file start no
 helper process. `tlscfg.NewTLSConfig(ctx, cfg)` reads each configured CA/cert/key file independently. SDK/RPC HTTP consumers
-use the same `web.NewHTTPClient` constructor. Cookie collection calls `Stat` and conditionally `Open`/parse; it closes the
+use the shared construction paths above. Cookie collection calls `Stat` and conditionally `Open`/parse; it closes the
 stream before returning. No helper process is retained between operations.
 
 On Unix the operation uses a reduced-authority helper. Windows retains the service account's file authority. Helpers
@@ -155,6 +177,10 @@ Why:
 Pass the HTTP client to `prometheus.New(client, request)` or
 `prometheus.NewWithSelector(client, request, selector)`. Use `ScrapeContext(ctx)`, `ScrapeSeries(ctx)` or
 `ScrapeSamples(ctx)` so cancellation reaches the bearer read as well as the HTTP request.
+
+HTTP scraping bounds both the response stream and explicitly decompressed gzip output to 64 MiB, including when
+the supplied client was not created by `web.NewHTTPClient`. Overflow fails the scrape before parsing. This does not
+change the separate local-file input path or imply a bound on parser memory.
 
 Do not hand-roll text exposition parsing in a collector.
 

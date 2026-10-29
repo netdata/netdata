@@ -63,6 +63,7 @@ func (f *httpFetcher) fetch(ctx context.Context, w io.Writer) error {
 		return err
 	}
 
+	resp.Body = web.LimitResponseBody(resp.Body)
 	defer web.CloseBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
@@ -87,7 +88,7 @@ func (f *httpFetcher) fetch(ctx context.Context, w io.Writer) error {
 		}
 	}
 
-	_, err = io.Copy(w, f.gzipr)
+	_, err = io.Copy(w, web.LimitResponseReader(f.gzipr))
 	_ = f.gzipr.Close()
 
 	return err

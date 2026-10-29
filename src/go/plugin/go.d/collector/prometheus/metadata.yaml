@@ -55,6 +55,10 @@ modules:
             `max_output_series_per_context` omits that entire context while other contexts remain available.
             Limits apply with and without profiles. Admission and output omission/recovery are reported in ordinary logs.
             These limits do not bound download, parser memory, or total retained storage.
+
+            HTTP responses have a separate fixed 64 MiB limit, including after gzip decompression.
+            A response exceeding this limit fails the scrape. Reduce the metrics exposed by the endpoint if it
+            exceeds this limit; collector-side selectors and relabeling do not reduce the downloaded body.
         performance_impact:
           description: ""
     setup: &setup
