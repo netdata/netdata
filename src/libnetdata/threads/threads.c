@@ -644,13 +644,13 @@ static void threads_unittest_worker(void *arg __maybe_unused) {
     ;
 }
 
-// compares pointers only, so it is safe to call with a wrapper that has been freed
-static bool threads_unittest_is_exited(ND_THREAD *nti) {
+// takes the wrapper's address as an integer, so it can be asked about a wrapper that has been freed
+static bool threads_unittest_is_exited(uintptr_t nti) {
     bool found = false;
 
     spinlock_lock(&threads_globals.exited.spinlock);
     for(ND_THREAD *t = threads_globals.exited.list; t; t = t->next) {
-        if(t == nti) {
+        if((uintptr_t)t == nti) {
             found = true;
             break;
         }
@@ -681,23 +681,30 @@ int threads_unittest(void) {
                                           threads_unittest_worker, NULL);
     if(!manual || !generic) {
         fprintf(stderr, " > FAILED: cannot create the test threads\n");
+        nd_thread_join(manual);
+        nd_thread_join(generic);
         return 1;
     }
 
     if(!threads_unittest_wait_finished(manual) || !threads_unittest_wait_finished(generic)) {
         fprintf(stderr, " > FAILED: the test threads did not finish\n");
+        nd_thread_join(manual);
+        nd_thread_join(generic);
         return 1;
     }
 
+    uintptr_t manual_id = (uintptr_t)manual;
+    uintptr_t generic_id = (uintptr_t)generic;
+
     nd_thread_join_threads();
 
-    if(!threads_unittest_is_exited(manual)) {
+    if(!threads_unittest_is_exited(manual_id)) {
         fprintf(stderr, " > FAILED: the drain took a manual-join thread from its owner\n");
         // the drain freed it; joining it here would be a use-after-free
         return 1;
     }
 
-    if(threads_unittest_is_exited(generic)) {
+    if(threads_unittest_is_exited(generic_id)) {
         fprintf(stderr, " > FAILED: the drain did not join a default thread\n");
         errors++;
     }
@@ -708,7 +715,7 @@ int threads_unittest(void) {
         errors++;
     }
 
-    if(threads_unittest_is_exited(manual)) {
+    if(threads_unittest_is_exited(manual_id)) {
         fprintf(stderr, " > FAILED: the owner's join left the thread on the exited list\n");
         errors++;
     }

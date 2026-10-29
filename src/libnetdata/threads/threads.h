@@ -16,7 +16,8 @@ typedef enum __attribute__((packed)) {
     NETDATA_THREAD_STATUS_JOINED           = 1 << 4,
 
     // the creator keeps the ND_THREAD pointer and joins it itself with nd_thread_join();
-    // nd_thread_join_threads() never joins or frees such a thread
+    // nd_thread_join_threads() never joins or frees such a thread, so one the creator
+    // never joins stays allocated until the process exits
     NETDATA_THREAD_OPTION_MANUAL_JOIN      = 1 << 5,
 } NETDATA_THREAD_OPTIONS;
 
@@ -131,6 +132,7 @@ void nd_thread_rwspinlock_write_unlocked(void);
 
 void nd_thread_can_run_sql(bool exclude);
 void nd_thread_join_threads();
+// joins every exited thread of the process: run it before anything else creates threads
 int threads_unittest(void);
 bool nd_thread_runs_sql(void);
 
