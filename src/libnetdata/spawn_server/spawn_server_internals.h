@@ -44,6 +44,7 @@ struct spawn_server {
     int control_peer_fd;    // forked server's private control socket
     pid_t creator_pid;
     pid_t server_pid;
+    usec_t request_ack_timeout_ut; // how long a request waits for the server to take its socket
     spawn_request_callback_t cb;
 
     int argc;

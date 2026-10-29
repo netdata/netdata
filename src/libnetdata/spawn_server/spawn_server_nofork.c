@@ -29,6 +29,10 @@ static SPAWN_REQUEST *spawn_server_requests = NULL;
 
 #define SPAWN_SERVER_IOV_MAX 10
 
+// The server writes this byte on a request socket as soon as it receives it.
+#define SPAWN_SERVER_REQUEST_ACK 'A'
+#define SPAWN_SERVER_REQUEST_ACK_TIMEOUT_UT (10 * USEC_PER_SEC)
+
 // Use the socketpair flag when the running kernel accepts it. The fallback also
 // works on older kernels and BSDs; spawn children explicitly close unwanted FDs.
 static bool spawn_server_socketpair(int type, int fds[2]) {
@@ -852,7 +856,72 @@ static int spawn_server_receive_control_fd(int control_fd) {
         return -1;
     }
 
+    // Tell the creator we hold the socket, so it can close its copy. A creator
+    // that already gave up has closed both ends, and this write fails.
+    char ack = SPAWN_SERVER_REQUEST_ACK;
+    ssize_t written;
+    do {
+        written = write(request_fd, &ack, sizeof(ack));
+    } while(written < 0 && errno == EINTR);
+
+    if(written != sizeof(ack)) {
+        close(request_fd);
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: cannot acknowledge request socket");
+        return -1;
+    }
+
     return request_fd;
+}
+
+// The creator keeps its copy of the request socket until the server has it.
+// macOS garbage-collects a unix socket that is referenced only by a message
+// queued on another socket which is not itself in transit, such as the control
+// channel: the queued request is flushed and the server reads end-of-file.
+static bool spawn_server_wait_request_ack(SPAWN_SERVER *server, int sock) {
+    usec_t deadline = now_monotonic_usec() + server->request_ack_timeout_ut;
+    struct pollfd fds[2] = {
+        { .fd = sock, .events = POLLIN },
+        // the server holds the only write end of the status pipe: any event means it exited
+        { .fd = server->pipe[0], .events = POLLIN },
+    };
+
+    for(;;) {
+        usec_t now = now_monotonic_usec();
+        if(now >= deadline) {
+            errno = ETIMEDOUT;
+            break;
+        }
+
+        int ret = poll(fds, 2, (int)((deadline - now + USEC_PER_MS - 1) / USEC_PER_MS));
+        if(ret < 0) {
+            if(errno == EINTR)
+                continue;
+            break;
+        }
+
+        if(fds[0].revents) {
+            char ack = 0;
+            ssize_t bytes;
+            do {
+                bytes = read(sock, &ack, sizeof(ack));
+            } while(bytes < 0 && errno == EINTR);
+
+            if(bytes == sizeof(ack) && ack == SPAWN_SERVER_REQUEST_ACK)
+                return true;
+
+            if(bytes >= 0)
+                errno = bytes ? EPROTO : EPIPE;
+            break;
+        }
+
+        if(fds[1].revents) {
+            errno = EPIPE;
+            break;
+        }
+    }
+
+    nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: spawn server did not take the request socket");
+    return false;
 }
 
 static bool spawn_server_send_request(SPAWN_REQUEST *request) {
@@ -1424,6 +1493,7 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name
     server->argv = argv;
     server->options = options;
     server->creator_pid = getpid();
+    server->request_ack_timeout_ut = SPAWN_SERVER_REQUEST_ACK_TIMEOUT_UT;
 
     server->name = strdupz(name && *name ? name : "unnamed");
 
@@ -1753,7 +1823,8 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
         .type = type
     };
 
-    if(!spawn_server_send_control_fd(server->control_fd, request_pair[1]))
+    if(!spawn_server_send_control_fd(server->control_fd, request_pair[1]) ||
+       !spawn_server_wait_request_ack(server, instance->sock))
         goto cleanup;
     close(request_pair[1]); request_pair[1] = -1;
 
