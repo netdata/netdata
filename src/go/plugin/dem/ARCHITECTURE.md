@@ -960,7 +960,8 @@ Explicit installation and protection (`synthetic/runtime`):
   it ready before admission. Interrupted initialization is retryable; ready stores never recreate missing safety
   namespaces or locks. A missing selection record or field is damage, not an uninstall.
 - Precreated roots, including mountpoints, initialize in place without requiring parent write access. Creating an absent
-  path stages its missing suffix and records the parent durability barrier for the next opener to reconcile. Interrupted
+  path stages its missing suffix and records the parent durability barrier in each created directory. New stores sharing
+  those ancestors reconcile that barrier too; successful setup retires the publication records. Interrupted
   publication can leave a small unpublished sibling containing only initial metadata, never payloads. Published roots
   and lock identities are preserved. Preload readers require ready state without modifying it.
 - Administrator commands hold candidate protection and serialize installation, update, repair and uninstall.

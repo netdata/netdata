@@ -578,3 +578,73 @@ func TestPrecreatedMountedStoreRoot(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, candidate.Close())
 }
+
+func TestSharedCreatedAncestorRetainsPublicationBarrier(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("requires unprivileged identity")
+	}
+	parent := t.TempDir()
+	first := filepath.Join(parent, "new", "nested", "first")
+	// The first initializer exits after publication, before syncing parent.
+	_, err := ensureStoreRoot(first)
+	require.NoError(t, err)
+	alias := filepath.Join(t.TempDir(), "alias")
+	require.NoError(t, os.Symlink(filepath.Dir(first), alias))
+	second := filepath.Join(alias, "second")
+	// Make the unresolved parent barrier fail while leaving traversal available.
+	require.NoError(t, os.Chmod(parent, 0100))
+	t.Cleanup(func() { require.NoError(t, os.Chmod(parent, 0700)) })
+	s, err := Open(DefaultConfig(second))
+	if s != nil {
+		require.NoError(t, s.Close())
+	}
+	require.ErrorIs(
+		t,
+		err,
+		os.ErrPermission,
+		"a different store must inherit the created ancestor's publication barrier",
+	)
+	require.NoError(t, os.Chmod(parent, 0700))
+	s, err = Open(DefaultConfig(second))
+	require.NoError(t, err)
+	require.NoError(t, s.Close())
+	s, err = Open(DefaultConfig(first))
+	require.NoError(t, err)
+	require.NoError(t, s.Close())
+	// Completed setup leaves no stale obligation to reopen the old ancestor.
+	require.NoError(t, os.Chmod(parent, 0100))
+	s, err = Open(DefaultConfig(filepath.Join(alias, "third")))
+	require.NoError(t, err)
+	require.NoError(t, s.Close())
+}
+
+func TestConcurrentStoresShareCreatedAncestors(t *testing.T) {
+	parent := filepath.Join(t.TempDir(), "new", "nested")
+	first := filepath.Join(parent, "first")
+	_, err := ensureStoreRoot(first)
+	require.NoError(t, err)
+	var group sync.WaitGroup
+	errs := make(chan error, 8)
+	for i := range cap(errs) {
+		group.Add(1)
+		go func() {
+			defer group.Done()
+			s, err := Open(DefaultConfig(filepath.Join(parent, fmt.Sprintf("store-%d", i))))
+			if err == nil {
+				err = s.Close()
+			}
+			errs <- err
+		}()
+	}
+	group.Wait()
+	close(errs)
+	for err := range errs {
+		require.NoError(t, err)
+	}
+	for _, path := range []string{parent, filepath.Dir(parent)} {
+		require.NoFileExists(t, filepath.Join(path, publicationName))
+	}
+	s, err := Open(DefaultConfig(first))
+	require.NoError(t, err)
+	require.NoError(t, s.Close())
+}

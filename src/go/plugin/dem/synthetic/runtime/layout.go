@@ -18,11 +18,15 @@ var storeLocks = []string{"coordination.lock", "installation.lock"}
 
 const layoutName = "layout.json"
 const layoutTemporaryPrefix = ".dem-layout-"
+const publicationName = ".dem-runtime-publication.json"
 
 type storeLayout struct {
-	Format            int    `json:"format"`
-	Phase             string `json:"phase"`
-	PublicationParent string `json:"publication_parent,omitempty"`
+	Format int    `json:"format"`
+	Phase  string `json:"phase"`
+}
+
+type storePublication struct {
+	Parent string `json:"parent"`
 }
 
 // The initialization record distinguishes interrupted bootstrap from lost safety
@@ -33,6 +37,9 @@ func openStoreRoot(path string) (string, *os.Root, error) {
 		return "", nil, err
 	}
 	if err := privateDirectory(canonical); err != nil {
+		return "", nil, err
+	}
+	if err := reconcileStorePublication(canonical); err != nil {
 		return "", nil, err
 	}
 	root, err := os.OpenRoot(canonical)
@@ -46,7 +53,7 @@ func openStoreRoot(path string) (string, *os.Root, error) {
 }
 
 func openStoreLayout(root *os.Root, path string) error {
-	record, err := readStoreLayout(root, path)
+	record, err := readStoreLayout(root)
 	if errors.Is(err, os.ErrNotExist) {
 		// Only unpublished bootstrap temporaries may precede the first record.
 		// Existing state with a missing record is never a fresh installation.
@@ -75,20 +82,10 @@ func openStoreLayout(root *os.Root, path string) error {
 		}); err != nil {
 			return err
 		}
-		record, err = readStoreLayout(root, path)
+		record, err = readStoreLayout(root)
 	}
 	if err != nil {
 		return err
-	}
-	if record.PublicationParent != "" {
-		parent, err := os.OpenRoot(record.PublicationParent)
-		if err != nil {
-			return err
-		}
-		err = errors.Join(syncDirectory(parent, "."), parent.Close())
-		if err != nil {
-			return err
-		}
 	}
 	if err := syncDirectory(root, "."); err != nil {
 		return err
@@ -105,12 +102,12 @@ func openStoreLayout(root *os.Root, path string) error {
 	if err := lock.Lock(); err != nil {
 		return errors.Join(err, lock.Close())
 	}
-	err = finishStoreInitialization(root, path)
+	err = finishStoreInitialization(root)
 	return errors.Join(err, lock.Close())
 }
 
-func finishStoreInitialization(root *os.Root, path string) error {
-	record, err := readStoreLayout(root, path)
+func finishStoreInitialization(root *os.Root) error {
+	record, err := readStoreLayout(root)
 	if err != nil {
 		return err
 	}
@@ -146,23 +143,13 @@ func finishStoreInitialization(root *os.Root, path string) error {
 	})
 }
 
-func readStoreLayout(root *os.Root, path string) (storeLayout, error) {
+func readStoreLayout(root *os.Root) (storeLayout, error) {
 	var record storeLayout
 	if err := readJSON(root, layoutName, &record); err != nil {
 		return record, err
 	}
 	if record.Format != 1 || (record.Phase != "initializing" && record.Phase != "ready") {
 		return record, errors.New("invalid runtime initialization record")
-	}
-	if record.PublicationParent != "" {
-		parent := record.PublicationParent
-		relative, err := filepath.Rel(parent, path)
-		if record.Phase != "initializing" || !filepath.IsAbs(parent) || filepath.Clean(parent) != parent ||
-			err != nil ||
-			relative == "." ||
-			!filepath.IsLocal(relative) {
-			return record, errors.New("invalid runtime initialization publication parent")
-		}
 	}
 	return record, nil
 }
@@ -188,9 +175,72 @@ func createInitialLayout(root *os.Root, record storeLayout) error {
 	return syncDirectory(root, ".")
 }
 
+// Only paths created by this protocol carry an origin. Resolving one proves all
+// links in that staged suffix durable before another store can build beneath it.
+func reconcileStorePublication(path string) error {
+	root, err := os.OpenRoot(path)
+	if err != nil {
+		return err
+	}
+	var origin storePublication
+	readErr := readJSON(root, publicationName, &origin)
+	closeErr := root.Close()
+	if errors.Is(readErr, os.ErrNotExist) {
+		return closeErr
+	}
+	if err := errors.Join(readErr, closeErr); err != nil {
+		return err
+	}
+	relative, err := filepath.Rel(origin.Parent, path)
+	if !filepath.IsAbs(origin.Parent) || filepath.Clean(origin.Parent) != origin.Parent || err != nil ||
+		relative == "." ||
+		!filepath.IsLocal(relative) {
+		return errors.New("invalid runtime initialization publication parent")
+	}
+	parent, err := os.OpenRoot(origin.Parent)
+	if err != nil {
+		return err
+	}
+	if err := errors.Join(syncDirectory(parent, "."), parent.Close()); err != nil {
+		return err
+	}
+	// Retire receipts only after the original barrier. Clearing the whole known
+	// suffix avoids stale parent-access requirements after successful bootstrap.
+	current := origin.Parent
+	for _, component := range strings.Split(relative, string(os.PathSeparator)) {
+		current = filepath.Join(current, component)
+		if err := retireStorePublication(current, origin); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func retireStorePublication(path string, origin storePublication) (result error) {
+	root, err := os.OpenRoot(path)
+	if err != nil {
+		return err
+	}
+	defer func() { result = errors.Join(result, root.Close()) }()
+	var record storePublication
+	if err := readJSON(root, publicationName, &record); errors.Is(err, os.ErrNotExist) {
+		// Another reconciler only removes this after syncing the same parent.
+		return nil
+	} else if err != nil {
+		return err
+	}
+	if record != origin {
+		return errors.New("runtime initialization publication origins differ")
+	}
+	if err := root.Remove(publicationName); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return syncDirectory(root, ".")
+}
+
 // Existing roots, including mountpoints, need no operations on their parents.
-// A missing suffix appears atomically with its publication debt, so another
-// opener of the same root cannot mistake it for durable administrator provisioning.
+// Every directory of a missing suffix advertises its publication debt, including
+// to another store creating a different path beneath a shared new ancestor.
 func ensureStoreRoot(path string) (string, error) {
 	ancestor := path
 	var missing []string
@@ -212,6 +262,9 @@ func ensureStoreRoot(path string) (string, error) {
 	if len(missing) == 0 {
 		return canonical, nil
 	}
+	if err := reconcileStorePublication(canonical); err != nil {
+		return "", err
+	}
 	temporary, err := os.MkdirTemp(canonical, ".dem-runtime-init-")
 	if err != nil {
 		return "", err
@@ -221,14 +274,34 @@ func ensureStoreRoot(path string) (string, error) {
 	if err := os.MkdirAll(stagedPath, 0700); err != nil {
 		return "", err
 	}
+	origin := storePublication{
+		Parent: canonical,
+	}
+	data, err := json.Marshal(origin)
+	if err != nil {
+		return "", err
+	}
+	dirPath := temporary
+	for index := range missing {
+		if index > 0 {
+			dirPath = filepath.Join(dirPath, missing[index])
+		}
+		dir, err := os.OpenRoot(dirPath)
+		if err != nil {
+			return "", err
+		}
+		err = errors.Join(writeNewFile(dir, publicationName, append(data, '\n'), 0600), dir.Close())
+		if err != nil {
+			return "", err
+		}
+	}
 	staged, err := os.OpenRoot(stagedPath)
 	if err != nil {
 		return "", err
 	}
 	err = createInitialLayout(staged, storeLayout{
-		Format:            1,
-		Phase:             "initializing",
-		PublicationParent: canonical,
+		Format: 1,
+		Phase:  "initializing",
 	})
 	err = errors.Join(err, staged.Close())
 	if err != nil {
@@ -282,8 +355,8 @@ func validateStoreLayout(root *os.Root) error {
 	return nil
 }
 
-func validateReadyStore(root *os.Root, path string) error {
-	record, err := readStoreLayout(root, path)
+func validateReadyStore(root *os.Root) error {
+	record, err := readStoreLayout(root)
 	if err != nil {
 		return err
 	}

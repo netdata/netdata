@@ -72,7 +72,7 @@ func ReadPreload(path string) (Paths, Manifest, error) {
 		return Paths{}, empty, err
 	}
 	defer root.Close()
-	if err := validateReadyStore(root, path); err != nil {
+	if err := validateReadyStore(root); err != nil {
 		return Paths{}, empty, err
 	}
 	var record preloadRecord
