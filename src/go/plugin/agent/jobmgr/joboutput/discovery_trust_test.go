@@ -32,9 +32,7 @@ func TestDiscoveredTrustRevocationRequiresPipelineIdentity(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
-			owner := &intentTestOwner{}
 			creator := controller.modules["module"]
-			creator.JobConfigIntent = owner
 			creator.Create = func() collectorapi.CollectorV1 {
 				charts := collectorapi.Charts{}
 				return &trustDurationCollector{
@@ -108,7 +106,7 @@ func TestDiscoveredTrustRevocationRequiresPipelineIdentity(t *testing.T) {
 			// The same duration is valid when resolved, but cannot decode as literal syntax.
 			config.SetTrustDiscoveredTargets(false)
 			if test.missingRuntime {
-				creator.ActivationDependencies = intentAdmissionDependencies(true)
+				creator.ActivationDependencies = enabledAdmissionDependencies(true)
 				controller.modules["module"] = creator
 			}
 			config.SetDiscoveryPipelineID(test.replacementID)
@@ -159,8 +157,6 @@ func TestDiscoveredTrustRevocationRequiresPipelineIdentity(t *testing.T) {
 			stored, err := graphRecordConfig(record)
 			require.NoError(t, err)
 			require.False(t, stored.TrustDiscoveredTargets())
-			_, _, _, enabled := owner.snapshot()
-			require.Zero(t, enabled, "revoked invalid configuration must release acquisition authority")
 			require.False(t, dependencies.Affects("vault:main", config.FullName(), true))
 			require.Equal(t, 1, acquisitions)
 			require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())

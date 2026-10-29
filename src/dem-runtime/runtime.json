@@ -1,0 +1,8 @@
+{
+  "contract": 1,
+  "version": "dev",
+  "paths": {
+    "dependencies": "dependencies",
+    "browser": "chrome"
+  }
+}

@@ -98,7 +98,7 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStop(id string) (jobmgr.Work
 				reply.restart.pause = pause
 				return dcjc.prepareMutationAfterApply(
 					ctx, scope, current, nil, permit, resourceRemovalDisposition(current), &postimage,
-					reply, dcjc.configStatusCleanup(id, dyncfg.StatusAccepted), state.markStopped, jobConfigIntentPreserve,
+					reply, dcjc.configStatusCleanup(id, dyncfg.StatusAccepted), state.markStopped,
 				)
 			},
 		},

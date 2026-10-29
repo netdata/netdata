@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestConfigIntentRejectsMalformedDiscovery(t *testing.T) {
+func TestEnabledAdmissionRejectsMalformedDiscovery(t *testing.T) {
 	for name, fixture := range map[string]struct {
 		creator collectorapi.Creator
 		field   string
@@ -30,10 +30,8 @@ func TestConfigIntentRejectsMalformedDiscovery(t *testing.T) {
 		for _, readiness := range []string{"available", "missing", "quarantined", "deadline"} {
 			t.Run(name+"/"+readiness, func(t *testing.T) {
 				controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
-				owner := &intentTestOwner{}
 				creator := fixture.creator
-				creator.JobConfigIntent = owner
-				creator.ActivationDependencies = intentAdmissionDependencies(readiness == "missing")
+				creator.ActivationDependencies = enabledAdmissionDependencies(readiness == "missing")
 				controller.modules["module"] = creator
 				if readiness == "quarantined" {
 					injectAdoptionAttemptFailure(controller, injectJobQuarantined)
@@ -57,21 +55,17 @@ func TestConfigIntentRejectsMalformedDiscovery(t *testing.T) {
 				require.NoError(t, err)
 				_, exists := graph.Lookup(config.FullName())
 				require.False(t, exists)
-				preparedCount, committed, aborted, enabled := owner.snapshot()
-				require.Equal(t, []int{0, 0, 0, 0}, []int{preparedCount, committed, aborted, enabled})
 			})
 		}
 	}
 }
 
-func TestConfigIntentRejectsMalformedPassiveEnable(t *testing.T) {
+func TestEnabledAdmissionRejectsMalformedPassiveEnable(t *testing.T) {
 	for _, missing := range []bool{false, true} {
 		t.Run(map[bool]string{false: "available", true: "missing"}[missing], func(t *testing.T) {
 			controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
-			owner := &intentTestOwner{}
 			creator := lighthouse.Creator(lighthouse.Dependencies{})
-			creator.JobConfigIntent = owner
-			creator.ActivationDependencies = intentAdmissionDependencies(missing)
+			creator.ActivationDependencies = enabledAdmissionDependencies(missing)
 			controller.modules["module"] = creator
 			config := acceptedActivationTestConfig(confgroup.TypeUser).Set("url", map[string]any{"bad": "shape"})
 			plan, err := planSourceTestConfig(controller, config, false, false)
@@ -79,7 +73,7 @@ func TestConfigIntentRejectsMalformedPassiveEnable(t *testing.T) {
 			applyActivationTestSubmission(t, activationTestSubmission{plan: plan}, nil, 0)
 			before, exists := graph.Lookup(config.FullName())
 			require.True(t, exists)
-			transaction, err := prepareIntentTestEnable(t, controller, config)
+			transaction, err := prepareAdmissionTestEnable(t, controller, config)
 			require.NoError(t, err)
 			applied, err := transaction.Apply(t.Context())
 			require.NoError(t, err)
@@ -87,18 +81,14 @@ func TestConfigIntentRejectsMalformedPassiveEnable(t *testing.T) {
 			after, _ := graph.Lookup(config.FullName())
 			require.Equal(t, before, after)
 			require.False(t, controller.ActivationEnabled(config.FullName()))
-			prepared, committed, aborted, enabled := owner.snapshot()
-			require.Equal(t, []int{0, 0, 0, 0}, []int{prepared, committed, aborted, enabled})
 		})
 	}
 }
 
-func TestConfigIntentInvalidDiscoveredReplacementPreservesDemand(t *testing.T) {
+func TestEnabledAdmissionInvalidDiscoveredReplacementPreservesBinding(t *testing.T) {
 	controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
-	owner := &intentTestOwner{}
 	creator := lighthouse.Creator(lighthouse.Dependencies{})
-	creator.JobConfigIntent = owner
-	creator.ActivationDependencies = intentAdmissionDependencies(true)
+	creator.ActivationDependencies = enabledAdmissionDependencies(true)
 	controller.modules["module"] = creator
 	config := acceptedActivationTestConfig(confgroup.TypeUser).Set("url", "https://example.test")
 	permit, _ := issueTestJobPermit(t, config.FullName(), 1)
@@ -130,11 +120,9 @@ func TestConfigIntentInvalidDiscoveredReplacementPreservesDemand(t *testing.T) {
 	require.NoError(t, err)
 	after, _ := graph.Lookup(config.FullName())
 	require.Equal(t, before, after)
-	preparedCount, committed, aborted, enabled := owner.snapshot()
-	require.Equal(t, []int{1, 1, 0, 1}, []int{preparedCount, committed, aborted, enabled})
 }
 
-func intentAdmissionDependencies(missing bool) func(map[string]any) ([]collectorapi.ActivationDependency, error) {
+func enabledAdmissionDependencies(missing bool) func(map[string]any) ([]collectorapi.ActivationDependency, error) {
 	return func(map[string]any) ([]collectorapi.ActivationDependency, error) {
 		return []collectorapi.ActivationDependency{{Kind: "runtime", Name: "browser", Ready: func() error {
 			if missing {
@@ -145,18 +133,16 @@ func intentAdmissionDependencies(missing bool) func(map[string]any) ([]collector
 	}
 }
 
-func TestConfigIntentAdmissionWaitsForExactValidationAttempt(t *testing.T) {
+func TestEnabledAdmissionAdmissionWaitsForExactValidationAttempt(t *testing.T) {
 	for name, cut := range map[string]bool{"busy": false, "deadline": true} {
 		t.Run(name, func(t *testing.T) {
 			controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
-			owner := &intentTestOwner{}
 			creator := lighthouse.Creator(lighthouse.Dependencies{})
-			creator.JobConfigIntent = owner
-			creator.ActivationDependencies = intentAdmissionDependencies(true)
+			creator.ActivationDependencies = enabledAdmissionDependencies(true)
 			controller.modules["module"] = creator
 			config := acceptedActivationTestConfig(confgroup.TypeUser).Set("url", "https://example.test")
 			authority := controller.factory.config.Attempts
-			identity := jobTestAttemptIdentity(configOperationValidateIntent, config)
+			identity := jobTestAttemptIdentity(configOperationAdmit, config)
 			entered, release := make(chan struct{}), make(chan struct{})
 			var once sync.Once
 			unblock := func() { once.Do(func() { close(release) }) }
@@ -193,8 +179,6 @@ func TestConfigIntentAdmissionWaitsForExactValidationAttempt(t *testing.T) {
 			applyActivationTestSubmission(t, commands.next(t, "internal/jobs/accepted-activation"), nil, 1)
 			_, exists := graph.Lookup(config.FullName())
 			require.False(t, exists, "validation wait must not adopt unproven configuration")
-			prepared, committed, _, enabled := owner.snapshot()
-			require.Equal(t, []int{0, 0, 0}, []int{prepared, committed, enabled})
 			controller.scheduler.accepted.mu.Lock()
 			entry := controller.scheduler.accepted.entries[config.FullName()]
 			var waiting bool
@@ -211,8 +195,6 @@ func TestConfigIntentAdmissionWaitsForExactValidationAttempt(t *testing.T) {
 				t.Fatalf("candidate advanced before physical validation release: %s", call.request.Route)
 			case <-time.After(20 * time.Millisecond):
 			}
-			prepared, committed, _, enabled = owner.snapshot()
-			require.Equal(t, []int{0, 0, 0}, []int{prepared, committed, enabled})
 			unblock()
 			select {
 			case <-physicalRelease:
@@ -224,37 +206,33 @@ func TestConfigIntentAdmissionWaitsForExactValidationAttempt(t *testing.T) {
 			record, exists := graph.Lookup(config.FullName())
 			require.True(t, exists)
 			require.Equal(t, dyncfg.StatusAccepted.String(), record.Status)
-			prepared, committed, _, enabled = owner.snapshot()
-			require.Equal(t, []int{1, 1, 1}, []int{prepared, committed, enabled})
 		})
 	}
 }
 
-type intentAdmissionQuarantinedAuthority struct {
+type enabledAdmissionQuarantinedAuthority struct {
 	jobmgr.ProcessAttemptAuthority
 	identity jobmgr.ProcessAttemptIdentity
 }
 
-func (a intentAdmissionQuarantinedAuthority) StartProcessAttempt(ctx context.Context, plan jobmgr.ProcessAttemptPlan) (jobmgr.ProcessAttempt, error) {
+func (a enabledAdmissionQuarantinedAuthority) StartProcessAttempt(ctx context.Context, plan jobmgr.ProcessAttemptPlan) (jobmgr.ProcessAttempt, error) {
 	if plan.Identity == a.identity {
 		return nil, jobmgr.ErrProcessAttemptQuarantined
 	}
 	return a.ProcessAttemptAuthority.StartProcessAttempt(ctx, plan)
 }
 
-func TestConfigIntentAdmissionQuarantineRejectsWithoutAcquisition(t *testing.T) {
+func TestEnabledAdmissionAdmissionQuarantineRejectsWithoutAdoption(t *testing.T) {
 	for _, route := range []string{"discovery", "enable"} {
 		t.Run(route, func(t *testing.T) {
 			controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
-			owner := &intentTestOwner{}
 			creator := lighthouse.Creator(lighthouse.Dependencies{})
-			creator.JobConfigIntent = owner
-			creator.ActivationDependencies = intentAdmissionDependencies(true)
+			creator.ActivationDependencies = enabledAdmissionDependencies(true)
 			controller.modules["module"] = creator
 			config := acceptedActivationTestConfig(confgroup.TypeUser).Set("url", "https://example.test")
-			controller.factory.config.Attempts = intentAdmissionQuarantinedAuthority{
+			controller.factory.config.Attempts = enabledAdmissionQuarantinedAuthority{
 				ProcessAttemptAuthority: controller.factory.config.Attempts,
-				identity:                jobTestAttemptIdentity(configOperationValidateIntent, config),
+				identity:                jobTestAttemptIdentity(configOperationAdmit, config),
 			}
 			if route == "enable" {
 				plan, err := planSourceTestConfig(controller, config, false, false)
@@ -262,7 +240,7 @@ func TestConfigIntentAdmissionQuarantineRejectsWithoutAcquisition(t *testing.T) 
 				applyActivationTestSubmission(t, activationTestSubmission{plan: plan}, nil, 0)
 				before, exists := graph.Lookup(config.FullName())
 				require.True(t, exists)
-				prepared, err := prepareIntentTestEnable(t, controller, config)
+				prepared, err := prepareAdmissionTestEnable(t, controller, config)
 				require.NoError(t, err)
 				applied, err := prepared.Apply(t.Context())
 				require.NoError(t, err)
@@ -279,24 +257,20 @@ func TestConfigIntentAdmissionQuarantineRejectsWithoutAcquisition(t *testing.T) 
 				_, exists := graph.Lookup(config.FullName())
 				require.False(t, exists)
 			}
-			prepared, committed, _, enabled := owner.snapshot()
-			require.Equal(t, []int{0, 0, 0}, []int{prepared, committed, enabled})
 		})
 	}
 }
 
-func TestConfigIntentAdmissionQuarantineAdvancesValidSibling(t *testing.T) {
+func TestEnabledAdmissionAdmissionQuarantineAdvancesValidSibling(t *testing.T) {
 	controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
-	owner := &intentTestOwner{}
 	creator := lighthouse.Creator(lighthouse.Dependencies{})
-	creator.JobConfigIntent = owner
-	creator.ActivationDependencies = intentAdmissionDependencies(true)
+	creator.ActivationDependencies = enabledAdmissionDependencies(true)
 	controller.modules["module"] = creator
 	config := acceptedActivationTestConfig(confgroup.TypeUser).Set("url", "https://quarantined.example.test")
 	sibling := acceptedActivationTestConfig(confgroup.TypeStock).Set("url", "https://valid.example.test")
-	controller.factory.config.Attempts = intentAdmissionQuarantinedAuthority{
+	controller.factory.config.Attempts = enabledAdmissionQuarantinedAuthority{
 		ProcessAttemptAuthority: controller.factory.config.Attempts,
-		identity:                jobTestAttemptIdentity(configOperationValidateIntent, config),
+		identity:                jobTestAttemptIdentity(configOperationAdmit, config),
 	}
 	commands := runtimeTestBindActivations(t, controller)
 	inventory := sourceTestInventory(controller, config, true, false, "user-source")
@@ -312,8 +286,6 @@ func TestConfigIntentAdmissionQuarantineAdvancesValidSibling(t *testing.T) {
 	applyActivationTestSubmission(t, commands.next(t, "internal/jobs/accepted-activation"), nil, 1)
 	_, exists := graph.Lookup(config.FullName())
 	require.False(t, exists)
-	prepared, committed, _, enabled := owner.snapshot()
-	require.Equal(t, []int{0, 0, 0}, []int{prepared, committed, enabled})
 	applyActivationTestSubmission(t, commands.next(t, "internal/jobs/accepted-activation"), nil, 2)
 	record, exists := graph.Lookup(config.FullName())
 	require.True(t, exists)
@@ -321,6 +293,4 @@ func TestConfigIntentAdmissionQuarantineAdvancesValidSibling(t *testing.T) {
 	adopted, err := graphRecordConfig(record)
 	require.NoError(t, err)
 	require.Equal(t, sibling, adopted)
-	prepared, committed, _, enabled = owner.snapshot()
-	require.Equal(t, []int{1, 1, 1}, []int{prepared, committed, enabled})
 }

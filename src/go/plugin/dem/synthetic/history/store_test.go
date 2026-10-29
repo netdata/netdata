@@ -29,6 +29,7 @@ func TestSyntheticHistoryReopenMixedKindsAndUnmatchedStart(t *testing.T) {
 	t.Cleanup(func() { require.NoError(t, st.Close()) })
 	old := time.Now().Add(-24 * time.Hour).UnixMicro()
 	run := synthetic.Run{
+		Runtime:      &synthetic.RuntimeIdentity{Version: "release-a", SHA256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Contract: 1},
 		ID:           "a",
 		JobID:        "journey:disabled",
 		Kind:         synthetic.Journey,

@@ -25,7 +25,7 @@ module.exports = class DEMReporter {
       // onBegin precedes worker startup. Do not execute an unsupported retry policy.
       process.exit(1);
     }
-    this.emit('suite', {title: 'Discovered ' + this.tests.size + ' tests', phase: 'discovery'});
+    this.emit('suite', {title: 'Discovered ' + this.tests.size + ' tests', phase: 'discovery', declared_tests: this.tests.size});
   }
   onTestBegin(test) {
     this.emit('test', {test_id: test.id, title: text(test.title), phase: 'start', status: 'running', expected_status: test.expectedStatus});

@@ -1,7 +1,8 @@
 {
   "protocol_version": 1,
-  "entrypoint": "run.mjs",
+  "entrypoint": "runner/run.mjs",
   "node_major_min": 24,
+  "node_version": "24.20.0",
   "platforms": [
     "linux/amd64",
     "linux/arm64"

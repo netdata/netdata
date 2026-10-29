@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCandidateFailedTrialsPreserveLogicalResourceIntent(t *testing.T) {
+func TestCandidateFailedTrialsPreserveLogicalBinding(t *testing.T) {
 	for _, sourceType := range []string{confgroup.TypeStock, confgroup.TypeUser} {
 		t.Run(sourceType, func(t *testing.T) {
 			controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
@@ -30,8 +30,6 @@ func TestCandidateFailedTrialsPreserveLogicalResourceIntent(t *testing.T) {
 				return module
 			}
 			controller.modules["module"] = creator
-			owner := &intentTestOwner{}
-			installIntentTestOwner(controller, owner)
 			commands := runtimeTestBindActivations(t, controller)
 			configs := []confgroup.Config{
 				acceptedActivationTestConfig(sourceType).Set("option_str", "first").Set("autodetection_retry", 0),
@@ -58,16 +56,8 @@ func TestCandidateFailedTrialsPreserveLogicalResourceIntent(t *testing.T) {
 				if binding == nil {
 					binding = config
 				} else {
-					require.NotEqual(t, binding.UID(), config.UID(), "the resource-intent assertion must exercise a distinct failed sibling")
+					require.NotEqual(t, binding.UID(), config.UID(), "the binding assertion must exercise a distinct failed sibling")
 				}
-				owner.mu.Lock()
-				ownsBinding := owner.enabled[jobConfigIdentity(binding)]
-				ownsTrial := config.UID() != binding.UID() && owner.enabled[jobConfigIdentity(config)]
-				count := len(owner.enabled)
-				owner.mu.Unlock()
-				require.True(t, ownsBinding, "logical job retains its resource demand")
-				require.False(t, ownsTrial, "a failed trial must not acquire resource demand")
-				require.Equal(t, 1, count)
 				record, listed := graph.Lookup(config.FullName())
 				if sourceType == confgroup.TypeStock {
 					require.False(t, listed, "private recovery must not list failed stock")
@@ -85,18 +75,16 @@ func TestCandidateFailedTrialsPreserveLogicalResourceIntent(t *testing.T) {
 			plan, err = planInventoryTest(controller, inventory)
 			require.NoError(t, err)
 			applyActivationTestSubmission(t, activationTestSubmission{plan: plan}, nil, 0)
-			_, _, _, enabled := owner.snapshot()
-			require.Zero(t, enabled, "source removal retires private and listed demand")
 		})
 	}
 }
 
-func TestSiblingIntentAdmissionRevalidatesCheckedStore(t *testing.T) {
+func TestSiblingAdmissionRevalidatesCheckedStore(t *testing.T) {
 	controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
 	oldScope, newScope := &factoryTestAtomicScope{value: "old"}, &factoryTestAtomicScope{value: "new"}
 	oldScope.current.Store(true)
 	newScope.current.Store(true)
-	var resolutions, checks, reservations atomic.Int32
+	var resolutions, checks atomic.Int32
 	controller.factory.config.ConfigModules.config.Configs = testConfigResolver(t, testAtomicResolver(t), func([]string) (secretresolver.AtomicScope, error) {
 		resolutions.Add(1)
 		if oldScope.current.Load() {
@@ -118,12 +106,16 @@ func TestSiblingIntentAdmissionRevalidatesCheckedStore(t *testing.T) {
 		}
 		return module
 	})
-	owner := &intentTestOwner{onPrepare: func() {
-		if reservations.Add(1) == 2 {
+	creator := controller.modules["module"]
+	create := creator.CreateV2
+	creator.ActivationDependencies = enabledAdmissionDependencies(false)
+	creator.CreateV2 = func() collectorapi.CollectorV2 {
+		if checks.Load() == 2 {
 			oldScope.current.Store(false)
 		}
-	}}
-	installIntentTestOwner(controller, owner)
+		return create()
+	}
+	controller.modules["module"] = creator
 	commands := bindHandoffTestWorkers(t, controller)
 	a := acceptedActivationTestConfig(confgroup.TypeUser).Set("option_str", "${store:vault:test:key}").Set("option_int", 1).Set("autodetection_retry", 0)
 	b := acceptedActivationTestConfig(confgroup.TypeUser).Set("option_str", "${store:vault:test:key}").Set("option_int", 2).Set("autodetection_retry", 0)
@@ -139,12 +131,10 @@ func TestSiblingIntentAdmissionRevalidatesCheckedStore(t *testing.T) {
 	require.True(t, exists)
 	current := applyActivationTestSubmission(t, commands.next(t, "internal/jobs/accepted-activation"), nil, 2)
 	t.Cleanup(func() { stopRuntimeTestResource(t, current) })
-	require.False(t, oldScope.current.Load(), "sibling reservation must invalidate the checked proof")
+	require.False(t, oldScope.current.Load(), "sibling admission must invalidate the checked proof")
 	require.Nil(t, current, "stale sibling must not install")
 	after, _ := graph.Lookup(a.FullName())
 	require.Equal(t, before, after, "stale sibling must not adopt its payload or health")
-	prepared, committed, aborted, enabled := owner.snapshot()
-	require.Equal(t, []int{2, 1, 1, 1}, []int{prepared, committed, aborted, enabled})
 	require.EqualValues(t, 2, checks.Load())
 
 	applyActivationTestSubmission(t, commands.next(t, "internal/jobs/candidate-resume"), nil, 0)
@@ -156,6 +146,4 @@ func TestSiblingIntentAdmissionRevalidatesCheckedStore(t *testing.T) {
 	require.Equal(t, dyncfg.StatusRunning.String(), after.Status)
 	require.EqualValues(t, 3, checks.Load(), "stale checked stage must be rebuilt exactly once")
 	require.EqualValues(t, 3, resolutions.Load(), "rebuild must resolve the current Store")
-	prepared, committed, aborted, enabled = owner.snapshot()
-	require.Equal(t, []int{3, 2, 1, 1}, []int{prepared, committed, aborted, enabled})
 }

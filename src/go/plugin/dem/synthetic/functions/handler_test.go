@@ -369,6 +369,7 @@ func TestHistoryFiltersAndUnavailableValues(t *testing.T) {
 
 func TestRunDetailPreservesPhaseAndNullableLabData(t *testing.T) {
 	run := model.Run{
+		Runtime:     &model.RuntimeIdentity{Version: "release-a", SHA256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Contract: 1},
 		ID:          "r",
 		JobID:       "journey:a",
 		Name:        "a",
@@ -426,6 +427,7 @@ func TestRunDetailPreservesPhaseAndNullableLabData(t *testing.T) {
 	)
 	detail := got.RawResponse["run"].(map[string]any)
 	assert.Equal(t, run.Tests, detail["tests"])
+	assert.Equal(t, run.Runtime, detail["runtime"])
 	assert.Equal(t, 2, detail["dropped_events"])
 	assert.Equal(
 		t,

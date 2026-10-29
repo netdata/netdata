@@ -61,6 +61,12 @@ func bindPrefix(root *os.Root, final string, m Manifest) error {
 			return fmt.Errorf("runtime directory is missing: %s", name)
 		}
 	}
+	if err := plainExistingParents(root, m.Layout.EntryPoint); err != nil {
+		return err
+	}
+	if info, err := root.Lstat(m.Layout.EntryPoint); err != nil || !info.Mode().IsRegular() {
+		return errors.New("runtime entrypoint must be a plain regular file")
+	}
 	fonts, launcher, err := boundConfiguration(final, m.Layout)
 	if err != nil {
 		return err
