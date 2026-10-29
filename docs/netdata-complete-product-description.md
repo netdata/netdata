@@ -1024,7 +1024,7 @@ Netdata is also available on [AWS Marketplace](https://aws.amazon.com/marketplac
 - **Not billed:** metrics volume, System Logs Monitoring (querying logs in place), users, data retention, containers, and API, uptime and other checks run from your own nodes.
 - **Netdata AI:** Business includes AI conversations for every user, subject to fair use. AI Investigations are bought pay as you go or as an annual subscription bundle (see Business products).
 - **Windows:** Windows Agents count as nodes like any other Agent; their local dashboard follows the same plan rules as on Linux.
-- **Plan-gated features:** Netdata Cloud MCP, enterprise notification integrations (all Cloud integrations except Discord, personal email and the mobile app), additional roles, SSO and SCIM require a paid plan.
+- **Plan-gated features:** exploring Network Flows (NetFlow, IPFIX, sFlow) and Traces (the Traces explorer over OpenTelemetry traces) requires a paid plan or an active trial; collection and storage on the Agent are not restricted. Netdata Cloud MCP, enterprise notification integrations (all Cloud integrations except Discord, personal email and the mobile app), additional roles, SSO and SCIM require a paid plan.
 
 ### Support
 

@@ -33,6 +33,8 @@ inspect a remote host; do not substitute the workstation's result for an Agent's
 The Agent's `/api/v3/info` API has no bearer requirement, but service, network and proxy availability still matter.
 An authorization denial without a signed identity uses 412 and may say
 `You need to be authorized to access this resource`; an identity lacking required permissions uses 403.
+A Function whose `access` includes `commercial` (for example `flows:netflow` and `otel-traces`) denies a Space
+without a paid plan or trial with 403 and `errorMsgKey: "ErrCommercialRequired"`; the plan, not the role, is the cause.
 An ACL denial has a separate path. Interpret the particular endpoint's permissions, rather than using 412 to conclude
 that every path needs a bearer. Owners: `src/web/api/web_api_v3.c`, `src/web/api/web_api.c`,
 `src/web/server/web_client.c` and `src/libnetdata/user-auth/http-access.h`.
