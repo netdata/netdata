@@ -68,6 +68,15 @@ def main() -> None:
             if not platform_match(parsed_image_info):
                 result(Status.MISMATCH)
 
+            if 'Digest' in parsed_image_info:
+                image_digests = [parsed_image_info['Digest']]
+            elif 'RepoDigests' in parsed_image_info:
+                image_digests = [
+                    x.rsplit('@', 1)[-1] for x in parsed_image_info['RepoDigests']
+                ]
+            else:
+                result(Status.UNKNOWN)
+
             manifest_info = subprocess.run(
                 (
                     docker_cmd,
@@ -88,7 +97,7 @@ def main() -> None:
                 parsed_manifest_info['manifests']
             ))
 
-            if parsed_image_info['Digest'] != target_manifest['digest']:
+            if not any(map(lambda x: target_manifest['digest'] == x, image_digests)):
                 result(Status.UPDATE)
 
             result(Status.OK)
