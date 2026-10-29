@@ -32,10 +32,12 @@
 //! subset above; keywords the table maps without a command panic the parse,
 //! and anything unknown is dropped.
 //!
-//! Chart-protocol text (CHART/DIMENSION/BEGIN/SET/END, ...) and bare keywords
-//! such as `PLUGIN_KEEPALIVE` and `TRUST_DURATIONS` are outside the message
-//! model: consumers write them verbatim with [`MessageWriter::write_raw`] (the
-//! `netdata-plugin-rt` chart registry and the otel-plugin supervisor do this).
+//! Chart-protocol lines (CHART, DIMENSION, CLABEL, BEGIN/SET/END) are outside
+//! the message model: the `chart` module encodes them into byte buffers
+//! ([`write_chart`], [`write_set_float`], ...), and consumers deliver those
+//! bytes verbatim with [`MessageWriter::write_raw`] (the `netdata-plugin-rt`
+//! chart registry and the otel-plugin supervisor do this). Bare keywords such
+//! as `PLUGIN_KEEPALIVE` and `TRUST_DURATIONS` are written the same way.
 //!
 //! Parsing direction is fixed when the parser is built and never re-checked
 //! against what arrives: feed a [`MessageReader`] the agent→plugin stream and
@@ -56,7 +58,10 @@
 //! - `tokio_codec` carries the `tokio_util::codec` Decoder/Encoder impls,
 //!   including each `Message`'s wire form;
 //! - `transport` provides [`MessageReader`]/[`MessageWriter`], the framed
-//!   I/O layer.
+//!   I/O layer;
+//! - `chart` encodes the chart-protocol lines, independent of the layers
+//!   above, and with feature `test-support` validates whole chart streams
+//!   (`validate_chart_stream`).
 //!
 //! Consumers: the `netdata-plugin-rt` plugin runtime (netflow-plugin, journal-function) runs
 //! its event loop on these types; the otel-plugin supervisor drives the
@@ -64,6 +69,7 @@
 //! `otel-ledger` and `otel-legacy-logs` workers, which build the same payload
 //! and message types but never touch the agent's stream.
 
+mod chart;
 mod line_parser;
 mod word_iterator;
 
@@ -82,6 +88,16 @@ pub use netdata_plugin_types::{
     FunctionResult, HttpAccess,
 };
 
+#[cfg(any(test, feature = "test-support"))]
+pub use chart::validate_chart_stream;
+/// Chart-protocol encoding: the chart vocabulary and one `write_*` function
+/// per line kind, all writing into a `bytes::BufMut`.
+pub use chart::{
+    ChartLine, ChartOptions, ChartType, DimensionAlgorithm, DimensionLine, DimensionOptions,
+    LabelSource, is_valid_chart_id, is_valid_dimension_id, write_begin, write_chart, write_clabel,
+    write_clabel_commit, write_dimension, write_end, write_quoted, write_set_empty,
+    write_set_float, write_set_int,
+};
 /// [`MessageWriter::send`] encodes every variant to its keyword line(s),
 /// except `Quit` and `FunctionProgressRequest`, which are inbound-only and
 /// encode to nothing.

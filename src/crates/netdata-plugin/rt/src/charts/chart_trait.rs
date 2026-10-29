@@ -43,7 +43,7 @@ pub trait ChartDimensions {
 /// - `x-chart-id` — a missing id falls back to `"unknown"`
 /// - `x-chart-name`, `x-chart-title`, `x-chart-units`, `x-chart-family`,
 ///   `x-chart-context`
-/// - `x-chart-type` — `line`, `area`, or `stacked` (anything else is `line`)
+/// - `x-chart-type` — `line`, `area`, `stacked` or `heatmap` (anything else is `line`)
 /// - `x-chart-priority` (i64), `x-chart-update-every` (u64, seconds)
 ///
 /// Dimension-level annotations (on fields):
@@ -153,6 +153,7 @@ fn extract_chart_metadata<T: serde::Serialize>(schema: &T) -> ChartMetadata {
             "line" => ChartType::Line,
             "area" => ChartType::Area,
             "stacked" => ChartType::Stacked,
+            "heatmap" => ChartType::Heatmap,
             _ => ChartType::Line,
         };
     }

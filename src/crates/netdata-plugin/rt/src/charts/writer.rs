@@ -1,5 +1,7 @@
-//! Pluginsd chart-protocol rendering: CHART, DIMENSION, BEGIN, SET and END
-//! emitted as newline-terminated lines into a reusable byte buffer.
+//! Pluginsd chart-protocol rendering for the chart registry: CHART,
+//! DIMENSION, BEGIN, SET and END emitted as newline-terminated lines into a
+//! reusable byte buffer, encoded by `netdata-plugin-protocol`'s chart module
+//! (the single owner of the line formats and their quoting rules).
 //!
 //! [`ChartWriter`] is the live rendering path for the whole `charts` module:
 //! [`ChartRegistry`](super::ChartRegistry) gives every registered chart sampler its own instance
@@ -9,10 +11,7 @@
 //! `NetdataChart` derive macro, or hand-written) supply the SETs in between.
 //! Delivery is the caller's job: the registry collects each writer's bytes
 //! with [`ChartWriter::append_to`] and sends the whole batch through the
-//! runtime's shared `MessageWriter`, one writer lock per batch tick. The
-//! String-returning emit helpers on `ChartMetadata`/`DimensionMetadata`
-//! (metadata.rs) are an unused alternative rendering; this writer is what the
-//! chart pipeline runs.
+//! runtime's shared `MessageWriter`, one writer lock per batch tick.
 //!
 //! Update cadence is the batch scheduler's decision, not this module's:
 //! BEGIN/SET/END are re-emitted on every tick even when values did not
@@ -25,6 +24,10 @@
 
 use super::metadata::{ChartMetadata, DimensionMetadata};
 use bytes::{BufMut, BytesMut};
+use netdata_plugin_protocol::{
+    ChartLine, ChartOptions, DimensionLine, DimensionOptions, write_begin, write_chart,
+    write_dimension, write_end, write_set_int,
+};
 use std::io::{self, Write};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -59,62 +62,50 @@ impl ChartWriter {
     /// (not stable across runs). Emitted once per chart, before its first
     /// update — `TrackedChart::emit_definition` enforces that.
     ///
-    /// Framing: `CHART <type.id> '<name>' '<title>' '<units>' '<family>'
-    /// '<context>' <line|area|stacked> <priority> <update_every>`, with
-    /// `update_every` in seconds. The id must contain a dot with non-empty
-    /// text on both sides — the agent splits it at the first dot and aborts
-    /// the run otherwise (`pluginsd_chart`). Quoted fields are not
-    /// escaped, so a single quote inside a value would end the field early
-    /// and shift every later word on the line. The optional
-    /// `options`/`plugin`/`module` CHART arguments the agent accepts are
-    /// never emitted.
+    /// `update_every` is in seconds and the CHART line carries no options.
+    /// The id must contain a dot with non-empty text on both sides — the agent
+    /// splits it at the first dot and aborts the run otherwise
+    /// (`pluginsd_chart`).
     pub fn write_chart_definition(&mut self, metadata: &ChartMetadata) {
-        self.buffer.put_slice(b"CHART ");
-        self.buffer.put_slice(metadata.id.as_bytes());
-        self.buffer.put_slice(b" '");
-        self.buffer.put_slice(metadata.name.as_bytes());
-        self.buffer.put_slice(b"' '");
-        self.buffer.put_slice(metadata.title.as_bytes());
-        self.buffer.put_slice(b"' '");
-        self.buffer.put_slice(metadata.units.as_bytes());
-        self.buffer.put_slice(b"' '");
-        self.buffer.put_slice(metadata.family.as_bytes());
-        self.buffer.put_slice(b"' '");
-        self.buffer.put_slice(metadata.context.as_bytes());
-        self.buffer.put_slice(b"' ");
-        self.buffer
-            .put_slice(metadata.chart_type.as_str().as_bytes());
-        self.buffer.put_slice(b" ");
-        self.write_i64(metadata.priority);
-        self.buffer.put_slice(b" ");
-        self.write_u64(metadata.update_every);
-        self.buffer.put_u8(b'\n');
+        write_chart(
+            &mut self.buffer,
+            &ChartLine {
+                id: &metadata.id,
+                name: &metadata.name,
+                title: &metadata.title,
+                units: &metadata.units,
+                family: &metadata.family,
+                context: &metadata.context,
+                chart_type: metadata.chart_type,
+                priority: metadata.priority,
+                update_every: metadata.update_every,
+                options: ChartOptions::default(),
+            },
+        );
 
         for dim in metadata.dimensions.values() {
             self.write_dimension_definition(dim);
         }
     }
 
-    /// Emit one `DIMENSION` line: `DIMENSION <id> '<name>' <algorithm>
-    /// <multiplier> <divisor>[ hidden]`. The agent attaches it to the chart
-    /// currently in scope, so it must follow that chart's `CHART` line.
+    /// Emit one `DIMENSION` line, with the `hidden` option when the dimension
+    /// is hidden. The agent attaches it to the chart currently in scope, so it
+    /// must follow that chart's `CHART` line.
     fn write_dimension_definition(&mut self, dim: &DimensionMetadata) {
-        self.buffer.put_slice(b"DIMENSION ");
-        self.buffer.put_slice(dim.id.as_bytes());
-        self.buffer.put_slice(b" '");
-        self.buffer.put_slice(dim.name.as_bytes());
-        self.buffer.put_slice(b"' ");
-        self.buffer.put_slice(dim.algorithm.as_str().as_bytes());
-        self.buffer.put_slice(b" ");
-        self.write_i64(dim.multiplier);
-        self.buffer.put_slice(b" ");
-        self.write_i64(dim.divisor);
-
-        if dim.hidden {
-            self.buffer.put_slice(b" hidden");
-        }
-
-        self.buffer.put_u8(b'\n');
+        write_dimension(
+            &mut self.buffer,
+            &DimensionLine {
+                id: &dim.id,
+                name: &dim.name,
+                algorithm: dim.algorithm,
+                multiplier: dim.multiplier,
+                divisor: dim.divisor,
+                options: DimensionOptions {
+                    hidden: dim.hidden,
+                    ..DimensionOptions::default()
+                },
+            },
+        );
     }
 
     /// Emit `BEGIN <chart_id> <microseconds>`, opening the update span that
@@ -126,32 +117,23 @@ impl ChartWriter {
     /// chart sampler passes its configured sampling interval
     /// (`TrackedChart::interval`), not a measured elapsed time.
     pub fn begin_chart(&mut self, chart_id: &str, update_every: Duration) {
-        self.buffer.put_slice(b"BEGIN ");
-        self.buffer.put_slice(chart_id.as_bytes());
-        self.buffer.put_u8(b' ');
-        self.write_u64(update_every.as_micros() as u64);
-        self.buffer.put_u8(b'\n');
+        write_begin(&mut self.buffer, chart_id, update_every.as_micros() as u64);
     }
 
     /// Emit `SET <dimension_id> = <value>`; one per dimension, between
     /// `begin_chart` and `end_chart`.
     ///
-    /// `dimension_id` goes to the stream verbatim: no validation against, or
-    /// dedupe with, any DIMENSION definition. The agent looks the id up on
-    /// every SET and aborts the run when the dimension does not exist
-    /// (`pluginsd_acquire_dimension` → `PLUGINSD_PROTOCOL_ERROR`; the worker
-    /// then restarts with backoff or disables the plugin), so ids must
-    /// match the `DIMENSION` lines `write_chart_definition` emitted.
-    /// The known way they can diverge is the `NetdataChart` derive macro: it
-    /// writes a SET for every non-instance field even when
-    /// `x-dimension-hidden` kept the field out of the chart's dimensions
-    /// (see the `ChartDimensions` docs in chart_trait.rs).
+    /// The agent looks the id up on every SET and aborts the run when the
+    /// dimension does not exist (`pluginsd_acquire_dimension` →
+    /// `PLUGINSD_PROTOCOL_ERROR`; the worker then restarts with backoff or
+    /// disables the plugin), so ids must match the `DIMENSION` lines
+    /// `write_chart_definition` emitted. The known way they can diverge is
+    /// the `NetdataChart` derive macro: it writes a SET for every
+    /// non-instance field even when `x-dimension-hidden` kept the field out
+    /// of the chart's dimensions (see the `ChartDimensions` docs in
+    /// chart_trait.rs).
     pub fn write_dimension(&mut self, dimension_id: &str, value: i64) {
-        self.buffer.put_slice(b"SET ");
-        self.buffer.put_slice(dimension_id.as_bytes());
-        self.buffer.put_slice(b" = ");
-        self.write_i64(value);
-        self.buffer.put_u8(b'\n');
+        write_set_int(&mut self.buffer, dimension_id, value);
     }
 
     /// Emit `END <unix-seconds>`, closing the update span opened by
@@ -161,29 +143,11 @@ impl ChartWriter {
     /// (`rrdset_timed_done`); 0 makes it use its current clock instead.
     /// Times before the Unix epoch are clamped to 0 here.
     pub fn end_chart(&mut self, collection_time: SystemTime) {
-        self.buffer.put_slice(b"END ");
         let secs = collection_time
             .duration_since(UNIX_EPOCH)
             .unwrap_or(Duration::ZERO)
             .as_secs();
-        self.write_u64(secs);
-        self.buffer.put_u8(b'\n');
-    }
-
-    /// Write an i64 value using itoa (zero-allocation integer formatting)
-    #[inline]
-    fn write_i64(&mut self, value: i64) {
-        let mut buf = itoa::Buffer::new();
-        let s = buf.format(value);
-        self.buffer.put_slice(s.as_bytes());
-    }
-
-    /// Write a u64 value using itoa (zero-allocation integer formatting)
-    #[inline]
-    fn write_u64(&mut self, value: u64) {
-        let mut buf = itoa::Buffer::new();
-        let s = buf.format(value);
-        self.buffer.put_slice(s.as_bytes());
+        write_end(&mut self.buffer, secs);
     }
 
     /// Write the buffered commands to the process's standard output and clear

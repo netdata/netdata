@@ -5,68 +5,13 @@
 //! dimension ids referenced by `BEGIN`/`SET` updates. `NetdataChart::chart_metadata()`
 //! (annotation extraction in `chart_trait`) builds it from a chart struct's
 //! schemars annotations, `TrackedChart` (tracker) stores it per registration,
-//! and `ChartWriter` (writer) serializes it to the pluginsd protocol.
-//!
-//! The `format!`-based `emit_*` helpers below render the same commands into
-//! strings. Nothing in this repository calls them — the registry path writes
-//! through `ChartWriter` buffers instead — but they remain public crate API
-//! (`netdata_plugin_rt::ChartMetadata`). The two paths differ only in trailing fields:
-//! `ChartWriter::begin_chart` appends the update interval in microseconds and
-//! `ChartWriter::end_chart` the collection timestamp, both of which the agent
-//! treats as optional, and the string `DIMENSION` line always carries the
-//! flags field (empty when not hidden) that the writer emits only when hidden.
+//! and `ChartWriter` (writer) serializes it to the pluginsd protocol. The chart
+//! vocabulary ([`ChartType`], [`DimensionAlgorithm`]) belongs to
+//! `netdata-plugin-protocol`, which encodes the lines.
 
 use std::collections::HashMap;
 
-/// Chart type on the `CHART` definition line (`line`, `area` or `stacked`).
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub enum ChartType {
-    #[default]
-    Line,
-    Area,
-    Stacked,
-}
-
-impl ChartType {
-    /// The string written to the `CHART` line; annotation extraction
-    /// (`chart_trait`) maps these same strings back to the enum.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            ChartType::Line => "line",
-            ChartType::Area => "area",
-            ChartType::Stacked => "stacked",
-        }
-    }
-}
-
-/// Dimension algorithm: how the agent stores each `SET` value.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub enum DimensionAlgorithm {
-    /// Store the value as-is
-    #[default]
-    Absolute,
-    /// Calculate difference from previous value (for counters)
-    Incremental,
-    /// Calculate percentage of dimension relative to row total
-    PercentageOfAbsoluteRow,
-    /// Calculate percentage of dimension relative to the row's incremental
-    /// (delta) total
-    PercentageOfIncrementalRow,
-}
-
-impl DimensionAlgorithm {
-    /// The string written on the `DIMENSION` line; annotation extraction maps
-    /// these same strings back to the enum (unknown names fall back to
-    /// `absolute` on both sides).
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            DimensionAlgorithm::Absolute => "absolute",
-            DimensionAlgorithm::Incremental => "incremental",
-            DimensionAlgorithm::PercentageOfAbsoluteRow => "percentage-of-absolute-row",
-            DimensionAlgorithm::PercentageOfIncrementalRow => "percentage-of-incremental-row",
-        }
-    }
-}
+pub use netdata_plugin_protocol::{ChartType, DimensionAlgorithm};
 
 /// Metadata for one dimension: the fields of a `DIMENSION` definition line.
 #[derive(Debug, Clone)]
@@ -105,26 +50,6 @@ impl DimensionMetadata {
             hidden: false,
         }
     }
-
-    /// Render one `DIMENSION` line: id, quoted name, algorithm, multiplier,
-    /// divisor and the `hidden` flag (always present, empty when not hidden).
-    ///
-    /// Called only by [`ChartMetadata::emit_definition`], which is itself
-    /// uncalled; `ChartWriter::write_dimension_definition` writes the
-    /// equivalent line into its buffer without the `String` allocation,
-    /// leaving out the flag field when the dimension is not hidden.
-    pub fn emit(&self) -> String {
-        let flags = if self.hidden { "hidden" } else { "" };
-        format!(
-            "DIMENSION {} '{}' {} {} {} {}\n",
-            self.id,
-            self.name,
-            self.algorithm.as_str(),
-            self.multiplier,
-            self.divisor,
-            flags
-        )
-    }
 }
 
 /// Metadata for one chart: the `CHART` definition line and its dimensions.
@@ -148,7 +73,7 @@ pub struct ChartMetadata {
     pub family: String,
     /// Context for alerts and API
     pub context: String,
-    /// Chart type (line, area, stacked)
+    /// Chart type (line, area, stacked, heatmap)
     pub chart_type: ChartType,
     /// Priority for ordering (lower = higher priority)
     pub priority: i64,
@@ -207,64 +132,11 @@ impl ChartMetadata {
             units: self.units.clone(),
             family: self.family.replace("{instance}", instance_id),
             context: self.context.replace("{instance}", instance_id),
-            chart_type: self.chart_type.clone(),
+            chart_type: self.chart_type,
             priority: self.priority,
             update_every: self.update_every,
             dimensions: self.dimensions.clone(),
             instance_field: None,
         }
-    }
-
-    /// Render the `CHART` definition line followed by one `DIMENSION` line per
-    /// dimension.
-    ///
-    /// No callers in this repository; the registry path serializes this
-    /// metadata through `ChartWriter::write_chart_definition`.
-    pub fn emit_definition(&self) -> String {
-        let mut output = format!(
-            "CHART {} '{}' '{}' '{}' '{}' '{}' {} {} {}\n",
-            self.id,
-            self.name,
-            self.title,
-            self.units,
-            self.family,
-            self.context,
-            self.chart_type.as_str(),
-            self.priority,
-            self.update_every
-        );
-
-        for dim in self.dimensions.values() {
-            output.push_str(&dim.emit());
-        }
-
-        output
-    }
-
-    /// Render the `BEGIN` line for this chart id.
-    ///
-    /// No callers in this repository; the registry path
-    /// (`ChartWriter::begin_chart`) also appends the update interval in
-    /// microseconds for interpolation.
-    pub fn emit_begin(&self) -> String {
-        format!("BEGIN {}\n", self.id)
-    }
-
-    /// Render the `SET` line for one dimension value.
-    ///
-    /// No callers in this repository; the registry path emits `SET`s through
-    /// `ChartDimensions::write_dimensions`. The chart id comes from the
-    /// preceding `BEGIN`, so this helper needs none.
-    pub fn emit_set(&self, dimension_id: &str, value: i64) -> String {
-        format!("SET {} = {}\n", dimension_id, value)
-    }
-
-    /// Render the `END` line closing the current update.
-    ///
-    /// No callers in this repository; the registry path
-    /// (`ChartWriter::end_chart`) also appends the collection time in Unix
-    /// seconds.
-    pub fn emit_end(&self) -> String {
-        "END\n".to_string()
     }
 }
