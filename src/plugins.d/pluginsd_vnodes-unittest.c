@@ -2,6 +2,7 @@
 
 #include "pluginsd_internals.h"
 #include "health/health_internals.h"
+#include "health/health-alert-entry.h"
 #include "streaming/stream-receiver-internals.h"
 
 static bool vnode_test_command(PARSER *parser, const char *command) {
@@ -400,13 +401,199 @@ cleanup:
     return result;
 }
 
+struct vnode_test_alert_insert {
+    RRDHOST *host;
+    RRDSET *st;
+    RRD_ALERT_PROTOTYPE *ap;
+    bool started;
+    bool inserted;
+};
+
+static void vnode_test_late_alert_insert(void *ptr) {
+    struct vnode_test_alert_insert *insert = ptr;
+    __atomic_store_n(&insert->started, true, __ATOMIC_RELEASE);
+    insert->inserted = rrdcalc_add_from_prototype(insert->host, insert->st, insert->ap);
+}
+
+static bool vnode_test_offline_dyncfg(RRDHOST *host) {
+    CLEAN_BUFFER *payload = buffer_create(0, NULL);
+    CLEAN_BUFFER *response = buffer_create(0, NULL);
+    buffer_strcat(payload,
+        "{\"format_version\":1,\"rules\":[{\"enabled\":true,\"type\":\"instance\","
+        "\"config\":{\"match\":{\"on\":\"vnode_alert.data\",\"host_labels\":\"*\",\"instance_labels\":\"*\"},"
+        "\"value\":{\"update_every\":1,\"database_lookup\":{\"after\":-1,\"before\":0,"
+        "\"time_group\":\"average\",\"dims_group\":\"sum\",\"data_source\":\"samples\","
+        "\"options\":[],\"dimensions\":\"value\"}},"
+        "\"conditions\":{\"warning_condition\":\"$this > 0\",\"critical_condition\":\"\"}}}]}");
+
+    int code = dyncfg_health_cb(NULL, "health:alert:prototype", DYNCFG_CMD_ADD, "vnode_offline_dyncfg",
+                                payload, NULL, NULL, response, HTTP_ACCESS_NONE, "unittest", NULL);
+    bool ok = code == DYNCFG_RESP_ACCEPTED && dictionary_entries(host->rrdcalc_root_index) == 0;
+    if(!ok)
+        netdata_log_error("VNODE unittest: offline DynCfg save: code=%d response='%s'", code, buffer_tostring(response));
+    if(code == DYNCFG_RESP_ACCEPTED) {
+        buffer_flush(response);
+        code = dyncfg_health_cb(NULL, "health:alert:prototype:vnode_offline_dyncfg", DYNCFG_CMD_REMOVE,
+                                NULL, NULL, NULL, NULL, response, HTTP_ACCESS_NONE, "unittest", NULL);
+        ok = ok && code == HTTP_RESP_OK;
+    }
+    return ok;
+}
+
+static int vnode_test_alert_removal(bool teardown, bool redefine) {
+    bool saved_health = health_globals.config.enabled;
+    health_globals.config.enabled = true;
+    const char *guid = "a11ce000-0000-4000-8000-000000000030";
+    struct plugind cd = { .update_every = 1, .filename = string_strdupz("vnode-alert-test") };
+    struct parser_user_object user = { .host = localhost, .enabled = 1, .cd = &cd };
+    PARSER *parser = parser_init(&user, -1, -1, PARSER_INPUT_SPLIT, NULL);
+    pluginsd_keywords_init(parser, PARSER_INIT_PLUGINSD);
+    PARSER *other = parser_init(&user, -1, -1, PARSER_INPUT_SPLIT, NULL);
+    pluginsd_keywords_init(other, PARSER_INIT_PLUGINSD);
+    RRDHOST *host = NULL;
+    int result = 1;
+    ND_THREAD *inserter = NULL;
+    bool alert_lock_held = false;
+    struct vnode_test_alert_insert insert = { 0 };
+    RRD_ALERT_PROTOTYPE ap = { .config = { .name = string_strdupz("vnode_test_alert"), .update_every = 1 } };
+    char command[256];
+
+    snprintfz(command, sizeof(command), "HOST_DEFINE %s vnode-alert-test", guid);
+    if(!vnode_test_command(parser, command) ||
+       !vnode_test_command(parser, "HOST_LABEL _node_stale_after_seconds 1") ||
+       !vnode_test_command(parser, "HOST_DEFINE_END") ||
+       !vnode_test_command(parser, "CHART vnode_alert.data '' 'Alerts' units family vnode_alert.data line 1 1") ||
+       !vnode_test_command(parser, "DIMENSION value '' absolute 1 1") ||
+       !vnode_test_command(parser, "BEGIN vnode_alert.data") ||
+       !vnode_test_command(parser, "SET value 1") ||
+       !vnode_test_command(parser, "END"))
+        goto cleanup;
+
+    host = parser->user.host;
+    RRDSET *st = rrdset_find(host, "vnode_alert.data", false);
+    if(!st || !rrdcalc_add_from_prototype(host, st, &ap) || dictionary_entries(host->rrdcalc_root_index) != 1)
+        goto cleanup;
+
+    // A second plugin keeps its own definition and can resume the same vnode after the first stops.
+    snprintfz(command, sizeof(command), "HOST_DEFINE %s vnode-alert-test", guid);
+    if(!vnode_test_command(other, command) ||
+       !vnode_test_command(other, "HOST_LABEL _node_stale_after_seconds 1") ||
+       !vnode_test_command(other, "HOST_DEFINE_END"))
+        goto cleanup;
+
+    // Hold admission while a prototype application starts, then disconnect before letting it finish.
+    dictionary_write_lock(host->rrdcalc_root_index);
+    alert_lock_held = true;
+    insert = (struct vnode_test_alert_insert) { .host = host, .st = st, .ap = &ap };
+    inserter = nd_thread_create("VNODE-ALERT-ADD", NETDATA_THREAD_OPTION_DEFAULT, vnode_test_late_alert_insert, &insert);
+    usec_t insert_deadline = now_monotonic_usec() + 5 * USEC_PER_SEC;
+    while(!__atomic_load_n(&insert.started, __ATOMIC_ACQUIRE) && now_monotonic_usec() < insert_deadline)
+        sleep_usec(USEC_PER_MS);
+    if(!__atomic_load_n(&insert.started, __ATOMIC_ACQUIRE))
+        goto cleanup;
+
+    if(teardown) {
+        // Exercise EOF through the plugin worker, which owns vnode teardown; parser destruction alone does not.
+        FILE *input = tmpfile();
+        FILE *output = tmpfile();
+        if(!input || !output) {
+            if(input) fclose(input);
+            if(output) fclose(output);
+            goto cleanup;
+        }
+        fprintf(input, "HOST_DEFINE %s vnode-alert-test\nHOST_LABEL _node_stale_after_seconds 1\nHOST_DEFINE_END\n", guid);
+        rewind(input);
+        struct plugind exiting = { .update_every = 1, .filename = string_strdupz("vnode-exit-test") };
+        exiting.unsafe.enabled = true;
+        bool retry, protocol_error;
+        pluginsd_process(localhost, &exiting, fileno(input), fileno(output), 0, &retry, &protocol_error);
+        string_freez(exiting.filename);
+        fclose(input);
+        fclose(output);
+        if(retry || protocol_error)
+            goto cleanup;
+    }
+    else {
+        usec_t deadline = now_monotonic_usec() + 5 * USEC_PER_SEC;
+        while(!vnode_test_offline(host) && now_monotonic_usec() < deadline) {
+            if(!vnode_test_command(parser, "HOST localhost"))
+                goto cleanup;
+            sleep_usec(50 * USEC_PER_MS);
+        }
+    }
+
+    dictionary_write_unlock(host->rrdcalc_root_index);
+    alert_lock_held = false;
+    nd_thread_join(inserter);
+    inserter = NULL;
+    if(insert.inserted)
+        goto cleanup;
+
+    if(!vnode_test_offline(host) || host->health.enabled || dictionary_entries(host->rrdcalc_root_index)) {
+        netdata_log_error("VNODE unittest: %s retained offline alerts or enabled health", teardown ? "teardown" : "expiry");
+        goto cleanup;
+    }
+
+    unsigned removed = 0;
+    for(ALARM_ENTRY *ae = host->health_log.alarms; ae; ae = ae->next) {
+        if(ae->new_status == RRDCALC_STATUS_REMOVED) {
+            if(ae->flags & HEALTH_ENTRY_FLAG_CHILD_DISCONNECTED)
+                goto cleanup;
+            removed++;
+        }
+    }
+    if(removed != 1 || !rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION) ||
+       !rrdset_flag_check(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION))
+        goto cleanup;
+
+    // A prototype application admitted before the disconnect must not insert after it.
+    if(rrdcalc_add_from_prototype(host, st, &ap) || dictionary_entries(host->rrdcalc_root_index))
+        goto cleanup;
+    if(!vnode_test_offline_dyncfg(host))
+        goto cleanup;
+
+    snprintfz(command, sizeof(command), redefine ? "HOST_DEFINE %s vnode-alert-test" : "HOST %s", guid);
+    if(!vnode_test_command(other, command) ||
+       (redefine && (!vnode_test_command(other, "HOST_LABEL _node_stale_after_seconds 1") ||
+                     !vnode_test_command(other, "HOST_DEFINE_END"))) ||
+       !vnode_test_live_state(host, true) || !rrdcalc_add_from_prototype(host, st, &ap) ||
+       dictionary_entries(host->rrdcalc_root_index) != 1)
+        goto cleanup;
+    result = 0;
+
+cleanup:
+    if(result)
+        netdata_log_error("VNODE unittest: alert lifecycle failed (%s, %s)",
+                          teardown ? "teardown" : "expiry", redefine ? "definition" : "HOST");
+    if(alert_lock_held)
+        dictionary_write_unlock(host->rrdcalc_root_index);
+    if(inserter)
+        nd_thread_join(inserter);
+    if(parser)
+        pluginsd_process_cleanup(parser);
+    pluginsd_process_cleanup(other);
+    health_globals.config.enabled = saved_health;
+    rrd_alert_config_cleanup(&ap.config);
+    string_freez(cd.filename);
+    rrd_wrlock();
+    host = rrdhost_find_by_guid(guid);
+    if(host)
+        rrdhost_free___while_having_rrd_wrlock(host);
+    rrd_wrunlock();
+    return result;
+}
+
 int pluginsd_vnodes_unittest(void) {
+    health_plugin_init();
     int errors = vnode_test_timeouts();
     errors += vnode_test_shorter_deadline(false);
     errors += vnode_test_shorter_deadline(true);
 
     errors += vnode_test_removal(true);
     errors += vnode_test_removal(false);
+    for(unsigned teardown = 0; teardown < 2; teardown++)
+        for(unsigned redefine = 0; redefine < 2; redefine++)
+            errors += vnode_test_alert_removal(teardown, redefine);
     for(unsigned redefine = 0; redefine < 2; redefine++) {
         // No peer, a disconnected peer, an attached peer, and an archived peer-disconnected host.
         for(unsigned peer = 0; peer < 4; peer++)

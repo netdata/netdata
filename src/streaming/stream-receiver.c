@@ -1378,6 +1378,18 @@ static void stream_receiver_replication_reset(RRDHOST *host) {
 RRDHOST_SET_RECEIVER_RESULT rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
     bool signal_rrdcontext = false;
     bool set_this = false;
+    RRDHOST_SET_RECEIVER_RESULT result = RRDHOST_SET_RECEIVER_ALREADY_ATTACHED;
+
+    // Vnode cleanup and claim may wait on other subsystems. Keep that work off receiver_lock,
+    // and let a competing receiver retry through the existing BUSY handshake.
+    if(netdata_mutex_trylock(&host->vnode_transition_mutex) != 0)
+        return RRDHOST_SET_RECEIVER_CLEANUP_BUSY;
+
+    if(!host->rrdcalc_root_index) {
+        netdata_mutex_unlock(&host->vnode_transition_mutex);
+        return RRDHOST_SET_RECEIVER_CLEANUP_BUSY;
+    }
+    dictionary_write_lock(host->rrdcalc_root_index);
 
     rrdhost_receiver_lock(host);
 
@@ -1387,8 +1399,8 @@ RRDHOST_SET_RECEIVER_RESULT rrdhost_set_receiver(RRDHOST *host, struct receiver_
     // charts obsolete and call ml_host_disconnected() on a connected host.
     // The child reconnects via normal backoff; by then the pass is done.
     if (rrdhost_flag_check(host, RRDHOST_FLAG_OBSOLETE_ALL_IN_PROGRESS)) {
-        rrdhost_receiver_unlock(host);
-        return RRDHOST_SET_RECEIVER_CLEANUP_BUSY;
+        result = RRDHOST_SET_RECEIVER_CLEANUP_BUSY;
+        goto unlock;
     }
 
     // A vnode has exactly one writer: the local collector that defines it.
@@ -1401,8 +1413,8 @@ RRDHOST_SET_RECEIVER_RESULT rrdhost_set_receiver(RRDHOST *host, struct receiver_
     // two paths mutually exclusive: either we attach first and the collector evicts us, or the
     // collector claims first and we are refused. Without it, we would become a second writer.
     if (rrdhost_is_virtual(host)) {
-        rrdhost_receiver_unlock(host);
-        return RRDHOST_SET_RECEIVER_VNODE_IS_LOCAL;
+        result = RRDHOST_SET_RECEIVER_VNODE_IS_LOCAL;
+        goto unlock;
     }
 
     if (!host->receiver) {
@@ -1445,15 +1457,20 @@ RRDHOST_SET_RECEIVER_RESULT rrdhost_set_receiver(RRDHOST *host, struct receiver_
         signal_rrdcontext = true;
         stream_receiver_replication_reset(host);
 
+        host->health.enabled = host->rrd_memory_mode != RRD_DB_MODE_NONE &&
+                               rpt->config.health.enabled != CONFIG_BOOLEAN_NO;
         rrdhost_flag_set(rpt->host, RRDHOST_FLAG_COLLECTOR_ONLINE);
         aclk_queue_node_info(rpt->host, true);
 
         stream_parents_host_reset(host, STREAM_HANDSHAKE_SP_PREPARING);
 
         set_this = true;
+        result = RRDHOST_SET_RECEIVER_OK;
     }
 
+unlock:
     rrdhost_receiver_unlock(host);
+    dictionary_write_unlock(host->rrdcalc_root_index);
 
     if(signal_rrdcontext)
         rrdcontext_host_child_connected(host);
@@ -1461,7 +1478,8 @@ RRDHOST_SET_RECEIVER_RESULT rrdhost_set_receiver(RRDHOST *host, struct receiver_
     if(set_this)
         ml_host_start(host);
 
-    return set_this ? RRDHOST_SET_RECEIVER_OK : RRDHOST_SET_RECEIVER_ALREADY_ATTACHED;
+    netdata_mutex_unlock(&host->vnode_transition_mutex);
+    return result;
 }
 
 void rrdhost_clear_receiver(struct receiver_state *rpt, STREAM_HANDSHAKE reason) {
@@ -1497,7 +1515,7 @@ void rrdhost_clear_receiver(struct receiver_state *rpt, STREAM_HANDSHAKE reason)
                 rrdcontext_host_child_disconnected(host);
 
                 if (rpt->config.health.enabled)
-                    rrdcalc_child_disconnected(host);
+                    rrdcalc_host_disconnected(host, RRDCALC_DISCONNECT_CHILD);
 
                 stream_parents_host_reset(host, reason);
 

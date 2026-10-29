@@ -118,6 +118,9 @@ The defaults suit most networks. For large or sensitive ones, tune the scan unde
 | `create_vnode` | `true` | Expose the device as its own virtual node in Netdata. |
 | `vnode_device_down_threshold` | `3` | Consecutive failed polls before the device is marked down. |
 
+When the device's virtual node becomes stale, its alerts are removed until collection resumes. On recovery,
+Netdata recreates and evaluates the alerts against the collected data.
+
 ### ICMP alongside SNMP
 
 By default Netdata also pings each device, giving you reachability and latency next to the SNMP metrics. SNMP and ping run concurrently — ping never delays polling.

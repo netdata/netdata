@@ -213,12 +213,19 @@ static void health_execute_delayed_initializations(RRDHOST *host) {
 
     RRDSET *st;
 
+    dictionary_write_lock(host->rrdcalc_root_index);
+    if(!rrdhost_should_run_health(host)) {
+        dictionary_write_unlock(host->rrdcalc_root_index);
+        return;
+    }
+
     // Atomically snapshot + clear the host pending flags. A separate check-then-clear
     // would race with concurrent setters (e.g. label updaters in plugins/streaming),
     // and a flag set between check and clear would be lost.
     RRDHOST_FLAGS old_host_flags = rrdhost_flag_set_and_clear(
         host, 0,
         RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION | RRDHOST_FLAG_PENDING_LABEL_RECHECK);
+    dictionary_write_unlock(host->rrdcalc_root_index);
 
     bool host_pending_init    = old_host_flags & RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION;
     bool host_pending_recheck = old_host_flags & RRDHOST_FLAG_PENDING_LABEL_RECHECK;
@@ -226,12 +233,21 @@ static void health_execute_delayed_initializations(RRDHOST *host) {
     if (!host_pending_init && !host_pending_recheck) return;
 
     rrdset_foreach_reentrant(st, host) {
+        dictionary_write_lock(host->rrdcalc_root_index);
+        if(!rrdhost_should_run_health(host)) {
+            // Preserve the host work consumed above, including label rechecks for unvisited charts.
+            rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION |
+                                 (host_pending_recheck ? RRDHOST_FLAG_PENDING_LABEL_RECHECK : 0));
+            dictionary_write_unlock(host->rrdcalc_root_index);
+            break;
+        }
         // Same race applies per-chart: snapshot + clear atomically so a concurrent
         // CLABEL stream commit or rrdset_update_rrdlabels() cannot have its
         // pending-recheck request swallowed by a separate clear.
         RRDSET_FLAGS old_st_flags = rrdset_flag_set_and_clear(
             st, 0,
             RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION | RRDSET_FLAG_PENDING_LABEL_RECHECK);
+        dictionary_write_unlock(host->rrdcalc_root_index);
 
         bool needs_init    = old_st_flags & RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION;
         bool needs_recheck = host_pending_recheck || (old_st_flags & RRDSET_FLAG_PENDING_LABEL_RECHECK);
@@ -458,14 +474,21 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
     worker_is_busy(WORKER_HEALTH_JOB_HOST_LOCK);
     {
         struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
-        if (aclk_host_config && aclk_alert_snapshot_state_get(aclk_host_config) == ACLK_ALERT_SNAPSHOT_READY)
-            return;
+        if (aclk_host_config && aclk_alert_snapshot_state_get(aclk_host_config) == ACLK_ALERT_SNAPSHOT_READY) {
+            // Keep evaluating while Cloud honors queued transition delays: a recovering alert may not
+            // have enough data yet. Freeze only once the snapshot can be sent. Invalidate before this
+            // pass so a deadline expiring midway cannot release a snapshot of partially evaluated alerts.
+            if (!alert_snapshot_held(host))
+                return;
+            __atomic_store_n(&host->health.alert_status_snapshot.valid, 0, __ATOMIC_RELEASE);
+        }
     }
 
     // Reuse query scratch across alerts. All arena pages are retained until
     // the caller destroys the arena at the end of this health iteration.
 
     // the first loop is to lookup values from the db
+    size_t snapshot_version = dictionary_version(host->rrdcalc_root_index);
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdhost_read(host, rc) {
         // The previous alert's RRDR is dead; its pages can now be reused.
@@ -913,10 +936,15 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
         foreach_rrdcalc_in_rrdhost_done(rc);
     }
 
-    if(likely(snapshot_complete)) {
+    dictionary_write_lock(host->rrdcalc_root_index);
+    if(likely(snapshot_complete) && rrdhost_should_run_health(host) &&
+       snapshot_version == dictionary_version(host->rrdcalc_root_index)) {
         uint64_t snapshot_generation = health_alert_status_snapshot_begin_update(host);
         health_alert_status_snapshot_finish_update(host, &status_counts, snapshot_generation);
     }
+    else
+        __atomic_store_n(&host->health.alert_status_snapshot.valid, 0, __ATOMIC_RELEASE);
+    dictionary_write_unlock(host->rrdcalc_root_index);
 
     if(unlikely(!service_running(SERVICE_HEALTH) || !rrdhost_should_run_health(host))) {
         alerts_raised_summary_free(hrm);

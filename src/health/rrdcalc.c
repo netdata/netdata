@@ -689,6 +689,14 @@ void rrdcalc_rrdhost_index_destroy(RRDHOST *host) {
 }
 
 bool rrdcalc_add_from_prototype(RRDHOST *host, RRDSET *st, RRD_ALERT_PROTOTYPE *ap) {
+    // Prototype matching may have started before disconnect. Serialize admission and the complete
+    // constructor/react sequence with cleanup, not just dictionary insertion's internal index lock.
+    dictionary_write_lock(host->rrdcalc_root_index);
+    if(!host->health.enabled || !rrdhost_flag_check(host, RRDHOST_FLAG_COLLECTOR_ONLINE)) {
+        dictionary_write_unlock(host->rrdcalc_root_index);
+        return false;
+    }
+
     char key[RRDCALC_MAX_KEY_SIZE + 1];
     size_t key_len = rrdcalc_key(key, RRDCALC_MAX_KEY_SIZE,
                                  string2str(st->id), string2str(ap->config.name));
@@ -701,17 +709,20 @@ bool rrdcalc_add_from_prototype(RRDHOST *host, RRDSET *st, RRD_ALERT_PROTOTYPE *
 
     bool ret = true;
 
+    __atomic_store_n(&host->health.alert_status_snapshot.valid, 0, __ATOMIC_RELEASE);
     dictionary_set_advanced(host->rrdcalc_root_index, key, (ssize_t)key_len,
                             NULL, sizeof(RRDCALC), &tmp);
 
     if(tmp.react_action != RRDCALC_REACT_NEW)
         ret = false;
 
+    dictionary_write_unlock(host->rrdcalc_root_index);
     return ret;
 }
 
 static void rrdcalc_unlink_and_delete_flagged(
     RRDHOST *host, RRDCALC *rc, bool having_ll_wrlock, HEALTH_ENTRY_FLAGS removed_flags) {
+    __atomic_store_n(&host->health.alert_status_snapshot.valid, 0, __ATOMIC_RELEASE);
     // remove from the name index first, while rc and host are both in hand and
     // the caller's lock state is known; the delete callback repeats this
     // defensively for any path that does not come through here
@@ -770,13 +781,17 @@ void rrdcalc_delete_all(RRDHOST *host) {
     rrdcalc_delete_all_flagged(host, 0);
 }
 
-void rrdcalc_child_disconnected(RRDHOST *host) {
-    // the REMOVED transitions are flagged: a child that only restarts comes back within minutes, so they reach
-    // the cloud after ALERT_TRANSITION_DELAY_LONG instead of the delay of an alert that is really gone
-    rrdcalc_delete_all_flagged(host, HEALTH_ENTRY_FLAG_CHILD_DISCONNECTED);
+void rrdcalc_host_disconnected(RRDHOST *host, RRDCALC_DISCONNECT_REASON reason) {
+    dictionary_write_lock(host->rrdcalc_root_index);
+    host->health.enabled = false;
+    __atomic_store_n(&host->health.alert_status_snapshot.valid, 0, __ATOMIC_RELEASE);
+
+    // Only streamed children receive the reconnect grace period. Vnodes use ordinary removal timing.
+    rrdcalc_delete_all_flagged(host, reason == RRDCALC_DISCONNECT_CHILD ? HEALTH_ENTRY_FLAG_CHILD_DISCONNECTED : 0);
+    dictionary_write_unlock(host->rrdcalc_root_index);
 
     // We just deleted every alert of this host, so we must also ask health to re-create them when
-    // the child comes back. We cannot rely on chart re-registration to do it: rrdset_conflict_callback()
+    // collection resumes. We cannot rely on chart re-registration to do it: rrdset_conflict_callback()
     // only raises these flags when a chart definition actually changed, and a reconnecting child
     // normally re-sends identical definitions. RRDHOST_FLAG_INITIALIZED_HEALTH is never cleared, so
     // health_initialize_rrdhost() will not re-apply the prototypes either.
@@ -784,11 +799,9 @@ void rrdcalc_child_disconnected(RRDHOST *host) {
     // This is the initialization flag rather than the label-recheck one on purpose: the alert lists
     // are now empty, so the incremental apply path is correct and cheaper than detach-and-reattach.
     //
-    // The flags stay pending, inert, for as long as the child is away: our caller clears
-    // RRDHOST_FLAG_COLLECTOR_ONLINE before calling us, so rrdhost_should_run_health() is already
-    // false by the time we raise them and nothing consumes them (health.enabled = false, set later
-    // in the same caller, only reinforces this). They are consumed on the first health pass after
-    // the host is online again, whichever path brings it back.
+    // Health admission is now disabled, and the caller excludes new collection until we return.
+    // Do not hold the alert lock while walking the chart index: chart destruction takes these in
+    // the opposite order. Pending-flag consumers recheck health admission under the alert lock.
     RRDSET *st;
     rrdset_foreach_read(st, host) {
         rrdset_flag_set(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
