@@ -148,6 +148,8 @@ func (ck *CommandKernel) runLoop(ctx context.Context) {
 			moreTaskStarts = ck.serviceTaskStarts(lifecycle.TaskStartServiceQuantum)
 			if cause := ck.run.DirtyCause(); cause != nil {
 				beginShutdown(cause)
+				// Service the new shutdown phase before waiting for another event.
+				continue
 			}
 		} else {
 			var shutdownErr error

@@ -173,7 +173,9 @@ flowchart TD
 
 1. **Submit** (off-loop) — an adapter validates a `Request`, attaches a prepared Job Manager plan or submits an
    unresolved Function request, pushes it onto a submission queue, and wakes the loop. `command_ports.go`,
-   `kernel_ingress.go`.
+   `kernel_ingress.go`. If shutdown completes before the caller observes admission, an already-published admission
+   result takes precedence over a stopping rejection. An accepted prepared-command waiter then observes its terminal
+   result; shutdown cannot relabel that accepted work as an admission failure.
 2. **Admit** (on-loop) — the loop dedupes the command's UID, resolves the route, derives the lane key, and installs
    the operation on its lane. Duplicate UIDs and invalid routes are rejected here. `kernel_admission.go`,
    `lifecycle/uid.go`.
@@ -1298,6 +1300,8 @@ The rotation is an acknowledged sequence (`composition/process.go`, `retireForSu
    paused ingress. A process-owned worker that ignores cancellation remains in the process census, not the retired run
    census.
 5. **Require a fully drained run authority census** and finish the run finalizer.
+   - A failure observed during task dispatch restarts the loop in shutdown mode before it waits for another event.
+     Otherwise an idle run could miss cancellation and finalization until its shutdown deadline.
    - Live run-owned leftovers still make the terminal state dirty.
    - Process-owned retained work does not fabricate run ownership.
    - If an ordinary frame write is the only remaining owner, the kernel arms one shutdown-only idle notification
