@@ -333,8 +333,11 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
             ? true : false;
 
     if(timeframe_matches) {
-        if(ri->rrdset)
-            rrdset_set_last_accessed_time_s(ri->rrdset, qtl->start_s);
+        RRDSET_ACQUIRED *rsa = rrdinstance_rrdset_acquire(qi->ria);
+        if(rsa) {
+            rrdset_set_last_accessed_time_s(rrdset_acquired_to_rrdset(rsa), qtl->start_s);
+            rrdset_acquired_release(rsa);
+        }
 
         if (qt->query.used == qt->query.size) {
             size_t old_mem = qt->query.size * sizeof(*qt->query.array);
@@ -605,22 +608,6 @@ inline STRING *query_instance_name_fqdn(
     }
 
     return qi->name_fqdn;
-}
-
-RRDSET_ACQUIRED *rrdinstance_acquired_rrdset_acquire(RRDINSTANCE_ACQUIRED *ria) {
-    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
-    RRDSET_ACQUIRED *rsa = rrdset_find_and_acquire(ri->rc->rrdhost, string2str(ri->id), true);
-    if(unlikely(!rsa))
-        return NULL;
-
-    RRDSET *st = rrdset_acquired_to_rrdset(rsa);
-
-    if(unlikely(st->rrdcontexts.rrdinstance != ria)) {
-        rrdset_acquired_release(rsa);
-        return NULL;
-    }
-
-    return rsa;
 }
 
 const char *rrdcontext_acquired_units(RRDCONTEXT_ACQUIRED *rca) {
