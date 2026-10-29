@@ -4,7 +4,7 @@
 //! see `main.rs`), which enters [`run`]. The supervisor re-execs the same
 //! binary as three worker subprocesses — ingestor, ledger, legacy-logs
 //! (`WorkerKind` in `main.rs`) — over ferryboat Unix-socket IPC using the
-//! typed messages from the `bridge` crate (the Configure → Ready handshake
+//! typed messages from the `otel-bridge` crate (the Configure → Ready handshake
 //! contract is documented there), and owns the agent connection: it
 //! translates pluginsd stdin/stdout (`netdata_plugin_protocol`) into
 //! Configure/Call/Cancel/Shutdown per worker and relays results, progress,
@@ -27,15 +27,15 @@ use std::time::Duration;
 use std::path::PathBuf;
 
 use anyhow::{Context, bail};
-use bridge::config::{LegacyLogsConfig, PluginConfig};
-use bridge::{
-    IngestorRequest, IngestorResponse, LedgerRequest, LedgerResponse, LegacyLogsRequest,
-    LegacyLogsResponse,
-};
 use ferryboat::{Connection, Endpoint, Listener};
 use file_registry::{Identity, InstanceId, MachineId};
 use netdata_plugin_protocol::{Message, MessageReader, MessageWriter};
 use netdata_plugin_types::{FunctionDeclaration, FunctionProgressResponse, FunctionResult};
+use otel_bridge::config::{LegacyLogsConfig, PluginConfig};
+use otel_bridge::{
+    IngestorRequest, IngestorResponse, LedgerRequest, LedgerResponse, LegacyLogsRequest,
+    LegacyLogsResponse,
+};
 use tokio::process::Command;
 
 /// Maximum time to wait for a worker to connect after spawning.
@@ -672,7 +672,7 @@ fn socket_dir() -> anyhow::Result<std::path::PathBuf> {
 /// binary against that socket, and accept the worker's connection, bounded by
 /// [`WORKER_CONNECT_TIMEOUT`]. The child is wrapped in a [`ChildGuard`]
 /// immediately, so a failed or timed-out accept still kills it. Both sides
-/// cap messages at `bridge::IPC_MAX_MESSAGE_SIZE`.
+/// cap messages at `otel_bridge::IPC_MAX_MESSAGE_SIZE`.
 async fn spawn_worker<S, R>(
     self_exe: &std::path::Path,
     sock: &SocketGuard,
@@ -683,7 +683,7 @@ where
     R: serde::de::DeserializeOwned + Send + 'static,
 {
     let mut listener = Listener::<S, R>::bind(Endpoint::ipc(sock.path()))
-        .max_message_size(bridge::IPC_MAX_MESSAGE_SIZE)
+        .max_message_size(otel_bridge::IPC_MAX_MESSAGE_SIZE)
         .open()
         .with_context(|| format!("failed to bind {name} socket at {}", sock.path()))?;
 

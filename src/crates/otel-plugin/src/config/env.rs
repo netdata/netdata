@@ -14,7 +14,7 @@
 //! a setting at its stock default. Only `load_config` (`mod.rs`) consumes
 //! this module; the workers receive the merged effective config over IPC.
 //!
-//! `bridge::config` here is the `bridge` crate (`otel-bridge/`), whose
+//! `otel_bridge::config` here is the `otel-bridge` crate, whose
 //! `RotationEntry`/`RetentionEntry` shapes the per-signal values fill.
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -308,7 +308,7 @@ impl SignalOverride {
     /// retention are per-tenant maps in YAML; the env vars can only fill the
     /// `default` tenant's entry.
     fn from_map(env: &EnvReader<'_>, prefix: &str) -> Result<Self> {
-        let rotation_default = bridge::config::RotationEntry {
+        let rotation_default = otel_bridge::config::RotationEntry {
             max_file_size: parse_env_var(env, &var(prefix, "ROTATION_MAX_FILE_SIZE"))?,
             max_entries: parse_env_var(env, &var(prefix, "ROTATION_MAX_ENTRIES"))?,
             max_file_duration: parse_env_duration(env, &var(prefix, "ROTATION_MAX_FILE_DURATION"))?,
@@ -316,7 +316,7 @@ impl SignalOverride {
         let rotation_has_any = rotation_default.max_file_size.is_some()
             || rotation_default.max_entries.is_some()
             || rotation_default.max_file_duration.is_some();
-        let retention_default = bridge::config::RetentionEntry {
+        let retention_default = otel_bridge::config::RetentionEntry {
             max_files: parse_env_var(env, &var(prefix, "RETENTION_MAX_FILES"))?,
             max_total_size: parse_env_var(env, &var(prefix, "RETENTION_MAX_TOTAL_SIZE"))?,
             max_age: parse_env_duration(env, &var(prefix, "RETENTION_MAX_AGE"))?,

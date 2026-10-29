@@ -38,10 +38,10 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::Context;
-use bridge::config::{LifecycleConfig, RemoteStorageConfig};
-use bridge::signals::Signal;
-use bridge::{LedgerRequest, LedgerResponse};
 use ferryboat::Connection;
+use otel_bridge::config::{LifecycleConfig, RemoteStorageConfig};
+use otel_bridge::signals::Signal;
+use otel_bridge::{LedgerRequest, LedgerResponse};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 

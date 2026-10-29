@@ -14,8 +14,8 @@
 //! still exists; `handle_retry_tick` re-issues due entries with capped
 //! exponential backoff.
 
-use bridge::signals::Signal;
 use file_registry::{SeqKey, TimestampNs};
+use otel_bridge::signals::Signal;
 use tokio::time::Instant;
 
 use file_lifecycle::ipc::{CatalogBuilderRequest, UploaderRequest, UploaderResponse};

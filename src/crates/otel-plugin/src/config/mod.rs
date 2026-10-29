@@ -25,7 +25,7 @@ use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use bridge::config::{PluginConfig, ProtocolConfig, TlsServerConfig};
+use otel_bridge::config::{PluginConfig, ProtocolConfig, TlsServerConfig};
 use serde::Deserialize;
 
 use metrics::MetricsOverride;
@@ -767,7 +767,7 @@ traces:
     fn stock_yaml_logs_tuning_parsed() {
         let config = resolved_stock();
         // Dirs are derived from base_dir, not configured per signal.
-        let logs = config.lifecycle_for(bridge::signals::Signal::Logs);
+        let logs = config.lifecycle_for(otel_bridge::signals::Signal::Logs);
         assert_eq!(
             logs.wal.dir,
             std::path::Path::new("/var/log/netdata/otel/v2/logs/wal")
@@ -795,7 +795,7 @@ traces:
     #[test]
     fn stock_yaml_traces_tuning_parsed() {
         let config = resolved_stock();
-        let traces = config.lifecycle_for(bridge::signals::Signal::Traces);
+        let traces = config.lifecycle_for(otel_bridge::signals::Signal::Traces);
         assert_eq!(
             traces.wal.dir,
             std::path::Path::new("/var/log/netdata/otel/v2/traces/wal")
@@ -1150,7 +1150,7 @@ logs:
         let config = resolve_with_user("base_dir: /data/otel\n").unwrap();
         assert_eq!(config.base_dir, std::path::Path::new("/data/otel"));
         // Derived dirs follow the new base.
-        let logs = config.lifecycle_for(bridge::signals::Signal::Logs);
+        let logs = config.lifecycle_for(otel_bridge::signals::Signal::Logs);
         assert_eq!(logs.wal.dir, std::path::Path::new("/data/otel/logs/wal"));
     }
 

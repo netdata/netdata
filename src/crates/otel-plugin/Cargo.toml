@@ -13,7 +13,7 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow = { workspace = true }
-bridge = { workspace = true }
+otel-bridge = { workspace = true }
 clap = { workspace = true }
 bytesize = { workspace = true }
 ferryboat = { workspace = true }

@@ -94,7 +94,7 @@ struct ActiveFile {
 /// `pipeline_id` into the filename (`FileId`, the ledger's per-signal
 /// routing key) and `payload_format` into the header (the frame-codec tag
 /// consumers check before decoding). The caller assigns both — `pipeline_id`
-/// from the signal axis (`bridge::signals`), `payload_format` from the frame
+/// from the signal axis (`otel_bridge::signals`), `payload_format` from the frame
 /// codec (`ng_flatten` for the OTel signals); the WAL stamps and routes by
 /// them, interpreting neither. Named fields so the two `u16`s cannot be
 /// swapped at a call site.

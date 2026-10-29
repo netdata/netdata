@@ -158,7 +158,7 @@
 //! Both ends must set the same limit: a mismatch means one side accepts
 //! frames the other refuses, and the link dies on the first oversized
 //! message. Production usage: the supervisor↔worker links set
-//! `bridge::IPC_MAX_MESSAGE_SIZE` (16 MiB) on both ends; the ingestor→ledger
+//! `otel_bridge::IPC_MAX_MESSAGE_SIZE` (16 MiB) on both ends; the ingestor→ledger
 //! WAL-event link runs at this crate's 8 MiB default on both ends. On the
 //! compressed path the check lands after decompression — `lz4_flex` allocates
 //! the embedded size up front — so the limit bounds the accepted message, not
@@ -200,10 +200,10 @@
 //! supervisor binds one socket per worker and spawns them
 //! (`src/crates/otel-plugin/src/supervisor.rs`); the worker crates
 //! `otel-ingestor`, `otel-ledger` and `otel-legacy-logs`, which connect back
-//! to the supervisor and speak the `bridge` enum pairs; and `file-lifecycle`
+//! to the supervisor and speak the `otel-bridge` enum pairs; and `file-lifecycle`
 //! (`ipc.rs`), whose ledger accepts the ingestor's WAL-event connection
 //! carrying `wal::Message` (`src/crates/otel-ingestor/src/ledger_sender.rs`
-//! is the connecting side). The `bridge` crate defines the message contracts
+//! is the connecting side). The `otel-bridge` crate defines the message contracts
 //! but does not depend on ferryboat; `file-registry`, `otel-catalog`, `wal`,
 //! `sfst` and `sfsq` do not use ferryboat directly. The [`RpcClient`] /
 //! [`RpcServer`] layer and the in-process transport have no production users
@@ -231,7 +231,7 @@ pub use mux::{RpcClient, RpcClientBuilder, RpcServer, RpcServerBuilder, RpcSessi
 
 /// Default IPC message-size limit (8 MiB); see the module docs for the three
 /// enforcement points. Supervisor↔worker links override it with
-/// `bridge::IPC_MAX_MESSAGE_SIZE`.
+/// `otel_bridge::IPC_MAX_MESSAGE_SIZE`.
 const DEFAULT_MAX_MESSAGE_SIZE: usize = 8 * 1024 * 1024;
 
 // Capacity of the mpsc channels backing in-process connections.

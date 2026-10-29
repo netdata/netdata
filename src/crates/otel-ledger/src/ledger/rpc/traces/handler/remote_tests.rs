@@ -17,8 +17,8 @@ use super::*;
 use crate::ledger::rpc::traces::fixtures::{
     Evicted, TestRemote, install_sealed, make_registries, otlp_req_svc,
 };
-use bridge::function::ProgressState;
 use file_registry::test_identity;
+use otel_bridge::function::ProgressState;
 use serde_json::json;
 use tokio_util::sync::CancellationToken;
 

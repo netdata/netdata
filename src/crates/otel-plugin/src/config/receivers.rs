@@ -14,7 +14,7 @@
 //! The user file may still carry the gRPC-only `endpoint:` section of the
 //! first release ([`DeprecatedEndpointOverride`]); its keys fold onto the
 //! gRPC listener with a deprecation warning.
-use bridge::config::{ProtocolConfig, ReceiversConfig};
+use otel_bridge::config::{ProtocolConfig, ReceiversConfig};
 use serde::Deserialize;
 
 /// The first release's `endpoint.*` keys, each paired with the

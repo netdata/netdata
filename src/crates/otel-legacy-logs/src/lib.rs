@@ -22,11 +22,11 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
-use bridge::function::{FunctionContext, FunctionHandler, HandlerAdapter, RawFunctionHandler};
-use bridge::{LegacyLogsRequest, LegacyLogsResponse};
 use ferryboat::{Connection, Endpoint};
 use netdata_plugin_protocol::{FunctionCall, Message};
 use netdata_plugin_types::FunctionResult;
+use otel_bridge::function::{FunctionContext, FunctionHandler, HandlerAdapter, RawFunctionHandler};
+use otel_bridge::{LegacyLogsRequest, LegacyLogsResponse};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
@@ -43,7 +43,7 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
 
     let mut supervisor: Connection<LegacyLogsResponse, LegacyLogsRequest> =
         Connection::connect(Endpoint::ipc(socket_path))
-            .max_message_size(bridge::IPC_MAX_MESSAGE_SIZE)
+            .max_message_size(otel_bridge::IPC_MAX_MESSAGE_SIZE)
             .open()
             .await?;
 

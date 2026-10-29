@@ -11,8 +11,8 @@
 //! the entry from the registry, failure un-marks it
 //! (`Ledger::handle_cleaner_resp`, `ledger/cleaner.rs`).
 
-use bridge::signals::Signal;
 use file_registry::{SeqKey, TenantId};
+use otel_bridge::signals::Signal;
 
 use file_lifecycle::ipc::CleanerRequest;
 use file_lifecycle::recovery::now_ns;

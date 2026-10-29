@@ -137,8 +137,8 @@ pub async fn reconcile_remote_uploads<S: Storage>(
     catalog_builder: &mut ComponentHandle<CatalogBuilderRequest, CatalogBuilderResponse>,
     storage: &S,
     tenant_id: &TenantId,
-    retention: &bridge::config::RetentionConfig,
-    ingest: &bridge::config::IngestConfig,
+    retention: &otel_bridge::config::RetentionConfig,
+    ingest: &otel_bridge::config::IngestConfig,
 ) -> Result<(), StorageError> {
     let today = chrono::Utc::now().date_naive();
     let max_days = crate::helpers::catalog_retention_days(retention).min(ingest.reconcile_days());
@@ -265,7 +265,7 @@ pub async fn reconcile_local_catalog_uploads<S: Storage>(
     uploader: &mut ComponentHandle<UploaderRequest, UploaderResponse>,
     storage: &S,
     tenant_id: &TenantId,
-    retention: &bridge::config::RetentionConfig,
+    retention: &otel_bridge::config::RetentionConfig,
 ) -> Result<(), StorageError> {
     let today = chrono::Utc::now().date_naive();
     let max_days = crate::helpers::catalog_retention_days(retention);

@@ -26,11 +26,11 @@ pub(crate) mod test_helpers;
 
 pub use ledger::Ledger;
 
-use bridge::signals::Signal;
+use otel_bridge::signals::Signal;
 
 use anyhow::{Context, Result};
-use bridge::{LedgerRequest, LedgerResponse};
 use ferryboat::{Connection, Endpoint};
+use otel_bridge::{LedgerRequest, LedgerResponse};
 
 /// Ledger worker entry point.
 ///
@@ -44,7 +44,7 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
 
     let mut supervisor: Connection<LedgerResponse, LedgerRequest> =
         Connection::connect(Endpoint::ipc(socket_path))
-            .max_message_size(bridge::IPC_MAX_MESSAGE_SIZE)
+            .max_message_size(otel_bridge::IPC_MAX_MESSAGE_SIZE)
             .open()
             .await?;
 

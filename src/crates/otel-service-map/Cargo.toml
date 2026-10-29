@@ -16,7 +16,7 @@ async-trait = { workspace = true }
 bincode = { workspace = true }
 crc32fast = { workspace = true }
 humantime = { workspace = true }
-bridge = { workspace = true }
+otel-bridge = { workspace = true }
 netdata-plugin-types = { workspace = true }
 opentelemetry-proto = { workspace = true }
 serde = { workspace = true, features = ["derive", "rc"] }

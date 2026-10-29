@@ -64,7 +64,7 @@
 //! `payload_format` (`0` reserved, rejected at [`Writer::new`]).
 //! `pipeline_id` is the numeric signal axis: stamped into every `FileId`,
 //! exposed by [`FileEvent::pipeline_id`], and routed on by the ledger; the
-//! id↔signal mapping lives in `bridge::signals`.
+//! id↔signal mapping lives in `otel_bridge::signals`.
 //!
 //! # Concurrency and errors
 //!

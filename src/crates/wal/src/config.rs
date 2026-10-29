@@ -10,13 +10,13 @@
 //! affects only files created afterwards.
 //!
 //! Producers: the otel-ingestor resolves one per tenant from
-//! `bridge::config::WalConfig` (its `rotation` policy resolved per tenant;
+//! `otel_bridge::config::WalConfig` (its `rotation` policy resolved per tenant;
 //! `logs_service.rs`/`trace_service.rs` `resolve_wal_config`, time rotation
 //! always on); the dev/bench `ng-ingest` disables rotation via
 //! `one_file_config`; tests use `Default` or hand-set limits. `Default` is
 //! the standalone default — the production path overrides every field from
 //! the plugin's per-signal tuning and per-tenant rotation policy
-//! (`bridge::config`). No serde: operator YAML is parsed upstream there;
+//! (`otel_bridge::config`). No serde: operator YAML is parsed upstream there;
 //! this type is code-constructed.
 use std::time::Duration;
 

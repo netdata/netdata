@@ -13,7 +13,7 @@
 //!
 //! Consumers: `netflow-plugin` and `journal-function` (through
 //! [`StdPluginRuntime`]) drive this runtime directly. The otel-plugin workers
-//! instead run the protocol-agnostic engine copy in `bridge::function`, fed by
+//! instead run the protocol-agnostic engine copy in `otel_bridge::function`, fed by
 //! the supervisor over IPC. The two crates carry parallel
 //! `FunctionHandler`/`FunctionCallContext`/`ProgressState` implementations with
 //! different progress semantics: raw work units here, percent over a fixed
@@ -158,7 +158,7 @@ pub use tracing_setup::init_tracing_with_identifier;
 /// `total` is non-zero, so a handler that never sets a total stays silent.
 /// The two counters are independent atomics, so a read may pair a newer `done`
 /// with an older `total`. Values are raw work units, sent as-is — the
-/// `bridge::function` engine used by the otel-plugin workers instead emits a
+/// `otel_bridge::function` engine used by the otel-plugin workers instead emits a
 /// percent over a fixed denominator of 100.
 ///
 /// # Example

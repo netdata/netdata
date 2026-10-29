@@ -304,7 +304,7 @@ impl FileEvent {
     /// variant carries a `FileId`, which carries the pipeline. The ingestor
     /// keys its per-signal `Message::frame_seq` stream by this value, and the
     /// ledger routes the event to the owning pipeline by it (decoding the raw
-    /// id via `bridge::signals::Signal::try_from`).
+    /// id via `otel_bridge::signals::Signal::try_from`).
     pub fn pipeline_id(&self) -> u16 {
         match self {
             FileEvent::Created { file_id, .. }

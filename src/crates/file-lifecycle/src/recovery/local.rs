@@ -279,7 +279,7 @@ pub async fn recover_retention(
     registry: &mut Registry,
     pipeline_id: u16,
     cleaner: &mut ComponentHandle<CleanerRequest, CleanerResponse>,
-    retention: &bridge::config::RetentionConfig,
+    retention: &otel_bridge::config::RetentionConfig,
     storage_enabled: bool,
 ) -> anyhow::Result<()> {
     // SFST pass.

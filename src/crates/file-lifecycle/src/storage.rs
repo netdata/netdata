@@ -23,7 +23,7 @@
 //!
 //! [`OpendalStorage::new`] wraps the backend in opendal's retry layer — the
 //! parameters and the ~3-minute per-operation backoff ceiling live on its
-//! docs (the bound `bridge::config`'s `startup_op_timeout` should stay
+//! docs (the bound `otel_bridge::config`'s `startup_op_timeout` should stay
 //! above). The layer is transparent to callers; where a call must be bounded
 //! tighter, the caller wraps it (`recovery::startup`'s per-op timeout,
 //! `remote_read`'s per-download deadline).
@@ -176,7 +176,7 @@ impl OpendalStorage {
     /// Build from a storage URI (e.g. `fs:///path`, `s3://bucket/?region=…`),
     /// wrapped in opendal's retry layer: exponential backoff 1 s → 30 s with
     /// jitter, at most 10 attempts — a worst-case ~3-minute backoff ceiling
-    /// per operation, which `bridge::config`'s `startup_op_timeout` should
+    /// per operation, which `otel_bridge::config`'s `startup_op_timeout` should
     /// stay above. Each retry is logged at `warn` with the redacted error
     /// text. Err only on URI parse failure, as a raw `std::io::Error`
     /// carrying opendal's error display — not a [`StorageError`], so it does

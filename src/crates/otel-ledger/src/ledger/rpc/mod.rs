@@ -4,7 +4,7 @@
 //!
 //! - `dispatch` — the run-loop's entry points: `handle_supervisor_req`,
 //!   `handle_outbound_resp`, and the per-call `dispatch_function_call`
-//!   that spawns handler tasks driven by the `bridge::function` engine.
+//!   that spawns handler tasks driven by the `otel_bridge::function` engine.
 //!   Signal-neutral: it routes by each pipeline's declared function name.
 //! - `grid` — the shared time-grid derivation behind the otel
 //!   Functions' histogram views: picks a "nice" bucket width and snaps

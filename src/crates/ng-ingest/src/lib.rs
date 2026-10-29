@@ -14,7 +14,7 @@ pub const PART_KEY: u64 = 0;
 /// no meaning to it here; it only labels the on-disk file name.
 pub const PIPELINE_ID: u16 = 0;
 
-/// The traces signal axis (== `bridge::signals::Signal::Traces.pipeline_id()`),
+/// The traces signal axis (== `otel_bridge::signals::Signal::Traces.pipeline_id()`),
 /// stamped into the traces WAL file id.
 pub const TRACES_PIPELINE_ID: u16 = 1;
 

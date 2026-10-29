@@ -462,32 +462,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bridge"
-version = "0.1.3"
-dependencies = [
- "async-trait",
- "bincode 2.0.1",
- "bytesize",
- "console-subscriber",
- "file-registry",
- "futures",
- "humantime-serde",
- "netdata-plugin-error",
- "netdata-plugin-protocol",
- "netdata-plugin-schema",
- "netdata-plugin-types",
- "schemars",
- "serde",
- "serde_json",
- "serde_yaml",
- "tokio",
- "tokio-util",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
 name = "bstr"
 version = "1.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1286,7 +1260,6 @@ name = "file-lifecycle"
 version = "0.1.3"
 dependencies = [
  "anyhow",
- "bridge",
  "bytesize",
  "chrono",
  "chunk-file",
@@ -1297,6 +1270,7 @@ dependencies = [
  "moka",
  "netdata-plugin-protocol",
  "opendal",
+ "otel-bridge",
  "otel-catalog",
  "reqwest",
  "sfst",
@@ -3655,6 +3629,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "otel-bridge"
+version = "0.1.3"
+dependencies = [
+ "async-trait",
+ "bincode 2.0.1",
+ "bytesize",
+ "console-subscriber",
+ "file-registry",
+ "futures",
+ "humantime-serde",
+ "netdata-plugin-error",
+ "netdata-plugin-protocol",
+ "netdata-plugin-schema",
+ "netdata-plugin-types",
+ "schemars",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "otel-catalog"
 version = "0.1.3"
 dependencies = [
@@ -3675,7 +3675,6 @@ version = "0.1.3"
 dependencies = [
  "anyhow",
  "axum",
- "bridge",
  "bytesize",
  "ferryboat",
  "file-registry",
@@ -3686,6 +3685,7 @@ dependencies = [
  "netdata-plugin-types",
  "ng-flatten",
  "opentelemetry-proto",
+ "otel-bridge",
  "otel-catalog",
  "otel-logs-identity",
  "otel-service-map",
@@ -3715,7 +3715,6 @@ version = "0.1.3"
 dependencies = [
  "anyhow",
  "async-trait",
- "bridge",
  "bytesize",
  "chrono",
  "ferryboat",
@@ -3729,6 +3728,7 @@ dependencies = [
  "ng-flatten",
  "ng-index",
  "opentelemetry-proto",
+ "otel-bridge",
  "otel-catalog",
  "otel-logs-identity",
  "serde",
@@ -3750,7 +3750,6 @@ version = "0.1.3"
 dependencies = [
  "anyhow",
  "async-trait",
- "bridge",
  "ferryboat",
  "journal-function",
  "journal-index",
@@ -3758,6 +3757,7 @@ dependencies = [
  "netdata-plugin-protocol",
  "netdata-plugin-schema",
  "netdata-plugin-types",
+ "otel-bridge",
  "serde_json",
  "tempfile",
  "tokio",
@@ -3779,7 +3779,6 @@ name = "otel-plugin"
 version = "0.1.3"
 dependencies = [
  "anyhow",
- "bridge",
  "bytesize",
  "clap",
  "ferryboat",
@@ -3787,6 +3786,7 @@ dependencies = [
  "humantime",
  "netdata-plugin-protocol",
  "netdata-plugin-types",
+ "otel-bridge",
  "otel-ingestor",
  "otel-ledger",
  "otel-legacy-logs",
@@ -3809,12 +3809,12 @@ version = "0.1.3"
 dependencies = [
  "async-trait",
  "bincode 2.0.1",
- "bridge",
  "crc32fast",
  "humantime",
  "netdata-plugin-protocol",
  "netdata-plugin-types",
  "opentelemetry-proto",
+ "otel-bridge",
  "serde",
  "serde_json",
  "tempfile",

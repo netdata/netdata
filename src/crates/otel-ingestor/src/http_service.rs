@@ -59,11 +59,11 @@ use axum::body::Body;
 use axum::extract::State;
 use axum::http::{HeaderMap, Response, StatusCode};
 use axum::routing::post;
-use bridge::config::{AuthConfig, ProtocolConfig};
 use file_registry::TenantId;
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
+use otel_bridge::config::{AuthConfig, ProtocolConfig};
 use prost::Message as _;
 use tonic::{Code, Status};
 
@@ -705,7 +705,6 @@ mod tests {
 
     use axum::body::Body;
     use axum::http::{Request, StatusCode, header};
-    use bridge::config::{AuthConfig, IngestConfig, RotationEntry, TlsServerConfig, WalConfig};
     use file_registry::{Identity, InstanceId, MachineId, MonotonicClock};
     use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
     use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
@@ -715,6 +714,9 @@ mod tests {
     use opentelemetry_proto::tonic::logs::v1::{LogRecord, ResourceLogs, ScopeLogs};
     use opentelemetry_proto::tonic::resource::v1::Resource;
     use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span};
+    use otel_bridge::config::{
+        AuthConfig, IngestConfig, RotationEntry, TlsServerConfig, WalConfig,
+    };
     use tower::ServiceExt;
 
     use super::*;
@@ -798,7 +800,7 @@ mod tests {
             dir: dir.to_path_buf(),
             crc_enabled: true,
             compression_enabled: true,
-            rotation: bridge::config::RotationPolicy::try_from(rotation)
+            rotation: otel_bridge::config::RotationPolicy::try_from(rotation)
                 .expect("test rotation has a complete default"),
         }
     }

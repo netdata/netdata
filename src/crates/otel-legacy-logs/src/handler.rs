@@ -18,11 +18,11 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 
 use async_trait::async_trait;
-use bridge::config::LegacyLogsConfig;
-use bridge::function::{FunctionCallContext, FunctionHandler};
 use netdata_plugin_error::Result;
 use netdata_plugin_protocol::FunctionDeclaration;
 use netdata_plugin_schema::HttpAccess;
+use otel_bridge::config::LegacyLogsConfig;
+use otel_bridge::function::{FunctionCallContext, FunctionHandler};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, instrument, trace, warn};
 

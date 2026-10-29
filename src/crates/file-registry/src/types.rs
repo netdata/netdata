@@ -28,7 +28,7 @@
 //!   parsing is lenient about padding and rejects nil identities.
 //!
 //! [`FileId::pipeline_id`] is an opaque `u16`. The signal↔id mapping and its
-//! closed value set live in the integration layer (`bridge::signals`); there
+//! closed value set live in the integration layer (`otel_bridge::signals`); there
 //! the numeric axis is the wire/disk form — stamped into `FileId`s, filenames,
 //! and WAL frames, never carrying a serialized `Signal` — and out-of-set ids
 //! are that layer's runtime error. file-registry carries the raw `u16` and
@@ -40,7 +40,7 @@
 //! `FileId`); `otel-ingestor` and `ng-ingest` (ingest binaries: `Identity`
 //! construction, clock, scalars; `otel-ingestor` also validates tenants and
 //! stamps `FileId`s); `sfsq` and `sfsq-cli` (query engine and CLI over
-//! `SelectedFile`/`Query`); `bridge` and `otel-plugin` (the plugin config
+//! `SelectedFile`/`Query`); `otel-bridge` and `otel-plugin` (the plugin config
 //! carries [`Identity`] to worker processes); `file-cache` (durable
 //! tmp+rename helpers); `ng-index` (tests only).
 use std::borrow::Borrow;
@@ -361,7 +361,7 @@ impl fmt::Display for InstanceId {
 /// the ingestor services, the plugin config) so the two ids cannot be
 /// transposed at a call site. Serializable so the plugin config can carry it
 /// to the worker processes (the supervisor stamps it into `PluginConfig`
-/// before configuring any worker — see `bridge::config`).
+/// before configuring any worker — see `otel_bridge::config`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Identity {
     pub machine_id: MachineId,
@@ -462,7 +462,7 @@ impl std::fmt::Display for SeqKey {
 /// signal/pipeline discriminator: this crate never interprets either. The
 /// content plane derives `part_key` and assigns its meaning (for OTel logs
 /// today, the content plane's service-stream hash); the integration layer
-/// assigns `pipeline_id` and owns the signal↔id mapping (`bridge::signals`).
+/// assigns `pipeline_id` and owns the signal↔id mapping (`otel_bridge::signals`).
 /// `pipeline_id` routes a file to its owning pipeline.
 ///
 /// `seq` is a single per-process counter shared across pipelines, so it alone
@@ -481,7 +481,7 @@ pub struct FileId {
     pub machine_id: MachineId,
     pub instance_id: InstanceId,
     /// Opaque pipeline/signal discriminator assigned by the integration layer
-    /// (the signal↔id mapping is its concern — see `bridge::signals` and the
+    /// (the signal↔id mapping is its concern — see `otel_bridge::signals` and the
     /// module docs). Always chosen explicitly at construction; there is no
     /// default pipeline.
     pub pipeline_id: u16,

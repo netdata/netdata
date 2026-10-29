@@ -35,21 +35,21 @@
 //! - Observers: `observer` (features that see accepted trace exports without
 //!   taking part in storing them). The service map (`otel-service-map`) is
 //!   one; it also serves the ingestor's one Function, `topology:tracing`,
-//!   through `bridge::driver::CallDriver`.
+//!   through `otel_bridge::driver::CallDriver`.
 
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
-use bridge::config::{AuthConfig, LifecycleConfig, PluginConfig, ProtocolConfig};
-use bridge::driver::{CallDriver, CallResponse, oversized_result};
-use bridge::function::RawFunctionHandler;
-use bridge::signals::Signal;
-use bridge::{IngestorRequest, IngestorResponse};
 use ferryboat::{Connection, Endpoint};
 use opentelemetry_proto::tonic::collector::logs::v1::logs_service_server::LogsServiceServer;
 use opentelemetry_proto::tonic::collector::metrics::v1::metrics_service_server::MetricsServiceServer;
 use opentelemetry_proto::tonic::collector::trace::v1::trace_service_server::TraceServiceServer;
+use otel_bridge::config::{AuthConfig, LifecycleConfig, PluginConfig, ProtocolConfig};
+use otel_bridge::driver::{CallDriver, CallResponse, oversized_result};
+use otel_bridge::function::RawFunctionHandler;
+use otel_bridge::signals::Signal;
+use otel_bridge::{IngestorRequest, IngestorResponse};
 use tokio::sync::RwLock;
 use tonic::transport::server::TcpIncoming;
 use tonic::transport::{Identity, Server, ServerTlsConfig};
@@ -96,7 +96,7 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
 
     let mut conn: Connection<IngestorResponse, IngestorRequest> =
         Connection::connect(Endpoint::ipc(socket_path))
-            .max_message_size(bridge::IPC_MAX_MESSAGE_SIZE)
+            .max_message_size(otel_bridge::IPC_MAX_MESSAGE_SIZE)
             .open()
             .await?;
 
@@ -836,7 +836,7 @@ mod seed_tests {
 
 #[cfg(test)]
 mod grpc_listener_tests {
-    use bridge::config::TlsServerConfig;
+    use otel_bridge::config::TlsServerConfig;
 
     use super::*;
 

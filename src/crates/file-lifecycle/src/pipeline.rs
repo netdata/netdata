@@ -43,10 +43,10 @@
 
 use std::sync::Arc;
 
-use bridge::config::LifecycleConfig;
-use bridge::function::RawFunctionHandler;
-use bridge::signals::SignalSpec;
 use netdata_plugin_protocol::FunctionDeclaration;
+use otel_bridge::config::LifecycleConfig;
+use otel_bridge::function::RawFunctionHandler;
+use otel_bridge::signals::SignalSpec;
 use tokio::sync::{RwLock, mpsc};
 
 use crate::ipc::{CatalogBuilderRequest, IndexerRequest};

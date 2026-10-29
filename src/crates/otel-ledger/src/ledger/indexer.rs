@@ -12,8 +12,8 @@
 
 use std::path::PathBuf;
 
-use bridge::signals::Signal;
 use file_registry::{FileId, SeqKey, TenantId};
+use otel_bridge::signals::Signal;
 
 use file_lifecycle::ipc::{CleanerRequest, IndexerResponse, UploaderRequest};
 

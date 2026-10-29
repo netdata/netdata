@@ -18,8 +18,8 @@ use crate::ledger::rpc::traces::fixtures::{
     install_sealed, install_sfst, install_wal, make_registries, otlp_req, otlp_req_svc,
     sealed_traces,
 };
-use bridge::function::ProgressState;
 use file_lifecycle::registry::TenantRegistries;
+use otel_bridge::function::ProgressState;
 use serde_json::json;
 use tokio_util::sync::CancellationToken;
 
@@ -1987,7 +1987,7 @@ fn bad_request_message(body: &str) -> String {
 /// `payload` verbatim through `HandlerAdapter::handle_raw` (None = no
 /// payload): the (status, body) the live bridge would transport.
 async fn raw_call(payload: Option<&[u8]>) -> (u32, String) {
-    use bridge::function::{FunctionContext, HandlerAdapter, RawFunctionHandler};
+    use otel_bridge::function::{FunctionContext, HandlerAdapter, RawFunctionHandler};
     let adapter = HandlerAdapter::new(make_handler());
     let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
     let ctx = Arc::new(FunctionContext {

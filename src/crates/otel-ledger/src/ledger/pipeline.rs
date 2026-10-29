@@ -20,10 +20,10 @@
 
 use std::sync::Arc;
 
-use bridge::config::LifecycleConfig;
-use bridge::function::{HandlerAdapter, RawFunctionHandler};
-use bridge::signals::Signal;
 use file_registry::TenantId;
+use otel_bridge::config::LifecycleConfig;
+use otel_bridge::function::{HandlerAdapter, RawFunctionHandler};
+use otel_bridge::signals::Signal;
 use tokio::sync::{RwLock, mpsc};
 use tokio_util::sync::CancellationToken;
 

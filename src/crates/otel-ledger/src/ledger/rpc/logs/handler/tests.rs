@@ -51,7 +51,7 @@ fn make_handler(tr: TenantRegistries) -> OtelLogsHandler {
 fn make_ctx(transaction: &str) -> FunctionCallContext {
     FunctionCallContext::new(
         transaction.to_string(),
-        bridge::function::ProgressState::new(),
+        otel_bridge::function::ProgressState::new(),
         CancellationToken::new(),
     )
 }
@@ -1233,7 +1233,7 @@ async fn remote_only_sfst_is_fetched_and_served() {
     .unwrap();
     // Keep a handle to the progress state so we can assert the fetch phase
     // advanced it. Build the context inline (make_ctx hides its ProgressState).
-    let progress = bridge::function::ProgressState::new();
+    let progress = otel_bridge::function::ProgressState::new();
     let ctx =
         FunctionCallContext::new("t1".to_string(), progress.clone(), CancellationToken::new());
     let v = serde_json::to_value(&h.on_call(ctx, req).await.unwrap()).unwrap();

@@ -11,8 +11,8 @@
 //! `UploadCatalog` with the shared uploader (none when remote storage is
 //! disabled). The remaining variants only log.
 
-use bridge::signals::Signal;
 use file_lifecycle::ipc::{CatalogBuilderRequest, CatalogBuilderResponse, UploaderRequest};
+use otel_bridge::signals::Signal;
 
 use crate::event::PipelineResp;
 

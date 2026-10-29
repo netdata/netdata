@@ -1,5 +1,5 @@
 //! Shared, pure mapping helpers for the file-lifecycle substrate: the
-//! conversions between the config framework's types (`bridge::config`) and
+//! conversions between the config framework's types (`otel_bridge::config`) and
 //! the format/catalog crates' plain structs, plus the single home of the
 //! summary → date and registry → upload-request derivations. Every function
 //! is a stateless computation over a resolved config or already-tracked
@@ -13,7 +13,7 @@
 //! [`sfst_retention_policy`] lowers the resolved config onto sfst's
 //! eviction policy. Both retention knobs rely on the `horizon > max_age`
 //! day-unit invariant enforced at config load
-//! ([`bridge::config::RetentionPolicy::validate`]).
+//! ([`otel_bridge::config::RetentionPolicy::validate`]).
 //!
 //! Consumers (grep-verified): otel-ledger's steady-state paths —
 //! `ledger/indexer.rs` ([`sfst_upload_request`]), `ledger/uploader.rs`
@@ -57,7 +57,7 @@ pub fn date_from_summary(summary: &sfst::Summary) -> Option<chrono::NaiveDate> {
 /// `u32` the consumer signature takes).
 ///
 /// The `horizon > max_age` day-unit invariant is enforced at config load
-/// ([`bridge::config::RetentionPolicy::validate`]): catalog eviction is
+/// ([`otel_bridge::config::RetentionPolicy::validate`]): catalog eviction is
 /// date-partition based (a file's earliest timestamp) while SFST eviction is
 /// age based (its latest timestamp), so the catalog gating an SFST's
 /// eviction always outlives that SFST.
@@ -73,7 +73,7 @@ pub fn date_from_summary(summary: &sfst::Summary) -> Option<chrono::NaiveDate> {
 /// ([`crate::recovery::reconcile_local_catalog_uploads`]) uses this window
 /// only as its re-upload cutoff — the set of catalogs it confirms on the
 /// remote is bounded by the still-local SFST set, not by this window.
-pub fn catalog_retention_days(retention: &bridge::config::RetentionConfig) -> u32 {
+pub fn catalog_retention_days(retention: &otel_bridge::config::RetentionConfig) -> u32 {
     retention
         .horizon
         .as_secs()
@@ -84,7 +84,7 @@ pub fn catalog_retention_days(retention: &bridge::config::RetentionConfig) -> u3
 
 /// Lower a resolved per-tenant retention config onto sfst's plain
 /// [`RetentionPolicy`](sfst::RetentionPolicy): `max_files` and `max_age` map
-/// 1:1; `max_total_size` is re-wrapped from bridge's `bytesize::ByteSize`
+/// 1:1; `max_total_size` is re-wrapped from `otel-bridge`'s `bytesize::ByteSize`
 /// into [`file_registry::ByteSize`]. The
 /// `retention_policy_maps_fields_one_to_one` test pins the mapping — the
 /// evict-all recovery tests (`recovery/tests.rs`, the `evict_all_retention`
@@ -94,7 +94,9 @@ pub fn catalog_retention_days(retention: &bridge::config::RetentionConfig) -> u3
 /// Consumers (grep-verified): the retention passes hand the result to
 /// `sfst::Registry::evaluate_retention` (otel-ledger's `ledger/retention.rs`;
 /// [`crate::recovery::recover_retention`]).
-pub fn sfst_retention_policy(retention: &bridge::config::RetentionConfig) -> sfst::RetentionPolicy {
+pub fn sfst_retention_policy(
+    retention: &otel_bridge::config::RetentionConfig,
+) -> sfst::RetentionPolicy {
     sfst::RetentionPolicy {
         max_files: retention.max_files,
         max_total_size: file_registry::ByteSize(retention.max_total_size.as_u64()),
@@ -142,7 +144,7 @@ pub fn build_catalog_entry(
 /// derivation lives here so the two callers cannot drift.
 ///
 /// `signal` is the owning signal's remote-key segment (`logs` / `traces`,
-/// from `bridge::signals::Signal::segment`); the request's `pipeline_id`
+/// from `otel_bridge::signals::Signal::segment`); the request's `pipeline_id`
 /// comes from the file's own [`FileId`], the single source of truth for
 /// which pipeline owns the file. The date bucket comes from
 /// [`date_from_summary`] (current UTC date for an empty SFST), the remote
@@ -179,7 +181,7 @@ mod tests {
     /// even compile, since the three fields have distinct types.
     #[test]
     fn retention_policy_maps_fields_one_to_one() {
-        let cfg = bridge::config::RetentionConfig {
+        let cfg = otel_bridge::config::RetentionConfig {
             max_files: 7,
             max_total_size: bytesize::ByteSize::gib(10),
             max_age: std::time::Duration::from_secs(86_400),

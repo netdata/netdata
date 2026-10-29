@@ -1,8 +1,8 @@
 //! Writer-event handling: gap-check, apply to registries, index on close.
 
 use super::Ledger;
-use bridge::signals::Signal;
 use file_lifecycle::ipc::IndexerRequest;
+use otel_bridge::signals::Signal;
 
 impl Ledger {
     #[tracing::instrument(

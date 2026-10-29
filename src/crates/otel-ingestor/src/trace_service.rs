@@ -53,8 +53,8 @@ use tonic::{Request, Response, Status};
 use crate::ledger_sender::LedgerSender;
 use crate::observer::TraceObserver;
 use crate::tenant::extract_tenant_id;
-use bridge::config::AuthConfig;
-use bridge::signals::Signal;
+use otel_bridge::config::AuthConfig;
+use otel_bridge::signals::Signal;
 use otel_logs_identity::ServiceStream;
 
 /// Total spans across a request's resource/scope spans.
@@ -148,18 +148,18 @@ pub struct NetdataTracesService {
     /// signal), so every signal's events MUST funnel through one sender.
     sender: Arc<LedgerSender>,
     wal_base_dir: PathBuf,
-    wal_config: bridge::config::WalConfig,
+    wal_config: otel_bridge::config::WalConfig,
     /// Global ingestion time-bounds: reject spans whose `[start, effective
     /// end]` interval falls outside `[now - max_age, now + future_skew]`.
     /// Applied per span inside `prepare_trace_frame`.
-    ingest_bounds: bridge::config::IngestConfig,
+    ingest_bounds: otel_bridge::config::IngestConfig,
     /// Shared global seq allocator (lib.rs hands the same one to the logs and
     /// traces services), so file `seq` is unique across signals.
     seq: Arc<wal::SeqAllocator>,
     auth: AuthConfig,
     /// Identity stamped into every WAL FileId (the machine GUID resolved by the
     /// supervisor plus its self-generated per-process instance id; see
-    /// `bridge::config::PluginConfig::identity`).
+    /// `otel_bridge::config::PluginConfig::identity`).
     identity: Identity,
     /// Features that see accepted exports without taking part in storing
     /// them (`observer.rs`).
@@ -171,8 +171,8 @@ impl NetdataTracesService {
     pub fn new(
         sender: Arc<LedgerSender>,
         wal_base_dir: PathBuf,
-        wal_config: bridge::config::WalConfig,
-        ingest_bounds: bridge::config::IngestConfig,
+        wal_config: otel_bridge::config::WalConfig,
+        ingest_bounds: otel_bridge::config::IngestConfig,
         seq: Arc<wal::SeqAllocator>,
         clock: Arc<Mutex<MonotonicClock>>,
         auth: AuthConfig,
@@ -520,7 +520,7 @@ mod tests {
         // ng-flatten's bounds tests and the out-of-window export tests below.
         test_service_with_ingest(
             wal_dir,
-            bridge::config::IngestConfig {
+            otel_bridge::config::IngestConfig {
                 max_age: std::time::Duration::from_secs(u64::MAX),
                 future_skew: std::time::Duration::from_secs(u64::MAX),
             },
@@ -529,7 +529,7 @@ mod tests {
 
     fn test_service_with_ingest(
         wal_dir: std::path::PathBuf,
-        ingest: bridge::config::IngestConfig,
+        ingest: otel_bridge::config::IngestConfig,
     ) -> NetdataTracesService {
         let socket = format!(
             "/tmp/netdata-traces-ingestor-test-{}.sock",
@@ -540,17 +540,17 @@ mod tests {
         let mut rotation = HashMap::new();
         rotation.insert(
             "default".to_string(),
-            bridge::config::RotationEntry {
+            otel_bridge::config::RotationEntry {
                 max_file_size: Some(bytesize::ByteSize::mb(64)),
                 max_entries: Some(100_000),
                 max_file_duration: Some(std::time::Duration::from_secs(3600)),
             },
         );
-        let wal_config = bridge::config::WalConfig {
+        let wal_config = otel_bridge::config::WalConfig {
             dir: wal_dir.clone(),
             crc_enabled: true,
             compression_enabled: true,
-            rotation: bridge::config::RotationPolicy::try_from(rotation)
+            rotation: otel_bridge::config::RotationPolicy::try_from(rotation)
                 .expect("test rotation has a complete default"),
         };
 
@@ -561,7 +561,7 @@ mod tests {
             ingest,
             Arc::new(wal::SeqAllocator::ephemeral(0)),
             Arc::new(Mutex::new(MonotonicClock::new())),
-            bridge::config::AuthConfig::default(),
+            otel_bridge::config::AuthConfig::default(),
             Identity::new(
                 MachineId::new(uuid::Uuid::from_u128(1)).unwrap(),
                 InstanceId::new(uuid::Uuid::from_u128(2)).unwrap(),
@@ -631,7 +631,7 @@ mod tests {
         // committed.
         let mut service = test_service_with_ingest(
             tmp.path().to_path_buf(),
-            bridge::config::IngestConfig {
+            otel_bridge::config::IngestConfig {
                 max_age: std::time::Duration::from_secs(60),
                 future_skew: std::time::Duration::from_secs(60),
             },
@@ -871,7 +871,7 @@ mod tests {
         // Tight window: 1h into the past, 10min into the future.
         let service = test_service_with_ingest(
             tmp.path().to_path_buf(),
-            bridge::config::IngestConfig {
+            otel_bridge::config::IngestConfig {
                 max_age: std::time::Duration::from_secs(3600),
                 future_skew: std::time::Duration::from_secs(600),
             },
@@ -928,7 +928,7 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let service = test_service_with_ingest(
             tmp.path().to_path_buf(),
-            bridge::config::IngestConfig {
+            otel_bridge::config::IngestConfig {
                 max_age: std::time::Duration::from_secs(3600),
                 future_skew: std::time::Duration::from_secs(600),
             },
@@ -969,29 +969,29 @@ mod tests {
         let mut rotation = HashMap::new();
         rotation.insert(
             "default".to_string(),
-            bridge::config::RotationEntry {
+            otel_bridge::config::RotationEntry {
                 max_file_size: Some(bytesize::ByteSize::mb(64)),
                 max_entries: Some(100_000),
                 max_file_duration: Some(std::time::Duration::ZERO),
             },
         );
-        let wal_config = bridge::config::WalConfig {
+        let wal_config = otel_bridge::config::WalConfig {
             dir: wal_dir.clone(),
             crc_enabled: true,
             compression_enabled: true,
-            rotation: bridge::config::RotationPolicy::try_from(rotation).unwrap(),
+            rotation: otel_bridge::config::RotationPolicy::try_from(rotation).unwrap(),
         };
         let service = NetdataTracesService::new(
             sender,
             wal_dir,
             wal_config,
-            bridge::config::IngestConfig {
+            otel_bridge::config::IngestConfig {
                 max_age: std::time::Duration::from_secs(u64::MAX),
                 future_skew: std::time::Duration::from_secs(u64::MAX),
             },
             Arc::new(wal::SeqAllocator::ephemeral(0)),
             Arc::new(Mutex::new(MonotonicClock::new())),
-            bridge::config::AuthConfig::default(),
+            otel_bridge::config::AuthConfig::default(),
             Identity::new(
                 MachineId::new(uuid::Uuid::from_u128(1)).unwrap(),
                 InstanceId::new(uuid::Uuid::from_u128(2)).unwrap(),

@@ -141,7 +141,7 @@ pub enum LedgerRequest {
     /// Execute a function — same fields and semantics as
     /// [`IngestorRequest::Call`]. The ledger routes by `name` to the pipeline
     /// whose handler declared it and runs the call through the
-    /// `bridge::function` engine; an undeclared `name` is answered with a
+    /// `otel_bridge::function` engine; an undeclared `name` is answered with a
     /// 404 `Result`.
     Call {
         transaction: String,
@@ -176,7 +176,7 @@ pub enum LedgerResponse {
     Result(FunctionResult),
     /// Progress update for a running function; `done`/`total` are forwarded
     /// to the agent verbatim and carry percent and a fixed denominator of
-    /// 100 (the `bridge::function` percent model), not raw work units.
+    /// 100 (the `otel_bridge::function` percent model), not raw work units.
     Progress {
         transaction: String,
         done: usize,
@@ -195,7 +195,7 @@ pub enum LegacyLogsRequest {
     Configure(LegacyLogsConfig),
     /// Execute a function — same fields and semantics as
     /// [`IngestorRequest::Call`]. The worker runs its declared function
-    /// through the `bridge::function` engine; an undeclared `name` is
+    /// through the `otel_bridge::function` engine; an undeclared `name` is
     /// answered with a 404 `Result`.
     Call {
         transaction: String,
@@ -232,7 +232,7 @@ pub enum LegacyLogsResponse {
     Result(FunctionResult),
     /// Progress update for a running function; `done`/`total` are forwarded
     /// to the agent verbatim and carry percent and a fixed denominator of
-    /// 100 (the `bridge::function` percent model), not raw work units.
+    /// 100 (the `otel_bridge::function` percent model), not raw work units.
     Progress {
         transaction: String,
         done: usize,

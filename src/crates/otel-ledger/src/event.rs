@@ -2,8 +2,8 @@
 //! single `tokio::select!` in [`crate::Ledger::run`] wakes on; its dispatch
 //! match in the same function routes each variant to a `handle_*` method.
 //! `PipelineResp` is the per-pipeline worker response `LedgerEvent` carries.
-use bridge::signals::Signal;
-use bridge::{LedgerRequest, LedgerResponse};
+use otel_bridge::signals::Signal;
+use otel_bridge::{LedgerRequest, LedgerResponse};
 
 use file_lifecycle::ipc::{
     CatalogBuilderResponse, CleanerResponse, IndexerResponse, UploaderResponse,

@@ -77,9 +77,9 @@ netdata-plugin-types = { path = "netdata-plugin/types" }
 rt = { path = "netdata-plugin/rt" }
 
 # Internal crates: OTel plugin.
-bridge = { path = "otel-bridge" }
 ferryboat = { path = "ferryboat" }
 file-lifecycle = { path = "file-lifecycle" }
+otel-bridge = { path = "otel-bridge" }
 otel-ingestor = { path = "otel-ingestor" }
 otel-ledger = { path = "otel-ledger" }
 otel-legacy-logs = { path = "otel-legacy-logs" }

@@ -22,9 +22,9 @@
 //! logs one; the registry/catalog/recovery machinery is
 //! [`super::pipeline::build_pipeline`]'s, reused unchanged.
 
-use bridge::config::LifecycleConfig;
-use bridge::function::{HandlerAdapter, RawFunctionHandler};
-use bridge::signals::Signal;
+use otel_bridge::config::LifecycleConfig;
+use otel_bridge::function::{HandlerAdapter, RawFunctionHandler};
+use otel_bridge::signals::Signal;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;

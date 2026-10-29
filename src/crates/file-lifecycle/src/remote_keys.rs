@@ -12,7 +12,7 @@
 //! segment — none is implicit, and a prefix-scoped bucket rule (retention or
 //! access) can target one signal without touching another. The substrate
 //! ascribes the segment no meaning beyond the path: each pipeline passes its
-//! own segment — sourced from `bridge::signals::Signal::segment` (the single
+//! own segment — sourced from `otel_bridge::signals::Signal::segment` (the single
 //! signal ↔ segment map) — as an opaque `&str`. The `sfst` segment is the
 //! artifact *type* (the SFST container), shared by every signal that seals
 //! into it — the `{signal}` segment, not the extension, distinguishes one

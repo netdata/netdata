@@ -7,7 +7,7 @@
 //! The crate is deliberately content-agnostic: no codec, no query engine, no
 //! signal knowledge. [`FileId::pipeline_id`] and [`FileId::part_key`] are
 //! opaque numbers here — the signal↔id mapping is the integration layer's
-//! (`bridge::signals`: logs=0, traces=1) and the content plane derives
+//! (`otel_bridge::signals`: logs=0, traces=1) and the content plane derives
 //! partition keys — so a second signal reuses the whole substrate without
 //! this crate learning its name.
 //!
@@ -105,7 +105,7 @@
 //! `file-cache` (durable) and `sfsq` (SelectedFile, FileDir/Query;
 //! `sfsq-cli` FileDir/Query only, `FileId`/`TimestampNs` in tests);
 //! `ng-ingest` and `ng-index` (value types and clock; ng-index only from
-//! tests); and `otel-plugin`/`bridge`, identity types only (the
+//! tests); and `otel-plugin`/`otel-bridge`, identity types only (the
 //! supervisor builds the per-process `Identity` for the plugin config).
 //! The crate does not depend on ferryboat and carries no IPC.
 pub mod durable;

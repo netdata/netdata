@@ -44,13 +44,13 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use bridge::function::ProgressState;
 use file_cache::CacheError;
 use file_lifecycle::chunk::ChunkCache;
 use file_lifecycle::query::{CatalogFile, RemotePlan};
 use file_lifecycle::registry::{TenantRegistries, WalDesc};
 use file_lifecycle::remote_read::RemoteRead;
 use file_registry::{FileId, TenantId};
+use otel_bridge::function::ProgressState;
 use sfsq::traces::{
     SourceId, TraceSfstCandidate, TraceSource, TraceUnavailable, TraceWalTail, WalCoverage,
 };

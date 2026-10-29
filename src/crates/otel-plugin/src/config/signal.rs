@@ -2,7 +2,7 @@
 //! global `remote_storage`/`auth` sections of otel.yaml — the shapes both
 //! override layers fill: the user YAML (parsed in `mod.rs`) and the
 //! `NETDATA_OTEL_CFG_*` environment (built in `env.rs`). The target types come
-//! from `bridge::config`, the `bridge` crate (`otel-bridge/`).
+//! from `otel_bridge::config`, the `otel-bridge` crate.
 //!
 //! Per-signal sections carry tuning only — no dirs (derived from `base_dir`) and
 //! no storage (global) — and there is no per-signal on/off. The same
@@ -16,13 +16,13 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use bridge::config::{AuthConfig, RemoteStorageConfig, RetentionEntry, SignalConfig};
 use bytesize::ByteSize;
+use otel_bridge::config::{AuthConfig, RemoteStorageConfig, RetentionEntry, SignalConfig};
 use serde::Deserialize;
 
 /// Partial form of [`SignalConfig`]. `rotation`/`retention` hold the raw
 /// per-tenant entry maps — not the validated
-/// [`bridge::config::RotationPolicy`] / [`bridge::config::RetentionPolicy`] —
+/// [`otel_bridge::config::RotationPolicy`] / [`otel_bridge::config::RetentionPolicy`] —
 /// because merging patches an already-valid policy through their
 /// `apply_overrides`: only `Some` fields replace, so the policy's `default`
 /// stays complete.
@@ -34,7 +34,7 @@ pub(super) struct SignalOverride {
     #[serde(default)]
     pub(super) compression_enabled: Option<bool>,
     #[serde(default)]
-    pub(super) rotation: Option<HashMap<String, bridge::config::RotationEntry>>,
+    pub(super) rotation: Option<HashMap<String, otel_bridge::config::RotationEntry>>,
     #[serde(default)]
     pub(super) retention: Option<HashMap<String, RetentionEntry>>,
     #[serde(default)]
@@ -51,7 +51,7 @@ pub(super) struct SignalOverride {
     pub(super) journal_dir: Option<PathBuf>,
 }
 
-/// Partial [`bridge::config::CatalogTuning`] (its dir is derived, not configured).
+/// Partial [`otel_bridge::config::CatalogTuning`] (its dir is derived, not configured).
 #[derive(Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct CatalogOverride {
@@ -61,7 +61,7 @@ pub(super) struct CatalogOverride {
     pub(super) rotation_period: Option<Duration>,
 }
 
-/// Partial [`bridge::config::IngestConfig`]: per-record ingestion time-bounds,
+/// Partial [`otel_bridge::config::IngestConfig`]: per-record ingestion time-bounds,
 /// global for the signal (not per-tenant).
 #[derive(Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -74,7 +74,7 @@ pub(super) struct IngestOverride {
 
 /// Deserialize an optional humantime `Duration` (e.g. `"24h"`, `"10m"`) from
 /// the YAML override file. The override types are never serialized — only the
-/// merged `PluginConfig` crosses the bincode IPC, via `bridge::config`'s
+/// merged `PluginConfig` crosses the bincode IPC, via `otel_bridge::config`'s
 /// duration module — so a plain humantime parse is correct here.
 fn opt_humantime<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<Duration>, D::Error> {
     match Option::<String>::deserialize(d)? {

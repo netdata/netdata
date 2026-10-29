@@ -21,7 +21,7 @@ path = "src/lib.rs"
 # in `tests/` backstops it.
 [dependencies]
 anyhow = { workspace = true }
-bridge = { workspace = true }
+otel-bridge = { workspace = true }
 chrono = { workspace = true }
 ferryboat = { workspace = true }
 file-cache = { workspace = true }

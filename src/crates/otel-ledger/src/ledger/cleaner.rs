@@ -17,8 +17,8 @@
 //! responses before this run loop starts. Responses arrive on the run-loop's
 //! `CleanerResp` arm — this is their only steady-state handler.
 
-use bridge::signals::Signal;
 use file_lifecycle::ipc::CleanerResponse;
+use otel_bridge::signals::Signal;
 
 use super::Ledger;
 

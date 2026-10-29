@@ -104,7 +104,7 @@
 //! (`Ledger`), the indexer component, and the log-content crates (`sfsq`,
 //! `otel-logs-identity`) this substrate must never see. The ingestor is not
 //! a cargo consumer — it reaches the ledger through the [`ipc`] socket
-//! above, depending on `bridge`, `ferryboat`, and `wal` instead.
+//! above, depending on `otel-bridge`, `ferryboat`, and `wal` instead.
 
 pub mod catalog_builder;
 pub mod chunk;

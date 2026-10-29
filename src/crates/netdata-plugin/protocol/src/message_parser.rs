@@ -73,7 +73,7 @@ impl Default for MessageParser {
 /// One message of the pluginsd function protocol: what the codec decodes from
 /// or serializes onto the plugin channel (the `Decoder`/`Encoder` impls in
 /// `tokio_codec`), and what producer tasks pass in-process to writer tasks in
-/// `rt`, `otel-plugin` and the bridge crates.
+/// `rt`, `otel-plugin` and `otel-bridge`.
 ///
 /// The decoder produces the agent-role subset (`FunctionCall`,
 /// `FunctionCancel`, `FunctionProgressRequest`, `Quit`) in the input

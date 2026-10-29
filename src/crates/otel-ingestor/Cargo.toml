@@ -12,7 +12,7 @@ name = "otel_ingestor"
 path = "src/lib.rs"
 
 [dependencies]
-bridge = { workspace = true }
+otel-bridge = { workspace = true }
 ferryboat = { workspace = true }
 flatten_otel = { workspace = true }
 ng-flatten = { workspace = true }

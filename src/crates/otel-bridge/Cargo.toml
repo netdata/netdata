@@ -1,5 +1,5 @@
 [package]
-name = "bridge"
+name = "otel-bridge"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

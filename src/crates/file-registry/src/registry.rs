@@ -11,7 +11,7 @@
 //! The bare `u64` seq keys an entry because a `FileId.seq` is unique within
 //! one process instance across pipelines and partitions. The registry reads
 //! only [`Sequenced::seq`]; the other `FileId` axes (machine/instance,
-//! `pipeline_id` — the `bridge::signals` signal axis — and `part_key`) ride
+//! `pipeline_id` — the `otel_bridge::signals` signal axis — and `part_key`) ride
 //! the entries' `FileId`s, which only [`FileRegistry::file_path`] touches.
 //!
 //! Concurrency is the caller's: mutators take `&mut self`, readers `&self`,

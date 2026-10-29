@@ -17,12 +17,12 @@
 //!   carrying `wal::Message`. Those wire types live in the `wal` crate;
 //!   this module owns only the accept plumbing, and the connecting side is
 //!   otel-ingestor's `LedgerSender`. The supervisor↔worker links are
-//!   `bridge`'s — its documented lib.rs records the carve-out that keeps
-//!   this socket's types here rather than in the bridge enums.
+//!   `otel-bridge`'s — its documented lib.rs records the carve-out that keeps
+//!   this socket's types here rather than in the `otel-bridge` enums.
 //!
 //! The WAL-event link runs at ferryboat's 8 MiB default size limit with no
 //! compression: neither end sets an override, so
-//! `bridge::IPC_MAX_MESSAGE_SIZE` (the supervisor↔worker ceiling) does not
+//! `otel_bridge::IPC_MAX_MESSAGE_SIZE` (the supervisor↔worker ceiling) does not
 //! apply. Framing, size-limit enforcement and link error semantics are
 //! ferryboat's (see its documented lib.rs); what the ledger does with a
 //! received event is otel-ledger's `handle_ingestor_msg`.

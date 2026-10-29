@@ -15,16 +15,16 @@
 //! the shared time-grid derivation in [`super::super::grid`].
 //!
 //! Netdata-plugin glue only, like the logs handler: the engine
-//! ([`sfsq::traces`]) stays wire-neutral; the bridge's `HandlerAdapter`
+//! ([`sfsq::traces`]) stays wire-neutral; `otel-bridge`'s `HandlerAdapter`
 //! owns the JSON round-trip, progress ticker, and cancellation.
 
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bridge::function::{FunctionCallContext, FunctionHandler};
 use file_registry::TenantId;
 use netdata_plugin_protocol::FunctionDeclaration;
 use netdata_plugin_types::HttpAccess;
+use otel_bridge::function::{FunctionCallContext, FunctionHandler};
 use tokio::sync::RwLock;
 
 use file_lifecycle::chunk::ChunkCache;

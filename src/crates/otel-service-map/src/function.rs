@@ -8,8 +8,8 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use async_trait::async_trait;
-use bridge::function::{FunctionContext, RawFunctionHandler};
 use netdata_plugin_types::{FunctionDeclaration, FunctionResult, HttpAccess};
+use otel_bridge::function::{FunctionContext, RawFunctionHandler};
 use serde::Deserialize;
 use serde_json::{Value, json};
 

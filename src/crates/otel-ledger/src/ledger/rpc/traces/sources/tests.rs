@@ -21,7 +21,7 @@ use super::*;
 use crate::ledger::rpc::traces::fixtures::{
     TestRemote, install_sfst, install_wal, make_registries, otlp_req, test_file_id,
 };
-use bridge::function::ProgressState;
+use otel_bridge::function::ProgressState;
 
 // ── supplier and id helpers ─────────────────────────────────────────
 

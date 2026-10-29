@@ -17,13 +17,13 @@
 //! - `BadRequest` is built by the otel-ledger otel-traces handler for the
 //!   requests it rejects; `FunctionHandler` by the otel-ledger otel-logs and
 //!   otel-traces handlers for everything else; `Other` by the function engines
-//!   in `rt`/`bridge` (cancellation) and the otel-legacy-logs and
+//!   in `rt`/`otel-bridge` (cancellation) and the otel-legacy-logs and
 //!   netflow-plugin handlers. `Runtime`, `Config` and `Closed` have no
 //!   constructor in the tree.
 //!
 //! Consumers type function handlers with [`Result`]: the `FunctionHandler`
-//! traits in `rt` and `bridge`, `PluginRuntime::run`, and the otel-ledger,
-//! otel-legacy-logs and netflow-plugin handlers. At the boundary, `bridge`
+//! traits in `rt` and `otel-bridge`, `PluginRuntime::run`, and the otel-ledger,
+//! otel-legacy-logs and netflow-plugin handlers. At the boundary, `otel-bridge`
 //! renders `BadRequest` as an HTTP 400 result whose JSON body carries the
 //! bare message, and any other handler error as an HTTP 500 result whose JSON
 //! body carries the variant's Display text. `rt` renders every handler error,
@@ -84,7 +84,7 @@ pub enum NetdataPluginError {
     /// Built by the otel-ledger otel-traces handler when it rejects a request
     /// after deserialization (a bad chip, window or trace id, or a query that
     /// needs more remote data than the download cache holds). The message is
-    /// user-facing: `bridge` turns the error into an HTTP 400 result whose
+    /// user-facing: `otel-bridge` turns the error into an HTTP 400 result whose
     /// JSON body carries the bare message as `errorMessage`.
     #[error("bad request: {message}")]
     BadRequest { message: String },
@@ -94,7 +94,7 @@ pub enum NetdataPluginError {
     /// validation included) and the otel-traces handler (download-cache
     /// eviction and planning failures, internal source-set inconsistencies,
     /// engine rejections its own checks should have caught). Messages are
-    /// user-facing: `bridge` turns the error into an HTTP 500 result whose
+    /// user-facing: `otel-bridge` turns the error into an HTTP 500 result whose
     /// JSON body carries this Display text.
     #[error("function handler error: {message}")]
     FunctionHandler { message: String },
@@ -114,7 +114,7 @@ pub enum NetdataPluginError {
     Closed,
 
     /// Anything without a dedicated variant, displayed as the bare message.
-    /// Built by the function engines in `rt` and `bridge` when a handler is
+    /// Built by the function engines in `rt` and `otel-bridge` when a handler is
     /// cancelled (`"Function cancelled"`), and by the otel-legacy-logs and
     /// netflow-plugin handlers for their stage failures; legacy-logs prefixes
     /// each message with the transaction id.

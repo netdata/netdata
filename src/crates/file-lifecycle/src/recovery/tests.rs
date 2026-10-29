@@ -543,7 +543,7 @@ fn validate_catalog_rejection_arm_priority() {
 /// cancellation token, then cancel the token to stop the cleaner.
 async fn run_recover_retention(
     registry: &mut Registry,
-    retention: &bridge::config::RetentionConfig,
+    retention: &otel_bridge::config::RetentionConfig,
     storage_enabled: bool,
 ) {
     use crate::cleaner::Cleaner;
@@ -560,8 +560,8 @@ async fn run_recover_retention(
 
 /// Retention whose `max_files: 0` makes every tracked file evictable; the
 /// size/age knobs are set so they do not fire.
-fn evict_all_retention() -> bridge::config::RetentionConfig {
-    bridge::config::RetentionConfig {
+fn evict_all_retention() -> otel_bridge::config::RetentionConfig {
+    otel_bridge::config::RetentionConfig {
         max_files: 0,
         max_total_size: bytesize::ByteSize::b(u64::MAX),
         max_age: std::time::Duration::from_secs(u64::MAX / 2),
@@ -914,7 +914,7 @@ async fn reconcile_confirms_old_catalog_of_still_local_sfst_so_it_can_evict() {
     );
 
     // Realistic production shape: horizon (2y) >> max_age (7d).
-    let retention = bridge::config::RetentionConfig {
+    let retention = otel_bridge::config::RetentionConfig {
         max_files: 100,
         max_total_size: bytesize::ByteSize::b(u64::MAX),
         max_age: std::time::Duration::from_secs(7 * 86_400),
@@ -1127,8 +1127,8 @@ async fn reconcile_local_catalog_uploads_confirms_present_via_mock() {
 /// single-day tests focused on one prefix. (`reconcile_remote_uploads` bounds
 /// its LIST window by the horizon-derived `catalog_retention_days`, clamped by
 /// `ingest.reconcile_days`.)
-fn today_window_retention() -> bridge::config::RetentionConfig {
-    bridge::config::RetentionConfig {
+fn today_window_retention() -> otel_bridge::config::RetentionConfig {
+    otel_bridge::config::RetentionConfig {
         max_files: 100,
         max_total_size: bytesize::ByteSize::b(u64::MAX),
         max_age: std::time::Duration::from_secs(0),
@@ -1193,7 +1193,7 @@ async fn reconcile_remote_uploads_marks_uploaded_and_enqueues_add_entry() {
         &storage,
         &TenantId::from("tenant1"),
         &today_window_retention(),
-        &bridge::config::IngestConfig::default(),
+        &otel_bridge::config::IngestConfig::default(),
     )
     .await
     .unwrap();
@@ -1235,7 +1235,7 @@ async fn reconcile_remote_uploads_skips_already_rotated() {
         &storage,
         &TenantId::from("tenant1"),
         &today_window_retention(),
-        &bridge::config::IngestConfig::default(),
+        &otel_bridge::config::IngestConfig::default(),
     )
     .await
     .unwrap();
@@ -1274,7 +1274,7 @@ async fn reconcile_remote_uploads_skips_when_local_sfst_missing() {
         &storage,
         &TenantId::from("tenant1"),
         &today_window_retention(),
-        &bridge::config::IngestConfig::default(),
+        &otel_bridge::config::IngestConfig::default(),
     )
     .await
     .unwrap();
@@ -1315,7 +1315,7 @@ async fn reconcile_remote_uploads_propagates_list_error() {
         &storage,
         &TenantId::from("tenant1"),
         &today_window_retention(),
-        &bridge::config::IngestConfig::default(),
+        &otel_bridge::config::IngestConfig::default(),
     )
     .await;
 
@@ -1359,7 +1359,7 @@ async fn reconcile_remote_uploads_skips_unparseable_key() {
         &storage,
         &TenantId::from("tenant1"),
         &today_window_retention(),
-        &bridge::config::IngestConfig::default(),
+        &otel_bridge::config::IngestConfig::default(),
     )
     .await
     .unwrap();
@@ -1670,7 +1670,7 @@ async fn reconcile_remote_does_not_falsely_mark_local_sfst_at_reused_seq() {
         &storage,
         &TenantId::from("tenant1"),
         &today_window_retention(),
-        &bridge::config::IngestConfig::default(),
+        &otel_bridge::config::IngestConfig::default(),
     )
     .await
     .unwrap();
@@ -1719,7 +1719,7 @@ async fn reconcile_remote_ignores_foreign_machine_objects() {
         &storage,
         &TenantId::from("tenant1"),
         &today_window_retention(),
-        &bridge::config::IngestConfig::default(),
+        &otel_bridge::config::IngestConfig::default(),
     )
     .await
     .unwrap();
@@ -1770,7 +1770,7 @@ async fn reconcile_remote_splice_guard_rejects_identity_mismatch() {
         &storage,
         &TenantId::from("tenant1"),
         &today_window_retention(),
-        &bridge::config::IngestConfig::default(),
+        &otel_bridge::config::IngestConfig::default(),
     )
     .await
     .unwrap();

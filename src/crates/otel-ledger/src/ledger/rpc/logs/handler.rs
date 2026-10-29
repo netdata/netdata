@@ -18,10 +18,10 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bridge::function::{FunctionCallContext, FunctionHandler};
 use file_registry::TenantId;
 use netdata_plugin_protocol::FunctionDeclaration;
 use netdata_plugin_types::HttpAccess;
+use otel_bridge::function::{FunctionCallContext, FunctionHandler};
 use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
 
