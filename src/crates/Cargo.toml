@@ -3,9 +3,11 @@ resolver = "2"
 exclude = ["jf"]
 members = [
     # Shared Rust plugin SDK: the pluginsd protocol, the plugin runtime, the
-    # config-form schema and the value types any Netdata Rust plugin builds on.
+    # config-form schema, derived-metrics charts and the value types any Netdata
+    # Rust plugin builds on.
     "netdata-plugin/charts-derive",
     "netdata-plugin/error",
+    "netdata-plugin/metrics",
     "netdata-plugin/protocol",
     "netdata-plugin/rt",
     "netdata-plugin/schema",
@@ -69,6 +71,7 @@ collapsible_if = "allow"
 # Internal crates: shared Rust plugin SDK.
 netdata-plugin-charts-derive = { path = "netdata-plugin/charts-derive" }
 netdata-plugin-error = { path = "netdata-plugin/error" }
+netdata-plugin-metrics = { path = "netdata-plugin/metrics" }
 netdata-plugin-protocol = { path = "netdata-plugin/protocol" }
 netdata-plugin-rt = { path = "netdata-plugin/rt" }
 netdata-plugin-schema = { path = "netdata-plugin/schema" }

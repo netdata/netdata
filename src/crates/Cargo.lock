@@ -3011,6 +3011,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "netdata-plugin-metrics"
+version = "0.1.3"
+dependencies = [
+ "netdata-plugin-protocol",
+]
+
+[[package]]
 name = "netdata-plugin-protocol"
 version = "0.1.3"
 dependencies = [
