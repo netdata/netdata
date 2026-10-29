@@ -103,6 +103,8 @@ set at the end.
 | L5/statistics-raw-sum-count | raw group view statistics preserve the exact accumulated sum and contributor count for Cloud merging | n/a | #23097 |
 | L5/gap-only-db-average-is-null | a dimension whose selected database points are all gaps reports null min/avg/max database statistics, not a numeric zero average that falsely represents observed data | n/a |  |
 | L5/anomaly-statistics | jsonwrap-v2 per-dimension anomaly arrays: view.dimensions.sts.arp = mean of the plotted rows' anomaly rates, db.dimensions.sts.arp = anomaly rate of the fetched db points; stored NAN gap points are excluded from BOTH counts | n/a |  |
+| L5/anomaly-statistics-percentage | options=percentage changes the plotted values only: view.dimensions.sts.arp stays the mean of the plotted rows' anomaly rates | n/a |  |
+| L5/summary-node-duration | jsonwrap-v2 summary.nodes[].st.ms reports every queried node's query time, the last (or only) node included: present, positive and within timings.total_ms | n/a |  |
 | L5/multi-key-group-by | multi-key group_by: groups are attribute TUPLES, ids join in the FIXED engine order (dimension, instance, label, node, context, units) regardless of request order; instance drops @node when node is in the mask; selected and percentage-of-instance collapse rules; avg alias; unknown aggregation silently parses to average | n/a |  |
 | L6/two-pass-grouping | two-pass grouping partitions pass 1 by the union of both requested keys and returns exactly the fixture-derived final groups across all tested key chains | n/a |  |
 | L6/two-pass-grid | every two-pass matrix query returns all 60 expected rows on the exact t0+1 through t0+60 grid | n/a |  |
