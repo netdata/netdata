@@ -35,6 +35,7 @@ use opentelemetry_proto::tonic::common::v1::any_value::Value;
 use opentelemetry_proto::tonic::logs::v1::ResourceLogs;
 use otel_bridge::config::AuthConfig;
 use otel_bridge::signals::Signal;
+use otel_derived_metrics::DerivedMetrics;
 use otel_logs_identity::ServiceStream;
 use tonic::{Request, Response, Status};
 
@@ -372,6 +373,8 @@ pub struct NetdataLogsService {
     /// supervisor plus its self-generated per-process instance id; see
     /// `otel_bridge::config::PluginConfig::identity`).
     identity: Identity,
+    /// Charts the plugin derives from what it ingests (`otel-derived-metrics`).
+    derived: Option<Arc<DerivedMetrics>>,
 }
 
 impl NetdataLogsService {
@@ -397,7 +400,14 @@ impl NetdataLogsService {
             seq,
             auth,
             identity,
+            derived: None,
         }
+    }
+
+    /// Sets where export outcomes and derived metrics are recorded; only
+    /// before the service is shared.
+    pub(crate) fn set_derived_metrics(&mut self, derived: Arc<DerivedMetrics>) {
+        self.derived = Some(derived);
     }
 
     /// The tenant's effective WAL rotation config: its per-tenant override,
@@ -545,6 +555,33 @@ fn encode_identity_or_drop(
 }
 
 impl NetdataLogsService {
+    /// The transport-agnostic OTLP logs export entry point: runs
+    /// [`Self::export_logs_core`] and counts its outcome (records stored and
+    /// records rejected) for self-monitoring. A failed export counts nothing:
+    /// the sender retries it.
+    pub(crate) async fn export_logs(
+        &self,
+        tenant_id: &TenantId,
+        request: ExportLogsServiceRequest,
+    ) -> Result<ExportLogsServiceResponse, Status> {
+        let records: u64 = request
+            .resource_logs
+            .iter()
+            .map(|rl| count_log_records(rl) as u64)
+            .sum();
+        let result = self.export_logs_core(tenant_id, request).await;
+        if let (Some(derived), Ok(response)) = (&self.derived, &result) {
+            if records > 0 {
+                let rejected = response
+                    .partial_success
+                    .as_ref()
+                    .map_or(0, |p| u64::try_from(p.rejected_log_records).unwrap_or(0));
+                derived.record_ingest(Signal::Logs, records.saturating_sub(rejected), rejected);
+            }
+        }
+        result
+    }
+
     /// The transport-agnostic OTLP logs export core: everything between
     /// "tenant resolved, request decoded" and the response. The gRPC
     /// `LogsService::export` wrapper resolves the tenant from tonic
@@ -553,7 +590,7 @@ impl NetdataLogsService {
     /// transports. The caller owns transport concerns (metadata/headers,
     /// request decoding, response framing); this core owns every rejection,
     /// ordering, and durability decision.
-    pub(crate) async fn export_logs(
+    async fn export_logs_core(
         &self,
         tenant_id: &TenantId,
         request: ExportLogsServiceRequest,

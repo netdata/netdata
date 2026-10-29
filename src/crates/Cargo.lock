@@ -3682,6 +3682,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "otel-derived-metrics"
+version = "0.1.3"
+dependencies = [
+ "netdata-plugin-metrics",
+ "netdata-plugin-protocol",
+ "otel-bridge",
+]
+
+[[package]]
 name = "otel-ingestor"
 version = "0.1.3"
 dependencies = [
@@ -3699,6 +3708,7 @@ dependencies = [
  "opentelemetry-proto",
  "otel-bridge",
  "otel-catalog",
+ "otel-derived-metrics",
  "otel-logs-identity",
  "otel-service-map",
  "prost",

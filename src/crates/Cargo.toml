@@ -17,6 +17,7 @@ members = [
     "ferryboat",
     "file-lifecycle",
     "otel-bridge",
+    "otel-derived-metrics",
     "otel-ingestor",
     "otel-ledger",
     "otel-legacy-logs",
@@ -81,6 +82,7 @@ netdata-plugin-types = { path = "netdata-plugin/types" }
 ferryboat = { path = "ferryboat" }
 file-lifecycle = { path = "file-lifecycle" }
 otel-bridge = { path = "otel-bridge" }
+otel-derived-metrics = { path = "otel-derived-metrics" }
 otel-ingestor = { path = "otel-ingestor" }
 otel-ledger = { path = "otel-ledger" }
 otel-legacy-logs = { path = "otel-legacy-logs" }

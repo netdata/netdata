@@ -55,6 +55,7 @@ use crate::observer::TraceObserver;
 use crate::tenant::extract_tenant_id;
 use otel_bridge::config::AuthConfig;
 use otel_bridge::signals::Signal;
+use otel_derived_metrics::DerivedMetrics;
 use otel_logs_identity::ServiceStream;
 
 /// Total spans across a request's resource/scope spans.
@@ -164,6 +165,8 @@ pub struct NetdataTracesService {
     /// Features that see accepted exports without taking part in storing
     /// them (`observer.rs`).
     observers: Vec<Arc<dyn TraceObserver>>,
+    /// Charts the plugin derives from what it ingests (`otel-derived-metrics`).
+    derived: Option<Arc<DerivedMetrics>>,
 }
 
 impl NetdataTracesService {
@@ -189,12 +192,19 @@ impl NetdataTracesService {
             auth,
             identity,
             observers: Vec::new(),
+            derived: None,
         }
     }
 
     /// Adds an observer; only before the service is shared.
     pub(crate) fn add_observer(&mut self, observer: Arc<dyn TraceObserver>) {
         self.observers.push(observer);
+    }
+
+    /// Sets where export outcomes and derived metrics are recorded; only
+    /// before the service is shared.
+    pub(crate) fn set_derived_metrics(&mut self, derived: Arc<DerivedMetrics>) {
+        self.derived = Some(derived);
     }
 
     /// The tenant's effective WAL rotation config: its per-tenant override,
@@ -293,6 +303,29 @@ impl NetdataTracesService {
 }
 
 impl NetdataTracesService {
+    /// The transport-agnostic OTLP traces export entry point: runs
+    /// [`Self::export_traces_core`] and counts its outcome (spans stored and
+    /// spans rejected) for self-monitoring. A failed export counts nothing:
+    /// the sender retries it.
+    pub(crate) async fn export_traces(
+        &self,
+        tenant_id: &TenantId,
+        request: ExportTraceServiceRequest,
+    ) -> Result<ExportTraceServiceResponse, Status> {
+        let spans = count_spans(&request) as u64;
+        let result = self.export_traces_core(tenant_id, request).await;
+        if let (Some(derived), Ok(response)) = (&self.derived, &result) {
+            if spans > 0 {
+                let rejected = response
+                    .partial_success
+                    .as_ref()
+                    .map_or(0, |p| u64::try_from(p.rejected_spans).unwrap_or(0));
+                derived.record_ingest(Signal::Traces, spans.saturating_sub(rejected), rejected);
+            }
+        }
+        result
+    }
+
     /// The transport-agnostic OTLP traces export core: everything between
     /// "tenant resolved, request decoded" and the response. The gRPC
     /// `TraceService::export` wrapper resolves the tenant from tonic
@@ -301,7 +334,7 @@ impl NetdataTracesService {
     /// transports. The caller owns transport concerns (metadata/headers,
     /// request decoding, response framing); this core owns every rejection,
     /// ordering, and durability decision.
-    pub(crate) async fn export_traces(
+    async fn export_traces_core(
         &self,
         tenant_id: &TenantId,
         request: ExportTraceServiceRequest,

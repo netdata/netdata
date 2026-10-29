@@ -191,6 +191,18 @@ modules:
                 This limits a single request's cardinality burst. It does not cap the total number of charts that successive requests can create.
               default_value: 100
               required: false
+            - name: derived_metrics.enabled
+              description: Make charts from the received logs and traces.
+              detailed_description: |
+                For each service, the plugin makes charts of requests, failed requests and request durations from traces, and charts of log records by severity from logs.
+              default_value: true
+              required: false
+            - name: derived_metrics.max_services
+              description: Maximum number of services with their own charts, for traces and for logs separately.
+              detailed_description: |
+                The records of more services go to one shared overflow chart set. When a service sends no data for 15 minutes, its charts are removed and its place becomes free.
+              default_value: 500
+              required: false
             - name: base_dir
               description: Absolute root directory for locally stored OpenTelemetry logs and traces.
               detailed_description: |
@@ -391,10 +403,30 @@ modules:
         enabled: false
       description: |
         Metrics are created dynamically from supported OpenTelemetry data. The exact charts depend on the received metric names, attributes, instrumentation scopes, and mapping rules.
+
+        The plugin also makes charts about the data it receives.
       availability: []
       dynamic_context_prefixes:
         - prefix: otel.
           reason: >-
             Chart contexts are generated at runtime from the received OpenTelemetry metric names as
             otel.<metric name>.
-      scopes: []
+      scopes:
+        - name: global
+          description: These metrics show the logs and traces the plugin receives.
+          labels: []
+          metrics:
+            - name: netdata.otel.spans
+              description: Spans received, stored or rejected (outside the accepted time window).
+              unit: spans/s
+              chart_type: stacked
+              dimensions:
+                - name: accepted
+                - name: rejected
+            - name: netdata.otel.log_records
+              description: Log records received, stored or rejected (outside the accepted time window, or not storable).
+              unit: records/s
+              chart_type: stacked
+              dimensions:
+                - name: accepted
+                - name: rejected

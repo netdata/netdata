@@ -91,6 +91,22 @@ metrics:
   # is not capped by this.
   max_new_charts_per_request: 100
 
+# Charts that the plugin makes from the logs and traces it receives:
+#   - for each service, from traces: requests per second, failed requests
+#     per second, and request durations;
+#   - for each service, from logs: log records per second, by severity.
+# A service is the service.namespace and service.name resource attributes,
+# kept apart by tenant and deployment environment.
+derived_metrics:
+  # Set to false to stop these charts.
+  enabled: true
+
+  # Maximum number of services that get their own charts, for traces and for
+  # logs separately. The records of more services go to one shared overflow
+  # chart set. When a service sends no data for 15 minutes, its charts are
+  # removed and its place becomes free.
+  max_services: 500
+
 # Root directory for stored OpenTelemetry logs and traces. Must be an
 # absolute path. Logs and traces each get their own subdirectory (for
 # example .../logs and .../traces).

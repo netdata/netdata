@@ -3,7 +3,7 @@
 //!
 //! Names mirror the YAML keys: the dotted path upper-cased with `.` → `_`
 //! under `NETDATA_OTEL_CFG_` for the global sections (`RECEIVERS_OTLP_PROTOCOLS_`,
-//! `METRICS_`, `BASE_DIR`, `REMOTE_STORAGE_`, `AUTH_`) and `NETDATA_OTEL_CFG_{LOGS|TRACES}_{FIELD}` for per-signal
+//! `METRICS_`, `DERIVED_METRICS_`, `BASE_DIR`, `REMOTE_STORAGE_`, `AUTH_`) and `NETDATA_OTEL_CFG_{LOGS|TRACES}_{FIELD}` for per-signal
 //! tuning. Values parse like the YAML layer's overrides: integers and byte
 //! sizes (`"2GiB"`) via `FromStr`, durations (`"2 hours"`) via `humantime`.
 //!
@@ -25,6 +25,7 @@ use std::time::Duration;
 use anyhow::Result;
 
 use super::ConfigOverride;
+use super::derived_metrics::DerivedMetricsOverride;
 use super::metrics::MetricsOverride;
 use super::receivers::{
     DEPRECATED_ENDPOINT_KEYS, ProtocolOverride, ReceiversOverride, TlsOverride, resolve_deprecated,
@@ -207,6 +208,7 @@ impl ConfigOverride {
         let env = &EnvReader::new(env);
         let receivers = receivers_from_map(env)?;
         let metrics = MetricsOverride::from_map(env)?;
+        let derived_metrics = DerivedMetricsOverride::from_map(env)?;
         let base_dir = get_env(env, "NETDATA_OTEL_CFG_BASE_DIR")?.map(PathBuf::from);
         let remote_storage = RemoteStorageOverride::from_map(env)?;
         let auth = AuthOverride::from_map(env)?;
@@ -220,6 +222,11 @@ impl ConfigOverride {
             endpoint: None,
             metrics: if metrics.has_any() {
                 Some(metrics)
+            } else {
+                None
+            },
+            derived_metrics: if derived_metrics.has_any() {
+                Some(derived_metrics)
             } else {
                 None
             },
@@ -272,6 +279,15 @@ impl MetricsOverride {
                 env,
                 "NETDATA_OTEL_CFG_METRICS_MAX_NEW_CHARTS_PER_REQUEST",
             )?,
+        })
+    }
+}
+
+impl DerivedMetricsOverride {
+    fn from_map(env: &EnvReader<'_>) -> Result<Self> {
+        Ok(Self {
+            enabled: parse_env_bool(env, "NETDATA_OTEL_CFG_DERIVED_METRICS_ENABLED")?,
+            max_services: parse_env_var(env, "NETDATA_OTEL_CFG_DERIVED_METRICS_MAX_SERVICES")?,
         })
     }
 }

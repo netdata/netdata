@@ -50,6 +50,7 @@ use otel_bridge::driver::{CallDriver, CallResponse, oversized_result};
 use otel_bridge::function::RawFunctionHandler;
 use otel_bridge::signals::Signal;
 use otel_bridge::{IngestorRequest, IngestorResponse};
+use otel_derived_metrics::DerivedMetrics;
 use tokio::sync::RwLock;
 use tonic::transport::server::TcpIncoming;
 use tonic::transport::{Identity, Server, ServerTlsConfig};
@@ -169,12 +170,19 @@ async fn run_ingestor(
         config.metrics.max_new_charts_per_request,
     ));
 
+    // Charts derived from ingested logs and traces, plus the plugin's own
+    // ingest outcomes. The export services record into it; the tick loop
+    // renders it. Its stores have their own locks, apart from the
+    // ChartManager's.
+    let derived = Arc::new(DerivedMetrics::new(&config.derived_metrics));
+
     // Channel for tick loop → main loop chart data forwarding
     let (chart_tx, mut chart_rx) = tokio::sync::mpsc::channel::<Vec<u8>>(64);
 
     // Tick loop: wakes on each second boundary and emits the chart data for
     // that slot.
     let tick_chart_manager = Arc::clone(&chart_manager);
+    let tick_derived = Arc::clone(&derived);
     let tick_handle = tokio::spawn(async move {
         let mut buf = String::new();
 
@@ -202,6 +210,19 @@ async fn run_ingestor(
                     break;
                 }
             }
+            // Derived charts come as whole-chart chunks under
+            // `otel_derived_metrics::MAX_CHUNK_BYTES`, so every send stays
+            // under the IPC frame limit.
+            let mut closed = false;
+            for chunk in tick_derived.emit(slot_timestamp) {
+                if chart_tx.send(chunk).await.is_err() {
+                    closed = true;
+                    break;
+                }
+            }
+            if closed {
+                break;
+            }
 
             // Sleep until the next second boundary.
             let elapsed = SystemTime::now()
@@ -228,14 +249,16 @@ async fn run_ingestor(
     let identity = config
         .identity
         .context("plugin config reached the ingestor without a resolved identity")?;
-    let logs_service = Arc::new(create_logs_service(
+    let mut logs_service = create_logs_service(
         &logs_lifecycle,
         &config.auth,
         Arc::clone(&sender),
         Arc::clone(&seq),
         Arc::clone(&clock),
         identity,
-    ));
+    );
+    logs_service.set_derived_metrics(Arc::clone(&derived));
+    let logs_service = Arc::new(logs_service);
 
     let mut traces_service = create_traces_service(
         &traces_lifecycle,
@@ -248,6 +271,7 @@ async fn run_ingestor(
     // The service map sees accepted trace exports through the observer seam
     // and serves `topology:tracing`. It is optional: when it cannot start,
     // ingestion goes on without it.
+    traces_service.set_derived_metrics(Arc::clone(&derived));
     let service_map = start_service_map(&config.base_dir);
     if let Some(map) = &service_map {
         traces_service.add_observer(Arc::new(observer::ServiceMapObserver(Arc::clone(map))));

@@ -13,6 +13,7 @@ path = "src/lib.rs"
 
 [dependencies]
 otel-bridge = { workspace = true }
+otel-derived-metrics = { workspace = true }
 ferryboat = { workspace = true }
 flatten-otel = { workspace = true }
 ng-flatten = { workspace = true }
