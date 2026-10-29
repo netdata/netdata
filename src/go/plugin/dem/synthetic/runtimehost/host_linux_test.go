@@ -31,13 +31,22 @@ func testBundle(t *testing.T, version string) (runtime.Manifest, []byte) {
 		mode int64
 	}{
 		{"node", slot, 0755}, {"browser", slot, 0755}, {"loader", []byte("loader"), 0755},
-		{"dependencies/package.json", []byte("{}"), 0644}, {"runner/run.mjs", []byte(version), 0644}, {"fonts/font", []byte("font"), 0644},
+		{
+			"dependencies/package.json",
+			[]byte("{}"),
+			0644,
+		}, {"runner/run.mjs", []byte(version), 0644}, {"fonts/font", []byte("font"), 0644},
 	}
 	var raw, compressed bytes.Buffer
 	tw := tar.NewWriter(&raw)
 	var expanded int64
 	for _, f := range files {
-		require.NoError(t, tw.WriteHeader(&tar.Header{Name: f.name, Mode: f.mode, Size: int64(len(f.data)), Typeflag: tar.TypeReg}))
+		require.NoError(t, tw.WriteHeader(&tar.Header{
+			Name:     f.name,
+			Mode:     f.mode,
+			Size:     int64(len(f.data)),
+			Typeflag: tar.TypeReg,
+		}))
 		_, err := tw.Write(f.data)
 		require.NoError(t, err)
 		expanded += int64(len(f.data))
@@ -47,10 +56,28 @@ func testBundle(t *testing.T, version string) (runtime.Manifest, []byte) {
 	_, err := gz.Write(raw.Bytes())
 	require.NoError(t, err)
 	require.NoError(t, gz.Close())
-	m := runtime.Manifest{Format: 1, Contract: 1, Version: version, Platform: "linux/" + goruntime.GOARCH,
-		Archive:  runtime.Archive{SHA256: fmt.Sprintf("%x", sha256.Sum256(compressed.Bytes())), Bytes: int64(compressed.Len()), TarBytes: int64(raw.Len()), ExpandedBytes: expanded, Entries: len(files)},
-		Layout:   runtime.Layout{EntryPoint: "runner/run.mjs", Node: "node", Browser: "browser", Loader: "loader", Dependencies: "dependencies", Fonts: "fonts"},
-		Bindings: []runtime.Binding{{Path: "node", Expected: slot}, {Path: "browser", Expected: slot}}}
+	m := runtime.Manifest{
+		Format:   1,
+		Contract: 1,
+		Version:  version,
+		Platform: "linux/" + goruntime.GOARCH,
+		Archive: runtime.Archive{
+			SHA256:        fmt.Sprintf("%x", sha256.Sum256(compressed.Bytes())),
+			Bytes:         int64(compressed.Len()),
+			TarBytes:      int64(raw.Len()),
+			ExpandedBytes: expanded,
+			Entries:       len(files),
+		},
+		Layout: runtime.Layout{
+			EntryPoint:   "runner/run.mjs",
+			Node:         "node",
+			Browser:      "browser",
+			Loader:       "loader",
+			Dependencies: "dependencies",
+			Fonts:        "fonts",
+		},
+		Bindings: []runtime.Binding{{Path: "node", Expected: slot}, {Path: "browser", Expected: slot}},
+	}
 	require.NoError(t, m.Validate())
 	return m, compressed.Bytes()
 }
@@ -81,7 +108,9 @@ func installBundle(t *testing.T, store *runtime.Store, version string) runtime.M
 
 func newTestHost(t *testing.T, store *runtime.Store) *Host {
 	t.Helper()
-	host := New(Config{Store: store})
+	host := New(Config{
+		Store: store,
+	})
 	t.Cleanup(func() { require.NoError(t, host.Close()) })
 	return host
 }
@@ -159,6 +188,24 @@ func TestSelectedInstallationSurvivesMaintenanceWithoutBrowserJobs(t *testing.T)
 	require.NoError(t, err)
 	require.Equal(t, manifest.Archive.SHA256, consumer.Manifest().Archive.SHA256)
 	require.NoError(t, consumer.Close())
+}
+
+func TestLostSelectedGenerationRequiresRepairRatherThanInstall(t *testing.T) {
+	store := testStore(t)
+	installBundle(t, store, "installed")
+	consumer, err := store.AcquireSelected()
+	require.NoError(t, err)
+	use, err := consumer.BeginUse()
+	require.NoError(t, err)
+	generation := filepath.Dir(use.Paths.Node)
+	require.NoError(t, use.Finish(true))
+	require.NoError(t, consumer.Close())
+	require.NoError(t, os.Rename(generation, filepath.Join(t.TempDir(), "lost")))
+	host := newTestHost(t, store)
+	require.ErrorIs(t, host.Ready(), runtime.ErrDamaged)
+	require.NotErrorIs(t, host.Ready(), runtime.ErrUnavailable)
+	require.Equal(t, StateUnavailable, host.Status().State)
+	require.Contains(t, host.Status().SetupError, "runtime repair")
 }
 
 func TestUncertainExecutionOutlivesHost(t *testing.T) {

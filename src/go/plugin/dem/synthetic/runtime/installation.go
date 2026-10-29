@@ -38,13 +38,18 @@ func (s *Store) selectedLocked(reconcile bool) (*Manifest, error) {
 		}
 	}
 	m, err := s.readSelection()
-	if err != nil || m == nil {
-		return m, err
-	}
-	if _, err := s.prepared(*m); err != nil {
+	if err == nil && m != nil {
+		_, err = s.prepared(*m)
 		if errors.Is(err, ErrUnavailable) {
 			err = damagedMetadata("selection.json", err)
 		}
+	}
+	if isMetadataDamage(err) {
+		// A declared but unusable selection needs repair, not an ordinary
+		// first installation. Do not expose ErrUnavailable through this error.
+		return nil, fmt.Errorf("%w: %v", ErrDamaged, err)
+	}
+	if err != nil {
 		return nil, err
 	}
 	return m, nil
@@ -53,7 +58,9 @@ func (s *Store) selectedLocked(reconcile bool) (*Manifest, error) {
 func (s *Store) readSelection() (*Manifest, error) {
 	// Only an explicit null means uninstalled. Missing fields or a missing
 	// record must not silently discard an installed release's protection.
-	record := selection{Manifest: &Manifest{}}
+	record := selection{
+		Manifest: &Manifest{},
+	}
 	if err := readJSON(s.root, "selection.json", &record); errors.Is(err, os.ErrNotExist) {
 		return nil, damagedMetadata("selection.json", err)
 	} else if err != nil {

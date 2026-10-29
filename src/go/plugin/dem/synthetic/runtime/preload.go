@@ -28,7 +28,9 @@ func (c *Candidate) SealPreload() error {
 		if err != nil {
 			return err
 		}
-		if len(inv.generations) != 1 || len(inv.processes) > 0 || len(inv.uses) > 0 || len(inv.reservations) > 0 || len(inv.candidates) != 1 || inv.candidates[c.manifest.Archive.SHA256] != 1 {
+		if len(inv.generations) != 1 || len(inv.processes) > 0 || len(inv.uses) > 0 || len(inv.reservations) > 0 ||
+			len(inv.candidates) != 1 ||
+			inv.candidates[c.manifest.Archive.SHA256] != 1 {
 			return ErrInUse
 		}
 		if _, err := c.store.prepared(c.manifest); err != nil {
@@ -40,7 +42,10 @@ func (c *Candidate) SealPreload() error {
 		// Publication can fail after rename. Close must not mutate a sealed root.
 		c.closed = true
 		c.sealed = true
-		return saveJSON(c.store.root, "preload.json", preloadRecord{Manifest: c.manifest, Path: c.store.path})
+		return saveJSON(c.store.root, "preload.json", preloadRecord{
+			Manifest: c.manifest,
+			Path:     c.store.path,
+		})
 	})
 }
 
@@ -67,6 +72,9 @@ func ReadPreload(path string) (Paths, Manifest, error) {
 		return Paths{}, empty, err
 	}
 	defer root.Close()
+	if err := validateReadyStore(root, path); err != nil {
+		return Paths{}, empty, err
+	}
 	var record preloadRecord
 	if err := readJSON(root, "preload.json", &record); err != nil {
 		return Paths{}, empty, err

@@ -328,7 +328,7 @@ What makes this layer predictable:
 |---|---|---|---|---|
 | Investigation journal | `${NETDATA_LIB_DIR}/dem/journal` | 30 days, 1 GiB | RUM investigation entries and synthetic run records | Retention worker, at startup and hourly |
 | Captures | `${NETDATA_LIB_DIR}/dem/artifacts` | 7 days, 2 GiB | Screenshots and HTML reports, one set per run | Retention worker, at startup and hourly |
-| Browser runtime store | `${NETDATA_LIB_DIR}/dem/runtime` | 4 GiB; selected release retained until uninstall/replacement; 7-day soft grace for newest unprotected obsolete release | Complete browser runtimes and preparation workspace | Runtime host worker, at startup and hourly; explicit installer |
+| Browser runtime store | `${NETDATA_LIB_DIR}/dem/runtime` | 4 GiB; selected release retained until uninstall/replacement; 7-day soft grace for most recently used unprotected obsolete release | Complete browser runtimes and preparation workspace | Runtime host worker, at startup and hourly; explicit installer |
 | In-memory site state | Memory | Measurements: per-site `window` (5 minutes by default); investigation context: bounded session and entry counts | Rolling populations, live feed, investigation context | The site job; lost on restart |
 
 - The journal and capture budgets live in `dem.conf`. The retention worker reloads them before each sweep, so valid
@@ -956,11 +956,13 @@ Fixed startup selection (`synthetic/runtimehost`):
 
 Explicit installation and protection (`synthetic/runtime`):
 
-- Fresh/empty stores publish a complete private layout atomically, including an explicit uninstalled selection.
-  Reopening validates existing safety namespaces/locks and reconciles ancestor-directory durability; it never recreates
-  missing ownership structure in a nonempty store. A missing selection record or field is damage, not an uninstall.
-- Interrupted bootstrap can leave a small unpublished sibling directory containing only initial metadata, never payloads.
-  Published store roots and lock identities are preserved after uncertain publication.
+- Fresh/empty stores publish an initialization record, complete the private layout under coordination, then durably mark
+  it ready before admission. Interrupted initialization is retryable; ready stores never recreate missing safety
+  namespaces or locks. A missing selection record or field is damage, not an uninstall.
+- Precreated roots, including mountpoints, initialize in place without requiring parent write access. Creating an absent
+  path stages its missing suffix and records the parent durability barrier for the next opener to reconcile. Interrupted
+  publication can leave a small unpublished sibling containing only initial metadata, never payloads. Published roots
+  and lock identities are preserved. Preload readers require ready state without modifying it.
 - Administrator commands hold candidate protection and serialize installation, update, repair and uninstall.
   Install/update/repair verify and prepare the trusted archive, qualify both a sandboxed journey and Lighthouse,
   then publish the selection.

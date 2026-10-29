@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -25,12 +26,20 @@ func damageRuntime(t *testing.T, s *Store, old, selected Manifest, damage string
 		return
 	case "mismatched-selection":
 		selected.Version = "different-version"
-		data, err := json.Marshal(selection{Manifest: &selected})
+		data, err := json.Marshal(selection{
+			Manifest: &selected,
+		})
 		require.NoError(t, err)
 		require.NoError(t, os.WriteFile(filepath.Join(s.path, name), data, 0600))
 		return
 	case "missing-selected":
-		require.NoError(t, os.Rename(filepath.Join(s.path, "generations", selected.Archive.SHA256), filepath.Join(t.TempDir(), "lost")))
+		require.NoError(
+			t,
+			os.Rename(
+				filepath.Join(s.path, "generations", selected.Archive.SHA256),
+				filepath.Join(t.TempDir(), "lost"),
+			),
+		)
 		return
 	case "missing-prepared", "invalid-prepared", "invalid-prepared-fields":
 		name = filepath.Join("generations", selected.Archive.SHA256, "prepared.json")
@@ -61,7 +70,22 @@ func damageRuntime(t *testing.T, s *Store, old, selected Manifest, damage string
 	require.NoError(t, os.WriteFile(filepath.Join(s.path, name), []byte(content), 0600))
 }
 
-var metadataDamageCases = []string{"malformed-selection", "missing-selection", "missing-selection-field", "null-selection-record", "empty-selection", "trailing-selection", "invalid-selection", "unknown-selection-field", "mismatched-selection", "missing-selected", "missing-prepared", "invalid-prepared", "invalid-prepared-fields", "invalid-unselected"}
+var metadataDamageCases = []string{
+	"malformed-selection",
+	"missing-selection",
+	"missing-selection-field",
+	"null-selection-record",
+	"empty-selection",
+	"trailing-selection",
+	"invalid-selection",
+	"unknown-selection-field",
+	"mismatched-selection",
+	"missing-selected",
+	"missing-prepared",
+	"invalid-prepared",
+	"invalid-prepared-fields",
+	"invalid-unselected",
+}
 
 func TestRecoveryUninstallDamagedMetadata(t *testing.T) {
 	for _, damage := range metadataDamageCases {
@@ -96,7 +120,7 @@ func TestRecoveryStatusRetainsDamagedInventory(t *testing.T) {
 }
 
 func TestOpenDoesNotRecreateLostSafetyStructure(t *testing.T) {
-	for _, name := range []string{"coordination.lock", "installation.lock", "claims", "uses", "staging", "initializing", "generations", "trash"} {
+	for _, name := range []string{layoutName, "coordination.lock", "installation.lock", "claims", "uses", "staging", "initializing", "generations", "trash"} {
 		t.Run(name, func(t *testing.T) {
 			s, _ := testStore(t)
 			installFixture(t, s, "installed")
@@ -127,6 +151,9 @@ func TestRepairRestoresMetadataDamageClass(t *testing.T) {
 				require.Empty(t, status.SelectionError)
 			} else {
 				require.NotEmpty(t, status.SelectionError)
+				_, err := s.AcquireSelected()
+				require.ErrorIs(t, err, ErrDamaged)
+				require.NotErrorIs(t, err, ErrUnavailable)
 				// An unknown/broken selection cannot authorize reclamation.
 				require.Positive(t, status.ProtectedBytes)
 			}
@@ -185,7 +212,10 @@ func TestRepairRefusesProtectedOrUnverifiableOwnership(t *testing.T) {
 					require.NoError(t, use.Finish(false))
 				}
 				if protection == "unreadable-execution" {
-					require.NoError(t, os.WriteFile(filepath.Join(s.path, use.name, "owner.json"), []byte("{broken"), 0600))
+					require.NoError(
+						t,
+						os.WriteFile(filepath.Join(s.path, use.name, "owner.json"), []byte("{broken"), 0600),
+					)
 				}
 				if protection == "invalid-owner-lock" {
 					require.NoError(t, os.Chmod(filepath.Join(s.path, use.name, "owner.lock"), 0644))
@@ -323,7 +353,18 @@ func TestRepairRetryAfterCallerExit(t *testing.T) {
 }
 
 func TestConcurrentStoreBootstrapAndCanonicalRoot(t *testing.T) {
+	for _, precreated := range []bool{false, true} {
+		t.Run(fmt.Sprintf("precreated=%t", precreated), func(t *testing.T) {
+			testConcurrentStoreBootstrapAndCanonicalRoot(t, precreated)
+		})
+	}
+}
+
+func testConcurrentStoreBootstrapAndCanonicalRoot(t *testing.T, precreated bool) {
 	target := filepath.Join(t.TempDir(), "new", "parent", "store")
+	if precreated {
+		require.NoError(t, os.MkdirAll(target, 0700))
+	}
 	config := DefaultConfig(target)
 	var group sync.WaitGroup
 	errs := make(chan error, 8)
@@ -354,6 +395,52 @@ func TestConcurrentStoreBootstrapAndCanonicalRoot(t *testing.T) {
 	require.NotZero(t, info.Mode()&os.ModeSymlink)
 }
 
+func TestStoreBootstrapResumesIncompleteLayout(t *testing.T) {
+	for _, phase := range []string{"temporary", "record", "locks", "directories", "selection"} {
+		t.Run(phase, func(t *testing.T) {
+			path := t.TempDir()
+			require.NoError(t, os.Chmod(path, 0700))
+			root, err := os.OpenRoot(path)
+			require.NoError(t, err)
+			defer root.Close()
+			if phase == "temporary" {
+				id, err := randomID()
+				require.NoError(t, err)
+				// A caller may exit while writing the temporary before publication.
+				require.NoError(t, writeNewFile(root, layoutTemporaryPrefix+id, []byte("{partial"), 0600))
+			} else {
+				require.NoError(t, createInitialLayout(root, storeLayout{
+					Format: 1,
+					Phase:  "initializing",
+				}))
+				if phase != "record" {
+					for _, name := range storeLocks {
+						require.NoError(t, ensureLock(root, name))
+					}
+				}
+				if phase == "directories" || phase == "selection" {
+					for _, name := range storeDirectories {
+						require.NoError(t, root.Mkdir(name, 0700))
+					}
+				}
+				if phase == "selection" {
+					require.NoError(t, saveJSON(root, "selection.json", selection{}))
+				}
+			}
+			s, err := Open(DefaultConfig(path))
+			require.NoError(t, err)
+			selected := installFixture(t, s, "resumed")
+			require.NoError(t, s.Close())
+			s, err = Open(DefaultConfig(path))
+			require.NoError(t, err)
+			defer s.Close()
+			status, err := s.Inspect()
+			require.NoError(t, err)
+			require.Equal(t, selected, *status.Selected, "reopening ready must not reset selection")
+		})
+	}
+}
+
 func TestRepairSerializesStartupAndInstallers(t *testing.T) {
 	s, _ := testStore(t)
 	m := installFixture(t, s, "selected")
@@ -370,7 +457,10 @@ func TestRepairSerializesStartupAndInstallers(t *testing.T) {
 		go func() {
 			<-start
 			c, err := other.AcquireSelected()
-			acquired <- acquisition{consumer: c, err: err}
+			acquired <- acquisition{
+				consumer: c,
+				err:      err,
+			}
 		}()
 		close(start)
 		candidate, repairErr := s.BeginRepair(context.Background(), m)
@@ -417,8 +507,8 @@ func TestBootstrapExitBeforeParentSyncProcess(t *testing.T) {
 	if path == "" {
 		return
 	}
-	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0700))
-	require.NoError(t, initializeStore(path))
+	_, err := ensureStoreRoot(path)
+	require.NoError(t, err)
 	os.Exit(73)
 }
 
@@ -432,12 +522,59 @@ func TestOpenReconcilesPublishedBootstrapAfterExit(t *testing.T) {
 	var exit *exec.ExitError
 	require.ErrorAs(t, err, &exit, string(output))
 	require.Equal(t, 73, exit.ExitCode(), string(output))
-	before, err := os.Stat(filepath.Join(path, "coordination.lock"))
+	before, err := os.Stat(path)
 	require.NoError(t, err)
 	s, err := Open(DefaultConfig(path))
 	require.NoError(t, err)
 	require.NoError(t, s.Close())
-	after, err := os.Stat(filepath.Join(path, "coordination.lock"))
+	after, err := os.Stat(path)
 	require.NoError(t, err)
 	require.True(t, os.SameFile(before, after))
+}
+
+func TestBootstrapPrecreatedRootNeedsNoParentWriteAccess(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("requires unprivileged identity")
+	}
+	parent := t.TempDir()
+	path := filepath.Join(parent, "cache")
+	require.NoError(t, os.Mkdir(path, 0700))
+	require.NoError(t, os.Chmod(parent, 0500))
+	t.Cleanup(func() { require.NoError(t, os.Chmod(parent, 0700)) })
+	s, err := Open(DefaultConfig(path))
+	require.NoError(t, err)
+	require.NoError(t, s.Close())
+}
+
+func TestOpenRequiresOnlyTraversalOfExistingAncestors(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("requires unprivileged identity")
+	}
+	parent := t.TempDir()
+	path := filepath.Join(parent, "private", "cache")
+	s, err := Open(DefaultConfig(path))
+	require.NoError(t, err)
+	require.NoError(t, s.Close())
+	require.NoError(t, os.Chmod(parent, 0100))
+	t.Cleanup(func() { require.NoError(t, os.Chmod(parent, 0700)) })
+	s, err = Open(DefaultConfig(path))
+	require.NoError(t, err)
+	require.NoError(t, s.Close())
+}
+
+func TestPrecreatedMountedStoreRoot(t *testing.T) {
+	path := os.Getenv("DEM_RUNTIME_TEST_PRECREATED_ROOT")
+	if path == "" {
+		t.Skip("requires an isolated private mountpoint")
+	}
+	s, err := Open(DefaultConfig(path))
+	require.NoError(t, err)
+	m := installFixture(t, s, "mounted")
+	require.NoError(t, s.Close())
+	s, err = Open(DefaultConfig(path))
+	require.NoError(t, err)
+	defer s.Close()
+	candidate, err := s.BeginRepair(context.Background(), m)
+	require.NoError(t, err)
+	require.NoError(t, candidate.Close())
 }
