@@ -133,7 +133,9 @@ SDK clients are also outside this guarantee; a lifetime byte cap is inappropriat
 Response-limit tests SHOULD prepare large bodies, including gzip compression, before starting HTTP requests. Serve
 each prepared body with one write: many small HTTP chunks feeding a large JSON value amplify decoder buffer checks
 under `-race`, and fixture compression can exhaust a client's deadline. Keep exact-limit, overflow, recovery, and
-above-default override coverage; use small bodies for cases that do not need the production-size boundary.
+above-default override coverage. Client test matrices SHOULD use KiB-scale policies; `pkg/web` tests retain the
+full-size boundaries. Check default and above-default policy propagation separately. To verify a client's own
+enforcement, supply a pass-through transport that advertises a small `ResponseBodyLimit()` without limiting reads.
 
 ### Configured credential and TLS files
 

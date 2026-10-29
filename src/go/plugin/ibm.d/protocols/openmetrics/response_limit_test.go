@@ -34,10 +34,22 @@ func openMetricsResponseBody(t *testing.T, size int64, compressed bool) []byte {
 	return buf.Bytes()
 }
 
+// Advertise a policy without bounding reads, so the protocol client must enforce it.
+type policyTransport struct {
+	http.RoundTripper
+	limit int64
+}
+
+func (t policyTransport) ResponseBodyLimit() int64 { return t.limit }
+
 func TestResponseLimit(t *testing.T) {
+	const limit = confopt.KiB
 	for name, compressed := range map[string]bool{"plain": false, "gzip": true} {
 		t.Run(name, func(t *testing.T) {
-			body := openMetricsResponseBody(t, web.DefaultResponseBodyLimit+1, compressed)
+			body := openMetricsResponseBody(t, limit.Bytes()+1, compressed)
+			if compressed {
+				require.Less(t, int64(len(body)), limit.Bytes(), "overflow must come from decompressed data")
+			}
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if compressed {
 					w.Header().Set("Content-Encoding", "gzip")
@@ -45,6 +57,11 @@ func TestResponseLimit(t *testing.T) {
 				_, _ = w.Write(body)
 			}))
 			defer server.Close()
+			base := server.Client()
+			base.Transport = policyTransport{
+				RoundTripper: base.Transport,
+				limit:        limit.Bytes(),
+			}
 			client, err := NewClientWithHTTP(
 				Config{
 					HTTPConfig: web.HTTPConfig{
@@ -53,7 +70,7 @@ func TestResponseLimit(t *testing.T) {
 						},
 					},
 				},
-				server.Client(),
+				base,
 			)
 			require.NoError(t, err)
 			_, err = client.FetchSeries(context.Background(), nil)
@@ -62,8 +79,37 @@ func TestResponseLimit(t *testing.T) {
 	}
 }
 
+func TestResponseLimitPolicy(t *testing.T) {
+	for name, tc := range map[string]struct {
+		limit confopt.ByteSize
+		want  int64
+	}{
+		"default":       {want: web.DefaultResponseBodyLimit},
+		"negative":      {limit: -1, want: web.DefaultResponseBodyLimit},
+		"small":         {limit: confopt.KiB, want: 1024},
+		"above default": {limit: 64*confopt.MiB + confopt.KiB, want: web.DefaultResponseBodyLimit + 1024},
+	} {
+		t.Run(name, func(t *testing.T) {
+			client, err := NewClient(context.Background(), Config{
+				HTTPConfig: web.HTTPConfig{
+					ClientConfig: web.ClientConfig{
+						ResponseBodyLimit: tc.limit,
+					},
+					RequestConfig: web.RequestConfig{
+						URL: "http://example.com/metrics",
+					},
+				},
+			})
+			require.NoError(t, err)
+			defer client.httpClient.CloseIdleConnections()
+			assert.Equal(t, tc.want, web.HTTPClientResponseBodyLimit(client.httpClient))
+		})
+	}
+}
+
 func TestCustomResponseLimit(t *testing.T) {
-	for name, limit := range map[string]confopt.ByteSize{"smaller": confopt.KiB, "larger": 64*confopt.MiB + confopt.KiB} {
+	// Shared web tests cover the full-size boundaries; exercise this client's acquisition with small policies here.
+	for name, limit := range map[string]confopt.ByteSize{"1 KiB": confopt.KiB, "4 KiB": 4 * confopt.KiB} {
 		t.Run(name, func(t *testing.T) {
 			for encoding, compressed := range map[string]bool{"plain": false, "gzip": true} {
 				t.Run(encoding, func(t *testing.T) {
