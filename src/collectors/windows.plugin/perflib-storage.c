@@ -352,13 +352,12 @@ static bool volume_space_start_worker(size_t worker_id)
     InterlockedExchange(&volume_space_worker_finished[worker_id], 0);
     volume_space_worker_retired[worker_id] = false;
     volume_space_threads[worker_id] = nd_thread_create(
-        "WIN[PerflibStorage space]", NETDATA_THREAD_OPTION_DEFAULT, volume_space_worker, (void *)(uintptr_t)worker_id);
+        "WIN[PerflibStorage space]", NETDATA_THREAD_OPTION_MANUAL_JOIN, volume_space_worker, (void *)(uintptr_t)worker_id);
     if (!volume_space_threads[worker_id]) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot create PerflibStorage volume-space worker %zu", worker_id);
         return false;
     }
 
-    nd_thread_set_manual_join(volume_space_threads[worker_id]);
     return true;
 }
 
@@ -370,13 +369,12 @@ static bool mount_points_start_worker(size_t worker_id)
     InterlockedExchange(&mount_points_worker_finished[worker_id], 0);
     mount_points_worker_retired[worker_id] = false;
     mount_points_threads[worker_id] = nd_thread_create(
-        "WIN[PerflibStorage discovery]", NETDATA_THREAD_OPTION_DEFAULT, mount_points_worker, (void *)(uintptr_t)worker_id);
+        "WIN[PerflibStorage discovery]", NETDATA_THREAD_OPTION_MANUAL_JOIN, mount_points_worker, (void *)(uintptr_t)worker_id);
     if (!mount_points_threads[worker_id]) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot create PerflibStorage discovery worker %zu", worker_id);
         return false;
     }
 
-    nd_thread_set_manual_join(mount_points_threads[worker_id]);
     return true;
 }
 
