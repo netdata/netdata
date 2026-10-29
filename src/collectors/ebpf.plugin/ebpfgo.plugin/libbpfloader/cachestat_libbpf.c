@@ -30,7 +30,7 @@
  */
 #ifndef NETDATA_CACHSTAT_ARENA_STATE_T_DEFINED
 struct netdata_cachestat_arena_state_t {
-    unsigned char __pad[49160];
+    unsigned char __pad[sizeof(struct nd_ebpf_arena_state)];
 };
 #endif
 
