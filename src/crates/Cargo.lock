@@ -1317,15 +1317,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "flatten-serde-json"
-version = "1.22.1"
-source = "git+https://github.com/meilisearch/meilisearch?tag=v1.22.1#077ec2ab11bb4daefcb57f89eab9cff16e075fdc"
-dependencies = [
- "serde_json",
-]
-
-[[package]]
-name = "flatten_otel"
+name = "flatten-otel"
 version = "0.1.3"
 dependencies = [
  "base64 0.22.1",
@@ -1333,6 +1325,14 @@ dependencies = [
  "opentelemetry-proto",
  "serde_json",
  "tracing",
+]
+
+[[package]]
+name = "flatten-serde-json"
+version = "1.22.1"
+source = "git+https://github.com/meilisearch/meilisearch?tag=v1.22.1#077ec2ab11bb4daefcb57f89eab9cff16e075fdc"
+dependencies = [
+ "serde_json",
 ]
 
 [[package]]
@@ -3679,7 +3679,7 @@ dependencies = [
  "ferryboat",
  "file-registry",
  "flate2",
- "flatten_otel",
+ "flatten-otel",
  "http",
  "http-body-util",
  "netdata-plugin-types",

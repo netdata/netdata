@@ -89,7 +89,7 @@ otel-service-map = { path = "otel-service-map" }
 chunk-file = { path = "chunk-file" }
 file-cache = { path = "file-cache" }
 file-registry = { path = "file-registry" }
-flatten_otel = { path = "flatten-otel" }
+flatten-otel = { path = "flatten-otel" }
 ng-flatten = { path = "ng-flatten" }
 ng-index = { path = "ng-index" }
 otel-catalog = { path = "otel-catalog" }

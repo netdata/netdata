@@ -14,7 +14,7 @@ path = "src/lib.rs"
 [dependencies]
 otel-bridge = { workspace = true }
 ferryboat = { workspace = true }
-flatten_otel = { workspace = true }
+flatten-otel = { workspace = true }
 ng-flatten = { workspace = true }
 netdata-plugin-types = { workspace = true }
 
