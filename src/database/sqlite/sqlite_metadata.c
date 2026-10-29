@@ -2120,7 +2120,7 @@ static void ctx_load_one_host(
     if (thread_found) {
         __atomic_store_n(&hclt[thread_index].busy, true, __ATOMIC_RELAXED);
         hclt[thread_index].host = host;
-        hclt[thread_index].thread = nd_thread_create("CTXLOAD", NETDATA_THREAD_OPTION_DEFAULT, restore_host_context, &hclt[thread_index]);
+        hclt[thread_index].thread = nd_thread_create("CTXLOAD", NETDATA_THREAD_OPTION_MANUAL_JOIN, restore_host_context, &hclt[thread_index]);
         rc = (hclt[thread_index].thread == NULL);
         *async_exec += (rc == 0);
         // if it failed, mark the thread slot as free

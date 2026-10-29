@@ -336,7 +336,8 @@ void nd_thread_join_threads()
         while(nti) {
             // Manual-join wrappers are owned by their creator. Do not claim JOINED before
             // checking this flag: a direct owner join would otherwise see a false success.
-            if (nd_thread_status_check(nti, NETDATA_THREAD_STATUS_MANUAL_JOIN)) {
+            // The flag is set at creation and never changes, so this check is final.
+            if (nd_thread_status_check(nti, NETDATA_THREAD_OPTION_MANUAL_JOIN)) {
                 nti = nti->next;
                 continue;
             }
@@ -351,13 +352,6 @@ void nd_thread_join_threads()
             nti->list = ND_THREAD_LIST_NONE;
         }
         spinlock_unlock(&threads_globals.exited.spinlock);
-
-        if(nti && nd_thread_status_check(nti, NETDATA_THREAD_STATUS_MANUAL_JOIN)) {
-            // The creator owns this wrapper and must join it directly. Keep it out of the generic
-            // drain until that owner releases it.
-            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(retained, nti, prev, next);
-            continue;
-        }
 
         // nd_thread_join_internal() handles NULL and will skip list removal since we already did it
         bool wrapper_released = true;
@@ -643,7 +637,82 @@ int nd_thread_join(ND_THREAD *nti) {
     return ret;
 }
 
-void nd_thread_set_manual_join(ND_THREAD *nti) {
-    if (nti)
-        nd_thread_status_set(nti, NETDATA_THREAD_STATUS_MANUAL_JOIN);
+// ----------------------------------------------------------------------------
+// unittest
+
+static void threads_unittest_worker(void *arg __maybe_unused) {
+    ;
+}
+
+// compares pointers only, so it is safe to call with a wrapper that has been freed
+static bool threads_unittest_is_exited(ND_THREAD *nti) {
+    bool found = false;
+
+    spinlock_lock(&threads_globals.exited.spinlock);
+    for(ND_THREAD *t = threads_globals.exited.list; t; t = t->next) {
+        if(t == nti) {
+            found = true;
+            break;
+        }
+    }
+    spinlock_unlock(&threads_globals.exited.spinlock);
+
+    return found;
+}
+
+static bool threads_unittest_wait_finished(ND_THREAD *nti) {
+    // FINISHED is set after the wrapper is appended to the exited list
+    for(size_t i = 0; i < 10000; i++) {
+        if(nd_thread_status_check(nti, NETDATA_THREAD_STATUS_FINISHED))
+            return true;
+        sleep_usec(1 * USEC_PER_MS);
+    }
+    return false;
+}
+
+int threads_unittest(void) {
+    int errors = 0;
+
+    fprintf(stderr, "\nTesting that nd_thread_join_threads() leaves manual-join threads to their owner...\n");
+
+    ND_THREAD *manual = nd_thread_create("UT_MANUAL", NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_MANUAL_JOIN,
+                                         threads_unittest_worker, NULL);
+    ND_THREAD *generic = nd_thread_create("UT_GENERIC", NETDATA_THREAD_OPTION_DONT_LOG,
+                                          threads_unittest_worker, NULL);
+    if(!manual || !generic) {
+        fprintf(stderr, " > FAILED: cannot create the test threads\n");
+        return 1;
+    }
+
+    if(!threads_unittest_wait_finished(manual) || !threads_unittest_wait_finished(generic)) {
+        fprintf(stderr, " > FAILED: the test threads did not finish\n");
+        return 1;
+    }
+
+    nd_thread_join_threads();
+
+    if(!threads_unittest_is_exited(manual)) {
+        fprintf(stderr, " > FAILED: the drain took a manual-join thread from its owner\n");
+        // the drain freed it; joining it here would be a use-after-free
+        return 1;
+    }
+
+    if(threads_unittest_is_exited(generic)) {
+        fprintf(stderr, " > FAILED: the drain did not join a default thread\n");
+        errors++;
+    }
+
+    int rc = nd_thread_join(manual);
+    if(rc != 0) {
+        fprintf(stderr, " > FAILED: the owner's join returned %d\n", rc);
+        errors++;
+    }
+
+    if(threads_unittest_is_exited(manual)) {
+        fprintf(stderr, " > FAILED: the owner's join left the thread on the exited list\n");
+        errors++;
+    }
+
+    fprintf(stderr, "%s\n", errors ? " > FAILED" : " > OK");
+    return errors;
 }

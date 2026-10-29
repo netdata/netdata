@@ -512,6 +512,8 @@ int netdata_main(int argc, char **argv) {
                                 return 1;
                             rrdlabels_aral_init(false);
 
+                            // first: its drain joins every exited thread, so run it before other tests start threads
+                            if (threads_unittest()) return 1;
                             if (pluginsd_parser_unittest()) return 1;
                             if (websocket_compression_unittest()) return 1;
                             if (web_client_request_size_unittest()) return 1;
@@ -643,6 +645,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "uuidmaptest") == 0) {
                             unittest_running = true;
                             return uuidmap_unittest();
+                        }
+                        else if(strcmp(optarg, "threadstest") == 0) {
+                            unittest_running = true;
+                            return threads_unittest();
                         }
                         else if(strcmp(optarg, "lockstest") == 0) {
                             unittest_running = true;
