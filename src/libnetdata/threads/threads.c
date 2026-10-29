@@ -687,9 +687,8 @@ int threads_unittest(void) {
     }
 
     if(!threads_unittest_wait_finished(manual) || !threads_unittest_wait_finished(generic)) {
+        // do not join: a thread that did not finish would block the test forever
         fprintf(stderr, " > FAILED: the test threads did not finish\n");
-        nd_thread_join(manual);
-        nd_thread_join(generic);
         return 1;
     }
 
