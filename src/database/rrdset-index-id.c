@@ -108,11 +108,14 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     // initialize the db tiers
     {
+        // not st->chart_uuid: it is assigned in the react callback, after the chart is already published
+        uint64_t seed = rrdset_storage_phase_seed(&host->host_id, chart_full_id);
+
         for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
             STORAGE_ENGINE *eng = st->rrdhost->db[tier].eng;
             if(!eng) continue;
 
-            st->smg[tier] = storage_engine_metrics_group_get(eng->seb, host->db[tier].si, &st->chart_uuid);
+            st->smg[tier] = storage_engine_metrics_group_get(eng->seb, host->db[tier].si, seed);
         }
     }
 

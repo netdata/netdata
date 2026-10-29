@@ -2602,7 +2602,7 @@ static int mrg_jv2_rejected_on_mapping_failure_check(void) {
         }
     }
 
-    if(devnull == 0)
+    if(devnull != -1)
         close(devnull);
 
 cleanup:
@@ -2678,7 +2678,7 @@ static int mrg_jv2_close_owned_v1_check(void) {
     }
     else if(!fd0_was_open && fd_is_open(0))
         close(0);
-    if(devnull != -1)
+    if(devnull > 0)
         close(devnull);
 
 cleanup:

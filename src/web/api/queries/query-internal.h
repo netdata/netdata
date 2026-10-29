@@ -13,8 +13,10 @@
 typedef struct query_point {
     STORAGE_POINT sp;
     NETDATA_DOUBLE value;
+    time_t storage_cadence; // retained before projection clips the point
     uint8_t tier;
     bool added;
+    bool synthetic;
 #ifdef NETDATA_INTERNAL_CHECKS
     size_t id;
 #endif
@@ -25,6 +27,7 @@ typedef struct query_point {
     .sp = STORAGE_POINT_UNSET, \
     .value = NAN, \
     .added = false, \
+    .synthetic = true, \
     .id = 0, \
 }
 #else
@@ -32,6 +35,7 @@ typedef struct query_point {
     .sp = STORAGE_POINT_UNSET, \
     .value = NAN, \
     .added = false, \
+    .synthetic = true, \
 }
 #endif
 
@@ -66,6 +70,7 @@ typedef struct query_engine_ops {
     // aggregating points over time
     size_t group_points_non_zero;
     size_t group_points_added;
+    time_t group_covered_s;             // seconds of this bucket already accounted for
     STORAGE_POINT group_point;          // aggregates min, max, sum, count, anomaly count for each group point
     STORAGE_POINT query_point;          // aggregates min, max, sum, count, anomaly count across the whole query
     RRDR_VALUE_FLAGS group_value_flags;
@@ -113,8 +118,18 @@ void rrd2rrdr_query_ops_freeall(RRDR *r, QUERY_ENGINE_OPS_CACHE *cache);
 // query execution
 void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_OPS *ops);
 
-// time aggregation
+// time aggregation: time_grouping_is_expression() lives with the grammar
+// it describes, in tg-expression.h
+
+// The hot path takes a bare value: every grouping except the four
+// condition ones needs nothing else, and building a point for them would
+// cost every query engine-wide. Only the condition groupings, which reason
+// about a stored window, take the richer point.
 void time_grouping_add(RRDR *r, NETDATA_DOUBLE value, const RRDR_TIME_GROUPING add_flush);
+
+// defined in tg-expression.h, which the grouping modules include
+struct tg_point;
+void time_grouping_add_point(RRDR *r, const struct tg_point *p, const RRDR_TIME_GROUPING add_flush);
 NETDATA_DOUBLE time_grouping_flush(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr, const RRDR_TIME_GROUPING add_flush);
 void rrdr_set_grouping_function(RRDR *r, RRDR_TIME_GROUPING group_method);
 

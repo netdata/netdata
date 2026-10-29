@@ -148,8 +148,6 @@ func reconcileRawFamilies(
 			switch {
 			case family.Shape == "info_suffix":
 				category = "writer_policy_skips_info_suffix"
-			case pipeline.writerFamilyRejects[family.Name] == promcollector.PipelineReasonSeriesLimit:
-				category = "writer_policy_series_limit"
 			case family.Shape == "histogram_without_buckets":
 				category = "writer_requires_histogram_buckets"
 			case family.Shape == "untyped" && !strings.HasSuffix(family.Name, "_total"):

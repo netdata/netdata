@@ -1,0 +1,8 @@
+# Test PCRE2 named groups that do not participate in the match
+pattern: "^(?<level>[A-Z]+)(?: code=(?<code>\\d+))? (?<message>.*)$"
+
+rewrite:
+  # optional group in a rewrite match
+  - key: MESSAGE
+    match: "^(?<word>\\w+)(?: (?<rest>.+))?$"
+    value: "${word}|${rest}"

@@ -14,20 +14,20 @@ import (
 )
 
 type Config struct {
-	Vnode              string `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery        int    `yaml:"update_every,omitempty" json:"update_every"`
-	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	web.HTTPConfig     `yaml:",inline" json:""`
-	Name               string                    `yaml:"name,omitempty" json:"name"`
-	Application        string                    `yaml:"app,omitempty" json:"app"`
-	Selector           selector.Expr             `yaml:"selector,omitempty" json:"selector"`
-	Relabeling         []relabel.Block           `yaml:"relabeling,omitempty" json:"relabeling,omitempty"`
-	Profiles           ProfilesConfig            `yaml:"profiles" json:"profiles"`
-	ExpectedPrefix     string                    `yaml:"expected_prefix,omitempty" json:"expected_prefix"`
-	MaxTS              int                       `yaml:"max_time_series" json:"max_time_series"`
-	MaxTSPerMetric     int                       `yaml:"max_time_series_per_metric" json:"max_time_series_per_metric"`
-	FallbackType       promprofiles.FallbackType `yaml:"fallback_type,omitempty" json:"fallback_type"`
-	CounterRawCharts   []string                  `yaml:"counter_raw_charts,omitempty" json:"counter_raw_charts"`
+	Vnode                     string `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery               int    `yaml:"update_every,omitempty" json:"update_every"`
+	AutoDetectionRetry        int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
+	web.HTTPConfig            `yaml:",inline" json:""`
+	Name                      string                    `yaml:"name,omitempty" json:"name"`
+	Application               string                    `yaml:"app,omitempty" json:"app"`
+	Selector                  selector.Expr             `yaml:"selector,omitempty" json:"selector"`
+	Relabeling                []relabel.Block           `yaml:"relabeling,omitempty" json:"relabeling,omitempty"`
+	Profiles                  ProfilesConfig            `yaml:"profiles" json:"profiles"`
+	ExpectedPrefix            string                    `yaml:"expected_prefix,omitempty" json:"expected_prefix"`
+	MaxInputSeries            int                       `yaml:"max_input_series" json:"max_input_series"`
+	MaxOutputSeriesPerContext int                       `yaml:"max_output_series_per_context" json:"max_output_series_per_context"`
+	FallbackType              promprofiles.FallbackType `yaml:"fallback_type,omitempty" json:"fallback_type"`
+	CounterRawCharts          []string                  `yaml:"counter_raw_charts,omitempty" json:"counter_raw_charts"`
 }
 
 const (

@@ -23,16 +23,17 @@ type PlanAttempt struct {
 type planAttemptState struct {
 	mu sync.Mutex
 
-	engine       *Engine
-	plan         Plan
-	materialized materializedState
-	journal      planJournal // inline, so an attempt and its journal are one allocation
-	transition   *templateTransition
-	epoch        uint64
-	commitSeq    uint64
-	attemptID    uint64
-	reserved     bool
-	finished     bool
+	engine            *Engine
+	plan              Plan
+	materialized      materializedState
+	journal           planJournal // inline, so an attempt and its journal are one allocation
+	transition        *templateTransition
+	epoch             uint64
+	commitSeq         uint64
+	attemptID         uint64
+	resetMaterialized bool
+	reserved          bool
+	finished          bool
 }
 
 func (a PlanAttempt) Plan() Plan {
@@ -58,6 +59,7 @@ func (a PlanAttempt) Commit() error {
 	materialized := a.state.materialized
 	journal := &a.state.journal
 	transition := a.state.transition
+	resetMaterialized := a.state.resetMaterialized
 	epoch := a.state.epoch
 	commitSeq := a.state.commitSeq
 	attemptID := a.state.attemptID
@@ -69,7 +71,7 @@ func (a PlanAttempt) Commit() error {
 	if engine == nil {
 		return fmt.Errorf("chartengine: nil engine on commit")
 	}
-	return engine.commitAttempt(materialized, journal, transition, epoch, commitSeq, attemptID)
+	return engine.commitAttempt(materialized, journal, transition, resetMaterialized, epoch, commitSeq, attemptID)
 }
 
 func (a PlanAttempt) Abort() {
@@ -167,6 +169,7 @@ func (e *Engine) PreparePlanWithOptions(reader metrix.Reader, opts PlanOptions) 
 	state.plan = plan
 	state.materialized = materialized
 	state.transition = transition
+	state.resetMaterialized = opts.ResetMaterialized
 	state.epoch = e.state.engineEpoch
 	state.commitSeq = e.state.commitSeq
 	state.attemptID = attemptID
@@ -188,6 +191,7 @@ func (e *Engine) commitAttempt(
 	materialized materializedState,
 	journal *planJournal,
 	transition *templateTransition,
+	resetMaterialized bool,
 	epoch, commitSeq, attemptID uint64,
 ) error {
 	if e == nil {
@@ -214,6 +218,7 @@ func (e *Engine) commitAttempt(
 	journal.compactAfterCommit(&e.state.materialized)
 	e.state.commitSeq++
 	e.state.outstanding = 0
+	e.commitContextLimits(journal.contextCounts, resetMaterialized)
 	return nil
 }
 
