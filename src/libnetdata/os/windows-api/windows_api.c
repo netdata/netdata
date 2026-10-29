@@ -122,7 +122,7 @@ int netdata_win_network_interfaces_get(struct netdata_win_network_interface **in
 
         entry->description = netdata_win_utf16_to_utf8(aa->Description);
         entry->friendly_name = netdata_win_utf16_to_utf8(aa->FriendlyName);
-        // Tunnel adapters may lack a description; callers then match by friendly name.
+        // Preserve adapters without a description for friendly-name matching.
         if ((aa->Description && !entry->description) || (aa->FriendlyName && !entry->friendly_name)) {
             free(entry->description);
             free(entry->friendly_name);

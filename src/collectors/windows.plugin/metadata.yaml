@@ -869,8 +869,9 @@ modules:
               required: false
             - name: disable by default interfaces matching
               description: |
-                Space-separated, case-sensitive interface-name patterns excluded from per-interface charts and the
-                live interface table. The physical network aggregate still includes these interfaces.
+                Space-separated, case-sensitive patterns matched against Perflib interface instance names. Use `*`
+                to span spaces in a name (for example, `Teredo*`). Matching interfaces are excluded from per-interface
+                charts and the live interface table. The physical network aggregate still includes them.
               default_value: ""
               required: false
         examples:
@@ -1130,9 +1131,9 @@ modules:
           name: Network Interfaces
           description: |
             Shows discovered physical and virtual interfaces with current traffic, packet, drop, speed, and operational
-            state values. Friendly names and state are shown only when a Windows adapter description or an empty-description
-            adapter's friendly name uniquely matches the Perflib instance name. Physical carrier state, duplex, and
-            multicast packets are unavailable.
+            state values. Friendly names and state are shown only when the Perflib instance name uniquely matches a
+            Windows adapter description or, if none matches, an adapter friendly name. Physical carrier state, duplex,
+            and multicast packets are unavailable.
           parameters: []
           returns:
             description: "One row per discovered, non-excluded interface; unavailable values are empty."

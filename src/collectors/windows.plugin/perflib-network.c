@@ -1183,8 +1183,7 @@ network_adapter_for_name(const struct netdata_win_network_interface *adapters, c
 
     for (const struct netdata_win_network_interface *adapter = adapters; adapter; adapter = adapter->next) {
         // Instance names cannot hold counter-path characters, so compare as for descriptions.
-        if ((adapter->description && *adapter->description) || !adapter->friendly_name ||
-            !network_adapter_name_matches(adapter->friendly_name, name))
+        if (!adapter->friendly_name || !network_adapter_name_matches(adapter->friendly_name, name))
             continue;
         if (match)
             return NULL; // A friendly name is not a unique identity.
