@@ -22,7 +22,7 @@ SD_PAGE = {
     "title": "# Service Discovery",
     "intro": [
         "Stop hand-writing collector jobs for every host, container, or device. Netdata's Service Discovery (SD) finds monitorable targets in your environment and turns them into collector jobs automatically.",
-        "Each SD pipeline is a `discoverer:` (where to look) plus a list of `services:` rules (how to turn what was found into collector jobs). The discoverer emits **targets**; the rules render **collector job YAML** from those targets using Go templates.",
+        "Each SD pipeline is a `discoverer:` (where to look) plus a list of `services:` rules (how to turn what was found into collector jobs). The discoverer emits **targets**; the rules create **collector jobs** from those targets using Go templates.",
     ],
     "jump_to": [
         {"label": "How it works", "anchor": "how-it-works"},
@@ -55,7 +55,7 @@ SD_PAGE = {
             },
             {
                 "name": "Render the collector job",
-                "description": "When a rule matches, its `config_template` is executed with the target as context, producing collector job YAML. The rendered YAML can be a single job map or a sequence of jobs.",
+                "description": "When a rule matches, its `config_template` is executed with the target as context. Each call to `job` submits one collector job. Existing templates that render YAML maps or sequences remain supported.",
             },
             {
                 "name": "Hand off to the collector",
@@ -81,7 +81,7 @@ services:
   - id: <rule-id>
     match: <go-template>      # must render to the literal string "true"
     config_template: |        # optional — omit to make this a "skip rule"
-      # collector job YAML, rendered with target as context
+      # job calls, evaluated with target as context
 ```""",
         "notes": [
             "`disabled: yes` keeps the file on disk but turns the pipeline off.",
@@ -169,7 +169,7 @@ services:
             "table": [
                 {
                     "name": "`match TYPE VALUE PATTERN [PATTERN...]`",
-                    "description": "Returns the string `\"true\"` if `VALUE` matches **any** of the patterns under the named matcher type. `TYPE` is one of:",
+                    "description": "Returns the boolean `true` if `VALUE` matches **any** of the patterns under the named matcher type. `TYPE` is one of:",
                     "sub": [
                         "`\"glob\"` — shell glob (`*`, `?`, `[abc]`).",
                         "`\"sp\"` — Netdata simple patterns (space-separated, `*` wildcard, `!` for negation).",
@@ -186,16 +186,19 @@ services:
                     "description": "Returns the well-known Prometheus exporter module name registered for `PORT`, or the empty string. `net_listeners`-specific.",
                 },
                 {
+                    "name": "`job KEY VALUE ...` or `job MAP`",
+                    "description": "Submit one complete collector job, capturing a detached copy of its values at the call. Returns empty text; encoding is automatic. Available only in `config_template`, not in `match` expressions.",
+                },
+                {
                     "name": "`toYaml VALUE`",
-                    "description": "Serialize the complete value as YAML. Strings retain their exact contents and type; maps and sequences remain collections. Used by `http` discoverer rules that pass through items as collector job configs.",
+                    "description": "Serialize a value as YAML text. Retained for existing templates; use `job` to create collector jobs with automatic encoding.",
                 },
             ],
             "notes": [
                 "`match` and `glob` are case-sensitive.",
                 "`match \"re\" ...` is unanchored. Use `^...$` to require a full-string match.",
                 "There is **no** standalone `regexp` or `regex` helper. Use `match \"re\"` (or sprig's `regexFind` / `regexMatch`) for regex matching.",
-                "`match` and `glob` return the **string** `\"true\"` or `\"false\"`, not a Go bool. The rule engine compares the trimmed template output against the literal `\"true\"`, so a top-level `match: '{{ glob .X \"foo*\" }}'` works directly.",
-                "**Composing with `if` / `and` / `or` is a footgun**: in Go templates a non-empty string is truthy, so both `\"true\"` *and* `\"false\"` evaluate truthy under `if`. `{{ if glob .X \"foo*\" }}` is therefore **wrong**. Either wrap each result with `eq ... \"true\"` to get a real bool, or use an explicit `if-then-true` block:\n  ```\n  match: '{{ if and (eq (glob .Vendor \"Cisco*\") \"true\") (eq .Category \"router\") }}true{{ end }}'\n  ```",
+                "`match` and `glob` return booleans and can be composed with `if`, `and`, and `or`. The rule engine compares the rendered match template with the literal text `true`.",
             ],
         },
     },
@@ -203,20 +206,27 @@ services:
         "heading": "## config_template rendering",
         "intro": [
             "By default, discovered jobs treat `${env:...}`, `${file:...}`, `${cmd:...}`, and `${store:...}` as literal text, even when a reference comes from an operator-authored discovery rule or credential. A pipeline with `trust_discovered_targets: yes` allows these references in all its generated collector jobs. Alternatively, adopt an individual collector job through Dynamic Configuration and review its complete configuration before saving.",
-            "When a template rule matches, its `config_template` is executed with the target as the dot context. The rendered output is parsed as YAML to produce one or more collector jobs.",
+            "When a template rule matches, its `config_template` is executed with the target as the dot context. Create each collector job with `job`, for example `{{ job \"name\" .Name \"url\" (printf \"http://%s\" .Address) }}`. Encoding is automatic: no `toYaml` pipe or whitespace trimming is needed.",
+            "Pass alternating string keys and values, or one map such as `{{ job .Item }}` for HTTP pass-through. String values retain their exact contents, including YAML punctuation and trailing newlines. Keep numbers and booleans typed, for example `(atoi .Port)` for a numeric port. Missing values, duplicate keys, non-string keys, nil maps, and unsupported argument shapes fail the rule.",
+            "For conditional fields, start with `{{ $cfg := dict \"name\" .Name }}`, assign fields with `{{ $_ := set $cfg \"key\" VALUE }}`, and submit with `{{ job $cfg }}`. Assigning the result of `set` to `$_` prevents it from printing the dictionary. Each call captures a detached snapshot, so later map changes do not alter jobs already submitted.",
+            "Existing user files and saved Dynamic Configuration rules are not rewritten during an upgrade. Templates that render raw YAML, including those using `toYaml`, remain supported. For rules that interpolate target values into YAML, migrate to `job`; metadata normalization and literal quotation marks do not safely encode those values.",
         ],
         "rules": [
             {
-                "name": "Single map → one job",
-                "description": "If the rendered YAML is a map, a single collector job is created.",
+                "name": "One call → one job",
+                "description": "Each `job` call submits one map. Call it repeatedly or inside `range` to create multiple jobs in call order. If no calls execute and the template produces only whitespace, it creates no jobs.",
             },
             {
-                "name": "Sequence of maps → one job per element",
-                "description": "If the rendered YAML is a sequence (top-level YAML `-` items), one job is created per element. Use this for multi-job rules. Example: a `net_listeners` rule that emits both a TCP and a Unix-socket MySQL job from the same target —\n\n  ```yaml\n  - id: mysql\n    match: '{{ or (eq .Port \"3306\") (eq .Comm \"mysqld\") }}'\n    config_template: |\n      - name: local\n        dsn: netdata@unix(/var/run/mysqld/mysqld.sock)/\n      - name: local\n        dsn: netdata@tcp({{.Address}})/\n  ```",
+                "name": "Multiple jobs",
+                "description": "This local-listener rule emits Unix-socket and TCP MySQL jobs in order:\n\n  ```yaml\n  - id: mysql\n    match: '{{ or (eq .Port \"3306\") (eq .Comm \"mysqld\") }}'\n    config_template: |\n      {{ job \"name\" \"local\" \"dsn\" \"netdata@unix(/var/run/mysqld/mysqld.sock)/\" }}\n      {{ job \"name\" \"local\" \"dsn\" (printf \"netdata@tcp(%s)/\" .Address) }}\n  ```",
+            },
+            {
+                "name": "Legacy YAML templates",
+                "description": "When no `job` call executes, rendered YAML is parsed as before: a map creates one job, and a sequence of maps creates one job per element. Do not mix submitted jobs with non-whitespace text in the same execution. That includes literal YAML, YAML comments, and accidentally printed values such as the result of `set`.",
             },
             {
                 "name": "Module inference from rule `id`",
-                "description": "If the rendered job map has no `module:` key, the rule's `id` is used as the module name. Set `id: snmp` (or `docker`, `http`, …) to omit `module:` from your template; otherwise include `module:` explicitly.",
+                "description": "If the rendered job map has no `module` key, the rule's `id` is used as the module name. Use the collector module name, such as `snmp` or `prometheus`, as the rule ID to omit `module` from the dictionary; otherwise set it explicitly.",
             },
             {
                 "name": "`id` uniqueness",
@@ -224,7 +234,7 @@ services:
             },
             {
                 "name": "Failure handling",
-                "description": "Render errors, YAML parse errors, and `missingkey=error` failures are logged at warn level. The agent skips the rule for that target and continues evaluation.",
+                "description": "Template errors, invalid `job` calls, mixed text/job output, and legacy YAML parse errors are logged at warn level. All jobs from the failing rule are discarded, including earlier calls in that execution. The agent continues with the next rule for that target.",
             },
         ],
     },
@@ -264,7 +274,7 @@ services:
             },
             {
                 "name": "YAML parse error after rendering",
-                "description": "`failed to parse services[N] template data` means the rendered output is not valid YAML. Common cause: a discovered string field contains a colon, hash, or other YAML special character. Serialize complete dynamic values with `toYaml`, for example `name: {{ .X | toYaml }}`. Adding quotes around raw template text does not escape embedded quotes or newlines.",
+                "description": "`failed to parse services[N] template data` means a legacy template's output cannot be parsed as job YAML. Common cause: raw target text contains a colon, hash, or line break. Use `{{ job \"name\" .Name \"url\" .Address }}` so encoding is automatic. For `cannot mix submitted jobs with rendered text`, remove literal YAML and suppress printed values such as the result of `set`.",
             },
         ],
     },

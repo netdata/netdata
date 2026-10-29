@@ -79,8 +79,10 @@ func parse(filename string, visited map[string]bool) ([]option, error) {
 
 	var options []option
 	sc := bufio.NewScanner(f)
+	var lineNumber int
 
 	for sc.Scan() {
+		lineNumber++
 		line := strings.TrimSpace(sc.Text())
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
@@ -88,7 +90,7 @@ func parse(filename string, visited map[string]bool) ([]option, error) {
 
 		opt, err := parseLine(line)
 		if err != nil {
-			return nil, fmt.Errorf("file '%s', error on parsing line '%s': %v", filename, line, err)
+			return nil, fmt.Errorf("file '%s', error on parsing line %d: %w", filename, lineNumber, err)
 		}
 
 		if !isOptionUsed(opt) {

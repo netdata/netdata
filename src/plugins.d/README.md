@@ -197,6 +197,13 @@ available for the plugin to use.
 |   `NETDATA_ERRORS_PER_PERIOD`    | The allowed number of log events per period.                                                                                                                                                                                                           | 
 | `NETDATA_SYSTEMD_JOURNAL_PATH`   | When `NETDATA_LOG_METHOD` is set to `journal`, this is the systemd-journald socket path to use.                                                                                                                                                        |
 
+`ebpf.plugin` and `ebpf-go.plugin` run with elevated privileges, so whoever starts them controls their environment.
+They do not use `NETDATA_PLUGINS_DIR`, `NETDATA_USER_CONFIG_DIR`, `NETDATA_STOCK_CONFIG_DIR` or `NETDATA_LOG_DIR`;
+they use the directories Netdata was built with, which are the same ones `netdata` sets on a standard installation.
+A `[directories]` override in `netdata.conf` therefore does not move these directories for them; each one they ignore
+is logged once at startup. If you write a plugin that runs with elevated privileges, do the same: never load, read or
+execute anything from a directory named in its environment.
+
 ### The output of the plugin
 
 The plugin should output instructions for Netdata to its output (`stdout`). Since this uses pipes, please make sure you flush stdout after every iteration.
@@ -271,6 +278,20 @@ There are a few special keys that are used to define the system information of t
 #### HOST_DEFINE_END
 
 `HOST_DEFINE_END` commits the host information, creating a new host entity, or updating an existing one with the same `machine_guid`.
+
+The reserved host label `_node_stale_after_seconds` sets the vnode inactivity timeout in seconds (an unsigned
+32-bit value). Each completed definition replaces the timeout; omitting the label or setting it to `0` disables it.
+The parser checks inactivity when processing `HOST localhost` (or `HOST` without a GUID), with a scan interval equal
+to the smallest positive timeout among its vnodes, or 60 seconds if none has a timeout. A new or reduced timeout
+brings the next scan forward when needed. Expiry therefore requires continued localhost selections by the plugin;
+with regular selections, it occurs within the timeout plus one scan interval and the localhost selection interval.
+A stale vnode becomes active again when selected with `HOST machine_guid`.
+
+When local collection resumes through `HOST` or `HOST_DEFINE_END`, any peer stream for the same host is stopped
+before restoring the vnode's live state. Health follows the local Agent's health setting and remains disabled for
+`memory mode = none`; a previous peer disconnect must not leave the recovered vnode orphaned or health disabled.
+If orphan cleanup has already archived the host after a peer disconnect, `HOST` requests a collector restart so a
+fresh `HOST_DEFINE` can rebuild its runtime structures before collection resumes.
 
 #### HOST 
 

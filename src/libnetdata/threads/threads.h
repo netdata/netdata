@@ -14,10 +14,14 @@ typedef enum __attribute__((packed)) {
     NETDATA_THREAD_STATUS_STARTED          = 1 << 2,
     NETDATA_THREAD_STATUS_FINISHED         = 1 << 3,
     NETDATA_THREAD_STATUS_JOINED           = 1 << 4,
-    NETDATA_THREAD_STATUS_MANUAL_JOIN      = 1 << 5,
+
+    // the creator keeps the ND_THREAD pointer and joins it itself with nd_thread_join();
+    // nd_thread_join_threads() never joins or frees such a thread, so one the creator
+    // never joins stays allocated until the process exits
+    NETDATA_THREAD_OPTION_MANUAL_JOIN      = 1 << 5,
 } NETDATA_THREAD_OPTIONS;
 
-#define NETDATA_THREAD_OPTIONS_ALL (NETDATA_THREAD_OPTION_DONT_LOG_STARTUP | NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP)
+#define NETDATA_THREAD_OPTIONS_ALL (NETDATA_THREAD_OPTION_DONT_LOG_STARTUP | NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP | NETDATA_THREAD_OPTION_MANUAL_JOIN)
 #define NETDATA_THREAD_OPTION_DONT_LOG (NETDATA_THREAD_OPTION_DONT_LOG_STARTUP | NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP)
 
 #define netdata_thread_cleanup_push(func, arg) pthread_cleanup_push(func, arg)
@@ -77,7 +81,6 @@ void netdata_threads_init_for_external_plugins(size_t stacksize);
 
 ND_THREAD *nd_thread_create(const char *tag, NETDATA_THREAD_OPTIONS options, void (*start_routine) (void *), void *arg);
 int nd_thread_join(ND_THREAD * nti);
-void nd_thread_set_manual_join(ND_THREAD *nti);
 ND_THREAD *nd_thread_self(void);
 bool nd_thread_is_me(ND_THREAD *nti);
 
@@ -129,6 +132,8 @@ void nd_thread_rwspinlock_write_unlocked(void);
 
 void nd_thread_can_run_sql(bool exclude);
 void nd_thread_join_threads();
+// joins every exited thread of the process: run it before anything else creates threads
+int threads_unittest(void);
 bool nd_thread_runs_sql(void);
 
 #endif //NETDATA_THREADS_H

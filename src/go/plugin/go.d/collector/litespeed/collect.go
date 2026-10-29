@@ -74,7 +74,7 @@ func (c *Collector) collectReport(mx map[string]int64, filename string) error {
 		for part := range parts {
 			before, after, ok := strings.Cut(part, ":")
 			if !ok {
-				c.Debugf("Skipping metric '%s': missing colon separator", part)
+				c.Debug("Skipping metric: missing colon separator")
 				continue
 			}
 
@@ -82,7 +82,7 @@ func (c *Collector) collectReport(mx map[string]int64, filename string) error {
 
 			val, err := strconv.ParseFloat(sVal, 64)
 			if err != nil {
-				c.Debugf("Skipping metric '%s': invalid value", part)
+				c.Debug("Skipping metric: invalid value")
 				continue
 			}
 

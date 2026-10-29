@@ -328,11 +328,14 @@ struct extent_io_data {
 
     // The metric this page belongs to, as a uuidmap id.
     //
-    // This exists so journal-v2 indexing never has to dereference the page's
-    // metric_id, which is a bare METRIC pointer with no reference behind it and
-    // can therefore be stale. Resolving the id through the MRG index is an
-    // indexed lookup that cannot touch freed memory; a dead metric simply
-    // misses. NOT a uuidmap reference - see mrg_metric_uuidmap_id().
+    // It originally existed so journal-v2 indexing never had to dereference the
+    // page's metric_id, which used to be a bare METRIC pointer. That reason is
+    // gone: page->metric_id is now the same uuidmap id (mrg_metric_id()). This
+    // field is therefore currently a duplicate of it, kept because journal-v2
+    // reads it here and the extent descriptor already carries it.
+    //
+    // NOT a uuidmap reference - see mrg_metric_uuidmap_id(). Resolve it with an
+    // indexed lookup that is allowed to miss; a deleted metric's id goes dead.
     UUIDMAP_ID uuid_id;
 };
 

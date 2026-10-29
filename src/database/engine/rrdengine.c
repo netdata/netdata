@@ -306,7 +306,7 @@ static void after_work_standard_callback(uv_work_t* req, int status) {
     worker_is_idle();
 }
 
-static bool work_dispatch(struct rrdengine_instance *ctx, void *data, struct completion *completion, enum rrdeng_opcode opcode, work_cb do_work_cb, after_work_cb do_after_work_cb) {
+static void work_dispatch(struct rrdengine_instance *ctx, void *data, struct completion *completion, enum rrdeng_opcode opcode, work_cb do_work_cb, after_work_cb do_after_work_cb) {
     struct rrdeng_work *work_request = NULL;
 
     internal_fatal(rrdeng_main.tid != gettid_cached(), "work_dispatch() can only be run from the event loop thread");
@@ -321,17 +321,15 @@ static bool work_dispatch(struct rrdengine_instance *ctx, void *data, struct com
     work_request->after_work_cb = do_after_work_cb;
     work_request->opcode = opcode;
 
-    if(uv_queue_work(&rrdeng_main.loop, &work_request->req, work_standard_worker, after_work_standard_callback)) {
-        internal_fatal(true, "DBENGINE: cannot queue work");
-        work_done(work_request);
-        return false;
-    }
+    // libuv fails only for a NULL work callback; the callers have no way to undo what they
+    // started for this work, so a failure here would leave it waiting forever
+    int ret = uv_queue_work(&rrdeng_main.loop, &work_request->req, work_standard_worker, after_work_standard_callback);
+    if(ret)
+        fatal("DBENGINE: cannot queue work for opcode %d: %s", (int)opcode, uv_strerror(ret));
 
     __atomic_add_fetch(&rrdeng_main.work_cmd.atomics.dispatched, 1, __ATOMIC_RELAXED);
     rrdeng_main.work_cmd.outstanding++;
     rrdeng_main.work_cmd.outstanding_by_opcode[opcode]++;
-
-    return true;
 }
 
 // ----------------------------------------------------------------------------
@@ -1445,22 +1443,10 @@ release_journal:
             continue;
         }
 
-        // the first open-cache page that really belongs to this metric (see open_cache_page_is_of_metric())
-        UUIDMAP_ID uuid_id = mrg_metric_uuidmap_id(main_mrg, uuid_first_t_entry->metric);
-        PGC_SEARCH method = PGC_SEARCH_FIRST;
-        time_t page_start_time_s = 0;
-        PGC_PAGE *page;
-        while ((page = pgc_page_get_and_acquire(
+        PGC_PAGE *page = pgc_page_get_and_acquire(
                 open_cache, (Word_t)ctx,
-                (Word_t)uuid_first_t_entry->metric, page_start_time_s,
-                method))) {
-            if (open_cache_page_is_of_metric(page, uuid_id))
-                break;
-
-            method = PGC_SEARCH_NEXT;
-            page_start_time_s = pgc_page_start_time_s(page);
-            pgc_page_release(open_cache, page);
-        }
+                mrg_metric_id(main_mrg, uuid_first_t_entry->metric), 0,
+                PGC_SEARCH_FIRST);
 
         if (page) {
             time_t old_first_time_s = uuid_first_t_entry->first_time_s;
@@ -2413,8 +2399,7 @@ static void extent_waiter_dispatch(struct rrdeng_cmd *cmd) {
     }
 
     rrdeng_main.extent_waiters.running++;
-    if(!work_dispatch(cmd->ctx, NULL, cmd->completion, cmd->opcode, do_work_cb, do_after_work_cb))
-        rrdeng_main.extent_waiters.running--;
+    work_dispatch(cmd->ctx, NULL, cmd->completion, cmd->opcode, do_work_cb, do_after_work_cb);
 }
 
 static void extent_waiter_dispatch_or_defer(struct rrdeng_cmd *cmd) {
@@ -2611,9 +2596,6 @@ static void timer_per_sec_cb(uv_timer_t *handle __maybe_unused)
     worker_set_metric(RRDENG_WORKS_DISPATCHED, (NETDATA_DOUBLE)__atomic_load_n(&rrdeng_main.work_cmd.atomics.dispatched, __ATOMIC_RELAXED));
     worker_set_metric(RRDENG_WORKS_EXECUTING, (NETDATA_DOUBLE)__atomic_load_n(&rrdeng_main.work_cmd.atomics.executing, __ATOMIC_RELAXED));
 
-    // normally dispatched when a waiter finishes; this only covers a failed dispatch
-    extent_waiters_dispatch_deferred();
-
     rrdeng_enq_cmd(NULL, RRDENG_OPCODE_FLUSH_MAIN, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
     rrdeng_enq_cmd(NULL, RRDENG_OPCODE_CLEANUP, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 
@@ -2623,8 +2605,6 @@ static void timer_per_sec_cb(uv_timer_t *handle __maybe_unused)
 // while the event loop drains its pool work at shutdown, wakes it up so that it can check its deadline
 static void timer_shutdown_drain_cb(uv_timer_t *handle __maybe_unused)
 {
-    // normally dispatched when a waiter finishes; this only covers a failed dispatch
-    extent_waiters_dispatch_deferred();
 }
 
 static size_t dbengine_cmd_queue_waiting(void) {
@@ -2679,24 +2659,22 @@ static void dbengine_initialize_structures(void) {
 bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx __maybe_unused) {
     static bool spawned = false;
     static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
+    int ret;
 
     spinlock_lock(&spinlock);
 
     if(!spawned) {
-        int ret;
-
         ret = uv_loop_init(&rrdeng_main.loop);
         if (ret) {
             netdata_log_error("DBENGINE: uv_loop_init(): %s", uv_strerror(ret));
-            return false;
+            goto failed;
         }
         rrdeng_main.loop.data = &rrdeng_main;
 
         ret = uv_async_init(&rrdeng_main.loop, &rrdeng_main.async, async_cb);
         if (ret) {
             netdata_log_error("DBENGINE: uv_async_init(): %s", uv_strerror(ret));
-            fatal_assert(0 == uv_loop_close(&rrdeng_main.loop));
-            return false;
+            goto close_loop;
         }
         rrdeng_main.async.data = &rrdeng_main;
 #if defined(OS_WINDOWS)
@@ -2706,17 +2684,13 @@ bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx __maybe_unused) {
         ret = uv_timer_init(&rrdeng_main.loop, &rrdeng_main.timer);
         if (ret) {
             netdata_log_error("DBENGINE: uv_timer_init(): %s", uv_strerror(ret));
-            uv_close((uv_handle_t *)&rrdeng_main.async, NULL);
-            fatal_assert(0 == uv_loop_close(&rrdeng_main.loop));
-            return false;
+            goto close_async;
         }
 
         ret = uv_timer_init(&rrdeng_main.loop, &rrdeng_main.retention_timer);
         if (ret) {
             netdata_log_error("DBENGINE: uv_timer_init(): %s", uv_strerror(ret));
-            uv_close((uv_handle_t *)&rrdeng_main.async, NULL);
-            fatal_assert(0 == uv_loop_close(&rrdeng_main.loop));
-            return false;
+            goto close_timer;
         }
 
         rrdeng_main.timer.data = &rrdeng_main;
@@ -2724,19 +2698,36 @@ bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx __maybe_unused) {
 
         dbengine_initialize_structures();
 
-        int retries = 0;
         rrdeng_main.thread = nd_thread_create("DBEV", NETDATA_THREAD_OPTION_DEFAULT, dbengine_event_loop, &rrdeng_main);
 
         fatal_assert(0 != rrdeng_main.thread);
-
-        if (retries)
-            nd_log_daemon(NDLP_WARNING, "DBENGINE thread was created after %d attempts", retries);
 
         spawned = true;
     }
 
     spinlock_unlock(&spinlock);
     return true;
+
+close_timer:
+    uv_close((uv_handle_t *)&rrdeng_main.timer, NULL);
+
+close_async:
+#if defined(OS_WINDOWS)
+    rrdeng_main.async_ready = false;
+#endif
+    uv_close((uv_handle_t *)&rrdeng_main.async, NULL);
+
+    // closing is asynchronous: run the close callbacks, so that the loop can be closed
+    uv_run(&rrdeng_main.loop, UV_RUN_NOWAIT);
+
+close_loop:
+    ret = uv_loop_close(&rrdeng_main.loop);
+    if (ret)
+        netdata_log_error("DBENGINE: uv_loop_close(): %s", uv_strerror(ret));
+
+failed:
+    spinlock_unlock(&spinlock);
+    return false;
 }
 
 static inline void worker_dispatch_extent_read(struct rrdeng_cmd cmd, bool from_worker) {
@@ -2878,7 +2869,7 @@ void dbengine_event_loop(void* arg) {
 
         do {
             worker_is_busy(RRDENG_OPCODE_MAX);
-            cmd = rrdeng_deq_cmd(RRDENG_OPCODE_NOOP);
+            cmd = rrdeng_deq_cmd(false);
             opcode = cmd.opcode;
 
             worker_is_busy(opcode);
@@ -2929,11 +2920,7 @@ void dbengine_event_loop(void* arg) {
                         !rrdeng_main.extent_waiters.deferred && extent_waiters_slot_available()) {
                         rrdeng_main.flushes_running++;
                         rrdeng_main.extent_waiters.running++;
-                        if(!work_dispatch(NULL, NULL, NULL, opcode, cache_flush_tp_worker, after_do_cache_flush)) {
-                            // no after-work callback will run
-                            rrdeng_main.flushes_running--;
-                            rrdeng_main.extent_waiters.running--;
-                        }
+                        work_dispatch(NULL, NULL, NULL, opcode, cache_flush_tp_worker, after_do_cache_flush);
                     }
                     break;
                 }
