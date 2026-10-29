@@ -111,7 +111,7 @@ static T clamp(const T& Value, const T& Min, const T& Max) {
   return std::max(Min, std::min(Value, Max));
 }
 
-#define ML_DIMENSION_ANOMALY_SCORE_THRESHOLD_DEFAULT 0.99
+static constexpr double ML_DIMENSION_ANOMALY_SCORE_THRESHOLD_DEFAULT = 0.99;
 
 /*
  * A model's anomaly score is capped at 100 and a dimension is anomalous only
@@ -204,7 +204,7 @@ void ml_config_load(ml_config_t *cfg) {
         ml_config_dimension_anomaly_score_threshold(configured_dimension_anomaly_score_threshold);
     if (dimension_anomaly_score_threshold != configured_dimension_anomaly_score_threshold)
         nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "ML: dimension anomaly score threshold %f is outside the range 0.01 - 1.00, using %f",
+               "ML: dimension anomaly score threshold %.10g is outside the range 0.01 - 1.00, using %.10g",
                configured_dimension_anomaly_score_threshold, dimension_anomaly_score_threshold);
 
     host_anomaly_rate_threshold = clamp(host_anomaly_rate_threshold, 0.1, 10.0);
