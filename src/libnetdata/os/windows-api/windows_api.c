@@ -114,9 +114,6 @@ int netdata_win_network_interfaces_get(struct netdata_win_network_interface **in
             break;
         }
 
-        if (!aa->Description)
-            continue;
-
         struct netdata_win_network_interface *entry = calloc(1, sizeof(*entry));
         if (!entry) {
             status = -1;
@@ -125,7 +122,8 @@ int netdata_win_network_interfaces_get(struct netdata_win_network_interface **in
 
         entry->description = netdata_win_utf16_to_utf8(aa->Description);
         entry->friendly_name = netdata_win_utf16_to_utf8(aa->FriendlyName);
-        if (!entry->description || (aa->FriendlyName && !entry->friendly_name)) {
+        // Tunnel adapters may lack a description; callers then match by friendly name.
+        if ((aa->Description && !entry->description) || (aa->FriendlyName && !entry->friendly_name)) {
             free(entry->description);
             free(entry->friendly_name);
             free(entry);

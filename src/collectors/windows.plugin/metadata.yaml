@@ -1210,7 +1210,7 @@ modules:
                 unit: ""
                 description: "Windows adapter friendly name, when matched."
           performance: "Queries the Windows adapter API when the table is opened."
-          security: "Requires signed-in, same-space access because adapter friendly names can contain user-entered text."
+          security: "Requires signed-in, same-space access because adapter friendly names can contain user-entered text. This is intentionally stricter than the Linux `network-interfaces` Function, which allows anonymous access; anonymous dashboard users receive HTTP 412 on Windows."
           availability: "Available after the Windows network collector successfully reads Perflib data."
   - meta:
       plugin_name: windows.plugin
