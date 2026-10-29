@@ -1431,7 +1431,7 @@ release_journal:
 
         PGC_PAGE *page = pgc_page_get_and_acquire(
                 open_cache, (Word_t)ctx,
-                (Word_t)uuid_first_t_entry->metric, 0,
+                mrg_metric_id(main_mrg, uuid_first_t_entry->metric), 0,
                 PGC_SEARCH_FIRST);
 
         if (page) {

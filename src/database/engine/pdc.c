@@ -1042,9 +1042,14 @@ static void epdl_extent_loading_error_log(struct rrdengine_instance *ctx, EPDL *
                 pd = *pd_pptr;
                 start_time_s = pd->first_time_s;
                 end_time_s = pd->last_time_s;
-                METRIC *metric = (METRIC *)pd->metric_id;
-                nd_uuid_t *u = mrg_metric_uuid(main_mrg, metric);
-                uuid_unparse_lower(*u, uuid);
+
+                // pd->metric_id is the metric's UUIDMAP_ID (mrg_metric_id()) and nothing here holds a
+                // reference to it: uuidmap_uuid() copies under the map lock and only misses on a dead id
+                nd_uuid_t u;
+                if(uuidmap_uuid((UUIDMAP_ID)pd->metric_id, u))
+                    uuid_unparse_lower(u, uuid);
+                else
+                    snprintfz(uuid, sizeof(uuid), "id:%u", (unsigned)pd->metric_id);
                 used_epdl = true;
             }
         }
@@ -1200,13 +1205,13 @@ static bool epdl_populate_pages_from_extent_data(
         }
 
         METRIC *metric = mrg_metric_get_and_acquire_by_uuid(main_mrg, &header->descr[i].uuid, (Word_t)ctx);
-        Word_t metric_id = (Word_t)metric;
         if(!metric) {
             char log[200 + 1];
             snprintfz(log, sizeof(log) - 1, "page %u (out of %u) has unknown UUID", i, count);
             epdl_extent_loading_error_log(ctx, epdl, &header->descr[i], log, NDLP_DEBUG);
             continue;
         }
+        Word_t metric_id = mrg_metric_id(main_mrg, metric);
         mrg_metric_release(main_mrg, metric);
 
         struct page_details *pd_list = epdl_get_pd_load_link_list_from_metric_start_time(epdl, metric_id, start_time_s);

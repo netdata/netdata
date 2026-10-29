@@ -237,9 +237,21 @@ bool mrg_metric_release(MRG *mrg, METRIC *metric) {
     return metric_release(mrg, metric);
 }
 
+// The PGC main/open cache key for a metric.
+//
+// This is the metric's UUIDMAP_ID, NOT its address. A bare METRIC pointer is not a
+// reference (see mrg-internals.h): the metric can be freed while cache pages still carry
+// the key, and ARAL then writes its free-list header over uuid and refcount, so any
+// consumer that dereferenced such a key read freed memory. An id cannot be dereferenced,
+// and it is never reused while the uuidmap lives.
+//
+// The id is the same for every tier - the tier is the cache SECTION ((Word_t)ctx) - so
+// (section, metric_id) is what identifies a metric's pages. Callers must always pass the
+// correct section; the pointer used to provide accidental tier discrimination, the id does
+// not.
 ALWAYS_INLINE
 Word_t mrg_metric_id(MRG *mrg __maybe_unused, METRIC *metric) {
-    return (Word_t)metric;
+    return (Word_t)metric->uuid;
 }
 
 ALWAYS_INLINE
@@ -362,7 +374,7 @@ bool mrg_metric_has_zero_disk_retention(MRG *mrg __maybe_unused, METRIC *metric)
         PGC_PAGE *page;
         PGC_SEARCH method = PGC_SEARCH_FIRST;
         time_t page_first_time_s = 0;
-        while ((page = pgc_page_get_and_acquire(main_cache, section, (Word_t)metric, page_first_time_s, method))) {
+        while ((page = pgc_page_get_and_acquire(main_cache, section, mrg_metric_id(mrg, metric), page_first_time_s, method))) {
             method = PGC_SEARCH_NEXT;
 
             bool is_hot = pgc_is_page_hot(page);
