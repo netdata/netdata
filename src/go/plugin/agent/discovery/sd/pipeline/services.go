@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"maps"
 	"strings"
 	"text/template"
 
@@ -21,7 +22,9 @@ func newServiceEngine(cfg []ServiceRuleConfig) (*serviceEngine, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &serviceEngine{rules: rules}, nil
+	return &serviceEngine{
+		rules: rules,
+	}, nil
 }
 
 type serviceEngine struct {
@@ -34,6 +37,7 @@ type serviceRule struct {
 	id    string
 	match *template.Template
 	tmpl  *template.Template // optional
+	jobs  []confgroup.Config // submitted during this rule's synchronous execution
 }
 
 func newServiceRules(cfg []ServiceRuleConfig) ([]*serviceRule, error) {
@@ -48,17 +52,20 @@ func newServiceRules(cfg []ServiceRuleConfig) ([]*serviceRule, error) {
 			return nil, fmt.Errorf("service '%s'[%d]: match: %v", rc.ID, i, err)
 		}
 
-		var tmpl *template.Template
+		rule := &serviceRule{
+			id:    rc.ID,
+			match: m,
+		}
 		if strings.TrimSpace(rc.ConfigTemplate) != "" {
-			tmpl, err = parseTemplate(rc.ConfigTemplate, fmap)
+			outputFuncs := maps.Clone(fmap)
+			outputFuncs["job"] = rule.emitJob
+			rule.tmpl, err = parseTemplate(rc.ConfigTemplate, outputFuncs)
 			if err != nil {
 				return nil, fmt.Errorf("service '%s'[%d]: config_template: %v", rc.ID, i, err)
 			}
 		}
 
-		rules = append(rules, &serviceRule{
-			id: rc.ID, match: m, tmpl: tmpl,
-		})
+		rules = append(rules, rule)
 	}
 	return rules, nil
 }
@@ -83,18 +90,25 @@ func (s *serviceEngine) compose(tgt model.Target) []confgroup.Config {
 		}
 
 		s.buf.Reset()
-		if err := r.tmpl.Execute(&s.buf, tgt); err != nil {
+		cfgs, err := r.execute(&s.buf, tgt)
+		if err != nil {
+			// Execution errors contain action text, which can include literal credentials.
+			var safe jobError
+			if errors.As(err, &safe) {
+				err = safe
+			}
 			s.Warningf("failed to execute services[%d]->config_template on target '%s': %v", i+1, tgt.TUID(), err)
 			continue
 		}
-		if s.buf.Len() == 0 {
-			continue
-		}
-
-		cfgs, err := parseConfigTemplateData(s.buf.Bytes())
-		if err != nil {
-			s.Warningf("failed to parse services[%d] template data: %v", i+1, err)
-			continue
+		if len(cfgs) == 0 {
+			if strings.TrimSpace(s.buf.String()) == "" {
+				continue
+			}
+			cfgs, err = parseConfigTemplateData(s.buf.Bytes())
+			if err != nil {
+				s.Warningf("failed to parse services[%d] template data: %v", i+1, err)
+				continue
+			}
 		}
 
 		for _, cfg := range cfgs {

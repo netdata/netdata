@@ -97,8 +97,7 @@ setup:
               - id: redis
                 match: '{{ or (eq .Port "6379") (eq .Comm "redis-server") }}'
                 config_template: |
-                  name: local
-                  address: redis://@{{.Address}}
+                  {{ job "name" "local" "address" (printf "redis://@%s" .Address) }}
         - name: 'Faster scan interval'
           description: 'Bump the scan rate to once per minute. Useful for very dynamic environments where services come and go often (e.g. ephemeral test runners).'
           config: |
@@ -160,30 +159,29 @@ services:
           - id: redis
             match: '{{ or (eq .Port "6379") (eq .Comm "redis-server") }}'
             config_template: |
-              name: local
-              address: redis://@{{.Address}}
+              {{ job "name" "local" "address" (printf "redis://@%s" .Address) }}
       - name: 'Comm + Cmdline glob (for interpreted services)'
         description: 'When the process is `java`/`python`/`node` and the real service name lives in the command line.'
         config: |
           - id: rabbitmq
             match: '{{ or (eq .Port "15672") (glob .Cmdline "*rabbitmq*") }}'
             config_template: |
-              name: local
-              url: http://{{.Address}}
-              username: guest
-              password: guest
-              collect_queues_metrics: no
-      - name: 'Multiple jobs from one target (sequence output)'
+              {{ job
+                "name" "local"
+                "url" (printf "http://%s" .Address)
+                "username" "guest"
+                "password" "guest"
+                "collect_queues_metrics" false
+              }}
+      - name: 'Multiple jobs from one target'
         description: |
-          When one running service should produce multiple collector jobs — for example, MySQL exposing both a Unix-socket DSN and a TCP DSN. The rendered YAML is a top-level sequence; each item becomes a separate job.
+          When one running service should produce multiple collector jobs — for example, MySQL exposing both a Unix-socket DSN and a TCP DSN. Call `job` once for each collector job, in the desired order.
         config: |
           - id: mysql
             match: '{{ or (eq .Port "3306") (eq .Comm "mysqld" "mariadbd") }}'
             config_template: |
-              - name: local
-                dsn: netdata@unix(/var/run/mysqld/mysqld.sock)/
-              - name: local
-                dsn: netdata@tcp({{.Address}})/
+              {{ job "name" "local" "dsn" "netdata@unix(/var/run/mysqld/mysqld.sock)/" }}
+              {{ job "name" "local" "dsn" (printf "netdata@tcp(%s)/" .Address) }}
       - name: 'Prometheus-exporter catch-all (`promPort`)'
         description: |
           The last rule in the stock conf catches generic Prometheus exporters by port. `promPort .Port` returns the well-known module name for that port, or empty. The rule is bottom-most because it overlaps with every preceding curated rule.
@@ -191,13 +189,15 @@ services:
           - id: exporter
             match: '{{ or (and (not (empty (promPort .Port))) (not (eq .Comm "docker-proxy"))) (glob .Comm "*exporter*") }}'
             config_template: |
-              {{ $name := promPort .Port -}}
-              {{ if empty $name -}}
-              {{ $name = printf "%s_%s" .Comm .Port -}}
-              {{ end -}}
-              module: prometheus
-              name: {{$name}}_local
-              url: http://{{.Address}}/metrics
+              {{ $job := dict }}
+              {{ $name := promPort .Port }}
+              {{ if empty $name }}
+              {{ $name = printf "%s_%s" .Comm .Port }}
+              {{ end }}
+              {{ $_ := set $job "module" "prometheus" }}
+              {{ $_ := set $job "name" (printf "%s_local" $name) }}
+              {{ $_ := set $job "url" (printf "http://%s/metrics" .Address) }}
+              {{ job $job }}
 verify:
   description: 'After enabling the discoverer, confirm it is finding listeners and producing jobs.'
   checks:
