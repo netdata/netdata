@@ -156,7 +156,11 @@ static void http_header_x_forwarded_for(struct web_client *w, const char *v, siz
     // The stored value is serialized into the comma separated key=value source string of
     // function calls and quoted into the FUNCTION lines sent to plugins and children,
     // so keep only the first entry, and only when it is an IPv4 or IPv6 address.
-    const char *e = v, *end = v + len;
+    const char *end = v + len;
+    while(v < end && isspace((uint8_t)*v))
+        v++;
+
+    const char *e = v;
     while(e < end && *e != ',')
         e++;
 
