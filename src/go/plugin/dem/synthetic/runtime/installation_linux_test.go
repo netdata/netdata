@@ -2,10 +2,12 @@
 package runtime
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"github.com/stretchr/testify/require"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -237,4 +239,56 @@ func TestRecoverSelectionAfterWriterExit(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPreparationReportsOneCandidateClaim(t *testing.T) {
+	s, _ := testStore(t)
+	m, archive := bundleFixture(t, "status")
+	candidate, err := s.BeginInstall(context.Background(), m)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, candidate.Close()) })
+	ready, resume := make(chan struct{}), make(chan struct{})
+	done := make(chan error, 1)
+	go func() {
+		done <- s.prepare(context.Background(), m, func() (io.ReadCloser, error) {
+			return io.NopCloser(&resumeReader{ready: ready, resume: resume, tail: bytes.NewReader(archive)}), nil
+		})
+	}()
+	joined := false
+	t.Cleanup(func() {
+		select {
+		case <-resume:
+		default:
+			close(resume)
+		}
+		if !joined {
+			require.NoError(t, <-done)
+		}
+	})
+	<-ready
+	status, err := s.Inspect()
+	require.NoError(t, err)
+	require.Equal(t, 1, status.CandidateClaims, "one installer is not two claims while staging")
+	require.Positive(t, status.ReservedBytes)
+	require.Positive(t, status.PreparingBytes)
+	require.Zero(t, status.ProcessClaims)
+	close(resume)
+	result := <-done
+	joined = true
+	require.NoError(t, result)
+	require.NoError(t, candidate.Select())
+}
+
+func TestUnsupportedContractKeepsInstalledSelection(t *testing.T) {
+	s, _ := testStore(t)
+	selected := installFixture(t, s, "selected")
+	unsupported := selected
+	unsupported.Contract = 2
+	candidate, err := s.BeginInstall(context.Background(), unsupported)
+	require.Nil(t, candidate)
+	require.ErrorContains(t, err, "unsupported runtime execution contract 2")
+	require.ErrorContains(t, err, "upgrade the Agent")
+	status, err := s.Inspect()
+	require.NoError(t, err)
+	require.Equal(t, selected, *status.Selected)
 }

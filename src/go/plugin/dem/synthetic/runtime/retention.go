@@ -25,6 +25,7 @@ type inventory struct {
 	generations        map[string]generation
 	processes          map[string]int
 	candidates         map[string]int
+	preparing          map[string]int
 	uses               map[string]int
 	uncertain          map[string]int
 	reservations       map[string]reservation
@@ -49,14 +50,14 @@ type Status struct {
 	LimitBytes            int64     `json:"limit_bytes"`
 	ProtectedBytes        int64     `json:"protected_bytes"`
 	ReclaimableBytes      int64     `json:"reclaimable_bytes"`
-	CandidateBytes        int64     `json:"candidates_bytes"`
-	CandidateClaims       int       `json:"candidates_claims"`
-	ProcessBytes          int64     `json:"processes_bytes"`
+	CandidateBytes        int64     `json:"candidate_bytes"`
+	CandidateClaims       int       `json:"candidate_claims"`
+	ProcessBytes          int64     `json:"process_bytes"`
 	ExecutionBytes        int64     `json:"execution_bytes"`
 	UncertainBytes        int64     `json:"uncertain_bytes"`
 	PreparingBytes        int64     `json:"preparing_bytes"`
 	TrashBytes            int64     `json:"trash_bytes"`
-	ProcessGenerations    int       `json:"processes_generations"`
+	ProcessGenerations    int       `json:"process_generations"`
 	ExecutionPins         int       `json:"execution_pins"`
 	UncertainPins         int       `json:"uncertain_pins"`
 	BootRecoveryAvailable bool      `json:"boot_recovery_available"`
@@ -64,7 +65,7 @@ type Status struct {
 }
 
 func (s *Store) inventoryLocked(reconcile bool) (inventory, error) {
-	inv := inventory{generations: make(map[string]generation), processes: make(map[string]int), candidates: make(map[string]int), uses: make(map[string]int), uncertain: make(map[string]int), reservations: make(map[string]reservation), protectedRecords: make(map[string]bool), reclaimableRecords: make(map[string]bool)}
+	inv := inventory{generations: make(map[string]generation), processes: make(map[string]int), candidates: make(map[string]int), preparing: make(map[string]int), uses: make(map[string]int), uncertain: make(map[string]int), reservations: make(map[string]reservation), protectedRecords: make(map[string]bool), reclaimableRecords: make(map[string]bool)}
 	var err error
 	inv.selected, err = s.selectedLocked(reconcile)
 	if err != nil {
@@ -193,7 +194,7 @@ func (s *Store) inventoryLocked(reconcile bool) (inventory, error) {
 		}
 		inv.reservations[name] = r
 		inv.protectedRecords[name] = true
-		inv.candidates[r.Generation]++
+		inv.preparing[r.Generation]++
 	}
 	generations, err := s.childDirectories("generations")
 	if err != nil {
@@ -444,5 +445,5 @@ func (s *Store) flushTrash() error {
 }
 
 func (inv inventory) protected(id string) bool {
-	return (inv.selected != nil && inv.selected.Archive.SHA256 == id) || inv.processes[id] > 0 || inv.candidates[id] > 0 || inv.uses[id] > 0
+	return (inv.selected != nil && inv.selected.Archive.SHA256 == id) || inv.processes[id] > 0 || inv.candidates[id] > 0 || inv.preparing[id] > 0 || inv.uses[id] > 0
 }
