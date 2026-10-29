@@ -4,13 +4,7 @@ package joboutput
 
 import (
 	"bytes"
-	"crypto/ed25519"
-	"crypto/rand"
-	"crypto/x509"
 	"encoding/json"
-	"encoding/pem"
-	"math/big"
-	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
@@ -21,6 +15,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/mysql"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/x509check"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -29,16 +24,6 @@ import (
 // the optional lifecycle secret redaction is involved.
 func TestDynCfgFileErrorsDoNotExposeContent(t *testing.T) {
 	const marker = "private_file_marker"
-	pub, key, err := ed25519.GenerateKey(rand.Reader)
-	require.NoError(t, err)
-	cert := &x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		NotBefore:    time.Unix(1, 0),
-		NotAfter:     time.Unix(2, 0),
-		URIs:         []*url.URL{{Scheme: "https", Host: "[" + marker}},
-	}
-	der, err := x509.CreateCertificate(rand.Reader, cert, cert, pub, key)
-	require.NoError(t, err)
 	for name, test := range map[string]struct {
 		module  string
 		content []byte
@@ -63,7 +48,7 @@ func TestDynCfgFileErrorsDoNotExposeContent(t *testing.T) {
 			message: "invalid exposition format",
 		},
 		"X509 certificate": {
-			module: "x509check", content: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}),
+			module: "x509check", content: collecttest.CertificateWithInvalidURI(t, marker),
 			config:  func(path string) map[string]any { return map[string]any{"source": "file://" + path} },
 			message: "invalid X.509 certificate",
 		},
