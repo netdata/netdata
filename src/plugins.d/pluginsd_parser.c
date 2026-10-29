@@ -293,10 +293,10 @@ static void pluginsd_vnode_stale_check_cb(RRDHOST *host, void *data) {
 // Expires the vnodes this plugin stopped feeding, and drops the ones that are gone.
 static void pluginsd_vnodes_stale_check(PARSER *parser) {
     time_t now = now_realtime_sec();
-    if(parser->user.vnodes.last_host_stale_check >= now)
+    if(parser->user.vnodes.last_host_stale_check > now)
         return;
 
-    uint32_t min_check_interval = UINT_MAX;
+    uint32_t min_check_interval = 0;
 
     // keys whose host is gone: JudyLDel() is not safe inside JudyLFirstThenNext(), so they are
     // collected here and deleted after the walk
@@ -329,7 +329,8 @@ static void pluginsd_vnodes_stale_check(PARSER *parser) {
         if (!t.stale_after_seconds)
             continue;
 
-        min_check_interval = MIN(min_check_interval, t.stale_after_seconds);
+        if(!min_check_interval || t.stale_after_seconds < min_check_interval)
+            min_check_interval = t.stale_after_seconds;
 
         if(t.expired) {
             // one atomic clear: both bits describe the same transition (we stopped collecting
@@ -349,10 +350,10 @@ static void pluginsd_vnodes_stale_check(PARSER *parser) {
         pluginsd_vnodes_index_del(parser, gone[i]);
     freez(gone);
 
-    if (min_check_interval == UINT_MAX)
+    if (!min_check_interval)
         min_check_interval = 60;
 
-    parser->user.vnodes.last_host_stale_check = now_realtime_sec() + min_check_interval;
+    parser->user.vnodes.last_host_stale_check = nd_time_t_add_saturating(now_realtime_sec(), min_check_interval);
 }
 
 // A host has exactly one writer. For a vnode that writer is the local collector that defines it.
@@ -370,7 +371,16 @@ static void pluginsd_vnodes_stale_check(PARSER *parser) {
 // On failure the caller MUST clear the flag again, unless the host is already registered in
 // parser->user.vnodes.JudyL - the stale detection and the plugin teardown clear it only for hosts
 // in that index, so an unregistered host would keep the gate closed with nobody collecting.
+// Success restores live local state after receiver teardown, including the local health policy.
 static bool pluginsd_host_claim_as_local_vnode(RRDHOST *host, const char *keyword) {
+    // HOST_DEFINE normally rebuilds archived structures through rrdhost_update(). Context loading
+    // can defer that update, so do not claim the host until its definition can finish initialization.
+    if(unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))) {
+        nd_log_daemon(NDLP_INFO, "PLUGINSD: %s: host %s is still archived - restarting the plugin later",
+                      keyword, host->machine_guid);
+        return false;
+    }
+
     // stream_receiver_signal_to_stop_and_wait() also returns true when no receiver is attached,
     // so we check first: that is the only way to tell "nothing to do" (the common case, silent)
     // from "we disconnected someone" (rare, and the only diagnostic for a GUID conflict).
@@ -378,23 +388,34 @@ static bool pluginsd_host_claim_as_local_vnode(RRDHOST *host, const char *keywor
     bool has_receiver = host->receiver != NULL;
     rrdhost_receiver_unlock(host);
 
-    if(!has_receiver)
-        return true;
+    if(has_receiver) {
+        // the peer identity is logged by the receiver itself, with this disconnect reason
+        if(!stream_receiver_signal_to_stop_and_wait(host, STREAM_HANDSHAKE_RCV_DISCONNECT_LOCAL_VNODE_CLAIMED)) {
+            nd_log_daemon(NDLP_ERR,
+                          "PLUGINSD: %s: host '%s' (machine guid %s) is collected locally as a vnode, but its "
+                          "streaming receiver could not be stopped - not collecting into it",
+                          keyword, rrdhost_hostname(host), host->machine_guid);
+            return false;
+        }
 
-    // the peer identity is logged by the receiver itself, with this disconnect reason
-    if(!stream_receiver_signal_to_stop_and_wait(host, STREAM_HANDSHAKE_RCV_DISCONNECT_LOCAL_VNODE_CLAIMED)) {
-        nd_log_daemon(NDLP_ERR,
-                      "PLUGINSD: %s: host '%s' (machine guid %s) is collected locally as a vnode, but its "
-                      "streaming receiver could not be stopped - not collecting into it",
+        nd_log_daemon(NDLP_WARNING,
+                      "PLUGINSD: %s: host '%s' (machine guid %s) was receiving a stream while it is collected "
+                      "locally as a vnode - the stream has been disconnected. If this is a real child node, "
+                      "its machine guid conflicts with the guid of a locally collected vnode.",
                       keyword, rrdhost_hostname(host), host->machine_guid);
-        return false;
     }
 
-    nd_log_daemon(NDLP_WARNING,
-                  "PLUGINSD: %s: host '%s' (machine guid %s) was receiving a stream while it is collected "
-                  "locally as a vnode - the stream has been disconnected. If this is a real child node, "
-                  "its machine guid conflicts with the guid of a locally collected vnode.",
-                  keyword, rrdhost_hostname(host), host->machine_guid);
+    // A receiver may have disconnected earlier or during this claim. Restore its teardown effects
+    // only after it has drained; otherwise teardown can disable a newly initialized local host.
+    object_state_activate_if_not_activated(&host->state_id);
+    spinlock_lock(&host->rrdhost_update_lock);
+    host->health.enabled = host->rrd_memory_mode != RRD_DB_MODE_NONE && health_plugin_enabled();
+    spinlock_unlock(&host->rrdhost_update_lock);
+    ml_host_start(host);
+    rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
+    rrdhost_flag_set(host, RRDHOST_FLAG_COLLECTOR_ONLINE);
+    pulse_host_status(host, 0, 0); // this will detect the receiver status
+    rrdcontext_host_child_connected(host);
 
     return true;
 }
@@ -464,11 +485,6 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
         return PARSER_RC_ERROR;
     }
 
-    rrdhost_flag_set(host, RRDHOST_FLAG_COLLECTOR_ONLINE);
-    object_state_activate_if_not_activated(&host->state_id);
-    ml_host_start(host);
-    pulse_host_status(host, 0, 0); // this will detect the receiver status
-
     bool labels_changed;
     if(host->rrdlabels) {
         labels_changed = rrdlabels_migrate_to_these(host->rrdlabels, parser->user.host_define.rrdlabels);
@@ -485,6 +501,8 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
     }
 
     labels_changed |= pluginsd_update_host_ephemerality(host);
+    // Transfer the timeout before cleanup resets the temporary definition state.
+    host->node_stale_after_seconds = parser->user.host_define.node_stale_after_seconds;
     pluginsd_host_define_cleanup(parser);
 
     if(labels_changed)
@@ -492,8 +510,6 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
 
     pluginsd_select_host(parser, host, true, PLUGINSD_KEYWORD_HOST_DEFINE_END);
 
-    rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
-    rrdcontext_host_child_connected(host);
     struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
     if (aclk_host_config)
         aclk_queue_node_info(host, true);
@@ -501,12 +517,18 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
         schedule_node_state_update(host, 100);
 
     rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_UPDATE);
+    time_t now = now_realtime_sec();
     uint32_t *Pvalue = pluginsd_vnodes_index_add(parser, host->machine_guid);
     if (Pvalue)
-        *Pvalue = (uint32_t) (now_realtime_sec() - VNODE_BASE_EPOCH);
+        *Pvalue = (uint32_t) (now - VNODE_BASE_EPOCH);
     else
         nd_log_daemon(NDLP_ERR, "VNODE: Cannot track virtual host \"%s\" for staleness - JudyLIns error", rrdhost_hostname(host));
-    host->node_stale_after_seconds = parser->user.host_define.node_stale_after_seconds;
+    if(host->node_stale_after_seconds) {
+        // A new or reduced timeout must not wait for the previously cached scan deadline.
+        time_t next_check = nd_time_t_add_saturating(now, host->node_stale_after_seconds);
+        if(parser->user.vnodes.last_host_stale_check > next_check)
+            parser->user.vnodes.last_host_stale_check = next_check;
+    }
     nd_log_daemon(NDLP_INFO, "VNODE: Configuring node stale after %u seconds for host \"%s\"", host->node_stale_after_seconds, rrdhost_hostname(host));
 
     return PARSER_RC_OK;
@@ -550,13 +572,15 @@ static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *pa
     if(unlikely(!host))
         return PLUGINSD_PROTOCOL_ERROR(PLUGINSD_KEYWORD_HOST, "cannot find a host with this machine guid - have you created it?");
 
-    if(unlikely(!pinned)) {
-        // a removal holds this host. We stop the plugin and retry it later instead of keeping the
-        // previous selection: the commands that follow are meant for this host, so collecting them
-        // into another one would misattribute them.
+    if(unlikely(!pinned || rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))) {
+        // Removal owns the host, or archiving destroyed its runtime structures. Retry the plugin
+        // so a fresh HOST_DEFINE can initialize it; following metrics must not use another host.
         nd_log_daemon(NDLP_INFO,
-                      "PLUGINSD: %s: host with machine guid %s is being removed - restarting the plugin later",
-                      PLUGINSD_KEYWORD_HOST, uuid_str);
+                      "PLUGINSD: %s: host with machine guid %s %s - restarting the plugin later",
+                      PLUGINSD_KEYWORD_HOST, uuid_str,
+                      pinned ? "is archived and needs a new definition" : "is being removed");
+        if(pinned)
+            rrdhost_pin_release(host);
         pluginsd_select_host(parser, NULL, false, PLUGINSD_KEYWORD_HOST);
         parser->user.retry = true;
         return PARSER_RC_ERROR;
@@ -577,7 +601,6 @@ static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *pa
             return PARSER_RC_ERROR;
         }
 
-        rrdhost_flag_set(host, RRDHOST_FLAG_COLLECTOR_ONLINE);
         nd_log_daemon(NDLP_INFO, "VNODE: Re-enabling virtual host \"%s\"", rrdhost_hostname(host));
         schedule_node_state_update(host, 1000);
     }
