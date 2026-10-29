@@ -992,7 +992,7 @@ var (
 	pvcCapacityChartTmpl = collectorapi.Chart{
 		IDSep:    true,
 		ID:       "pvc_%s.capacity",
-		Title:    "PVC Capacity",
+		Title:    "PVC Capacity Request Difference",
 		Units:    "B",
 		Fam:      "pvc",
 		Ctx:      "k8s_state.pvc_capacity",

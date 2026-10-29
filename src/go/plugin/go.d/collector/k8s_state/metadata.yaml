@@ -526,7 +526,7 @@ modules:
               description: PersistentVolumeClaim name.
           metrics:
             - name: k8s_state.pvc_capacity
-              description: PVC Capacity
+              description: PVC Capacity Request Difference
               unit: B
               chart_type: line
               dimensions:

@@ -1015,7 +1015,7 @@ func TestCollector_Collect(t *testing.T) {
 						{Key: "k8s_namespace", Value: "default", Source: collectorapi.LabelSourceK8s},
 						{Key: "k8s_pvc_name", Value: "bound", Source: collectorapi.LabelSourceK8s},
 					}, chart.Labels)
-					assert.Equal(t, "PVC Capacity", chart.Title)
+					assert.Equal(t, "PVC Capacity Request Difference", chart.Title)
 					assert.Equal(t, "k8s_state.pvc_capacity", chart.Ctx)
 					var dimIDs, dimNames []string
 					for _, dim := range chart.Dims {
