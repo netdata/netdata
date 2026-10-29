@@ -6,16 +6,30 @@ import path from 'node:path';
 import os from 'node:os';
 import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {metricsFromLHR} from '../lighthouse.mjs';
-const assets = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const dependencies = process.env.DEM_TEST_DEPENDENCIES || assets;
+import {metricsFromLHR} from '../runner/lighthouse.mjs';
+const sourceRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+const dependencies = process.env.DEM_TEST_DEPENDENCIES || sourceRoot;
 
-async function run(source, options = {}) {
+async function fixtureRuntime(dependencyRoot, browser = 'missing-prepared-browser') {
+  const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'dem-runtime-test-')));
+  await fs.cp(path.join(sourceRoot, 'runner'), path.join(root, 'runner'), {recursive:true});
+  await fs.symlink(dependencyRoot, path.join(root, 'dependencies'));
+  const pins = JSON.parse(await fs.readFile(path.join(sourceRoot, 'manifest.json'), 'utf8'));
+  pins.node_version = process.versions.node;
+  await fs.writeFile(path.join(root, 'manifest.json'), JSON.stringify(pins));
+  await fs.writeFile(path.join(root, 'runtime.json'), JSON.stringify({contract:1, version:'test-release',
+    paths:{dependencies:'dependencies',browser}}));
+  return root;
+}
+const runtimeRoot = await fixtureRuntime(dependencies);
+const assets = path.join(runtimeRoot, 'runner');
+
+async function run(source, options = {}, root = runtimeRoot) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'dem-runner-test-'));
-  const request = {version: 1, kind: 'journey', run_id: 'test', dependencies_path: dependencies,
-    browser_path: '/missing-prepared-browser', work_dir: dir, script: source, timeout_ms: 10000,
+  const request = {version: 1, kind: 'journey', run_id: 'test',
+    work_dir: dir, script: source, timeout_ms: 10000,
     capture: false, secrets: {}, ...options};
-  const child = spawn(process.execPath, [path.join(assets, 'run.mjs')], {stdio: ['pipe', 'pipe', 'pipe'], env: {...process.env, NODE_OPTIONS: '', DEM_SECRET_UNPASSED: 'must-not-inherit'}});
+  const child = spawn(process.execPath, [path.join(root, 'runner/run.mjs')], {stdio: ['pipe', 'pipe', 'pipe'], env: {...process.env, NODE_OPTIONS: '', DEM_SECRET_UNPASSED: 'must-not-inherit'}});
   let out = '', err = '';
   child.stdout.on('data', b => out += b);
   child.stderr.on('data', b => err += b);
@@ -49,6 +63,7 @@ for (const [name, [source,status,expected]] of Object.entries(outcomes)) {
     const actual = await run(prefix + source);
     assert.equal(actual.result.status,status);
     assert.deepEqual(actual.result.tests,expected);
+    assert.equal(actual.events.find(e=>e.kind==='suite'&&e.phase==='discovery').declared_tests,expected.declared);
     assert.equal(actual.result.capture_state,'disabled');
     if(status==='failed'||status==='timeout') assert.ok(actual.events.some(e=>e.kind==='error'));
   });
@@ -168,14 +183,16 @@ test('optional Lighthouse report write failure preserves completed measurements'
   }
   await fs.mkdir(path.join(modules,'lighthouse/core/config'),{recursive:true});
   await fs.mkdir(path.join(modules,'chrome-launcher/dist'),{recursive:true});
-  await fs.writeFile(path.join(modules,'lighthouse/core/index.js'),`export default async()=>({lhr:{categories:{performance:{score:0.88}},audits:{'largest-contentful-paint':{numericValue:123}}},report:['{}','<html>fixture</html>']});`);
-  await fs.writeFile(path.join(modules,'lighthouse/core/config/lr-desktop-config.js'),'export default {};');
+  await fs.writeFile(path.join(modules,'lighthouse/core/index.js'),`import assert from 'node:assert/strict';export default async(url,options,config)=>{assert.equal(config.profile,'desktop');assert.deepEqual(options.onlyCategories,['performance']);return {lhr:{categories:{performance:{score:0.88}},audits:{'largest-contentful-paint':{numericValue:123}}},report:['{}','<html>fixture</html>']}};`);
+  await fs.writeFile(path.join(modules,'lighthouse/core/config/lr-desktop-config.js'),"export default {profile:'desktop'};");
   const closed=path.join(dir,'closed');
-  await fs.writeFile(path.join(modules,'chrome-launcher/dist/index.js'),`import fs from 'node:fs/promises';export const launch=async()=>({port:1,kill:async()=>fs.writeFile(${JSON.stringify(closed)},'closed')});`);
+  await fs.writeFile(path.join(modules,'chrome-launcher/dist/index.js'),`import assert from 'node:assert/strict';import fs from 'node:fs/promises';export const launch=async options=>{assert.deepEqual(options.chromeFlags,['--headless=new','--disable-dev-shm-usage']);return {port:1,kill:async()=>fs.writeFile(${JSON.stringify(closed)},'closed')}};`);
   await fs.mkdir(path.join(dir,'output/lighthouse.html'),{recursive:true});
-  const child=spawn(process.execPath,[path.join(assets,'lighthouse.mjs')],{stdio:['pipe','ignore','pipe','pipe']});
+  const fixture=await fixtureRuntime(dir,'chrome');
+  await fs.symlink(process.execPath,path.join(fixture,'chrome'));
+  const child=spawn(process.execPath,[path.join(fixture,'runner/lighthouse.mjs')],{stdio:['pipe','ignore','pipe','pipe']});
   let wire='';child.stdio[3].on('data',b=>wire+=b);
-  child.stdin.end(JSON.stringify({dependencies_path:dir,browser_path:process.execPath,work_dir:dir,url:'http://fixture.invalid',timeout_ms:1000,capture:true}));
+  child.stdin.end(JSON.stringify({work_dir:dir,url:'http://fixture.invalid',timeout_ms:1000,capture:true}));
   await new Promise(r=>child.on('close',r));
   const records=wire.trim().split('\n').map(JSON.parse);
   const result=records.find(r=>r.type==='result').result;
@@ -189,7 +206,7 @@ test('optional Lighthouse report write failure preserves completed measurements'
 
 
 test('known stream prefixes stay protected for every byte partition', async()=>{
-  const {default:protocol}=await import('../protocol.cjs');
+  const {default:protocol}=await import('../runner/protocol.cjs');
   protocol.configureSecrets({DEM_SECRET_A:'abc',DEM_SECRET_B:'abcdef',DEM_SECRET_UTF:'秘密🔐value',DEM_SECRET_NEWLINE:'first\nsecond',DEM_SECRET_SHORT:'!'});
   try {
     const input=Buffer.from('ordinary 界 abc abcdef 秘密🔐value first\nsecond ! tail abcde');
@@ -216,7 +233,7 @@ test('assertion failure takes precedence over launch inability in the same test'
 });
 
 test('mixed stream chunks preserve byte ordering and empty UTF-8 boundaries',async()=>{
-  const {default:protocol}=await import('../protocol.cjs');
+  const {default:protocol}=await import('../runner/protocol.cjs');
   for(const chunks of [[Buffer.from([0xe7]),'',Buffer.from([0x95,0x8c])],[Buffer.from([0xe7]),'middle',Buffer.from([0x95,0x8c])]]){
     let recovered='';const stream=protocol.secretStream(value=>recovered+=value);
     for(const chunk of chunks)stream.write(chunk);
@@ -229,4 +246,78 @@ test('mixed stream chunks preserve byte ordering and empty UTF-8 boundaries',asy
     stream.write(Buffer.from([0xe7]));stream.write('');stream.write(Buffer.from([0x95,0x8c]));stream.end();
     assert.equal(recovered,'[REDACTED]');
   }finally{protocol.configureSecrets();}
+});
+
+test('monitor requests cannot select component paths', async()=>{
+  for(const field of ['dependencies_path','browser_path']) {
+    const actual=await run(prefix+"test('pass',async()=>{});",{[field]:'/tmp/alternate'});
+    assert.equal(actual.result.status,'error');
+    assert.match(actual.result.error,/component paths are not request fields/);
+    assert.ok(!actual.events.some(event=>event.phase==='discovery'));
+  }
+});
+
+test('journey launches the runtime browser with sandbox enabled', async()=>{
+  const root=await fixtureRuntime(dependencies,'chrome');
+  await fs.writeFile(path.join(root,'chrome'),'#!/bin/sh\nprintf \'%s\\n\' "$@" > "$(dirname "$0")/browser-args"\nexit 1\n',{mode:0o755});
+  const actual=await run(prefix+"test('browser',async({page})=>{});",{},root);
+  assert.equal(actual.result.status,'error');
+  const args=(await fs.readFile(path.join(root,'browser-args'),'utf8')).trim().split('\n');
+  assert.ok(args.some(arg=>arg.startsWith('--headless')));
+  assert.ok(!args.includes('--no-sandbox'));
+  assert.ok(!args.includes('--disable-setuid-sandbox'));
+});
+
+async function check(root) {
+  const child=spawn(process.execPath,[path.join(root,'runner/run.mjs'),'--check'],{
+    stdio:['ignore','pipe','pipe'],env:{PATH:process.env.PATH}});
+  let stdout='',stderr='';
+  child.stdout.on('data',chunk=>stdout+=chunk);
+  child.stderr.on('data',chunk=>stderr+=chunk);
+  const code=await new Promise((resolve,reject)=>{child.on('error',reject);child.on('close',resolve)});
+  return {code,stdout,stderr};
+}
+
+test('self-check verifies runtime-owned versions and private imports without a session', async()=>{
+  const root=await fixtureRuntime(dependencies,'chrome');
+  const pins=JSON.parse(await fs.readFile(path.join(root,'manifest.json'),'utf8'));
+  await fs.writeFile(path.join(root,'chrome'),`#!/bin/sh\n[ "$#" = 1 ] && [ "$1" = --version ] || exit 27\nprintf 'Chromium ${pins.chromium.version}\\n'\n`,{mode:0o755});
+  const good=await check(root);
+  assert.equal(good.code,0,good.stderr);
+  assert.equal(good.stderr,'');
+  assert.deepEqual(JSON.parse(good.stdout),{contract:1,version:'test-release',uid:process.geteuid(),gid:process.getegid()});
+  assert.ok(Buffer.byteLength(good.stdout)<4096);
+  for(const [changed,message] of [
+    [{...pins,packages:{...pins.packages,playwright:'0.0.0'}},/package version mismatch/],
+    [{...pins,node_version:'0.0.0'},/Node or execution contract mismatch/],
+    [{...pins,chromium:{...pins.chromium,version:'0.0.0'}},/Chromium version mismatch/],
+  ]) {
+    await fs.writeFile(path.join(root,'manifest.json'),JSON.stringify(changed));
+    const bad=await check(root);
+    assert.equal(bad.code,1);
+    assert.equal(bad.stdout,'');
+    assert.match(JSON.parse(bad.stderr).error,message);
+  }
+});
+
+test('self-check rejects missing private imports before invoking the browser', async()=>{
+  const dependencies=await fs.mkdtemp(path.join(os.tmpdir(),'dem-check-modules-'));
+  const pins=JSON.parse(await fs.readFile(path.join(sourceRoot,'manifest.json'),'utf8'));
+  for(const [name,version] of Object.entries(pins.packages)) {
+    const dir=path.join(dependencies,'node_modules',name);
+    await fs.mkdir(dir,{recursive:true});
+    await fs.writeFile(path.join(dir,'package.json'),JSON.stringify({type:'module',version}));
+  }
+  for(const name of ['@playwright/test/index.mjs','playwright/index.mjs','lighthouse/core/index.js']) {
+    const target=path.join(dependencies,'node_modules',name);
+    await fs.mkdir(path.dirname(target),{recursive:true});
+    await fs.writeFile(target,'export default {};');
+  }
+  const root=await fixtureRuntime(dependencies,'chrome');
+  await fs.writeFile(path.join(root,'chrome'),'#!/bin/sh\ntouch "$(dirname "$0")/browser-called"\n',{mode:0o755});
+  const actual=await check(root);
+  assert.equal(actual.code,1);
+  assert.equal(actual.stdout,'');
+  assert.match(JSON.parse(actual.stderr).error,/lr-desktop-config/);
+  await assert.rejects(fs.access(path.join(root,'browser-called')));
 });

@@ -98,8 +98,8 @@ func TestDynCfgTestContainsNonCooperativeCollectorPerRawConfigIdentity(t *testin
 
 func TestContainedConfigValidationYieldsGraphClaimForAllCallbacks(t *testing.T) {
 	for name, kind := range map[string]configOperationKind{
-		"passive": configOperationValidate,
-		"intent":  configOperationValidateIntent,
+		"passive":   configOperationValidate,
+		"admission": configOperationAdmit,
 	} {
 		t.Run(name, func(t *testing.T) {
 			controller, _, _, _, _ := newDynCfgJobTestHarness(t)
@@ -138,23 +138,8 @@ func TestContainedConfigValidationYieldsGraphClaimForAllCallbacks(t *testing.T) 
 			config.SetSource("user=test")
 			config.SetProvider(confgroup.TypeDyncfg)
 			expectedCallbacks := int32(2)
-			if kind == configOperationValidateIntent {
-				owner := &intentTestOwner{onPrepare: func() {
-					callbacks.Add(1)
-					if !outsideClaim.Load() {
-						violations.Add(1)
-					}
-				}}
-				installIntentTestOwner(controller, owner)
-				intent, err := controller.prepareJobConfigIntent(t.Context(), config.FullName(), config, jobConfigIntentEnable)
-				require.NoError(t, err)
-				require.NotNil(t, intent)
-				require.NoError(t, intent.abort())
-				expectedCallbacks++
-			} else {
-				_, err := controller.runConfigOperation(t.Context(), config, kind, true)
-				require.NoError(t, err)
-			}
+			_, err := controller.runConfigOperation(t.Context(), config, kind, true)
+			require.NoError(t, err)
 			require.Equal(t, expectedCallbacks, callbacks.Load())
 			require.Zero(t, violations.Load())
 		})

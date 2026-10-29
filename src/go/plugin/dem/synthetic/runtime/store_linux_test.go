@@ -37,29 +37,29 @@ func importFixture(t *testing.T, s *Store, label string) Manifest {
 	m, archive := bundleFixture(t, label)
 	file := filepath.Join(t.TempDir(), "archive.tar.gz")
 	require.NoError(t, os.WriteFile(file, archive, 0600))
-	require.NoError(t, s.Import(context.Background(), m, file))
+	require.NoError(t, s.importUnselected(context.Background(), m, file))
 	return m
 }
 
-func TestStoreGraceDemandAndRestart(t *testing.T) {
+func TestStoreGraceProcessAndRestart(t *testing.T) {
 	s, now := testStore(t)
 	first := importFixture(t, s, "first")
 	*now = now.Add(time.Hour)
 	second := importFixture(t, s, "second")
-	claim, err := s.Demand(second.Archive.SHA256)
+	claim, err := s.testProcessClaim(second.Archive.SHA256)
 	require.NoError(t, err)
 	*now = now.Add(8 * 24 * time.Hour)
 	require.NoError(t, s.Sweep())
-	_, err = s.BeginUse(first)
+	_, err = s.beginUse(first)
 	require.ErrorIs(t, err, ErrUnavailable)
-	use, err := s.BeginUse(second)
+	use, err := s.beginUse(second)
 	require.NoError(t, err)
 	require.NoError(t, use.Finish(true))
 	require.NoError(t, claim.Close())
 	preparedPath := filepath.Join(s.path, "generations", second.Archive.SHA256, "prepared.json")
 	before, err := os.ReadFile(preparedPath)
 	require.NoError(t, err)
-	*now = now.Add(20 * 24 * time.Hour)
+	*now = now.Add(5 * 24 * time.Hour)
 	other, err := Open(s.config)
 	require.NoError(t, err)
 	defer other.Close()
@@ -68,31 +68,31 @@ func TestStoreGraceDemandAndRestart(t *testing.T) {
 	require.NoError(t, err)
 	after, err := os.ReadFile(preparedPath)
 	require.NoError(t, err)
-	require.Equal(t, before, after, "status/restart must not reset idle deadline")
+	require.Equal(t, before, after, "status/restart must not reset retirement deadline")
 	require.NoError(t, other.Sweep())
-	*now = now.Add(11 * 24 * time.Hour)
+	*now = now.Add(3 * 24 * time.Hour)
 	require.NoError(t, other.Sweep())
-	_, err = s.BeginUse(second)
+	_, err = s.beginUse(second)
 	require.ErrorIs(t, err, ErrUnavailable)
 }
 
-func TestStorePressureNeverEvictsDemandOrUncertainUse(t *testing.T) {
+func TestStorePressureNeverEvictsProcessOrUncertainUse(t *testing.T) {
 	s, now := testStore(t)
 	s.config.MaxBytes = 128 << 10
 	first := importFixture(t, s, strings.Repeat("A", 80<<10))
-	claim, err := s.Demand(first.Archive.SHA256)
+	claim, err := s.testProcessClaim(first.Archive.SHA256)
 	require.NoError(t, err)
 	second, archive := bundleFixture(t, strings.Repeat("B", 80<<10))
 	file := filepath.Join(t.TempDir(), "archive")
 	require.NoError(t, os.WriteFile(file, archive, 0600))
-	require.ErrorIs(t, s.Import(context.Background(), second, file), ErrAllowance)
-	use, err := s.BeginUse(first)
+	require.ErrorIs(t, s.importUnselected(context.Background(), second, file), ErrAllowance)
+	use, err := s.beginUse(first)
 	require.NoError(t, err)
 	require.NoError(t, use.Finish(false)) // no launch proof is supplied
 	require.NoError(t, claim.Close())
 	*now = now.Add(365 * 24 * time.Hour)
 	require.NoError(t, s.Sweep())
-	require.ErrorIs(t, s.Import(context.Background(), second, file), ErrAllowance)
+	require.ErrorIs(t, s.importUnselected(context.Background(), second, file), ErrAllowance)
 	status, err := s.Inspect()
 	require.NoError(t, err)
 	require.Equal(t, 1, status.UncertainPins)
@@ -104,9 +104,9 @@ func TestStorePressureReclaimsSoftGrace(t *testing.T) {
 	s.config.MaxBytes = 128 << 10
 	first := importFixture(t, s, strings.Repeat("A", 80<<10))
 	second := importFixture(t, s, strings.Repeat("B", 80<<10))
-	_, err := s.BeginUse(first)
+	_, err := s.beginUse(first)
 	require.ErrorIs(t, err, ErrUnavailable)
-	use, err := s.BeginUse(second)
+	use, err := s.beginUse(second)
 	require.NoError(t, err)
 	require.NoError(t, use.Finish(true))
 	status, err := s.Inspect()
@@ -119,8 +119,8 @@ func TestFailedImportAndReadOnlyInspection(t *testing.T) {
 	m, archive := bundleFixture(t, "broken")
 	file := filepath.Join(t.TempDir(), "truncated")
 	require.NoError(t, os.WriteFile(file, archive[:len(archive)-1], 0600))
-	require.Error(t, s.Import(context.Background(), m, file))
-	_, err := s.BeginUse(m)
+	require.Error(t, s.importUnselected(context.Background(), m, file))
+	_, err := s.beginUse(m)
 	require.ErrorIs(t, err, ErrUnavailable)
 	require.NoError(t, s.Sweep())
 	for _, parent := range []string{"uses", "claims", "staging", "trash", "initializing", "generations"} {
@@ -141,7 +141,7 @@ func TestPersistentSupervisorCompletionReleasesPin(t *testing.T) {
 	t.Cleanup(ndexec.SetRunnerPathsForTests(helper, ""))
 	s, now := testStore(t)
 	m := importFixture(t, s, "proof")
-	use, err := s.BeginUse(m)
+	use, err := s.beginUse(m)
 	require.NoError(t, err)
 	process, err := ndexec.StartUnprivilegedProcessTree(context.Background(), ndexec.TreeOptions{Completion: use.Completion}, "/bin/true")
 	require.NoError(t, err)
@@ -150,7 +150,7 @@ func TestPersistentSupervisorCompletionReleasesPin(t *testing.T) {
 	require.NoError(t, use.Finish(false))
 	*now = now.Add(31 * 24 * time.Hour)
 	require.NoError(t, s.Sweep())
-	_, err = s.BeginUse(m)
+	_, err = s.beginUse(m)
 	require.ErrorIs(t, err, ErrUnavailable)
 	status, err := s.Inspect()
 	require.NoError(t, err)
@@ -165,7 +165,7 @@ func TestCallerFinishesAfterReceiptReconciliation(t *testing.T) {
 	t.Cleanup(ndexec.SetRunnerPathsForTests(helper, ""))
 	s, _ := testStore(t)
 	m := importFixture(t, s, "receipt-race")
-	use, err := s.BeginUse(m)
+	use, err := s.beginUse(m)
 	require.NoError(t, err)
 	process, err := ndexec.StartUnprivilegedProcessTree(context.Background(), ndexec.TreeOptions{Completion: use.Completion}, "/bin/true")
 	require.NoError(t, err)
@@ -226,12 +226,12 @@ func TestConcurrentPreparationAccountingAndReuse(t *testing.T) {
 	require.GreaterOrEqual(t, status.UsedBytes+status.ReservedBytes, needed)
 	require.Equal(t, status.UsedBytes, status.ProtectedBytes)
 	require.Zero(t, status.ReclaimableBytes)
-	require.ErrorIs(t, other.Import(context.Background(), m, "/must-not-open"), ErrPreparing)
+	require.ErrorIs(t, other.importUnselected(context.Background(), m, "/must-not-open"), ErrPreparing)
 	require.NoError(t, other.Sweep())
 	close(resume)
 	require.NoError(t, <-result)
 	// A successor reuses the published result without touching its input.
-	require.NoError(t, other.Import(context.Background(), m, "/must-not-open"))
+	require.NoError(t, other.importUnselected(context.Background(), m, "/must-not-open"))
 	status, err = other.Inspect()
 	require.NoError(t, err)
 	require.Zero(t, status.ReservedBytes)
@@ -259,19 +259,19 @@ func TestAllowanceExplainsProtectedGenerationBytes(t *testing.T) {
 	s, _ := testStore(t)
 	s.config.MaxBytes = 128 << 10
 	m := importFixture(t, s, strings.Repeat("a", 80<<10))
-	claim, err := s.Demand(m.Archive.SHA256)
+	claim, err := s.testProcessClaim(m.Archive.SHA256)
 	require.NoError(t, err)
 	defer claim.Close()
-	use, err := s.BeginUse(m)
+	use, err := s.beginUse(m)
 	require.NoError(t, err)
 	require.NoError(t, use.Finish(false))
 	next, _ := bundleFixture(t, strings.Repeat("b", 80<<10))
-	err = s.Import(context.Background(), next, "/must-not-open")
+	err = s.importUnselected(context.Background(), next, "/must-not-open")
 	var allowance *AllowanceError
 	require.True(t, errors.As(err, &allowance))
 	require.Positive(t, allowance.NeededBytes)
-	require.GreaterOrEqual(t, allowance.Status.DemandBytes, m.Archive.ExpandedBytes)
-	require.Equal(t, allowance.Status.DemandBytes, allowance.Status.ExecutionBytes)
+	require.GreaterOrEqual(t, allowance.Status.ProcessBytes, m.Archive.ExpandedBytes)
+	require.Equal(t, allowance.Status.ProcessBytes, allowance.Status.ExecutionBytes)
 	require.Equal(t, allowance.Status.ExecutionBytes, allowance.Status.UncertainBytes)
 	require.Equal(t, allowance.Status.UsedBytes, allowance.Status.ProtectedBytes)
 	require.Zero(t, allowance.Status.ReclaimableBytes)
@@ -293,7 +293,7 @@ func TestRealBundlePreparation(t *testing.T) {
 	require.NoError(t, json.Unmarshal(data, &m))
 	s, _ := testStore(t)
 	start := time.Now()
-	require.NoError(t, s.Import(context.Background(), m, os.Getenv("DEM_RUNTIME_TEST_ARCHIVE")))
+	require.NoError(t, s.importUnselected(context.Background(), m, os.Getenv("DEM_RUNTIME_TEST_ARCHIVE")))
 	t.Logf("prepared archive_bytes=%d expanded_bytes=%d entries=%d duration=%s", m.Archive.Bytes, m.Archive.ExpandedBytes, m.Archive.Entries, time.Since(start))
 	for i := 0; i < 6; i++ {
 		start = time.Now()
@@ -302,7 +302,7 @@ func TestRealBundlePreparation(t *testing.T) {
 		t.Logf("inspect duration=%s used_bytes=%d", time.Since(start), status.UsedBytes)
 	}
 	for _, command := range []string{"node", "browser", "reexec"} {
-		use, err := s.BeginUse(m)
+		use, err := s.beginUse(m)
 		require.NoError(t, err)
 		program, args := use.Paths.Node, []string{"--version"}
 		if command == "browser" {
@@ -342,7 +342,7 @@ func TestRuntimeOwnerProcess(t *testing.T) {
 	}
 	ready := func() { fmt.Println("ready"); _, _ = io.Copy(io.Discard, os.Stdin); os.Exit(0) }
 	if mode == "claim" {
-		if _, err := s.Demand(m.Archive.SHA256); err != nil {
+		if _, err := s.testProcessClaim(m.Archive.SHA256); err != nil {
 			t.Fatal(err)
 		}
 		ready()
@@ -399,7 +399,7 @@ func startRuntimeOwner(t *testing.T, s *Store, m Manifest, mode string) func() {
 	return stop
 }
 
-func TestAbandonedPreparationAndProcessDemand(t *testing.T) {
+func TestAbandonedPreparationAndProcessClaim(t *testing.T) {
 	s, now := testStore(t)
 	first := importFixture(t, s, "existing")
 	stop := startRuntimeOwner(t, s, first, "claim")
@@ -410,7 +410,7 @@ func TestAbandonedPreparationAndProcessDemand(t *testing.T) {
 	require.NoError(t, s.Sweep())
 	*now = now.Add(31 * 24 * time.Hour)
 	require.NoError(t, s.Sweep())
-	_, err := s.BeginUse(first)
+	_, err := s.beginUse(first)
 	require.ErrorIs(t, err, ErrUnavailable)
 	second, _ := bundleFixture(t, "incoming")
 	stop = startRuntimeOwner(t, s, second, "partial")
@@ -459,7 +459,7 @@ func TestKernelBootProvenance(t *testing.T) {
 	s, now := testStore(t)
 	m := importFixture(t, s, "boot")
 	s.boot = bootIdentity{ID: "11111111-1111-1111-1111-111111111111", Verified: true}
-	use, err := s.BeginUse(m)
+	use, err := s.beginUse(m)
 	require.NoError(t, err)
 	require.NoError(t, use.Finish(false))
 	*now = now.Add(100 * 24 * time.Hour)
@@ -468,7 +468,9 @@ func TestKernelBootProvenance(t *testing.T) {
 	require.FileExists(t, filepath.Join(s.path, "generations", m.Archive.SHA256, "prepared.json"))
 	s.boot.Verified = true
 	require.NoError(t, s.Sweep())
-	_, err = s.BeginUse(m)
+	*now = now.Add(8 * 24 * time.Hour)
+	require.NoError(t, s.Sweep())
+	_, err = s.beginUse(m)
 	require.ErrorIs(t, err, ErrUnavailable)
 }
 
@@ -486,11 +488,11 @@ func BenchmarkRuntimeUse(b *testing.B) {
 	m, archive := bundleFixture(b, "benchmark")
 	file := filepath.Join(b.TempDir(), "archive")
 	require.NoError(b, os.WriteFile(file, archive, 0600))
-	require.NoError(b, s.Import(context.Background(), m, file))
+	require.NoError(b, s.importUnselected(context.Background(), m, file))
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		use, err := s.BeginUse(m)
+		use, err := s.beginUse(m)
 		require.NoError(b, err)
 		process, err := ndexec.StartUnprivilegedProcessTree(context.Background(), ndexec.TreeOptions{Completion: use.Completion}, "/bin/true")
 		require.NoError(b, err)
@@ -501,4 +503,20 @@ func BenchmarkRuntimeUse(b *testing.B) {
 	}
 	b.StopTimer()
 	require.NoError(b, s.Sweep())
+}
+
+// These helpers exercise unselected-generation retention and individual owner
+// reclamation. Installation behavior is tested through the public API separately.
+func (s *Store) importUnselected(ctx context.Context, m Manifest, path string) error {
+	candidate, err := s.BeginInstall(ctx, m)
+	if err != nil {
+		return err
+	}
+	defer candidate.Close()
+	return candidate.Import(ctx, path)
+}
+func (s *Store) testProcessClaim(id string) (*claim, error) {
+	var owner *claim
+	err := s.withLock(func() error { var err error; owner, err = s.claimLocked(id, "process"); return err })
+	return owner, err
 }

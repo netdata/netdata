@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,25 +25,15 @@ func (l *healthLog) Write(p []byte) (int, error) {
 }
 func (l *healthLog) String() string { l.mu.Lock(); defer l.mu.Unlock(); return l.data.String() }
 
-func TestSetupLoggingRequiresDemandAndChangedError(t *testing.T) {
-	unavailable := errors.New("installed manifest missing")
-	h := New(Config{Unavailable: unavailable})
-	var logs healthLog
-	h.log = logger.NewWithWriter(&logs)
-	h.setState(StateUnavailable, unavailable)
-	require.Empty(t, logs.String())
-	intent, err := h.Prepare(collectorapi.JobConfigIdentity{}, collectorapi.JobConfigIdentity{1}, nil)
+func TestUnavailableSetupKeepsDependenciesUsable(t *testing.T) {
+	h := New(Config{Unavailable: errors.New("runtime unavailable")})
+	defer h.Close()
+	dependencies, err := h.Dependencies(nil)
 	require.NoError(t, err)
-	intent.Commit()
-	for range 3 {
-		h.setState(StateUnavailable, unavailable)
-	}
-	require.Equal(t, 1, strings.Count(logs.String(), "DEM runtime setup unavailable"))
-	h.setState(StateUnavailable, errors.New("runtime downloads disabled"))
-	require.Equal(t, 2, strings.Count(logs.String(), "DEM runtime setup unavailable"))
-	h.setState(StateReady, nil)
-	require.Equal(t, 2, strings.Count(logs.String(), "DEM runtime"))
-	require.NoError(t, h.Close())
+	require.Len(t, dependencies, 1)
+	require.ErrorContains(t, dependencies[0].Ready(), "runtime unavailable")
+	_, err = h.BeginUse()
+	require.Error(t, err)
 }
 
 func TestMaintenanceLoggingAndRecoveryAreOperationSpecific(t *testing.T) {
@@ -54,12 +43,12 @@ func TestMaintenanceLoggingAndRecoveryAreOperationSpecific(t *testing.T) {
 	h.setMaintenance("cleanup", errors.New("trash blocked"))
 	h.setMaintenance("cleanup", errors.New("trash blocked"))
 	require.Equal(t, 1, strings.Count(logs.String(), "cleanup failed"))
-	h.setMaintenance("demand commit", errors.New("claim metadata blocked"))
+	h.setMaintenance("execution completion", errors.New("execution metadata blocked"))
 	h.setMaintenance("cleanup", nil)
-	require.Contains(t, h.Status().MaintenanceError, "claim metadata blocked")
+	require.Contains(t, h.Status().MaintenanceError, "execution metadata blocked")
 	require.NotContains(t, h.Status().MaintenanceError, "trash blocked")
 	require.Equal(t, 1, strings.Count(logs.String(), "cleanup recovered"))
-	h.setMaintenance("demand commit", nil)
+	h.setMaintenance("execution completion", nil)
 	require.Empty(t, h.Status().MaintenanceError)
-	require.Equal(t, 1, strings.Count(logs.String(), "demand commit recovered"))
+	require.Equal(t, 1, strings.Count(logs.String(), "execution completion recovered"))
 }

@@ -422,13 +422,13 @@ Synthetic packages:
 | `synthetic/history` | Synthetic record encoding and run reduction |
 | `synthetic/functions` | Function declarations, arguments, permissions, columns and response serialization |
 | `synthetic/runner` | Prepared browser execution, admission, process supervision and private reporter protocol |
-| `synthetic/runner/assets` | Immutable Node adapters and pinned dependency manifests; not a Go package |
-| `synthetic/runtime` | Trusted bundle verification, shared cache inventory, demand/use pins and automatic retirement |
-| `synthetic/runtimehost` | Accepted enabled demand, asynchronous preparation, readiness notifications and process maintenance |
+| `src/dem-runtime` (outside the Go plugin) | Independently versioned adapters, component pins and semantic conformance tests |
+| `synthetic/runtime` | Trusted bundle verification, installation inventory, process/execution protection and automatic retirement |
+| `synthetic/runtimehost` | Fixed startup selection, dependency readiness and process maintenance |
 | `synthetic/artifacts` | Work directories, verified publication, immutable captures, reads and retention |
 
 Deeper package guides: [runtime store](synthetic/runtime/README.md), [runtime host](synthetic/runtimehost/README.md),
-[capture store](synthetic/artifacts/README.md), [runner assets](synthetic/runner/assets/README.md) and
+[capture store](synthetic/artifacts/README.md), [runtime release](../../../dem-runtime/README.md) and
 [Faro assets](rum/faro/assets/README.md).
 
 ## Design contracts

@@ -204,7 +204,7 @@ func (dcjc *DynCfgJobController) prepareEnable(
 		return dcjc.reject(scope, current, permit, jobFailure{class: failureNotFound, message: "config not found."})
 	}
 	if state := dcjc.candidates.view(scope.ID); state != nil && state.Enablement == candidateEnabled {
-		return dcjc.satisfyWithEnabledIntent(ctx, scope, current, permit, record, nil)
+		return dcjc.satisfy(scope, current, permit, dyncfg.Status(record.Status), nil)
 	}
 	delta, err := dcjc.candidates.prepareEnable(scope.ID, dcjc.scheduler.retries.now())
 	if err != nil {
@@ -221,7 +221,7 @@ func (dcjc *DynCfgJobController) prepareEnable(
 	reply.candidate = delta
 	return dcjc.prepareMutationAfterApply(ctx, scope, current, nil, permit,
 		resourceRemovalDisposition(current), postimage, reply,
-		dcjc.candidateProjectionCleanup(scope.ID, postimage, delta), nil, jobConfigIntentEnable)
+		dcjc.candidateProjectionCleanup(scope.ID, postimage, delta), nil)
 }
 
 func (dcjc *DynCfgJobController) prepareRestart(

@@ -37,11 +37,12 @@ func bundleFixture(t testing.TB, label string) (Manifest, []byte) {
 		{name: "dependencies/package.json", contents: []byte(label), mode: 0644},
 		{name: "dependencies/node_modules/.bin/tool", link: "../package/tool.js", kind: tar.TypeSymlink},
 		{name: "dependencies/node_modules/package/tool.js", contents: []byte("tool"), mode: 0644},
+		{name: "runner/run.mjs", contents: []byte("export {}"), mode: 0644},
 		{name: "fonts/font.ttf", contents: []byte("font"), mode: 0644},
 	}
 	a, archive := archiveFixture(t, entries)
-	m := Manifest{Format: 1, Version: "test-1", Platform: "linux/" + goruntime.GOARCH, Archive: a,
-		Layout:   Layout{Node: "node/bin/node", Dependencies: "dependencies", Browser: "browser/browser", Loader: "lib/loader.so", Fonts: "fonts"},
+	m := Manifest{Format: 1, Contract: 1, Version: "test-1", Platform: "linux/" + goruntime.GOARCH, Archive: a,
+		Layout:   Layout{EntryPoint: "runner/run.mjs", Node: "node/bin/node", Dependencies: "dependencies", Browser: "browser/browser", Loader: "lib/loader.so", Fonts: "fonts"},
 		Bindings: []Binding{{Path: "node/bin/node", Offset: 32, Expected: expected}, {Path: "browser/browser", Offset: 32, Expected: expected}},
 	}
 	require.NoError(t, m.Validate())

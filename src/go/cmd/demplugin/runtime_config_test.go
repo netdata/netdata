@@ -45,9 +45,9 @@ func runtimeConfigRoots(t *testing.T) (user, stock, buildUser, buildStock, cli s
 	return
 }
 
-func writeRuntimeConfig(t *testing.T, dir, manifest, cache string) {
+func writeRuntimeConfig(t *testing.T, dir, cache string) {
 	t.Helper()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("runtime:\n  allow_download: false\n  manifest_path: "+manifest+"\n  cache_path: "+cache+"\n"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("runtime:\n  cache_path: "+cache+"\n"), 0600))
 }
 
 func TestRuntimeConfigurationMatchesService(t *testing.T) {
@@ -65,16 +65,16 @@ func TestRuntimeConfigurationMatchesService(t *testing.T) {
 			var confDirs []string
 			switch scenario {
 			case "environment-replaces-build-user":
-				writeRuntimeConfig(t, buildUser, "/wrong-build-user.json", "/wrong-cache")
+				writeRuntimeConfig(t, buildUser, "/wrong-cache")
 			case "environment-replaces-build-stock":
-				writeRuntimeConfig(t, buildStock, "/wrong-build-stock.json", "/wrong-cache")
+				writeRuntimeConfig(t, buildStock, "/wrong-cache")
 			case "cli-inherits-user":
 				selected, confDirs = user, []string{cli}
 			case "cli-inherits-stock":
 				confDirs = []string{cli}
 			case "cli-takes-priority":
 				selected, confDirs = cli, []string{cli}
-				writeRuntimeConfig(t, user, "/wrong-user.json", "/wrong-cache")
+				writeRuntimeConfig(t, user, "/wrong-cache")
 			case "build-defaults":
 				t.Setenv("NETDATA_USER_CONFIG_DIR", "")
 				t.Setenv("NETDATA_STOCK_CONFIG_DIR", "")
@@ -110,33 +110,28 @@ func TestRuntimeConfigurationMatchesService(t *testing.T) {
 					selected = stock
 				}
 			}
-			manifest := filepath.Join(selected, "selected.json")
-			wantDownload := false
-			if scenario == "environment-replaces-build-stock" {
-				// An empty selected stock root must not fall through to build stock.
-				manifest = dem.RuntimeManifestPath(dem.DefaultConfig().Runtime, filepath.Join(executable.Directory, "dem"))
-				wantDownload = true
-			} else {
-				writeRuntimeConfig(t, selected, manifest, filepath.Join(selected, "cache"))
+			varlib := filepath.Join(t.TempDir(), "varlib")
+			t.Setenv("NETDATA_LIB_DIR", varlib)
+			if scenario != "environment-replaces-build-stock" {
+				writeRuntimeConfig(t, selected, filepath.Join(selected, "cache"))
 			}
 			args := []string{"runtime", "status"}
 			if len(confDirs) > 0 {
 				args = append(args, "--config-dir", confDirs[0])
 			}
 			report, err := runtimeCommand(t, args...)
-			require.Error(t, err) // Selection is observable before opening the absent manifest.
-			require.Equal(t, manifest, report.ManifestPath)
-			require.Equal(t, wantDownload, report.DownloadAllowed)
+			require.Error(t, err) // Cache selection is observable before opening an absent installation.
 			pluginconfig.MustInit(pluginconfig.InitInput{ConfDir: confDirs})
 			service, err := dem.LoadConfig(pluginconfig.ConfigDir())
 			require.NoError(t, err)
-			require.Equal(t, dem.RuntimeManifestPath(service.Runtime, filepath.Join(executable.Directory, "dem")), report.ManifestPath)
-			require.Equal(t, service.Runtime.AllowDownload, report.DownloadAllowed)
-			// Explicit policy/trust overrides still apply after installation resolution.
-			report, err = runtimeCommand(t, append(args, "--manifest", filepath.Join(selected, "override.json"), "--allow-download=true")...)
+			storeConfig, err := service.Runtime.StoreConfig(varlib)
+			require.NoError(t, err)
+			require.Equal(t, storeConfig.Path, report.CachePath)
+			require.False(t, report.DownloadAllowed)
+			override := filepath.Join(selected, "override-cache")
+			report, err = runtimeCommand(t, append(args, "--cache", override)...)
 			require.Error(t, err)
-			require.Equal(t, filepath.Join(selected, "override.json"), report.ManifestPath)
-			require.True(t, report.DownloadAllowed)
+			require.Equal(t, override, report.CachePath)
 		})
 	}
 }

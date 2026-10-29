@@ -6,6 +6,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"os"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
@@ -15,21 +19,23 @@ import (
 )
 
 type runtimeQualification struct {
-	VersionsAndAssets     bool   `json:"versions_and_assets"`
-	SandboxedLocalJourney bool   `json:"sandboxed_local_journey"`
-	ProcessTreeDrained    bool   `json:"process_tree_drained"`
-	Scope                 string `json:"scope"`
+	ExecutionContract        bool                       `json:"execution_contract"`
+	SandboxedLocalLighthouse bool                       `json:"sandboxed_local_lighthouse"`
+	Runtime                  *synthetic.RuntimeIdentity `json:"runtime,omitempty"`
+	SandboxedLocalJourney    bool                       `json:"sandboxed_local_journey"`
+	ProcessTreeDrained       bool                       `json:"process_tree_drained"`
+	Scope                    string                     `json:"scope"`
 }
 
 // Qualification deliberately uses the normal adapter, ownership, sandbox and
 // process supervisor. It proves this invocation's environment, not daemon policy.
-func qualifyRuntime(ctx context.Context, assetsPath string, source runner.Source) (_ *runtimeQualification, retErr error) {
-	result := &runtimeQualification{Scope: "Current CLI user/environment: version and asset checks plus one local Playwright page; no network target, Lighthouse audit, daemon sandbox, or cross-platform certification."}
-	check := runner.New(assetsPath, source, nil, nil)
+func qualifyRuntime(ctx context.Context, source runner.Source) (_ *runtimeQualification, retErr error) {
+	result := &runtimeQualification{Scope: fmt.Sprintf("Current CLI uid=%d gid=%d and environment: release contract check, sandboxed local Playwright journey and desktop Lighthouse audit on loopback content; does not certify daemon confinement or other hosts/platforms.", os.Geteuid(), os.Getegid())}
+	check := runner.New(source, nil, nil)
 	if err := check.Check(ctx, synthetic.Journey); err != nil {
 		return result, err
 	}
-	result.VersionsAndAssets = true
+	result.ExecutionContract = true
 	captures, err := artifacts.Open("")
 	if err != nil {
 		return result, err
@@ -40,7 +46,7 @@ func qualifyRuntime(ctx context.Context, assetsPath string, source runner.Source
 			retErr = errors.Join(retErr, captures.Close())
 		}
 	}()
-	engine := runner.New(assetsPath, source, nil, captures)
+	engine := runner.New(source, nil, captures)
 	execution := engine.Execute(ctx, synthetic.Request{Kind: synthetic.Journey, Name: "runtime-qualification", Timeout: 30 * time.Second,
 		Script: `import { test, expect } from '@playwright/test';
  test('sandboxed local page', async ({ page }) => {
@@ -60,5 +66,24 @@ func qualifyRuntime(ctx context.Context, assetsPath string, source runner.Source
 		return result, errors.New("local browser qualification did not report exactly one passing test")
 	}
 	result.SandboxedLocalJourney = true
+	result.Runtime = execution.Run.Runtime
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = io.WriteString(w, "<!doctype html><html lang=en><head><title>DEM runtime qualification</title><meta name=viewport content='width=device-width,initial-scale=1'></head><body><h1>ready</h1></body></html>")
+	}))
+	defer server.Close()
+	audit := engine.Execute(ctx, synthetic.Request{Kind: synthetic.Lighthouse, Name: "runtime-qualification-audit", URL: server.URL, Timeout: 90 * time.Second, Capture: false}, nil)
+	drained = audit.Drained
+	result.ProcessTreeDrained = drained
+	if !drained {
+		return result, ndexec.ErrTreeNotDrained
+	}
+	if audit.Run.Outcome != synthetic.Success || audit.Run.Metrics == nil {
+		return result, fmt.Errorf("local Lighthouse qualification %s: %s", audit.Run.Outcome, audit.Run.Error)
+	}
+	if result.Runtime == nil || audit.Run.Runtime == nil || *result.Runtime != *audit.Run.Runtime {
+		return result, errors.New("runtime identity changed during qualification")
+	}
+	result.SandboxedLocalLighthouse = true
 	return result, nil
 }

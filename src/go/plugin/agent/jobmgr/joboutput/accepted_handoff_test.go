@@ -12,6 +12,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/stretchr/testify/require"
@@ -338,7 +339,7 @@ func requireNoHandoffActivation(t *testing.T, commands *activationTestCommands) 
 	}
 }
 
-func TestCandidateAdoptionRevalidatesAfterIntentReservation(t *testing.T) {
+func TestCandidateAdoptionRevalidatesAfterAdmission(t *testing.T) {
 	for _, invalidation := range []string{"Store generation", "candidate retirement"} {
 		t.Run(invalidation, func(t *testing.T) {
 			controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
@@ -365,16 +366,23 @@ func TestCandidateAdoptionRevalidatesAfterIntentReservation(t *testing.T) {
 				return snapshot, nil
 			})
 			var cut atomic.Bool
-			owner := &intentTestOwner{onPrepare: func() {
-				// Intent preparation runs after Check but before graph adoption.
+			creator := controller.modules["module"]
+			create := creator.CreateV2
+			creator.ActivationDependencies = enabledAdmissionDependencies(false)
+			creator.CreateV2 = func() collectorapi.CollectorV2 {
+				if checks.Load() == 0 {
+					return create()
+				}
+				// Admission validation runs after Check but before graph adoption.
 				if invalidation == "Store generation" {
 					snapshot.current.Store(false)
 				} else {
 					cut.Store(controller.factory.config.Attempts.CutProcessAttempt(
 						jobAttemptIdentity(jobmgr.ProcessAttemptJob, config.FullName()), jobmgr.ErrProcessAttemptSuperseded))
 				}
-			}}
-			installIntentTestOwner(controller, owner)
+				return create()
+			}
+			controller.modules["module"] = creator
 			permit, tasks := issueTestJobPermit(t, config.FullName(), 1)
 			prepared, err := controller.Prepare(t.Context(), DynCfgJobRequest{
 				Args:       []string{controller.externalID(config.FullName()), "update"},
@@ -387,11 +395,6 @@ func TestCandidateAdoptionRevalidatesAfterIntentReservation(t *testing.T) {
 			require.Equal(t, 503, applied.ResultStatus())
 			after, _ := graph.Lookup(config.FullName())
 			require.Equal(t, before, after)
-			preparedCount, committed, aborted, enabled := owner.snapshot()
-			require.Equal(t, 1, preparedCount)
-			require.Zero(t, committed)
-			require.Equal(t, 1, aborted)
-			require.Zero(t, enabled)
 			require.EqualValues(t, 1, checks.Load())
 			if invalidation == "candidate retirement" {
 				require.True(t, cut.Load())

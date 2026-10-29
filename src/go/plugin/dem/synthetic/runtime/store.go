@@ -22,7 +22,6 @@ import (
 const (
 	DefaultMaxBytes          = int64(4 << 30)
 	DefaultPreviousRetention = 7 * 24 * time.Hour
-	DefaultIdleRetention     = 30 * 24 * time.Hour
 )
 
 var (
@@ -48,15 +47,14 @@ type Config struct {
 	Path              string
 	MaxBytes          int64
 	PreviousRetention time.Duration
-	IdleRetention     time.Duration
 }
 
 func DefaultConfig(path string) Config {
-	return Config{Path: path, MaxBytes: DefaultMaxBytes, PreviousRetention: DefaultPreviousRetention, IdleRetention: DefaultIdleRetention}
+	return Config{Path: path, MaxBytes: DefaultMaxBytes, PreviousRetention: DefaultPreviousRetention}
 }
 
-// Store coordinates local processes. Reserved/accepted demand and execution pins
-// protect cached generations; owners must execute through BeginUse.
+// Store coordinates durable installation, process consumers and execution pins.
+// Executable access requires an acquired Consumer or Candidate.
 // The directory must remain on one host and may not be copied or network-shared.
 type Store struct {
 	completedUses       map[string]bool
@@ -70,6 +68,7 @@ type Store struct {
 	boot                bootIdentity
 	cleanupError        error
 	cleanupErrorVersion uint64
+	syncSelection       func() error // Directory durability barrier before selection-dependent operations.
 }
 
 type generation struct {
@@ -79,6 +78,7 @@ type generation struct {
 }
 
 type Paths struct {
+	EntryPoint   string
 	Node         string
 	Dependencies string
 	Browser      string
@@ -88,7 +88,7 @@ func Open(config Config) (*Store, error) {
 	if goruntime.GOOS != "linux" || (goruntime.GOARCH != "amd64" && goruntime.GOARCH != "arm64") {
 		return nil, errors.New("managed browser runtimes require Linux amd64 or arm64")
 	}
-	if config.MaxBytes <= 0 || config.PreviousRetention < 0 || config.IdleRetention < 0 {
+	if config.MaxBytes <= 0 || config.PreviousRetention < 0 {
 		return nil, errors.New("invalid runtime storage policy")
 	}
 	if !filepath.IsAbs(config.Path) {
@@ -117,6 +117,11 @@ func Open(config Config) (*Store, error) {
 		root.Close()
 		return nil, err
 	}
+	if err := ensureLock(root, "installation.lock"); err != nil {
+		root.Close()
+		return nil, err
+	}
+	s.syncSelection = func() error { return syncDirectory(root, ".") }
 	s.lock = flock.New(filepath.Join(path, "coordination.lock"))
 	err = s.withLock(func() error {
 		for _, dir := range []string{"generations", "claims", "uses", "staging", "trash", "initializing"} {
@@ -220,6 +225,13 @@ func readJSON(root *os.Root, name string, value any) error {
 }
 
 func saveJSON(root *os.Root, name string, value any) error {
+	if err := publishJSON(root, name, value); err != nil {
+		return err
+	}
+	return syncDirectory(root, filepath.Dir(name))
+}
+
+func publishJSON(root *os.Root, name string, value any) error {
 	data, err := json.Marshal(value)
 	if err != nil {
 		return err
@@ -235,7 +247,7 @@ func saveJSON(root *os.Root, name string, value any) error {
 	if err := root.Rename(temporary, name); err != nil {
 		return err
 	}
-	return syncDirectory(root, filepath.Dir(name))
+	return nil
 }
 
 func (s *Store) loadGeneration(id string) (generation, error) {
@@ -285,7 +297,7 @@ func preparedPaths(root *os.Root, path string, m Manifest) (Paths, error) {
 		return Paths{}, errors.New("prepared runtime manifest differs from installed requirement")
 	}
 	base := filepath.Join(path, "generations", m.Archive.SHA256)
-	return Paths{Node: filepath.Join(base, m.Layout.Node), Dependencies: filepath.Join(base, m.Layout.Dependencies), Browser: filepath.Join(base, "chrome")}, nil
+	return Paths{EntryPoint: filepath.Join(base, m.Layout.EntryPoint), Node: filepath.Join(base, m.Layout.Node), Dependencies: filepath.Join(base, m.Layout.Dependencies), Browser: filepath.Join(base, "chrome")}, nil
 }
 
 func checkContext(ctx context.Context) error {
@@ -296,7 +308,7 @@ func checkContext(ctx context.Context) error {
 }
 
 // Available verifies prepared identity without acquiring execution ownership or
-// changing idle timestamps. BeginUse must still precede every executable access.
+// changing retention timestamps. Consumer.BeginUse must precede executable access.
 func (s *Store) Available(m Manifest) error {
 	if err := m.Validate(); err != nil {
 		return err

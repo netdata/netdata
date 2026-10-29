@@ -17,9 +17,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/plugin/dem"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v2"
 )
 
 // This authenticated fixture proves archive plumbing and final-path binding, not
@@ -33,6 +33,8 @@ func adminBundleFixture(t *testing.T) (manifestPath, archivePath string) {
 	}{
 		{"node", prefix}, {"browser", prefix}, {"loader", []byte("loader")},
 		{"dependencies/package.json", []byte("{}")}, {"fonts/test.ttf", []byte("font")},
+		{"runner/run.mjs", []byte("// non-executable qualification fixture")},
+		{"runtime.json", []byte(`{"contract":1,"version":"cli-fixture","paths":{"dependencies":"dependencies","browser":"chrome"}}`)},
 	}
 	var raw, compressed bytes.Buffer
 	tw := tar.NewWriter(&raw)
@@ -49,9 +51,9 @@ func adminBundleFixture(t *testing.T) (manifestPath, archivePath string) {
 	require.NoError(t, err)
 	require.NoError(t, gz.Close())
 	digest := sha256.Sum256(compressed.Bytes())
-	manifest := runtime.Manifest{Format: 1, Version: "cli-fixture", Platform: "linux/" + goruntime.GOARCH,
+	manifest := runtime.Manifest{Format: 1, Contract: 1, Version: "cli-fixture", Platform: "linux/" + goruntime.GOARCH,
 		Archive:  runtime.Archive{SHA256: hex.EncodeToString(digest[:]), Bytes: int64(compressed.Len()), TarBytes: int64(raw.Len()), ExpandedBytes: expanded, Entries: len(entries)},
-		Layout:   runtime.Layout{Node: "node", Browser: "browser", Dependencies: "dependencies", Loader: "loader", Fonts: "fonts"},
+		Layout:   runtime.Layout{EntryPoint: "runner/run.mjs", Node: "node", Browser: "browser", Dependencies: "dependencies", Loader: "loader", Fonts: "fonts"},
 		Bindings: []runtime.Binding{{Path: "node", Expected: prefix}, {Path: "browser", Expected: prefix}},
 	}
 	require.NoError(t, manifest.Validate())
@@ -65,116 +67,114 @@ func adminBundleFixture(t *testing.T) (manifestPath, archivePath string) {
 	return manifestPath, archivePath
 }
 
-func TestRuntimeOfflineImportStatusAndReuse(t *testing.T) {
+func TestRuntimeInstallRejectsUnqualifiedArchive(t *testing.T) {
 	manifest, archive := adminBundleFixture(t)
 	root := t.TempDir()
 	cache := filepath.Join(root, "cache")
-	base := []string{"--config-dir", root, "--manifest", manifest, "--cache", cache, "--allow-download=false"}
-	report, err := runtimeCommand(t, append([]string{"runtime", "prepare"}, base...)...)
-	require.ErrorContains(t, err, "downloads are disabled")
-	assert.Equal(t, "unavailable", report.State)
-	report, err = runtimeCommand(t, append(append([]string{"runtime", "import"}, base...), "--archive", archive)...)
-	require.NoError(t, err)
-	assert.Equal(t, "prepared", report.State)
-	require.Nil(t, report.Qualification)
-	require.NotNil(t, report.Storage)
-	assert.Positive(t, report.Storage.UsedBytes)
-	for _, command := range []string{"status", "prepare"} {
-		report, err = runtimeCommand(t, append([]string{"runtime", command}, base...)...)
-		require.NoError(t, err)
-		assert.Equal(t, "prepared", report.State)
-		require.Nil(t, report.Qualification)
-	}
-	report, err = runtimeCommand(t, append([]string{"runtime", "qualify"}, base...)...)
+	report, err := runtimeCommand(t, "runtime", "install", "--config-dir", root, "--manifest", manifest, "--cache", cache, "--archive", archive)
 	require.Error(t, err)
-	assert.NotEqual(t, "qualified", report.State)
+	assert.Equal(t, "prepared", report.State)
 	require.NotNil(t, report.Qualification)
 	assert.False(t, report.Qualification.SandboxedLocalJourney)
-}
-
-func TestRuntimeOfflinePreloadUsesFinalRootAndRejectsReplacement(t *testing.T) {
-	manifest, archive := adminBundleFixture(t)
-	root := t.TempDir()
-	final := filepath.Join(root, "preloaded")
-	args := []string{"runtime", "preload", "--config-dir", root, "--manifest", manifest, "--archive", archive, "--root", final, "--allow-download=false"}
-	report, err := runtimeCommand(t, args...)
-	require.NoError(t, err)
-	require.NotNil(t, report.PreloadedConfig)
-	cfg := report.PreloadedConfig["runtime"].(map[string]any)
-	assert.Equal(t, "preloaded", cfg["mode"])
-	assert.Equal(t, final, cfg["preload_path"])
-	assert.NotContains(t, cfg, "node_path")
-	body, err := yaml.Marshal(report.PreloadedConfig)
-	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(filepath.Join(root, "dem.conf"), body, 0600))
-	// The actual emitted configuration must resolve the preload without opening a
-	// managed store or adding lifecycle records, even with a read-only directory.
-	require.NoError(t, os.Chmod(final, 0500))
-	t.Cleanup(func() { require.NoError(t, os.Chmod(final, 0700)) })
-	loaded := dem.DefaultConfig()
-	require.NoError(t, yaml.Unmarshal(body, &loaded))
-	handle := dem.OpenRuntime(loaded.Runtime, "/unused/assets", "/unused/cache")
-	require.NoError(t, handle.SetupError)
-	require.Nil(t, handle.Store)
-	require.Nil(t, handle.Host)
-	use, err := handle.Source.BeginUse()
-	require.NoError(t, err)
-	assert.Contains(t, use.Paths().Node, filepath.Join(final, "generations", report.Generation))
-	require.NoError(t, use.Finish(true))
-	require.NoError(t, handle.Close())
-	status, err := runtimeCommand(t, "runtime", "status", "--config-dir", root)
-	require.NoError(t, err)
-	assert.Equal(t, "prepared", status.State)
-	assert.Equal(t, report.Generation, status.Generation)
-	assert.Nil(t, status.Storage)
-	assert.Nil(t, status.Qualification)
-	// This archive is structurally prepared but is not an executable browser.
-	status, err = runtimeCommand(t, "runtime", "qualify", "--config-dir", root)
-	require.Error(t, err)
-	require.NotNil(t, status.Qualification)
-	assert.NotEqual(t, "qualified", status.State)
-	assert.Contains(t, report.Notice, "Stop all consumers")
-	_, err = runtimeCommand(t, args...)
-	require.ErrorContains(t, err, "preload root must be empty")
-}
-
-func TestRuntimeImportDigestFailureNeverReportsPrepared(t *testing.T) {
-	manifest, archive := adminBundleFixture(t)
-	root := t.TempDir()
-	require.NoError(t, os.WriteFile(archive, []byte("corrupt"), 0600))
-	report, err := runtimeCommand(t, "runtime", "import", "--config-dir", root, "--manifest", manifest, "--archive", archive, "--cache", filepath.Join(root, "cache"))
-	require.Error(t, err)
-	assert.Equal(t, "unavailable", report.State)
-	assert.NotEmpty(t, report.SetupError)
-	report, err = runtimeCommand(t, "runtime", "status", "--config-dir", root, "--manifest", manifest, "--cache", filepath.Join(root, "cache"))
+	require.NotNil(t, report.Storage)
+	assert.Nil(t, report.Storage.Selected)
+	report, err = runtimeCommand(t, "runtime", "status", "--config-dir", root, "--cache", cache)
 	require.ErrorIs(t, err, runtime.ErrUnavailable)
 	assert.Equal(t, "unavailable", report.State)
 }
 
-func TestRuntimeImportUsesServiceConfiguration(t *testing.T) {
-	if !runtimeConfigProcess(t, "offline-import") {
+func TestRuntimePreloadRequiresQualifiedArchiveAndFreshRoot(t *testing.T) {
+	manifest, archive := adminBundleFixture(t)
+	root := t.TempDir()
+	final := filepath.Join(root, "preloaded")
+	args := []string{"runtime", "preload", "--config-dir", root, "--manifest", manifest, "--archive", archive, "--root", final}
+	report, err := runtimeCommand(t, args...)
+	require.Error(t, err)
+	assert.Nil(t, report.PreloadedConfig)
+	assert.NoFileExists(t, filepath.Join(final, "preload.json"))
+	_, err = runtimeCommand(t, args...)
+	require.ErrorContains(t, err, "preload root must be empty")
+}
+
+func TestRuntimeInstallDigestFailureNeverReportsPrepared(t *testing.T) {
+	manifest, archive := adminBundleFixture(t)
+	root := t.TempDir()
+	require.NoError(t, os.WriteFile(archive, []byte("corrupt"), 0600))
+	report, err := runtimeCommand(t, "runtime", "install", "--config-dir", root, "--manifest", manifest, "--archive", archive, "--cache", filepath.Join(root, "cache"))
+	require.Error(t, err)
+	assert.Equal(t, "unavailable", report.State)
+	assert.NotEmpty(t, report.SetupError)
+	require.NotNil(t, report.Storage)
+	assert.Nil(t, report.Storage.Selected)
+}
+
+func TestRuntimeInstallUsesServiceConfiguration(t *testing.T) {
+	if !runtimeConfigProcess(t, "offline-install") {
 		return
 	}
 	manifest, archive := adminBundleFixture(t)
 	_, stock, buildUser, _, _ := runtimeConfigRoots(t)
 	serviceCache, wrongCache := filepath.Join(t.TempDir(), "service-cache"), filepath.Join(t.TempDir(), "wrong-cache")
-	writeRuntimeConfig(t, stock, manifest, serviceCache)
-	writeRuntimeConfig(t, buildUser, manifest, wrongCache)
+	writeRuntimeConfig(t, stock, serviceCache)
+	writeRuntimeConfig(t, buildUser, wrongCache)
 	pluginconfig.MustInit(pluginconfig.InitInput{})
 	service, err := dem.LoadConfig(pluginconfig.ConfigDir())
 	require.NoError(t, err)
 	require.Equal(t, serviceCache, service.Runtime.CachePath)
-	report, err := runtimeCommand(t, "runtime", "import", "--archive", archive)
-	require.NoError(t, err)
+	report, err := runtimeCommand(t, "runtime", "install", "--manifest", manifest, "--archive", archive)
+	require.Error(t, err) // Structurally valid fixture cannot qualify as an executable runtime.
 	require.Equal(t, "prepared", report.State)
 	require.Equal(t, service.Runtime.CachePath, report.CachePath)
 	require.DirExists(t, filepath.Join(serviceCache, "generations", report.Generation))
 	require.NoDirExists(t, wrongCache)
-	// A later explicit cache override must not be lost to cached process state.
 	overrideCache := filepath.Join(t.TempDir(), "override-cache")
-	report, err = runtimeCommand(t, "runtime", "import", "--archive", archive, "--cache", overrideCache)
-	require.NoError(t, err)
+	report, err = runtimeCommand(t, "runtime", "install", "--manifest", manifest, "--archive", archive, "--cache", overrideCache)
+	require.Error(t, err)
 	require.Equal(t, overrideCache, report.CachePath)
 	require.DirExists(t, filepath.Join(overrideCache, "generations", report.Generation))
 	require.NoDirExists(t, wrongCache)
+}
+
+// This opt-in test uses authentic release descriptors and archives through the
+// production CLI acquisition, qualification and publication path.
+func TestRealRuntimeInstallQualifyAndUninstall(t *testing.T) {
+	manifest, archive, helper := os.Getenv("DEM_RUNTIME_TEST_MANIFEST"), os.Getenv("DEM_RUNTIME_TEST_ARCHIVE"), os.Getenv("DEM_RUNTIME_TEST_HELPER")
+	if manifest == "" || archive == "" || helper == "" {
+		t.Skip("requires DEM_RUNTIME_TEST_MANIFEST, DEM_RUNTIME_TEST_ARCHIVE and DEM_RUNTIME_TEST_HELPER")
+	}
+	require.NotZero(t, os.Geteuid())
+	restore := ndexec.SetRunnerPathsForTests(helper, "")
+	defer restore()
+	root := t.TempDir()
+	cache := filepath.Join(root, "installed")
+	common := []string{"--config-dir", root, "--cache", cache}
+	install := append(append([]string{"runtime", "install"}, common...), "--manifest", manifest, "--archive", archive)
+	report, err := runtimeCommand(t, install...)
+	require.NoError(t, err)
+	require.Equal(t, "installed", report.State)
+	require.NotNil(t, report.Runtime)
+	require.NotNil(t, report.Qualification)
+	require.True(t, report.Qualification.ExecutionContract)
+	require.True(t, report.Qualification.SandboxedLocalJourney)
+	require.True(t, report.Qualification.SandboxedLocalLighthouse)
+	require.True(t, report.Qualification.ProcessTreeDrained)
+	require.Equal(t, report.Runtime, report.Qualification.Runtime)
+	for _, command := range []string{"status", "qualify"} {
+		result, err := runtimeCommand(t, append([]string{"runtime", command}, common...)...)
+		require.NoError(t, err)
+		require.Equal(t, report.Runtime, result.Runtime)
+	}
+	store, err := runtime.Open(runtime.DefaultConfig(cache))
+	require.NoError(t, err)
+	consumer, err := store.AcquireSelected()
+	require.NoError(t, err)
+	_, err = runtimeCommand(t, append([]string{"runtime", "uninstall"}, common...)...)
+	require.Error(t, err)
+	require.NoError(t, consumer.Close())
+	require.NoError(t, store.Close())
+	result, err := runtimeCommand(t, append([]string{"runtime", "uninstall"}, common...)...)
+	require.NoError(t, err)
+	require.Equal(t, "uninstalled", result.State)
+	_, err = runtimeCommand(t, append([]string{"runtime", "status"}, common...)...)
+	require.ErrorIs(t, err, runtime.ErrUnavailable)
 }

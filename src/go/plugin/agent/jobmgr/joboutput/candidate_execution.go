@@ -68,7 +68,7 @@ func (dcjc *DynCfgJobController) prepareCandidateDecision(ctx context.Context, s
 	reply := internalReply()
 	reply.candidate = delta
 	reply.restart = option.restart
-	return dcjc.prepareMutationAfterApplyAndFallback(ctx, scope, current, nil, permit, resourceRemovalDisposition(current), postimage, reply, cleanup, resume, option.lifecycle, jobConfigIntentPreserve, nil, nil, nil)
+	return dcjc.prepareMutationAfterApplyAndFallback(ctx, scope, current, nil, permit, resourceRemovalDisposition(current), postimage, reply, cleanup, resume, option.lifecycle, nil, nil, nil)
 }
 
 func (dcjc *DynCfgJobController) candidateProjectionCleanup(id string, postimage *dyncfg.GraphConfig, delta *candidateDelta) lifecycle.TaskCleanup {
@@ -139,7 +139,7 @@ func (dcjc *DynCfgJobController) prepareCandidateCommit(delta *candidateDelta, h
 // executor's object identity and the controller token are independent fences.
 func (dcjc *DynCfgJobController) prepareControllerActivation(ctx context.Context, attempt acceptedActivationAttempt, current lifecycle.ReadyResource, scope lifecycle.ResourceTransactionScope, permit lifecycle.LongLivedPermit) (transaction lifecycle.PreparedResourceTransaction, resultErr error) {
 	defer func() {
-		var admission *configIntentAdmissionError
+		var admission *configAdmissionError
 		if errors.As(resultErr, &admission) && ctx.Err() == nil && !lifecycle.OwnershipRetained(resultErr) {
 			transaction, resultErr = dcjc.prepareControllerAdmissionFailure(ctx, attempt, current, scope, permit, resultErr)
 		}
@@ -158,7 +158,7 @@ func (dcjc *DynCfgJobController) prepareControllerActivation(ctx context.Context
 	}
 	if work.Tentative || state.Binding == nil || state.Binding.Key != work.Token.Candidate {
 		// Every changed binding retains its checked stage across admission.
-		// Resource reservation may yield and invalidate its dependency proof.
+		// Admission validation may yield and invalidate its dependency proof.
 		result, err := attempt.stage.inspect()
 		if err != nil {
 			return dcjc.prepareControllerActivationError(ctx, attempt, current, scope, permit, classifyActivationError(err))
@@ -224,7 +224,7 @@ func (dcjc *DynCfgJobController) prepareControllerAdmissionFailure(ctx context.C
 	activation := classifyActivationError(cause)
 	switch activation.kind {
 	case activationFailureBusy, activationFailureDeadline:
-		identity := jobTestAttemptIdentity(configOperationValidateIntent, attempt.spec.config)
+		identity := jobTestAttemptIdentity(configOperationAdmit, attempt.spec.config)
 		release, ok := dcjc.factory.config.Attempts.ProcessAttemptReleased(identity)
 		if !ok {
 			released := make(chan struct{})

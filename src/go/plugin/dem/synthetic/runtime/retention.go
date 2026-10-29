@@ -21,9 +21,10 @@ type reservation struct {
 }
 
 type inventory struct {
+	selected           *Manifest
 	generations        map[string]generation
-	demand             map[string]int
-	pending            map[string]int
+	processes          map[string]int
+	candidates         map[string]int
 	uses               map[string]int
 	uncertain          map[string]int
 	reservations       map[string]reservation
@@ -34,33 +35,41 @@ type inventory struct {
 
 // Status describes logical managed files and protection. ReservedBytes is the
 // unwritten remainder of active reservations, not additional used disk bytes.
-// ProtectedBytes and ReclaimableBytes count each owned file once. PendingBytes,
-// DemandBytes,
+// ProtectedBytes and ReclaimableBytes count each owned file once. CandidateBytes,
+// ProcessBytes,
 // ExecutionBytes and UncertainBytes describe overlapping generation protection;
 // uncertain bytes are a subset of execution bytes. PreparingBytes and TrashBytes
 // describe written workspace, not extra disk usage.
 type Status struct {
-	UsedBytes             int64  `json:"used_bytes"`
-	ReservedBytes         int64  `json:"reserved_bytes"`
-	LimitBytes            int64  `json:"limit_bytes"`
-	ProtectedBytes        int64  `json:"protected_bytes"`
-	ReclaimableBytes      int64  `json:"reclaimable_bytes"`
-	PendingBytes          int64  `json:"pending_bytes"`
-	PendingClaims         int    `json:"pending_claims"`
-	DemandBytes           int64  `json:"demand_bytes"`
-	ExecutionBytes        int64  `json:"execution_bytes"`
-	UncertainBytes        int64  `json:"uncertain_bytes"`
-	PreparingBytes        int64  `json:"preparing_bytes"`
-	TrashBytes            int64  `json:"trash_bytes"`
-	DemandGenerations     int    `json:"demand_generations"`
-	ExecutionPins         int    `json:"execution_pins"`
-	UncertainPins         int    `json:"uncertain_pins"`
-	BootRecoveryAvailable bool   `json:"boot_recovery_available"`
-	CleanupError          string `json:"cleanup_error,omitempty"`
+	Selected              *Manifest `json:"selected,omitempty"`
+	SelectedBytes         int64     `json:"selected_bytes"`
+	ProcessClaims         int       `json:"process_claims"`
+	UsedBytes             int64     `json:"used_bytes"`
+	ReservedBytes         int64     `json:"reserved_bytes"`
+	LimitBytes            int64     `json:"limit_bytes"`
+	ProtectedBytes        int64     `json:"protected_bytes"`
+	ReclaimableBytes      int64     `json:"reclaimable_bytes"`
+	CandidateBytes        int64     `json:"candidates_bytes"`
+	CandidateClaims       int       `json:"candidates_claims"`
+	ProcessBytes          int64     `json:"processes_bytes"`
+	ExecutionBytes        int64     `json:"execution_bytes"`
+	UncertainBytes        int64     `json:"uncertain_bytes"`
+	PreparingBytes        int64     `json:"preparing_bytes"`
+	TrashBytes            int64     `json:"trash_bytes"`
+	ProcessGenerations    int       `json:"processes_generations"`
+	ExecutionPins         int       `json:"execution_pins"`
+	UncertainPins         int       `json:"uncertain_pins"`
+	BootRecoveryAvailable bool      `json:"boot_recovery_available"`
+	CleanupError          string    `json:"cleanup_error,omitempty"`
 }
 
 func (s *Store) inventoryLocked(reconcile bool) (inventory, error) {
-	inv := inventory{generations: make(map[string]generation), demand: make(map[string]int), pending: make(map[string]int), uses: make(map[string]int), uncertain: make(map[string]int), reservations: make(map[string]reservation), protectedRecords: make(map[string]bool), reclaimableRecords: make(map[string]bool)}
+	inv := inventory{generations: make(map[string]generation), processes: make(map[string]int), candidates: make(map[string]int), uses: make(map[string]int), uncertain: make(map[string]int), reservations: make(map[string]reservation), protectedRecords: make(map[string]bool), reclaimableRecords: make(map[string]bool)}
+	var err error
+	inv.selected, err = s.selectedLocked(reconcile)
+	if err != nil {
+		return inv, err
+	}
 	// Live completion proof also survives a successful rename followed by a
 	// failed directory sync. Retry these names even if enumeration cannot see
 	// the original record anymore.
@@ -110,12 +119,15 @@ func (s *Store) inventoryLocked(reconcile bool) (inventory, error) {
 			return inv, err
 		}
 		if !validID(claim.Generation) {
-			return inv, errors.New("invalid runtime demand binding")
+			return inv, errors.New("invalid runtime processes binding")
 		}
-		if claim.Pending {
-			inv.pending[claim.Generation]++
-		} else {
-			inv.demand[claim.Generation]++
+		switch claim.Kind {
+		case "candidate":
+			inv.candidates[claim.Generation]++
+		case "process":
+			inv.processes[claim.Generation]++
+		default:
+			return inv, errors.New("invalid runtime claim kind")
 		}
 		inv.protectedRecords[name] = true
 	}
@@ -181,7 +193,7 @@ func (s *Store) inventoryLocked(reconcile bool) (inventory, error) {
 		}
 		inv.reservations[name] = r
 		inv.protectedRecords[name] = true
-		inv.demand[r.Generation]++
+		inv.candidates[r.Generation]++
 	}
 	generations, err := s.childDirectories("generations")
 	if err != nil {
@@ -195,7 +207,7 @@ func (s *Store) inventoryLocked(reconcile bool) (inventory, error) {
 			return inv, err
 		}
 		changed := false
-		if inv.demand[id] > 0 {
+		if inv.protected(id) {
 			changed = !g.Unneeded.IsZero()
 			g.Unneeded = time.Time{}
 		} else if g.Unneeded.IsZero() {
@@ -213,7 +225,7 @@ func (s *Store) inventoryLocked(reconcile bool) (inventory, error) {
 }
 
 func (s *Store) statusLocked(inv inventory) (Status, error) {
-	status := Status{LimitBytes: s.config.MaxBytes, DemandGenerations: len(inv.demand), BootRecoveryAvailable: s.boot.Verified}
+	status := Status{Selected: inv.selected, LimitBytes: s.config.MaxBytes, ProcessGenerations: len(inv.processes), BootRecoveryAvailable: s.boot.Verified}
 	if err := errors.Join(inv.cleanupError, s.cleanupError); err != nil {
 		status.CleanupError = err.Error()
 	}
@@ -243,16 +255,22 @@ func (s *Store) statusLocked(inv inventory) (Status, error) {
 			status.TrashBytes += size
 		}
 	}
-	for _, count := range inv.pending {
-		status.PendingClaims += count
+	for _, count := range inv.processes {
+		status.ProcessClaims += count
+	}
+	for _, count := range inv.candidates {
+		status.CandidateClaims += count
 	}
 	for id := range inv.generations {
 		size := bytesByRecord[filepath.Join("generations", id)]
-		if inv.pending[id] > 0 {
-			status.PendingBytes += size
+		if inv.selected != nil && inv.selected.Archive.SHA256 == id {
+			status.SelectedBytes += size
 		}
-		if inv.demand[id] > 0 {
-			status.DemandBytes += size
+		if inv.candidates[id] > 0 {
+			status.CandidateBytes += size
+		}
+		if inv.processes[id] > 0 {
+			status.ProcessBytes += size
 		}
 		if inv.uses[id] > 0 {
 			status.ExecutionBytes += size
@@ -260,7 +278,7 @@ func (s *Store) statusLocked(inv inventory) (Status, error) {
 		if inv.uncertain[id] > 0 {
 			status.UncertainBytes += size
 		}
-		if inv.demand[id] > 0 || inv.pending[id] > 0 || inv.uses[id] > 0 {
+		if inv.protected(id) {
 			status.ProtectedBytes += size
 		} else {
 			status.ReclaimableBytes += size
@@ -288,8 +306,7 @@ func (s *Store) Inspect() (Status, error) {
 	return status, err
 }
 
-// Sweep runs at startup and periodically. Cached files may expire before saved
-// enabled configuration is accepted; only known ownership prevents reclamation.
+// Sweep retires unselected releases without process or execution ownership.
 // Failed cleanup is separate from the ability to use a matching runtime.
 func (s *Store) Sweep() error {
 	var cleanupVersion uint64
@@ -329,7 +346,7 @@ func (s *Store) finishSweep(cleanupVersion uint64, result error) {
 func (s *Store) candidates(inv inventory, pressure bool) []string {
 	var ids []string
 	for id := range inv.generations {
-		if inv.demand[id] == 0 && inv.pending[id] == 0 && inv.uses[id] == 0 {
+		if !inv.protected(id) {
 			ids = append(ids, id)
 		}
 	}
@@ -343,13 +360,10 @@ func (s *Store) candidates(inv inventory, pressure bool) []string {
 	if pressure || len(ids) == 0 {
 		return ids
 	}
-	// One previous generation is preferred while demand exists; without browser
-	// demand only the last used generation receives the longer idle grace.
+	// Keep the most recently used obsolete generation for a bounded rollback
+	// grace. The selected installation never participates in retirement.
 	last := ids[len(ids)-1]
 	grace := s.config.PreviousRetention
-	if len(inv.demand) == 0 {
-		grace = s.config.IdleRetention
-	}
 	if s.now().Before(inv.generations[last].Unneeded.Add(grace)) {
 		ids = ids[:len(ids)-1]
 	}
@@ -409,6 +423,9 @@ func (s *Store) flushTrash() error {
 		if err != nil {
 			return err
 		}
+		if err := s.syncSelection(); err != nil {
+			return err
+		}
 		for _, parent := range []string{"generations", "uses", "claims", "staging", "trash", "initializing"} {
 			if err := syncDirectory(s.root, parent); err != nil {
 				return err
@@ -424,4 +441,8 @@ func (s *Store) flushTrash() error {
 		result = errors.Join(result, s.root.RemoveAll(name))
 	}
 	return errors.Join(result, syncDirectory(s.root, "trash"))
+}
+
+func (inv inventory) protected(id string) bool {
+	return (inv.selected != nil && inv.selected.Archive.SHA256 == id) || inv.processes[id] > 0 || inv.candidates[id] > 0 || inv.uses[id] > 0
 }
