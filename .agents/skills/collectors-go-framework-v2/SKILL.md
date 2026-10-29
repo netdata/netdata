@@ -233,6 +233,8 @@ shape. Older V2 collectors can supply local patterns, but check for stale style 
   partial local artifact checklist in V2 collector work.
 - MUST NOT log raw secrets, DSNs, bearer tokens, or URLs with embedded
   credentials.
+  Configured-file diagnostic and error-chain handling is owned by
+  `.agents/skills/collectors-authoring/collector-practices.md#file-content-diagnostics`.
 
 ## Hot-Path Logging
 
