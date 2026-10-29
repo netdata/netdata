@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"unicode"
 
 	"github.com/gosnmp/gosnmp"
 
@@ -88,7 +89,7 @@ func GetSysInfo(client ScalarClient) (*SysInfo, error) {
 		case OidSysDescr:
 			si.Probe.SeenSysDescr = true
 			si.Descr, err = PduToString(pdu)
-			si.Descr = valueSanitizer.Replace(si.Descr)
+			si.Descr = sanitizeMetadata(si.Descr)
 		case OidSysObject:
 			si.Probe.SeenSysObjectID = true
 			si.Probe.SysObjectIDType = pdu.Type.String()
@@ -96,15 +97,15 @@ func GetSysInfo(client ScalarClient) (*SysInfo, error) {
 		case OidSysContact:
 			si.Probe.SeenSysContact = true
 			si.Contact, err = PduToString(pdu)
-			si.Contact = valueSanitizer.Replace(si.Contact)
+			si.Contact = sanitizeMetadata(si.Contact)
 		case OidSysName:
 			si.Probe.SeenSysName = true
 			si.Name, err = PduToString(pdu)
-			si.Name = valueSanitizer.Replace(si.Name)
+			si.Name = sanitizeMetadata(si.Name)
 		case OidSysLocation:
 			si.Probe.SeenSysLocation = true
 			si.Location, err = PduToString(pdu)
-			si.Location = valueSanitizer.Replace(si.Location)
+			si.Location = sanitizeMetadata(si.Location)
 		}
 		if err != nil {
 			return nil, WithFailure(fmt.Errorf("OID %q: %w", pdu.Name, err), "system_identity", "processing")
@@ -239,15 +240,21 @@ func getSysInfoChunkPDUs(client ScalarClient, version gosnmp.SnmpVersion, oids [
 	return nil, nil
 }
 
-var valueSanitizer = strings.NewReplacer(
-	"'", "",
-	"\n", " ",
-	"\r", " ",
-	"\x00", "",
-	"\"", "",
-	"`", "",
-	"\\", "",
-)
+// sanitizeMetadata keeps device metadata single-line and control-free. Consumers still need output encoding.
+func sanitizeMetadata(value string) string {
+	return strings.Map(func(r rune) rune {
+		switch r {
+		case '\'', '"', '`', '\\', 0:
+			return -1 // Preserve the existing metadata character removals.
+		case '\u2028', '\u2029':
+			return ' '
+		}
+		if unicode.IsControl(r) {
+			return ' '
+		}
+		return r
+	}, value)
+}
 
 // updateMetadata enriches a SysInfo struct with metadata based on its SysObjectID.
 // It populates the Organization, Vendor, Category, and Model fields.
@@ -287,7 +294,7 @@ func updateMetadata(si *SysInfo) {
 		}
 	}
 
-	if org := valueSanitizer.Replace(rawOrg); org != "" {
+	if org := sanitizeMetadata(rawOrg); org != "" {
 		si.Organization = org
 	} else if si.Organization == "" {
 		si.Organization = "Unknown"

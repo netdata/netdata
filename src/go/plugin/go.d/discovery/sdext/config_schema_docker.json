@@ -61,7 +61,7 @@
             },
             "config_template": {
               "title": "Config template",
-              "description": "**Uses the same fields as match expression**. Go template that generates the data collection job configuration in YAML format. **Must include 'module' and 'name' fields**, plus any module-specific settings.",
+              "description": "Go template that creates jobs with the job helper. Pass key/value pairs or a prepared map; call job once per job. The module defaults to the rule ID when omitted.",
               "type": "string"
             }
           },
@@ -121,7 +121,7 @@
         },
         "config_template": {
           "ui:widget": "textarea",
-          "ui:placeholder": "module: nginx\nname: {{.Name}}\nurl: http://{{.Address}}/stub_status"
+          "ui:placeholder": "{{ job \"module\" \"nginx\" \"name\" .Name \"url\" (printf \"http://%s/stub_status\" .Address) }}\n"
         }
       },
       "ui:help": "- Match discovered Docker containers and generate collector configurations.\n- Each rule specifies match criteria and a config template.\n- When a container matches, a data collection job is created."
