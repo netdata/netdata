@@ -1389,8 +1389,6 @@ RRDHOST_SET_RECEIVER_RESULT rrdhost_set_receiver(RRDHOST *host, struct receiver_
         netdata_mutex_unlock(&host->vnode_transition_mutex);
         return RRDHOST_SET_RECEIVER_CLEANUP_BUSY;
     }
-    dictionary_write_lock(host->rrdcalc_root_index);
-
     rrdhost_receiver_lock(host);
 
     // If the obsolete-all cleanup is running on this host, refuse the attach.
@@ -1457,11 +1455,6 @@ RRDHOST_SET_RECEIVER_RESULT rrdhost_set_receiver(RRDHOST *host, struct receiver_
         signal_rrdcontext = true;
         stream_receiver_replication_reset(host);
 
-        host->health.enabled = host->rrd_memory_mode != RRD_DB_MODE_NONE &&
-                               rpt->config.health.enabled != CONFIG_BOOLEAN_NO;
-        rrdhost_flag_set(rpt->host, RRDHOST_FLAG_COLLECTOR_ONLINE);
-        aclk_queue_node_info(rpt->host, true);
-
         stream_parents_host_reset(host, STREAM_HANDSHAKE_SP_PREPARING);
 
         set_this = true;
@@ -1470,7 +1463,18 @@ RRDHOST_SET_RECEIVER_RESULT rrdhost_set_receiver(RRDHOST *host, struct receiver_
 
 unlock:
     rrdhost_receiver_unlock(host);
-    dictionary_write_unlock(host->rrdcalc_root_index);
+
+    if(set_this) {
+        // The parser starts only after admission returns, and the transition mutex excludes local claims.
+        // Publish health after the chart walk and after releasing receiver_lock: chart GC takes the chart
+        // index before the alert dictionary, while health readers take alert dictionary before receiver_lock.
+        dictionary_write_lock(host->rrdcalc_root_index);
+        host->health.enabled = host->rrd_memory_mode != RRD_DB_MODE_NONE &&
+                               rpt->config.health.enabled != CONFIG_BOOLEAN_NO;
+        rrdhost_flag_set(host, RRDHOST_FLAG_COLLECTOR_ONLINE);
+        dictionary_write_unlock(host->rrdcalc_root_index);
+        aclk_queue_node_info(host, true);
+    }
 
     if(signal_rrdcontext)
         rrdcontext_host_child_connected(host);

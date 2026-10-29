@@ -407,12 +407,62 @@ struct vnode_test_alert_insert {
     RRD_ALERT_PROTOTYPE *ap;
     bool started;
     bool inserted;
+    bool finished;
 };
 
 static void vnode_test_late_alert_insert(void *ptr) {
     struct vnode_test_alert_insert *insert = ptr;
     __atomic_store_n(&insert->started, true, __ATOMIC_RELEASE);
     insert->inserted = rrdcalc_add_from_prototype(insert->host, insert->st, insert->ap);
+    __atomic_store_n(&insert->finished, true, __ATOMIC_RELEASE);
+}
+
+struct vnode_test_receiver_attach {
+    RRDHOST *host;
+    struct receiver_state receiver;
+    RRDHOST_SET_RECEIVER_RESULT result;
+};
+
+static void vnode_test_attach_receiver(void *ptr) {
+    struct vnode_test_receiver_attach *attach = ptr;
+    attach->result = rrdhost_set_receiver(attach->host, &attach->receiver);
+}
+
+static bool vnode_test_receiver_chart_lock(RRDHOST *host, RRDSET *st, RRD_ALERT_PROTOTYPE *ap) {
+    struct vnode_test_receiver_attach attach = {
+        .host = host, .receiver = { .sock.fd = -1, .config.health.enabled = CONFIG_BOOLEAN_YES },
+    };
+    struct vnode_test_alert_insert insert = { .host = host, .st = st, .ap = ap };
+    unsigned connections = __atomic_load_n(&host->stream.rcv.status.connections, __ATOMIC_RELAXED);
+
+    // Chart GC owns this lock before taking the alert dictionary. Block the receiver's real chart
+    // walk and verify it leaves the alert dictionary available, rather than forming the reverse order.
+    dictionary_write_lock(host->rrdset_root_index);
+    ND_THREAD *receiver = nd_thread_create("VNODE-ATTACH", NETDATA_THREAD_OPTION_DEFAULT, vnode_test_attach_receiver, &attach);
+    usec_t deadline = now_monotonic_usec() + 3 * USEC_PER_SEC;
+    while(__atomic_load_n(&host->stream.rcv.status.connections, __ATOMIC_RELAXED) == connections &&
+          now_monotonic_usec() < deadline)
+        sleep_usec(USEC_PER_MS);
+    bool started = __atomic_load_n(&host->stream.rcv.status.connections, __ATOMIC_RELAXED) != connections;
+
+    ND_THREAD *inserter = nd_thread_create("VNODE-ALERT-PROBE", NETDATA_THREAD_OPTION_DEFAULT, vnode_test_late_alert_insert, &insert);
+    deadline = now_monotonic_usec() + USEC_PER_SEC;
+    while(!__atomic_load_n(&insert.finished, __ATOMIC_ACQUIRE) && now_monotonic_usec() < deadline)
+        sleep_usec(USEC_PER_MS);
+    bool available = __atomic_load_n(&insert.finished, __ATOMIC_ACQUIRE);
+    struct receiver_state contender = { .sock.fd = -1 };
+    bool busy = rrdhost_set_receiver(host, &contender) == RRDHOST_SET_RECEIVER_CLEANUP_BUSY;
+
+    dictionary_write_unlock(host->rrdset_root_index);
+    nd_thread_join(receiver);
+    nd_thread_join(inserter);
+    if(attach.result == RRDHOST_SET_RECEIVER_OK)
+        rrdhost_clear_receiver(&attach.receiver, STREAM_HANDSHAKE_DISCONNECT_SIGNALED_TO_STOP);
+    bool ok = started && available && busy && attach.result == RRDHOST_SET_RECEIVER_OK;
+    if(!ok)
+        netdata_log_error("VNODE unittest: receiver chart walk held alert admission (started=%d available=%d busy=%d)",
+                          started, available, busy);
+    return ok;
 }
 
 static bool vnode_test_offline_dyncfg(RRDHOST *host) {
@@ -550,6 +600,8 @@ static int vnode_test_alert_removal(bool teardown, bool redefine) {
     if(rrdcalc_add_from_prototype(host, st, &ap) || dictionary_entries(host->rrdcalc_root_index))
         goto cleanup;
     if(!vnode_test_offline_dyncfg(host))
+        goto cleanup;
+    if(!teardown && !redefine && !vnode_test_receiver_chart_lock(host, st, &ap))
         goto cleanup;
 
     snprintfz(command, sizeof(command), redefine ? "HOST_DEFINE %s vnode-alert-test" : "HOST %s", guid);

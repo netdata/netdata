@@ -8,6 +8,8 @@
 
 extern __thread bool is_health_thread;
 
+static bool alert_snapshot_held(RRDHOST *host);
+
 #define SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param)                                                                     \
     ({                                                                                                                 \
         int _param = (param);                                                                                          \
@@ -576,7 +578,9 @@ void health_alarm_log_populate(
     " AND hl.host_id = @host_id AND aq.host_id = hl.host_id AND hl.health_log_id = hld.health_log_id"                  \
     " ORDER BY aq.sequence_id ASC LIMIT "ACLK_MAX_ALERT_UPDATES
 
-static void aclk_push_alert_event(RRDHOST *host, sqlite3_stmt **res, sqlite3_stmt **res_version, sqlite3_stmt **res_delete)
+static void aclk_push_alert_event(
+    RRDHOST *host, sqlite3_stmt **res, sqlite3_stmt **res_version, sqlite3_stmt **res_delete,
+    ACLK_ALARM_LOG_SEND_RESULT (*send_entry)(struct alarm_log_entry *))
 {
     CLAIM_ID claim_id = claim_id_get();
 
@@ -625,7 +629,7 @@ static void aclk_push_alert_event(RRDHOST *host, sqlite3_stmt **res, sqlite3_stm
         // queued, with their version untouched, and retry on the next pass. A message that can never be sent
         // (cannot be built, too big for the server) is consumed as before, so one bad row cannot block the queue.
         bool emitted;
-        if (!send_alert_transition_if_needed(&alarm_log, status, aclk_send_alarm_log_entry, res_version, &emitted)) {
+        if (!send_alert_transition_if_needed(&alarm_log, status, send_entry, res_version, &emitted)) {
             destroy_alarm_log_entry(&alarm_log);
             rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
             break;
@@ -731,7 +735,9 @@ done:
 // empty would re-queue transitions or schedule a needless snapshot. A transaction does not isolate threads that share
 // a connection, so hold the connection mutex across both statements; the savepoint makes them all-or-nothing.
 // When another transaction is already open on db_meta (metadata_scan_host), a savepoint would only nest inside it, so
-// the rebuild is deferred to the next pass.
+// the rebuild is deferred to the next pass. Snapshot eligibility and health's decision to start evaluating share
+// this mutex. A newly held checkpoint rolls back its speculative versions; RELEASE captures an eligible state
+// that remains publishable even if a new transition starts afterward.
 //
 // Returns true when the table was rebuilt.
 static bool rebuild_host_alert_version_table(RRDHOST *host)
@@ -755,7 +761,7 @@ static bool rebuild_host_alert_version_table(RRDHOST *host)
     sqlite3_mutex *db_mutex = sqlite3_db_mutex(db_meta);
     sqlite3_mutex_enter(db_mutex);
 
-    if (!sqlite3_get_autocommit(db_meta)) {
+    if (!sqlite3_get_autocommit(db_meta) || alert_snapshot_held(host)) {
         sqlite3_mutex_leave(db_mutex);
         goto done;
     }
@@ -770,12 +776,14 @@ static bool rebuild_host_alert_version_table(RRDHOST *host)
     if (rc == SQLITE_DONE)
         rc = execute_insert(res_insert);
 
-    if (rc == SQLITE_DONE && sqlite3_exec(db_meta, "RELEASE rebuild_alert_version", NULL, NULL, NULL) == SQLITE_OK)
+    bool held = rc == SQLITE_DONE && alert_snapshot_held(host);
+    if (rc == SQLITE_DONE && !held && sqlite3_exec(db_meta, "RELEASE rebuild_alert_version", NULL, NULL, NULL) == SQLITE_OK)
         rebuilt = true;
     else {
         (void)sqlite3_exec(db_meta, "ROLLBACK TO rebuild_alert_version", NULL, NULL, NULL);
         (void)sqlite3_exec(db_meta, "RELEASE rebuild_alert_version", NULL, NULL, NULL);
-        error_report("Failed to rebuild the host alert version table, rc = %d", rc);
+        if (!held)
+            error_report("Failed to rebuild the host alert version table, rc = %d", rc);
     }
 
     sqlite3_mutex_leave(db_mutex);
@@ -837,7 +845,7 @@ done:
 // Snapshots wait for queued transition deadlines as well as writes still in progress. Otherwise the health log's
 // latest REMOVED or non-runnable UNINITIALIZED state would bypass the grace period, including after reconnection.
 // The queue row is written before pending_transitions drops, so a transition being saved cannot escape both gates.
-bool alert_snapshot_held(RRDHOST *host)
+static bool alert_snapshot_held(RRDHOST *host)
 {
     if (__atomic_load_n(&host->health.pending_transitions, __ATOMIC_ACQUIRE))
         return true;
@@ -849,6 +857,26 @@ bool alert_snapshot_held(RRDHOST *host)
         return true;
 
     return alert_queue_has_rows_not_due(host, now_realtime_sec());
+}
+
+bool alert_snapshot_freezes_health(RRDHOST *host)
+{
+    struct aclk_sync_cfg_t *config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
+    if (!config || aclk_alert_snapshot_state_get(config) != ACLK_ALERT_SNAPSHOT_READY)
+        return false;
+
+    // Serialize admission of another health pass with snapshot capture. Invalidate before releasing the
+    // mutex so an expiring queue deadline cannot expose partially evaluated alerts to the snapshot builder.
+    sqlite3_mutex *db_mutex = sqlite3_db_mutex(db_meta);
+    sqlite3_mutex_enter(db_mutex);
+    bool freeze = false;
+    if (aclk_alert_snapshot_state_get(config) == ACLK_ALERT_SNAPSHOT_READY) {
+        freeze = !alert_snapshot_held(host);
+        if (!freeze)
+            __atomic_store_n(&host->health.alert_status_snapshot.valid, 0, __ATOMIC_RELEASE);
+    }
+    sqlite3_mutex_leave(db_mutex);
+    return freeze;
 }
 
 // the earliest date_scheduled queued for the host, nd_time_t_max() when nothing is
@@ -1040,6 +1068,45 @@ done:
     return failed ? -1 : reaped;
 }
 
+static void aclk_push_alert_events_for_host(
+    RRDHOST *host, sqlite3_stmt **res, sqlite3_stmt **res_version, sqlite3_stmt **res_delete,
+    ACLK_ALARM_LOG_SEND_RESULT (*send_entry)(struct alarm_log_entry *))
+{
+    if (!rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS) ||
+        rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))
+        return;
+
+    rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
+
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
+    // alert_queue is drained only by the health thread, for every host; here only what it submitted is consumed
+    if (!aclk_host_config || !aclk_alert_streaming_enabled(aclk_host_config) || rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
+        if (commit_alert_events(host))
+            rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
+        return;
+    }
+
+    enum aclk_alert_snapshot_state snapshot_state = aclk_alert_snapshot_state_get(aclk_host_config);
+    if (snapshot_state != ACLK_ALERT_SNAPSHOT_IDLE) {
+        rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
+        if (snapshot_state == ACLK_ALERT_SNAPSHOT_PENDING)
+            return;
+        // A held/deferred checkpoint must not delay unrelated due alerts. Failed preparation rolls back its
+        // speculative versions, so normal sender dedup still compares against what Cloud actually knows.
+        if (!rebuild_host_alert_version_table(host)) {
+            aclk_push_alert_event(host, res, res_version, res_delete, send_entry);
+            return;
+        }
+        // Successful preparation captured an eligible state under the DB mutex. A later hold belongs to
+        // newer transitions and must not veto publication after those captured versions were committed.
+        send_alert_snapshot_to_cloud(host);
+        aclk_host_config->snapshot_count++;
+        aclk_alert_snapshot_complete(aclk_host_config);
+    }
+    else
+        aclk_push_alert_event(host, res, res_version, res_delete, send_entry);
+}
+
 void aclk_push_alert_events_for_all_hosts(void)
 {
     RRDHOST *host;
@@ -1069,43 +1136,7 @@ void aclk_push_alert_events_for_all_hosts(void)
     }
 
     dfe_start_reentrant(rrdhost_root_index, host) {
-        if (!rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS) ||
-            rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))
-            continue;
-
-        rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
-
-        struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
-        // alert_queue is drained only by the health thread, for every host; here only what it submitted is consumed
-        if (!aclk_host_config || !aclk_alert_streaming_enabled(aclk_host_config) || rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
-            if (commit_alert_events(host))
-                rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
-            continue;
-        }
-
-        enum aclk_alert_snapshot_state snapshot_state = aclk_alert_snapshot_state_get(aclk_host_config);
-        if (snapshot_state != ACLK_ALERT_SNAPSHOT_IDLE) {
-            rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
-            if (snapshot_state == ACLK_ALERT_SNAPSHOT_PENDING)
-                continue;
-            // checked before the rebuild so a held snapshot is not rebuilt on every pass, and again after it: the
-            // REMOVED transitions of a child that disconnected meanwhile may already be in the rebuilt table
-            if (alert_snapshot_held(host))
-                continue;
-            // the snapshot itself is rebuilt from the health log, not from what is still queued, so rows the
-            // health thread has not drained yet cannot make it stale; the flag is already set on this path for
-            // the remainder
-            (void)commit_alert_events(host);
-            // the flag is already set on this path, so a deferred or failed rebuild is retried on the next pass,
-            // and the snapshot is only sent from a rebuilt table
-            if (!rebuild_host_alert_version_table(host) || alert_snapshot_held(host))
-                continue;
-            send_alert_snapshot_to_cloud(host);
-            aclk_host_config->snapshot_count++;
-            aclk_alert_snapshot_complete(aclk_host_config);
-        }
-        else
-            aclk_push_alert_event(host, &res, &res_version, &res_delete);
+        aclk_push_alert_events_for_host(host, &res, &res_version, &res_delete, aclk_send_alarm_log_entry);
     }
     dfe_done(host);
     SQLITE_FINALIZE(res);
@@ -1701,12 +1732,12 @@ done:
 
 // Persist through the production writer: this also queues the transition and advances last_transition_id,
 // so the snapshot tests observe the same health-log state as a real removal/recovery.
-static int64_t aq_save_transition(
-    RRDHOST *host, uint32_t unique_id, RRDCALC_STATUS old_status, RRDCALC_STATUS new_status,
+static int64_t aq_save_transition_for_alarm(
+    RRDHOST *host, uint32_t alarm_id, uint32_t unique_id, RRDCALC_STATUS old_status, RRDCALC_STATUS new_status,
     uint32_t flags, time_t when)
 {
     ALARM_ENTRY ae = {
-        .alarm_id = 100,
+        .alarm_id = alarm_id,
         .unique_id = unique_id,
         .alarm_event_id = unique_id,
         .old_status = old_status,
@@ -1727,13 +1758,21 @@ static int64_t aq_save_transition(
     sqlite3_stmt *res = NULL;
     int64_t id = 0;
     if (PREPARE_STATEMENT(
-            db_meta, "SELECT health_log_id FROM health_log WHERE host_id = ?1 AND alarm_id = 100", &res)) {
+            db_meta, "SELECT health_log_id FROM health_log WHERE host_id = ?1 AND alarm_id = ?2", &res)) {
         if (sqlite3_bind_blob(res, 1, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC) == SQLITE_OK &&
+            sqlite3_bind_int64(res, 2, alarm_id) == SQLITE_OK &&
             sqlite3_step_monitored(res) == SQLITE_ROW)
             id = sqlite3_column_int64(res, 0);
         SQLITE_FINALIZE(res);
     }
     return id;
+}
+
+static int64_t aq_save_transition(
+    RRDHOST *host, uint32_t unique_id, RRDCALC_STATUS old_status, RRDCALC_STATUS new_status,
+    uint32_t flags, time_t when)
+{
+    return aq_save_transition_for_alarm(host, 100, unique_id, old_status, new_status, flags, when);
 }
 
 static bool aq_seed_alert_config(RRDHOST *host)
@@ -1768,10 +1807,14 @@ static int aq_snapshot_rows(RRDHOST *host)
 }
 
 static unsigned aq_emitted_events;
+static int64_t aq_last_alarm_id;
+static enum aclk_alarm_status aq_last_status;
 
-static ACLK_ALARM_LOG_SEND_RESULT aq_record_send(struct alarm_log_entry *entry __maybe_unused)
+static ACLK_ALARM_LOG_SEND_RESULT aq_record_send(struct alarm_log_entry *entry)
 {
     aq_emitted_events++;
+    aq_last_alarm_id = entry->alarm_id;
+    aq_last_status = entry->status;
     return ACLK_ALARM_LOG_SENT;
 }
 
@@ -1780,6 +1823,14 @@ static int aq_deny_alert_version_read(
     const char *database __maybe_unused, const char *source __maybe_unused)
 {
     return action == SQLITE_READ && table && !strcmp(table, "alert_version") ? SQLITE_DENY : SQLITE_OK;
+}
+
+static void aq_hold_snapshot_during_rebuild(sqlite3_context *context, int argc __maybe_unused, sqlite3_value **argv __maybe_unused)
+{
+    RRDHOST *host = sqlite3_user_data(context);
+    // Model a metadata save starting after the initial eligibility check but before the checkpoint commits.
+    __atomic_store_n(&host->health.pending_transitions, 1, __ATOMIC_RELEASE);
+    sqlite3_result_int(context, 0);
 }
 
 // Each bounce fixture has one alert. Exercise the production sender decision and acknowledgement with a
@@ -2381,6 +2432,148 @@ int alert_queue_unittest(void)
         bool matches_on_error = cloud_status_matches(id, RRDCALC_STATUS_UNINITIALIZED);
         AQ_SQL(sqlite3_set_authorizer(db_meta, NULL, NULL), "restore version read");
         AQ_CHECK(!matches_on_error, "sender dedup: a failed version read cannot establish a matching Cloud status");
+        freez(h->aclk_host_config);
+        freez(h);
+    }
+
+    // --- a READY snapshot held by one delayed initialization must not block another alert's due raise.
+    // Run the production per-host dispatcher and real joined push query, recording only the transport call.
+    {
+        ND_UUID saved_claim = claim_id_get_uuid();
+        AQ_CHECK(claim_id_set_str("00000000-0000-4000-8000-000000000111"), "mixed alerts: synthetic claim is valid");
+        for (int critical = 0; critical < 2; critical++) {
+            RRDHOST *h = callocz(1, sizeof(*h));
+            uuid_generate(h->host_id.uuid);
+            uuid_generate(h->node_id.uuid);
+            h->hostname = string_strdupz("mixed-alert-host");
+            h->health.default_exec = string_strdupz("/bin/true");
+            h->aclk_host_config = callocz(1, sizeof(*h->aclk_host_config));
+            h->health.enabled = true;
+            h->health.alert_status_snapshot.valid = 1;
+            rrdhost_flag_set(h, RRDHOST_FLAG_COLLECTOR_ONLINE | RRDHOST_FLAG_ACLK_STREAM_ALERTS);
+            aclk_alert_streaming_set(h->aclk_host_config, true);
+            aclk_alert_snapshot_request(h->aclk_host_config);
+            AQ_CHECK(aclk_alert_snapshot_mark_ready(h->aclk_host_config), "mixed alerts: snapshot becomes READY");
+            AQ_SQL(aq_seed_alert_config(h) ? SQLITE_DONE : SQLITE_ERROR, "mixed alerts config");
+            time_t now = now_realtime_sec();
+            RRDCALC_STATUS raised = critical ? RRDCALC_STATUS_CRITICAL : RRDCALC_STATUS_WARNING;
+            uint32_t uid = 15000 + critical * 10;
+            AQ_CHECK(aq_save_transition(h, uid, RRDCALC_STATUS_REMOVED, RRDCALC_STATUS_UNINITIALIZED, 0, now) > 0,
+                     "mixed alerts: first alert has a future initialization");
+            int64_t raised_id = aq_save_transition_for_alarm(h, 101, uid + 1, RRDCALC_STATUS_CLEAR, raised, 0, now);
+            AQ_CHECK(raised_id > 0 && process_alert_pending_queue(h) &&
+                         aq_pending_rows(&h->host_id.uuid) == 1 && aq_test_queue(&h->host_id.uuid, NULL, NULL) == 1,
+                     "mixed alerts: second alert is submitted while initialization remains pending");
+
+            sqlite3_stmt *push = NULL, *version = NULL, *remove = NULL;
+            unsigned before = aq_emitted_events;
+            aclk_push_alert_events_for_host(h, &push, &version, &remove, aq_record_send);
+            AQ_CHECK(aq_emitted_events == before + 1 && aq_last_alarm_id == 101 &&
+                         aq_last_status == rrdcalc_status_to_proto_enum(raised) &&
+                         cloud_status_matches(raised_id, raised) && aq_test_queue(&h->host_id.uuid, NULL, NULL) == 0,
+                     "mixed alerts: READY dispatch emits due %s despite another alert's future row",
+                     critical ? "CRITICAL" : "WARNING");
+            AQ_CHECK(aclk_alert_snapshot_state_get(h->aclk_host_config) == ACLK_ALERT_SNAPSHOT_READY &&
+                         !h->aclk_host_config->snapshot_count && aq_pending_rows(&h->host_id.uuid) == 1 &&
+                         rrdhost_flag_check(h, RRDHOST_FLAG_ACLK_STREAM_ALERTS),
+                     "mixed alerts: dispatch retains the held snapshot and delayed transition");
+            SQLITE_FINALIZE(push);
+            SQLITE_FINALIZE(version);
+            SQLITE_FINALIZE(remove);
+            string_freez(h->health.default_exec);
+            string_freez(h->hostname);
+            freez(h->aclk_host_config);
+            freez(h);
+        }
+        // A hold emerging during checkpoint preparation must roll back speculative versions, including
+        // alerts beyond one normal-send batch. Otherwise sender dedup would consume unsent raises.
+        {
+            RRDHOST *h = callocz(1, sizeof(*h));
+            uuid_generate(h->host_id.uuid);
+            uuid_generate(h->node_id.uuid);
+            h->hostname = string_strdupz("snapshot-race-host");
+            h->health.default_exec = string_strdupz("/bin/true");
+            h->aclk_host_config = callocz(1, sizeof(*h->aclk_host_config));
+            h->health.enabled = true;
+            h->health.alert_status_snapshot.valid = 1;
+            rrdhost_flag_set(h, RRDHOST_FLAG_COLLECTOR_ONLINE | RRDHOST_FLAG_ACLK_STREAM_ALERTS);
+            aclk_alert_streaming_set(h->aclk_host_config, true);
+            aclk_alert_snapshot_request(h->aclk_host_config);
+            AQ_CHECK(aclk_alert_snapshot_mark_ready(h->aclk_host_config), "snapshot race: request becomes READY");
+            AQ_SQL(aq_seed_alert_config(h) ? SQLITE_DONE : SQLITE_ERROR, "snapshot race config");
+            const int batch = atoi(ACLK_MAX_ALERT_UPDATES);
+            const int count = batch + 7;
+            time_t now = now_realtime_sec();
+            int64_t last_id = 0;
+            for (int i = 0; i < count; i++) {
+                last_id = aq_save_transition_for_alarm(h, 200 + i, 16000 + i,
+                                                      RRDCALC_STATUS_CLEAR, RRDCALC_STATUS_WARNING, 0, now);
+                AQ_CHECK(last_id > 0, "snapshot race: persisted due raise %d", i);
+            }
+            AQ_CHECK(process_alert_pending_queue(h) && aq_test_queue(&h->host_id.uuid, NULL, NULL) == count,
+                     "snapshot race: more than one due batch is submitted");
+            AQ_SQL(sqlite3_create_function_v2(db_meta, "aq_hold_snapshot_during_rebuild", 0, SQLITE_UTF8,
+                                               h, aq_hold_snapshot_during_rebuild, NULL, NULL, NULL),
+                   "snapshot race register hold callback");
+            AQ_SQL(sqlite3_exec(db_meta,
+                               "CREATE TEMP TRIGGER aq_snapshot_hold AFTER INSERT ON alert_version"
+                               " BEGIN SELECT aq_hold_snapshot_during_rebuild(); END", NULL, NULL, NULL),
+                   "snapshot race register hold trigger");
+            sqlite3_stmt *push = NULL, *version = NULL, *remove = NULL;
+            unsigned before = aq_emitted_events;
+            aclk_push_alert_events_for_host(h, &push, &version, &remove, aq_record_send);
+            AQ_CHECK(aq_emitted_events == before + batch &&
+                         aq_test_queue(&h->host_id.uuid, NULL, NULL) == count - batch &&
+                         !cloud_status_matches(last_id, RRDCALC_STATUS_WARNING),
+                     "snapshot race: new hold rolls back speculative versions and sends only one real batch");
+            aclk_push_alert_events_for_host(h, &push, &version, &remove, aq_record_send);
+            AQ_CHECK(aq_emitted_events == before + count && aq_test_queue(&h->host_id.uuid, NULL, NULL) == 0 &&
+                         cloud_status_matches(last_id, RRDCALC_STATUS_WARNING) &&
+                         aclk_alert_snapshot_state_get(h->aclk_host_config) == ACLK_ALERT_SNAPSHOT_READY &&
+                         !h->aclk_host_config->snapshot_count,
+                     "snapshot race: next held dispatch sends the remainder without losing the snapshot request");
+            SQLITE_FINALIZE(push);
+            SQLITE_FINALIZE(version);
+            SQLITE_FINALIZE(remove);
+            AQ_SQL(sqlite3_exec(db_meta, "DROP TRIGGER aq_snapshot_hold", NULL, NULL, NULL),
+                   "snapshot race remove hold trigger");
+            AQ_SQL(sqlite3_create_function_v2(db_meta, "aq_hold_snapshot_during_rebuild", 0, SQLITE_UTF8,
+                                               NULL, NULL, NULL, NULL, NULL),
+                   "snapshot race remove hold callback");
+            string_freez(h->health.default_exec);
+            string_freez(h->hostname);
+            freez(h->aclk_host_config);
+            freez(h);
+        }
+        claim_id_set(saved_claim);
+        (void)db_execute(db_meta, "DELETE FROM alert_queue", NULL);
+        (void)db_execute(db_meta, "DELETE FROM aclk_queue", NULL);
+    }
+
+    // --- only an eligible READY checkpoint freezes health. Admitting evaluation invalidates the completed
+    // pass under the same mutex used by snapshot preparation.
+    {
+        RRDHOST *h = callocz(1, sizeof(*h));
+        uuid_generate(h->host_id.uuid);
+        h->aclk_host_config = callocz(1, sizeof(*h->aclk_host_config));
+        h->health.enabled = true;
+        h->health.alert_status_snapshot.valid = 1;
+        rrdhost_flag_set(h, RRDHOST_FLAG_COLLECTOR_ONLINE);
+        AQ_CHECK(!alert_snapshot_freezes_health(h) && h->health.alert_status_snapshot.valid,
+                 "health freeze: IDLE allows evaluation");
+        aclk_alert_snapshot_request(h->aclk_host_config);
+        AQ_CHECK(!alert_snapshot_freezes_health(h) && h->health.alert_status_snapshot.valid,
+                 "health freeze: PENDING allows evaluation");
+        AQ_CHECK(aclk_alert_snapshot_mark_ready(h->aclk_host_config) && alert_snapshot_freezes_health(h) &&
+                     h->health.alert_status_snapshot.valid,
+                 "health freeze: eligible READY preserves the completed pass");
+        h->health.pending_transitions = 1;
+        AQ_CHECK(!alert_snapshot_freezes_health(h) && !h->health.alert_status_snapshot.valid,
+                 "health freeze: held READY admits and invalidates evaluation");
+        h->health.pending_transitions = 0;
+        AQ_CHECK(!alert_snapshot_freezes_health(h), "health freeze: incomplete evaluation keeps READY held");
+        h->health.alert_status_snapshot.valid = 1;
+        AQ_CHECK(alert_snapshot_freezes_health(h), "health freeze: completed evaluation makes READY eligible again");
         freez(h->aclk_host_config);
         freez(h);
     }

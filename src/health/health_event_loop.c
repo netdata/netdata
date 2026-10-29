@@ -472,17 +472,10 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
     }
 
     worker_is_busy(WORKER_HEALTH_JOB_HOST_LOCK);
-    {
-        struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
-        if (aclk_host_config && aclk_alert_snapshot_state_get(aclk_host_config) == ACLK_ALERT_SNAPSHOT_READY) {
-            // Keep evaluating while Cloud honors queued transition delays: a recovering alert may not
-            // have enough data yet. Freeze only once the snapshot can be sent. Invalidate before this
-            // pass so a deadline expiring midway cannot release a snapshot of partially evaluated alerts.
-            if (!alert_snapshot_held(host))
-                return;
-            __atomic_store_n(&host->health.alert_status_snapshot.valid, 0, __ATOMIC_RELEASE);
-        }
-    }
+    // Snapshot preparation and this admission decision share the SQL connection mutex. Evaluation
+    // continues while queued delays hold a snapshot, and freezes once its complete state can be sent.
+    if (alert_snapshot_freezes_health(host))
+        return;
 
     // Reuse query scratch across alerts. All arena pages are retained until
     // the caller destroys the arena at the end of this health iteration.
