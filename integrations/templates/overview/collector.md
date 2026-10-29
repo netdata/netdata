@@ -53,12 +53,10 @@ This collector only supports collecting metrics from a single instance of this i
 This integration doesn't support auto-detection.
 [% endif %]
 
+[% if entry.overview.default_behavior.limits.description | trim %]
 #### Limits
 
-[% if entry.overview.default_behavior.limits.description %]
 [[ entry.overview.default_behavior.limits.description ]]
-[% else %]
-The default configuration for this integration does not impose any limits on data collection.
 [% endif %]
 
 #### Performance Impact

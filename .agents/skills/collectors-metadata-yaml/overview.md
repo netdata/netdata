@@ -128,8 +128,9 @@ internals. Those are Setup (option rows and `detailed_description`) or nothing.
 
 **Question:** with the defaults, what caps, quotas, or floors will I run into, and how will I notice?
 
-Empty renders "The default configuration for this integration does not impose any limits on data collection." That
-MUST be true when the field is empty.
+Collector pages omit the Limits section when this description is empty. Missing documentation MUST NOT imply that
+collection is unlimited. Authors MUST still document actionable operator limits; an omitted section does not excuse
+missing guidance. Flow and device pages use separate templates; check their rendering when editing those types.
 
 - Name the operator-visible bounds: minimum collection interval, maximum instances or series, API quotas the collector
   respects, retention or lookback windows, and what happens at the bound (charts stop appearing, the job refuses to
@@ -171,5 +172,5 @@ metric), cost is the most important content on the page and this field MUST be e
 - Does `method_description` name what the collector talks to and how, without irrelevant implementation mechanics?
 - Is every permission the code requests in the table, and nothing that it does not?
 - Is the collector covered by a `go.d/sd/*.conf` rule? Then `auto_detection` names the discoverer and the rule file.
-- Are `limits` and `performance_impact` either true-as-placeholder or filled with operator-visible bounds and costs?
+- Does `limits` document actionable operator bounds, and is `performance_impact` truthful when empty or filled?
 - Are there headings, more than one admonition, or a glossary before the first capability? Then restructure or route.
