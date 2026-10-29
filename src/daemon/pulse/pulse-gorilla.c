@@ -36,7 +36,8 @@ static inline void global_statistics_copy(struct gorilla_statistics *gs) {
 
 void pulse_gorilla_do(bool extended __maybe_unused) {
 #ifdef ENABLE_DBENGINE
-    if(!extended) return;
+    // without a running dbengine tier there are no Gorilla pages to count
+    if(!extended || !dbengine_enabled) return;
     gorilla_statistics.enabled = true;
 
     struct gorilla_statistics gs;
