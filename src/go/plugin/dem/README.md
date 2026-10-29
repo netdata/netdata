@@ -564,7 +564,9 @@ start are distinct from a failed target. A workflow failure means a declared che
 The static `dem_journey_failed` template warns on the latest fresh failed/timed-out observation. A new successful
 observation clears it. Unknown, inconclusive, execution error, cancellation and observations older than two native
 intervals are UNDEFINED, not recovery. Replacement/restart begins unknown until a new observation. Critical escalation
-and configurable sensitivity are left for a separate alert-policy decision. Native job status identifies unavailable dependencies; plugin logs explain runtime preparation errors.
+and configurable sensitivity are left for a separate alert-policy decision. Native job status identifies unavailable
+dependencies; plugin logs explain runtime setup/execution errors. The installation CLI reports preparation and
+qualification failures.
 Functions show current execution and retained diagnosis.
 
 Lighthouse performance is a desktop lab score in points from 0 to 100; FCP, LCP, TBT and Speed Index are milliseconds,

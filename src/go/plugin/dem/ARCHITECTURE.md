@@ -111,7 +111,7 @@ How to read it:
 - **Grey** cylinders are on-disk stores, owned by the command for the whole process lifetime.
 - **Blue** boxes are outside DEM's own code: external systems and the shared framework scheduler.
 - The receiver and the site jobs are separate: one receiver serves every site, and each site keeps its own state.
-- Not drawn: the retention worker and the browser runtime cache (see [Storage and retention](#storage-and-retention)).
+- Not drawn: the retention worker and the browser runtime store (see [Storage and retention](#storage-and-retention)).
 
 ## Who owns what
 
@@ -259,8 +259,8 @@ Key points of this path:
 - **One run at a time.** A single plugin-wide admission slot serializes expensive browser runs. Waiting time is
   separate from execution time, and cancellation while waiting starts no browser.
 - **A fresh browser per run.** Runs share no browser state.
-- **The runtime is prepared elsewhere.** The runtime host downloads or imports the browser runtime in the background,
-  or an administrator supplies a preload. A run only pins an already prepared runtime for its duration.
+- **Installation is explicit.** An administrator installs and qualifies a complete runtime, or supplies a sealed
+  preload. The process acquires its release at startup; each run pins that already prepared release for its duration.
 - **Proof of completion.** The Node adapter and its browser start through `nd-run`, the Agent's unprivileged launcher,
   acting as a Linux subreaper. A run finishes only when that supervision proves the whole child process tree has
   exited. Only then are captures published and the admission slot released.
@@ -328,14 +328,15 @@ What makes this layer predictable:
 |---|---|---|---|---|
 | Investigation journal | `${NETDATA_LIB_DIR}/dem/journal` | 30 days, 1 GiB | RUM investigation entries and synthetic run records | Retention worker, at startup and hourly |
 | Captures | `${NETDATA_LIB_DIR}/dem/artifacts` | 7 days, 2 GiB | Screenshots and HTML reports, one set per run | Retention worker, at startup and hourly |
-| Browser runtime cache | `${NETDATA_LIB_DIR}/dem/runtime` | 4 GiB; 7-day grace for previous, 30-day for idle runtimes | Prepared Node + Chromium bundles | Runtime host worker, at startup and hourly |
+| Browser runtime store | `${NETDATA_LIB_DIR}/dem/runtime` | 4 GiB; selected release retained until uninstall/replacement; 7-day soft grace for newest unprotected obsolete release | Complete browser runtimes and preparation workspace | Runtime host worker, at startup and hourly; explicit installer |
 | In-memory site state | Memory | Measurements: per-site `window` (5 minutes by default); investigation context: bounded session and entry counts | Rolling populations, live feed, investigation context | The site job; lost on restart |
 
 - The journal and capture budgets live in `dem.conf`. The retention worker reloads them before each sweep, so valid
-  edits apply at the next hourly sweep, without a restart. Runtime cache settings apply after a plugin restart.
+  edits apply at the next hourly sweep, without a restart. Runtime settings and newly installed releases apply after
+  restarting the plugin process, including the first installation.
 - Budgets are targets, not physical disk caps. The README explains what can exceed them.
 - Terminal and debug runs use a private temporary journal and capture store and leave live history and captures
-  untouched. The browser runtime cache is not private: it still uses `runtime.cache_path` or
+  untouched. The browser runtime store is shared with normal operation: it still uses `runtime.cache_path` or
   `${NETDATA_LIB_DIR}/dem/runtime`.
 
 ## Startup and shutdown
@@ -367,11 +368,12 @@ flowchart TD
 ```
 
 - The journal opens first, and the configured history budget applies before any producer can append.
-- The browser runtime is either a managed host (downloads, imports, retirement) or an administrator preload. The
-  runner holds the single plugin-wide admission slot.
+- The browser runtime is either a managed host holding the installed startup selection or an administrator preload.
+  The host maintains storage but never downloads or changes its selection. The runner holds the single plugin-wide
+  admission slot.
 - Unusable retained history stops the plugin at startup, before any Function registers.
 - An initial capture cleanup failure does not stop startup; the retention worker retries it.
-- Browser runtime setup problems (missing manifest, unsupported platform, bad preload) never stop startup. Synthetic
+- Browser runtime setup problems (missing installation, unsupported platform, bad preload) never stop startup. Synthetic
   jobs see the runtime as unavailable, and RUM keeps working.
 - The runner can signal a fatal, unverified process tree (from a run or a preflight probe) at any time. The command
   then exits without closing stores, so nothing deletes files a surviving child might still use.
@@ -379,7 +381,7 @@ flowchart TD
 ## Package map
 
 The root `dem` package composes the plugin and owns its process-level policy: it loads and validates `dem.conf`
-(`config.go`), opens the browser runtime from the installed manifest (`runtime_setup.go`), runs the retention worker
+(`config.go`), acquires the selected installation or sealed preload (`runtime_setup.go`), runs the retention worker
 (`retention.go`), and wires native collectors, process Function providers, query services and retention
 (`plugin.go`). It does not decode domain journal records, reduce investigation results or serialize Function tables. The
 command creates and closes the shared resources across framework generations.
@@ -938,25 +940,32 @@ Node adapter and supervision:
   fail-stop before attempting reader joins.
 - The command cannot close stores when the host returns forced recovery or the engine reports unverified cleanup.
 
-### Browser runtime host and cache
+### Browser runtime installation and process ownership
 
-Demand and preparation (`synthetic/runtimehost`):
+Fixed startup selection (`synthetic/runtimehost`):
 
-- The process runtime host owns accepted enabled browser configuration independently of collector activation.
-- Graph transactions use contained process work to validate and reserve demand before adoption, outside graph claims
-  and host state locks.
-- Commit and Abort only transfer in-memory ownership. The existing process worker releases aborted claims and reports
-  physical cleanup failures through maintenance health and final Close.
-- Late contained results abort once and remain process-owned until joined.
-- Disabled/passive configuration never downloads.
-- A process worker prepares the selected trusted bundle, retries failures and polls for offline imports.
-- Run-scoped subscriptions wake the existing named dependency scheduler.
-- RUM and configuration mutation do not wait for a download.
+- The host atomically acquires the selected installation and a process claim at construction. It keeps that release
+  across monitor changes and internal framework restarts. A missing startup installation remains unavailable until
+  the plugin process restarts, even after an administrator installs a runtime.
+- Enabling or validating a monitor never downloads executables. Contained structural configuration validation remains
+  required before a malformed binding can become a named-dependency waiter; no per-monitor runtime claim is reserved.
+- Readiness reads the fixed process state. There is no preparation worker, download retry, import polling or
+  installation-driven readiness notification.
+- Startup and hourly maintenance retire unprotected old versions independently of enabled monitors. Maintenance
+  errors do not invalidate an otherwise usable runtime or change website outcomes.
 
-Store and pins (`synthetic/runtime`):
+Explicit installation and protection (`synthetic/runtime`):
 
-- The managed store serializes reservations, generation publication and retirement across consumers.
-- Accepted demand and each invocation's durable use pin protect files independently.
+- Administrator commands hold candidate protection and serialize installation, update and uninstall. Install/update
+  verify and prepare the trusted archive, qualify both a sandboxed journey and Lighthouse, then publish the selection.
+- Selected installation, process claims, candidates and each invocation's durable use pin protect files independently.
+  Preparation reservations account for workspace. The selected release never expires for inactivity; process and
+  execution protection keep older releases safe after an update.
+- Unprotected old releases can retire; the most recently used gets a seven-day soft grace, which pressure can shorten.
+  Protected files may prevent a new installation within the configured allowance.
+- Uninstall refuses live consumers, preparation and unresolved executions across all generations. It durably clears
+  selection before retiring files. Publication uncertainty is reconciled before admission, another mutation or cleanup;
+  invalid persisted metadata stops those operations rather than being treated as an absent installation.
 - The runner acquires a use before inspecting runtime files, passes its completion handle to `nd-run`, and releases it
   after supervised drainage and local reader joins.
 - Completed preparation releases its local claim and staging locks before coordinated record reclamation.
@@ -965,17 +974,16 @@ Store and pins (`synthetic/runtime`):
 - Cleanup health survives coordination failures and cannot be cleared by an older sweep.
 - Unknown execution completion retains protection across process restart. A positively verified host reboot may
   release the old execution pin, because its children cannot remain alive.
-- Preparation/maintenance errors do not alter website outcomes.
+- CLI preparation and qualification errors preserve the previous selection and do not produce website observations.
 
-Startup and preloads:
+Protected preloads and shutdown:
 
-- Startup does not wait for a saved-configuration replay marker. Unneeded cached files may expire or yield to pressure
-  before saved enables arrive; this permits a cache miss, not unsafe deletion during execution.
-- A controlled offline preload selects one protected bundle root, validated against installed trust and its final
-  location.
-- Administrator-owned preloaded bundles use installed trust and stay outside cache retirement. Replacement requires
-  stopped consumers.
-- Preloaded roots are read-only during use and refused by managed-cache operations.
+- The preload command qualifies a fresh root and seals its trusted descriptor and final location into that root.
+  Readers use the sealed metadata without a separate installed manifest.
+- Preloads remain private, service-account-owned and outside managed retirement. They can be mounted read-only;
+  managed operations refuse their roots. Stop every consumer before replacement/removal and restart DEM to switch.
+- This immutable-preload contract does not implement native package transaction coordination; production delivery
+  remains a separate stage.
 - Independent component paths are unsupported.
 - Command shutdown closes the host and store only after jobs and contained configuration work have joined. Fail-stop
   paths retain the existing execution evidence.
