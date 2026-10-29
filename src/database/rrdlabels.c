@@ -431,25 +431,31 @@ void rrdlabels_add_pair(RRDLABELS *labels, const char *string, RRDLABEL_SRC ls)
 
 // ----------------------------------------------------------------------------
 
+// Always adds exactly one item, the value or null, so the caller's array stays parallel to its dimensions.
 void rrdlabels_value_to_buffer_array_item_or_null(RRDLABELS *labels, BUFFER *wb, const char *key) {
-    if(!labels) return;
+    if(!labels) {
+        buffer_json_add_array_item_string(wb, NULL);
+        return;
+    }
 
     STRING *this_key = string_strdupz(key);
 
+    bool added = false;
     RRDLABEL *lb;
     RRDLABEL_SRC ls;
     lfe_start_read(labels, lb, ls)
     {
         if (lb->index.key == this_key) {
-            if (lb->index.value)
-                buffer_json_add_array_item_string(wb, string2str(lb->index.value));
-            else
-                buffer_json_add_array_item_string(wb, NULL);
+            buffer_json_add_array_item_string(wb, lb->index.value ? string2str(lb->index.value) : NULL);
+            added = true;
             break;
         }
     }
     lfe_done(labels);
     string_freez(this_key);
+
+    if(!added)
+        buffer_json_add_array_item_string(wb, NULL);
 }
 
 void rrdlabels_key_to_buffer_array_item(RRDLABELS *labels, BUFFER *wb)
@@ -546,7 +552,12 @@ void rrdlabels_get_value_strdup_or_null(RRDLABELS *labels, char **value, const c
 
 void rrdlabels_get_value_to_buffer_or_unset(RRDLABELS *labels, BUFFER *wb, const char *key, const char *unset)
 {
-    if(!labels || !key || !wb) return;
+    if(!key || !wb) return;
+
+    if(!labels) {
+        buffer_strcat(wb, unset);
+        return;
+    }
 
     STRING *this_key = string_strdupz(key);
     RRDLABEL *lb;

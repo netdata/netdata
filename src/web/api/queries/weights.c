@@ -2246,15 +2246,16 @@ static int registered_results_to_json_mcp_callback(const DICTIONARY_ITEM *item _
     buffer_json_add_array_item_string(wb, rrdmetric_acquired_name(t->rma));
     
     // Add labels (as object or null)
-    RRDLABELS *labels = rrdinstance_acquired_labels(t->ria);
-    if(labels && rrdlabels_entries(labels) > 0) {
+    RRDINSTANCE_LABELS_REF lref = rrdinstance_acquired_labels_acquire(t->ria);
+    if(lref.labels && rrdlabels_entries(lref.labels) > 0) {
         buffer_json_add_array_item_object(wb);
-        rrdlabels_to_buffer_json_members(labels, wb);
+        rrdlabels_to_buffer_json_members(lref.labels, wb);
         buffer_json_object_close(wb);
     }
     else {
         buffer_json_add_array_item_string(wb, NULL);
     }
+    rrdinstance_labels_release(&lref);
     
     buffer_json_array_close(wb); // End row array
     

@@ -221,7 +221,17 @@ static RRDHOST *load_archived_host_from_row(sqlite3_stmt *res)
         host->stream.rcv.status.last_disconnected = now_realtime_sec();
     }
 
-    host->rrdlabels = sql_load_host_labels(&host_uuid);
+    // A new archived host has no labels yet. One that rrdhost_find_or_create() found already has a set, which
+    // other threads may be reading: refill it, never replace it (the replaced set would also leak).
+    RRDLABELS *loaded_labels = sql_load_host_labels(&host_uuid);
+    if (loaded_labels) {
+        if (!host->rrdlabels)
+            host->rrdlabels = loaded_labels;
+        else {
+            rrdlabels_migrate_to_these(host->rrdlabels, loaded_labels);
+            rrdlabels_destroy(loaded_labels);
+        }
+    }
     host->stream.snd.status.last_connected = last_connected;
 
     pulse_host_status(host, 0, 0); // this will detect the receiver status

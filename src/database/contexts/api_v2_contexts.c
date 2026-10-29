@@ -249,9 +249,9 @@ static void rrdcontext_to_json_v2_full_text_search(struct rrdcontext_to_json_v2_
         // Check labels only if labels option is enabled
         if(ctl->options & CONTEXTS_OPTION_LABELS) {
             size_t label_searches = 0;
-            RRDLABELS *labels = rrdinstance_labels(ri);
-            if(unlikely(rrdlabels_entries(labels))) {
-                results->matched_labels = rrdlabels_full_text_search(labels, q, results->matched_labels, &label_searches);
+            RRDINSTANCE_LABELS_REF lref = rrdinstance_acquired_labels_acquire((RRDINSTANCE_ACQUIRED *)ri_dfe.item);
+            if(unlikely(rrdlabels_entries(lref.labels))) {
+                results->matched_labels = rrdlabels_full_text_search(lref.labels, q, results->matched_labels, &label_searches);
                 
                 if(results->matched_labels) {
                     results->matched_types |= SEARCH_MATCH_LABEL;
@@ -260,6 +260,7 @@ static void rrdcontext_to_json_v2_full_text_search(struct rrdcontext_to_json_v2_
                 ctl->q.fts.searches += label_searches;
                 ctl->q.fts.char_searches += label_searches;
             }
+            rrdinstance_labels_release(&lref);
         }
 
         // We don't check alerts anymore as they are less relevant for the search
@@ -1012,8 +1013,9 @@ static void contexts_react_callback(const DICTIONARY_ITEM *item __maybe_unused, 
 
         // Collect labels from this instance
         if(t->labels_aggregated) {
-            RRDLABELS *labels = rrdinstance_labels(ri);
-            rrdlabels_aggregated_add_from_rrdlabels(t->labels_aggregated, labels);
+            RRDINSTANCE_LABELS_REF lref = rrdinstance_acquired_labels_acquire((RRDINSTANCE_ACQUIRED *)ri_dfe.item);
+            rrdlabels_aggregated_add_from_rrdlabels(t->labels_aggregated, lref.labels);
+            rrdinstance_labels_release(&lref);
         }
     }
     dfe_done(ri);

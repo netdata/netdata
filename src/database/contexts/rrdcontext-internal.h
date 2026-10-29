@@ -543,7 +543,6 @@ void get_metric_retention_by_id(RRDHOST *host, UUIDMAP_ID id, time_t *min_first_
 void rrdcontext_delete_after_loading(RRDHOST *host, RRDCONTEXT *rc);
 void rrdcontext_initial_processing_after_loading(RRDCONTEXT *rc);
 
-RRDLABELS *rrdinstance_labels(RRDINSTANCE *ri);
 
 // Bump the dbengine-rotations counter that gates extreme-cardinality
 // protection. Called from rrdcontext_db_rotation(); the chart-cleanup
