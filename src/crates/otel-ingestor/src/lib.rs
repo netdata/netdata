@@ -268,10 +268,10 @@ async fn run_ingestor(
         clock,
         identity,
     );
+    traces_service.set_derived_metrics(Arc::clone(&derived));
     // The service map sees accepted trace exports through the observer seam
     // and serves `topology:tracing`. It is optional: when it cannot start,
     // ingestion goes on without it.
-    traces_service.set_derived_metrics(Arc::clone(&derived));
     let service_map = start_service_map(&config.base_dir);
     if let Some(map) = &service_map {
         traces_service.add_observer(Arc::new(observer::ServiceMapObserver(Arc::clone(map))));

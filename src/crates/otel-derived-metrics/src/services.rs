@@ -3,7 +3,8 @@
 //! A service is identified by the OTel resource attributes `service.namespace`
 //! and `service.name`, kept apart by tenant and deployment environment
 //! (`deployment.environment.name`, or the deprecated `deployment.environment`).
-//! A request is a span that is a trace root, or of kind SERVER or CONSUMER; it
+//! A request is a span that is a trace root (no parent id, or the all-zero
+//! one, which storage also treats as unset), or of kind SERVER or CONSUMER; it
 //! failed when its status is ERROR. It counts at its end time, weighted by the
 //! adjusted count its `ot=th` sampling threshold implies.
 
@@ -100,7 +101,7 @@ impl Services {
             let mut instance: Option<InstanceRef> = None;
             for scope_spans in &resource_spans.scope_spans {
                 for span in &scope_spans.spans {
-                    let is_request = span.parent_span_id.is_empty()
+                    let is_request = span.parent_span_id.iter().all(|&b| b == 0)
                         || span.kind == SpanKind::Server as i32
                         || span.kind == SpanKind::Consumer as i32;
                     if !is_request {
@@ -149,7 +150,7 @@ pub(crate) fn service_labels(tenant: &str, resource: Option<&Resource>) -> Label
     let mut labels = Labels::new();
     labels.push(
         "resource.attributes.service.name",
-        name.filter(|n| !n.is_empty()).unwrap_or(UNKNOWN_SERVICE),
+        name.filter(|n| !is_blank(n)).unwrap_or(UNKNOWN_SERVICE),
     );
     labels.push(
         "resource.attributes.service.namespace",
@@ -157,10 +158,19 @@ pub(crate) fn service_labels(tenant: &str, resource: Option<&Resource>) -> Label
     );
     labels.push(
         "resource.attributes.deployment.environment.name",
-        environment.or(deprecated_environment).unwrap_or_default(),
+        environment
+            .filter(|e| !is_blank(e))
+            .or(deprecated_environment)
+            .unwrap_or_default(),
     );
     labels.push("tenant", tenant);
     labels
+}
+
+/// Blank as the agent sees label values: whitespace and control characters
+/// only (it would store `[none]`).
+fn is_blank(value: &str) -> bool {
+    value.chars().all(|c| c.is_whitespace() || c.is_control())
 }
 
 /// The number of spans a sampled span stands for, from the `th` (rejection
@@ -328,6 +338,38 @@ mod tests {
         );
         assert!(!unnamed.contains("service.namespace"));
         assert!(!unnamed.contains("deployment.environment"));
+    }
+
+    #[test]
+    fn an_all_zero_parent_id_marks_a_root() {
+        let services = Services::new(10);
+        let mut root = span(false, SpanKind::Internal, false, 95, 10, "");
+        root.parent_span_id = vec![0; 8];
+        let out = render(
+            &services,
+            &request(vec![attr("service.name", "a")], vec![root]),
+        );
+        assert_eq!(values(&out, "success")[0], "1");
+    }
+
+    #[test]
+    fn blank_identity_values_fall_back() {
+        let services = Services::new(10);
+        let out = render(
+            &services,
+            &request(
+                vec![
+                    attr("service.name", "  "),
+                    attr("deployment.environment.name", ""),
+                    attr("deployment.environment", "prod"),
+                ],
+                vec![span(false, SpanKind::Server, false, 95, 10, "")],
+            ),
+        );
+        assert!(out.contains("CLABEL 'resource.attributes.service.name' 'unknown_service' 1\n"));
+        assert!(
+            out.contains("CLABEL 'resource.attributes.deployment.environment.name' 'prod' 1\n")
+        );
     }
 
     #[test]

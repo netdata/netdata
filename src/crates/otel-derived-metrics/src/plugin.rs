@@ -102,7 +102,8 @@ impl Plugin {
                 units: "records/s",
                 family: "derived metrics",
                 context: "netdata.otel.derived_adjusted_records",
-                chart_type: ChartType::Stacked,
+                // One record can be both late and overflowed.
+                chart_type: ChartType::Line,
                 priority: 150_011,
                 dimensions: adjusted,
             });
@@ -137,6 +138,16 @@ impl Plugin {
             .record(instance, now)
             .add(counter, ACCEPTED, accepted as f64)
             .add(counter, REJECTED, rejected as f64);
+        batch
+    }
+
+    /// An empty record at `now`: rendered as zeros, it keeps the
+    /// self-monitoring charts defined from the first tick and never lets them
+    /// expire while the plugin runs, with or without derived metrics.
+    pub(crate) fn heartbeat(&self, now: u64) -> Batch {
+        let mut batch = Batch::new(&self.family);
+        let instance = batch.instance(Labels::new());
+        batch.record(instance, now);
         batch
     }
 
@@ -202,6 +213,16 @@ mod tests {
         ));
         assert!(out.contains("'netdata.otel.spans'"));
         assert!(!out.contains("derived"));
+    }
+
+    #[test]
+    fn the_heartbeat_keeps_the_charts_defined_without_traffic() {
+        let plugin = Plugin::new(false);
+        let mut store = Store::new(plugin.family.clone());
+        store.merge(plugin.heartbeat(100), 100);
+        let out = String::from_utf8(store.emit(101, usize::MAX).concat()).unwrap();
+        assert!(out.contains("CHART otel_plugin.spans "));
+        assert!(out.contains("SET accepted = 0\nSET rejected = 0\n"));
     }
 
     #[test]

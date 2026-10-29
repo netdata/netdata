@@ -22,6 +22,10 @@ pub(crate) struct PartialSlot {
 pub(crate) struct BatchInstance {
     pub(crate) labels: Labels,
     pub(crate) slots: Vec<PartialSlot>,
+    /// Slot number → index in `slots`; records mostly arrive in time order,
+    /// so `last` answers most lookups without hashing.
+    index: HashMap<u64, usize>,
+    last: usize,
 }
 
 /// Records of one unit of work, for one family.
@@ -56,6 +60,8 @@ impl Batch {
         self.instances.push(BatchInstance {
             labels,
             slots: Vec::new(),
+            index: HashMap::new(),
+            last: 0,
         });
         InstanceRef(i)
     }
@@ -66,19 +72,26 @@ impl Batch {
     pub fn record(&mut self, instance: InstanceRef, unix_seconds: u64) -> Record<'_> {
         let family = &self.family.0;
         let slot = unix_seconds / family.update_every;
-        let slots = &mut self.instances[instance.0].slots;
-        let index = match slots.iter().position(|s| s.slot == slot) {
-            Some(index) => index,
-            None => {
+        let batch_instance = &mut self.instances[instance.0];
+        let index = if batch_instance
+            .slots
+            .get(batch_instance.last)
+            .is_some_and(|s| s.slot == slot)
+        {
+            batch_instance.last
+        } else {
+            let slots = &mut batch_instance.slots;
+            *batch_instance.index.entry(slot).or_insert_with(|| {
                 slots.push(PartialSlot {
                     slot,
                     records: 0,
                     cells: family.initial.clone().into_boxed_slice(),
                 });
                 slots.len() - 1
-            }
+            })
         };
-        let partial = &mut slots[index];
+        batch_instance.last = index;
+        let partial = &mut batch_instance.slots[index];
         partial.records += 1;
         Record {
             cells: &mut partial.cells,

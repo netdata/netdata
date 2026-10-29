@@ -177,7 +177,9 @@ impl DerivedMetrics {
                 self.plugin_store.lock().unwrap().merge(batch, now);
             }
         }
-        chunks.extend(self.plugin_store.lock().unwrap().emit(now, MAX_CHUNK_BYTES));
+        let mut plugin_store = self.plugin_store.lock().unwrap();
+        plugin_store.merge(self.plugin.heartbeat(now), now);
+        chunks.extend(plugin_store.emit(now, MAX_CHUNK_BYTES));
         chunks
     }
 }

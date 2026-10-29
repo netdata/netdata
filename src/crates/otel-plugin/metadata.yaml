@@ -192,7 +192,7 @@ modules:
               default_value: 100
               required: false
             - name: derived_metrics.enabled
-              description: Make charts from the received logs and traces.
+              description: Make per-service charts from the received logs and traces.
               detailed_description: |
                 For each service, the plugin makes charts of requests, failed requests and request durations from traces, and charts of log records by severity from logs.
               default_value: true
@@ -417,14 +417,14 @@ modules:
           labels: []
           metrics:
             - name: netdata.otel.spans
-              description: Spans received, stored or rejected (outside the accepted time window).
+              description: Spans of each export that the plugin accepted, stored or rejected (outside the accepted time window). Exports that fail are not counted, because the sender sends them again.
               unit: spans/s
               chart_type: stacked
               dimensions:
                 - name: accepted
                 - name: rejected
             - name: netdata.otel.log_records
-              description: Log records received, stored or rejected (outside the accepted time window, or not storable).
+              description: Log records of each export that the plugin accepted, stored or rejected (outside the accepted time window, or not storable). Exports that fail are not counted, because the sender sends them again.
               unit: records/s
               chart_type: stacked
               dimensions:
@@ -439,9 +439,9 @@ modules:
                 - name: logs
             - name: netdata.otel.derived_adjusted_records
               description: |
-                Records counted in a different time slot or chart set: late (older than the open time slots), future (newer than the current time), or overflowed (from a service over the maximum number of services).
+                Records counted in a different time slot or chart set: late (older than the open time slots), future (newer than the current time), or overflowed (from a service over the maximum number of services). One record can be both late and overflowed.
               unit: records/s
-              chart_type: stacked
+              chart_type: line
               dimensions:
                 - name: traces_late
                 - name: traces_future
@@ -458,16 +458,16 @@ modules:
                 - name: logs
         - name: service
           description: |
-            These metrics are made from the spans and log records of each service. A request is a span that starts a trace, or a span of kind SERVER or CONSUMER. A request failed when its span status is ERROR. A request counts at the time it ends. Spans sampled with an OpenTelemetry sampling threshold (`ot=th` in the trace state) count for the number of spans that they represent. A log record counts at its own time, in the severity range of its severity number; a record without a severity number counts as `unspecified`. The charts show data with a delay of 10 seconds, so that data that arrives late is still counted in the correct second.
+            These metrics are made from the spans and log records of each service. A request is a span that starts a trace, or a span of kind SERVER or CONSUMER. A request failed when its span status is ERROR. A request counts at the time it ends. Spans sampled with an OpenTelemetry sampling threshold (`ot=th` in the trace state) count for the number of spans that they represent. A log record counts at its time (its own time, else its observed time, else the time it arrived), in the severity range of its severity number; a record without a severity number counts as `unspecified`. The charts show data with a delay of 10 seconds, so that data that arrives late is still counted in the correct second.
           labels:
             - name: resource.attributes.service.name
-              description: The `service.name` resource attribute, or `unknown_service` when it is not set.
+              description: The `service.name` resource attribute, or `unknown_service` when it is not set. Not present on the overflow chart set.
             - name: resource.attributes.service.namespace
               description: The `service.namespace` resource attribute. Not present when it is not set.
             - name: resource.attributes.deployment.environment.name
               description: The `deployment.environment.name` resource attribute, or the older `deployment.environment`. Not present when neither is set.
             - name: tenant
-              description: The tenant of the sender (`default` when tenant authentication is disabled).
+              description: The tenant of the sender (`default` when tenant authentication is disabled). Not present on the overflow chart set.
             - name: otel.metric.overflow
               description: Set to `true` only on the chart set that holds the services over `derived_metrics.max_services`.
           metrics:

@@ -666,6 +666,24 @@ mod tests {
     }
 
     #[test]
+    fn records_spread_over_many_seconds_land_in_their_slots() {
+        let f = fixture(10, 900, None);
+        let mut store = Store::new(f.family.clone());
+        let mut batch = Batch::new(&f.family);
+        let inst = batch.instance(labels("a"));
+        for time in [995, 996, 995, 997, 996, 999] {
+            batch.record(inst, time).add(f.requests, 0, 1.0);
+        }
+        store.merge(batch, 1000);
+        let out = text(&store.emit(1011, usize::MAX));
+        let ok: Vec<&str> = out
+            .lines()
+            .filter_map(|l| l.strip_prefix("SET ok = "))
+            .collect();
+        assert_eq!(ok, ["2", "2", "1", "0", "1", "0"]);
+    }
+
+    #[test]
     fn chunks_hold_whole_blocks_under_the_budget() {
         let f = fixture(0, 900, None);
         let mut store = Store::new(f.family.clone());
