@@ -42,9 +42,6 @@ This collector only supports collecting metrics from a single instance of this i
 The collector automatically detects all of the metrics, no further configuration is required.
 
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

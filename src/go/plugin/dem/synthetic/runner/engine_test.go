@@ -109,13 +109,8 @@ func testEngine(t *testing.T) (*Engine, *fakeHistory, *observedArtifacts) {
 	base := t.TempDir()
 	bin, err := os.Executable()
 	require.NoError(t, err)
-	assets, err := filepath.Abs("assets")
-	require.NoError(t, err)
-	for name, pin := range requiredRuntime.Packages {
-		dir := filepath.Join(base, "deps", "node_modules", name)
-		require.NoError(t, os.MkdirAll(dir, 0700))
-		require.NoError(t, os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"version":"`+pin+`"}`), 0600))
-	}
+	entrypoint := filepath.Join(base, "run.mjs")
+	require.NoError(t, os.WriteFile(entrypoint, []byte("// runtime entrypoint fixture"), 0600))
 	store, err := artifacts.Open(filepath.Join(base, "artifacts"))
 	require.NoError(t, err)
 	t.Cleanup(func() {
@@ -136,11 +131,10 @@ func testEngine(t *testing.T) (*Engine, *fakeHistory, *observedArtifacts) {
 		Store: store,
 	}
 	engine := New(
-		assets,
 		fixtureRuntime{Paths: Paths{
-			Node:         bin,
-			Browser:      bin,
-			Dependencies: filepath.Join(base, "deps"),
+			Node:       bin,
+			EntryPoint: entrypoint,
+			Identity:   synthetic.RuntimeIdentity{Version: "release-a", SHA256: strings.Repeat("a", 64), Contract: SupportedContract},
 		}},
 		history,
 		owner,
@@ -326,9 +320,10 @@ func TestDeadlineKeepsIncrementalEvidence(t *testing.T) {
 			frame{
 				Type: "event",
 				Event: &synthetic.Event{
-					Kind:  "suite",
-					Title: "Discovered 3 tests",
-					Phase: "discovery",
+					Kind:          "suite",
+					Title:         "localized discovery label",
+					DeclaredTests: intPointer(3),
+					Phase:         "discovery",
 				},
 			},
 		)
@@ -518,29 +513,49 @@ func TestOversizeRequestNeverStartsWorkflow(t *testing.T) {
 	assert.Contains(t, got.Run.Error, "4 MiB")
 	assert.Equal(t, int32(1), a.finalized.Load())
 }
-func TestCheckVersionProbeIsSupervisedAndDoesNotLoadWorkflow(t *testing.T) {
+func TestCheckIsSupervisedWithoutWorkflowInput(t *testing.T) {
 	if os.Geteuid() == 0 {
-		t.Skip("the prepared runtime explicitly requires unprivileged plugin identity")
+		t.Skip("requires unprivileged identity")
 	}
 	e, _, a := testEngine(t)
+	paths := e.source.(fixtureRuntime).Paths
 	calls := 0
 	e.start = starter(t, func(_ context.Context, args []string, raw []byte, out, _ *os.File) ndexec.TreeResult {
 		calls++
 		assert.Empty(t, raw)
-		assert.Equal(t, "-e", args[0])
-		assert.NotContains(t, strings.Join(args, " "), "run.mjs")
-		if calls == 1 {
-			fmt.Fprintf(out, `{"version":"24.20.0","uid":%d,"gid":%d}`, os.Geteuid(), os.Getegid())
-		} else {
-			fmt.Fprint(out, "Chromium 154.0.8037.92")
-		}
-		return ndexec.TreeResult{
-			Drained: true,
-		}
+		assert.Equal(t, []string{paths.EntryPoint, "--check"}, args)
+		fmt.Fprintf(out, `{"version":%q,"contract":1,"uid":%d,"gid":%d}`, paths.Identity.Version, os.Geteuid(), os.Getegid())
+		return ndexec.TreeResult{Drained: true}
 	})
 	require.NoError(t, e.Check(context.Background(), synthetic.Journey))
-	assert.Equal(t, 2, calls)
+	assert.Equal(t, 1, calls)
 	assert.Zero(t, a.finalized.Load())
+}
+
+func TestDiscoveryCountIsTypedAndValidated(t *testing.T) {
+	for _, tc := range []struct {
+		name, raw string
+		valid     bool
+		declared  int
+	}{
+		{"localized title", `{"type":"event","event":{"kind":"suite","phase":"discovery","title":"other language","declared_tests":3}}`, true, 3},
+		{"empty discovery", `{"type":"event","event":{"kind":"suite","phase":"discovery","declared_tests":0}}`, true, 0},
+		{"missing typed count", `{"type":"event","event":{"kind":"suite","phase":"discovery","title":"Discovered 3 tests"}}`, false, 0},
+		{"negative count", `{"type":"event","event":{"kind":"suite","phase":"discovery","declared_tests":-1}}`, false, 0},
+		{"fractional count", `{"type":"event","event":{"kind":"suite","phase":"discovery","declared_tests":1.5}}`, false, 0},
+		{"other event", `{"type":"event","event":{"kind":"step","declared_tests":1}}`, false, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := newSink(synthetic.Journey, false, newRedactor(nil))
+			err := s.consume(strings.NewReader(tc.raw + "\n"))
+			if tc.valid {
+				require.NoError(t, err)
+				assert.Equal(t, tc.declared, s.declared)
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
 }
 
 func TestHistorySnapshotOwnsNullableMetricsAndEventDurations(t *testing.T) {
@@ -706,91 +721,69 @@ func TestWhitespaceScriptRejectedBeforeExecution(t *testing.T) {
 	assert.Equal(t, "script must not be blank", got.Run.Error)
 }
 
-func TestCheckRequiresQualifiedBrowserIdentity(t *testing.T) {
+func TestCheckRequiresTrustedReleaseAndPreservedIdentity(t *testing.T) {
 	if os.Geteuid() == 0 {
-		t.Skip("the prepared runtime explicitly requires unprivileged plugin identity")
+		t.Skip("requires unprivileged identity")
 	}
 	for _, tc := range []struct {
-		name    string
-		version string
-		valid   bool
+		name, version      string
+		contract, uid, gid int
+		valid              bool
 	}{
-		{name: "qualified binary", version: "Chromium 154.0.8037.92 \n", valid: true},
-		{name: "Debian launcher", version: "Chromium 154.0.8037.92 built on Debian GNU/Linux 13 (trixie)\n", valid: true},
-		{name: "previous browser", version: "Chromium 153.0.8010.12"},
-		{name: "new unqualified version", version: "Chromium 154.0.8037.93"},
-		{name: "version substring", version: "Chromium 154.0.8037.920"},
-		{name: "Chrome for Testing", version: "Google Chrome for Testing 154.0.8037.92"},
-		{name: "unrelated output", version: "diagnostic: Chromium 154.0.8037.92"},
-		{name: "empty response"},
+		{"qualified release", "release-a", SupportedContract, os.Geteuid(), os.Getegid(), true},
+		{"another release", "release-b", SupportedContract, os.Geteuid(), os.Getegid(), false},
+		{"another contract", "release-a", SupportedContract + 1, os.Geteuid(), os.Getegid(), false},
+		{"root", "release-a", SupportedContract, 0, os.Getegid(), false},
+		{"another uid", "release-a", SupportedContract, os.Geteuid() + 1, os.Getegid(), false},
+		{"another gid", "release-a", SupportedContract, os.Geteuid(), os.Getegid() + 1, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			e, _, _ := testEngine(t)
+			paths := e.source.(fixtureRuntime).Paths
 			calls := 0
-			e.start = starter(t, func(_ context.Context, _ []string, _ []byte, out, _ *os.File) ndexec.TreeResult {
+			e.start = starter(t, func(_ context.Context, args []string, raw []byte, out, _ *os.File) ndexec.TreeResult {
 				calls++
-				if calls == 1 {
-					fmt.Fprintf(out, `{"version":"24.20.0","uid":%d,"gid":%d}`, os.Geteuid(), os.Getegid())
-				} else {
-					fmt.Fprint(out, tc.version)
-				}
+				assert.Equal(t, []string{paths.EntryPoint, "--check"}, args)
+				assert.Empty(t, raw)
+				fmt.Fprintf(out, `{"version":%q,"contract":%d,"uid":%d,"gid":%d}`, tc.version, tc.contract, tc.uid, tc.gid)
 				return ndexec.TreeResult{Drained: true}
 			})
 			err := e.Check(context.Background(), synthetic.Journey)
 			if tc.valid {
 				require.NoError(t, err)
 			} else {
-				require.ErrorContains(t, err, "prepared full Chromium must be version 154.0.8037.92")
+				require.Error(t, err)
 			}
-			assert.Equal(t, 2, calls)
+			assert.Equal(t, 1, calls)
 		})
 	}
 }
 
-func TestCheckRejectsUnqualifiedPackageBeforeStarting(t *testing.T) {
-	e, _, _ := testEngine(t)
-	metadata := filepath.Join(e.source.(fixtureRuntime).Paths.Dependencies, "node_modules", "playwright", "package.json")
-	require.NoError(t, os.WriteFile(metadata, []byte(`{"version":"0.0.0"}`), 0600))
-	e.start = func(context.Context, ndexec.TreeOptions, string, ...string) (treeProcess, error) {
-		t.Fatal("unqualified package started a version probe")
-		return nil, errors.New("unexpected process")
-	}
-	require.ErrorContains(t, e.Check(context.Background(), synthetic.Journey), "prepared playwright must be version 1.63.0")
+func TestExecutionRecordsAcquiredIdentityBeforeStart(t *testing.T) {
+	e, h, _ := testEngine(t)
+	expected := e.source.(fixtureRuntime).Paths.Identity
+	e.start = starter(t, func(ctx context.Context, args []string, raw []byte, out, errOut *os.File) ndexec.TreeResult {
+		if !assert.Len(t, h.runs, 1) {
+			return ndexec.TreeResult{Drained: true, Err: errors.New("start history was not appended before execution")}
+		}
+		assert.Equal(t, &expected, h.runs[0].Runtime)
+		var request map[string]any
+		assert.NoError(t, json.Unmarshal(raw, &request))
+		assert.NotContains(t, request, "dependencies_path")
+		assert.NotContains(t, request, "browser_path")
+		return resultPayload(success())(ctx, args, raw, out, errOut)
+	})
+	got := e.Execute(context.Background(), journey(), nil)
+	require.Equal(t, synthetic.Success, got.Run.Outcome)
+	require.Len(t, h.runs, 2)
+	assert.Equal(t, &expected, got.Run.Runtime)
+	assert.Equal(t, &expected, h.runs[1].Runtime)
+	got.Run.Runtime.Version = "modified observation"
+	assert.Equal(t, expected.Version, h.runs[0].Runtime.Version)
+	assert.Equal(t, expected.Version, h.runs[1].Runtime.Version)
 }
 
-func TestCheckPreservesNodeMinimumFromManifest(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("the prepared runtime explicitly requires unprivileged plugin identity")
-	}
-	for _, tc := range []struct {
-		version string
-		valid   bool
-	}{
-		{version: "23.11.0"}, {version: "24.20.0", valid: true}, {version: "25.0.0", valid: true},
-	} {
-		t.Run(tc.version, func(t *testing.T) {
-			e, _, _ := testEngine(t)
-			calls := 0
-			e.start = starter(t, func(_ context.Context, _ []string, _ []byte, out, _ *os.File) ndexec.TreeResult {
-				calls++
-				if calls == 1 {
-					fmt.Fprintf(out, `{"version":%q,"uid":%d,"gid":%d}`, tc.version, os.Geteuid(), os.Getegid())
-				} else {
-					fmt.Fprint(out, "Chromium 154.0.8037.92")
-				}
-				return ndexec.TreeResult{Drained: true}
-			})
-			err := e.Check(context.Background(), synthetic.Journey)
-			if tc.valid {
-				require.NoError(t, err)
-				assert.Equal(t, 2, calls)
-			} else {
-				require.ErrorContains(t, err, "prepared Node must be version 24 or newer")
-				assert.Equal(t, 1, calls)
-			}
-		})
-	}
-}
+func intPointer(value int) *int { return &value }
 
 type fixtureRuntime struct{ Paths Paths }
 

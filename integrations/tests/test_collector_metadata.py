@@ -15,6 +15,7 @@ REPO_ROOT = INTEGRATIONS_DIR.parent
 sys.path.insert(0, str(INTEGRATIONS_DIR))
 
 import _common  # noqa: E402
+import gen_integrations  # noqa: E402
 
 GO_D_COLLECTORS = REPO_ROOT / 'src' / 'go' / 'plugin' / 'go.d' / 'collector'
 SD_RULES_DIR = REPO_ROOT / 'src' / 'go' / 'plugin' / 'go.d' / 'config' / 'go.d' / 'sd'
@@ -61,7 +62,8 @@ INLINE_CODE = re.compile(r'`[^`\n]*`')
 CODE_SPAN = re.compile(r'(?<!`)(`+)(?!`)(.+?)(?<!`)\1(?!`)', re.S)
 # A backtick preceded by an odd run of backslashes is an escaped literal, not a delimiter; keep the even part.
 ESCAPED_BACKTICK = re.compile(r'(?<!\\)((?:\\\\)*)\\`')
-TEMPLATE_MODULE = re.compile(r'^\s*(?:-\s*)?module:\s*(\S+)', re.M)
+# Stock templates use literal module names, either in YAML or as job/dict/set arguments.
+TEMPLATE_MODULE = re.compile(r'^\s*(?:-\s*)?module:\s*(\w+)|"module"\s+"(\w+)"', re.M)
 
 
 def sd_covered_modules():
@@ -73,10 +75,11 @@ def sd_covered_modules():
             rule_id = rule.get('id')
             if not rule_id or rule_id in SD_NON_COLLECTOR_RULE_IDS:
                 continue
-            match = TEMPLATE_MODULE.search(rule.get('config_template') or '')
-            module = match.group(1) if match else rule_id
+            modules = [yaml_name or dict_name for yaml_name, dict_name in
+                       TEMPLATE_MODULE.findall(rule.get('config_template') or '')] or [rule_id]
             # Every sd rule today targets a go.d module; a rule for another plugin would need its own metadata path.
-            covered.setdefault(module, set()).add(path.name)
+            for module in modules:
+                covered.setdefault(module, set()).add(path.name)
     return covered
 
 
@@ -166,6 +169,15 @@ def markdown_problems(text):
 class ServiceDiscoveryClaimsTest(unittest.TestCase):
     """A collector named by a service-discovery rule is auto-detected; its page must not say otherwise."""
 
+    def test_template_module_names(self):
+        for template in ('module: hdfs', '- module: hdfs',
+                         '{{ job "module" "hdfs" "url" .Address }}',
+                         '{{ dict "module" "hdfs" "url" .Address | toYaml -}}',
+                         '{{- $_ := set $job "module" "hdfs" -}}'):
+            with self.subTest(template=template):
+                matches = TEMPLATE_MODULE.findall(template)
+                self.assertEqual([yaml_name or dict_name for yaml_name, dict_name in matches], ['hdfs'])
+
     def test_sd_covered_collectors_document_auto_detection(self):
         covered = sd_covered_modules()
         self.assertTrue(covered, 'no service-discovery rules found')
@@ -197,6 +209,29 @@ class ServiceDiscoveryClaimsTest(unittest.TestCase):
         self.assertEqual(
             SD_AUTO_DETECTION_BACKLOG - empty, set(),
             'SD_AUTO_DETECTION_BACKLOG lists a collector whose auto_detection is now filled; remove it')
+
+
+class CollectorLimitsRenderingTest(unittest.TestCase):
+    def render_overview(self, limits):
+        entry = _common.load_yaml(GO_D_COLLECTORS / 'httpcheck' / 'metadata.yaml')['modules'][0]
+        entry['overview']['default_behavior']['limits']['description'] = limits
+        template = gen_integrations.get_jinja_env().get_template('overview/collector.md')
+        return template.render(entry=entry, related=[])
+
+    def test_empty_limits_make_no_unlimited_collection_claim(self):
+        for limits in ('', ' \n '):
+            with self.subTest(limits=limits):
+                overview = self.render_overview(limits)
+                self.assertNotIn('#### Limits', overview)
+                self.assertNotIn('does not impose any limits', overview)
+                self.assertIn('#### Auto-Detection', overview)
+                self.assertIn('#### Performance Impact', overview)
+
+    def test_authored_limits_remain_visible(self):
+        description = 'An oversized response fails the check; use a smaller health endpoint.'
+        overview = self.render_overview(description)
+        self.assertIn('#### Limits', overview)
+        self.assertIn(description, overview)
 
 
 class MarkdownSafetyTest(unittest.TestCase):

@@ -13,13 +13,14 @@ import (
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/pkg/safefile"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
-// LoadRuntimeManifest reads installed administrator-controlled trust. An archive,
+// LoadRuntimeManifest reads explicit administrator-controlled release trust. An archive,
 // monitor request, or download response can never replace this manifest.
 func LoadRuntimeManifest(path string) (*runtime.Manifest, error) {
 	if !filepath.IsAbs(path) {
@@ -48,13 +49,6 @@ func LoadRuntimeManifest(path string) (*runtime.Manifest, error) {
 	return &manifest, nil
 }
 
-func RuntimeManifestPath(cfg RuntimeConfig, assetsPath string) string {
-	if cfg.ManifestPath != "" {
-		return cfg.ManifestPath
-	}
-	return filepath.Join(assetsPath, "runtime-"+goruntime.GOARCH+".json")
-}
-
 // RuntimeHandle owns process resources. Close follows joined jobs and workers;
 // it must not run while a supervised browser invocation may still use the cache.
 type RuntimeHandle struct {
@@ -67,7 +61,7 @@ type RuntimeHandle struct {
 	closeErr   error
 }
 
-func OpenRuntime(cfg RuntimeConfig, assetsPath, varLibPath string) *RuntimeHandle {
+func OpenRuntime(cfg RuntimeConfig, varLibPath string) *RuntimeHandle {
 	result := &RuntimeHandle{}
 	if err := cfg.validate(); err != nil {
 		result.SetupError = err
@@ -78,15 +72,14 @@ func OpenRuntime(cfg RuntimeConfig, assetsPath, varLibPath string) *RuntimeHandl
 	if goruntime.GOOS != "linux" || (goruntime.GOARCH != "amd64" && goruntime.GOARCH != "arm64") {
 		result.SetupError = errors.Join(result.SetupError, errors.New("browser runtime requires Linux amd64 or arm64"))
 	}
-	if result.SetupError == nil {
-		result.Manifest, result.SetupError = LoadRuntimeManifest(RuntimeManifestPath(cfg, assetsPath))
-	}
 	if cfg.Mode == "preloaded" {
 		if result.SetupError == nil {
 			var paths runtime.Paths
-			paths, result.SetupError = runtime.ReadPreload(cfg.PreloadPath, *result.Manifest)
+			var manifest runtime.Manifest
+			paths, manifest, result.SetupError = runtime.ReadPreload(cfg.PreloadPath)
+			result.Manifest = &manifest
 			if result.SetupError == nil {
-				result.Source = preloadedRuntime{paths: runner.Paths{Node: paths.Node, Dependencies: paths.Dependencies, Browser: paths.Browser}}
+				result.Source = preloadedRuntime{paths: runner.Paths{Node: paths.Node, EntryPoint: paths.EntryPoint, Identity: synthetic.RuntimeIdentity{Version: manifest.Version, SHA256: manifest.Archive.SHA256, Contract: manifest.Contract}}}
 			}
 		}
 		if result.SetupError != nil {
@@ -101,7 +94,8 @@ func OpenRuntime(cfg RuntimeConfig, assetsPath, varLibPath string) *RuntimeHandl
 		}
 		result.SetupError = err
 	}
-	result.Host = runtimehost.New(runtimehost.Config{Store: result.Store, Manifest: result.Manifest, Unavailable: result.SetupError, AllowDownload: cfg.AllowDownload})
+	result.Host = runtimehost.New(runtimehost.Config{Store: result.Store, Unavailable: result.SetupError})
+	result.SetupError = result.Host.Ready()
 	result.Source = result.Host
 	return result
 }

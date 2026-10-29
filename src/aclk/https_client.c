@@ -302,6 +302,41 @@ static inline void chunked_response_buffer_grow_by(http_parse_ctx *parse_ctx, si
     parse_ctx->chunked_response_size += size;
 }
 
+// The chunked responses this client receives are small JSON documents (OTP challenge and
+// password, /env). The cap bounds the payload and is checked before every allocation, so a
+// chunk size from the peer can never make us ask for more; the buffer holds one more byte,
+// the terminating NUL.
+#define HTTPS_MAX_CHUNKED_RESPONSE_SIZE (1024 * 1024)
+
+// Parse a chunk-size line (RFC 9112, 7.1): one or more hex digits, then optional whitespace
+// and a ';' chunk extension, which we ignore. Returns NULL on success, or why it was rejected.
+static const char *parse_chunk_size(const char *line, size_t line_len, size_t received, size_t *chunk_size)
+{
+    const char *end = line + line_len;
+    if (memchr(line, '\0', line_len))
+        return "Chunk size line contains a NUL";
+
+    const char *s = line;
+    if (s == end || !isxdigit((uint8_t)*s))
+        return "Invalid chunk size";
+
+    size_t size = 0;
+    for (; s < end && isxdigit((uint8_t)*s); s++) {
+        size = size * 16 + (isdigit((uint8_t)*s) ? (size_t)(*s - '0') : (size_t)(tolower((uint8_t)*s) - 'a' + 10));
+        if (size > HTTPS_MAX_CHUNKED_RESPONSE_SIZE - received)
+            return "Chunked response is too big";
+    }
+
+    while (s < end && (*s == ' ' || *s == '\t'))
+        s++;
+
+    if (s < end && *s != ';')
+        return "Invalid chunk size";
+
+    *chunk_size = size;
+    return NULL;
+}
+
 static int process_chunked_content(rbuf_t buf, http_parse_ctx *parse_ctx)
 {
     size_t idx;
@@ -316,8 +351,9 @@ static int process_chunked_content(rbuf_t buf, http_parse_ctx *parse_ctx)
                     return HTTP_PARSE_NEED_MORE_DATA;
                 }
                 if (idx == 0) {
-                    parse_ctx->chunked_content_state = CHUNKED_CONTENT_FINAL_CRLF;
-                    continue;
+                    // the body ends only with a zero-size chunk
+                    netdata_log_error("ACLK: Empty chunk size line");
+                    return HTTP_PARSE_ERROR;
                 }
                 if (idx >= HTTP_HDR_BUFFER_SIZE) {
                     netdata_log_error("ACLK: Chunk size is too long");
@@ -326,17 +362,12 @@ static int process_chunked_content(rbuf_t buf, http_parse_ctx *parse_ctx)
                 char buf_size[HTTP_HDR_BUFFER_SIZE];
                 rbuf_pop(buf, buf_size, idx);
                 buf_size[idx] = 0;
-                long chunk_size = strtol(buf_size, NULL, 16);
-                if (chunk_size < 0 || chunk_size == LONG_MAX) {
-                    netdata_log_error("ACLK: Chunk size out of range");
+                const char *err = parse_chunk_size(buf_size, idx, parse_ctx->chunked_response_size, &parse_ctx->chunk_size);
+                if (err) {
+                    netdata_log_error("ACLK: %s", err);
                     return HTTP_PARSE_ERROR;
                 }
-                parse_ctx->chunk_size = chunk_size;
                 if (parse_ctx->chunk_size == 0) {
-                    if (errno == EINVAL) {
-                        netdata_log_error("ACLK: Invalid chunk size");
-                        return HTTP_PARSE_ERROR;
-                    }
                     parse_ctx->chunked_content_state = CHUNKED_CONTENT_CHUNK_END_CRLF;
                     continue;
                 }
@@ -1072,7 +1103,8 @@ https_client_resp_t https_request(https_req_t *request, https_req_response_t *re
     http_parse_ctx_destroy(&ctx->parse_ctx);
     response->http_code = ctx->parse_ctx.http_code;
     if (ctx->parse_ctx.content_length == TRANSFER_ENCODING_CHUNKED) {
-        response->payload_size = ctx->parse_ctx.chunked_response_size;
+        // the buffer holds one more byte, the terminating NUL, which is not payload
+        response->payload_size = ctx->parse_ctx.chunked_response_written;
         response->payload = ctx->parse_ctx.chunked_response;
         ctx->parse_ctx.chunked_response = NULL;
         ctx->parse_ctx.chunked_response_size = 0;
@@ -1215,3 +1247,153 @@ void url_t_destroy(url_t *url) {
     freez(url->path);
     freez(url->proto);
 }
+
+// ----------------------------------------------------------------------------
+// unittest
+
+#define HTTPS_CHUNKED_TEST(condition, msg) do {                                  \
+        if(!(condition)) {                                                       \
+            fprintf(stderr, "https client chunked unittest FAILED: %s (%s:%d)\n",\
+                    (msg), __FUNCTION__, __LINE__);                              \
+            errors++;                                                            \
+        }                                                                        \
+    } while(0)
+
+// Feed a chunked response body to the parser the way https_request() does: push what fits
+// into the receive ring, parse, repeat. Returns the parser's verdict.
+static http_parse_rc chunked_test_feed(http_parse_ctx *ctx, rbuf_t buf, const char *data, size_t len)
+{
+    http_parse_rc rc = HTTP_PARSE_NEED_MORE_DATA;
+    while (len && rc == HTTP_PARSE_NEED_MORE_DATA) {
+        size_t pushed = rbuf_push(buf, data, len);
+        data += pushed;
+        len -= pushed;
+        rc = parse_http_response(buf, ctx);
+        if (!pushed)
+            break; // the parser consumed nothing from a full ring: give up rather than spin
+    }
+    return rc;
+}
+
+static void chunked_test_start(http_parse_ctx *ctx, rbuf_t *buf)
+{
+    static const char headers[] = "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n";
+
+    memset(ctx, 0, sizeof(*ctx));
+    http_parse_ctx_create(ctx, HTTP_PARSE_INITIAL);
+    *buf = rbuf_create(RX_BUFFER_SIZE, RX_BUFFER_SIZE);
+    rbuf_push(*buf, headers, sizeof(headers) - 1);
+}
+
+static void chunked_test_end(http_parse_ctx *ctx, rbuf_t buf)
+{
+    freez(ctx->chunked_response);
+    http_parse_ctx_destroy(ctx);
+    rbuf_free(buf);
+}
+
+static http_parse_rc chunked_test_body(const char *body, size_t len, size_t *written, char *payload, size_t payload_size)
+{
+    http_parse_ctx ctx;
+    rbuf_t buf;
+    chunked_test_start(&ctx, &buf);
+
+    http_parse_rc rc = chunked_test_feed(&ctx, buf, body, len);
+    if (rc == HTTP_PARSE_SUCCESS && payload && payload_size)
+        strncpyz(payload, ctx.chunked_response, payload_size - 1);
+    *written = ctx.chunked_response_written;
+
+    chunked_test_end(&ctx, buf);
+    return rc;
+}
+
+int https_client_chunked_unittest(void) {
+    int errors = 0;
+    size_t written;
+    char payload[256];
+
+    fprintf(stderr, "\nrunning https client chunked unittest\n");
+
+    // a chunk size the agent cannot allocate must fail the request, not exit the agent
+    static const char huge[] = "7ffffffffffffffe\r\n";
+    HTTPS_CHUNKED_TEST(chunked_test_body(huge, sizeof(huge) - 1, &written, NULL, 0) == HTTP_PARSE_ERROR,
+                       "a huge chunk size was accepted");
+
+    static const char over_cap[] = "100001\r\n";
+    HTTPS_CHUNKED_TEST(chunked_test_body(over_cap, sizeof(over_cap) - 1, &written, NULL, 0) == HTTP_PARSE_ERROR,
+                       "a chunk bigger than the response cap was accepted");
+
+    // the cap holds across chunks too: 32 chunks of 32 KiB fill 1 MiB, the 33rd is refused
+    {
+        http_parse_ctx ctx;
+        rbuf_t buf;
+        chunked_test_start(&ctx, &buf);
+        char *chunk = mallocz(32768);
+        memset(chunk, 'a', 32768);
+        http_parse_rc rc = HTTP_PARSE_NEED_MORE_DATA;
+        int chunks;
+        for (chunks = 0; chunks < 40 && rc == HTTP_PARSE_NEED_MORE_DATA; chunks++) {
+            rc = chunked_test_feed(&ctx, buf, "8000\r\n", 6);
+            if (rc == HTTP_PARSE_NEED_MORE_DATA)
+                rc = chunked_test_feed(&ctx, buf, chunk, 32768);
+            if (rc == HTTP_PARSE_NEED_MORE_DATA)
+                rc = chunked_test_feed(&ctx, buf, "\r\n", 2);
+        }
+        HTTPS_CHUNKED_TEST(rc == HTTP_PARSE_ERROR, "chunks adding up past the response cap were accepted");
+        HTTPS_CHUNKED_TEST(chunks == 33, "the response cap did not stop the 33rd chunk");
+        HTTPS_CHUNKED_TEST(ctx.chunked_response_size <= HTTPS_MAX_CHUNKED_RESPONSE_SIZE,
+                           "more than the response cap was allocated");
+        freez(chunk);
+        chunked_test_end(&ctx, buf);
+    }
+
+    // malformed size lines
+    static const struct {
+        const char *body;
+        size_t len;
+        const char *msg;
+    } malformed[] = {
+        { "zz\r\n",                 4, "a non-hex chunk size was accepted" },
+        { "12zz\r\n",               6, "a chunk size with trailing garbage was accepted" },
+        { "+1a\r\n",                5, "a signed chunk size was accepted" },
+        { " 1a\r\n",                5, "a chunk size with leading whitespace was accepted" },
+        { "1\0\r\n",               4, "a chunk size line with a NUL was accepted" },
+        { "\r\n",                   2, "an empty chunk size line was accepted" },
+        { "3\r\nabc\r\n\r\n",  10, "a body ended by an empty line instead of a zero-size chunk was accepted" },
+    };
+    for (size_t i = 0; i < sizeof(malformed) / sizeof(malformed[0]); i++)
+        HTTPS_CHUNKED_TEST(chunked_test_body(malformed[i].body, malformed[i].len, &written, NULL, 0) == HTTP_PARSE_ERROR,
+                           malformed[i].msg);
+
+    // valid bodies
+    static const char multi[] = "3\r\nabc\r\nA\r\n0123456789\r\n0\r\n\r\n";
+    HTTPS_CHUNKED_TEST(chunked_test_body(multi, sizeof(multi) - 1, &written, payload, sizeof(payload)) == HTTP_PARSE_SUCCESS &&
+                           !strcmp(payload, "abc0123456789") && written == 13,
+                       "a multi-chunk body was not parsed");
+
+    static const char ext[] = "1a;name=value\r\nabcdefghijklmnopqrstuvwxyz\r\n3 ;x\r\nend\r\n0\r\n\r\n";
+    HTTPS_CHUNKED_TEST(chunked_test_body(ext, sizeof(ext) - 1, &written, payload, sizeof(payload)) == HTTP_PARSE_SUCCESS &&
+                           !strcmp(payload, "abcdefghijklmnopqrstuvwxyzend"),
+                       "chunk extensions were not accepted");
+
+    static const char upper[] = "0000B\r\nhello world\r\n0\r\n\r\n";
+    HTTPS_CHUNKED_TEST(chunked_test_body(upper, sizeof(upper) - 1, &written, payload, sizeof(payload)) == HTTP_PARSE_SUCCESS &&
+                           !strcmp(payload, "hello world"),
+                       "an uppercase hex chunk size with leading zeros was not parsed");
+
+    // the last chunk must not depend on a stale errno
+    static const char empty[] = "0\r\n\r\n";
+    errno = EINVAL;
+    HTTPS_CHUNKED_TEST(chunked_test_body(empty, sizeof(empty) - 1, &written, payload, sizeof(payload)) == HTTP_PARSE_SUCCESS &&
+                           written == 0,
+                       "an empty body with a stale errno was not parsed");
+
+    if (errors)
+        fprintf(stderr, "https client chunked unittest: %d ERROR(S)\n", errors);
+    else
+        fprintf(stderr, "https client chunked unittest: OK\n");
+
+    return errors;
+}
+
+#undef HTTPS_CHUNKED_TEST

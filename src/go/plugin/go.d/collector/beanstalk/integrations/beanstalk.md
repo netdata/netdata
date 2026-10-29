@@ -45,9 +45,6 @@ This collector supports collecting metrics from multiple instances of this integ
 By default, it detects Beanstalk instances running on localhost that are listening on port 11300.
 
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

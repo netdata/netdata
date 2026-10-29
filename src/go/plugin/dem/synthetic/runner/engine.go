@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Package runner owns admission and supervised execution of prepared DEM assets.
+// Package runner owns admission and supervised execution of prepared DEM runtimes.
 package runner
 
 import (
@@ -9,7 +9,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -39,7 +38,6 @@ type ArtifactStore interface {
 }
 
 type Engine struct {
-	assetsPath string
 	source     Source
 	history    historyWriter
 	artifacts  ArtifactStore
@@ -51,16 +49,15 @@ type Engine struct {
 	platform   func() error
 }
 
-func New(assetsPath string, source Source, history historyWriter, artifacts ArtifactStore) *Engine {
+func New(source Source, history historyWriter, artifacts ArtifactStore) *Engine {
 	return &Engine{
-		assetsPath: assetsPath,
-		source:     source,
-		history:    history,
-		artifacts:  artifacts,
-		admission:  make(chan struct{}, 1),
-		fatal:      make(chan error, 1),
-		poisoned:   make(chan struct{}),
-		platform:   runtimeAllowed,
+		source:    source,
+		history:   history,
+		artifacts: artifacts,
+		admission: make(chan struct{}, 1),
+		fatal:     make(chan error, 1),
+		poisoned:  make(chan struct{}),
+		platform:  runtimeAllowed,
 		start: func(ctx context.Context, opts ndexec.TreeOptions, bin string, args ...string) (treeProcess, error) {
 			return ndexec.StartUnprivilegedProcessTree(ctx, opts, bin, args...)
 		},
@@ -169,6 +166,8 @@ func (e *Engine) Execute(ctx context.Context, request synthetic.Request, state f
 	if e.artifacts == nil {
 		return finishUnstarted(errors.New("artifact owner is unavailable"), true)
 	}
+	identity := paths.Identity
+	run.Runtime = &identity
 	e.save(attempt, "start", &run, redact)
 	work, err := e.artifacts.Begin(run.ID, run.JobID)
 	if err != nil {
@@ -180,18 +179,16 @@ func (e *Engine) Execute(ctx context.Context, request synthetic.Request, state f
 		}
 	}
 	req := wireRequest{
-		Version:          1,
-		Kind:             request.Kind,
-		RunID:            run.ID,
-		DependenciesPath: paths.Dependencies,
-		BrowserPath:      paths.Browser,
-		WorkDir:          work,
-		Script:           request.Script,
-		ScriptPath:       request.ScriptPath,
-		URL:              request.URL,
-		TimeoutMS:        request.Timeout.Milliseconds(),
-		Capture:          request.Capture,
-		Secrets:          request.Secrets,
+		Version:    SupportedContract,
+		Kind:       request.Kind,
+		RunID:      run.ID,
+		WorkDir:    work,
+		Script:     request.Script,
+		ScriptPath: request.ScriptPath,
+		URL:        request.URL,
+		TimeoutMS:  request.Timeout.Milliseconds(),
+		Capture:    request.Capture,
+		Secrets:    request.Secrets,
 	}
 	raw, err := json.Marshal(req)
 	if err == nil && len(raw) > FrameMaxBytes {
@@ -214,7 +211,7 @@ func (e *Engine) Execute(ctx context.Context, request synthetic.Request, state f
 		attempt,
 		paths,
 		use.Completion(),
-		[]string{filepath.Join(e.assetsPath, "run.mjs")},
+		[]string{paths.EntryPoint},
 		raw,
 		sink.consume,
 		sink.stderr,

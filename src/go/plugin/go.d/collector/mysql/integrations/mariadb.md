@@ -58,9 +58,6 @@ By default, it detects instances running on localhost by trying to connect as ro
 - "[::1]:3306"
 
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

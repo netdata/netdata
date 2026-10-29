@@ -5,11 +5,10 @@ package runtimehost
 import (
 	"errors"
 	"fmt"
-	"sort"
 )
 
 // Each operation owns its error slot. A successful sweep cannot erase an
-// unresolved claim failure, nor can a healthy invocation erase failed cleanup.
+// unresolved execution failure, nor can a healthy invocation erase failed cleanup.
 type healthChange struct {
 	operation string
 	err       error
@@ -50,14 +49,10 @@ func (h *Host) recordFinishError(err error) {
 }
 func (h *Host) maintenanceErrorLocked() error {
 	var result error
-	for _, operation := range []string{"demand commit", "demand release", "cleanup", "execution completion"} {
+	for _, operation := range []string{"cleanup", "execution completion"} {
 		if err := h.maintenance[operation]; err != nil {
 			result = errors.Join(result, fmt.Errorf("%s: %w", operation, err))
 		}
 	}
 	return result
-}
-func stableErrors(errs []error) error {
-	sort.Slice(errs, func(i, j int) bool { return errs[i].Error() < errs[j].Error() })
-	return errors.Join(errs...)
 }

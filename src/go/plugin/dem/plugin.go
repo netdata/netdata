@@ -89,7 +89,6 @@ func New(deps Dependencies, cfg Config) Components {
 		Executor: deps.Executor,
 	})
 	if deps.Runtime != nil {
-		workflow.JobConfigIntent, audit.JobConfigIntent = deps.Runtime, deps.Runtime
 		workflow.ActivationDependencies, audit.ActivationDependencies = deps.Runtime.Dependencies, deps.Runtime.Dependencies
 	}
 	collectors.Register("journey", workflow)

@@ -42,9 +42,6 @@ On startup, it tries to collect metrics from:
 - https://127.0.0.1:3128
 
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

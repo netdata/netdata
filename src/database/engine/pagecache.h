@@ -18,8 +18,6 @@ struct pgc_page;
 
 extern struct rrdeng_cache_efficiency_stats rrdeng_cache_efficiency_stats;
 
-bool open_cache_page_is_of_metric(struct pgc_page *page, UUIDMAP_ID uuid_id);
-
 struct page_descr_with_data {
     UUIDMAP_ID uuid_id;
     Word_t metric_id;
@@ -61,5 +59,7 @@ void pgc_open_add_hot_page(
     struct rrdengine_datafile *datafile,
     uint64_t extent_offset,
     unsigned extent_size);
+
+int pagecache_flush_drop_unittest(void);
 
 #endif /* NETDATA_PAGECACHE_H */

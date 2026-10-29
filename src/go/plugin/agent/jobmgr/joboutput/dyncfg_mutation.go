@@ -35,7 +35,7 @@ func (dcjc *DynCfgJobController) prepareMutation(
 		postimage,
 		reply,
 		cleanup,
-		nil, jobConfigIntentDisable,
+		nil,
 	)
 }
 
@@ -50,7 +50,6 @@ func (dcjc *DynCfgJobController) prepareMutationAfterApply(
 	reply jobReply,
 	cleanup lifecycle.TaskCleanup,
 	afterApply func(),
-	intent jobConfigIntentTransition,
 	failures ...collectorapi.JobConfigFailure,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	jobConfig := preparedJobConfigLifecycleState(successor)
@@ -70,7 +69,7 @@ func (dcjc *DynCfgJobController) prepareMutationAfterApply(
 		reply,
 		cleanup,
 		afterApply,
-		jobConfig, intent,
+		jobConfig,
 		nil,
 		nil,
 		nil,
@@ -89,11 +88,10 @@ func (dcjc *DynCfgJobController) prepareMutationAfterApplyAndFallback(
 	cleanup lifecycle.TaskCleanup,
 	afterApply func(),
 	jobConfig preparedJobConfigLifecycle,
-	intent jobConfigIntentTransition,
 	busyFallback *ResourceActivationFallback,
 	quarantinedFallback *ResourceActivationFallback,
 	candidate *preparedJobCandidate,
-) (prepared lifecycle.PreparedResourceTransaction, resultErr error) {
+) (lifecycle.PreparedResourceTransaction, error) {
 	delta, err := dcjc.prepareControlCandidate(scope.ID, postimage, reply)
 	if err != nil {
 		return nil, err
@@ -122,35 +120,11 @@ func (dcjc *DynCfgJobController) prepareMutationAfterApplyAndFallback(
 		}
 	}
 	dependencyCommit = composeAfterApply(dependencyCommit, jobConfigReconcile)
-	configIntent, err := dcjc.prepareMutationJobConfigIntent(ctx, scope.ID, postimage, reply, intent)
-	if err != nil {
+	if err := dcjc.validateCandidateAdmission(ctx, reply.candidate); err != nil {
 		if successor != nil {
 			err = rollbackSuccessorMutation(successor, err)
 		}
 		return nil, err
-	}
-	transferred := false
-	defer func() {
-		if !transferred {
-			resultErr = errors.Join(resultErr, configIntent.abort())
-			for _, fallback := range []*ResourceActivationFallback{busyFallback, quarantinedFallback} {
-				if fallback != nil {
-					resultErr = errors.Join(resultErr, fallback.configIntent.abort())
-				}
-			}
-		}
-	}()
-	for _, fallback := range []*ResourceActivationFallback{busyFallback, quarantinedFallback} {
-		if fallback == nil {
-			continue
-		}
-		fallback.configIntent, err = dcjc.prepareMutationJobConfigIntent(ctx, scope.ID, fallback.Change.Config, reply, intent)
-		if err != nil {
-			if successor != nil {
-				err = rollbackSuccessorMutation(successor, err)
-			}
-			return nil, err
-		}
 	}
 	// Admission can yield the graph claim after Check. Validate every captured
 	// dependency and candidate ownership only after all yielding work has finished.
@@ -169,14 +143,12 @@ func (dcjc *DynCfgJobController) prepareMutationAfterApplyAndFallback(
 			Successor:                     successor,
 			UnusedPermit:                  unusedPermit,
 			Graph:                         dcjc.graph,
-			configIntent:                  configIntent,
 			AfterApply:                    afterApply,
 			ActivationBusyFallback:        busyFallback,
 			ActivationQuarantinedFallback: quarantinedFallback,
 			Cleanup:                       cleanup,
 			reply:                         &reply,
 		})
-		transferred = err == nil
 		return transaction, err
 	}
 	if err != nil {
@@ -196,7 +168,6 @@ func (dcjc *DynCfgJobController) prepareMutationAfterApplyAndFallback(
 			Mutation:                      mutation,
 			MutationPrepared:              true,
 			AfterGraphCommit:              dependencyCommit,
-			configIntent:                  configIntent,
 			AfterApply:                    afterApply,
 			ActivationBusyFallback:        busyFallback,
 			ActivationQuarantinedFallback: quarantinedFallback,
@@ -204,7 +175,6 @@ func (dcjc *DynCfgJobController) prepareMutationAfterApplyAndFallback(
 			reply:                         &reply,
 		},
 	)
-	transferred = prepareErr == nil
 	return transaction, prepareErr
 }
 
@@ -339,7 +309,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithActivationFallbacks(
 		reply,
 		cleanup,
 		afterApply,
-		jobConfig, jobConfigIntentPreserve,
+		jobConfig,
 		busyFallback,
 		quarantinedFallback,
 		nil,
@@ -412,7 +382,7 @@ func (dcjc *DynCfgJobController) prepareTransientConstructionFailure(
 		&postimage,
 		reply,
 		cleanup,
-		nil, jobConfigIntentEnable,
+		nil,
 		jobConfigFailure(err, "construction"),
 	)
 }
@@ -474,7 +444,7 @@ func (dcjc *DynCfgJobController) prepareProbeFailure(
 			identity: dcjc.postimageJobConfigLifecycleGraphState(postimage).identity,
 			snapshot: failure.jobConfigLifecycle,
 			failure:  failure.diagnosticFailure,
-		}, jobConfigIntentEnable,
+		},
 		nil,
 		nil,
 		nil,

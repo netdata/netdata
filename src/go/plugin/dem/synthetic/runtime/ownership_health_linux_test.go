@@ -16,7 +16,7 @@ func TestFinishFailureAppearsInStorageHealthUntilSweep(t *testing.T) {
 	require.NoError(t, err)
 	defer s.Close()
 	manifest := importFixture(t, s, "finish-health")
-	use, err := s.BeginUse(manifest)
+	use, err := s.beginUse(manifest)
 	require.NoError(t, err)
 	trash := filepath.Join(path, "trash")
 	require.NoError(t, os.Rename(trash, trash+".saved"))
@@ -41,7 +41,7 @@ func TestOlderSweepDoesNotClearConcurrentFinishFailure(t *testing.T) {
 	require.NoError(t, err)
 	defer s.Close()
 	manifest := importFixture(t, s, "finish-during-sweep")
-	use, err := s.BeginUse(manifest)
+	use, err := s.beginUse(manifest)
 	require.NoError(t, err)
 	// Run the inventory phase, then interleave the real failed Finish before the
 	// older sweep publishes its result after deleting trash.
@@ -74,7 +74,7 @@ func TestOlderSweepDoesNotClearConcurrentFinishFailure(t *testing.T) {
 func TestFinishCoordinationFailureRetainsDrainedProof(t *testing.T) {
 	s, _ := testStore(t)
 	manifest := importFixture(t, s, "finish-coordination")
-	use, err := s.BeginUse(manifest)
+	use, err := s.beginUse(manifest)
 	require.NoError(t, err)
 	coordination := filepath.Join(s.path, "coordination.lock")
 	require.NoError(t, os.Rename(coordination, coordination+".saved"))

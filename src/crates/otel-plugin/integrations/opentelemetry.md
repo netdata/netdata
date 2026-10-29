@@ -118,26 +118,26 @@ Older files configure the OTLP/gRPC listener in an `endpoint:` section: `endpoin
 | receivers.otlp.protocols.http.tls.cert_file | Path to the server TLS certificate for the OTLP/HTTP listener. Set it together with `receivers.otlp.protocols.http.tls.key_file`. |  | no |
 | receivers.otlp.protocols.http.tls.key_file | Path to the server TLS private key for the OTLP/HTTP listener. Set it together with `receivers.otlp.protocols.http.tls.cert_file`. |  | no |
 | [receivers.otlp.protocols.http.tls.client_ca_file](#option-receivers-otlp-protocols-http-tls-client-ca-file) | Path to a CA certificate used to verify client certificates on the OTLP/HTTP listener. |  | no |
+| [auth.enabled](#option-auth-enabled) | Require each sender to set its tenant name in the `X-Scope-OrgID` header. Applies to logs and traces. | no | no |
 | [metrics.chart_configs_dir](#option-metrics-chart-configs-dir) | Directory containing user metric mapping YAML files. | /etc/netdata/otel.d/v1/metrics | no |
 | [metrics.interval_secs](#option-metrics-interval-secs) | Default Netdata chart update interval in seconds. | 10 | no |
 | metrics.grace_period_secs | Time after the last data point before the plugin begins filling chart gaps. | 60 | no |
 | metrics.expiry_duration_secs | Time without data after which a chart is removed. | 900 | no |
 | [metrics.max_new_charts_per_request](#option-metrics-max-new-charts-per-request) | Maximum number of new charts one OTLP export request can create. | 100 | no |
 | [base_dir](#option-base-dir) | Absolute root directory for locally stored OpenTelemetry logs and traces. | /var/log/netdata/otel/v2 | no |
+| logs.rotation.default.max_file_size | File size at which incoming logs start a new file. | 25MB | no |
+| logs.rotation.default.max_entries | Entry count at which incoming logs start a new file. | 50000 | no |
+| logs.retention.default.max_files | Maximum number of stored log files. | 100000 | no |
+| [logs.retention.default.max_total_size](#option-logs-retention-default-max-total-size) | Maximum total size of stored log files. | 1GB | no |
+| logs.retention.default.max_age | Maximum age of stored log files. | 7 days | no |
+| traces.rotation.default.max_file_size | File size at which incoming spans start a new file. | 25MB | no |
+| traces.rotation.default.max_entries | Span count at which incoming spans start a new file. | 50000 | no |
+| traces.retention.default.max_files | Maximum number of stored trace files. | 100000 | no |
+| [traces.retention.default.max_total_size](#option-traces-retention-default-max-total-size) | Maximum total size of stored trace files. | 1GB | no |
+| traces.retention.default.max_age | Maximum age of stored trace files, measured on the start time of the newest span in each file. | 7 days | no |
 | [remote_storage.enabled](#option-remote-storage-enabled) | Upload retained OpenTelemetry logs and traces to configured remote object storage. | no | no |
 | [remote_storage.uri](#option-remote-storage-uri) | Remote storage URI. Supported schemes are `fs` and `s3`. | fs:///var/log/netdata/otel/v2/remote | no |
 | remote_storage.read_cache_max_size | Maximum size of the local download cache, shared by logs and traces, for data fetched back from remote storage during queries. | 1GB | no |
-| [auth.enabled](#option-auth-enabled) | Require the `X-Scope-OrgID` header (gRPC metadata or HTTP header) to select a log or trace tenant. | no | no |
-| logs.rotation.default.max_file_size | Write-ahead log file size that triggers rotation. | 25MB | no |
-| logs.rotation.default.max_entries | Write-ahead log entry count that triggers rotation. | 50000 | no |
-| logs.retention.default.max_files | Maximum retained indexed-file count. | 100000 | no |
-| [logs.retention.default.max_total_size](#option-logs-retention-default-max-total-size) | Maximum retained indexed-data size. | 1GB | no |
-| logs.retention.default.max_age | Maximum retained indexed-file age. | 7 days | no |
-| traces.rotation.default.max_file_size | Trace write-ahead log file size that triggers rotation. | 25MB | no |
-| traces.rotation.default.max_entries | Trace write-ahead log span count that triggers rotation. | 50000 | no |
-| traces.retention.default.max_files | Maximum retained indexed trace-file count. | 100000 | no |
-| [traces.retention.default.max_total_size](#option-traces-retention-default-max-total-size) | Maximum retained indexed trace-data size. | 1GB | no |
-| traces.retention.default.max_age | Maximum retained indexed trace-file age, measured on the start time of its newest span. | 7 days | no |
 
 <a id="option-receivers-otlp-protocols-grpc-endpoint"></a>
 ##### receivers.otlp.protocols.grpc.endpoint
@@ -163,6 +163,12 @@ The default IPv4 loopback address accepts only local senders. To accept remote s
 Setting a CA certificate enables mutual TLS and therefore also requires the server certificate and key. Clients must present a certificate signed by this CA.
 
 
+<a id="option-auth-enabled"></a>
+##### auth.enabled
+
+Tenants keep the logs and traces of different senders apart, and the `logs` and `traces` sections can set rotation and retention limits per tenant. Metrics do not use tenants. When enabled, the plugin rejects logs and traces without this header. When disabled, the plugin ignores the header and keeps all logs and traces in one `default` tenant. The header does not prove who the sender is: use TLS or mutual TLS and network access controls to limit which senders can connect.
+
+
 <a id="option-metrics-chart-configs-dir"></a>
 ##### metrics.chart_configs_dir
 
@@ -184,37 +190,35 @@ This limits a single request's cardinality burst. It does not cap the total numb
 <a id="option-base-dir"></a>
 ##### base_dir
 
-Retention limits govern retained indexed files. Write-ahead logs, catalogs, and the download cache for offloaded data (in the `remote-read` subdirectory under your configured base directory) can make total usage below this directory exceed the `retention.*.max_total_size` limits.
+The retention limits count only the stored log and trace files. Total disk use under this directory can be higher, because it also holds:
+
+- the files that hold incoming data (limited by the `rotation` options),
+- catalog files that list the stored files,
+- the download cache for remote storage (the `remote-read` subdirectory, limited by `remote_storage.read_cache_max_size`).
+
+
+<a id="option-logs-retention-default-max-total-size"></a>
+##### logs.retention.default.max_total_size
+
+This limit counts only the stored log files. Other files under `base_dir` also use disk space; see `base_dir`.
+
+
+<a id="option-traces-retention-default-max-total-size"></a>
+##### traces.retention.default.max_total_size
+
+This limit counts only the stored trace files. Other files under `base_dir` also use disk space; see `base_dir`.
 
 
 <a id="option-remote-storage-enabled"></a>
 ##### remote_storage.enabled
 
-Sealed indexed files are uploaded in addition to being kept under local retention. When a query needs a remotely cataloged file that is no longer local, the plugin downloads it into the bounded download cache shared by logs and traces. Each download may take 30 seconds plus one second per MiB, at most 5 minutes; a file that takes longer or cannot be served is left out (traces report the answer as partial). A query needing more data than the cache holds fails with a message to narrow its time range.
+The plugin uploads the stored log and trace files, and also keeps them on local disk under the retention limits. When a query needs a file that retention has deleted from local disk, the plugin downloads it from remote storage into a download cache shared by logs and traces. The plugin waits at most 30 seconds plus one second per MiB for each download, and never more than 5 minutes. A file that takes longer, or that the plugin cannot download, is left out of the answer (traces mark the answer as partial). A query that needs more data than the cache can hold fails with a message to narrow its time range.
 
 
 <a id="option-remote-storage-uri"></a>
 ##### remote_storage.uri
 
 Put non-secret backend options in the query string. Never put credentials in this file or URI. For S3, use the standard AWS environment, credentials file, or instance-role mechanisms available to the Netdata service account.
-
-
-<a id="option-auth-enabled"></a>
-##### auth.enabled
-
-This is tenant selection, not credential authentication. When disabled, all logs and traces belong to the `default` tenant. When enabled, trust the header only behind TLS or mutual TLS and suitable network controls. Metrics are not tenant-scoped.
-
-
-<a id="option-logs-retention-default-max-total-size"></a>
-##### logs.retention.default.max_total_size
-
-This is not a cap on all plugin disk use. Write-ahead logs, catalogs, and cache are additional.
-
-
-<a id="option-traces-retention-default-max-total-size"></a>
-##### traces.retention.default.max_total_size
-
-This is not a cap on all plugin disk use. Write-ahead logs, catalogs, and cache are additional.
 
 
 

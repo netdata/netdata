@@ -201,6 +201,26 @@ Then [restart netdata](/docs/netdata-agent/start-stop-restart.md) for the change
 
 ## Troubleshooting
 
+### HTTP response-size errors
+
+If a collector logs `HTTP response body exceeds the 64 MiB limit`, reading a response crossed its HTTP
+response-size limit. Gzip decompression does not bypass the limit. Depending on the collector, this can fail the
+collection or leave only the metrics from other successful requests. Some SDK integrations report a sanitized error
+instead of this exact message.
+
+- For **HTTPCheck**, use a dedicated health-check endpoint with a smaller response. A body-read failure reports
+  `bad_content` and a response length of zero, even without a `response_match` rule, and can trigger its existing alerts.
+- For **Prometheus endpoints**, reduce the metrics exposed by the exporter or target. Collector-side selectors,
+  relabeling and series limits do not shrink the downloaded response.
+- For **other API collectors**, reduce the data returned by the target using its supported API controls, while
+  preserving the response format the collector needs. If the API cannot return a smaller response, contact Netdata
+  support with the collector name and failing API operation.
+
+There is no option to raise this limit; increasing `timeout` does not change it. The limit applies while reading
+HTTP responses, so a parser that finishes early may accept a response without reading all of its trailing content.
+Some collectors have stricter limits. PAN-OS and independently managed cloud, vSphere and Kubernetes SDK clients
+are outside this shared limit; local-file and FastCGI inputs are also outside it.
+
 ### Plugin CLI
 
 ```sh

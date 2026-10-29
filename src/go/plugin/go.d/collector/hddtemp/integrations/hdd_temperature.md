@@ -41,9 +41,6 @@ This collector supports collecting metrics from multiple instances of this integ
 
 By default, this collector will attempt to connect to the `hddtemp` daemon on `127.0.0.1:7634`
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

@@ -6,11 +6,11 @@ This document explains the access control policies that govern feature availabil
 
 Netdata implements a layered access control system to protect sensitive information while keeping core monitoring capabilities freely available. The system distinguishes between three access levels:
 
-| Access Level                | Description                                                              |
-|-----------------------------|--------------------------------------------------------------------------|
-| **Anonymous**               | Using the Netdata dashboard without signing in                           |
-| **Netdata Cloud Community** | Signed in to Netdata Cloud (free tier)                                   |
-| **Netdata Cloud paid plan** | Signed in with a paid plan (Homelab, Business, or Enterprise On-Premise) |
+| Access Level                | Description                                                                                             |
+|-----------------------------|---------------------------------------------------------------------------------------------------------|
+| **Anonymous**               | Using the Netdata dashboard without signing in                                                          |
+| **Netdata Cloud Community** | Signed in to Netdata Cloud (free tier)                                                                  |
+| **Netdata Cloud paid plan** | Signed in with a paid plan (Homelab, Business, or Enterprise On-Premise) or an active Business trial    |
 
 ## Why Access Controls Exist
 
@@ -57,6 +57,8 @@ Functions provide on-demand, detailed information beyond standard metrics.
 | **Database Queries**    | Top queries, deadlocks, errors              |     ✗     |     ✓     |  ✓   |
 | **Streaming Status**    | Netdata streaming topology                  |     ✗     |     ✓     |  ✓   |
 | **API Call Tracing**    | Netdata API request tracing                 |     ✗     |     ✓     |  ✓   |
+| **Network Flows**       | NetFlow, IPFIX and sFlow traffic analysis   |     ✗     |     ✗     |  ✓   |
+| **Traces**              | OpenTelemetry traces stored on the Agent    |     ✗     |     ✗     |  ✓   |
 
 ### Configuration and Management
 
@@ -108,7 +110,7 @@ For MCP setup and configuration, see the [MCP documentation](/docs/netdata-ai/mc
 2. **Connect your nodes** to your Netdata Cloud Space
 3. **Access the dashboard** through Netdata Cloud
 
-Once signed in, you'll have access to all sensitive functions (processes, logs, network connections, etc.) on nodes within your Space.
+Once signed in, you'll have access to the sensitive functions (processes, logs, network connections, etc.) on nodes within your Space. Network Flows and Traces also require a paid plan or an active trial.
 
 ### Enable Dynamic Configuration
 
@@ -162,10 +164,11 @@ Netdata Cloud and each Agent keep separate preferred-node lists. Netdata Cloud s
 | **Alert Notifications**   | Full access | Full access   | Full access |
 | **Public Functions**      | Full access | Full access   | Full access |
 | **Sensitive Functions**   | Blocked     | Full access   | Full access |
+| **Network Flows & Traces** | Blocked     | Blocked       | Full access |
 | **AI Features**           | Blocked     | Not available | Full access |
 | **Dynamic Configuration** | Blocked     | Blocked       | Full access |
 | **Node Dashboard Access** | 5 nodes     | 5 nodes       | Unlimited   |
 | **Custom Dashboards**     | 1 per agent | 1 per room    | Unlimited   |
 | **RBAC & SSO**            | N/A         | Not available | Full access |
 
-Netdata's access control model ensures that sensitive system information is protected while keeping powerful monitoring capabilities freely available. Sign in to Netdata Cloud to unlock sensitive functions, or upgrade to a paid plan for full configuration control and unlimited scale.
+Netdata's access control model ensures that sensitive system information is protected while keeping powerful monitoring capabilities freely available. Sign in to Netdata Cloud to unlock sensitive functions, or upgrade to a paid plan for Network Flows, Traces, full configuration control and unlimited scale.

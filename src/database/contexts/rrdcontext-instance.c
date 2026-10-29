@@ -35,10 +35,24 @@ inline STRING *rrdinstance_acquired_units_dup(RRDINSTANCE_ACQUIRED *ria) {
     return string_dup(ri->units);
 }
 
-inline RRDLABELS *rrdinstance_labels(RRDINSTANCE *ri) {
-    RRDSET *st = rrdinstance_rrdset_atomic_load(ri);
-    if(st)
-        return st->rrdlabels;
+// An instance's labels are its chart's while it is linked to one, and its own once archived.
+// The chart's labels are destroyed with the chart, so they are handed out with a reference on it.
+// The instance's own set lives as long as the instance, which the caller holds: it is created with the
+// instance and destroyed with it, never swapped, only refilled.
+RRDINSTANCE_LABELS_REF rrdinstance_acquired_labels_acquire(RRDINSTANCE_ACQUIRED *ria) {
+    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
+    RRDINSTANCE_LABELS_REF ref = { .rsa = NULL, .labels = NULL };
+
+    ref.rsa = rrdinstance_rrdset_acquire(ria);
+    if(ref.rsa) {
+        ref.labels = rrdset_acquired_to_rrdset(ref.rsa)->rrdlabels;
+        return ref;
+    }
+
+    // still linked, but the chart is going away right now: the instance's own set has not been
+    // refilled from it yet, so there are no labels to give
+    if(rrdinstance_rrdset_atomic_load(ri))
+        return ref;
 
     if (rrd_flag_check_all(ri, RRD_FLAG_OWN_LABELS | RRD_FLAG_DEMAND_LABELS)) {
         rrd_flag_clear(ri, RRD_FLAG_DEMAND_LABELS);
@@ -46,17 +60,53 @@ inline RRDLABELS *rrdinstance_labels(RRDINSTANCE *ri) {
         rrdinstance_trigger_updates(ri, __FUNCTION__ );
     }
 
-    return ri->rrdlabels;
+    ref.labels = ri->rrdlabels;
+    return ref;
 }
 
-inline RRDLABELS *rrdinstance_acquired_labels(RRDINSTANCE_ACQUIRED *ria) {
-    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
-    return rrdinstance_labels(ri);
+void rrdinstance_labels_release(RRDINSTANCE_LABELS_REF *ref) {
+    rrdset_acquired_release(ref->rsa);
+    ref->rsa = NULL;
+    ref->labels = NULL;
 }
 
-inline RRDSET *rrdinstance_acquired_rrdset(RRDINSTANCE_ACQUIRED *ria) {
+// ri->rrdset is a raw back-pointer that holds no reference on the chart: holding the instance keeps the
+// INSTANCE alive, not the CHART, and the obsolete-chart cleanup frees the chart while such a holder still
+// uses it. So consumers must never dereference ri->rrdset - they acquire the chart by id instead.
+// rrdset_acquire() has no side effects (it does not touch last_accessed), so it never keeps an obsolete
+// chart from being freed. The identity check makes the result authoritative: it succeeds only when the
+// acquired chart and THIS instance are linked to each other. Both sides are needed: when a chart changes
+// context, rrdinstance_from_rrdset() links the new instance to the chart before the chart to it, and points
+// the chart to the new instance before it unlinks the old one, so either side alone briefly accepts an
+// instance the chart is not (or no longer) linked with. The chart side is only compared, never dereferenced.
+RRDSET_ACQUIRED *rrdinstance_rrdset_acquire(RRDINSTANCE_ACQUIRED *ria) {
     RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
-    return rrdinstance_rrdset_atomic_load(ri);
+
+    // archived instance: no chart to look up (only compared, never dereferenced)
+    if(!rrdinstance_rrdset_atomic_load(ri))
+        return NULL;
+
+    RRDSET_ACQUIRED *rsa = rrdset_acquire(ri->rc->rrdhost, string2str(ri->id));
+    if(unlikely(!rsa))
+        return NULL;
+
+    RRDSET *st = rrdset_acquired_to_rrdset(rsa);
+    if(unlikely(rrdinstance_rrdset_atomic_load(ri) != st || st->rrdcontexts.rrdinstance != ria)) {
+        rrdset_acquired_release(rsa);
+        return NULL;
+    }
+
+    return rsa;
+}
+
+RRDSET_ACQUIRED *rrdinstance_acquired_rrdset_acquire(RRDINSTANCE_ACQUIRED *ria) {
+    RRDSET_ACQUIRED *rsa = rrdinstance_rrdset_acquire(ria);
+
+    // these callers are queries: they keep a queried chart from being freed, as they always did
+    if(rsa)
+        rrdset_touch_last_accessed_time_s(rrdset_acquired_to_rrdset(rsa));
+
+    return rsa;
 }
 
 inline RRDHOST *rrdinstance_acquired_rrdhost(RRDINSTANCE_ACQUIRED *ria) {
@@ -80,8 +130,8 @@ inline time_t rrdinstance_acquired_update_every(RRDINSTANCE_ACQUIRED *ria) {
 
 static void rrdinstance_free(RRDINSTANCE *ri) {
 
-    if(rrd_flag_check(ri, RRD_FLAG_OWN_LABELS))
-        rrdlabels_destroy(ri->rrdlabels);
+    // the instance always owns this set, linked to a chart or not
+    rrdlabels_destroy(ri->rrdlabels);
 
     rrdmetrics_destroy_from_rrdinstance(ri);
     string_freez(ri->id);
@@ -219,8 +269,9 @@ static bool rrdinstance_conflict_callback(const DICTIONARY_ITEM *item __maybe_un
     }
 
     if(st) {
-        // our labels are not needed any more
+        // our labels are not needed any more (the set itself stays: readers of the archived instance may hold it)
         rrdlabels_flush(ri->rrdlabels);
+        rrd_flag_clear(ri, RRD_FLAG_OWN_LABELS | RRD_FLAG_DEMAND_LABELS);
 
         if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_HIDDEN)))
             rrd_flag_set(ri, RRD_FLAG_HIDDEN);
@@ -498,7 +549,8 @@ inline void rrdinstance_rrdset_is_freed(RRDSET *st) {
     if(owned) {
         rrdinstance_set_archived(ri);
 
-        SWAP(ri->rrdlabels, st->rrdlabels);
+        // copy, never swap: the instance's set must outlive this chart, readers of the instance may hold it
+        rrdlabels_migrate_to_these(ri->rrdlabels, st->rrdlabels);
         rrd_flag_set(ri, RRD_FLAG_OWN_LABELS);
 
         rrdinstance_rrdset_atomic_store(ri, NULL);

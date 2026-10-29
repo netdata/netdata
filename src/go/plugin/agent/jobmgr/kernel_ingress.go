@@ -168,15 +168,25 @@ func (ck *CommandKernel) submitWithPlan(
 		case err := <-result:
 			return err
 		case <-ck.done:
-			return ck.stoppingError()
+			return ck.submissionResultAfterShutdown(result)
 		}
 		select {
 		case err := <-result:
 			return err
 		case <-ck.done:
-			return ck.stoppingError()
+			return ck.submissionResultAfterShutdown(result)
 		}
 	case <-ck.done:
+		return ck.submissionResultAfterShutdown(result)
+	}
+}
+
+// Admission may already have completed before its observer sees kernel shutdown.
+func (ck *CommandKernel) submissionResultAfterShutdown(result <-chan error) error {
+	select {
+	case err := <-result:
+		return err
+	default:
 		return ck.stoppingError()
 	}
 }

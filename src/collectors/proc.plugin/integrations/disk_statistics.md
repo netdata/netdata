@@ -41,9 +41,6 @@ This collector supports collecting metrics from multiple instances of this integ
 
 This integration doesn't support auto-detection.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 
@@ -111,7 +108,7 @@ Metrics:
 
 ### Per disk
 
-
+A block device listed in /proc/diskstats; the `disk_ext` discard charts need Linux 4.18 or later, and their `flushes` dimensions need Linux 5.5 or later.
 
 Labels:
 

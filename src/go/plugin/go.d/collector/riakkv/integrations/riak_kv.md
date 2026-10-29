@@ -43,9 +43,6 @@ On startup, it tries to collect metrics from:
 - http://127.0.0.1:8098/stats
 
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

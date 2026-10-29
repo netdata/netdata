@@ -318,6 +318,8 @@ static ALWAYS_INLINE void rrdinstance_rrdset_atomic_store(RRDINSTANCE *ri, RRDSE
     __atomic_store_n(&ri->rrdset, st, __ATOMIC_RELEASE);
 }
 
+RRDSET_ACQUIRED *rrdinstance_rrdset_acquire(RRDINSTANCE_ACQUIRED *ria);
+
 typedef struct rrdcontext {
     uint64_t version;
 
@@ -552,7 +554,6 @@ void get_metric_retention_by_id(RRDHOST *host, UUIDMAP_ID id, time_t *min_first_
 void rrdcontext_delete_after_loading(RRDHOST *host, RRDCONTEXT *rc);
 void rrdcontext_initial_processing_after_loading(RRDCONTEXT *rc);
 
-RRDLABELS *rrdinstance_labels(RRDINSTANCE *ri);
 
 // Bump the dbengine-rotations counter that gates extreme-cardinality
 // protection. Called from rrdcontext_db_rotation(); the chart-cleanup

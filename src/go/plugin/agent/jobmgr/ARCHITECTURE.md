@@ -175,7 +175,9 @@ flowchart TD
 
 1. **Submit** (off-loop) — an adapter validates a `Request`, attaches a prepared Job Manager plan or submits an
    unresolved Function request, pushes it onto a submission queue, and wakes the loop. `command_ports.go`,
-   `kernel_ingress.go`.
+   `kernel_ingress.go`. If shutdown completes before the caller observes admission, an already-published admission
+   result takes precedence over a stopping rejection. An accepted prepared-command waiter then observes its terminal
+   result; shutdown cannot relabel that accepted work as an admission failure.
 2. **Admit** (on-loop) — the loop dedupes the command's UID, resolves the route, derives the lane key, and installs
    the operation on its lane. Duplicate UIDs and invalid routes are rejected here. `kernel_admission.go`,
    `lifecycle/uid.go`.
@@ -682,9 +684,9 @@ flowchart TD
      already matches. A runtime is passed only when readiness commits Running; failed candidates leave no runtime reference behind. Replacement/removal reconciles
      the prior incarnation from the graph preimage. Hook panic is fail-open and cannot change candidate, graph, or
      cleanup behavior. This is a latest-state projection, not an event bus or retry history.
-4. **Accept and retire** — after every admission step that yields graph claims (including configuration-intent
-   reservation), revalidate the candidate's process ownership, Store snapshot and vnode lifetime before preparing
-   graph adoption. A stale candidate aborts its unused reservation and follows the same source-specific failure
+4. **Accept and retire** — after every admission step that yields graph claims (including structural
+   configuration validation), revalidate the candidate's process ownership, Store snapshot and vnode lifetime before preparing
+   graph adoption. A stale candidate is released and follows the same source-specific failure
    policy as preflight: interactive rejection preserves the incumbent; discovery retains its dependency wait or
    pending rebuild policy. A successful preflight candidate remains process-owned while a short transaction commits
    Accepted and transfers it to accepted activation. Replacement fences the incumbent's ordinary output and detaches
@@ -807,9 +809,9 @@ the plugin restarts. Echo replies update status or record rejection without repl
   public configuration, active work, finite pass, retry deadlines and exact/source scope. Passive or disabled
   configurations accept enabled intent (`202`) through a short transaction. That actual transition starts a fresh
   same-tier alternative search for source-owned jobs; DynCfg-owned config remains exact.
-  Changed enabled identities with a configuration-intent resource owner first require pure raw validation and a
-  resource reservation. Construction, readiness and health settle afterward. Explicit RESTART targets the stored
-  configuration when an immediate recovery attempt is needed.
+  Changed enabled identities with named activation dependencies first require pure raw validation. Construction,
+  readiness and health settle afterward. Explicit RESTART targets the stored configuration when an immediate
+  recovery attempt is needed.
 - **Other mutations.** Disabled UPDATE, DISABLE and REMOVE return `200` when applied. Runtime quarantine discovered
   after an accepted UPDATE is reported through later failed status and diagnostics; the mutation reply remains `202`.
 - **Informative commands.** TEST preserves its validation/error codes and never adopts its payload. RESTART probes
@@ -835,29 +837,20 @@ replies through real Function ingress; candidate-only tests cannot detect a CREA
 owns enablement; the graph and executor registry are projections. A passive registration never starts merely because
 a dependency appears.
 
-Collectors with `JobConfigIntentOwner` reserve resources only after structural validation of each changed enabled
-identity. This admission gate covers discovery, Enable and failure adoption, independently of missing dependencies
-or a quarantined candidate. Pure configuration validation and owner reservation run in the same separate contained
-operation outside the graph claim, so neither supersedes a candidate awaiting handoff. The stage owns its reservation
-until graph claims are reacquired and the result is taken. Taking a reservation does not authorize a stale
-preflight candidate: candidate validity is checked again before any graph or incumbent change. Cancellation,
-rejection and failed claim reacquisition abort a late or untaken reservation inside the physical attempt; process
-shutdown joins that cleanup. Same-job
-mutations remain serialized while unrelated graph work can proceed. Unchanged identity and retirement do not
-repeat validation callbacks. Retirement calls the intent owner's Prepare with a zero next identity, then Commit to
-release intent. Retirement preparation, Commit and Abort perform bounded in-memory ownership changes. The owner may
-queue physical cleanup on its maintenance worker; cleanup failures remain visible through owner health and final
-joined close. Operational failure/retry retains valid intent. An owning discovery pipeline's trust withdrawal
-retires the trusted binding and acquisition intent during inventory commit, even when replacement metadata is invalid.
+Collectors with named activation dependencies require structural validation of each changed enabled binding.
+This admission gate covers discovery, Enable and failure adoption, independently of missing dependencies
+or a quarantined candidate. Pure configuration validation runs in a separate contained operation outside the graph
+claim, so it does not supersede a candidate awaiting handoff. Candidate validity is checked again after admission
+before any graph or incumbent change. Cancellation and failed claim reacquisition reject the result; process
+containment retains late validation and cleanup until they physically return. Same-job mutations remain serialized
+while unrelated graph work can proceed. Unchanged enabled bindings and retirement do not repeat validation callbacks.
+An owning discovery pipeline's trust withdrawal retires the trusted binding during inventory commit, even when
+replacement metadata is invalid.
 
-If admission validation or reservation is busy or times out, the controller retains unaccepted work until that
+If admission validation is busy or times out, the controller retains unaccepted work until that
 exact admission attempt releases, preserving the incumbent. A quarantined admission identity rejects that revision.
-Interactive commands reject unavailable admission without changing state. Neither path grants acquisition before
+Interactive commands reject unavailable admission without changing state. Neither path adopts a changed binding before
 validation completes. No dependency lookup, reference resolution, Init or Check is part of this admission proof.
-
-Resource intent follows the admitted raw binding independently of public listing. Hidden Failed stock retains enabled
-resource demand; admitted replacement transfers it, while disable, removal and trust revocation retire it. The resource
-index retains identities and owners only and cannot select candidates or schedule retries.
 
 - Controller work carries `{run epoch, intent generation, attempt sequence, candidate incarnation}`. A tentative
   proposal also pins its predecessor intent. Short lane transactions commit the controller and graph together before
@@ -1483,6 +1476,8 @@ The rotation is an acknowledged sequence (`composition/process.go`, `retireForSu
    paused ingress. A process-owned worker that ignores cancellation remains in the process census, not the retired run
    census.
 5. **Require a fully drained run authority census** and finish the run finalizer.
+   - A failure observed during task dispatch restarts the loop in shutdown mode before it waits for another event.
+     Otherwise an idle run could miss cancellation and finalization until its shutdown deadline.
    - Live run-owned leftovers still make the terminal state dirty.
    - Process-owned retained work does not fabricate run ownership.
    - If an ordinary frame write is the only remaining owner, the kernel arms one shutdown-only idle notification

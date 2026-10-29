@@ -44,8 +44,18 @@ const char *rrdinstance_acquired_name(RRDINSTANCE_ACQUIRED *ria);
 bool rrdinstance_acquired_has_name(RRDINSTANCE_ACQUIRED *ria);
 const char *rrdinstance_acquired_units(RRDINSTANCE_ACQUIRED *ria);
 STRING *rrdinstance_acquired_units_dup(RRDINSTANCE_ACQUIRED *ria);
-RRDLABELS *rrdinstance_acquired_labels(RRDINSTANCE_ACQUIRED *ria);
-RRDSET *rrdinstance_acquired_rrdset(RRDINSTANCE_ACQUIRED *ria);
+
+// An instance's labels belong to its chart while it is linked to one, and to the instance once archived.
+// The acquire keeps the chart alive when the labels are the chart's. The caller MUST release the ref when it
+// stops using .labels, and MUST hold the instance until then. .labels is NULL when none are available.
+typedef struct rrdinstance_labels_ref {
+    RRDSET_ACQUIRED *rsa;   // the chart holding the labels, NULL when they are the instance's own
+    RRDLABELS *labels;
+} RRDINSTANCE_LABELS_REF;
+
+RRDINSTANCE_LABELS_REF rrdinstance_acquired_labels_acquire(RRDINSTANCE_ACQUIRED *ria);
+void rrdinstance_labels_release(RRDINSTANCE_LABELS_REF *ref);
+
 RRDHOST *rrdinstance_acquired_rrdhost(RRDINSTANCE_ACQUIRED *ria);
 RRDSET_ACQUIRED *rrdinstance_acquired_rrdset_acquire(RRDINSTANCE_ACQUIRED *ria);
 
@@ -200,6 +210,8 @@ typedef struct _query_instance {
     RRDINSTANCE_ACQUIRED *ria;
     STRING *id_fqdn;        // never access this directly - it is created on demand via query_instance_id_fqdn()
     STRING *name_fqdn;      // never access this directly - it is created on demand via query_instance_name_fqdn()
+    RRDINSTANCE_LABELS_REF labels; // never access this directly - it is acquired on demand via query_instance_labels()
+    bool labels_acquired;
 
     STORAGE_POINT query_points;
     QUERY_METRICS_COUNTS metrics;
@@ -614,6 +626,9 @@ struct storage *query_metric_storage_engine(QUERY_TARGET *qt, QUERY_METRIC *qm, 
 
 STRING *query_instance_id_fqdn(QUERY_INSTANCE *qi, size_t version);
 STRING *query_instance_name_fqdn(QUERY_INSTANCE *qi, size_t version, const STRING *host_hostname);
+
+// the instance's labels, acquired on first use and held until the query target releases the instance
+RRDLABELS *query_instance_labels(QUERY_INSTANCE *qi);
 
 void query_target_free(void);
 void query_target_release(QUERY_TARGET *qt);

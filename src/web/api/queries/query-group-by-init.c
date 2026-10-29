@@ -54,7 +54,7 @@ static void query_group_by_make_dimension_key(BUFFER *key, RRDR_GROUP_BY group_b
         }
 
         if (group_by & RRDR_GROUP_BY_LABEL) {
-            RRDLABELS *labels = rrdinstance_acquired_labels(qi->ria);
+            RRDLABELS *labels = query_instance_labels(qi);
             for (size_t l = 0; l < qt->group_by[group_by_id].used; l++) {
                 buffer_fast_strcat(key, "|", 1);
                 rrdlabels_get_value_to_buffer_or_unset(labels, key, qt->group_by[group_by_id].label_keys[l], "[unset]");
@@ -115,7 +115,7 @@ static void query_group_by_make_dimension_id(BUFFER *key, RRDR_GROUP_BY group_by
         }
 
         if (group_by & RRDR_GROUP_BY_LABEL) {
-            RRDLABELS *labels = rrdinstance_acquired_labels(qi->ria);
+            RRDLABELS *labels = query_instance_labels(qi);
             for (size_t l = 0; l < qt->group_by[group_by_id].used; l++) {
                 if (buffer_strlen(key) != 0)
                     buffer_fast_strcat(key, ",", 1);
@@ -186,7 +186,7 @@ static void query_group_by_make_dimension_name(
         }
 
         if (group_by & RRDR_GROUP_BY_LABEL) {
-            RRDLABELS *labels = rrdinstance_acquired_labels(qi->ria);
+            RRDLABELS *labels = query_instance_labels(qi);
             for (size_t l = 0; l < qt->group_by[group_by_id].used; l++) {
                 if (buffer_strlen(key) != 0)
                     buffer_fast_strcat(key, ",", 1);
@@ -493,7 +493,7 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
                 entries[pos].od |= qm->status;
 
             if (entries[pos].dl)
-                rrdlabels_walkthrough_read(rrdinstance_acquired_labels(qi->ria),
+                rrdlabels_walkthrough_read(query_instance_labels(qi),
                                            rrdlabels_traversal_cb_to_group_by_label_key, entries[pos].dl);
         }
 

@@ -46,9 +46,6 @@ The `top-queries` and `running-queries` functions require:
 
 This integration doesn't support auto-detection.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

@@ -2,10 +2,17 @@
 
 package runner
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
+import (
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
+)
 
 // Paths is an immutable snapshot held for one supervised invocation.
-type Paths struct{ Node, Dependencies, Browser string }
+type Paths struct {
+	Node       string
+	EntryPoint string
+	Identity   synthetic.RuntimeIdentity
+}
 
 // Source acquires runtime ownership before any runtime files are inspected.
 // Implementations must support concurrent probes and executions.

@@ -238,10 +238,13 @@ int aclk_timeout_unittest(void);
 int aclk_backoff_unittest(void);
 int aclk_http_msg_unittest(void);
 int https_client_timeout_unittest(void);
+int https_client_chunked_unittest(void);
 int mqtt_wss_client_timeout_unittest(void);
 int pgc_unittest(void);
 int mrg_unittest(void);
+int pagecache_flush_drop_unittest(void);
 int pluginsd_parser_unittest(void);
+int pluginsd_vnodes_unittest(void);
 int websocket_compression_unittest(void);
 int web_client_request_size_unittest(void);
 int rrdhost_machine_guid_unittest(void);
@@ -525,6 +528,8 @@ int netdata_main(int argc, char **argv) {
                                 return 1;
                             rrdlabels_aral_init(false);
 
+                            // first: its drain joins every exited thread, so run it before other tests start threads
+                            if (threads_unittest()) return 1;
                             if (pluginsd_parser_unittest()) return 1;
                             if (websocket_compression_unittest()) return 1;
                             if (web_client_request_size_unittest()) return 1;
@@ -551,7 +556,8 @@ int netdata_main(int argc, char **argv) {
                             // summed, not short-circuited: this is the path CI runs, so one
                             // failing suite must not hide the others
                             if (aclk_timeout_unittest() + aclk_backoff_unittest() +
-                                https_client_timeout_unittest() + mqtt_wss_client_timeout_unittest()) return 1;
+                                https_client_timeout_unittest() + https_client_chunked_unittest() +
+                                mqtt_wss_client_timeout_unittest()) return 1;
 #ifdef OS_WINDOWS
                             if (command_pipe_security_unittest()) return 1;
                             if (os_windows_path_translation_unittest()) return 1;
@@ -590,6 +596,7 @@ int netdata_main(int argc, char **argv) {
                             if (nrpc_del_unittest()) return 1;
                             if (nrpc_registry_unittest()) return 1;
                             if (pluginsd_functions_unittest()) return 1;
+                            if (pluginsd_vnodes_unittest()) return 1;
                             if (nrpc_catalog_unittest()) return 1;
                             if (mcp_execute_function_access_unittest()) return 1;
                             if (mcp_jsonrpc_batch_unittest()) return 1;
@@ -607,6 +614,7 @@ int netdata_main(int argc, char **argv) {
                             if (uuidmap_unittest()) return 1;
 #ifdef ENABLE_DBENGINE
                             if (mrg_unittest()) return 1;
+                            if (pagecache_flush_drop_unittest()) return 1;
 #endif
                             if (paths_unittest()) return 1;
 #ifdef HAVE_STACKTRACE
@@ -662,6 +670,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "uuidmaptest") == 0) {
                             unittest_running = true;
                             return uuidmap_unittest();
+                        }
+                        else if(strcmp(optarg, "threadstest") == 0) {
+                            unittest_running = true;
+                            return threads_unittest();
                         }
                         else if(strcmp(optarg, "lockstest") == 0) {
                             unittest_running = true;
@@ -733,6 +745,10 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return aclk_http_msg_unittest() ? 1 : 0;
                         }
+                        else if(strcmp(optarg, "aclkchunkedtest") == 0) {
+                            unittest_running = true;
+                            return https_client_chunked_unittest() ? 1 : 0;
+                        }
                         else if(strcmp(optarg, "aclktimeouttest") == 0) {
                             unittest_running = true;
                             // run all three and report the total, so one failure does not
@@ -754,6 +770,8 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return uuid_unittest();
                         }
+                        else if(strcmp(optarg, "pluginsd-vnodes") == 0)
+                            return unittest_run_with_rrd(pluginsd_vnodes_unittest);
                         else if(strcmp(optarg, "sqlite-lease-test") == 0) {
                             unittest_running = true;
                             // the same SQLite setup as -W unittest; the teardown test runs the real teardown,
@@ -837,6 +855,10 @@ int netdata_main(int argc, char **argv) {
                             sqlite_library_shutdown();
                             rrdlabels_aral_destroy(false);
                             return rc;
+                        }
+                        else if(strcmp(optarg, "pagecachetest") == 0) {
+                            unittest_running = true;
+                            return pagecache_flush_drop_unittest();
                         }
                         else if(strcmp(optarg, "mrgretentionbench") == 0) {
                             unittest_running = true;

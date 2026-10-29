@@ -321,7 +321,7 @@ Metrics:
 
 ### Per IPsec summary
 
-These metrics summarize active PAN-OS IPsec security associations.
+These metrics count distinct PAN-OS tunnels, including separate proxy IDs, with at least one established IPsec security association (SA).
 
 This scope has no labels.
 
@@ -334,7 +334,7 @@ Metrics:
 
 ### Per IPsec tunnel
 
-These metrics refer to one active PAN-OS IPsec security association.
+These metrics report the maximum valid remaining SA lifetime for each tunnel and remote peer, including overlapping SAs during rekeying.
 
 Labels:
 
@@ -343,7 +343,7 @@ Labels:
 | tunnel | Tunnel name. |
 | gateway | Gateway name. |
 | remote | Remote peer. |
-| tunnel_id | PAN-OS tunnel identifier. |
+| tunnel_id | PAN-OS tunnel identifier, or unknown when the response omits it. |
 | protocol | Tunnel protocol. |
 | encryption | Encryption algorithm. |
 
@@ -519,5 +519,5 @@ Verify the account permissions and platform support for the metricset, or provid
 
 #### A PAN-OS value cannot be parsed
 
-The collector reports missing or invalid integer, decimal, duration, status, license expiration, and IPsec tunnel-count values with the metricset, field, entity name, and raw value when present.
+The collector reports missing or invalid integer, decimal, duration, status, license expiration, and IPsec SA lifetime values with the metricset, field, entity name, and raw value when present.
 It does not silently convert missing or malformed values to zero, report fake valid status, or treat unrecognized license dates as never-expiring licenses.

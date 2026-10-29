@@ -585,6 +585,40 @@ static inline int nd_setsockopt(int s, int l, int o, const char *v, socklen_t vl
 #define getsockopt(s, l, o, v, vl) nd_getsockopt((s), (l), (o), (char *)(v), (vl))
 #define setsockopt(s, l, o, v, vl) nd_setsockopt((s), (l), (o), (const char *)(v), (vl))
 
+// ── connect() ── Winsock reports failures via WSAGetLastError(), never errno ───
+// Callers follow POSIX and test errno, e.g. EINPROGRESS after a non-blocking
+// connect, which Winsock reports as WSAEWOULDBLOCK. Map the error to errno and
+// keep WSAGetLastError() intact for callers that read it.
+static inline int nd_connect(int s, const struct sockaddr *addr, socklen_t addrlen) {
+    // zero-extend int → uintptr_t to avoid sign-extension of SOCKET values
+    if (connect((SOCKET)(uintptr_t)(unsigned int)s, addr, (int)addrlen) == 0)
+        return 0;
+
+    int wsa_error = WSAGetLastError();
+    switch (wsa_error) {
+        case WSAEWOULDBLOCK:
+        case WSAEINPROGRESS: errno = EINPROGRESS; break;
+        case WSAEALREADY: errno = EALREADY; break;
+        case WSAEINTR: errno = EINTR; break;
+        case WSAEISCONN: errno = EISCONN; break;
+        case WSAECONNREFUSED: errno = ECONNREFUSED; break;
+        case WSAETIMEDOUT: errno = ETIMEDOUT; break;
+        case WSAENETUNREACH: errno = ENETUNREACH; break;
+        case WSAEHOSTUNREACH: errno = EHOSTUNREACH; break;
+        case WSAEADDRINUSE: errno = EADDRINUSE; break;
+        case WSAEADDRNOTAVAIL: errno = EADDRNOTAVAIL; break;
+        case WSAEAFNOSUPPORT: errno = EAFNOSUPPORT; break;
+        case WSAEACCES: errno = EACCES; break;
+        case WSAENOTSOCK: errno = EBADF; break;
+        case WSAEINVAL: errno = EINVAL; break;
+        case WSAENOBUFS: errno = ENOMEM; break;
+        default: errno = EIO; break;
+    }
+    WSASetLastError(wsa_error);
+    return -1;
+}
+#define connect(s, a, l) nd_connect((int)(intptr_t)(s), (const struct sockaddr *)(a), (socklen_t)(l))
+
 // ── fcntl / F_GETFL / F_SETFL / F_GETFD / F_SETFD / O_NONBLOCK / FD_CLOEXEC ──
 // UCRT64 has no POSIX fcntl; implement what socket.c needs via Winsock APIs.
 // fd values are raw SOCKET / Win32 HANDLE values (not CRT fd indices).

@@ -452,72 +452,98 @@ containers need compatible namespace/seccomp support. RUM does not require a bro
 
 ### Runtime setup and retirement
 
-Browser runtime delivery is experimental. DEM is disabled by default at build time. This tree provides preparation,
-execution and retirement, but no bundle builder, release artifacts or manifest installation. Development deployments
-must supply a trusted manifest and its matching bundle. Packaging and independent runtime releases are separate work;
-the current Agent-owned adapters and exact component pins are temporary. Browser jobs cannot run without those inputs.
+Browser runtime delivery is experimental and DEM remains disabled by default at build time. The independent
+runtime owns Node, Chromium, Playwright, Lighthouse and their JavaScript adapters. This tree provides a local bundle
+builder and explicit installation from administrator-trusted metadata; production publication, native packages,
+authenticated release discovery and automatic updates are separate delivery work.
 
-Managed mode is the default. Accepting an enabled journey or Lighthouse configuration requests its exact runtime;
-validation and disabled configurations do not download it. Preparation runs separately from website monitoring.
-An unavailable runtime leaves the monitor waiting for its dependency; it does not produce website failure measurements.
-Downloads can be disabled by the administrator:
+Install the runtime explicitly as the consuming service account. Enabling a browser monitor does not download it.
+A missing installation leaves browser monitors waiting for their dependency; it does not create website failures.
+RUM does not need the browser runtime.
+
+```sh
+dem.plugin runtime install --manifest /absolute/path/manifest.json --archive /absolute/path/runtime.tar.gz
+# Alternatively, explicitly download the URL in the trusted descriptor:
+dem.plugin runtime install --manifest /absolute/path/manifest.json --allow-download
+dem.plugin runtime status
+dem.plugin runtime qualify
+```
+
+Install, update and repair verify the archive, prepare its private paths, then run both a local sandboxed journey and
+Lighthouse audit before selecting the release. A descriptor must come from a trusted administrator source;
+the archive does not authenticate its own descriptor. `qualify` repeats these checks for the selected release.
+It tests the calling account and environment, not a different service's AppArmor, SELinux or container policy.
+
+**Restart DEM after installation, update or repair, including the first installation.** Each process keeps the runtime it
+acquired at startup. A process started without a runtime stays unavailable until restarted. Runtime releases can
+update their components without an Agent upgrade while preserving execution contract 1. Runs record the actual
+release version, archive digest and execution contract for investigation.
+
+```sh
+dem.plugin runtime update --manifest /absolute/path/new-manifest.json --archive /absolute/path/new-runtime.tar.gz
+# Stop every DEM/standalone consumer first:
+dem.plugin runtime uninstall
+```
+
+Uninstall refuses while any generation has a running consumer or unresolved execution. Refusal leaves the installation
+intact. If child completion cannot be proved, execution protection remains; neither a timeout nor a missing PID allows
+removal. A failed selection write after publication reports uncertainty; inspection/reconciliation establishes the
+selected state before cleanup proceeds. A successful update does not replace files used by running processes.
+
+If selection or generation metadata is damaged, `status` still reports the available inventory and identifies the
+metadata errors, with a nonzero exit status. A healthy selected release remains identified even when an older release
+is damaged. Incomplete ownership or storage inspection is reported as unknown, not as an empty installation.
+
+Stop all DEM and standalone consumers and let their executions drain before repairing the managed store:
+
+```sh
+dem.plugin runtime repair --manifest /absolute/path/manifest.json --archive /absolute/path/runtime.tar.gz
+# Alternatively, use the trusted descriptor URL with --allow-download.
+```
+
+Repair removes damaged generations and rebuilds the requested release, including a same-release reinstall. It uses
+the same trusted descriptor, service account, store and browser qualification as install. A healthy selection of a
+different release stays selected if repair fails; ordinary retention still applies to other unselected releases.
+If repair clears the selection being rebuilt, failed preparation or qualification leaves it unavailable. The old
+selection cannot be rolled back; correct the reported problem and retry repair, then restart DEM after success.
+The command reports candidate progress separately from the final selected installation.
+
+Repair and uninstall can handle damaged executable metadata only when independent ownership records prove removal
+is safe. They refuse active consumers, preparation, unresolved executions, missing safety structure and storage access
+errors. There is no force-delete option; dead PIDs and timeouts do not prove execution completion. Do not manually
+edit selection records or remove generation directories. Repair applies only to private managed stores; immutable,
+administrator-owned preloads must be replaced through their separate lifecycle. Arbitrary external deletion of
+individual ownership records or copying a live store is outside this recovery guarantee.
+
+The store defaults to `NETDATA_LIB_DIR/dem/runtime`; override `cache_path` in `dem.conf` or `--cache` for administration.
+Use the same installation directory and service account for the CLI and running plugin. `--config-dir` selects an
+administrator configuration directory; all explicit paths must be absolute. Normal plugin configuration lookup rules
+apply. Terminal sessions ignore configuration-root environment variables, so use `--config-dir` when needed.
 
 ```yaml
 runtime:
   mode: managed
-  allow_download: false
+  cache_path: ''
   max_bytes: 4294967296
   previous_retention_days: 7
-  idle_retention_days: 30
 ```
 
-Managed setup reads a trusted `plugins.d/dem/runtime-<architecture>.json` manifest identifying the archive, digest,
-size limits and executable layout. The administrator must supply this file, or select an absolute `manifest_path`
-in `dem.conf`. Monitor configuration cannot choose a download URL. A checkout or package without that manifest reports
-setup unavailability; it does not guess a source or fetch a different browser.
+The selected runtime stays installed until explicitly uninstalled, even with no browser monitors. The 4 GiB logical
+allowance includes preparation workspace and reservations. Processes and executions protect older releases. Unprotected
+old releases are cleaned hourly, with a seven-day grace for the most recently used obsolete release; storage pressure
+can shorten that grace. Protected files can prevent a new installation. This is not a physical disk quota.
+`status` reports the selected installation and storage inventory without launching a browser; it does not report the
+runtime held by another running process.
 
-The cache defaults to `NETDATA_LIB_DIR/dem/runtime`. Its 4 GiB allowance includes preparation reservations. Known
-enabled monitors protect their runtime; every probe and browser invocation also has an independent execution pin.
-Unneeded previous generations get a 7-day grace and idle runtimes 30 days, with hourly cleanup. Storage pressure can
-shorten either grace. Protected demand and executions can exceed the allowance. If child completion cannot be proved,
-the plugin stops and retains the execution's protection; an arbitrary timeout is not permission to remove its files.
+The same local bundle/store format can be used in native, Docker, static and source layouts on Linux amd64/arm64.
+This does not establish production delivery or platform qualification. Persist the store in Docker to retain installation
+across container replacement. No host Node/npm/browser installation is required or discovered.
 
-This is an ordinary cache: startup cleanup or another consumer can remove an expired generation before saved monitor
-enables arrive. Online setup can download it again; offline setup reports unavailability. For guaranteed offline
-availability across that gap, use an administrator-owned preload as described below. Restart the plugin after changing
-runtime configuration; an Agent upgrade requiring a new runtime needs that exact archive available online or imported.
-
-Run administration commands as the consuming service account, with the same configuration and library directory:
+For an immutable image or read-only deployment, create a protected preload at its final path:
 
 ```sh
-dem.plugin runtime status
-dem.plugin runtime prepare
-dem.plugin runtime import --archive /absolute/path/runtime.tar.gz
-dem.plugin runtime qualify
+dem.plugin runtime preload --root /opt/netdata-dem-runtime --manifest /absolute/path/manifest.json --archive /absolute/path/runtime.tar.gz
 ```
-
-`status` reports cache inventory and whether the selected archive is prepared, without downloading or launching a
-browser. `prepare` uses only the installed manifest's URL; `import` verifies an offline archive against that same trust.
-`qualify` runs a local sandboxed Playwright journey through the actual supervisor and reports qualification separately
-from preparation. It does not download missing files. `--config-dir`, `--manifest`, `--cache` and `--assets` support
-explicit installation paths; paths must be absolute. Configuration lookup follows normal plugin startup:
-`--config-dir` takes priority while retaining the selected user and stock roots; environment roots replace build
-roots, with the same installation fallbacks when neither is set. As at normal startup, terminal sessions ignore
-configuration-root environment variables; use `--config-dir` for an explicit administrator directory in that case.
-Explicit `--manifest`, `--cache` and `--allow-download` values override the loaded configuration. Cache inventory and
-maintenance errors remain separate from monitor outcomes. CLI inventory is a storage observation, not the running plugin's live preparation status.
-
-With an explicitly supplied manifest and matching bundle, the same managed store can be used in native, Docker,
-static and source-build layouts. This does not establish production delivery or qualification for those methods.
-The bundle supplies private Node, Chromium libraries, fonts and JavaScript dependencies; preparation does not install
-host packages or modify installed adapters. Persist the cache in Docker if it should survive container replacement.
-A development image can instead include a preload at its final path:
-
-```sh
-dem.plugin runtime preload --root /opt/netdata-dem-runtime --archive /absolute/path/runtime.tar.gz
-```
-
-The root must be new or empty. Use the returned `runtime.mode: preloaded` configuration:
 
 ```yaml
 runtime:
@@ -525,19 +551,11 @@ runtime:
   preload_path: /opt/netdata-dem-runtime
 ```
 
-Both modes require the installed trusted runtime manifest. If the preload command uses an explicit `--manifest`,
-its returned configuration includes that `manifest_path`. A preload must match the required bundle and remain at its
-final path; moving it or upgrading to an Agent requiring a different bundle makes it unavailable. Prepare the new
-bundle at a new final path and switch configuration after stopping all consumers of the old preload.
-
-Preloads are outside automatic retirement, and managed-cache operations refuse their roots. Keep the directory
-privately owned by the consuming service account. It may be mounted read-only for execution. Stop every consumer
-before replacing or removing its files. This supports controlled offline images and read-only deployments while
-using the same qualified bundle as managed mode. Separately installed Node, npm packages or browsers cannot be selected.
-
-`runtime status` checks prepared identity without starting a browser; `runtime qualify` tests a local sandboxed
-browser under its calling account. Qualification still needs to run under the target service's sandbox and security
-policy; a successful image build does not establish host compatibility.
+The root must be new or empty. The command verifies and qualifies the complete release, then seals its identity and
+final location into the root. Keep it private and owned by the consuming service account; it may be mounted read-only.
+Preloads are outside managed retirement. Stop **every** consumer before replacement or removal, prepare replacements
+at a new final path, and restart DEM to switch. Moving a prepared root is unsupported. This preload contract does not
+implement native package transaction safety; native packaging remains separate work.
 
 Configure exactly one of inline `script` or absolute `script_path` in `dem/journey.conf`. Standard named imports from
 `@playwright/test` and destructured CommonJS `require` use the real pinned package. JS/TS, mjs/mts and cjs/cts entries,
@@ -571,7 +589,9 @@ start are distinct from a failed target. A workflow failure means a declared che
 The static `dem_journey_failed` template warns on the latest fresh failed/timed-out observation. A new successful
 observation clears it. Unknown, inconclusive, execution error, cancellation and observations older than two native
 intervals are UNDEFINED, not recovery. Replacement/restart begins unknown until a new observation. Critical escalation
-and configurable sensitivity are left for a separate alert-policy decision. Native job status identifies unavailable dependencies; plugin logs explain runtime preparation errors.
+and configurable sensitivity are left for a separate alert-policy decision. Native job status identifies unavailable
+dependencies; plugin logs explain runtime setup/execution errors. The installation CLI reports preparation and
+qualification failures.
 Functions show current execution and retained diagnosis.
 
 Lighthouse performance is a desktop lab score in points from 0 to 100; FCP, LCP, TBT and Speed Index are milliseconds,

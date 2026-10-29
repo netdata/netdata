@@ -37,9 +37,6 @@ The plugin needs to access the server. Netdata sets permissions during installat
 
 The plugin detects when CUPS server is running and tries to connect to it.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

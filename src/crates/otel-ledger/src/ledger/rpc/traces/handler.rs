@@ -802,14 +802,19 @@ impl FunctionHandler for OtelTracesHandler {
 
     /// Advertise the function to the agent/Cloud: `global` (not scoped
     /// to one node), tagged `traces`, accessible to signed-in users of
-    /// the same space, with the SENSITIVE_DATA flag since trace payloads
-    /// may carry sensitive content.
+    /// the same space on a commercial plan (traces are a paid feature),
+    /// with the SENSITIVE_DATA flag since trace payloads may carry
+    /// sensitive content.
     fn declaration(&self) -> FunctionDeclaration {
         let mut d = FunctionDeclaration::new("otel-traces", "Query OpenTelemetry traces");
         d.global = true;
         d.tags = Some("traces".to_string());
-        d.access =
-            Some(HttpAccess::SIGNED_ID | HttpAccess::SAME_SPACE | HttpAccess::SENSITIVE_DATA);
+        d.access = Some(
+            HttpAccess::SIGNED_ID
+                | HttpAccess::SAME_SPACE
+                | HttpAccess::COMMERCIAL_SPACE
+                | HttpAccess::SENSITIVE_DATA,
+        );
         d
     }
 }

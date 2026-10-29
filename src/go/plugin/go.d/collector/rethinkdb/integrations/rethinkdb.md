@@ -42,9 +42,6 @@ This collector supports collecting metrics from multiple instances of this integ
 If no configuration is given, collector will attempt to connect to RethinkDB instance on `127.0.0.1:28015` address.
 
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

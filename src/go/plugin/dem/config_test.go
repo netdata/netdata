@@ -87,7 +87,7 @@ func TestRuntimeValidationLeavesOtherSectionsOpaque(t *testing.T) {
 	dir := t.TempDir()
 	body := "enabled: yes\njobs: {future_option: [{duplicate: one, duplicate: two}]}\n" +
 		"history: {days: 7, unrelated: value}\nartifacts: {days: 2, unrelated: value}\n" +
-		"runtime: {allow_download: false}\n"
+		"runtime: {max_bytes: 2048}\n"
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte(body), 0600))
 	cfg, err := LoadConfig(multipath.New(dir))
 	require.NoError(t, err)
@@ -95,5 +95,5 @@ func TestRuntimeValidationLeavesOtherSectionsOpaque(t *testing.T) {
 	require.Equal(t, DefaultConfig().History.MaxBytes, cfg.History.MaxBytes)
 	require.Equal(t, 2, cfg.Artifacts.Days)
 	require.Equal(t, DefaultConfig().Artifacts.MaxBytes, cfg.Artifacts.MaxBytes)
-	require.False(t, cfg.Runtime.AllowDownload)
+	require.EqualValues(t, 2048, cfg.Runtime.MaxBytes)
 }

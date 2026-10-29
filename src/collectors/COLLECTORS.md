@@ -291,7 +291,7 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 | [Network Connections](https://github.com/netdata/netdata/blob/master/src/collectors/network-viewer.plugin/integrations/network_connections.md) | This plugin reads the system's socket tables to enumerate all active network connections, including TCP and UDP sockets in all states, for both IPv4 and IPv6. |
 | [Network interfaces](https://github.com/netdata/netdata/blob/master/src/collectors/proc.plugin/integrations/network_interfaces.md) | Monitor network interface metrics about bandwidth, state, errors and more. |
 | [Network statistics](https://github.com/netdata/netdata/blob/master/src/collectors/proc.plugin/integrations/network_statistics.md) | Monitor host-wide IP, TCP, UDP, ICMP, broadcast, multicast, fragmentation, and ECN activity from Linux kernel protocol counters. |
-| [Network Subsystem](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/network_subsystem.md) | Monitor network interface metrics about bandwidth, state, errors and more. |
+| [Network Subsystem](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/network_subsystem.md) | Monitor Windows network interface traffic, packets, speed, errors, drops, and offload activity in charts. |
 | [NextDNS](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/nextdns.md) | Track NextDNS DNS resolver and security platform metrics for efficient DNS management and security. |
 | [NSD](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/nsd/integrations/nsd.md) | This collector monitors NSD statistics like queries, zones, protocols, query types and more. |
 | [NTPd](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/ntpd/integrations/ntpd.md) | This collector monitors the system variables of the local `ntpd` daemon (optional incl. |
@@ -330,6 +330,7 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 | [AWS Quota](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/aws_quota.md) | Monitor AWS Service Quotas exposed by aws_quota_exporter. |
 | [Azure API Management](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_api_management.md) | :::info |
 | [Azure App Service](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_app_service.md) | :::info |
+| [Azure App Service Plan](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_app_service_plan.md) | :::info |
 | [Azure Application Gateway](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_application_gateway.md) | :::info |
 | [Azure Application Insights](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_application_insights.md) | :::info |
 | [Azure Cache for Redis](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_cache_for_redis.md) | :::info |
@@ -496,8 +497,9 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 | [Logstash](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/logstash/integrations/logstash.md) | This collector monitors Logstash instances. |
 | [loki](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/loki.md) | Track Loki metrics. |
 | [Lynis audit reports](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/lynis_audit_reports.md) | Track Lynis security auditing tool metrics for efficient system security and compliance management. |
+| [Microsoft Message Queuing](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/microsoft_message_queuing.md) | This collector monitors Microsoft Message Queuing (MSMQ) queues on Windows. |
 | [Minecraft](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/minecraft.md) | Track Minecraft server metrics for efficient game server management and performance. |
-| [MS Exchange](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/ms_exchange.md) | This collector monitors Microsoft Exchange. |
+| [MS Exchange](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/ms_exchange.md) | Monitor Exchange transport queues, Active Directory access, client activity, HTTP proxy traffic, and background workloads. |
 | [mtail](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/mtail.md) | Monitor log data metrics using mtail log data extractor and parser. |
 | [NET Framework](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/net_framework.md) | Monitor runtime and performance statistics for applications built with .NET Framework through Perflib. |
 | [Nextcloud servers](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/nextcloud_servers.md) | Keep an eye on Nextcloud cloud storage metrics for efficient file hosting and management. |
