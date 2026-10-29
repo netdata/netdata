@@ -857,7 +857,8 @@ self_update() {
     create_exec_tmp_directory
     cd "${ndtmpdir}" || exit 1
 
-    if _safe_download "${RELEASE_ARTIFACT_URL_PREFIX}/installer/netdata-updater.sh" ./netdata-updater.sh; then
+    if _safe_download "${RELEASE_ARTIFACT_URL_PREFIX}/installer/netdata-updater.sh" ./netdata-updater.sh ||
+       _safe_download "https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-updater.sh" ./netdata-updater.sh; then
       chmod +x ./netdata-updater.sh || exit 1
       export ENVIRONMENT_FILE="${ENVIRONMENT_FILE}"
 
