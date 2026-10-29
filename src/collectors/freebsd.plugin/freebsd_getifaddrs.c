@@ -561,9 +561,7 @@ int do_getifaddrs(int update_every, usec_t dt) {
             }
 
             netdata_mutex_lock(&network_interfaces_mutex);
-            if (network_interfaces_media_fd < 0)
-                network_interfaces_media_fd = socket(AF_INET, SOCK_DGRAM | SOCK_CLOEXEC, 0);
-            int media_fd = network_interfaces_media_fd;
+            bool media_open_attempted = false;
 
             for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
                 if (!ifa->ifa_addr || !ifa->ifa_data || ifa->ifa_addr->sa_family != AF_LINK)
@@ -579,22 +577,6 @@ int do_getifaddrs(int update_every, usec_t dt) {
                 ifm->duplex = FREEBSD_DUPLEX_UNKNOWN;
                 ifm->speed_mbit = NAN;
                 ifm->mtu = if_data->ifi_mtu;
-
-                if (media_fd >= 0) {
-                    struct ifmediareq media = {0};
-                    strncpyz(media.ifm_name, ifa->ifa_name, sizeof(media.ifm_name) - 1);
-                    if (ioctl(media_fd, SIOCGIFMEDIA, &media) == 0 &&
-                        (media.ifm_status & IFM_AVALID) && (media.ifm_status & IFM_ACTIVE)) {
-                        if (IFM_TYPE(media.ifm_active) == IFM_ETHER) {
-                            if (media.ifm_active & IFM_FDX)
-                                ifm->duplex = FREEBSD_DUPLEX_FULL;
-                            else if (media.ifm_active & IFM_HDX)
-                                ifm->duplex = FREEBSD_DUPLEX_HALF;
-                        }
-                        if (if_data->ifi_baudrate > 0)
-                            ifm->speed_mbit = (double)if_data->ifi_baudrate / 1000000.0;
-                    }
-                }
 
                 if (unlikely(!ifm->configured)) {
                     char var_name[4096 + 1];
@@ -629,6 +611,27 @@ int do_getifaddrs(int update_every, usec_t dt) {
 
                 if (unlikely(!ifm->enabled))
                     continue;
+
+                // The Function consumes media state even when the charts are disabled.
+                if (network_interfaces_media_fd < 0 && !media_open_attempted) {
+                    media_open_attempted = true;
+                    network_interfaces_media_fd = socket(AF_INET, SOCK_DGRAM | SOCK_CLOEXEC, 0);
+                }
+                if (network_interfaces_media_fd >= 0) {
+                    struct ifmediareq media = {0};
+                    strncpyz(media.ifm_name, ifa->ifa_name, sizeof(media.ifm_name) - 1);
+                    if (ioctl(network_interfaces_media_fd, SIOCGIFMEDIA, &media) == 0 &&
+                        (media.ifm_status & IFM_AVALID) && (media.ifm_status & IFM_ACTIVE)) {
+                        if (IFM_TYPE(media.ifm_active) == IFM_ETHER) {
+                            if (media.ifm_active & IFM_FDX)
+                                ifm->duplex = FREEBSD_DUPLEX_FULL;
+                            else if (media.ifm_active & IFM_HDX)
+                                ifm->duplex = FREEBSD_DUPLEX_HALF;
+                        }
+                        if (if_data->ifi_baudrate > 0)
+                            ifm->speed_mbit = (double)if_data->ifi_baudrate / 1000000.0;
+                    }
+                }
 
                 if (ifm->do_bandwidth == CONFIG_BOOLEAN_YES || ifm->do_bandwidth == CONFIG_BOOLEAN_AUTO) {
                     if (unlikely(!ifm->st_bandwidth)) {
