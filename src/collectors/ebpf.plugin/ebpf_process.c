@@ -1415,7 +1415,7 @@ static void process_collector(ebpf_module_t *em)
 
             netdata_apps_integration_flags_t apps_enabled = em->apps_charts;
 
-            if (ebpf_all_pids_count > 0) {
+            if (__atomic_load_n(&ebpf_all_pids_count, __ATOMIC_RELAXED) > 0) {
                 if (!ebpf_shm_sem_wait_or_stop(shm_mutex_ebpf_integration)) {
                     if (errno != ECANCELED)
                         netdata_log_error("PROCESS: Failed to wait on semaphore.");

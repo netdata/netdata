@@ -349,7 +349,7 @@ func validateStep(parent context.Context, s *validationSession, dumpPath string)
 				s.routes.observe(fact)
 			}
 		}
-		s.engine, err = newRouteEngine(s.templateYAML, emitTypeID, routeObserver)
+		s.engine, err = newRouteEngine(s.templateYAML, emitTypeID, routeObserver, coll.EnginePolicy())
 		if err != nil {
 			var planErr *routePlanError
 			errors.As(err, &planErr)
@@ -539,6 +539,12 @@ func validateStep(parent context.Context, s *validationSession, dumpPath string)
 	r.DimensionLosses = routeInspection.dimensionLosses
 	r.Collisions = routeInspection.collisions
 	r.InstanceLosses = routeInspection.instanceLosses
+	for _, item := range routeSummary.contextSeriesOmissions {
+		r.ContextSeriesOmissions = append(r.ContextSeriesOmissions, item)
+		r.addError("context_series_limit", "max_output_series_per_context",
+			fmt.Sprintf("context %q offered %d output series, exceeding limit %d; the whole context was omitted", item.Context, item.ObservedSeries, item.Limit),
+			"Every context must fit the configured output limit for the supplied evidence; routing coverage alone does not establish publication.")
+	}
 
 	if r.Counts.SeriesAutogen != 0 {
 		path := ""
