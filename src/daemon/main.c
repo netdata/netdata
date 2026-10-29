@@ -231,6 +231,7 @@ int pgc_unittest(void);
 int mrg_unittest(void);
 int pagecache_flush_drop_unittest(void);
 int pluginsd_parser_unittest(void);
+int pluginsd_vnodes_unittest(void);
 int websocket_compression_unittest(void);
 int web_client_request_size_unittest(void);
 int rrdhost_machine_guid_unittest(void);
@@ -576,6 +577,7 @@ int netdata_main(int argc, char **argv) {
                             if (nrpc_del_unittest()) return 1;
                             if (nrpc_registry_unittest()) return 1;
                             if (pluginsd_functions_unittest()) return 1;
+                            if (pluginsd_vnodes_unittest()) return 1;
                             if (nrpc_catalog_unittest()) return 1;
                             if (mcp_execute_function_access_unittest()) return 1;
                             if (mcp_jsonrpc_batch_unittest()) return 1;
@@ -741,6 +743,8 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return uuid_unittest();
                         }
+                        else if(strcmp(optarg, "pluginsd-vnodes") == 0)
+                            return unittest_run_with_rrd(pluginsd_vnodes_unittest);
                         else if(strcmp(optarg, "sqlite-lease-test") == 0) {
                             unittest_running = true;
                             // the same SQLite setup as -W unittest; the teardown test runs the real teardown,
