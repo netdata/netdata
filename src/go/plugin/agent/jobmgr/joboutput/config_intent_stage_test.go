@@ -234,7 +234,9 @@ func TestConfigIntentStageCallerCancellationLeavesLateWorkContained(t *testing.T
 	case <-time.After(time.Second):
 		t.Fatal("caller did not cancel")
 	}
-	require.Equal(t, 1, attempts.Census().Contained)
+	// Work can enter before StartProcessAttempt returns its handle to the stage.
+	// Cancellation is cut as soon as that registration finishes.
+	require.Eventually(t, func() bool { return attempts.Census().Contained == 1 }, time.Second, time.Millisecond)
 	releaseOnce.Do(func() { close(release) })
 	require.Eventually(t, func() bool { return attempts.Census() == (containment.Census{}) }, time.Second, time.Millisecond)
 	require.EqualValues(t, 1, reservation.aborted.Load())

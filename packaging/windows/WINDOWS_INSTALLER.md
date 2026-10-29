@@ -338,6 +338,27 @@ On Windows, `edit-config` opens files with the `nano` editor.
 
 The MSI uninstall removes the Netdata binaries and the Windows service, but it does **not** remove your metric database, cache, or edited configuration files. To uninstall the Agent and completely delete the data it leaves behind, see [Uninstall Netdata](/packaging/installer/UNINSTALL.md).
 
+## Troubleshooting installation failures
+
+If installation fails, rerun the MSI from an Administrator command prompt with verbose logging enabled:
+
+```cmd
+msiexec /i "netdata-x64.msi" /l*v "C:\Path\To\install_log.txt"
+```
+
+- Replace `C:\Path\To\install_log.txt` with a file in an existing directory you can write to. `msiexec` does not create missing directories.
+- Use the full path to the downloaded MSI if it is not in the current directory. Keep the quotes, because the path may contain spaces.
+- The command opens the installation wizard and writes diagnostic details to the log file, even when the installation fails.
+- If you install silently, add the same `/l*v` option to your existing command:
+
+  ```cmd
+  msiexec /qn /i "netdata-x64.msi" TOKEN="<YOUR_TOKEN>" /l*v "C:\Path\To\install_log.txt"
+  ```
+
+To find the failure, open the log and search for `Return value 3`. The lines just above it show the step that failed and the error message.
+
+Before sharing the log with support, review it. The installer masks the claim token and proxy values, but the log still contains your computer name, user name, Room IDs, the Cloud URL, and file paths.
+
 ## Related Windows documentation
 
 - [Service Control](/docs/netdata-agent/start-stop-restart.md#windows) — Start, stop, restart, and check status of the Netdata Agent

@@ -719,7 +719,7 @@ func cleanTopologyString(value string) string {
 	return strings.TrimSpace(value)
 }
 
-// Keep in sync with chartemit.wireValueReplacer so overlay refs match chart labels.
+// Keep quote/control-character handling aligned with netdataapi.SanitizeWireValue.
 var topologyLabelValueReplacer = strings.NewReplacer(
 	"'", "",
 	"\n", " ",

@@ -307,6 +307,13 @@ narrowest stable family set.
 
 ## Writer rejection and schema drift
 
+Input admission precedes writer eligibility: `max_input_series` counts final assembled
+scalars plus every histogram bucket or summary quantile and two count/sum slots per
+distribution, even incomplete distributions the writer skips. Exceeding it rejects the
+whole Check or Collect attempt before writer mutation. After routing and aggregation,
+`max_output_series_per_context` omits whole contexts independently; it never drops a
+source family before a rollup. See `profile-format.md` for the operator contract.
+
 The writer rejects unsafe series rather than letting invalid data corrupt the
 metric store. Examples include:
 
@@ -315,7 +322,6 @@ metric store. Examples include:
 - invalid summary quantiles/count/sum;
 - a histogram/summary instance whose bucket or quantile schema differs from the
   accepted schema for that family;
-- a family over `max_time_series_per_metric`;
 - incompatible type drift while a descriptor remains authoritative.
 
 A family can be partially written: one identity is valid while another is NaN

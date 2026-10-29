@@ -14,6 +14,14 @@
 // helper: convert a bool to JSONC_REQUIRED / JSONC_OPTIONAL
 #define JSONC_REQUIRE_IF(cond) ((cond) ? JSONC_REQUIRED : JSONC_OPTIONAL)
 
+static inline bool jsonc_string_has_embedded_nul(json_object *value) {
+    if(!json_object_is_type(value, json_type_string))
+        return false;
+
+    const char *text = json_object_get_string(value);
+    return text && memchr(text, '\0', (size_t)json_object_get_string_len(value)) != NULL;
+}
+
 #define JSONC_INTEGER_DESTINATION_IS_UNSIGNED(dst) _Generic((dst), \
     unsigned char: true,                                             \
     unsigned short: true,                                            \
@@ -710,6 +718,7 @@ static inline bool jsonc_double_fits_integer_destination(double value, size_t si
 
 typedef bool (*json_parse_function_payload_t)(json_object *jobj, void *data, BUFFER *error);
 int nrpc_call_error(BUFFER *wb, const char *msg, int code);
+int nrpc_call_error_with_key(BUFFER *wb, const char *msg, const char *msg_key, int code);
 struct json_object *json_parse_function_payload_or_error(BUFFER *output, BUFFER *payload, int *code, json_parse_function_payload_t cb, void *cb_data);
 
 // return HTTP response code

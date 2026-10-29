@@ -273,6 +273,22 @@
 - Fix(go.d/powerstore): decode rolled-up performance and space metrics ([#24448](https://github.com/netdata/netdata/issues/24448))
 - Test(go.d/ceph): stabilize OSD whole-list completeness test ([#24449](https://github.com/netdata/netdata/issues/24449))
 - Ebpf.plugin: stop the tracked PID count from growing under churn ([#24423](https://github.com/netdata/netdata/issues/24423))
+- Dbengine: close the /dev/null fds of the mrg journal close tests exactly once ([#24437](https://github.com/netdata/netdata/issues/24437))
+- Drop LibreSSL check from CI. ([#24455](https://github.com/netdata/netdata/issues/24455))
+- Drop distros we make native packages for from local build testing in CI. ([#24454](https://github.com/netdata/netdata/issues/24454))
+- Feat(go.d/prometheus): separate input and context output limits ([#24458](https://github.com/netdata/netdata/issues/24458))
+- Log2journal: fix JSON numbers, unicode escapes and per-line state ([#24443](https://github.com/netdata/netdata/issues/24443))
+- Dbengine: keep chart page phases across restarts ([#24453](https://github.com/netdata/netdata/issues/24453))
+- Stop log2journal json escapes from reading past the line terminator ([#24365](https://github.com/netdata/netdata/issues/24365))
+- Statsd: remove idle metrics safely ([#24440](https://github.com/netdata/netdata/issues/24440))
+- Fix NetFlow startup reconciliation and keepalive coverage ([#24414](https://github.com/netdata/netdata/issues/24414))
+- Docs: add volume discounts, the University of Amsterdam study, the Cloud availability commitment and street-level flow maps to the product description ([#24407](https://github.com/netdata/netdata/issues/24407))
+- Log2journal: don't use PCRE2_UNSET offsets of unmatched named groups ([#24380](https://github.com/netdata/netdata/issues/24380))
+- Add troubleshooting section to MSI ([#24456](https://github.com/netdata/netdata/issues/24456))
+- Api: fleet time-aggregations - percentage-of-time, number-of-flaps, number-of-times ([#23281](https://github.com/netdata/netdata/issues/23281))
+- Properly name and split installer related unit tests. ([#24464](https://github.com/netdata/netdata/issues/24464))
+- Switch updater check in CI to use static builds. ([#24457](https://github.com/netdata/netdata/issues/24457))
+- Properly skip all parts of local build tests. ([#24465](https://github.com/netdata/netdata/issues/24465))
 
 ## [2.12.0] - 2026-09-30
 

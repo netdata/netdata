@@ -345,6 +345,10 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             query_progress_done_step(qt->request.transaction, 1);
     }
 
+    // the loop closes a node only when the next one starts
+    if(last_qn)
+        last_qn->duration_ut = last_ut - last_qn_ut;
+
     // free all resources used by the grouping method
     r_tmp->time_grouping.free(r_tmp);
 

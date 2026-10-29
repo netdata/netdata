@@ -299,19 +299,19 @@
           }
         }
       },
-      "max_time_series": {
-        "title": "Time series limit",
-        "description": "If the final output after job and profile relabeling contains more time series than this limit, the data is not processed. Set to 0 for no limit.",
+      "max_input_series": {
+        "title": "Input series limit",
+        "description": "Maximum input series after selector and job/profile relabeling, checked at startup and every collection. Each scalar counts once; each histogram counts its buckets plus two count/sum slots, and each summary counts its quantiles plus two count/sum slots, including incomplete distributions. Exceeding the limit rejects the whole collection before storage. Zero disables the limit; negative values are invalid. This does not bound download or parser memory.",
         "type": "integer",
         "minimum": 0,
-        "default": 2000
+        "default": 10000
       },
-      "max_time_series_per_metric": {
-        "title": "Time series per metric limit",
-        "description": "Final metric families with more time series than this limit are skipped. Set to 0 for no limit.",
+      "max_output_series_per_context": {
+        "title": "Output series per context limit",
+        "description": "Maximum distinct current chart/dimension pairs per resolved context in one job and host scope, counted after routing and aggregation across all charts. Exceeding the limit omits the whole context; other contexts keep their complete inputs. Applies to profiles, automatic charts and raw counter companion charts. Zero disables the limit; negative values are invalid.",
         "type": "integer",
         "minimum": 0,
-        "default": 200
+        "default": 1000
       },
       "fallback_type": {
         "title": "Untyped metrics fallback",
@@ -485,8 +485,8 @@
         {
           "title": "Limits",
           "fields": [
-            "max_time_series",
-            "max_time_series_per_metric"
+            "max_input_series",
+            "max_output_series_per_context"
           ]
         },
         {
