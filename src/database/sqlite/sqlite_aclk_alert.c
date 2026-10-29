@@ -1495,8 +1495,8 @@ done:
     return count;
 }
 
-// queue a pending transition the way SQL_INSERT_ALERT_PENDING_QUEUE does, due `due_in_s` from now, without
-// touching the host's next-due gate
+// queue a pending transition with the upsert of SQL_INSERT_ALERT_PENDING_QUEUE (without its latest-transition gate),
+// due `due_in_s` from now, without touching the host's next-due gate
 static bool aq_pending_seed(nd_uuid_t *host_id, int64_t health_log_id, int64_t unique_id, int64_t due_in_s)
 {
     sqlite3_stmt *res = NULL;
@@ -1723,7 +1723,7 @@ int alert_queue_unittest(void)
 
     // --- the pending queue (alert_queue) carries the same defect and the same guard. Its conflict key is
     // (host_id, health_log_id, alarm_id), NOT the submit queue's key, so it needs its own case. The seeding
-    // INSERT mirrors SQL_INSERT_ALERT_PENDING_QUEUE in sqlite_health.c.
+    // INSERT mirrors the upsert of SQL_INSERT_ALERT_PENDING_QUEUE in sqlite_health.c, without its gate.
     {
         const char *pending_insert =
             "INSERT INTO alert_queue (host_id, health_log_id, unique_id, alarm_id, status, date_scheduled)"
