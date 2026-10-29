@@ -303,6 +303,12 @@ typedef struct rrdinstance {
     } internal;
 } RRDINSTANCE;
 
+static ALWAYS_INLINE RRDSET *rrdinstance_rrdset_atomic_load(RRDINSTANCE *ri) {
+    return __atomic_load_n(&ri->rrdset, __ATOMIC_ACQUIRE);
+}
+
+RRDSET_ACQUIRED *rrdinstance_rrdset_acquire(RRDINSTANCE_ACQUIRED *ria);
+
 typedef struct rrdcontext {
     uint64_t version;
 
