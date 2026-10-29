@@ -83,7 +83,8 @@ if(ENABLE_PLUGIN_EBPF)
             "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/*.c"
             "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/*.h"
             "${CMAKE_SOURCE_DIR}/src/go/pkg/netipc/*.go"
-            "${CMAKE_SOURCE_DIR}/src/go/pkg/netdataapi/*.go")
+            "${CMAKE_SOURCE_DIR}/src/go/pkg/netdataapi/*.go"
+            "${CMAKE_SOURCE_DIR}/src/go/pkg/privilege/*.go")
     # go.work is optional; watch its exact path so appearance or removal regenerates the graph.
     file(GLOB EBPF_GO_WORKSPACE_FILE CONFIGURE_DEPENDS LIST_DIRECTORIES false
             "${CMAKE_SOURCE_DIR}/go.work")
