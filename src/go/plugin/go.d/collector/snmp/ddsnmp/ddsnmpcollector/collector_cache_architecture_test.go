@@ -370,6 +370,7 @@ func TestCollector_Collect_SharesFailedDirectTableWalkPerPass(t *testing.T) {
 		device := newStatefulSNMPDevice()
 		device.walkErrs[trimOID(first.Table.OID)] = errors.New("BGP table timeout")
 		device.install(mockHandler)
+		var stats ddsnmp.CollectionStats
 		collector := New(Config{
 			SnmpClient: mockHandler,
 			Profiles: []*ddsnmp.Profile{{
@@ -379,17 +380,18 @@ func TestCollector_Collect_SharesFailedDirectTableWalkPerPass(t *testing.T) {
 				},
 			}},
 			Log: logger.New(),
+			AcquisitionObserver: AcquisitionObserverFunc(func(_ AcquisitionProfileReport, metrics *ddsnmp.ProfileMetrics) {
+				stats = metrics.Stats
+			}),
 		})
 
 		results, err := collector.Collect()
-		require.NoError(t, err)
-		require.Len(t, results, 1)
-		assert.Empty(t, results[0].BGPRows)
-		require.Error(t, results[0].BGPCollectError)
+		require.ErrorIs(t, err, device.walkErrs[trimOID(first.Table.OID)])
+		require.Empty(t, results)
 		assert.Equal(t, 1, device.walkCount[trimOID(first.Table.OID)])
-		assert.EqualValues(t, 1, results[0].Stats.SNMP.WalkRequests)
-		assert.EqualValues(t, 1, results[0].Stats.Errors.SNMP)
-		assert.Zero(t, results[0].Stats.SNMP.TablesWalked)
+		assert.EqualValues(t, 1, stats.SNMP.WalkRequests)
+		assert.EqualValues(t, 1, stats.Errors.SNMP)
+		assert.Zero(t, stats.SNMP.TablesWalked)
 	})
 
 	t.Run("BGP dependency", func(t *testing.T) {
@@ -454,6 +456,7 @@ func TestCollector_Collect_SharesFailedDirectTableWalkPerPass(t *testing.T) {
 		device := newStatefulSNMPDevice()
 		device.walkErrs[trimOID(first.Table.OID)] = errors.New("licensing table timeout")
 		device.install(mockHandler)
+		var stats ddsnmp.CollectionStats
 		collector := New(Config{
 			SnmpClient: mockHandler,
 			Profiles: []*ddsnmp.Profile{{
@@ -463,16 +466,18 @@ func TestCollector_Collect_SharesFailedDirectTableWalkPerPass(t *testing.T) {
 				},
 			}},
 			Log: logger.New(),
+			AcquisitionObserver: AcquisitionObserverFunc(func(_ AcquisitionProfileReport, metrics *ddsnmp.ProfileMetrics) {
+				stats = metrics.Stats
+			}),
 		})
 
 		results, err := collector.Collect()
-		require.NoError(t, err)
-		require.Len(t, results, 1)
-		assert.Empty(t, results[0].LicenseRows)
+		require.ErrorIs(t, err, device.walkErrs[trimOID(first.Table.OID)])
+		require.Empty(t, results)
 		assert.Equal(t, 1, device.walkCount[trimOID(first.Table.OID)])
-		assert.EqualValues(t, 1, results[0].Stats.SNMP.WalkRequests)
-		assert.EqualValues(t, 1, results[0].Stats.Errors.SNMP)
-		assert.Zero(t, results[0].Stats.SNMP.TablesWalked)
+		assert.EqualValues(t, 1, stats.SNMP.WalkRequests)
+		assert.EqualValues(t, 1, stats.Errors.SNMP)
+		assert.Zero(t, stats.SNMP.TablesWalked)
 	})
 
 	t.Run("licensing dependency", func(t *testing.T) {
