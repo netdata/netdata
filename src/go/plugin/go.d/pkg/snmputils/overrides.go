@@ -165,10 +165,10 @@ func mergeOverrides(dst, src *overrides) {
 }
 
 func getSnmpMetadataDir() string {
-	if !pluginconfig.ConfigRestricted() && executable.Name == "test" {
+	if executable.Name == "test" {
 		return snmpMetadataDirFromThisFile()
 	}
-	if path := filepath.Join(executable.Directory, "..", "config", executable.Name, "snmp.profiles", "metadata"); !pluginconfig.ConfigRestricted() && isDirExists(path) {
+	if path := filepath.Join(executable.Directory, "..", "config", executable.Name, "snmp.profiles", "metadata"); isDirExists(path) {
 		return path
 	}
 	return filepath.Join(pluginconfig.CollectorsStockDir(), "snmp.profiles", "metadata")

@@ -204,13 +204,6 @@ A `[directories]` override in `netdata.conf` therefore does not move these direc
 is logged once at startup. If you write a plugin that runs with elevated privileges, do the same: never load, read or
 execute anything from a directory named in its environment.
 
-`go.d.plugin` also selects its build's user and stock configuration roots when it gains setuid/setgid or Linux
-capability privileges. In that mode it ignores `NETDATA_USER_CONFIG_DIR`, `NETDATA_STOCK_CONFIG_DIR` and
-`NETDATA_PLUGINS_GOD_WATCH_PATH`, and rejects explicit `-c`/`--config-dir` and `-w`/`--watch-path` options. Runtime
-configuration-directory relocation is unavailable for those launches; custom build prefixes are embedded normally.
-Direct root and ordinary unprivileged invocations retain their path options. See the
-[go.d configuration policy](/src/go/plugin/go.d/README.md#configuration-paths-after-gaining-privileges).
-
 ### The output of the plugin
 
 The plugin should output instructions for Netdata to its output (`stdout`). Since this uses pipes, please make sure you flush stdout after every iteration.

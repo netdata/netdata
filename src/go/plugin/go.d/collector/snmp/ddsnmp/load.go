@@ -275,11 +275,11 @@ func prepareLoadedProfile(profile *Profile) error {
 }
 
 func getProfilesDirs() multipath.MultiPath {
-	if !pluginconfig.ConfigRestricted() && executable.Name == "test" {
+	if executable.Name == "test" {
 		return multipath.New(snmpProfilesDirFromThisFile())
 	}
 
-	if dir := filepath.Join(executable.Directory, "../config/go.d/snmp.profiles/default"); !pluginconfig.ConfigRestricted() && isDirExists(dir) {
+	if dir := filepath.Join(executable.Directory, "../config/go.d/snmp.profiles/default"); isDirExists(dir) {
 		return multipath.New(dir)
 	}
 

@@ -5,10 +5,9 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
-
-	"github.com/netdata/netdata/go/plugins/pkg/privilege"
 )
 
 // The install directories this build was configured for. The build sets them
@@ -83,8 +82,89 @@ func sameDir(a, b string) bool {
 	return strings.TrimRight(a, "/") == strings.TrimRight(b, "/")
 }
 
-// Keep this plugin's existing boolean/error policy while sharing the detector.
+// gainedPrivilegesAtExec reports whether this process is more privileged than the
+// one that exec'd it - what the kernel records as AT_SECURE and libc answers from
+// secure_getenv(). Go has neither, and AT_SECURE can only be read from
+// /proc/self/auxv, which is mode 0400 and owned by root once gaining privileges at
+// exec clears dumpable. Reading our own is not blocked by the ptrace check, so a
+// setuid-root process could do it on euid 0 alone - but one carrying only file
+// capabilities cannot, and that is a case this has to answer. So the kernel's own
+// conditions are re-evaluated instead, from /proc/self/status, which stays world
+// readable either way.
 func gainedPrivilegesAtExec() bool {
-	gained, _ := privilege.GainedAtExec()
-	return gained
+	// a setuid or setgid binary
+	if os.Geteuid() != os.Getuid() || os.Getegid() != os.Getgid() {
+		return true
+	}
+
+	// A root process is not a privilege boundary with its caller, and the kernel
+	// likewise only weighs capabilities for a non-root exec.
+	if os.Geteuid() == 0 {
+		return false
+	}
+
+	// A file capability granted to this executable. /proc/self/status is world
+	// readable even for a privileged process, unlike /proc/self/auxv, so an
+	// unreadable one means we are not on a Linux system that grants capabilities
+	// at all and there is nothing here to protect against.
+	status, err := os.ReadFile("/proc/self/status")
+	if err != nil {
+		return false
+	}
+
+	return gainedCapabilitiesAtExec(status)
+}
+
+// gainedCapabilitiesAtExec answers the capability half of the kernel's AT_SECURE
+// decision for a non-root exec (cap_bprm_creds_from_file()), which has two
+// independent triggers.
+//
+// First: the permitted set grew past the ambient set the caller passed down. Read
+// permitted, not effective - a file marked "cap_bpf=p" lands in permitted only,
+// leaving CapEff empty, and the kernel still marks that exec secure, so judging by
+// CapEff alone would trust an environment the C side rejects.
+//
+// Second: the file asked for its capabilities to be effective at exec. The kernel
+// counts that on its own, even when those capabilities add nothing to what the
+// caller already had. That bit is not recoverable from /proc/self/status, because
+// CapEff == CapPrm looks identical whether the file set it or the caller's ambient
+// set did - so any effective capability held by a non-root process is treated as a
+// gain. The single cell where this is stricter than the kernel is a caller that
+// passed ambient capabilities down to us; there this errs toward the compiled-in
+// directories, and netdata does not spawn plugins that way.
+func gainedCapabilitiesAtExec(status []byte) bool {
+	permitted, found := capabilitySet(status, "CapPrm:")
+	if !found {
+		return false
+	}
+
+	// Kernels older than 4.3 have no ambient set; there, any permitted capability
+	// a non-root process holds came from the executable.
+	ambient, _ := capabilitySet(status, "CapAmb:")
+	if permitted&^ambient != 0 {
+		return true
+	}
+
+	effective, _ := capabilitySet(status, "CapEff:")
+
+	return effective != 0
+}
+
+// capabilitySet reads one hex capability mask out of /proc/self/status.
+func capabilitySet(status []byte, field string) (mask uint64, found bool) {
+	for line := range strings.SplitSeq(string(status), "\n") {
+		value, ok := strings.CutPrefix(line, field)
+		if !ok {
+			continue
+		}
+
+		mask, err := strconv.ParseUint(strings.TrimSpace(value), 16, 64)
+		if err != nil {
+			return 0, false
+		}
+
+		return mask, true
+	}
+
+	return 0, false
 }

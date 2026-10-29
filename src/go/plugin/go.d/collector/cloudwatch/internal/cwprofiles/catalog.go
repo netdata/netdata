@@ -138,7 +138,7 @@ func validateUniqueChartIDs(profiles []profilecatalog.Named[Profile], isStock fu
 }
 
 func defaultDirSpecs() []profilecatalog.DirSpec {
-	if !pluginconfig.ConfigRestricted() && executable.Name == "test" {
+	if executable.Name == "test" {
 		if dir := cwProfilesDirFromThisFile(); dir != "" {
 			return []profilecatalog.DirSpec{{Path: dir, IsStock: true}}
 		}
@@ -148,7 +148,7 @@ func defaultDirSpecs() []profilecatalog.DirSpec {
 	// Keep the adjacent stock-dir fast path for local development runs where the
 	// built binary lives under src/go/plugin/go.d/bin and should use the source-tree
 	// stock profiles without depending on installed pluginconfig paths.
-	if dir := filepath.Join(executable.Directory, "../config/go.d", profilesDirName, "default"); !pluginconfig.ConfigRestricted() && profilecatalog.DirExists(dir) {
+	if dir := filepath.Join(executable.Directory, "../config/go.d", profilesDirName, "default"); profilecatalog.DirExists(dir) {
 		return []profilecatalog.DirSpec{{Path: dir, IsStock: true}}
 	}
 
