@@ -816,9 +816,8 @@ cleanup:
 
 // The ML training scheduler orders dimensions by rrdeng_store_metric_page_time_to_close_s(): how many seconds of data
 // the current page still needs before the point that fills it and makes it flush. Verify it against the engine's own
-// page sequence, for a cadence whose pages align (1 s) and one whose pages are irregular (5 s: aligned_allocation_
-// entries() works in seconds while a page advances slots * update_every, and the max_slots / 3 floor kicks in), by
-// storing points one by one and watching when the page actually flushes. The data is dated months before the local
+// page sequence, for a cadence of 1 s and one of 5 s (the first page is shortened to the chart's slot, down to the
+// max_slots / 3 floor), by storing points one by one and watching when the page actually flushes. The data is dated months before the local
 // clock, so this also checks that the value depends only on the dimension's own timestamps (a lagging child).
 static time_t test_dbengine_page_close_of(STORAGE_COLLECT_HANDLE *sch, time_t last_point_s) {
     time_t to_close = rrdeng_store_metric_page_time_to_close_s(sch);
@@ -920,6 +919,134 @@ static size_t test_dbengine_page_close_time(RRDHOST *host) {
     return errors;
 }
 
+// The page phase of a chart (the slot of the page cycle its pages close at) must depend only on the chart's identity:
+// a restart creates new metrics groups, and their pages must close exactly where the previous process closed them,
+// or data written before the restart is packed into extents in an order nothing reads in after it. For each cadence,
+// writers on one metric with the chart's own group, a fresh group of the same identity and a group of another
+// identity each open a page at three positions a third of a page cycle apart, every point in its own page cycle so
+// the pages never collide. A page must close at the same phase of the cycle (max_slots points) wherever it started,
+// except where the max_slots / 3 floor stretches a first page (at most one of the three positions).
+#define PAGE_PHASE_POSITIONS 3
+
+static void test_dbengine_page_phase_closes(RRDDIM *rd, STORAGE_METRICS_GROUP *smg, size_t max_slots, int ue,
+                                            time_t base, size_t writer, time_t phases[PAGE_PHASE_POSITIONS]) {
+    const time_t cycle_s = (time_t)max_slots * ue;
+    for(size_t k = 0; k < PAGE_PHASE_POSITIONS; k++) {
+        time_t t = base + (time_t)((writer * PAGE_PHASE_POSITIONS + k) * max_slots + k * (max_slots / 3)) * ue;
+        STORAGE_COLLECT_HANDLE *sch = rrdeng_store_metric_init(rd->tiers[0].smh, ue, smg);
+        if(!sch) {
+            phases[k] = -1;
+            continue;
+        }
+        rrdeng_store_metric_next(sch, (usec_t)t * USEC_PER_SEC, 1, 1, 1, 1, 0, SN_DEFAULT_FLAGS);
+        time_t to_close = rrdeng_store_metric_page_time_to_close_s(sch);
+        phases[k] = to_close < 0 ? -1 : (t + to_close) % cycle_s;
+        rrdeng_store_metric_finalize(sch);
+    }
+}
+
+static size_t test_dbengine_page_phase_seed(RRDHOST *host) {
+    size_t errors = 0;
+    const int cadences[] = { 1, 5, 60 };
+
+    STORAGE_INSTANCE *si = host->db[0].si;
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
+    const size_t max_slots = tier_page_size[ctx->config.tier] / CTX_POINT_SIZE_BYTES(ctx);
+    const time_t base = START_TIMESTAMP - 20000000;
+
+    for(size_t c = 0; c < _countof(cadences); c++) {
+        const int ue = cadences[c];
+        char prefix[64];
+        snprintfz(prefix, sizeof(prefix) - 1, "dbengine-page-phase-%d", ue);
+
+        RRDDIM *rd = dbengine_cadence_test_create_metric(host, prefix, ue);
+        if(!rd)
+            return errors + 1;
+
+        RRDSET *st = rd->rrdset;
+        uint64_t seed = rrdset_storage_phase_seed(&host->host_id, rrdset_id(st));
+        if(((struct pg_alignment *)st->smg[0])->seed != seed) {
+            fprintf(stderr, " >>> DBENGINE: page-phase ue=%d: the chart's metrics group is not seeded from its identity\n", ue);
+            errors++;
+        }
+
+        // another chart identity on a different slot
+        uint64_t other_seed = seed;
+        for(size_t i = 0; other_seed % max_slots == seed % max_slots; i++) {
+            char id[64];
+            snprintfz(id, sizeof(id) - 1, "netdata.dbengine-page-phase-other-%zu", i);
+            other_seed = rrdset_storage_phase_seed(&host->host_id, id);
+        }
+
+        STORAGE_METRICS_GROUP *same = rrdeng_metrics_group_get(si, seed);
+        STORAGE_METRICS_GROUP *other = rrdeng_metrics_group_get(si, other_seed);
+
+        time_t own[PAGE_PHASE_POSITIONS], fresh[PAGE_PHASE_POSITIONS], another[PAGE_PHASE_POSITIONS];
+        test_dbengine_page_phase_closes(rd, st->smg[0], max_slots, ue, base, 0, own);
+        test_dbengine_page_phase_closes(rd, same, max_slots, ue, base, 1, fresh);
+        test_dbengine_page_phase_closes(rd, other, max_slots, ue, base, 2, another);
+
+        rrdeng_metrics_group_release(si, same);
+        rrdeng_metrics_group_release(si, other);
+
+        bool other_differs = false;
+        size_t agreeing = 0;
+        for(size_t k = 0; k < PAGE_PHASE_POSITIONS; k++) {
+            if(own[k] < 0 || fresh[k] != own[k]) {
+                fprintf(stderr, " >>> DBENGINE: page-phase ue=%d: at position %zu a new metrics group of the same chart "
+                                "closes its page at phase %ld s, the chart's own writer at %ld s\n",
+                        ue, k, (long)fresh[k], (long)own[k]);
+                errors++;
+            }
+            if(another[k] != own[k])
+                other_differs = true;
+
+            size_t same_phase = 0;
+            for(size_t j = 0; j < PAGE_PHASE_POSITIONS; j++)
+                same_phase += own[j] == own[k];
+            if(same_phase > agreeing)
+                agreeing = same_phase;
+        }
+        if(agreeing < PAGE_PHASE_POSITIONS - 1) {
+            fprintf(stderr, " >>> DBENGINE: page-phase ue=%d: pages close at phases %ld, %ld, %ld s, depending on where "
+                            "they started\n", ue, (long)own[0], (long)own[1], (long)own[2]);
+            errors++;
+        }
+        if(!other_differs) {
+            fprintf(stderr, " >>> DBENGINE: page-phase ue=%d: another chart closes its pages where this chart does\n", ue);
+            errors++;
+        }
+    }
+
+    // charts spread over the slots: no flush bursts
+    ND_UUID host_id = { 0 };
+    host_id.uuid[0] = 1;
+
+    // the same chart id on another host is another identity
+    ND_UUID other_host_id = host_id;
+    other_host_id.uuid[15] = 1;
+    if(rrdset_storage_phase_seed(&host_id, "system.cpu") == rrdset_storage_phase_seed(&other_host_id, "system.cpu")) {
+        fprintf(stderr, " >>> DBENGINE: page-phase: the seed ignores the host\n");
+        errors++;
+    }
+    size_t per_slot[max_slots];
+    memset(per_slot, 0, sizeof(per_slot));
+    size_t used = 0, worst = 0;
+    for(size_t i = 0; i < max_slots; i++) {
+        char id[64];
+        snprintfz(id, sizeof(id) - 1, "system.chart%zu", i);
+        size_t slot = rrdset_storage_phase_seed(&host_id, id) % max_slots;
+        if(!per_slot[slot]++) used++;
+        if(per_slot[slot] > worst) worst = per_slot[slot];
+    }
+    if(worst > 8 || used < max_slots / 2) {
+        fprintf(stderr, " >>> DBENGINE: page-phase: %zu charts use %zu slots, up to %zu in one\n", max_slots, used, worst);
+        errors++;
+    }
+
+    return errors;
+}
+
 static size_t test_dbengine_single_missing_sample_reuse(RRDHOST *host) {
     const time_t t = START_TIMESTAMP + 2750000;
     RRDDIM *rd = dbengine_cadence_test_create_metric(host, "dbengine-single-missing-sample", 1);
@@ -972,6 +1099,39 @@ static size_t test_dbengine_single_missing_sample_reuse(RRDHOST *host) {
     return errors;
 }
 
+static size_t test_dbengine_datafile_names(void) {
+    static const struct {
+        const char *name;
+        bool valid;
+        unsigned fileno;
+    } cases[] = {
+        { "datafile-1-0000000001.ndf", true, 1 },
+        { "datafile-1-4294967295.ndf", true, 4294967295U },
+        { "datafile-1-0000000001.ndf.bak", false, 0 },
+        { "datafile-1-0000000001.ndf~", false, 0 },
+        { "datafile-1-0000000001.ndfx", false, 0 },
+        { "datafile-1-0000000001.xyz", false, 0 },
+        { "datafile-1-0000000001", false, 0 },
+        { "datafile-1-1.ndf", false, 0 },
+        { "datafile-2-0000000001.ndf", false, 0 },
+        { "journalfile-1-0000000001.njf", false, 0 },
+    };
+
+    size_t errors = 0;
+    for (size_t i = 0; i < _countof(cases); i++) {
+        unsigned fileno = 0;
+        bool valid = datafile_name_parse(cases[i].name, &fileno);
+        if (valid != cases[i].valid || (valid && fileno != cases[i].fileno)) {
+            fprintf(stderr, " >>> DBENGINE: datafile name '%s' parsed as %s (fileno %u), expected %s (fileno %u)\n",
+                    cases[i].name, valid ? "valid" : "invalid", fileno,
+                    cases[i].valid ? "valid" : "invalid", cases[i].fileno);
+            errors++;
+        }
+    }
+
+    return errors;
+}
+
 int test_dbengine(void) {
     // provide enough threads to dbengine
     setenv("UV_THREADPOOL_SIZE", "48", 1);
@@ -987,8 +1147,10 @@ int test_dbengine(void) {
     if(!host)
         fatal("Failed to initialize host");
 
+    errors += test_dbengine_datafile_names();
     errors += test_dbengine_burst_retention(host);
     errors += test_dbengine_page_close_time(host);
+    errors += test_dbengine_page_phase_seed(host);
 
     RRDSET *st[CHARTS] = { 0 };
     RRDDIM *rd[CHARTS][DIMS] = { 0 };
@@ -1043,12 +1205,19 @@ int test_dbengine(void) {
     // prevent closing the database before the test is finished
     sleep(5);
 
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)host->db[0].si;
     rrd_wrlock();
-    rrdeng_quiesce((struct rrdengine_instance *)host->db[0].si);
-    rrdeng_flush_all((struct rrdengine_instance *)host->db[0].si);
-    rrdeng_exit((struct rrdengine_instance *)host->db[0].si);
-    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_SHUTDOWN_EVLOOP, NULL, NULL, STORAGE_PRIORITY_BEST_EFFORT, NULL, NULL);
+    rrdeng_quiesce(ctx);
+    rrdeng_flush_all(ctx);
+    rrdeng_exit(ctx);
+    host->db[0].si = NULL;
     rrd_wrunlock();
+
+    // free the ctx only after the event loop finished its work: after-work callbacks use it
+    if(dbengine_shutdown())
+        freez(ctx);
+    else
+        errors++;
 
     return (int)(errors + value_errors + time_errors);
 }

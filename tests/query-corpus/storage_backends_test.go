@@ -169,15 +169,15 @@ func storageBackendStateHeld(t *testing.T, dd *daemon.Daemon) bool {
 		rawStatsOK && rawTierOK
 }
 
-func TestStorageBackendGapState(t *testing.T) {
-	const contract = "L1/storage-backend-gap-state"
+type storageBackendCase struct {
+	pageType string
+	memory   string
+	restart  bool
+	guidIdx  int
+}
 
-	cases := map[string]struct {
-		pageType string
-		memory   string
-		restart  bool
-		guidIdx  int
-	}{
+func storageBackendCases() map[string]storageBackendCase {
+	return map[string]storageBackendCase{
 		"dbengine-gorilla-hot":     {memory: "dbengine", guidIdx: 410},
 		"dbengine-gorilla-restart": {memory: "dbengine", restart: true, guidIdx: 411},
 		"dbengine-raw-hot":         {pageType: "raw", memory: "dbengine", guidIdx: 412},
@@ -185,7 +185,11 @@ func TestStorageBackendGapState(t *testing.T) {
 		"ram":                      {memory: "ram", guidIdx: 414},
 		"alloc":                    {memory: "alloc", guidIdx: 415},
 	}
-	for component, tc := range cases {
+}
+
+func TestStorageBackendGapState(t *testing.T) {
+	const contract = "L1/storage-backend-gap-state"
+	for component, tc := range storageBackendCases() {
 		t.Run(component, func(t *testing.T) {
 			trackContractComponent(t, contract, component)
 			dd := startDedicatedStorageDaemon(t, daemon.Options{
@@ -211,6 +215,107 @@ func TestStorageBackendGapState(t *testing.T) {
 			}
 			if !storageBackendStateHeld(t, dd) {
 				t.Errorf("BROKEN %s (%s): %s", contract, component, manifest[contract].Proves)
+			}
+		})
+	}
+}
+
+func TestStorageBackendSignedEvidence(t *testing.T) {
+	const host, context = "signed-backend", "fixture.signed_backend"
+	for component, tc := range storageBackendCases() {
+		t.Run(component, func(t *testing.T) {
+			for _, invariant := range []string{"values", "reset", "anomaly-rate"} {
+				registerContractComponent(t, "L1/storage-backend-signed-"+invariant, component)
+			}
+			dd := startDedicatedStorageDaemon(t, daemon.Options{
+				StorageTiers: 1, DBEnginePageType: tc.pageType, StreamMemoryMode: tc.memory,
+			})
+			ch := fixture.Series(context, context, fixture.T0, 6, 1, func(i int) string {
+				return strconv.Itoa([]int{0, 10, 0, -20, 30, 0, 40}[i])
+			}, func(i int) string {
+				switch i {
+				case 2, 5:
+					return stream.FlagEmpty
+				case 3:
+					// R without A carries both RESET and anomaly evidence.
+					return stream.FlagReset
+				default:
+					return stream.FlagNotAnomalous
+				}
+			})
+			ch.Dimensions[0].ID = storageBackendDim
+			closeFixture := pushDedicatedChart(t, dd, host, guid(tc.guidIdx+9550), ch)
+			first := int64(fixture.T0 + 1)
+			if tc.memory == "ram" || tc.memory == "alloc" {
+				first = fixture.T0
+			}
+			if _, err := dd.WaitRetention(host, context, first, ch.LastT(), 15*time.Second); err != nil {
+				t.Fatal(err)
+			}
+			if tc.restart {
+				if err := closeFixture(); err != nil {
+					t.Fatal(err)
+				}
+				if err := dd.Restart(); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := dd.WaitRetention(host, context, first, ch.LastT(), 15*time.Second); err != nil {
+					t.Fatal(err)
+				}
+			}
+			p := daemon.DataParamsTier(context, 0, fixture.T0, fixture.T0+6, 6, "average")
+			p.Set("scope_dimensions", storageBackendDim)
+			p.Set("options", "jsonwrap|unaligned")
+			doc, err := dd.DataV3(host, p)
+			if err != nil {
+				t.Fatal(err)
+			}
+			cols, err := canon.Columns(doc)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !assertOnlyColumn(t, cols, storageBackendDim) || !assertTierPresence(t, doc, []bool{true}) ||
+				!queryTimestampGridExact(t, doc, queryExpectedVirtualGrid(t, fixture.T0, fixture.T0+6, 6, false)) {
+				t.Fatal("signed backend control changed its dimension, tier, or grid")
+			}
+			for _, invariant := range []string{"values", "reset", "anomaly-rate"} {
+				t.Run(invariant, func(t *testing.T) {
+					trackContractComponent(t, "L1/storage-backend-signed-"+invariant, component)
+					var want []expectedColumnPoint
+					for i, point := range ch.Dimensions[0].Points {
+						value, numeric := point.CollectedValue(storageBackendDim)
+						expected := wantNumberAt(point.T, value)
+						if !numeric {
+							expected = wantEmptyAt(point.T)
+						}
+						if invariant == "reset" {
+							pa := int64(0)
+							if !numeric {
+								pa = canon.AnnotationEmpty
+							} else if i == 2 {
+								pa = canon.AnnotationReset
+							}
+							expected.PA = &pa
+						}
+						if invariant == "anomaly-rate" {
+							arp := 0.0
+							if i == 2 {
+								arp = 100
+							}
+							expected.ARP = &arp
+						}
+						want = append(want, expected)
+					}
+					held := false
+					if invariant == "values" {
+						held = assertExactColumnValues(t, cols, storageBackendDim, want, 0)
+					} else {
+						held = assertExactColumnMetadata(t, cols, storageBackendDim, want)
+					}
+					if !held {
+						t.Error("storage backend lost signed sample " + invariant)
+					}
+				})
 			}
 		})
 	}

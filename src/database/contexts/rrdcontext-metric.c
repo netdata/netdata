@@ -41,6 +41,14 @@ inline NETDATA_DOUBLE rrdmetric_acquired_last_stored_value(RRDMETRIC_ACQUIRED *r
     return NAN;
 }
 
+// The same classification the query makes (query_target.c): read from the
+// RRDMETRIC's published algorithm, so a caller deciding units outside the
+// query path cannot disagree with the query about what it just summed.
+inline bool rrdmetric_acquired_stored_as_rates(RRDMETRIC_ACQUIRED *rma) {
+    RRDMETRIC *rm = rrdmetric_acquired_value(rma);
+    return rrdmetric_algorithm_atomic_load(rm) == RRD_ALGORITHM_INCREMENTAL;
+}
+
 inline bool rrdmetric_acquired_belongs_to_instance(RRDMETRIC_ACQUIRED *rma, RRDINSTANCE_ACQUIRED *ria) {
     RRDMETRIC *rm = rrdmetric_acquired_value(rma);
     RRDINSTANCE *ri = rrdinstance_acquired_value(ria);

@@ -39,6 +39,7 @@ struct page_descr_with_data {
 
 struct pg_alignment {
     uint32_t refcount;
+    uint64_t seed;      // the chart's identity hash: picks the slot of absolute time its pages close at
 };
 
 struct rrdeng_query_handle;

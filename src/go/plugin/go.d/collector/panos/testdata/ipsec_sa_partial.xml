@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<response status="success">
+  <result>
+    <entries>
+      <entry>
+        <gwid>4</gwid>
+        <gateway>gw-branch-d</gateway>
+        <tid>3</tid>
+        <remote>198.51.100.40                          </remote>
+        <name>branch-d</name>
+        <proto>ESP</proto>
+        <enc>G256</enc>
+        <hash/>
+        <i_spi>1000000001</i_spi>
+        <o_spi>1000000002</o_spi>
+        <kb>Unlimited</kb>
+        <life>7200</life>
+        <remain>5145</remain>
+      </entry>
+      <entry>
+        <gwid>3</gwid>
+        <gateway>gw-branch-c</gateway>
+        <tid>4</tid>
+        <remote>198.51.100.30                          </remote>
+        <name>branch-c</name>
+        <proto>ESP</proto>
+        <enc>G256</enc>
+        <hash/>
+        <i_spi>1000000003</i_spi>
+        <o_spi>1000000004</o_spi>
+        <kb>Unlimited</kb>
+        <life>7200</life>
+        <remain>4743</remain>
+      </entry>
+    </entries>
+    <ntun>6</ntun>
+  </result>
+</response>

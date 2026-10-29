@@ -111,7 +111,7 @@ type FunctionAvailability interface {
 }
 
 // CollectorV2EnginePolicy allows a V2 collector to provide chartengine policy
-// (series selector + autogen behavior), captured once after Check. Overrides
+// (series selector, autogen behavior and context output limit), captured once after Check. Overrides
 // apply to global policy; native entry restrictions remain in force.
 type CollectorV2EnginePolicy interface {
 	EnginePolicy() chartengine.EnginePolicy

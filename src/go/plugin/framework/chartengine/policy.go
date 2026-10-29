@@ -11,10 +11,11 @@ import (
 )
 
 type effectiveEnginePolicy struct {
-	autogen           AutogenPolicy
-	autogenRules      []charttpl.ValidatedAutogenRule
-	autogenCounterRaw charttpl.ValidatedCounterRawCharts
-	selector          metrixselector.Selector
+	maxOutputSeriesPerContext int
+	autogen                   AutogenPolicy
+	autogenRules              []charttpl.ValidatedAutogenRule
+	autogenCounterRaw         charttpl.ValidatedCounterRawCharts
+	selector                  metrixselector.Selector
 }
 
 func resolveEffectivePolicy(
@@ -68,9 +69,10 @@ func resolveEffectivePolicy(
 	}
 
 	return effectiveEnginePolicy{
-		autogen:           autogen,
-		autogenRules:      autogenRules,
-		autogenCounterRaw: autogenCounterRaw,
-		selector:          selector,
+		maxOutputSeriesPerContext: cfg.maxOutputSeriesPerContext,
+		autogen:                   autogen,
+		autogenRules:              autogenRules,
+		autogenCounterRaw:         autogenCounterRaw,
+		selector:                  selector,
 	}, nil
 }
