@@ -43,9 +43,6 @@ By default, it detects SpigotMC instances running on localhost that are listenin
 > While Netdata can automatically detect SpigotMC instances and create data collection jobs, these jobs will fail unless you provide the necessary credentials.
 
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

@@ -261,8 +261,10 @@ The de-facto standard "scrape me" annotation. Match pods that opt in, route to t
 - id: prometheus
   match: '{{ and (hasKey .Annotations "prometheus.io/scrape") (eq (index .Annotations "prometheus.io/scrape") "true") }}'
   config_template: |
-    name: {{ .Namespace }}_{{ .Name }}_{{ .ContName }}
-    url: http://{{ .Address }}{{ index .Annotations "prometheus.io/path" | default "/metrics" }}
+    {{ job
+      "name" (printf "%s_%s_%s" .Namespace .Name .ContName)
+      "url" (printf "http://%s%s" .Address (index .Annotations "prometheus.io/path" | default "/metrics"))
+    }}
 
 ```
 
@@ -275,8 +277,7 @@ Run with `role: service`. Match Services that carry a `metrics-endpoint` compone
 - id: prometheus
   match: '{{ and (hasKey .Labels "app.kubernetes.io/component") (eq (index .Labels "app.kubernetes.io/component") "metrics-endpoint") }}'
   config_template: |
-    name: {{ .Namespace }}_{{ .Name }}
-    url: http://{{ .Address }}/metrics
+    {{ job "name" (printf "%s_%s" .Namespace .Name) "url" (printf "http://%s/metrics" .Address) }}
 
 ```
 
@@ -289,8 +290,7 @@ Match nginx-image pods on a known port. Use `match "sp"` for the four-form image
 - id: nginx
   match: '{{ and (eq .Port "80") (match "sp" .Image "nginx nginx:* */nginx */nginx:*") }}'
   config_template: |
-    name: {{ .Namespace }}_{{ .Name }}
-    url: http://{{ .Address }}/stub_status
+    {{ job "name" (printf "%s_%s" .Namespace .Name) "url" (printf "http://%s/stub_status" .Address) }}
 
 ```
 

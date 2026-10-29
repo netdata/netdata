@@ -48,9 +48,6 @@ By default, it detects instances running on localhost by attempting to connect u
 - 127.0.0.1:2182
 
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 
