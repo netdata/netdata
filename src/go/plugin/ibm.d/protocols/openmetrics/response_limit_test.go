@@ -3,9 +3,9 @@
 package openmetrics
 
 import (
+	"bytes"
 	"compress/gzip"
 	"context"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -17,28 +17,32 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type repeatingByte byte
-
-func (v repeatingByte) Read(p []byte) (int, error) {
-	for i := range p {
-		p[i] = byte(v)
+func openMetricsResponseBody(t *testing.T, size int64, compressed bool) []byte {
+	t.Helper()
+	require.Positive(t, size)
+	body := bytes.Repeat([]byte("x"), int(size))
+	body[0] = '#'
+	if !compressed {
+		return body
 	}
-	return len(p), nil
+	var buf bytes.Buffer
+	gz, err := gzip.NewWriterLevel(&buf, gzip.BestSpeed)
+	require.NoError(t, err)
+	_, err = gz.Write(body)
+	require.NoError(t, err)
+	require.NoError(t, gz.Close())
+	return buf.Bytes()
 }
 
 func TestResponseLimit(t *testing.T) {
 	for name, compressed := range map[string]bool{"plain": false, "gzip": true} {
 		t.Run(name, func(t *testing.T) {
+			body := openMetricsResponseBody(t, web.DefaultResponseBodyLimit+1, compressed)
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				var dst io.Writer = w
 				if compressed {
 					w.Header().Set("Content-Encoding", "gzip")
-					gz := gzip.NewWriter(w)
-					defer gz.Close()
-					dst = gz
 				}
-				_, _ = io.WriteString(dst, "#")
-				_, _ = io.CopyN(dst, repeatingByte('x'), web.DefaultResponseBodyLimit)
+				_, _ = w.Write(body)
 			}))
 			defer server.Close()
 			client, err := NewClientWithHTTP(
@@ -63,17 +67,12 @@ func TestCustomResponseLimit(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			for encoding, compressed := range map[string]bool{"plain": false, "gzip": true} {
 				t.Run(encoding, func(t *testing.T) {
-					var size atomic.Int64
+					var body atomic.Value
 					server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-						var dst io.Writer = w
 						if compressed {
 							w.Header().Set("Content-Encoding", "gzip")
-							gz := gzip.NewWriter(w)
-							defer gz.Close()
-							dst = gz
 						}
-						_, _ = io.WriteString(dst, "#")
-						_, _ = io.CopyN(dst, repeatingByte('x'), size.Load()-1)
+						_, _ = w.Write(body.Load().([]byte))
 					}))
 					defer server.Close()
 					cfg := Config{
@@ -89,13 +88,14 @@ func TestCustomResponseLimit(t *testing.T) {
 					client, err := NewClient(context.Background(), cfg)
 					require.NoError(t, err)
 					defer client.httpClient.CloseIdleConnections()
-					size.Store(limit.Bytes())
+					// Build/compress fixtures before starting the client's request deadline.
+					body.Store(openMetricsResponseBody(t, limit.Bytes(), compressed))
 					_, err = client.FetchSeries(context.Background(), nil)
 					require.NoError(t, err, "exact custom limit")
-					size.Store(limit.Bytes() + 1)
+					body.Store(openMetricsResponseBody(t, limit.Bytes()+1, compressed))
 					_, err = client.FetchSeries(context.Background(), nil)
 					require.ErrorIs(t, err, web.ErrResponseTooLarge)
-					size.Store(8)
+					body.Store(openMetricsResponseBody(t, 8, compressed))
 					_, err = client.FetchSeries(context.Background(), nil)
 					require.NoError(t, err, "recovery after overflow")
 				})
