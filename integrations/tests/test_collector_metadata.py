@@ -15,6 +15,7 @@ REPO_ROOT = INTEGRATIONS_DIR.parent
 sys.path.insert(0, str(INTEGRATIONS_DIR))
 
 import _common  # noqa: E402
+import gen_integrations  # noqa: E402
 
 GO_D_COLLECTORS = REPO_ROOT / 'src' / 'go' / 'plugin' / 'go.d' / 'collector'
 SD_RULES_DIR = REPO_ROOT / 'src' / 'go' / 'plugin' / 'go.d' / 'config' / 'go.d' / 'sd'
@@ -208,6 +209,29 @@ class ServiceDiscoveryClaimsTest(unittest.TestCase):
         self.assertEqual(
             SD_AUTO_DETECTION_BACKLOG - empty, set(),
             'SD_AUTO_DETECTION_BACKLOG lists a collector whose auto_detection is now filled; remove it')
+
+
+class CollectorLimitsRenderingTest(unittest.TestCase):
+    def render_overview(self, limits):
+        entry = _common.load_yaml(GO_D_COLLECTORS / 'httpcheck' / 'metadata.yaml')['modules'][0]
+        entry['overview']['default_behavior']['limits']['description'] = limits
+        template = gen_integrations.get_jinja_env().get_template('overview/collector.md')
+        return template.render(entry=entry, related=[])
+
+    def test_empty_limits_make_no_unlimited_collection_claim(self):
+        for limits in ('', ' \n '):
+            with self.subTest(limits=limits):
+                overview = self.render_overview(limits)
+                self.assertNotIn('#### Limits', overview)
+                self.assertNotIn('does not impose any limits', overview)
+                self.assertIn('#### Auto-Detection', overview)
+                self.assertIn('#### Performance Impact', overview)
+
+    def test_authored_limits_remain_visible(self):
+        description = 'An oversized response fails the check; use a smaller health endpoint.'
+        overview = self.render_overview(description)
+        self.assertIn('#### Limits', overview)
+        self.assertIn(description, overview)
 
 
 class MarkdownSafetyTest(unittest.TestCase):

@@ -159,7 +159,7 @@ func TestRawGraphQLClient(t *testing.T) {
 			)
 			defer server.Close()
 
-			client := tc.client(server.URL, server.Client())
+			client := tc.client(server.URL, newCatoHTTPClient(server.Client()))
 			tc.check(t, &client)
 		})
 	}
@@ -187,7 +187,7 @@ func TestRawGraphQLClientExplicitGzip(t *testing.T) {
 		url:        server.URL,
 		apiKey:     "secret",
 		headers:    map[string]string{"Accept-Encoding": "gzip"},
-		httpClient: server.Client(),
+		httpClient: newCatoHTTPClient(server.Client()),
 	}
 	snapshot, err := client.AccountSnapshot(context.Background(), "12345", []string{"1001"})
 
@@ -220,7 +220,7 @@ func TestRawGraphQLClientRejectsCorruptGzipTrailer(t *testing.T) {
 		url:        server.URL,
 		apiKey:     "secret",
 		headers:    map[string]string{"Accept-Encoding": "gzip"},
-		httpClient: server.Client(),
+		httpClient: newCatoHTTPClient(server.Client()),
 	}
 	_, err = client.AccountSnapshot(context.Background(), "12345", []string{"1001"})
 
@@ -291,7 +291,7 @@ func TestRawGraphQLClientErrors(t *testing.T) {
 			client := rawGraphQLClient{
 				url:        server.URL,
 				apiKey:     "secret",
-				httpClient: server.Client(),
+				httpClient: newCatoHTTPClient(server.Client()),
 			}
 			_, err := client.AccountSnapshot(context.Background(), "12345", []string{"1001"})
 			require.ErrorContains(t, err, tc.wantErr)
@@ -418,7 +418,10 @@ func TestSDKClientAccountMetrics(t *testing.T) {
 				require.Equal(t, "secret", r.Header.Get("x-api-key"))
 				require.NoError(t, json.NewDecoder(r.Body).Decode(&request))
 				w.Header().Set("Content-Type", "application/json")
-				_, err := io.WriteString(w, `{"data":{"accountMetrics":{"sites":[{"id":"1001","interfaces":[{"name":"WAN 1","metrics":{"rtt":15},"timeseries":[{"label":"bytesUpstreamMax","data":[[1,6008],[2,7168]]}]}]}]}}}`)
+				_, err := io.WriteString(
+					w,
+					`{"data":{"accountMetrics":{"sites":[{"id":"1001","interfaces":[{"name":"WAN 1","metrics":{"rtt":15},"timeseries":[{"label":"bytesUpstreamMax","data":[[1,6008],[2,7168]]}]}]}]}}}`,
+				)
 				require.NoError(t, err)
 			}))
 			defer server.Close()
@@ -431,7 +434,14 @@ func TestSDKClientAccountMetrics(t *testing.T) {
 			client, err := newSDKAPIClient(cfg, server.Client())
 			require.NoError(t, err)
 
-			metrics, err := client.AccountMetrics(context.Background(), "12345", []string{"1001", "1002"}, "last.PT10M", 3, tc.groupInterfaces)
+			metrics, err := client.AccountMetrics(
+				context.Background(),
+				"12345",
+				[]string{"1001", "1002"},
+				"last.PT10M",
+				3,
+				tc.groupInterfaces,
+			)
 			require.NoError(t, err)
 
 			var groupInterfaces any

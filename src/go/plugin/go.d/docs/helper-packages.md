@@ -52,6 +52,7 @@ Use `src/go/pkg/confopt` for common configuration value types.
 When:
 
 - users configure durations that should accept strings such as `5s`, `30m`, or numeric seconds;
+- code or configuration needs byte sizes with explicit units such as `128MiB`;
 - users need explicit `auto` / `enabled` / `disabled` behavior instead of a plain boolean;
 - an option takes one of a fixed set of string values, with a default that an empty or omitted value means;
 - a migration needs to preserve legacy pointer-boolean semantics without keeping pointer plumbing in new code.
@@ -59,6 +60,9 @@ When:
 Why:
 
 - `confopt.Duration` and `confopt.LongDuration` centralize YAML/JSON duration parsing and formatting;
+- `confopt.ByteSize` accepts numeric bytes or SI/binary unit strings and marshals a lossless string. Use
+  `128 * confopt.MiB` in Go and `.Bytes()` at I/O boundaries. `MB` means 1,000,000 bytes; `MiB` means 1,048,576.
+  Signed decimal quantities are supported; fractional bytes, mixed units, exponents and int64 overflow are rejected;
 - `confopt.AutoBool` makes tri-state behavior explicit and schema-friendly;
 - `confopt.Enum` decodes and encodes an empty value as its default, and `Validate` reports the allowed values;
 - collectors avoid ad hoc parsers and inconsistent boolean defaults.
@@ -78,7 +82,7 @@ Why:
 
 - `web.HTTPConfig` embeds `web.RequestConfig` and `web.ClientConfig` so HTTP collectors expose the same option surface;
 - `web.NewHTTPClient(ctx, c.ClientConfig)` applies timeout, TLS, proxy, redirect, and HTTP/2
-  behavior consistently;
+  behavior consistently, with a default 64 MiB response-body ceiling;
 - `web.NewHTTPRequest(ctx, c.RequestConfig)` and
   `web.NewHTTPRequestWithPath(ctx, c.RequestConfig, path)` apply user agent,
   authentication, headers, body, and safe path joining.
@@ -94,6 +98,37 @@ type Config struct {
 Use `src/go/pkg/tlscfg` directly only when the collector is not HTTP-based but still needs TLS, such as Redis or
 x509-style checks. HTTP collectors should get TLS behavior through `web.HTTPConfig`.
 
+### HTTP response limits
+
+`web.NewHTTPClient` limits bytes read from each response to `web.DefaultResponseBodyLimit` (64 MiB) by default.
+Set `web.ClientConfig.ResponseBodyLimit` in code, for example `128 * confopt.MiB`, to select a different limit.
+Zero or negative values use the default; there is no unlimited mode. The field is excluded from YAML/JSON, so this
+does not expose an operator option. Exactly-at-limit bodies are accepted. Overflow errors match
+`web.ErrResponseTooLarge` with `errors.Is`; `errors.As` can retrieve `*web.ResponseBodyLimitError` and its byte limit.
+The bound applies to the body returned by the transport, including automatic gzip decompression, without changing
+headers or content. A parser that stops early can succeed; cleanup is bounded but does not validate unread content.
+This is not a bound on decoded objects, retained buffer capacity, aggregate jobs or total process memory.
+
+When accepting an arbitrary HTTP client, obtain its policy with `web.HTTPClientResponseBodyLimit(client)` once per
+fetch and call `web.LimitResponseBody(body, limit)` before deferring `web.CloseBody`. An explicit decompressor MUST
+also wrap its output with `web.LimitResponseReader(reader, limit)`; a bound on the
+compressed input alone does not stop expansion. Keep these limits before any full-body allocation. Existing stricter
+protocol limits remain valid.
+
+Transport adapters MUST forward `ResponseBodyLimit() int64` to preserve a wrapped client's selected policy.
+Unknown clients use the default in acquisition helpers. To tune an arbitrary transport, assemble it with
+`web.NewHTTPClientWithTransport`. Known nested transports use the stricter policy; wrapping an already bounded
+body cannot raise its existing limit. Configure the policy before making requests.
+
+For custom HTTP/1 dialing, build with `web.NewHTTPTransport`, configure the transport, then call
+`web.NewHTTPClientWithTransport`. That assembly applies the response limit, timeout and redirect policy; TLS, proxy
+and protocol selection belong to the supplied transport. Do not assert or unwrap the transport of a bounded client.
+
+SDK coverage depends on supported injection points. Cato's supplied client bounds explicit gzip before SDK parsing;
+Redfish retains its stricter acquisition policy. Pango requires a concrete `*http.Transport`, so PAN-OS uses the raw
+builder and is outside the shared response-size guarantee. Independently constructed cloud, vSphere and Kubernetes
+SDK clients are also outside this guarantee; a lifetime byte cap is inappropriate for Kubernetes watch streams.
+
 ### Configured credential and TLS files
 
 HTTP helpers handle credential files internally. `web.NewHTTPClient(ctx, cfg)` returns a standard `*http.Client`;
@@ -103,7 +138,7 @@ Keep `web.DoHTTP(client)` response/parsing helpers per use; their `OnNokCode` ca
 
 Each configured file operation uses its own reduced-authority helper on Unix. Requests without a bearer file start no
 helper process. `tlscfg.NewTLSConfig(ctx, cfg)` reads each configured CA/cert/key file independently. SDK/RPC HTTP consumers
-use the same `web.NewHTTPClient` constructor. Cookie collection calls `Stat` and conditionally `Open`/parse; it closes the
+use the shared construction paths above. Cookie collection calls `Stat` and conditionally `Open`/parse; it closes the
 stream before returning. No helper process is retained between operations.
 
 On Unix the operation uses a reduced-authority helper. Windows retains the service account's file authority. Helpers
@@ -154,6 +189,10 @@ Why:
 Pass the HTTP client to `prometheus.New(client, request)` or
 `prometheus.NewWithSelector(client, request, selector)`. Use `ScrapeContext(ctx)`, `ScrapeSeries(ctx)` or
 `ScrapeSamples(ctx)` so cancellation reaches the bearer read as well as the HTTP request.
+
+HTTP scraping bounds both the response stream and explicitly decompressed gzip output to the supplied client's
+policy, defaulting to 64 MiB for unknown clients. Overflow fails the scrape before parsing. This does not
+change the separate local-file input path or imply a bound on parser memory.
 
 Do not hand-roll text exposition parsing in a collector.
 

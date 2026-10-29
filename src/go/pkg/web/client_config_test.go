@@ -38,7 +38,7 @@ func TestNewHTTPClient(t *testing.T) {
 				assert.NotNil(t, client.Transport)
 
 				// Verify it's using http.Transport (not http2)
-				transport, ok := client.Transport.(*http.Transport)
+				transport, ok := client.Transport.(*responseLimitTransport).base.(*http.Transport)
 				assert.True(t, ok)
 				assert.NotNil(t, transport)
 			},
@@ -50,7 +50,7 @@ func TestNewHTTPClient(t *testing.T) {
 			validate: func(t *testing.T, client *http.Client, cfg ClientConfig) {
 				assert.Equal(t, time.Second*5, client.Timeout)
 
-				transport, ok := client.Transport.(*http.Transport)
+				transport, ok := client.Transport.(*responseLimitTransport).base.(*http.Transport)
 				require.True(t, ok)
 				assert.Equal(t, time.Second*5, transport.TLSHandshakeTimeout)
 			},
@@ -72,7 +72,7 @@ func TestNewHTTPClient(t *testing.T) {
 				ProxyURL: "http://127.0.0.1:3128",
 			},
 			validate: func(t *testing.T, client *http.Client, cfg ClientConfig) {
-				transport, ok := client.Transport.(*http.Transport)
+				transport, ok := client.Transport.(*responseLimitTransport).base.(*http.Transport)
 				require.True(t, ok)
 				assert.NotNil(t, transport.Proxy)
 
@@ -95,7 +95,7 @@ func TestNewHTTPClient(t *testing.T) {
 				ProxyURL: "",
 			},
 			validate: func(t *testing.T, client *http.Client, cfg ClientConfig) {
-				transport, ok := client.Transport.(*http.Transport)
+				transport, ok := client.Transport.(*responseLimitTransport).base.(*http.Transport)
 				require.True(t, ok)
 
 				// Set env var for testing
@@ -116,7 +116,7 @@ func TestNewHTTPClient(t *testing.T) {
 			},
 			validate: func(t *testing.T, client *http.Client, cfg ClientConfig) {
 				// Verify it's using http2Transport
-				transport, ok := client.Transport.(*http2Transport)
+				transport, ok := client.Transport.(*responseLimitTransport).base.(*http2Transport)
 				assert.True(t, ok)
 				assert.NotNil(t, transport)
 				assert.NotNil(t, transport.t2)
@@ -130,7 +130,7 @@ func TestNewHTTPClient(t *testing.T) {
 				},
 			},
 			validate: func(t *testing.T, client *http.Client, cfg ClientConfig) {
-				transport, ok := client.Transport.(*http.Transport)
+				transport, ok := client.Transport.(*responseLimitTransport).base.(*http.Transport)
 				require.True(t, ok)
 				assert.NotNil(t, transport.TLSClientConfig)
 				assert.True(t, transport.TLSClientConfig.InsecureSkipVerify)
@@ -160,7 +160,7 @@ func TestNewHTTPClient(t *testing.T) {
 				assert.Equal(t, time.Second*10, client.Timeout)
 				assert.NotNil(t, client.CheckRedirect)
 
-				transport, ok := client.Transport.(*http.Transport)
+				transport, ok := client.Transport.(*responseLimitTransport).base.(*http.Transport)
 				require.True(t, ok)
 				assert.True(t, transport.TLSClientConfig.InsecureSkipVerify)
 				assert.NotNil(t, transport.Proxy)
@@ -174,7 +174,7 @@ func TestNewHTTPClient(t *testing.T) {
 				},
 			},
 			validate: func(t *testing.T, client *http.Client, cfg ClientConfig) {
-				transport, ok := client.Transport.(*http2Transport)
+				transport, ok := client.Transport.(*responseLimitTransport).base.(*http2Transport)
 				require.True(t, ok)
 				assert.True(t, transport.t2.TLSClientConfig.InsecureSkipVerify)
 				assert.True(t, transport.t2c.TLSClientConfig.InsecureSkipVerify)
@@ -218,14 +218,11 @@ func TestHTTP2Transport_RoundTrip(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify the transport is http2Transport
-	transport, ok := client.Transport.(*http2Transport)
+	transport, ok := client.Transport.(*responseLimitTransport).base.(*http2Transport)
 	require.True(t, ok)
 	assert.NotNil(t, transport.t2)
 	assert.NotNil(t, transport.t2c)
 
-	// Note: We can't easily test actual HTTP/2 communication without setting up
-	// proper HTTP/2 servers, which httptest doesn't support directly.
-	// The integration test with regular servers is sufficient for basic functionality.
 }
 
 func TestHTTP2Transport_CloseIdleConnections(t *testing.T) {
