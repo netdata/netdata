@@ -21,7 +21,7 @@ Using the **timestamp** and **duration**, Netdata calculates for each point its 
 
 Netdata stores one value per **update every** slot. For incremental metrics (counters), Netdata interpolates the collected values to align them to the expected **end time** at the microsecond level, absorbing data collection micro-latencies.
 
-For all other metrics (such as `absolute`), the value collected for a slot is stored as-is. When a data collection is late enough to miss a slot, Netdata fills the missed slot by interpolating between the values collected around it, so a metric that collects only integers may still store fractional values. When two collections fall in the same slot, only one of them is stored. Queries return the stored values, not the original collected samples.
+For all other metrics (such as `absolute`), Netdata stores the value calculated from the collection (after applying the multiplier and divisor, or the percentage). When a collection is late enough to miss a slot, Netdata fills the missed slot by interpolating between the calculated values around it, so a metric that collects only integers may still store fractional values. Longer delays leave gaps instead. When several collections fall in the same slot, only one value is stored for it. Queries read these stored values, not the original collected samples, and may aggregate them further (for example with `points`, `gtime` or `group`).
 
 When data points are stored in higher tiers (time aggregations - see [Tiers](#tiers) below), each data point has:
 
