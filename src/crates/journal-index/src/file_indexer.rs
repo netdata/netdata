@@ -110,10 +110,8 @@ pub struct FileIndexer {
     // the index space the bitmaps' entry indices live in
     entry_offset_index: HashMap<NonZeroU64, u64>,
 
-    // Entry offsets of ND_REMAPPING=1 bookkeeping records: the OTel log
-    // writer's field-mapping metadata (`journal-log-writer/src/log/mod.rs`
-    // `write_remapping_entry`),
-    // not log entries. Excluded from the histogram, the time-ordered list and
+    // Entry offsets of ND_REMAPPING=1 bookkeeping records: the field-mapping
+    // metadata of the plugin's former journal writer, not log entries. Excluded from the histogram, the time-ordered list and
     // the bitmaps so consumers see only genuine log entries.
     remapping_entry_offsets: HashSet<NonZeroU64>,
 }
@@ -206,16 +204,15 @@ impl FileIndexer {
         let was_online = journal_file.journal_header_ref().state == 1 || file.is_active();
 
         // field_map: requested field name -> the systemd-side name stored in
-        // the journal. Identity for plain fields; the OTel log writer's
+        // the journal. Identity for plain fields; the former journal writer's
         // remappings resolve to their ND_<md5> names
         // (`journal-core/src/file/file.rs` `load_fields`).
         let field_map = journal_file.load_fields()?;
 
         // Find the ND_REMAPPING=1 bookkeeping records so their entry offsets
-        // can be excluded everywhere below. The OTel log writer writes one
-        // record whenever new field mappings appear and all of them share a
-        // single ND_REMAPPING=1 data object
-        // (`journal-log-writer/src/log/mod.rs` `write_remapping_entry`); journals without
+        // can be excluded everywhere below. The plugin's former journal writer
+        // wrote one record whenever new field mappings appeared, and all of
+        // them share a single ND_REMAPPING=1 data object; journals without
         // remappings leave the exclusion set empty.
         self.collect_remapping_entry_offsets(&journal_file, tail_object_offset)?;
 
@@ -470,8 +467,9 @@ impl FileIndexer {
 
     /// Collect the entry offsets of `ND_REMAPPING=1` bookkeeping records.
     ///
-    /// The OTel log writer emits these records to carry the OTel→systemd
-    /// field-name mapping (ND_<md5>=<otel-name>); they are metadata, not
+    /// The plugin's former journal writer emitted these records to carry the
+    /// OTel→systemd field-name mapping (ND_<md5>=<otel-name>); they are
+    /// metadata, not
     /// log entries, so every offset found here is excluded from the
     /// histogram, the time-ordered list and the bitmaps. Journals without
     /// remappings leave the set empty, and only offsets within the snapshot

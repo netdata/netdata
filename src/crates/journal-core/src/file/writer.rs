@@ -3,9 +3,8 @@
 //! entry array and the per-data entry arrays - appending to an existing
 //! [`JournalFile<MmapMut>`] (file/file.rs) through its `*_mut` accessors.
 //! Creating the file is not this file's job: [`JournalFile::create`]
-//! lays out the header and hash tables and
-//! [`JournalFile::create_successor`] builds a rotation
-//! successor; a writer is then placed on top with [`JournalWriter::new`],
+//! lays out the header and hash tables; a writer is then placed on top
+//! with [`JournalWriter::new`],
 //! and `add_entry` is the sole write path.
 //!
 //! Everything is appended at one strictly growing `append_offset` - the end
@@ -28,14 +27,12 @@
 //! (the `GuardedCell` in-use flag) and is not `Sync` (the `GuardedCell`
 //! holds an `UnsafeCell`), so the pair is used from a
 //! single thread. The writer never syncs; appends reach disk only through
-//! [`JournalFile::sync`], which journal-log-writer calls
-//! per batch, on rotation and on drop
-//! (journal-log-writer/src/log/mod.rs).
+//! [`JournalFile::sync`].
 //!
-//! Consumers (grep-verified): the only non-test consumer is
-//! journal-log-writer (journal-log-writer/src/log/mod.rs); everything else
-//! builds test fixtures (journal-core's
-//! reader/file test modules, journal-index, journal-engine). netflow-plugin
+//! Consumers (grep-verified): test fixtures only (journal-core's
+//! reader/file test modules, journal-index, journal-engine). The plugin's
+//! former journal writer, which produced the files otel-legacy-logs reads,
+//! was the only production consumer. netflow-plugin
 //! drives the published sdk twin's `journal_sdk_core::JournalWriter`
 //! (its tests in src/crates/netflow-plugin/src/facet_runtime.rs), and the
 //! in-tree jf twin has its own same-named writer
@@ -201,15 +198,6 @@ pub struct JournalWriter {
 }
 
 impl JournalWriter {
-    /// The written arena's end - where the next object appends, and what
-    /// `header_size + arena_size` add up to. Not the on-disk length: mmap
-    /// windows map in whole chunks and the writable `MemoryMapMut`'s
-    /// `create` extends the file past this. Rotation sizing reads it as
-    /// the size signal (journal-log-writer/src/log/mod.rs).
-    pub fn current_file_size(&self) -> u64 {
-        self.append_offset.get()
-    }
-
     /// Monotonic timestamp of the first entry written through this writer;
     /// `None` until the first `add_entry` lands, and still `None` for a
     /// writer resumed on a file that already has entries. In-memory only -
@@ -217,20 +205,6 @@ impl JournalWriter {
     /// and nothing outside this file reads it today.
     pub fn first_entry_monotonic(&self) -> Option<u64> {
         self.first_entry_monotonic
-    }
-
-    /// Sequence number the next `add_entry` will write; incremented after
-    /// each entry. journal-log-writer carries it into the successor file
-    /// on rotation (journal-log-writer/src/log/mod.rs).
-    pub fn next_seqnum(&self) -> u64 {
-        self.next_seqnum
-    }
-
-    /// Boot id stamped into every entry header and the header's
-    /// `tail_entry_boot_id` (a `JournalHeader` field); carried across
-    /// rotation (journal-log-writer/src/log/mod.rs).
-    pub fn boot_id(&self) -> uuid::Uuid {
-        self.boot_id
     }
 
     /// Builds a writer on an already-opened journal file, resuming appends
@@ -275,17 +249,6 @@ impl JournalWriter {
             first_entry_monotonic: None,
             boot_id,
         })
-    }
-
-    /// Writer state for a successor file: a fresh writer on `journal_file`
-    /// carrying this writer's `next_seqnum` and `boot_id`; caches, the
-    /// item buffer and `first_entry_monotonic` start empty. Making the
-    /// successor FILE is [`JournalFile::create_successor`]'s job;
-    /// journal-log-writer pairs the two with plain
-    /// [`JournalWriter::new`] (journal-log-writer/src/log/mod.rs)
-    /// and nothing calls this method today.
-    pub fn create_successor(&self, journal_file: &mut JournalFile<MmapMut>) -> Result<Self> {
-        Self::new(journal_file, self.next_seqnum, self.boot_id)
     }
 
     /// Writes one entry and all its bookkeeping: resolves every item to a

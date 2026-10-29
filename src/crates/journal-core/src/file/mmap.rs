@@ -25,11 +25,9 @@
 //! opens a new window, evicting the oldest at `max_windows`. Sizing is
 //! caller policy: JournalFile passes 16 windows after `open` / 32 after
 //! `create` but takes chunk sizes from its callers - the
-//! [`JournalFileOptions`](crate::file::JournalFileOptions) default is 64 KiB,
-//! rotation switches to 8 MiB
+//! [`JournalFileOptions`](crate::file::JournalFileOptions) default is 64 KiB
 //! ([`JournalFile::open`](crate::file::JournalFile::open),
-//! [`JournalFile::create`](crate::file::JournalFile::create),
-//! [`JournalFile::create_successor`](crate::file::JournalFile::create_successor)).
+//! [`JournalFile::create`](crate::file::JournalFile::create)).
 //!
 //! Load-bearing contract: any access can unmap or move windows, so a slice
 //! handed out earlier dangles once its window goes. Through `&mut self` the
@@ -49,9 +47,8 @@
 //! `Send`/`Sync` follow `M` (both memmap2 types are); the journal file type
 //! is `!Sync` because of its `GuardedCell` wrapper, not this module.
 //!
-//! Consumers: `JournalFile` (file/file.rs) is the only `WindowManager` user,
-//! and journal-log-writer imports `MmapMut` from here directly
-//! (journal-log-writer/src/log/mod.rs). This module's near-twin is
+//! Consumers: `JournalFile` (file/file.rs) is the only `WindowManager` user.
+//! This module's near-twin is
 //! src/crates/jf/window_manager/src/lib.rs (keeps the old window start on
 //! remap, no `flush`/`sync`, no failure logging).
 //!
@@ -210,7 +207,7 @@ impl<M: MemoryMap> WindowManager<M> {
     /// `u64::is_multiple_of`) and `max_windows` caps the window count
     /// (debug-asserted non-zero). Callers set both: JournalFile passes 16
     /// (open) / 32 (create) windows but takes chunk sizes from its callers -
-    /// the `JournalFileOptions` default is 64 KiB, rotation uses 8 MiB
+    /// the `JournalFileOptions` default is 64 KiB
     /// ([`JournalFile::open`](crate::file::JournalFile::open) /
     /// [`JournalFile::create`](crate::file::JournalFile::create)).
     pub fn new(file: File, chunk_size: u64, max_windows: usize) -> Result<Self> {

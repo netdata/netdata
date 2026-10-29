@@ -47,9 +47,7 @@ members = [
     "journal-engine",
     "journal-function",
     "journal-index",
-    "journal-log-writer",
     "journal-registry",
-    "rdp",
 
     # NetFlow plugin.
     "netflow-plugin",
@@ -107,7 +105,6 @@ journal-engine = { path = "journal-engine" }
 journal-function = { path = "journal-function" }
 journal-index = { path = "journal-index", default-features = false }
 journal-registry = { path = "journal-registry" }
-rdp = { path = "rdp" }
 
 # External crates used by more than one group (plugin SDK, OTel, legacy
 # journal stack, NetFlow, netipc).

@@ -1,11 +1,8 @@
-//! Type-safe time units for the journal stack: `Seconds`/`Microseconds`
-//! newtypes, the strictly monotonic `RealtimeClock`, and `monotonic_now`;
-//! imported via the flat crate-root re-export ([`crate::Seconds`],
-//! [`crate::Microseconds`], [`crate::RealtimeClock`],
-//! [`crate::monotonic_now`]), not this path.
+//! Type-safe time units for the journal stack: the `Seconds`/`Microseconds`
+//! newtypes, imported via the flat crate-root re-export ([`crate::Seconds`],
+//! [`crate::Microseconds`]), not this path.
 
 use serde::{Deserialize, Serialize};
-use std::cell::Cell;
 use std::ops::{Add, Rem, Sub};
 
 /// A count of seconds (`u32`): epoch seconds for timestamps (registry time
@@ -227,116 +224,6 @@ impl std::fmt::Display for Microseconds {
     }
 }
 
-/// A strictly monotonic stream of wall-clock microseconds.
-///
-/// Wraps `SystemTime`-based wall-clock time but never returns a value at or
-/// below its floor (the highest value returned or seeded): when the system
-/// clock stalls or steps backwards (NTP correction), the next value is
-/// `floor + 1µs` instead. `now()` and `observe()` share one floor, so
-/// interleaving them keeps the combined stream strictly increasing — until
-/// saturation at `u64::MAX`, where the +1µs bump can no longer move it.
-///
-/// The floor is a `Cell`, so both methods take only `&self`; that makes the
-/// clock `Send` but `!Sync` — not shareable across threads.
-#[derive(Debug)]
-pub struct RealtimeClock {
-    max_seen: Cell<u64>,
-}
-
-impl RealtimeClock {
-    /// Creates a clock whose floor is the current system time.
-    ///
-    /// Panics if the system clock is before the Unix epoch (via
-    /// `Microseconds::now()`).
-    pub fn new() -> Self {
-        Self::with_initial(Microseconds::now())
-    }
-
-    /// Creates a clock seeded with a known timestamp.
-    ///
-    /// Values at or below `initial` are bumped to `initial + 1µs` on the next
-    /// read. journal-log-writer seeds this from the persisted chain's tail
-    /// realtime timestamp on open (`journal-log-writer/src/log/mod.rs`
-    /// `Log::new`).
-    pub fn with_initial(initial: Microseconds) -> Self {
-        Self {
-            max_seen: Cell::new(initial.get()),
-        }
-    }
-
-    /// Current wall-clock time as microseconds since the Unix epoch, kept
-    /// strictly increasing.
-    ///
-    /// Returns the system time when it is ahead of the floor; otherwise
-    /// `floor + 1µs` (saturating). Shares the floor with `observe()`.
-    pub fn now(&self) -> Microseconds {
-        let current = Microseconds::now();
-        let max = self.max_seen.get();
-
-        let next = if current.get() > max {
-            current.get()
-        } else {
-            max.saturating_add(1)
-        };
-
-        self.max_seen.set(next);
-        Microseconds::new(next)
-    }
-
-    /// Admits an externally supplied timestamp, keeping the stream monotonic.
-    ///
-    /// Returns `candidate` when it is ahead of the floor; otherwise
-    /// `floor + 1µs` (saturating). Shares the floor with `now()`.
-    /// journal-log-writer routes caller-supplied entry realtime overrides
-    /// through this (`journal-log-writer/src/log/mod.rs`
-    /// `Log::capture_dual_timestamp`).
-    pub fn observe(&self, candidate: Microseconds) -> Microseconds {
-        let max = self.max_seen.get();
-        let next = if candidate.get() > max {
-            candidate.get()
-        } else {
-            max.saturating_add(1)
-        };
-
-        self.max_seen.set(next);
-        Microseconds::new(next)
-    }
-
-    /// Get the last seen timestamp without advancing the clock.
-    pub fn last_seen(&self) -> Microseconds {
-        Microseconds::new(self.max_seen.get())
-    }
-}
-
-impl Default for RealtimeClock {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-/// Reads `CLOCK_MONOTONIC` as microseconds since boot.
-///
-/// Not tied to the Unix epoch and unaffected by system-clock jumps, but
-/// it does not advance while the system is suspended. Matches the monotonic
-/// half of systemd's journal dual timestamps. Consecutive calls can repeat
-/// within one microsecond, so per-entry distinctness needs clamping —
-/// journal-log-writer clamps against the last written monotonic value for the
-/// boot (`journal-log-writer/src/log/mod.rs`
-/// `Log::capture_dual_timestamp`).
-///
-/// The error carries the raw `clock_gettime` errno as `io::Error`;
-/// effectively unreachable for `CLOCK_MONOTONIC` on Linux.
-pub fn monotonic_now() -> std::io::Result<Microseconds> {
-    use nix::sys::time::TimeValLike;
-    use nix::time::ClockId;
-
-    let ts = ClockId::CLOCK_MONOTONIC
-        .now()
-        .map_err(|e| std::io::Error::from_raw_os_error(e as i32))?;
-
-    Ok(Microseconds::new(ts.num_microseconds() as u64))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -537,75 +424,5 @@ mod tests {
         let g = Microseconds::new(10000);
         let h = Microseconds::new(0);
         assert!(!g.is_multiple_of(h)); // zero divisor returns false, no panic
-    }
-
-    #[test]
-    fn test_realtime_clock_monotonic() {
-        let clock = RealtimeClock::new();
-        let t1 = clock.now();
-        let t2 = clock.now();
-        let t3 = clock.now();
-
-        assert!(t2 > t1);
-        assert!(t3 > t2);
-    }
-
-    #[test]
-    fn test_realtime_clock_with_initial() {
-        let initial = Microseconds::new(1000000);
-        let clock = RealtimeClock::with_initial(initial);
-
-        assert_eq!(clock.last_seen(), initial);
-
-        let t1 = clock.now();
-        assert!(t1 >= initial);
-    }
-
-    #[test]
-    fn test_realtime_clock_handles_same_time() {
-        // two now() calls within one wall-clock microsecond still differ by 1µs
-        let initial = Microseconds::new(1000000);
-        let clock = RealtimeClock::with_initial(initial);
-
-        let t1 = clock.now();
-        let t2 = clock.now();
-
-        assert!(t2 > t1);
-        assert_eq!(t2.get() - t1.get(), 1);
-    }
-
-    #[test]
-    fn test_realtime_clock_last_seen() {
-        let clock = RealtimeClock::new();
-
-        let t1 = clock.now();
-        assert_eq!(clock.last_seen(), t1);
-
-        let t2 = clock.now();
-        assert_eq!(clock.last_seen(), t2);
-    }
-
-    #[test]
-    fn test_realtime_clock_forward_jump() {
-        let past = Microseconds::new(1000000);
-        let clock = RealtimeClock::with_initial(past);
-
-        // the real clock is ahead of the floor, so it wins
-        let t1 = clock.now();
-        assert!(t1.get() > past.get());
-    }
-
-    #[test]
-    fn test_realtime_clock_observe_preserves_monotonicity() {
-        let clock = RealtimeClock::with_initial(Microseconds::new(1_000_000));
-
-        let t1 = clock.observe(Microseconds::new(900_000));
-        assert_eq!(t1.get(), 1_000_001);
-
-        let t2 = clock.observe(Microseconds::new(1_000_001));
-        assert_eq!(t2.get(), 1_000_002);
-
-        let t3 = clock.observe(Microseconds::new(1_500_000));
-        assert_eq!(t3.get(), 1_500_000);
     }
 }

@@ -2487,7 +2487,6 @@ dependencies = [
  "parking_lot",
  "rand 0.9.5",
  "rayon",
- "rdp",
  "regex",
  "rustc-hash",
  "ruzstd",
@@ -2567,25 +2566,6 @@ dependencies = [
  "roaring 0.11.2",
  "serde",
  "static_assertions",
- "tempfile",
- "thiserror 2.0.20",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "journal-log-writer"
-version = "0.1.3"
-dependencies = [
- "flatten-serde-json",
- "itoa",
- "journal-common",
- "journal-core",
- "journal-registry",
- "nix",
- "rdp",
- "serde",
- "serde_json",
  "tempfile",
  "thiserror 2.0.20",
  "tracing",
@@ -4518,13 +4498,6 @@ dependencies = [
  "time",
  "x509-parser",
  "yasna",
-]
-
-[[package]]
-name = "rdp"
-version = "0.1.3"
-dependencies = [
- "md5",
 ]
 
 [[package]]

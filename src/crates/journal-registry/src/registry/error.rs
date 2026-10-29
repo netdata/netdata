@@ -1,9 +1,8 @@
 //! Registry error type: returned by `Monitor::new` and every fallible
 //! `Registry` method through the `Result` alias below. Re-exported flat from
 //! the crate root ([`crate::RegistryError`]) and therefore public API;
-//! journal-engine and journal-log-writer wrap it via `#[from]`
-//! (`journal-engine/src/error.rs`, `journal-log-writer/src/error.rs`;
-//! neither wrapper produces it today), netflow-plugin and otel-legacy-logs
+//! journal-engine wraps it via `#[from]` (`journal-engine/src/error.rs`;
+//! the wrapper never produces it today), netflow-plugin and otel-legacy-logs
 //! handle it through anyhow (`netflow-plugin/src/query/service.rs`,
 //! `otel-legacy-logs/src/handler.rs`).
 //!

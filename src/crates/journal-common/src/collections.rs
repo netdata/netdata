@@ -19,8 +19,7 @@
 //! `crate::collections`): journal-core `field_map.rs` (HashMap, HashSet),
 //! `file/file.rs` (HashMap); journal-index
 //! `file_index.rs`, `file_indexer.rs`; journal-function `netdata/facets.rs`,
-//! `netdata/histogram.rs`; journal-engine `histogram.rs`; journal-log-writer
-//! `log/chain.rs`. Direct `journal_common::collections` imports:
+//! `netdata/histogram.rs`; journal-engine `histogram.rs`. Direct `journal_common::collections` imports:
 //! journal-registry `registry/mod.rs`, `repository/collection.rs`,
 //! `repository/mod.rs`. The crate root also re-exports the three aliases flat
 //! ([`crate::HashMap`], [`crate::HashSet`], [`crate::VecDeque`]); no external

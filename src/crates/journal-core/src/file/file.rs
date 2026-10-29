@@ -19,8 +19,8 @@
 //! than racing.
 //!
 //! Consumers: `JournalWriter` (file/writer.rs) writes through the `*_mut`
-//! accessors; journal-log-writer creates files via [`JournalFileOptions`]
-//! and rotates via `create_successor`; journal-index and journal-engine
+//! accessors (test fixtures create files via [`JournalFileOptions`]);
+//! journal-index and journal-engine
 //! read files via `open` and the typed accessors (netflow-plugin consumes
 //! the published `journal-sdk-core` release instead). Field-name
 //! remappings (`ND_REMAPPING=1` entries) are parsed by `load_fields` below;
@@ -142,62 +142,6 @@ impl JournalFileOptions {
         }
     }
 
-    /// Sizes the hash tables for a successor file. With utilization data:
-    /// double a table above 75% occupancy, halve it below 25% (only while
-    /// larger than the 4096/512 defaults), else keep it. Without: derive
-    /// data buckets from `max_file_size` (default 8 MiB) and fix field
-    /// buckets at 128.
-    pub fn with_optimized_buckets(
-        mut self,
-        previous_utilization: Option<BucketUtilization>,
-        max_file_size: Option<u64>,
-    ) -> Self {
-        let (data_buckets, field_buckets) = if let Some(utilization) = previous_utilization {
-            let data_utilization = utilization.data_utilization();
-            let field_utilization = utilization.field_utilization();
-
-            let data_buckets = if data_utilization > 0.75 {
-                (utilization.data_total * 2).next_power_of_two()
-            } else if data_utilization < 0.25 && utilization.data_total > 4096 {
-                (utilization.data_total / 2).next_power_of_two()
-            } else {
-                utilization.data_total
-            };
-
-            let field_buckets = if field_utilization > 0.75 {
-                (utilization.field_total * 2).next_power_of_two()
-            } else if field_utilization < 0.25 && utilization.field_total > 512 {
-                (utilization.field_total / 2).next_power_of_two()
-            } else {
-                utilization.field_total
-            };
-
-            (data_buckets, field_buckets)
-        } else {
-            // Initial sizing based on rotation policy max file size
-            let max_file_size = max_file_size.unwrap_or(8 * 1024 * 1024);
-
-            // 16 MiB -> 4096 data buckets
-            let data_buckets = (max_file_size / 4096).max(1024).next_power_of_two() as usize;
-            let field_buckets = 128; // Fixed; 8:1 vs data at the 1024-bucket floor, 16:1 at the 8 MiB default
-
-            (data_buckets, field_buckets)
-        };
-
-        self.data_hash_table_buckets = data_buckets;
-        self.field_hash_table_buckets = field_buckets;
-        self
-    }
-
-    /// Sets the journal's mmap window size; must be a multiple of 8 and of
-    /// the 4096-byte page (asserted).
-    pub fn with_window_size(mut self, size: u64) -> Self {
-        assert_eq!(size % OBJECT_ALIGNMENT, 0);
-        assert_eq!(size % 4096, 0, "Window size must be page-aligned");
-        self.window_size = size;
-        self
-    }
-
     /// Bucket count; must be a power of two (asserted) - bucket lookup is
     /// `hash % buckets` (object.rs).
     pub fn with_data_hash_table_buckets(mut self, buckets: usize) -> Self {
@@ -220,44 +164,9 @@ impl JournalFileOptions {
         self
     }
 
-    /// Sets the header's `KeyedHash` flag; see `JournalFile::hash`.
-    pub fn with_keyed_hash(mut self, enabled: bool) -> Self {
-        self.enable_keyed_hash = enabled;
-        self
-    }
-
     /// Convenience wrapper around `JournalFile::create`.
     pub fn create<M: MemoryMapMut>(self, file: &crate::repository::File) -> Result<JournalFile<M>> {
         JournalFile::create(file, self)
-    }
-}
-
-/// Hash-table occupancy per table: `*_occupied` counts buckets with a
-/// chain head. Produced by `JournalFile::bucket_utilization`, consumed by
-/// `with_optimized_buckets`.
-#[derive(Debug, Clone, Copy)]
-pub struct BucketUtilization {
-    pub data_occupied: usize,
-    pub data_total: usize,
-    pub field_occupied: usize,
-    pub field_total: usize,
-}
-
-impl BucketUtilization {
-    pub fn data_utilization(&self) -> f64 {
-        if self.data_total == 0 {
-            0.0
-        } else {
-            self.data_occupied as f64 / self.data_total as f64
-        }
-    }
-
-    pub fn field_utilization(&self) -> f64 {
-        if self.field_total == 0 {
-            0.0
-        } else {
-            self.field_occupied as f64 / self.field_total as f64
-        }
     }
 }
 
@@ -641,14 +550,14 @@ impl<M: MemoryMap> JournalFile<M> {
     /// field_map.rs), walks every entry referencing it through the data
     /// object's inlined cursor, and parses each entry's other data payloads
     /// as `name=value` (first `=`), mapping `value` (original) -> `name`
-    /// (stored). No name-shape gate: both `rdp::encode_full` normal names
+    /// (stored). No name-shape gate: both encoded names
     /// (`ND<checksum><structure>_<NAME>`) and MD5-fallback names (`ND_` +
     /// 32 hex) load - unlike `JournalReader::load_remappings`
     /// (file/reader.rs), which accepts only the 35-byte MD5-fallback shape
     /// and silently drops normal names; the two reader paths disagree. A
     /// payload without `=` fails with `InvalidField`; non-UTF-8 payloads
-    /// panic (`expect`). The `_BOOT_ID=...` item journal-log-writer adds to
-    /// every marker entry (journal-log-writer/src/log/mod.rs) is parsed
+    /// panic (`expect`). The `_BOOT_ID=...` item the former writer added to
+    /// every marker entry is parsed
     /// like any mapping and contributes `<boot-id> -> _BOOT_ID`.
     ///
     /// Pass 2 - identity mappings: every field-table field whose payload
@@ -770,34 +679,6 @@ impl<M: MemoryMap> JournalFile<M> {
         })
     }
 
-    /// Occupied bucket counts per hash table (buckets with a chain head);
-    /// `None` when either table is missing. Consumed by `create_successor`
-    /// via `with_optimized_buckets`.
-    pub fn bucket_utilization(&self) -> Option<BucketUtilization> {
-        let data_hash_table = self.data_hash_table_ref()?;
-        let data_total = data_hash_table.items.len();
-        let data_occupied = data_hash_table
-            .items
-            .iter()
-            .filter(|item| item.head_hash_offset.is_some())
-            .count();
-
-        let field_hash_table = self.field_hash_table_ref()?;
-        let field_total = field_hash_table.items.len();
-        let field_occupied = field_hash_table
-            .items
-            .iter()
-            .filter(|item| item.head_hash_offset.is_some())
-            .count();
-
-        Some(BucketUtilization {
-            data_occupied,
-            data_total,
-            field_occupied,
-            field_total,
-        })
-    }
-
     /// Tail-minus-head entry realtime as a `Duration` (microseconds).
     /// `None` for an empty or single-entry journal, or when
     /// `tail_entry_realtime <= head_entry_realtime`.
@@ -829,31 +710,6 @@ impl<M: MemoryMapMut> JournalFile<M> {
         window_manager.sync()?;
 
         Ok(())
-    }
-
-    /// Creates a fresh successor file for rotation: IDs copied from this
-    /// header (machine, boot, seqnum; a NEW random `file_id`), bucket
-    /// counts sized from this file's `bucket_utilization`, keyed-hash flag
-    /// inherited, 8 MiB windows. The successor starts empty. Used by
-    /// journal-log-writer on rotation (journal-log-writer/src/log/mod.rs).
-    pub fn create_successor(
-        &self,
-        file: &crate::repository::File,
-        max_file_size: Option<u64>,
-    ) -> Result<Self> {
-        let header = self.journal_header_ref();
-        let bucket_utilization = self.bucket_utilization();
-
-        let options = JournalFileOptions::new(
-            uuid::Uuid::from_bytes(header.machine_id),
-            uuid::Uuid::from_bytes(header.tail_entry_boot_id),
-            uuid::Uuid::from_bytes(header.seqnum_id),
-        )
-        .with_window_size(8 * 1024 * 1024)
-        .with_optimized_buckets(bucket_utilization, max_file_size)
-        .with_keyed_hash(header.has_incompatible_flag(HeaderIncompatibleFlags::KeyedHash));
-
-        Self::create(file, options)
     }
 
     /// Creates a journal file at `file`'s path, truncating anything already

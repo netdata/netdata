@@ -12,8 +12,7 @@
 //! written by one side to stay readable by the other.
 //!
 //! The choice is per file and permanent: `file_id` is a fresh UUIDv4 at
-//! create and never changes; `create_successor` inherits the keyed/legacy
-//! mode flag for the next file but gives it a new id (file/file.rs). Stored
+//! create and never changes (file/file.rs). Stored
 //! object `hash` fields and hash-table buckets (`hash % n_buckets`,
 //! file/object.rs) were computed with the file's own hash mode (keyed by
 //! `file_id`, or unkeyed for legacy files), and lookups re-check the

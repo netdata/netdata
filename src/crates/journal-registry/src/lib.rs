@@ -65,7 +65,7 @@
 //! `journal-common/allocative`.
 //!
 //! Consumers: journal-core (re-export shim only), journal-index,
-//! journal-engine, journal-function and journal-log-writer.
+//! journal-engine and journal-function.
 //! netflow-plugin runs the same API against the published twin
 //! `journal-sdk-registry` (`src/crates/Cargo.toml`,
 //! `netflow-plugin/Cargo.toml`) instead of this crate.
@@ -83,8 +83,7 @@ pub mod registry;
 // (collection.rs) keeping the sorted chains and running the queries.
 // Chain/Repository/RepositoryError are #[doc(hidden)] re-exports reached by
 // full path (repository/mod.rs): journal-engine folds RepositoryError
-// (journal-engine/src/error.rs) and journal-log-writer drives Chain
-// (journal-log-writer/src/log/chain.rs).
+// (journal-engine/src/error.rs).
 pub mod repository;
 // TimeRange (time_range.rs): Unknown until a file is indexed, then Active
 // (still being written) or Bounded (archived), each carrying start/end and
@@ -97,21 +96,14 @@ pub mod time_range;
 // Monitor/Registry onward (journal-function/src/lib.rs) for
 // otel-legacy-logs' watch_directory → process_event → find_files_in_range loop
 // (otel-legacy-logs/src/handler.rs); RegistryError is folded
-// into the engine and log-writer error enums (journal-engine/src/error.rs,
-// journal-log-writer/src/error.rs).
+// into the engine error enum (journal-engine/src/error.rs).
 pub use registry::{Monitor, Registry, RegistryError};
 // Flat imports of the file model. File is the workhorse: imported directly
 // by journal-index (journal-index/src/file_indexer.rs), journal-engine
-// (journal-engine/src/cache.rs, journal-engine/src/logs/query.rs) and
-// journal-log-writer (via repository::, journal-log-writer/src/log/chain.rs),
+// (journal-engine/src/cache.rs, journal-engine/src/logs/query.rs),
 // re-exported by journal-function (journal-function/src/lib.rs), and also
 // reached through journal-core's repository shim
-// (journal-index/src/file_index.rs). journal-log-writer
-// imports Origin into its Config (journal-log-writer/src/log/config.rs) and
-// builds Source::System origins in its doc examples and tests
-// (journal-log-writer/src/lib.rs, journal-log-writer/tests/log_writer.rs);
-// its directory naming comes from load_machine_id,
-// not the Origin (journal-log-writer/src/log/mod.rs). FileInfo ships onward
+// (journal-index/src/file_index.rs). FileInfo ships onward
 // through journal-function; Status has no external importer.
 pub use repository::{File, FileInfo, Origin, Source, Status};
 // TimeRange, flat: re-exported onward by journal-function
