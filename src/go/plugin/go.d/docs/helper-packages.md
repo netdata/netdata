@@ -130,6 +130,13 @@ Redfish retains its stricter acquisition policy. Pango requires a concrete `*htt
 builder and is outside the shared response-size guarantee. Independently constructed cloud, vSphere and Kubernetes
 SDK clients are also outside this guarantee; a lifetime byte cap is inappropriate for Kubernetes watch streams.
 
+Response-limit tests SHOULD prepare large bodies, including gzip compression, before starting HTTP requests. Serve
+each prepared body with one write: many small HTTP chunks feeding a large JSON value amplify decoder buffer checks
+under `-race`, and fixture compression can exhaust a client's deadline. Keep exact-limit, overflow, recovery, and
+above-default override coverage. Client test matrices SHOULD use KiB-scale policies; `pkg/web` tests retain the
+full-size boundaries. Check default and above-default policy propagation separately. To verify a client's own
+enforcement, supply a pass-through transport that advertises a small `ResponseBodyLimit()` without limiting reads.
+
 ### Configured credential and TLS files
 
 HTTP helpers handle credential files internally. `web.NewHTTPClient(ctx, cfg)` returns a standard `*http.Client`;
