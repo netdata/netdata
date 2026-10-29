@@ -763,11 +763,12 @@ static int mrg_stale_peeked_id_unittest(void) {
     return errors;
 }
 
-// Locks in the contract that pgc_open_cache_to_journal_v2() depends on when it
-// casts a PGC page's bare metric_id back to a METRIC *.
+// Locks in the contract that any holder of a bare METRIC pointer depends on.
 //
-// PGC pages store metric_id = (Word_t)metric WITHOUT holding an MRG reference,
-// so that pointer can outlive the METRIC. Two things then matter:
+// No cache keys on a METRIC address any more - PGC's page->metric_id is the
+// metric's UUIDMAP_ID (mrg_metric_id()) - so this is no longer about PGC. It
+// still matters for ANY code that keeps a METRIC * without holding a reference:
+// such a pointer can outlive the METRIC, and two things then follow:
 //
 //   1. mrg_metric_dup() CANNOT reject such a pointer. ARAL writes its free-list
 //      header over the first 16 bytes of a freed element, which on 64bit
@@ -823,9 +824,9 @@ static int mrg_stale_metric_pointer_unittest(void) {
         return 1;
     }
 
-    // Keep the raw pointer exactly the way a PGC page keeps page->metric_id:
-    // as a bare value, with no reference behind it.
-    METRIC *stale = (METRIC *)(uintptr_t)mrg_metric_id(mrg, metric);
+    // Keep the raw pointer the way PGC pages kept page->metric_id before it became the
+    // uuidmap id: as a bare value, with no reference behind it.
+    METRIC *stale = metric;
 
     // Delete it. From here on `stale` points into the MRG partition ARAL's
     // free list - this is the situation a page with a stale metric_id is in.
@@ -941,6 +942,97 @@ static PGC *jv2_test_cache_create(const char *name) {
         PGC_OPTIONS_DEFAULT, 1, sizeof(struct extent_io_data));
 }
 
+// A deleted metric's cache pages must never be found by a different metric.
+//
+// Rotation deletes a metric while its clean main-cache pages stay in the cache (they are not
+// retention, and nothing evicts them). When the page key was the METRIC address, ARAL handed the
+// freed slot to the next metric of the partition and that metric found the old pages as its own.
+// The key is the uuidmap id now, and ids are never reused while the map lives.
+static int mrg_page_key_not_reused_unittest(void) {
+    fprintf(stderr, "\nTesting a deleted metric's pages are not found by a new metric...\n");
+    int errors = 0;
+
+    const Word_t section = (Word_t)&test_ctx_0;
+    MRG *mrg = mrg_create_for_unittest();
+    PGC *cache = jv2_test_cache_create("page-key-reuse-test");
+
+    nd_uuid_t old_uuid, new_uuid;
+    uuid_generate_random(old_uuid);
+
+    // the same MRG partition, so the new metric can get the freed slot
+    do {
+        uuid_generate_random(new_uuid);
+    } while(uuid_to_uuidmap_partition(new_uuid) != uuid_to_uuidmap_partition(old_uuid));
+
+    bool added = false;
+    MRG_ENTRY entry = {
+        .uuid = &old_uuid,
+        .section = section,
+        .first_time_s = 0,
+        .last_time_s = 0,
+        .latest_update_every_s = 0,
+    };
+    METRIC *old_metric = mrg_metric_add_and_acquire(mrg, entry, &added);
+    Word_t old_key = mrg_metric_id(mrg, old_metric);
+    METRIC *new_metric = NULL;
+    Word_t new_key = 0;
+
+    // a clean page of the old metric
+    struct extent_io_data xio = { 0 };
+    bool page_added = false;
+    PGC_PAGE *page = pgc_page_add_and_acquire(cache, (PGC_ENTRY){
+        .section = section,
+        .metric_id = old_key,
+        .start_time_s = 100,
+        .end_time_s = 200,
+        .size = 4096,
+        .data = NULL,
+        .update_every_s = 1,
+        .hot = false,
+        .custom_data = (uint8_t *)&xio,
+    }, &page_added);
+
+    if(!page || !page_added) {
+        fprintf(stderr, "ERROR: cannot add the old metric's page\n");
+        errors++;
+        goto cleanup;
+    }
+    pgc_page_release(cache, page);
+
+    if(!mrg_metric_release_and_delete(mrg, old_metric)) {
+        fprintf(stderr, "ERROR: the old metric was not deleted\n");
+        errors++;
+        goto cleanup;
+    }
+
+    entry.uuid = &new_uuid;
+    new_metric = mrg_metric_add_and_acquire(mrg, entry, &added);
+    new_key = mrg_metric_id(mrg, new_metric);
+
+    if(new_key == old_key) {
+        fprintf(stderr, "ERROR: the new metric got the deleted metric's page key\n");
+        errors++;
+    }
+
+    page = pgc_page_get_and_acquire(cache, section, new_key, 0, PGC_SEARCH_FIRST);
+    if(page) {
+        fprintf(stderr, "ERROR: the new metric found the deleted metric's page (start %ld)\n",
+                (long)pgc_page_start_time_s(page));
+        errors++;
+        pgc_page_release(cache, page);
+    }
+
+    mrg_metric_release(mrg, new_metric);
+
+cleanup:
+    pgc_destroy(cache, false);
+    (void)mrg_destroy(mrg);
+
+    fprintf(stderr, "Testing a deleted metric's pages are not found by a new metric: %s\n",
+            errors ? "FAILED" : "OK");
+    return errors;
+}
+
 static int mrg_jv2_stale_metric_not_dereferenced_unittest(void) {
 #if defined(FSANITIZE_ADDRESS)
     fprintf(stderr, "\nTesting jv2 does not dereference a stale METRIC... SKIPPED (FSANITIZE_ADDRESS)\n");
@@ -984,7 +1076,7 @@ static int mrg_jv2_stale_metric_not_dereferenced_unittest(void) {
         return 1;
     }
 
-    METRIC *stale = (METRIC *)(uintptr_t)mrg_metric_id(mrg, metric);
+    METRIC *stale = metric;
 
     // The id the open-cache page will carry. Captured while the metric is still
     // alive, exactly as pgc_open_add_hot_page() does in production. After the
@@ -1019,7 +1111,7 @@ static int mrg_jv2_stale_metric_not_dereferenced_unittest(void) {
     __atomic_store_n(&stale->refcount, (REFCOUNT)PLANTED, __ATOMIC_RELAXED);
 
     // 4. a hot page in the section/datafile the indexer will walk, carrying the
-    //    stale pointer as its metric_id - the production layout.
+    //    stale pointer as its metric_id - the pre-fix layout.
     struct extent_io_data xio = {
         .fileno = TEST_FILENO,
         .block = 4096,
@@ -1345,7 +1437,7 @@ static int jv2_make_two_pointers_one_uuid(MRG *mrg, Word_t section, struct jv2_t
         jv2_two_pointers_undo(mrg, out);
         return 1;
     }
-    out->stale_ptr = (METRIC *)(uintptr_t)mrg_metric_id(mrg, first);
+    out->stale_ptr = first;
 
     // delete it; `pinned` keeps the uuid (and therefore the id) alive
     if(!mrg_metric_release_and_delete(mrg, first)) {
@@ -1383,7 +1475,7 @@ static int jv2_make_two_pointers_one_uuid(MRG *mrg, Word_t section, struct jv2_t
     }
     out->shared_id = mrg_metric_uuidmap_id(mrg, out->live);
 
-    METRIC *new_ptr = (METRIC *)(uintptr_t)mrg_metric_id(mrg, out->live);
+    METRIC *new_ptr = out->live;
     if(new_ptr == out->stale_ptr) {
         // ARAL handed back the same slot, so there is no "two pointers, one uuid"
         // situation. Not a product defect - an inconclusive run, and better reported
@@ -1408,11 +1500,18 @@ static int jv2_make_two_pointers_one_uuid(MRG *mrg, Word_t section, struct jv2_t
 // Two open-cache pages for the SAME uuid but with DIFFERENT page->metric_id
 // values must be indexed as ONE metric.
 //
-// This happens in production when a metric is deleted and re-created for the
-// same uuid: the new METRIC gets a new pointer, while older open-cache pages
-// still carry the old one. The uuidmap id survives the deletion whenever
-// something else still references that uuid - another tier's METRIC for the same
-// dimension, for instance - so both pages legitimately carry the same uuid_id.
+// This USED to happen in production, while page->metric_id was a bare METRIC
+// pointer: a metric deleted and re-created for the same uuid got a new pointer,
+// while older open-cache pages still carried the old one. The uuidmap id survives
+// the deletion whenever something else still references that uuid - another tier's
+// METRIC for the same dimension, for instance - so both pages legitimately carried
+// the same uuid_id.
+//
+// It can no longer arise from a production caller: page->metric_id IS the uuidmap
+// id now (mrg_metric_id()), so both incarnations share one key. This test injects
+// the divergence by hand to keep the indexer honest, because the property it locks
+// in - group by uuid, never by whatever PGC uses as its index key - is what makes
+// the journal correct regardless of how that key is chosen.
 //
 // It matters because journal v2 wants one entry per uuid:
 // journalfile_migrate_to_v2_callback() builds and sorts a uuid list, and its
@@ -1422,9 +1521,9 @@ static int jv2_make_two_pointers_one_uuid(MRG *mrg, Word_t section, struct jv2_t
 // Keying JudyL_metrics by page->metric_id produces two groups here. Keying it by
 // the page's uuid_id produces one.
 //
-// Note this only became reachable once metrics were resolved by id: while the
-// indexer dereferenced page->metric_id, the older page failed to resolve and was
-// skipped, so the duplicate could not form.
+// Note the divergence only became reachable at all once metrics were resolved by
+// id: while the indexer dereferenced page->metric_id, the older page failed to
+// resolve and was skipped, so the duplicate could not form.
 // start_old / start_new are the two pages' start times, and expected_pages is how
 // many pages the indexer should end up with. Distinct start times => both pages
 // are indexed. IDENTICAL start times => the two pages collide inside the single
@@ -1457,7 +1556,7 @@ static int mrg_jv2_same_uuid_grouped_once_check(
         goto cleanup_early;
     }
     old_ptr = tp.stale_ptr;
-    new_ptr = (METRIC *)(uintptr_t)mrg_metric_id(mrg, tp.live);
+    new_ptr = tp.live;
     shared_id = tp.shared_id;
     pinned = tp.pinned;
     second = tp.live;
@@ -2722,6 +2821,7 @@ int mrg_unittest(void) {
     errors += mrg_destroy_referenced_metric_unittest();
     errors += mrg_stale_peeked_id_unittest();
     errors += mrg_stale_metric_pointer_unittest();
+    errors += mrg_page_key_not_reused_unittest();
     errors += mrg_jv2_stale_metric_not_dereferenced_unittest();
     errors += mrg_jv2_same_uuid_grouped_once_unittest();
     errors += mrg_jv2_real_writer_unittest();
