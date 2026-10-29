@@ -224,6 +224,7 @@ int mqtt_ng_unittest(void);
 int aclk_timeout_unittest(void);
 int aclk_backoff_unittest(void);
 int https_client_timeout_unittest(void);
+int https_client_chunked_unittest(void);
 int mqtt_wss_client_timeout_unittest(void);
 int pgc_unittest(void);
 int mrg_unittest(void);
@@ -528,7 +529,8 @@ int netdata_main(int argc, char **argv) {
                             // summed, not short-circuited: this is the path CI runs, so one
                             // failing suite must not hide the others
                             if (aclk_timeout_unittest() + aclk_backoff_unittest() +
-                                https_client_timeout_unittest() + mqtt_wss_client_timeout_unittest()) return 1;
+                                https_client_timeout_unittest() + https_client_chunked_unittest() +
+                                mqtt_wss_client_timeout_unittest()) return 1;
 #ifdef OS_WINDOWS
                             if (unit_test_windows_os_version()) return 1;
                             if (unit_test_windows_virt_normalize()) return 1;
@@ -689,6 +691,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "mqttngtest") == 0) {
                             unittest_running = true;
                             return mqtt_ng_unittest();
+                        }
+                        else if(strcmp(optarg, "aclkchunkedtest") == 0) {
+                            unittest_running = true;
+                            return https_client_chunked_unittest() ? 1 : 0;
                         }
                         else if(strcmp(optarg, "aclktimeouttest") == 0) {
                             unittest_running = true;
