@@ -9,6 +9,8 @@
 extern __thread bool is_health_thread;
 
 static bool alert_snapshot_held(RRDHOST *host);
+static void send_snapshot_if_online(alarm_snapshot_proto_ptr_t snapshot);
+static void send_alert_snapshot_to_cloud(RRDHOST *host, void (*send_snapshot)(alarm_snapshot_proto_ptr_t));
 
 #define SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param)                                                                     \
     ({                                                                                                                 \
@@ -730,6 +732,11 @@ done:
 #define SQL_DELETE_HOST_ALERT_VERSION_TABLE                                                                            \
     "DELETE FROM alert_version WHERE health_log_id IN (SELECT health_log_id FROM health_log WHERE host_id = @host_id)"
 
+#define SQL_DELETE_SNAPSHOT_COVERED_SUBMIT_ROWS                                                                         \
+    "DELETE FROM aclk_queue WHERE host_id = @host_id AND EXISTS ("                                                     \
+    " SELECT 1 FROM alert_version av WHERE av.health_log_id = aclk_queue.health_log_id"                                 \
+    " AND aclk_queue.unique_id <= av.unique_id)"
+
 // The DELETE and the INSERT must look like one step to the other threads using db_meta:
 // cloud_status_matches() and calculate_node_alert_version() read alert_version on the same connection, and seeing it
 // empty would re-queue transitions or schedule a needless snapshot. A transaction does not isolate threads that share
@@ -744,6 +751,7 @@ static bool rebuild_host_alert_version_table(RRDHOST *host)
 {
     sqlite3_stmt *res_delete = NULL;
     sqlite3_stmt *res_insert = NULL;
+    sqlite3_stmt *res_queue = NULL;
     bool rebuilt = false;
     int param = 0;
 
@@ -752,10 +760,14 @@ static bool rebuild_host_alert_version_table(RRDHOST *host)
 
     if (!PREPARE_STATEMENT(db_meta, SQL_REBUILD_HOST_ALERT_VERSION_TABLE, &res_insert))
         goto done;
+    if (!PREPARE_STATEMENT(db_meta, SQL_DELETE_SNAPSHOT_COVERED_SUBMIT_ROWS, &res_queue))
+        goto done;
 
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res_delete, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
     param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res_insert, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
+    param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res_queue, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
     param = 0;
 
     sqlite3_mutex *db_mutex = sqlite3_db_mutex(db_meta);
@@ -775,6 +787,10 @@ static bool rebuild_host_alert_version_table(RRDHOST *host)
     int rc = execute_insert(res_delete);
     if (rc == SQLITE_DONE)
         rc = execute_insert(res_insert);
+    // The captured checkpoint supersedes these submit rows. Consume them in the same savepoint so an older
+    // REMOVED cannot follow the recovered snapshot, and a new hold restores both versions and queued rows.
+    if (rc == SQLITE_DONE)
+        rc = execute_insert(res_queue);
 
     bool held = rc == SQLITE_DONE && alert_snapshot_held(host);
     if (rc == SQLITE_DONE && !held && sqlite3_exec(db_meta, "RELEASE rebuild_alert_version", NULL, NULL, NULL) == SQLITE_OK)
@@ -792,6 +808,7 @@ done:
     REPORT_BIND_FAIL(res_delete, param);
     SQLITE_FINALIZE(res_delete);
     SQLITE_FINALIZE(res_insert);
+    SQLITE_FINALIZE(res_queue);
     return rebuilt;
 }
 
@@ -803,6 +820,53 @@ done:
 
 // a drain that failed, or kept a row it could not submit, looks at the queue again after this many seconds
 #define ALERT_QUEUE_RETRY_S (10)
+
+#define SQL_PENDING_ALERT_STILL_CURRENT                                                                                \
+    "SELECT 1 FROM alert_queue WHERE host_id = @host_id AND health_log_id = @health_log_id"                            \
+    " AND rowid = @row AND unique_id = @unique_id"
+
+// A pending cursor can cache a transition before a recovery replaces it or a snapshot captures that recovery.
+// Check ownership and submit under one connection lock; stale candidates must not queue or rewind version ids.
+static int submit_pending_alert_if_current(
+    nd_uuid_t *host_id, int64_t health_log_id, int64_t row, uint32_t unique_id, RRDCALC_STATUS status)
+{
+    static __thread sqlite3_stmt *compiled_res = NULL;
+    sqlite3_stmt *res = NULL;
+    if (is_health_thread) {
+        if (!compiled_res && !PREPARE_COMPILED_STATEMENT(db_meta, SQL_PENDING_ALERT_STILL_CURRENT, &compiled_res))
+            return -1;
+        res = compiled_res;
+    } else if (!PREPARE_STATEMENT(db_meta, SQL_PENDING_ALERT_STILL_CURRENT, &res))
+        return -1;
+
+    int ret = -1;
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_id, sizeof(*host_id), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, health_log_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, row));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, unique_id));
+    param = 0;
+
+    sqlite3_mutex *db_mutex = sqlite3_db_mutex(db_meta);
+    sqlite3_mutex_enter(db_mutex);
+    int rc = sqlite3_step_monitored(res);
+    SQLITE_RESET(res);
+    if (rc == SQLITE_ROW)
+        ret = insert_alert_to_submit_queue(host_id, health_log_id, unique_id, status);
+    else if (rc == SQLITE_DONE)
+        ret = 1;
+    else
+        error_report("Failed to verify pending alert ownership, rc = %d", rc);
+    sqlite3_mutex_leave(db_mutex);
+
+done:
+    REPORT_BIND_FAIL(res, param);
+    if (is_health_thread)
+        SQLITE_RESET(res);
+    else
+        SQLITE_FINALIZE(res);
+    return ret;
+}
 
 // The pending queue is only read when something in it can be due: every writer lowers the host's next-due time
 // to the date_scheduled it wrote, and each drain sets it to the earliest date_scheduled still queued.
@@ -962,7 +1026,7 @@ bool process_alert_pending_queue(RRDHOST *host)
 
         struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
         if (aclk_host_config) {
-            int ret = insert_alert_to_submit_queue(&host->host_id.uuid, health_log_id, unique_id, new_status);
+            int ret = submit_pending_alert_if_current(&host->host_id.uuid, health_log_id, row, unique_id, new_status);
             if (ret == 0)
                 added++;
             else if (ret < 0) {
@@ -1070,7 +1134,8 @@ done:
 
 static void aclk_push_alert_events_for_host(
     RRDHOST *host, sqlite3_stmt **res, sqlite3_stmt **res_version, sqlite3_stmt **res_delete,
-    ACLK_ALARM_LOG_SEND_RESULT (*send_entry)(struct alarm_log_entry *))
+    ACLK_ALARM_LOG_SEND_RESULT (*send_entry)(struct alarm_log_entry *),
+    void (*send_snapshot)(alarm_snapshot_proto_ptr_t))
 {
     if (!rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS) ||
         rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))
@@ -1099,7 +1164,7 @@ static void aclk_push_alert_events_for_host(
         }
         // Successful preparation captured an eligible state under the DB mutex. A later hold belongs to
         // newer transitions and must not veto publication after those captured versions were committed.
-        send_alert_snapshot_to_cloud(host);
+        send_alert_snapshot_to_cloud(host, send_snapshot);
         aclk_host_config->snapshot_count++;
         aclk_alert_snapshot_complete(aclk_host_config);
     }
@@ -1136,7 +1201,8 @@ void aclk_push_alert_events_for_all_hosts(void)
     }
 
     dfe_start_reentrant(rrdhost_root_index, host) {
-        aclk_push_alert_events_for_host(host, &res, &res_version, &res_delete, aclk_send_alarm_log_entry);
+        aclk_push_alert_events_for_host(host, &res, &res_version, &res_delete,
+                                        aclk_send_alarm_log_entry, send_snapshot_if_online);
     }
     dfe_done(host);
     SQLITE_FINALIZE(res);
@@ -1460,7 +1526,15 @@ static bool host_has_alerts(RRDHOST *host)
 }
 
 #define ALARM_EVENTS_PER_CHUNK 1000
-void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
+static void send_snapshot_if_online(alarm_snapshot_proto_ptr_t snapshot)
+{
+    if (aclk_online_for_alerts())
+        aclk_send_alarm_snapshot(snapshot);
+    else
+        destroy_alarm_snapshot_proto(snapshot);
+}
+
+static void send_alert_snapshot_to_cloud(RRDHOST *host, void (*send_snapshot)(alarm_snapshot_proto_ptr_t))
 {
     if (unlikely(!host)) {
         nd_log(NDLS_ACCESS, NDLP_WARNING, "AC [N/A (N/A)]: Node id not found");
@@ -1538,10 +1612,7 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
     // no alerts: send the single empty chunk
     if (rc == SQLITE_DONE) {
         snapshot_proto = generate_alarm_snapshot_proto(&alarm_snap);
-        if (aclk_online_for_alerts())
-            aclk_send_alarm_snapshot(snapshot_proto);
-        else
-            destroy_alarm_snapshot_proto(snapshot_proto);
+        send_snapshot(snapshot_proto);
         goto created;
     }
 
@@ -1559,10 +1630,7 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
         version += alarm_log.version;
 
         if (cnt == ALARM_EVENTS_PER_CHUNK) {
-            if (aclk_online_for_alerts())
-                aclk_send_alarm_snapshot(snapshot_proto);
-            else
-                destroy_alarm_snapshot_proto(snapshot_proto);
+            send_snapshot(snapshot_proto);
             snapshot_proto = NULL;
             cnt = 0;
             if (alarm_snap.chunk < chunks) {
@@ -1573,8 +1641,8 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
         destroy_alarm_log_entry(&alarm_log);
     } while (sqlite3_step_monitored(res) == SQLITE_ROW);
 
-    if (cnt && aclk_online_for_alerts())
-        aclk_send_alarm_snapshot(snapshot_proto);
+    if (cnt)
+        send_snapshot(snapshot_proto);
     else
         destroy_alarm_snapshot_proto(snapshot_proto);
 
@@ -1708,6 +1776,33 @@ done:
     return due;
 }
 
+static int64_t aq_cached_pending_row(RRDHOST *host, int64_t *unique_id)
+{
+    sqlite3_stmt *res = NULL;
+    int64_t row = 0;
+    if (PREPARE_STATEMENT(db_meta, SQL_PROCESS_ALERT_PENDING_QUEUE, &res)) {
+        if (sqlite3_bind_blob(res, 1, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC) == SQLITE_OK &&
+            sqlite3_step_monitored(res) == SQLITE_ROW) {
+            *unique_id = sqlite3_column_int64(res, 1);
+            row = sqlite3_column_int64(res, 3);
+        }
+        SQLITE_FINALIZE(res);
+    }
+    return row;
+}
+
+static int64_t aq_version_unique_id(int64_t health_log_id)
+{
+    sqlite3_stmt *res = NULL;
+    int64_t unique_id = 0;
+    if (PREPARE_STATEMENT(db_meta, "SELECT unique_id FROM alert_version WHERE health_log_id = ?1", &res)) {
+        if (sqlite3_bind_int64(res, 1, health_log_id) == SQLITE_OK && sqlite3_step_monitored(res) == SQLITE_ROW)
+            unique_id = sqlite3_column_int64(res, 0);
+        SQLITE_FINALIZE(res);
+    }
+    return unique_id;
+}
+
 // A failed seed used to surface as a confusing queue-state mismatch three assertions later, so every
 // bind/step in the fixtures reports itself with its rc and the sqlite message.
 #define AQ_SQL(expr, what)                                                                                             \
@@ -1807,6 +1902,7 @@ static int aq_snapshot_rows(RRDHOST *host)
 }
 
 static unsigned aq_emitted_events;
+static unsigned aq_emitted_snapshots;
 static int64_t aq_last_alarm_id;
 static enum aclk_alarm_status aq_last_status;
 
@@ -1816,6 +1912,12 @@ static ACLK_ALARM_LOG_SEND_RESULT aq_record_send(struct alarm_log_entry *entry)
     aq_last_alarm_id = entry->alarm_id;
     aq_last_status = entry->status;
     return ACLK_ALARM_LOG_SENT;
+}
+
+static void aq_record_snapshot(alarm_snapshot_proto_ptr_t snapshot)
+{
+    aq_emitted_snapshots++;
+    destroy_alarm_snapshot_proto(snapshot);
 }
 
 static int aq_deny_alert_version_read(
@@ -2467,7 +2569,7 @@ int alert_queue_unittest(void)
 
             sqlite3_stmt *push = NULL, *version = NULL, *remove = NULL;
             unsigned before = aq_emitted_events;
-            aclk_push_alert_events_for_host(h, &push, &version, &remove, aq_record_send);
+            aclk_push_alert_events_for_host(h, &push, &version, &remove, aq_record_send, aq_record_snapshot);
             AQ_CHECK(aq_emitted_events == before + 1 && aq_last_alarm_id == 101 &&
                          aq_last_status == rrdcalc_status_to_proto_enum(raised) &&
                          cloud_status_matches(raised_id, raised) && aq_test_queue(&h->host_id.uuid, NULL, NULL) == 0,
@@ -2521,12 +2623,12 @@ int alert_queue_unittest(void)
                    "snapshot race register hold trigger");
             sqlite3_stmt *push = NULL, *version = NULL, *remove = NULL;
             unsigned before = aq_emitted_events;
-            aclk_push_alert_events_for_host(h, &push, &version, &remove, aq_record_send);
+            aclk_push_alert_events_for_host(h, &push, &version, &remove, aq_record_send, aq_record_snapshot);
             AQ_CHECK(aq_emitted_events == before + batch &&
                          aq_test_queue(&h->host_id.uuid, NULL, NULL) == count - batch &&
                          !cloud_status_matches(last_id, RRDCALC_STATUS_WARNING),
                      "snapshot race: new hold rolls back speculative versions and sends only one real batch");
-            aclk_push_alert_events_for_host(h, &push, &version, &remove, aq_record_send);
+            aclk_push_alert_events_for_host(h, &push, &version, &remove, aq_record_send, aq_record_snapshot);
             AQ_CHECK(aq_emitted_events == before + count && aq_test_queue(&h->host_id.uuid, NULL, NULL) == 0 &&
                          cloud_status_matches(last_id, RRDCALC_STATUS_WARNING) &&
                          aclk_alert_snapshot_state_get(h->aclk_host_config) == ACLK_ALERT_SNAPSHOT_READY &&
@@ -2540,6 +2642,125 @@ int alert_queue_unittest(void)
             AQ_SQL(sqlite3_create_function_v2(db_meta, "aq_hold_snapshot_during_rebuild", 0, SQLITE_UTF8,
                                                NULL, NULL, NULL, NULL, NULL),
                    "snapshot race remove hold callback");
+            string_freez(h->health.default_exec);
+            string_freez(h->hostname);
+            freez(h->aclk_host_config);
+            freez(h);
+        }
+        // Snapshot capture can overtake the pending-queue drain on recovery. The snapshot already contains
+        // the raised recovery, so an older submitted REMOVED must never be emitted on the following tick.
+        {
+            RRDHOST *h = callocz(1, sizeof(*h));
+            uuid_generate(h->host_id.uuid);
+            uuid_generate(h->node_id.uuid);
+            h->hostname = string_strdupz("snapshot-covered-alert-host");
+            h->health.default_exec = string_strdupz("/bin/true");
+            h->aclk_host_config = callocz(1, sizeof(*h->aclk_host_config));
+            aclk_node_id_set(h->aclk_host_config, h->node_id.uuid);
+            h->health.enabled = true;
+            h->health.alert_status_snapshot.valid = 1;
+            rrdhost_flag_set(h, RRDHOST_FLAG_COLLECTOR_ONLINE | RRDHOST_FLAG_ACLK_STREAM_ALERTS);
+            aclk_alert_streaming_set(h->aclk_host_config, true);
+            AQ_SQL(aq_seed_alert_config(h) ? SQLITE_DONE : SQLITE_ERROR, "snapshot covered alert config");
+            time_t now = now_realtime_sec();
+            int64_t id = aq_save_transition(h, 18001, RRDCALC_STATUS_REMOVED, RRDCALC_STATUS_WARNING, 0, now - 2000);
+            AQ_CHECK(id > 0 && process_alert_pending_queue(h) && aq_send_one(h) == 1,
+                     "snapshot covered alert: initial WARNING is sent");
+            AQ_CHECK(aq_save_transition(h, 18002, RRDCALC_STATUS_WARNING, RRDCALC_STATUS_REMOVED, 0, now - 11) == id &&
+                         process_alert_pending_queue(h),
+                     "snapshot covered alert: older REMOVED is submitted");
+            AQ_CHECK(aq_save_transition(h, 18003, RRDCALC_STATUS_REMOVED, RRDCALC_STATUS_WARNING, 0, now) == id,
+                     "snapshot covered alert: recovery is persisted before its pending row drains");
+            aclk_alert_snapshot_request(h->aclk_host_config);
+            AQ_CHECK(aclk_alert_snapshot_mark_ready(h->aclk_host_config), "snapshot covered alert: request is READY");
+
+            sqlite3_stmt *push = NULL, *version = NULL, *remove = NULL;
+            unsigned before = aq_emitted_events, snapshots_before = aq_emitted_snapshots;
+            aclk_push_alert_events_for_host(h, &push, &version, &remove, aq_record_send, aq_record_snapshot);
+            AQ_CHECK(aq_emitted_snapshots == snapshots_before + 1 && aq_emitted_events == before &&
+                         cloud_status_matches(id, RRDCALC_STATUS_WARNING) &&
+                         aclk_alert_snapshot_state_get(h->aclk_host_config) == ACLK_ALERT_SNAPSHOT_IDLE,
+                     "snapshot covered alert: production dispatch publishes the recovered WARNING snapshot");
+            aclk_push_alert_events_for_host(h, &push, &version, &remove, aq_record_send, aq_record_snapshot);
+            AQ_CHECK(aq_emitted_events == before && cloud_status_matches(id, RRDCALC_STATUS_WARNING) &&
+                         aq_test_queue(&h->host_id.uuid, NULL, NULL) == 0,
+                     "snapshot covered alert: no older REMOVED follows the recovered snapshot");
+            (void)process_alert_pending_queue(h);
+            rrdhost_flag_set(h, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
+            aclk_push_alert_events_for_host(h, &push, &version, &remove, aq_record_send, aq_record_snapshot);
+            AQ_CHECK(aq_emitted_events == before && aq_pending_rows(&h->host_id.uuid) == 0 &&
+                         cloud_status_matches(id, RRDCALC_STATUS_WARNING),
+                     "snapshot covered alert: later pending drain does not duplicate the snapshot recovery");
+            AQ_CHECK(insert_alert_to_submit_queue(&h->host_id.uuid, id, 18004, RRDCALC_STATUS_CRITICAL) == 0 &&
+                         rebuild_host_alert_version_table(h),
+                     "snapshot covered alert: a newer submit identity remains outside the captured checkpoint");
+            int64_t newer_uid = 0;
+            AQ_CHECK(aq_test_queue(&h->host_id.uuid, NULL, &newer_uid) == 1 && newer_uid == 18004,
+                     "snapshot covered alert: snapshot cleanup preserves a submit row newer than capture");
+            SQLITE_FINALIZE(push);
+            SQLITE_FINALIZE(version);
+            SQLITE_FINALIZE(remove);
+            string_freez(h->health.default_exec);
+            string_freez(h->hostname);
+            freez(h->aclk_host_config);
+            freez(h);
+        }
+        // A pending cursor can have cached both an old removal and an old recovery before later writes
+        // replace that row. Snapshot capture must not let either cached owner submit or rewind its version.
+        {
+            RRDHOST *h = callocz(1, sizeof(*h));
+            uuid_generate(h->host_id.uuid);
+            uuid_generate(h->node_id.uuid);
+            h->hostname = string_strdupz("snapshot-pending-owner-host");
+            h->health.default_exec = string_strdupz("/bin/true");
+            h->aclk_host_config = callocz(1, sizeof(*h->aclk_host_config));
+            aclk_node_id_set(h->aclk_host_config, h->node_id.uuid);
+            h->health.enabled = true;
+            h->health.alert_status_snapshot.valid = 1;
+            rrdhost_flag_set(h, RRDHOST_FLAG_COLLECTOR_ONLINE | RRDHOST_FLAG_ACLK_STREAM_ALERTS);
+            aclk_alert_streaming_set(h->aclk_host_config, true);
+            AQ_SQL(aq_seed_alert_config(h) ? SQLITE_DONE : SQLITE_ERROR, "pending owner config");
+            time_t now = now_realtime_sec();
+            int64_t id = aq_save_transition(h, 19000, RRDCALC_STATUS_REMOVED, RRDCALC_STATUS_WARNING, 0, now - 2000);
+            AQ_CHECK(id > 0 && process_alert_pending_queue(h) && aq_send_one(h) == 1,
+                     "pending owner: initial raise is acknowledged");
+            AQ_CHECK(aq_save_transition(h, 19001, RRDCALC_STATUS_WARNING, RRDCALC_STATUS_REMOVED, 0, now - 11) == id,
+                     "pending owner: removal is persisted");
+            int64_t removed_uid = 0, recovery_uid = 0;
+            int64_t removed_row = aq_cached_pending_row(h, &removed_uid);
+            AQ_CHECK(removed_row && removed_uid == 19001, "pending owner: cursor caches the due removal");
+            AQ_CHECK(aq_save_transition(h, 19002, RRDCALC_STATUS_REMOVED, RRDCALC_STATUS_WARNING, 0, now) == id,
+                     "pending owner: first recovery replaces removal");
+            int64_t recovery_row = aq_cached_pending_row(h, &recovery_uid);
+            AQ_CHECK(recovery_row == removed_row && recovery_uid == 19002,
+                     "pending owner: cursor caches the due recovery on the same row");
+            AQ_CHECK(aq_save_transition(h, 19003, RRDCALC_STATUS_WARNING, RRDCALC_STATUS_REMOVED, 0, now) == id &&
+                         aq_save_transition(h, 19004, RRDCALC_STATUS_REMOVED, RRDCALC_STATUS_WARNING, 0, now) == id,
+                     "pending owner: another bounce replaces both cached owners");
+            aclk_alert_snapshot_request(h->aclk_host_config);
+            AQ_CHECK(aclk_alert_snapshot_mark_ready(h->aclk_host_config), "pending owner: snapshot request is READY");
+            sqlite3_stmt *push = NULL, *version = NULL, *remove = NULL;
+            unsigned before = aq_emitted_events;
+            aclk_push_alert_events_for_host(h, &push, &version, &remove, aq_record_send, aq_record_snapshot);
+            AQ_CHECK(aq_version_unique_id(id) == 19004 && cloud_status_matches(id, RRDCALC_STATUS_WARNING),
+                     "pending owner: actual snapshot captures the newest recovery");
+            AQ_CHECK(submit_pending_alert_if_current(&h->host_id.uuid, id, removed_row, removed_uid,
+                                                     RRDCALC_STATUS_REMOVED) == 1 &&
+                         submit_pending_alert_if_current(&h->host_id.uuid, id, recovery_row, recovery_uid,
+                                                         RRDCALC_STATUS_WARNING) == 1 &&
+                         aq_test_queue(&h->host_id.uuid, NULL, NULL) == 0 && aq_version_unique_id(id) == 19004,
+                     "pending owner: cached transitions cannot submit or rewind the captured version");
+            int64_t current_uid = 0;
+            AQ_CHECK(aq_cached_pending_row(h, &current_uid) == recovery_row && current_uid == 19004 &&
+                         aq_pending_rows(&h->host_id.uuid) == 1,
+                     "pending owner: rejecting stale cursors preserves the current pending row");
+            (void)process_alert_pending_queue(h);
+            AQ_CHECK(aq_pending_rows(&h->host_id.uuid) == 0 && aq_version_unique_id(id) == 19004 &&
+                         aq_emitted_events == before,
+                     "pending owner: the current row drains without a duplicate event");
+            SQLITE_FINALIZE(push);
+            SQLITE_FINALIZE(version);
+            SQLITE_FINALIZE(remove);
             string_freez(h->health.default_exec);
             string_freez(h->hostname);
             freez(h->aclk_host_config);

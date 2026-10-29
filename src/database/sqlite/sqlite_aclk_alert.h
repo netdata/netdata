@@ -12,7 +12,6 @@ void alert_hash_mark_sent(nd_uuid_t *hash_id);
 void aclk_start_alert_streaming(char *node_id, uint64_t cloud_version);
 void aclk_alert_version_check(char *node_id, char *claim_id, uint64_t cloud_version);
 
-void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused);
 bool alert_snapshot_freezes_health(RRDHOST *host);
 bool process_alert_pending_queue(RRDHOST *host);
 void alert_queue_next_due_lower(RRDHOST *host, time_t when);
