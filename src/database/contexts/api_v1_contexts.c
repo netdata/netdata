@@ -130,19 +130,27 @@ static inline int rrdinstance_to_json_callback(const DICTIONARY_ITEM *item, void
     if(before && (!ri->first_time_s || before < ri->first_time_s))
         return 0;
 
-    RRDLABELS *labels = rrdinstance_labels(ri);
+    // An archived instance loads its labels from SQLite on first access; read them only when used.
+    // Held to the end, so the labels written below are the ones filtered here: release it on every return.
+    RRDINSTANCE_LABELS_REF lref = { .rsa = NULL, .labels = NULL };
+    if(t_parent->chart_label_key || t_parent->chart_labels_filter || (options & RRDCONTEXT_OPTION_SHOW_LABELS))
+        lref = rrdinstance_acquired_labels_acquire((RRDINSTANCE_ACQUIRED *)item);
 
     if(t_parent->chart_label_key && rrdlabels_match_simple_pattern_parsed(
-                                         labels,
+                                         lref.labels,
                                          t_parent->chart_label_key,
-                                         '\0', NULL) != SP_MATCHED_POSITIVE)
+                                         '\0', NULL) != SP_MATCHED_POSITIVE) {
+        rrdinstance_labels_release(&lref);
         return 0;
+    }
 
     if(t_parent->chart_labels_filter && rrdlabels_match_simple_pattern_parsed(
-                                             labels,
+                                             lref.labels,
                                              t_parent->chart_labels_filter, ':',
-                                             NULL) != SP_MATCHED_POSITIVE)
+                                             NULL) != SP_MATCHED_POSITIVE) {
+        rrdinstance_labels_release(&lref);
         return 0;
+    }
 
     time_t first_time_s = ri->first_time_s;
     time_t last_time_s = ri->last_time_s;
@@ -169,6 +177,7 @@ static inline int rrdinstance_to_json_callback(const DICTIONARY_ITEM *item, void
 
         if(has_filter && !t_metrics.written) {
             buffer_free(wb_metrics);
+            rrdinstance_labels_release(&lref);
             return 0;
         }
 
@@ -217,11 +226,12 @@ static inline int rrdinstance_to_json_callback(const DICTIONARY_ITEM *item, void
         buffer_json_array_close(wb);
     }
 
-    if(options & RRDCONTEXT_OPTION_SHOW_LABELS && rrdlabels_entries(labels)) {
+    if(options & RRDCONTEXT_OPTION_SHOW_LABELS && rrdlabels_entries(lref.labels)) {
         buffer_json_member_add_object(wb, "labels");
-        rrdlabels_to_buffer_json_members(labels, wb);
+        rrdlabels_to_buffer_json_members(lref.labels, wb);
         buffer_json_object_close(wb);
     }
+    rrdinstance_labels_release(&lref);
 
     if(wb_metrics) {
         buffer_json_member_add_object(wb, "dimensions");

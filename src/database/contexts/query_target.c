@@ -729,7 +729,22 @@ static inline void query_instance_strings_free(QUERY_INSTANCE *qi) {
     qi->name_fqdn = NULL;
 }
 
+RRDLABELS *query_instance_labels(QUERY_INSTANCE *qi) {
+    if(!qi->labels_acquired) {
+        qi->labels = rrdinstance_acquired_labels_acquire(qi->ria);
+        qi->labels_acquired = true;
+    }
+
+    return qi->labels.labels;
+}
+
 static inline void query_instance_release(QUERY_INSTANCE *qi) {
+    // before the instance: the labels may be the instance's own
+    if(qi->labels_acquired) {
+        rrdinstance_labels_release(&qi->labels);
+        qi->labels_acquired = false;
+    }
+
     if(qi->ria) {
         rrdinstance_release(qi->ria);
         qi->ria = NULL;
@@ -791,19 +806,29 @@ static inline SIMPLE_PATTERN_RESULT query_instance_matches(QUERY_INSTANCE *qi,
 }
 
 static inline bool query_instance_matches_labels(
-    RRDINSTANCE *ri,
+    RRDINSTANCE_ACQUIRED *ria,
     SIMPLE_PATTERN *chart_label_key_sp,
     struct pattern_array *labels_pa)
 {
-    RRDLABELS *labels = rrdinstance_labels(ri);
-    if (chart_label_key_sp && rrdlabels_match_simple_pattern_parsed(labels, chart_label_key_sp, '\0', NULL) != SP_MATCHED_POSITIVE)
-        return false;
+    // Without a label filter every instance matches. Do not read the labels then:
+    // an archived instance loads them from SQLite on first access.
+    if (!chart_label_key_sp && !labels_pa)
+        return true;
 
-    if (labels_pa) {
-        return pattern_array_label_match(labels_pa, labels, ':', NULL);
-    }
+    RRDINSTANCE_LABELS_REF lref = rrdinstance_acquired_labels_acquire(ria);
 
-    return true;
+    // labels that cannot be read right now (the chart is going away or moving to another context) match nothing:
+    // pattern_array_label_match() would accept them unchecked
+    bool matched = true;
+    if (!lref.labels)
+        matched = false;
+    else if (chart_label_key_sp && rrdlabels_match_simple_pattern_parsed(lref.labels, chart_label_key_sp, '\0', NULL) != SP_MATCHED_POSITIVE)
+        matched = false;
+    else if (labels_pa)
+        matched = pattern_array_label_match(labels_pa, lref.labels, ':', NULL);
+
+    rrdinstance_labels_release(&lref);
+    return matched;
 }
 
 static bool query_instance_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CONTEXT *qc,
@@ -822,7 +847,7 @@ static bool query_instance_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_C
 
     if(queryable_instance)
         queryable_instance = query_instance_matches_labels(
-            ri,
+            ria,
             qt->instances.chart_label_key_pattern,
             qt->instances.labels_pa);
 
@@ -917,7 +942,7 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
         
         // Check scope_labels
         if(qt->instances.scope_labels_pa || qt->instances.scope_chart_label_key_pattern) {
-            if(!query_instance_matches_labels(ri,
+            if(!query_instance_matches_labels(qt->request.ria,
                 qt->instances.scope_chart_label_key_pattern,
                 qt->instances.scope_labels_pa))
                 return 0;
@@ -950,7 +975,7 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
         
         // Check scope_labels
         if(qt->instances.scope_labels_pa || qt->instances.scope_chart_label_key_pattern) {
-            if(!query_instance_matches_labels(ri,
+            if(!query_instance_matches_labels(ria,
                 qt->instances.scope_chart_label_key_pattern,
                 qt->instances.scope_labels_pa)) {
                 rrdinstance_release(ria);
@@ -985,7 +1010,7 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
             
             // Check scope_labels
             if(qt->instances.scope_labels_pa || qt->instances.scope_chart_label_key_pattern) {
-                if(!query_instance_matches_labels(ri,
+                if(!query_instance_matches_labels(ria,
                     qt->instances.scope_chart_label_key_pattern,
                     qt->instances.scope_labels_pa))
                     continue;
@@ -1408,7 +1433,7 @@ ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
                 
                 // Check scope_labels - if it doesn't match, skip entirely
                 if(scope_labels_pa) {
-                    if(!query_instance_matches_labels(ri, NULL, scope_labels_pa))
+                    if(!query_instance_matches_labels(ria, NULL, scope_labels_pa))
                         continue;
                 }
 
@@ -1423,7 +1448,7 @@ ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
                         continue;
                 }
 
-                if(!query_instance_matches_labels(ri, chart_label_key_sp, labels_pa))
+                if(!query_instance_matches_labels(ria, chart_label_key_sp, labels_pa))
                     continue;
 
                 if(alerts_sp && !query_target_match_alert_pattern(ria, alerts_sp))
