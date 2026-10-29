@@ -170,14 +170,24 @@ static void test_control_queue_full(SPAWN_SERVER *server, const char *argv0) {
     }
 }
 
-// Wait up to timeout_ms for a request thread to finish.
-static bool test_control_call_finished(SPAWN_CONTROL_TEST_CALL *call, int timeout_ms) {
-    for(int waited = 0; !__atomic_load_n(&call->done, __ATOMIC_ACQUIRE); waited += 10) {
-        if(waited >= timeout_ms)
-            return false;
-        sleep_usec(10 * USEC_PER_MS);
-    }
-    return true;
+typedef struct {
+    SPAWN_SERVER *server;
+    size_t request_id;
+    pid_t pid;
+    bool killed;
+} SPAWN_CONTROL_TEST_KILLER;
+
+// Kill the server shortly after the next request has been issued, so the
+// request is already queued and waiting for the server to take its socket.
+static void *test_control_kill_server(void *arg) {
+    SPAWN_CONTROL_TEST_KILLER *killer = arg;
+    while(__atomic_load_n(&killer->server->request_id, __ATOMIC_RELAXED) == killer->request_id)
+        sleep_usec(USEC_PER_MS);
+    sleep_usec(200 * USEC_PER_MS);
+
+    int status;
+    killer->killed = kill(killer->pid, SIGKILL) == 0 && waitpid(killer->pid, &status, 0) == killer->pid;
+    return NULL;
 }
 
 // Stop the server so it cannot take the request socket. The request must give
@@ -193,25 +203,17 @@ static void test_request_ack_timeout(SPAWN_SERVER *server, const char *argv0) {
         exit(1);
     }
 
-    pthread_t thread;
     SPAWN_CONTROL_TEST_CALL call = { .server = server, .argv0 = argv0, .index = 2000 };
-    if(pthread_create(&thread, NULL, test_control_concurrent_call, &call) != 0) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot start the request timeout test thread");
-        exit(1);
-    }
-    bool finished = test_control_call_finished(&call, 2000);
+    test_control_concurrent_call(&call);
 
     if(kill(pid, SIGCONT) != 0) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot resume the spawn server");
         exit(1);
     }
-    if(finished)
-        pthread_join(thread, NULL);
     server->request_ack_timeout_ut = timeout_ut;
 
-    if(!finished || call.result) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Request to a stopped server %s",
-               finished ? "succeeded" : "did not time out");
+    if(call.result) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Request to a stopped server succeeded");
         exit(1);
     }
 
@@ -293,26 +295,33 @@ static void test_private_control_channel(int argc, const char **argv) {
         exit(1);
     }
     pthread_t thread;
-    SPAWN_CONTROL_TEST_CALL waiting = { .server = server, .argv0 = argv[0], .index = 3000 };
-    if(pthread_create(&thread, NULL, test_control_concurrent_call, &waiting) != 0) {
+    SPAWN_CONTROL_TEST_KILLER killer = {
+        .server = server,
+        .request_id = __atomic_load_n(&server->request_id, __ATOMIC_RELAXED),
+        .pid = server_pid,
+    };
+    if(pthread_create(&thread, NULL, test_control_kill_server, &killer) != 0) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot start the server exit test thread");
         exit(1);
     }
-    sleep_usec(200 * USEC_PER_MS);
-    if(__atomic_load_n(&waiting.done, __ATOMIC_ACQUIRE)) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Request to a stopped server did not wait");
-        exit(1);
-    }
-    if(kill(server_pid, SIGKILL) != 0 || waitpid(server_pid, &status, 0) != server_pid) {
+    usec_t started_ut = now_monotonic_usec();
+    SPAWN_CONTROL_TEST_CALL waiting = { .server = server, .argv0 = argv[0], .index = 3000 };
+    test_control_concurrent_call(&waiting);
+    usec_t elapsed_ut = now_monotonic_usec() - started_ut;
+    pthread_join(thread, NULL);
+    server->server_pid = 0; // already reaped; destroy must not signal a recycled PID
+
+    if(!killer.killed) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot stop private-channel test server");
         exit(1);
     }
-    server->server_pid = 0; // already reaped; destroy must not signal a recycled PID
-    if(!test_control_call_finished(&waiting, 2000) || waiting.result) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Request did not fail promptly when the server exited");
+    // it must have waited for the server (killed after 200 ms), and not for its deadline
+    if(waiting.result || elapsed_ut < 150 * USEC_PER_MS || elapsed_ut > 3 * USEC_PER_SEC) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "Request did not fail promptly when the server exited (%llu ms)",
+               (unsigned long long)(elapsed_ut / USEC_PER_MS));
         exit(1);
     }
-    pthread_join(thread, NULL);
 
     // Requests must fail promptly when the forked server is already gone.
     const char *args[] = { argv[0], "plugin-echo-and-exit", NULL };
