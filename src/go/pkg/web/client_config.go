@@ -24,6 +24,10 @@ var ErrRedirectAttempted = errors.New("redirect")
 // This structure is not intended to be used directly as part of a module's configuration.
 // Supported configuration file formats: YAML.
 type ClientConfig struct {
+	// ResponseBodyLimit sets the consumed-byte limit per response. Nonpositive
+	// values use DefaultResponseBodyLimit. This is a library-only setting.
+	ResponseBodyLimit confopt.ByteSize `yaml:"-" json:"-"`
+
 	// Timeout specifies a time limit for requests made by this ClientConfig.
 	// Default (zero value) is no timeout. Must be set before http.Client creation.
 	Timeout confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
@@ -67,9 +71,16 @@ func NewHTTPClientWithTransport(cfg ClientConfig, transport http.RoundTripper) *
 	if transport == nil {
 		transport = http.DefaultTransport
 	}
+	limit := responseBodyLimit(cfg.ResponseBodyLimit.Bytes())
+	if policy, ok := transport.(interface{ ResponseBodyLimit() int64 }); ok {
+		limit = min(limit, responseBodyLimit(policy.ResponseBodyLimit()))
+	}
 	return &http.Client{
-		Timeout:       cfg.Timeout.Duration(),
-		Transport:     &responseLimitTransport{base: transport},
+		Timeout: cfg.Timeout.Duration(),
+		Transport: &responseLimitTransport{
+			base:  transport,
+			limit: limit,
+		},
 		CheckRedirect: redirectFunc(cfg.NotFollowRedirect),
 	}
 }
@@ -90,7 +101,9 @@ func NewHTTPTransport(ctx context.Context, cfg ClientConfig) (*http.Transport, e
 		}
 	}
 
-	d := &net.Dialer{Timeout: cfg.Timeout.Duration()}
+	d := &net.Dialer{
+		Timeout: cfg.Timeout.Duration(),
+	}
 
 	transport := &http.Transport{
 		TLSClientConfig:     tlsConfig,
@@ -108,7 +121,9 @@ func newHTTP2Transport(ctx context.Context, cfg ClientConfig) (*http2Transport, 
 		return nil, fmt.Errorf("error on creating TLS config: %w", err)
 	}
 
-	d := &net.Dialer{Timeout: cfg.Timeout.Duration()}
+	d := &net.Dialer{
+		Timeout: cfg.Timeout.Duration(),
+	}
 
 	transport := &http2Transport{
 		t2: &http2.Transport{

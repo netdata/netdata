@@ -5,8 +5,10 @@ package web
 import (
 	"compress/gzip"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -19,7 +21,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
+	"gopkg.in/yaml.v2"
 )
 
 type repeatingByte byte
@@ -34,12 +38,20 @@ func (v repeatingByte) Read(p []byte) (int, error) {
 func TestHTTPClientResponseLimit(t *testing.T) {
 	const limit = 64 << 20
 	for name, tc := range map[string]struct {
-		size int64
-		gzip bool
+		size  int64
+		limit confopt.ByteSize
+		gzip  bool
 	}{
-		"exact limit":    {size: limit},
-		"plain overflow": {size: limit + 1},
-		"gzip overflow":  {size: limit + 1, gzip: true},
+		"exact limit":         {size: limit},
+		"plain overflow":      {size: limit + 1},
+		"gzip overflow":       {size: limit + 1, gzip: true},
+		"negative default":    {size: limit + 1, limit: -1},
+		"small exact":         {size: 1024, limit: confopt.KiB},
+		"small overflow":      {size: 1025, limit: confopt.KiB},
+		"small gzip overflow": {size: 1025, limit: confopt.KiB, gzip: true},
+		"large exact":         {size: limit + 1024, limit: 64*confopt.MiB + confopt.KiB},
+		"large gzip exact":    {size: limit + 1024, limit: 64*confopt.MiB + confopt.KiB, gzip: true},
+		"large overflow":      {size: limit + 1025, limit: 64*confopt.MiB + confopt.KiB},
 	} {
 		t.Run(name, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -53,16 +65,23 @@ func TestHTTPClientResponseLimit(t *testing.T) {
 				_, _ = io.CopyN(dst, repeatingByte('x'), tc.size)
 			}))
 			defer server.Close()
-			client, err := NewHTTPClient(context.Background(), ClientConfig{})
+			client, err := NewHTTPClient(context.Background(), ClientConfig{
+				ResponseBodyLimit: tc.limit,
+			})
 			require.NoError(t, err)
 			defer client.CloseIdleConnections()
 			resp, err := client.Get(server.URL)
 			require.NoError(t, err)
 			defer resp.Body.Close()
 			n, err := io.Copy(io.Discard, resp.Body)
-			if tc.size > limit {
+			effective := int64(limit)
+			if tc.limit > 0 {
+				effective = tc.limit.Bytes()
+			}
+			assert.Equal(t, effective, HTTPClientResponseBodyLimit(client))
+			if tc.size > effective {
 				assert.ErrorIs(t, err, ErrResponseTooLarge)
-				assert.EqualValues(t, limit, n)
+				assert.EqualValues(t, effective, n)
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, tc.size, n)
@@ -88,10 +107,7 @@ func TestResponseLimitReader(t *testing.T) {
 		"error at boundary": {r: io.MultiReader(strings.NewReader("abcd"), iotest.ErrReader(readErr)), want: "abcd", err: readErr},
 	} {
 		t.Run(name, func(t *testing.T) {
-			r := &responseLimitReader{
-				reader:    tc.r,
-				remaining: 4,
-			}
+			r := LimitResponseReader(tc.r, 4)
 			got, err := io.ReadAll(r)
 			assert.Equal(t, tc.want, string(got))
 			assert.ErrorIs(t, err, tc.err)
@@ -129,20 +145,20 @@ func TestResponseLimitBodyCleanup(t *testing.T) {
 		Reader:   repeatingByte('x'),
 		closeErr: closeErr,
 	}
-	body := LimitResponseBody(source)
-	assert.Same(t, body, LimitResponseBody(body))
+	body := LimitResponseBody(source, 0)
+	assert.Same(t, body, LimitResponseBody(body, 0))
 	n, err := body.Read(nil)
 	assert.Zero(t, n)
 	assert.NoError(t, err)
 	assert.Zero(t, source.read)
 	_, err = io.Copy(io.Discard, body)
 	require.ErrorIs(t, err, ErrResponseTooLarge)
-	assert.Equal(t, MaxResponseBodySize+1, source.read)
+	assert.Equal(t, DefaultResponseBodyLimit+1, source.read)
 	CloseBody(&http.Response{
 		Body: body,
 	})
 	assert.True(t, source.closed)
-	assert.Equal(t, MaxResponseBodySize+1, source.read)
+	assert.Equal(t, DefaultResponseBodyLimit+1, source.read)
 	assert.ErrorIs(t, body.Close(), closeErr)
 }
 
@@ -150,7 +166,7 @@ func TestHTTP2ResponseLimit(t *testing.T) {
 	for name, tls := range map[string]bool{"TLS": true, "h2c": false} {
 		t.Run(name, func(t *testing.T) {
 			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				_, _ = io.CopyN(w, repeatingByte('x'), MaxResponseBodySize+1)
+				_, _ = io.CopyN(w, repeatingByte('x'), DefaultResponseBodyLimit+1)
 			})
 			var server *httptest.Server
 			if tls {
@@ -178,7 +194,7 @@ func TestHTTP2ResponseLimit(t *testing.T) {
 			assert.Equal(t, 2, resp.ProtoMajor)
 			n, err := io.Copy(io.Discard, resp.Body)
 			assert.ErrorIs(t, err, ErrResponseTooLarge)
-			assert.EqualValues(t, MaxResponseBodySize, n)
+			assert.EqualValues(t, DefaultResponseBodyLimit, n)
 		})
 	}
 }
@@ -195,7 +211,7 @@ func (t *observedTransport) RoundTrip(req *http.Request) (*http.Response, error)
 		Header: http.Header{
 			"Content-Encoding": {"gzip"},
 		},
-		ContentLength: MaxResponseBodySize + 1,
+		ContentLength: DefaultResponseBodyLimit + 1,
 	}, nil
 }
 
@@ -214,7 +230,7 @@ func TestResponseLimitPreservesRepresentationAndPartialReads(t *testing.T) {
 	resp, err := client.Do(req)
 	require.NoError(t, err)
 	assert.Equal(t, "gzip", resp.Header.Get("Content-Encoding"))
-	assert.EqualValues(t, MaxResponseBodySize+1, resp.ContentLength)
+	assert.EqualValues(t, DefaultResponseBodyLimit+1, resp.ContentLength)
 	assert.False(t, resp.Uncompressed)
 	require.NoError(t, resp.Body.Close())
 	assert.Zero(t, source.read, "neither RoundTrip nor Close may eagerly read")
@@ -230,7 +246,7 @@ func TestResponseLimitPreservesRepresentationAndPartialReads(t *testing.T) {
 	var got map[string]bool
 	require.NoError(t, DoHTTP(client).RequestJSON(req, &got))
 	assert.Equal(t, map[string]bool{"ok": true}, got)
-	assert.Equal(t, MaxResponseBodySize+1, source.read)
+	assert.Equal(t, DefaultResponseBodyLimit+1, source.read)
 }
 
 func BenchmarkHTTPClientResponse(b *testing.B) {
@@ -250,5 +266,96 @@ func BenchmarkHTTPClientResponse(b *testing.B) {
 		_, err = io.Copy(io.Discard, resp.Body)
 		require.NoError(b, err)
 		require.NoError(b, resp.Body.Close())
+	}
+}
+
+func TestResponseBodyLimitComposition(t *testing.T) {
+	for name, limits := range map[string][2]int64{"same": {4, 4}, "lower": {8, 4}, "higher": {4, 8}} {
+		t.Run(name, func(t *testing.T) {
+			source := &observedBody{
+				Reader: strings.NewReader("123456789"),
+			}
+			first := LimitResponseBody(source, limits[0])
+			second := LimitResponseBody(first, limits[1])
+			if limits[0] == limits[1] {
+				assert.Same(t, first, second)
+			}
+			n, err := io.Copy(io.Discard, second)
+			require.ErrorIs(t, err, ErrResponseTooLarge)
+			assert.EqualValues(t, 4, n)
+			var overflow *ResponseBodyLimitError
+			require.ErrorAs(t, err, &overflow)
+			assert.EqualValues(t, 4, overflow.Limit)
+			assert.EqualError(t, err, "HTTP response body exceeds the 4 byte limit")
+			require.NoError(t, second.Close())
+			assert.True(t, source.closed)
+		})
+	}
+	// Deduplication uses the initial limit even after a partial read.
+	body := LimitResponseBody(io.NopCloser(strings.NewReader("12345")), 4)
+	_, err := body.Read(make([]byte, 1))
+	require.NoError(t, err)
+	assert.Same(t, body, LimitResponseBody(body, 4))
+	for _, limit := range []int64{0, -1, math.MinInt64} {
+		n, err := io.Copy(io.Discard, LimitResponseReader(repeatingByte('x'), limit))
+		require.ErrorIs(t, err, ErrResponseTooLarge)
+		assert.EqualValues(t, DefaultResponseBodyLimit, n)
+		assert.EqualError(t, err, "HTTP response body exceeds the 64 MiB limit")
+	}
+	n, err := io.Copy(io.Discard, LimitResponseReader(strings.NewReader("abc"), math.MaxInt64))
+	assert.NoError(t, err)
+	assert.EqualValues(t, 3, n)
+}
+
+func TestHTTPClientResponseBodyLimitComposition(t *testing.T) {
+	assert.EqualValues(t, DefaultResponseBodyLimit, HTTPClientResponseBodyLimit(nil))
+	assert.EqualValues(t, DefaultResponseBodyLimit, HTTPClientResponseBodyLimit(&http.Client{}))
+	for _, limits := range [][2]confopt.ByteSize{{4, 8}, {8, 4}, {4, 4}, {128 * confopt.MiB, 256 * confopt.MiB}} {
+		source := &observedBody{
+			Reader: repeatingByte('x'),
+		}
+		inner := NewHTTPClientWithTransport(
+			ClientConfig{
+				ResponseBodyLimit: limits[0],
+			},
+			&observedTransport{
+				body: source,
+			},
+		)
+		outer := NewHTTPClientWithTransport(ClientConfig{
+			ResponseBodyLimit: limits[1],
+		}, inner.Transport)
+		want := min(limits[0], limits[1]).Bytes()
+		assert.Equal(t, want, HTTPClientResponseBodyLimit(outer))
+		resp, err := outer.Get("http://example.com")
+		require.NoError(t, err)
+		n, err := io.Copy(io.Discard, resp.Body)
+		require.ErrorIs(t, err, ErrResponseTooLarge)
+		assert.Equal(t, want, n)
+		require.NoError(t, resp.Body.Close())
+	}
+}
+
+func TestResponseBodyLimitNotUserConfig(t *testing.T) {
+	for name, codec := range map[string]struct {
+		marshal   func(any) ([]byte, error)
+		unmarshal func([]byte, any) error
+	}{"JSON": {json.Marshal, json.Unmarshal}, "YAML": {yaml.Marshal, yaml.Unmarshal}} {
+		t.Run(name, func(t *testing.T) {
+			cfg := ClientConfig{
+				ResponseBodyLimit: 128 * confopt.MiB,
+			}
+			got, err := codec.marshal(cfg)
+			require.NoError(t, err)
+			want, err := codec.marshal(ClientConfig{})
+			require.NoError(t, err)
+			assert.Equal(t, string(want), string(got))
+			data, err := codec.marshal(
+				map[string]any{"ResponseBodyLimit": "1MiB", "response_body_limit": "1MiB", "responsebodylimit": 1},
+			)
+			require.NoError(t, err)
+			require.NoError(t, codec.unmarshal(data, &cfg))
+			assert.Equal(t, 128*confopt.MiB, cfg.ResponseBodyLimit)
+		})
 	}
 }

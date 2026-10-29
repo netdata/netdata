@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
@@ -48,7 +49,7 @@ func TestHTTPFetchBoundsCleanup(t *testing.T) {
 	for name, status := range map[string]int{"HTTP error": http.StatusBadGateway, "invalid gzip": http.StatusOK} {
 		t.Run(name, func(t *testing.T) {
 			body := &fetchBody{
-				Reader: io.LimitReader(repeatingByte('x'), web.MaxResponseBodySize+4096),
+				Reader: io.LimitReader(repeatingByte('x'), web.DefaultResponseBodyLimit+4096),
 			}
 			client := &http.Client{
 				Transport: fetchRoundTripFunc(func(*http.Request) (*http.Response, error) {
@@ -69,7 +70,7 @@ func TestHTTPFetchBoundsCleanup(t *testing.T) {
 			}
 			require.Error(t, f.fetch(context.Background(), io.Discard))
 			assert.True(t, body.closed)
-			assert.Equal(t, web.MaxResponseBodySize+1, body.read)
+			assert.Equal(t, web.DefaultResponseBodyLimit+1, body.read)
 		})
 	}
 }
@@ -155,4 +156,71 @@ func BenchmarkHTTPFetch(b *testing.B) {
 			}
 		})
 	}
+}
+
+func TestPrometheusCustomResponseLimit(t *testing.T) {
+	for name, limit := range map[string]confopt.ByteSize{"smaller": confopt.KiB, "larger": 64*confopt.MiB + confopt.KiB} {
+		t.Run(name, func(t *testing.T) {
+			for encoding, compressed := range map[string]bool{"plain": false, "gzip": true} {
+				t.Run(encoding, func(t *testing.T) {
+					var size atomic.Int64
+					server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						var dst io.Writer = w
+						if compressed {
+							w.Header().Set("Content-Encoding", "gzip")
+							gz := gzip.NewWriter(w)
+							defer gz.Close()
+							dst = gz
+						}
+						_, _ = io.WriteString(dst, "#")
+						_, _ = io.CopyN(dst, repeatingByte('x'), size.Load()-1)
+					}))
+					defer server.Close()
+					client, err := web.NewHTTPClient(context.Background(), web.ClientConfig{
+						ResponseBodyLimit: limit,
+					})
+					require.NoError(t, err)
+					defer client.CloseIdleConnections()
+					p := NewWithSelector(client, web.RequestConfig{
+						URL: server.URL,
+					}, nil)
+					size.Store(limit.Bytes())
+					_, err = p.ScrapeSeries(context.Background())
+					require.NoError(t, err, "exact custom limit")
+					size.Store(limit.Bytes() + 1)
+					_, err = p.ScrapeSeries(context.Background())
+					require.ErrorIs(t, err, web.ErrResponseTooLarge)
+					size.Store(8)
+					_, err = p.ScrapeSeries(context.Background())
+					require.NoError(t, err, "recovery after overflow")
+				})
+			}
+		})
+	}
+}
+
+func TestPrometheusLimitFollowsHTTPClient(t *testing.T) {
+	server := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = io.WriteString(w, "metric 1\n") }),
+	)
+	defer server.Close()
+	first, err := web.NewHTTPClient(context.Background(), web.ClientConfig{
+		ResponseBodyLimit: 4,
+	})
+	require.NoError(t, err)
+	defer first.CloseIdleConnections()
+	p := New(first, web.RequestConfig{
+		URL: server.URL,
+	})
+	_, err = p.ScrapeSeries(context.Background())
+	require.ErrorIs(t, err, web.ErrResponseTooLarge)
+	second, err := web.NewHTTPClient(context.Background(), web.ClientConfig{
+		ResponseBodyLimit: 16,
+	})
+	require.NoError(t, err)
+	defer second.CloseIdleConnections()
+	first.CloseIdleConnections()
+	p.HTTPClient().Transport = second.Transport
+	_, err = p.ScrapeSeries(context.Background())
+	require.NoError(t, err)
 }

@@ -203,7 +203,7 @@ Then [restart netdata](/docs/netdata-agent/start-stop-restart.md) for the change
 
 ### HTTP response-size errors
 
-If a collector logs `HTTP response body exceeds the 64 MiB limit`, reading a response crossed the fixed HTTP
+If a collector logs `HTTP response body exceeds the 64 MiB limit`, reading a response crossed its HTTP
 response-size limit. Gzip decompression does not bypass the limit. Depending on the collector, this can fail the
 collection or leave only the metrics from other successful requests. Some SDK integrations report a sanitized error
 instead of this exact message.

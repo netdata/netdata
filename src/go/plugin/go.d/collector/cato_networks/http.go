@@ -22,19 +22,25 @@ func newCatoHTTPClient(client *http.Client) *http.Client {
 		base = http.DefaultTransport
 	}
 	cloned.Transport = &catoResponseTransport{
-		base: base,
+		base:  base,
+		limit: web.HTTPClientResponseBodyLimit(client),
 	}
 	return &cloned
 }
 
-type catoResponseTransport struct{ base http.RoundTripper }
+type catoResponseTransport struct {
+	base  http.RoundTripper
+	limit int64
+}
+
+func (t *catoResponseTransport) ResponseBodyLimit() int64 { return t.limit }
 
 func (t *catoResponseTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	resp, err := t.base.RoundTrip(req)
 	if err != nil {
 		return resp, err
 	}
-	resp.Body = web.LimitResponseBody(resp.Body)
+	resp.Body = web.LimitResponseBody(resp.Body, t.limit)
 	if strings.EqualFold(strings.TrimSpace(resp.Header.Get("Content-Encoding")), "gzip") {
 		gz, err := gzip.NewReader(resp.Body)
 		if err != nil {
@@ -44,7 +50,7 @@ func (t *catoResponseTransport) RoundTrip(req *http.Request) (*http.Response, er
 		resp.Body = web.LimitResponseBody(&gzipResponseBody{
 			Reader: gz,
 			body:   resp.Body,
-		})
+		}, t.limit)
 		resp.Header.Del("Content-Encoding")
 		resp.Header.Del("Content-Length")
 		resp.ContentLength = -1
