@@ -77,8 +77,8 @@ github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.7 h1:fSNAt6hs4qLjb9tMZc
 github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.7/go.mod h1:TMav+EuXQu5kNpZZz/6rIC8xx4mCsW+6AKHrjvOSAsE=
 github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.8.7 h1:7NS6kqBjkWIN8P/AEdmtyq6eQGAhN1oHTZdzXclpH6Y=
 github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.8.7/go.mod h1:1PFqtAUsIgF1nEVojzRJSf/v88zjzqrGW+w+UAtkXyQ=
-github.com/aws/aws-sdk-go-v2/internal/v4a v1.5.6 h1:Qmn60RWuk9+bd2ddvJJqwf3Cpac3VvGMOdbGemtUhX4=
-github.com/aws/aws-sdk-go-v2/internal/v4a v1.5.6/go.mod h1:h/YJhe4AVyQxEUMluph10iqV7mjajH7A9L+BHF5ppis=
+github.com/aws/aws-sdk-go-v2/internal/v4a v1.5.7 h1:wYu55QUHARwu9YzeuY5yEJUTsIu8ahkmp1l3QmbzHn8=
+github.com/aws/aws-sdk-go-v2/internal/v4a v1.5.7/go.mod h1:OteEkhFAgFwQtZft/3myWo3tVWxdAo7cwV+7AbcpAtQ=
 github.com/aws/aws-sdk-go-v2/service/cloudwatch v1.73.3 h1:VmR1+YQW2vc3Sy2fLGSFtijUq9bAOMzzFxNC1zmHiA0=
 github.com/aws/aws-sdk-go-v2/service/cloudwatch v1.73.3/go.mod h1:Q6H59zrEAgECYo4bjSh3IAvr+A+KklmThMoZjqnXbHY=
 github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.22 h1:qHfXn1Tm2Rh8kic/DvdKaiSVlHQRSr5C+rMuBR29D44=
@@ -101,8 +101,8 @@ github.com/aws/aws-sdk-go-v2/service/sso v1.38.4 h1:ChCtagixSFOxltv0o6E3NT8F7ksv
 github.com/aws/aws-sdk-go-v2/service/sso v1.38.4/go.mod h1:+FEO9jrVMpc9oN3CdAxJbtlQEu3z8UddDPSedpeM3PY=
 github.com/aws/aws-sdk-go-v2/service/ssooidc v1.43.4 h1:j6c+HA4AoS0EBEjArPjavFEBrucJEryfrQU0TffmACk=
 github.com/aws/aws-sdk-go-v2/service/ssooidc v1.43.4/go.mod h1:RhghaXUk9q66VtOQUX1FdPddQuHnqQZzbB0fEYXmPRA=
-github.com/aws/aws-sdk-go-v2/service/sts v1.51.4 h1:OKEfbf2tcfsF2pBk/S9QqNpo6alaAtiBs4hysCsBjPw=
-github.com/aws/aws-sdk-go-v2/service/sts v1.51.4/go.mod h1:mCd6qGo9b8hTtfjgsmNkFlzwjyce4owd7HDVFnCLXhM=
+github.com/aws/aws-sdk-go-v2/service/sts v1.51.5 h1:OuyNaMncYP4ftrvcnOHJ9j3AxO3zsC5C/ewD0HoHdjQ=
+github.com/aws/aws-sdk-go-v2/service/sts v1.51.5/go.mod h1:Bhu66tgvf94uunUSiAc0Ew0avhnpSm0J8Hl1MYocRbo=
 github.com/aws/smithy-go v1.28.6 h1:Pj+/sUviNYjow8ELRtNwKHZ9ECeF+7pATX3+shjLIrw=
 github.com/aws/smithy-go v1.28.6/go.mod h1:YE2RhdIuDbA5E5bTdciG9KrW3+TiEONeUWCqxX9i1Fc=
 github.com/axiomhq/hyperloglog v0.3.0 h1:IQzzb1zjZiODMwCgBRHKak4oIp2Oj7K0Q0rVoAoFVuM=
