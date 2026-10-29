@@ -45,9 +45,6 @@ eBPF DCstat can be monitored further using the following other integrations:
 
 The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT), presence of BTF files, and the configured object flavor to decide which eBPF program will be attached. Because `lookup_fast` is a static kernel function, the collector resolves its real symbol name from `/proc/kallsyms` before attaching.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

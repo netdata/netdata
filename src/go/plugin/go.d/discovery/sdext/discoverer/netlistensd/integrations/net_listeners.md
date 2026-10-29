@@ -135,8 +135,7 @@ services:
   - id: redis
     match: '{{ or (eq .Port "6379") (eq .Comm "redis-server") }}'
     config_template: |
-      name: local
-      address: redis://@{{.Address}}
+      {{ job "name" "local" "address" (printf "redis://@%s" .Address) }}
 
 ```
 ###### Faster scan interval
@@ -198,8 +197,7 @@ The most common stock-rule shape. Match the canonical port AND the canonical pro
 - id: redis
   match: '{{ or (eq .Port "6379") (eq .Comm "redis-server") }}'
   config_template: |
-    name: local
-    address: redis://@{{.Address}}
+    {{ job "name" "local" "address" (printf "redis://@%s" .Address) }}
 
 ```
 
@@ -211,27 +209,27 @@ When the process is `java`/`python`/`node` and the real service name lives in th
 - id: rabbitmq
   match: '{{ or (eq .Port "15672") (glob .Cmdline "*rabbitmq*") }}'
   config_template: |
-    name: local
-    url: http://{{.Address}}
-    username: guest
-    password: guest
-    collect_queues_metrics: no
+    {{ job
+      "name" "local"
+      "url" (printf "http://%s" .Address)
+      "username" "guest"
+      "password" "guest"
+      "collect_queues_metrics" false
+    }}
 
 ```
 
-#### Multiple jobs from one target (sequence output)
+#### Multiple jobs from one target
 
-When one running service should produce multiple collector jobs — for example, MySQL exposing both a Unix-socket DSN and a TCP DSN. The rendered YAML is a top-level sequence; each item becomes a separate job.
+When one running service should produce multiple collector jobs — for example, MySQL exposing both a Unix-socket DSN and a TCP DSN. Call `job` once for each collector job, in the desired order.
 
 
 ```yaml
 - id: mysql
   match: '{{ or (eq .Port "3306") (eq .Comm "mysqld" "mariadbd") }}'
   config_template: |
-    - name: local
-      dsn: netdata@unix(/var/run/mysqld/mysqld.sock)/
-    - name: local
-      dsn: netdata@tcp({{.Address}})/
+    {{ job "name" "local" "dsn" "netdata@unix(/var/run/mysqld/mysqld.sock)/" }}
+    {{ job "name" "local" "dsn" (printf "netdata@tcp(%s)/" .Address) }}
 
 ```
 
@@ -244,13 +242,15 @@ The last rule in the stock conf catches generic Prometheus exporters by port. `p
 - id: exporter
   match: '{{ or (and (not (empty (promPort .Port))) (not (eq .Comm "docker-proxy"))) (glob .Comm "*exporter*") }}'
   config_template: |
-    {{ $name := promPort .Port -}}
-    {{ if empty $name -}}
-    {{ $name = printf "%s_%s" .Comm .Port -}}
-    {{ end -}}
-    module: prometheus
-    name: {{$name}}_local
-    url: http://{{.Address}}/metrics
+    {{ $job := dict }}
+    {{ $name := promPort .Port }}
+    {{ if empty $name }}
+    {{ $name = printf "%s_%s" .Comm .Port }}
+    {{ end }}
+    {{ $_ := set $job "module" "prometheus" }}
+    {{ $_ := set $job "name" (printf "%s_local" $name) }}
+    {{ $_ := set $job "url" (printf "http://%s/metrics" .Address) }}
+    {{ job $job }}
 
 ```
 

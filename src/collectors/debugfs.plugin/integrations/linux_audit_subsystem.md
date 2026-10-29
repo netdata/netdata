@@ -43,9 +43,6 @@ This integration requires root privileges or CAP_AUDIT_CONTROL capability to que
 Automatically detects and monitors the Linux audit subsystem when the kernel supports NETLINK_AUDIT. Gracefully disables itself if audit is not available.
 
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

@@ -41,9 +41,6 @@ Disk space can be monitored further using the following other integrations:
 
 The plugin reads data from `/proc/self/mountinfo` and `/proc/diskstats file`.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

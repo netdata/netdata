@@ -44,9 +44,6 @@ The hwmon sysfs attributes are generally world-readable, so no additional permis
 All hardware monitoring chips exposed by the hwmon subsystem are detected and collected automatically. The collection interval is automatically raised above the configured update every when reading the sensors is slow.
 
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 
