@@ -1,0 +1,395 @@
+CHART netflow.input_packets '' 'Netflow UDP Input Packets' 'packets/s' 'netflow' 'netdata.netflow.input_packets' line 1000 1
+DIMENSION empty 'empty' incremental 1 1
+DIMENSION kernel_dropped 'kernel_dropped' incremental 1 1
+DIMENSION udp_received 'udp_received' incremental 1 1
+BEGIN netflow.input_packets 1000000
+SET udp_received = 0
+SET kernel_dropped = 0
+SET empty = 0
+END 1700000000
+CHART netflow.input_bytes '' 'Netflow Input Bytes' 'bytes/s' 'netflow' 'netdata.netflow.input_bytes' line 1000 1
+DIMENSION udp_received 'udp_received' incremental 1 1
+BEGIN netflow.input_bytes 1000000
+SET udp_received = 0
+END 1700000000
+CHART netflow.protocol_packets '' 'Netflow Protocol Packets' 'packets/s' 'netflow' 'netdata.netflow.protocol_packets' stacked 1000 1
+DIMENSION ipfix 'ipfix' incremental 1 1
+DIMENSION netflow_v5 'netflow_v5' incremental 1 1
+DIMENSION netflow_v7 'netflow_v7' incremental 1 1
+DIMENSION netflow_v9 'netflow_v9' incremental 1 1
+DIMENSION sflow 'sflow' incremental 1 1
+BEGIN netflow.protocol_packets 1000000
+SET netflow_v5 = 0
+SET netflow_v7 = 0
+SET netflow_v9 = 0
+SET ipfix = 0
+SET sflow = 0
+END 1700000000
+CHART netflow.flow_sets '' 'Netflow Sets' 'sets/s' 'netflow' 'netdata.netflow.flow_sets' stacked 1000 1
+DIMENSION ipfix_data 'ipfix_data' incremental 1 1
+DIMENSION ipfix_ignored 'ipfix_ignored' incremental 1 1
+DIMENSION ipfix_missing_template 'ipfix_missing_template' incremental 1 1
+DIMENSION ipfix_options_data 'ipfix_options_data' incremental 1 1
+DIMENSION ipfix_options_templates 'ipfix_options_templates' incremental 1 1
+DIMENSION ipfix_templates 'ipfix_templates' incremental 1 1
+DIMENSION v9_data 'v9_data' incremental 1 1
+DIMENSION v9_ignored 'v9_ignored' incremental 1 1
+DIMENSION v9_missing_template 'v9_missing_template' incremental 1 1
+DIMENSION v9_options_data 'v9_options_data' incremental 1 1
+DIMENSION v9_options_templates 'v9_options_templates' incremental 1 1
+DIMENSION v9_templates 'v9_templates' incremental 1 1
+BEGIN netflow.flow_sets 1000000
+SET v9_data = 0
+SET v9_options_data = 0
+SET v9_templates = 0
+SET v9_options_templates = 0
+SET v9_missing_template = 0
+SET v9_ignored = 0
+SET ipfix_data = 0
+SET ipfix_options_data = 0
+SET ipfix_templates = 0
+SET ipfix_options_templates = 0
+SET ipfix_missing_template = 0
+SET ipfix_ignored = 0
+END 1700000000
+CHART netflow.templates '' 'Netflow Template Definitions' 'templates/s' 'netflow' 'netdata.netflow.templates' stacked 1000 1
+DIMENSION ipfix_data 'ipfix_data' incremental 1 1
+DIMENSION ipfix_options 'ipfix_options' incremental 1 1
+DIMENSION v9_data 'v9_data' incremental 1 1
+DIMENSION v9_options 'v9_options' incremental 1 1
+BEGIN netflow.templates 1000000
+SET v9_data = 0
+SET v9_options = 0
+SET ipfix_data = 0
+SET ipfix_options = 0
+END 1700000000
+CHART netflow.flow_records '' 'Netflow Decoded Data Records' 'records/s' 'netflow' 'netdata.netflow.flow_records' stacked 1000 1
+DIMENSION ipfix 'ipfix' incremental 1 1
+DIMENSION netflow_v5 'netflow_v5' incremental 1 1
+DIMENSION netflow_v7 'netflow_v7' incremental 1 1
+DIMENSION netflow_v9 'netflow_v9' incremental 1 1
+BEGIN netflow.flow_records 1000000
+SET netflow_v5 = 0
+SET netflow_v7 = 0
+SET netflow_v9 = 0
+SET ipfix = 0
+END 1700000000
+CHART netflow.options_records '' 'Netflow Options Records' 'records/s' 'netflow' 'netdata.netflow.options_records' stacked 1000 1
+DIMENSION ipfix 'ipfix' incremental 1 1
+DIMENSION netflow_v9 'netflow_v9' incremental 1 1
+DIMENSION sampling_data 'sampling_data' incremental 1 1
+BEGIN netflow.options_records 1000000
+SET netflow_v9 = 0
+SET ipfix = 0
+SET sampling_data = 0
+END 1700000000
+CHART netflow.sflow_samples '' 'sFlow Samples' 'samples/s' 'netflow' 'netdata.netflow.sflow_samples' stacked 1000 1
+DIMENSION counter 'counter' incremental 1 1
+DIMENSION discarded_packet 'discarded_packet' incremental 1 1
+DIMENSION flow 'flow' incremental 1 1
+DIMENSION rt_flow 'rt_flow' incremental 1 1
+DIMENSION rt_metric 'rt_metric' incremental 1 1
+DIMENSION unknown 'unknown' incremental 1 1
+BEGIN netflow.sflow_samples 1000000
+SET flow = 0
+SET counter = 0
+SET discarded_packet = 0
+SET rt_metric = 0
+SET rt_flow = 0
+SET unknown = 0
+END 1700000000
+CHART netflow.decoder_exceptions '' 'Netflow Decoder Exceptions' 'events/s' 'netflow' 'netdata.netflow.decoder_exceptions' line 1000 1
+DIMENSION decapsulation_failed_records 'decapsulation_failed_records' incremental 1 1
+DIMENSION disabled_protocol_packets 'disabled_protocol_packets' incremental 1 1
+DIMENSION ipfix_zero_reverse_records 'ipfix_zero_reverse_records' incremental 1 1
+DIMENSION missing_template_sets 'missing_template_sets' incremental 1 1
+DIMENSION parse_errors 'parse_errors' incremental 1 1
+DIMENSION parser_source_evictions 'parser_source_evictions' incremental 1 1
+DIMENSION partial_counter_records 'partial_counter_records' incremental 1 1
+DIMENSION udp_receive_errors 'udp_receive_errors' incremental 1 1
+DIMENSION udp_socket_setup_errors 'udp_socket_setup_errors' incremental 1 1
+DIMENSION unsupported_data_sets 'unsupported_data_sets' incremental 1 1
+BEGIN netflow.decoder_exceptions 1000000
+SET udp_receive_errors = 0
+SET udp_socket_setup_errors = 0
+SET parse_errors = 0
+SET missing_template_sets = 0
+SET disabled_protocol_packets = 0
+SET parser_source_evictions = 0
+SET partial_counter_records = 0
+SET decapsulation_failed_records = 0
+SET unsupported_data_sets = 0
+SET ipfix_zero_reverse_records = 0
+END 1700000000
+CHART netflow.flow_rows '' 'Netflow Row Pipeline' 'rows/s' 'netflow' 'netdata.netflow.flow_rows' line 1000 1
+DIMENSION classifier_filtered 'classifier_filtered' incremental 1 1
+DIMENSION decoded 'decoded' incremental 1 1
+DIMENSION journaled 'journaled' incremental 1 1
+DIMENSION write_failed 'write_failed' incremental 1 1
+BEGIN netflow.flow_rows 1000000
+SET decoded = 0
+SET classifier_filtered = 0
+SET journaled = 0
+SET write_failed = 0
+END 1700000000
+CHART netflow.nsel_events '' 'Cisco NSEL Events' 'records/s' 'netflow' 'netdata.netflow.nsel_events' stacked 1000 1
+DIMENSION create 'create' incremental 1 1
+DIMENSION denied 'denied' incremental 1 1
+DIMENSION malformed 'malformed' incremental 1 1
+DIMENSION teardown 'teardown' incremental 1 1
+DIMENSION unsupported 'unsupported' incremental 1 1
+DIMENSION update 'update' incremental 1 1
+BEGIN netflow.nsel_events 1000000
+SET update = 0
+SET create = 0
+SET teardown = 0
+SET denied = 0
+SET unsupported = 0
+SET malformed = 0
+END 1700000000
+CHART netflow.nsel_rows '' 'Cisco NSEL Rows' 'rows/s' 'netflow' 'netdata.netflow.nsel_rows' stacked 1000 1
+DIMENSION forward 'forward' incremental 1 1
+DIMENSION reverse 'reverse' incremental 1 1
+BEGIN netflow.nsel_rows 1000000
+SET forward = 0
+SET reverse = 0
+END 1700000000
+CHART netflow.nsel_exceptions '' 'Cisco NSEL Exceptions' 'events/s' 'netflow' 'netdata.netflow.nsel_exceptions' line 1000 1
+DIMENSION counterless_updates 'counterless_updates' incremental 1 1
+DIMENSION partial_counter_directions 'partial_counter_directions' incremental 1 1
+DIMENSION zero_responder 'zero_responder' incremental 1 1
+BEGIN netflow.nsel_exceptions 1000000
+SET counterless_updates = 0
+SET partial_counter_directions = 0
+SET zero_responder = 0
+END 1700000000
+CHART netflow.raw_journal_ops '' 'Netflow Raw Journal Operations' 'ops/s' 'netflow' 'netdata.netflow.raw_journal_ops' line 1000 1
+DIMENSION entries_written 'entries_written' incremental 1 1
+DIMENSION sync_calls 'sync_calls' incremental 1 1
+DIMENSION sync_errors 'sync_errors' incremental 1 1
+DIMENSION write_errors 'write_errors' incremental 1 1
+BEGIN netflow.raw_journal_ops 1000000
+SET entries_written = 0
+SET write_errors = 0
+SET sync_calls = 0
+SET sync_errors = 0
+END 1700000000
+CHART netflow.raw_journal_bytes '' 'Netflow Raw Journal Logical Bytes' 'bytes/s' 'netflow' 'netdata.netflow.raw_journal_bytes' line 1000 1
+DIMENSION logical_written 'logical_written' incremental 1 1
+BEGIN netflow.raw_journal_bytes 1000000
+SET logical_written = 0
+END 1700000000
+CHART netflow.materialized_tier_ops '' 'Netflow Materialized Tier Operations' 'ops/s' 'netflow' 'netdata.netflow.materialized_tier_ops' line 1000 1
+DIMENSION flushes 'flushes' incremental 1 1
+DIMENSION hour_1_rows 'hour_1_rows' incremental 1 1
+DIMENSION minute_1_rows 'minute_1_rows' incremental 1 1
+DIMENSION minute_5_rows 'minute_5_rows' incremental 1 1
+DIMENSION sync_calls 'sync_calls' incremental 1 1
+DIMENSION sync_errors 'sync_errors' incremental 1 1
+DIMENSION write_errors 'write_errors' incremental 1 1
+BEGIN netflow.materialized_tier_ops 1000000
+SET minute_1_rows = 0
+SET minute_5_rows = 0
+SET hour_1_rows = 0
+SET flushes = 0
+SET write_errors = 0
+SET sync_calls = 0
+SET sync_errors = 0
+END 1700000000
+CHART netflow.materialized_tier_bytes '' 'Netflow Materialized Tier Logical Bytes' 'bytes/s' 'netflow' 'netdata.netflow.materialized_tier_bytes' stacked 1000 1
+DIMENSION hour_1_logical_written 'hour_1_logical_written' incremental 1 1
+DIMENSION minute_1_logical_written 'minute_1_logical_written' incremental 1 1
+DIMENSION minute_5_logical_written 'minute_5_logical_written' incremental 1 1
+BEGIN netflow.materialized_tier_bytes 1000000
+SET minute_1_logical_written = 0
+SET minute_5_logical_written = 0
+SET hour_1_logical_written = 0
+END 1700000000
+CHART netflow.tier_commit_age '' 'Netflow Tier Commit Age' 'seconds' 'netflow' 'netdata.netflow.tier_commit_age' line 1000 1
+DIMENSION hour_1 'hour_1' absolute 1 1
+DIMENSION minute_1 'minute_1' absolute 1 1
+DIMENSION minute_5 'minute_5' absolute 1 1
+BEGIN netflow.tier_commit_age 1000000
+SET minute_1 = 0
+SET minute_5 = 0
+SET hour_1 = 0
+END 1700000000
+CHART netflow.tier_commit_duration '' 'Netflow Tier Commit Duration' 'microseconds' 'netflow' 'netdata.netflow.tier_commit_duration' line 1000 1
+DIMENSION hour_1 'hour_1' absolute 1 1
+DIMENSION minute_1 'minute_1' absolute 1 1
+DIMENSION minute_5 'minute_5' absolute 1 1
+BEGIN netflow.tier_commit_duration 1000000
+SET minute_1 = 0
+SET minute_5 = 0
+SET hour_1 = 0
+END 1700000000
+CHART netflow.tier_commit_batches '' 'Netflow Tier Commit Batches' 'batches/s' 'netflow' 'netdata.netflow.tier_commit_batches' line 1000 1
+DIMENSION hour_1 'hour_1' incremental 1 1
+DIMENSION minute_1 'minute_1' incremental 1 1
+DIMENSION minute_5 'minute_5' incremental 1 1
+BEGIN netflow.tier_commit_batches 1000000
+SET minute_1 = 0
+SET minute_5 = 0
+SET hour_1 = 0
+END 1700000000
+CHART netflow.tier_commit_stretched '' 'Netflow Tier Commit Stretched Windows' 'events/s' 'netflow' 'netdata.netflow.tier_commit_stretched' line 1000 1
+DIMENSION hour_1 'hour_1' incremental 1 1
+DIMENSION minute_1 'minute_1' incremental 1 1
+DIMENSION minute_5 'minute_5' incremental 1 1
+BEGIN netflow.tier_commit_stretched 1000000
+SET minute_1 = 0
+SET minute_5 = 0
+SET hour_1 = 0
+END 1700000000
+CHART netflow.open_tiers '' 'Netflow Open Tier Rows' 'rows' 'netflow' 'netdata.netflow.open_tiers' stacked 1000 1
+DIMENSION hour_1 'hour_1' absolute 1 1
+DIMENSION minute_1 'minute_1' absolute 1 1
+DIMENSION minute_5 'minute_5' absolute 1 1
+BEGIN netflow.open_tiers 1000000
+SET minute_1 = 0
+SET minute_5 = 0
+SET hour_1 = 0
+END 1700000000
+CHART netflow.journal_io_ops '' 'Netflow Journal Auxiliary I/O Operations' 'ops/s' 'netflow' 'netdata.netflow.journal_io_ops' line 1000 1
+DIMENSION decoder_state_move_errors 'decoder_state_move_errors' incremental 1 1
+DIMENSION decoder_state_persist_calls 'decoder_state_persist_calls' incremental 1 1
+DIMENSION decoder_state_write_errors 'decoder_state_write_errors' incremental 1 1
+DIMENSION facet_active_update_errors 'facet_active_update_errors' incremental 1 1
+DIMENSION facet_lifecycle_errors 'facet_lifecycle_errors' incremental 1 1
+DIMENSION facet_persist_errors 'facet_persist_errors' incremental 1 1
+BEGIN netflow.journal_io_ops 1000000
+SET decoder_state_persist_calls = 0
+SET decoder_state_write_errors = 0
+SET decoder_state_move_errors = 0
+SET facet_active_update_errors = 0
+SET facet_lifecycle_errors = 0
+SET facet_persist_errors = 0
+END 1700000000
+CHART netflow.journal_io_bytes '' 'Netflow Journal Auxiliary I/O Bytes' 'bytes/s' 'netflow' 'netdata.netflow.journal_io_bytes' line 1000 1
+DIMENSION decoder_state_persist_bytes 'decoder_state_persist_bytes' incremental 1 1
+BEGIN netflow.journal_io_bytes 1000000
+SET decoder_state_persist_bytes = 0
+END 1700000000
+CHART netflow.decoder_scopes '' 'Netflow Decoder Scope Counts' 'scopes' 'netflow' 'netdata.netflow.decoder_scopes' line 1000 1
+DIMENSION hydrated_sources 'hydrated_sources' absolute 1 1
+DIMENSION ipfix_sources 'ipfix_sources' absolute 1 1
+DIMENSION legacy_sources 'legacy_sources' absolute 1 1
+DIMENSION namespaces 'namespaces' absolute 1 1
+DIMENSION v9_sources 'v9_sources' absolute 1 1
+BEGIN netflow.decoder_scopes 1000000
+SET v9_sources = 0
+SET ipfix_sources = 0
+SET legacy_sources = 0
+SET namespaces = 0
+SET hydrated_sources = 0
+END 1700000000
+CHART netflow.facet_values '' 'Netflow Facet Values' 'values' 'netflow' 'netdata.netflow.facet_values' line 1000 1
+DIMENSION exposed 'exposed' absolute 1 1
+DIMENSION total 'total' absolute 1 1
+BEGIN netflow.facet_values 1000000
+SET total = 0
+SET exposed = 0
+END 1700000000
+CHART netflow.facet_fields '' 'Netflow Facet Fields' 'fields' 'netflow' 'netdata.netflow.facet_fields' line 1000 1
+DIMENSION autocomplete 'autocomplete' absolute 1 1
+DIMENSION populated 'populated' absolute 1 1
+BEGIN netflow.facet_fields 1000000
+SET populated = 0
+SET autocomplete = 0
+END 1700000000
+CHART netflow.tier_index_entries '' 'Netflow Tier Index Entries' 'entries' 'netflow' 'netdata.netflow.tier_index_entries' line 1000 1
+DIMENSION flows 'flows' absolute 1 1
+DIMENSION hours 'hours' absolute 1 1
+BEGIN netflow.tier_index_entries 1000000
+SET hours = 0
+SET flows = 0
+END 1700000000
+CHART netflow.memory_resident_bytes '' 'Netflow Process Memory' 'bytes' 'netflow' 'netdata.netflow.memory_resident_bytes' line 1000 1
+DIMENSION anon_huge_pages 'anon_huge_pages' absolute 1 1
+DIMENSION hwm 'hwm' absolute 1 1
+DIMENSION rss 'rss' absolute 1 1
+DIMENSION rss_anon 'rss_anon' absolute 1 1
+DIMENSION rss_file 'rss_file' absolute 1 1
+DIMENSION rss_shmem 'rss_shmem' absolute 1 1
+BEGIN netflow.memory_resident_bytes 1000000
+SET rss = 0
+SET hwm = 0
+SET rss_anon = 0
+SET rss_file = 0
+SET rss_shmem = 0
+SET anon_huge_pages = 0
+END 1700000000
+CHART netflow.memory_resident_mapping_bytes '' 'Netflow Resident Mapping Breakdown' 'bytes' 'netflow' 'netdata.netflow.memory_resident_mapping_bytes' stacked 1000 1
+DIMENSION anon_other 'anon_other' absolute 1 1
+DIMENSION geoip_asn 'geoip_asn' absolute 1 1
+DIMENSION geoip_geo 'geoip_geo' absolute 1 1
+DIMENSION heap 'heap' absolute 1 1
+DIMENSION journal_1h 'journal_1h' absolute 1 1
+DIMENSION journal_1m 'journal_1m' absolute 1 1
+DIMENSION journal_5m 'journal_5m' absolute 1 1
+DIMENSION journal_raw 'journal_raw' absolute 1 1
+DIMENSION other_file 'other_file' absolute 1 1
+DIMENSION shmem 'shmem' absolute 1 1
+BEGIN netflow.memory_resident_mapping_bytes 1000000
+SET heap = 0
+SET anon_other = 0
+SET journal_raw = 0
+SET journal_1m = 0
+SET journal_5m = 0
+SET journal_1h = 0
+SET geoip_asn = 0
+SET geoip_geo = 0
+SET other_file = 0
+SET shmem = 0
+END 1700000000
+CHART netflow.memory_allocator_bytes '' 'Netflow Allocator Memory' 'bytes' 'netflow' 'netdata.netflow.memory_allocator_bytes' line 1000 1
+DIMENSION heap_arena 'heap_arena' absolute 1 1
+DIMENSION heap_free 'heap_free' absolute 1 1
+DIMENSION heap_in_use 'heap_in_use' absolute 1 1
+DIMENSION mmap_in_use 'mmap_in_use' absolute 1 1
+DIMENSION releasable 'releasable' absolute 1 1
+BEGIN netflow.memory_allocator_bytes 1000000
+SET heap_in_use = 0
+SET heap_free = 0
+SET heap_arena = 0
+SET mmap_in_use = 0
+SET releasable = 0
+END 1700000000
+CHART netflow.memory_accounted_bytes '' 'Netflow Accounted Memory' 'bytes' 'netflow' 'netdata.netflow.memory_accounted_bytes' stacked 1000 1
+DIMENSION facet_active 'facet_active' absolute 1 1
+DIMENSION facet_active_contributions 'facet_active_contributions' absolute 1 1
+DIMENSION facet_archived 'facet_archived' absolute 1 1
+DIMENSION facet_archived_paths 'facet_archived_paths' absolute 1 1
+DIMENSION facet_published 'facet_published' absolute 1 1
+DIMENSION geoip_asn 'geoip_asn' absolute 1 1
+DIMENSION geoip_geo 'geoip_geo' absolute 1 1
+DIMENSION open_tiers 'open_tiers' absolute 1 1
+DIMENSION tier_indexes 'tier_indexes' absolute 1 1
+DIMENSION unaccounted 'unaccounted' absolute 1 1
+BEGIN netflow.memory_accounted_bytes 1000000
+SET facet_archived = 0
+SET facet_active = 0
+SET facet_active_contributions = 0
+SET facet_published = 0
+SET facet_archived_paths = 0
+SET tier_indexes = 0
+SET open_tiers = 0
+SET geoip_asn = 0
+SET geoip_geo = 0
+SET unaccounted = 0
+END 1700000000
+CHART netflow.memory_tier_index_bytes '' 'Netflow Tier Index Memory Breakdown' 'bytes' 'netflow' 'netdata.netflow.memory_tier_index_bytes' stacked 1000 1
+DIMENSION field_stores 'field_stores' absolute 1 1
+DIMENSION flow_lookup 'flow_lookup' absolute 1 1
+DIMENSION index_keys 'index_keys' absolute 1 1
+DIMENSION row_storage 'row_storage' absolute 1 1
+DIMENSION schema 'schema' absolute 1 1
+DIMENSION scratch_field_ids 'scratch_field_ids' absolute 1 1
+BEGIN netflow.memory_tier_index_bytes 1000000
+SET row_storage = 0
+SET field_stores = 0
+SET flow_lookup = 0
+SET schema = 0
+SET index_keys = 0
+SET scratch_field_ids = 0
+END 1700000000

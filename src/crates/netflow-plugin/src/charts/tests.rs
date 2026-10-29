@@ -744,3 +744,89 @@ fn chart_sampler_work_helper_refreshes_memory_diagnostics_on_configured_cadence(
     );
     assert_eq!(third.memory_diagnostics.open_tier_bytes, 8_192);
 }
+
+/// Renders every netflow chart's definition and one zero-valued update
+/// through the runtime's chart writer, in registration order. DIMENSION
+/// lines come out of a `HashMap`, so each run of them is sorted to make the
+/// text stable across processes.
+fn render_chart_protocol() -> String {
+    use netdata_plugin_rt::TrackedChart;
+    use netdata_plugin_rt::charts::ChartWriter;
+    use std::time::{Duration, UNIX_EPOCH};
+
+    let mut writer = ChartWriter::new();
+    macro_rules! render {
+        ($($chart:ty),+ $(,)?) => {$(
+            let mut tracked = TrackedChart::new(<$chart>::default(), Duration::from_secs(1));
+            tracked.emit_definition(&mut writer);
+            tracked.emit_update(&mut writer, UNIX_EPOCH + Duration::from_secs(1_700_000_000));
+        )+};
+    }
+    render!(
+        InputPacketsMetrics,
+        InputBytesMetrics,
+        ProtocolPacketsMetrics,
+        FlowSetMetrics,
+        TemplateMetrics,
+        FlowRecordMetrics,
+        OptionsRecordMetrics,
+        SflowSampleMetrics,
+        DecoderExceptionMetrics,
+        FlowRowMetrics,
+        NselEventMetrics,
+        NselRowMetrics,
+        NselExceptionMetrics,
+        RawJournalOpsMetrics,
+        RawJournalBytesMetrics,
+        MaterializedTierOpsMetrics,
+        MaterializedTierBytesMetrics,
+        TierCommitAgeMetrics,
+        TierCommitDurationMetrics,
+        TierCommitBatchesMetrics,
+        TierCommitStretchedMetrics,
+        OpenTierMetrics,
+        JournalIoOpsMetrics,
+        JournalIoBytesMetrics,
+        DecoderScopeMetrics,
+        FacetValueMetrics,
+        FacetFieldMetrics,
+        TierIndexEntryMetrics,
+        MemoryResidentBytesMetrics,
+        MemoryResidentMappingBytesMetrics,
+        MemoryAllocatorBytesMetrics,
+        MemoryAccountedBytesMetrics,
+        MemoryTierIndexBytesMetrics,
+    );
+
+    let text = String::from_utf8(writer.buffer().to_vec()).expect("chart protocol is UTF-8");
+    let mut lines: Vec<&str> = text.lines().collect();
+    let mut start = 0;
+    while start < lines.len() {
+        let mut end = start;
+        while end < lines.len() && lines[end].starts_with("DIMENSION ") {
+            end += 1;
+        }
+        lines[start..end].sort_unstable();
+        start = end.max(start + 1);
+    }
+    let mut out = lines.join("\n");
+    out.push('\n');
+    out
+}
+
+/// Pins the exact chart protocol netflow emits, so shared chart-writer
+/// changes in `netdata-plugin/` cannot alter it unnoticed. Regenerate with
+/// `NETFLOW_CHART_GOLDEN_WRITE=1` only for an intended netflow change.
+#[test]
+fn chart_protocol_output_is_pinned() {
+    let golden = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/charts/testdata/chart_protocol.golden"
+    );
+    let actual = render_chart_protocol();
+    if std::env::var_os("NETFLOW_CHART_GOLDEN_WRITE").is_some() {
+        std::fs::write(golden, &actual).expect("write chart protocol golden file");
+    }
+    let expected = std::fs::read_to_string(golden).expect("read chart protocol golden file");
+    assert_eq!(actual, expected);
+}
