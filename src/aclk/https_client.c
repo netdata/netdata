@@ -312,24 +312,25 @@ static inline void chunked_response_buffer_grow_by(http_parse_ctx *parse_ctx, si
 // and a ';' chunk extension, which we ignore. Returns NULL on success, or why it was rejected.
 static const char *parse_chunk_size(const char *line, size_t line_len, size_t received, size_t *chunk_size)
 {
-    if (strlen(line) != line_len)
+    const char *end = line + line_len;
+    if (memchr(line, '\0', line_len))
         return "Chunk size line contains a NUL";
 
     const char *s = line;
-    if (!isxdigit((uint8_t)*s))
+    if (s == end || !isxdigit((uint8_t)*s))
         return "Invalid chunk size";
 
     size_t size = 0;
-    for (; isxdigit((uint8_t)*s); s++) {
+    for (; s < end && isxdigit((uint8_t)*s); s++) {
         size = size * 16 + (isdigit((uint8_t)*s) ? (size_t)(*s - '0') : (size_t)(tolower((uint8_t)*s) - 'a' + 10));
         if (size > HTTPS_MAX_CHUNKED_RESPONSE_SIZE - received)
             return "Chunked response is too big";
     }
 
-    while (*s == ' ' || *s == '\t')
+    while (s < end && (*s == ' ' || *s == '\t'))
         s++;
 
-    if (*s && *s != ';')
+    if (s < end && *s != ';')
         return "Invalid chunk size";
 
     *chunk_size = size;
