@@ -57,8 +57,8 @@ func TestCollector_AcquisitionObserverReportsEveryProfileInExecutionOrder(t *tes
 	})
 
 	metrics, err := collector.Collect()
-	require.NoError(t, err)
-	require.Len(t, metrics, 1)
+	require.ErrorContains(t, err, "secret transport detail")
+	require.Empty(t, metrics)
 	require.Len(t, got, 2)
 
 	assert.Equal(t, uint32(0), got[0].report.Identity.Ordinal)
