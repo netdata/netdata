@@ -1935,6 +1935,49 @@ static void aq_hold_snapshot_during_rebuild(sqlite3_context *context, int argc _
     sqlite3_result_int(context, 0);
 }
 
+// Unit-test hosts are detached RRDHOSTs holding only what the queue paths read.
+static RRDHOST *aq_test_host_create(void)
+{
+    RRDHOST *h = callocz(1, sizeof(*h));
+    uuid_generate(h->host_id.uuid);
+    h->aclk_host_config = callocz(1, sizeof(*h->aclk_host_config));
+    return h;
+}
+
+// An online host with a completed health pass, streaming its alerts to Cloud.
+static RRDHOST *aq_test_streaming_host_create(const char *hostname, bool with_node_id)
+{
+    RRDHOST *h = aq_test_host_create();
+    uuid_generate(h->node_id.uuid);
+    h->hostname = string_strdupz(hostname);
+    h->health.default_exec = string_strdupz("/bin/true");
+    if (with_node_id)
+        aclk_node_id_set(h->aclk_host_config, h->node_id.uuid);
+    h->health.enabled = true;
+    h->health.alert_status_snapshot.valid = 1;
+    rrdhost_flag_set(h, RRDHOST_FLAG_COLLECTOR_ONLINE | RRDHOST_FLAG_ACLK_STREAM_ALERTS);
+    aclk_alert_streaming_set(h->aclk_host_config, true);
+    return h;
+}
+
+static void aq_test_host_free(RRDHOST *h)
+{
+    string_freez(h->health.default_exec);
+    string_freez(h->hostname);
+    freez(h->aclk_host_config);
+    freez(h);
+}
+
+// One pass of the production per-host dispatcher, recording only the transport calls.
+static void aq_push(RRDHOST *h)
+{
+    sqlite3_stmt *push = NULL, *version = NULL, *remove = NULL;
+    aclk_push_alert_events_for_host(h, &push, &version, &remove, aq_record_send, aq_record_snapshot);
+    SQLITE_FINALIZE(push);
+    SQLITE_FINALIZE(version);
+    SQLITE_FINALIZE(remove);
+}
+
 // Each bounce fixture has one alert. Exercise the production sender decision and acknowledgement with a
 // recording transport; an empty queue or a suppressed duplicate emits zero messages.
 static int aq_send_one(RRDHOST *host)
@@ -2282,9 +2325,7 @@ int alert_queue_unittest(void)
     // --- a REMOVED of a disconnected child takes its own due time, not the earlier one of the transition it replaces;
     // every other transition keeps the earlier due time, so a reconnect overwrites a queued REMOVED as soon as it is due
     {
-        RRDHOST *h = callocz(1, sizeof(*h));
-        uuid_generate(h->host_id.uuid);
-        h->aclk_host_config = callocz(1, sizeof(*h->aclk_host_config));
+        RRDHOST *h = aq_test_host_create();
         h->health.alert_queue_next_due_s = nd_time_t_max();
         nd_uuid_t *hid = &h->host_id.uuid;
         time_t now = now_realtime_sec();
@@ -2311,17 +2352,14 @@ int alert_queue_unittest(void)
         AQ_CHECK(aq_pending_due(hid, 31) == now, "replace: another REMOVED keeps the earlier due time");
 
         (void)db_execute(db_meta, "DELETE FROM alert_queue", NULL);
-        freez(h->aclk_host_config);
-        freez(h);
+        aq_test_host_free(h);
     }
 
     // --- repeated short outages coalesce in the real pending/submit queues. Cloud already knows the raised
     // status, so recovery before removal is submitted must generate no extra Cloud transition.
     for (int child = 0; child < 2; child++) {
         for (int critical = 0; critical < 2; critical++) {
-            RRDHOST *h = callocz(1, sizeof(*h));
-            uuid_generate(h->host_id.uuid);
-            h->aclk_host_config = callocz(1, sizeof(*h->aclk_host_config));
+            RRDHOST *h = aq_test_host_create();
             h->health.alert_queue_next_due_s = nd_time_t_max();
             nd_uuid_t *hid = &h->host_id.uuid;
             RRDCALC_STATUS raised = critical ? RRDCALC_STATUS_CRITICAL : RRDCALC_STATUS_WARNING;
@@ -2381,17 +2419,14 @@ int alert_queue_unittest(void)
             AQ_CHECK(aq_test_queue(hid, NULL, NULL) == 0 && rebuild_host_alert_version_table(h) &&
                          aq_snapshot_rows(h) == 0,
                      "bounce: sustained outage has one removal and an empty snapshot (child=%d)", child);
-            freez(h->aclk_host_config);
-            freez(h);
+            aq_test_host_free(h);
         }
     }
 
     // --- recovery after the pending removal became due, but before ACLK consumed it, must supersede that
     // submit-queue entry too. Otherwise the delayed REMOVED is sent after recovery with no raise left to follow it.
     {
-        RRDHOST *h = callocz(1, sizeof(*h));
-        uuid_generate(h->host_id.uuid);
-        h->aclk_host_config = callocz(1, sizeof(*h->aclk_host_config));
+        RRDHOST *h = aq_test_host_create();
         AQ_SQL(aq_seed_alert_config(h) ? SQLITE_DONE : SQLITE_ERROR, "submitted bounce alert config");
         time_t now = now_realtime_sec();
         int64_t id = aq_save_transition(h, 12001, RRDCALC_STATUS_REMOVED, RRDCALC_STATUS_WARNING, 0, now - 1000);
@@ -2432,16 +2467,13 @@ int alert_queue_unittest(void)
         AQ_CHECK(aq_send_one(h) == 1, "submitted bounce: acknowledged removal needs exactly one recovery message");
         AQ_CHECK(cloud_status_matches(id, RRDCALC_STATUS_WARNING) && aq_test_queue(&h->host_id.uuid, NULL, NULL) == 0,
                  "submitted bounce: draining after recovery leaves Cloud raised");
-        freez(h->aclk_host_config);
-        freez(h);
+        aq_test_host_free(h);
     }
 
     // --- a snapshot requested between reconnect and the completed health pass must not publish the old
     // REMOVED health-log state. The completed-pass marker and persistence barrier cover distinct windows.
     {
-        RRDHOST *h = callocz(1, sizeof(*h));
-        uuid_generate(h->host_id.uuid);
-        h->aclk_host_config = callocz(1, sizeof(*h->aclk_host_config));
+        RRDHOST *h = aq_test_host_create();
         h->health.enabled = true;
         AQ_SQL(aq_seed_alert_config(h) ? SQLITE_DONE : SQLITE_ERROR, "recovery snapshot alert config");
         time_t now = now_realtime_sec();
@@ -2487,16 +2519,13 @@ int alert_queue_unittest(void)
         h->health.enabled = false;
         h->health.alert_status_snapshot.valid = 0;
         AQ_CHECK(!alert_snapshot_held(h), "recovery snapshot: health-disabled host does not wait for evaluation");
-        freez(h->aclk_host_config);
-        freez(h);
+        aq_test_host_free(h);
     }
 
     // --- a reconnect that never becomes runnable cannot hold snapshots forever. Its real initialization
     // transition keeps the ordinary 600-second delay, then becomes eligible even though its status never changed.
     {
-        RRDHOST *h = callocz(1, sizeof(*h));
-        uuid_generate(h->host_id.uuid);
-        h->aclk_host_config = callocz(1, sizeof(*h->aclk_host_config));
+        RRDHOST *h = aq_test_host_create();
         h->health.enabled = true;
         AQ_SQL(aq_seed_alert_config(h) ? SQLITE_DONE : SQLITE_ERROR, "non-runnable recovery alert config");
         time_t now = now_realtime_sec();
@@ -2534,8 +2563,7 @@ int alert_queue_unittest(void)
         bool matches_on_error = cloud_status_matches(id, RRDCALC_STATUS_UNINITIALIZED);
         AQ_SQL(sqlite3_set_authorizer(db_meta, NULL, NULL), "restore version read");
         AQ_CHECK(!matches_on_error, "sender dedup: a failed version read cannot establish a matching Cloud status");
-        freez(h->aclk_host_config);
-        freez(h);
+        aq_test_host_free(h);
     }
 
     // --- a READY snapshot held by one delayed initialization must not block another alert's due raise.
@@ -2544,16 +2572,7 @@ int alert_queue_unittest(void)
         ND_UUID saved_claim = claim_id_get_uuid();
         AQ_CHECK(claim_id_set_str("00000000-0000-4000-8000-000000000111"), "mixed alerts: synthetic claim is valid");
         for (int critical = 0; critical < 2; critical++) {
-            RRDHOST *h = callocz(1, sizeof(*h));
-            uuid_generate(h->host_id.uuid);
-            uuid_generate(h->node_id.uuid);
-            h->hostname = string_strdupz("mixed-alert-host");
-            h->health.default_exec = string_strdupz("/bin/true");
-            h->aclk_host_config = callocz(1, sizeof(*h->aclk_host_config));
-            h->health.enabled = true;
-            h->health.alert_status_snapshot.valid = 1;
-            rrdhost_flag_set(h, RRDHOST_FLAG_COLLECTOR_ONLINE | RRDHOST_FLAG_ACLK_STREAM_ALERTS);
-            aclk_alert_streaming_set(h->aclk_host_config, true);
+            RRDHOST *h = aq_test_streaming_host_create("mixed-alert-host", false);
             aclk_alert_snapshot_request(h->aclk_host_config);
             AQ_CHECK(aclk_alert_snapshot_mark_ready(h->aclk_host_config), "mixed alerts: snapshot becomes READY");
             AQ_SQL(aq_seed_alert_config(h) ? SQLITE_DONE : SQLITE_ERROR, "mixed alerts config");
@@ -2567,9 +2586,8 @@ int alert_queue_unittest(void)
                          aq_pending_rows(&h->host_id.uuid) == 1 && aq_test_queue(&h->host_id.uuid, NULL, NULL) == 1,
                      "mixed alerts: second alert is submitted while initialization remains pending");
 
-            sqlite3_stmt *push = NULL, *version = NULL, *remove = NULL;
             unsigned before = aq_emitted_events;
-            aclk_push_alert_events_for_host(h, &push, &version, &remove, aq_record_send, aq_record_snapshot);
+            aq_push(h);
             AQ_CHECK(aq_emitted_events == before + 1 && aq_last_alarm_id == 101 &&
                          aq_last_status == rrdcalc_status_to_proto_enum(raised) &&
                          cloud_status_matches(raised_id, raised) && aq_test_queue(&h->host_id.uuid, NULL, NULL) == 0,
@@ -2579,27 +2597,12 @@ int alert_queue_unittest(void)
                          !h->aclk_host_config->snapshot_count && aq_pending_rows(&h->host_id.uuid) == 1 &&
                          rrdhost_flag_check(h, RRDHOST_FLAG_ACLK_STREAM_ALERTS),
                      "mixed alerts: dispatch retains the held snapshot and delayed transition");
-            SQLITE_FINALIZE(push);
-            SQLITE_FINALIZE(version);
-            SQLITE_FINALIZE(remove);
-            string_freez(h->health.default_exec);
-            string_freez(h->hostname);
-            freez(h->aclk_host_config);
-            freez(h);
+            aq_test_host_free(h);
         }
         // A hold emerging during checkpoint preparation must roll back speculative versions, including
         // alerts beyond one normal-send batch. Otherwise sender dedup would consume unsent raises.
         {
-            RRDHOST *h = callocz(1, sizeof(*h));
-            uuid_generate(h->host_id.uuid);
-            uuid_generate(h->node_id.uuid);
-            h->hostname = string_strdupz("snapshot-race-host");
-            h->health.default_exec = string_strdupz("/bin/true");
-            h->aclk_host_config = callocz(1, sizeof(*h->aclk_host_config));
-            h->health.enabled = true;
-            h->health.alert_status_snapshot.valid = 1;
-            rrdhost_flag_set(h, RRDHOST_FLAG_COLLECTOR_ONLINE | RRDHOST_FLAG_ACLK_STREAM_ALERTS);
-            aclk_alert_streaming_set(h->aclk_host_config, true);
+            RRDHOST *h = aq_test_streaming_host_create("snapshot-race-host", false);
             aclk_alert_snapshot_request(h->aclk_host_config);
             AQ_CHECK(aclk_alert_snapshot_mark_ready(h->aclk_host_config), "snapshot race: request becomes READY");
             AQ_SQL(aq_seed_alert_config(h) ? SQLITE_DONE : SQLITE_ERROR, "snapshot race config");
@@ -2621,46 +2624,29 @@ int alert_queue_unittest(void)
                                "CREATE TEMP TRIGGER aq_snapshot_hold AFTER INSERT ON alert_version"
                                " BEGIN SELECT aq_hold_snapshot_during_rebuild(); END", NULL, NULL, NULL),
                    "snapshot race register hold trigger");
-            sqlite3_stmt *push = NULL, *version = NULL, *remove = NULL;
             unsigned before = aq_emitted_events;
-            aclk_push_alert_events_for_host(h, &push, &version, &remove, aq_record_send, aq_record_snapshot);
+            aq_push(h);
             AQ_CHECK(aq_emitted_events == before + batch &&
                          aq_test_queue(&h->host_id.uuid, NULL, NULL) == count - batch &&
                          !cloud_status_matches(last_id, RRDCALC_STATUS_WARNING),
                      "snapshot race: new hold rolls back speculative versions and sends only one real batch");
-            aclk_push_alert_events_for_host(h, &push, &version, &remove, aq_record_send, aq_record_snapshot);
+            aq_push(h);
             AQ_CHECK(aq_emitted_events == before + count && aq_test_queue(&h->host_id.uuid, NULL, NULL) == 0 &&
                          cloud_status_matches(last_id, RRDCALC_STATUS_WARNING) &&
                          aclk_alert_snapshot_state_get(h->aclk_host_config) == ACLK_ALERT_SNAPSHOT_READY &&
                          !h->aclk_host_config->snapshot_count,
                      "snapshot race: next held dispatch sends the remainder without losing the snapshot request");
-            SQLITE_FINALIZE(push);
-            SQLITE_FINALIZE(version);
-            SQLITE_FINALIZE(remove);
             AQ_SQL(sqlite3_exec(db_meta, "DROP TRIGGER aq_snapshot_hold", NULL, NULL, NULL),
                    "snapshot race remove hold trigger");
             AQ_SQL(sqlite3_create_function_v2(db_meta, "aq_hold_snapshot_during_rebuild", 0, SQLITE_UTF8,
                                                NULL, NULL, NULL, NULL, NULL),
                    "snapshot race remove hold callback");
-            string_freez(h->health.default_exec);
-            string_freez(h->hostname);
-            freez(h->aclk_host_config);
-            freez(h);
+            aq_test_host_free(h);
         }
         // Snapshot capture can overtake the pending-queue drain on recovery. The snapshot already contains
         // the raised recovery, so an older submitted REMOVED must never be emitted on the following tick.
         {
-            RRDHOST *h = callocz(1, sizeof(*h));
-            uuid_generate(h->host_id.uuid);
-            uuid_generate(h->node_id.uuid);
-            h->hostname = string_strdupz("snapshot-covered-alert-host");
-            h->health.default_exec = string_strdupz("/bin/true");
-            h->aclk_host_config = callocz(1, sizeof(*h->aclk_host_config));
-            aclk_node_id_set(h->aclk_host_config, h->node_id.uuid);
-            h->health.enabled = true;
-            h->health.alert_status_snapshot.valid = 1;
-            rrdhost_flag_set(h, RRDHOST_FLAG_COLLECTOR_ONLINE | RRDHOST_FLAG_ACLK_STREAM_ALERTS);
-            aclk_alert_streaming_set(h->aclk_host_config, true);
+            RRDHOST *h = aq_test_streaming_host_create("snapshot-covered-alert-host", true);
             AQ_SQL(aq_seed_alert_config(h) ? SQLITE_DONE : SQLITE_ERROR, "snapshot covered alert config");
             time_t now = now_realtime_sec();
             int64_t id = aq_save_transition(h, 18001, RRDCALC_STATUS_REMOVED, RRDCALC_STATUS_WARNING, 0, now - 2000);
@@ -2674,20 +2660,19 @@ int alert_queue_unittest(void)
             aclk_alert_snapshot_request(h->aclk_host_config);
             AQ_CHECK(aclk_alert_snapshot_mark_ready(h->aclk_host_config), "snapshot covered alert: request is READY");
 
-            sqlite3_stmt *push = NULL, *version = NULL, *remove = NULL;
             unsigned before = aq_emitted_events, snapshots_before = aq_emitted_snapshots;
-            aclk_push_alert_events_for_host(h, &push, &version, &remove, aq_record_send, aq_record_snapshot);
+            aq_push(h);
             AQ_CHECK(aq_emitted_snapshots == snapshots_before + 1 && aq_emitted_events == before &&
                          cloud_status_matches(id, RRDCALC_STATUS_WARNING) &&
                          aclk_alert_snapshot_state_get(h->aclk_host_config) == ACLK_ALERT_SNAPSHOT_IDLE,
                      "snapshot covered alert: production dispatch publishes the recovered WARNING snapshot");
-            aclk_push_alert_events_for_host(h, &push, &version, &remove, aq_record_send, aq_record_snapshot);
+            aq_push(h);
             AQ_CHECK(aq_emitted_events == before && cloud_status_matches(id, RRDCALC_STATUS_WARNING) &&
                          aq_test_queue(&h->host_id.uuid, NULL, NULL) == 0,
                      "snapshot covered alert: no older REMOVED follows the recovered snapshot");
             (void)process_alert_pending_queue(h);
             rrdhost_flag_set(h, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
-            aclk_push_alert_events_for_host(h, &push, &version, &remove, aq_record_send, aq_record_snapshot);
+            aq_push(h);
             AQ_CHECK(aq_emitted_events == before && aq_pending_rows(&h->host_id.uuid) == 0 &&
                          cloud_status_matches(id, RRDCALC_STATUS_WARNING),
                      "snapshot covered alert: later pending drain does not duplicate the snapshot recovery");
@@ -2697,28 +2682,12 @@ int alert_queue_unittest(void)
             int64_t newer_uid = 0;
             AQ_CHECK(aq_test_queue(&h->host_id.uuid, NULL, &newer_uid) == 1 && newer_uid == 18004,
                      "snapshot covered alert: snapshot cleanup preserves a submit row newer than capture");
-            SQLITE_FINALIZE(push);
-            SQLITE_FINALIZE(version);
-            SQLITE_FINALIZE(remove);
-            string_freez(h->health.default_exec);
-            string_freez(h->hostname);
-            freez(h->aclk_host_config);
-            freez(h);
+            aq_test_host_free(h);
         }
         // A pending cursor can have cached both an old removal and an old recovery before later writes
         // replace that row. Snapshot capture must not let either cached owner submit or rewind its version.
         {
-            RRDHOST *h = callocz(1, sizeof(*h));
-            uuid_generate(h->host_id.uuid);
-            uuid_generate(h->node_id.uuid);
-            h->hostname = string_strdupz("snapshot-pending-owner-host");
-            h->health.default_exec = string_strdupz("/bin/true");
-            h->aclk_host_config = callocz(1, sizeof(*h->aclk_host_config));
-            aclk_node_id_set(h->aclk_host_config, h->node_id.uuid);
-            h->health.enabled = true;
-            h->health.alert_status_snapshot.valid = 1;
-            rrdhost_flag_set(h, RRDHOST_FLAG_COLLECTOR_ONLINE | RRDHOST_FLAG_ACLK_STREAM_ALERTS);
-            aclk_alert_streaming_set(h->aclk_host_config, true);
+            RRDHOST *h = aq_test_streaming_host_create("snapshot-pending-owner-host", true);
             AQ_SQL(aq_seed_alert_config(h) ? SQLITE_DONE : SQLITE_ERROR, "pending owner config");
             time_t now = now_realtime_sec();
             int64_t id = aq_save_transition(h, 19000, RRDCALC_STATUS_REMOVED, RRDCALC_STATUS_WARNING, 0, now - 2000);
@@ -2739,9 +2708,8 @@ int alert_queue_unittest(void)
                      "pending owner: another bounce replaces both cached owners");
             aclk_alert_snapshot_request(h->aclk_host_config);
             AQ_CHECK(aclk_alert_snapshot_mark_ready(h->aclk_host_config), "pending owner: snapshot request is READY");
-            sqlite3_stmt *push = NULL, *version = NULL, *remove = NULL;
             unsigned before = aq_emitted_events;
-            aclk_push_alert_events_for_host(h, &push, &version, &remove, aq_record_send, aq_record_snapshot);
+            aq_push(h);
             AQ_CHECK(aq_version_unique_id(id) == 19004 && cloud_status_matches(id, RRDCALC_STATUS_WARNING),
                      "pending owner: actual snapshot captures the newest recovery");
             AQ_CHECK(submit_pending_alert_if_current(&h->host_id.uuid, id, removed_row, removed_uid,
@@ -2758,13 +2726,7 @@ int alert_queue_unittest(void)
             AQ_CHECK(aq_pending_rows(&h->host_id.uuid) == 0 && aq_version_unique_id(id) == 19004 &&
                          aq_emitted_events == before,
                      "pending owner: the current row drains without a duplicate event");
-            SQLITE_FINALIZE(push);
-            SQLITE_FINALIZE(version);
-            SQLITE_FINALIZE(remove);
-            string_freez(h->health.default_exec);
-            string_freez(h->hostname);
-            freez(h->aclk_host_config);
-            freez(h);
+            aq_test_host_free(h);
         }
         claim_id_set(saved_claim);
         (void)db_execute(db_meta, "DELETE FROM alert_queue", NULL);
@@ -2774,9 +2736,7 @@ int alert_queue_unittest(void)
     // --- only an eligible READY checkpoint freezes health. Admitting evaluation invalidates the completed
     // pass under the same mutex used by snapshot preparation.
     {
-        RRDHOST *h = callocz(1, sizeof(*h));
-        uuid_generate(h->host_id.uuid);
-        h->aclk_host_config = callocz(1, sizeof(*h->aclk_host_config));
+        RRDHOST *h = aq_test_host_create();
         h->health.enabled = true;
         h->health.alert_status_snapshot.valid = 1;
         rrdhost_flag_set(h, RRDHOST_FLAG_COLLECTOR_ONLINE);
@@ -2795,8 +2755,7 @@ int alert_queue_unittest(void)
         AQ_CHECK(!alert_snapshot_freezes_health(h), "health freeze: incomplete evaluation keeps READY held");
         h->health.alert_status_snapshot.valid = 1;
         AQ_CHECK(alert_snapshot_freezes_health(h), "health freeze: completed evaluation makes READY eligible again");
-        freez(h->aclk_host_config);
-        freez(h);
+        aq_test_host_free(h);
     }
 
     // --- non-raised vnode removals keep the ordinary long-delay policy.
@@ -2805,9 +2764,7 @@ int alert_queue_unittest(void)
             RRDCALC_STATUS_CLEAR, RRDCALC_STATUS_UNDEFINED, RRDCALC_STATUS_UNINITIALIZED,
         };
         for (size_t i = 0; i < sizeof(statuses) / sizeof(statuses[0]); i++) {
-            RRDHOST *h = callocz(1, sizeof(*h));
-            uuid_generate(h->host_id.uuid);
-            h->aclk_host_config = callocz(1, sizeof(*h->aclk_host_config));
+            RRDHOST *h = aq_test_host_create();
             AQ_SQL(aq_seed_alert_config(h) ? SQLITE_DONE : SQLITE_ERROR, "non-raised alert config");
             AQ_CHECK(aq_save_transition(h, 11000 + i, statuses[i], RRDCALC_STATUS_REMOVED, 0,
                                        now_realtime_sec() - 11) > 0,
@@ -2816,8 +2773,7 @@ int alert_queue_unittest(void)
             AQ_CHECK(aq_pending_rows(&h->host_id.uuid) == 1 && aq_test_queue(&h->host_id.uuid, NULL, NULL) == 0 &&
                          alert_snapshot_held(h),
                      "ordinary removal: non-raised status %d retains its grace", statuses[i]);
-            freez(h->aclk_host_config);
-            freez(h);
+            aq_test_host_free(h);
         }
         (void)db_execute(db_meta, "DELETE FROM alert_queue", NULL);
     }
