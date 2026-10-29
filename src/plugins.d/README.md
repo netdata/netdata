@@ -290,6 +290,8 @@ A stale vnode becomes active again when selected with `HOST machine_guid`.
 When local collection resumes through `HOST` or `HOST_DEFINE_END`, any peer stream for the same host is stopped
 before restoring the vnode's live state. Health follows the local Agent's health setting and remains disabled for
 `memory mode = none`; a previous peer disconnect must not leave the recovered vnode orphaned or health disabled.
+If orphan cleanup has already archived the host after a peer disconnect, `HOST` requests a collector restart so a
+fresh `HOST_DEFINE` can rebuild its runtime structures before collection resumes.
 
 #### HOST 
 

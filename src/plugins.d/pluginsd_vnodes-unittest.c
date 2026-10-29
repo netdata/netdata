@@ -262,8 +262,9 @@ static bool vnode_test_live_state(RRDHOST *host, bool health_enabled) {
     if(acquired)
         object_state_release(&host->state_id);
 
-    return acquired && vnode_test_online(host) && !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN) &&
-           host->health.enabled == health_enabled && !host->receiver;
+    return acquired && vnode_test_online(host) &&
+           !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN | RRDHOST_FLAG_ARCHIVED) &&
+           host->health.enabled == health_enabled && host->rrdcalc_root_index && !host->receiver;
 }
 
 static int vnode_test_recovery(bool redefine, unsigned peer, bool health_enabled, RRD_DB_MODE memory_mode) {
@@ -307,7 +308,7 @@ static int vnode_test_recovery(bool redefine, unsigned peer, bool health_enabled
         if(rrdhost_set_receiver(host, &receiver) != RRDHOST_SET_RECEIVER_OK)
             goto cleanup;
 
-        if(peer == 1)
+        if(peer == 1 || peer == 3)
             rrdhost_clear_receiver(&receiver, STREAM_HANDSHAKE_DISCONNECT_SIGNALED_TO_STOP);
         else {
             // The fixture drains through the real disconnect path only after the parser signals it.
@@ -318,11 +319,39 @@ static int vnode_test_recovery(bool redefine, unsigned peer, bool health_enabled
         }
     }
 
-    snprintfz(command, sizeof(command), redefine ? "HOST_DEFINE %s vnode-recovery-test" : "HOST %s", guid);
+    bool send_definition = redefine;
+    if(peer == 3) {
+        // Use the orphan reaper's actual archive transition and lifetime guards, without waiting an hour.
+        rrd_wrlock();
+        if(!rw_spinlock_trywrite_lock(&host->metadata_lifetime_lock)) {
+            rrd_wrunlock();
+            goto cleanup;
+        }
+        rrdhost_cleanup_data_collection_and_health(host);
+        rw_spinlock_write_unlock(&host->metadata_lifetime_lock);
+        rrd_wrunlock();
+        if(!rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED) || host->rrdcalc_root_index)
+            goto cleanup;
+
+        if(!redefine) {
+            snprintfz(command, sizeof(command), "HOST %s", guid);
+            if(parser_action(parser, command) != PARSER_RC_ERROR || !parser->user.retry ||
+               !parser->user.enabled || parser->user.host || parser->user.host_pin)
+                goto cleanup;
+
+            // A restarted collector publishes a fresh definition through the normal unarchive owner.
+            pluginsd_process_cleanup(parser);
+            parser = parser_init(&user, -1, -1, PARSER_INPUT_SPLIT, NULL);
+            pluginsd_keywords_init(parser, PARSER_INIT_PLUGINSD);
+            send_definition = true;
+        }
+    }
+
+    snprintfz(command, sizeof(command), send_definition ? "HOST_DEFINE %s vnode-recovery-test" : "HOST %s", guid);
     if(!vnode_test_command(parser, command))
         goto cleanup;
-    if(redefine && (!vnode_test_command(parser, "HOST_LABEL _node_stale_after_seconds 1") ||
-                   !vnode_test_command(parser, "HOST_DEFINE_END")))
+    if(send_definition && (!vnode_test_command(parser, "HOST_LABEL _node_stale_after_seconds 1") ||
+                          !vnode_test_command(parser, "HOST_DEFINE_END")))
         goto cleanup;
 
     if(drainer) {
@@ -379,8 +408,8 @@ int pluginsd_vnodes_unittest(void) {
     errors += vnode_test_removal(true);
     errors += vnode_test_removal(false);
     for(unsigned redefine = 0; redefine < 2; redefine++) {
-        // Normal recovery, a peer that already disconnected, and a peer evicted by local recovery.
-        for(unsigned peer = 0; peer < 3; peer++)
+        // No peer, a disconnected peer, an attached peer, and an archived peer-disconnected host.
+        for(unsigned peer = 0; peer < 4; peer++)
             errors += vnode_test_recovery(redefine, peer, true, RRD_DB_MODE_RAM);
         errors += vnode_test_recovery(redefine, 2, false, RRD_DB_MODE_RAM);
         errors += vnode_test_recovery(redefine, 2, true, RRD_DB_MODE_NONE);

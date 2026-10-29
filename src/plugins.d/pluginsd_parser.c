@@ -378,6 +378,14 @@ static void pluginsd_vnodes_stale_check(PARSER *parser) {
 // in that index, so an unregistered host would keep the gate closed with nobody collecting.
 // Success restores live local state after receiver teardown, including the local health policy.
 static bool pluginsd_host_claim_as_local_vnode(RRDHOST *host, const char *keyword) {
+    // HOST_DEFINE normally rebuilds archived structures through rrdhost_update(). Context loading
+    // can defer that update, so do not claim the host until its definition can finish initialization.
+    if(unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))) {
+        nd_log_daemon(NDLP_INFO, "PLUGINSD: %s: host %s is still archived - restarting the plugin later",
+                      keyword, host->machine_guid);
+        return false;
+    }
+
     // stream_receiver_signal_to_stop_and_wait() also returns true when no receiver is attached,
     // so we check first: that is the only way to tell "nothing to do" (the common case, silent)
     // from "we disconnected someone" (rare, and the only diagnostic for a GUID conflict).
@@ -569,13 +577,15 @@ static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *pa
     if(unlikely(!host))
         return PLUGINSD_PROTOCOL_ERROR(PLUGINSD_KEYWORD_HOST, "cannot find a host with this machine guid - have you created it?");
 
-    if(unlikely(!pinned)) {
-        // a removal holds this host. We stop the plugin and retry it later instead of keeping the
-        // previous selection: the commands that follow are meant for this host, so collecting them
-        // into another one would misattribute them.
+    if(unlikely(!pinned || rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))) {
+        // Removal owns the host, or archiving destroyed its runtime structures. Retry the plugin
+        // so a fresh HOST_DEFINE can initialize it; following metrics must not use another host.
         nd_log_daemon(NDLP_INFO,
-                      "PLUGINSD: %s: host with machine guid %s is being removed - restarting the plugin later",
-                      PLUGINSD_KEYWORD_HOST, uuid_str);
+                      "PLUGINSD: %s: host with machine guid %s %s - restarting the plugin later",
+                      PLUGINSD_KEYWORD_HOST, uuid_str,
+                      pinned ? "is archived and needs a new definition" : "is being removed");
+        if(pinned)
+            rrdhost_pin_release(host);
         pluginsd_select_host(parser, NULL, false, PLUGINSD_KEYWORD_HOST);
         parser->user.retry = true;
         return PARSER_RC_ERROR;
