@@ -199,6 +199,23 @@ modules:
 
 Then [restart netdata](/docs/netdata-agent/start-stop-restart.md) for the change to take effect.
 
+### Configuration paths after gaining privileges
+
+When `go.d.plugin` gains privileges through setuid/setgid or Linux file capabilities, it uses only the user and
+stock configuration roots embedded in its build. These include the installation prefix, so normal installations
+and custom build prefixes continue to work. Profile and metadata loading uses the same installed roots.
+
+In this mode, `-c`/`--config-dir` and `-w`/`--watch-path` stop startup with an error. The plugin ignores
+`NETDATA_USER_CONFIG_DIR`, `NETDATA_STOCK_CONFIG_DIR` and `NETDATA_PLUGINS_GOD_WATCH_PATH`, warning when an override
+differs from the installed selection. A runtime `[directories]` override in `netdata.conf` therefore cannot relocate
+these configuration roots for a privilege-gaining plugin. Use the installed roots, or run without a privilege gain
+(as an ordinary unprivileged user or directly as root) when custom configuration paths are required.
+
+Direct root invocations and ordinary unprivileged development runs keep their existing path options. Installed
+configuration symlinks, trusted DynCfg jobs, log-file access and the plugin's monitoring capabilities remain supported.
+If Linux launch privileges cannot be determined, or the build lacks absolute embedded configuration roots, startup
+fails before configuration is loaded.
+
 ## Troubleshooting
 
 ### HTTP response-size errors

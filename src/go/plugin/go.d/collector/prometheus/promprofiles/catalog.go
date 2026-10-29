@@ -153,14 +153,14 @@ func (c Catalog) Resolve(profileNames []string) ([]Profile, error) {
 }
 
 func defaultDirSpecs() []DirSpec {
-	if executable.Name == "test" {
+	if !pluginconfig.ConfigRestricted() && executable.Name == "test" {
 		if dir := profilesDirFromThisFile(); dir != "" {
 			return []DirSpec{{Path: dir, IsStock: true}}
 		}
 		return nil
 	}
 
-	if dir := filepath.Join(executable.Directory, "../config/go.d", profilesDirName, "default"); profilecatalog.DirExists(dir) {
+	if dir := filepath.Join(executable.Directory, "../config/go.d", profilesDirName, "default"); !pluginconfig.ConfigRestricted() && profilecatalog.DirExists(dir) {
 		return []DirSpec{{Path: dir, IsStock: true}}
 	}
 

@@ -23,9 +23,11 @@ import (
 )
 
 var (
-	initOnce sync.Once
-	env      envData
-	dirs     directories
+	initOnce    sync.Once
+	env         envData
+	dirs        directories
+	initErr     error
+	initIgnored []string
 )
 
 type envData struct {
@@ -44,6 +46,7 @@ type directories struct {
 	// Root config
 	userConfigDirs multipath.MultiPath // includes CLI dirs (+ env user + fallback)
 	stockConfigDir string
+	restrictConfig bool
 
 	// Collectors (derived from roots)
 	collectorsUserDirs multipath.MultiPath
@@ -60,10 +63,13 @@ type directories struct {
 	stockDataDir    string
 }
 
-// InitInput is the minimal CLI-derived input required to initialize paths.
+// InitInput supplies CLI paths and an optional installed-root policy.
+// Only go.d selects RestrictConfig after checking its launch privileges.
 type InitInput struct {
 	ConfDir   []string
 	WatchPath []string
+	// RestrictConfig rejects CLI config/watch overrides and uses only embedded roots.
+	RestrictConfig bool
 }
 
 func IsStock(path string) bool {
@@ -78,16 +84,43 @@ func IsStock(path string) bool {
 // MustInit parses env, applies CLI overrides, discovers directories, and stores them.
 // Safe to call multiple times; only the first call has effect.
 func MustInit(input InitInput) {
-	initOnce.Do(func() {
-		env = readEnvFromOS(executable.Directory)
-		var d directories
-		if err := d.build(input, env, executable.Name, executable.Directory); err != nil {
-			// fail fast during startup (internal invariant was broken)
-			panic(fmt.Errorf("pluginconfig initialization failed: %w", err))
-		}
-		dirs = d
-	})
+	if _, err := Init(input); err != nil {
+		panic(fmt.Errorf("pluginconfig initialization failed: %w", err))
+	}
 }
+
+// Init initializes process paths once. The returned names identify ignored
+// environment overrides; their caller-controlled values are never returned.
+func Init(input InitInput) ([]string, error) {
+	initOnce.Do(func() {
+		nextEnv := readEnvFromOS(executable.Directory)
+		var d directories
+		if err := d.build(input, nextEnv, executable.Name, executable.Directory); err != nil {
+			initErr = err
+			return
+		}
+		env, dirs = nextEnv, d
+		initErr = nil
+		initIgnored = nil
+		if input.RestrictConfig {
+			for _, variable := range []struct{ name, installed string }{
+				{"NETDATA_USER_CONFIG_DIR", buildinfo.UserConfigDir},
+				{"NETDATA_STOCK_CONFIG_DIR", buildinfo.StockConfigDir},
+				{"NETDATA_PLUGINS_GOD_WATCH_PATH", ""},
+			} {
+				value := os.Getenv(variable.name)
+				if value != "" && safePathClean(value) != safePathClean(variable.installed) {
+					initIgnored = append(initIgnored, variable.name)
+				}
+			}
+		}
+	})
+	return slices.Clone(initIgnored), initErr
+}
+
+// ConfigRestricted reports whether this command selected installed config roots.
+// Development profile/metadata shortcuts must obey the same selection.
+func ConfigRestricted() bool { return dirs.restrictConfig }
 
 func EnvLogLevel() string      { return env.logLevel }
 func HostPrefix() string       { return hostPrefix() }
@@ -141,10 +174,22 @@ func (d *directories) serviceDiscoveryDir() multipath.MultiPath {
 }
 
 func (d *directories) build(input InitInput, env envData, execName, execDir string) error {
-	d.initConfigRoots(input, env, execDir)
+	d.restrictConfig = input.RestrictConfig
+	if input.RestrictConfig {
+		if len(input.ConfDir) != 0 || len(input.WatchPath) != 0 {
+			return fmt.Errorf("-c/--config-dir and -w/--watch-path are unavailable after gaining privileges; use installed configuration or an unprivileged/direct-root invocation")
+		}
+		if !filepath.IsAbs(buildinfo.UserConfigDir) || !filepath.IsAbs(buildinfo.StockConfigDir) {
+			return fmt.Errorf("privilege-gaining execution requires absolute embedded configuration roots; use a correctly installed build")
+		}
+		d.userConfigDirs = multipath.New(filepath.Clean(buildinfo.UserConfigDir))
+		d.stockConfigDir = filepath.Clean(buildinfo.StockConfigDir)
+	} else {
+		d.initConfigRoots(input, env, execDir)
+		d.initWatchPaths(input, env)
+	}
 	d.deriveCollectors(execName)
 	d.deriveServiceDiscovery(execName)
-	d.initWatchPaths(input, env)
 	d.initVarLib(env)
 	d.initDataRoots(env, execDir)
 	return d.validate()

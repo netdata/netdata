@@ -12,7 +12,7 @@ import (
 )
 
 func defaultProfileCatalogPaths() catalog.Paths {
-	if dir := filepath.Join(executable.Directory, "../config/go.d/snmp.trap-profiles/default"); profilecatalog.DirExists(dir) {
+	if dir := filepath.Join(executable.Directory, "../config/go.d/snmp.trap-profiles/default"); !pluginconfig.ConfigRestricted() && profilecatalog.DirExists(dir) {
 		return catalog.Paths{StockDir: dir}
 	}
 

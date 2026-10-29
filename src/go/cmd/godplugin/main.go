@@ -18,6 +18,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/hostinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
+	"github.com/netdata/netdata/go/plugins/pkg/privilege"
 	"github.com/netdata/netdata/go/plugins/pkg/terminal"
 	"github.com/netdata/netdata/go/plugins/plugin/agent"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
@@ -48,10 +49,10 @@ func main() {
 		return
 	}
 
-	pluginconfig.MustInit(pluginconfig.InitInput{
-		ConfDir:   opts.ConfDir,
-		WatchPath: opts.WatchPath,
-	})
+	if err := initConfig(opts, privilege.GainedAtExec); err != nil {
+		fmt.Fprintf(os.Stderr, "initializing configuration: %v\n", err)
+		os.Exit(1)
+	}
 
 	if lvl := pluginconfig.EnvLogLevel(); lvl != "" {
 		logger.Level.SetByName(lvl)
@@ -142,4 +143,23 @@ func moduleRegistryWithSystemdPolicy(base collectorapi.Registry, systemdVersion 
 		registry[name] = creator
 	}
 	return registry
+}
+
+func initConfig(opts *cli.Option, detect func() (bool, error)) error {
+	gained, err := detect()
+	if err != nil {
+		return fmt.Errorf("cannot determine launch privileges: %w", err)
+	}
+	ignored, err := pluginconfig.Init(pluginconfig.InitInput{
+		ConfDir:        opts.ConfDir,
+		WatchPath:      opts.WatchPath,
+		RestrictConfig: gained,
+	})
+	if err != nil {
+		return err
+	}
+	for _, name := range ignored {
+		fmt.Fprintf(os.Stderr, "go.d.plugin: ignoring %s after gaining privileges; using installed configuration roots and no custom watch paths; runtime directory relocation requires an unprivileged/direct-root invocation\n", name)
+	}
+	return nil
 }
