@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "pluginsd_internals.h"
+#include "health/health_internals.h"
+#include "streaming/stream-receiver-internals.h"
 
 static bool vnode_test_command(PARSER *parser, const char *command) {
     char *input = strdupz(command);
@@ -238,6 +240,137 @@ cleanup:;
     return result;
 }
 
+struct vnode_test_receiver_drain {
+    struct receiver_state *receiver;
+    bool cancel;
+    bool signalled;
+};
+
+static void vnode_test_drain_receiver(void *data) {
+    struct vnode_test_receiver_drain *drain = data;
+    usec_t deadline = now_monotonic_usec() + 3 * USEC_PER_SEC;
+    while(!__atomic_load_n(&drain->receiver->exit.shutdown, __ATOMIC_ACQUIRE) &&
+          !__atomic_load_n(&drain->cancel, __ATOMIC_ACQUIRE) && now_monotonic_usec() < deadline)
+        sleep_usec(USEC_PER_MS);
+
+    drain->signalled = __atomic_load_n(&drain->receiver->exit.shutdown, __ATOMIC_ACQUIRE);
+    rrdhost_clear_receiver(drain->receiver, STREAM_HANDSHAKE_DISCONNECT_SIGNALED_TO_STOP);
+}
+
+static bool vnode_test_live_state(RRDHOST *host, bool health_enabled) {
+    bool acquired = object_state_acquire(&host->state_id, object_state_id(&host->state_id));
+    if(acquired)
+        object_state_release(&host->state_id);
+
+    return acquired && vnode_test_online(host) && !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN) &&
+           host->health.enabled == health_enabled && !host->receiver;
+}
+
+static int vnode_test_recovery(bool redefine, unsigned peer, bool health_enabled, RRD_DB_MODE memory_mode) {
+    const char *guid = "a11ce000-0000-4000-8000-000000000007";
+    struct plugind cd = { .update_every = 1, .filename = string_strdupz("vnode-recovery-test") };
+    struct parser_user_object user = { .host = localhost, .enabled = 1, .cd = &cd };
+    PARSER *parser = parser_init(&user, -1, -1, PARSER_INPUT_SPLIT, NULL);
+    pluginsd_keywords_init(parser, PARSER_INIT_PLUGINSD);
+    bool saved_health = health_globals.config.enabled;
+    RRD_DB_MODE saved_memory_mode = default_rrd_memory_mode;
+    health_globals.config.enabled = health_enabled;
+    default_rrd_memory_mode = memory_mode;
+    bool expected_health = health_enabled && memory_mode != RRD_DB_MODE_NONE;
+    struct receiver_state receiver = { .sock.fd = -1, .config.health.enabled = CONFIG_BOOLEAN_YES };
+    struct vnode_test_receiver_drain drain = { .receiver = &receiver };
+    ND_THREAD *drainer = NULL;
+    RRDHOST *host = NULL;
+    int result = 1;
+    char command[256];
+
+    snprintfz(command, sizeof(command), "HOST_DEFINE %s vnode-recovery-test", guid);
+    if(!vnode_test_command(parser, command) ||
+       !vnode_test_command(parser, "HOST_LABEL _node_stale_after_seconds 1") ||
+       !vnode_test_command(parser, "HOST_DEFINE_END"))
+        goto cleanup;
+
+    host = rrdhost_find_by_guid(guid);
+    if(!host || !vnode_test_live_state(host, expected_health))
+        goto cleanup;
+
+    usec_t deadline = now_monotonic_usec() + 3 * USEC_PER_SEC;
+    while(!vnode_test_offline(host) && now_monotonic_usec() < deadline) {
+        if(!vnode_test_command(parser, "HOST localhost"))
+            goto cleanup;
+        sleep_usec(50 * USEC_PER_MS);
+    }
+    if(!vnode_test_offline(host))
+        goto cleanup;
+
+    if(peer) {
+        if(rrdhost_set_receiver(host, &receiver) != RRDHOST_SET_RECEIVER_OK)
+            goto cleanup;
+
+        if(peer == 1)
+            rrdhost_clear_receiver(&receiver, STREAM_HANDSHAKE_DISCONNECT_SIGNALED_TO_STOP);
+        else {
+            // The fixture drains through the real disconnect path only after the parser signals it.
+            drainer = nd_thread_create("vnode-receiver", NETDATA_THREAD_OPTION_DONT_LOG,
+                                       vnode_test_drain_receiver, &drain);
+            if(!drainer)
+                goto cleanup;
+        }
+    }
+
+    snprintfz(command, sizeof(command), redefine ? "HOST_DEFINE %s vnode-recovery-test" : "HOST %s", guid);
+    if(!vnode_test_command(parser, command))
+        goto cleanup;
+    if(redefine && (!vnode_test_command(parser, "HOST_LABEL _node_stale_after_seconds 1") ||
+                   !vnode_test_command(parser, "HOST_DEFINE_END")))
+        goto cleanup;
+
+    if(drainer) {
+        nd_thread_join(drainer);
+        drainer = NULL;
+        if(!drain.signalled)
+            goto cleanup;
+    }
+
+    if(!vnode_test_command(parser, "CHART recovery.data '' 'Recovery' units family recovery.data line 1 1") ||
+       !vnode_test_command(parser, "DIMENSION value '' absolute 1 1") ||
+       !vnode_test_command(parser, "BEGIN recovery.data") ||
+       !vnode_test_command(parser, "SET value 1") ||
+       !vnode_test_command(parser, "END") ||
+       !vnode_test_live_state(host, expected_health))
+        goto cleanup;
+
+    struct receiver_state contender = { .sock.fd = -1 };
+    RRDHOST_SET_RECEIVER_RESULT attached = rrdhost_set_receiver(host, &contender);
+    if(attached != RRDHOST_SET_RECEIVER_VNODE_IS_LOCAL) {
+        if(attached == RRDHOST_SET_RECEIVER_OK)
+            rrdhost_clear_receiver(&contender, STREAM_HANDSHAKE_DISCONNECT_SIGNALED_TO_STOP);
+        goto cleanup;
+    }
+    result = 0;
+
+cleanup:
+    if(drainer) {
+        __atomic_store_n(&drain.cancel, true, __ATOMIC_RELEASE);
+        nd_thread_join(drainer);
+    }
+    if(host && host->receiver == &receiver)
+        rrdhost_clear_receiver(&receiver, STREAM_HANDSHAKE_DISCONNECT_SIGNALED_TO_STOP);
+    if(result)
+        netdata_log_error("VNODE unittest: %s recovery failed (peer=%u, health=%d, memory=%d)",
+                          redefine ? "HOST_DEFINE_END" : "HOST", peer, health_enabled, (int)memory_mode);
+    health_globals.config.enabled = saved_health;
+    default_rrd_memory_mode = saved_memory_mode;
+    pluginsd_process_cleanup(parser);
+    string_freez(cd.filename);
+    rrd_wrlock();
+    host = rrdhost_find_by_guid(guid);
+    if(host)
+        rrdhost_free___while_having_rrd_wrlock(host);
+    rrd_wrunlock();
+    return result;
+}
+
 int pluginsd_vnodes_unittest(void) {
     int errors = vnode_test_timeouts();
     errors += vnode_test_shorter_deadline(false);
@@ -245,6 +378,13 @@ int pluginsd_vnodes_unittest(void) {
 
     errors += vnode_test_removal(true);
     errors += vnode_test_removal(false);
+    for(unsigned redefine = 0; redefine < 2; redefine++) {
+        // Normal recovery, a peer that already disconnected, and a peer evicted by local recovery.
+        for(unsigned peer = 0; peer < 3; peer++)
+            errors += vnode_test_recovery(redefine, peer, true, RRD_DB_MODE_RAM);
+        errors += vnode_test_recovery(redefine, 2, false, RRD_DB_MODE_RAM);
+        errors += vnode_test_recovery(redefine, 2, true, RRD_DB_MODE_NONE);
+    }
     if(!errors)
         fprintf(stderr, "VNODE PARSER TESTS PASSED\n");
     return errors;

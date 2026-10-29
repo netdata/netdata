@@ -287,6 +287,10 @@ brings the next scan forward when needed. Expiry therefore requires continued lo
 with regular selections, it occurs within the timeout plus one scan interval and the localhost selection interval.
 A stale vnode becomes active again when selected with `HOST machine_guid`.
 
+When local collection resumes through `HOST` or `HOST_DEFINE_END`, any peer stream for the same host is stopped
+before restoring the vnode's live state. Health follows the local Agent's health setting and remains disabled for
+`memory mode = none`; a previous peer disconnect must not leave the recovered vnode orphaned or health disabled.
+
 #### HOST 
 
 `HOST` switches data collection between hosts.
