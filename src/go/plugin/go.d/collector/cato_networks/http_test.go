@@ -22,29 +22,44 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
-type repeatingByte byte
-
-func (v repeatingByte) Read(p []byte) (int, error) {
-	for i := range p {
-		p[i] = byte(v)
+func catoResponseBody(t *testing.T, payload string, size int64, compressed bool) []byte {
+	t.Helper()
+	require.GreaterOrEqual(t, size, int64(len(payload)))
+	body := bytes.Repeat([]byte(" "), int(size))
+	copy(body[len(body)-len(payload):], payload)
+	if !compressed {
+		return body
 	}
-	return len(p), nil
+	var buf bytes.Buffer
+	gz, err := gzip.NewWriterLevel(&buf, gzip.BestSpeed)
+	require.NoError(t, err)
+	_, err = gz.Write(body)
+	require.NoError(t, err)
+	require.NoError(t, gz.Close())
+	return buf.Bytes()
 }
 
+// Advertise a policy without bounding reads, so the Cato adapter must enforce it.
+type catoPolicyTransport struct {
+	http.RoundTripper
+	limit int64
+}
+
+func (t catoPolicyTransport) ResponseBodyLimit() int64 { return t.limit }
+
 func TestCatoResponseLimit(t *testing.T) {
+	const limit = confopt.KiB
 	for name, compressed := range map[string]bool{"plain": false, "explicit gzip": true} {
 		t.Run(name, func(t *testing.T) {
+			body := catoResponseBody(t, `{"data":{}}`, limit.Bytes()+1, compressed)
+			if compressed {
+				require.Less(t, int64(len(body)), limit.Bytes(), "overflow must come from decompressed data")
+			}
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				var dst io.Writer = w
 				if compressed {
 					w.Header().Set("Content-Encoding", "gzip")
-					gz := gzip.NewWriter(w)
-					defer gz.Close()
-					dst = gz
 				}
-				_, _ = io.WriteString(dst, `{"data":{"padding":"`)
-				_, _ = io.CopyN(dst, repeatingByte('x'), web.DefaultResponseBodyLimit)
-				_, _ = io.WriteString(dst, `"}}`)
+				_, _ = w.Write(body)
 			}))
 			defer server.Close()
 			cfg := New().Config
@@ -52,7 +67,12 @@ func TestCatoResponseLimit(t *testing.T) {
 			cfg.APIKey = "test-key"
 			cfg.AccountID = "123"
 			cfg.Headers = map[string]string{"Accept-Encoding": "gzip"}
-			client, err := newSDKAPIClient(cfg, server.Client())
+			base := server.Client()
+			base.Transport = catoPolicyTransport{
+				RoundTripper: base.Transport,
+				limit:        limit.Bytes(),
+			}
+			client, err := newSDKAPIClient(cfg, base)
 			require.NoError(t, err)
 			t.Run("SDK", func(t *testing.T) {
 				assert.ErrorIs(t, client.Probe(context.Background(), cfg.AccountID), web.ErrResponseTooLarge)
@@ -76,9 +96,31 @@ func TestCatoHTTPClientPreservesClientPolicy(t *testing.T) {
 	}
 	cloned := newCatoHTTPClient(original)
 	assert.Nil(t, original.Transport)
+	assert.EqualValues(t, web.DefaultResponseBodyLimit, web.HTTPClientResponseBodyLimit(cloned))
 	assert.Equal(t, original.Timeout, cloned.Timeout)
 	assert.Same(t, jar, cloned.Jar)
 	assert.ErrorIs(t, cloned.CheckRedirect(nil, nil), redirectErr)
+}
+
+func TestCatoHTTPClientResponseLimitPolicy(t *testing.T) {
+	for name, tc := range map[string]struct {
+		limit confopt.ByteSize
+		want  int64
+	}{
+		"default":       {want: web.DefaultResponseBodyLimit},
+		"negative":      {limit: -1, want: web.DefaultResponseBodyLimit},
+		"small":         {limit: confopt.KiB, want: 1024},
+		"above default": {limit: 64*confopt.MiB + confopt.KiB, want: web.DefaultResponseBodyLimit + 1024},
+	} {
+		t.Run(name, func(t *testing.T) {
+			base, err := web.NewHTTPClient(context.Background(), web.ClientConfig{
+				ResponseBodyLimit: tc.limit,
+			})
+			require.NoError(t, err)
+			defer base.CloseIdleConnections()
+			assert.Equal(t, tc.want, web.HTTPClientResponseBodyLimit(newCatoHTTPClient(base)))
+		})
+	}
 }
 
 type catoRoundTripFunc func(*http.Request) (*http.Response, error)
@@ -146,30 +188,17 @@ func TestCatoGzipBodyLifecycle(t *testing.T) {
 }
 
 func TestCatoCustomResponseLimit(t *testing.T) {
-	for name, limit := range map[string]confopt.ByteSize{"smaller": confopt.KiB, "larger": 64*confopt.MiB + confopt.KiB} {
+	// Shared web tests cover the full-size boundaries; exercise both parser paths with small policies here.
+	for name, limit := range map[string]confopt.ByteSize{"1 KiB": confopt.KiB, "4 KiB": 4 * confopt.KiB} {
 		t.Run(name, func(t *testing.T) {
 			for encoding, compressed := range map[string]bool{"plain": false, "gzip": true} {
 				t.Run(encoding, func(t *testing.T) {
-					var size atomic.Int64
+					var body atomic.Value
 					server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-						var dst io.Writer = w
 						if compressed {
 							w.Header().Set("Content-Encoding", "gzip")
-							gz := gzip.NewWriter(w)
-							defer gz.Close()
-							dst = gz
 						}
-						request, err := io.ReadAll(r.Body)
-						if err != nil {
-							t.Error(err)
-							return
-						}
-						payload := `{"data":{"accountSnapshot":{"sites":[]}}}`
-						if strings.Contains(string(request), "entityLookup") {
-							payload = `{"data":{"entityLookup":{"items":[]}}}`
-						}
-						_, _ = io.CopyN(dst, repeatingByte(' '), size.Load()-int64(len(payload)))
-						_, _ = io.WriteString(dst, payload)
+						_, _ = w.Write(body.Load().([]byte))
 					}))
 					defer server.Close()
 					cfg := New().Config
@@ -190,11 +219,15 @@ func TestCatoCustomResponseLimit(t *testing.T) {
 						"raw": func() error { _, err := client.AccountSnapshot(context.Background(), cfg.AccountID, nil); return err },
 					} {
 						t.Run(path, func(t *testing.T) {
-							size.Store(limit.Bytes())
+							payload := `{"data":{"accountSnapshot":{"sites":[]}}}`
+							if path == "SDK" {
+								payload = `{"data":{"entityLookup":{"items":[]}}}`
+							}
+							body.Store(catoResponseBody(t, payload, limit.Bytes(), compressed))
 							require.NoError(t, fetch(), "exact custom limit")
-							size.Store(limit.Bytes() + 1)
+							body.Store(catoResponseBody(t, payload, limit.Bytes()+1, compressed))
 							require.ErrorIs(t, fetch(), web.ErrResponseTooLarge)
-							size.Store(64)
+							body.Store(catoResponseBody(t, payload, 64, compressed))
 							require.NoError(t, fetch(), "recovery after overflow")
 						})
 					}
