@@ -18,6 +18,8 @@ from locked import HTTPS_OPENER, DOWNLOAD_TIMEOUT_SECONDS
 
 ARCHITECTURES = ('amd64', 'arm64')
 METADATA_LIMIT = 1 << 20
+PUBLIC_KEY_LIMIT = 1 << 20
+PUBLIC_KEY_URL = 'https://repository.netdata.cloud/netdatabot.gpg.key'
 RECIPE = Path(__file__).resolve().parent
 
 
@@ -92,6 +94,16 @@ def verified_release(tool, key, path):
     return json.loads(base64.b64decode(json.loads(path.read_bytes())['payload'], validate=True))
 
 
+def fetch_public_key(args):
+    """Acquire current online trust from the fixed package-signing authority."""
+    with HTTPS_OPENER.open(PUBLIC_KEY_URL, timeout=DOWNLOAD_TIMEOUT_SECONDS) as response:
+        body = response.read(PUBLIC_KEY_LIMIT + 1)
+    if not 0 < len(body) <= PUBLIC_KEY_LIMIT:
+        raise ValueError('public keyring exceeds the protocol limit or is empty')
+    # No fallback/cache: failed acquisition leaves no partially written keyring.
+    args.output.write_bytes(body)
+
+
 def read_latest(remote):
     # Read the authenticated storage API, not a possibly stale public CDN, when
     # guarding publisher sequence. Only the workflow's serialized writer uses it.
@@ -102,10 +114,10 @@ def read_latest(remote):
             return None
         raise
     if stat['IsDir'] or not 0 < stat['Size'] <= METADATA_LIMIT:
-        raise ValueError('latest descriptor exceeds the protocol limit')
+        raise ValueError('stored descriptor exceeds the protocol limit')
     body = run(['rclone', 'cat', '--count', str(METADATA_LIMIT + 1), remote], capture=True).encode()
     if len(body) != stat['Size'] or len(body) > METADATA_LIMIT:
-        raise ValueError('latest descriptor changed during publication inspection')
+        raise ValueError('stored descriptor changed during publication inspection')
     return body
 
 
@@ -204,7 +216,7 @@ def stage(args):
         for name in (archive_name, source_name, 'manifest.json', 'source-archive.json',
                      'provenance.json', 'sbom.cdx.json', 'sources-required.json'):
             shutil.copyfile(directory / name, destination / name)
-        run([args.release_tool, 'sign', '--key', args.private_key,
+        run([args.release_tool, 'sign', '--key', args.signing_key, '--public-key', args.public_key,
              '--manifest', directory / 'manifest.json', '--archive', directory / archive_name,
              '--sources', directory / source_name, '--sequence', str(args.sequence),
              '--archive-url', args.public_base + '/' + prefix + '/' + archive_name,
@@ -240,39 +252,72 @@ def publication(args):
     return proposed, directories
 
 
+def canonical_descriptors(args, proposed, directories, temporary, *, required):
+    """Authenticate immutable retry state without rewriting the staging workspace."""
+    paths, existing = {}, set()
+    for arch, directory in directories.items():
+        staged = directory / 'release.json'
+        relative = staged.relative_to(args.publication).as_posix()
+        body = read_latest(args.remote.rstrip('/') + '/' + relative)
+        if body is None:
+            if required:
+                raise ValueError('immutable release descriptor is missing')
+            paths[arch] = staged
+            continue
+        canonical = temporary / (arch + '.json')
+        canonical.write_bytes(body)
+        if verified_release(args.release_tool, args.public_key, canonical) != proposed[arch]:
+            raise ValueError('immutable release payload differs from proposed release')
+        paths[arch] = canonical
+        existing.add(arch)
+    return paths, existing
+
+
 def publish(args):
     proposed, directories = publication(args)
     guard_sequence(current_releases(args), proposed)
-    for directory in directories.values():
-        for path in sorted(directory.iterdir()):
-            if path.is_symlink() or not path.is_file():
-                raise ValueError('publication only accepts regular artifact files')
-            relative = path.relative_to(args.publication).as_posix()
-            upload(args, path, relative)
-            public_identity(args.public_base + '/' + relative, sha256(path), path.stat().st_size)
+    with tempfile.TemporaryDirectory(prefix='dem-release-publish-') as temporary:
+        # GPG signatures vary between attempts. Reuse only a trusted immutable
+        # descriptor with the same complete payload, never replace its bytes.
+        canonical, existing = canonical_descriptors(args, proposed, directories, Path(temporary), required=False)
+        for arch, directory in directories.items():
+            for path in sorted(directory.iterdir()):
+                if path.is_symlink() or not path.is_file():
+                    raise ValueError('publication only accepts regular artifact files')
+                relative = path.relative_to(args.publication).as_posix()
+                if path.name == 'release.json':
+                    path = canonical[arch]
+                    if arch not in existing:
+                        upload(args, path, relative)
+                else:
+                    upload(args, path, relative)
+                public_identity(args.public_base + '/' + relative, sha256(path), path.stat().st_size)
 
 
 def promote(args):
     proposed, directories = publication(args)
     guard_sequence(current_releases(args), proposed)
-    # Check every platform before updating either pointer. Promotion is atomic
-    # per object, not across architectures. A retry completes partial promotion.
-    for arch, release in proposed.items():
-        for item in (release['manifest']['archive'], release['sources']):
-            public_identity(item['url'], item['sha256'], item['bytes'])
-        path = directories[arch] / 'release.json'
-        relative = path.relative_to(args.publication).as_posix()
-        public_identity(args.public_base + '/' + relative, sha256(path), path.stat().st_size)
-    for arch, directory in directories.items():
-        path = directory / 'release.json'
-        relative = 'dem-runtime/latest/' + arch + '.json'
-        upload(args, path, relative, mutable=True)
-        public_identity(args.public_base + '/' + relative, sha256(path), path.stat().st_size)
+    with tempfile.TemporaryDirectory(prefix='dem-release-promote-') as temporary:
+        canonical, _ = canonical_descriptors(args, proposed, directories, Path(temporary), required=True)
+        # Check every platform before updating either pointer. Promotion is atomic
+        # per object, not across architectures. A retry completes partial promotion.
+        for arch, release in proposed.items():
+            for item in (release['manifest']['archive'], release['sources']):
+                public_identity(item['url'], item['sha256'], item['bytes'])
+            path = canonical[arch]
+            relative = (directories[arch] / 'release.json').relative_to(args.publication).as_posix()
+            public_identity(args.public_base + '/' + relative, sha256(path), path.stat().st_size)
+        for arch, path in canonical.items():
+            relative = 'dem-runtime/latest/' + arch + '.json'
+            upload(args, path, relative, mutable=True)
+            public_identity(args.public_base + '/' + relative, sha256(path), path.stat().st_size)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
+    key_parser = commands.add_parser('fetch-public-key')
+    key_parser.add_argument('--output', type=Path, required=True)
     assemble_parser = commands.add_parser('assemble')
     assemble_parser.add_argument('--arch', required=True, choices=ARCHITECTURES)
     assemble_parser.add_argument('--runtime-output', type=Path, required=True)
@@ -282,7 +327,7 @@ def main():
     stage_parser = commands.add_parser('stage')
     stage_parser.add_argument('--artifacts', type=Path, required=True)
     stage_parser.add_argument('--output', type=Path, required=True)
-    stage_parser.add_argument('--private-key', type=Path, required=True)
+    stage_parser.add_argument('--signing-key', required=True, help='imported package-signing GPG fingerprint')
     stage_parser.add_argument('--sequence', type=int, required=True)
     for name in ('publish', 'promote'):
         p = commands.add_parser(name)
@@ -290,11 +335,16 @@ def main():
         p.add_argument('--remote', required=True,
                        help='confirmed rclone bucket destination, without dem-runtime suffix')
     for name, p in commands.choices.items():
+        if name == 'fetch-public-key':
+            continue
         p.add_argument('--release-tool', type=Path, required=True)
         if name != 'assemble':
             p.add_argument('--public-key', type=Path, required=True)
             p.add_argument('--public-base', required=True)
     args = parser.parse_args()
+    if args.command == 'fetch-public-key':
+        fetch_public_key(args)
+        return
     args.release_tool = args.release_tool.resolve()
     if args.command == 'assemble' and args.package_release <= 0:
         parser.error('package release must be positive')

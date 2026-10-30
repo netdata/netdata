@@ -113,35 +113,35 @@ jobs:
         env:
           PUBLIC_BASE: ${{ vars.DEM_RUNTIME_PUBLIC_BASE_URL }}
           R2_REMOTE: ${{ vars.DEM_RUNTIME_R2_REMOTE }}
-          PUBLIC_KEY: ${{ vars.DEM_RUNTIME_RELEASE_PUBLIC_KEY }}
         run: |
           set -eu
-          test -n "$PUBLIC_BASE" && test -n "$R2_REMOTE" && test -n "$PUBLIC_KEY"
+          test -n "$PUBLIC_BASE" && test -n "$R2_REMOTE"
       - name: Install publication tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y rclone rsync debsigs rpm python3-ruamel.yaml
+          sudo apt-get install -y gnupg rclone rsync debsigs rpm python3-ruamel.yaml
           (cd src/go && go build -trimpath -o "$RUNNER_TEMP/dem-runtime-release" ./tools/dem-runtime-release)
+      - name: Import package and runtime signing key
+        id: package-key
+        uses: crazy-max/ghaction-import-gpg@2dc316deee8e90f13e1a351ab510b4d5bc0c82cd # v7.0.0
+        with:
+          gpg_private_key: ${{ secrets.NETDATABOT_PACKAGE_SIGNING_KEY }}
+      - name: Fetch current package-signing public keyring
+        run: |
+          python3 packaging/dem-runtime/release.py fetch-public-key --output "$RUNNER_TEMP/release-public.gpg"
       - name: Sign complete runtime descriptors
         env:
-          PRIVATE_KEY: ${{ secrets.DEM_RUNTIME_RELEASE_PRIVATE_KEY }}
-          PUBLIC_KEY: ${{ vars.DEM_RUNTIME_RELEASE_PUBLIC_KEY }}
+          PACKAGE_KEY: ${{ steps.package-key.outputs.fingerprint }}
           PUBLIC_BASE: ${{ vars.DEM_RUNTIME_PUBLIC_BASE_URL }}
           SEQUENCE: ${{ inputs.sequence }}
         run: |
           set -euo pipefail
-          umask 077
-          key_dir="$(mktemp -d "$RUNNER_TEMP/dem-release-keys.XXXXXX")"
-          trap 'rm -f "$key_dir/private.pem" "$key_dir/public.pem"; rmdir "$key_dir"' EXIT
-          printf '%s\n' "$PRIVATE_KEY" > "$key_dir/private.pem"
-          printf '%s\n' "$PUBLIC_KEY" > "$key_dir/public.pem"
           python3 packaging/dem-runtime/release.py stage --artifacts "$RUNNER_TEMP/artifacts" \
             --output "$RUNNER_TEMP/publication" --sequence "$SEQUENCE" \
-            --release-tool "$RUNNER_TEMP/dem-runtime-release" --private-key "$key_dir/private.pem" \
-            --public-key "$key_dir/public.pem" --public-base "$PUBLIC_BASE"
+            --release-tool "$RUNNER_TEMP/dem-runtime-release" --signing-key "$PACKAGE_KEY" \
+            --public-key "$RUNNER_TEMP/release-public.gpg" --public-base "$PUBLIC_BASE"
       - name: Publish and verify immutable R2 runtime/source objects
         env:
-          PUBLIC_KEY: ${{ vars.DEM_RUNTIME_RELEASE_PUBLIC_KEY }}
           PUBLIC_BASE: ${{ vars.DEM_RUNTIME_PUBLIC_BASE_URL }}
           R2_REMOTE: ${{ vars.DEM_RUNTIME_R2_REMOTE }}
           RCLONE_CONFIG_S3_TYPE: s3
@@ -152,15 +152,9 @@ jobs:
           RCLONE_CONFIG_S3_REGION: auto
         run: |
           set -euo pipefail
-          printf '%s\n' "$PUBLIC_KEY" > "$RUNNER_TEMP/release-public.pem"
           python3 packaging/dem-runtime/release.py publish --publication "$RUNNER_TEMP/publication" \
-            --release-tool "$RUNNER_TEMP/dem-runtime-release" --public-key "$RUNNER_TEMP/release-public.pem" \
+            --release-tool "$RUNNER_TEMP/dem-runtime-release" --public-key "$RUNNER_TEMP/release-public.gpg" \
             --public-base "$PUBLIC_BASE" --remote "$R2_REMOTE"
-      - name: Import package signing key
-        id: package-key
-        uses: crazy-max/ghaction-import-gpg@2dc316deee8e90f13e1a351ab510b4d5bc0c82cd # v7.0.0
-        with:
-          gpg_private_key: ${{ secrets.NETDATABOT_PACKAGE_SIGNING_KEY }}
       - name: Authenticate package upload
         uses: shimataro/ssh-key-action@87a8f067114a8ce263df83e9ed5c849953548bc3 # v2.8.1
         with:
@@ -190,7 +184,7 @@ jobs:
           RCLONE_CONFIG_S3_REGION: auto
         run: |
           python3 packaging/dem-runtime/release.py promote --publication "$RUNNER_TEMP/publication" \
-            --release-tool "$RUNNER_TEMP/dem-runtime-release" --public-key "$RUNNER_TEMP/release-public.pem" \
+            --release-tool "$RUNNER_TEMP/dem-runtime-release" --public-key "$RUNNER_TEMP/release-public.gpg" \
             --public-base "$PUBLIC_BASE" --remote "$R2_REMOTE"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()

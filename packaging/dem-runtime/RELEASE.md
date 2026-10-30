@@ -31,7 +31,9 @@ environment, target qualification and publication infrastructure below are confi
    across architectures and semantic-contract changes, independently of Agent
    versions. The protected environment's reviewers verify the candidate artifacts,
    qualification evidence, source/license completeness and destination/key setup.
-5. Sign complete release descriptors with Ed25519. Upload immutable archives,
+5. Import the existing package GPG key once and fetch the canonical OpenPGP public
+   keyring from `https://repository.netdata.cloud/netdatabot.gpg.key`. Sign complete
+   release descriptors with that signer and verify them inside Go. Upload immutable archives,
    corresponding sources, descriptors and inventories to R2. Read each through
    the public HTTPS route and check its full SHA256/size before promotion.
 6. Sign the native packages and submit them through the existing package upload
@@ -48,7 +50,11 @@ retained while any installation can reference them.
 Promotion is atomic per architecture, not across architectures or native repositories.
 If a step fails, an earlier immutable upload or one architecture's promotion may
 already have succeeded. Rerun the failed publication job with the same artifacts,
-sequence and keys; identical pointer retries are allowed. A changed rebuild must
+sequence and valid signing trust. OpenPGP signature timestamps can produce new
+descriptor bytes for an identical payload: publication reuses the authenticated
+immutable descriptor when its complete release payload matches, and promotion
+uses those canonical bytes. Different payloads and unverifiable existing metadata
+are rejected; immutable descriptors are never overwritten. A changed rebuild must
 not overwrite that release. Repository ingestion is asynchronous: successful SSH
 submission does not prove repository availability. Packaging/SRE must verify the
 signed repository metadata and installation from it before announcing availability.
@@ -67,8 +73,6 @@ Configure these in the protected `dem-runtime-release` environment after review:
 |---|---|
 | `DEM_RUNTIME_PUBLIC_BASE_URL` variable | Confirmed HTTPS public base, without `/dem-runtime`; proposed existing artifact routing is not assumed valid |
 | `DEM_RUNTIME_R2_REMOTE` variable | Named rclone bucket path; proposed `s3:netdata-agent-artifacts` |
-| `DEM_RUNTIME_RELEASE_PUBLIC_KEY` variable | Dedicated Ed25519 PKIX public PEM; also provision this trust through Agent/admin configuration |
-| `DEM_RUNTIME_RELEASE_PRIVATE_KEY` secret | Matching unencrypted PKCS8 private PEM, under approved release-key custody |
 | Existing R2 secrets | `CLOUDFLARE_R2_ACCESS_KEY`, `CLOUDFLARE_R2_SECRET_KEY`, `CLOUDFLARE_R2_RELEASE_ENDPOINT` |
 | Existing package secrets | `NETDATABOT_PACKAGE_SIGNING_KEY`, `NETDATABOT_PACKAGES_SSH_KEY`, `PACKAGES_KNOWN_HOSTS` |
 
@@ -97,10 +101,20 @@ dem-runtime/latest/<amd64|arm64>.json
 
 The public route must return the exact bytes, preserve immutable paths and avoid
 stale caching of mutable latest pointers. Keep every published identity and its
-sources; no garbage collection of publisher objects is implemented. A changed
-public verification key needs an Agent/admin trust update. The signed client
-protocol still does not detect withheld releases or establish freshness for a
-new installation; see the runtime protocol documentation for those approved limits.
+sources; no garbage collection of publisher objects is implemented. Online clients
+fetch canonical package trust for each preparation attempt; offline users provision
+a public keyring explicitly. No private signing material reaches clients. The signed
+client protocol still does not detect withheld releases or establish freshness for a
+new installation; see the runtime protocol documentation for those limits.
+
+Planned signing-key rotation MUST keep valid old/new keys available together until
+current latest descriptors have been promoted with the new signer. The publisher
+authenticates current latest and any reused immutable descriptor; missing, revoked or
+expired signers block that operation. Never bypass those checks for recovery. An
+emergency trust/pointer recovery requires an explicit release-owner procedure.
+Fetching a key does not establish freshness or immediate revocation through CDN
+caches, and key changes do not stop already installed runtimes. Agent-wide shipped
+trust is intentionally separate follow-up work.
 
 ## Local validation and limits
 
