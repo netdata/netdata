@@ -689,6 +689,15 @@ sockets on the same process port. `default_type` must reference
 evidence references, arrays, or JSON cells. For evidence sources, `evidence`
 names an evidence type id.
 
+`name_column` is the bullet key: the UI merges rows with the same value into
+one bullet and resolves link endpoint port names against it, so it must carry
+the same port identity the links use. Optional `label_column` names a scalar
+display column shown as the bullet label; when its value is null or empty the
+label falls back to `name_column`. Use it for operator-facing names that are
+not port identity, such as an SNMP interface alias. Never put such a name in
+`name_column`: ports sharing it would merge and links would stop resolving to
+their port.
+
 `hover.fields` is intentionally lightweight graph hover metadata. Full modal
 and table composition lives in `types.actor_types.<id>.presentation.modal`,
 `types.link_types.<id>.presentation.modal`, and optional
@@ -1650,6 +1659,9 @@ Managed SNMP device actor modals are port-centric:
   device name, management IP, vendor, model, port counts, and LLDP/CDP counts
   in the modal identification area;
 - use `actor_ports` as the primary `Ports` section;
+- port bullets key on `actor_ports.name` (the port identity link endpoints
+  use) and set `label_column: if_alias`, so bullets show the interface alias
+  when the device reports one;
 - expose real port identity columns, including SNMP `if_index` as the visible
   numeric port ID when known, source `port_id`, display `name`, `if_name`,
   `if_descr`, `if_alias`, MAC, speed, status, mode, role, VLAN, FDB, link, and

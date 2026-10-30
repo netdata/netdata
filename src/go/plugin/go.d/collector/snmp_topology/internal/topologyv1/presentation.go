@@ -87,11 +87,14 @@ func snmpTopologyV1ActorTypes() map[string]topologyapi.ActorType {
 				Ports: &topologyapi.ActorPortsPresentation{
 					ShowBullets: true,
 					Sources: []topologyapi.PortSourcePresentation{
+						// Bullets are keyed by name so link endpoints (ifName-based) still resolve to
+						// their port; the operator-assigned alias is only the visible label.
 						{
 							Source:       "actor_table",
 							Table:        "actor_ports",
 							ActorColumn:  "actor",
 							NameColumn:   "name",
+							LabelColumn:  "if_alias",
 							TypeColumn:   "topology_role",
 							DefaultType:  "topology",
 							StatusColumn: "oper_status",

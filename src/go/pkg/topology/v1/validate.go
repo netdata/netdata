@@ -1856,6 +1856,15 @@ func validatePortSourcePresentation(path string, source map[string]any, shape to
 	if columnType := columns[nameColumn]; !isDisplayColumnType(columnType) {
 		return fmt.Errorf("%s.name_column references non-display source column %q (%s)", path, nameColumn, columnType)
 	}
+	if labelColumn, _ := source["label_column"].(string); labelColumn != "" {
+		columnType, ok := columns[labelColumn]
+		if !ok {
+			return fmt.Errorf("%s.label_column references unknown source column %q", path, labelColumn)
+		}
+		if !isDisplayColumnType(columnType) {
+			return fmt.Errorf("%s.label_column references non-display source column %q (%s)", path, labelColumn, columnType)
+		}
+	}
 	valueColumn, _ := source["value_column"].(string)
 	if valueColumn != "" {
 		columnType, ok := columns[valueColumn]

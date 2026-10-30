@@ -433,6 +433,62 @@ func TestValidateDecodedResponseRejectsMissingPortSourceTable(t *testing.T) {
 	assert.Contains(t, err.Error(), "references unknown actor table")
 }
 
+func TestValidateDecodedResponsePortSourceLabelColumn(t *testing.T) {
+	tests := map[string]struct {
+		labelColumn string
+		wantErr     string
+	}{
+		"display column":     {labelColumn: "port_alias"},
+		"unknown column":     {labelColumn: "missing", wantErr: `label_column references unknown source column "missing"`},
+		"non-display column": {labelColumn: "port_meta", wantErr: `label_column references non-display source column "port_meta" (json)`},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			links := dependencyLinkTableWith(1,
+				[]Column{
+					NewColumn("port_name", "string"),
+					NewColumn("port_alias", "string", WithNullable()),
+					NewColumn("port_meta", "json", WithNullable()),
+				},
+				[]ColumnEncoding{Values("eth0"), Values("uplink"), Values(nil)},
+			)
+			data := minimalValidationData(
+				&ActorPresentation{
+					Ports: &ActorPortsPresentation{
+						ShowBullets: true,
+						Sources: []PortSourcePresentation{
+							{
+								Source:      "links",
+								ActorColumn: "src",
+								NameColumn:  "port_name",
+								LabelColumn: tc.labelColumn,
+								DefaultType: "topology",
+							},
+						},
+					},
+				},
+				withLinks(links),
+				withPortTypes(map[string]PortType{
+					"topology": {Presentation: &PortPresentation{Label: "Topology"}},
+				}),
+			)
+
+			err := validateResponseData(t, data)
+			if tc.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+
+			payloadBytes, err := json.Marshal(NewResponse(data))
+			require.NoError(t, err)
+			validateAgainstTopologySchema(t, payloadBytes)
+		})
+	}
+}
+
 func TestValidateDecodedResponseRejectsMissingModalActorTable(t *testing.T) {
 	err := validateResponseData(t, minimalValidationData(
 		&ActorPresentation{
