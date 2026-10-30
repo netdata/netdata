@@ -177,6 +177,10 @@ static inline bool rrdcalc_rrdset_read_lock_if_matches(RRDCALC *rc, RRDSET *st) 
     return true;
 }
 
+// rc->rrdset holds no reference on the chart, and this and rrdcalc_rrdset_read_lock_if_matches() dereference it
+// (to take its alerts lock) before they can check it. The caller MUST keep the chart alive across the call: either
+// run inside a foreach_rrdcalc_in_rrdhost_*() traversal of the chart's host (chart teardown unlinks its alerts under
+// the write lock of that index before freeing anything), or hold an acquired reference on the chart.
 static inline RRDSET *rrdcalc_rrdset_read_lock(RRDCALC *rc) {
     RRDSET *st = rc->rrdset;
     if(unlikely(!rrdcalc_rrdset_read_lock_if_matches(rc, st)))

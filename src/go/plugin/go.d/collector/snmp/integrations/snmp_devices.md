@@ -130,9 +130,6 @@ sudo ./edit-config go.d/sd/snmp.conf
 ```
 
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

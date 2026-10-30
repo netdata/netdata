@@ -59,20 +59,21 @@ modules:
         list:
           - title: Set up the browser runtime
             description: |
-              Browser runtime delivery is experimental; released bundles and automatic manifest installation are not
-              provided. Supply a trusted runtime manifest and its matching bundle before enabling browser monitors.
-              Run Chromium with its sandbox enabled as the unprivileged Netdata service account on Linux amd64 or arm64.
-              Managed mode prepares the exact runtime when a browser monitor is enabled, using an administrator-installed
-              runtime manifest. For offline setup, install the trusted manifest and import its matching archive, or select
-              `runtime.mode: preloaded` in `dem.conf` with the final `preload_path` produced by `dem.plugin runtime preload`.
-              Both modes require the trusted manifest and its matching bundle. Preloads stay outside automatic cleanup;
-              stop every consumer before replacing or removing them. Separately installed runtime components are unsupported.
+              Browser monitoring requires an explicitly installed runtime on Linux amd64 or arm64, running as the
+              unprivileged Netdata service account with Chromium sandboxing enabled. Delivery is experimental;
+              production downloads and native packages are not provided yet.
 
-              Run `dem.plugin runtime status` to inspect preparation and `dem.plugin runtime qualify` as the service
-              account to check a local sandboxed browser run. Follow the
-              [DEM runtime setup guide](https://github.com/netdata/netdata/blob/master/src/go/plugin/dem/README.md#runtime-setup-and-retirement)
-              for manifests, downloads, offline imports, retention and protected preloads. Restart the plugin after changing
-              runtime configuration.
+              Obtain a trusted release descriptor and matching archive, then run as the service account:
+
+              ```sh
+              dem.plugin runtime install --manifest /absolute/path/manifest.json --archive /absolute/path/runtime.tar.gz
+              dem.plugin runtime status
+              ```
+
+              Restart DEM to activate the installation. Enabling a monitor never downloads a runtime.
+              Use `dem.plugin runtime qualify` under the service's execution policy to check both journeys and Lighthouse.
+              See the [runtime setup guide](https://github.com/netdata/netdata/blob/master/src/go/plugin/dem/README.md#runtime-setup-and-retirement)
+              for updates, explicit downloads, installation paths and protected preloads.
       configuration:
         file:
           name: dem/lighthouse.conf

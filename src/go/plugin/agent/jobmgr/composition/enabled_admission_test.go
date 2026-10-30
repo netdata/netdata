@@ -22,28 +22,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type admissionTestIntentOwner struct{ committed atomic.Int32 }
-type admissionTestIntentReservation struct{ owner *admissionTestIntentOwner }
-
-func (o *admissionTestIntentOwner) Prepare(
-	previous, next collectorapi.JobConfigIdentity,
-	config map[string]any,
-) (collectorapi.PreparedJobConfigIntent, error) {
-	return &admissionTestIntentReservation{o}, nil
-}
-func (r *admissionTestIntentReservation) Commit()    { r.owner.committed.Add(1) }
-func (*admissionTestIntentReservation) Abort() error { return nil }
-
-func TestProcessAutoEnableInvalidConfigDoesNotCommitIntent(t *testing.T) {
+func TestProcessAutoEnableRejectsInvalidConfigBeforeDependencyWait(t *testing.T) {
 	source := &testDependencySource{callbacks: make(map[int]func(string, string))}
-	owner := &admissionTestIntentOwner{}
 	reader, writer := io.Pipe()
 	output := newProcessSynchronizedBuffer()
 	cfg := testProductionProcessConfig(reader, output)
 	cfg.AutoEnable = true
 	cfg.Services = []ProcessService{source}
 	creator := lighthouse.Creator(lighthouse.Dependencies{})
-	creator.JobConfigIntent = owner
 	creator.ActivationDependencies = func(map[string]any) ([]collectorapi.ActivationDependency, error) {
 		return []collectorapi.ActivationDependency{
 			{Kind: "dem-runtime", Name: "browser", Ready: func() error { return errors.New("runtime missing") }},
@@ -94,12 +80,10 @@ func TestProcessAutoEnableInvalidConfigDoesNotCommitIntent(t *testing.T) {
 		return false
 	}, 3*time.Second, time.Millisecond)
 	require.NotContains(t, output.String(), "CONFIG go.d:collector:test:site create accepted")
-	require.Zero(t, owner.committed.Load(), "invalid lighthouse config must not commit acquisition intent")
 }
 
 // A failed browser probe is an operational error, not malformed input.
-func TestProcessStockJourneyRetryRetainsIntentAcrossHiddenFailure(t *testing.T) {
-	owner := &admissionTestIntentOwner{}
+func TestProcessStockJourneyRetryRecoversHiddenFailure(t *testing.T) {
 	reader, writer := io.Pipe()
 	output := newProcessSynchronizedBuffer()
 	cfg := testProductionProcessConfig(reader, output)
@@ -109,7 +93,6 @@ func TestProcessStockJourneyRetryRetainsIntentAcrossHiddenFailure(t *testing.T) 
 		Executor: executor,
 		Registry: syntheticregistry.New(),
 	})
-	creator.JobConfigIntent = owner
 	cfg.Modules["test"] = creator
 	cfg.DiscoveryProviders = []agentdiscovery.ProviderFactory{
 		agentdiscovery.NewProviderFactory(
@@ -149,9 +132,8 @@ func TestProcessStockJourneyRetryRetainsIntentAcrossHiddenFailure(t *testing.T) 
 	})
 	output.waitContains(t, "CONFIG go.d:collector:test:site delete")
 	require.Positive(t, executor.checks.Load(), "initial rejection must come from Check")
-	// Failed stock is hidden, but its admitted enabled binding owns retry and
-	// resource demand independently of the public graph projection.
-	require.EqualValues(t, 1, owner.committed.Load())
+	// Failed stock is hidden, but its admitted enabled binding owns retry
+	// independently of the public graph projection.
 	executor.ready.Store(true)
 
 	t.Cleanup(func() {
@@ -166,7 +148,6 @@ func TestProcessStockJourneyRetryRetainsIntentAcrossHiddenFailure(t *testing.T) 
 	require.Eventually(t, func() bool {
 		return strings.Contains(output.String(), "CONFIG go.d:collector:test:site status running")
 	}, 6*time.Second, 10*time.Millisecond, "stock journey did not recover through automatic retry")
-	require.EqualValues(t, 1, owner.committed.Load())
 	for _, event := range diagnostics.snapshot() {
 		if event.Err != nil {
 			require.NotContains(t, event.Err.Error(), "yielded work is unavailable")

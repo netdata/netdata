@@ -42,9 +42,6 @@ This collector only supports collecting metrics from a single instance of this i
 This collector is enabled by default and checks for DNS Server counters on every collection. Once Windows registers the counters, DNS Server charts appear on the next collection if the DNS Server service is running.
 
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

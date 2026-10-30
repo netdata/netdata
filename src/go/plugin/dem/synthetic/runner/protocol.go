@@ -212,10 +212,7 @@ func (s *sink) add(event synthetic.Event) {
 }
 func (s *sink) retain(event synthetic.Event) {
 	if event.Kind == "suite" && event.Phase == "discovery" {
-		var n int
-		if _, err := fmt.Sscanf(event.Title, "Discovered %d tests", &n); err == nil && n >= 0 {
-			s.declared = n
-		}
+		s.declared = *event.DeclaredTests
 	}
 	if event.Kind == "test" && event.TestID != "" {
 		s.tests[event.TestID] = event
@@ -289,6 +286,13 @@ func (s *sink) snapshot() sinkSnapshot {
 	}
 }
 func validateEvent(event synthetic.Event) error {
+	if event.Kind == "suite" && event.Phase == "discovery" {
+		if event.DeclaredTests == nil || *event.DeclaredTests < 0 {
+			return errors.New("discovery event requires a nonnegative declared test count")
+		}
+	} else if event.DeclaredTests != nil {
+		return errors.New("declared test count is only valid in a discovery event")
+	}
 	switch event.Kind {
 	case "suite", "test", "step", "error", "stdout", "stderr", "audit":
 	default:
@@ -389,16 +393,14 @@ func validateResult(kind synthetic.Kind, capture bool, result *reporterResult) e
 func finite(value float64) bool { return !math.IsNaN(value) && !math.IsInf(value, 0) }
 
 type wireRequest struct {
-	Version          int               `json:"version"`
-	Kind             synthetic.Kind    `json:"kind"`
-	RunID            string            `json:"run_id"`
-	DependenciesPath string            `json:"dependencies_path"`
-	BrowserPath      string            `json:"browser_path"`
-	WorkDir          string            `json:"work_dir"`
-	Script           string            `json:"script,omitempty"`
-	ScriptPath       string            `json:"script_path,omitempty"`
-	URL              string            `json:"url,omitempty"`
-	TimeoutMS        int64             `json:"timeout_ms"`
-	Capture          bool              `json:"capture"`
-	Secrets          map[string]string `json:"secrets,omitempty"`
+	Version    int               `json:"version"`
+	Kind       synthetic.Kind    `json:"kind"`
+	RunID      string            `json:"run_id"`
+	WorkDir    string            `json:"work_dir"`
+	Script     string            `json:"script,omitempty"`
+	ScriptPath string            `json:"script_path,omitempty"`
+	URL        string            `json:"url,omitempty"`
+	TimeoutMS  int64             `json:"timeout_ms"`
+	Capture    bool              `json:"capture"`
+	Secrets    map[string]string `json:"secrets,omitempty"`
 }

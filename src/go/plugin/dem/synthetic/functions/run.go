@@ -81,6 +81,7 @@ func runDetail(run model.Run) map[string]any {
 		"history_error":  run.HistoryError,
 		"dropped_events": run.DroppedEvents,
 		"metrics":        nil,
+		"runtime":        run.Runtime,
 	}
 	if m := run.Metrics; m != nil {
 		detail["metrics"] = map[string]any{

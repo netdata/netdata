@@ -49,9 +49,6 @@ By default, it detects Pi-hole instances running on:
 > While Netdata can automatically detect Pi-hole instances and create data collection jobs, these jobs will fail unless you provide the necessary credentials.
 
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

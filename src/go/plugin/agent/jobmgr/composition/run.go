@@ -557,7 +557,7 @@ func (jrf joinedRunFinalizer) FinalizeRun(ctx context.Context, generation uint64
 		return errors.New("jobmgr composition: incomplete run finalizer")
 	}
 	jrf.jobs.FinalizeJobConfigLifecycles()
-	result := errors.Join(jrf.subscriptions.close(), jrf.jobs.FinalizeJobConfigIntents(), jrf.metricsRegistration.release(), jrf.functions.FinalizeRun(ctx, generation))
+	result := errors.Join(jrf.subscriptions.close(), jrf.metricsRegistration.release(), jrf.functions.FinalizeRun(ctx, generation))
 	if jrf.secrets != nil {
 		result = errors.Join(result, jrf.secrets.CloseProjection())
 	}

@@ -72,9 +72,6 @@ When Netdata is installed on a Proxmox VE host, it automatically detects and mon
 - ZFS pools (if ZFS is used)
 
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

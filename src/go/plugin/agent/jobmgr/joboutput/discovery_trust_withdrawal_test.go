@@ -114,13 +114,11 @@ func TestInventoryMetadataQuarantineCannotHideTrustWithdrawal(t *testing.T) {
 	}
 }
 
-func TestInventoryTrustWithdrawalReleasesDependenciesAndResourceIntent(t *testing.T) {
+func TestInventoryTrustWithdrawalReleasesDependencies(t *testing.T) {
 	for _, pipelineID := range []string{"owner", "other", ""} {
 		t.Run(pipelineID, func(t *testing.T) {
 			controller, graph, _, _, state := newDynCfgJobTestHarness(t)
-			owner := &intentTestOwner{}
 			creator := controller.modules["module"]
-			creator.JobConfigIntent = owner
 			creator.Create = func() collectorapi.CollectorV1 {
 				charts := collectorapi.Charts{}
 				module := state.module(nil, false)
@@ -161,8 +159,6 @@ func TestInventoryTrustWithdrawalReleasesDependenciesAndResourceIntent(t *testin
 				}
 			})
 			require.True(t, dependencies.Affects("vault:main", trusted.FullName(), true))
-			_, _, _, enabled := owner.snapshot()
-			require.Equal(t, 1, enabled)
 			before, exists := graph.Lookup(trusted.FullName())
 			require.True(t, exists)
 
@@ -195,12 +191,6 @@ func TestInventoryTrustWithdrawalReleasesDependenciesAndResourceIntent(t *testin
 				assert.Equal(t, before, after)
 			}
 			assert.Equal(t, retained, dependencies.Affects("vault:main", trusted.FullName(), true))
-			_, _, _, enabled = owner.snapshot()
-			if retained {
-				assert.Equal(t, 1, enabled)
-			} else {
-				assert.Zero(t, enabled, "trust withdrawal must release acquisition authority")
-			}
 		})
 	}
 }

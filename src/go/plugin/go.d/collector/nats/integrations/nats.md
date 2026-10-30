@@ -43,9 +43,6 @@ The collector can automatically detect NATS instances running on:
 - within Docker containers
 
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

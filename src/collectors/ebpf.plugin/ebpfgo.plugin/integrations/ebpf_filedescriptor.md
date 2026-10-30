@@ -45,9 +45,6 @@ eBPF Filedescriptor can be monitored further using the following other integrati
 
 The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT), presence of BTF files, and the configured object flavor to decide which eBPF program will be attached. The attach symbols differ by kernel version and architecture, so the collector resolves them from `/proc/kallsyms` before attaching. Open uses `do_sys_openat2`, then `do_sys_open`: both are inner functions that `open`, `openat` and `openat2` all funnel through. Close uses the architecture's close(2) syscall symbol (`__x64_sys_close`, `__arm64_sys_close`, ..., or the unprefixed `sys_close` on architectures without syscall wrappers), falling back to the inner helpers `close_fd` and `__close_fd` on kernels that predate the wrappers. The inner helper is not used on newer kernels because the close(2) syscall no longer calls it, which made the close counters read zero.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

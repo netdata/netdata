@@ -57,9 +57,24 @@ Each attempt starts a fresh browser and consumes CPU, memory and target website 
 
 ### Prerequisites
 
-#### Prepare the browser runtime
+#### Set up the browser runtime
 
-Configure the Node executable, pinned Playwright and Lighthouse dependencies, and full Chromium binary in the runtime section of dem.conf. Chromium must run with its sandbox enabled as the Netdata service account. Restart dem.plugin after changing runtime paths; the plugin does not download dependencies. Follow the [DEM runtime preparation guide](https://github.com/netdata/netdata/blob/master/src/go/plugin/dem/README.md) for the pinned versions and setup commands.
+Browser monitoring requires an explicitly installed runtime on Linux amd64 or arm64, running as the
+unprivileged Netdata service account with Chromium sandboxing enabled. Delivery is experimental;
+production downloads and native packages are not provided yet.
+
+Obtain a trusted release descriptor and matching archive, then run as the service account:
+
+```sh
+dem.plugin runtime install --manifest /absolute/path/manifest.json --archive /absolute/path/runtime.tar.gz
+dem.plugin runtime status
+```
+
+Restart DEM to activate the installation. Enabling a monitor never downloads a runtime.
+Use `dem.plugin runtime qualify` under the service's execution policy to check both journeys and Lighthouse.
+See the [runtime setup guide](https://github.com/netdata/netdata/blob/master/src/go/plugin/dem/README.md#runtime-setup-and-retirement)
+for updates, explicit downloads, installation paths and protected preloads.
+
 
 
 ### Configuration
@@ -364,4 +379,4 @@ Retained capture metadata remains available after run history expires. Fetch ver
 
 #### No conclusive observations
 
-Inspect native job status and synthetic inventory for runtime preparation errors, waiting attempts or execution inability. Open the latest retained run for errors and actual failure phases. Missing measurements are gaps; stale, inconclusive and cancelled observations are not recovery.
+Inspect native job status for unavailable dependencies and plugin logs for runtime preparation errors, waiting attempts or execution inability. Open the latest retained run for errors and actual failure phases. Missing measurements are gaps; stale, inconclusive and cancelled observations are not recovery.

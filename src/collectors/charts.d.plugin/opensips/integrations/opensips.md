@@ -37,9 +37,6 @@ This collector supports collecting metrics from multiple instances of this integ
 
 The collector will attempt to call `opensipsctl` along with a default number of parameters, even without any configuration.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

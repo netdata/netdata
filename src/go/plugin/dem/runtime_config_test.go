@@ -16,25 +16,21 @@ import (
 func TestRuntimeConfigDefaultsAndOverrides(t *testing.T) {
 	cfg := DefaultRuntimeConfig()
 	assert.Equal(t, "managed", cfg.Mode)
-	assert.True(t, cfg.AllowDownload)
 	store, err := cfg.StoreConfig("/var/lib/netdata")
 	require.NoError(t, err)
 	assert.Equal(t, "/var/lib/netdata/dem/runtime", store.Path)
 	assert.Equal(t, int64(4<<30), store.MaxBytes)
 	assert.Equal(t, 7*24*time.Hour, store.PreviousRetention)
-	assert.Equal(t, 30*24*time.Hour, store.IdleRetention)
 	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("runtime: {allow_download: false, max_bytes: 2147483648, previous_retention_days: 0}"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("runtime: {max_bytes: 2147483648, previous_retention_days: 0}"), 0600))
 	loaded, err := LoadConfig(multipath.New(dir))
 	require.NoError(t, err)
-	assert.False(t, loaded.Runtime.AllowDownload)
 	assert.Equal(t, "managed", loaded.Runtime.Mode)
-	assert.Equal(t, 30, loaded.Runtime.IdleRetentionDays)
 	assert.Equal(t, 0, loaded.Runtime.PreviousRetentionDays)
 }
 
 func TestRuntimeConfigRejectsAmbiguousAndInvalidPolicy(t *testing.T) {
-	for _, body := range []string{"mode: auto", "max_bytes: 0", "previous_retention_days: -1", "idle_retention_days: 36501"} {
+	for _, body := range []string{"mode: auto", "max_bytes: 0", "previous_retention_days: -1", "previous_retention_days: 36501"} {
 		t.Run(body, func(t *testing.T) {
 			dir := t.TempDir()
 			require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("runtime: {"+body+"}"), 0600))
@@ -64,7 +60,7 @@ func TestPreloadedMissingPathIsSetupUnavailable(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("runtime: {mode: preloaded, preload_path: relative}"), 0600))
 	cfg, err := LoadConfig(multipath.New(dir))
 	require.NoError(t, err)
-	handle := OpenRuntime(cfg.Runtime, "/installed/dem", "")
+	handle := OpenRuntime(cfg.Runtime, "")
 	require.ErrorContains(t, handle.SetupError, "must be absolute")
 	require.Nil(t, handle.Host)
 	_, err = handle.Source.BeginUse()
@@ -73,7 +69,7 @@ func TestPreloadedMissingPathIsSetupUnavailable(t *testing.T) {
 }
 
 func TestRuntimeConfigRejectsRemovedComponentsAndUnknownSettings(t *testing.T) {
-	for _, body := range []string{"mode: external", "node_path: /usr/bin/node", "browser_path: /usr/bin/chromium", "dependencies_path: /opt/deps", "allow_downlaod: false", "mode: managed, preload_path: /bundle", "mode: preloaded, preload_path: /bundle, cache_path: /cache"} {
+	for _, body := range []string{"allow_download: false", "manifest_path: /runtime.json", "idle_retention_days: 30", "mode: external", "node_path: /usr/bin/node", "browser_path: /usr/bin/chromium", "dependencies_path: /opt/deps", "allow_downlaod: false", "mode: managed, preload_path: /bundle", "mode: preloaded, preload_path: /bundle, cache_path: /cache"} {
 		t.Run(body, func(t *testing.T) {
 			dir := t.TempDir()
 			require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("enabled: true\nruntime: {"+body+"}\n"), 0600))
@@ -88,8 +84,8 @@ func TestRuntimeConfigErrorsReferToOriginalInput(t *testing.T) {
 		body, line, detail string
 	}{
 		"unknown":   {"allow_downlaod: false", "line 4:", "field allow_downlaod not found"},
-		"duplicate": {"allow_download: true\n  allow_download: false", "line 5:", "field allow_download already set"},
-		"type":      {"allow_download: [false]", "line 4:", "cannot unmarshal !!seq into bool"},
+		"duplicate": {"max_bytes: 4096\n  max_bytes: 2048", "line 5:", "field max_bytes already set"},
+		"type":      {"max_bytes: [2048]", "line 4:", "cannot unmarshal !!seq into int64"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -106,10 +102,10 @@ func TestRuntimeConfigErrorsReferToOriginalInput(t *testing.T) {
 func TestRuntimeConfigMergeValidation(t *testing.T) {
 	for name, body := range map[string]string{
 		"merged unknown":   "runtime:\n  <<: {node_path: /tmp/node}\n",
-		"merged duplicate": "runtime:\n  <<: {allow_download: false, allow_download: true}\n",
+		"merged duplicate": "runtime:\n  <<: {max_bytes: 2048, max_bytes: 4096}\n",
 		"alias unknown":    "base: &base {allow_downlaod: false}\nruntime: {<<: *base}\n",
 		"alias duplicate":  "base: &base {mode: managed, mode: preloaded}\nruntime: {<<: *base}\n",
-		"top duplicate":    "enabled: true\nenabled: false\nruntime: {allow_download: false}\n",
+		"top duplicate":    "enabled: true\nenabled: false\nruntime: {max_bytes: 2048}\n",
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -122,10 +118,10 @@ func TestRuntimeConfigMergeValidation(t *testing.T) {
 
 func TestRuntimeConfigLegitimateMergesPreserveDefaults(t *testing.T) {
 	for name, body := range map[string]string{
-		"override":  "runtime: {<<: {allow_download: true}, allow_download: false}\n",
-		"sequence":  "runtime: {<<: [{allow_download: false}, {allow_download: true}]}\n",
-		"alias":     "base: &base {allow_download: false}\nruntime: {<<: *base}\n",
-		"top merge": "base: &base {runtime: {allow_download: false}}\n<<: *base\n",
+		"override":  "runtime: {<<: {max_bytes: 4096}, max_bytes: 2048}\n",
+		"sequence":  "runtime: {<<: [{max_bytes: 2048}, {max_bytes: 4096}]}\n",
+		"alias":     "base: &base {max_bytes: 2048}\nruntime: {<<: *base}\n",
+		"top merge": "base: &base {runtime: {max_bytes: 2048}}\n<<: *base\n",
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -133,7 +129,7 @@ func TestRuntimeConfigLegitimateMergesPreserveDefaults(t *testing.T) {
 			cfg, err := LoadConfig(multipath.New(dir))
 			require.NoError(t, err)
 			expected := DefaultRuntimeConfig()
-			expected.AllowDownload = false
+			expected.MaxBytes = 2048
 			require.Equal(t, expected, cfg.Runtime)
 		})
 	}
@@ -142,8 +138,8 @@ func TestRuntimeConfigLegitimateMergesPreserveDefaults(t *testing.T) {
 func TestRuntimeConfigMergeErrorsUseOriginalSourceLines(t *testing.T) {
 	for name, tc := range map[string]struct{ source, line, detail string }{
 		"unknown":   {"defaults: &defaults\n  node_path: /tmp/node\n\nruntime: {<<: *defaults}\n", "line 2:", "node_path"},
-		"duplicate": {"defaults: &defaults\n  allow_download: true\n  allow_download: false\n\nruntime: {<<: *defaults}\n", "line 3:", "allow_download"},
-		"type":      {"defaults: &defaults\n  allow_download: [false]\n\nruntime: {<<: *defaults}\n", "line 2:", "bool"},
+		"duplicate": {"defaults: &defaults\n  max_bytes: 4096\n  max_bytes: 2048\n\nruntime: {<<: *defaults}\n", "line 3:", "max_bytes"},
+		"type":      {"defaults: &defaults\n  max_bytes: [2048]\n\nruntime: {<<: *defaults}\n", "line 2:", "int64"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()

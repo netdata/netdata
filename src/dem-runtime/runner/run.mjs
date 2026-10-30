@@ -5,6 +5,7 @@ import {fileURLToPath} from 'node:url';
 import {spawn} from 'node:child_process';
 import {createInterface} from 'node:readline';
 import protocol from './protocol.cjs';
+import {runtimePaths, checkRuntime} from './runtime.mjs';
 const {text, event, write} = protocol;
 const here = path.dirname(fileURLToPath(import.meta.url));
 const emit = record => write(1, record);
@@ -15,7 +16,8 @@ function absolute(value, name) {
 }
 function validate(r) {
   if (!r || r.version !== 1 || !['journey', 'lighthouse'].includes(r.kind)) throw new Error('unsupported runner request');
-  for (const key of ['dependencies_path', 'browser_path', 'work_dir']) absolute(r[key], key);
+  absolute(r.work_dir, 'work_dir');
+  if ('dependencies_path' in r || 'browser_path' in r) throw new Error('runtime component paths are not request fields');
   if (typeof r.run_id !== 'string' || !r.run_id) throw new Error('run_id is required');
   if (!Number.isSafeInteger(r.timeout_ms) || r.timeout_ms <= 0) throw new Error('timeout_ms must be positive');
   if (typeof r.capture !== 'boolean') throw new Error('capture must be boolean');
@@ -32,7 +34,12 @@ function validate(r) {
   }
 }
 async function main() {
-  if (Number(process.versions.node.split('.')[0]) < 24) throw new Error('DEM prepared runtime requires Node 24 or newer');
+  if (process.argv.length !== 2) {
+    if (process.argv.length !== 3 || process.argv[2] !== '--check') throw new Error('unsupported runtime operation');
+    write(1, await checkRuntime());
+    return;
+  }
+  const runtime = await runtimePaths();
   const chunks = [];
   for await (const chunk of process.stdin) chunks.push(chunk);
   request = JSON.parse(Buffer.concat(chunks).toString('utf8'));
@@ -56,21 +63,21 @@ async function main() {
       entry = path.join(input, 'journey.spec.ts');
       await fs.writeFile(entry, r.script, {mode: 0o600});
     }
-    const modules = path.join(r.dependencies_path, 'node_modules');
+    const modules = runtime.modules;
     const config = {
       testDir: path.dirname(entry), workers: 1, retries: 0, repeatEach: 1, fullyParallel: false,
       forbidOnly: true, timeout: r.timeout_ms, globalTimeout: r.timeout_ms,
       respectGitIgnore: false, outputDir: path.join(r.work_dir, 'output'),
       reporter: [[path.join(here, 'reporter.cjs'), {workDir: r.work_dir, capture: r.capture}]],
       projects: [{name: 'chromium', use: {browserName: 'chromium', headless: true,
-        launchOptions: {executablePath: r.browser_path, chromiumSandbox: true},
+        launchOptions: {executablePath: runtime.browser, chromiumSandbox: true},
         screenshot: r.capture ? 'only-on-failure' : 'off', trace: 'off', video: 'off'}}],
     };
     const configPath = path.join(r.work_dir, 'playwright.config.cjs');
     const escaped = entry.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     await fs.writeFile(configPath, 'module.exports = Object.assign(' + JSON.stringify(config) + ', {testMatch: new RegExp(' + JSON.stringify('^' + escaped + '$') + ')});\n', {mode: 0o600});
     const tsconfig = path.join(r.work_dir, 'tsconfig.json');
-    await fs.writeFile(tsconfig, JSON.stringify({compilerOptions: {allowJs: true, baseUrl: r.dependencies_path, paths: {
+    await fs.writeFile(tsconfig, JSON.stringify({compilerOptions: {allowJs: true, baseUrl: runtime.dependencies, paths: {
       '@playwright/test': [path.join(modules, '@playwright/test/index.mjs')],
       'playwright/test': [path.join(modules, 'playwright/test.mjs')],
       'playwright': [path.join(modules, 'playwright/index.mjs')],
@@ -105,6 +112,11 @@ async function main() {
   emit({type: 'result', result: terminal});
 }
 main().catch(error => {
+  if (process.argv.includes('--check')) {
+    write(2, {error: text(error.message)});
+    process.exitCode = 1;
+    return;
+  }
   emit({type: 'event', event: event('error', {phase: 'execution', status: 'error', message: text(error.message)})});
   emit({type: 'result', result: {status: 'error', error: text(error.message), capture_state: request?.capture ? 'unavailable' : 'disabled'}});
   process.exitCode = 1;

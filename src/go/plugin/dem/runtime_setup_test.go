@@ -16,9 +16,9 @@ import (
 )
 
 func trustedFixture() runtime.Manifest {
-	return runtime.Manifest{Format: 1, Version: "test", Platform: "linux/" + goruntime.GOARCH,
+	return runtime.Manifest{Format: 1, Contract: 1, Version: "test", Platform: "linux/" + goruntime.GOARCH,
 		Archive:  runtime.Archive{SHA256: strings.Repeat("a", 64), Bytes: 100, TarBytes: 10240, ExpandedBytes: 200, Entries: 2},
-		Layout:   runtime.Layout{Node: "node", Dependencies: "dependencies", Browser: "browser", Loader: "loader", Fonts: "fonts"},
+		Layout:   runtime.Layout{EntryPoint: "runtime.mjs", Node: "node", Dependencies: "dependencies", Browser: "browser", Loader: "loader", Fonts: "fonts"},
 		Bindings: []runtime.Binding{{Path: "node", Expected: []byte("loader\x00")}, {Path: "browser", Expected: []byte("loader\x00")}}}
 }
 func TestInstalledManifestTrust(t *testing.T) {
@@ -47,30 +47,25 @@ func TestInstalledManifestTrust(t *testing.T) {
 	_, err = LoadRuntimeManifest(t.TempDir())
 	require.Error(t, err)
 }
-func TestDefaultInstalledManifestAndUnavailableRUMSetup(t *testing.T) {
+func TestMissingInstallationLeavesRUMSetupAvailable(t *testing.T) {
 	cfg := DefaultRuntimeConfig()
-	assets := filepath.Join(t.TempDir(), "dem")
-	assert.Equal(t, filepath.Join(assets, "runtime-"+goruntime.GOARCH+".json"), RuntimeManifestPath(cfg, assets))
 	cache := filepath.Join(t.TempDir(), "cache")
 	cfg.CachePath = cache
-	handle := OpenRuntime(cfg, assets, "")
+	handle := OpenRuntime(cfg, "")
 	require.Error(t, handle.SetupError)
 	require.NotNil(t, handle.Source)
 	require.NotNil(t, handle.Host)
-	assert.Equal(t, "unavailable", handle.Host.Status().State)
+	assert.Contains(t, []string{"unavailable", "missing"}, handle.Host.Status().State)
 	_, err := handle.Source.BeginUse()
 	require.Error(t, err)
-	_, err = os.Stat(cache)
-	require.True(t, os.IsNotExist(err), "missing installed trust must not initialize the cache")
 	require.NoError(t, handle.Close())
 	require.NoError(t, handle.Close())
 }
-func TestPreloadedRuntimeRequiresInstalledTrust(t *testing.T) {
+func TestPreloadedRuntimeRequiresProtectedInstallation(t *testing.T) {
 	cfg := DefaultRuntimeConfig()
 	cfg.Mode = "preloaded"
 	cfg.PreloadPath = filepath.Join(t.TempDir(), "not-created")
-	cfg.ManifestPath = "/not-installed/manifest.json"
-	handle := OpenRuntime(cfg, "/installed/dem", "")
+	handle := OpenRuntime(cfg, "")
 	require.Error(t, handle.SetupError)
 	require.Nil(t, handle.Host)
 	require.Nil(t, handle.Store)

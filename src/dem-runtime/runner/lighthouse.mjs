@@ -4,6 +4,7 @@ import {constants} from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import protocol from './protocol.cjs';
+import {runtimePaths} from './runtime.mjs';
 const {text, event, write} = protocol;
 const emit = record => write(3, record);
 
@@ -24,7 +25,8 @@ async function main() {
   for await (const chunk of process.stdin) chunks.push(chunk);
   const request = JSON.parse(Buffer.concat(chunks).toString('utf8'));
   captureEnabled = request.capture;
-  const modules = path.join(request.dependencies_path, 'node_modules');
+  const runtime = await runtimePaths();
+  const modules = runtime.modules;
   const {default: lighthouse} = await import(pathToFileURL(path.join(modules, 'lighthouse/core/index.js')));
   const {default: desktop} = await import(pathToFileURL(path.join(modules, 'lighthouse/core/config/lr-desktop-config.js')));
   const {launch} = await import(pathToFileURL(path.join(modules, 'chrome-launcher/dist/index.js')));
@@ -34,8 +36,8 @@ async function main() {
   let result;
   try {
     emit({type: 'event', event: event('audit', {phase: 'start', title: 'Desktop performance audit', status: 'running'})});
-    await fs.access(request.browser_path, constants.X_OK);
-    chrome = await launch({chromePath: request.browser_path, userDataDir: profile, handleSIGINT: false,
+    await fs.access(runtime.browser, constants.X_OK);
+    chrome = await launch({chromePath: runtime.browser, userDataDir: profile, handleSIGINT: false,
       chromeFlags: ['--headless=new', '--disable-dev-shm-usage']});
     const audit = await lighthouse(request.url, {port: chrome.port, output: request.capture ? ['json', 'html'] : ['json'],
       onlyCategories: ['performance'], maxWaitForLoad: request.timeout_ms, logLevel: 'error'}, desktop);

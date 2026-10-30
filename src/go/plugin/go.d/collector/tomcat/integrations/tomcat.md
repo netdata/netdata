@@ -42,9 +42,6 @@ By default, this Tomcat collector cannot access the server's status page. To ena
 If the Netdata Agent and Tomcat are on the same host, the collector will attempt to connect to the Tomcat server's status page at `http://localhost:8080/manager/status?XML=true`.
 
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

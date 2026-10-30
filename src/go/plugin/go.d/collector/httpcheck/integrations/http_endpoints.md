@@ -28,12 +28,12 @@ Possible statuses:
 
 | Status        | Description                                                                                                                                                                                  |
 |---------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| success       | HTTP request completed successfully with a status code matching the configured `status_accepted` range (default: 200), and the response body and headers (if configured) match expectations. |
+| success       | HTTP request completed with a status code in `status_accepted` (default: 200), and the response passed the applicable body and header checks. |
 | timeout       | HTTP request timed out before receiving a response (default: 1 second).                                                                                                                      |
 | no_connection | Failed to establish a connection to the target.                                                                                                                                              |
 | redirect      | Received a redirect response (3xx status code) while `not_follow_redirects` is configured.                                                                                                   |
 | bad_status    | HTTP request completed with a status code outside the configured `status_accepted` range (default: non-200).                                                                                 |
-| bad_content   | HTTP request completed successfully but the response body does not match the expected content (when using `response_match`).                                                                 |
+| bad_content   | The response body could not be read, including when it exceeds the response-size limit, or it does not match the configured `response_match`. |
 | bad_header    | HTTP request completed successfully but response headers do not match the expected values (when using `header_match`).                                                                      |
 
 
@@ -52,7 +52,12 @@ This integration doesn't support auto-detection.
 
 #### Limits
 
-The default configuration for this integration does not impose any limits on data collection.
+Reading a response body is limited to 64 MiB, including after automatic gzip decompression.
+Exceeding this limit reports `bad_content` even without `response_match`. A body-read failure reports
+response length as zero and contributes to the existing HTTPCheck alerts.
+Use a smaller health-check endpoint or reduce the response returned by the server; this limit has no
+configuration override.
+
 
 #### Performance Impact
 
@@ -338,7 +343,7 @@ The following alerts are available:
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
 | [ httpcheck_web_service_up ](https://github.com/netdata/netdata/blob/master/src/health/health.d/httpcheck.conf) | httpcheck.status | HTTP check endpoint ${label:url} liveness status |
-| [ httpcheck_web_service_bad_content ](https://github.com/netdata/netdata/blob/master/src/health/health.d/httpcheck.conf) | httpcheck.status | Percentage of HTTP responses from ${label:url} with unexpected content in the last 5 minutes |
+| [ httpcheck_web_service_bad_content ](https://github.com/netdata/netdata/blob/master/src/health/health.d/httpcheck.conf) | httpcheck.status | Percentage of HTTP responses from ${label:url} that could not be read completely or did not match the expected content in the last 5 minutes |
 | [ httpcheck_web_service_bad_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/httpcheck.conf) | httpcheck.status | Percentage of HTTP responses from ${label:url} with unexpected status in the last 5 minutes |
 | [ httpcheck_web_service_bad_header ](https://github.com/netdata/netdata/blob/master/src/health/health.d/httpcheck.conf) | httpcheck.status | Percentage of HTTP responses from ${label:url} with unexpected header in the last 5 minutes |
 | [ httpcheck_web_service_timeouts ](https://github.com/netdata/netdata/blob/master/src/health/health.d/httpcheck.conf) | httpcheck.status | Percentage of timed-out HTTP requests to ${label:url} in the last 5 minutes |
@@ -444,3 +449,19 @@ If your Netdata runs in a Docker container named "netdata" (replace if different
 ```bash
 docker logs netdata 2>&1 | grep httpcheck
 ```
+
+### Known Errors
+
+#### error on reading body : HTTP response body exceeds the 64 MiB limit
+
+**Cause**
+
+Reading the endpoint's response crossed the response-size limit. The check reports `bad_content`
+even when no content-matching rule is configured.
+
+
+**Fix**
+
+Set `url` to a smaller health-check endpoint or reduce the response returned by the server.
+Increasing `timeout` or changing `response_match` does not raise the limit.
+See [HTTP response-size troubleshooting](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/README.md#http-response-size-errors).

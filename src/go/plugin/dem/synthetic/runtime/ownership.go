@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"time"
 
 	"github.com/gofrs/flock"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
@@ -16,103 +15,41 @@ import (
 
 type claimRecord struct {
 	Generation string `json:"generation"`
-	Pending    bool   `json:"pending,omitempty"`
+	Kind       string `json:"kind"`
 }
 
-// Claim protects a pending or accepted configuration, including a runtime not
-// prepared yet. It is process-owned, never execution-lifetime evidence.
-type Claim struct {
-	store         *Store
-	name          string
-	generation    string
-	lock          io.Closer
-	mu            sync.Mutex
-	closed        bool
-	released      bool
-	commitStarted bool
+// claim protects a process or candidate, never surviving-child lifetime.
+type claim struct {
+	store  *Store
+	name   string
+	lock   io.Closer
+	mu     sync.Mutex
+	closed bool
 }
 
-// ReserveDemand protects an identity without changing generation timestamps.
-// Call Commit only after configuration adoption; Close aborts unused reservations.
-func (s *Store) ReserveDemand(id string) (*Claim, error) {
+func (s *Store) claimLocked(id, kind string) (*claim, error) {
 	if !validID(id) {
-		return nil, errors.New("invalid requested runtime identity")
+		return nil, errors.New("invalid runtime identity")
 	}
-	var claim *Claim
-	err := s.withLock(func() error {
-		name, lock, err := s.newOwner("claims", claimRecord{Generation: id, Pending: true})
-		if err == nil {
-			claim = &Claim{store: s, name: name, generation: id, lock: lock}
-		}
-		return err
-	})
+	name, lock, err := s.newOwner("claims", claimRecord{Generation: id, Kind: kind})
 	if err != nil {
-		if claim != nil {
-			err = errors.Join(err, claim.Close())
-		}
 		return nil, err
 	}
-	return claim, nil
+	return &claim{store: s, name: name, lock: lock}, nil
 }
 
-// Commit promotes reserved protection to accepted demand. An I/O failure retains
-// ownership, so the accepted caller can retry without exposing files to eviction.
-func (c *Claim) Commit() error {
+func (c *claim) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.closed {
-		return errors.New("runtime demand is closed")
-	}
-	c.commitStarted = true
-	return c.store.withLock(func() error {
-		if err := saveJSON(c.store.root, filepath.Join(c.name, "owner.json"), claimRecord{Generation: c.generation}); err != nil {
-			return err
-		}
-		g, err := c.store.loadGeneration(c.generation)
-		if errors.Is(err, ErrUnavailable) {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		if g.Unneeded.IsZero() {
-			return nil
-		}
-		g.Unneeded = time.Time{}
-		return saveJSON(c.store.root, filepath.Join("generations", c.generation, "prepared.json"), g)
-	})
-}
-
-// Demand is the immediate reservation/commit path for explicit preparation.
-func (s *Store) Demand(id string) (*Claim, error) {
-	claim, err := s.ReserveDemand(id)
-	if err != nil {
-		return nil, err
-	}
-	if err := claim.Commit(); err != nil {
-		return nil, errors.Join(err, claim.Close())
-	}
-	return claim, nil
-}
-
-func (c *Claim) Close() error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.released {
 		return nil
 	}
-	c.closed = true
-	// Terminal ownership ends independently of coordinated record reclamation.
-	// If local release fails, Store retains the handle even for one-shot callers.
 	err := c.store.releaseOwner(c.lock)
 	if err == nil {
-		c.released = true
+		c.closed = true
 		err = c.store.withLock(func() error {
 			if err := c.store.removeOwned(c.name); err != nil {
 				return err
-			}
-			if !c.commitStarted {
-				return nil
 			}
 			_, err := c.store.inventoryLocked(true)
 			return err
@@ -225,7 +162,7 @@ type Use struct {
 	finished   bool
 }
 
-func (s *Store) BeginUse(m Manifest) (*Use, error) {
+func (s *Store) beginUse(m Manifest) (*Use, error) {
 	if err := m.Validate(); err != nil {
 		return nil, err
 	}
