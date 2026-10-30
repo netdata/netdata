@@ -108,8 +108,11 @@ client protocol still does not detect withheld releases or establish freshness f
 new installation; see the runtime protocol documentation for those limits.
 
 Planned signing-key rotation MUST keep valid old/new keys available together until
-current latest descriptors have been promoted with the new signer. The publisher
-authenticates current latest and any reused immutable descriptor; missing, revoked or
+current latest descriptors have been promoted with the new signer. Publish a new
+runtime version with a higher sequence for this transition: retrying an existing
+version reuses its original immutable signature, and changing only its sequence is
+rejected. The publisher authenticates current latest and any reused immutable
+descriptor; missing, revoked or
 expired signers block that operation. Never bypass those checks for recovery. An
 emergency trust/pointer recovery requires an explicit release-owner procedure.
 Fetching a key does not establish freshness or immediate revocation through CDN
