@@ -117,6 +117,7 @@ func TestArchiveRejectsUnsafeAndMismatchedInput(t *testing.T) {
 		"device":           {{name: "device", kind: tar.TypeChar, mode: 0600}},
 		"setuid":           {{name: "file", contents: []byte("no"), mode: 04755}},
 		"reserved":         {{name: "prepared.json", contents: []byte("{}"), mode: 0600}},
+		"native reserved":  {{name: "native.json", contents: []byte("{}"), mode: 0600}},
 	}
 	for name, entries := range cases {
 		t.Run(name, func(t *testing.T) {
