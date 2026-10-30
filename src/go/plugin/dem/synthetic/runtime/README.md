@@ -41,6 +41,12 @@ a historical high-water mark after explicit recovery, or rotate verification key
 Those keys require an Agent or administrator trust update. Signature validity also
 does not establish platform qualification or actual source availability.
 
+Archives use zstd only. The existing Go decoder limits the frame window and its
+decoding buffers to 8 MiB with one decoder worker; this is not a total process-memory
+limit. Compressed size/digest verification precedes extraction, and the signed tar,
+regular-file and entry bounds still apply through the complete decoded stream.
+No system `zstd` executable is required.
+
 Extraction rejects escaping paths, duplicate entries, privileged modes, devices,
 hard links and symlink parents. Preparation validates plain executables and the
 entrypoint, binds only authenticated interpreter slots to the final generation,

@@ -2859,6 +2859,17 @@
       "source_version": "5.8.1-1+deb13u2",
       "url": "https://snapshot.debian.org/file/461bb07acdfece6cb04c54ba55153bd70e6c7497",
       "version": "5.8.1-1+deb13u2"
+    },
+    {
+      "architecture": "amd64",
+      "bytes": 756244,
+      "file": "zstd_1.5.7+dfsg-1_amd64.deb",
+      "name": "zstd",
+      "sha256": "6da09b6aad171ef9b50d6a2bb4c62f756b3561aac5e05b452b80516223e5e0f5",
+      "source": "libzstd",
+      "source_version": "1.5.7+dfsg-1",
+      "url": "https://snapshot.debian.org/file/68018e28d4afac4567e7ef0b4b86aa8cd888734d",
+      "version": "1.5.7+dfsg-1"
     }
   ],
   "chromium": {
@@ -2870,7 +2881,9 @@
   "index_sha256": {
     "deb.debian.org_debian-security_dists_stable-security_InRelease": "3aa9ba8fc86be9eb335aaa82d06b91f8d1ba8c2a9319b5ef9793b565a3a1c28f",
     "deb.debian.org_debian_dists_stable-updates_InRelease": "b64618446aa09adb8dd4ca5d1cc0b77cf9aa0f9dc7ae63e9b20332ae360155e8",
-    "deb.debian.org_debian_dists_stable_InRelease": "0584fba32e13e0ab8285fb16c27adea1ec03a73669c18702821094fd6ca86675"
+    "deb.debian.org_debian_dists_stable_InRelease": "0584fba32e13e0ab8285fb16c27adea1ec03a73669c18702821094fd6ca86675",
+    "zstd-trixie-Release": "ed56aac47e7911e65ee63aae8d67e29f20e023f840e49f8ed037043a33de138a",
+    "zstd-trixie-main-binary-amd64-Packages.xz": "7778d3e3f303b7ddb8ce0fe7c8d57473a076c6bf2e8f241f75421d2396352498"
   },
   "installed": [
     {
@@ -4860,6 +4873,13 @@
       "source": "zlib",
       "source_version": "1:1.3.dfsg+really1.3.1-1",
       "version": "1:1.3.dfsg+really1.3.1-1+b1"
+    },
+    {
+      "architecture": "amd64",
+      "name": "zstd",
+      "source": "libzstd",
+      "source_version": "1.5.7+dfsg-1",
+      "version": "1.5.7+dfsg-1"
     }
   ],
   "requested_packages": [
@@ -4877,7 +4897,8 @@
     "fonts-unifont",
     "fonts-wqy-zenhei",
     "xfonts-cyrillic",
-    "xfonts-scalable"
+    "xfonts-scalable",
+    "zstd"
   ],
   "sources": {
     "acl@2.3.2-2": {

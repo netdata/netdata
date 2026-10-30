@@ -5,6 +5,9 @@ on:
     paths:
       - '.github/workflows/dem-runtime-tests.yml'
       - '.github/workflows/dem-runtime-release.yml'
+      - '.github/data/distros.yml'
+      - '.github/scripts/package-upload.sh'
+      - 'packaging/cmake/Modules/Packaging.cmake'
       - 'src/collectors/utils/nd-run.c'
       - 'src/collectors/utils/nd-process-tree.*'
       - 'src/collectors/utils/supervisor-pipes.h'
@@ -28,6 +31,9 @@ on:
     paths:
       - '.github/workflows/dem-runtime-tests.yml'
       - '.github/workflows/dem-runtime-release.yml'
+      - '.github/data/distros.yml'
+      - '.github/scripts/package-upload.sh'
+      - 'packaging/cmake/Modules/Packaging.cmake'
       - 'src/collectors/utils/nd-run.c'
       - 'src/collectors/utils/nd-process-tree.*'
       - 'src/collectors/utils/supervisor-pipes.h'
@@ -87,7 +93,7 @@ jobs:
       - name: Install native package inspection tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake rpm cpio dpkg-dev
+          sudo apt-get install -y cmake rpm cpio dpkg-dev zstd python3-ruamel.yaml
           for tool in cmake cpack dpkg-deb rpmbuild rpm rpm2cpio cpio; do command -v "$tool"; done
       - name: Builder, source assembly, and native package contracts
         run: |

@@ -3,7 +3,6 @@
 """Container-side bundle construction. Only the immutable donor executes this."""
 import argparse
 import base64
-import gzip
 import hashlib
 import json
 import os
@@ -89,10 +88,10 @@ def recipe_sources():
     """Release-owned recipe files only; never recurse into caches or local outputs."""
     return ('build.py', 'bundle.py', 'locked.py', 'sources.py', 'refresh-lock.py', 'snapshot.py', 'test_snapshot.py',
             'inputs.json', 'Dockerfile', 'README.md', 'RELEASE.md', 'test_bundle.py',
-            'test_delivery.py', 'test_locked.py', 'release.py', 'test_release.py',
+            'test_delivery.py', 'test_locked.py', 'release.py', 'test_release.py', 'ci.py', 'test_ci.py',
             'locks/amd64.json', 'locks/arm64.json',
             'native/CMakeLists.txt', 'native/netdata-dem-browser', 'native/hook.sh.in', 'native/lifecycle.sh', 'native/README.md',
-            'native/tests/test_lifecycle.py', 'native/tests/test_recipe.py', 'native/tests/test_package.py')
+            'native/tests/test_agent_metadata.py', 'native/tests/test_lifecycle.py', 'native/tests/test_recipe.py', 'native/tests/test_package.py')
 
 
 def install_runner(assets, root, version):
@@ -197,10 +196,10 @@ def package_archive(root, output, epoch):
                     archive.addfile(info, stream)
             else:
                 raise ValueError('unsupported archive file: ' + name)
-    compressed = output / 'runtime.tar.gz'
-    with tar_path.open('rb') as source, compressed.open('wb') as destination:
-        with gzip.GzipFile(filename='', mode='wb', fileobj=destination, mtime=epoch, compresslevel=9) as zipped:
-            shutil.copyfileobj(source, zipped)
+    compressed = output / 'runtime.tar.zst'
+    # One deterministic frame with an 8 MiB window, matching the Store decoder cap.
+    run(['zstd', '-19', '--single-thread', '--zstd=wlog=23', '--check',
+         '--no-progress', '-o', compressed, tar_path])
     result = {'sha256': sha256(compressed), 'bytes': compressed.stat().st_size,
               'tar_bytes': tar_path.stat().st_size, 'expanded_bytes': expanded, 'entries': len(paths)}
     tar_path.unlink()  # Task-created intermediate, never a source file.
@@ -480,11 +479,11 @@ def prepare(args):
                {path.relative_to(root).as_posix(): {'sha256': sha256(path),
                                                     'bytes': path.stat().st_size} for path in regular_files(root)})
     compressed, archive = package_archive(root, output, inputs['source_date_epoch'])
-    relative = f'dem-runtime/{inputs["version"]}/{args.arch}/{archive["sha256"]}.tar.gz'
+    relative = f'dem-runtime/{inputs["version"]}/{args.arch}/{archive["sha256"]}.tar.zst'
     archive['url'] = args.url_prefix.rstrip('/') + '/' + relative if args.url_prefix else ''
     manifest = {'format': 1, 'contract': contract['protocol_version'], 'version': inputs['version'], 'platform': 'linux/' + args.arch,
                 'archive': archive, 'layout': layout, 'bindings': bindings}
-    final = output / (archive['sha256'] + '.tar.gz')
+    final = output / (archive['sha256'] + '.tar.zst')
     compressed.rename(final)
     write_json(output / 'manifest.json', manifest)
     write_json(output / 'provenance.json', provenance)

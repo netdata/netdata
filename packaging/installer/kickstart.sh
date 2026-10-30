@@ -3047,7 +3047,7 @@ validate_args() {
         fatal "--install-dem-runtime cannot be combined with this action. Use an ordinary install/update, or the installed runtime CLI for explicit offline setup." F052F ;;
     esac
     if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
-      fatal "--install-dem-runtime requires online acquisition. For offline setup, use dem.plugin runtime install --release /absolute/release.json --archive /absolute/runtime.tar.gz as the Netdata service user." F052F
+      fatal "--install-dem-runtime requires online acquisition. For offline setup, use dem.plugin runtime install --release /absolute/release.json --archive /absolute/runtime.tar.zst as the Netdata service user." F052F
     fi
   fi
 

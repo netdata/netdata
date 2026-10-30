@@ -2,7 +2,6 @@
 """Publisher control-flow regressions; signing/verification belongs to Go tests."""
 import copy
 import base64
-import gzip
 import hashlib
 import io
 import json
@@ -72,7 +71,7 @@ class PublicationTests(unittest.TestCase):
     def test_immutable_upload_never_syncs_or_mutates_prior_objects(self):
         args = SimpleNamespace(remote='s3:bucket')
         with patch.object(release, 'run') as run:
-            release.upload(args, Path('/tmp/archive'), 'dem-runtime/1/amd64/hash.tar.gz')
+            release.upload(args, Path('/tmp/archive'), 'dem-runtime/1/amd64/hash.tar.zst')
             command = run.call_args.args[0]
             self.assertEqual(command[:2], ['rclone', 'copyto'])
             self.assertIn('--immutable', command)
@@ -176,7 +175,8 @@ class SignedPublicationTests(unittest.TestCase):
                     member = tarfile.TarInfo(name)
                     member.size = len(data)
                     archive.addfile(member, io.BytesIO(data))
-            data = gzip.compress(raw.getvalue(), mtime=0)
+            data = subprocess.run(['zstd', '-19', '--single-thread', '--zstd=wlog=23', '--check', '-c'],
+                                  input=raw.getvalue(), capture_output=True, check=True).stdout
             digest = hashlib.sha256(data).hexdigest()
             source_data = b'synthetic source fixture'
             source_hash = hashlib.sha256(source_data).hexdigest()
@@ -190,8 +190,8 @@ class SignedPublicationTests(unittest.TestCase):
                                        'entrypoint': 'runner/run.mjs', 'dependencies': 'dependencies', 'fonts': 'fonts'},
                             'bindings': [{'path': p, 'offset': 0, 'expected': base64.b64encode(slot).decode()}
                                          for p in ('node', 'browser')]}
-                (directory / (digest + '.tar.gz')).write_bytes(data)
-                source_name = source_hash + '.sources.tar.gz'
+                (directory / (digest + '.tar.zst')).write_bytes(data)
+                source_name = source_hash + '.sources.tar.zst'
                 (directory / source_name).write_bytes(source_data)
                 release.write_json(directory / 'manifest.json', manifest)
                 release.write_json(directory / 'source-archive.json', {'format': 1, 'runtime_archive': digest,

@@ -22,16 +22,30 @@ concurrency:
   group: dem-runtime-release
   cancel-in-progress: false
 jobs:
+  matrix:
+    name: Select native runners from the shared distro catalog
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install catalog reader
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-ruamel.yaml
+      - id: matrix
+        run: |
+          matrix="$(python3 packaging/dem-runtime/ci.py build-matrix)"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
   build:
     name: Build ${{ matrix.arch }} portable/native runtime and sources
+    needs: matrix
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - arch: amd64
-            runner: ubuntu-24.04
-          - arch: arm64
-            runner: ubuntu-24.04-arm
+      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     steps:
@@ -45,7 +59,7 @@ jobs:
       - name: Install packaging tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake rpm
+          sudo apt-get install -y cmake rpm zstd
       - name: Build the release tool and portable runtime
         env:
           DEM_ARCH: ${{ matrix.arch }}
@@ -77,7 +91,7 @@ jobs:
     name: Sign, publish and promote the qualified release
     needs: build
     if: inputs.publish && github.repository == 'netdata/netdata' && github.ref == 'refs/heads/master'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 90
     # Configure required reviewers/branch restrictions before enabling this job.
     # Reviewers verify both architecture artifacts, source/license completeness,
@@ -99,17 +113,14 @@ jobs:
         env:
           PUBLIC_BASE: ${{ vars.DEM_RUNTIME_PUBLIC_BASE_URL }}
           R2_REMOTE: ${{ vars.DEM_RUNTIME_R2_REMOTE }}
-          PACKAGE_HOST: ${{ vars.DEM_RUNTIME_PACKAGE_HOST }}
-          PACKAGE_REPO: ${{ vars.DEM_RUNTIME_PACKAGE_REPOSITORY }}
           PUBLIC_KEY: ${{ vars.DEM_RUNTIME_RELEASE_PUBLIC_KEY }}
         run: |
           set -eu
-          test -n "$PUBLIC_BASE" && test -n "$R2_REMOTE" && test -n "$PACKAGE_HOST"
-          test -n "$PACKAGE_REPO" && test -n "$PUBLIC_KEY"
+          test -n "$PUBLIC_BASE" && test -n "$R2_REMOTE" && test -n "$PUBLIC_KEY"
       - name: Install publication tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y rclone rsync debsigs rpm
+          sudo apt-get install -y rclone rsync debsigs rpm python3-ruamel.yaml
           (cd src/go && go build -trimpath -o "$RUNNER_TEMP/dem-runtime-release" ./tools/dem-runtime-release)
       - name: Sign complete runtime descriptors
         env:
@@ -159,19 +170,14 @@ jobs:
       - name: Sign native packages and submit to the existing repositories
         env:
           PACKAGE_KEY: ${{ steps.package-key.outputs.fingerprint }}
-          PACKAGE_HOST: ${{ vars.DEM_RUNTIME_PACKAGE_HOST }}
-          PACKAGE_REPO: ${{ vars.DEM_RUNTIME_PACKAGE_REPOSITORY }}
         run: |
           set -euo pipefail
           for arch in amd64 arm64; do
             artifacts="$RUNNER_TEMP/artifacts/dem-runtime-$arch"
             debsigs --sign=origin --default-key="$PACKAGE_KEY" "$artifacts"/*.deb
             rpmsign --define "_gpg_name $PACKAGE_KEY" --define '__gpg /usr/bin/gpg' --addsign "$artifacts"/*.rpm
-            .github/scripts/package-upload.sh "$PACKAGE_HOST" ubuntu/noble "$arch" deb "$PACKAGE_REPO" "$artifacts"
-            rpm_arch=x86_64
-            if [ "$arch" = arm64 ]; then rpm_arch=aarch64; fi
-            .github/scripts/package-upload.sh "$PACKAGE_HOST" el/9 "$rpm_arch" rpm "$PACKAGE_REPO" "$artifacts"
           done
+          python3 packaging/dem-runtime/ci.py upload-native --artifacts "$RUNNER_TEMP/artifacts"
       - name: Promote latest after all immutable objects are publicly verified
         env:
           PUBLIC_BASE: ${{ vars.DEM_RUNTIME_PUBLIC_BASE_URL }}

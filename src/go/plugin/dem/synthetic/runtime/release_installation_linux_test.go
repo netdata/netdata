@@ -18,13 +18,13 @@ import (
 func publishedFixture(t *testing.T, sequence uint64) (Release, string, func(context.Context) (Release, error)) {
 	t.Helper()
 	m, archive := bundleFixture(t, strings.Repeat("release", int(sequence)))
-	m.Archive.URL = "https://artifacts.example.invalid/" + m.Archive.SHA256 + ".tar.gz"
+	m.Archive.URL = "https://artifacts.example.invalid/" + m.Archive.SHA256 + ".tar.zst"
 	release := Release{Format: 1, Sequence: sequence, Manifest: m,
-		Sources: ReleaseSource{URL: "https://artifacts.example.invalid/sources.tar.gz", SHA256: strings.Repeat("b", 64), Bytes: 100}}
+		Sources: ReleaseSource{URL: "https://artifacts.example.invalid/sources.tar.zst", SHA256: strings.Repeat("b", 64), Bytes: 100}}
 	_, key := releaseFixture(t)
 	envelope, err := SignRelease(release, key)
 	require.NoError(t, err)
-	path := filepath.Join(t.TempDir(), "archive.tar.gz")
+	path := filepath.Join(t.TempDir(), "archive.tar.zst")
 	require.NoError(t, os.WriteFile(path, archive, 0600))
 	return release, path, func(context.Context) (Release, error) {
 		return VerifyRelease(envelope, []ed25519.PublicKey{key.Public().(ed25519.PublicKey)})

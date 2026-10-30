@@ -11,7 +11,7 @@ project on a Linux package builder with CMake 3.21 or newer and dpkg/rpmbuild:
 
 ```sh
 /path/to/dem-runtime-release stage-native \
-  --manifest /build/manifest.json --archive /build/runtime.tar.gz \
+  --manifest /build/manifest.json --archive /build/runtime.tar.zst \
   --output /build/payload
 cmake -S packaging/dem-runtime/native -B /build/native-package \
   -DDEM_PAYLOAD_DIR=/build/payload -DDEM_ARCH=arm64 \
@@ -33,7 +33,11 @@ Packages require `netdata-dem-runtime-api = 1`, provided by a compatible install
 `netdata-plugin-dem`. Debian uses versioned Pre-Depends; RPM declares ordinary and
 pre/preun/posttrans dependencies. The Agent package must publish this capability
 before these packages can be installed. This is a helper interface version, not
-an exact Agent/runtime release pairing.
+an exact Agent/runtime release pairing. The Agent recommends the DEM plugin;
+installations that disable weak dependencies may omit it. The plugin suggests this
+runtime package, so installing the plugin alone does not install a browser. RPM
+weak relationships are emitted only on distributions that support them; older
+package managers receive no hard-dependency fallback.
 
 The only executable payload prefix is `/usr/lib/netdata/dem-runtime`. The package
 MUST NOT own or purge `/var/lib/netdata-dem-runtime`: root admission and

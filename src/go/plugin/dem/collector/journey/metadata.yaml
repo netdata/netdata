@@ -78,7 +78,7 @@ modules:
               and matching archive, then run as the service account:
 
               ```sh
-              dem.plugin runtime install --release /absolute/path/release.json --archive /absolute/path/runtime.tar.gz
+              dem.plugin runtime install --release /absolute/path/release.json --archive /absolute/path/runtime.tar.zst
               dem.plugin runtime status
               ```
 

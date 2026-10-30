@@ -28,9 +28,9 @@ func trustedFixture() runtime.Manifest {
 func signedSetupFixture(t *testing.T) (RuntimeConfig, runtime.Release, []byte) {
 	t.Helper()
 	manifest := trustedFixture()
-	manifest.Archive.URL = "https://example.invalid/runtime.tar.gz"
+	manifest.Archive.URL = "https://example.invalid/runtime.tar.zst"
 	release := runtime.Release{Format: 1, Sequence: 1, Manifest: manifest,
-		Sources: runtime.ReleaseSource{URL: "https://example.invalid/sources.tar.gz", SHA256: strings.Repeat("b", 64), Bytes: 1}}
+		Sources: runtime.ReleaseSource{URL: "https://example.invalid/sources.tar.zst", SHA256: strings.Repeat("b", 64), Bytes: 1}}
 	key := ed25519.NewKeyFromSeed(bytes.Repeat([]byte{19}, ed25519.SeedSize))
 	raw, err := runtime.SignRelease(release, key)
 	require.NoError(t, err)

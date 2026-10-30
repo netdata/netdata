@@ -23,10 +23,10 @@ func adminSigningKey() ed25519.PrivateKey {
 func writeAdminRelease(t *testing.T, path string, manifest runtime.Manifest) {
 	t.Helper()
 	if manifest.Archive.URL == "" {
-		manifest.Archive.URL = "https://example.invalid/runtime.tar.gz"
+		manifest.Archive.URL = "https://example.invalid/runtime.tar.zst"
 	}
 	release := runtime.Release{Format: 1, Sequence: 1, Manifest: manifest,
-		Sources: runtime.ReleaseSource{URL: "https://example.invalid/sources.tar.gz", SHA256: manifest.Archive.SHA256, Bytes: 1}}
+		Sources: runtime.ReleaseSource{URL: "https://example.invalid/sources.tar.zst", SHA256: manifest.Archive.SHA256, Bytes: 1}}
 	data, err := runtime.SignRelease(release, adminSigningKey())
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(path, data, 0600))

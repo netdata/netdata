@@ -5,7 +5,6 @@ package main
 import (
 	"archive/tar"
 	"bytes"
-	"compress/gzip"
 	"crypto/ed25519"
 	"crypto/x509"
 	"encoding/json"
@@ -15,6 +14,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/klauspost/compress/zstd"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -77,7 +77,7 @@ func newFixture(t *testing.T, arch string) fixture {
 		dir:      dir,
 		manifest: m,
 		private:  private,
-		args:     []string{"sign", "--key", filepath.Join(dir, "private.pem"), "--manifest", filepath.Join(dir, "manifest.json"), "--archive", filepath.Join(dir, "archive"), "--sources", filepath.Join(dir, "sources"), "--archive-url", "https://example.invalid/runtime.tar.gz", "--sources-url", "https://example.invalid/sources.tar.gz", "--sequence", "17", "--output", filepath.Join(dir, "release.json")},
+		args:     []string{"sign", "--key", filepath.Join(dir, "private.pem"), "--manifest", filepath.Join(dir, "manifest.json"), "--archive", filepath.Join(dir, "archive"), "--sources", filepath.Join(dir, "sources"), "--archive-url", "https://example.invalid/runtime.tar.zst", "--sources-url", "https://example.invalid/sources.tar.zst", "--sequence", "17", "--output", filepath.Join(dir, "release.json")},
 	}
 }
 
@@ -96,7 +96,7 @@ func TestSignVerifyBothArchitectures(t *testing.T) {
 			release, err := runtime.VerifyRelease(data, []ed25519.PublicKey{f.private.Public().(ed25519.PublicKey)})
 			require.NoError(t, err)
 			expected := f.manifest
-			expected.Archive.URL = "https://example.invalid/runtime.tar.gz"
+			expected.Archive.URL = "https://example.invalid/runtime.tar.zst"
 			assert.Equal(t, expected, release.Manifest)
 			assert.Equal(t, uint64(17), release.Sequence)
 			hash, size, err := hashFile(filepath.Join(f.dir, "sources"))
@@ -224,10 +224,11 @@ func TestStageNativeUsesBuilderManifestWithoutSigningKey(t *testing.T) {
 				expanded += int64(len(entry.data))
 			}
 			require.NoError(t, tw.Close())
-			gz := gzip.NewWriter(&compressed)
-			_, err := gz.Write(tarData.Bytes())
+			encoder, err := zstd.NewWriter(&compressed, zstd.WithEncoderConcurrency(1))
 			require.NoError(t, err)
-			require.NoError(t, gz.Close())
+			_, err = encoder.Write(tarData.Bytes())
+			require.NoError(t, err)
+			require.NoError(t, encoder.Close())
 			archive := filepath.Join(f.dir, "archive")
 			require.NoError(t, os.WriteFile(archive, compressed.Bytes(), 0600))
 			hash, size, err := hashFile(archive)
