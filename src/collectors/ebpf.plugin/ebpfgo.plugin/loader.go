@@ -94,6 +94,9 @@ var kernelReleaseRe = regexp.MustCompile(`^([0-9]+)\.([0-9]+)\.([0-9]+)`)
 var redHatReleaseRe = regexp.MustCompile(`(?i)^\s*(red hat|centos|almalinux|rocky linux|cloudlinux).*?release[[:space:]]+([0-9]+)(\.([0-9]+))?`)
 var redHatKernelReleaseRe = regexp.MustCompile(`\.el([0-9]+)(?:_[0-9]+)?(?:\.|$)`)
 
+// CloudLinux 7 hybrid kernels (4.18-based) use an "el7h" suffix.
+var cloudLinuxKernelReleaseRe = regexp.MustCompile(`\.el([0-9]+)h?(?:_[0-9]+)?(?:\.|$)`)
+
 // Oracle UEK6 (5.4.x on OL8) has dedicated RHF objects and must stay on legacy; other UEK releases do not.
 var oracleUEK6KernelReleaseRe = regexp.MustCompile(`^5\.4\.[0-9]+.*\.el8uek(?:\.|$)`)
 
@@ -687,13 +690,18 @@ func redHatKernelLineageMatches(release string, rhf int, cloudLinux bool) bool {
 	if strings.Contains(release, ".elrepo") {
 		return false
 	}
-	if strings.Contains(release, ".lve") {
-		return cloudLinux && rhf/256 == 8
+	lve := strings.Contains(release, ".lve")
+	if lve && !cloudLinux {
+		return false
 	}
-	if oracleUEK6KernelReleaseRe.MatchString(release) {
+	if !lve && oracleUEK6KernelReleaseRe.MatchString(release) {
 		return rhf/256 == 8
 	}
-	if match := redHatKernelReleaseRe.FindStringSubmatch(release); len(match) == 2 {
+	releaseRe := redHatKernelReleaseRe
+	if lve {
+		releaseRe = cloudLinuxKernelReleaseRe
+	}
+	if match := releaseRe.FindStringSubmatch(release); len(match) == 2 {
 		major, err := strconv.Atoi(match[1])
 		return err == nil && major == rhf/256
 	}

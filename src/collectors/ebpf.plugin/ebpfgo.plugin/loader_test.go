@@ -139,7 +139,11 @@ func TestRedHatReleaseFromFile(t *testing.T) {
 			contents: "Red Hat Enterprise Linux release 9.4 (Plow)",
 			want:     2308,
 		},
-		"cloudlinux": {
+		"cloudlinux 7": {
+			contents: "CloudLinux release 7.9",
+			want:     1801,
+		},
+		"cloudlinux 8": {
 			contents: "CloudLinux release 8.10 (Shared)",
 			want:     2058,
 		},
@@ -170,6 +174,10 @@ func TestRedHatReleaseFromOSRelease(t *testing.T) {
 		"rocky id": {
 			contents: "ID=rocky\nVERSION_ID=9.6\n",
 			want:     2310,
+		},
+		"cloudlinux 7 id": {
+			contents: "ID=cloudlinux\nVERSION_ID=\"7.9\"\n",
+			want:     1801,
 		},
 		"cloudlinux crlf and patch version": {
 			contents: "ID=cloudlinux\r\nVERSION_ID=\"8.10.1\"\r\n",
@@ -424,16 +432,23 @@ func TestRedHatKernelLineageMatches(t *testing.T) {
 		cloudLinux bool
 		want       bool
 	}{
-		"matching el10":         {release: "6.12.0-124.8.1.el10_1.x86_64", rhf: 10 * 256, want: true},
-		"matching el9":          {release: "5.14.0-503.el9.x86_64", rhf: 9 * 256, want: true},
-		"ELRepo RHEL9 rebuild":  {release: "6.12.1-1.el9.elrepo.x86_64", rhf: 9 * 256, want: false},
-		"UEK suffix":            {release: "5.15.0-300.163.18.el8uek.x86_64", rhf: 8 * 256, want: false},
-		"UEK6 on OL8":           {release: "5.4.17-2136.328.3.el8uek.x86_64", rhf: 8 * 256, want: true},
-		"UEK6 on OL7":           {release: "5.4.17-2136.328.3.el7uek.x86_64", rhf: 7 * 256, want: false},
-		"UEK6 with wrong major": {release: "5.4.17-2136.328.3.el8uek.x86_64", rhf: 9 * 256, want: false},
-		"wrong el major":        {release: "5.14.0-503.el8.x86_64", rhf: 9 * 256, want: false},
-		"CloudLinux 8 lve":      {release: "4.18.0-425.lve.el8.x86_64", rhf: 8 * 256, cloudLinux: true, want: true},
-		"lve on another distro": {release: "4.18.0-425.lve.el8.x86_64", rhf: 8 * 256, want: false},
+		"matching el10":             {release: "6.12.0-124.8.1.el10_1.x86_64", rhf: 10 * 256, want: true},
+		"matching el9":              {release: "5.14.0-503.el9.x86_64", rhf: 9 * 256, want: true},
+		"ELRepo RHEL9 rebuild":      {release: "6.12.1-1.el9.elrepo.x86_64", rhf: 9 * 256, want: false},
+		"UEK suffix":                {release: "5.15.0-300.163.18.el8uek.x86_64", rhf: 8 * 256, want: false},
+		"UEK6 on OL8":               {release: "5.4.17-2136.328.3.el8uek.x86_64", rhf: 8 * 256, want: true},
+		"UEK6 on OL7":               {release: "5.4.17-2136.328.3.el7uek.x86_64", rhf: 7 * 256, want: false},
+		"UEK6 with wrong major":     {release: "5.4.17-2136.328.3.el8uek.x86_64", rhf: 9 * 256, want: false},
+		"wrong el major":            {release: "5.14.0-503.el8.x86_64", rhf: 9 * 256, want: false},
+		"CloudLinux 7 lve":          {release: "3.10.0-962.3.2.lve1.5.39.el7.x86_64", rhf: 7*256 + 9, cloudLinux: true, want: true},
+		"CloudLinux 7 hybrid":       {release: "4.18.0-553.177.1.lve.el7h.x86_64", rhf: 7*256 + 9, cloudLinux: true, want: true},
+		"CloudLinux 7 hybrid lve.1": {release: "4.18.0-553.150.1.lve.1.el7h.x86_64", rhf: 7*256 + 9, cloudLinux: true, want: true},
+		"el7h without lve":          {release: "4.18.0-553.177.1.el7h.x86_64", rhf: 7*256 + 9, cloudLinux: true, want: false},
+		"CloudLinux 8 lve":          {release: "4.18.0-425.lve.el8.x86_64", rhf: 8 * 256, cloudLinux: true, want: true},
+		"lve wrong el major":        {release: "3.10.0-962.3.2.lve1.5.39.el7.x86_64", rhf: 8 * 256, cloudLinux: true, want: false},
+		"lve without el major":      {release: "3.10.0-962.3.2.lve1.5.39.x86_64", rhf: 7*256 + 9, cloudLinux: true, want: false},
+		"lve on another distro el7": {release: "3.10.0-962.3.2.lve1.5.39.el7.x86_64", rhf: 7*256 + 9, want: false},
+		"lve on another distro":     {release: "4.18.0-425.lve.el8.x86_64", rhf: 8 * 256, want: false},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {

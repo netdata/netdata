@@ -146,7 +146,14 @@ static int test_red_hat_kernel_lineage(void)
            !ebpf_rhf_kernel_lineage_matches("5.4.17-2136.328.3.el7uek.x86_64", 7 * 256, 0) &&
            !ebpf_rhf_kernel_lineage_matches("5.4.17-2136.328.3.el8uek.x86_64", 9 * 256, 0) &&
            !ebpf_rhf_kernel_lineage_matches("5.14.0-503.el8.x86_64", 9 * 256, 0) &&
+           ebpf_rhf_kernel_lineage_matches("3.10.0-962.3.2.lve1.5.39.el7.x86_64", 7 * 256 + 9, 1) &&
+           ebpf_rhf_kernel_lineage_matches("4.18.0-553.177.1.lve.el7h.x86_64", 7 * 256 + 9, 1) &&
+           ebpf_rhf_kernel_lineage_matches("4.18.0-553.150.1.lve.1.el7h.x86_64", 7 * 256 + 9, 1) &&
+           !ebpf_rhf_kernel_lineage_matches("4.18.0-553.177.1.el7h.x86_64", 7 * 256 + 9, 1) &&
            ebpf_rhf_kernel_lineage_matches("4.18.0-425.lve.el8.x86_64", 8 * 256, 1) &&
+           !ebpf_rhf_kernel_lineage_matches("3.10.0-962.3.2.lve1.5.39.el7.x86_64", 8 * 256, 1) &&
+           !ebpf_rhf_kernel_lineage_matches("3.10.0-962.3.2.lve1.5.39.x86_64", 7 * 256 + 9, 1) &&
+           !ebpf_rhf_kernel_lineage_matches("3.10.0-962.3.2.lve1.5.39.el7.x86_64", 7 * 256 + 9, 0) &&
            !ebpf_rhf_kernel_lineage_matches("4.18.0-425.lve.el8.x86_64", 8 * 256, 0);
 }
 
@@ -201,6 +208,7 @@ static int test_redhat_release_version_parser(void)
            ebpf_parse_redhat_release_version("CentOS Stream release 9") == 2304 &&
            ebpf_parse_redhat_release_version("CentOS Linux release 7.9.2009 (Core)") == 1801 &&
            ebpf_parse_redhat_release_version("AlmaLinux release 9.6 (Sage Margay)") == 2310 &&
+           ebpf_parse_redhat_release_version("CloudLinux release 7.9") == 1801 &&
            ebpf_parse_redhat_release_version("CloudLinux release 8.10 (Shared)") == 2058 &&
            ebpf_parse_redhat_release_version("not a Red Hat release") == -1;
 }
@@ -208,6 +216,7 @@ static int test_redhat_release_version_parser(void)
 static int test_redhat_os_release_parser(void)
 {
     return ebpf_parse_redhat_release_from_os_release("ID=almalinux\nVERSION_ID=10.1\n") == 2561 &&
+           ebpf_parse_redhat_release_from_os_release("ID=cloudlinux\nVERSION_ID=\"7.9\"\n") == 1801 &&
            ebpf_parse_redhat_release_from_os_release("ID=cloudlinux\r\nVERSION_ID=\"8.10\"\r\n") == 2058 &&
            ebpf_parse_redhat_release_from_os_release("ID=rocky\nVERSION_ID=9.6.1\n") == 2310 &&
            ebpf_parse_redhat_release_from_os_release("ID=rocky\nVERSION_ID=9.6.bad\n") == -1 &&

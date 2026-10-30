@@ -341,9 +341,6 @@ int ebpf_rhf_kernel_lineage_matches(const char *kernel_release, int rhf, int clo
     if (strstr(kernel_release, ".elrepo"))
         return 0;
 
-    if (strstr(kernel_release, ".lve"))
-        return rhf / 256 == 8 && cloudlinux;
-
     const char *el = strstr(kernel_release, ".el");
     if (!el || !isdigit((unsigned char)el[3]))
         return 0;
@@ -353,6 +350,12 @@ int ebpf_rhf_kernel_lineage_matches(const char *kernel_release, int rhf, int clo
     long major = strtol(el + 3, &end, 10);
     if (errno || end == el + 3)
         return 0;
+
+    if (strstr(kernel_release, ".lve")) {
+        // CloudLinux 7 hybrid kernels (4.18-based) use an "el7h" suffix.
+        const char *tail = (*end == 'h') ? end + 1 : end;
+        return cloudlinux && (*tail == '.' || *tail == '_' || *tail == '\0') && major == rhf / 256;
+    }
 
     // Oracle UEK6 (5.4.x on OL8) has dedicated RHF objects and must stay on legacy; other UEK releases do not.
     if (!strncmp(end, "uek", 3) && (end[3] == '.' || end[3] == '\0'))
