@@ -363,6 +363,59 @@ func TestIfaceCache(t *testing.T) {
 				assert.False(t, entry.updated)
 			},
 		},
+		"alias from any metric of the interface": {
+			setup: func(c *Collector) {
+				c.resetIfaceCache()
+				c.updateIfaceCacheEntry(ddsnmp.Metric{Name: "ifTraffic", IsTable: true, Tags: map[string]string{tagInterface: "eth0"}})
+				c.updateIfaceCacheEntry(ddsnmp.Metric{Name: "ifOperStatus", IsTable: true, Tags: map[string]string{tagInterface: "eth0", tagIfAlias: "uplink-core"}})
+				c.updateIfaceCacheEntry(ddsnmp.Metric{Name: "ifTraffic", IsTable: true, Tags: map[string]string{tagInterface: "eth1"}})
+				c.finalizeIfaceCache()
+			},
+			validate: func(t *testing.T, c *Collector) {
+				c.ifaceCache.mu.RLock()
+				defer c.ifaceCache.mu.RUnlock()
+
+				aliases := make(map[string]string)
+				for name, entry := range c.ifaceCache.interfaces {
+					aliases[name] = entry.ifAlias
+				}
+				assert.Equal(t, map[string]string{"eth0": "uplink-core", "eth1": ""}, aliases)
+			},
+		},
+		"alias kept during cycle and replaced at finalize": {
+			setup: func(c *Collector) {
+				c.resetIfaceCache()
+				c.updateIfaceCacheEntry(ddsnmp.Metric{Name: "ifTraffic", IsTable: true, Tags: map[string]string{tagInterface: "eth0", tagIfAlias: "old"}})
+				c.finalizeIfaceCache()
+
+				c.resetIfaceCache()
+				c.updateIfaceCacheEntry(ddsnmp.Metric{Name: "ifTraffic", IsTable: true, Tags: map[string]string{tagInterface: "eth0", tagIfAlias: "new"}})
+			},
+			validate: func(t *testing.T, c *Collector) {
+				entry := c.ifaceCache.interfaces["eth0"]
+				require.NotNil(t, entry)
+				assert.Equal(t, "old", entry.ifAlias, "mid-cycle readers keep the committed alias")
+
+				c.finalizeIfaceCache()
+				assert.Equal(t, "new", entry.ifAlias)
+			},
+		},
+		"alias cleared on device": {
+			setup: func(c *Collector) {
+				c.resetIfaceCache()
+				c.updateIfaceCacheEntry(ddsnmp.Metric{Name: "ifTraffic", IsTable: true, Tags: map[string]string{tagInterface: "eth0", tagIfAlias: "old"}})
+				c.finalizeIfaceCache()
+
+				c.resetIfaceCache()
+				c.updateIfaceCacheEntry(ddsnmp.Metric{Name: "ifTraffic", IsTable: true, Tags: map[string]string{tagInterface: "eth0"}})
+				c.finalizeIfaceCache()
+			},
+			validate: func(t *testing.T, c *Collector) {
+				entry := c.ifaceCache.interfaces["eth0"]
+				require.NotNil(t, entry)
+				assert.Empty(t, entry.ifAlias)
+			},
+		},
 	}
 
 	for name, tc := range tests {

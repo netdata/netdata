@@ -27,6 +27,7 @@ const (
 	tagInterface = "interface"
 	tagIfType    = "_if_type"
 	tagIfTypeGrp = "_if_type_group"
+	tagIfAlias   = "_if_alias"
 )
 
 // ifaceCache holds interface metrics between collections for function queries.
@@ -41,6 +42,7 @@ type ifaceCache struct {
 type ifaceEntry struct {
 	// Identity
 	name        string // interface name (from Tags["interface"])
+	ifAlias     string // operator-assigned alias (from Tags["_if_alias"]), may be empty
 	ifType      string // interface type (from Tags["_if_type"])
 	ifTypeGroup string // interface type group (from Tags["_if_type_group"])
 
@@ -58,6 +60,10 @@ type ifaceEntry struct {
 
 	// Computed rates (per-second, nil if not yet calculable)
 	rates ifaceRates
+
+	// Alias seen in the current cycle; committed in finalize so readers between
+	// reset and finalize keep the previous alias and a cleared alias is applied.
+	pendingAlias string
 
 	// Tracking
 	updated bool // true if seen in current collection cycle
@@ -121,6 +127,7 @@ func (c *Collector) resetIfaceCache() {
 
 	for _, entry := range c.ifaceCache.interfaces {
 		entry.updated = false
+		entry.pendingAlias = ""
 	}
 }
 
@@ -153,6 +160,9 @@ func (c *Collector) updateIfaceCacheEntry(m ddsnmp.Metric) {
 	}
 	if ifTypeGroup := m.Tags[tagIfTypeGrp]; ifTypeGroup != "" {
 		entry.ifTypeGroup = ifTypeGroup
+	}
+	if ifAlias := m.Tags[tagIfAlias]; ifAlias != "" {
+		entry.pendingAlias = ifAlias
 	}
 
 	switch m.Name {
@@ -224,6 +234,8 @@ func (c *Collector) finalizeIfaceCache() {
 			delete(c.ifaceCache.interfaces, name)
 			continue
 		}
+
+		entry.ifAlias = entry.pendingAlias
 
 		if entry.hasPrev {
 			elapsed := now.Sub(entry.prevTime)
