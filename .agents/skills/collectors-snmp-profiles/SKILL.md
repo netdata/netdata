@@ -115,6 +115,18 @@ The retired `constant_value_one` key is ignored. Ordinary metric symbols still r
 
 ## Common Patterns
 
+Interface alias label: every `interface`/`_interface` tag read from `ifName` MUST be followed by an `_if_alias` tag
+with the same `table`, `MIB` and `index_transform`, reading `ifAlias` (`1.3.6.1.2.1.31.1.1.1.18`). The underscore keeps
+chart IDs unchanged; the UI uses the `if_alias` label. `TestStockProfiles_IfNameInterfaceTagsCarryIfAlias` enforces it.
+
+```yaml
+- tag: _if_alias
+  table: ifXTable
+  symbol:
+    OID: 1.3.6.1.2.1.31.1.1.1.18
+    name: ifAlias
+```
+
 Q-BRIDGE learned FDB MAC:
 
 ```yaml
