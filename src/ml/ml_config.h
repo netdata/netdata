@@ -56,6 +56,8 @@ typedef struct {
 
 void ml_config_load(ml_config_t *cfg);
 
+double ml_config_dimension_anomaly_score_threshold(double configured);
+
 extern ml_config_t Cfg;
 
 #endif /* ML_CONFIG_H */

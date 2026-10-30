@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <limits>
 #include <utility>
 #include <vector>
 
@@ -1158,6 +1159,111 @@ static void test_dimension_lookup_info_short_machine_guid()
     }
 }
 
+// Test: the configured dimension anomaly score threshold is kept within the
+// range prediction can reach. A model's score is capped at 100 and a dimension
+// is anomalous only when every model scores at least 100 * threshold, so a
+// threshold above 1.0 used to disable anomaly detection without a word.
+static void test_dimension_anomaly_score_threshold_range()
+{
+    fprintf(stderr, "  test_dimension_anomaly_score_threshold_range...\n");
+
+    const double inf = std::numeric_limits<double>::infinity();
+    struct {
+        double configured;
+        double effective;
+    } cases[] = {
+        { 0.99, 0.99 },
+        { 0.01, 0.01 },
+        { 1.00, 1.00 },
+        { 1.01, 1.00 },
+        { 5.00, 1.00 },
+        { 0.005, 0.01 },
+        { -1.0, 0.01 },
+        { inf, 1.00 },
+        { -inf, 0.01 },
+        { std::numeric_limits<double>::quiet_NaN(), 0.99 },
+    };
+
+    for (auto &c : cases) {
+        double effective = ml_config_dimension_anomaly_score_threshold(c.configured);
+        ML_TEST_ASSERT(effective == c.effective, "unexpected effective dimension anomaly score threshold");
+        if (effective != c.effective)
+            fprintf(stderr, "    configured %f: expected %f, got %f\n", c.configured, c.effective, effective);
+    }
+}
+
+// Test: every accepted dimension anomaly score threshold can flag an anomaly.
+// The fixture is test_predict_flat_model_abstains()'s real model: it scores 0
+// for a steady series and is capped at 100 for a jump.
+static void test_predict_max_threshold_flags_anomaly()
+{
+    fprintf(stderr, "  test_predict_max_threshold_flags_anomaly...\n");
+
+    unsigned saved_diff_n = Cfg.diff_n;
+    unsigned saved_lag_n = Cfg.lag_n;
+    size_t saved_smooth = Cfg.max_samples_to_smooth;
+    size_t saved_suppression_window = Cfg.suppression_window;
+    size_t saved_suppression_threshold = Cfg.suppression_threshold;
+    double saved_threshold = Cfg.dimension_anomaly_score_threshold;
+    time_t saved_profile_update_every = nd_profile.update_every;
+
+    Cfg.diff_n = 1;
+    Cfg.lag_n = 5;
+    Cfg.max_samples_to_smooth = 3;
+    Cfg.suppression_window = 1000000;
+    Cfg.suppression_threshold = 1000000;
+    nd_profile.update_every = 1;
+
+    RRDSET st = {};
+    st.update_every = 1;
+
+    RRDDIM rd = {};
+    rd.rrdset = &st;
+
+    ml_kmeans_inlined_t real;
+    for (auto &cc : real.cluster_centers) {
+        cc.set_size(6);
+        for (int i = 0; i < 6; i++)
+            cc(i) = 0.0;
+    }
+    real.min_dist = 0.0;
+    real.max_dist = 1.0;
+
+    const unsigned n = Cfg.diff_n + 3 + Cfg.lag_n;
+    const double configured[] = { 0.99, 1.00, 5.00 };
+
+    for (double c : configured) {
+        Cfg.dimension_anomaly_score_threshold = ml_config_dimension_anomaly_score_threshold(c);
+
+        ml_dimension_t dim = {};
+        spinlock_init(&dim.slock);
+        dim.rd = &rd;
+        dim.mls = MACHINE_LEARNING_STATUS_ENABLED;
+        dim.mt = METRIC_TYPE_CONSTANT;
+        dim.ts = TRAINING_STATUS_TRAINED;
+        dim.km_contexts = { real };
+
+        bool anomalous = false;
+        for (unsigned i = 0; i <= n; i++)
+            anomalous = ml_dimension_predict(&dim, 100.0, true);
+        ML_TEST_ASSERT(dim.suppression_window_counter == 1, "the sample after warmup must be scored");
+        ML_TEST_ASSERT(!anomalous, "a steady sample must not be anomalous");
+
+        anomalous = ml_dimension_predict(&dim, 1000.0, true);
+        ML_TEST_ASSERT(anomalous, "a jump scoring 100 must be anomalous at every accepted threshold");
+        if (!anomalous)
+            fprintf(stderr, "    configured threshold: %f\n", c);
+    }
+
+    Cfg.diff_n = saved_diff_n;
+    Cfg.lag_n = saved_lag_n;
+    Cfg.max_samples_to_smooth = saved_smooth;
+    Cfg.suppression_window = saved_suppression_window;
+    Cfg.suppression_threshold = saved_suppression_threshold;
+    Cfg.dimension_anomaly_score_threshold = saved_threshold;
+    nd_profile.update_every = saved_profile_update_every;
+}
+
 extern "C" int ml_unittest()
 {
     fprintf(stderr, "\nML unit tests:\n");
@@ -1182,6 +1288,8 @@ extern "C" int ml_unittest()
     test_dimension_finalize_constant_state();
     test_chart_update_dimension_counts();
     test_circular_buffer_equivalence();
+    test_dimension_anomaly_score_threshold_range();
+    test_predict_max_threshold_flags_anomaly();
     test_same_value_uses_newest_sample();
     test_preprocess_predict_equivalence();
     test_constant_input();
