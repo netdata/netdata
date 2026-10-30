@@ -15,16 +15,18 @@ func newMetrics() *metrics {
 	mx.Kubelet.Docker.Operations = make(map[string]mtx.Gauge)
 	mx.Kubelet.Docker.OperationsErrors = make(map[string]mtx.Gauge)
 	mx.Kubelet.PodLogFileSystemUsage = make(map[string]mtx.Gauge)
+	mx.PVC = make(map[string]*pvcMetrics)
 
 	return &mx
 }
 
 type metrics struct {
-	Token         tokenMetrics         `stm:"token"`
-	RESTClient    restClientMetrics    `stm:"rest_client"`
-	APIServer     apiServerMetrics     `stm:"apiserver"`
-	Kubelet       kubeletMetrics       `stm:"kubelet"`
-	VolumeManager volumeManagerMetrics `stm:"volume_manager"`
+	Token         tokenMetrics           `stm:"token"`
+	RESTClient    restClientMetrics      `stm:"rest_client"`
+	APIServer     apiServerMetrics       `stm:"apiserver"`
+	Kubelet       kubeletMetrics         `stm:"kubelet"`
+	VolumeManager volumeManagerMetrics   `stm:"volume_manager"`
+	PVC           map[string]*pvcMetrics `stm:"pvc"`
 }
 
 type tokenMetrics struct {
@@ -110,4 +112,27 @@ type volumeManagerPlugin struct {
 		Actual  mtx.Gauge `stm:"actual"`
 		Desired mtx.Gauge `stm:"desired"`
 	} `stm:"state"`
+}
+
+// pvcUtilizationPrecision keeps two decimal places of the utilization percentage.
+// It must equal the multiplier in pvcSpaceMetrics.Utilization's stm tag.
+const pvcUtilizationPrecision = 100
+
+// pvcMetrics holds the values of a PVC; a nil group means the kubelet has no data for it.
+type pvcMetrics struct {
+	Space  *pvcSpaceMetrics  `stm:"space"`
+	Inodes *pvcInodesMetrics `stm:"inodes"`
+}
+
+type pvcSpaceMetrics struct {
+	Available   mtx.Gauge `stm:"available"`
+	Used        mtx.Gauge `stm:"used"`
+	Reserved    mtx.Gauge `stm:"reserved"`
+	Utilization mtx.Gauge `stm:"utilization,100"`
+}
+
+type pvcInodesMetrics struct {
+	Available mtx.Gauge `stm:"available"`
+	Used      mtx.Gauge `stm:"used"`
+	Reserved  mtx.Gauge `stm:"reserved"`
 }
