@@ -10,7 +10,36 @@ Release inputs and adapters live in `src/dem-runtime` and `packaging/dem-runtime
 An administrator-trusted format-1 descriptor identifies execution contract 1,
 release version, platform, archive SHA256/size, tar/expanded bounds, entry count,
 layout and authenticated interpreter slots. The archive is not its own trust anchor.
-Production authentication and release discovery are separate delivery work.
+Production release discovery and CLI delivery integration are separate from these
+local installation primitives.
+
+### Signed release descriptors
+
+`SignRelease` and `VerifyRelease` define version 1 of the release envelope. It
+contains a key ID, the complete base64-encoded release JSON and an Ed25519 signature
+over the domain `netdata-dem-runtime-release-v1` followed by a NUL and the exact
+JSON bytes. Verification keys come from local administrator trust, never the
+downloaded envelope. The key ID is the SHA256 of the raw Ed25519 public key.
+
+The signed release includes the entire `Manifest`, including layout, extraction
+bounds and interpreter-binding instructions, and the source archive's HTTPS URL,
+digest and size. Signing only the executable archive digest would not authenticate
+the instructions used to prepare it. Publisher and verifier enforce a 1 MiB
+envelope limit; descriptors carry metadata and binding slots, not source bodies
+or complete file inventories. Unknown fields and trailing JSON are rejected.
+
+Publication sequence is monotonically increasing across architectures and execution
+contract changes in the release channel. `ReleaseUpdate` rejects regression below
+the current selected sequence and reuse of that sequence for different release
+content. Equal content is a no-op. This rule applies to ordinary latest checks,
+including an explicitly requested check; choosing an older authenticated offline
+release is a deliberate administrator recovery operation instead.
+
+Sequence describes publisher order, not component security. These primitives do
+not detect withheld updates, guarantee freshness for a fresh installation, retain
+a historical high-water mark after explicit recovery, or rotate verification keys.
+Those keys require an Agent or administrator trust update. Signature validity also
+does not establish platform qualification or actual source availability.
 
 Extraction rejects escaping paths, duplicate entries, privileged modes, devices,
 hard links and symlink parents. Preparation validates plain executables and the
@@ -65,6 +94,21 @@ provenance. Container replacements and bind mounts of the per-read `uuid` source
 are rejected. Missing provenance disables reboot recovery, not ordinary receipts.
 
 ## Retirement and status
+
+`BeginPublishedInstall` serializes release discovery, candidate qualification and
+selection with explicit installation and uninstall. It takes installer exclusion
+before reading consent or fetching metadata, but never holds inventory exclusion
+across the network. Automatic checks do nothing when no authenticated installation
+has opted in. Cancellation releases installer exclusion; a progressing download
+has no total duration limit, so another installer or uninstall may wait.
+
+The selected descriptor, publication sequence and automatic-update policy share one
+atomic selection record. Failed candidates preserve them. The same publication
+sequence is a no-op only for identical complete release metadata; explicit
+reinstallation can change its update policy without downloading unchanged bytes.
+Normal checks reject regressions. Explicit repair can select an older authenticated
+release after all consumers/executions drain, with a newly specified update policy.
+Trusted-local imports remain manual and do not silently acquire download consent.
 
 The default allowance is 4 GiB of logical regular-file bytes, including archives,
 workspace, lifecycle records and trash. Active preparation reserves its unwritten
