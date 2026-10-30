@@ -280,6 +280,7 @@ class ReleaseToolSourcesTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
             package = self.fixture(root)
+
             def listing(command, **kwargs):
                 self.assertEqual(command, ['go', 'list', '-mod=readonly', '-deps', '-json',
                                            './tools/dem-runtime-release'])

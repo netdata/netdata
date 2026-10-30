@@ -47,7 +47,8 @@ def archive_sources(source, output, runtime_digest, epoch):
         if relative.is_absolute() or '..' in relative.parts or str(relative) != name:
             raise ValueError('invalid source inventory path')
         path = source / name
-        if not path.is_file() or path.is_symlink() or path.stat().st_size != item['bytes'] or sha256(path) != item['sha256']:
+        if not path.is_file() or path.is_symlink() or path.stat(
+        ).st_size != item['bytes'] or sha256(path) != item['sha256']:
             raise ValueError('source assembly content differs from inventory: ' + name)
     actual = set()
     for path in source.rglob('*'):
@@ -64,8 +65,8 @@ def archive_sources(source, output, runtime_digest, epoch):
     final = output / (bounds['sha256'] + '.sources.tar.zst')
     archive.rename(final)
     write_json(output / 'source-archive.json', {'format': 1, 'runtime_archive': runtime_digest,
-                                              'file': final.name, 'sha256': bounds['sha256'],
-                                              'bytes': bounds['bytes']})
+                                                'file': final.name, 'sha256': bounds['sha256'],
+                                                'bytes': bounds['bytes']})
     return final
 
 

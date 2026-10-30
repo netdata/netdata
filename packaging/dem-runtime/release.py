@@ -214,7 +214,7 @@ def stage(args):
     if len(versions) != 1:
         raise ValueError('both platforms must belong to one independent release')
     write_json(output / 'publication.json', {'format': 1, 'version': versions.pop(),
-                                            'sequence': args.sequence, 'public_base': args.public_base})
+                                             'sequence': args.sequence, 'public_base': args.public_base})
 
 
 def publication(args):
@@ -227,7 +227,8 @@ def publication(args):
         directory = args.publication / 'dem-runtime' / version / arch
         release = verified_release(args.release_tool, args.public_key, directory / 'release.json')
         manifest = release['manifest']
-        if manifest['platform'] != 'linux/' + arch or manifest['version'] != version or release['sequence'] != record['sequence']:
+        if (manifest['platform'] != 'linux/' + arch or manifest['version'] != version
+                or release['sequence'] != record['sequence']):
             raise ValueError('publication identity differs between platforms')
         prefix = args.public_base + '/dem-runtime/' + version + '/' + arch + '/'
         for item, suffix in ((manifest['archive'], '.tar.zst'), (release['sources'], '.sources.tar.zst')):
@@ -286,7 +287,8 @@ def main():
     for name in ('publish', 'promote'):
         p = commands.add_parser(name)
         p.add_argument('--publication', type=Path, required=True)
-        p.add_argument('--remote', required=True, help='confirmed rclone bucket destination, without dem-runtime suffix')
+        p.add_argument('--remote', required=True,
+                       help='confirmed rclone bucket destination, without dem-runtime suffix')
     for name, p in commands.choices.items():
         p.add_argument('--release-tool', type=Path, required=True)
         if name != 'assemble':

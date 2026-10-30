@@ -45,7 +45,8 @@ class PublicationTests(unittest.TestCase):
             self.assertEqual(run.call_args_list[0].args[0], ['rclone', 'lsjson', '--stat', remote])
             self.assertIn('--count', run.call_args_list[1].args[0])
         for status in (3, 4, 1, 5, 7):
-            with self.subTest(status=status), patch.object(release, 'run', side_effect=subprocess.CalledProcessError(status, ['rclone'])):
+            with self.subTest(status=status), \
+                    patch.object(release, 'run', side_effect=subprocess.CalledProcessError(status, ['rclone'])):
                 if status in (3, 4):
                     self.assertIsNone(release.read_latest(remote))
                 else:
@@ -60,7 +61,8 @@ class PublicationTests(unittest.TestCase):
     def test_public_object_exact_size_digest_and_streaming_bound(self):
         original = b'archive fixture'
         digest = hashlib.sha256(original).hexdigest()
-        for data, ok in ((original, True), (original[:-1], False), (original + b'x', False), (b'x' * len(original), False)):
+        for data, ok in ((original, True), (original[:-1], False),
+                         (original + b'x', False), (b'x' * len(original), False)):
             with self.subTest(data=data), patch.object(release.HTTPS_OPENER, 'open', return_value=io.BytesIO(data)):
                 if ok:
                     release.public_identity('https://example.invalid/runtime', digest, len(original))
@@ -128,9 +130,9 @@ class PublicationTests(unittest.TestCase):
             proposed, directories = self.publication_fixture(args.publication)
             events = []
             with patch.object(release, 'publication', return_value=(proposed, directories)), \
-                 patch.object(release, 'current_releases', return_value={}), \
-                 patch.object(release, 'public_identity', side_effect=lambda *a: events.append(('verify', a[0]))), \
-                 patch.object(release, 'upload', side_effect=lambda *a, **k: events.append(('upload', a[2]))):
+                    patch.object(release, 'current_releases', return_value={}), \
+                    patch.object(release, 'public_identity', side_effect=lambda *a: events.append(('verify', a[0]))), \
+                    patch.object(release, 'upload', side_effect=lambda *a, **k: events.append(('upload', a[2]))):
                 release.promote(args)
             self.assertEqual([e[0] for e in events], ['verify'] * 6 + ['upload', 'verify', 'upload', 'verify'])
             self.assertEqual(events[6][1], 'dem-runtime/latest/amd64.json')
@@ -142,11 +144,12 @@ class PublicationTests(unittest.TestCase):
             proposed, directories = self.publication_fixture(args.publication)
             for source_failure in (True, False):
                 with self.subTest(source_failure=source_failure), \
-                     patch.object(release, 'publication', return_value=(proposed, directories)), \
-                     patch.object(release, 'current_releases', **({'return_value': {}} if source_failure else
-                                      {'side_effect': ValueError('invalid signature')})), \
-                     patch.object(release, 'public_identity', side_effect=[None, ValueError('missing sources')]), \
-                     patch.object(release, 'upload') as upload:
+                        patch.object(release, 'publication', return_value=(proposed, directories)), \
+                        patch.object(release, 'current_releases',
+                                     **({'return_value': {}} if source_failure else
+                                        {'side_effect': ValueError('invalid signature')})), \
+                        patch.object(release, 'public_identity', side_effect=[None, ValueError('missing sources')]), \
+                        patch.object(release, 'upload') as upload:
                     with self.assertRaises(ValueError):
                         release.promote(args)
                     upload.assert_not_called()
@@ -187,7 +190,8 @@ class SignedPublicationTests(unittest.TestCase):
                             'archive': {'sha256': digest, 'bytes': len(data), 'tar_bytes': len(raw.getvalue()),
                                         'expanded_bytes': sum(map(len, entries.values())), 'entries': len(entries)},
                             'layout': {'node': 'node', 'browser': 'browser', 'loader': 'lib/loader',
-                                       'entrypoint': 'runner/run.mjs', 'dependencies': 'dependencies', 'fonts': 'fonts'},
+                                       'entrypoint': 'runner/run.mjs', 'dependencies': 'dependencies',
+                                       'fonts': 'fonts'},
                             'bindings': [{'path': p, 'offset': 0, 'expected': base64.b64encode(slot).decode()}
                                          for p in ('node', 'browser')]}
                 (directory / (digest + '.tar.zst')).write_bytes(data)
