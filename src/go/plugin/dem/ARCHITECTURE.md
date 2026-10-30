@@ -1003,8 +1003,9 @@ Protected preloads and shutdown:
   Readers use the sealed metadata without a separate installed manifest.
 - Preloads remain private, service-account-owned and outside managed retirement. They can be mounted read-only;
   managed operations refuse their roots. Stop every consumer before replacement/removal and restart DEM to switch.
-- This immutable-preload contract does not implement native package transaction coordination; production delivery
-  remains a separate stage.
+- Native package payloads have a separate root-owned admission gate and service-owned process/execution proof.
+  Package hooks close admission and require drainage before replacing files, then qualify both browser workloads
+  before reopening it. The package manager owns those payloads; DEM does not retire or replace them.
 - Independent component paths are unsupported.
 - Command shutdown closes the host and store only after jobs and contained configuration work have joined. Fail-stop
   paths retain the existing execution evidence.

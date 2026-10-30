@@ -292,6 +292,10 @@ EXTRACT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/netdata-extract.XXXXXX")" || exit $?
 sudo sh artifacts/netdata-x86_64-latest.gz.run --target "$EXTRACT_DIR" --noexec --keep
 ```
 
+For authorized unattended extraction, add `--accept` to accept the embedded license. `--noexec` alone does not
+suppress the license prompt: `packaging/makeself/makeself-header.sh::MS_PrintLicense` handles it independently.
+Without an answer, an invocation with closed stdin can repeatedly prompt instead of extracting.
+
 Keep the extracted files for inspection; do not reuse an existing destination or remove unrelated files.
 
 ## How to extend this skill
