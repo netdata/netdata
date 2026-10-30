@@ -95,9 +95,10 @@ Use the DEM CLI's explicit runtime install/update commands with a signed release
 descriptor and its exact archive. The outer builder `manifest.json` and the
 source-level component manifest inside the runtime are different documents.
 `src/go/tools/dem-runtime-release` signs the complete descriptor, including the
-publication sequence, archive identity/bounds and source identity. Configure trusted
-public keys locally; never derive trust from a key fetched beside an archive.
-Offline imports still verify a signature and do not fetch the signed HTTPS URLs.
+publication sequence, archive identity/bounds and source identity. Online preparation
+fetches the canonical package OpenPGP keyring over HTTPS. Offline imports require an
+explicit administrator-provisioned local keyring and do not fetch keys or the signed
+HTTPS URLs. The descriptor cannot choose its own key source.
 See `src/go/plugin/dem/README.md` for CLI options, automatic/manual update consent
 and restart activation. Enabling a monitor does not acquire runtime components.
 
