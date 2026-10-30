@@ -1,0 +1,6 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+NATIVE_FAMILY=@NATIVE_FAMILY@
+@NATIVE_LIFECYCLE@
+native_hook '@NATIVE_HOOK@' "$@"
+exit $?
