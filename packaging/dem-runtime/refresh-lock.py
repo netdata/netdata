@@ -11,6 +11,7 @@ import sys
 
 from bundle import run, sha256, write_json
 from locked import checksums, inventory, paragraphs, repository_url, source_key
+from snapshot import resolve_locks
 
 
 PACKAGES = ['python3', 'curl', 'ca-certificates', 'xz-utils', 'fontconfig',
@@ -54,6 +55,7 @@ def capture(args):
             'requested_packages': PACKAGES, 'base': base, 'installed': installed,
             'binary_packages': binaries, 'sources': sources,
             'index_sha256': {p.name: sha256(p) for p in sorted(Path('/var/lib/apt/lists').glob('*InRelease'))}}
+    lock = resolve_locks([lock])[0]
     write_json(Path('/out') / (args.arch + '.json'), lock)
     for path in Path('/out').iterdir():
         os.chown(path, int(os.environ['OUTPUT_UID']), int(os.environ['OUTPUT_GID']))
@@ -61,11 +63,30 @@ def capture(args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--arch', required=True, choices=('arm64', 'amd64'))
+    parser.add_argument('--arch', choices=('arm64', 'amd64'))
     parser.add_argument('--output', type=Path)
+    parser.add_argument('--snapshot-lock', nargs='+', type=Path,
+                        help='convert existing locks to verified Snapshot URLs without resolving packages')
     parser.add_argument('--capture', action='store_true', help=argparse.SUPPRESS)
     parser.add_argument('--base-image', help=argparse.SUPPRESS)
     args = parser.parse_args()
+    if args.snapshot_lock:
+        if args.arch or args.capture or args.base_image or args.output is None:
+            parser.error('--snapshot-lock requires --output and cannot be combined with refresh options')
+        locks = [json.loads(path.read_text()) for path in args.snapshot_lock]
+        names = [lock['architecture'] + '.json' for lock in locks]
+        if len(set(names)) != len(names):
+            parser.error('supply at most one lock for each architecture')
+        output = args.output.resolve()
+        output.mkdir(parents=True, exist_ok=True)
+        if any(output.iterdir()):
+            parser.error('--output must be empty; existing locks are never overwritten')
+        resolved = resolve_locks(locks)
+        for name, lock in zip(names, resolved):
+            write_json(output / name, lock)
+        return
+    if args.arch is None:
+        parser.error('--arch is required for package refresh')
     if args.capture:
         capture(args)
         return

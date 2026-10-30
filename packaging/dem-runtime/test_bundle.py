@@ -93,7 +93,7 @@ class BuilderTests(unittest.TestCase):
                 self.assertTrue(all(m.uid == m.gid == 0 and m.mtime == 12345 for m in members))
 
     def test_archive_refuses_reserved_names_and_escape(self):
-        cases = {'chrome': None, 'fonts.conf': None, 'prepared.json': None,
+        cases = {'chrome': None, 'fonts.conf': None, 'prepared.json': None, 'native.json': None,
                  'escape': '/etc/passwd', 'relative_escape': '../outside', 'dangling': 'missing'}
         for name, target in cases.items():
             with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
