@@ -23,7 +23,10 @@ python3 -m unittest discover -s packaging/dem-runtime -v
 
 The output directory MUST be empty. No packages are installed on the host. An
 architecture-compatible Docker worker or emulation is required; an emulated
-build does not establish native execution acceptance.
+build does not establish native execution acceptance. The container uses the locked
+zstd build tool. Source-archive assembly and local Python tests additionally require
+`zstd` on their worker; the installed plugin uses its existing Go decoder and needs
+no host compression executable.
 
 `inputs.json` pins the independent runtime version, deterministic timestamp,
 Debian base image and architecture manifests, Node and patchelf binary hashes,
@@ -57,8 +60,8 @@ perform no apt, npm, or browser downloads when the Agent prepares a runtime.
 
 The output contains:
 
-- `<sha256>.tar.gz`: sorted entries with normalized ownership/mode/time and fixed
-  gzip timestamp, excluding source trees;
+- `<sha256>.tar.zst`: sorted entries with normalized ownership/mode/time, excluding
+  source trees, compressed with zstd level 19, one thread, a checksum and an 8 MiB window;
 - `manifest.json`: format 1 identity, execution contract 1, exact compressed/tar/regular-file byte bounds,
   entry count, layout including `entrypoint: runner/run.mjs`, and authenticated ELF bindings;
 - `provenance.json`: complete runtime source/test and recipe hashes, exact input locks, original copied
@@ -82,7 +85,7 @@ sandbox qualification. Runtime launchers never disable the browser sandbox.
 
 Without `--url-prefix`, `archive.url` remains empty in the builder descriptor. An explicit
 approved HTTPS base constructs
-`<prefix>/dem-runtime/<version>/<architecture>/<digest>.tar.gz`. The builder does
+`<prefix>/dem-runtime/<version>/<architecture>/<digest>.tar.zst`. The builder does
 not publish anything. The release signing step binds the reviewed manifest to its
 archive and source URLs; an unsigned manifest is not an administrator CLI input.
 
@@ -186,7 +189,8 @@ the verified inventory.
 The optional archive output must be a separate, new or empty directory. Before
 archiving, the command verifies every declared file's digest/size, the complete
 file set and the runtime identity again. It emits a deterministic
-`<sha256>.sources.tar.gz` and `source-archive.json` with its digest and byte count.
+`<sha256>.sources.tar.zst` with the same zstd settings and `source-archive.json`
+with its digest and byte count.
 Supply this archive to the release signer; a source URL alone is not source
 delivery. Keep the assembly unchanged throughout archiving and signing.
 Debian source sets can be unpacked with `dpkg-source -x <descriptor>` using their

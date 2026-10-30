@@ -15,7 +15,9 @@ environment, target qualification and publication infrastructure below are confi
    archive, verified source archive and DEB/RPM payloads. The source assembly runs
    from the same checkout used to compile the staging tool and records its local
    Go dependency closure plus module pins. No browser installation occurs on the
-   runner host; packaging tools are installed on the disposable worker.
+   runner host; packaging tools are installed on the disposable worker. Architecture
+   runners follow `.github/data/distros.yml`; the catalog and publication jobs use
+   `ubuntu-latest`. Runtime and source archives use zstd level 19 with an 8 MiB window.
 3. Qualify the exact runtime artifacts on supported targets with real sandboxed
    journeys and Lighthouse, including service/package upgrade and removal.
    Successful archive/package assembly is not execution or confinement evidence.
@@ -33,7 +35,8 @@ environment, target qualification and publication infrastructure below are confi
    corresponding sources, descriptors and inventories to R2. Read each through
    the public HTTPS route and check its full SHA256/size before promotion.
 6. Sign the native packages and submit them through the existing package upload
-   pipeline. Finally promote the signed `latest` descriptor for each architecture.
+   pipeline to both package hosts and all three release-channel repositories described
+   below. Finally promote the signed `latest` descriptor for each architecture.
 
 The workflow runs one publisher at a time and does not cancel an in-flight release.
 The publisher reads current signed pointers from the storage API, avoiding a stale
@@ -66,14 +69,18 @@ Configure these in the protected `dem-runtime-release` environment after review:
 | `DEM_RUNTIME_R2_REMOTE` variable | Named rclone bucket path; proposed `s3:netdata-agent-artifacts` |
 | `DEM_RUNTIME_RELEASE_PUBLIC_KEY` variable | Dedicated Ed25519 PKIX public PEM; also provision this trust through Agent/admin configuration |
 | `DEM_RUNTIME_RELEASE_PRIVATE_KEY` secret | Matching unencrypted PKCS8 private PEM, under approved release-key custody |
-| `DEM_RUNTIME_PACKAGE_HOST` variable | Confirmed existing package ingestion SSH host |
-| `DEM_RUNTIME_PACKAGE_REPOSITORY` variable | Confirmed existing repository namespace, e.g. `netdata/netdata` |
 | Existing R2 secrets | `CLOUDFLARE_R2_ACCESS_KEY`, `CLOUDFLARE_R2_SECRET_KEY`, `CLOUDFLARE_R2_RELEASE_ENDPOINT` |
 | Existing package secrets | `NETDATABOT_PACKAGE_SIGNING_KEY`, `NETDATABOT_PACKAGES_SSH_KEY`, `PACKAGES_KNOWN_HOSTS` |
 
-The draft repository targets are `ubuntu/noble` and `el/9`, for both architectures.
-Confirm packaging conventions, package signatures and repository ingestion before
-publication. The Agent/plugin repository must already provide
+Native submission uses both `packages.netdata.cloud` and `packages2.netdata.cloud`.
+Each receives the independently released runtime in `netdata/netdata`,
+`netdata/netdata-edge` and `netdata/netdata-devel`; the repoconfig repository is excluded.
+Destinations follow every nonempty `packages` entry in `.github/data/distros.yml`,
+intersected with runtime-supported `amd64`/`arm64` (RPM `x86_64`/`aarch64`).
+Each submission has isolated staging so packages cannot leak between destinations.
+This repository coverage does not establish browser or package-lifecycle qualification
+on every distribution. Confirm package signatures, repository ingestion and the
+supported host matrix before publication. The Agent/plugin repository must already provide
 `netdata-dem-runtime-api = 1`. A runtime version does not need to match an Agent
 version. All native installations currently require a live systemd host; native
 chroot/image provisioning is explicitly deferred.
@@ -81,8 +88,8 @@ chroot/image provisioning is explicitly deferred.
 Expected object layout:
 
 ```text
-dem-runtime/<version>/<amd64|arm64>/<sha256>.tar.gz
-dem-runtime/<version>/<amd64|arm64>/<sha256>.sources.tar.gz
+dem-runtime/<version>/<amd64|arm64>/<sha256>.tar.zst
+dem-runtime/<version>/<amd64|arm64>/<sha256>.sources.tar.zst
 dem-runtime/<version>/<amd64|arm64>/release.json
 dem-runtime/<version>/<amd64|arm64>/{manifest,provenance,sbom.cdx,...}.json
 dem-runtime/latest/<amd64|arm64>.json

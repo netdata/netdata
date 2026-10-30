@@ -17,13 +17,13 @@ func releaseFixture(t *testing.T) (Release, ed25519.PrivateKey) {
 	t.Helper()
 	m, _ := bundleFixture(t, "signed-release")
 	m.Platform = "linux/arm64"
-	m.Archive.URL = "https://artifacts.example.invalid/dem-runtime/1/arm64/" + m.Archive.SHA256 + ".tar.gz"
+	m.Archive.URL = "https://artifacts.example.invalid/dem-runtime/1/arm64/" + m.Archive.SHA256 + ".tar.zst"
 	return Release{
 		Format:   1,
 		Sequence: 23,
 		Manifest: m,
 		Sources: ReleaseSource{
-			URL:    "https://artifacts.example.invalid/dem-runtime/1/sources.tar.gz",
+			URL:    "https://artifacts.example.invalid/dem-runtime/1/sources.tar.zst",
 			SHA256: strings.Repeat("a", 64),
 			Bytes:  100,
 		},

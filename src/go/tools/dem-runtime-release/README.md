@@ -15,18 +15,18 @@ or its archives. The tool neither generates keys nor chooses production trust.
 go run ./tools/dem-runtime-release sign \
   --key /protected/release-private.pem \
   --manifest /build/manifest.json \
-  --archive /build/runtime.tar.gz \
-  --sources /build/sources.tar.gz \
-  --archive-url https://artifacts.example.invalid/dem-runtime/1/arm64/runtime.tar.gz \
-  --sources-url https://artifacts.example.invalid/dem-runtime/1/arm64/sources.tar.gz \
+  --archive /build/runtime.tar.zst \
+  --sources /build/sources.tar.zst \
+  --archive-url https://artifacts.example.invalid/dem-runtime/1/arm64/runtime.tar.zst \
+  --sources-url https://artifacts.example.invalid/dem-runtime/1/arm64/sources.tar.zst \
   --sequence 17 \
   --output /build/release.json
 
 go run ./tools/dem-runtime-release verify \
   --key /trusted/release-public.pem \
   --release /build/release.json \
-  --archive /build/runtime.tar.gz \
-  --sources /build/sources.tar.gz
+  --archive /build/runtime.tar.zst \
+  --sources /build/sources.tar.zst
 ```
 
 The builder manifest is decoded strictly, independently of the signing host's
@@ -75,7 +75,7 @@ manifest and matching archive, without a signing key or runtime execution:
 ```sh
 go run ./tools/dem-runtime-release stage-native \
   --manifest /build/manifest.json \
-  --archive /build/runtime.tar.gz \
+  --archive /build/runtime.tar.zst \
   --output /build/package-root/usr/lib/netdata/dem-runtime
 ```
 

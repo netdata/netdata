@@ -29,15 +29,15 @@ func (f qualifyFunc) Qualify(ctx context.Context, source runner.Source) (*runner
 func publishedBundle(t *testing.T, version string, sequence uint64) (runtime.Release, []byte) {
 	t.Helper()
 	m, data := testBundle(t, version)
-	m.Archive.URL = "https://artifacts.example.invalid/runtime.tar.gz"
+	m.Archive.URL = "https://artifacts.example.invalid/runtime.tar.zst"
 	return runtime.Release{Format: 1, Sequence: sequence, Manifest: m,
-		Sources: runtime.ReleaseSource{URL: "https://artifacts.example.invalid/sources.tar.gz", SHA256: strings.Repeat("a", 64), Bytes: 100}}, data
+		Sources: runtime.ReleaseSource{URL: "https://artifacts.example.invalid/sources.tar.zst", SHA256: strings.Repeat("a", 64), Bytes: 100}}, data
 }
 
 func selectPublished(t *testing.T, store *runtime.Store, release runtime.Release, data []byte, policy runtime.UpdatePolicy) {
 	t.Helper()
 	// Non-executable bytes test acquisition/ownership; this does not qualify a browser.
-	path := filepath.Join(t.TempDir(), "archive.tar.gz")
+	path := filepath.Join(t.TempDir(), "archive.tar.zst")
 	require.NoError(t, os.WriteFile(path, data, 0600))
 	candidate, err := store.BeginPublishedInstall(context.Background(), runtime.ReleaseInstallOptions{Operation: runtime.InstallRelease, Updates: policy}, func(context.Context) (runtime.Release, error) { return release, nil })
 	require.NoError(t, err)

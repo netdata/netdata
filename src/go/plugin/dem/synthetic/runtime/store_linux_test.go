@@ -35,7 +35,7 @@ func testStore(t *testing.T) (*Store, *time.Time) {
 func importFixture(t *testing.T, s *Store, label string) Manifest {
 	t.Helper()
 	m, archive := bundleFixture(t, label)
-	file := filepath.Join(t.TempDir(), "archive.tar.gz")
+	file := filepath.Join(t.TempDir(), "archive.tar.zst")
 	require.NoError(t, os.WriteFile(file, archive, 0600))
 	require.NoError(t, s.importUnselected(context.Background(), m, file))
 	return m
@@ -420,7 +420,7 @@ func TestAbandonedPreparationAndProcessClaim(t *testing.T) {
 	require.ErrorIs(t, err, ErrUnavailable)
 	second, _ := bundleFixture(t, "incoming")
 	stop = startRuntimeOwner(t, s, second, "partial")
-	partials, err := filepath.Glob(filepath.Join(s.path, "staging", "*", "archive.tar.gz"))
+	partials, err := filepath.Glob(filepath.Join(s.path, "staging", "*", "archive.tar.zst"))
 	require.NoError(t, err)
 	require.Len(t, partials, 1)
 	partial, err := os.Stat(partials[0])

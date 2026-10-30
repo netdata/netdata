@@ -48,12 +48,12 @@ def assemble(args):
     if manifest['platform'] != 'linux/' + args.arch:
         raise ValueError('runtime platform differs from package architecture')
     archive_record = manifest['archive']
-    archive = args.runtime_output / (archive_record['sha256'] + '.tar.gz')
+    archive = args.runtime_output / (archive_record['sha256'] + '.tar.zst')
     file_identity(archive, archive_record['sha256'], archive_record['bytes'])
     sources = json.loads((args.source_archive / 'source-archive.json').read_text())
     if sources['format'] != 1 or sources['runtime_archive'] != archive_record['sha256']:
         raise ValueError('source assembly belongs to another runtime')
-    source_name = sources['sha256'] + '.sources.tar.gz'
+    source_name = sources['sha256'] + '.sources.tar.zst'
     if sources['file'] != source_name:
         raise ValueError('unexpected source archive name')
     source = args.source_archive / source_name
@@ -192,8 +192,8 @@ def stage(args):
         if manifest['platform'] != 'linux/' + arch or manifest['version'] != version:
             raise ValueError('artifact identity differs from manifest')
         sources = json.loads((directory / 'source-archive.json').read_text())
-        archive_name = manifest['archive']['sha256'] + '.tar.gz'
-        source_name = sources['sha256'] + '.sources.tar.gz'
+        archive_name = manifest['archive']['sha256'] + '.tar.zst'
+        source_name = sources['sha256'] + '.sources.tar.zst'
         if sources['runtime_archive'] != manifest['archive']['sha256'] or sources['file'] != source_name:
             raise ValueError('source assembly belongs to another runtime')
         prefix = 'dem-runtime/' + version + '/' + arch
@@ -230,7 +230,7 @@ def publication(args):
         if manifest['platform'] != 'linux/' + arch or manifest['version'] != version or release['sequence'] != record['sequence']:
             raise ValueError('publication identity differs between platforms')
         prefix = args.public_base + '/dem-runtime/' + version + '/' + arch + '/'
-        for item, suffix in ((manifest['archive'], '.tar.gz'), (release['sources'], '.sources.tar.gz')):
+        for item, suffix in ((manifest['archive'], '.tar.zst'), (release['sources'], '.sources.tar.zst')):
             name = item['sha256'] + suffix
             if item['url'] != prefix + name:
                 raise ValueError('signed publication URL differs from its immutable path')

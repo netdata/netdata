@@ -488,11 +488,11 @@ A missing installation leaves browser monitors waiting for their dependency; it 
 RUM does not need the browser runtime.
 
 ```sh
-dem.plugin runtime install --release /absolute/path/release.json --archive /absolute/path/runtime.tar.gz
+dem.plugin runtime install --release /absolute/path/release.json --archive /absolute/path/runtime.tar.zst
 # Alternatively, use the administrator-configured signed latest release:
 dem.plugin runtime install --allow-download
 # Disable automatic update preparation for a controlled/offline deployment:
-dem.plugin runtime install --release /absolute/path/release.json --archive /absolute/path/runtime.tar.gz --manual-updates
+dem.plugin runtime install --release /absolute/path/release.json --archive /absolute/path/runtime.tar.zst --manual-updates
 dem.plugin runtime status
 dem.plugin runtime qualify
 ```
@@ -519,7 +519,7 @@ or guarantee freshness on a new installation. Key replacement requires an admini
 Normal updates compare with the currently selected sequence; explicit older-release repair resets that baseline.
 
 ```sh
-dem.plugin runtime update --release /absolute/path/new-release.json --archive /absolute/path/new-runtime.tar.gz
+dem.plugin runtime update --release /absolute/path/new-release.json --archive /absolute/path/new-runtime.tar.zst
 # Stop every DEM/standalone consumer first:
 dem.plugin runtime uninstall
 ```
@@ -536,7 +536,7 @@ is damaged. Incomplete ownership or storage inspection is reported as unknown, n
 Stop all DEM and standalone consumers and let their executions drain before repairing the managed store:
 
 ```sh
-dem.plugin runtime repair --release /absolute/path/release.json --archive /absolute/path/runtime.tar.gz
+dem.plugin runtime repair --release /absolute/path/release.json --archive /absolute/path/runtime.tar.zst
 # Alternatively, explicitly request configured latest with --allow-download.
 ```
 
@@ -590,7 +590,7 @@ installation is required or discovered. Host sandbox prerequisites still apply t
 For an immutable image or read-only deployment, create a protected preload at its final path:
 
 ```sh
-dem.plugin runtime preload --root /opt/netdata-dem-runtime --release /absolute/path/release.json --archive /absolute/path/runtime.tar.gz
+dem.plugin runtime preload --root /opt/netdata-dem-runtime --release /absolute/path/release.json --archive /absolute/path/runtime.tar.zst
 ```
 
 ```yaml

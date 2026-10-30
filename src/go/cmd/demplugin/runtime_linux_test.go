@@ -5,7 +5,6 @@ package main
 import (
 	"archive/tar"
 	"bytes"
-	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
 	"os"
@@ -13,6 +12,7 @@ import (
 	goruntime "runtime"
 	"testing"
 
+	"github.com/klauspost/compress/zstd"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/plugin/dem"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
@@ -45,10 +45,11 @@ func adminBundleFixture(t *testing.T) (manifestPath, archivePath string) {
 		expanded += int64(len(entry.body))
 	}
 	require.NoError(t, tw.Close())
-	gz := gzip.NewWriter(&compressed)
-	_, err := gz.Write(raw.Bytes())
+	encoder, err := zstd.NewWriter(&compressed, zstd.WithEncoderConcurrency(1))
 	require.NoError(t, err)
-	require.NoError(t, gz.Close())
+	_, err = encoder.Write(raw.Bytes())
+	require.NoError(t, err)
+	require.NoError(t, encoder.Close())
 	digest := sha256.Sum256(compressed.Bytes())
 	manifest := runtime.Manifest{Format: 1, Contract: 1, Version: "cli-fixture", Platform: "linux/" + goruntime.GOARCH,
 		Archive:  runtime.Archive{SHA256: hex.EncodeToString(digest[:]), Bytes: int64(compressed.Len()), TarBytes: int64(raw.Len()), ExpandedBytes: expanded, Entries: len(entries)},
@@ -58,7 +59,7 @@ func adminBundleFixture(t *testing.T) (manifestPath, archivePath string) {
 	require.NoError(t, manifest.Validate())
 	root := t.TempDir()
 	manifestPath = filepath.Join(root, "trusted.json")
-	archivePath = filepath.Join(root, "runtime.tar.gz")
+	archivePath = filepath.Join(root, "runtime.tar.zst")
 	writeAdminRelease(t, manifestPath, manifest)
 	require.NoError(t, os.WriteFile(archivePath, compressed.Bytes(), 0600))
 	return manifestPath, archivePath

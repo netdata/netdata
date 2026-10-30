@@ -48,7 +48,7 @@ func TestRuntimeMissingReleaseNeverPreparesCandidate(t *testing.T) {
 			root := t.TempDir()
 			cache := filepath.Join(root, "cache")
 			writeAdminTrust(t, root, "")
-			args := []string{"runtime", command, "--config-dir", root, "--release", filepath.Join(root, "missing.json"), "--archive", filepath.Join(root, "archive.tar.gz")}
+			args := []string{"runtime", command, "--config-dir", root, "--release", filepath.Join(root, "missing.json"), "--archive", filepath.Join(root, "archive.tar.zst")}
 			if command == "preload" {
 				args = append(args, "--root", cache)
 			} else {
@@ -106,12 +106,12 @@ func TestRuntimeRepairRequiresTrustedExplicitInput(t *testing.T) {
 		message string
 	}{
 		{"missing input", nil, "either --archive or --allow-download"},
-		{"offline without release", []string{"--archive", "/runtime.tar.gz"}, "offline archive requires"},
+		{"offline without release", []string{"--archive", "/runtime.tar.zst"}, "offline archive requires"},
 		{"relative manifest", []string{"--release", "relative.json"}, "--release must be absolute"},
 		{"retired manifest", []string{"--manifest", "/trusted.json"}, "flag provided but not defined"},
 		{"no archive", []string{"--release", "/trusted.json"}, "either --archive or --allow-download"},
-		{"two sources", []string{"--release", "/trusted.json", "--archive", "/runtime.tar.gz", "--allow-download"}, "either --archive or --allow-download"},
-		{"relative archive", []string{"--release", "/trusted.json", "--archive", "runtime.tar.gz"}, "--archive must be absolute"},
+		{"two sources", []string{"--release", "/trusted.json", "--archive", "/runtime.tar.zst", "--allow-download"}, "either --archive or --allow-download"},
+		{"relative archive", []string{"--release", "/trusted.json", "--archive", "runtime.tar.zst"}, "--archive must be absolute"},
 		{"preload root", []string{"--release", "/trusted.json", "--allow-download", "--root", "/preload"}, "--root is only valid for preload"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -126,7 +126,7 @@ func TestRuntimeManualUpdatesOnlyChangesInstallAndRepairPolicy(t *testing.T) {
 		t.Run(command, func(t *testing.T) {
 			args := []string{"runtime", command, "--manual-updates"}
 			if command == "update" || command == "preload" {
-				args = append(args, "--release", "/release.json", "--archive", "/archive.tar.gz")
+				args = append(args, "--release", "/release.json", "--archive", "/archive.tar.zst")
 			}
 			_, err := runtimeCommand(t, args...)
 			require.ErrorContains(t, err, "--manual-updates is only valid for install/repair")

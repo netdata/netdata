@@ -61,7 +61,7 @@ def archive_sources(source, output, runtime_digest, epoch):
     if any(output.iterdir()):
         raise ValueError('source archive output must be empty')
     archive, bounds = package_archive(source, output, epoch)
-    final = output / (bounds['sha256'] + '.sources.tar.gz')
+    final = output / (bounds['sha256'] + '.sources.tar.zst')
     archive.rename(final)
     write_json(output / 'source-archive.json', {'format': 1, 'runtime_archive': runtime_digest,
                                               'file': final.name, 'sha256': bounds['sha256'],

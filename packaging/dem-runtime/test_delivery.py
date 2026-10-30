@@ -6,6 +6,7 @@ import io
 import json
 from pathlib import Path
 import sys
+import subprocess
 import tarfile
 import tempfile
 import unittest
@@ -223,7 +224,8 @@ class DeliveryTests(unittest.TestCase):
             self.assertEqual(identity['sha256'], bundle.sha256(first))
             self.assertEqual(identity['bytes'], first.stat().st_size)
             inventory = json.loads((output / 'source-assembly.json').read_text())
-            with tarfile.open(first) as archive:
+            with tarfile.open(fileobj=io.BytesIO(subprocess.run(
+                    ['zstd', '-d', '-c', first], capture_output=True, check=True).stdout)) as archive:
                 files = {m.name for m in archive.getmembers() if m.isfile()}
                 self.assertEqual(files, set(inventory['files']) | {'source-assembly.json'})
                 self.assertEqual(archive.extractfile('runtime-source/runner/run.mjs').read(),

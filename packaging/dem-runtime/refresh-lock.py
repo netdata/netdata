@@ -17,7 +17,7 @@ from snapshot import resolve_locks
 PACKAGES = ['python3', 'curl', 'ca-certificates', 'xz-utils', 'fontconfig',
             'fonts-dejavu-core', 'fonts-noto-color-emoji', 'fonts-liberation',
             'fonts-freefont-ttf', 'fonts-ipafont-gothic', 'fonts-tlwg-loma-otf',
-            'fonts-unifont', 'fonts-wqy-zenhei', 'xfonts-cyrillic', 'xfonts-scalable']
+            'fonts-unifont', 'fonts-wqy-zenhei', 'xfonts-cyrillic', 'xfonts-scalable', 'zstd']
 
 
 def capture(args):

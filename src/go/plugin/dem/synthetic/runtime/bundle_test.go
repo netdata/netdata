@@ -9,6 +9,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/xml"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,6 +17,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/klauspost/compress/zstd"
 	"github.com/stretchr/testify/require"
 )
 
@@ -68,10 +70,11 @@ func archiveFixture(t testing.TB, entries []fixtureEntry) (Archive, []byte) {
 		}
 	}
 	require.NoError(t, writer.Close())
-	gz := gzip.NewWriter(&compressed)
-	_, err := gz.Write(raw.Bytes())
+	encoder, err := zstd.NewWriter(&compressed, zstd.WithEncoderConcurrency(1))
 	require.NoError(t, err)
-	require.NoError(t, gz.Close())
+	_, err = encoder.Write(raw.Bytes())
+	require.NoError(t, err)
+	require.NoError(t, encoder.Close())
 	sum := sha256.Sum256(compressed.Bytes())
 	return Archive{SHA256: hex.EncodeToString(sum[:]), Bytes: int64(compressed.Len()), TarBytes: int64(raw.Len()), ExpandedBytes: expanded, Entries: len(entries)}, compressed.Bytes()
 }
@@ -199,4 +202,56 @@ func TestBindingRejectsPayloadBeyondAbsolutePathLimit(t *testing.T) {
 	prefix := strings.Repeat("/"+strings.Repeat("p", 99), length/100) + strings.Repeat("p", length%100)
 	require.Len(t, prefix+"/"+m.Layout.Loader, 4095)
 	require.ErrorContains(t, bindPrefix(root, prefix, m), "absolute path limit")
+}
+
+func TestArchiveZstdIntegrityAndBounds(t *testing.T) {
+	a, compressed := archiveFixture(t, []fixtureEntry{{name: "file", contents: []byte("payload"), mode: 0600}})
+	decoder, err := zstd.NewReader(nil)
+	require.NoError(t, err)
+	raw, err := decoder.DecodeAll(compressed, nil)
+	decoder.Close()
+	require.NoError(t, err)
+	var legacy bytes.Buffer
+	gzipWriter := gzip.NewWriter(&legacy)
+	_, err = gzipWriter.Write(raw)
+	require.NoError(t, err)
+	require.NoError(t, gzipWriter.Close())
+	damaged := append([]byte(nil), compressed...)
+	damaged[len(damaged)-1] ^= 1
+	writer, err := zstd.NewWriter(nil, zstd.WithEncoderConcurrency(1))
+	require.NoError(t, err)
+	defer writer.Close()
+	cases := map[string][]byte{
+		"gzip":                          legacy.Bytes(),
+		"checksum":                      damaged,
+		"truncated checksum":            compressed[:len(compressed)-1],
+		"trailing junk":                 append(append([]byte(nil), compressed...), []byte("junk")...),
+		"trailing byte":                 append(append([]byte(nil), compressed...), 0),
+		"truncated following frame":     append(append([]byte(nil), compressed...), 0x28, 0xb5, 0x2f),
+		"concatenated decoded overflow": append(append([]byte(nil), compressed...), writer.EncodeAll([]byte("extra"), nil)...),
+	}
+	for name, data := range cases {
+		t.Run(name, func(t *testing.T) {
+			root, err := os.OpenRoot(t.TempDir())
+			require.NoError(t, err)
+			defer root.Close()
+			require.Error(t, extractArchive(bytes.NewReader(data), root, a))
+		})
+	}
+	t.Run("window exceeds builder contract", func(t *testing.T) {
+		root, err := os.OpenRoot(t.TempDir())
+		require.NoError(t, err)
+		defer root.Close()
+		// Frame header declares a 16 MiB window before any block is decoded.
+		frame := []byte{0x28, 0xb5, 0x2f, 0xfd, 0x00, 0x70, 0x01, 0x00, 0x00}
+		require.ErrorIs(t, extractArchive(bytes.NewReader(frame), root, a), zstd.ErrWindowSizeExceeded)
+	})
+	t.Run("skippable frames retain bounded decoded content", func(t *testing.T) {
+		root, err := os.OpenRoot(t.TempDir())
+		require.NoError(t, err)
+		defer root.Close()
+		// A valid empty skippable frame contributes no tar bytes.
+		frame := []byte{0x50, 0x2a, 0x4d, 0x18, 0, 0, 0, 0}
+		require.NoError(t, extractArchive(io.MultiReader(bytes.NewReader(frame), bytes.NewReader(compressed)), root, a))
+	})
 }

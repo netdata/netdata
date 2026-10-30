@@ -21,7 +21,7 @@ func TestPrepareNativePackageBothArchitectures(t *testing.T) {
 		t.Run(arch, func(t *testing.T) {
 			m, data := bundleFixture(t, "package")
 			m.Platform = "linux/" + arch
-			archive := filepath.Join(t.TempDir(), "archive.tar.gz")
+			archive := filepath.Join(t.TempDir(), "archive.tar.zst")
 			require.NoError(t, os.WriteFile(archive, data, 0600))
 			output := filepath.Join(t.TempDir(), "payload")
 			require.NoError(t, PrepareNativePackage(context.Background(), m, archive, output))
