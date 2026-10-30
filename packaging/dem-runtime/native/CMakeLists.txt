@@ -1,15 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 cmake_minimum_required(VERSION 3.21)
-project(netdata-dem-runtime LANGUAGES NONE)
 
 foreach(required DEM_PAYLOAD_DIR DEM_ARCH DEM_VERSION DEM_RELEASE DEM_PACKAGE_FORMAT)
   if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
     message(FATAL_ERROR "${required} must be explicitly supplied")
   endif()
 endforeach()
-if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
-  message(FATAL_ERROR "Native packages must be assembled on Linux")
-endif()
 if(NOT DEM_ARCH MATCHES "^(amd64|arm64)$" OR NOT DEM_VERSION MATCHES "^[0-9][0-9A-Za-z.+~]*$"
    OR NOT DEM_RELEASE MATCHES "^[1-9][0-9]*$" OR NOT DEM_PACKAGE_FORMAT MATCHES "^(DEB|RPM)$")
   message(FATAL_ERROR "Unsupported architecture, package version/release or format")
@@ -25,6 +21,14 @@ string(JSON native_version GET "${native_record}" manifest version)
 if(NOT native_format EQUAL 1 OR NOT native_path STREQUAL "/usr/lib/netdata/dem-runtime"
    OR NOT native_platform STREQUAL "linux/${DEM_ARCH}" OR NOT native_version STREQUAL DEM_VERSION)
   message(FATAL_ERROR "Staged native metadata differs from requested package identity or fixed prefix")
+endif()
+
+# CMake project versions allow at most four numeric components. Preserve the
+# complete package version (including suffixes) separately for CPack below.
+string(REGEX MATCH "^[0-9]+(\\.[0-9]+)?(\\.[0-9]+)?(\\.[0-9]+)?" DEM_PROJECT_VERSION "${DEM_VERSION}")
+project(netdata-dem-runtime VERSION "${DEM_PROJECT_VERSION}" LANGUAGES NONE)
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  message(FATAL_ERROR "Native packages must be assembled on Linux")
 endif()
 
 # CMake-created ancestors must not inherit the builder's umask. Payload modes
