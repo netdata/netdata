@@ -8,7 +8,6 @@ import (
 	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	goruntime "runtime"
@@ -57,12 +56,10 @@ func adminBundleFixture(t *testing.T) (manifestPath, archivePath string) {
 		Bindings: []runtime.Binding{{Path: "node", Expected: prefix}, {Path: "browser", Expected: prefix}},
 	}
 	require.NoError(t, manifest.Validate())
-	manifestJSON, err := json.Marshal(manifest)
-	require.NoError(t, err)
 	root := t.TempDir()
 	manifestPath = filepath.Join(root, "trusted.json")
 	archivePath = filepath.Join(root, "runtime.tar.gz")
-	require.NoError(t, os.WriteFile(manifestPath, manifestJSON, 0600))
+	writeAdminRelease(t, manifestPath, manifest)
 	require.NoError(t, os.WriteFile(archivePath, compressed.Bytes(), 0600))
 	return manifestPath, archivePath
 }
@@ -70,10 +67,12 @@ func adminBundleFixture(t *testing.T) (manifestPath, archivePath string) {
 func TestRuntimeInstallRejectsUnqualifiedArchive(t *testing.T) {
 	manifest, archive := adminBundleFixture(t)
 	root := t.TempDir()
+	writeAdminTrust(t, root, "")
 	cache := filepath.Join(root, "cache")
-	report, err := runtimeCommand(t, "runtime", "install", "--config-dir", root, "--manifest", manifest, "--cache", cache, "--archive", archive)
+	report, err := runtimeCommand(t, "runtime", "install", "--config-dir", root, "--release", manifest, "--cache", cache, "--archive", archive)
 	require.Error(t, err)
-	assert.Equal(t, "prepared", report.State)
+	assert.Equal(t, "unavailable", report.State)
+	assert.Equal(t, "prepared", report.CandidateState)
 	require.NotNil(t, report.Qualification)
 	assert.False(t, report.Qualification.SandboxedLocalJourney)
 	require.NotNil(t, report.Storage)
@@ -86,8 +85,9 @@ func TestRuntimeInstallRejectsUnqualifiedArchive(t *testing.T) {
 func TestRuntimePreloadRequiresQualifiedArchiveAndFreshRoot(t *testing.T) {
 	manifest, archive := adminBundleFixture(t)
 	root := t.TempDir()
+	writeAdminTrust(t, root, "")
 	final := filepath.Join(root, "preloaded")
-	args := []string{"runtime", "preload", "--config-dir", root, "--manifest", manifest, "--archive", archive, "--root", final}
+	args := []string{"runtime", "preload", "--config-dir", root, "--release", manifest, "--archive", archive, "--root", final}
 	report, err := runtimeCommand(t, args...)
 	require.Error(t, err)
 	assert.Nil(t, report.PreloadedConfig)
@@ -99,8 +99,9 @@ func TestRuntimePreloadRequiresQualifiedArchiveAndFreshRoot(t *testing.T) {
 func TestRuntimeInstallDigestFailureNeverReportsPrepared(t *testing.T) {
 	manifest, archive := adminBundleFixture(t)
 	root := t.TempDir()
+	writeAdminTrust(t, root, "")
 	require.NoError(t, os.WriteFile(archive, []byte("corrupt"), 0600))
-	report, err := runtimeCommand(t, "runtime", "install", "--config-dir", root, "--manifest", manifest, "--archive", archive, "--cache", filepath.Join(root, "cache"))
+	report, err := runtimeCommand(t, "runtime", "install", "--config-dir", root, "--release", manifest, "--archive", archive, "--cache", filepath.Join(root, "cache"))
 	require.Error(t, err)
 	assert.Equal(t, "unavailable", report.State)
 	assert.NotEmpty(t, report.SetupError)
@@ -115,40 +116,43 @@ func TestRuntimeInstallUsesServiceConfiguration(t *testing.T) {
 	manifest, archive := adminBundleFixture(t)
 	_, stock, buildUser, _, _ := runtimeConfigRoots(t)
 	serviceCache, wrongCache := filepath.Join(t.TempDir(), "service-cache"), filepath.Join(t.TempDir(), "wrong-cache")
-	writeRuntimeConfig(t, stock, serviceCache)
+	writeAdminTrust(t, stock, serviceCache)
 	writeRuntimeConfig(t, buildUser, wrongCache)
 	pluginconfig.MustInit(pluginconfig.InitInput{})
 	service, err := dem.LoadConfig(pluginconfig.ConfigDir())
 	require.NoError(t, err)
 	require.Equal(t, serviceCache, service.Runtime.CachePath)
-	report, err := runtimeCommand(t, "runtime", "install", "--manifest", manifest, "--archive", archive)
+	report, err := runtimeCommand(t, "runtime", "install", "--release", manifest, "--archive", archive)
 	require.Error(t, err) // Structurally valid fixture cannot qualify as an executable runtime.
-	require.Equal(t, "prepared", report.State)
+	require.Equal(t, "unavailable", report.State)
+	require.Equal(t, "prepared", report.CandidateState)
 	require.Equal(t, service.Runtime.CachePath, report.CachePath)
-	require.DirExists(t, filepath.Join(serviceCache, "generations", report.Generation))
+	require.DirExists(t, filepath.Join(serviceCache, "generations", report.Candidate.SHA256))
 	require.NoDirExists(t, wrongCache)
 	overrideCache := filepath.Join(t.TempDir(), "override-cache")
-	report, err = runtimeCommand(t, "runtime", "install", "--manifest", manifest, "--archive", archive, "--cache", overrideCache)
+	report, err = runtimeCommand(t, "runtime", "install", "--release", manifest, "--archive", archive, "--cache", overrideCache)
 	require.Error(t, err)
 	require.Equal(t, overrideCache, report.CachePath)
-	require.DirExists(t, filepath.Join(overrideCache, "generations", report.Generation))
+	require.DirExists(t, filepath.Join(overrideCache, "generations", report.Candidate.SHA256))
 	require.NoDirExists(t, wrongCache)
 }
 
 // This opt-in test uses authentic release descriptors and archives through the
 // production CLI acquisition, qualification and publication path.
 func TestRealRuntimeInstallQualifyAndUninstall(t *testing.T) {
-	manifest, archive, helper := os.Getenv("DEM_RUNTIME_TEST_MANIFEST"), os.Getenv("DEM_RUNTIME_TEST_ARCHIVE"), os.Getenv("DEM_RUNTIME_TEST_HELPER")
-	if manifest == "" || archive == "" || helper == "" {
-		t.Skip("requires DEM_RUNTIME_TEST_MANIFEST, DEM_RUNTIME_TEST_ARCHIVE and DEM_RUNTIME_TEST_HELPER")
+	manifest, archive, helper := os.Getenv("DEM_RUNTIME_TEST_RELEASE"), os.Getenv("DEM_RUNTIME_TEST_ARCHIVE"), os.Getenv("DEM_RUNTIME_TEST_HELPER")
+	publicKey := os.Getenv("DEM_RUNTIME_TEST_PUBLIC_KEY")
+	if manifest == "" || archive == "" || helper == "" || publicKey == "" {
+		t.Skip("requires DEM_RUNTIME_TEST_RELEASE, DEM_RUNTIME_TEST_ARCHIVE, DEM_RUNTIME_TEST_PUBLIC_KEY and DEM_RUNTIME_TEST_HELPER")
 	}
 	require.NotZero(t, os.Geteuid())
 	restore := ndexec.SetRunnerPathsForTests(helper, "")
 	defer restore()
 	root := t.TempDir()
+	writeRuntimeTrustConfig(t, root, "", publicKey)
 	cache := filepath.Join(root, "installed")
 	common := []string{"--config-dir", root, "--cache", cache}
-	install := append(append([]string{"runtime", "install"}, common...), "--manifest", manifest, "--archive", archive)
+	install := append(append([]string{"runtime", "install"}, common...), "--release", manifest, "--archive", archive)
 	report, err := runtimeCommand(t, install...)
 	require.NoError(t, err)
 	require.Equal(t, "installed", report.State)

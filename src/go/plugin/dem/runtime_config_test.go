@@ -29,8 +29,19 @@ func TestRuntimeConfigDefaultsAndOverrides(t *testing.T) {
 	assert.Equal(t, 0, loaded.Runtime.PreviousRetentionDays)
 }
 
+func TestNativeRuntimeConfigurationUsesFixedPackagePaths(t *testing.T) {
+	cfg := DefaultRuntimeConfig()
+	cfg.Mode = "native"
+	require.NoError(t, cfg.validate())
+	cfg.CachePath = "/alternate/proof"
+	require.ErrorContains(t, cfg.validate(), "cache_path is only valid in managed mode")
+	cfg.CachePath = ""
+	cfg.PreloadPath = "/alternate/payload"
+	require.ErrorContains(t, cfg.validate(), "preload_path requires mode: preloaded")
+}
+
 func TestRuntimeConfigRejectsAmbiguousAndInvalidPolicy(t *testing.T) {
-	for _, body := range []string{"mode: auto", "max_bytes: 0", "previous_retention_days: -1", "previous_retention_days: 36501"} {
+	for _, body := range []string{"mode: auto", "max_bytes: 0", "previous_retention_days: -1", "previous_retention_days: 36501", "release_url: http://example.invalid/latest", "release_url: https://user:pass@example.invalid/latest", "release_url: https://example.invalid/latest#fragment", "verification_keys: [relative.pem]"} {
 		t.Run(body, func(t *testing.T) {
 			dir := t.TempDir()
 			require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("runtime: {"+body+"}"), 0600))
