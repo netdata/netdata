@@ -5,16 +5,16 @@ package main
 import (
 	"archive/tar"
 	"bytes"
-	"crypto/ed25519"
-	"crypto/x509"
 	"encoding/json"
-	"encoding/pem"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/klauspost/compress/zstd"
+	"github.com/netdata/netdata/go/plugins/internal/pgptest"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,7 +23,7 @@ import (
 type fixture struct {
 	dir      string
 	manifest runtime.Manifest
-	private  ed25519.PrivateKey
+	trust    *runtime.ReleaseTrust
 	args     []string
 }
 
@@ -60,45 +60,55 @@ func newFixture(t *testing.T, arch string) fixture {
 	data, err := json.Marshal(m)
 	require.NoError(t, err)
 	write("manifest.json", data)
-	private := ed25519.NewKeyFromSeed(bytes.Repeat([]byte{7}, ed25519.SeedSize))
-	der, err := x509.MarshalPKCS8PrivateKey(private)
-	require.NoError(t, err)
-	write("private.pem", pem.EncodeToMemory(&pem.Block{
-		Type:  "PRIVATE KEY",
-		Bytes: der,
-	}))
-	der, err = x509.MarshalPKIXPublicKey(private.Public())
-	require.NoError(t, err)
-	write("public.pem", pem.EncodeToMemory(&pem.Block{
-		Type:  "PUBLIC KEY",
-		Bytes: der,
-	}))
 	return fixture{
 		dir:      dir,
 		manifest: m,
-		private:  private,
-		args:     []string{"sign", "--key", filepath.Join(dir, "private.pem"), "--manifest", filepath.Join(dir, "manifest.json"), "--archive", filepath.Join(dir, "archive"), "--sources", filepath.Join(dir, "sources"), "--archive-url", "https://example.invalid/runtime.tar.zst", "--sources-url", "https://example.invalid/sources.tar.zst", "--sequence", "17", "--output", filepath.Join(dir, "release.json")},
+		args:     []string{"sign", "--manifest", filepath.Join(dir, "manifest.json"), "--archive", filepath.Join(dir, "archive"), "--sources", filepath.Join(dir, "sources"), "--archive-url", "https://example.invalid/runtime.tar.zst", "--sources-url", "https://example.invalid/sources.tar.zst", "--sequence", "17", "--output", filepath.Join(dir, "release.json")},
 	}
 }
 
+func newSigningFixture(t *testing.T, arch string) fixture {
+	t.Helper()
+	f := newFixture(t, arch)
+	fingerprint, public := gpgFixture(t)
+	require.NoError(t, os.WriteFile(filepath.Join(f.dir, "public.gpg"), public, 0600))
+	var err error
+	f.trust, err = runtime.ParseReleaseKeyring(public)
+	require.NoError(t, err)
+	f.args = append(f.args, "--key", fingerprint, "--public-key", filepath.Join(f.dir, "public.gpg"))
+	return f
+}
+
 func (f fixture) verifyArgs() []string {
-	return []string{"verify", "--key", filepath.Join(f.dir, "public.pem"), "--release", filepath.Join(f.dir, "release.json"), "--archive", filepath.Join(f.dir, "archive"), "--sources", filepath.Join(f.dir, "sources")}
+	return []string{"verify", "--key", filepath.Join(f.dir, "public.gpg"), "--release", filepath.Join(f.dir, "release.json"), "--archive", filepath.Join(f.dir, "archive"), "--sources", filepath.Join(f.dir, "sources")}
 }
 
 func TestSignVerifyBothArchitectures(t *testing.T) {
 	for _, arch := range []string{"amd64", "arm64"} {
 		t.Run(arch, func(t *testing.T) {
-			f := newFixture(t, arch)
+			f := newSigningFixture(t, arch)
 			require.NoError(t, run(f.args, io.Discard))
 			require.NoError(t, run(f.verifyArgs(), io.Discard))
 			data, err := os.ReadFile(filepath.Join(f.dir, "release.json"))
 			require.NoError(t, err)
-			release, err := runtime.VerifyRelease(data, []ed25519.PublicKey{f.private.Public().(ed25519.PublicKey)})
+			release, err := runtime.VerifyRelease(data, f.trust)
 			require.NoError(t, err)
 			expected := f.manifest
 			expected.Archive.URL = "https://example.invalid/runtime.tar.zst"
 			assert.Equal(t, expected, release.Manifest)
 			assert.Equal(t, uint64(17), release.Sequence)
+			var envelope struct {
+				Payload   []byte `json:"payload"`
+				Signature []byte `json:"signature"`
+			}
+			require.NoError(t, json.Unmarshal(data, &envelope))
+			signedPayload, err := runtime.ReleaseSigningPayload(release)
+			require.NoError(t, err)
+			payloadPath, signaturePath := filepath.Join(f.dir, "signed-payload"), filepath.Join(f.dir, "signature")
+			require.NoError(t, os.WriteFile(payloadPath, signedPayload, 0600))
+			require.NoError(t, os.WriteFile(signaturePath, envelope.Signature, 0600))
+			output, err := exec.Command("gpg", "--batch", "--verify", signaturePath, payloadPath).CombinedOutput()
+			require.NoError(t, err, string(output))
 			hash, size, err := hashFile(filepath.Join(f.dir, "sources"))
 			require.NoError(t, err)
 			assert.Equal(t, hash, release.Sources.SHA256)
@@ -114,7 +124,7 @@ func TestSignVerifyBothArchitectures(t *testing.T) {
 func TestSignRejectsInvalidInputs(t *testing.T) {
 	for _, kind := range []string{"digest", "size", "unknown", "trailing", "oversize", "url", "sequence", "key", "empty-sources"} {
 		t.Run(kind, func(t *testing.T) {
-			f := newFixture(t, "amd64")
+			f := newSigningFixture(t, "amd64")
 			switch kind {
 			case "digest":
 				require.NoError(t, os.WriteFile(filepath.Join(f.dir, "archive"), bytes.Repeat([]byte("x"), int(f.manifest.Archive.Bytes)), 0600))
@@ -139,7 +149,7 @@ func TestSignRejectsInvalidInputs(t *testing.T) {
 			case "sequence":
 				f.args = append(f.args, "--sequence", "0")
 			case "key":
-				require.NoError(t, os.WriteFile(filepath.Join(f.dir, "private.pem"), []byte("PRIVATE CONTENT MUST NOT APPEAR IN ERROR"), 0600))
+				f.args = append(f.args, "--key", "PRIVATE CONTENT MUST NOT APPEAR IN ERROR")
 			case "empty-sources":
 				require.NoError(t, os.WriteFile(filepath.Join(f.dir, "sources"), nil, 0600))
 			}
@@ -155,17 +165,11 @@ func TestSignRejectsInvalidInputs(t *testing.T) {
 func TestVerifyRequiresAuthenticationAndArtifactIntegrity(t *testing.T) {
 	for _, kind := range []string{"wrong-key", "tampered", "archive", "sources"} {
 		t.Run(kind, func(t *testing.T) {
-			f := newFixture(t, "arm64")
+			f := newSigningFixture(t, "arm64")
 			require.NoError(t, run(f.args, io.Discard))
 			switch kind {
 			case "wrong-key":
-				key := ed25519.NewKeyFromSeed(bytes.Repeat([]byte{8}, ed25519.SeedSize))
-				der, err := x509.MarshalPKIXPublicKey(key.Public())
-				require.NoError(t, err)
-				require.NoError(t, os.WriteFile(filepath.Join(f.dir, "public.pem"), pem.EncodeToMemory(&pem.Block{
-					Type:  "PUBLIC KEY",
-					Bytes: der,
-				}), 0600))
+				require.NoError(t, os.WriteFile(filepath.Join(f.dir, "public.gpg"), pgptest.Public(t, pgptest.Key(t, 8)), 0600))
 			case "tampered":
 				p := filepath.Join(f.dir, "release.json")
 				data, err := os.ReadFile(p)
@@ -269,4 +273,31 @@ func TestStageNativeRejectsInvalidInputs(t *testing.T) {
 	err := run([]string{"stage-native", "--manifest", filepath.Join(f.dir, "manifest.json"), "--archive", filepath.Join(f.dir, "archive"), "--output", output}, io.Discard)
 	require.Error(t, err)
 	assert.NoFileExists(t, filepath.Join(output, "native.json"))
+}
+
+func gpgFixture(t *testing.T) (string, []byte) {
+	t.Helper()
+	if _, err := exec.LookPath("gpg"); err != nil {
+		t.Skip("GPG interoperability requires host gpg")
+	}
+	home := t.TempDir()
+	require.NoError(t, os.Chmod(home, 0700))
+	t.Setenv("GNUPGHOME", home)
+	command := exec.Command("gpg", "--batch", "--pinentry-mode", "loopback", "--passphrase", "", "--quick-generate-key", "DEM release test <release@example.invalid>", "rsa2048", "sign", "1d")
+	output, err := command.CombinedOutput()
+	require.NoError(t, err, string(output))
+	output, err = exec.Command("gpg", "--batch", "--with-colons", "--list-keys").Output()
+	require.NoError(t, err)
+	var fingerprint string
+	for _, line := range strings.Split(string(output), "\n") {
+		fields := strings.Split(line, ":")
+		if fields[0] == "fpr" {
+			fingerprint = fields[9]
+			break
+		}
+	}
+	require.NotEmpty(t, fingerprint)
+	public, err := exec.Command("gpg", "--batch", "--export", fingerprint).Output()
+	require.NoError(t, err)
+	return fingerprint, public
 }

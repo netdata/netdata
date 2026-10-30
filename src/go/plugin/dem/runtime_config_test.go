@@ -41,7 +41,7 @@ func TestNativeRuntimeConfigurationUsesFixedPackagePaths(t *testing.T) {
 }
 
 func TestRuntimeConfigRejectsAmbiguousAndInvalidPolicy(t *testing.T) {
-	for _, body := range []string{"mode: auto", "max_bytes: 0", "previous_retention_days: -1", "previous_retention_days: 36501", "release_url: http://example.invalid/latest", "release_url: https://user:pass@example.invalid/latest", "release_url: https://example.invalid/latest#fragment", "verification_keys: [relative.pem]"} {
+	for _, body := range []string{"mode: auto", "max_bytes: 0", "previous_retention_days: -1", "previous_retention_days: 36501", "release_url: http://example.invalid/latest", "release_url: https://user:pass@example.invalid/latest", "release_url: https://example.invalid/latest#fragment", "offline_keyring: relative.gpg"} {
 		t.Run(body, func(t *testing.T) {
 			dir := t.TempDir()
 			require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("runtime: {"+body+"}"), 0600))

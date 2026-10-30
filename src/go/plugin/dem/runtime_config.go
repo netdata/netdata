@@ -4,7 +4,6 @@ package dem
 
 import (
 	"context"
-	"crypto/ed25519"
 	"errors"
 	"fmt"
 	"net/url"
@@ -18,13 +17,13 @@ import (
 // RuntimeConfig is administrator-owned process configuration, never monitor input.
 // Protected preloads are borrowed for the process lifetime and are outside cache GC.
 type RuntimeConfig struct {
-	Mode                  string   `yaml:"mode" json:"mode"`
-	CachePath             string   `yaml:"cache_path" json:"cache_path,omitempty"`
-	MaxBytes              int64    `yaml:"max_bytes" json:"max_bytes"`
-	PreviousRetentionDays int      `yaml:"previous_retention_days" json:"previous_retention_days"`
-	PreloadPath           string   `yaml:"preload_path" json:"preload_path,omitempty"`
-	ReleaseURL            string   `yaml:"release_url" json:"release_url,omitempty"`
-	VerificationKeys      []string `yaml:"verification_keys" json:"verification_keys,omitempty"`
+	Mode                  string `yaml:"mode" json:"mode"`
+	CachePath             string `yaml:"cache_path" json:"cache_path,omitempty"`
+	MaxBytes              int64  `yaml:"max_bytes" json:"max_bytes"`
+	PreviousRetentionDays int    `yaml:"previous_retention_days" json:"previous_retention_days"`
+	PreloadPath           string `yaml:"preload_path" json:"preload_path,omitempty"`
+	ReleaseURL            string `yaml:"release_url" json:"release_url,omitempty"`
+	OfflineKeyring        string `yaml:"offline_keyring" json:"offline_keyring,omitempty"`
 }
 
 // DefaultRuntimeMode is set to native by DEB/RPM builds. Other installations use
@@ -57,30 +56,36 @@ func (c RuntimeConfig) validate() error {
 			return errors.New("release_url requires HTTPS without credentials or a fragment")
 		}
 	}
-	for _, key := range c.VerificationKeys {
-		if !filepath.IsAbs(key) {
-			return errors.New("verification_keys requires absolute paths to public PEM files")
-		}
+	if c.OfflineKeyring != "" && !filepath.IsAbs(c.OfflineKeyring) {
+		return errors.New("offline_keyring requires an absolute path to a public OpenPGP keyring")
 	}
 	return nil
 }
 
-// ReleaseLoader reads trust only from process configuration. Empty path selects
-// the configured latest URL; a nonempty path imports signed offline metadata.
+// ReleaseLoader selects canonical online trust only with network consent.
+// Offline imports require an explicit administrator-provisioned public keyring.
 // Call it under installation exclusion, never before checking update consent.
-func (c RuntimeConfig) ReleaseLoader(path string) func(context.Context) (runtime.Release, error) {
+func (c RuntimeConfig) ReleaseLoader(path string, networkAllowed bool) func(context.Context) (runtime.Release, error) {
 	return func(ctx context.Context) (runtime.Release, error) {
-		keys := make([]ed25519.PublicKey, 0, len(c.VerificationKeys))
-		for _, path := range c.VerificationKeys {
-			key, err := runtime.ReadReleaseKey(path)
-			if err != nil {
-				return runtime.Release{}, fmt.Errorf("runtime verification key: %w", err)
+		var keys *runtime.ReleaseTrust
+		var trustErr error
+		if networkAllowed {
+			keys, trustErr = runtime.FetchReleaseKeyring(ctx)
+		} else {
+			if c.OfflineKeyring == "" {
+				return runtime.Release{}, errors.New("offline preparation requires runtime.offline_keyring; no runtime release verification key is configured")
 			}
-			keys = append(keys, key)
+			keys, trustErr = runtime.ReadReleaseKeyring(c.OfflineKeyring)
+		}
+		if trustErr != nil {
+			return runtime.Release{}, fmt.Errorf("runtime verification key: %w", trustErr)
 		}
 		var release runtime.Release
 		var err error
 		if path == "" {
+			if !networkAllowed {
+				return runtime.Release{}, errors.New("release download requires explicit network consent")
+			}
 			release, err = runtime.FetchRelease(ctx, c.ReleaseURL, keys)
 		} else {
 			release, err = runtime.ReadRelease(path, keys)

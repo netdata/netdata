@@ -1,19 +1,23 @@
 # DEM runtime release descriptors
 
-This offline release tool signs and verifies the complete runtime preparation
-contract through `runtime.SignRelease` and `runtime.VerifyRelease`. It performs
+This offline release tool signs the complete runtime preparation contract with
+GPG and verifies it through `runtime.VerifyRelease`. It performs
 no network requests, publication, browser execution or release discovery. Run it
 from `src/go`, using a Go version matching `go.mod`.
 
-Use an unencrypted Ed25519 private key in PKCS8 PEM format for signing and its
-public key in PKIX PEM format for verification. Supply key files through the
-release environment's approved secret handling; never commit private keys.
-Verification trust comes from the explicitly supplied public key, not the release
-or its archives. The tool neither generates keys nor chooses production trust.
+Import the package signing key into the release worker's GPG keyring and pass its
+fingerprint for signing, plus an explicitly supplied OpenPGP public keyring for
+verification. GPG uses the worker's normal keyring or `GNUPGHOME`; private keys
+remain in that keyring and MUST NOT be committed. Only signing requires a `gpg`
+executable; verification runs inside Go. Trust comes from the supplied public
+keyring, never the release or its archives. The tool neither generates production
+keys nor fetches trust. The release workflow obtains the public keyring from
+`https://repository.netdata.cloud/netdatabot.gpg.key`.
 
 ```sh
 go run ./tools/dem-runtime-release sign \
-  --key /protected/release-private.pem \
+  --key PACKAGE_SIGNING_FINGERPRINT \
+  --public-key /trusted/netdatabot.gpg.key \
   --manifest /build/manifest.json \
   --archive /build/runtime.tar.zst \
   --sources /build/sources.tar.zst \
@@ -23,7 +27,7 @@ go run ./tools/dem-runtime-release sign \
   --output /build/release.json
 
 go run ./tools/dem-runtime-release verify \
-  --key /trusted/release-public.pem \
+  --key /trusted/netdatabot.gpg.key \
   --release /build/release.json \
   --archive /build/runtime.tar.zst \
   --sources /build/sources.tar.zst
@@ -36,7 +40,9 @@ manifest values, including extraction bounds, layout and ELF binding bytes,
 remain unchanged. Signing streams the local runtime archive and compares its
 SHA256 and byte count with the manifest. It streams the local source archive and
 includes its SHA256 and byte count in the signed release. Inputs must remain
-unchanged throughout signing and subsequent publication.
+unchanged throughout signing and subsequent publication. The tool verifies the
+resulting detached signature before creating the envelope; the public keyring must
+authorize the selected GPG signer.
 
 `--sequence` is required, positive and explicitly allocated by the publisher in
 one shared channel namespace across architectures and contract changes. The tool
@@ -48,7 +54,10 @@ of them. Package/repository signing is a separate operation.
 
 Output is a complete descriptor created atomically under the requested name.
 Existing output paths are always rejected, even if identical; inspect and reuse
-an existing verified result instead of overwriting it. Output creation uses a
+an existing verified result instead of overwriting it. OpenPGP signatures contain
+creation times, so signing the same payload again need not produce identical bytes.
+The publisher reconciles retries against the authenticated immutable descriptor;
+this tool does not rewrite existing outputs. Output creation uses a
 same-directory temporary file and a hard link, so the destination filesystem must
 support hard links. The output inherits the temporary file's private permissions;
 the publication workflow can read and upload it without making local key material

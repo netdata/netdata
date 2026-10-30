@@ -44,12 +44,12 @@ func runRuntimeCommand(ctx context.Context, args []string, stdout, stderr io.Wri
 	flags := flag.NewFlagSet("runtime "+command, flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	configDir := flags.String("config-dir", "", "directory containing administrator dem.conf")
-	releasePath := flags.String("release", "", "signed offline release descriptor; otherwise use configured latest URL")
+	releasePath := flags.String("release", "", "local signed release descriptor; otherwise use configured latest URL")
 	manualUpdates := flags.Bool("manual-updates", false, "disable automatic daily update preparation (install/repair); activation always requires restart")
 	cache := flags.String("cache", "", "managed installation directory")
 	root := flags.String("root", "", "preload final root (must be new or empty; never move it)")
 	archive := flags.String("archive", "", "offline archive checked against the trusted release descriptor")
-	allowDownload := flags.Bool("allow-download", false, "explicitly download signed release metadata and runtime bytes; install/repair enables automatic preparation unless --manual-updates")
+	allowDownload := flags.Bool("allow-download", false, "explicitly download canonical package-signing keys, signed release metadata and runtime bytes; install/repair enables automatic preparation unless --manual-updates")
 	if err := flags.Parse(args[2:]); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return true, nil
@@ -218,7 +218,7 @@ func runRuntimeCommand(ctx context.Context, args []string, stdout, stderr io.Wri
 				fmt.Fprintln(stderr, "Runtime installation enables daily automatic update preparation. Activation requires a DEM restart; use --manual-updates to disable automatic preparation.")
 			}
 		}
-		candidate, err := store.BeginPublishedInstall(ctx, options, cfg.ReleaseLoader(*releasePath))
+		candidate, err := store.BeginPublishedInstall(ctx, options, cfg.ReleaseLoader(*releasePath, *allowDownload))
 		if err != nil {
 			return true, err
 		}
