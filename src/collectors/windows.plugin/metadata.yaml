@@ -5376,6 +5376,195 @@ modules:
                 - name: queued
   - meta:
       plugin_name: windows.plugin
+      module_name: GetFSRMQuota
+      monitored_instance:
+        name: FSRM Quotas
+        description: "Monitor Windows File Server Resource Manager quota usage, limits, and state."
+        link: "https://learn.microsoft.com/en-us/windows-server/storage/fsrm/quota-management"
+        categories:
+          - data-collection.storage
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - windows
+        - microsoft
+        - fsrm
+        - quota
+        - file server
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors File Server Resource Manager (FSRM) quotas on Windows: space used, the highest usage
+          recorded, the quota limit, and whether each quota is disabled, a soft limit, or still matches its template.
+        method_description: |
+          It queries the `MSFT_FSRMQuota` WMI class in the `root\Microsoft\Windows\FSRM` namespace on its own thread,
+          so a slow WMI service cannot delay other Windows collectors.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: |
+          The Netdata service account needs read access to the `root\Microsoft\Windows\FSRM` WMI namespace. The
+          default `LocalSystem` account has it; whether other accounts can read quotas has not been verified.
+      default_behavior:
+        auto_detection:
+          description: |
+            The module is disabled by default. Once enabled, it charts every quota the FSRM provider returns. Quotas
+            created later appear on the next collection; deleted quotas stop being charted.
+        limits:
+          description: |
+            Every quota is charted individually, with two charts per quota. Hosts with thousands of quotas create a
+            matching number of charts.
+        performance_impact:
+          description: |
+            Each collection runs one WMI query. If the query fails, the module retries with exponential backoff, up to
+            every 10 minutes, so a host without the FSRM role costs almost nothing.
+    setup:
+      prerequisites:
+        list:
+          - title: FSRM role installed
+            description: |
+              The File Server Resource Manager role service must be installed and the `SrmSvc` service running, with
+              at least one quota configured.
+          - title: Enable the module
+            description: |
+              Set `GetFSRMQuota = yes` in the `[plugin:windows]` section of `netdata.conf` and restart Netdata.
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows:GetFSRMQuota]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 10
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list:
+          - name: No FSRM charts after enabling the module
+            description: |
+              Check the Netdata collector log for `GetFSRMQuota` errors. `FSRM WMI provider not found` means the FSRM
+              role is not installed; `access denied` means the service account cannot read the FSRM WMI namespace;
+              `timed out` means the WMI service did not answer in time. A host with no quotas shows only the quota
+              count chart, at 0.
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: "A failed WMI query leaves a gap in every chart instead of reporting zeros."
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics refer to all FSRM quotas on the host."
+          labels: []
+          metrics:
+            - name: fsrm.quotas
+              description: FSRM quotas
+              unit: quotas
+              chart_type: line
+              dimensions:
+                - name: quotas
+        - name: quota
+          description: "These metrics refer to one FSRM quota."
+          labels:
+            - name: path
+              description: The folder or volume path the quota applies to.
+            - name: template
+              description: The quota template the quota was created from; empty when none.
+          metrics:
+            - name: fsrm.quota_space
+              description: FSRM quota space
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: used
+                - name: peak
+                - name: limit
+            - name: fsrm.quota_state
+              description: FSRM quota state
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: disabled
+                - name: soft_limit
+                - name: matches_template
+    functions:
+      description: |
+        View every FSRM quota, including its description, which is not kept as a chart label.
+      list:
+        - id: fsrm-quotas
+          name: FSRM Quotas
+          description: |
+            Shows the quotas from the latest successful collection with usage, limit, peak usage, percentage used, and
+            state. Returns an error when no collection has succeeded within three collection intervals.
+          parameters: []
+          returns:
+            description: "One row per quota; unavailable values are empty."
+            columns:
+              - name: Path
+                type: string
+                unit: ""
+                description: "Quota path."
+              - name: Template
+                type: string
+                unit: ""
+                description: "Quota template; empty when none."
+              - name: Description
+                type: string
+                unit: ""
+                description: "Quota description."
+              - name: Used
+                type: number
+                unit: bytes
+                description: "Disk space charged to the quota."
+              - name: Limit
+                type: number
+                unit: bytes
+                description: "Quota size."
+              - name: Peak
+                type: number
+                unit: bytes
+                description: "Highest usage charged to the quota."
+                visibility: hidden
+              - name: Used%
+                type: number
+                unit: "%"
+                description: "Usage as a percentage of the quota size."
+              - name: SoftLimit
+                type: string
+                unit: ""
+                description: "`yes` for a soft limit, `no` for a hard limit."
+              - name: Disabled
+                type: string
+                unit: ""
+                description: "`yes` when the quota is disabled."
+              - name: MatchesTemplate
+                type: string
+                unit: ""
+                description: "`yes` when the quota properties match its template."
+                visibility: hidden
+          performance: "Reads the in-memory result of the latest collection; it does not query WMI."
+          security: "Requires signed-in, same-space access because quota paths and descriptions can contain user-entered text."
+          availability: "Available after the first successful collection with the module enabled."
+  - meta:
+      plugin_name: windows.plugin
       module_name: PerflibNUMA
       monitored_instance:
         name: NUMA Architecture
