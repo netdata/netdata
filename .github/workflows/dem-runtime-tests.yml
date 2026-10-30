@@ -4,11 +4,18 @@ on:
   pull_request:
     paths:
       - '.github/workflows/dem-runtime-tests.yml'
+      - '.github/workflows/dem-runtime-release.yml'
       - 'src/collectors/utils/nd-run.c'
       - 'src/collectors/utils/nd-process-tree.*'
       - 'src/collectors/utils/supervisor-pipes.h'
       - 'src/collectors/utils/nd-file-reader.*'
       - 'src/collectors/utils/exec-signals.h'
+      - 'packaging/dem-runtime/**'
+      - 'packaging/cmake/pkg-files/deb/netdata/prerm'
+      - 'packaging/installer/kickstart.sh'
+      - 'packaging/installer/tests/test_dem_runtime.py'
+      - 'src/dem-runtime/**'
+      - 'src/go/tools/dem-runtime-release/**'
       - 'src/go/cmd/demplugin/**'
       - 'src/go/plugin/dem/**'
       - 'src/go/plugin/agent/jobmgr/**'
@@ -20,11 +27,18 @@ on:
     branches: [master]
     paths:
       - '.github/workflows/dem-runtime-tests.yml'
+      - '.github/workflows/dem-runtime-release.yml'
       - 'src/collectors/utils/nd-run.c'
       - 'src/collectors/utils/nd-process-tree.*'
       - 'src/collectors/utils/supervisor-pipes.h'
       - 'src/collectors/utils/nd-file-reader.*'
       - 'src/collectors/utils/exec-signals.h'
+      - 'packaging/dem-runtime/**'
+      - 'packaging/cmake/pkg-files/deb/netdata/prerm'
+      - 'packaging/installer/kickstart.sh'
+      - 'packaging/installer/tests/test_dem_runtime.py'
+      - 'src/dem-runtime/**'
+      - 'src/go/tools/dem-runtime-release/**'
       - 'src/go/cmd/demplugin/**'
       - 'src/go/plugin/dem/**'
       - 'src/go/plugin/agent/jobmgr/**'
@@ -40,7 +54,7 @@ concurrency:
 jobs:
   contracts:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -66,5 +80,23 @@ jobs:
       - name: Store lifecycle and supervisor integration
         working-directory: src/go
         run: |
-          go test -race -count=1 ./plugin/dem/... ./cmd/demplugin ./plugin/go.d/pkg/ndexec ./plugin/agent/jobmgr/composition
-          go vet ./plugin/dem/... ./cmd/demplugin ./plugin/go.d/pkg/ndexec ./plugin/agent/jobmgr/composition
+          go test -race -count=1 ./plugin/dem/... ./cmd/demplugin ./tools/dem-runtime-release ./plugin/go.d/pkg/ndexec ./plugin/agent/jobmgr/composition
+          go vet ./plugin/dem/... ./cmd/demplugin ./tools/dem-runtime-release ./plugin/go.d/pkg/ndexec ./plugin/agent/jobmgr/composition
+          go build -trimpath -o "$RUNNER_TEMP/dem-runtime-release" ./tools/dem-runtime-release
+          echo "DEM_RELEASE_TEST_TOOL=$RUNNER_TEMP/dem-runtime-release" >> "$GITHUB_ENV"
+      - name: Install native package inspection tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake rpm cpio dpkg-dev
+          for tool in cmake cpack dpkg-deb rpmbuild rpm rpm2cpio cpio; do command -v "$tool"; done
+      - name: Builder, source assembly, and native package contracts
+        run: |
+          python3 -m unittest discover -s packaging/dem-runtime -v
+          python3 -m unittest discover -s packaging/dem-runtime/native/tests -v
+      - name: Explicit installer and service identity contracts
+        run: |
+          docker pull python:3.13-bookworm
+          docker run --rm --network none \
+            -e NETDATA_TEST_PRIVILEGED_CONTAINER=1 \
+            -v "$PWD:/workspace:ro" -w /workspace python:3.13-bookworm \
+            sh -ec 'useradd --system netdata; exec python3 -B -m unittest discover -s packaging/installer/tests -p test_dem_runtime.py -v'

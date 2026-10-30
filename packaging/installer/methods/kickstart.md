@@ -82,6 +82,7 @@ Use these flags to customize your installation.
 |                         | `--install-version`    | Install specific version            |
 | **Auto-Updates**        | `--auto-update`        | Enable updates                      |
 |                         | `--no-updates`         | Disable updates                     |
+| **Synthetic monitoring** | `--install-dem-runtime` | Explicitly install the optional DEM browser runtime |
 | **Netdata Cloud**       | `--claim-token`        | Provide claim token                 |
 |                         | `--claim-rooms`        | Assign node to specific Cloud Rooms |
 | **Reinstall/Uninstall** | `--reinstall`          | Reinstall existing Netdata          |
@@ -92,6 +93,24 @@ Use these flags to customize your installation.
 **Managing auto-updates after installation:** `kickstart.sh` enables daily auto-updates by default. To disable, check, or re-enable auto-updates — including why `netdata-updater.conf` cannot disable them — see [Managing Automatic Updates](/packaging/installer/UPDATE.md#managing-automatic-updates) in the Update guide.
 
 :::
+
+## Optional browser runtime for synthetic monitoring
+
+Add `--install-dem-runtime` to an ordinary kickstart install or update to prepare the browser runtime used by DEM journeys and Lighthouse. Without this option, kickstart does not acquire a browser runtime. The option also works with an existing installation supported by kickstart.
+
+```sh
+sudo sh ./kickstart.sh --install-dem-runtime
+```
+
+For native package installations, kickstart installs the optional `netdata-dem-runtime` package using the same package manager and interaction policy as the Agent. Native runtime packages require the named `netdata` service account. Package hooks qualify the runtime and may restart a previously running Agent. If package installation or runtime readiness fails, kickstart reports failure; it does not switch to managed delivery.
+
+For static and source installations, kickstart runs the installed `dem.plugin runtime install --allow-download` as the configured nonroot Netdata service user. It reads the installed Agent's normal configuration to find its plugin, administrator/stock configuration and persistent-state directories, including custom installation prefixes. The CLI uses the configured publisher URL and verification keys; kickstart does not provide a substitute trust key or release URL.
+
+This managed action downloads signed release metadata and the browser archive, then enables automatic daily preparation of future releases. **An operator must restart the Agent to activate the prepared runtime.** Kickstart does not restart it for managed runtime activation. The Agent's `--no-updates` option controls Agent updates separately; to disable automatic runtime preparation, run the runtime CLI with `install --allow-download --manual-updates` as the service user. See [DEM runtime installation](/src/go/plugin/dem/README.md#runtime-setup-and-retirement) for CLI and offline setup.
+
+The browser runtime requires Linux `x86_64` or `aarch64`, an Agent containing the runtime CLI, and a host where browser sandboxing is allowed. Native package qualification requires a running systemd host. Missing publisher configuration, an unavailable optional package, or failed browser qualification makes explicit setup fail even if Agent installation succeeded. Kickstart does not inspect live service `-c`/`-u` arguments or environment overrides. Such custom launch setups, and plugin paths requiring escaping, must use the runtime CLI directly with the same service identity and configuration as the Agent.
+
+`--install-dem-runtime` cannot be combined with `--offline-install-source`, `--prepare-offline-install-source`, `--repositories-only`, `--claim-only`, or `--uninstall`. Use the signed offline runtime CLI or your package manager for offline runtime installation. `--dry-run` reports the intended action without acquiring or qualifying a runtime.
 
 ## Environment Variables
 
