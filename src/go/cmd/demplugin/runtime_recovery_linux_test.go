@@ -3,14 +3,13 @@
 package main
 
 import (
-	"bytes"
 	"context"
-	"crypto/ed25519"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/internal/pgptest"
 	"github.com/netdata/netdata/go/plugins/plugin/dem"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
@@ -26,8 +25,8 @@ func selectedAdminFixture(t *testing.T) (root, cache, manifest, archive string, 
 	root = t.TempDir()
 	writeAdminTrust(t, root, "")
 	cfg := dem.DefaultRuntimeConfig()
-	cfg.VerificationKeys = []string{filepath.Join(root, "release-public.pem")}
-	release, err := cfg.ReleaseLoader(manifest)(context.Background())
+	cfg.OfflineKeyring = filepath.Join(root, "release-public.gpg")
+	release, err := cfg.ReleaseLoader(manifest, false)(context.Background())
 	require.NoError(t, err)
 	m := release.Manifest
 	cache = filepath.Join(root, "cache")
@@ -121,10 +120,10 @@ func TestRuntimeRepairValidatesTrustBeforeChangingDamagedStore(t *testing.T) {
 			case "missing trust":
 				writeRuntimeConfig(t, root, cache)
 			case "untrusted signer":
-				release, err := runtime.ReadRelease(releasePath, []ed25519.PublicKey{adminSigningKey().Public().(ed25519.PublicKey)})
+				release, err := runtime.ReadRelease(releasePath, adminTrust(t))
 				require.NoError(t, err)
-				wrong := ed25519.NewKeyFromSeed(bytes.Repeat([]byte{30}, ed25519.SeedSize))
-				data, err := runtime.SignRelease(release, wrong)
+				wrong := pgptest.Key(t, 30)
+				data, err := pgptest.Release(release, wrong)
 				require.NoError(t, err)
 				require.NoError(t, os.WriteFile(releasePath, data, 0600))
 			}

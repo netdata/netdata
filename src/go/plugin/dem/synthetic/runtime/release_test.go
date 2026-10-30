@@ -4,16 +4,18 @@ package runtime
 
 import (
 	"bytes"
-	"crypto/ed25519"
 	"encoding/json"
 	"strings"
 	"testing"
+
+	openpgp "github.com/ProtonMail/go-crypto/openpgp/v2"
+	"github.com/netdata/netdata/go/plugins/internal/pgptest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func releaseFixture(t *testing.T) (Release, ed25519.PrivateKey) {
+func releaseFixture(t *testing.T) (Release, *openpgp.Entity) {
 	t.Helper()
 	m, _ := bundleFixture(t, "signed-release")
 	m.Platform = "linux/arm64"
@@ -27,15 +29,15 @@ func releaseFixture(t *testing.T) (Release, ed25519.PrivateKey) {
 			SHA256: strings.Repeat("a", 64),
 			Bytes:  100,
 		},
-	}, ed25519.NewKeyFromSeed(bytes.Repeat([]byte{1}, ed25519.SeedSize))
+	}, pgptest.Key(t, 1)
 }
 
 func TestReleaseAuthenticatesCompletePreparation(t *testing.T) {
 	release, key := releaseFixture(t)
-	public := key.Public().(ed25519.PublicKey)
-	data, err := SignRelease(release, key)
+	public := key
+	data, err := pgptest.Release(release, key)
 	require.NoError(t, err)
-	verified, err := VerifyRelease(data, []ed25519.PublicKey{public})
+	verified, err := VerifyRelease(data, testTrust(t, public))
 	require.NoError(t, err)
 	assert.Equal(t, release, verified)
 	for _, field := range []string{"binding", "layout", "bounds", "sequence", "sources"} {
@@ -60,7 +62,7 @@ func TestReleaseAuthenticatesCompletePreparation(t *testing.T) {
 			require.NoError(t, err)
 			tampered, err := json.Marshal(envelope)
 			require.NoError(t, err)
-			_, err = VerifyRelease(tampered, []ed25519.PublicKey{public})
+			_, err = VerifyRelease(tampered, testTrust(t, public))
 			assert.ErrorContains(t, err, "not signed by a trusted key")
 		})
 	}
@@ -68,38 +70,38 @@ func TestReleaseAuthenticatesCompletePreparation(t *testing.T) {
 
 func TestReleaseVerificationRequiresLocalTrustAndBoundedMetadata(t *testing.T) {
 	release, key := releaseFixture(t)
-	data, err := SignRelease(release, key)
+	data, err := pgptest.Release(release, key)
 	require.NoError(t, err)
-	other := ed25519.NewKeyFromSeed(bytes.Repeat([]byte{2}, ed25519.SeedSize)).Public().(ed25519.PublicKey)
-	for _, keys := range [][]ed25519.PublicKey{nil, {other}, {[]byte("invalid")}} {
+	other := pgptest.Key(t, 2)
+	for _, keys := range []*ReleaseTrust{nil, testTrust(t, other), {}} {
 		_, err := VerifyRelease(data, keys)
 		assert.Error(t, err)
 	}
-	public := key.Public().(ed25519.PublicKey)
+	public := key
 	for _, invalid := range [][]byte{append(bytes.Clone(data), []byte(" {}")...), []byte("{}"), bytes.Repeat([]byte(" "), ReleaseEnvelopeLimit+1)} {
-		_, err := VerifyRelease(invalid, []ed25519.PublicKey{public})
+		_, err := VerifyRelease(invalid, testTrust(t, public))
 		assert.Error(t, err)
 	}
 	var envelope releaseEnvelope
 	require.NoError(t, json.Unmarshal(data, &envelope))
 	envelope.Payload = append(envelope.Payload[:len(envelope.Payload)-1], []byte(`,"unknown":true}`)...)
-	envelope.Signature = ed25519.Sign(key, releaseSignedBytes(envelope.Payload))
+	envelope.Signature = pgptest.Sign(t, key, releaseSignedBytes(envelope.Payload))
 	unknown, err := json.Marshal(envelope)
 	require.NoError(t, err)
-	_, err = VerifyRelease(unknown, []ed25519.PublicKey{public})
+	_, err = VerifyRelease(unknown, testTrust(t, public))
 	assert.ErrorContains(t, err, "unknown field")
 	// A signature for the raw JSON is not a signature for this release protocol.
 	require.NoError(t, json.Unmarshal(data, &envelope))
-	envelope.Signature = ed25519.Sign(key, envelope.Payload)
+	envelope.Signature = pgptest.Sign(t, key, envelope.Payload)
 	otherPurpose, err := json.Marshal(envelope)
 	require.NoError(t, err)
-	_, err = VerifyRelease(otherPurpose, []ed25519.PublicKey{public})
+	_, err = VerifyRelease(otherPurpose, testTrust(t, public))
 	assert.ErrorContains(t, err, "not signed by a trusted key")
 	// The byte bound applies before parsing, including otherwise valid whitespace.
 	atLimit := append(bytes.Clone(data), bytes.Repeat([]byte(" "), ReleaseEnvelopeLimit-len(data))...)
-	_, err = VerifyRelease(atLimit, []ed25519.PublicKey{public})
+	_, err = VerifyRelease(atLimit, testTrust(t, public))
 	require.NoError(t, err)
-	_, err = VerifyRelease(append(atLimit, ' '), []ed25519.PublicKey{public})
+	_, err = VerifyRelease(append(atLimit, ' '), testTrust(t, public))
 	assert.ErrorContains(t, err, "size limit")
 }
 
@@ -136,4 +138,11 @@ func TestReleaseUpdatePreservesPublicationOrder(t *testing.T) {
 			assert.Equal(t, scenario.update, update)
 		})
 	}
+}
+
+func testTrust(t *testing.T, key *openpgp.Entity) *ReleaseTrust {
+	t.Helper()
+	trust, err := ParseReleaseKeyring(pgptest.Public(t, key))
+	require.NoError(t, err)
+	return trust
 }

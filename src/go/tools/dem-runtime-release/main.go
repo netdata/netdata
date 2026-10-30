@@ -6,18 +6,17 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/ed25519"
 	"crypto/sha256"
-	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
-	"encoding/pem"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 )
@@ -38,14 +37,15 @@ func run(args []string, diagnostics io.Writer) error {
 	}
 	fs := flag.NewFlagSet(args[0], flag.ContinueOnError)
 	fs.SetOutput(diagnostics)
-	var key, descriptor, archive, sources string
-	fs.StringVar(&key, "key", "", "PKCS8 Ed25519 private PEM (sign) or PKIX public PEM (verify)")
+	var key, publicKey, descriptor, archive, sources string
+	fs.StringVar(&key, "key", "", "GPG signing fingerprint (sign) or local public OpenPGP keyring path (verify)")
 	fs.StringVar(&archive, "archive", "", "local runtime archive (required for sign; optional for verify)")
 	fs.StringVar(&sources, "sources", "", "local source archive (required for sign; optional for verify)")
 	var manifest, archiveURL, sourcesURL string
 	var sequence uint64
 	switch args[0] {
 	case "sign":
+		fs.StringVar(&publicKey, "public-key", "", "local public OpenPGP keyring to verify the generated signature")
 		fs.StringVar(&descriptor, "output", "", "new immutable signed descriptor path")
 		fs.StringVar(&manifest, "manifest", "", "builder manifest JSON")
 		fs.StringVar(&archiveURL, "archive-url", "", "immutable HTTPS runtime archive publication URL")
@@ -68,8 +68,8 @@ func run(args []string, diagnostics io.Writer) error {
 	if args[0] == "verify" {
 		return verify(key, descriptor, archive, sources)
 	}
-	if manifest == "" || archive == "" || sources == "" || archiveURL == "" || sourcesURL == "" || sequence == 0 {
-		return errors.New("sign requires manifest, archive, sources, archive-url, sources-url, and a positive sequence")
+	if publicKey == "" || manifest == "" || archive == "" || sources == "" || archiveURL == "" || sourcesURL == "" || sequence == 0 {
+		return errors.New("sign requires public-key, manifest, archive, sources, archive-url, sources-url, and a positive sequence")
 	}
 	m, err := readBuilderManifest(manifest)
 	if err != nil {
@@ -99,27 +99,39 @@ func run(args []string, diagnostics io.Writer) error {
 			Bytes:  size,
 		},
 	}
-	block, err := readPEM(key, "PRIVATE KEY")
+	trusted, err := runtime.ReadReleaseKeyring(publicKey)
 	if err != nil {
 		return err
 	}
-	parsed, err := x509.ParsePKCS8PrivateKey(block.Bytes)
-	if err != nil {
-		return errors.New("invalid PKCS8 private key")
+	// Accept a full fingerprint only; argument parsing must never select another
+	// GPG operation or a loosely matching user ID from the publisher keyring.
+	if (len(key) != 40 && len(key) != 64) || strings.Trim(key, "0123456789abcdefABCDEF") != "" {
+		return errors.New("sign requires a full GPG signing fingerprint")
 	}
-	private, ok := parsed.(ed25519.PrivateKey)
-	if !ok {
-		return errors.New("signing key must be Ed25519")
-	}
-	signed, err := runtime.SignRelease(release, private)
+	payload, err := runtime.ReleaseSigningPayload(release)
 	if err != nil {
 		return err
+	}
+	command := exec.Command("gpg", "--batch", "--no-tty", "--no-armor", "--no-textmode", "--digest-algo", "SHA256", "--local-user", key, "--detach-sign", "--output", "-")
+	command.Stdin = bytes.NewReader(payload)
+	// Host GPG owns private key access through GNUPGHOME; never echo its output
+	// on failure, since diagnostics can contain private publisher configuration.
+	signature, err := command.Output()
+	if err != nil {
+		return errors.New("GPG runtime release signing failed")
+	}
+	signed, err := runtime.EncodeRelease(payload, signature)
+	if err != nil {
+		return err
+	}
+	if _, err := runtime.VerifyRelease(signed, trusted); err != nil {
+		return fmt.Errorf("verify generated signature: %w", err)
 	}
 	return writeNew(descriptor, signed)
 }
 
 func verify(key, descriptor, archive, sources string) error {
-	public, err := runtime.ReadReleaseKey(key)
+	public, err := runtime.ReadReleaseKeyring(key)
 	if err != nil {
 		return err
 	}
@@ -127,7 +139,7 @@ func verify(key, descriptor, archive, sources string) error {
 	if err != nil {
 		return err
 	}
-	release, err := runtime.VerifyRelease(data, []ed25519.PublicKey{public})
+	release, err := runtime.VerifyRelease(data, public)
 	if err != nil {
 		return err
 	}
@@ -159,18 +171,6 @@ func readBounded(path string) ([]byte, error) {
 		return nil, errors.New("metadata exceeds release protocol size limit")
 	}
 	return data, nil
-}
-
-func readPEM(path, kind string) (*pem.Block, error) {
-	data, err := readBounded(path)
-	if err != nil {
-		return nil, err
-	}
-	block, rest := pem.Decode(data)
-	if block == nil || block.Type != kind || len(block.Headers) != 0 || len(bytes.TrimSpace(rest)) != 0 || !bytes.HasPrefix(bytes.TrimSpace(data), []byte("-----BEGIN "+kind+"-----")) {
-		return nil, fmt.Errorf("expected one unencrypted %s PEM block", kind)
-	}
-	return block, nil
 }
 
 func hashFile(path string) (string, int64, error) {

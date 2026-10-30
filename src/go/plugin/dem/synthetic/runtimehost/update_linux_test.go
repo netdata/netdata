@@ -4,7 +4,6 @@ package runtimehost
 
 import (
 	"context"
-	"crypto/ed25519"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/internal/pgptest"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/stretchr/testify/require"
@@ -63,12 +63,13 @@ func TestUpdaterPreparesOnceAndRequiresRestart(t *testing.T) {
 	http.DefaultTransport = server.Client().Transport
 	defer func() { http.DefaultTransport = previous }()
 	next.Manifest.Archive.URL = server.URL
-	public, private, err := ed25519.GenerateKey(nil)
+	private := pgptest.Key(t, 66)
+	public, err := runtime.ParseReleaseKeyring(pgptest.Public(t, private))
 	require.NoError(t, err)
-	envelope, err := runtime.SignRelease(next, private)
+	envelope, err := pgptest.Release(next, private)
 	require.NoError(t, err)
 	load := func(context.Context) (runtime.Release, error) {
-		return runtime.VerifyRelease(envelope, []ed25519.PublicKey{public})
+		return runtime.VerifyRelease(envelope, public)
 	}
 	calls := 0
 	u := NewUpdater(host, qualifyFunc(func(_ context.Context, source runner.Source) (*runner.Qualification, error) {

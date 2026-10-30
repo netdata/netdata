@@ -3,14 +3,18 @@
 package runtime
 
 import (
+	"bytes"
 	"context"
-	"crypto/ed25519"
 	"errors"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/internal/pgptest"
 
 	"github.com/stretchr/testify/require"
 )
@@ -22,12 +26,12 @@ func publishedFixture(t *testing.T, sequence uint64) (Release, string, func(cont
 	release := Release{Format: 1, Sequence: sequence, Manifest: m,
 		Sources: ReleaseSource{URL: "https://artifacts.example.invalid/sources.tar.zst", SHA256: strings.Repeat("b", 64), Bytes: 100}}
 	_, key := releaseFixture(t)
-	envelope, err := SignRelease(release, key)
+	envelope, err := pgptest.Release(release, key)
 	require.NoError(t, err)
 	path := filepath.Join(t.TempDir(), "archive.tar.zst")
 	require.NoError(t, os.WriteFile(path, archive, 0600))
 	return release, path, func(context.Context) (Release, error) {
-		return VerifyRelease(envelope, []ed25519.PublicKey{key.Public().(ed25519.PublicKey)})
+		return VerifyRelease(envelope, testTrust(t, key))
 	}
 }
 
@@ -208,4 +212,47 @@ func TestPublishedRepairAllowsExplicitRecoveryAndRequiresDrain(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, older, *status.Release)
 	require.False(t, status.AutomaticUpdates)
+}
+
+func TestPublishedOnlineTrustFailurePreservesInstalledSelection(t *testing.T) {
+	store, _ := testStore(t)
+	current := installPublishedFixture(t, store, 2, AutomaticUpdates)
+	consumer, err := store.AcquireSelected()
+	require.NoError(t, err)
+	defer consumer.Close()
+	next, _, _ := publishedFixture(t, 3)
+	key := pgptest.Key(t, 1)
+	signed, err := pgptest.Release(next, key)
+	require.NoError(t, err)
+	previous := http.DefaultTransport
+	t.Cleanup(func() { http.DefaultTransport = previous })
+	status := http.StatusServiceUnavailable
+	calls := 0
+	http.DefaultTransport = trustTransport(func(r *http.Request) (*http.Response, error) {
+		calls++
+		require.Equal(t, ReleaseKeyringURL, r.URL.String())
+		return &http.Response{StatusCode: status, Body: io.NopCloser(bytes.NewReader(pgptest.Public(t, key))), Header: make(http.Header)}, nil
+	})
+	load := func(ctx context.Context) (Release, error) {
+		trust, err := FetchReleaseKeyring(ctx)
+		if err != nil {
+			return Release{}, err
+		}
+		return VerifyRelease(signed, trust)
+	}
+	candidate, err := store.BeginPublishedInstall(context.Background(), ReleaseInstallOptions{Operation: AutomaticReleaseUpdate}, load)
+	require.ErrorContains(t, err, "503")
+	require.Nil(t, candidate)
+	inspection, err := store.Inspect()
+	require.NoError(t, err)
+	require.Equal(t, current, *inspection.Release)
+	require.Equal(t, current.Manifest, consumer.Manifest())
+	require.Equal(t, 1, calls)
+	// The next attempt fetches trust afresh and can proceed under the same owner.
+	status = http.StatusOK
+	candidate, err = store.BeginPublishedInstall(context.Background(), ReleaseInstallOptions{Operation: AutomaticReleaseUpdate}, load)
+	require.NoError(t, err)
+	require.NotNil(t, candidate)
+	require.NoError(t, candidate.Close())
+	require.Equal(t, 2, calls)
 }

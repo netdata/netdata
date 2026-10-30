@@ -115,7 +115,7 @@ func main() {
 	runtimeHandle := dem.OpenRuntime(cfg.Runtime, pluginconfig.VarLibDir())
 	executor := runner.New(runtimeHandle.Source, synthetichistory.NewStore(history), captures)
 	if runtimeHandle.Store != nil && runtimeHandle.Host != nil {
-		runtimeHandle.Updater = runtimehost.NewUpdater(runtimeHandle.Host, executor, cfg.Runtime.ReleaseLoader(""))
+		runtimeHandle.Updater = runtimehost.NewUpdater(runtimeHandle.Host, executor, cfg.Runtime.ReleaseLoader("", true))
 	}
 	components := dem.New(
 		dem.Dependencies{

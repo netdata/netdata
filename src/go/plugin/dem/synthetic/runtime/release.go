@@ -4,9 +4,6 @@ package runtime
 
 import (
 	"bytes"
-	"crypto/ed25519"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -39,7 +36,6 @@ type ReleaseSource struct {
 
 type releaseEnvelope struct {
 	Format    int    `json:"format"`
-	KeyID     string `json:"key_id"`
 	Payload   []byte `json:"payload"`
 	Signature []byte `json:"signature"`
 }
@@ -62,23 +58,8 @@ func (r Release) Validate() error {
 	return nil
 }
 
-// ReleaseKeyID identifies a locally trusted public key. The envelope cannot
-// introduce a key or change the administrator's trust configuration.
-func ReleaseKeyID(key ed25519.PublicKey) string {
-	sum := sha256.Sum256(key)
-	return hex.EncodeToString(sum[:])
-}
-
-func releaseSignedBytes(payload []byte) []byte {
-	return append([]byte(releaseSignatureDomain), payload...)
-}
-
-// SignRelease is used by release tooling. Source publication and platform
-// qualification remain publisher obligations; a signature cannot prove either.
-func SignRelease(release Release, key ed25519.PrivateKey) ([]byte, error) {
-	if len(key) != ed25519.PrivateKeySize {
-		return nil, errors.New("invalid runtime release signing key")
-	}
+// ReleaseSigningPayload returns the exact domain-separated bytes signed by GPG.
+func ReleaseSigningPayload(release Release) ([]byte, error) {
 	if err := release.Validate(); err != nil {
 		return nil, err
 	}
@@ -86,21 +67,28 @@ func SignRelease(release Release, key ed25519.PrivateKey) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	envelope, err := json.Marshal(releaseEnvelope{
-		Format:    1,
-		KeyID:     ReleaseKeyID(key.Public().(ed25519.PublicKey)),
-		Payload:   payload,
-		Signature: ed25519.Sign(key, releaseSignedBytes(payload)),
-	})
+	return releaseSignedBytes(payload), nil
+}
+
+func releaseSignedBytes(payload []byte) []byte {
+	return append([]byte(releaseSignatureDomain), payload...)
+}
+
+// EncodeRelease wraps the original payload and binary detached OpenPGP signature.
+// The caller must verify the resulting descriptor before publishing it.
+func EncodeRelease(signedPayload, signature []byte) ([]byte, error) {
+	if !bytes.HasPrefix(signedPayload, []byte(releaseSignatureDomain)) {
+		return nil, errors.New("invalid release signing domain")
+	}
+	envelope, err := json.Marshal(releaseEnvelope{Format: 1, Payload: signedPayload[len(releaseSignatureDomain):], Signature: signature})
 	if err == nil && len(envelope) > ReleaseEnvelopeLimit {
 		return nil, errors.New("runtime release descriptor exceeds protocol size limit")
 	}
 	return envelope, err
 }
 
-// VerifyRelease authenticates all preparation fields before exposing them to
-// acquisition. It provides no freshness, expiry or automatic key-rotation claim.
-func VerifyRelease(data []byte, trusted []ed25519.PublicKey) (Release, error) {
+// VerifyRelease authenticates every preparation field and checks current signer validity.
+func VerifyRelease(data []byte, trusted *ReleaseTrust) (Release, error) {
 	var result Release
 	if len(data) > ReleaseEnvelopeLimit {
 		return result, errors.New("runtime release descriptor exceeds protocol size limit")
@@ -109,20 +97,11 @@ func VerifyRelease(data []byte, trusted []ed25519.PublicKey) (Release, error) {
 	if err := decodeReleaseJSON(data, &envelope); err != nil {
 		return result, fmt.Errorf("runtime release envelope: %w", err)
 	}
-	if envelope.Format != 1 || !validID(envelope.KeyID) || len(envelope.Signature) != ed25519.SignatureSize {
+	if envelope.Format != 1 {
 		return result, errors.New("invalid runtime release envelope")
 	}
-	var key ed25519.PublicKey
-	for _, candidate := range trusted {
-		if len(candidate) != ed25519.PublicKeySize {
-			return result, errors.New("invalid configured runtime release verification key")
-		}
-		if ReleaseKeyID(candidate) == envelope.KeyID {
-			key = candidate
-		}
-	}
-	if key == nil || !ed25519.Verify(key, releaseSignedBytes(envelope.Payload), envelope.Signature) {
-		return result, errors.New("runtime release is not signed by a trusted key")
+	if err := verifyReleaseSignature(releaseSignedBytes(envelope.Payload), envelope.Signature, trusted); err != nil {
+		return result, err
 	}
 	if err := decodeReleaseJSON(envelope.Payload, &result); err != nil {
 		return Release{}, fmt.Errorf("signed runtime release: %w", err)

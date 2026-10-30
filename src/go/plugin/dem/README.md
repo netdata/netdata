@@ -498,8 +498,9 @@ dem.plugin runtime qualify
 ```
 
 Install, update and repair verify the archive, prepare its private paths, then run both a local sandboxed journey and
-Lighthouse audit before selecting the release. Both offline and downloaded descriptors require a signature from
-a public key installed through administrator configuration. `qualify` repeats these checks for the selected release.
+Lighthouse audit before selecting the release. Online operations fetch the package public keyring from
+`https://repository.netdata.cloud/netdatabot.gpg.key`; offline operations require `runtime.offline_keyring` to name
+an administrator-provisioned OpenPGP public keyring. `qualify` repeats these checks for the selected release.
 It tests the calling account and environment, not a different service's AppArmor, SELinux or container policy.
 
 **Restart DEM after installation, update or repair, including the first installation.** Each process keeps the runtime it
@@ -515,7 +516,9 @@ Qualification shares the browser execution slot, so monitors can wait while thes
 the selected release and appear as update maintenance errors, separately from website measurements.
 
 Signatures authenticate publication order and complete preparation instructions. They cannot detect withheld updates
-or guarantee freshness on a new installation. Key replacement requires an administrator/Agent trust update.
+or guarantee freshness on a new installation. Online trust follows the canonical HTTPS key endpoint and system TLS
+trust. A key fetch/verification failure blocks that preparation attempt without stopping the installed runtime.
+No stale cached key is used as a fallback; offline keyring updates remain an administrator responsibility.
 Normal updates compare with the currently selected sequence; explicit older-release repair resets that baseline.
 
 ```sh
@@ -566,14 +569,17 @@ runtime:
   cache_path: ''
   max_bytes: 4294967296
   previous_retention_days: 7
-  release_url: https://artifacts.example.invalid/dem-runtime/latest/linux/arm64.json
-  verification_keys:
-    - /absolute/path/runtime-release-public.pem
+  release_url: https://artifacts.example.invalid/dem-runtime/latest/arm64.json
+  offline_keyring: /absolute/path/netdatabot.gpg.key  # required only for offline operations
 ```
 
-The URL above is an example. Use the confirmed publication URL for the host architecture and a publisher-approved
-Ed25519 public key in PKIX PEM format. The descriptor and archive cannot supply their own verification key.
-Publication infrastructure and production trust must be provisioned before online setup can succeed.
+The release URL above is an example; use the confirmed publication URL for the host architecture. Online preparation
+uses the canonical package-key HTTPS endpoint, including when `--release` is combined with `--allow-download`.
+`--release` plus `--archive` is fully offline and uses only `offline_keyring`; this local trust is never an online fallback.
+The descriptor and archive cannot supply their own verification key. Explicit offline installation still enables future
+automatic online preparation unless `--manual-updates` is selected; protected preloads remain manual. The release URL
+and publication infrastructure must be configured before online setup succeeds. Ordinary execution and status do not
+fetch a key, and an already installed runtime can continue operating offline.
 
 The selected runtime stays installed until explicitly uninstalled, even with no browser monitors. The 4 GiB logical
 allowance includes preparation workspace and reservations. Processes and executions protect older releases. Unprotected

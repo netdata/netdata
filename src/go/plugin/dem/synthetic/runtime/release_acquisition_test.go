@@ -5,7 +5,6 @@ package runtime
 import (
 	"bytes"
 	"context"
-	"crypto/ed25519"
 	"io"
 	"net/http"
 	"os"
@@ -14,13 +13,15 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/internal/pgptest"
+
 	"github.com/stretchr/testify/require"
 )
 
 func TestReleaseAcquisitionAuthenticatesRemoteAndOffline(t *testing.T) {
 	release, key := releaseFixture(t)
-	keys := []ed25519.PublicKey{key.Public().(ed25519.PublicKey)}
-	signed, err := SignRelease(release, key)
+	keys := testTrust(t, key)
+	signed, err := pgptest.Release(release, key)
 	require.NoError(t, err)
 	var calls atomic.Int32
 	server := inactivityServer(t, func(w http.ResponseWriter, r *http.Request) {
@@ -38,14 +39,14 @@ func TestReleaseAcquisitionAuthenticatesRemoteAndOffline(t *testing.T) {
 	_, err = FetchRelease(context.Background(), server.URL, nil)
 	require.ErrorContains(t, err, "no runtime release verification key")
 	require.Equal(t, int32(1), calls.Load(), "missing trust must fail before network access")
-	wrong := ed25519.NewKeyFromSeed(bytes.Repeat([]byte{9}, ed25519.SeedSize)).Public().(ed25519.PublicKey)
-	_, err = ReadRelease(path, []ed25519.PublicKey{wrong})
+	wrong := pgptest.Key(t, 9)
+	_, err = ReadRelease(path, testTrust(t, wrong))
 	require.ErrorContains(t, err, "not signed by a trusted key")
 }
 
 func TestReleaseAcquisitionBoundsAndTransport(t *testing.T) {
 	_, key := releaseFixture(t)
-	keys := []ed25519.PublicKey{key.Public().(ed25519.PublicKey)}
+	keys := testTrust(t, key)
 	for _, address := range []string{"http://example.invalid/release", "https://user:secret@example.invalid/release", "https://example.invalid/release#fragment"} {
 		_, err := FetchRelease(context.Background(), address, keys)
 		require.ErrorContains(t, err, "requires HTTPS")
