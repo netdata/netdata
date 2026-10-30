@@ -247,9 +247,9 @@ func (c *Collector) addProfileScalarMetricChart(m ddsnmp.Metric) {
 	}
 }
 
-func (c *Collector) addProfileTableMetricChart(m ddsnmp.Metric) {
+func (c *Collector) addProfileTableMetricChart(m ddsnmp.Metric) *collectorapi.Chart {
 	if m.Name == "" {
-		return
+		return nil
 	}
 
 	key := tableMetricKey(m)
@@ -275,14 +275,7 @@ func (c *Collector) addProfileTableMetricChart(m ddsnmp.Metric) {
 		chart.Type = collectorapi.Area
 	}
 
-	tags := c.chartBaseLabels()
-
-	maps.Copy(tags, m.Profile.Tags)
-	addMetricTagLabels(tags, m.Tags)
-
-	for k, v := range tags {
-		chart.Labels = append(chart.Labels, collectorapi.Label{Key: k, Value: v})
-	}
+	chart.Labels = c.profileTableChartLabels(m)
 
 	if len(m.MultiValue) > 0 {
 		seen := make(map[string]bool)
@@ -302,7 +295,22 @@ func (c *Collector) addProfileTableMetricChart(m ddsnmp.Metric) {
 
 	if err := c.Charts().Add(chart); err != nil {
 		c.Warning(err)
+		return nil
 	}
+	return chart
+}
+
+func (c *Collector) profileTableChartLabels(m ddsnmp.Metric) []collectorapi.Label {
+	tags := c.chartBaseLabels()
+
+	maps.Copy(tags, m.Profile.Tags)
+	addMetricTagLabels(tags, m.Tags)
+
+	labels := make([]collectorapi.Label, 0, len(tags))
+	for k, v := range tags {
+		labels = append(labels, collectorapi.Label{Key: k, Value: v})
+	}
+	return labels
 }
 
 func (c *Collector) removeProfileTableMetricChart(key string) {

@@ -76,6 +76,7 @@ func (c *Collector) collectProfileScalarMetrics(mx map[string]int64, metrics []d
 
 func (c *Collector) collectProfileTableMetrics(mx map[string]int64, metrics []ddsnmp.Metric) {
 	seen := make(map[string]bool)
+	namesStale := false
 
 	for _, m := range metrics {
 		if !m.IsTable {
@@ -96,11 +97,19 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, metrics []dd
 			continue
 		}
 
+		firstRow := !seen[key]
 		seen[key] = true
 
-		if !c.seenTableMetrics[key] {
-			c.seenTableMetrics[key] = true
-			c.addProfileTableMetricChart(m)
+		if st, ok := c.tableCharts[key]; !ok {
+			c.tableCharts[key] = newTableChartState(c.addProfileTableMetricChart(m), m)
+			namesStale = true
+		} else if firstRow && st.privateTagsChanged(m.Tags) {
+			st.update(m)
+			if st.chart != nil {
+				st.chart.Labels = c.profileTableChartLabels(m)
+				st.chart.MarkNotCreated()
+			}
+			namesStale = true
 		}
 
 		if len(m.MultiValue) == 0 {
@@ -122,11 +131,16 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, metrics []dd
 		}
 	}
 
-	for key := range c.seenTableMetrics {
+	for key := range c.tableCharts {
 		if !seen[key] {
-			delete(c.seenTableMetrics, key)
+			delete(c.tableCharts, key)
 			c.removeProfileTableMetricChart(key)
+			namesStale = true
 		}
+	}
+
+	if namesStale || c.tableChartNamesPending {
+		c.updateTableChartNames()
 	}
 }
 
@@ -171,6 +185,11 @@ func (c *Collector) collectProfileStats(mx map[string]int64, pms []*ddsnmp.Profi
 }
 
 func tableMetricKey(m ddsnmp.Metric) string {
+	return tableMetricKeyWith(m, "", "")
+}
+
+// tableMetricKeyWith builds the table metric key with the value of tag replaceTag swapped for replaceValue.
+func tableMetricKeyWith(m ddsnmp.Metric, replaceTag, replaceValue string) string {
 	if m.Name == "" {
 		return ""
 	}
@@ -181,6 +200,9 @@ func tableMetricKey(m ddsnmp.Metric) string {
 	for k, v := range m.Tags {
 		if v == "" || strings.HasPrefix(k, "_") {
 			continue
+		}
+		if k == replaceTag {
+			v = replaceValue
 		}
 		include = append(include, k)
 		totalLen += len("_") + len(v)
@@ -196,8 +218,12 @@ func tableMetricKey(m ddsnmp.Metric) string {
 
 	sb.WriteString(m.Name)
 	for _, k := range include {
+		v := m.Tags[k]
+		if k == replaceTag {
+			v = replaceValue
+		}
 		sb.WriteByte('_')
-		sb.WriteString(m.Tags[k])
+		sb.WriteString(v)
 	}
 
 	return sb.String()
