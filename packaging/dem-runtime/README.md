@@ -6,8 +6,9 @@ loader/library closure, fonts, notices, and the complete release-owned execution
 adapters from `src/dem-runtime`. `nd-run` remains an Agent component. DEM disables
 video recording, so no Playwright FFmpeg artifact is shipped. Exact component pins
 are runtime-owned; the Agent validates semantic execution contract 1 and immutable
-release identity. This is local assembly for an experimental default-off stage.
-It does not publish a release or build native packages.
+release identity. The Agent integration remains experimental while delivery is
+qualified. The builder itself does not publish. The separate [release workflow](RELEASE.md)
+assembles optional native packages and defines protected signing/publication steps.
 
 ## Build from reviewed inputs
 
@@ -31,8 +32,11 @@ immutable base inventory, complete resulting Debian inventory, exact additional
 binary archive URLs/sizes/SHA256s, and source records. The base image owns unchanged
 packages; every changed or added package comes from a locked binary archive.
 
-Ordinary builds MUST NOT resolve current apt candidates. The host fetches only
-locked `.deb` files and verifies their hashes/sizes. Docker's bootstrap transaction
+Ordinary builds MUST NOT resolve current apt candidates. Debian files use official
+Snapshot content-address URLs, so mirror rotation does not change the selected
+bytes. Their SHA1 URL identifiers are locators only: the host still verifies the
+signed-index SHA256 and size, using the lock's explicit filename. Builds do not
+query Snapshot metadata or fall back to current packages. Docker's bootstrap transaction
 uses only those local files with empty apt sources, no remote package indexes,
 and BuildKit networking disabled. Local file acquisition remains enabled because
 apt must copy supplied archives into its transaction cache. The container verifies the entire installed
@@ -76,21 +80,23 @@ Chromium credits are exported in the root build container with Playwright's
 build-time sandbox disabled. This reads embedded notices and MUST NOT count as
 sandbox qualification. Runtime launchers never disable the browser sandbox.
 
-Without `--url-prefix`, `archive.url` remains empty for offline import. An explicit
+Without `--url-prefix`, `archive.url` remains empty in the builder descriptor. An explicit
 approved HTTPS base constructs
 `<prefix>/dem-runtime/<version>/<architecture>/<digest>.tar.gz`. The builder does
-not publish anything. Supply the reviewed manifest to the administrator CLI; a manifest
-fetched beside an archive MUST NOT become the trust anchor.
+not publish anything. The release signing step binds the reviewed manifest to its
+archive and source URLs; an unsigned manifest is not an administrator CLI input.
 
 ## Local installation and qualification
 
-Use the DEM CLI's explicit runtime install/update commands with a locally trusted
-outer `manifest.json` and its exact archive. The source-level component manifest
-inside the runtime is a different document. The trusted descriptor MUST match the
-qualified archive and any immutable URL. Never derive trust from an arbitrary
-descriptor fetched beside an archive. Offline imports use a reviewed descriptor
-with an empty URL. See `src/go/plugin/dem/README.md` for CLI options and restart
-activation semantics. Enabling a monitor does not acquire runtime components.
+Use the DEM CLI's explicit runtime install/update commands with a signed release
+descriptor and its exact archive. The outer builder `manifest.json` and the
+source-level component manifest inside the runtime are different documents.
+`src/go/tools/dem-runtime-release` signs the complete descriptor, including the
+publication sequence, archive identity/bounds and source identity. Configure trusted
+public keys locally; never derive trust from a key fetched beside an archive.
+Offline imports still verify a signature and do not fetch the signed HTTPS URLs.
+See `src/go/plugin/dem/README.md` for CLI options, automatic/manual update consent
+and restart activation. Enabling a monitor does not acquire runtime components.
 
 Candidate qualification must run both a journey and a Lighthouse audit against
 deterministic local content through the Agent and supervised `nd-run`. Runtime
@@ -127,15 +133,40 @@ clean builds, a byte-for-byte repeat, and qualification of the exact browser/
 Playwright pair. Verify Node and patchelf releases against their official release
 checksums when changing those separately maintained pins.
 
+Before writing a candidate lock, refresh queries the official Snapshot API once
+per source version. It matches binary version/architecture and source filenames,
+then downloads each distinct candidate to verify the original SHA256 and size.
+Snapshot metadata supplies SHA1 locators and sizes, not the SHA256 trust anchor.
+Ambiguous names/sizes are resolved only by verified bytes. Missing or mismatched
+files fail generation; newly uploaded packages may require waiting for Snapshot
+ingestion. A cold refresh downloads the locked source files as well as binaries;
+temporary verification files are removed after each file. Snapshot retention
+avoids normal mirror rotation but does not guarantee permanent availability.
+
+To repair locations in existing locks without apt resolution or component updates:
+
+```sh
+python3 packaging/dem-runtime/refresh-lock.py \
+  --snapshot-lock packaging/dem-runtime/locks/amd64.json packaging/dem-runtime/locks/arm64.json \
+  --output /absolute/new/snapshot-locks
+```
+
+The output must be new or empty. All input locks remain untouched, and no converted
+lock is written until every mapping succeeds. Review the URL-only diff before
+adopting the generated locks; all versions, inventories, hashes and sizes remain
+unchanged. Ordinary builds still require no metadata lookup or warm cache.
+
 ## Assemble release sources
 
-Keep sources outside the end-user runtime. From the exact recipe and runtime source
-used to produce a bundle, assemble a separate release source directory:
+Keep sources outside the end-user runtime. With the Go toolchain specified by
+`src/go/go.mod`, use the exact recipe/runtime checkout that builds the release tool
+to assemble a separate release source directory:
 
 ```sh
 python3 packaging/dem-runtime/sources.py \
   --runtime-output .local/audits/dem-runtime-delivery/build-arm64 \
-  --output .local/audits/dem-runtime-delivery/release-sources-arm64
+  --output .local/audits/dem-runtime-delivery/release-sources-arm64 \
+  --archive-output .local/audits/dem-runtime-delivery/source-archive-arm64
 ```
 
 This fetches and hash-verifies every selected Debian `.dsc` and ALL its companions,
@@ -147,10 +178,17 @@ route does not independently verify the descriptor's OpenPGP signature.
 
 The assembly also verifies Node sources, patchelf sources, and exact npm published
 source archives using their integrity pins. It retains the complete packaging/ELF
-modification recipe and tests, locks, all runtime adapters/tests, runtime identity/provenance/SBOM, and a
+modification recipe and tests, native package/publisher recipes, locks, all runtime adapters/tests,
+the staging tool's local Go build closure and module pins, runtime identity/provenance/SBOM, and a
 `source-assembly.json` file inventory. Existing downloads are reverified on rerun. The output must stay outside the recipe
 directory; unexpected existing files are rejected and preserved, not included in
 the verified inventory.
+The optional archive output must be a separate, new or empty directory. Before
+archiving, the command verifies every declared file's digest/size, the complete
+file set and the runtime identity again. It emits a deterministic
+`<sha256>.sources.tar.gz` and `source-archive.json` with its digest and byte count.
+Supply this archive to the release signer; a source URL alone is not source
+delivery. Keep the assembly unchanged throughout archiving and signing.
 Debian source sets can be unpacked with `dpkg-source -x <descriptor>` using their
 preserved filenames. Actual source availability and applicable redistribution
 obligations still require packaging/legal review; names, links and notices alone
@@ -188,3 +226,13 @@ read-only preloads, and browser/Node re-execution. Container evidence applies on
 to its tested kernel/userland. Native qualification, source/license delivery,
 security rebuild ownership and SRE-confirmed public hosting remain publication
 gates. Immutable archives MUST NOT be overwritten during dependency rebuilds.
+
+The native package supplies an AppArmor namespace allowance attached only to its
+root-owned Chromium executable. Qualification must pass with the host's normal
+restrictions and browser sandbox enabled, including after reboot. This named
+unconfined profile permits sandbox setup; it is not extra browser confinement.
+Managed/static bundles and preloads have a different ownership boundary: their
+executable files are service-owned. On restricted Ubuntu hosts, administrator
+policy preparation is an explicit prerequisite; the installer MUST NOT grant a
+generic exception to those writable paths. Container policy is also a separate
+host/deployment prerequisite. See the [operator guidance](../../src/go/plugin/dem/README.md#runtime-setup-and-retirement).

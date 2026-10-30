@@ -18,7 +18,7 @@ import tarfile
 from urllib.parse import urlsplit, urlunsplit
 
 
-RESERVED = {'chrome', 'fonts.conf', 'prepared.json'}
+RESERVED = {'chrome', 'fonts.conf', 'prepared.json', 'native.json'}
 
 
 def credential_free_https(value):
@@ -83,6 +83,16 @@ def runtime_sources(assets):
                  for directory in ('runner', 'tests') for path in (assets / directory).rglob('*')
                  if path.is_file())
     return sorted(names)
+
+
+def recipe_sources():
+    """Release-owned recipe files only; never recurse into caches or local outputs."""
+    return ('build.py', 'bundle.py', 'locked.py', 'sources.py', 'refresh-lock.py', 'snapshot.py', 'test_snapshot.py',
+            'inputs.json', 'Dockerfile', 'README.md', 'RELEASE.md', 'test_bundle.py',
+            'test_delivery.py', 'test_locked.py', 'release.py', 'test_release.py',
+            'locks/amd64.json', 'locks/arm64.json',
+            'native/CMakeLists.txt', 'native/netdata-dem-browser', 'native/hook.sh.in', 'native/lifecycle.sh', 'native/README.md',
+            'native/tests/test_lifecycle.py', 'native/tests/test_recipe.py', 'native/tests/test_package.py')
 
 
 def install_runner(assets, root, version):
@@ -461,10 +471,7 @@ def prepare(args):
                   'runtime_manifest': contract,
                   'source_sha256': {name: sha256(assets / name)
                                     for name in runtime_sources(assets)},
-                  'recipe_sha256': {name: sha256(recipe / name) for name in
-                                    ('build.py', 'bundle.py', 'locked.py', 'sources.py', 'refresh-lock.py',
-                                     'inputs.json', 'Dockerfile', 'README.md', 'test_bundle.py',
-                                     'test_delivery.py', 'test_locked.py', 'locks/amd64.json', 'locks/arm64.json')},
+                  'recipe_sha256': {name: sha256(recipe / name) for name in recipe_sources()},
                   'debian_sources': required_sources,
                   'library_sources': {name: {'path': str(source), 'sha256': sha256(source)}
                                       for name, source in sorted(closure.items())}}
