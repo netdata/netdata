@@ -1736,8 +1736,7 @@ modules:
                     required: false
         prerequisites:
             list:
-              - description: DEM is experimental and opt-in. Build Netdata with `-DENABLE_PLUGIN_DEM=ON`, or use
-                    `--enable-plugin-dem` with the source installer. Install the resulting DEM plugin package.
+              - description: Linux builds include DEM by default. Native installations include the `netdata-plugin-dem` package. RUM does not require the optional browser runtime.
                 title: Install the DEM plugin
               - description: Configure the canonical receiver in `dem/receiver.conf`, then add one job per website in
                     `dem/rum.conf`. The native configuration UI exposes the receiver as a single object and sites as
