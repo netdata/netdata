@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F052F
+# Next unused error code: F0530
 
 # ======================================================================
 # Constants
@@ -67,6 +67,7 @@ SELECTED_INSTALL_METHOD="none"
 INSTALL_TYPE="unknown"
 INSTALL_PREFIX=""
 NETDATA_AUTO_UPDATES="default"
+NETDATA_INSTALL_DEM_RUNTIME=0
 NETDATA_CLAIM_URL="https://app.netdata.cloud"
 NETDATA_COMMAND="default"
 NETDATA_INSTALLER_OPTIONS=""
@@ -170,6 +171,7 @@ main() {
   fi
 
   set_auto_updates
+  install_dem_runtime
 
   printf >&2 "%s\n\n" "Successfully installed the Netdata Agent."
   deferred_warnings
@@ -190,6 +192,7 @@ USAGE: kickstart.sh [options]
   --non-interactive                Do not prompt for user input. (default: prompt if there is a controlling terminal)
   --interactive                    Prompt for user input even if there is no controlling terminal.
   --dont-start-it                  Do not start the agent by default (only for static installs or local builds)
+  --install-dem-runtime            Explicitly install the optional browser runtime for DEM synthetic monitoring.
   --dry-run                        Report what we would do with the given options on this system, but don’t actually do anything.
   --release-channel                Specify the release channel to use for the install (default: ${DEFAULT_RELEASE_CHANNEL})
   --stable-channel                 Equivalent to "--release-channel stable"
@@ -213,6 +216,11 @@ USAGE: kickstart.sh [options]
   --static-install-options         Specify additional options to pass to the static installer code. Only valid if --static-only is also specified.
   --offline-architecture           Limit an offline install source being prepared with --prepare-offline-install-source to only include the specified static build architecture.
   --offline-install-source         Specify a folder to use as installation source when working offline. Use --prepare-offline-install-source first to set up this folder.
+
+--install-dem-runtime uses the installed Agent's normal configuration. Custom service
+-c/-u arguments or environment overrides require direct runtime CLI setup. Native
+runtime packages require the named netdata service account. Managed setup downloads
+the browser archive and enables daily preparation; restart the Agent to activate it.
 
 The following options are mutually exclusive and specifiy special operations other than trying to install Netdata normally or update an existing install:
 
@@ -1434,6 +1442,9 @@ handle_existing_install() {
         progress "Not attempting to claim existing install at ${ndprefix} (no claiming token provided)."
       fi
 
+      dem_claim_status=$ret
+      install_dem_runtime
+      ret=$dem_claim_status
       deferred_warnings
       success_banner
       cleanup
@@ -1462,6 +1473,9 @@ handle_existing_install() {
           INSTALL_PREFIX="${ndprefix}"
           claim
           ret=$?
+          dem_claim_status=$ret
+          install_dem_runtime
+          ret=$dem_claim_status
 
           cleanup
           trap - EXIT
@@ -1701,6 +1715,174 @@ claim() {
 }
 
 # ======================================================================
+# Explicit DEM browser runtime setup.
+install_dem_runtime() {
+  [ "${NETDATA_INSTALL_DEM_RUNTIME}" -eq 1 ] || return 0
+
+  if setup_dem_runtime; then
+    return 0
+  else
+    dem_setup_status=$?
+    warning "Explicit DEM runtime setup failed (status ${dem_setup_status}). The Agent may already be installed; browser runtime setup did not complete."
+    cleanup
+    trap - EXIT
+    exit "${dem_setup_status}"
+  fi
+}
+
+dem_runtime_config() {
+  # Use the Agent's config parser, including legacy-key migration and compiled
+  # directory defaults. No shell evaluation of configuration values is needed.
+  run_as_root "${ndpath}" -W get "$1" "$2" ""
+}
+
+dem_runtime_plugin() {
+  # The Agent exposes plugins as a quoted path list. Consume paths as data,
+  # never shell source, and follow the Agent's first executable match.
+  dem_plugin_list=$1
+  while [ -n "${dem_plugin_list}" ]; do
+    dem_plugin_list=${dem_plugin_list#"${dem_plugin_list%%[![:space:]]*}"}
+    [ -n "${dem_plugin_list}" ] || break
+    case "${dem_plugin_list}" in
+      \"*)
+        dem_plugin_list=${dem_plugin_list#\"}
+        case "${dem_plugin_list}" in *\"*) ;; *) return 1 ;; esac
+        dem_plugin_dir=${dem_plugin_list%%\"*}
+        dem_plugin_list=${dem_plugin_list#*\"}
+        ;;
+      \'*)
+        dem_plugin_list=${dem_plugin_list#\'}
+        case "${dem_plugin_list}" in *\'*) ;; *) return 1 ;; esac
+        dem_plugin_dir=${dem_plugin_list%%\'*}
+        dem_plugin_list=${dem_plugin_list#*\'}
+        ;;
+      *)
+        dem_plugin_dir=${dem_plugin_list%%[[:space:]]*}
+        dem_plugin_list=${dem_plugin_list#"${dem_plugin_dir}"}
+        ;;
+    esac
+    case "${dem_plugin_list}" in ''|[[:space:]]*) ;; *) return 1 ;; esac
+    case "${dem_plugin_dir}" in *\\*) return 1 ;; /*) ;; *) return 1 ;; esac
+    # Native plugins can be root:netdata 0750, inaccessible to the invoking user.
+    # Only discovery is privileged; dem_runtime_cli still uses the service UID.
+    if run_as_root test -x "${dem_plugin_dir}/dem.plugin"; then
+      dem_plugin="${dem_plugin_dir}/dem.plugin"
+      return 0
+    fi
+  done
+  return 1
+}
+
+dem_runtime_cli() {
+  # Run from a directory accessible to the service user, even if kickstart's
+  # temporary checkout is private to root. Never create a managed store as root.
+  (
+    cd / || exit 1
+    set -- env NETDATA_LIB_DIR="${dem_lib}" NETDATA_USER_CONFIG_DIR="${dem_config}" \
+      NETDATA_STOCK_CONFIG_DIR="${dem_stock_config}" \
+      "${dem_plugin}" runtime "$@" --config-dir "${dem_config}"
+    if [ "$(id -u)" = "${dem_uid}" ]; then
+      run "$@"
+    elif command -v runuser >/dev/null 2>&1; then
+      run_as_root runuser -u "${dem_user}" -- "$@"
+    elif command -v sudo >/dev/null 2>&1; then
+      run_as_root sudo -H -u "${dem_user}" -- "$@"
+    else
+      warning "Runtime setup requires runuser or sudo to execute dem.plugin as the configured service user. Run the runtime CLI as that user; do not run managed installation as root."
+      return 1
+    fi
+  )
+}
+
+setup_dem_runtime() {
+  case "${SYSTYPE}:${SYSARCH}" in
+    Linux:x86_64|Linux:aarch64) ;;
+    *) warning "DEM browser runtimes require Linux x86_64 or aarch64; no runtime was acquired."; return 1 ;;
+  esac
+
+  if [ "${DRY_RUN}" -ne 1 ]; then
+    # A fresh source install may add /netdata to the requested prefix. Re-detect
+    # the installed executable instead of guessing its configured paths.
+    ndpath=
+    ndprefix=
+    detect_existing_install
+    if [ -z "${ndpath}" ] || [ ! -x "${ndpath}" ]; then
+      warning "Cannot find the installed Agent to read its runtime paths. Use dem.plugin runtime directly with the installation's configuration and service user."
+      return 1
+    fi
+    dem_user=$(dem_runtime_config global 'run as user') || return $?
+    dem_uid=$(id -u "${dem_user}") || return $?
+    if [ -z "${dem_user}" ] || [ "${dem_uid}" = 0 ]; then
+      warning "DEM runtime setup requires a configured nonroot Netdata service user."
+      return 1
+    fi
+  fi
+  case "${INSTALL_TYPE}" in
+    binpkg-deb|binpkg-rpm)
+      if [ "${DRY_RUN}" -ne 1 ] && [ "${dem_user}" != netdata ]; then
+        warning "Native runtime packages require the named netdata service account. Use the runtime CLI for an explicitly configured managed installation under another account."
+        return 1
+      fi
+      progress "Installing optional netdata-dem-runtime through the system package manager; package hooks may restart the Agent."
+      configure_native_package_manager || return $?
+      # These are the same fixed package-manager option lists used for the Agent.
+      # shellcheck disable=SC2086
+      run_as_root env ${env} ${pm_cmd} ${install_subcmd} ${pkg_install_opts} netdata-dem-runtime || return $?
+      dem_action=status
+      ;;
+    kickstart-static|manual-static|legacy-static|kickstart-build|legacy-build)
+      progress "Explicit DEM setup downloads signed release metadata and the browser archive, then enables daily automatic preparation. Activation requires an operator Agent restart."
+      dem_action=install
+      ;;
+    *)
+      warning "Cannot determine a supported DEM runtime installation method. Use the optional native package for package-managed Agents, or the installed dem.plugin runtime CLI as the service user."
+      return 1
+      ;;
+  esac
+
+  if [ "${DRY_RUN}" -eq 1 ]; then
+    progress "Would run dem.plugin runtime ${dem_action} as the configured nonroot service user, using the installed Agent's directories and publisher configuration."
+    return 0
+  fi
+  dem_config=$(dem_runtime_config directories config) || return $?
+  dem_stock_config=$(dem_runtime_config directories 'stock config') || return $?
+  dem_lib=$(dem_runtime_config directories lib) || return $?
+  for dem_path in "${dem_config}" "${dem_stock_config}" "${dem_lib}"; do
+    case "${dem_path}" in /*) ;; *) warning "The installed Agent did not report absolute runtime directories; use its runtime CLI with explicit configuration."; return 1 ;; esac
+  done
+  dem_plugins=$(dem_runtime_config directories plugins) || return $?
+  if ! dem_runtime_plugin "${dem_plugins}"; then
+    warning "Cannot locate dem.plugin in the configured plugin directories. Install an Agent with DEM support, or run the correct installed runtime CLI explicitly for custom plugin layouts."
+    return 1
+  fi
+  if [ "${dem_action}" = install ]; then
+    if dem_runtime_cli install --allow-download; then
+      progress "DEM runtime prepared with daily automatic preparation enabled. Restart the Agent explicitly to activate it; kickstart does not restart it for managed runtime activation."
+    else
+      dem_cli_status=$?
+      warning "Managed runtime installation failed. Check the CLI error and dem.conf publisher release_url/verification_keys; kickstart does not invent trust or bypass qualification. For manual updates, use runtime install --allow-download --manual-updates as the service user."
+      return "${dem_cli_status}"
+    fi
+  else
+    # RPM can report success despite a failed posttrans hook. Ready admission,
+    # observed by the actual service identity, is required before success.
+    if dem_native_status=$(dem_runtime_cli status); then
+      printf '%s\n' "${dem_native_status}"
+      # Match the CLI's top-level mode field, not a nested runtime setting.
+      if ! printf '%s\n' "${dem_native_status}" | grep -Eq '^  "mode": "native",?$'; then
+        warning "The installed DEM configuration does not report native mode. Check dem.conf and use the matching runtime installation method."
+        return 1
+      fi
+      progress "Native DEM runtime is installed and available."
+    else
+      dem_cli_status=$?
+      warning "Native runtime is not available after package installation. Inspect package hook errors and repair the package; no managed fallback was attempted."
+      return "${dem_cli_status}"
+    fi
+  fi
+}
+
+# ======================================================================
 # Auto-update handling code.
 set_auto_updates() {
   if run_as_root test -x "${INSTALL_PREFIX}/usr/libexec/netdata/netdata-updater.sh"; then
@@ -1898,42 +2080,9 @@ common_dnf_opts() {
   uninstall_subcmd="remove"
 }
 
-try_package_install() {
-  failed_refresh_msg="Failed to refresh repository metadata. ${BADNET_MSG} or incompatibilities with one or more third-party package repositories in the system package manager configuration."
-
-  if [ -z "${DISTRO_COMPAT_NAME}" ] || [ "${DISTRO_COMPAT_NAME}" = "unknown" ]; then
-    warning "Unable to determine Linux distribution for native packages."
-    return 3
-  elif [ -z "${SYSCODENAME}" ]; then
-    case "${DISTRO_COMPAT_NAME}" in
-      debian|ubuntu)
-        warning "Release codename not set. Unable to check availability of native packages for this system."
-        return 3
-        ;;
-    esac
-  fi
-
-  set_tmpdir
-
-  if [ "${DRY_RUN}" -eq 1 ]; then
-    progress "Would attempt to install using native packages..."
-  else
-    progress "Attempting to install using native packages..."
-  fi
-
-  if [ "${SELECTED_RELEASE_CHANNEL}" = "nightly" ]; then
-    release="-edge"
-  else
-    release=""
-  fi
-
+configure_native_package_manager() {
   interactive_opts=""
   env=""
-
-  if [ -n "${SKIP_DISTRO_DETECTION}" ]; then
-    warning "Attempting to use native packages with a distro override. This is not officially supported, but may work in some cases. If your system requires a distro override to use native packages, please open a feature request at ${AGENT_BUG_REPORT_URL} about it so that we can update the installer to auto-detect this."
-  fi
-
   case "${DISTRO_COMPAT_NAME}" in
     debian|ubuntu)
       if [ "${INTERACTIVE}" = "0" ]; then
@@ -1993,6 +2142,42 @@ try_package_install() {
       return 3
       ;;
   esac
+}
+
+try_package_install() {
+  failed_refresh_msg="Failed to refresh repository metadata. ${BADNET_MSG} or incompatibilities with one or more third-party package repositories in the system package manager configuration."
+
+  if [ -z "${DISTRO_COMPAT_NAME}" ] || [ "${DISTRO_COMPAT_NAME}" = "unknown" ]; then
+    warning "Unable to determine Linux distribution for native packages."
+    return 3
+  elif [ -z "${SYSCODENAME}" ]; then
+    case "${DISTRO_COMPAT_NAME}" in
+      debian|ubuntu)
+        warning "Release codename not set. Unable to check availability of native packages for this system."
+        return 3
+        ;;
+    esac
+  fi
+
+  set_tmpdir
+
+  if [ "${DRY_RUN}" -eq 1 ]; then
+    progress "Would attempt to install using native packages..."
+  else
+    progress "Attempting to install using native packages..."
+  fi
+
+  if [ "${SELECTED_RELEASE_CHANNEL}" = "nightly" ]; then
+    release="-edge"
+  else
+    release=""
+  fi
+
+  if [ -n "${SKIP_DISTRO_DETECTION}" ]; then
+    warning "Attempting to use native packages with a distro override. This is not officially supported, but may work in some cases. If your system requires a distro override to use native packages, please open a feature request at ${AGENT_BUG_REPORT_URL} about it so that we can update the installer to auto-detect this."
+  fi
+
+  configure_native_package_manager || return $?
 
   if [ -n "${INSTALL_VERSION}" ]; then
     if echo "${INSTALL_VERSION}" | grep -q "nightly"; then
@@ -2856,6 +3041,16 @@ handle_major_version() {
 validate_args() {
   check_claim_opts
 
+  if [ "${NETDATA_INSTALL_DEM_RUNTIME}" -eq 1 ]; then
+    case "${ACTION}" in
+      uninstall|claim|repositories-only|prepare-offline)
+        fatal "--install-dem-runtime cannot be combined with this action. Use an ordinary install/update, or the installed runtime CLI for explicit offline setup." F052F ;;
+    esac
+    if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
+      fatal "--install-dem-runtime requires online acquisition. For offline setup, use dem.plugin runtime install --release /absolute/release.json --archive /absolute/runtime.tar.gz as the Netdata service user." F052F
+    fi
+  fi
+
   if [ -n "${NETDATA_REQUESTED_INSTALL_TYPE}" ]; then
     SELECTED_INSTALL_METHOD="${NETDATA_REQUESTED_INSTALL_TYPE}"
   fi
@@ -2956,6 +3151,7 @@ parse_args() {
       "--dont-wait"|"--non-interactive") INTERACTIVE=0 ;;
       "--interactive") INTERACTIVE=1 ;;
       "--dry-run") DRY_RUN=1 ;;
+      "--install-dem-runtime") NETDATA_INSTALL_DEM_RUNTIME=1 ;;
       "--release-channel")
         RELEASE_CHANNEL="$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
         case "${RELEASE_CHANNEL}" in
