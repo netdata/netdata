@@ -75,8 +75,8 @@ Configure these in the protected `dem-runtime-release` environment after review:
 Native submission uses both `packages.netdata.cloud` and `packages2.netdata.cloud`.
 Each receives the independently released runtime in `netdata/netdata`,
 `netdata/netdata-edge` and `netdata/netdata-devel`; the repoconfig repository is excluded.
-Destinations follow every nonempty `packages` entry in `.github/data/distros.yml`,
-intersected with runtime-supported `amd64`/`arm64` (RPM `x86_64`/`aarch64`).
+Destinations follow nonempty `packages` entries in the active `include` list of
+`.github/data/distros.yml`, excluding `legacy` entries, and are intersected with runtime-supported `amd64`/`arm64` (RPM `x86_64`/`aarch64`).
 Each submission has isolated staging so packages cannot leak between destinations.
 This repository coverage does not establish browser or package-lifecycle qualification
 on every distribution. Confirm package signatures, repository ingestion and the
