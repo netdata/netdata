@@ -86,7 +86,9 @@ class LifecycleTests(unittest.TestCase):
 
     def hook(self, kind, action, family='deb'):
         # Arguments are positional, never interpreted as shell source.
-        script = '. "$1"; NATIVE_HELPER=$2; NATIVE_INTENT_DIR=$3; NATIVE_SYSTEMD_DIR=$4; NATIVE_FAMILY=$5; NATIVE_APPARMOR_ENABLED=$8; NATIVE_APPARMOR_PROFILES=$9; shift 9; NATIVE_APPARMOR_PROFILE=$1; NATIVE_APPARMOR_DISABLED=$2; native_hook "$3" "$4"'
+        script = ('. "$1"; NATIVE_HELPER=$2; NATIVE_INTENT_DIR=$3; NATIVE_SYSTEMD_DIR=$4; '
+                  'NATIVE_FAMILY=$5; NATIVE_APPARMOR_ENABLED=$8; NATIVE_APPARMOR_PROFILES=$9; shift 9; '
+                  'NATIVE_APPARMOR_PROFILE=$1; NATIVE_APPARMOR_DISABLED=$2; native_hook "$3" "$4"')
         env = dict(os.environ, FIXTURE=str(self.root), PATH=str(self.bin)+os.pathsep+os.environ['PATH'])
         if getattr(self, 'isolated_path', False):
             env['PATH'] = str(self.bin)
@@ -94,7 +96,8 @@ class LifecycleTests(unittest.TestCase):
         return subprocess.run(['sh', '-c', script, 'fixture', str(SOURCE/'lifecycle.sh'),
                                str(self.bin/'dem plugin'), str(self.intent), str(self.systemd),
                                family, kind, action, str(self.enabled), str(self.root/'profiles'),
-                               str(self.root/'profile'), str(self.root/'disabled'), kind, action], env=env, text=True, capture_output=True)
+                               str(self.root/'profile'), str(self.root/'disabled'), kind, action],
+                              env=env, text=True, capture_output=True)
 
     def marker(self):
         return self.intent / 'restart-pending'
@@ -110,14 +113,14 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(self.state()['active'], 'active')
         self.assertEqual(self.state()['gate'], 'ready')
         self.assertFalse(self.marker().exists())
-        self.assertFalse(any(name == 'systemctl' and 'stop' in args for name,args in self.calls()))
+        self.assertFalse(any(name == 'systemctl' and 'stop' in args for name, args in self.calls()))
 
     def test_inactive_stays_inactive(self):
         self.state(active='inactive')
         self.assertEqual(self.hook('rpm-pre', '1', 'rpm').returncode, 0)
         self.assertEqual(self.hook('rpm-posttrans', '1', 'rpm').returncode, 0)
         self.assertEqual(self.state()['active'], 'inactive')
-        self.assertFalse(any('start' in args for _,args in self.calls()))
+        self.assertFalse(any('start' in args for _, args in self.calls()))
 
     def test_policy_denied_stop_refuses_before_helper(self):
         self.state(deny_stop=True)
@@ -125,7 +128,7 @@ class LifecycleTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('payload mutation refused', result.stderr)
         self.assertEqual(self.state()['gate'], 'ready')
-        self.assertFalse(any(name == 'dem plugin' for name,_ in self.calls()))
+        self.assertFalse(any(name == 'dem plugin' for name, _ in self.calls()))
 
     def test_service_stop_failure_preserves_exit_status(self):
         self.state(stop_exit=23)
@@ -183,7 +186,7 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(self.hook('deb-postinst', 'abort-upgrade').returncode, 0)
         self.assertEqual(self.state()['gate'], 'closed')
         self.assertEqual(self.state()['active'], 'active')
-        self.assertFalse(any('native-configure' in args for _,args in self.calls()))
+        self.assertFalse(any('native-configure' in args for _, args in self.calls()))
 
     def test_unknown_and_transitional_states_refuse(self):
         for state in ('activating', 'deactivating', 'reloading', 'unknown', ''):
@@ -192,7 +195,7 @@ class LifecycleTests(unittest.TestCase):
                 result = self.hook('deb-preinst', 'install')
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn('ActiveState', result.stderr)
-        self.assertFalse(any(name == 'dem plugin' for name,_ in self.calls()))
+        self.assertFalse(any(name == 'dem plugin' for name, _ in self.calls()))
 
     def test_failed_service_is_stopped_and_proved_inactive_without_starting(self):
         self.state(active='failed')
@@ -202,15 +205,15 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(self.marker().read_text().strip(), 'inactive')
         self.assertEqual(self.hook('deb-postinst', 'configure').returncode, 0)
         self.assertEqual(self.state()['gate'], 'ready')
-        self.assertTrue(any('stop' in args for _,args in self.calls()))
-        self.assertFalse(any('start' in args for _,args in self.calls()))
+        self.assertTrue(any('stop' in args for _, args in self.calls()))
+        self.assertFalse(any('start' in args for _, args in self.calls()))
 
     def test_denied_stop_of_failed_service_does_not_reach_payload_helper(self):
         self.state(active='failed', deny_stop=True)
         result = self.hook('deb-preinst', 'install')
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('payload mutation refused', result.stderr)
-        self.assertFalse(any(name == 'dem plugin' for name,_ in self.calls()))
+        self.assertFalse(any(name == 'dem plugin' for name, _ in self.calls()))
 
     def test_chroot_and_symlink_intent_fail_closed(self):
         self.systemd.rmdir()
@@ -227,10 +230,11 @@ class LifecycleTests(unittest.TestCase):
         self.enabled.write_text('Y\n')
         result = self.hook('deb-postinst', 'configure')
         self.assertEqual(result.returncode, 0, result.stderr)
-        events = [(name, args[-1]) for name,args in self.calls() if name in ('dem plugin','apparmor_parser')]
-        self.assertEqual(events, [('dem plugin','native-prepare'), ('apparmor_parser',str(self.root/'profile')),
-                                  ('dem plugin','native-configure')])
-        self.assertIn(['-r',str(self.root/'profile')], [args for name,args in self.calls() if name == 'apparmor_parser'])
+        events = [(name, args[-1]) for name, args in self.calls() if name in ('dem plugin', 'apparmor_parser')]
+        self.assertEqual(events, [('dem plugin', 'native-prepare'), ('apparmor_parser', str(self.root/'profile')),
+                                  ('dem plugin', 'native-configure')])
+        self.assertIn(['-r', str(self.root/'profile')], [args for name,
+                      args in self.calls() if name == 'apparmor_parser'])
 
     def test_apparmor_load_failure_restores_rum_and_preserves_closed_gate(self):
         self.enabled.write_text('Y\n')
@@ -239,7 +243,7 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(result.returncode, 43, result.stderr)
         self.assertEqual(self.state()['gate'], 'closed')
         self.assertEqual(self.state()['active'], 'active')
-        self.assertFalse(any('native-configure' in args for _,args in self.calls()))
+        self.assertFalse(any('native-configure' in args for _, args in self.calls()))
         self.state(parser_exit=0)
         self.assertEqual(self.hook('deb-postinst', 'configure').returncode, 0)
 
@@ -253,7 +257,7 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual((self.root/'profiles').read_text(), '')
         self.state(start_exit=0)
         self.assertEqual(self.hook('deb-prerm', 'remove').returncode, 0)
-        self.assertEqual(len([1 for name,args in self.calls() if name == 'apparmor_parser']), 1)
+        self.assertEqual(len([1 for name, args in self.calls() if name == 'apparmor_parser']), 1)
 
     def test_apparmor_unload_failure_refuses_removal_restores_rum(self):
         self.enabled.write_text('Y\n')
@@ -269,16 +273,17 @@ class LifecycleTests(unittest.TestCase):
     def test_apparmor_upgrade_posthooks_never_unload(self):
         self.enabled.write_text('Y\n')
         (self.root/'profiles').write_text('netdata-dem-browser (unconfined)\n')
-        for hook, action, family in [('deb-postrm','upgrade','deb'), ('rpm-preun','1','rpm'), ('rpm-postun','1','rpm')]:
-            self.assertEqual(self.hook(hook,action,family).returncode, 0)
-        self.assertFalse(any(name == 'apparmor_parser' for name,_ in self.calls()))
+        for hook, action, family in [('deb-postrm', 'upgrade', 'deb'),
+                                     ('rpm-preun', '1', 'rpm'), ('rpm-postun', '1', 'rpm')]:
+            self.assertEqual(self.hook(hook, action, family).returncode, 0)
+        self.assertFalse(any(name == 'apparmor_parser' for name, _ in self.calls()))
 
     def test_apparmor_busy_consumer_prevents_policy_mutation(self):
         self.enabled.write_text('Y\n')
         self.state(prepare_exit=29)
-        for hook,action in [('deb-postinst','configure'),('deb-prerm','remove')]:
-            self.assertEqual(self.hook(hook,action).returncode, 29)
-        self.assertFalse(any(name == 'apparmor_parser' for name,_ in self.calls()))
+        for hook, action in [('deb-postinst', 'configure'), ('deb-prerm', 'remove')]:
+            self.assertEqual(self.hook(hook, action).returncode, 29)
+        self.assertFalse(any(name == 'apparmor_parser' for name, _ in self.calls()))
 
     def test_apparmor_unreadable_inventory_refuses_removal(self):
         self.enabled.write_text('Y\n')
@@ -287,12 +292,12 @@ class LifecycleTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(self.state()['gate'], 'closed')
         self.assertEqual(self.state()['active'], 'active')
-        self.assertFalse(any(name == 'apparmor_parser' for name,_ in self.calls()))
+        self.assertFalse(any(name == 'apparmor_parser' for name, _ in self.calls()))
 
     def test_active_apparmor_missing_parser_refuses_with_rum_restored(self):
         self.enabled.write_text('Y\n')
         (self.bin/'apparmor_parser').unlink()
-        for tool in ('sh','sed','mkdir','cat','rm'):
+        for tool in ('sh', 'sed', 'mkdir', 'cat', 'rm'):
             (self.bin/tool).symlink_to(shutil.which(tool))
         (self.bin/'python3').symlink_to(sys.executable)
         self.isolated_path = True
@@ -314,13 +319,13 @@ class LifecycleTests(unittest.TestCase):
         result = self.hook('deb-postinst', 'configure')
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(self.state()['gate'], 'closed')
-        self.assertFalse(any(name == 'apparmor_parser' for name,_ in self.calls()))
+        self.assertFalse(any(name == 'apparmor_parser' for name, _ in self.calls()))
 
     def test_command_quoting_keeps_metacharacters_as_data(self):
         result = self.hook('deb-preinst', 'install')
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual([args for name,args in self.calls() if name == 'dem plugin'],
-                         [['runtime','native-prepare']])
+        self.assertEqual([args for name, args in self.calls() if name == 'dem plugin'],
+                         [['runtime', 'native-prepare']])
         self.assertIn("'\\''", result.stderr)
         self.assertEqual(result.stdout, '')
 
@@ -330,14 +335,14 @@ class LifecycleTests(unittest.TestCase):
         sink.chmod(0o755)
         output = self.root / 'recorded'
         secret = 'synthetic-token=not-for-logs;$(not-a-command)'
-        result = subprocess.run(['sh','-c','. "$1"; native_run "$2" "$3" "$4"',
-                                 'fixture',str(SOURCE/'lifecycle.sh'),str(sink),secret,str(output)],
-                                capture_output=True,text=True)
-        self.assertEqual(result.returncode,17)
-        self.assertEqual(output.read_text(),secret)
-        self.assertNotIn(secret,result.stderr)
-        self.assertIn('<redacted>',result.stderr)
-        self.assertIn('status 17',result.stderr)
+        result = subprocess.run(['sh', '-c', '. "$1"; native_run "$2" "$3" "$4"',
+                                 'fixture', str(SOURCE/'lifecycle.sh'), str(sink), secret, str(output)],
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 17)
+        self.assertEqual(output.read_text(), secret)
+        self.assertNotIn(secret, result.stderr)
+        self.assertIn('<redacted>', result.stderr)
+        self.assertIn('status 17', result.stderr)
 
 
 if __name__ == '__main__':

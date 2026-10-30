@@ -18,6 +18,7 @@ class SnapshotTests(unittest.TestCase):
         binary, source = b'binary bytes', b'source bytes'
         binary_hash = hashlib.sha1(binary).hexdigest()
         source_hash = hashlib.sha1(source).hexdigest()
+
         def record(name, data):
             return {'name': name, 'sha256': hashlib.sha256(data).hexdigest(),
                     'bytes': len(data), 'url': 'https://deb.debian.org/pool/' + name}
@@ -37,6 +38,7 @@ class SnapshotTests(unittest.TestCase):
 
     def convert(self, locks, metadata, bodies):
         urls = []
+
         def opened(url, **kwargs):
             urls.append(url)
             data = json.dumps(metadata).encode() if '/mr/' in url else bodies[url.rsplit('/', 1)[1]]
@@ -80,13 +82,20 @@ class SnapshotTests(unittest.TestCase):
                 lock, metadata, bodies = self.fixture()
                 original = copy.deepcopy(lock)
                 candidate = metadata['result']['binaries'][0]['files'][0]
-                if fault == 'missing': metadata['result']['binaries'] = []
-                elif fault == 'bytes': bodies[candidate['hash']] = b'wrong! bytes'
-                elif fault == 'architecture': candidate['architecture'] = 'arm64'
-                elif fault == 'version': metadata['result']['binaries'][0]['version'] = '2.0-4'
-                elif fault == 'source': metadata['package'] = 'other'
-                elif fault == 'filename': metadata['fileinfo'][candidate['hash']][0]['name'] = 'other.deb'
-                else: metadata['fileinfo'][candidate['hash']][0]['size'] = 13
+                if fault == 'missing':
+                    metadata['result']['binaries'] = []
+                elif fault == 'bytes':
+                    bodies[candidate['hash']] = b'wrong! bytes'
+                elif fault == 'architecture':
+                    candidate['architecture'] = 'arm64'
+                elif fault == 'version':
+                    metadata['result']['binaries'][0]['version'] = '2.0-4'
+                elif fault == 'source':
+                    metadata['package'] = 'other'
+                elif fault == 'filename':
+                    metadata['fileinfo'][candidate['hash']][0]['name'] = 'other.deb'
+                else:
+                    metadata['fileinfo'][candidate['hash']][0]['size'] = 13
                 with self.assertRaises(ValueError):
                     self.convert([lock], metadata, bodies)
                 self.assertEqual(lock, original)
@@ -104,12 +113,14 @@ class SnapshotTests(unittest.TestCase):
                 output = root / 'converted'
                 if missing:
                     metadata['result']['source'] = []
+
                 def opened(url, **kwargs):
                     data = json.dumps(metadata).encode() if '/mr/' in url else bodies[url.rsplit('/', 1)[1]]
                     response = io.BytesIO(data)
                     response.url = url
                     return response
-                with patch('sys.argv', ['refresh-lock.py', '--snapshot-lock', str(original), '--output', str(output)]), \
+                with patch('sys.argv', ['refresh-lock.py', '--snapshot-lock', str(original),
+                                        '--output', str(output)]), \
                         patch.object(refresh, 'run', side_effect=AssertionError('apt or Docker invoked')), \
                         patch.object(snapshot.HTTPS_OPENER, 'open', side_effect=opened):
                     if missing:

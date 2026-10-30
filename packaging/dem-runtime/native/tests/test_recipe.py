@@ -28,29 +28,29 @@ class RecipeTests(unittest.TestCase):
         return result, build
 
     def test_hooks_and_capability_dependencies(self):
-        for fmt in ('DEB','RPM'):
+        for fmt in ('DEB', 'RPM'):
             with self.subTest(fmt=fmt), tempfile.TemporaryDirectory() as temp:
-                result,build = self.configure(Path(temp),fmt=fmt)
-                self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+                result, build = self.configure(Path(temp), fmt=fmt)
+                self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
                 config = (build/'CPackConfig.cmake').read_text()
-                self.assertIn('netdata-dem-runtime-api',config)
-                self.assertIn('set(CPACK_STRIP_FILES "OFF")',config)
+                self.assertIn('netdata-dem-runtime-api', config)
+                self.assertIn('set(CPACK_STRIP_FILES "OFF")', config)
                 if fmt == 'DEB':
-                    self.assertIn('PACKAGE_PREDEPENDS "netdata-dem-runtime-api (= 1)',config)
-                    hooks = ('preinst','postinst','prerm','postrm')
+                    self.assertIn('PACKAGE_PREDEPENDS "netdata-dem-runtime-api (= 1)', config)
+                    hooks = ('preinst', 'postinst', 'prerm', 'postrm')
                 else:
-                    self.assertIn('Requires(posttrans): netdata-dem-runtime-api = 1',config)
-                    self.assertIn('PACKAGE_ARCHITECTURE "aarch64"',config)
-                    hooks = ('pre','preun','posttrans','postun')
+                    self.assertIn('Requires(posttrans): netdata-dem-runtime-api = 1', config)
+                    self.assertIn('PACKAGE_ARCHITECTURE "aarch64"', config)
+                    hooks = ('pre', 'preun', 'posttrans', 'postun')
                 for hook in hooks:
                     script = build/'hooks'/hook
-                    checked = subprocess.run(['sh','-n',str(script)],capture_output=True,text=True)
-                    self.assertEqual(checked.returncode,0,checked.stderr)
-                    self.assertIn('native_hook',script.read_text())
-                    self.assertNotIn('@NATIVE_',script.read_text())
+                    checked = subprocess.run(['sh', '-n', str(script)], capture_output=True, text=True)
+                    self.assertEqual(checked.returncode, 0, checked.stderr)
+                    self.assertIn('native_hook', script.read_text())
+                    self.assertNotIn('@NATIVE_', script.read_text())
                 install = (build/'cmake_install.cmake').read_text()
-                self.assertIn('usr/lib/netdata/dem-runtime',install)
-                self.assertNotIn('/var/lib/netdata-dem-runtime',install)
+                self.assertIn('usr/lib/netdata/dem-runtime', install)
+                self.assertNotIn('/var/lib/netdata-dem-runtime', install)
 
     def test_project_and_package_versions(self):
         versions = {'2026.10.29.1': '2026.10.29.1', '1.2.3~rc1': '1.2.3',
@@ -77,10 +77,10 @@ class RecipeTests(unittest.TestCase):
                     self.assertEqual(output.read_text().splitlines(), [version, '7'])
 
     def test_requested_identity_must_match_staging(self):
-        for kwargs in ({'arch':'amd64'},{'version':'9.9'},{'arch':'s390x'},{'version':'1;bad'}):
+        for kwargs in ({'arch': 'amd64'}, {'version': '9.9'}, {'arch': 's390x'}, {'version': '1;bad'}):
             with self.subTest(kwargs=kwargs), tempfile.TemporaryDirectory() as temp:
-                result,build = self.configure(Path(temp),**kwargs)
-                self.assertNotEqual(result.returncode,0)
+                result, build = self.configure(Path(temp), **kwargs)
+                self.assertNotEqual(result.returncode, 0)
                 # Invalid package identities must fail before project initialization.
                 cache = build / 'CMakeCache.txt'
                 if cache.exists():

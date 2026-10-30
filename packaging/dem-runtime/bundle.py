@@ -90,8 +90,10 @@ def recipe_sources():
             'inputs.json', 'Dockerfile', 'README.md', 'RELEASE.md', 'test_bundle.py',
             'test_delivery.py', 'test_locked.py', 'release.py', 'test_release.py', 'ci.py', 'test_ci.py',
             'locks/amd64.json', 'locks/arm64.json',
-            'native/CMakeLists.txt', 'native/netdata-dem-browser', 'native/hook.sh.in', 'native/lifecycle.sh', 'native/README.md',
-            'native/tests/test_agent_metadata.py', 'native/tests/test_lifecycle.py', 'native/tests/test_recipe.py', 'native/tests/test_package.py')
+            'native/CMakeLists.txt', 'native/netdata-dem-browser', 'native/hook.sh.in', 'native/lifecycle.sh',
+            'native/README.md',
+            'native/tests/test_agent_metadata.py', 'native/tests/test_lifecycle.py', 'native/tests/test_recipe.py',
+            'native/tests/test_package.py')
 
 
 def install_runner(assets, root, version):
@@ -481,7 +483,8 @@ def prepare(args):
     compressed, archive = package_archive(root, output, inputs['source_date_epoch'])
     relative = f'dem-runtime/{inputs["version"]}/{args.arch}/{archive["sha256"]}.tar.zst'
     archive['url'] = args.url_prefix.rstrip('/') + '/' + relative if args.url_prefix else ''
-    manifest = {'format': 1, 'contract': contract['protocol_version'], 'version': inputs['version'], 'platform': 'linux/' + args.arch,
+    manifest = {'format': 1, 'contract': contract['protocol_version'], 'version': inputs['version'],
+                'platform': 'linux/' + args.arch,
                 'archive': archive, 'layout': layout, 'bindings': bindings}
     final = output / (archive['sha256'] + '.tar.zst')
     compressed.rename(final)
