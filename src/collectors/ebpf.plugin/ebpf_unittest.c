@@ -142,6 +142,9 @@ static int test_red_hat_kernel_lineage(void)
            ebpf_rhf_kernel_lineage_matches("5.14.0-503.el9.x86_64", 9 * 256, 0) &&
            !ebpf_rhf_kernel_lineage_matches("6.12.1-1.el9.elrepo.x86_64", 9 * 256, 0) &&
            !ebpf_rhf_kernel_lineage_matches("5.15.0-300.el8uek.x86_64", 8 * 256, 0) &&
+           ebpf_rhf_kernel_lineage_matches("5.4.17-2136.328.3.el8uek.x86_64", 8 * 256, 0) &&
+           !ebpf_rhf_kernel_lineage_matches("5.4.17-2136.328.3.el7uek.x86_64", 7 * 256, 0) &&
+           !ebpf_rhf_kernel_lineage_matches("5.4.17-2136.328.3.el8uek.x86_64", 9 * 256, 0) &&
            !ebpf_rhf_kernel_lineage_matches("5.14.0-503.el8.x86_64", 9 * 256, 0) &&
            ebpf_rhf_kernel_lineage_matches("4.18.0-425.lve.el8.x86_64", 8 * 256, 1) &&
            !ebpf_rhf_kernel_lineage_matches("4.18.0-425.lve.el8.x86_64", 8 * 256, 0);

@@ -110,28 +110,30 @@ func TestBuildDCStatLegacyPlan(t *testing.T) {
 }
 
 func TestDCStat6162PlansUseShippedFlavors(t *testing.T) {
-	tests := []struct {
+	tests := map[string]struct {
 		requested string
 		want      string
 	}{
-		{requested: "buffer", want: "pnetdata_ebpf_dc_buffer.6.16.2.o"},
-		{requested: "arena", want: "pnetdata_ebpf_dc_arena.6.16.2.o"},
-		{requested: "tracing", want: "pnetdata_ebpf_dc.6.12.o"},
+		"buffer uses exact rung":      {requested: "buffer", want: "pnetdata_ebpf_dc_buffer.6.16.2.o"},
+		"arena uses exact rung":       {requested: "arena", want: "pnetdata_ebpf_dc_arena.6.16.2.o"},
+		"tracing uses 6.12 base rung": {requested: "tracing", want: "pnetdata_ebpf_dc.6.12.o"},
 	}
 
-	for _, tc := range tests {
-		cfg := DCStatLegacyConfig{
-			PluginsDir:    defaultPluginsDir(),
-			Kernels:       dcstatKernelMask,
-			IsRHF:         -1,
-			KernelVersion: exactKernelVersion6162,
-			HasBTF:        false,
-			ObjectFlavor:  tc.requested,
-		}
-		got := BuildDCStatLegacyPlan(cfg)
-		if path := filepath.Base(got.ObjectPath); path != tc.want {
-			t.Errorf("BuildDCStatLegacyPlan(%q) = %q, want %q", tc.requested, path, tc.want)
-		}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cfg := DCStatLegacyConfig{
+				PluginsDir:    defaultPluginsDir(),
+				Kernels:       dcstatKernelMask,
+				IsRHF:         -1,
+				KernelVersion: exactKernelVersion6162,
+				HasBTF:        false,
+				ObjectFlavor:  tc.requested,
+			}
+			got := BuildDCStatLegacyPlan(cfg)
+			if path := filepath.Base(got.ObjectPath); path != tc.want {
+				t.Errorf("BuildDCStatLegacyPlan(%q) = %q, want %q", tc.requested, path, tc.want)
+			}
+		})
 	}
 }
 

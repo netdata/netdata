@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 )
 
@@ -46,18 +47,17 @@ func TestKernelVersionFromRelease(t *testing.T) {
 }
 
 func TestGeneric6162SelectorIsExactAndCannotWalkDownFromSeven(t *testing.T) {
-	tests := []struct {
-		name string
+	tests := map[string]struct {
 		kver uint32
 		want uint32
 	}{
-		{name: "6.16.1 uses 6.12", kver: exactKernelVersion6162 - 1, want: 11},
-		{name: "6.16.2 uses exact rung", kver: exactKernelVersion6162, want: 13},
-		{name: "6.16.3 uses 6.12", kver: exactKernelVersion6162 + 1, want: 11},
-		{name: "7.0 does not walk down to 6.16.2", kver: minimumKernelVersionSeven, want: 12},
+		"6.16.1 uses 6.12":                 {kver: exactKernelVersion6162 - 1, want: 11},
+		"6.16.2 uses exact rung":           {kver: exactKernelVersion6162, want: 13},
+		"6.16.3 uses 6.12":                 {kver: exactKernelVersion6162 + 1, want: 11},
+		"7.0 does not walk down to 6.16.2": {kver: minimumKernelVersionSeven, want: 12},
 	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
 			if got := SelectMaxIndex(-1, tc.kver); got != int(tc.want) {
 				t.Fatalf("SelectMaxIndex() = %d, want %d", got, tc.want)
 			}
@@ -360,15 +360,25 @@ func TestSelectLoadAndAttachModes(t *testing.T) {
 			wantL:  LoadCore,
 			wantA:  LoadTracepoint,
 		},
-		"rhf-oracle-legacy": {
+		"uek6-with-btf-stays-legacy": {
 			hasBTF: true,
 			load:   LoadPlayDice,
 			kver:   328800,
-			isRH:   1,
+			isRH:   8 * 256,
 			mode:   RunModeReturn,
 			attach: "probe",
 			wantL:  LoadLegacy,
 			wantA:  LoadRetprobe,
+		},
+		"generic-5.4-with-btf-uses-core": {
+			hasBTF: true,
+			load:   LoadPlayDice,
+			kver:   328800,
+			isRH:   -1,
+			mode:   RunModeEntry,
+			attach: "trampoline",
+			wantL:  LoadCore,
+			wantA:  LoadTrampoline,
 		},
 	}
 
@@ -386,21 +396,20 @@ func TestSelectLoadAndAttachModes(t *testing.T) {
 }
 
 func TestEffectiveMaxBaseSelector(t *testing.T) {
-	tests := []struct {
-		name string
+	tests := map[string]struct {
 		max  int
 		rhf  int
 		kver uint32
 		want int
 	}{
-		{name: "generic 6.12 uses generated base family", max: 7, rhf: -1, kver: 396288, want: 11},
-		{name: "RHEL 9 remains capped", max: 7, rhf: 9 * 256, kver: 396288, want: 7},
-		{name: "RHEL 10 uses generated base family", max: 7, rhf: 10 * 256, kver: 396288, want: 11},
-		{name: "generic 6.16 uses generated 6.12 base family", max: 7, rhf: -1, kver: 6*65536 + 16*256, want: 11},
-		{name: "generic 7.0 uses generated base family", max: 7, rhf: -1, kver: minimumKernelVersionSeven, want: 12},
+		"generic 6.12 uses generated base family":      {max: 7, rhf: -1, kver: 396288, want: 11},
+		"RHEL 9 remains capped":                        {max: 7, rhf: 9 * 256, kver: 396288, want: 7},
+		"RHEL 10 uses generated base family":           {max: 7, rhf: 10 * 256, kver: 396288, want: 11},
+		"generic 6.16 uses generated 6.12 base family": {max: 7, rhf: -1, kver: 6*65536 + 16*256, want: 11},
+		"generic 7.0 uses generated base family":       {max: 7, rhf: -1, kver: minimumKernelVersionSeven, want: 12},
 	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
 			if got := effectiveMaxBaseSelector(tc.max, tc.rhf, tc.kver); got != tc.want {
 				t.Fatalf("effectiveMaxBaseSelector() = %d, want %d", got, tc.want)
 			}
@@ -409,23 +418,25 @@ func TestEffectiveMaxBaseSelector(t *testing.T) {
 }
 
 func TestRedHatKernelLineageMatches(t *testing.T) {
-	tests := []struct {
-		name       string
+	tests := map[string]struct {
 		release    string
 		rhf        int
 		cloudLinux bool
 		want       bool
 	}{
-		{name: "matching el10", release: "6.12.0-124.8.1.el10_1.x86_64", rhf: 10 * 256, want: true},
-		{name: "matching el9", release: "5.14.0-503.el9.x86_64", rhf: 9 * 256, want: true},
-		{name: "ELRepo RHEL9 rebuild", release: "6.12.1-1.el9.elrepo.x86_64", rhf: 9 * 256, want: false},
-		{name: "UEK suffix", release: "5.15.0-300.163.18.el8uek.x86_64", rhf: 8 * 256, want: false},
-		{name: "wrong el major", release: "5.14.0-503.el8.x86_64", rhf: 9 * 256, want: false},
-		{name: "CloudLinux 8 lve", release: "4.18.0-425.lve.el8.x86_64", rhf: 8 * 256, cloudLinux: true, want: true},
-		{name: "lve on another distro", release: "4.18.0-425.lve.el8.x86_64", rhf: 8 * 256, want: false},
+		"matching el10":         {release: "6.12.0-124.8.1.el10_1.x86_64", rhf: 10 * 256, want: true},
+		"matching el9":          {release: "5.14.0-503.el9.x86_64", rhf: 9 * 256, want: true},
+		"ELRepo RHEL9 rebuild":  {release: "6.12.1-1.el9.elrepo.x86_64", rhf: 9 * 256, want: false},
+		"UEK suffix":            {release: "5.15.0-300.163.18.el8uek.x86_64", rhf: 8 * 256, want: false},
+		"UEK6 on OL8":           {release: "5.4.17-2136.328.3.el8uek.x86_64", rhf: 8 * 256, want: true},
+		"UEK6 on OL7":           {release: "5.4.17-2136.328.3.el7uek.x86_64", rhf: 7 * 256, want: false},
+		"UEK6 with wrong major": {release: "5.4.17-2136.328.3.el8uek.x86_64", rhf: 9 * 256, want: false},
+		"wrong el major":        {release: "5.14.0-503.el8.x86_64", rhf: 9 * 256, want: false},
+		"CloudLinux 8 lve":      {release: "4.18.0-425.lve.el8.x86_64", rhf: 8 * 256, cloudLinux: true, want: true},
+		"lve on another distro": {release: "4.18.0-425.lve.el8.x86_64", rhf: 8 * 256, want: false},
 	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
 			if got := redHatKernelLineageMatches(tc.release, tc.rhf, tc.cloudLinux); got != tc.want {
 				t.Fatalf("redHatKernelLineageMatches() = %t, want %t", got, tc.want)
 			}
@@ -628,6 +639,30 @@ func TestBuildFallbackPlansRHFGenericAlternates(t *testing.T) {
 	}
 }
 
+func TestUEK6PlansPreferOracleObjects(t *testing.T) {
+	cfg := SocketLegacyConfig{
+		PluginsDir:    defaultPluginsDir(),
+		Kernels:       socketKernelMask,
+		IsRHF:         8*256 + 10,
+		KernelVersion: 5<<16 + 4<<8 + 17,
+		HasBTF:        true,
+		ObjectFlavor:  "buffer",
+	}
+	primary := BuildSocketLegacyPlan(cfg)
+	if primary.LoadMode != LoadLegacy {
+		t.Fatalf("UEK6 plan load mode = %v, want LoadLegacy", primary.LoadMode)
+	}
+
+	var got []string
+	for _, plan := range buildFallbackPlans(primary, cfg.PluginsDir, cfg.IsRHF, "socket", socketMaxBaseSelector) {
+		got = append(got, filepath.Base(plan.ObjectPath))
+	}
+	want := []string{"pnetdata_ebpf_socket.5.4.rhf.o", "pnetdata_ebpf_socket.5.4.o"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("UEK6 fallback plans = %v, want %v", got, want)
+	}
+}
+
 func TestKernelRejected(t *testing.T) {
 	dir := t.TempDir()
 	reject := filepath.Join(dir, "reject.txt")
@@ -645,35 +680,34 @@ func TestKernelRejected(t *testing.T) {
 }
 
 func TestLegacyArtifactFamilyAvailability(t *testing.T) {
-	tests := []struct {
-		name   string
+	tests := map[string]struct {
 		module string
 		rhf    int
 		kver   uint32
 		want   bool
 	}{
-		{name: "3.10 keeps available collector", module: "swap", rhf: 7 * 256, kver: 3<<16 + 10<<8, want: true},
-		{name: "3.10 has no DNS object", module: "dns", rhf: 7 * 256, kver: 3<<16 + 10<<8},
-		{name: "generic 6.10 disk artifact", module: "disk", rhf: -1, kver: 6<<16 + 10<<8, want: true},
-		{name: "generic 6.10 legacy artifact family", module: "process", rhf: -1, kver: 6<<16 + 10<<8, want: true},
-		{name: "generic 6.12 full family", module: "dns", rhf: -1, kver: 6<<16 + 12<<8, want: true},
-		{name: "generic 6.16 falls back to older family", module: "swap", rhf: -1, kver: 6<<16 + 16<<8, want: true},
-		{name: "generic 6.16 disk falls back to older family", module: "disk", rhf: -1, kver: 6<<16 + 16<<8, want: true},
-		{name: "generic 7.0 process artifact", module: "process", rhf: -1, kver: minimumKernelVersionSeven, want: true},
-		{name: "generic 7.0 cachestat base artifact", module: "cachestat", rhf: -1, kver: minimumKernelVersionSeven, want: true},
-		{name: "generic 7.0 dcstat base artifact", module: "dc", rhf: -1, kver: minimumKernelVersionSeven, want: true},
-		{name: "generic 7.0 dcstat validator name", module: "dcstat", rhf: -1, kver: minimumKernelVersionSeven, want: true},
-		{name: "generic 7.0 fd base artifact", module: "fd", rhf: -1, kver: minimumKernelVersionSeven, want: true},
-		{name: "generic 7.0 socket base artifact", module: "socket", rhf: -1, kver: minimumKernelVersionSeven, want: true},
-		{name: "generic 7.0 DNS has an older compatible family", module: "dns", rhf: -1, kver: minimumKernelVersionSeven, want: true},
-		{name: "RHEL 9 object family", module: "socket", rhf: 9 * 256, kver: 5<<16 + 14<<8, want: true},
-		{name: "RHEL 9 5.16 remains compatible", module: "socket", rhf: 9 * 256, kver: 5<<16 + 16<<8, want: true},
-		{name: "non-RHEL10 RH 5.17 fails closed", module: "swap", rhf: 9 * 256, kver: 5<<16 + 17<<8},
-		{name: "RHEL 10 6.12 family", module: "dns", rhf: 10 * 256, kver: 6<<16 + 12<<8, want: true},
+		"3.10 keeps available collector":                 {module: "swap", rhf: 7 * 256, kver: 3<<16 + 10<<8, want: true},
+		"3.10 has no DNS object":                         {module: "dns", rhf: 7 * 256, kver: 3<<16 + 10<<8},
+		"generic 6.10 disk artifact":                     {module: "disk", rhf: -1, kver: 6<<16 + 10<<8, want: true},
+		"generic 6.10 legacy artifact family":            {module: "process", rhf: -1, kver: 6<<16 + 10<<8, want: true},
+		"generic 6.12 full family":                       {module: "dns", rhf: -1, kver: 6<<16 + 12<<8, want: true},
+		"generic 6.16 falls back to older family":        {module: "swap", rhf: -1, kver: 6<<16 + 16<<8, want: true},
+		"generic 6.16 disk falls back to older family":   {module: "disk", rhf: -1, kver: 6<<16 + 16<<8, want: true},
+		"generic 7.0 process artifact":                   {module: "process", rhf: -1, kver: minimumKernelVersionSeven, want: true},
+		"generic 7.0 cachestat base artifact":            {module: "cachestat", rhf: -1, kver: minimumKernelVersionSeven, want: true},
+		"generic 7.0 dcstat base artifact":               {module: "dc", rhf: -1, kver: minimumKernelVersionSeven, want: true},
+		"generic 7.0 dcstat validator name":              {module: "dcstat", rhf: -1, kver: minimumKernelVersionSeven, want: true},
+		"generic 7.0 fd base artifact":                   {module: "fd", rhf: -1, kver: minimumKernelVersionSeven, want: true},
+		"generic 7.0 socket base artifact":               {module: "socket", rhf: -1, kver: minimumKernelVersionSeven, want: true},
+		"generic 7.0 DNS has an older compatible family": {module: "dns", rhf: -1, kver: minimumKernelVersionSeven, want: true},
+		"RHEL 9 object family":                           {module: "socket", rhf: 9 * 256, kver: 5<<16 + 14<<8, want: true},
+		"RHEL 9 5.16 remains compatible":                 {module: "socket", rhf: 9 * 256, kver: 5<<16 + 16<<8, want: true},
+		"non-RHEL10 RH 5.17 fails closed":                {module: "swap", rhf: 9 * 256, kver: 5<<16 + 17<<8},
+		"RHEL 10 6.12 family":                            {module: "dns", rhf: 10 * 256, kver: 6<<16 + 12<<8, want: true},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
 			if got := legacyArtifactFamilyAvailable(tc.module, tc.rhf, tc.kver); got != tc.want {
 				t.Fatalf("legacyArtifactFamilyAvailable(%q, %d, %d) = %v, want %v", tc.module, tc.rhf, tc.kver, got, tc.want)
 			}
@@ -682,18 +716,17 @@ func TestLegacyArtifactFamilyAvailability(t *testing.T) {
 }
 
 func TestLegacyArtifactFlavorRespectsRedHatFamily(t *testing.T) {
-	for _, tc := range []struct {
-		name string
+	for name, tc := range map[string]struct {
 		rhf  int
 		kver uint32
 		want bool
 	}{
-		{name: "RHEL 9 5.17", rhf: 9 * 256, kver: 5<<16 + 17<<8},
-		{name: "RHEL 10 6.13", rhf: 10 * 256, kver: 6<<16 + 13<<8},
-		{name: "RHEL 10 6.12", rhf: 10 * 256, kver: 6<<16 + 12<<8, want: true},
-		{name: "generic 6.13", rhf: -1, kver: 6<<16 + 13<<8, want: true},
+		"RHEL 9 5.17":  {rhf: 9 * 256, kver: 5<<16 + 17<<8},
+		"RHEL 10 6.13": {rhf: 10 * 256, kver: 6<<16 + 13<<8},
+		"RHEL 10 6.12": {rhf: 10 * 256, kver: 6<<16 + 12<<8, want: true},
+		"generic 6.13": {rhf: -1, kver: 6<<16 + 13<<8, want: true},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(name, func(t *testing.T) {
 			for _, flavor := range []ObjectFlavor{ObjectFlavorBase, ObjectFlavorBuffer, ObjectFlavorArena} {
 				if got := legacyArtifactFlavorAvailable("dc", flavor, tc.rhf, tc.kver); got != tc.want {
 					t.Errorf("legacyArtifactFlavorAvailable(dc, %v, %d, %d) = %v, want %v",

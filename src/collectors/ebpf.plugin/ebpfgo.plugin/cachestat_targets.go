@@ -43,21 +43,19 @@ func defaultCachestatTargets() CachestatTargets {
 	}
 }
 
+// Folio helpers come first so kernels exporting both names use the current API.
+var (
+	cachestatAddCandidates    = []string{"filemap_add_folio", "add_to_page_cache_lru"}
+	cachestatAccessCandidates = []string{"folio_mark_accessed", "mark_page_accessed"}
+)
+
 func (t *CachestatTargets) ResolveAllFromReader(symbols io.Reader) error {
-	resolved, err := selectKallsymsCandidateSets(
-		symbols,
-		[]string{"filemap_add_folio", "add_to_page_cache_lru"},
-		[]string{"folio_mark_accessed", "mark_page_accessed"},
-		t.AccountPage,
-	)
+	candidateSets := [][]string{cachestatAddCandidates, cachestatAccessCandidates, t.AccountPage}
+	resolved, err := selectKallsymsCandidateSets(symbols, candidateSets...)
 	if err != nil {
 		return fmt.Errorf("reading kernel symbols: %w", err)
 	}
-	for i, candidates := range [][]string{
-		{"filemap_add_folio", "add_to_page_cache_lru"},
-		{"folio_mark_accessed", "mark_page_accessed"},
-		t.AccountPage,
-	} {
+	for i, candidates := range candidateSets {
 		if resolved[i] == "" {
 			return fmt.Errorf("no cachestat target found among %v", candidates)
 		}

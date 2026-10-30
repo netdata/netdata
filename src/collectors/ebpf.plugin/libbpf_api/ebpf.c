@@ -351,7 +351,14 @@ int ebpf_rhf_kernel_lineage_matches(const char *kernel_release, int rhf, int clo
     errno = 0;
     char *end;
     long major = strtol(el + 3, &end, 10);
-    if (errno || end == el + 3 || (*end != '.' && *end != '_' && *end != '\0'))
+    if (errno || end == el + 3)
+        return 0;
+
+    // Oracle UEK6 (5.4.x on OL8) has dedicated RHF objects and must stay on legacy; other UEK releases do not.
+    if (!strncmp(end, "uek", 3) && (end[3] == '.' || end[3] == '\0'))
+        return major == 8 && rhf / 256 == 8 && !strncmp(kernel_release, "5.4.", 4);
+
+    if (*end != '.' && *end != '_' && *end != '\0')
         return 0;
     return major == rhf / 256;
 }
@@ -1679,9 +1686,9 @@ static void ebpf_update_target_with_conf(ebpf_module_t *em, netdata_ebpf_program
  * Select the load mode according the given inputs.
  *
  * @param btf_file a pointer to the loaded btf file.
- * @parma load     current value.
- * @param btf_file a pointer to the loaded btf file.
- * @param is_rhf is Red Hat family?
+ * @param load     current value.
+ * @param kver     the kernel version
+ * @param is_rh    is Red Hat family?
  *
  * @return it returns the new load mode.
  */
@@ -1693,7 +1700,7 @@ static netdata_ebpf_load_mode_t ebpf_select_load_mode(
 {
 #ifdef LIBBPF_MAJOR_VERSION
     if ((load & EBPF_LOAD_CORE) || (load & EBPF_LOAD_PLAY_DICE)) {
-        // Quick fix for Oracle linux 8.x
+        // Only UEK6 passes the RH lineage check on 5.4; CO-RE is not validated there (#13935).
         load = (!btf_file || (is_rh > 0 &&
                               (kver >= NETDATA_EBPF_KERNEL_5_4 && kver < NETDATA_EBPF_KERNEL_5_5))) ?
                    EBPF_LOAD_LEGACY :

@@ -94,6 +94,9 @@ var kernelReleaseRe = regexp.MustCompile(`^([0-9]+)\.([0-9]+)\.([0-9]+)`)
 var redHatReleaseRe = regexp.MustCompile(`(?i)^\s*(red hat|centos|almalinux|rocky linux|cloudlinux).*?release[[:space:]]+([0-9]+)(\.([0-9]+))?`)
 var redHatKernelReleaseRe = regexp.MustCompile(`\.el([0-9]+)(?:_[0-9]+)?(?:\.|$)`)
 
+// Oracle UEK6 (5.4.x on OL8) has dedicated RHF objects and must stay on legacy; other UEK releases do not.
+var oracleUEK6KernelReleaseRe = regexp.MustCompile(`^5\.4\.[0-9]+.*\.el8uek(?:\.|$)`)
+
 func KernelVersionFromRelease(release string) (uint32, error) {
 	release = strings.TrimSpace(release)
 	match := kernelReleaseRe.FindStringSubmatch(release)
@@ -583,6 +586,7 @@ func BuildObjectPathWithFlavor(
 
 func SelectLoadMode(hasBTF bool, load LoadMethod, kver uint32, isRH int) LoadMethod {
 	if load&LoadCore != 0 || load&LoadPlayDice != 0 {
+		// Only UEK6 passes the RH lineage check on 5.4; CO-RE is not validated there (#13935).
 		if !hasBTF || (isRH > 0 && kver >= 328704 && kver < 328960) {
 			return LoadLegacy
 		}
@@ -685,6 +689,9 @@ func redHatKernelLineageMatches(release string, rhf int, cloudLinux bool) bool {
 	}
 	if strings.Contains(release, ".lve") {
 		return cloudLinux && rhf/256 == 8
+	}
+	if oracleUEK6KernelReleaseRe.MatchString(release) {
+		return rhf/256 == 8
 	}
 	if match := redHatKernelReleaseRe.FindStringSubmatch(release); len(match) == 2 {
 		major, err := strconv.Atoi(match[1])

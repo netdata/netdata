@@ -41,7 +41,7 @@ func tryLoadDNSPlan(plan LoadPlan, perQuery bool) (*DNSLegacyHandle, error) {
 
 func LoadDNSLegacy(cfg DNSLegacyConfig) (*DNSLegacyHandle, error) {
 	if cfg.KernelVersion < 4<<16+14<<8 {
-		return nil, fmt.Errorf("DNS collection is unavailable on kernel 3.10: no compatible legacy object is shipped")
+		return nil, fmt.Errorf("DNS collection is unavailable on kernels older than 4.14: no compatible legacy object is shipped")
 	}
 	versionStr, err := KernelVersionString()
 	if err != nil {

@@ -122,28 +122,30 @@ func TestBuildCachestatLegacyPlan(t *testing.T) {
 }
 
 func TestCachestat6162PlansUseShippedFlavors(t *testing.T) {
-	tests := []struct {
+	tests := map[string]struct {
 		requested string
 		want      string
 	}{
-		{requested: "buffer", want: "pnetdata_ebpf_cachestat_buffer.6.16.2.o"},
-		{requested: "arena", want: "pnetdata_ebpf_cachestat_arena.6.16.2.o"},
-		{requested: "tracing", want: "pnetdata_ebpf_cachestat.6.12.o"},
+		"buffer uses exact rung":      {requested: "buffer", want: "pnetdata_ebpf_cachestat_buffer.6.16.2.o"},
+		"arena uses exact rung":       {requested: "arena", want: "pnetdata_ebpf_cachestat_arena.6.16.2.o"},
+		"tracing uses 6.12 base rung": {requested: "tracing", want: "pnetdata_ebpf_cachestat.6.12.o"},
 	}
 
-	for _, tc := range tests {
-		cfg := CachestatLegacyConfig{
-			PluginsDir:    defaultPluginsDir(),
-			Kernels:       cachestatKernelMask,
-			IsRHF:         -1,
-			KernelVersion: exactKernelVersion6162,
-			HasBTF:        false,
-			ObjectFlavor:  tc.requested,
-		}
-		got := BuildCachestatLegacyPlan(cfg)
-		if path := filepath.Base(got.ObjectPath); path != tc.want {
-			t.Errorf("BuildCachestatLegacyPlan(%q) = %q, want %q", tc.requested, path, tc.want)
-		}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cfg := CachestatLegacyConfig{
+				PluginsDir:    defaultPluginsDir(),
+				Kernels:       cachestatKernelMask,
+				IsRHF:         -1,
+				KernelVersion: exactKernelVersion6162,
+				HasBTF:        false,
+				ObjectFlavor:  tc.requested,
+			}
+			got := BuildCachestatLegacyPlan(cfg)
+			if path := filepath.Base(got.ObjectPath); path != tc.want {
+				t.Errorf("BuildCachestatLegacyPlan(%q) = %q, want %q", tc.requested, path, tc.want)
+			}
+		})
 	}
 }
 
