@@ -679,20 +679,12 @@ int journalfile_unlink(struct rrdengine_journalfile *journalfile)
     return ret;
 }
 
-// A journal v2 does not always exist next to its v1: a missing one is not an error.
-int journalfile_v2_unlink(struct rrdengine_journalfile *journalfile)
+// A missing file is not an error: a journal v2 does not always exist next to its v1.
+static int journalfile_unlink_if_exists(struct rrdengine_instance *ctx, const char *path)
 {
-    struct rrdengine_datafile *datafile = journalfile->datafile;
-    struct rrdengine_instance *ctx = datafile_ctx(datafile);
     uv_fs_t req;
-
-    char path[RRDENG_PATH_MAX];
-    journalfile_v2_generate_path(datafile, path, sizeof(path));
-
     int ret = uv_fs_unlink(NULL, &req, path, NULL);
-    if (ret == 0)
-        __atomic_add_fetch(&ctx->stats.journalfile_deletions, 1, __ATOMIC_RELAXED);
-    else if (ret != UV_ENOENT) {
+    if (ret != 0 && ret != UV_ENOENT) {
         netdata_log_error("DBENGINE: uv_fs_unlink(\"%s\"): %s", path, uv_strerror(ret));
         ctx_fs_error(ctx);
     }
@@ -701,17 +693,29 @@ int journalfile_v2_unlink(struct rrdengine_journalfile *journalfile)
     return ret;
 }
 
+int journalfile_v2_unlink(struct rrdengine_journalfile *journalfile)
+{
+    struct rrdengine_datafile *datafile = journalfile->datafile;
+    struct rrdengine_instance *ctx = datafile_ctx(datafile);
+
+    char path[RRDENG_PATH_MAX];
+    journalfile_v2_generate_path(datafile, path, sizeof(path));
+
+    int ret = journalfile_unlink_if_exists(ctx, path);
+    if (ret == 0)
+        __atomic_add_fetch(&ctx->stats.journalfile_deletions, 1, __ATOMIC_RELAXED);
+
+    return ret;
+}
+
 uint8_t journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)
 {
     struct rrdengine_instance *ctx = datafile_ctx(datafile);
-    int ret;
-    uv_fs_t req_v2 = { 0 };
-    uv_fs_t req_v1 = { 0 };
     char path[RRDENG_PATH_MAX];
     char path_v2[RRDENG_PATH_MAX];
 
     journalfile_v1_generate_path(datafile, path, sizeof(path));
-    journalfile_v2_generate_path(datafile, path_v2, sizeof(path));
+    journalfile_v2_generate_path(datafile, path_v2, sizeof(path_v2));
 
     (void)journalfile_v1_close(journalfile, datafile);
 
@@ -722,23 +726,11 @@ uint8_t journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, st
     // Now safe to delete the files - no threads are accessing them
     uint8_t deleted = 0;
 
-    ret = uv_fs_unlink(NULL, &req_v2, path_v2, NULL);
-    if (ret == 0)
+    if (journalfile_unlink_if_exists(ctx, path_v2) == 0)
         deleted |= JOURNALFILE_DELETED_V2;
-    else if (ret != UV_ENOENT) {
-        netdata_log_error("DBENGINE: uv_fs_unlink(\"%s\"): %s", path_v2, uv_strerror(ret));
-        ctx_fs_error(ctx);
-    }
-    uv_fs_req_cleanup(&req_v2);
 
-    ret = uv_fs_unlink(NULL, &req_v1, path, NULL);
-    if (ret == 0)
+    if (journalfile_unlink_if_exists(ctx, path) == 0)
         deleted |= JOURNALFILE_DELETED_V1;
-    else if (ret != UV_ENOENT) {
-        netdata_log_error("DBENGINE: uv_fs_unlink(\"%s\"): %s", path, uv_strerror(ret));
-        ctx_fs_error(ctx);
-    }
-    uv_fs_req_cleanup(&req_v1);
 
     __atomic_add_fetch(&ctx->stats.journalfile_deletions, __builtin_popcount(deleted), __ATOMIC_RELAXED);
 
