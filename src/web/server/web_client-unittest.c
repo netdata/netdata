@@ -496,3 +496,85 @@ int web_client_request_size_unittest(void)
 
     return errors;
 }
+
+int web_client_forwarded_for_unittest(void)
+{
+    fprintf(stderr, "\n%s() running...\n", __FUNCTION__);
+
+    int errors = 0;
+    size_t memory_accounting = 0;
+    struct web_client *w = web_client_create(&memory_accounting);
+
+    // The stored value is serialized into the comma separated key=value source
+    // string of function calls and quoted into the FUNCTION lines sent to plugins
+    // and children, so only the first entry of the list is kept, and only when it
+    // is an IPv4 or IPv6 address.
+    static const struct {
+        const char *header;
+        const char *expected;
+    } cases[] = {
+        { "203.0.113.7", "203.0.113.7" },
+        { "2001:db8::7", "2001:db8::7" },
+        { "\t203.0.113.7", "203.0.113.7" },
+        { "203.0.113.7, 198.51.100.1", "203.0.113.7" },
+        { "203.0.113.7 , 198.51.100.1", "203.0.113.7" },
+        { "203.0.113.7,role=admin", "203.0.113.7" },
+        { "role=admin", "" },
+        { "203.0.113.7 role=admin", "" },
+        { "203.0.113.7\" \"x", "" },
+        { "203.0.113.7:8080", "" },
+        { "unknown", "" },
+        { "", "" },
+    };
+
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        web_client_reuse_from_cache(w);
+        buffer_flush(w->response.data);
+        buffer_sprintf(w->response.data, "GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For: %s\r\n\r\n", cases[i].header);
+        WEB_CLIENT_TEST(
+            http_request_validate(w) == HTTP_VALIDATION_OK,
+            "request with X-Forwarded-For '%s' did not validate",
+            cases[i].header);
+        WEB_CLIENT_TEST(
+            strcmp(w->user_auth.forwarded_for, cases[i].expected) == 0,
+            "X-Forwarded-For '%s' was stored as '%s', expected '%s'",
+            cases[i].header,
+            w->user_auth.forwarded_for,
+            cases[i].expected);
+    }
+
+    // the identity serialized for plugins must parse back unchanged
+    web_client_reuse_from_cache(w);
+    buffer_flush(w->response.data);
+    buffer_strcat(
+        w->response.data,
+        "GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For: 203.0.113.7,method=api-bearer,role=admin,permissions=ffff\r\n\r\n");
+    WEB_CLIENT_TEST(http_request_validate(w) == HTTP_VALIDATION_OK, "request with a key=value X-Forwarded-For did not validate");
+
+    CLEAN_BUFFER *source = buffer_create(0, NULL);
+    user_auth_to_source_buffer(&w->user_auth, source);
+
+    USER_AUTH parsed;
+    WEB_CLIENT_TEST(user_auth_from_source(buffer_tostring(source), &parsed), "source '%s' could not be parsed", buffer_tostring(source));
+    WEB_CLIENT_TEST(
+        parsed.method == w->user_auth.method && parsed.user_role == w->user_auth.user_role &&
+            parsed.access == w->user_auth.access,
+        "source '%s' parsed back with method %d, role %d, access 0x%llx, expected method %d, role %d, access 0x%llx",
+        buffer_tostring(source),
+        (int)parsed.method,
+        (int)parsed.user_role,
+        (unsigned long long)parsed.access,
+        (int)w->user_auth.method,
+        (int)w->user_auth.user_role,
+        (unsigned long long)w->user_auth.access);
+
+    web_client_free(w);
+    WEB_CLIENT_TEST(memory_accounting == 0, "web client leaked %zu accounted bytes", memory_accounting);
+
+    if (errors)
+        fprintf(stderr, "%s() failed with %d error(s)\n", __FUNCTION__, errors);
+    else
+        fprintf(stderr, "%s() passed\n", __FUNCTION__);
+
+    return errors;
+}
