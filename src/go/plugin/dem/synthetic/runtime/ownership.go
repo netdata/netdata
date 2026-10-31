@@ -7,159 +7,15 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sync"
-
-	"github.com/gofrs/flock"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
-
-type claimRecord struct {
-	Generation string `json:"generation"`
-	Kind       string `json:"kind"`
-}
-
-// claim protects a process or candidate, never surviving-child lifetime.
-type claim struct {
-	store  *Store
-	name   string
-	lock   io.Closer
-	mu     sync.Mutex
-	closed bool
-}
-
-func (s *Store) claimLocked(id, kind string) (*claim, error) {
-	if !validID(id) {
-		return nil, errors.New("invalid runtime identity")
-	}
-	name, lock, err := s.newOwner("claims", claimRecord{Generation: id, Kind: kind})
-	if err != nil {
-		return nil, err
-	}
-	return &claim{store: s, name: name, lock: lock}, nil
-}
-
-func (c *claim) Close() error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.closed {
-		return nil
-	}
-	err := c.store.releaseOwner(c.lock)
-	if err == nil {
-		c.closed = true
-		err = c.store.withLock(func() error {
-			if err := c.store.removeOwned(c.name); err != nil {
-				return err
-			}
-			_, err := c.store.inventoryLocked(true)
-			return err
-		})
-	}
-	c.store.recordCleanupError(err)
-	return err
-}
-
-// releaseOwner is only for process-local owner locks. Dead claim/staging records
-// are reclaimed by inventory; releasing a use lock never proves child completion.
-func (s *Store) releaseOwner(owner io.Closer) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.releaseOwnerLocked(owner)
-}
-
-func (s *Store) releaseOwnerLocked(owner io.Closer) error {
-	err := owner.Close()
-	if err != nil {
-		s.releasingOwners[owner] = struct{}{}
-	} else {
-		delete(s.releasingOwners, owner)
-	}
-	return err
-}
-
-func (s *Store) retryOwnerReleasesLocked() error {
-	var result error
-	for owner := range s.releasingOwners {
-		result = errors.Join(result, s.releaseOwnerLocked(owner))
-	}
-	return result
-}
-
-func (s *Store) recordCleanupError(err error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.recordCleanupErrorLocked(err)
-}
-
-func (s *Store) recordCleanupErrorLocked(err error) {
-	if err != nil {
-		s.cleanupError = err
-		s.cleanupErrorVersion++
-	}
-}
-
-func (s *Store) finishPreparation(name string, owner io.Closer) {
-	err := s.releaseOwner(owner)
-	if err == nil {
-		err = s.withLock(func() error { return s.removeOwned(name) })
-	}
-	s.recordCleanupError(errors.Join(err, s.flushTrash()))
-}
-
-func (s *Store) newOwner(parent string, record any) (_ string, _ *flock.Flock, result error) {
-	id, err := randomID()
-	if err != nil {
-		return "", nil, err
-	}
-	name := filepath.Join("initializing", id)
-	if err := s.root.Mkdir(name, 0700); err != nil {
-		return "", nil, err
-	}
-	if err := ensureLock(s.root, filepath.Join(name, "owner.lock")); err != nil {
-		return "", nil, err
-	}
-	lock := flock.New(filepath.Join(s.path, name, "owner.lock"))
-	defer func() {
-		if result != nil {
-			releaseErr := s.releaseOwnerLocked(lock)
-			s.recordCleanupErrorLocked(releaseErr)
-			result = errors.Join(result, releaseErr)
-		}
-	}()
-	if err := lock.Lock(); err != nil {
-		return "", nil, err
-	}
-	if err := saveJSON(s.root, filepath.Join(name, "owner.json"), record); err != nil {
-		return "", nil, err
-	}
-	final := filepath.Join(parent, id)
-	if err := s.root.Rename(name, final); err != nil {
-		return "", nil, err
-	}
-	if err := errors.Join(syncDirectory(s.root, "initializing"), syncDirectory(s.root, parent)); err != nil {
-		return "", nil, err
-	}
-	return final, lock, nil
-}
-
-type useRecord struct {
-	Generation string       `json:"generation"`
-	Invocation string       `json:"invocation"`
-	Boot       bootIdentity `json:"boot"`
-}
 
 // Use protects every access that may execute the managed runtime, including
 // version probes. Pass Completion to ndexec, then Finish only after joining it.
 // If launch never started, the owning caller may Finish(true). Lost callers
 // cannot make that assertion; recovery requires a receipt or verified host reboot.
 type Use struct {
-	lock       io.Closer
-	Paths      Paths
-	Completion *ndexec.TreeCompletion
-	store      *Store
-	name       string
-	mu         sync.Mutex
-	finished   bool
+	*executionLease
+	Paths Paths
 }
 
 func (s *Store) beginUse(m Manifest) (*Use, error) {
@@ -172,36 +28,15 @@ func (s *Store) beginUse(m Manifest) (*Use, error) {
 		if err != nil {
 			return err
 		}
-		id, err := randomID()
+		lease, err := s.newUseLocked(m.Archive.SHA256)
 		if err != nil {
 			return err
 		}
-		name := filepath.Join("initializing", id)
-		completion, err := ndexec.CreateTreeCompletion(filepath.Join(s.path, name))
-		if err != nil {
-			return err
-		}
-		if err := ensureLock(s.root, filepath.Join(name, "owner.lock")); err != nil {
-			return errors.Join(err, completion.Close())
-		}
-		lock := flock.New(filepath.Join(s.path, name, "owner.lock"))
 		defer func() {
 			if result != nil {
-				// No executable path escaped. Preserve that proof if cleanup
-				// fails after the record moved into the execution namespace.
-				s.completedUses[name] = true
-				cleanupErr := errors.Join(completion.Close(), s.releaseOwnerLocked(lock), s.removeOwned(name))
-				s.recordCleanupErrorLocked(cleanupErr)
-				result = errors.Join(result, cleanupErr)
+				result = errors.Join(result, lease.abortLocked())
 			}
 		}()
-		if err := lock.Lock(); err != nil {
-			return err
-		}
-		record := useRecord{Generation: m.Archive.SHA256, Invocation: completion.ID(), Boot: s.boot}
-		if err := saveJSON(s.root, filepath.Join(name, "owner.json"), record); err != nil {
-			return err
-		}
 		g, err := s.loadGeneration(m.Archive.SHA256)
 		if err == nil {
 			g.LastUsed = s.now().UTC()
@@ -210,15 +45,10 @@ func (s *Store) beginUse(m Manifest) (*Use, error) {
 		if err != nil {
 			return err
 		}
-		final := filepath.Join("uses", id)
-		if err := s.root.Rename(name, final); err != nil {
+		if err := lease.publishLocked(); err != nil {
 			return err
 		}
-		name = final
-		if err := errors.Join(syncDirectory(s.root, "initializing"), syncDirectory(s.root, "uses")); err != nil {
-			return err
-		}
-		use = &Use{Paths: paths, Completion: completion, store: s, name: final, lock: lock}
+		use = &Use{Paths: paths, executionLease: lease}
 		return nil
 	})
 	if err != nil && use != nil {
@@ -228,84 +58,41 @@ func (s *Store) beginUse(m Manifest) (*Use, error) {
 	return use, err
 }
 
-func (u *Use) Finish(drained bool) error {
-	u.mu.Lock()
-	defer u.mu.Unlock()
-	if u.finished {
-		return nil
-	}
-	u.finished = true
-	if drained {
-		// Callers finish only once. Retain their proof before filesystem cleanup,
-		// including failure to acquire coordination, so Sweep can retry it.
-		u.store.mu.Lock()
-		u.store.completedUses[u.name] = true
-		u.store.mu.Unlock()
-	}
-	err := errors.Join(u.Completion.Close(), u.store.releaseOwner(u.lock))
-	if drained {
-		err = errors.Join(err, u.store.withLock(func() error {
-			return u.store.removeOwned(u.name)
-		}))
-	}
-	u.store.recordCleanupError(err)
-	return err
-}
-
-func (s *Store) removeOwned(name string) error {
-	id, err := randomID()
-	if err != nil {
-		return err
-	}
-	if _, err := s.root.Lstat(name); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return err
-	} else if err == nil && filepath.Dir(name) == "staging" {
-		// Make a possible payload publication durable before abandoning its owner.
-		if err := errors.Join(syncDirectory(s.root, name), syncDirectory(s.root, "generations")); err != nil {
-			return err
-		}
-	}
-	if err := s.root.Rename(name, filepath.Join("trash", id)); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
-	// A successor may already have retired this record. Re-sync both parents
-	// even when the source vanished, including retry after a failed fsync.
-	err = errors.Join(syncDirectory(s.root, filepath.Dir(name)), syncDirectory(s.root, "trash"))
+func (s *Store) finishPreparation(name string, owner io.Closer) {
+	err := s.releaseOwner(owner)
 	if err == nil {
-		delete(s.completedUses, name)
+		err = s.withLock(func() error { return s.removeOwned(name) })
+	}
+	s.recordCleanupError(errors.Join(err, s.flushTrash()))
+}
+
+// closeClaim preserves managed reconciliation after releasing common proof.
+func (s *Store) closeClaim(c *claim) error {
+	retired, err := c.close()
+	if retired && err == nil {
+		err = s.withLock(func() error { _, err := s.inventoryLocked(true); return err })
+		s.recordCleanupError(err)
 	}
 	return err
 }
 
-// ownerAlive is only for in-process claims/preparation, never for execution pins.
-func (s *Store) ownerAlive(name string) (bool, error) {
-	info, err := s.root.Lstat(filepath.Join(name, "owner.lock"))
-	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm() != 0600 || info.Size() != 0 {
-		return false, errors.New("invalid runtime operation owner")
-	}
-	lock := flock.New(filepath.Join(s.path, name, "owner.lock"))
-	acquired, err := lock.TryLock()
-	releaseErr := s.releaseOwnerLocked(lock)
-	s.recordCleanupErrorLocked(releaseErr)
-	return !acquired, errors.Join(err, releaseErr)
-}
-
-func (s *Store) childDirectories(parent string) ([]string, error) {
-	f, err := s.root.Open(parent)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	entries, err := f.ReadDir(-1)
-	if err != nil {
-		return nil, err
-	}
-	var names []string
-	for _, entry := range entries {
-		if !entry.IsDir() || !validID(entry.Name()) || entry.Type()&os.ModeSymlink != 0 {
-			return nil, errors.New("invalid runtime ownership inventory")
+// Managed payloads share trash with proof records, but their publication
+// barriers remain the responsibility of Store.
+func (s *Store) removeOwned(name string) error {
+	switch filepath.Dir(name) {
+	case "claims", "uses", "initializing":
+		return s.ownershipLedger.removeOwned(name)
+	case "staging":
+		if _, err := s.root.Lstat(name); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		} else if err == nil {
+			if err := errors.Join(syncDirectory(s.root, name), syncDirectory(s.root, "generations")); err != nil {
+				return err
+			}
 		}
-		names = append(names, filepath.Join(parent, entry.Name()))
+	case "generations":
+	default:
+		return errors.New("invalid managed retirement namespace")
 	}
-	return names, nil
+	return retireToTrash(s.root, name)
 }

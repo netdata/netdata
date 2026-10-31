@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import base64
 from contextlib import redirect_stderr, redirect_stdout
-import gzip
 import io
 import json
 import os
@@ -83,17 +82,18 @@ class BuilderTests(unittest.TestCase):
             b, mb = bundle.package_archive(root, second, 12345)
             self.assertEqual(a.read_bytes(), b.read_bytes())
             self.assertEqual(ma, mb)
-            raw = gzip.decompress(a.read_bytes())
+            self.assertEqual(a.read_bytes()[:4], bytes.fromhex("28b52ffd"))
+            raw = subprocess.run(['zstd', '-d', '-c', a], capture_output=True, check=True).stdout
             self.assertEqual(ma, {'sha256': bundle.sha256(a), 'bytes': a.stat().st_size,
                                   'tar_bytes': len(raw), 'expanded_bytes': 11, 'entries': 4})
-            with tarfile.open(a) as archive:
+            with tarfile.open(fileobj=io.BytesIO(raw)) as archive:
                 members = archive.getmembers()
                 self.assertEqual([m.name for m in members], ['bin', 'bin/link', 'bin/tool', 'data'])
                 self.assertEqual([m.mode for m in members], [0o555, 0o777, 0o555, 0o444])
                 self.assertTrue(all(m.uid == m.gid == 0 and m.mtime == 12345 for m in members))
 
     def test_archive_refuses_reserved_names_and_escape(self):
-        cases = {'chrome': None, 'fonts.conf': None, 'prepared.json': None,
+        cases = {'chrome': None, 'fonts.conf': None, 'prepared.json': None, 'native.json': None,
                  'escape': '/etc/passwd', 'relative_escape': '../outside', 'dangling': 'missing'}
         for name, target in cases.items():
             with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:

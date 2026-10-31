@@ -4,6 +4,28 @@ set -e
 
 case "$1" in
   remove)
+    if [ -z "${DPKG_ROOT:-}" ] && [ -d /run/systemd/system ]; then
+      printf '%s\n' "netdata: run deb-systemd-invoke stop netdata.service" >&2
+      if deb-systemd-invoke stop 'netdata.service' >/dev/null; then
+        :
+      else
+        netdata_status=$?
+        printf 'netdata: service stop failed in %s: status %s; removal refused\n' "$(pwd)" "$netdata_status" >&2
+        exit "$netdata_status"
+      fi
+      # A policy-denied stop can return success without stopping the service.
+      if netdata_service_state=$(systemctl --system show --property=ActiveState --value 'netdata.service'); then
+        :
+      else
+        netdata_status=$?
+        printf 'netdata: service state query failed in %s: status %s; removal refused\n' "$(pwd)" "$netdata_status" >&2
+        exit "$netdata_status"
+      fi
+      if [ "$netdata_service_state" != inactive ]; then
+        printf '%s\n' 'netdata: service is not inactive (stop may be denied or skipped); removal refused' >&2
+        exit 1
+      fi
+    fi
     if [ -x "/usr/libexec/netdata/netdata-updater.sh" ] ; then
       /usr/libexec/netdata/netdata-updater.sh --disable-auto-updates
     fi

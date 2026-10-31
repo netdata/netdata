@@ -49,7 +49,7 @@ func (h *Host) recordFinishError(err error) {
 }
 func (h *Host) maintenanceErrorLocked() error {
 	var result error
-	for _, operation := range []string{"cleanup", "execution completion"} {
+	for _, operation := range []string{"cleanup", "execution completion", "update"} {
 		if err := h.maintenance[operation]; err != nil {
 			result = errors.Join(result, fmt.Errorf("%s: %w", operation, err))
 		}
