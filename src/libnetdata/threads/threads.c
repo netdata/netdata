@@ -57,7 +57,7 @@ static struct {
         ND_THREAD *list;
     } running;
 
-    pthread_attr_t attr;
+    size_t stack_size;
 } threads_globals = {
     .exited = {
         .spinlock = SPINLOCK_INITIALIZER,
@@ -67,6 +67,7 @@ static struct {
         .spinlock = SPINLOCK_INITIALIZER,
         .list = NULL,
     },
+    .stack_size = ND_THREAD_STACK_SIZE_DEFAULT,
 };
 
 static __thread ND_THREAD *_nd_thread_info = NULL;
@@ -208,49 +209,22 @@ void nd_thread_rwspinlock_write_unlocked(void) { if(_nd_thread_info) _nd_thread_
 #endif
 
 // --------------------------------------------------------------------------------------------------------------------
-// early initialization
+// stack size of the threads created by nd_thread_create()
 
-size_t netdata_threads_init(void) {
-    memset(&threads_globals.attr, 0, sizeof(threads_globals.attr));
-
-    if(pthread_attr_init(&threads_globals.attr) != 0)
-        fatal("pthread_attr_init() failed.");
-
-    // get the required stack size of the threads of netdata
-    size_t stacksize = 0;
-    if(pthread_attr_getstacksize(&threads_globals.attr, &stacksize) != 0)
-        fatal("pthread_attr_getstacksize() failed with code.");
-
-    return stacksize;
-}
-
-// ----------------------------------------------------------------------------
-// late initialization
-
-void netdata_threads_set_stack_size(size_t stacksize) {
-    int i;
-
-    // set pthread stack size
-    if(stacksize > (size_t)PTHREAD_STACK_MIN) {
-        i = pthread_attr_setstacksize(&threads_globals.attr, stacksize);
-        if(i != 0)
-            nd_log(NDLS_DAEMON, NDLP_WARNING, "pthread_attr_setstacksize() to %zu bytes, failed with code %d.", stacksize, i);
-        else
-            nd_log(NDLS_DAEMON, NDLP_DEBUG, "Set threads stack size to %zu bytes", stacksize);
+void nd_thread_set_stack_size(size_t stack_size) {
+    if(stack_size < ND_THREAD_STACK_SIZE_MIN) {
+        errno_clear();
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "THREADS: stack size %zu bytes is below the minimum, using %zu bytes",
+               stack_size, (size_t)ND_THREAD_STACK_SIZE_MIN);
+        stack_size = ND_THREAD_STACK_SIZE_MIN;
     }
-    else
-        nd_log(NDLS_DAEMON, NDLP_WARNING, "Invalid pthread stacksize %zu", stacksize);
+
+    __atomic_store_n(&threads_globals.stack_size, stack_size, __ATOMIC_RELAXED);
 }
 
-// ----------------------------------------------------------------------------
-// threads init for external plugins
-
-void netdata_threads_init_for_external_plugins(size_t stacksize) {
-    size_t default_stacksize = netdata_threads_init();
-    if(default_stacksize < 1 * 1024 * 1024)
-        default_stacksize = 1 * 1024 * 1024;
-
-    netdata_threads_set_stack_size(stacksize ? stacksize : default_stacksize);
+size_t nd_thread_stack_size(void) {
+    return __atomic_load_n(&threads_globals.stack_size, __ATOMIC_RELAXED);
 }
 
 // ----------------------------------------------------------------------------
@@ -480,8 +454,21 @@ static int create_uv_thread(uv_thread_t *thread, uv_thread_cb thread_func, void 
 {
     int err;
 
+#if !defined(OS_WINDOWS)
+    // on Windows libuv gives the stack size to _beginthreadex() as the initial commit,
+    // not as a reservation, so there threads keep the default stack of the executable
+    uv_thread_options_t options = {
+        .flags = UV_THREAD_HAS_STACK_SIZE,
+        .stack_size = nd_thread_stack_size(),
+    };
+#endif
+
     do {
+#if defined(OS_WINDOWS)
         err = uv_thread_create(thread, thread_func, arg);
+#else
+        err = uv_thread_create_ex(thread, &options, thread_func, arg);
+#endif
         if (err == 0)
             break;
 
@@ -720,5 +707,66 @@ int threads_unittest(void) {
     }
 
     fprintf(stderr, "%s\n", errors ? " > FAILED" : " > OK");
+    return errors;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+// unittest
+
+#if defined(OS_LINUX)
+static void nd_thread_stack_size_unittest_thread(void *arg) {
+    size_t *stack_size = arg;
+    pthread_attr_t attr;
+    if(pthread_getattr_np(pthread_self(), &attr) == 0) {
+        if(pthread_attr_getstacksize(&attr, stack_size) != 0)
+            *stack_size = 0;
+        pthread_attr_destroy(&attr);
+    }
+}
+#endif
+
+int nd_thread_stack_size_unittest(void) {
+    int errors = 0;
+
+    fprintf(stderr, "\nrunning thread stack size unittest\n");
+
+#if defined(OS_LINUX)
+    size_t saved = nd_thread_stack_size();
+    const size_t wanted[] = { ND_THREAD_STACK_SIZE_MIN, 3 * 1024 * 1024, 4096 };
+
+    for(size_t i = 0; i < sizeof(wanted) / sizeof(wanted[0]); i++) {
+        nd_thread_set_stack_size(wanted[i]);
+        size_t expected = MAX(wanted[i], (size_t)ND_THREAD_STACK_SIZE_MIN);
+
+        size_t got = 0;
+        ND_THREAD *t = nd_thread_create("STACKTEST", NETDATA_THREAD_OPTION_DEFAULT, nd_thread_stack_size_unittest_thread, &got);
+        if(!t || nd_thread_join(t) != 0) {
+            fprintf(stderr, "thread stack size unittest FAILED: cannot run a thread for %zu bytes\n", wanted[i]);
+            errors++;
+            continue;
+        }
+
+        // musl adds the TLS area to the stack it reports, and glibc may give
+        // a thread the cached stack of an exited one, up to 4 times bigger
+#ifdef __GLIBC__
+        size_t max_got = 4 * expected + 64 * 1024;
+#else
+        size_t max_got = expected + 64 * 1024;
+#endif
+        if(nd_thread_stack_size() != expected || got < expected || got > max_got) {
+            fprintf(stderr, "thread stack size unittest FAILED: asked %zu bytes, configured %zu, thread got %zu, expected %zu\n",
+                    wanted[i], nd_thread_stack_size(), got, expected);
+            errors++;
+        }
+        else
+            fprintf(stderr, "thread stack size unittest: asked %zu bytes, thread got %zu\n", wanted[i], got);
+    }
+
+    nd_thread_set_stack_size(saved);
+    fprintf(stderr, "thread stack size unittest %s\n", errors ? "FAILED" : "OK");
+#else
+    fprintf(stderr, "thread stack size unittest skipped: it needs pthread_getattr_np()\n");
+#endif
+
     return errors;
 }
