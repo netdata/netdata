@@ -346,11 +346,23 @@ static int ebpf_mdflush_load_bpf(ebpf_module_t *em)
                 else {
                     em->targets[NETDATA_MD_FLUSH_REQUEST].mode = EBPF_LOAD_PROBE;
                     ret = ebpf_mdflush_load_and_attach(mdflush_bpf_obj, em);
+                    if (ret) {
+                        mdflush_bpf__destroy(mdflush_bpf_obj);
+                        mdflush_bpf_obj = NULL;
+                    }
                 }
             }
         }
     }
 #endif
+
+    if (ret && (em->load & EBPF_LOAD_CORE)) {
+        if (mdflush_bpf_obj) {
+            mdflush_bpf__destroy(mdflush_bpf_obj);
+            mdflush_bpf_obj = NULL;
+        }
+        ret = ebpf_load_legacy_fallback(em, running_on_kernel, isrh);
+    }
 
     return ret;
 }

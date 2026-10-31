@@ -31,7 +31,7 @@ func tryLoadCachestatPlan(cfg CachestatLegacyConfig, plan LoadPlan) (*CachestatL
 		return nil, err
 	}
 
-	if err := rt.Attach(cfg.AccountFunction); err != nil {
+	if err := rt.Attach(cfg.Targets.AddToPageCacheLru.Name, cfg.Targets.MarkPageAccessed.Name, cfg.AccountFunction); err != nil {
 		rt.Close()
 		return nil, err
 	}
@@ -63,6 +63,9 @@ func tryLoadCachestatPlan(cfg CachestatLegacyConfig, plan LoadPlan) (*CachestatL
 }
 
 func LoadCachestatLegacy(cfg CachestatLegacyConfig) (*CachestatLegacyHandle, error) {
+	if cfg.TargetResolutionErr != nil {
+		return nil, cfg.TargetResolutionErr
+	}
 	versionStr, err := KernelVersionString()
 	if err != nil {
 		return nil, fmt.Errorf("kernel version string: %w", err)
@@ -71,24 +74,23 @@ func LoadCachestatLegacy(cfg CachestatLegacyConfig) (*CachestatLegacyHandle, err
 	if err != nil {
 		return nil, fmt.Errorf("kernel reject check: %w", err)
 	}
-	if err := CanLoadCode(cfg.KernelVersion, cfg.IsRHF, rejected, IsRoot(), "ebpf-go.plugin"); err != nil {
+	if err := CanLoadCode(cfg.KernelVersion, cfg.IsRHF, rejected, IsRoot(), true, "ebpf-go.plugin"); err != nil {
 		return nil, err
 	}
 
 	plan := BuildCachestatLegacyPlan(cfg)
 	coreSupported := libbpfloader.SupportsCore()
 	if !coreSupported {
-		selector := SelectIndex(cfg.Kernels, cfg.IsRHF, cfg.KernelVersion)
-		if int(selector) > cachestatMaxBaseSelector {
-			selector = uint32(cachestatMaxBaseSelector)
-		}
-		plan.ObjectPath = BuildObjectPathWithFlavor(cfg.PluginsDir, selector, "cachestat", false, cfg.IsRHF, ObjectFlavorBase)
 		plan.LoadMode = LoadLegacy
-		// No fallback in legacy mode: there is only one object.
-		return tryLoadCachestatPlan(cfg, plan)
 	}
 
 	plans := buildFallbackPlans(plan, cfg.PluginsDir, cfg.IsRHF, "cachestat", cachestatMaxBaseSelector)
+	if coreSupported {
+		plans = append(plans, buildCoreLegacyFallbackPlans(plan, cfg.PluginsDir, cfg.IsRHF, "cachestat", cachestatMaxBaseSelector)...)
+	}
+	if len(plans) == 0 {
+		return nil, fmt.Errorf("cachestat has no compatible object family for this kernel")
+	}
 	var lastErr error
 	for i, fp := range plans {
 		handle, err := tryLoadCachestatPlan(cfg, fp)

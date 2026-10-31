@@ -43,38 +43,56 @@ func defaultCachestatTargets() CachestatTargets {
 	}
 }
 
+// Folio helpers come first so kernels exporting both names use the current API.
+var (
+	cachestatAddCandidates    = []string{"filemap_add_folio", "add_to_page_cache_lru"}
+	cachestatAccessCandidates = []string{"folio_mark_accessed", "mark_page_accessed"}
+)
+
+func (t *CachestatTargets) ResolveAllFromReader(symbols io.Reader) error {
+	candidateSets := [][]string{cachestatAddCandidates, cachestatAccessCandidates, t.AccountPage}
+	resolved, err := selectKallsymsCandidateSets(symbols, candidateSets...)
+	if err != nil {
+		return fmt.Errorf("reading kernel symbols: %w", err)
+	}
+	for i, candidates := range candidateSets {
+		if resolved[i] == "" {
+			return fmt.Errorf("no cachestat target found among %v", candidates)
+		}
+	}
+	t.AddToPageCacheLru.Name = resolved[0]
+	t.MarkPageAccessed.Name = resolved[1]
+	t.AccountPageDirtied.Name = resolved[2]
+	return nil
+}
+
+func selectCachestatKernelTargetFromReader(candidates []string, symbols io.Reader) (string, error) {
+	name, err := selectKallsymsCandidate(candidates, symbols)
+	if err != nil {
+		return "", err
+	}
+	if name == "" {
+		return "", fmt.Errorf("no cachestat target found among %v", candidates)
+	}
+	return name, nil
+}
+
 func resolveCachestatTargets() (CachestatTargets, error) {
 	targets := defaultCachestatTargets()
-	if err := targets.ResolveAccountPageTarget(); err != nil {
+	symbols, err := openProcKallsyms()
+	if err != nil {
+		return CachestatTargets{}, err
+	}
+	defer symbols.Close()
+	if err := targets.ResolveAllFromReader(symbols); err != nil {
 		return CachestatTargets{}, err
 	}
 
 	return targets, nil
 }
 
-func (t *CachestatTargets) ResolveAccountPageTarget() error {
-	name, err := selectCachestatAccountPageTarget(t.AccountPage)
-	if err != nil {
-		return err
-	}
-
-	t.AccountPageDirtied.Name = name
-	return nil
-}
-
-// selectCachestatAccountPageTarget resolves the account-page target from the
-// live symbol table.  Unlike dcstat, an unresolvable target IS fatal here: the
+// Unlike dcstat, an unresolvable account-page target is fatal here: the
 // caller has no usable default (AccountPageDirtied ships with an empty name).
-func selectCachestatAccountPageTarget(candidates []string) (string, error) {
-	symbols, err := openProcKallsyms()
-	if err != nil {
-		return "", err
-	}
-	defer symbols.Close()
-
-	return selectCachestatAccountPageTargetFromReader(candidates, symbols)
-}
-
 func selectCachestatAccountPageTargetFromReader(candidates []string, r io.Reader) (string, error) {
 	name, err := selectKallsymsCandidate(candidates, r)
 	if err != nil {

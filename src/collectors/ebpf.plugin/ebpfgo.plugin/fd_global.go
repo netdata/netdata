@@ -173,9 +173,15 @@ func runFDGlobalCollector(
 	}
 
 	createFDGlobalCharts(api, updateEvery, handle.ReportErrors)
+	if handle.Plan.Flavor == ObjectFlavorArena {
+		createArenaDropsChart(api, fdGlobalModule, updateEvery)
+	}
 
 	lastCollection := time.Now()
 	collectAndPublish := func(usecSince int) {
+		if handle.Plan.Flavor == ObjectFlavorArena {
+			publishArenaDrops(api, fdGlobalModule, handle.Runtime.ArenaDropped(), usecSince)
+		}
 		// Global snapshot — one CGO call.
 		snapshot, err := handle.Runtime.Snapshot(handle.MapsPerCore)
 		if err != nil {
