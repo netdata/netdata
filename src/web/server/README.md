@@ -387,3 +387,32 @@ ws://localhost:19999/echo?max_frame_size=32768
 This is particularly useful for resource-constrained devices or network environments with specific limitations.
 
 </details>
+
+<details>
+<summary><strong>Embedding the Dashboard via Iframe</strong></summary>
+
+The Agent dashboard is embeddable in external web pages by default. The [`x-frame-options response header`](#configuration-options) is empty by default, so no `X-Frame-Options` header is sent and browsers allow the dashboard at `http://NODE:19999` to be loaded inside an `<iframe>` on any page.
+
+Embed the dashboard with a standard iframe element:
+
+```html
+<iframe src="http://NODE:19999" width="1024" height="768" frameborder="0"></iframe>
+```
+
+Replace `NODE` with the hostname or IP address of the node running the Agent.
+
+### Restricting Iframe Embedding
+
+To prevent the dashboard from being embedded on other sites, set `x-frame-options response header` in the `[web]` section of `netdata.conf` (see [Configure Basic Settings](#configure-basic-settings) for `edit-config` usage):
+
+```text
+[web]
+    x-frame-options response header = SAMEORIGIN
+```
+
+- `SAMEORIGIN`: allow embedding only in pages from the same origin as the Agent.
+- `DENY`: block embedding on all pages.
+
+Restart your Agent to apply changes. See the [`x-frame-options response header`](#configuration-options) row in the configuration table for the default value.
+
+</details>
