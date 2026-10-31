@@ -314,6 +314,10 @@ release** (the goroutine actually returns).
 
 `process_attempt.go` declares the contract; `containment/authority.go` implements it.
 
+`Cut` and `CutProcessAttempt` publish logical settlement before returning. A caller awaiting that settlement can resume
+before the worker records the cut result. Tests that assert such worker observations must wait for an explicit signal
+from the worker.
+
 - `StartProcessAttempt` checks caller cancellation while holding the identity-registry mutex. A successful claim
   linearizes at that snapshot: later cancellation follows the caller's normal post-start lifecycle. The caller context
   gates admission only; the worker receives an independent process-owned context.
