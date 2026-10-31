@@ -26,8 +26,8 @@ jobs:
       - name: Prepare tools
         id: prepare
         run: |
-          sudo apt-get update || true
-          sudo apt-get install -y python3-ruamel.yaml
+          sudo sh .github/scripts/ci-package.sh apt-get update
+          sudo sh .github/scripts/ci-package.sh apt-get install -y python3-ruamel.yaml
       - name: Read build matrix
         id: set-matrix
         run: |

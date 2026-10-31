@@ -227,8 +227,8 @@ jobs:
       - name: Prepare tools
         id: prepare
         run: |
-          sudo apt-get update || true
-          sudo apt-get install -y python3-ruamel.yaml
+          sudo sh .github/scripts/ci-package.sh apt-get update
+          sudo sh .github/scripts/ci-package.sh apt-get install -y python3-ruamel.yaml
       - name: Read build matrix
         id: set-matrix
         run: |
@@ -379,9 +379,8 @@ jobs:
         id: qemu
         if: matrix.qemu && needs.file-check.outputs.run == 'true'
         run: |
-          sudo apt-get update
-          sudo apt-get upgrade -y
-          sudo apt-get install -y qemu-user-static
+          sudo sh .github/scripts/ci-package.sh apt-get update
+          sudo sh .github/scripts/ci-package.sh apt-get install -y qemu-user-static
       - name: Download topology-ip-intel stock payload
         id: fetch-topology-stock
         if: needs.file-check.outputs.run == 'true' && matrix.arch != 'armv6l'
@@ -1030,7 +1029,7 @@ jobs:
       - name: Setup python environment
         id: setup-python
         run: |
-          pip install -r .github/scripts/modules/requirements.txt
+          sh .github/scripts/ci-package.sh pip install -r .github/scripts/modules/requirements.txt
       - name: Check if the version is latest and published
         id: check-latest-version
         run: |
@@ -1093,11 +1092,15 @@ jobs:
       - artifact-verification-dist
       - artifact-verification-static
     steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Install Rclone
         id: install-rclone
         run: |
-          sudo apt-get update || exit 1
-          sudo apt-get install -y rclone || exit 1
+          sudo sh .github/scripts/ci-package.sh apt-get update
+          sudo sh .github/scripts/ci-package.sh apt-get install -y rclone
       - name: Retrieve Artifacts
         id: fetch
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -1228,11 +1231,15 @@ jobs:
       - artifact-verification-dist
       - artifact-verification-static
     steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Install Rclone
         id: install-rclone
         run: |
-          sudo apt-get update || exit 1
-          sudo apt-get install -y rclone || exit 1
+          sudo sh .github/scripts/ci-package.sh apt-get update
+          sudo sh .github/scripts/ci-package.sh apt-get install -y rclone
       - name: Retrieve Artifacts
         id: fetch
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -1288,8 +1295,8 @@ jobs:
       - name: Prepare tools
         id: prepare
         run: |
-          sudo apt-get update || true
-          sudo apt-get install -y python3-ruamel.yaml
+          sudo sh .github/scripts/ci-package.sh apt-get update
+          sudo sh .github/scripts/ci-package.sh apt-get install -y python3-ruamel.yaml
       - name: Read build matrix
         id: set-matrix
         run: |
@@ -1416,10 +1423,16 @@ jobs:
       - name: Install latest bash
         id: install-bash
         if: needs.file-check.outputs.run == 'true'
+        timeout-minutes: 15
+        env:
+          HOMEBREW_CURL_RETRIES: 5
         run: |
           brew install bash
       - name: Install ndsudo test dependencies
         if: needs.file-check.outputs.run == 'true' && matrix.name == 'macos-15-M1'
+        timeout-minutes: 15
+        env:
+          HOMEBREW_CURL_RETRIES: 5
         run: |
           brew install jq smartmontools
       - name: Install netdata dependencies
