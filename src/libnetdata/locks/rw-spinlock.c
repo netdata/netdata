@@ -7,6 +7,9 @@
 #define WRITER_BIT (1U << 31)
 #define READER_MASK (~WRITER_BIT)
 
+// Embedded in every DICTIONARY (twice) and every RRDSET: it must not grow.
+_Static_assert(sizeof(RW_SPINLOCK) == 8, "RW_SPINLOCK must stay 8 bytes");
+
 // ----------------------------------------------------------------------------
 // Holder-aware deadlock detection for rw-spinlocks.
 //
@@ -19,10 +22,15 @@
 // it is embedded in every DICTIONARY (twice) and every RRDSET. So everything else we need is
 // accumulated on the WAITER'S OWN STACK, exactly like the pre-existing deadlock_timestamp local:
 //
-//   - readers_min/readers_max over the whole wait: a count that never drops means genuinely stuck
-//     readers; a fluctuating one means reader churn starvation. That is the discriminator.
-//   - the writer tid sampled on the first check: unchanged at timeout means ONE writer held the
-//     lock for the entire wait; changed means writers are cycling and we are being starved.
+//   - readers_min/readers_max over the deadlock checks: a minimum above zero points at stuck
+//     readers, a minimum of zero at reader churn starving the waiter.
+//   - the writer tid sampled on the first check: the same tid at timeout points at one writer
+//     holding the lock for the whole wait, a different one at writers cycling.
+//
+// Both are samples taken once per deadlock check (about a minute apart once backed off), so the
+// message reports them and leaves the conclusion to the reader. writer is also 0 while a waiting
+// writer has only flicked WRITER_BIT on, and briefly during unlock, so "no writer" is not proof
+// that readers block us.
 //
 // Zero bytes added to the lock, no change to the uncontended fast path.
 typedef struct rw_spinlock_wait {
@@ -34,11 +42,28 @@ typedef struct rw_spinlock_wait {
 
 #define RW_SPINLOCK_WAIT_INIT (RW_SPINLOCK_WAIT){ 0 }
 
-static void rw_spinlock_deadlock_detect(RW_SPINLOCK_WAIT *w, const char *type, const char *func,
-                                        RW_SPINLOCK *rw_spinlock, uint32_t readers_now) {
-    // writer is written with a plain store on acquire, so this read is racy by design. It is only
-    // ever printed, never dereferenced, so a stale value cannot fault.
-    pid_t writer_now = rw_spinlock->writer;
+void rw_spinlock_deadlock_holder_format(char *dst, size_t dst_size, pid_t self, pid_t writer, pid_t first_writer,
+                                        uint32_t readers, uint32_t readers_min, uint32_t readers_max) {
+    char writer_txt[80];
+    if (!writer)
+        snprintfz(writer_txt, sizeof(writer_txt), "no writer");
+    else if (writer == first_writer)
+        snprintfz(writer_txt, sizeof(writer_txt), "writer tid=%d%s, same at the first check",
+                  writer, writer == self ? " (this thread)" : "");
+    else
+        snprintfz(writer_txt, sizeof(writer_txt), "writer tid=%d%s, was tid=%d at the first check",
+                  writer, writer == self ? " (this thread)" : "", first_writer);
+
+    snprintfz(dst, dst_size, "[holder: %s, readers=%u (min=%u max=%u over the checks)]",
+              writer_txt, readers, readers_min, readers_max);
+}
+
+// Out of line: the inlined lock functions keep only the call, not the message buffers.
+static NEVER_INLINE void rw_spinlock_deadlock_detect(RW_SPINLOCK_WAIT *w, const char *type, const char *func,
+                                                     RW_SPINLOCK *rw_spinlock, uint32_t readers_now) {
+    // writer is written with a plain store on acquire, so it can be stale by the time we print it.
+    // It is only ever printed, never dereferenced.
+    pid_t writer_now = __atomic_load_n(&rw_spinlock->writer, __ATOMIC_RELAXED);
 
     if (!w->timestamp) {
         w->timestamp = now_monotonic_usec();
@@ -58,18 +83,8 @@ static void rw_spinlock_deadlock_detect(RW_SPINLOCK_WAIT *w, const char *type, c
     int64_t waited_s = (int64_t)((now - w->timestamp) / USEC_PER_SEC);
 
     char holder[256];
-    if (writer_now)
-        snprintfz(holder, sizeof(holder),
-                  "[holder: writer tid=%d%s readers=%u (min=%u max=%u)]",
-                  writer_now,
-                  (w->first_writer == writer_now) ? ", SAME writer for the whole wait" : ", writer CHANGED during the wait",
-                  readers_now, w->readers_min, w->readers_max);
-    else
-        snprintfz(holder, sizeof(holder),
-                  "[holder: no writer, blocked by readers=%u (min=%u max=%u)%s]",
-                  readers_now, w->readers_min, w->readers_max,
-                  (w->readers_min > 0) ? " - readers never drained, a reader is stuck"
-                                       : " - reader count reached zero, this is starvation not a stuck reader");
+    rw_spinlock_deadlock_holder_format(holder, sizeof(holder), gettid_cached(), writer_now, w->first_writer,
+                                       readers_now, w->readers_min, w->readers_max);
 
     fatal("DEADLOCK DETECTED: %s in function '%s' could not be acquired for %"PRIi64" seconds %s",
           type, func, waited_s, holder);
