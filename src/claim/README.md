@@ -320,13 +320,13 @@ more <VARLIB>\netdata_random_session_id                              # Windows (
 
 Use the exact command the dialog shows — it fills in the correct path for your install. The `docker exec netdata` form assumes the default container name (`--name=netdata`); adjust it if your container uses a different name. After pasting the UUID, the claim is rejected with `invalid key`, even though the value was copied exactly.
 
-**Why this happens:** The UUID in `netdata_random_session_id` is **single-use**. The Agent generates a new UUID and overwrites the file on **every** claim attempt — including failed ones — as a brute-force defense. The UUID is regenerated on the `invalid key` response, the `invalid parameters` response, and on every attempt that passes those checks (whether the claiming call to Cloud then succeeds or fails). So if any claim attempt occurred after you read the file (an earlier submit with a wrong or missing Space token/Rooms, a retry from another browser tab, or a concurrent claiming script), the value you copied is already stale.
+**Why this happens:** The UUID in `netdata_random_session_id` is **single-use**. The Agent regenerates it at startup, after a claim attempt that presented the **correct** key (the `invalid parameters` response, and every attempt that passes those checks whether the claiming call to Cloud then succeeds or fails), and on a successful claim. A request with a **wrong** key does **not** regenerate it. So if any claim attempt that used the correct key occurred after you read the file (an earlier submit with a wrong or missing Space token/Rooms, a retry from another browser tab, or a concurrent claiming script), the value you copied is already stale.
 
 **Solution:** Read the file **again** to get the current UUID and submit once, in the same pass, with a valid Space token and Rooms — making sure no other claim attempt regenerates the UUID first:
 
 1. Re-run the command from the dialog (the value is different each time).
 2. Copy the new UUID.
-3. Paste it with the correct Space token and Rooms, then submit once. Do not re-submit the old value or retry from a second tab — each failed attempt invalidates the current UUID again.
+3. Paste it with the correct Space token and Rooms, then submit once. Do not re-submit the old value or retry from a second tab — each attempt that presents the correct key invalidates the current UUID again.
 
 #### kickstart: unsupported Netdata installation
 

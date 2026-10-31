@@ -6498,9 +6498,9 @@ paths:
             4. Use it in the claim request
 
             **Security Notes:**
-            - Key is randomly generated on each info request
-            - Key is regenerated after each claim attempt (prevents reuse)
-            - Mismatched key triggers new key generation (prevents brute force)
+            - Key is generated at startup (and on an info request if none exists yet)
+            - Key is regenerated after a claim attempt that presented the correct key, and on a successful claim (prevents reuse)
+            - A mismatched key does NOT regenerate it: the endpoint is unauthenticated, so a wrong key must not be able to reset the challenge
             - Validates server ownership through file system access
 
             **When to Include:**
