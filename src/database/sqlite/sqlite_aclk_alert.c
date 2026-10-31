@@ -2,6 +2,7 @@
 
 #include "sqlite_functions.h"
 #include "sqlite_aclk_alert.h"
+#include "health/health-alert-entry.h"
 
 #include "../../aclk/aclk_alarm_api.h"
 
@@ -1494,8 +1495,8 @@ done:
     return count;
 }
 
-// queue a pending transition the way SQL_INSERT_ALERT_PENDING_QUEUE does, due `due_in_s` from now, without
-// touching the host's next-due gate
+// queue a pending transition with the upsert of SQL_INSERT_ALERT_PENDING_QUEUE (without its latest-transition gate),
+// due `due_in_s` from now, without touching the host's next-due gate
 static bool aq_pending_seed(nd_uuid_t *host_id, int64_t health_log_id, int64_t unique_id, int64_t due_in_s)
 {
     sqlite3_stmt *res = NULL;
@@ -1565,6 +1566,79 @@ done:
         else                                                                                                           \
             netdata_log_info("ALERT QUEUE TEST ok: " fmt, ##__VA_ARGS__);                                              \
     } while (0)
+
+static ALARM_ENTRY *aq_test_ae(uint32_t alarm_id, uint32_t unique_id, RRDCALC_STATUS old_status, RRDCALC_STATUS new_status, const char *chart_name)
+{
+    ALARM_ENTRY *ae = callocz(1, sizeof(*ae));
+    ae->alarm_id = alarm_id;
+    ae->unique_id = unique_id;
+    ae->alarm_event_id = unique_id;
+    ae->old_status = old_status;
+    ae->new_status = new_status;
+    ae->when = now_realtime_sec();
+    ae->chart_name = string_strdupz(chart_name);
+    uuid_generate_random(ae->transition_id);
+    return ae;
+}
+
+static void aq_test_ae_free(ALARM_ENTRY *ae)
+{
+    string_freez(ae->chart_name);
+    freez(ae);
+}
+
+// the unique_id of the transition health_log names as the alert's latest, or 0
+static int64_t aq_test_latest_transition(nd_uuid_t *host_id, uint32_t alarm_id, char *chart_name, size_t size)
+{
+    sqlite3_stmt *res = NULL;
+    int64_t unique_id = 0;
+
+    if (chart_name && size)
+        chart_name[0] = '\0';
+
+    if (!PREPARE_STATEMENT(
+            db_meta,
+            "SELECT hld.unique_id, hl.chart_name FROM health_log hl, health_log_detail hld"
+            " WHERE hl.host_id = @host_id AND hl.alarm_id = @alarm_id AND hld.transition_id = hl.last_transition_id",
+            &res))
+        return 0;
+
+    if (sqlite3_bind_blob(res, 1, host_id, sizeof(*host_id), SQLITE_STATIC) == SQLITE_OK &&
+        sqlite3_bind_int64(res, 2, alarm_id) == SQLITE_OK && sqlite3_step_monitored(res) == SQLITE_ROW) {
+        unique_id = sqlite3_column_int64(res, 0);
+        if (chart_name && size && sqlite3_column_text(res, 1))
+            strncpyz(chart_name, (const char *)sqlite3_column_text(res, 1), size - 1);
+    }
+
+    SQLITE_FINALIZE(res);
+    return unique_id;
+}
+
+// the number of pending queue rows of the alert, and the last one's transition
+static int aq_test_pending_for_alarm(nd_uuid_t *host_id, uint32_t alarm_id, int64_t *unique_id, int *status)
+{
+    sqlite3_stmt *res = NULL;
+    int rows = 0;
+
+    *unique_id = 0;
+    *status = 0;
+
+    if (!PREPARE_STATEMENT(
+            db_meta, "SELECT unique_id, status FROM alert_queue WHERE host_id = @host_id AND alarm_id = @alarm_id", &res))
+        return 0;
+
+    if (sqlite3_bind_blob(res, 1, host_id, sizeof(*host_id), SQLITE_STATIC) == SQLITE_OK &&
+        sqlite3_bind_int64(res, 2, alarm_id) == SQLITE_OK) {
+        while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+            *unique_id = sqlite3_column_int64(res, 0);
+            *status = sqlite3_column_int(res, 1);
+            rows++;
+        }
+    }
+
+    SQLITE_FINALIZE(res);
+    return rows;
+}
 
 int alert_queue_unittest(void)
 {
@@ -1649,7 +1723,7 @@ int alert_queue_unittest(void)
 
     // --- the pending queue (alert_queue) carries the same defect and the same guard. Its conflict key is
     // (host_id, health_log_id, alarm_id), NOT the submit queue's key, so it needs its own case. The seeding
-    // INSERT mirrors SQL_INSERT_ALERT_PENDING_QUEUE in sqlite_health.c.
+    // INSERT mirrors the upsert of SQL_INSERT_ALERT_PENDING_QUEUE in sqlite_health.c, without its gate.
     {
         const char *pending_insert =
             "INSERT INTO alert_queue (host_id, health_log_id, unique_id, alarm_id, status, date_scheduled)"
@@ -1849,6 +1923,145 @@ int alert_queue_unittest(void)
 
         (void)db_execute(db_meta, "DELETE FROM alert_queue", NULL);
         (void)db_execute(db_meta, "DELETE FROM aclk_queue", NULL);
+        freez(h->aclk_host_config);
+        freez(h);
+    }
+
+    // --- an alert's transitions can reach SQLite out of order: link/unlink entries are saved by the metadata
+    // thread, the evaluation's by the health thread. A delete-and-reattach writes X->REMOVED, REMOVED->UNINITIALIZED
+    // and UNINITIALIZED->X in one second, and the X->REMOVED can be the last one saved. It must not become the
+    // alert's latest transition, neither in health_log nor in the cloud pending queue.
+    {
+        RRDHOST *h = callocz(1, sizeof(*h));
+        uuid_generate(h->host_id.uuid);
+        h->aclk_host_config = callocz(1, sizeof(*h->aclk_host_config));
+        nd_uuid_t *hid = &h->host_id.uuid;
+
+        (void)db_execute(db_meta, "DELETE FROM alert_queue", NULL);
+
+        // alarm 1: in the order the threads can save them
+        ALARM_ENTRY *raised = aq_test_ae(1, 100, RRDCALC_STATUS_UNINITIALIZED, RRDCALC_STATUS_WARNING, "old");
+        ALARM_ENTRY *removed = aq_test_ae(1, 101, RRDCALC_STATUS_WARNING, RRDCALC_STATUS_REMOVED, "old");
+        ALARM_ENTRY *attached = aq_test_ae(1, 102, RRDCALC_STATUS_REMOVED, RRDCALC_STATUS_UNINITIALIZED, "new");
+        ALARM_ENTRY *reraised = aq_test_ae(1, 103, RRDCALC_STATUS_UNINITIALIZED, RRDCALC_STATUS_WARNING, "new");
+        sql_health_alarm_log_save(h, raised);
+        sql_health_alarm_log_save(h, attached);
+        sql_health_alarm_log_save(h, reraised);
+        sql_health_alarm_log_save(h, removed);
+
+        char chart_name[16] = "";
+        int64_t latest = aq_test_latest_transition(hid, 1, chart_name, sizeof(chart_name));
+        AQ_CHECK(
+            latest == 103 && !strcmp(chart_name, "new"),
+            "save order: an older transition saved last does not become the latest "
+            "(latest unique_id=%" PRId64 " chart_name=%s, expected 103 new)", latest, chart_name);
+
+        int64_t pending_uid = 0;
+        int pending_status = 0;
+        int rows = aq_test_pending_for_alarm(hid, 1, &pending_uid, &pending_status);
+        AQ_CHECK(
+            rows == 1 && pending_uid == 103 && pending_status == RRDCALC_STATUS_WARNING,
+            "save order: the pending queue keeps the newest transition "
+            "(rows=%d unique_id=%" PRId64 " status=%d, expected 1 103 %d)",
+            rows, pending_uid, pending_status, RRDCALC_STATUS_WARNING);
+
+        // alarm 2: the newer transition was already drained when the older one is saved
+        ALARM_ENTRY *older = aq_test_ae(2, 201, RRDCALC_STATUS_CLEAR, RRDCALC_STATUS_REMOVED, "c");
+        ALARM_ENTRY *newer = aq_test_ae(2, 202, RRDCALC_STATUS_UNINITIALIZED, RRDCALC_STATUS_CLEAR, "c");
+        sql_health_alarm_log_save(h, newer);
+        (void)db_execute(db_meta, "DELETE FROM alert_queue WHERE alarm_id = 2", NULL);
+        sql_health_alarm_log_save(h, older);
+        rows = aq_test_pending_for_alarm(hid, 2, &pending_uid, &pending_status);
+        latest = aq_test_latest_transition(hid, 2, NULL, 0);
+        AQ_CHECK(
+            rows == 0 && latest == 202,
+            "save order: an older transition saved after the newer one was drained queues nothing "
+            "(rows=%d latest=%" PRId64 ", expected 0 202)", rows, latest);
+
+        // alarm 3: in-order saves are unchanged
+        ALARM_ENTRY *first = aq_test_ae(3, 301, RRDCALC_STATUS_UNINITIALIZED, RRDCALC_STATUS_CLEAR, "a");
+        ALARM_ENTRY *second = aq_test_ae(3, 302, RRDCALC_STATUS_CLEAR, RRDCALC_STATUS_CRITICAL, "b");
+        sql_health_alarm_log_save(h, first);
+        latest = aq_test_latest_transition(hid, 3, chart_name, sizeof(chart_name));
+        AQ_CHECK(
+            latest == 301 && !strcmp(chart_name, "a"),
+            "save order: a new alert's first transition is its latest (latest=%" PRId64 " chart_name=%s)",
+            latest, chart_name);
+        sql_health_alarm_log_save(h, second);
+        latest = aq_test_latest_transition(hid, 3, chart_name, sizeof(chart_name));
+        rows = aq_test_pending_for_alarm(hid, 3, &pending_uid, &pending_status);
+        AQ_CHECK(
+            latest == 302 && !strcmp(chart_name, "b") && rows == 1 && pending_uid == 302 &&
+                pending_status == RRDCALC_STATUS_CRITICAL,
+            "save order: in-order saves move the latest transition and the pending row forward "
+            "(latest=%" PRId64 " chart_name=%s rows=%d pending=%" PRId64 ")",
+            latest, chart_name, rows, pending_uid);
+
+        // alarm 4: a transition whose detail row could not be saved is neither the latest nor queued
+        ALARM_ENTRY *saved = aq_test_ae(4, 401, RRDCALC_STATUS_UNINITIALIZED, RRDCALC_STATUS_CLEAR, "s");
+        ALARM_ENTRY *lost = aq_test_ae(4, 402, RRDCALC_STATUS_CLEAR, RRDCALC_STATUS_WARNING, "l");
+        sql_health_alarm_log_save(h, saved);
+        AQ_SQL(
+            db_execute(
+                db_meta,
+                "CREATE TRIGGER aq_detail_fail BEFORE INSERT ON health_log_detail WHEN NEW.unique_id = 402"
+                " BEGIN SELECT RAISE(ABORT, 'alert queue test'); END",
+                NULL),
+            "create detail failure trigger");
+        sql_health_alarm_log_save(h, lost);
+        (void)db_execute(db_meta, "DROP TRIGGER aq_detail_fail", NULL);
+        latest = aq_test_latest_transition(hid, 4, chart_name, sizeof(chart_name));
+        rows = aq_test_pending_for_alarm(hid, 4, &pending_uid, &pending_status);
+        AQ_CHECK(
+            latest == 401 && !strcmp(chart_name, "s") && rows == 1 && pending_uid == 401,
+            "save order: a transition whose detail failed to save changes nothing "
+            "(latest=%" PRId64 " chart_name=%s rows=%d pending=%" PRId64 ", expected 401 s 1 401)",
+            latest, chart_name, rows, pending_uid);
+
+        // alarm 5 never got a transition saved, so it has no latest transition; the history of alarm 6 must still
+        // be cleaned up
+        ALARM_ENTRY *unsaved = aq_test_ae(5, 501, RRDCALC_STATUS_UNINITIALIZED, RRDCALC_STATUS_CLEAR, "u");
+        ALARM_ENTRY *expired = aq_test_ae(6, 601, RRDCALC_STATUS_UNINITIALIZED, RRDCALC_STATUS_CLEAR, "e");
+        ALARM_ENTRY *current = aq_test_ae(6, 602, RRDCALC_STATUS_CLEAR, RRDCALC_STATUS_WARNING, "e");
+        expired->when = current->when = now_realtime_sec() - 7200;
+        expired->updated_by_id = 602;
+        AQ_SQL(
+            db_execute(
+                db_meta,
+                "CREATE TRIGGER aq_detail_fail BEFORE INSERT ON health_log_detail WHEN NEW.unique_id = 501"
+                " BEGIN SELECT RAISE(ABORT, 'alert queue test'); END",
+                NULL),
+            "create detail failure trigger");
+        sql_health_alarm_log_save(h, unsaved);
+        (void)db_execute(db_meta, "DROP TRIGGER aq_detail_fail", NULL);
+        sql_health_alarm_log_save(h, expired);
+        sql_health_alarm_log_save(h, current);
+        h->health_log.health_log_retention_s = 3600;
+        sql_health_alarm_log_cleanup(h);
+        int remaining = 0;
+        sqlite3_stmt *cnt = NULL;
+        if (PREPARE_STATEMENT(
+                db_meta,
+                "SELECT COUNT(*) FROM health_log_detail WHERE alarm_id = 6"
+                " AND health_log_id IN (SELECT health_log_id FROM health_log WHERE host_id = @host_id)",
+                &cnt)) {
+            if (sqlite3_bind_blob(cnt, 1, hid, sizeof(*hid), SQLITE_STATIC) == SQLITE_OK &&
+                sqlite3_step_monitored(cnt) == SQLITE_ROW)
+                remaining = sqlite3_column_int(cnt, 0);
+            SQLITE_FINALIZE(cnt);
+        }
+        latest = aq_test_latest_transition(hid, 6, NULL, 0);
+        AQ_CHECK(
+            remaining == 1 && latest == 602,
+            "save order: an alert without a latest transition does not stop the cleanup of the host "
+            "(alarm 6 detail rows=%d latest=%" PRId64 ", expected 1 602)", remaining, latest);
+
+        ALARM_ENTRY *all[] = {
+            raised, removed, attached, reraised, older, newer, first, second, saved, lost, unsaved, expired, current};
+        for (size_t i = 0; i < _countof(all); i++)
+            aq_test_ae_free(all[i]);
+
+        (void)db_execute(db_meta, "DELETE FROM alert_queue", NULL);
         freez(h->aclk_host_config);
         freez(h);
     }

@@ -153,9 +153,15 @@ int calculate_delay(RRDCALC_STATUS old_status, RRDCALC_STATUS new_status)
     return delay;
 }
 
+// Queues the transition only while it is the alert's latest saved one (health_log.last_transition_id). An alert's
+// transitions can be saved out of order (the metadata thread saves link/unlink entries, the health thread its own),
+// so an older transition saved late must not replace a newer one here, nor be queued again after the newer one was
+// already drained.
 #define SQL_INSERT_ALERT_PENDING_QUEUE                                                                                 \
     "INSERT INTO alert_queue (host_id, health_log_id, unique_id, alarm_id, status, date_scheduled)"                    \
-    "  VALUES (@host_id, @health_log_id, @unique_id, @alarm_id, @new_status, @delay)"                                  \
+    "  SELECT @host_id, @health_log_id, @unique_id, @alarm_id, @new_status, @delay FROM health_log hl"                 \
+    "  WHERE hl.health_log_id = @health_log_id AND hl.last_transition_id = @transition_id"                             \
+    "  AND EXISTS (SELECT 1 FROM health_log_detail hld WHERE hld.transition_id = @transition_id)"                      \
     " ON CONFLICT (host_id, health_log_id, alarm_id)"                                                                  \
     " DO UPDATE SET status = excluded.status, unique_id = excluded.unique_id, "                                        \
     " date_scheduled = MIN(date_scheduled, excluded.date_scheduled)"
@@ -165,6 +171,7 @@ static void insert_alert_queue(
     uint64_t health_log_id,
     int64_t unique_id,
     uint32_t alarm_id,
+    nd_uuid_t *transition_id,
     RRDCALC_STATUS old_status,
     RRDCALC_STATUS new_status,
     time_t trigger_time)
@@ -199,9 +206,11 @@ static void insert_alert_queue(
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, alarm_id));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, new_status));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, submit_delay));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, transition_id, sizeof(*transition_id), SQLITE_STATIC));
 
     param = 0;
     rc = sqlite3_step_monitored(res);
+    // also when the gate queued nothing: an early due time only costs one drain that finds nothing
     if (rc == SQLITE_DONE)
         alert_queue_next_due_lower(host, submit_delay);
     else
@@ -224,7 +233,7 @@ done:
     "@non_clear_duration,@flags,@exec_run_timestamp,@delay_up_to_timestamp, @info,@exec_code,@new_status,@old_status,"       \
     "@delay,@new_value,@old_value,@last_repeat,@transition_id,@global_id,@summary)"
 
-static void sql_health_alarm_log_insert_detail(RRDHOST *host, uint64_t health_log_id, ALARM_ENTRY *ae)
+static bool sql_health_alarm_log_insert_detail(RRDHOST *host, uint64_t health_log_id, ALARM_ENTRY *ae)
 {
     static __thread sqlite3_stmt *compiled_res = NULL;
     sqlite3_stmt *res = NULL;
@@ -232,15 +241,15 @@ static void sql_health_alarm_log_insert_detail(RRDHOST *host, uint64_t health_lo
     if (is_health_thread) {
         if (!compiled_res) {
             if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_INSERT_HEALTH_LOG_DETAIL, &compiled_res))
-                return;
+                return false;
         }
         res = compiled_res;
     } else {
         if (!PREPARE_STATEMENT(db_meta, SQL_INSERT_HEALTH_LOG_DETAIL, &res))
-            return;
+            return false;
     }
 
-    int rc;
+    int rc = SQLITE_ERROR;
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)health_log_id));
@@ -281,15 +290,63 @@ done:
         SQLITE_RESET(res);
     else
         SQLITE_FINALIZE(res);
+
+    return rc == SQLITE_DONE;
 }
 
+// The alert's latest transition only moves forward: an older transition saved after a newer one (see
+// SQL_INSERT_ALERT_PENDING_QUEUE) leaves it alone. It is set only once the transition's detail row exists, so the
+// unique_id it is compared with is always there; a pointer to a missing row (NULL, cleaned up) gives way.
+// unique_id is a uint32_t that starts from the epoch (rrd.h), so the comparison holds until it wraps, around 2106.
+#define SQL_SET_LATEST_TRANSITION                                                                                      \
+    "UPDATE health_log SET last_transition_id = @transition_id, chart_name = @chart_name, "                            \
+    " config_hash_id = @config_hash_id WHERE health_log_id = @health_log_id"                                           \
+    " AND IFNULL((SELECT hld.unique_id FROM health_log_detail hld"                                                     \
+    "   WHERE hld.transition_id = health_log.last_transition_id), 0) <= @unique_id"
+
+static void sql_health_alarm_log_set_latest(RRDHOST *host, uint64_t health_log_id, ALARM_ENTRY *ae)
+{
+    static __thread sqlite3_stmt *compiled_res = NULL;
+    sqlite3_stmt *res = NULL;
+
+    if (is_health_thread) {
+        if (!compiled_res) {
+            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_SET_LATEST_TRANSITION, &compiled_res))
+                return;
+        }
+        res = compiled_res;
+    } else {
+        if (!PREPARE_STATEMENT(db_meta, SQL_SET_LATEST_TRANSITION, &res))
+            return;
+    }
+
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &ae->transition_id, sizeof(ae->transition_id), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ae->chart_name));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &ae->config_hash_id, sizeof(ae->config_hash_id), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)health_log_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->unique_id));
+
+    param = 0;
+    int rc = sqlite3_step_monitored(res);
+    if (rc != SQLITE_DONE)
+        error_report("HEALTH [%s]: Failed to execute SQL_SET_LATEST_TRANSITION, rc = %d", rrdhost_hostname(host), rc);
+
+done:
+    REPORT_BIND_FAIL(res, param);
+    if (is_health_thread)
+        SQLITE_RESET(res);
+    else
+        SQLITE_FINALIZE(res);
+}
+
+// A new alert starts without a latest transition: sql_health_alarm_log_set_latest() names it once its detail is saved.
 #define SQL_INSERT_HEALTH_LOG                                                                                          \
     "INSERT INTO health_log (host_id, alarm_id, "                                                                      \
-    "config_hash_id, name, chart, exec, recipient, units, chart_context, last_transition_id, chart_name) "             \
+    "config_hash_id, name, chart, exec, recipient, units, chart_context, chart_name) "                                 \
     "VALUES (@host_id,@alarm_id, @config_hash_id,@name,@chart,@exec,@recipient,@units,@chart_context,"                 \
-    "@last_transition_id,@chart_name) ON CONFLICT (host_id, alarm_id) DO UPDATE "                                      \
-    "SET last_transition_id = excluded.last_transition_id, chart_name = excluded.chart_name, "                         \
-    "config_hash_id=excluded.config_hash_id RETURNING health_log_id"
+    "@chart_name) ON CONFLICT (host_id, alarm_id) DO UPDATE "                                                          \
+    "SET alarm_id = excluded.alarm_id RETURNING health_log_id"
 
 static void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae)
 {
@@ -319,16 +376,24 @@ static void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae)
     SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ae->recipient));
     SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ae->units));
     SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ae->chart_context));
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &ae->transition_id, sizeof(ae->transition_id), SQLITE_STATIC));
     SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ae->chart_name));
 
     param = 0;
     rc = sqlite3_step_monitored(res);
     if (rc == SQLITE_ROW) {
         health_log_id = (size_t)sqlite3_column_int64(res, 0);
-        sql_health_alarm_log_insert_detail(host, health_log_id, ae);
-        insert_alert_queue(
-            host, health_log_id, (int64_t)ae->unique_id, (int64_t)ae->alarm_id, ae->old_status, ae->new_status, ae->when);
+        if (sql_health_alarm_log_insert_detail(host, health_log_id, ae)) {
+            sql_health_alarm_log_set_latest(host, health_log_id, ae);
+            insert_alert_queue(
+                host,
+                health_log_id,
+                (int64_t)ae->unique_id,
+                (int64_t)ae->alarm_id,
+                &ae->transition_id,
+                ae->old_status,
+                ae->new_status,
+                ae->when);
+        }
     } else
         error_report("HEALTH [%s]: Failed to execute SQL_INSERT_HEALTH_LOG, rc = %d", rrdhost_hostname(host), rc);
 
@@ -358,11 +423,13 @@ void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae)
  *
  */
 
+// An alert whose first transition is not saved yet has no latest transition (NULL), and a NULL in a NOT IN list
+// would make it match nothing, stopping the cleanup of the whole host.
 #define SQL_CLEANUP_HEALTH_LOG_DETAIL                                                                                  \
     "DELETE FROM health_log_detail WHERE health_log_id IN "                                                            \
     " (SELECT health_log_id FROM health_log WHERE host_id = @host_id) AND when_key < UNIXEPOCH() - @history "          \
     " AND updated_by_id <> 0 AND transition_id NOT IN "                                                                \
-    " (SELECT last_transition_id FROM health_log hl WHERE hl.host_id = @host_id)"
+    " (SELECT last_transition_id FROM health_log hl WHERE hl.host_id = @host_id AND hl.last_transition_id IS NOT NULL)"
 
 void sql_health_alarm_log_cleanup(RRDHOST *host)
 {
@@ -496,7 +563,14 @@ static void sql_inject_removed_status(
         int64_t health_log_id = sqlite3_column_int64(res, 0);
         RRDCALC_STATUS old_status = (RRDCALC_STATUS)sqlite3_column_double(res, 1);
         insert_alert_queue(
-            host, health_log_id, (int64_t)max_unique_id, (int64_t)alarm_id, old_status, RRDCALC_STATUS_REMOVED, now);
+            host,
+            health_log_id,
+            (int64_t)max_unique_id,
+            (int64_t)alarm_id,
+            &transition_id,
+            old_status,
+            RRDCALC_STATUS_REMOVED,
+            now);
     }
 
 done:
