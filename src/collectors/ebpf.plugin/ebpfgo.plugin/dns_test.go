@@ -24,7 +24,7 @@ func TestBuildDNSLegacyPlan(t *testing.T) {
 			wantMode: LoadCore,
 		},
 		"buffer-on-5-10": {
-			// kver 5.10 (330240) maps to selector index 6 = "5.11" per SelectKernelName.
+			// 5.10 uses the matching buffer artifact family.
 			cfg: DNSLegacyConfig{
 				PluginsDir:    defaultPluginsDir(),
 				Kernels:       dnsKernelMask,
@@ -33,7 +33,7 @@ func TestBuildDNSLegacyPlan(t *testing.T) {
 				IsDebian:      false,
 				ObjectFlavor:  "buffer",
 			},
-			want:     "pnetdata_ebpf_dns_buffer.5.11.o",
+			want:     "pnetdata_ebpf_dns_buffer.5.10.o",
 			wantMode: LoadCore,
 		},
 		"arena-on-6-12": {

@@ -95,6 +95,68 @@ func TestRHEL10ErrataKernelSelectsRHF612Object(t *testing.T) {
 	}
 }
 
+func TestGeneric510Through514SelectsBuiltObjectFamilies(t *testing.T) {
+	tests := map[string]struct {
+		kernelVersion uint32
+		selector      int
+	}{
+		"5.10": {kernelVersion: 5<<16 + 10<<8, selector: 5},
+		"5.11": {kernelVersion: 5<<16 + 11<<8, selector: 6},
+		"5.13": {kernelVersion: 5<<16 + 13<<8, selector: 6},
+		"5.14": {kernelVersion: 5<<16 + 14<<8, selector: 7},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			if got := SelectMaxIndex(-1, tc.kernelVersion); got != tc.selector {
+				t.Fatalf("SelectMaxIndex() = %d, want %d", got, tc.selector)
+			}
+		})
+	}
+}
+
+func TestGeneric510BufferAndBaseFallbackUseShippedObjects(t *testing.T) {
+	tests := map[string]struct {
+		name     string
+		prefix   string
+		isReturn bool
+	}{
+		"cachestat": {name: "cachestat", prefix: "p"},
+		"dcstat":    {name: "dc", prefix: "p"},
+		"dns":       {name: "dns", prefix: "p"},
+		"fd":        {name: "fd", prefix: "r", isReturn: true},
+		"socket":    {name: "socket", prefix: "p"},
+	}
+	const kernelVersion = 5<<16 + 10<<8
+	for caseName, tc := range tests {
+		t.Run(caseName, func(t *testing.T) {
+			selector := SelectIndex((1<<14)-1, -1, kernelVersion)
+			primary := LoadPlan{
+				KernelVersion: kernelVersion,
+				Kernels:       (1 << 14) - 1,
+				IsRHF:         -1,
+				Selector:      selector,
+				Flavor:        ObjectFlavorBuffer,
+				IsReturn:      tc.isReturn,
+				LoadMode:      LoadLegacy,
+				ObjectPath:    BuildObjectPathWithFlavor(defaultPluginsDir(), selector, tc.name, tc.isReturn, -1, ObjectFlavorBuffer),
+			}
+			plans := buildFallbackPlans(primary, defaultPluginsDir(), -1, tc.name, 7)
+			want := []string{
+				tc.prefix + "netdata_ebpf_" + tc.name + "_buffer.5.10.o",
+				tc.prefix + "netdata_ebpf_" + tc.name + ".5.4.o",
+			}
+			if len(plans) != len(want) {
+				t.Fatalf("buildFallbackPlans() returned %d plans, want %d", len(plans), len(want))
+			}
+			for i, plan := range plans {
+				if got := filepath.Base(plan.ObjectPath); got != want[i] {
+					t.Errorf("plans[%d] = %q, want %q", i, got, want[i])
+				}
+			}
+		})
+	}
+}
+
 func TestRHEL10612StreamIsBoundedAndDoesNotTryGenericObjects(t *testing.T) {
 	if !isRHEL10Kernel612Stream(10*256, minimumKernelVersionArena) ||
 		!isRHEL10Kernel612Stream(10*256, minimumKernelVersionArena+211) {
@@ -621,6 +683,7 @@ func TestBuildLoadPlan(t *testing.T) {
 func TestBuildFallbackPlansRHFGenericAlternates(t *testing.T) {
 	primary := LoadPlan{
 		KernelVersion: 331264,
+		Kernels:       (1 << 14) - 1,
 		IsRHF:         2308,
 		Selector:      7,
 		Flavor:        ObjectFlavorBuffer,
@@ -800,6 +863,7 @@ func TestBuildCoreLegacyFallbackPlansUsesOnlyVerifiedFamilies(t *testing.T) {
 	}
 
 	primary.KernelVersion = minimumKernelVersionSeven
+	primary.Kernels = (1 << 13) - 1
 	primary.Selector = 12
 	primary.Flavor = ObjectFlavorBase
 	if plans := buildFallbackPlans(primary, "/plugins", -1, "cachestat", cachestatMaxBaseSelector); len(plans) != 1 || plans[0].LoadMode != LoadCore {

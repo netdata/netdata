@@ -466,10 +466,12 @@ func SelectMaxIndex(isRHF int, kver uint32) int {
 		return 9
 	case kver >= 331520:
 		return 8
-	case kver >= 330496:
+	case kver >= 331264:
 		return 7
-	case kver >= 330240:
+	case kver >= 330496:
 		return 6
+	case kver >= 330240:
+		return 5
 	case kver >= 266496: // 4.17 through 5.3 use the 5.4 producer family.
 		return 4
 	case kver >= 265984:
@@ -779,7 +781,7 @@ func selectHighestIndexAtOrBelow(kernels uint32, isRHF int, kver uint32, maxInde
 		kernels &^= 1 << 12
 	}
 	switch module {
-	case "cachestat", "dc", "dcstat", "dns", "socket":
+	case "cachestat", "dc", "dcstat", "dns", "fd", "socket":
 		// These modules do not ship a base 5.10 object.
 		kernels &^= 1 << 5
 	}
@@ -835,7 +837,7 @@ func buildFallbackPlans(primary LoadPlan, pluginsDir string, isRHF int, name str
 		fb := primary
 		fb.Flavor = ObjectFlavorBase
 		fbSelector := primary.Selector
-		if maxBaseSelector > 0 && int(fbSelector) > maxBaseSelector {
+		if maxBaseSelector > 0 {
 			fbSelector = selectHighestIndexAtOrBelow(primary.Kernels, isRHF, primary.KernelVersion, maxBaseSelector, name)
 		}
 		fb.Selector = fbSelector
@@ -853,7 +855,7 @@ func buildCoreLegacyFallbackPlans(primary LoadPlan, pluginsDir string, isRHF int
 
 	maxBaseSelector = effectiveMaxBaseSelectorForModule(maxBaseSelector, name, isRHF, primary.KernelVersion)
 	selector := primary.Selector
-	if primary.Flavor == ObjectFlavorBase && maxBaseSelector > 0 && int(selector) > maxBaseSelector {
+	if primary.Flavor == ObjectFlavorBase && maxBaseSelector > 0 {
 		selector = selectHighestIndexAtOrBelow(primary.Kernels, isRHF, primary.KernelVersion, maxBaseSelector, name)
 	}
 

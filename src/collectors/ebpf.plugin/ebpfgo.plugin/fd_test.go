@@ -69,13 +69,11 @@ func TestBuildFDLegacyPlan(t *testing.T) {
 			want:          "rnetdata_ebpf_fd.6.12.o",
 			wantMode:      LoadCore,
 		},
-		// fd ships no base object for "5.10".  A 5.10 host asking for the base
-		// flavor must therefore not land on rnetdata_ebpf_fd.5.10.o; the selector
-		// resolves to 5.11, which does exist.
+		// fd ships no base 5.10 object; use the older 5.4 base family.
 		"kernel-5-10-avoids-the-missing-base-object": {
 			kernelVersion: 330240, // 5.10
 			objectFlavor:  "tracing",
-			want:          "rnetdata_ebpf_fd.5.11.o",
+			want:          "rnetdata_ebpf_fd.5.4.o",
 			wantMode:      LoadLegacy,
 		},
 	}
@@ -228,27 +226,25 @@ func TestBuildFDFallbackPlansRHFKeepsReturnPrefix(t *testing.T) {
 	}
 }
 
-// TestSelectMaxIndexNeverReturnsTheMissingFDBaseSelector guards the assumption
-// fdMaxBaseSelector rests on: fd ships no base object for selector 5 ("5.10"),
-// and no cap protects against it, because SelectMaxIndex jumps from 4 to 6 at
-// that kernel boundary.  If that ladder ever grows a 5.10 rung, fd needs an
-// explicit exclusion.
-func TestSelectMaxIndexNeverReturnsTheMissingFDBaseSelector(t *testing.T) {
+func TestFDBasePlanNeverSelectsMissing510Object(t *testing.T) {
 	kernels := []uint32{
 		328448, // 5.3
 		328704, // 5.4
 		330239, // just below 5.10
 		330240, // 5.10
-		330496, // 5.14 numeric boundary used by the ladder
+		330496, // 5.11
 		395264, // 6.8
 		396288, // 6.12
 	}
 
 	for _, kver := range kernels {
 		for _, isRHF := range []int{-1, 8 * 256, 9 * 256} {
-			if SelectMaxIndex(isRHF, kver) == 5 {
-				t.Fatalf("SelectMaxIndex(isRHF=%d, kver=%d) = 5 (\"5.10\"); fd ships no base object for it",
-					isRHF, kver)
+			cfg := baseFDConfig()
+			cfg.KernelVersion = kver
+			cfg.IsRHF = isRHF
+			cfg.ObjectFlavor = "tracing"
+			if object := filepath.Base(BuildFDLegacyPlan(cfg).ObjectPath); strings.Contains(object, ".5.10") {
+				t.Fatalf("FD base object %q does not exist (isRHF=%d, kver=%d)", object, isRHF, kver)
 			}
 		}
 	}
