@@ -575,11 +575,15 @@ static int scan_data_files(struct rrdengine_instance *ctx)
             must_delete_pair = 1;
 
         journalfile = journalfile_alloc_and_init(datafile);
-        ret = journalfile_load(ctx, journalfile, datafile);
-        if (0 != ret) {
-            if (!must_delete_pair) /* If datafile is still open close it */
+
+        // the journal of a datafile that cannot be loaded is not replayed: its pages would
+        // point the open cache at a datafile that is deleted and freed below
+        if (!must_delete_pair) {
+            ret = journalfile_load(ctx, journalfile, datafile);
+            if (0 != ret) {
                 close_data_file(datafile);
-            must_delete_pair = 1;
+                must_delete_pair = 1;
+            }
         }
 
         if (must_delete_pair) {
