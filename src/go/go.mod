@@ -19,7 +19,7 @@ require (
 	github.com/alexbrainman/odbc v0.0.0-20250601004241-49e6b2bc0cf0
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
 	github.com/aws/aws-sdk-go-v2 v1.47.5
-	github.com/aws/aws-sdk-go-v2/config v1.33.10
+	github.com/aws/aws-sdk-go-v2/config v1.33.12
 	github.com/aws/aws-sdk-go-v2/credentials v1.20.12
 	github.com/aws/aws-sdk-go-v2/service/cloudwatch v1.75.1
 	github.com/aws/aws-sdk-go-v2/service/rds v1.131.1
