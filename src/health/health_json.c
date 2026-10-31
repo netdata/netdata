@@ -324,6 +324,8 @@ void health_entry_flags_to_json_array(BUFFER *wb, const char *key, HEALTH_ENTRY_
         buffer_json_add_array_item_string(wb, "EXEC_IN_PROGRESS");
     if(flags & HEALTH_ENTRY_FLAG_IS_REPEATING)
         buffer_json_add_array_item_string(wb, "RECURRING");
+    if(flags & HEALTH_ENTRY_FLAG_CHILD_DISCONNECTED)
+        buffer_json_add_array_item_string(wb, "CHILD_DISCONNECTED");
     if(flags & HEALTH_ENTRY_FLAG_SAVED)
         buffer_json_add_array_item_string(wb, "SAVED");
     if(flags & HEALTH_ENTRY_FLAG_ACLK_QUEUED)

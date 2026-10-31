@@ -23,7 +23,8 @@ struct health_alert_status_counts {
 };
 
 typedef struct health {
-    // Recomputed on each host health evaluation and read by alerts APIs as a host-level prefilter.
+    // Recomputed after a complete health pass. Alert mutations invalidate it; APIs fall back to a
+    // full scan and Cloud waits for the first completed recovery pass before sending a snapshot.
     struct {
         uint64_t generation;                         // seqlock-style generation for consistent readers
         struct health_alert_status_counts counts;

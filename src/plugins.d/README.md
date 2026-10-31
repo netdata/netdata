@@ -287,6 +287,11 @@ brings the next scan forward when needed. Expiry therefore requires continued lo
 with regular selections, it occurs within the timeout plus one scan interval and the localhost selection interval.
 A stale vnode becomes active again when selected with `HOST machine_guid`.
 
+Stale expiry and plugin exit remove the vnode's alerts and disable its health evaluation. Alert reloads and dynamic
+configuration changes do not recreate alerts while it is offline. Recovery through `HOST` or `HOST_DEFINE_END`
+restores health policy and schedules alert recreation and evaluation. Vnode removals use ordinary alert transition
+delays; the longer grace period for a disconnected streaming child does not apply to vnodes.
+
 When local collection resumes through `HOST` or `HOST_DEFINE_END`, any peer stream for the same host is stopped
 before restoring the vnode's live state. Health follows the local Agent's health setting and remains disabled for
 `memory mode = none`; a previous peer disconnect must not leave the recovered vnode orphaned or health disabled.

@@ -82,8 +82,13 @@ done:
  *
 */
 
-int calculate_delay(RRDCALC_STATUS old_status, RRDCALC_STATUS new_status)
+int calculate_delay(RRDCALC_STATUS old_status, RRDCALC_STATUS new_status, uint32_t flags)
 {
+    // a child that disconnected usually comes back (restart, update): give it the long delay, so that a
+    // reconnect overwrites the queued REMOVED and the cloud does not see the alert removed and raised again
+    if (new_status == RRDCALC_STATUS_REMOVED && (flags & HEALTH_ENTRY_FLAG_CHILD_DISCONNECTED))
+        return ALERT_TRANSITION_DELAY_LONG;
+
     int delay = ALERT_TRANSITION_DELAY_NONE;
     switch(old_status) {
         case RRDCALC_STATUS_REMOVED:
@@ -158,15 +163,20 @@ int calculate_delay(RRDCALC_STATUS old_status, RRDCALC_STATUS new_status)
     "  VALUES (@host_id, @health_log_id, @unique_id, @alarm_id, @new_status, @delay)"                                  \
     " ON CONFLICT (host_id, health_log_id, alarm_id)"                                                                  \
     " DO UPDATE SET status = excluded.status, unique_id = excluded.unique_id, "                                        \
-    " date_scheduled = MIN(date_scheduled, excluded.date_scheduled)"
+    " date_scheduled = CASE WHEN @replace_due THEN excluded.date_scheduled"                                            \
+    "   ELSE MIN(date_scheduled, excluded.date_scheduled) END"
 
-static void insert_alert_queue(
+// A transition replaces the one still queued for the alert, and keeps the earlier due time of the two, so a
+// reconnect overwrites a queued REMOVED as soon as it is due. A REMOVED of a disconnected child takes its own due time
+// instead: inheriting the due time of a transition queued just before the disconnect would cut its delay short.
+void insert_alert_queue(
     RRDHOST *host,
     uint64_t health_log_id,
     int64_t unique_id,
     uint32_t alarm_id,
     RRDCALC_STATUS old_status,
     RRDCALC_STATUS new_status,
+    uint32_t flags,
     time_t trigger_time)
 {
     // check before preparing: an early return after PREPARE_STATEMENT would leak the statement
@@ -190,7 +200,7 @@ static void insert_alert_queue(
 
     int rc;
 
-    time_t submit_delay = nd_time_t_add_saturating(trigger_time, calculate_delay(old_status, new_status));
+    time_t submit_delay = nd_time_t_add_saturating(trigger_time, calculate_delay(old_status, new_status, flags));
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
@@ -199,6 +209,12 @@ static void insert_alert_queue(
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, alarm_id));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, new_status));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, submit_delay));
+    SQLITE_BIND_FAIL(
+        done,
+        sqlite3_bind_int(
+            res,
+            ++param,
+            new_status == RRDCALC_STATUS_REMOVED && (flags & HEALTH_ENTRY_FLAG_CHILD_DISCONNECTED)));
 
     param = 0;
     rc = sqlite3_step_monitored(res);
@@ -328,7 +344,14 @@ static void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae)
         health_log_id = (size_t)sqlite3_column_int64(res, 0);
         sql_health_alarm_log_insert_detail(host, health_log_id, ae);
         insert_alert_queue(
-            host, health_log_id, (int64_t)ae->unique_id, (int64_t)ae->alarm_id, ae->old_status, ae->new_status, ae->when);
+            host,
+            health_log_id,
+            (int64_t)ae->unique_id,
+            (int64_t)ae->alarm_id,
+            ae->old_status,
+            ae->new_status,
+            ae->flags,
+            ae->when);
     } else
         error_report("HEALTH [%s]: Failed to execute SQL_INSERT_HEALTH_LOG, rc = %d", rrdhost_hostname(host), rc);
 
@@ -496,7 +519,7 @@ static void sql_inject_removed_status(
         int64_t health_log_id = sqlite3_column_int64(res, 0);
         RRDCALC_STATUS old_status = (RRDCALC_STATUS)sqlite3_column_double(res, 1);
         insert_alert_queue(
-            host, health_log_id, (int64_t)max_unique_id, (int64_t)alarm_id, old_status, RRDCALC_STATUS_REMOVED, now);
+            host, health_log_id, (int64_t)max_unique_id, (int64_t)alarm_id, old_status, RRDCALC_STATUS_REMOVED, 0, now);
     }
 
 done:
