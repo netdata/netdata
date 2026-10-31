@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F052F
+# Next unused error code: F0530
 
 # ======================================================================
 # Constants
@@ -71,6 +71,7 @@ NETDATA_CLAIM_URL="https://app.netdata.cloud"
 NETDATA_COMMAND="default"
 NETDATA_INSTALLER_OPTIONS=""
 NETDATA_REQUESTED_INSTALL_TYPE="auto"
+NETDATA_ALLOW_LOCAL_BUILD=0
 NETDATA_OFFLINE_INSTALL_SOURCE=""
 NETDATA_WARNINGS=""
 RELEASE_CHANNEL="default"
@@ -200,7 +201,8 @@ USAGE: kickstart.sh [options]
   --disable-telemetry              Opt-out of anonymous statistics.
   --native-only                    Only install if native binary packages are available.
   --static-only                    Only install if a static build is available.
-  --build-only                     Only install using a local build.
+  --build-only                     Only install using a local build (best-effort support).
+  --allow-local-build              Allow falling back to a local build on Linux even if binary installation fails (best-effort support).
   --install-type <type>            Specify what installation type to use (native, static, build, auto, or any).
   --install-prefix <path>          Specify an installation prefix for local builds (default: autodetect based on system type).
   --old-install-prefix <path>      Specify an old local builds installation prefix for uninstall/reinstall (if it's not default).
@@ -223,6 +225,10 @@ The following options are mutually exclusive and specifiy special operations oth
   --claim-only                     If there is an existing install, only try to claim it without attempting to update it. If there is no existing install, install and claim Netdata normally.
   --repositories-only              Only install repository configuration packages instead of doing a full install of Netdata. Automatically sets --native-only.
   --prepare-offline-install-source Instead of installing the agent, prepare a directory that can be used to install on another system without needing to download anything.
+
+On Linux, local builds are only attempted automatically when native packages and static builds are unavailable.
+Use --allow-local-build to permit source fallback after binary installation failures, or --build-only to build directly.
+Native package failures may also require --install-type any to continue to other installation methods.
 
 Additionally, this script may use the following environment variables:
 
@@ -2232,6 +2238,7 @@ set_static_archive_urls() {
   esac
 }
 
+# Return 2 when no archive is available, 3 when an available archive fails to install.
 try_static_install() {
   set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" || return 1
 
@@ -2297,7 +2304,7 @@ try_static_install() {
   if ! run_as_root ${env_cmd} /bin/sh "./${archive_name}" ${opts} -- ${NETDATA_INSTALLER_OPTIONS}; then
     warning "Failed to install static build of Netdata on ${SYSARCH}."
     run rm -rf /opt/netdata
-    return 2
+    return 3
   fi
 
   if [ "${DRY_RUN}" -ne 1 ]; then
@@ -2715,6 +2722,8 @@ prepare_offline_install_source() {
 # Per system-type install logic
 
 install_on_linux() {
+  # Keep binary availability separate from whether installation succeeded.
+  binary_available=0
   if [ "${NETDATA_REQUESTED_INSTALL_TYPE}" != 'static' ] && [ "${NETDATA_REQUESTED_INSTALL_TYPE}" != 'build' ] && [ -z "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
     SELECTED_INSTALL_METHOD="native"
     try_package_install
@@ -2726,6 +2735,7 @@ install_on_linux() {
         ;;
       1) fatal "Unable to install on this system." F0300 ;;
       2)
+        binary_available=1
         case "${NETDATA_REQUESTED_INSTALL_TYPE}" in
           native|auto) fatal "Could not install using native binary packages even though they appear to be available. This usually means something is wrong with your system package manager that requires manual intervention to fix. If you want to install anyway without using native packages, re-run this script with the option '--install-type any'" F0301 ;;
           *) warning "Could not install using native binary packages, falling back to alternative installation method." ;;
@@ -2754,14 +2764,18 @@ install_on_linux() {
     SELECTED_INSTALL_METHOD="static"
     INSTALL_TYPE="kickstart-static"
     try_static_install
+    static_install_status=$?
 
-    case "$?" in
+    case "${static_install_status}" in
       0)
         NETDATA_INSTALL_SUCCESSFUL=1
         INSTALL_PREFIX="/opt/netdata"
         ;;
       1) fatal "Unable to install on this system." F0302 ;;
-      2)
+      2|3)
+        if [ "${static_install_status}" -eq 3 ]; then
+          binary_available=1
+        fi
         case "${NETDATA_REQUESTED_INSTALL_TYPE}" in
           static) fatal "Could not install static build." F0303 ;;
           *) warning "Could not install static build, falling back to alternative installation method." ;;
@@ -2771,6 +2785,10 @@ install_on_linux() {
   fi
 
   if [ "${NETDATA_REQUESTED_INSTALL_TYPE}" != 'native' ] && [ "${NETDATA_REQUESTED_INSTALL_TYPE}" != 'static' ] && [ -z "${NETDATA_INSTALL_SUCCESSFUL}" ]; then
+    if [ "${NETDATA_REQUESTED_INSTALL_TYPE}" != 'build' ] && [ "${binary_available}" -eq 1 ] && [ "${NETDATA_ALLOW_LOCAL_BUILD}" -ne 1 ]; then
+      fatal "Binary packages are available for this system, but installation failed. Local build fallback is disabled. Fix the binary installation failure or re-run with --allow-local-build to allow a local build with best-effort support." F052F
+    fi
+    warning "Support for local builds is best-effort. Use native packages or static builds where possible."
     SELECTED_INSTALL_METHOD="build"
     INSTALL_TYPE="kickstart-build"
     try_build_install
@@ -3046,6 +3064,7 @@ parse_args() {
       "--native-only") NETDATA_REQUESTED_INSTALL_TYPE="native" ;;
       "--static-only") NETDATA_REQUESTED_INSTALL_TYPE="static" ;;
       "--build-only") NETDATA_REQUESTED_INSTALL_TYPE="build" ;;
+      "--allow-local-build") NETDATA_ALLOW_LOCAL_BUILD=1 ;;
       "--install-type")
         case "${2}" in
           native|static|build|auto|any) NETDATA_REQUESTED_INSTALL_TYPE="${2}" ;;
