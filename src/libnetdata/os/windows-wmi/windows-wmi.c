@@ -22,22 +22,25 @@ void wmi_bstr_to_multibyte(char *dst, size_t dst_size, BSTR src)
     }
 }
 
-HRESULT InitializeWMI(void) {
-    if(nd_wmi.pLoc && nd_wmi.pSvc) return S_OK;
-    CleanupWMI();
+HRESULT nd_wmi_connect(ND_WMI *wmi, const wchar_t *namespace_path, const char **failed_step) {
+    const char *step_dummy;
+    if (!failed_step)
+        failed_step = &step_dummy;
+    *failed_step = NULL;
 
-    IWbemLocator **pLoc = &nd_wmi.pLoc;
-    IWbemServices **pSvc = &nd_wmi.pSvc;
+    if(wmi->pLoc && wmi->pSvc) return S_OK;
+    nd_wmi_disconnect(wmi);
 
     HRESULT hr;
 
     // Initialize COM
     hr = CoInitializeEx(0, COINIT_MULTITHREADED);
     if (FAILED(hr)) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Failed to initialize COM library. Error code = 0x%X", hr);
-        CleanupWMI();
+        *failed_step = "Failed to initialize COM library";
         return hr;
     }
+    // S_FALSE (already initialized) also needs a matching CoUninitialize().
+    wmi->com_initialized = true;
 
     // Set COM security levels
     hr = CoInitializeSecurity(
@@ -52,8 +55,8 @@ HRESULT InitializeWMI(void) {
             NULL
     );
     if (FAILED(hr) && hr != RPC_E_TOO_LATE) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Failed to initialize security. Error code = 0x%X", hr);
-        CleanupWMI();
+        *failed_step = "Failed to initialize security";
+        nd_wmi_disconnect(wmi);
         return hr;
     }
 
@@ -61,23 +64,25 @@ HRESULT InitializeWMI(void) {
     hr = CoCreateInstance(
             &CLSID_WbemLocator, 0,
             CLSCTX_INPROC_SERVER,
-            &IID_IWbemLocator, (LPVOID *)pLoc
+            &IID_IWbemLocator, (LPVOID *)&wmi->pLoc
     );
     if (FAILED(hr)) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Failed to create IWbemLocator object. Error code = 0x%X", hr);
-        CleanupWMI();
+        *failed_step = "Failed to create IWbemLocator object";
+        nd_wmi_disconnect(wmi);
         return hr;
     }
 
     // Connect to WMI.
-    // These probes run synchronously on the daemon startup path (before rrd_init()), so a
-    // hung/unhealthy WMI service would otherwise block agent startup indefinitely. The query
-    // iteration is already time-bounded (Next() in the GetSystemInfo helper), but ConnectServer()
-    // has no custom-timeout knob; WBEM_FLAG_CONNECT_USE_MAX_WAIT is the only mechanism and caps
-    // the connect at ~2 minutes, turning an indefinite hang into a bounded delay.
-    BSTR namespacePath = SysAllocString(L"ROOT\\CIMV2");
-    hr = (*pLoc)->lpVtbl->ConnectServer(
-            *pLoc,
+    // ConnectServer() has no custom-timeout knob; WBEM_FLAG_CONNECT_USE_MAX_WAIT is the only mechanism and caps
+    // the connect at ~2 minutes, turning an indefinite hang on an unhealthy WMI service into a bounded delay.
+    BSTR namespacePath = SysAllocString(namespace_path);
+    if (!namespacePath) {
+        *failed_step = "Failed to allocate WMI namespace path";
+        nd_wmi_disconnect(wmi);
+        return E_OUTOFMEMORY;
+    }
+    hr = wmi->pLoc->lpVtbl->ConnectServer(
+            wmi->pLoc,
             namespacePath,
             NULL,
             NULL,
@@ -85,19 +90,19 @@ HRESULT InitializeWMI(void) {
             WBEM_FLAG_CONNECT_USE_MAX_WAIT,
             0,
             0,
-            pSvc
+            &wmi->pSvc
     );
     SysFreeString(namespacePath);
 
     if (FAILED(hr)) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Could not connect to WMI server. Error code = 0x%X", hr);
-        CleanupWMI();
+        *failed_step = "Could not connect to WMI server";
+        nd_wmi_disconnect(wmi);
         return hr;
     }
 
     // Set security levels on the proxy
     hr = CoSetProxyBlanket(
-            (IUnknown *)*pSvc,
+            (IUnknown *)wmi->pSvc,
             RPC_C_AUTHN_WINNT,
             RPC_C_AUTHZ_NONE,
             NULL,
@@ -107,25 +112,145 @@ HRESULT InitializeWMI(void) {
             EOAC_NONE
     );
     if (FAILED(hr)) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Could not set proxy blanket. Error code = 0x%X", hr);
-        CleanupWMI();
+        *failed_step = "Could not set proxy blanket";
+        nd_wmi_disconnect(wmi);
         return hr;
     }
 
     return S_OK;
 }
 
+void nd_wmi_disconnect(ND_WMI *wmi) {
+    if (wmi->pSvc)
+        wmi->pSvc->lpVtbl->Release(wmi->pSvc);
+
+    if(wmi->pLoc)
+        wmi->pLoc->lpVtbl->Release(wmi->pLoc);
+
+    wmi->pLoc = NULL;
+    wmi->pSvc = NULL;
+
+    // Uninitialize only what this handle initialized, keeping the per-thread COM reference count balanced.
+    if (wmi->com_initialized) {
+        CoUninitialize();
+        wmi->com_initialized = false;
+    }
+}
+
+HRESULT InitializeWMI(void) {
+    // These probes run synchronously on the daemon startup path (before rrd_init()). The query iteration is
+    // time-bounded (Next() in the GetSystemInfo helper); the connect is bounded by nd_wmi_connect().
+    const char *failed_step = NULL;
+    HRESULT hr = nd_wmi_connect(&nd_wmi, L"ROOT\\CIMV2", &failed_step);
+    if (FAILED(hr))
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "%s. Error code = 0x%X", failed_step ? failed_step : "WMI connect failed", hr);
+
+    return hr;
+}
+
 void CleanupWMI(void) {
-    if(nd_wmi.pLoc)
-        nd_wmi.pLoc->lpVtbl->Release(nd_wmi.pLoc);
+    nd_wmi_disconnect(&nd_wmi);
+}
 
-    if (nd_wmi.pSvc)
-        nd_wmi.pSvc->lpVtbl->Release(nd_wmi.pSvc);
+HRESULT nd_wmi_exec_query(IWbemServices *svc, const wchar_t *query_text, IEnumWbemClassObject **enumerator) {
+    *enumerator = NULL;
+    if (!svc)
+        return E_POINTER;
 
-    nd_wmi.pLoc = NULL;
-    nd_wmi.pSvc = NULL;
+    BSTR query = SysAllocString(query_text);
+    BSTR wql = SysAllocString(L"WQL");
+    if(!query || !wql) {
+        // Do not hand a NULL BSTR to ExecQuery(); SysFreeString(NULL) is a safe no-op.
+        SysFreeString(query);
+        SysFreeString(wql);
+        return E_OUTOFMEMORY;
+    }
 
-    CoUninitialize();
+    HRESULT hr = svc->lpVtbl->ExecQuery(
+        svc, wql, query,
+        WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY,
+        NULL, enumerator);
+
+    SysFreeString(query);
+    SysFreeString(wql);
+
+    if (FAILED(hr) || !*enumerator) {
+        if (*enumerator)
+            (*enumerator)->lpVtbl->Release(*enumerator);
+        *enumerator = NULL;
+        return FAILED(hr) ? hr : E_FAIL;
+    }
+
+    return S_OK;
+}
+
+bool nd_wmi_get_string_property(IWbemClassObject *obj, const wchar_t *prop, char *out, size_t out_size) {
+    if(!obj || !out || out_size == 0) return false;
+
+    VARIANT vtProp;
+    VariantInit(&vtProp);
+    HRESULT hr = obj->lpVtbl->Get(obj, prop, 0, &vtProp, 0, 0);
+    if(FAILED(hr) || vtProp.vt != VT_BSTR) {
+        VariantClear(&vtProp);
+        return false;
+    }
+
+    // Shared helper converts the UTF-16 BSTR to UTF-8 (locale-independent) and always
+    // null-terminates; empties out on conversion failure.
+    wmi_bstr_to_multibyte(out, out_size, vtProp.bstrVal);
+    VariantClear(&vtProp);
+    return true;
+}
+
+bool nd_wmi_get_uint64_property(IWbemClassObject *obj, const wchar_t *prop, uint64_t *out) {
+    if (!obj || !out) return false;
+
+    VARIANT vtProp;
+    VariantInit(&vtProp);
+    HRESULT hr = obj->lpVtbl->Get(obj, prop, 0, &vtProp, 0, 0);
+    if (FAILED(hr)) {
+        VariantClear(&vtProp);
+        return false;
+    }
+
+    bool ok = true;
+    switch (vtProp.vt) {
+        // WMI marshals CIM uint64/sint64 as decimal strings.
+        case VT_BSTR: {
+            char buf[32];
+            char *end = NULL;
+            wmi_bstr_to_multibyte(buf, sizeof(buf), vtProp.bstrVal);
+            errno_clear();
+            unsigned long long v = strtoull(buf, &end, 10);
+            if (!buf[0] || !end || *end || errno == ERANGE || buf[0] == '-')
+                ok = false;
+            else
+                *out = (uint64_t)v;
+            break;
+        }
+        case VT_UI8: *out = (uint64_t)vtProp.ullVal; break;
+        case VT_I8:  ok = vtProp.llVal >= 0; if (ok) *out = (uint64_t)vtProp.llVal; break;
+        case VT_UI4: *out = (uint64_t)vtProp.ulVal; break;
+        case VT_I4:  ok = vtProp.lVal >= 0; if (ok) *out = (uint64_t)vtProp.lVal; break;
+        default: ok = false; break;
+    }
+
+    VariantClear(&vtProp);
+    return ok;
+}
+
+bool nd_wmi_get_bool_property(IWbemClassObject *obj, const wchar_t *prop, bool *out) {
+    if (!obj || !out) return false;
+
+    VARIANT vtProp;
+    VariantInit(&vtProp);
+    HRESULT hr = obj->lpVtbl->Get(obj, prop, 0, &vtProp, 0, 0);
+    bool ok = SUCCEEDED(hr) && vtProp.vt == VT_BOOL;
+    if (ok)
+        *out = vtProp.boolVal != VARIANT_FALSE;
+
+    VariantClear(&vtProp);
+    return ok;
 }
 
 #endif
