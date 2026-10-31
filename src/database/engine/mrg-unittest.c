@@ -2846,8 +2846,30 @@ static int mrg_jv2_close_unavailable_referenced_check(void) {
 
     struct jv2_close_in_thread c = { .fx = &t.fx };
     ND_THREAD *th = nd_thread_create("JV2CLOSE", NETDATA_THREAD_OPTION_DONT_LOG, jv2_close_in_thread, &c);
+    if(!th) {
+        fprintf(stderr, "ERROR: cannot start the closing thread\n");
+        errors++;
+        journalfile_v2_data_release(journalfile);
+        goto cleanup;
+    }
 
-    sleep_usec(200 * USEC_PER_MS);
+    // the close drops the index entry right before it waits for readers: once the entry
+    // is gone the thread is in teardown, and our reference must keep it there
+    bool in_teardown = false;
+    for(int i = 0; i < 500 && !in_teardown && !__atomic_load_n(&c.done, __ATOMIC_ACQUIRE); i++) {
+        rw_spinlock_read_lock(&t.fx.ctx.njfv2idx.spinlock);
+        in_teardown = !journalfile->njfv2idx.indexed_as;
+        rw_spinlock_read_unlock(&t.fx.ctx.njfv2idx.spinlock);
+
+        if(!in_teardown)
+            sleep_usec(10 * USEC_PER_MS);
+    }
+    if(!in_teardown) {
+        fprintf(stderr, "ERROR: closing an unavailable journal v2 did not drop its index entry\n");
+        errors++;
+    }
+
+    sleep_usec(100 * USEC_PER_MS);
     if(__atomic_load_n(&c.done, __ATOMIC_ACQUIRE)) {
         fprintf(stderr, "ERROR: an unavailable journal v2 was closed under a live reference\n");
         errors++;
@@ -2859,8 +2881,9 @@ static int mrg_jv2_close_unavailable_referenced_check(void) {
         sleep_usec(10 * USEC_PER_MS);
 
     if(!__atomic_load_n(&c.done, __ATOMIC_ACQUIRE)) {
+        // the closing thread is stuck and still uses the fixture: report and leak it all
         fprintf(stderr, "ERROR: closing an unavailable journal v2 did not finish after its reader released it\n");
-        errors++;
+        return errors + 1;
     }
     nd_thread_join(th);
 
