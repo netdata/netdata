@@ -22,6 +22,8 @@ func (c *Collector) runUpdateState(in <-chan resource) {
 				c.updateCronJobState(res)
 			case kubeResourceJob:
 				c.updateJobState(res)
+			case kubeResourcePVC:
+				c.updatePVCState(res)
 			}
 			c.state.Unlock()
 		}

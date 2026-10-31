@@ -110,6 +110,7 @@ func (c *Collector) collectKubeState(mx map[string]int64) {
 	c.collectNodesState(mx)
 	c.collectDeploymentState(mx)
 	c.collectCronJobState(mx)
+	c.collectPVCState(mx)
 }
 
 func (c *Collector) collectPodsState(mx map[string]int64) {
@@ -441,6 +442,37 @@ func (c *Collector) collectCronJobState(mx map[string]int64) {
 					mx[px+"suspended_jobs"]++
 				}
 			}
+		}
+
+		return false
+	})
+}
+
+func (c *Collector) collectPVCState(mx map[string]int64) {
+	maps.DeleteFunc(c.state.pvcs, func(s string, ps *pvcState) bool {
+		if ps.deleted {
+			c.removePVCCharts(ps)
+			return true
+		}
+
+		if ps.new {
+			ps.new = false
+			c.addPVCCharts(ps)
+		}
+
+		px := fmt.Sprintf("pvc_%s_", ps.id())
+
+		// A missing value is a gap, not 0: a Pending PVC has no capacity yet.
+		if ps.hasRequested {
+			mx[px+"requested"] = ps.requested
+		}
+		if ps.hasCapacity {
+			mx[px+"capacity"] = ps.capacity
+		}
+		// requested and capacity are set together from one PVC object under the state lock, so the difference
+		// never mixes two updates.
+		if diff, ok := ps.requestedCapacityDiff(); ok {
+			mx[px+"requested_capacity_diff"] = diff
 		}
 
 		return false

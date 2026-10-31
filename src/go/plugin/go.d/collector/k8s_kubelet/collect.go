@@ -3,8 +3,11 @@
 package k8s_kubelet
 
 import (
+	"maps"
 	"math"
+	"slices"
 	"strings"
+	"time"
 
 	"context"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
@@ -27,6 +30,7 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	c.collectAPIServer(raw, mx)
 	c.collectKubelet(raw, mx)
 	c.collectVolumeManager(raw, mx)
+	c.collectVolumeStats(raw, mx)
 
 	return stm.ToMap(mx), nil
 }
@@ -90,6 +94,151 @@ func (c *Collector) collectVolumeManager(raw prometheus.Series, mx *metrics) {
 	}
 
 	mx.VolumeManager.Plugins = vmPlugins
+}
+
+const (
+	pvcSeenCapacity = 1 << iota
+	pvcSeenUsed
+	pvcSeenAvailable
+	pvcSeenInodes
+	pvcSeenInodesUsed
+	pvcSeenInodesFree
+
+	pvcSeenSpace     = pvcSeenCapacity | pvcSeenUsed | pvcSeenAvailable
+	pvcSeenAllInodes = pvcSeenInodes | pvcSeenInodesUsed | pvcSeenInodesFree
+)
+
+// pvcStats holds the kubelet_volume_stats_* values of a PVC; seen tells a reported 0 from a missing series.
+type pvcStats struct {
+	namespace, name string
+	seen            int
+
+	capacity, used, available      float64
+	inodes, inodesUsed, inodesFree float64
+}
+
+// The kubelet reports 0 for values a volume does not provide (no filesystem stats for block volumes, no inodes on
+// SMB shares), so 0 totals mean "no data", not an empty or full volume.
+func (s *pvcStats) hasSpace() bool {
+	return s.seen&pvcSeenSpace == pvcSeenSpace && s.capacity > 0 && s.used+s.available > 0
+}
+
+func (s *pvcStats) hasInodes() bool {
+	return s.seen&pvcSeenAllInodes == pvcSeenAllInodes && s.inodes > 0
+}
+
+func (c *Collector) collectVolumeStats(raw prometheus.Series, mx *metrics) {
+	/*
+		# HELP kubelet_volume_stats_available_bytes [ALPHA] Number of available bytes in the volume
+		# TYPE kubelet_volume_stats_available_bytes gauge
+		kubelet_volume_stats_available_bytes{namespace="app",persistentvolumeclaim="data-db-0"} 450000
+	*/
+	stats := make(map[string]*pvcStats)
+
+	series := raw.FindByNames(
+		"kubelet_volume_stats_capacity_bytes",
+		"kubelet_volume_stats_used_bytes",
+		"kubelet_volume_stats_available_bytes",
+		"kubelet_volume_stats_inodes",
+		"kubelet_volume_stats_inodes_used",
+		"kubelet_volume_stats_inodes_free",
+	)
+
+	for _, metric := range series {
+		namespace := metric.Labels.Get("namespace")
+		pvc := metric.Labels.Get("persistentvolumeclaim")
+
+		if namespace == "" || pvc == "" {
+			continue
+		}
+
+		id := pvcID(namespace, pvc)
+		st, ok := stats[id]
+		if !ok {
+			st = &pvcStats{
+				namespace: namespace,
+				name:      pvc,
+			}
+			stats[id] = st
+		}
+
+		switch metric.Name() {
+		case "kubelet_volume_stats_capacity_bytes":
+			st.capacity = metric.Value
+			st.seen |= pvcSeenCapacity
+		case "kubelet_volume_stats_used_bytes":
+			st.used = metric.Value
+			st.seen |= pvcSeenUsed
+		case "kubelet_volume_stats_available_bytes":
+			st.available = metric.Value
+			st.seen |= pvcSeenAvailable
+		case "kubelet_volume_stats_inodes":
+			st.inodes = metric.Value
+			st.seen |= pvcSeenInodes
+		case "kubelet_volume_stats_inodes_used":
+			st.inodesUsed = metric.Value
+			st.seen |= pvcSeenInodesUsed
+		case "kubelet_volume_stats_inodes_free":
+			st.inodesFree = metric.Value
+			st.seen |= pvcSeenInodesFree
+		}
+	}
+
+	withSpace := make(map[string]*pvcStats)
+	withInodes := make(map[string]*pvcStats)
+
+	for id, st := range stats {
+		var pvc pvcMetrics
+
+		// reserved is clamped at 0: drivers whose used + available exceed capacity would draw a negative area
+		if st.hasSpace() {
+			withSpace[id] = st
+			pvc.Space = &pvcSpaceMetrics{}
+			pvc.Space.Available.Set(st.available)
+			pvc.Space.Used.Set(st.used)
+			pvc.Space.Reserved.Set(max(0, st.capacity-st.used-st.available))
+			pvc.Space.Utilization.Set(st.used / (st.used + st.available) * 100)
+		}
+		if st.hasInodes() {
+			withInodes[id] = st
+			pvc.Inodes = &pvcInodesMetrics{}
+			pvc.Inodes.Available.Set(st.inodesFree)
+			pvc.Inodes.Used.Set(st.inodesUsed)
+			pvc.Inodes.Reserved.Set(max(0, st.inodes-st.inodesUsed-st.inodesFree))
+		}
+
+		if pvc.Space != nil || pvc.Inodes != nil {
+			mx.PVC[id] = &pvc
+		}
+	}
+
+	c.updatePVCCharts(c.collectedPVCSpace, pvcSpaceChartsTmpl, withSpace)
+	c.updatePVCCharts(c.collectedPVCInodes, pvcInodesChartsTmpl, withInodes)
+}
+
+// updatePVCCharts adds the charts of PVCs that have data and removes the charts of PVCs that no longer have it.
+func (c *Collector) updatePVCCharts(collected map[string]*Charts, tmpl Charts, withData map[string]*pvcStats) {
+	// sorted, so chart priorities do not depend on map order
+	for _, id := range slices.Sorted(maps.Keys(withData)) {
+		if _, ok := collected[id]; ok {
+			continue
+		}
+		st := withData[id]
+		charts := newPVCCharts(tmpl, st.namespace, st.name)
+		if err := c.charts.Add(*charts...); err != nil {
+			c.Limit("k8s_kubelet:pvc:add_charts", 1, time.Hour).
+				Warningf("failed to add charts for PVC '%s/%s': %v", st.namespace, st.name, err)
+			continue
+		}
+		collected[id] = charts
+	}
+
+	for id, charts := range collected {
+		if _, ok := withData[id]; !ok {
+			removePVCCharts(charts)
+			delete(collected, id)
+		}
+	}
 }
 
 func (c *Collector) collectKubelet(raw prometheus.Series, mx *metrics) {
@@ -257,7 +406,10 @@ func (c *Collector) collectRESTClientHTTPRequests(raw prometheus.Series, mx *met
 			_ = chart.AddDim(&Dim{ID: dimID, Name: code, Algo: collectorapi.Incremental})
 			chart.MarkNotCreated()
 		}
-		mx.RESTClient.Requests.ByStatusCode[code] = mtx.Gauge(metric.Value)
+		// a code has one series per method and host: sum them
+		v := mx.RESTClient.Requests.ByStatusCode[code]
+		v.Add(metric.Value)
+		mx.RESTClient.Requests.ByStatusCode[code] = v
 	}
 
 	chart = c.charts.Get("rest_client_requests_by_method")
@@ -272,7 +424,9 @@ func (c *Collector) collectRESTClientHTTPRequests(raw prometheus.Series, mx *met
 			_ = chart.AddDim(&Dim{ID: dimID, Name: method, Algo: collectorapi.Incremental})
 			chart.MarkNotCreated()
 		}
-		mx.RESTClient.Requests.ByMethod[method] = mtx.Gauge(metric.Value)
+		v := mx.RESTClient.Requests.ByMethod[method]
+		v.Add(metric.Value)
+		mx.RESTClient.Requests.ByMethod[method] = v
 	}
 }
 

@@ -24,6 +24,7 @@ const (
 	kubeResourceDeployment
 	kubeResourceCronJob
 	kubeResourceJob
+	kubeResourcePVC
 )
 
 func toNode(i any) (*corev1.Node, error) {
@@ -78,5 +79,18 @@ func toJob(i any) (*batchv1.Job, error) {
 		return toJob(v.value())
 	default:
 		return nil, fmt.Errorf("unexpected type: %T (expected %T or %T)", v, &batchv1.Job{}, resource(nil))
+	}
+}
+
+func toPVC(i any) (*corev1.PersistentVolumeClaim, error) {
+	switch v := i.(type) {
+	case *corev1.PersistentVolumeClaim:
+		return v, nil
+	case resource:
+		return toPVC(v.value())
+	default:
+		return nil, fmt.Errorf(
+			"unexpected type: %T (expected %T or %T)", v, &corev1.PersistentVolumeClaim{}, resource(nil),
+		)
 	}
 }
