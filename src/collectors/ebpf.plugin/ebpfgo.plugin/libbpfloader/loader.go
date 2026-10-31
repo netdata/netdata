@@ -18,6 +18,8 @@ type FDRuntime struct{}
 
 type SocketRuntime struct{}
 
+type ProcessRuntime struct{}
+
 func OpenObject(path string) (*Object, error) {
 	return nil, ErrDisabled
 }
@@ -247,6 +249,40 @@ func (r *SocketRuntime) SnapshotPerPID() ([]SocketPIDEntry, error) {
 func (r *SocketRuntime) Close() {
 	// No-op in the disabled build because the runtime never acquired native resources.
 }
+
+func ProcessRuntimeOpenMode(path string, useCore bool) (*ProcessRuntime, error) {
+	return newDisabledRuntime[ProcessRuntime](path, useCore)
+}
+
+func (r *ProcessRuntime) Prepare(pidTableSize uint32, mapsPerCore bool) error {
+	_, _ = pidTableSize, mapsPerCore
+	return ErrDisabled
+}
+
+func (r *ProcessRuntime) Load() error { return ErrDisabled }
+
+func (r *ProcessRuntime) Attach() error { return ErrDisabled }
+
+func (r *ProcessRuntime) UpdateController(appsEnabled bool, appsLevel int) error {
+	_, _ = appsEnabled, appsLevel
+	return ErrDisabled
+}
+
+func (r *ProcessRuntime) SupportsCore() bool { return false }
+
+func (r *ProcessRuntime) Snapshot(mapsPerCore bool) (ProcessSnapshot, error) {
+	_ = mapsPerCore
+	return ProcessSnapshot{}, ErrDisabled
+}
+
+func (r *ProcessRuntime) SnapshotApps(mapsPerCore bool) ([]ProcessAppSnapshot, error) {
+	_ = mapsPerCore
+	return nil, ErrDisabled
+}
+
+func (r *ProcessRuntime) DeletePids(pids []uint32) error { _ = pids; return ErrDisabled }
+
+func (r *ProcessRuntime) Close() {}
 
 // DNSRuntime disabled stubs — mirrored from dns_libbpf.go (netdata_ebpf_libbpf build).
 
