@@ -1,0 +1,3 @@
+INFO started
+ERROR code=42 disk failed
+WARN low-memory

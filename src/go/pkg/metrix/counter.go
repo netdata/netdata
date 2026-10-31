@@ -10,12 +10,20 @@ type snapshotCounterInstrument struct {
 	base    []LabelSet
 }
 
+func (i *snapshotCounterInstrument) hostScope() HostScope {
+	return i.scope
+}
+
 // statefulCounterInstrument writes maintained counter deltas.
 type statefulCounterInstrument struct {
 	backend meterBackend
 	desc    *instrumentDescriptor
 	scope   HostScope
 	base    []LabelSet
+}
+
+func (i *statefulCounterInstrument) hostScope() HostScope {
+	return i.scope
 }
 
 // stagedCounter holds one in-cycle counter current total for a series identity.

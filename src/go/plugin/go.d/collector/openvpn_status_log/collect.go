@@ -45,7 +45,7 @@ func (c *Collector) collectUsers(mx map[string]int64, clients []clientInfo) {
 		if !c.collectedUsers[name] {
 			c.collectedUsers[name] = true
 			if err := c.addUserCharts(name); err != nil {
-				c.Warning(err)
+				c.Warning("could not add per-user charts: invalid or duplicate chart identity")
 			}
 		}
 		mx[name+"_bytes_in"] = user.bytesReceived

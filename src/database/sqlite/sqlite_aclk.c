@@ -221,7 +221,17 @@ static RRDHOST *load_archived_host_from_row(sqlite3_stmt *res)
         host->stream.rcv.status.last_disconnected = now_realtime_sec();
     }
 
-    host->rrdlabels = sql_load_host_labels(&host_uuid);
+    // A new archived host has no labels yet. One that rrdhost_find_or_create() found already has a set, which
+    // other threads may be reading: refill it, never replace it (the replaced set would also leak).
+    RRDLABELS *loaded_labels = sql_load_host_labels(&host_uuid);
+    if (loaded_labels) {
+        if (!host->rrdlabels)
+            host->rrdlabels = loaded_labels;
+        else {
+            rrdlabels_migrate_to_these(host->rrdlabels, loaded_labels);
+            rrdlabels_destroy(loaded_labels);
+        }
+    }
     host->stream.snd.status.last_connected = last_connected;
 
     pulse_host_status(host, 0, 0); // this will detect the receiver status
@@ -234,6 +244,9 @@ static RRDHOST *load_archived_host_from_row(sqlite3_stmt *res)
                    rrdhost_hostname(host), host->machine_guid, node_str, is_ephemeral);
 #endif
 
+    // the pin from rrdhost_find_or_create() covered the initialization above; from here on an
+    // archived host is kept by RRDHOST_FLAG_PENDING_CONTEXT_LOAD, which every remover skips
+    rrdhost_pin_release(host);
     return host;
 }
 

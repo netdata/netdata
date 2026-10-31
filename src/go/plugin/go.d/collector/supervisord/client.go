@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/mattn/go-xmlrpc"
+	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
 type supervisorClient interface {
@@ -23,27 +24,36 @@ type supervisorRPCClient struct {
 	client *xmlrpc.Client
 }
 
-func newSupervisorRPCClient(serverURL *url.URL, httpClient *http.Client) (supervisorClient, error) {
+func newSupervisorRPCClient(ctx context.Context, serverURL *url.URL, cfg web.ClientConfig) (supervisorClient, error) {
+	var httpClient *http.Client
+	var err error
+	rpcURL := serverURL.String()
 	switch serverURL.Scheme {
 	case "http", "https":
-		c := xmlrpc.NewClient(serverURL.String())
-		c.HttpClient = httpClient
-		return &supervisorRPCClient{client: c}, nil
+		httpClient, err = web.NewHTTPClient(ctx, cfg)
 	case "unix":
-		c := xmlrpc.NewClient("http://unix/RPC2")
-		t, ok := httpClient.Transport.(*http.Transport)
-		if !ok {
+		if cfg.ForceHTTP2 {
 			return nil, errors.New("unexpected HTTPConfig client transport")
 		}
+		t, err := web.NewHTTPTransport(ctx, cfg)
+		if err != nil {
+			return nil, fmt.Errorf("create HTTP transport: %w", err)
+		}
 		t.DialContext = func(ctx context.Context, _, _ string) (net.Conn, error) {
-			d := net.Dialer{Timeout: httpClient.Timeout}
+			d := net.Dialer{Timeout: cfg.Timeout.Duration()}
 			return d.DialContext(ctx, "unix", serverURL.Path)
 		}
-		c.HttpClient = httpClient
-		return &supervisorRPCClient{client: c}, nil
+		httpClient = web.NewHTTPClientWithTransport(cfg, t)
+		rpcURL = "http://unix/RPC2"
 	default:
 		return nil, fmt.Errorf("unexpected URL scheme: %s", serverURL)
 	}
+	if err != nil {
+		return nil, fmt.Errorf("create HTTP client: %w", err)
+	}
+	c := xmlrpc.NewClient(rpcURL)
+	c.HttpClient = httpClient
+	return &supervisorRPCClient{client: c}, nil
 }
 
 // http://supervisord.org/api.html#process-control

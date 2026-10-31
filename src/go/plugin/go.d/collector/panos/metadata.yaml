@@ -187,7 +187,7 @@ modules:
               Verify the account permissions and platform support for the metricset, or provide a sanitized XML sample so the parser can be updated.
           - name: A PAN-OS value cannot be parsed
             description: |
-              The collector reports missing or invalid integer, decimal, duration, status, license expiration, and IPsec tunnel-count values with the metricset, field, entity name, and raw value when present.
+              The collector reports missing or invalid integer, decimal, duration, status, license expiration, and IPsec SA lifetime values with the metricset, field, entity name, and raw value when present.
               It does not silently convert missing or malformed values to zero, report fake valid status, or treat unrecognized license dates as never-expiring licenses.
     alerts:
       - name: panos_bgp_peer_not_established
@@ -396,7 +396,7 @@ modules:
               dimensions:
                 - name: time_until_expiration
         - name: IPsec summary
-          description: These metrics summarize active PAN-OS IPsec security associations.
+          description: These metrics count distinct PAN-OS tunnels, including separate proxy IDs, with at least one established IPsec security association (SA).
           labels: []
           metrics:
             - name: panos.ipsec.tunnels
@@ -406,7 +406,7 @@ modules:
               dimensions:
                 - name: active
         - name: IPsec tunnel
-          description: These metrics refer to one active PAN-OS IPsec security association.
+          description: These metrics report the maximum valid remaining SA lifetime for each tunnel and remote peer, including overlapping SAs during rekeying.
           labels:
             - name: tunnel
               description: Tunnel name.
@@ -415,7 +415,7 @@ modules:
             - name: remote
               description: Remote peer.
             - name: tunnel_id
-              description: PAN-OS tunnel identifier.
+              description: PAN-OS tunnel identifier, or unknown when the response omits it.
             - name: protocol
               description: Tunnel protocol.
             - name: encryption

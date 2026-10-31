@@ -33,7 +33,8 @@ void analytics_set_data_str(char **name, const char *value);
         if ((res)) {                                                                                                   \
             int _rc = sqlite3_finalize((res));                                                                         \
             if (_rc != SQLITE_OK) {                                                                                    \
-                nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to finalize statement rc=%d in %s", _rc, __FUNCTION__);          \
+                nd_log(NDLS_DAEMON, NDLP_ERR, "SQLite statement finalize in %s returned rc=%d (%s)",                 \
+                       __FUNCTION__, _rc, sqlite3_errstr(_rc));                                                        \
             }                                                                                                          \
         }                                                                                                              \
     } while (0)
@@ -43,7 +44,8 @@ void analytics_set_data_str(char **name, const char *value);
         if ((res)) {                                                                                                   \
             int _rc = sqlite3_reset((res));                                                                            \
             if (_rc != SQLITE_OK) {                                                                                    \
-                nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to reset statement rc=%d in %s", _rc, __FUNCTION__);             \
+                nd_log(NDLS_DAEMON, NDLP_ERR, "SQLite statement reset in %s returned rc=%d (%s)",                    \
+                       __FUNCTION__, _rc, sqlite3_errstr(_rc));                                                        \
             }                                                                                                          \
         }                                                                                                              \
     } while (0)
@@ -178,6 +180,10 @@ void sqlite_library_shutdown(void);
 void sql_close_database(sqlite3 *database, const char *database_name);
 void sql_close_thread_db_safe(sqlite3 **database);
 void sqlite_close_databases(void);
+int sqlite_lease_unittest(void);
+// Runs the real sqlite_close_databases() and sqlite_library_shutdown(): it MUST be the last SQLite work of its
+// process (the end of -W unittest, or -W sqlite-lease-test).
+int sqlite_lease_teardown_unittest(void);
 uint64_t get_total_database_space(void);
 int sqlite_release_memory(int bytes);
 #endif //NETDATA_SQLITE_FUNCTIONS_H

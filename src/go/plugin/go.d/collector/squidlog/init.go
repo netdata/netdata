@@ -35,12 +35,12 @@ func (c *Collector) createParser() error {
 	}
 
 	var found bool
-	for _, line := range lines {
+	for i, line := range lines {
 		if line = strings.TrimSpace(line); line == "" {
 			continue
 		}
 
-		c.Debugf("last line: '%s'", line)
+		c.Debugf("testing sampled log line %d", i+1)
 
 		c.parser, err = logs.NewParser(c.ParserConfig, c.file)
 		if err != nil {

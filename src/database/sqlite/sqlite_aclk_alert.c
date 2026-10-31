@@ -198,9 +198,9 @@ done:
 // would destroy it unsent and leave the cloud on a status the agent has already left. Guarded this way, a
 // re-pointed row simply fails the predicate, survives, and goes out on the next pass.
 //
-// The caller owns the statement: this runs once per row sent, and re-preparing it each time would take
-// the global sqlite_spinlock in simple_prepare_statement() - and a full SQL parse - up to
-// ACLK_MAX_ALERT_UPDATES times per host per tick, on a lock every web, API and metadata thread contends on.
+// The caller owns the statement: this runs once per row sent, and re-preparing it each time would cost a
+// full SQL parse (and a lifetime-lease round trip in simple_prepare_statement()) up to
+// ACLK_MAX_ALERT_UPDATES times per host per tick.
 // Returns true when the row was actually removed. A false means the row was re-pointed after we read it - the
 // guard did its job and the newer transition is still queued, which the caller must not mistake for "done".
 static bool delete_alert_from_submit_queue(nd_uuid_t *host_id, int64_t sequence_id, int64_t unique_id, sqlite3_stmt **res)

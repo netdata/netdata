@@ -21,7 +21,7 @@ MED_ARRAY_17=med_value_17
 MED_ARRAY_18=med_value_18
 MED_ARRAY_19=med_value_19
 MED_ARRAY_20=med_value_20
-MULTI_REWRITE= Final
+MULTI_REWRITE=First Second Third Final
 SMALL_ARRAY_1=value1
 SMALL_ARRAY_2=value2
 

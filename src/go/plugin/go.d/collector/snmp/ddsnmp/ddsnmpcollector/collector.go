@@ -39,7 +39,12 @@ func New(cfg Config) *Collector {
 		tableIdentity:             buildTableIdentity(cfg.Profiles),
 	}
 
-	cfg.SnmpClient = &diagnosticClient{Handler: cfg.SnmpClient, failures: &coll.failures, negative: &coll.negative}
+	cfg.SnmpClient = &diagnosticClient{
+		Handler:  cfg.SnmpClient,
+		failures: &coll.failures,
+		negative: &coll.negative,
+		requests: &coll.requests,
+	}
 
 	for _, prof := range cfg.Profiles {
 		coll.profiles[prof.SourceFile] = &profileState{profile: prof}
@@ -60,6 +65,7 @@ func New(cfg Config) *Collector {
 type (
 	Collector struct {
 		failures                  ddsnmp.CollectionFailures
+		requests                  snmpRequestState
 		log                       *logger.Logger
 		profiles                  map[string]*profileState
 		missingOIDs               map[string]bool
@@ -100,6 +106,7 @@ type (
 
 func (c *Collector) CollectDeviceMetadata() (map[string]ddsnmp.MetaTag, error) {
 	c.failures = ddsnmp.CollectionFailures{}
+	c.requests = snmpRequestState{}
 	meta := make(map[string]ddsnmp.MetaTag)
 
 	for _, prof := range c.profiles {
@@ -120,8 +127,12 @@ func (c *Collector) CollectDeviceMetadata() (map[string]ddsnmp.MetaTag, error) {
 	return meta, nil
 }
 
+// Collect preserves partial profile results, but returns no results when every
+// current request fails without a response. Cached/no-op profiles cannot mask
+// an unresponsive target; per-profile diagnostic reports are still delivered.
 func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 	c.failures = ddsnmp.CollectionFailures{}
+	c.requests = snmpRequestState{}
 	var prepared []*preparedProfileCollection
 	var errs []error
 
@@ -196,6 +207,11 @@ func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 		c.observeAcquisitionProfile(profile, AcquisitionProfileOutcomeSuccess, AcquisitionFailurePhaseNone)
 	}
 
+	// A no-op profile can survive after all requests fail. Do not let its local
+	// statistics turn that failed poll into vnode activity.
+	if !c.requests.responded && c.requests.err != nil {
+		return nil, fmt.Errorf("all SNMP requests failed: %w", c.requests.err)
+	}
 	if len(metrics) == 0 && len(errs) > 0 {
 		return nil, errors.Join(errs...)
 	}
@@ -274,7 +290,12 @@ func collectHiddenMetrics(metrics []ddsnmp.Metric) []ddsnmp.Metric {
 }
 
 func (c *Collector) SetSNMPClient(snmpClient gosnmp.Handler) {
-	snmpClient = &diagnosticClient{Handler: snmpClient, failures: &c.failures, negative: &c.negative}
+	snmpClient = &diagnosticClient{
+		Handler:  snmpClient,
+		failures: &c.failures,
+		negative: &c.negative,
+		requests: &c.requests,
+	}
 	if c.globalTagsCollector != nil {
 		c.globalTagsCollector.snmpClient = snmpClient
 	}

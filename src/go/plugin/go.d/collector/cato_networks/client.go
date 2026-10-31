@@ -4,7 +4,6 @@ package cato_networks
 
 import (
 	"bytes"
-	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
@@ -57,6 +56,7 @@ type rawGraphQLClient struct {
 
 func newSDKAPIClient(cfg Config, httpClient *http.Client) (apiClient, error) {
 	headers := catoRequestHeaders(cfg.Headers)
+	httpClient = newCatoHTTPClient(httpClient)
 
 	client, err := catosdk.New(cfg.URL, cfg.APIKey, cfg.AccountID, httpClient, headers)
 	if err != nil {
@@ -181,10 +181,9 @@ func (c *sdkAPIClient) AccountMetrics(
 	res, err := c.client.AccountMetrics(ctx,
 		nil, nil, nil, &buckets,
 		labels,
-		nil, nil, nil, nil, nil, nil, nil, nil,
+		nil,
 		siteIDs,
-		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
-		nil, nil, &accountID, nil, timeFrame, groupInterfaces, nil,
+		nil, nil, &accountID, nil, timeFrame, groupInterfaces, nil, nil,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("accountMetrics: %w", err)
@@ -275,18 +274,8 @@ func (c rawGraphQLClient) AccountSnapshot(
 		return nil, fmt.Errorf("http status %d", resp.StatusCode)
 	}
 
-	bodyReader := io.Reader(resp.Body)
-	if strings.EqualFold(strings.TrimSpace(resp.Header.Get("Content-Encoding")), "gzip") {
-		reader, err := gzip.NewReader(resp.Body)
-		if err != nil {
-			return nil, fmt.Errorf("gzip decode: %w", err)
-		}
-		defer reader.Close()
-		bodyReader = reader
-	}
-
 	var decoded rawAccountSnapshotResponse
-	decoder := json.NewDecoder(bodyReader)
+	decoder := json.NewDecoder(resp.Body)
 	if err := decoder.Decode(&decoded); err != nil {
 		return nil, fmt.Errorf("json decode: %w", err)
 	}

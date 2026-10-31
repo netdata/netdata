@@ -50,7 +50,10 @@ modules:
           description: |
             By default, it detects instances running on the local host by trying to connect to known ports that are [allocated to exporters](https://github.com/prometheus/prometheus/wiki/Default-port-allocations).
         limits:
-          description: ""
+          description: |
+            HTTP responses have a fixed 64 MiB limit, including after gzip decompression.
+            A response exceeding this limit fails the scrape. Reduce the metrics exposed by the endpoint if it
+            exceeds this limit; collector-side selectors and relabeling do not reduce the downloaded body.
         performance_impact:
           description: ""
     setup: &setup

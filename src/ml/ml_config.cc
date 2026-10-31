@@ -2,6 +2,8 @@
 
 #include "ml_config.h"
 
+#include <cmath>
+
 static void ml_config_migrate() {
     const char *config_section_ml = CONFIG_SECTION_ML;
     
@@ -109,6 +111,20 @@ static T clamp(const T& Value, const T& Min, const T& Max) {
   return std::max(Min, std::min(Value, Max));
 }
 
+static constexpr double ML_DIMENSION_ANOMALY_SCORE_THRESHOLD_DEFAULT = 0.99;
+
+/*
+ * A model's anomaly score is capped at 100 and a dimension is anomalous only
+ * when every model scores at least 100 * threshold, so a threshold above 1.00
+ * can never be reached.
+ */
+double ml_config_dimension_anomaly_score_threshold(double configured) {
+    if (std::isnan(configured))
+        return ML_DIMENSION_ANOMALY_SCORE_THRESHOLD_DEFAULT;
+
+    return clamp(configured, 0.01, 1.00);
+}
+
 /*
  * Initialize global configuration variable.
  */
@@ -138,7 +154,8 @@ void ml_config_load(ml_config_t *cfg) {
 
     unsigned max_kmeans_iters = inicfg_get_number(&netdata_config, config_section_ml, "maximum number of k-means iterations", 1000);
 
-    double dimension_anomaly_rate_threshold = inicfg_get_double(&netdata_config, config_section_ml, "dimension anomaly score threshold", 0.99);
+    double configured_dimension_anomaly_score_threshold = inicfg_get_double(
+        &netdata_config, config_section_ml, "dimension anomaly score threshold", ML_DIMENSION_ANOMALY_SCORE_THRESHOLD_DEFAULT);
 
     double host_anomaly_rate_threshold = inicfg_get_double(&netdata_config, config_section_ml, "host anomaly rate threshold", 1.0);
     std::string anomaly_detection_grouping_method = inicfg_get(&netdata_config, config_section_ml, "anomaly detection grouping method", "average");
@@ -183,7 +200,12 @@ void ml_config_load(ml_config_t *cfg) {
 
     max_kmeans_iters = clamp(max_kmeans_iters, 500u, 1000u);
 
-    dimension_anomaly_rate_threshold = clamp(dimension_anomaly_rate_threshold, 0.01, 5.00);
+    double dimension_anomaly_score_threshold =
+        ml_config_dimension_anomaly_score_threshold(configured_dimension_anomaly_score_threshold);
+    if (dimension_anomaly_score_threshold != configured_dimension_anomaly_score_threshold)
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "ML: dimension anomaly score threshold %.10g is outside the range 0.01 - 1.00, using %.10g",
+               configured_dimension_anomaly_score_threshold, dimension_anomaly_score_threshold);
 
     host_anomaly_rate_threshold = clamp(host_anomaly_rate_threshold, 0.1, 10.0);
     anomaly_detection_query_duration = clamp<time_t>(anomaly_detection_query_duration, 60, 15 * 60);
@@ -229,7 +251,7 @@ void ml_config_load(ml_config_t *cfg) {
     cfg->anomaly_detection_grouping_method =
         time_grouping_parse(anomaly_detection_grouping_method.c_str(), RRDR_GROUPING_AVERAGE);
     cfg->anomaly_detection_query_duration = anomaly_detection_query_duration;
-    cfg->dimension_anomaly_score_threshold = dimension_anomaly_rate_threshold;
+    cfg->dimension_anomaly_score_threshold = dimension_anomaly_score_threshold;
 
     cfg->hosts_to_skip = inicfg_get(&netdata_config, config_section_ml, "hosts to skip from training", "!*");
     cfg->sp_host_to_skip = simple_pattern_create(cfg->hosts_to_skip.c_str(), NULL, SIMPLE_PATTERN_EXACT, true);
