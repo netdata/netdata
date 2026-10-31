@@ -16,6 +16,7 @@ package_tree="
   dev-libs/libuv
   dev-libs/libyaml
   dev-libs/openssl
+  dev-libs/protobuf
   dev-util/cmake
   dev-vcs/git
   net-libs/libmnl
