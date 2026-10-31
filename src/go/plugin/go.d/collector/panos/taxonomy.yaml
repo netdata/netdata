@@ -57,6 +57,8 @@ placements:
         items:
           - panos.ipsec.tunnels
           - panos.ipsec.tunnel.sa_lifetime
+          - panos.ipsec.tunnel.state
+          - panos.ipsec.gateway.state
       - type: group
         id: bgp
         title: BGP

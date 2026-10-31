@@ -38,6 +38,12 @@ var (
 	dataLicenses, _            = os.ReadFile("testdata/licenses.xml")
 	dataIPSecSA, _             = os.ReadFile("testdata/ipsec_sa.xml")
 	dataIPSecSAPartial, _      = os.ReadFile("testdata/ipsec_sa_partial.xml")
+	dataIPSecFlow, _           = os.ReadFile("testdata/ipsec_flow.xml")
+	dataIPSecFlowPartial, _    = os.ReadFile("testdata/ipsec_flow_partial.xml")
+	dataIPSecGateway, _        = os.ReadFile("testdata/ipsec_gateway.xml")
+	dataIPSecIKESA, _          = os.ReadFile("testdata/ipsec_ike_sa.xml")
+	dataIPSecIKESAPartial, _   = os.ReadFile("testdata/ipsec_ike_sa_partial.xml")
+	dataIPSecIKESAEmpty, _     = os.ReadFile("testdata/ipsec_ike_sa_empty.xml")
 )
 
 func Test_testDataIsValid(t *testing.T) {
@@ -54,6 +60,12 @@ func Test_testDataIsValid(t *testing.T) {
 		"dataLicenses":            dataLicenses,
 		"dataIPSecSA":             dataIPSecSA,
 		"dataIPSecSAPartial":      dataIPSecSAPartial,
+		"dataIPSecFlow":           dataIPSecFlow,
+		"dataIPSecFlowPartial":    dataIPSecFlowPartial,
+		"dataIPSecGateway":        dataIPSecGateway,
+		"dataIPSecIKESA":          dataIPSecIKESA,
+		"dataIPSecIKESAPartial":   dataIPSecIKESAPartial,
+		"dataIPSecIKESAEmpty":     dataIPSecIKESAEmpty,
 	} {
 		require.NotNil(t, data, name)
 	}
@@ -378,6 +390,9 @@ func TestCollector_CollectStopsWhenBGPSummaryIsCanceled(t *testing.T) {
 		environmentCommand,
 		licenseInfoCommand,
 		ipsecSACommand,
+		ipsecFlowCommand,
+		ipsecGatewayCommand,
+		ipsecIKESACommand,
 		legacyBGPPeerCommand,
 		advancedBGPPeerCommands[0],
 		advancedBGPSummaryCommand,
@@ -398,21 +413,24 @@ func TestCollector_ChartTemplateYAML(t *testing.T) {
 	require.NoError(t, err)
 }
 
+type collectStep struct {
+	name        string
+	setup       func(*Collector, *mockAPIClient)
+	wantErr     string
+	wantMetrics map[string]metrix.SampleValue
+	wantMissing []string
+	wantLog     []string
+	notWantLog  []string
+	check       func(*testing.T, *Collector, *mockAPIClient, map[string]metrix.SampleValue)
+}
+
+type collectScenario struct {
+	prepare func(*Collector, *mockAPIClient)
+	steps   []collectStep
+}
+
 func TestCollector_Collect(t *testing.T) {
-	type collectStep struct {
-		name        string
-		setup       func(*Collector, *mockAPIClient)
-		wantErr     string
-		wantMetrics map[string]metrix.SampleValue
-		wantMissing []string
-		wantLog     []string
-		notWantLog  []string
-		check       func(*testing.T, *Collector, *mockAPIClient, map[string]metrix.SampleValue)
-	}
-	tests := map[string]struct {
-		prepare func(*Collector, *mockAPIClient)
-		steps   []collectStep
-	}{
+	tests := map[string]collectScenario{
 		"read-only telemetry and legacy BGP": {
 			prepare: func(c *Collector, api *mockAPIClient) {
 				api.responses = map[string][]byte{
@@ -565,6 +583,9 @@ func TestCollector_Collect(t *testing.T) {
 							environmentCommand,
 							licenseInfoCommand,
 							ipsecSACommand,
+							ipsecFlowCommand,
+							ipsecGatewayCommand,
+							ipsecIKESACommand,
 							legacyBGPPeerCommand,
 							advancedBGPPeerCommands[0],
 							advancedBGPSummaryCommand,
@@ -616,6 +637,9 @@ func TestCollector_Collect(t *testing.T) {
 							environmentCommand,
 							licenseInfoCommand,
 							ipsecSACommand,
+							ipsecFlowCommand,
+							ipsecGatewayCommand,
+							ipsecIKESACommand,
 							advancedBGPPeerCommands[0],
 							advancedBGPSummaryCommand,
 						}, api.commands)
@@ -775,6 +799,9 @@ func TestCollector_Collect(t *testing.T) {
 							environmentCommand,
 							licenseInfoCommand,
 							ipsecSACommand,
+							ipsecFlowCommand,
+							ipsecGatewayCommand,
+							ipsecIKESACommand,
 							advancedBGPPeerCommands[0],
 						}, api.commands)
 					},
@@ -860,6 +887,9 @@ func TestCollector_Collect(t *testing.T) {
 							environmentCommand,
 							licenseInfoCommand,
 							ipsecSACommand,
+							ipsecFlowCommand,
+							ipsecGatewayCommand,
+							ipsecIKESACommand,
 							legacyBGPPeerCommand,
 							advancedBGPPeerCommands[0],
 						}, api.commands)
@@ -903,6 +933,9 @@ func TestCollector_Collect(t *testing.T) {
 							environmentCommand,
 							licenseInfoCommand,
 							ipsecSACommand,
+							ipsecFlowCommand,
+							ipsecGatewayCommand,
+							ipsecIKESACommand,
 							legacyBGPPeerCommand,
 							advancedBGPPeerCommands[0],
 							advancedBGPSummaryCommand,
@@ -956,7 +989,7 @@ func TestCollector_Collect(t *testing.T) {
 					},
 					check: func(t *testing.T, c *Collector, api *mockAPIClient, _ map[string]metrix.SampleValue) {
 						assert.Equal(t, routingEngineNone, c.routingEngine)
-						assert.Len(t, api.commands, 9)
+						assert.Len(t, api.commands, 12)
 					},
 				},
 				{
@@ -968,7 +1001,7 @@ func TestCollector_Collect(t *testing.T) {
 						metricKey("system_uptime", systemLabels()): 183845,
 					},
 					check: func(t *testing.T, _ *Collector, api *mockAPIClient, _ map[string]metrix.SampleValue) {
-						assert.Len(t, api.commands, 5)
+						assert.Len(t, api.commands, 8)
 					},
 				},
 				{
@@ -983,7 +1016,7 @@ func TestCollector_Collect(t *testing.T) {
 						metricKey("system_uptime", systemLabels()): 183845,
 					},
 					check: func(t *testing.T, _ *Collector, api *mockAPIClient, _ map[string]metrix.SampleValue) {
-						assert.Len(t, api.commands, 9)
+						assert.Len(t, api.commands, 12)
 					},
 				},
 			},
@@ -1045,6 +1078,9 @@ func TestCollector_Collect(t *testing.T) {
 							environmentCommand,
 							licenseInfoCommand,
 							ipsecSACommand,
+							ipsecFlowCommand,
+							ipsecGatewayCommand,
+							ipsecIKESACommand,
 							legacyBGPPeerCommand,
 							advancedBGPPeerCommands[0],
 						}, api.commands)
@@ -1217,6 +1253,9 @@ func TestCollector_Collect(t *testing.T) {
 							environmentCommand,
 							licenseInfoCommand,
 							ipsecSACommand,
+							ipsecFlowCommand,
+							ipsecGatewayCommand,
+							ipsecIKESACommand,
 							legacyBGPPeerCommand,
 							legacyBGPPeerCommand,
 							advancedBGPPeerCommands[0],
@@ -1726,50 +1765,48 @@ func TestCollector_Collect(t *testing.T) {
 	}
 
 	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			collr := New()
-			var logBuf bytes.Buffer
-			collr.Logger = logger.NewWithWriter(&logBuf)
-			api := &mockAPIClient{}
-			collr.apiClient = api
-			if tc.prepare != nil {
-				tc.prepare(collr, api)
+		t.Run(name, func(t *testing.T) { runCollectScenario(t, tc) })
+	}
+}
+
+func runCollectScenario(t *testing.T, tc collectScenario) {
+	t.Helper()
+	collr := New()
+	var logBuf bytes.Buffer
+	collr.Logger = logger.NewWithWriter(&logBuf)
+	api := &mockAPIClient{}
+	collr.apiClient = api
+	if tc.prepare != nil {
+		tc.prepare(collr, api)
+	}
+
+	for _, step := range tc.steps {
+		t.Run(step.name, func(t *testing.T) {
+			if step.setup != nil {
+				step.setup(collr, api)
 			}
 
-			for _, step := range tc.steps {
-				t.Run(step.name, func(t *testing.T) {
-					if step.setup != nil {
-						step.setup(collr, api)
-					}
-
-					logBuf.Reset()
-					mx, err := collecttest.CollectScalarSeries(collr, metrix.ReadFlatten())
-					logOutput := logBuf.String()
-					if step.wantErr != "" {
-						require.ErrorContains(t, err, step.wantErr)
-						assertExpectedLogs(t, logOutput, step.wantLog, step.notWantLog)
-						return
-					}
-					require.NoError(t, err)
-					assertExpectedMetrics(t, mx, step.wantMetrics)
-					assertMissingMetrics(t, mx, step.wantMissing)
-					assertExpectedLogs(t, logOutput, step.wantLog, step.notWantLog)
-					if step.check != nil {
-						step.check(t, collr, api, mx)
-					}
-				})
+			logBuf.Reset()
+			mx, err := collecttest.CollectScalarSeries(collr, metrix.ReadFlatten())
+			logOutput := logBuf.String()
+			if step.wantErr != "" {
+				require.ErrorContains(t, err, step.wantErr)
+				assertExpectedLogs(t, logOutput, step.wantLog, step.notWantLog)
+				return
+			}
+			require.NoError(t, err)
+			assertExpectedMetrics(t, mx, step.wantMetrics)
+			assertMissingMetrics(t, mx, step.wantMissing)
+			assertExpectedLogs(t, logOutput, step.wantLog, step.notWantLog)
+			if step.check != nil {
+				step.check(t, collr, api, mx)
 			}
 		})
 	}
 }
 
 func TestCollector_Collect_ReturnsMetricsetAPIErrors(t *testing.T) {
-	tests := map[string]struct {
-		command     string
-		wantMetric  string
-		wantMissing string
-		wantLog     string
-	}{
+	tests := map[string]metricsetErrorCase{
 		"system": {
 			command:     systemInfoCommand,
 			wantMetric:  stateMetricKey("ha_status", "enabled", nil),
@@ -1801,6 +1838,11 @@ func TestCollector_Collect_ReturnsMetricsetAPIErrors(t *testing.T) {
 			wantLog:     "ipsec metricset: IPsec SA query API call: transport failed",
 		},
 	}
+	maps.Copy(tests, ipsecStateErrorCases(
+		"ipsec tunnel state metricset: IPsec tunnel flow query API call: transport failed",
+		"ipsec gateway metricset: IPsec gateway query API call: transport failed",
+		"ipsec gateway metricset: IPsec IKE SA query API call: transport failed",
+	))
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -1821,12 +1863,7 @@ func TestCollector_Collect_ReturnsMetricsetAPIErrors(t *testing.T) {
 }
 
 func TestCollector_Collect_ReportsMalformedXMLResponse(t *testing.T) {
-	tests := map[string]struct {
-		command     string
-		wantMetric  string
-		wantMissing string
-		wantLog     string
-	}{
+	tests := map[string]metricsetErrorCase{
 		"system": {
 			command:     systemInfoCommand,
 			wantMetric:  stateMetricKey("ha_status", "enabled", nil),
@@ -1864,6 +1901,11 @@ func TestCollector_Collect_ReportsMalformedXMLResponse(t *testing.T) {
 			wantLog:     "parse PAN-OS BGP response",
 		},
 	}
+	maps.Copy(tests, ipsecStateErrorCases(
+		"parse PAN-OS IPsec flow response",
+		"parse PAN-OS IPsec gateway response",
+		"parse PAN-OS IPsec IKE SA response",
+	))
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -2606,6 +2648,26 @@ func TestParseReadOnlyTelemetry(t *testing.T) {
 			require.Len(t, tunnels, 2)
 			assert.Equal(t, "branch-a", tunnels[0].Name)
 		},
+		"ipsec flow": func(t *testing.T) {
+			tunnels, err := parseVPNFlow(dataIPSecFlowPartial)
+			require.NoError(t, err)
+			require.Len(t, tunnels, 6)
+			assert.Equal(t, vpnFlowTunnel{Name: "branch-a", ID: "1", State: "inactive"}, tunnels[0])
+			assert.Equal(t, vpnFlowTunnel{Name: "branch-c", ID: "4", State: "active"}, tunnels[5])
+		},
+		"ipsec gateway": func(t *testing.T) {
+			gateways, err := parseVPNGateways(dataIPSecGateway)
+			require.NoError(t, err)
+			require.Len(t, gateways, 4)
+			assert.Equal(t, "ikev1", ipsecIKEVersion(gateways[0]))
+			assert.Equal(t, "ikev2", ipsecIKEVersion(gateways[3]))
+		},
+		"ipsec IKE SA": func(t *testing.T) {
+			sas, err := parseVPNIKESAs(dataIPSecIKESAPartial)
+			require.NoError(t, err)
+			require.Len(t, sas, 2)
+			assert.Equal(t, vpnIKESA{GatewayID: "3", Name: "gw-branch-c"}, sas[0])
+		},
 	}
 
 	for name, run := range tests {
@@ -2874,7 +2936,7 @@ func assertBGPProbeErrorNotCached(t *testing.T, c *Collector, api *mockAPIClient
 	t.Helper()
 	assert.Equal(t, routingEngineUnknown, c.routingEngine)
 	assert.True(t, c.noBGPProbedAt.IsZero())
-	assert.Len(t, api.commands, 9)
+	assert.Len(t, api.commands, 12)
 }
 
 func collectOnceWithContext(t *testing.T, c *Collector, ctx context.Context) error {
@@ -2907,6 +2969,9 @@ func allCommandErrors(err error) map[string]error {
 		environmentCommand:         err,
 		licenseInfoCommand:         err,
 		ipsecSACommand:             err,
+		ipsecFlowCommand:           err,
+		ipsecGatewayCommand:        err,
+		ipsecIKESACommand:          err,
 		legacyBGPPeerCommand:       err,
 		advancedBGPPeerCommands[0]: err,
 		advancedBGPPeerCommands[1]: err,
@@ -3023,6 +3088,70 @@ func ipsecLabels(tunnel, gateway, remote, tunnelID, protocol, encryption string)
 		"protocol":   protocol,
 		"encryption": encryption,
 	}
+}
+
+// metricsetErrorCase describes a metricset whose command fails while the system metricset still commits.
+type metricsetErrorCase struct {
+	command     string
+	wantMetric  string
+	wantMissing string
+	wantLog     string
+}
+
+// ipsecStateErrorCases returns the error cases of the IPsec state metricsets, shared by the
+// API error and malformed XML tables, which differ only in the expected log line.
+func ipsecStateErrorCases(flowLog, gatewayLog, ikeSALog string) map[string]metricsetErrorCase {
+	systemUptime := metricKey("system_uptime", systemLabels())
+	tunnelState := stateMetricKey("ipsec_tunnel_state", "active", ipsecTunnelStateLabels("branch-a", "1"))
+	gatewayState := stateMetricKey("ipsec_gateway_state", "up", ipsecGatewayLabels("gw-branch-a", "ikev1"))
+	return map[string]metricsetErrorCase{
+		"ipsec tunnel flow": {command: ipsecFlowCommand, wantMetric: systemUptime, wantMissing: tunnelState, wantLog: flowLog},
+		"ipsec gateway":     {command: ipsecGatewayCommand, wantMetric: systemUptime, wantMissing: gatewayState, wantLog: gatewayLog},
+		"ipsec IKE SA":      {command: ipsecIKESACommand, wantMetric: systemUptime, wantMissing: gatewayState, wantLog: ikeSALog},
+	}
+}
+
+func ipsecTunnelStateLabels(tunnel, tunnelID string) metrix.Labels {
+	return metrix.Labels{
+		"tunnel":    tunnel,
+		"tunnel_id": tunnelID,
+	}
+}
+
+func ipsecGatewayLabels(gateway, ikeVersion string) metrix.Labels {
+	return metrix.Labels{
+		"gateway":     gateway,
+		"ike_version": ikeVersion,
+	}
+}
+
+func ipsecTunnelStateMetrics(tunnel, tunnelID, active string) map[string]metrix.SampleValue {
+	return stateSetMetrics("ipsec_tunnel_state", ipsecTunnelStates, active, ipsecTunnelStateLabels(tunnel, tunnelID))
+}
+
+func ipsecGatewayStateMetrics(gateway, ikeVersion, active string) map[string]metrix.SampleValue {
+	return stateSetMetrics("ipsec_gateway_state", ipsecGatewayStates, active, ipsecGatewayLabels(gateway, ikeVersion))
+}
+
+// stateSetMetrics returns every state of a state set: 1 for the active state, 0 for the rest.
+func stateSetMetrics(name string, states []string, active string, labels metrix.Labels) map[string]metrix.SampleValue {
+	out := make(map[string]metrix.SampleValue, len(states))
+	for _, state := range states {
+		value := metrix.SampleValue(0)
+		if state == active {
+			value = 1
+		}
+		out[stateMetricKey(name, state, labels)] = value
+	}
+	return out
+}
+
+func mergeMetrics(parts ...map[string]metrix.SampleValue) map[string]metrix.SampleValue {
+	out := make(map[string]metrix.SampleValue)
+	for _, part := range parts {
+		maps.Copy(out, part)
+	}
+	return out
 }
 
 func legacyPeerLabels() metrix.Labels {
@@ -3147,6 +3276,12 @@ func (m *mockAPIClient) op(ctx context.Context, cmd string) ([]byte, error) {
 		return dataLicenses, nil
 	case ipsecSACommand:
 		return dataIPSecSA, nil
+	case ipsecFlowCommand:
+		return dataIPSecFlow, nil
+	case ipsecGatewayCommand:
+		return dataIPSecGateway, nil
+	case ipsecIKESACommand:
+		return dataIPSecIKESA, nil
 	case legacyBGPPeerCommand, advancedBGPPeerCommands[0], advancedBGPPeerCommands[1], advancedBGPPeerCommands[2]:
 		return []byte(`<response status="success"><result></result></response>`), nil
 	default:

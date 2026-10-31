@@ -47,6 +47,8 @@ type licenseMetricInstruments struct {
 type ipsecMetricInstruments struct {
 	tunnelsActive metrix.SnapshotGauge
 	saLifetime    metrix.SnapshotGaugeVec
+	tunnelState   metrix.SnapshotStateSetVec
+	gatewayState  metrix.SnapshotStateSetVec
 }
 
 type bgpMetricInstruments struct {
@@ -76,6 +78,8 @@ var haStatusStates = []string{"enabled", "disabled"}
 var licenseStatusStates = []string{"valid", "expired"}
 var operationalModeStates = []string{"normal", "other"}
 var upDownStates = []string{"up", "down", "unknown"}
+var ipsecTunnelStates = []string{"active", "inactive", "init", "unknown"}
+var ipsecGatewayStates = []string{"up", "down"}
 var haSyncStates = []string{"synchronized", "not_synchronized", "unknown"}
 var alarmStates = []string{"clear", "alarm"}
 var presenceStates = []string{"present", "absent"}
@@ -87,6 +91,8 @@ func newCollectorMetrics(store metrix.CollectorStore) *collectorMetrics {
 	environment := meter.Vec("sensor_type", "slot", "sensor")
 	licenses := meter.Vec("feature", "description")
 	ipsecTunnels := meter.Vec("tunnel", "gateway", "remote", "tunnel_id", "protocol", "encryption")
+	ipsecTunnelState := meter.Vec("tunnel", "tunnel_id")
+	ipsecGateway := meter.Vec("gateway", "ike_version")
 	bgpPeer := meter.Vec("vr", "peer_address", "local_address", "remote_as", "peer_group")
 	bgpPrefix := meter.Vec("vr", "peer_address", "local_address", "remote_as", "peer_group", "afi", "safi")
 	bgpVR := meter.Vec("vr")
@@ -122,6 +128,8 @@ func newCollectorMetrics(store metrix.CollectorStore) *collectorMetrics {
 		ipsec: ipsecMetricInstruments{
 			tunnelsActive: meter.Gauge("ipsec_tunnels_active"),
 			saLifetime:    ipsecTunnels.Gauge("ipsec_tunnel_sa_lifetime"),
+			tunnelState:   newStateSetVec(ipsecTunnelState, "ipsec_tunnel_state", ipsecTunnelStates),
+			gatewayState:  newStateSetVec(ipsecGateway, "ipsec_gateway_state", ipsecGatewayStates),
 		},
 		bgp: bgpMetricInstruments{
 			peerState:                  newStateSetVec(bgpPeer, "bgp_peer_state", bgpStates),

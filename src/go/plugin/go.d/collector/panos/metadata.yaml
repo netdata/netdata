@@ -29,7 +29,7 @@ modules:
       data_collection:
         metrics_description: |
           This collector monitors Palo Alto Networks PAN-OS firewalls.
-          It collects read-only XML API telemetry for BGP, system status, HA, environment sensors, licenses, and IPsec SAs.
+          It collects read-only XML API telemetry for BGP, system status, HA, environment sensors, licenses, IPsec SAs, tunnels, and gateways.
         method_description: |
           It gathers metrics by periodically running PAN-OS XML API operational commands through the pango SDK.
       default_behavior:
@@ -39,6 +39,7 @@ modules:
         limits:
           description: |
             The default collection interval is 60 seconds to keep polling load conservative on the PAN-OS management plane.
+            IPsec states describe local VPN state, not end-to-end reachability. On-demand VPNs may have no SA until traffic triggers negotiation.
         performance_impact:
           description: |
             Each collection runs PAN-OS XML API operational requests. The collector uses serial requests and caps the SDK transport to 2 connections per firewall job. Multiple jobs targeting the same firewall multiply that per-job connection budget, so configure one job per firewall management interface unless you intentionally need separate scopes.
@@ -402,6 +403,43 @@ modules:
               chart_type: line
               dimensions:
                 - name: remaining_lifetime
+        - name: IPsec tunnel state
+          description: |
+            These metrics refer to one configured PAN-OS IPsec tunnel, whether or not it currently has an established SA.
+            The collector preserves the PAN-OS flow states `active`, `inactive`, and `init`; `unknown` means an unrecognized nonempty state.
+            Missing state data produces a gap.
+          labels:
+            - name: tunnel
+              description: Tunnel name.
+            - name: tunnel_id
+              description: PAN-OS tunnel identifier.
+          metrics:
+            - name: panos.ipsec.tunnel.state
+              description: IPsec Tunnel State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: active
+                - name: inactive
+                - name: init
+                - name: unknown
+        - name: IPsec gateway
+          description: |
+            These metrics refer to one configured PAN-OS IKE gateway, using the configured inventory and current IKE SA list.
+            A failed or unreadable query produces a gap.
+          labels:
+            - name: gateway
+              description: Gateway name.
+            - name: ike_version
+              description: IKE version the gateway is configured for (`ikev1`, `ikev2`, or `unknown`).
+          metrics:
+            - name: panos.ipsec.gateway.state
+              description: IPsec Gateway State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: up
+                - name: down
         - name: BGP peer
           description: These metrics refer to a single BGP peer on a PAN-OS virtual router or logical router.
           labels:

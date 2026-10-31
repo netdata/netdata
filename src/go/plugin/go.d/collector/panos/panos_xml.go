@@ -13,10 +13,12 @@ type panosResultResponse struct {
 	Status  string               `xml:"status,attr"`
 	Code    string               `xml:"code,attr"`
 	Message panosResponseMessage `xml:"msg"`
-	Result  struct {
-		Message  panosResponseMessage `xml:"msg"`
-		InnerXML string               `xml:",innerxml"`
-	} `xml:"result"`
+	Result  *panosResult         `xml:"result"`
+}
+
+type panosResult struct {
+	Message  panosResponseMessage `xml:"msg"`
+	InnerXML string               `xml:",innerxml"`
 }
 
 func decodePANOSResult(body []byte, context string, dst any) error {
@@ -43,6 +45,9 @@ func decodePANOSResultInner(body []byte, context string) (string, error) {
 	if resp.failed() {
 		return "", panosResponseError{code: resp.Code, message: resp.errorMessage()}
 	}
+	if resp.Result == nil {
+		return "", missingPANOSResultError{expected: "<result>"}
+	}
 	return resp.Result.InnerXML, nil
 }
 
@@ -60,7 +65,11 @@ func (r panosResultResponse) failed() bool {
 }
 
 func (r panosResultResponse) errorMessage() string {
-	return firstNonEmpty(r.Message.String(), r.Result.Message.String(), panosResponseCodeName(r.Code))
+	var resultMessage string
+	if r.Result != nil {
+		resultMessage = r.Result.Message.String()
+	}
+	return firstNonEmpty(r.Message.String(), resultMessage, panosResponseCodeName(r.Code))
 }
 
 type missingPANOSResultError struct {
