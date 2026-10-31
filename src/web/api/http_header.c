@@ -126,6 +126,30 @@ static void http_header_x_auth_token(struct web_client *w, const char *v, size_t
     w->auth_bearer_token = strdupz(v);
 }
 
+static void http_header_cookie(struct web_client *w, const char *v, size_t len __maybe_unused) {
+    // the browser may send multiple cookies with our name - the first one wins
+    if(w->auth.registry_person_guid[0])
+        return;
+
+    const size_t name_len = sizeof(NETDATA_REGISTRY_COOKIE_NAME) - 1;
+
+    while(*v) {
+        while(*v == ';' || *v == ' ') v++;
+
+        const char *pair = v;
+        while(*v && *v != ';') v++;
+
+        if((size_t)(v - pair) > name_len && pair[name_len] == '=' &&
+            strncmp(pair, NETDATA_REGISTRY_COOKIE_NAME, name_len) == 0) {
+            const char *value = &pair[name_len + 1];
+            size_t value_len = v - value;
+            strncpyz(w->auth.registry_person_guid, value,
+                     MIN(value_len, sizeof(w->auth.registry_person_guid) - 1));
+            return;
+        }
+    }
+}
+
 static void http_header_host(struct web_client *w, const char *v, size_t len) {
     char buffer[NI_MAXHOST];
     strncpyz(buffer, v, (len < sizeof(buffer) - 1 ? len : sizeof(buffer) - 1));
@@ -369,6 +393,7 @@ struct {
     { .hash = 0, .key = "User-Agent",            .cb = http_header_user_agent},
     { .hash = 0, .key = "Accept",                .cb = http_header_accept },
     { .hash = 0, .key = "X-Auth-Token",          .cb = http_header_x_auth_token },
+    { .hash = 0, .key = "Cookie",                .cb = http_header_cookie },
     { .hash = 0, .key = "Host",                  .cb = http_header_host },
     { .hash = 0, .key = "Accept-Encoding",       .cb = http_header_accept_encoding },
     { .hash = 0, .key = "X-Forwarded-Host",      .cb = http_header_x_forwarded_host },
