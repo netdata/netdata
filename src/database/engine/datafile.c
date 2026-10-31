@@ -586,6 +586,14 @@ static int scan_data_files(struct rrdengine_instance *ctx)
             char path[RRDENG_PATH_MAX];
 
             netdata_log_error("DBENGINE: deleting invalid data and journal file pair.");
+
+            // a journal v2 loaded before the pair failed is indexed and charged: it must
+            // leave ctx->njfv2idx before the datafile is freed, and go with the pair
+            size_t journal_v2_size = journalfile_v2_data_size_get(journalfile);
+            (void)journalfile_close(journalfile, datafile);
+            if (!journalfile_v2_unlink(journalfile) && journal_v2_size)
+                ctx_current_disk_space_decrease(ctx, journal_v2_size);
+
             ret = journalfile_unlink(journalfile);
             if (!ret) {
                 journalfile_v1_generate_path(datafile, path, sizeof(path));
