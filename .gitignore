@@ -250,6 +250,14 @@ install.sh
 # Local AI/agent planning notes. Durable SOW/spec work lives under .agents/.
 TODO-*.md
 
+# Static build related bits
+packaging/static/cache
+packaging/static/staging
+packaging/static/work
+packaging/static/makeself.lsm
+packaging/static/install-type
+
+# Rust related stuff
 corrosion/
 _deps/
 
