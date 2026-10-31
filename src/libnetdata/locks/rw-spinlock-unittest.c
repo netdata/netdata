@@ -122,18 +122,18 @@ int rw_spinlock_unittest(void) {
 
         rw_spinlock_deadlock_holder_format(buf, sizeof(buf), 100, 200, 200, 0, 0, 0);
         RW_TEST(strcmp(buf, "[holder: writer tid=200, same at the first check, "
-                            "readers=0 (min=0 max=0 over the checks)]") == 0, "holder: same writer");
+                            "reader count=0 (min=0 max=0 over the checks)]") == 0, "holder: same writer");
 
         rw_spinlock_deadlock_holder_format(buf, sizeof(buf), 100, 300, 200, 2, 1, 4);
         RW_TEST(strcmp(buf, "[holder: writer tid=300, was tid=200 at the first check, "
-                            "readers=2 (min=1 max=4 over the checks)]") == 0, "holder: writer changed");
+                            "reader count=2 (min=1 max=4 over the checks)]") == 0, "holder: writer changed");
 
         rw_spinlock_deadlock_holder_format(buf, sizeof(buf), 100, 100, 100, 0, 0, 0);
         RW_TEST(strcmp(buf, "[holder: writer tid=100 (this thread), same at the first check, "
-                            "readers=0 (min=0 max=0 over the checks)]") == 0, "holder: self-deadlock");
+                            "reader count=0 (min=0 max=0 over the checks)]") == 0, "holder: self-deadlock");
 
         rw_spinlock_deadlock_holder_format(buf, sizeof(buf), 100, 0, 0, 3, 3, 3);
-        RW_TEST(strcmp(buf, "[holder: no writer, readers=3 (min=3 max=3 over the checks)]") == 0,
+        RW_TEST(strcmp(buf, "[holder: no writer, reader count=3 (min=3 max=3 over the checks)]") == 0,
                 "holder: readers only");
     }
 

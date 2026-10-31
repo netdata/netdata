@@ -22,15 +22,14 @@ _Static_assert(sizeof(RW_SPINLOCK) == 8, "RW_SPINLOCK must stay 8 bytes");
 // it is embedded in every DICTIONARY (twice) and every RRDSET. So everything else we need is
 // accumulated on the WAITER'S OWN STACK, exactly like the pre-existing deadlock_timestamp local:
 //
-//   - readers_min/readers_max over the deadlock checks: a minimum above zero points at stuck
-//     readers, a minimum of zero at reader churn starving the waiter.
-//   - the writer tid sampled on the first check: the same tid at timeout points at one writer
-//     holding the lock for the whole wait, a different one at writers cycling.
+//   - the reader count, with its min/max over the deadlock checks;
+//   - the writer tid at the first check, to compare with the one at timeout.
 //
-// Both are samples taken once per deadlock check (about a minute apart once backed off), so the
-// message reports them and leaves the conclusion to the reader. writer is also 0 while a waiting
-// writer has only flicked WRITER_BIT on, and briefly during unlock, so "no writer" is not proof
-// that readers block us.
+// These are samples taken once per deadlock check (about a minute apart once backed off), so the
+// message reports them and leaves the conclusion to the reader:
+//   - the reader count includes readers caught mid-attempt (they increment, see a writer, undo);
+//   - writer is 0 while a waiting writer has only flicked WRITER_BIT on, and briefly during unlock;
+//   - the same tid at both checks does not prove one uninterrupted hold.
 //
 // Zero bytes added to the lock, no change to the uncontended fast path.
 typedef struct rw_spinlock_wait {
@@ -44,25 +43,28 @@ typedef struct rw_spinlock_wait {
 
 void rw_spinlock_deadlock_holder_format(char *dst, size_t dst_size, pid_t self, pid_t writer, pid_t first_writer,
                                         uint32_t readers, uint32_t readers_min, uint32_t readers_max) {
-    char writer_txt[80];
-    if (!writer)
-        snprintfz(writer_txt, sizeof(writer_txt), "no writer");
-    else if (writer == first_writer)
-        snprintfz(writer_txt, sizeof(writer_txt), "writer tid=%d%s, same at the first check",
-                  writer, writer == self ? " (this thread)" : "");
-    else
-        snprintfz(writer_txt, sizeof(writer_txt), "writer tid=%d%s, was tid=%d at the first check",
-                  writer, writer == self ? " (this thread)" : "", first_writer);
+    char now_txt[40], first_txt[48];
 
-    snprintfz(dst, dst_size, "[holder: %s, readers=%u (min=%u max=%u over the checks)]",
-              writer_txt, readers, readers_min, readers_max);
+    if (writer)
+        snprintfz(now_txt, sizeof(now_txt), "writer tid=%d%s", writer, writer == self ? " (this thread)" : "");
+    else
+        snprintfz(now_txt, sizeof(now_txt), "no writer");
+
+    if (writer == first_writer)
+        snprintfz(first_txt, sizeof(first_txt), "same at the first check");
+    else if (first_writer)
+        snprintfz(first_txt, sizeof(first_txt), "was tid=%d at the first check", first_writer);
+    else
+        snprintfz(first_txt, sizeof(first_txt), "no writer at the first check");
+
+    snprintfz(dst, dst_size, "[holder: %s, %s, reader count=%u (min=%u max=%u over the checks)]",
+              now_txt, first_txt, readers, readers_min, readers_max);
 }
 
 // Out of line: the inlined lock functions keep only the call, not the message buffers.
 static NEVER_INLINE void rw_spinlock_deadlock_detect(RW_SPINLOCK_WAIT *w, const char *type, const char *func,
                                                      RW_SPINLOCK *rw_spinlock, uint32_t readers_now) {
-    // writer is written with a plain store on acquire, so it can be stale by the time we print it.
-    // It is only ever printed, never dereferenced.
+    // Can be stale by the time we print it; it is only ever printed, never dereferenced.
     pid_t writer_now = __atomic_load_n(&rw_spinlock->writer, __ATOMIC_RELAXED);
 
     if (!w->timestamp) {
@@ -140,7 +142,7 @@ ALWAYS_INLINE void rw_spinlock_read_lock_with_trace(RW_SPINLOCK *rw_spinlock, co
         // Check for deadlock every SPINS_BEFORE_DEADLOCK_CHECK iterations
         if ((spins % SPINS_BEFORE_DEADLOCK_CHECK) == 0) {
             // val still carries the reader count we observed before undoing our own increment;
-            // subtract ourselves so the number describes the OTHER holders.
+            // subtract ourselves so the number describes the other threads counted in the lock.
             uint32_t readers = (val & READER_MASK);
             rw_spinlock_deadlock_detect(&wait, "rw-spinlock read lock", func, rw_spinlock,
                                         readers ? readers - 1 : 0);
@@ -161,7 +163,7 @@ ALWAYS_INLINE bool rw_spinlock_trywrite_lock_with_trace(RW_SPINLOCK *rw_spinlock
     uint32_t old = __atomic_fetch_or(&rw_spinlock->counter, WRITER_BIT, __ATOMIC_ACQUIRE);
 
     if(old == 0) {
-        rw_spinlock->writer = gettid_cached();
+        __atomic_store_n(&rw_spinlock->writer, gettid_cached(), __ATOMIC_RELAXED);
         worker_spinlock_contention(func, 0);
         nd_thread_rwspinlock_write_locked();
         return true;
@@ -191,7 +193,7 @@ ALWAYS_INLINE void rw_spinlock_write_lock_with_trace(RW_SPINLOCK *rw_spinlock, c
 
         // Check if we were the only one
         if (old == 0) {
-            rw_spinlock->writer = gettid_cached();
+            __atomic_store_n(&rw_spinlock->writer, gettid_cached(), __ATOMIC_RELAXED);
             worker_spinlock_contention(func, spins);
             nd_thread_rwspinlock_write_locked();
             return;
@@ -220,7 +222,7 @@ ALWAYS_INLINE void rw_spinlock_write_lock_with_trace(RW_SPINLOCK *rw_spinlock, c
 }
 
 ALWAYS_INLINE void rw_spinlock_write_unlock_with_trace(RW_SPINLOCK *rw_spinlock, const char *func __maybe_unused) {
-    rw_spinlock->writer = 0;
+    __atomic_store_n(&rw_spinlock->writer, 0, __ATOMIC_RELAXED);
     __atomic_and_fetch(&rw_spinlock->counter, ~WRITER_BIT, __ATOMIC_RELEASE);
     nd_thread_rwspinlock_write_unlocked();
 }
