@@ -1,0 +1,42 @@
+version: v1
+context_namespace: cachestat
+groups:
+  - family: cachestat
+    metrics:
+      - ratio
+      - dirty
+      - hit
+      - miss
+    charts:
+      - id: cachestat_ratio
+        title: Hit ratio
+        context: mem.cachestat_ratio
+        units: "%"
+        type: area
+        dimensions:
+          - selector: ratio
+            name: ratio
+      - id: cachestat_dirties
+        title: Number of dirty pages
+        context: mem.cachestat_dirties
+        units: "page/s"
+        type: area
+        dimensions:
+          - selector: dirty
+            name: dirty
+      - id: cachestat_hits
+        title: Number of accessed files
+        context: mem.cachestat_hits
+        units: "hits/s"
+        type: area
+        dimensions:
+          - selector: hit
+            name: hit
+      - id: cachestat_misses
+        title: Files out of page cache
+        context: mem.cachestat_misses
+        units: "misses/s"
+        type: area
+        dimensions:
+          - selector: miss
+            name: miss
