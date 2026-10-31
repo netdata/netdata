@@ -299,6 +299,7 @@ uint8_t journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, st
 int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
 int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile,
                      struct rrdengine_datafile *datafile);
+int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
 void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile);
 bool journalfile_v2_rebuild_from_v1(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile);
 bool journalfile_v2_samples_descriptor(const uint8_t *data_start, size_t file_size, struct journal_v2_samples_descriptor *out);
