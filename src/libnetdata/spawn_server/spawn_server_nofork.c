@@ -23,68 +23,37 @@ pid_t spawn_server_pid(SPAWN_SERVER *server) { return server->server_pid; }
 extern char **environ;
 #endif
 
-static size_t spawn_server_id = 0;
 static volatile sig_atomic_t spawn_server_exit = false;
 static volatile sig_atomic_t spawn_server_sigchld = false;
 static SPAWN_REQUEST *spawn_server_requests = NULL;
 
 #define SPAWN_SERVER_IOV_MAX 10
 
-static size_t spawn_server_max_unix_socket_path_length(void) {
-    struct sockaddr_un server_addr = { 0 };
-    return sizeof(server_addr.sun_path) - 1;
-}
+// The server writes this byte on a request socket as soon as it receives it.
+#define SPAWN_SERVER_REQUEST_ACK 'A'
+#define SPAWN_SERVER_REQUEST_ACK_TIMEOUT_UT (10 * USEC_PER_SEC)
 
-static bool spawn_server_set_unix_socket_path(struct sockaddr_un *server_addr, const char *path, bool log, const char *action) {
-    const size_t max_path_length = sizeof(server_addr->sun_path) - 1;
-
-    if(strlen(path) > max_path_length) {
-        errno = ENAMETOOLONG;
-        if(log)
-            nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                   "%s '%s': exceeds the %zu-byte AF_UNIX limit",
-                   action, path, max_path_length);
+// Use the socketpair flag when the running kernel accepts it. The fallback also
+// works on older kernels and BSDs; spawn children explicitly close unwanted FDs.
+static bool spawn_server_socketpair(int type, int fds[2]) {
+#ifdef SOCK_CLOEXEC
+    if(socketpair(AF_UNIX, type | SOCK_CLOEXEC, 0, fds) == 0)
+        return true;
+    if(errno != EINVAL && errno != EPROTONOSUPPORT)
         return false;
-    }
+#endif
+    if(socketpair(AF_UNIX, type, 0, fds) != 0)
+        return false;
 
-    strncpyz(server_addr->sun_path, path, max_path_length);
-    return true;
-}
+    if(sock_setcloexec(fds[0], true) == 1 && sock_setcloexec(fds[1], true) == 1)
+        return true;
 
-// --------------------------------------------------------------------------------------------------------------------
-
-static int connect_to_spawn_server(const char *path, bool log) {
-    int sock = -1;
-    struct sockaddr_un server_addr = {
-        .sun_family = AF_UNIX,
-    };
-
-    if(!spawn_server_set_unix_socket_path(&server_addr, path, log,
-                                          "SPAWN PARENT: Cannot connect() to spawn server on path"))
-        return -1;
-
-    if ((sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
-        if(log) {
-            int error = errno;
-            nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                   "SPAWN PARENT: cannot create socket() to connect to spawn server: %s (%d).",
-                   strerror(error), error);
-        }
-        return -1;
-    }
-
-    if (connect(sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
-        if(log) {
-            int error = errno;
-            nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                   "SPAWN PARENT: cannot connect() to spawn server on path '%s': %s (%d).",
-                   path, strerror(error), error);
-        }
-        close(sock);
-        return -1;
-    }
-
-    return sock;
+    int saved_errno = errno;
+    close(fds[0]);
+    close(fds[1]);
+    fds[0] = fds[1] = -1;
+    errno = saved_errno;
+    return false;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -178,7 +147,6 @@ typedef enum {
     STATUS_REPORT_STARTED,
     STATUS_REPORT_FAILED,
     STATUS_REPORT_EXITED,
-    STATUS_REPORT_PING,
 } STATUS_REPORT;
 
 #define STATUS_REPORT_MAGIC 0xBADA55EE
@@ -200,17 +168,6 @@ struct status_report {
         } exited;
     };
 };
-
-static void spawn_server_send_status_ping(int sock) {
-    struct status_report sr = {
-        .magic = STATUS_REPORT_MAGIC,
-        .status = STATUS_REPORT_PING,
-    };
-
-    if(write(sock, &sr, sizeof(sr)) != sizeof(sr))
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-            "SPAWN SERVER: Cannot send ping reply.");
-}
 
 static void spawn_server_send_status_success(SPAWN_REQUEST *rq) {
     const struct status_report sr = {
@@ -467,7 +424,7 @@ static bool spawn_server_run_callback(SPAWN_SERVER *server __maybe_unused, SPAWN
         }
 
         // close the server sockets;
-        close(server->sock); server->sock = -1;
+        close(server->control_peer_fd); server->control_peer_fd = -1;
         if(server->pipe[0] != -1) { close(server->pipe[0]); server->pipe[0] = -1; }
         if(server->pipe[1] != -1) { close(server->pipe[1]); server->pipe[1] = -1; }
 
@@ -578,7 +535,6 @@ static void spawn_server_execute_request(SPAWN_SERVER *server, SPAWN_REQUEST *rq
 typedef enum __attribute__((packed)) {
     SPAWN_SERVER_MSG_INVALID = 0,
     SPAWN_SERVER_MSG_REQUEST,
-    SPAWN_SERVER_MSG_PING,
 } SPAWN_SERVER_MSG;
 
 static void spawn_server_close_received_fds(void *control, size_t controllen) {
@@ -808,56 +764,167 @@ static bool spawn_server_sendmsg_fully(int sock, const struct iovec *iov, size_t
     return true;
 }
 
-static bool spawn_server_is_running(const char *path) {
-    struct iovec iov[7];
-    SPAWN_SERVER_MSG msg_type = SPAWN_SERVER_MSG_PING;
-    size_t dummy_size = 0;
-    SPAWN_INSTANCE_TYPE dummy_type = 0;
-    ND_UUID magic = UUID_ZERO;
+// One datagram carries one descriptor. No stream framing or cross-thread lock is
+// needed: each sendmsg is one record, and request data uses its own stream pair.
+static bool spawn_server_send_control_fd(int control_fd, int request_fd) {
+    char marker = 'R';
+    struct iovec iov = { .iov_base = &marker, .iov_len = sizeof(marker) };
+    char control[CMSG_SPACE(sizeof(int))] __attribute__((aligned(sizeof(size_t))));
+    struct msghdr msg = { .msg_iov = &iov, .msg_iovlen = 1,
+                          .msg_control = control, .msg_controllen = sizeof(control) };
+    struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
+    cmsg->cmsg_level = SOL_SOCKET;
+    cmsg->cmsg_type = SCM_RIGHTS;
+    cmsg->cmsg_len = CMSG_LEN(sizeof(int));
+    memcpy(CMSG_DATA(cmsg), &request_fd, sizeof(request_fd));
 
-    iov[0].iov_base = &msg_type;
-    iov[0].iov_len = sizeof(msg_type);
+    // The server can be stuck receiving another caller's incomplete request.
+    // Do not let a full control queue block every other calling thread forever.
+    usec_t deadline = now_monotonic_usec() + 2 * USEC_PER_SEC;
+    for(;;) {
+#ifdef MSG_NOSIGNAL
+        ssize_t sent = sendmsg(control_fd, &msg, MSG_NOSIGNAL);
+#else
+        ssize_t sent = sendmsg(control_fd, &msg, 0);
+#endif
+        if(sent == sizeof(marker))
+            return true;
+        int send_errno = sent < 0 ? errno : 0;
+        if(send_errno == EINTR)
+            continue;
 
-    iov[1].iov_base = magic.uuid;
-    iov[1].iov_len = sizeof(magic.uuid);
+        bool queue_full = send_errno == EAGAIN || send_errno == EWOULDBLOCK;
+#if defined(OS_MACOS) || defined(OS_FREEBSD)
+        // A full datagram queue reports ENOBUFS here, and POLLOUT does not wait for room.
+        bool no_buffers = send_errno == ENOBUFS;
+        queue_full = queue_full || no_buffers;
+#endif
 
-    iov[2].iov_base = &dummy_size;
-    iov[2].iov_len = sizeof(dummy_size);
-
-    iov[3].iov_base = &dummy_size;
-    iov[3].iov_len = sizeof(dummy_size);
-
-    iov[4].iov_base = &dummy_size;
-    iov[4].iov_len = sizeof(dummy_size);
-
-    iov[5].iov_base = &dummy_size;
-    iov[5].iov_len = sizeof(dummy_size);
-
-    iov[6].iov_base = &dummy_type;
-    iov[6].iov_len = sizeof(dummy_type);
-
-    int sock = connect_to_spawn_server(path, false);
-    if(sock == -1)
-        return false;
-
-    if(!spawn_server_sendmsg_fully(sock, iov, 7, NULL, 0, "spawn server ping")) {
-        close(sock);
-        return false;
+        if(queue_full) {
+            if(now_monotonic_usec() >= deadline) {
+                errno = ETIMEDOUT;
+                break;
+            }
+#if defined(OS_MACOS) || defined(OS_FREEBSD)
+            if(no_buffers) {
+                sleep_usec(10 * USEC_PER_MS);
+                continue;
+            }
+#endif
+            struct pollfd pfd = { .fd = control_fd, .events = POLLOUT };
+            if(poll(&pfd, 1, 100) < 0 && errno != EINTR)
+                break;
+            continue;
+        }
+        break;
     }
 
-    // Receive response
-    struct status_report sr = { 0 };
-    if (read(sock, &sr, sizeof(sr)) != sizeof(sr)) {
-        // cannot receive a ping reply
-        close(sock);
-        return false;
-    }
-
-    close(sock);
-    return sr.status == STATUS_REPORT_PING;
+    nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: cannot pass request socket to spawn server");
+    return false;
 }
 
-static bool spawn_server_send_request(ND_UUID *magic, SPAWN_REQUEST *request) {
+static int spawn_server_receive_control_fd(int control_fd) {
+    char marker = 0;
+    struct iovec iov = { .iov_base = &marker, .iov_len = sizeof(marker) };
+    char control[CMSG_SPACE(sizeof(int) * 4)] __attribute__((aligned(sizeof(size_t))));
+    struct msghdr msg = { .msg_iov = &iov, .msg_iovlen = 1,
+                          .msg_control = control, .msg_controllen = sizeof(control) };
+    ssize_t received;
+    do {
+        received = recvmsg(control_fd, &msg, 0);
+    } while(received < 0 && errno == EINTR);
+
+    if(received < 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: cannot receive control message");
+        return -1;
+    }
+
+    struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
+    if(received != sizeof(marker) || marker != 'R' || (msg.msg_flags & (MSG_TRUNC | MSG_CTRUNC)) ||
+       !cmsg || cmsg->cmsg_level != SOL_SOCKET || cmsg->cmsg_type != SCM_RIGHTS ||
+       cmsg->cmsg_len != CMSG_LEN(sizeof(int)) || CMSG_NXTHDR(&msg, cmsg)) {
+        spawn_server_close_received_fds(control, msg.msg_controllen);
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: invalid control message");
+        return -1;
+    }
+
+    int request_fd;
+    memcpy(&request_fd, CMSG_DATA(cmsg), sizeof(request_fd));
+    if(sock_setcloexec(request_fd, true) != 1) {
+        close(request_fd);
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: cannot set close-on-exec on request socket");
+        return -1;
+    }
+
+    // Tell the creator we hold the socket, so it can close its copy. A creator
+    // that already gave up has closed both ends, and this write fails.
+    char ack = SPAWN_SERVER_REQUEST_ACK;
+    ssize_t written;
+    do {
+        written = write(request_fd, &ack, sizeof(ack));
+    } while(written < 0 && errno == EINTR);
+
+    if(written != sizeof(ack)) {
+        close(request_fd);
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: cannot acknowledge request socket");
+        return -1;
+    }
+
+    return request_fd;
+}
+
+// The creator keeps its copy of the request socket until the server has it.
+// macOS garbage-collects a unix socket that is referenced only by a message
+// queued on another socket which is not itself in transit, such as the control
+// channel: the queued request is flushed and the server reads end-of-file.
+static bool spawn_server_wait_request_ack(SPAWN_SERVER *server, int sock) {
+    usec_t deadline = now_monotonic_usec() + server->request_ack_timeout_ut;
+    struct pollfd fds[2] = {
+        { .fd = sock, .events = POLLIN },
+        // the server holds the only write end of the status pipe: any event means it exited
+        { .fd = server->pipe[0], .events = POLLIN },
+    };
+
+    for(;;) {
+        usec_t now = now_monotonic_usec();
+        if(now >= deadline) {
+            errno = ETIMEDOUT;
+            break;
+        }
+
+        int ret = poll(fds, 2, (int)((deadline - now + USEC_PER_MS - 1) / USEC_PER_MS));
+        if(ret < 0) {
+            if(errno == EINTR)
+                continue;
+            break;
+        }
+
+        if(fds[0].revents) {
+            char ack = 0;
+            ssize_t bytes;
+            do {
+                bytes = read(sock, &ack, sizeof(ack));
+            } while(bytes < 0 && errno == EINTR);
+
+            if(bytes == sizeof(ack) && ack == SPAWN_SERVER_REQUEST_ACK)
+                return true;
+
+            if(bytes >= 0)
+                errno = bytes ? EPROTO : EPIPE;
+            break;
+        }
+
+        if(fds[1].revents) {
+            errno = EPIPE;
+            break;
+        }
+    }
+
+    nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: spawn server did not take the request socket");
+    return false;
+}
+
+static bool spawn_server_send_request(SPAWN_REQUEST *request) {
     bool ret = false;
 
     size_t env_size = 0;
@@ -872,40 +939,37 @@ static bool spawn_server_send_request(ND_UUID *magic, SPAWN_REQUEST *request) {
     char cmsgbuf[CMSG_SPACE(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS)] __attribute__((aligned(sizeof(size_t))));
     struct iovec iov[SPAWN_SERVER_IOV_MAX];
 
-    // We send 1 request with 10 iovec in it
+    // We send 1 request with 9 iovec in it
     // The request will be received in 2 parts
     // 1. the first 6 iovec which include the sizes of the memory allocations required
-    // 2. the last 4 iovec which require the memory allocations to be received
+    // 2. the last 3 iovec which require the memory allocations to be received
 
     iov[0].iov_base = &msg_type;
     iov[0].iov_len = sizeof(msg_type);
 
-    iov[1].iov_base = magic->uuid;
-    iov[1].iov_len = sizeof(magic->uuid);
+    iov[1].iov_base = &request->request_id;
+    iov[1].iov_len = sizeof(request->request_id);
 
-    iov[2].iov_base = &request->request_id;
-    iov[2].iov_len = sizeof(request->request_id);
+    iov[2].iov_base = &env_size;
+    iov[2].iov_len = sizeof(env_size);
 
-    iov[3].iov_base = &env_size;
-    iov[3].iov_len = sizeof(env_size);
+    iov[3].iov_base = &argv_size;
+    iov[3].iov_len = sizeof(argv_size);
 
-    iov[4].iov_base = &argv_size;
-    iov[4].iov_len = sizeof(argv_size);
+    iov[4].iov_base = &request->data_size;
+    iov[4].iov_len = sizeof(request->data_size);
 
-    iov[5].iov_base = &request->data_size;
-    iov[5].iov_len = sizeof(request->data_size);
+    iov[5].iov_base = &request->type;
+    iov[5].iov_len = sizeof(request->type);
 
-    iov[6].iov_base = &request->type;  // Added this line
-    iov[6].iov_len = sizeof(request->type);
+    iov[6].iov_base = encoded_env;
+    iov[6].iov_len = env_size;
 
-    iov[7].iov_base = encoded_env;
-    iov[7].iov_len = env_size;
+    iov[7].iov_base = encoded_argv;
+    iov[7].iov_len = argv_size;
 
-    iov[8].iov_base = encoded_argv;
-    iov[8].iov_len = argv_size;
-
-    iov[9].iov_base = (char *)request->data;
-    iov[9].iov_len = request->data_size;
+    iov[8].iov_base = (char *)request->data;
+    iov[8].iov_len = request->data_size;
 
     msg.msg_control = cmsgbuf;
     msg.msg_controllen = CMSG_SPACE(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS);
@@ -917,7 +981,7 @@ static bool spawn_server_send_request(ND_UUID *magic, SPAWN_REQUEST *request) {
 
     memcpy(CMSG_DATA(cmsg), request->fds, sizeof(int) * SPAWN_SERVER_TRANSFER_FDS);
 
-    if(!spawn_server_sendmsg_fully(request->sock, iov, 10, cmsgbuf, CMSG_SPACE(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS),
+    if(!spawn_server_sendmsg_fully(request->sock, iov, 9, cmsgbuf, CMSG_SPACE(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS),
                                    "request to spawn server"))
         goto cleanup;
 
@@ -933,13 +997,12 @@ cleanup:
 
 static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
     struct msghdr msg = {0};
-    struct iovec iov[7];
+    struct iovec iov[6];
     SPAWN_SERVER_MSG msg_type = SPAWN_SERVER_MSG_INVALID;
     size_t request_id;
     size_t env_size;
     size_t argv_size;
     size_t data_size;
-    ND_UUID magic = UUID_ZERO;
     SPAWN_INSTANCE_TYPE type;
     char cmsgbuf[CMSG_SPACE(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS)] __attribute__((aligned(sizeof(size_t))));
     char *envp_encoded = NULL, *argv_encoded = NULL, *data = NULL;
@@ -950,40 +1013,30 @@ static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
     iov[0].iov_base = &msg_type;
     iov[0].iov_len = sizeof(msg_type);
 
-    iov[1].iov_base = magic.uuid;
-    iov[1].iov_len = sizeof(magic.uuid);
+    iov[1].iov_base = &request_id;
+    iov[1].iov_len = sizeof(request_id);
 
-    iov[2].iov_base = &request_id;
-    iov[2].iov_len = sizeof(request_id);
+    iov[2].iov_base = &env_size;
+    iov[2].iov_len = sizeof(env_size);
 
-    iov[3].iov_base = &env_size;
-    iov[3].iov_len = sizeof(env_size);
+    iov[3].iov_base = &argv_size;
+    iov[3].iov_len = sizeof(argv_size);
 
-    iov[4].iov_base = &argv_size;
-    iov[4].iov_len = sizeof(argv_size);
+    iov[4].iov_base = &data_size;
+    iov[4].iov_len = sizeof(data_size);
 
-    iov[5].iov_base = &data_size;
-    iov[5].iov_len = sizeof(data_size);
-
-    iov[6].iov_base = &type;
-    iov[6].iov_len = sizeof(type);
+    iov[5].iov_base = &type;
+    iov[5].iov_len = sizeof(type);
 
     msg.msg_iov = iov;
-    msg.msg_iovlen = 7;
+    msg.msg_iovlen = 6;
     msg.msg_control = cmsgbuf;
     msg.msg_controllen = sizeof(cmsgbuf);
 
     memset(cmsgbuf, 0, sizeof(cmsgbuf));
     size_t received_controllen = 0;
-    if(!spawn_server_recvmsg_fully(sock, iov, 7, cmsgbuf, sizeof(cmsgbuf), &received_controllen,
+    if(!spawn_server_recvmsg_fully(sock, iov, 6, cmsgbuf, sizeof(cmsgbuf), &received_controllen,
                                    "the first part of the request")) {
-        close(sock);
-        return;
-    }
-
-    if(msg_type == SPAWN_SERVER_MSG_PING) {
-        spawn_server_close_received_fds(cmsgbuf, received_controllen);
-        spawn_server_send_status_ping(sock);
         close(sock);
         return;
     }
@@ -1027,14 +1080,6 @@ static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
             "SPAWN SERVER: invalid file descriptors received, stdin = %d, stdout = %d, stderr = %d",
             stdin_fd, stdout_fd, stderr_fd);
-        goto cleanup;
-    }
-
-    if(!UUIDeq(magic, server->magic)) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-            "SPAWN SERVER: Invalid authorization key for request %zu. "
-            "Rejecting request.",
-            request_id);
         goto cleanup;
     }
 
@@ -1334,7 +1379,7 @@ static int spawn_server_event_loop(SPAWN_SERVER *server) {
     }
 
     struct pollfd fds[2];
-    fds[0].fd = server->sock;
+    fds[0].fd = server->control_peer_fd;
     fds[0].events = POLLIN;
     fds[1].fd = pipe_fd;
     fds[1].events = POLLHUP | POLLERR;
@@ -1362,23 +1407,16 @@ static int spawn_server_event_loop(SPAWN_SERVER *server) {
         }
 
         if (fds[0].revents & POLLIN) {
-            int sock = accept(server->sock, NULL, NULL);
-            if (sock == -1) {
-                nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: accept() failed");
-                continue;
-            }
-
-            // do not fork this socket
-            sock_setcloexec(sock, true);
-
-            // receive the request and process it
-            spawn_server_receive_request(sock, server);
+            int sock = spawn_server_receive_control_fd(server->control_peer_fd);
+            if(sock != -1)
+                spawn_server_receive_request(sock, server);
         }
+
+        if(fds[0].revents & (POLLHUP | POLLERR | POLLNVAL))
+            break;
     }
 
     // Cleanup before exiting
-    unlink(server->path);
-
     // stop all children
     if(spawn_server_requests) {
         spawn_server_signal_all_children(SIGTERM);
@@ -1402,63 +1440,19 @@ static int spawn_server_event_loop(SPAWN_SERVER *server) {
 // management of the spawn server
 
 void spawn_server_destroy(SPAWN_SERVER *server) {
+    if(!server) return;
     if(server->pipe[0] != -1) close(server->pipe[0]);
     if(server->pipe[1] != -1) close(server->pipe[1]);
-    if(server->sock != -1) close(server->sock);
+    if(server->control_fd != -1) close(server->control_fd);
+    if(server->control_peer_fd != -1) close(server->control_peer_fd);
 
     if(server->server_pid) {
         kill(server->server_pid, SIGTERM);
         waitpid(server->server_pid, NULL, 0);
     }
 
-    if(server->path) {
-        unlink(server->path);
-        freez(server->path);
-    }
-
     freez((void *)server->name);
     freez(server);
-}
-
-static bool spawn_server_create_listening_socket(SPAWN_SERVER *server) {
-    if(spawn_server_is_running(server->path)) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Server is already listening on path '%s'", server->path);
-        return false;
-    }
-
-    struct sockaddr_un server_addr = {
-        .sun_family = AF_UNIX,
-    };
-
-    if(!spawn_server_set_unix_socket_path(&server_addr, server->path, true,
-                                          "SPAWN SERVER: Cannot listen on path"))
-        return false;
-
-    if ((server->sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
-        int error = errno;
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to create socket(): %s (%d)", strerror(error), error);
-        return false;
-    }
-
-    unlink(server->path);
-    errno = 0;
-
-    if (bind(server->sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
-        int error = errno;
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to bind(): %s (%d)", strerror(error), error);
-        return false;
-    }
-
-    if (listen(server->sock, SOMAXCONN) == -1) {
-        int error = errno;
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to listen(): %s (%d)", strerror(error), error);
-        return false;
-    }
-
-    if(chmod(server->path, 0770) != 0)
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: failed to chmod '%s' to 0770", server->path);
-
-    return true;
 }
 
 static void replace_stdio_with_dev_null() {
@@ -1492,82 +1486,28 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name
     SPAWN_SERVER *server = callocz(1, sizeof(SPAWN_SERVER));
     server->pipe[0] = -1;
     server->pipe[1] = -1;
-    server->sock = -1;
+    server->control_fd = -1;
+    server->control_peer_fd = -1;
     server->cb = child_callback;
     server->argc = argc;
     server->argv = argv;
     server->options = options;
-    server->id = __atomic_add_fetch(&spawn_server_id, 1, __ATOMIC_RELAXED);
-    os_uuid_generate_random(server->magic.uuid);
+    server->creator_pid = getpid();
+    server->request_ack_timeout_ut = SPAWN_SERVER_REQUEST_ACK_TIMEOUT_UT;
 
-    const char *runtime_directory = getenv("NETDATA_RUN_DIR");
-    if(!runtime_directory || !*runtime_directory)
-        runtime_directory = os_run_dir(true);
+    server->name = strdupz(name && *name ? name : "unnamed");
 
-    if (runtime_directory) {
-        struct stat statbuf;
-
-        if(!*runtime_directory)
-            // it is empty
-                runtime_directory = NULL;
-
-        else if (stat(runtime_directory, &statbuf) == 0 && S_ISDIR(statbuf.st_mode)) {
-            // it exists and it is a directory
-
-            if (access(runtime_directory, W_OK) != 0) {
-                // it is not writable by us
-                nd_log(NDLS_COLLECTORS, NDLP_ERR, "Runtime directory '%s' is not writable, falling back to '/tmp'", runtime_directory);
-                runtime_directory = NULL;
-            }
-        }
-        else {
-            // it does not exist
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Runtime directory '%s' does not exist, falling back to '/tmp'", runtime_directory);
-            runtime_directory = NULL;
-        }
-    }
-    if(!runtime_directory)
-        runtime_directory = "/tmp";
-
-    char path[1024];
-    int path_length;
-    const size_t max_path_length = spawn_server_max_unix_socket_path_length();
-    if(name && *name) {
-        server->name = strdupz(name);
-        path_length = snprintf(path, sizeof(path), "%s/netdata-spawn-%s.sock", runtime_directory, name);
-    }
-    else {
-        server->name = strdupz("unnamed");
-        path_length = snprintf(path, sizeof(path), "%s/netdata-spawn-%d-%zu.sock", runtime_directory, getpid(), server->id);
-    }
-
-    if(path_length < 0) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-               "SPAWN SERVER: failed to generate socket path for '%s'",
-               server->name);
+    int control[2] = { -1, -1 };
+    if(!spawn_server_socketpair(SOCK_DGRAM, control)) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: cannot create private control socketpair");
         goto cleanup;
     }
-
-    if((size_t)path_length >= sizeof(path)) {
-        errno = ENAMETOOLONG;
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-               "SPAWN SERVER: socket path for '%s' in runtime directory '%s' was truncated (needed %d chars plus NUL, buffer is %zu bytes)",
-               server->name, runtime_directory, path_length, sizeof(path));
+    server->control_fd = control[0];
+    server->control_peer_fd = control[1];
+    if(sock_setnonblock(server->control_fd, true) != 1) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: cannot make control socket nonblocking");
         goto cleanup;
     }
-
-    if((size_t)path_length > max_path_length) {
-        errno = ENAMETOOLONG;
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-               "SPAWN SERVER: socket path for '%s' in runtime directory '%s' exceeds the %zu-byte AF_UNIX limit",
-               server->name, runtime_directory, max_path_length);
-        goto cleanup;
-    }
-
-    server->path = strdupz(path);
-
-    if (!spawn_server_create_listening_socket(server))
-        goto cleanup;
 
     if (pipe(server->pipe) == -1) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Cannot create status pipe()");
@@ -1577,6 +1517,8 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name
     pid_t pid = fork();
     if (pid == 0) {
         // the child - the spawn server
+
+        close(server->control_fd); server->control_fd = -1;
 
         char buf[16];
         snprintfz(buf, sizeof(buf), "spawn-%s", server->name);
@@ -1588,7 +1530,7 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name
             dup2(nd_log_collectors_fd(), STDERR_FILENO);
 
         int fds_to_keep[] = {
-            server->sock,
+            server->control_peer_fd,
             server->pipe[1],
             nd_log_systemd_journal_fd(),
         };
@@ -1599,7 +1541,7 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name
     else if (pid > 0) {
         // the parent
         server->server_pid = pid;
-        close(server->sock); server->sock = -1;
+        close(server->control_peer_fd); server->control_peer_fd = -1;
         close(server->pipe[1]); server->pipe[1] = -1;
 
         struct status_report sr = { 0 };
@@ -1828,12 +1770,20 @@ int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int t
 
 SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custom_fd, const char **argv, const void *data, size_t data_size, SPAWN_INSTANCE_TYPE type) {
     if(!server) return NULL;
+    // Forked descendants may inherit the descriptor, but must not use this API
+    // to submit work to their creator's server.
+    if(getpid() != server->creator_pid) {
+        errno = EPERM;
+        return NULL;
+    }
 
     int pipe_stdin[2] = { -1, -1 }, pipe_stdout[2] = { -1, -1 };
+    int request_pair[2] = { -1, -1 };
 
     SPAWN_INSTANCE *instance = callocz(1, sizeof(SPAWN_INSTANCE));
     instance->read_fd = -1;
     instance->write_fd = -1;
+    instance->sock = -1;
     instance->process_group = type == SPAWN_INSTANCE_TYPE_EXEC_GROUP;
 
     if(argv) {
@@ -1841,9 +1791,11 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
         instance->cmdline = strdupz(buffer_tostring(wb));
     }
 
-    instance->sock = connect_to_spawn_server(server->path, true);
-    if(instance->sock == -1)
+    if(!spawn_server_socketpair(SOCK_STREAM, request_pair)) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: cannot create request socketpair");
         goto cleanup;
+    }
+    instance->sock = request_pair[0]; request_pair[0] = -1;
 
     if (pipe(pipe_stdin) == -1) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: Cannot create stdin pipe()");
@@ -1871,7 +1823,12 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
         .type = type
     };
 
-    if(!spawn_server_send_request(&server->magic, &request))
+    if(!spawn_server_send_control_fd(server->control_fd, request_pair[1]) ||
+       !spawn_server_wait_request_ack(server, instance->sock))
+        goto cleanup;
+    close(request_pair[1]); request_pair[1] = -1;
+
+    if(!spawn_server_send_request(&request))
         goto cleanup;
 
     close(pipe_stdin[0]); pipe_stdin[0] = -1;
@@ -1928,6 +1885,8 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     }
 
 cleanup:
+    if(request_pair[0] >= 0) close(request_pair[0]);
+    if(request_pair[1] >= 0) close(request_pair[1]);
     if (pipe_stdin[0] >= 0) close(pipe_stdin[0]);
     if (pipe_stdin[1] >= 0) close(pipe_stdin[1]);
     if (pipe_stdout[0] >= 0) close(pipe_stdout[0]);

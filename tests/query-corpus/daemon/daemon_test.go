@@ -210,16 +210,15 @@ func TestDaemonRejectsLongRuntimePathBeforeLaunch(t *testing.T) {
 
 func TestRuntimeSocketPathLimits(t *testing.T) {
 	maxPathBytes := len(syscall.RawSockaddrUnix{}.Path) - 1
-	maxRunBytes := maxPathBytes - len("/netdata-spawn-plugins.sock")
+	maxRunBytes := maxPathBytes - len("/netdata.pipe")
 	for _, tc := range []struct {
 		name, runDir, rejectedSocket string
 	}{
 		{"boundary", "/" + strings.Repeat("x", maxRunBytes-1), ""},
-		{"spawn-only-overflow", "/" + strings.Repeat("x", maxRunBytes), "netdata-spawn-plugins.sock"},
-		{"unclean-spawn-path", strings.Repeat("/", maxRunBytes) + "x", "netdata-spawn-plugins.sock"},
-		{"cli-overflow", "/" + strings.Repeat("x", maxPathBytes-len("/netdata.pipe")), "netdata.pipe"},
+		{"cli-overflow", "/" + strings.Repeat("x", maxRunBytes), "netdata.pipe"},
+		{"unclean-path-cleaned", strings.Repeat("/", maxRunBytes) + "x", ""},
 		{"multibyte-boundary", "/" + strings.Repeat("é", (maxRunBytes-1)/2) + strings.Repeat("x", (maxRunBytes-1)%2), ""},
-		{"multibyte-overflow", "/" + strings.Repeat("é", (maxRunBytes+1)/2), "netdata-spawn-plugins.sock"},
+		{"multibyte-overflow", "/" + strings.Repeat("é", (maxRunBytes+1)/2), "netdata.pipe"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			err := validateRuntimeSocketPaths(tc.runDir)

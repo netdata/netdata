@@ -358,17 +358,11 @@ func (d *Daemon) cleanupRuntime() error {
 
 func validateRuntimeSocketPaths(runDir string) error {
 	maxPathBytes := len(syscall.RawSockaddrUnix{}.Path) - 1
-	// main.c starts the init/plugins spawn servers; external collectors are disabled.
-	// The spawn server appends to NETDATA_RUN_DIR without cleaning its path.
-	for _, path := range []string{
-		filepath.Join(runDir, "netdata.pipe"),
-		runDir + "/netdata-spawn-init.sock",
-		runDir + "/netdata-spawn-plugins.sock",
-	} {
-		if len(path) > maxPathBytes {
-			return fmt.Errorf("daemon: IPC socket path %q is %d bytes, exceeds the %d-byte Unix-socket limit; set TMPDIR to a shorter directory",
-				path, len(path), maxPathBytes)
-		}
+	// The CLI socket is the daemon's only pathname socket; external collectors are disabled.
+	path := filepath.Join(runDir, "netdata.pipe")
+	if len(path) > maxPathBytes {
+		return fmt.Errorf("daemon: IPC socket path %q is %d bytes, exceeds the %d-byte Unix-socket limit; set TMPDIR to a shorter directory",
+			path, len(path), maxPathBytes)
 	}
 	return nil
 }

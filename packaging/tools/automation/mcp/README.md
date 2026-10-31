@@ -54,7 +54,7 @@ Each agent gets an isolated runtime dir **`~/opt/netdata-mcp/run/<agent-id>/`**
 (`etc`, `cache`, `lib`, `log`, `run`) and a generated `netdata.conf` (ram db, isolated
 `[directories]`, bind `127.0.0.1`); netdata launches as
 `<install>/usr/sbin/netdata -D -p <port> -c <conf>` with `NETDATA_RUN_DIR=<run dir>/run`,
-so its spawn-server and plugin sockets never collide with another agent's (without it
+so its plugin sockets and other runtime files never collide with another agent's (without it
 every agent falls back to the shared `/tmp/netdata`). Unix socket paths are limited to
 107 bytes, so `netdata_agent_declare` refuses an agent id that would push the longest
 of them past it (about 35 chars under a short `/home/<user>`). Readiness is probed via
