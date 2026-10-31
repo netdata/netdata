@@ -55,6 +55,7 @@ func Declarations() []funcapi.FunctionConfig {
 				UpdateEvery:    spec.every,
 				Help:           spec.help,
 				Tags:           "rum",
+				RequireCloud:   true,
 				RawRequest:     true,
 				ManagedInfo:    true,
 				HasHistory:     spec.history,
