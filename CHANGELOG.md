@@ -322,6 +322,12 @@
 - Regenerate integrations docs ([#24326](https://github.com/netdata/netdata/issues/24326))
 - Contexts: hold the chart while reading instance labels ([#24474](https://github.com/netdata/netdata/issues/24474))
 - Feat(dem): support independent browser runtime releases ([#24500](https://github.com/netdata/netdata/issues/24500))
+- Dbengine unittest: do not leave the default memory mode set to dbengine ([#24503](https://github.com/netdata/netdata/issues/24503))
+- Regenerate integrations docs ([#24502](https://github.com/netdata/netdata/issues/24502))
+- Update netdata-updater.sh to use new artifact hosting. ([#24445](https://github.com/netdata/netdata/issues/24445))
+- FreeBSD network metrics ([#24459](https://github.com/netdata/netdata/issues/24459))
+- Regenerate integrations docs ([#24508](https://github.com/netdata/netdata/issues/24508))
+- Ml: keep the dimension anomaly score threshold reachable ([#24499](https://github.com/netdata/netdata/issues/24499))
 
 ## [2.12.0] - 2026-09-30
 
