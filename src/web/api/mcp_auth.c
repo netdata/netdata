@@ -14,10 +14,10 @@ static char mcp_dev_preview_api_key[MCP_DEV_PREVIEW_API_KEY_LENGTH + 1] = "";
 static bool mcp_api_key_generate_and_save(void) {
     nd_uuid_t uuid;
     uuid_generate_random(uuid);
-    
+
     // Unparse directly to the destination buffer
     uuid_unparse_lower(uuid, mcp_dev_preview_api_key);
-    
+
     // Construct full path
     char path[PATH_MAX];
     snprintf(path, sizeof(path), "%s/%s", netdata_configured_varlib_dir, MCP_DEV_PREVIEW_API_KEY_FILENAME);

@@ -35,75 +35,11 @@
 #define MIB_TCP_STATE_DELETE_TCB 12
 #endif
 
-#ifndef MIB_TCPROW_OWNER_PID
-typedef struct {
-    DWORD dwState;
-    DWORD dwLocalAddr;
-    DWORD dwLocalPort;
-    DWORD dwRemoteAddr;
-    DWORD dwRemotePort;
-    DWORD dwOwningPid;
-} MIB_TCPROW_OWNER_PID;
-
-typedef struct {
-    UCHAR ucLocalAddr[16];
-    DWORD dwLocalScopeId;
-    DWORD dwLocalPort;
-    UCHAR ucRemoteAddr[16];
-    DWORD dwRemoteScopeId;
-    DWORD dwRemotePort;
-    DWORD dwState;
-    DWORD dwOwningPid;
-} MIB_TCP6ROW_OWNER_PID;
-
-typedef struct {
-    DWORD dwNumEntries;
-    MIB_TCPROW_OWNER_PID table[];
-} MIB_TCPTABLE_OWNER_PID;
-
-typedef struct {
-    DWORD dwNumEntries;
-    MIB_TCP6ROW_OWNER_PID table[];
-} MIB_TCP6TABLE_OWNER_PID;
-
-typedef struct {
-    DWORD dwLocalAddr;
-    DWORD dwLocalPort;
-    DWORD dwOwningPid;
-} MIB_UDPROW_OWNER_PID;
-
-typedef struct {
-    UCHAR ucLocalAddr[16];
-    DWORD dwLocalScopeId;
-    DWORD dwLocalPort;
-    DWORD dwOwningPid;
-} MIB_UDP6ROW_OWNER_PID;
-
-typedef struct {
-    DWORD dwNumEntries;
-    MIB_UDPROW_OWNER_PID table[];
-} MIB_UDPTABLE_OWNER_PID;
-
-typedef struct {
-    DWORD dwNumEntries;
-    MIB_UDP6ROW_OWNER_PID table[];
-} MIB_UDP6TABLE_OWNER_PID;
-
-#endif // MIB_TCPROW_OWNER_PID
-
 // Windows-native AF_ values for the IP Helper API calls.
 // Cygwin POSIX headers define AF_INET6=10; the Windows API expects 23.
 // AF_INET=2 happens to be the same on both.
 #define LS_WIN_AF_INET  2
 #define LS_WIN_AF_INET6 23
-
-typedef enum { TCP_TABLE_OWNER_PID_ALL = 5 } LS_TCP_TABLE_CLASS;
-typedef enum { UDP_TABLE_OWNER_PID = 1 }    LS_UDP_TABLE_CLASS;
-
-DWORD WINAPI GetExtendedTcpTable(PVOID pTcpTable, PDWORD pdwSize, BOOL bOrder,
-                                 ULONG ulAf, LS_TCP_TABLE_CLASS TableClass, ULONG Reserved);
-DWORD WINAPI GetExtendedUdpTable(PVOID pUdpTable, PDWORD pdwSize, BOOL bOrder,
-                                 ULONG ulAf, LS_UDP_TABLE_CLASS TableClass, ULONG Reserved);
 
 // --------------------------------------------------------------------------------------------------------------------
 // per-collection-pass process table (Toolhelp snapshot):
