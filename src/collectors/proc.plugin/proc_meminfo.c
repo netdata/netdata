@@ -13,6 +13,10 @@ int do_proc_meminfo(int update_every, usec_t dt) {
     (void)dt;
 
     static bool swap_configured = false;
+    static RRDSET *st_mem_swap_cached = NULL;
+    static RRDDIM *rd_cached = NULL;
+    static RRDSET *st_mem_zswap = NULL;
+    static RRDDIM *rd_zswap = NULL, *rd_zswapped = NULL;
 
     static procfile *ff = NULL;
     static int do_ram = -1
@@ -261,37 +265,29 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         common_mem_swap(SwapFree * 1024, SwapUsed * 1024, update_every);
         swap_configured = true;
 
-        {
-            static RRDSET *st_mem_swap_cached = NULL;
-            static RRDDIM *rd_cached = NULL;
+        if (unlikely(!st_mem_swap_cached)) {
+            st_mem_swap_cached = rrdset_create_localhost(
+                    "mem"
+                    , "swap_cached"
+                    , NULL
+                    , "swap"
+                    , NULL
+                    , "Swap Memory Cached in RAM"
+                    , "MiB"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_MEMINFO_NAME
+                    , NETDATA_CHART_PRIO_MEM_SWAP + 1
+                    , update_every
+                    , RRDSET_TYPE_AREA
+            );
 
-            if (unlikely(!st_mem_swap_cached)) {
-                st_mem_swap_cached = rrdset_create_localhost(
-                        "mem"
-                        , "swap_cached"
-                        , NULL
-                        , "swap"
-                        , NULL
-                        , "Swap Memory Cached in RAM"
-                        , "MiB"
-                        , PLUGIN_PROC_NAME
-                        , PLUGIN_PROC_MODULE_MEMINFO_NAME
-                        , NETDATA_CHART_PRIO_MEM_SWAP + 1
-                        , update_every
-                        , RRDSET_TYPE_AREA
-                );
-
-                rd_cached = rrddim_add(st_mem_swap_cached, "cached", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
-            }
-
-            rrddim_set_by_pointer(st_mem_swap_cached, rd_cached, SwapCached);
-            rrdset_done(st_mem_swap_cached);
+            rd_cached = rrddim_add(st_mem_swap_cached, "cached", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
         }
 
-        if (is_mem_zswap_enabled && (arl_zswapped->flags & ARL_ENTRY_FLAG_FOUND)) {
-            static RRDSET *st_mem_zswap = NULL;
-            static RRDDIM *rd_zswap = NULL, *rd_zswapped = NULL;
+        rrddim_set_by_pointer(st_mem_swap_cached, rd_cached, SwapCached);
+        rrdset_done(st_mem_swap_cached);
 
+        if (is_mem_zswap_enabled && (arl_zswapped->flags & ARL_ENTRY_FLAG_FOUND)) {
             if (unlikely(!st_mem_zswap)) {
                 st_mem_zswap = rrdset_create_localhost(
                         "mem"
@@ -318,7 +314,22 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         }
     } else {
         if (swap_configured) {
-            common_mem_swap(SwapFree * 1024, SwapUsed * 1024, update_every);
+            // swap was disabled: retire every chart that only swap feeds
+            common_mem_swap(0, 0, update_every);
+
+            if (st_mem_swap_cached) {
+                rrdset_is_obsolete___safe_from_collector_thread(st_mem_swap_cached);
+                st_mem_swap_cached = NULL;
+                rd_cached = NULL;
+            }
+
+            if (st_mem_zswap) {
+                rrdset_is_obsolete___safe_from_collector_thread(st_mem_zswap);
+                st_mem_zswap = NULL;
+                rd_zswap = NULL;
+                rd_zswapped = NULL;
+            }
+
             swap_configured = false;
         }
     }
