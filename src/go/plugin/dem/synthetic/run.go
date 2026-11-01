@@ -24,7 +24,15 @@ type TestCounts struct {
 	NotRun          int `json:"not_run"`
 }
 
+// RuntimeIdentity identifies the trusted release acquired for an execution.
+type RuntimeIdentity struct {
+	Version  string `json:"version"`
+	SHA256   string `json:"sha256"`
+	Contract int    `json:"contract"`
+}
+
 type Event struct {
+	DeclaredTests  *int     `json:"declared_tests,omitempty"`
 	Kind           string   `json:"kind"`
 	AtMS           int64    `json:"at_ms"`
 	TestID         string   `json:"test_id,omitempty"`
@@ -50,23 +58,24 @@ type LabMetrics struct {
 // StartedUS is immutable across both phases. Positive completion wall time may
 // precede start after a clock adjustment; DurationMS is measured independently.
 type Run struct {
-	ID            string      `json:"id"`
-	JobID         string      `json:"job_id"`
-	Kind          Kind        `json:"kind"`
-	Name          string      `json:"name"`
-	Target        string      `json:"target,omitempty"`
-	StartedUS     int64       `json:"started_us"`
-	CompletedUS   int64       `json:"completed_us"`
-	DurationMS    *float64    `json:"duration_ms,omitempty"`
-	Outcome       Outcome     `json:"outcome"`
-	Error         string      `json:"error,omitempty"`
-	Tests         *TestCounts `json:"tests,omitempty"`
-	Metrics       *LabMetrics `json:"metrics,omitempty"`
-	Events        []Event     `json:"events"`
-	DroppedEvents int         `json:"dropped_events"`
-	CaptureState  string      `json:"capture_state"`
-	Artifacts     []Artifact  `json:"artifacts"`
-	HistoryError  string      `json:"history_error,omitempty"`
+	Runtime       *RuntimeIdentity `json:"runtime,omitempty"`
+	ID            string           `json:"id"`
+	JobID         string           `json:"job_id"`
+	Kind          Kind             `json:"kind"`
+	Name          string           `json:"name"`
+	Target        string           `json:"target,omitempty"`
+	StartedUS     int64            `json:"started_us"`
+	CompletedUS   int64            `json:"completed_us"`
+	DurationMS    *float64         `json:"duration_ms,omitempty"`
+	Outcome       Outcome          `json:"outcome"`
+	Error         string           `json:"error,omitempty"`
+	Tests         *TestCounts      `json:"tests,omitempty"`
+	Metrics       *LabMetrics      `json:"metrics,omitempty"`
+	Events        []Event          `json:"events"`
+	DroppedEvents int              `json:"dropped_events"`
+	CaptureState  string           `json:"capture_state"`
+	Artifacts     []Artifact       `json:"artifacts"`
+	HistoryError  string           `json:"history_error,omitempty"`
 }
 
 type Execution struct {
@@ -77,8 +86,16 @@ type Execution struct {
 // CloneRun copies every mutable field crossing observation and history boundaries.
 func CloneRun(in Run) Run {
 	r := in
+	if in.Runtime != nil {
+		identity := *in.Runtime
+		r.Runtime = &identity
+	}
 	r.Events = append([]Event(nil), in.Events...)
 	for i := range r.Events {
+		if v := r.Events[i].DeclaredTests; v != nil {
+			n := *v
+			r.Events[i].DeclaredTests = &n
+		}
 		if v := r.Events[i].DurationMS; v != nil {
 			n := *v
 			r.Events[i].DurationMS = &n

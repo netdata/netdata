@@ -3,6 +3,7 @@ package runner
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
@@ -33,53 +33,33 @@ func (e *Engine) checkFiles(kind synthetic.Kind, paths Paths) error {
 	if kind != synthetic.Journey && kind != synthetic.Lighthouse {
 		return errors.New("unsupported synthetic kind")
 	}
-	for name, value := range map[string]string{"node_path": paths.Node, "dependencies_path": paths.Dependencies, "browser_path": paths.Browser, "assets_path": e.assetsPath} {
+	if paths.Identity.Contract != SupportedContract {
+		return fmt.Errorf("unsupported runtime execution contract %d (Agent supports %d)", paths.Identity.Contract, SupportedContract)
+	}
+	digest, err := hex.DecodeString(paths.Identity.SHA256)
+	if paths.Identity.Version == "" || err != nil || len(digest) != 32 {
+		return errors.New("runtime source supplied an invalid trusted release identity")
+	}
+	for name, value := range map[string]string{"node": paths.Node, "entrypoint": paths.EntryPoint} {
 		if !filepath.IsAbs(value) {
 			return fmt.Errorf("prepared %s must be an absolute path", name)
 		}
-	}
-	for name, value := range map[string]string{"node": paths.Node, "browser": paths.Browser} {
 		info, err := os.Stat(value)
 		if err != nil {
 			return fmt.Errorf("prepared %s: %w", name, err)
 		}
-		if !info.Mode().IsRegular() || info.Mode().Perm()&0111 == 0 {
-			return fmt.Errorf("prepared %s is not an executable regular file", name)
-		}
-	}
-	for _, name := range []string{"run.mjs", "reporter.cjs", "protocol.cjs", "lighthouse.mjs"} {
-		f, err := os.Open(filepath.Join(e.assetsPath, name))
-		if err != nil {
-			return fmt.Errorf("prepared runner asset %s: %w", name, err)
-		}
-		info, statErr := f.Stat()
-		err = errors.Join(statErr, f.Close())
-		if err != nil {
-			return err
-		}
 		if !info.Mode().IsRegular() {
-			return fmt.Errorf("prepared runner asset %s is not regular", name)
+			return fmt.Errorf("prepared %s is not a regular file", name)
 		}
-	}
-	for name, pin := range requiredRuntime.Packages {
-		raw, err := os.ReadFile(filepath.Join(paths.Dependencies, "node_modules", name, "package.json"))
-		if err != nil {
-			return fmt.Errorf("prepared %s package: %w", name, err)
-		}
-		var p struct {
-			Version string `json:"version"`
-		}
-		if err = json.Unmarshal(raw, &p); err != nil {
-			return fmt.Errorf("prepared %s package metadata: %w", name, err)
-		}
-		if p.Version != pin {
-			return fmt.Errorf("prepared %s must be version %s", name, pin)
+		if name == "node" && info.Mode().Perm()&0111 == 0 {
+			return errors.New("prepared node is not executable")
 		}
 	}
 	return nil
 }
 
-// Check verifies the prepared runtime using bounded supervised version probes.
+// Check verifies the release contract through its own bounded supervised check.
+// Component versions and private dependency checks belong to the runtime release.
 // It never loads the configured workflow or launches a browser session.
 func (e *Engine) Check(ctx context.Context, kind synthetic.Kind) error {
 	if e.isPoisoned() {
@@ -90,45 +70,28 @@ func (e *Engine) Check(ctx context.Context, kind synthetic.Kind) error {
 	}
 	checkCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	node, err := e.probe(
-		checkCtx, kind,
-		func(Paths) []string {
-			return []string{
-				"-e",
-				"process.stdout.write(JSON.stringify({version:process.versions.node,uid:process.getuid(),gid:process.getgid()}))",
-			}
-		},
-	)
+	var identity synthetic.RuntimeIdentity
+	output, err := e.probe(checkCtx, kind, func(paths Paths) []string {
+		identity = paths.Identity
+		return []string{paths.EntryPoint, "--check"}
+	})
 	if err != nil {
-		return fmt.Errorf("prepared Node check: %w", err)
+		return fmt.Errorf("prepared runtime check: %w", err)
 	}
 	var actual struct {
-		Version string `json:"version"`
-		UID     int    `json:"uid"`
-		GID     int    `json:"gid"`
+		Contract int    `json:"contract"`
+		Version  string `json:"version"`
+		UID      *int   `json:"uid"`
+		GID      *int   `json:"gid"`
 	}
-	if err = json.Unmarshal(node, &actual); err != nil {
-		return fmt.Errorf("invalid prepared Node version response")
+	if err := json.Unmarshal(output, &actual); err != nil {
+		return errors.New("invalid prepared runtime check response")
 	}
-	var major int
-	if _, err = fmt.Sscanf(actual.Version, "%d.", &major); err != nil || major < requiredRuntime.NodeMajorMin {
-		return fmt.Errorf("prepared Node must be version %d or newer", requiredRuntime.NodeMajorMin)
+	if actual.Contract != identity.Contract || actual.Version != identity.Version {
+		return errors.New("prepared runtime check does not match its trusted release identity")
 	}
-	if actual.UID == 0 || actual.UID != os.Geteuid() || actual.GID != os.Getegid() {
+	if actual.UID == nil || actual.GID == nil || *actual.UID == 0 || *actual.UID != os.Geteuid() || *actual.GID != os.Getegid() {
 		return errors.New("nd-run must preserve the plugin's unprivileged identity for private run directories")
-	}
-	// execFileSync is confined to a version query. It runs under the same tree
-	// supervisor; cancellation still drains any descendant it creates.
-	script := "require('node:child_process').execFileSync(process.argv[1],['--version'],{stdio:['ignore',1,2]})"
-	browser, err := e.probe(checkCtx, kind, func(paths Paths) []string { return []string{"-e", script, paths.Browser} })
-	if err != nil {
-		return fmt.Errorf("prepared Chromium check: %w", err)
-	}
-	// Debian's launcher may append its distribution name after the version.
-	// Compare complete identity fields, not a version substring from any brand.
-	identity := strings.Fields(string(browser))
-	if len(identity) < 2 || identity[0] != "Chromium" || identity[1] != requiredRuntime.Chromium.Version {
-		return fmt.Errorf("prepared full Chromium must be version %s", requiredRuntime.Chromium.Version)
 	}
 	return nil
 }
@@ -158,7 +121,7 @@ func (e *Engine) probe(ctx context.Context, kind synthetic.Kind, arguments func(
 	result, err := e.executeProcess(ctx, paths, use.Completion(), arguments(paths), nil, func(reader io.Reader) error {
 		output, parseErr = io.ReadAll(io.LimitReader(reader, 4097))
 		if len(output) > 4096 {
-			parseErr = errors.New("runtime version response exceeds 4096 bytes")
+			parseErr = errors.New("runtime check response exceeds 4096 bytes")
 		}
 		return parseErr
 	}, func(reader io.Reader) {
@@ -180,7 +143,7 @@ func (e *Engine) probe(ctx context.Context, kind synthetic.Kind, arguments func(
 		return nil, ctx.Err()
 	}
 	if result.Err != nil {
-		return nil, fmt.Errorf("version probe failed: %w (%s)", result.Err, diagnostic)
+		return nil, fmt.Errorf("runtime check failed: %w (%s)", result.Err, diagnostic)
 	}
 	return output, nil
 }

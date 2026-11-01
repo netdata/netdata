@@ -40,9 +40,6 @@ This collector supports collecting metrics from multiple instances of this integ
 It discovers instances running on localhost by attempting to connect to a known Docker TCP socket: `http://127.0.0.1:9323/metrics`.
 
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

@@ -64,7 +64,6 @@ type DynCfgJobController struct {
 	diagnostics      jobmgr.DiagnosticObserver // operational log sink
 	commands         jobmgr.PreparedCommandPort
 	restartObservers restartObservers
-	configIntents    jobConfigIntentIndex
 	scheduler        *Scheduler           // tick + retry scheduler
 	candidates       *candidateController // source selection and activation intent
 }
@@ -251,7 +250,7 @@ func (dcjc *DynCfgJobController) Prepare(
 	default:
 		transaction, err = dcjc.reject(scope, current, permit, notImplementedFailure(target.command))
 	}
-	var admission *configIntentAdmissionError
+	var admission *configAdmissionError
 	if errors.As(err, &admission) && ctx.Err() == nil && !lifecycle.OwnershipRetained(err) {
 		if rejection, ok := preparationFailure(classifyActivationError(err),
 			validationBusyMessage, validationBusyMessage, validationBusyMessage); ok {

@@ -279,6 +279,20 @@ There are a few special keys that are used to define the system information of t
 
 `HOST_DEFINE_END` commits the host information, creating a new host entity, or updating an existing one with the same `machine_guid`.
 
+The reserved host label `_node_stale_after_seconds` sets the vnode inactivity timeout in seconds (an unsigned
+32-bit value). Each completed definition replaces the timeout; omitting the label or setting it to `0` disables it.
+The parser checks inactivity when processing `HOST localhost` (or `HOST` without a GUID), with a scan interval equal
+to the smallest positive timeout among its vnodes, or 60 seconds if none has a timeout. A new or reduced timeout
+brings the next scan forward when needed. Expiry therefore requires continued localhost selections by the plugin;
+with regular selections, it occurs within the timeout plus one scan interval and the localhost selection interval.
+A stale vnode becomes active again when selected with `HOST machine_guid`.
+
+When local collection resumes through `HOST` or `HOST_DEFINE_END`, any peer stream for the same host is stopped
+before restoring the vnode's live state. Health follows the local Agent's health setting and remains disabled for
+`memory mode = none`; a previous peer disconnect must not leave the recovered vnode orphaned or health disabled.
+If orphan cleanup has already archived the host after a peer disconnect, `HOST` requests a collector restart so a
+fresh `HOST_DEFINE` can rebuild its runtime structures before collection resumes.
+
 #### HOST 
 
 `HOST` switches data collection between hosts.

@@ -4,7 +4,6 @@ package dem
 
 import (
 	"errors"
-	"fmt"
 	"path/filepath"
 	"time"
 
@@ -15,18 +14,14 @@ import (
 // Protected preloads are borrowed for the process lifetime and are outside cache GC.
 type RuntimeConfig struct {
 	Mode                  string `yaml:"mode" json:"mode"`
-	AllowDownload         bool   `yaml:"allow_download" json:"allow_download"`
 	CachePath             string `yaml:"cache_path" json:"cache_path,omitempty"`
-	ManifestPath          string `yaml:"manifest_path" json:"manifest_path,omitempty"`
 	MaxBytes              int64  `yaml:"max_bytes" json:"max_bytes"`
 	PreviousRetentionDays int    `yaml:"previous_retention_days" json:"previous_retention_days"`
-	IdleRetentionDays     int    `yaml:"idle_retention_days" json:"idle_retention_days"`
 	PreloadPath           string `yaml:"preload_path" json:"preload_path,omitempty"`
 }
 
 func DefaultRuntimeConfig() RuntimeConfig {
-	return RuntimeConfig{Mode: "managed", AllowDownload: true, MaxBytes: runtime.DefaultMaxBytes,
-		PreviousRetentionDays: 7, IdleRetentionDays: 30}
+	return RuntimeConfig{Mode: "managed", MaxBytes: runtime.DefaultMaxBytes, PreviousRetentionDays: 7}
 }
 
 func (c RuntimeConfig) validate() error {
@@ -36,10 +31,8 @@ func (c RuntimeConfig) validate() error {
 	if c.MaxBytes <= 0 {
 		return errors.New("max_bytes must be positive")
 	}
-	for name, days := range map[string]int{"previous_retention_days": c.PreviousRetentionDays, "idle_retention_days": c.IdleRetentionDays} {
-		if days < 0 || days > 36500 {
-			return fmt.Errorf("%s must be between 0 and 36500", name)
-		}
+	if c.PreviousRetentionDays < 0 || c.PreviousRetentionDays > 36500 {
+		return errors.New("previous_retention_days must be between 0 and 36500")
 	}
 	if c.Mode == "managed" && c.PreloadPath != "" {
 		return errors.New("preload_path requires mode: preloaded")
@@ -64,6 +57,5 @@ func (c RuntimeConfig) StoreConfig(varLibPath string) (runtime.Config, error) {
 		return runtime.Config{}, errors.New("runtime.cache_path must be absolute")
 	}
 	return runtime.Config{Path: path, MaxBytes: c.MaxBytes,
-		PreviousRetention: time.Duration(c.PreviousRetentionDays) * 24 * time.Hour,
-		IdleRetention:     time.Duration(c.IdleRetentionDays) * 24 * time.Hour}, nil
+		PreviousRetention: time.Duration(c.PreviousRetentionDays) * 24 * time.Hour}, nil
 }

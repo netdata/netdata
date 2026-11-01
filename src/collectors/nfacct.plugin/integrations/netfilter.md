@@ -37,9 +37,6 @@ This plugin needs setuid.
 
 This plugin uses socket to connect with netfilter to collect data
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

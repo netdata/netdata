@@ -21,7 +21,7 @@ import (
 
 // Import uses the same trusted digest/format as network preparation. The archive
 // is an offline input, not a replacement for the installed trust manifest.
-func (s *Store) Import(ctx context.Context, m Manifest, archive string) error {
+func (s *Store) importArchive(ctx context.Context, m Manifest, archive string) error {
 	return s.prepare(ctx, m, func() (io.ReadCloser, error) {
 		file, err := safefile.Open(archive)
 		if err != nil {
@@ -44,11 +44,6 @@ func (s *Store) prepare(ctx context.Context, m Manifest, open func() (io.ReadClo
 	if err := checkContext(ctx); err != nil {
 		return err
 	}
-	claim, err := s.Demand(m.Archive.SHA256)
-	if err != nil {
-		return err
-	}
-	defer claim.Close() // Close records cleanup health independently of preparation.
 	// Cleanup errors are exposed independently; a matching prepared runtime
 	// remains usable. New reservations still require a complete inventory.
 	_ = s.Sweep()
@@ -141,7 +136,7 @@ func (s *Store) reserve(m Manifest) (string, *flock.Flock, error) {
 		progress := false
 		err := s.withLock(func() error {
 			// Publication and reservation share one decision. A concurrent
-			// preparer may have finished since this caller established demand.
+			// preparer may have finished since this candidate established protection.
 			if _, err := s.prepared(m); err == nil {
 				g, err := s.loadGeneration(m.Archive.SHA256)
 				if err != nil {

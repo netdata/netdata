@@ -37,7 +37,7 @@ func TestPreparationCoordinationFailureReleasesTerminalOwners(t *testing.T) {
 	require.ErrorIs(t, err, failed)
 	status, err := s.Inspect()
 	require.NoError(t, err)
-	require.Zero(t, status.DemandGenerations, "finished preparation must not retain local demand")
+	require.Zero(t, status.ProcessGenerations, "finished preparation must not retain process ownership")
 	require.Zero(t, status.ReservedBytes, "finished preparation must not retain live staging")
 	require.NotEmpty(t, status.CleanupError)
 	require.NoError(t, s.Sweep())
@@ -75,22 +75,20 @@ func TestOlderSweepPreservesPreparationCleanupHealth(t *testing.T) {
 	require.NotEmpty(t, status.CleanupError, "older sweep cannot clear finalizer failure")
 }
 
-func TestFailedCommitCleanupReleasesClaimWithoutCoordination(t *testing.T) {
+func TestTerminalCleanupReleasesClaimWithoutCoordination(t *testing.T) {
 	s, _ := testStore(t)
 	m := importFixture(t, s, "failed-commit")
-	claim, err := s.ReserveDemand(m.Archive.SHA256)
+	claim, err := s.testProcessClaim(m.Archive.SHA256)
 	require.NoError(t, err)
 	restore := blockCoordination(t, s)
-	require.Error(t, claim.Commit())
 	require.Error(t, claim.Close())
 	restore()
 	// The caller may discard the failed candidate. The dead record is the retry owner.
 	require.NoError(t, s.Sweep())
 	status, err := s.Inspect()
 	require.NoError(t, err)
-	require.Zero(t, status.PendingClaims)
-	require.Zero(t, status.DemandGenerations)
-	require.Error(t, claim.Commit(), "a terminal claim cannot become accepted again")
+	require.Zero(t, status.ProcessClaims)
+	require.Zero(t, status.ProcessGenerations)
 }
 
 // Native unlock failure is not safely reproducible. Fail the first Close while
@@ -115,12 +113,11 @@ func TestTerminalOwnerCloseFailureRetriedBySweep(t *testing.T) {
 			var closer *retryOwnerClose
 			switch kind {
 			case "claim":
-				claim, err := s.ReserveDemand(m.Archive.SHA256)
+				claim, err := s.testProcessClaim(m.Archive.SHA256)
 				require.NoError(t, err)
 				closer = &retryOwnerClose{Closer: claim.lock, fail: true}
 				claim.lock = closer
 				require.Error(t, claim.Close())
-				require.Error(t, claim.Commit(), "terminal close forbids subsequent acceptance")
 			case "staging":
 				other, _ := bundleFixture(t, "staging-release")
 				name, owner, err := s.reserve(other)
@@ -129,7 +126,7 @@ func TestTerminalOwnerCloseFailureRetriedBySweep(t *testing.T) {
 				closer = &retryOwnerClose{Closer: owner, fail: true}
 				s.finishPreparation(name, closer)
 			default:
-				use, err := s.BeginUse(m)
+				use, err := s.beginUse(m)
 				require.NoError(t, err)
 				closer = &retryOwnerClose{Closer: use.lock, fail: true}
 				use.lock = closer
@@ -144,7 +141,7 @@ func TestTerminalOwnerCloseFailureRetriedBySweep(t *testing.T) {
 			status, err = s.Inspect()
 			require.NoError(t, err)
 			require.Empty(t, status.CleanupError)
-			require.Zero(t, status.PendingClaims)
+			require.Zero(t, status.ProcessClaims)
 			require.Zero(t, status.ReservedBytes)
 			if kind == "use-unknown" {
 				require.Equal(t, 1, status.UncertainPins, "local release is not process-tree completion")
@@ -159,7 +156,7 @@ func TestTerminalOwnerCloseFailureRetriedBySweep(t *testing.T) {
 func TestStoreCloseRetriesTerminalOwnerRelease(t *testing.T) {
 	s, _ := testStore(t)
 	m, _ := bundleFixture(t, "store-close-release")
-	claim, err := s.ReserveDemand(m.Archive.SHA256)
+	claim, err := s.testProcessClaim(m.Archive.SHA256)
 	require.NoError(t, err)
 	closer := &retryOwnerClose{Closer: claim.lock, fail: true}
 	claim.lock = closer
@@ -179,7 +176,7 @@ func TestBeginUseConstructorCleanupFailureReportsHealth(t *testing.T) {
 		require.NoError(t, os.Rename(path, path+".saved"))
 		require.NoError(t, os.WriteFile(path, nil, 0600))
 	}
-	use, err := s.BeginUse(m)
+	use, err := s.beginUse(m)
 	require.Error(t, err)
 	require.Nil(t, use)
 	for _, dir := range []string{"uses", "trash"} {

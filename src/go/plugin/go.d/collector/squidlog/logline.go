@@ -139,11 +139,11 @@ const hyphen = "-"
 
 func (l *logLine) assignRespTime(time string) error {
 	if time == hyphen {
-		return fmt.Errorf("assign '%s': %w", time, errBadRespTime)
+		return errBadRespTime
 	}
 	v, err := strconv.Atoi(time)
 	if err != nil || !isRespTimeValid(v) {
-		return fmt.Errorf("assign '%s': %w", time, errBadRespTime)
+		return errBadRespTime
 	}
 	l.respTime = v
 	return nil
@@ -151,7 +151,7 @@ func (l *logLine) assignRespTime(time string) error {
 
 func (l *logLine) assignClientAddress(address string) error {
 	if address == hyphen {
-		return fmt.Errorf("assign '%s': %w", address, errBadClientAddr)
+		return errBadClientAddr
 	}
 	l.clientAddr = address
 	return nil
@@ -159,7 +159,7 @@ func (l *logLine) assignClientAddress(address string) error {
 
 func (l *logLine) assignCacheCode(code string) error {
 	if code == hyphen || !isCacheCodeValid(code) {
-		return fmt.Errorf("assign '%s': %w", code, errBadCacheCode)
+		return errBadCacheCode
 	}
 	l.cacheCode = code
 	return nil
@@ -167,11 +167,11 @@ func (l *logLine) assignCacheCode(code string) error {
 
 func (l *logLine) assignHTTPCode(code string) error {
 	if code == hyphen {
-		return fmt.Errorf("assign '%s': %w", code, errBadHTTPCode)
+		return errBadHTTPCode
 	}
 	v, err := strconv.Atoi(code)
 	if err != nil || !isHTTPCodeValid(v) {
-		return fmt.Errorf("assign '%s': %w", code, errBadHTTPCode)
+		return errBadHTTPCode
 	}
 	l.httpCode = v
 	return nil
@@ -180,7 +180,7 @@ func (l *logLine) assignHTTPCode(code string) error {
 func (l *logLine) assignResultCode(code string) error {
 	i := strings.IndexByte(code, '/')
 	if i <= 0 {
-		return fmt.Errorf("assign '%s': %w", code, errBadResultCode)
+		return errBadResultCode
 	}
 	if err := l.assignCacheCode(code[:i]); err != nil {
 		return err
@@ -190,11 +190,11 @@ func (l *logLine) assignResultCode(code string) error {
 
 func (l *logLine) assignRespSize(size string) error {
 	if size == hyphen {
-		return fmt.Errorf("assign '%s': %w", size, errBadRespSize)
+		return errBadRespSize
 	}
 	v, err := strconv.Atoi(size)
 	if err != nil || !isRespSizeValid(v) {
-		return fmt.Errorf("assign '%s': %w", size, errBadRespSize)
+		return errBadRespSize
 	}
 	l.respSize = v
 	return nil
@@ -202,7 +202,7 @@ func (l *logLine) assignRespSize(size string) error {
 
 func (l *logLine) assignReqMethod(method string) error {
 	if method == hyphen || !isReqMethodValid(method) {
-		return fmt.Errorf("assign '%s': %w", method, errBadReqMethod)
+		return errBadReqMethod
 	}
 	l.reqMethod = method
 	return nil
@@ -210,7 +210,7 @@ func (l *logLine) assignReqMethod(method string) error {
 
 func (l *logLine) assignHierCode(code string) error {
 	if code == hyphen || !isHierCodeValid(code) {
-		return fmt.Errorf("assign '%s': %w", code, errBadHierCode)
+		return errBadHierCode
 	}
 	l.hierCode = code
 	return nil
@@ -229,7 +229,7 @@ func (l *logLine) assignServerAddress(address string) error {
 func (l *logLine) assignHierarchy(hierarchy string) error {
 	i := strings.IndexByte(hierarchy, '/')
 	if i <= 0 {
-		return fmt.Errorf("assign '%s': %w", hierarchy, errBadHierarchy)
+		return errBadHierarchy
 	}
 	if err := l.assignHierCode(hierarchy[:i]); err != nil {
 		return err
@@ -246,7 +246,7 @@ func (l *logLine) assignMimeType(mime string) error {
 	// format: type/subtype, type/subtype;parameter=value
 	i := strings.IndexByte(mime, '/')
 	if i <= 0 {
-		return fmt.Errorf("assign '%s': %w", mime, errBadMimeType)
+		return errBadMimeType
 	}
 
 	if !isMimeTypeValid(mime[:i]) {
@@ -263,31 +263,31 @@ func (l logLine) verify() error {
 		return fmt.Errorf("verify: %w", errEmptyLine)
 	}
 	if l.hasRespTime() && !l.isRespTimeValid() {
-		return fmt.Errorf("verify '%d': %w", l.respTime, errBadRespTime)
+		return fmt.Errorf("verify: %w", errBadRespTime)
 	}
 	if l.hasClientAddress() && !l.isClientAddressValid() {
-		return fmt.Errorf("verify '%s': %w", l.clientAddr, errBadClientAddr)
+		return fmt.Errorf("verify: %w", errBadClientAddr)
 	}
 	if l.hasCacheCode() && !l.isCacheCodeValid() {
-		return fmt.Errorf("verify '%s': %w", l.cacheCode, errBadCacheCode)
+		return fmt.Errorf("verify: %w", errBadCacheCode)
 	}
 	if l.hasHTTPCode() && !l.isHTTPCodeValid() {
-		return fmt.Errorf("verify '%d': %w", l.httpCode, errBadHTTPCode)
+		return fmt.Errorf("verify: %w", errBadHTTPCode)
 	}
 	if l.hasRespSize() && !l.isRespSizeValid() {
-		return fmt.Errorf("verify '%d': %w", l.respSize, errBadRespSize)
+		return fmt.Errorf("verify: %w", errBadRespSize)
 	}
 	if l.hasReqMethod() && !l.isReqMethodValid() {
-		return fmt.Errorf("verify '%s': %w", l.reqMethod, errBadReqMethod)
+		return fmt.Errorf("verify: %w", errBadReqMethod)
 	}
 	if l.hasHierCode() && !l.isHierCodeValid() {
-		return fmt.Errorf("verify '%s': %w", l.hierCode, errBadHierCode)
+		return fmt.Errorf("verify: %w", errBadHierCode)
 	}
 	if l.hasServerAddress() && !l.isServerAddressValid() {
-		return fmt.Errorf("verify '%s': %w", l.serverAddr, errBadServerAddr)
+		return fmt.Errorf("verify: %w", errBadServerAddr)
 	}
 	if l.hasMimeType() && !l.isMimeTypeValid() {
-		return fmt.Errorf("verify '%s': %w", l.mimeType, errBadMimeType)
+		return fmt.Errorf("verify: %w", errBadMimeType)
 	}
 	return nil
 }

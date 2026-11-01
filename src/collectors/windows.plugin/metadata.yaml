@@ -820,9 +820,12 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          Monitor network interface metrics about bandwidth, state, errors and more.
+          Monitor Windows network interface traffic, packets, speed, errors, drops, and offload activity in charts.
+          A live interface table also shows current operational state and the adapter's friendly name when Windows can match it to a discovered interface.
         method_description: |
-          It queries 'Network Interface' and 'Network Adapter' objects from Perflib in order to gather the metrics.
+          It queries the 'Network Interface' Perflib object and uses its 'Network Adapter' data when present, querying
+          'Network Adapter' separately when absent. The live interface table
+          queries the Windows adapter API when opened and combines that result with the latest collected chart values.
       supported_platforms:
         include: ["windows"]
         exclude: []
@@ -834,9 +837,18 @@ modules:
           description: |
             The collector automatically detects all of the metrics, no further configuration is required.
         limits:
-          description: ""
+          description: |
+            Operational state and friendly name are unavailable in the live table when a Perflib instance cannot be
+            matched uniquely to a Windows adapter. A missing value is shown as unavailable, not as a down state.
+            Per-interface charts start after the first received or sent byte; the live table can show idle interfaces
+            before their charts start. Existing charts continue through later zero-byte counter values.
+            When Windows cannot read an interface instance name, the aggregate bandwidth chart and removal of vanished
+            interfaces pause for up to 60 collection cycles; after that they continue without the unnamed instance.
         performance_impact:
-          description: ""
+          description: |
+            A separate 'Network Adapter' Perflib query runs only when the 'Network Interface' result lacks that object.
+            The live interface table queries the Windows adapter API on demand. It does not add an adapter API call
+            to each chart collection cycle.
     setup:
       prerequisites:
         list: []
@@ -854,6 +866,13 @@ modules:
             - name: update every
               description: Data collection frequency.
               default_value: 1
+              required: false
+            - name: disable by default interfaces matching
+              description: |
+                Space-separated, case-sensitive patterns matched against Perflib interface instance names. Use `*`
+                to span spaces in a name (for example, `Teredo*`). Matching interfaces are excluded from per-interface
+                charts and the live interface table. The physical network aggregate still includes them.
+              default_value: ""
               required: false
         examples:
           folding:
@@ -1026,7 +1045,7 @@ modules:
             - name: interface_type
               description: "Classification of the network interface (real or virtual)."
             - name: device
-              description: "System-assigned network interface identifier."
+              description: "Perflib network interface instance name."
           metrics:
             - name: net.net
               description: Bandwidth
@@ -1062,6 +1081,12 @@ modules:
               dimensions:
                 - name: inbound
                 - name: outbound
+            - name: net.unknown_protocol_packets
+              description: Packets Received with Unknown Protocol
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: inbound
             - name: net.queue_length
               description: Interface Output Queue Length
               unit: "packets"
@@ -1098,6 +1123,96 @@ modules:
               chart_type: line
               dimensions:
                 - name: connections
+    functions:
+      description: |
+        View current Windows network interface performance and operational state.
+      list:
+        - id: network-interfaces
+          name: Network Interfaces
+          description: |
+            Shows discovered physical and virtual interfaces with current traffic, packet, drop, speed, and operational
+            state values. Friendly names and state are shown only when the Perflib instance name uniquely matches a
+            Windows adapter description or, if none matches, an adapter friendly name. Physical carrier state, duplex,
+            and multicast packets are unavailable.
+          parameters: []
+          returns:
+            description: "One row per discovered, non-excluded interface; unavailable values are empty."
+            columns:
+              - name: Interface
+                type: string
+                unit: ""
+                description: "Perflib network interface name."
+              - name: Type
+                type: string
+                unit: ""
+                description: "Physical or virtual interface."
+              - name: UsedBy
+                type: string
+                unit: ""
+                description: "Interface owner."
+              - name: PhState
+                type: string
+                unit: ""
+                description: "Physical carrier state, currently unavailable."
+                visibility: hidden
+              - name: OpState
+                type: string
+                unit: ""
+                description: "Current Windows adapter operational state, when matched."
+              - name: Duplex
+                type: string
+                unit: ""
+                description: "Duplex mode, currently unavailable."
+                visibility: hidden
+              - name: Speed
+                type: number
+                unit: Mbit/s
+                description: "Link speed."
+              - name: MTU
+                type: number
+                unit: Octets
+                description: "Maximum transmission unit."
+              - name: In
+                type: number
+                unit: Mbit/s
+                description: "Traffic received."
+              - name: Out
+                type: number
+                unit: Mbit/s
+                description: "Traffic sent."
+              - name: Total
+                type: number
+                unit: Mbit/s
+                description: "Traffic received and sent."
+                visibility: hidden
+              - name: PktsIn
+                type: number
+                unit: Kpps
+                description: "Received packets."
+              - name: PktsOut
+                type: number
+                unit: Kpps
+                description: "Sent packets."
+              - name: McastIn
+                type: number
+                unit: Kpps
+                description: "Multicast received packets, currently unavailable."
+                visibility: hidden
+              - name: DropsIn
+                type: number
+                unit: Drops
+                description: "Dropped inbound packets."
+              - name: DropsOut
+                type: number
+                unit: Drops
+                description: "Dropped outbound packets."
+              - name: FriendlyName
+                type: string
+                unit: ""
+                description: "Windows adapter friendly name, when matched."
+          performance: "Queries the Windows adapter API when the table is opened."
+          security: "Requires signed-in, same-space access because adapter friendly names can contain user-entered text. This is intentionally stricter than the Linux `network-interfaces` Function, which allows anonymous access; anonymous dashboard users receive HTTP 412 on Windows."
+          availability: "Available after the Windows network collector successfully reads Perflib data."
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibSMB

@@ -45,9 +45,6 @@ Rspamd can be monitored further using the following other integrations:
 By default, it detects Rspamd instances running on localhost that are listening on port 11334.
 
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

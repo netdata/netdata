@@ -370,6 +370,7 @@ set(INTERNAL_COLLECTORS_FILES
         src/collectors/common-contexts/power-supply.h
         src/collectors/common-contexts/hw-sensors.h
         src/collectors/common-contexts/hw-sensors-function.h
+        src/collectors/common-contexts/network-interfaces-function.h
 )
 
 set(PLUGINSD_PLUGIN_FILES
@@ -379,6 +380,7 @@ set(PLUGINSD_PLUGIN_FILES
         src/plugins.d/pluginsd_dyncfg.h
         src/plugins.d/pluginsd_functions.c
         src/plugins.d/pluginsd_functions-unittest.c
+        src/plugins.d/pluginsd_vnodes-unittest.c
         src/plugins.d/pluginsd_functions.h
         src/plugins.d/pluginsd_internals.c
         src/plugins.d/pluginsd_internals.h

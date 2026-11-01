@@ -13,10 +13,11 @@ import (
 	"strings"
 )
 
-// Manifest is installed with the Agent. Archive-supplied metadata is never a
-// trust anchor. Changing any build input produces a new archive identity.
+// Manifest is administrator-trusted release metadata. Archive-supplied metadata
+// is never a trust anchor. Component versions belong to the release, not the Agent.
 type Manifest struct {
 	Format   int       `json:"format"`
+	Contract int       `json:"contract"`
 	Version  string    `json:"version"`
 	Platform string    `json:"platform"`
 	Archive  Archive   `json:"archive"`
@@ -34,6 +35,7 @@ type Archive struct {
 }
 
 type Layout struct {
+	EntryPoint   string `json:"entrypoint"`
 	Node         string `json:"node"`
 	Dependencies string `json:"dependencies"`
 	Browser      string `json:"browser"`
@@ -67,6 +69,9 @@ func (m Manifest) Validate() error {
 	if m.Format != 1 || m.Version == "" || (m.Platform != "linux/amd64" && m.Platform != "linux/arm64") || !validID(m.Archive.SHA256) {
 		return errors.New("invalid runtime identity or platform")
 	}
+	if m.Contract != 1 {
+		return fmt.Errorf("unsupported runtime execution contract %d (Agent supports 1); upgrade the Agent or select a compatible runtime release", m.Contract)
+	}
 	a := m.Archive
 	if a.Bytes <= 0 || a.TarBytes <= 0 || a.ExpandedBytes <= 0 || a.ExpandedBytes > a.TarBytes || a.Entries <= 0 || a.Bytes == math.MaxInt64 || a.TarBytes == math.MaxInt64 {
 		return errors.New("invalid runtime archive bounds")
@@ -78,7 +83,7 @@ func (m Manifest) Validate() error {
 			return errors.New("runtime download requires an installed HTTPS URL without credentials")
 		}
 	}
-	for _, name := range []string{m.Layout.Node, m.Layout.Dependencies, m.Layout.Browser, m.Layout.Loader, m.Layout.Fonts} {
+	for _, name := range []string{m.Layout.EntryPoint, m.Layout.Node, m.Layout.Dependencies, m.Layout.Browser, m.Layout.Loader, m.Layout.Fonts} {
 		if !localName(name) || reservedName(name) {
 			return errors.New("invalid runtime layout path")
 		}

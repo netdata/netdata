@@ -40,9 +40,6 @@ This collector requires the DAC_READ_SEARCH capability when monitoring files not
 
 This integration doesn't support auto-detection.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

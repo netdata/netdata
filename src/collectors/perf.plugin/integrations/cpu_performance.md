@@ -40,9 +40,6 @@ It needs setuid to use the necessary syscall to collect perf events. Netdata set
 
 This integration doesn't support auto-detection.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

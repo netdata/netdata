@@ -163,7 +163,7 @@ func (t *runtimeSettlementTransaction) Apply(ctx context.Context) (applied lifec
 	prepared, err := dcjc.prepareMutationAfterApplyAndFallback(
 		ctx, t.scope, t.current, nil, lifecycle.LongLivedPermit{}, disposition, &postimage, reply,
 		dcjc.configStatusCleanup(t.scope.ID, status), afterApply,
-		jobConfig, jobConfigIntentPreserve, nil, nil, nil,
+		jobConfig, nil, nil, nil,
 	)
 	if err != nil {
 		return lifecycle.AppliedResourceTransaction{}, err

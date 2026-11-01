@@ -42,9 +42,6 @@ Automatically discovers and collects UWSGI statistics from the following default
 - localhost:1717
 
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

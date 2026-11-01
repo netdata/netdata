@@ -13,14 +13,17 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	syntheticfunctions "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/functions"
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
+	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 
 	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
@@ -32,32 +35,32 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// TestPreparedLinuxRuntime uses the public Engine, real nd-run tree supervisor,
-// prepared packages/browser, artifact owner and journal. It never downloads a
-// browser. An operator must explicitly provide all four runtime fixture paths.
+// TestPreparedLinuxRuntime uses the selected production installation, actual
+// acquired process/execution claims, nd-run, artifacts and journal. It never
+// injects private component paths or downloads a runtime.
 func TestPreparedLinuxRuntime(t *testing.T) {
-	names := []string{
-		"DEM_RUNNER_TEST_NODE",
-		"DEM_RUNNER_TEST_DEPENDENCIES",
-		"DEM_RUNNER_TEST_BROWSER",
-		"DEM_RUNNER_TEST_HELPER",
-	}
+	names := []string{"DEM_RUNNER_TEST_MANIFEST", "DEM_RUNNER_TEST_STORE", "DEM_RUNNER_TEST_HELPER"}
 	values := make([]string, len(names))
 	for i, name := range names {
 		values[i] = os.Getenv(name)
 		if values[i] == "" {
-			t.Skip("real prepared Linux validation requires " + name)
+			t.Skip("real Linux validation requires " + name)
 		}
 	}
 	require.NotZero(t, os.Geteuid(), "browser runtime must run unprivileged")
-	restore := ndexec.SetRunnerPathsForTests(values[3], "")
+	restore := ndexec.SetRunnerPathsForTests(values[2], "")
 	defer restore()
-	_, source, _, ok := runtime.Caller(0)
-	require.True(t, ok)
-	assets := os.Getenv("DEM_RUNNER_TEST_ASSETS")
-	if assets == "" {
-		assets = filepath.Join(filepath.Dir(source), "assets")
-	}
+	raw, err := os.ReadFile(values[0])
+	require.NoError(t, err)
+	var manifest runtime.Manifest
+	require.NoError(t, json.Unmarshal(raw, &manifest))
+	require.NoError(t, manifest.Validate())
+	store, err := runtime.Open(runtime.DefaultConfig(values[1]))
+	require.NoError(t, err)
+	consumer, err := store.AcquireSelected()
+	require.NoError(t, err)
+	require.Equal(t, manifest, consumer.Manifest(), "selected release must match the supplied trusted descriptor")
+	expectedIdentity := synthetic.RuntimeIdentity{Version: manifest.Version, SHA256: manifest.Archive.SHA256, Contract: manifest.Contract}
 	base, err := os.MkdirTemp("", "dem-real-runtime-")
 	require.NoError(t, err)
 	safe := true
@@ -67,17 +70,31 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 	require.NoError(t, err)
 	defer func() {
 		if safe {
+			assert.NoError(t, consumer.Close())
+			assert.NoError(t, store.Close())
 			assert.NoError(t, history.Close())
 			assert.NoError(t, captures.Close())
 			assert.NoError(t, os.RemoveAll(base))
 		}
 	}()
-	paths := runner.Paths{
-		Node:         values[0],
-		Dependencies: values[1],
-		Browser:      values[2],
+	observedHistory := &identityHistory{Store: synthetichistory.NewStore(history)}
+	engine := runner.New(selectedRuntime{consumer}, observedHistory, captures)
+	verifyIdentity := func(t *testing.T, run synthetic.Run) {
+		t.Helper()
+		require.Equal(t, &expectedIdentity, run.Runtime)
+		records := observedHistory.records[run.ID]
+		require.Len(t, records, 2, "both start and completion must carry the actual acquired identity")
+		require.Zero(t, records[0].CompletedUS)
+		require.Equal(t, &expectedIdentity, records[0].Runtime)
+		require.Equal(t, &expectedIdentity, records[1].Runtime)
+		retained, err := observedHistory.GetRun(context.Background(), run.JobID, run.ID)
+		require.NoError(t, err)
+		require.Equal(t, &expectedIdentity, retained.Runtime)
+		handler := syntheticfunctions.New(query.New(nil, observedHistory, captures, nil))
+		response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{Method: "synthetics-run", Args: []string{"job_id:" + run.JobID, "run_id:" + run.ID}, Permissions: "0x7b"})
+		require.NotNil(t, response.RawResponse, response.Message)
+		require.Equal(t, &expectedIdentity, response.RawResponse["run"].(map[string]any)["runtime"])
 	}
-	engine := runner.New(assets, fixtureRuntime{Paths: paths}, synthetichistory.NewStore(history), captures)
 	require.NoError(t, engine.Check(context.Background(), synthetic.Journey))
 
 	var mu sync.Mutex
@@ -188,6 +205,7 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 			t.Fatalf("tree not drained: %+v", execution.Run)
 		}
 		require.Empty(t, execution.Run.HistoryError)
+		verifyIdentity(t, execution.Run)
 		t.Logf("%s: %s (%s)", name, execution.Run.Outcome, execution.Run.Error)
 		return execution
 	}
@@ -220,10 +238,51 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 			assert.Equal(t, synthetic.Inconclusive, got.Run.Outcome)
 		}
 	})
+	t.Run("single-entry-helpers-fixtures-and-worker-policy", func(t *testing.T) {
+		input := filepath.Join(base, "script-source")
+		require.NoError(t, os.MkdirAll(input, 0700))
+		require.NoError(t, os.WriteFile(filepath.Join(input, "helper.ts"), []byte(`export const label='fixture ready';`), 0600))
+		require.NoError(t, os.WriteFile(filepath.Join(input, "fixtures.ts"), []byte(`import {test as base} from '@playwright/test';
+export const test=base.extend({message:async({},use)=>{await use('fixture ready')}});
+export {expect} from '@playwright/test';`), 0600))
+		entry := filepath.Join(input, "chosen.spec.ts")
+		require.NoError(t, os.WriteFile(entry, []byte(`import {test,expect} from './fixtures';
+import {label} from './helper';
+test('selected entry',async({message},info)=>{
+ expect(message).toBe(label);
+ expect(info.config.workers).toBe(1);
+ expect(info.config.fullyParallel).toBe(false);
+ expect(info.project.retries).toBe(0);
+ expect(info.retry).toBe(0);
+ expect(process.env.DEM_RUNTIME_INHERITED).toBeUndefined();
+ expect(process.env.DEM_SECRET_TEST).toBe('private-fixture-value');
+ console.log('private-fixture-value');
+});`), 0600))
+		require.NoError(t, os.WriteFile(filepath.Join(input, "unselected.spec.ts"), []byte(`throw new Error('unselected entry must never load');`), 0600))
+		t.Setenv("DEM_RUNTIME_INHERITED", "must-not-reach-worker")
+		got := engine.Execute(context.Background(), synthetic.Request{Kind: synthetic.Journey, Name: "file-contract", ScriptPath: entry, Timeout: 30 * time.Second, Secrets: map[string]string{"DEM_SECRET_TEST": "private-fixture-value"}}, nil)
+		if !got.Drained {
+			safe = false
+			t.Fatal("file-contract tree not drained")
+		}
+		require.Equal(t, synthetic.Success, got.Run.Outcome, got.Run.Error)
+		require.Equal(t, &synthetic.TestCounts{Declared: 1, Passed: 1}, got.Run.Tests)
+		require.Equal(t, "disabled", got.Run.CaptureState)
+		require.Empty(t, got.Run.Artifacts)
+		encoded, err := json.Marshal(got.Run)
+		require.NoError(t, err)
+		require.NotContains(t, string(encoded), "private-fixture-value")
+		verifyIdentity(t, got.Run)
+	})
+	t.Run("capture-disabled-browser-failure", func(t *testing.T) {
+		got := run(t, context.Background(), "no-capture", browserPrefix+"test('fails',async({page})=>{await page.goto("+string(urlJSON)+");expect(1).toBe(2)});", 30*time.Second, false)
+		require.Equal(t, synthetic.Failed, got.Run.Outcome)
+		require.Equal(t, "disabled", got.Run.CaptureState)
+		require.Empty(t, got.Run.Artifacts)
+		verifyGone(t)
+	})
 	t.Run("setup-inability", func(t *testing.T) {
-		missing := paths
-		missing.Browser = filepath.Join(base, "missing-browser")
-		unavailable := runner.New(assets, fixtureRuntime{Paths: missing}, synthetichistory.NewStore(history), captures)
+		unavailable := runner.New(nil, synthetichistory.NewStore(history), captures)
 		require.Error(t, unavailable.Check(context.Background(), synthetic.Journey))
 		got := unavailable.Execute(
 			context.Background(),
@@ -284,6 +343,7 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 			t.Fatal("cancelled tree not drained")
 		}
 		assert.Equal(t, synthetic.Cancelled, got.Run.Outcome)
+		verifyIdentity(t, got.Run)
 		verifyGone(t)
 		mu.Lock()
 		registered = nil
@@ -316,6 +376,7 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 			t.Fatal("Lighthouse tree not drained")
 		}
 		require.Equal(t, synthetic.Success, got.Run.Outcome, got.Run.Error)
+		verifyIdentity(t, got.Run)
 		require.NotNil(t, got.Run.Metrics)
 		require.NotNil(t, got.Run.Metrics.Performance)
 		assert.GreaterOrEqual(t, *got.Run.Metrics.Performance, 0.0)
@@ -326,6 +387,7 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 		_, raw, err := captures.Fetch(context.Background(), got.Run.JobID, got.Run.ID, got.Run.Artifacts[0].ID)
 		require.NoError(t, err)
 		assert.Contains(t, string(raw), "<!doctype html>")
+		assert.Regexp(t, `"formFactor"\s*:\s*"desktop"`, string(raw))
 	})
 }
 
@@ -362,12 +424,42 @@ func readProcIdentity(pid int) (procIdentity, error) {
 	}, nil
 }
 
-type fixtureRuntime struct{ Paths runner.Paths }
+// This adapter exposes only the public execution contract of the acquired
+// consumer. It cannot select a different generation or inject private paths.
+type selectedRuntime struct{ consumer *runtime.Consumer }
 
-func (r fixtureRuntime) BeginUse() (runner.Use, error) { return fixtureUse{r.Paths}, nil }
+func (s selectedRuntime) BeginUse() (runner.Use, error) {
+	use, err := s.consumer.BeginUse()
+	if err != nil {
+		return nil, err
+	}
+	m := s.consumer.Manifest()
+	return selectedUse{use: use, identity: synthetic.RuntimeIdentity{Version: m.Version, SHA256: m.Archive.SHA256, Contract: m.Contract}}, nil
+}
 
-type fixtureUse struct{ paths runner.Paths }
+type selectedUse struct {
+	use      *runtime.Use
+	identity synthetic.RuntimeIdentity
+}
 
-func (u fixtureUse) Paths() runner.Paths                { return u.paths }
-func (u fixtureUse) Completion() *ndexec.TreeCompletion { return nil }
-func (u fixtureUse) Finish(bool) error                  { return nil }
+func (u selectedUse) Paths() runner.Paths {
+	return runner.Paths{Node: u.use.Paths.Node, EntryPoint: u.use.Paths.EntryPoint, Identity: u.identity}
+}
+func (u selectedUse) Completion() *ndexec.TreeCompletion { return u.use.Completion }
+func (u selectedUse) Finish(drained bool) error          { return u.use.Finish(drained) }
+
+type identityHistory struct {
+	*synthetichistory.Store
+	records map[string][]synthetic.Run
+}
+
+func (h *identityHistory) AppendRun(ctx context.Context, phase string, run synthetic.Run) (bool, error) {
+	attempted, err := h.Store.AppendRun(ctx, phase, run)
+	if err == nil {
+		if h.records == nil {
+			h.records = make(map[string][]synthetic.Run)
+		}
+		h.records[run.ID] = append(h.records[run.ID], synthetic.CloneRun(run))
+	}
+	return attempted, err
+}
