@@ -72,14 +72,16 @@ warning() {
 error() {
   echo >&3 "$(date) : ERROR: ${script_name}: " "${1}"
   if [ -n "${NETDATA_SAVE_WARNINGS}" ]; then
-    NETDATA_WARNINGS="${NETDATA_WARNINGS}\n  - ${1}"
+    NETDATA_WARNINGS="${NETDATA_WARNINGS}
+  - ${1}"
   fi
 }
 
 fatal() {
   echo >&3 "$(date) : FATAL: ${script_name}: FAILED TO UPDATE NETDATA: " "${1}"
   if [ -n "${NETDATA_SAVE_WARNINGS}" ]; then
-    NETDATA_WARNINGS="${NETDATA_WARNINGS}\n  - ${1}"
+    NETDATA_WARNINGS="${NETDATA_WARNINGS}
+  - ${1}"
   fi
   exit_reason "${1}" "${2}"
   exit 1
@@ -92,9 +94,15 @@ exit_reason() {
     if [ -n "${NETDATA_PROPAGATE_WARNINGS}" ]; then
       if [ -n "${NETDATA_SCRIPT_STATUS_PATH}" ]; then
         {
-          echo "EXIT_REASON=\"${EXIT_REASON}\""
-          echo "EXIT_CODE=\"${EXIT_CODE}\""
-          echo "NETDATA_WARNINGS=\"${NETDATA_WARNINGS}\""
+          printf '%s' 'EXIT_REASON="'
+          printf '%s' "${EXIT_REASON}" | sed 's/[\\"$`]/\\&/g'
+          printf '"\n'
+          printf '%s' 'EXIT_CODE="'
+          printf '%s' "${EXIT_CODE}" | sed 's/[\\"$`]/\\&/g'
+          printf '"\n'
+          printf '%s' 'NETDATA_WARNINGS="'
+          printf '%s' "${NETDATA_WARNINGS}" | sed 's/[\\"$`]/\\&/g'
+          printf '"\n'
         } >> "${NETDATA_SCRIPT_STATUS_PATH}"
       else
         export EXIT_REASON
