@@ -29,7 +29,7 @@ You can find this command in three places in the UI:
 
 **Verifying node ownership:** As part of the connection flow, your Agent's local dashboard displays a command to run directly on the machine whose Agent you are connecting — not on your local workstation or any other machine. The command reads a random session ID (a UUID) that the Agent generates at startup and writes to its library directory (`/var/lib/netdata/` by default, following the `lib` option under the `[directories]` section of `netdata.conf`). Copy the output and paste it back into the dialog. This proves you have administrative access to the node and prevents unauthorized claiming of machines you do not control.
 
-If your pasted UUID is rejected with `invalid key`, it is single-use: every claim attempt (including failed ones) regenerates a new one. See [Pasted verification UUID rejected as invalid key](#pasted-verification-uuid-rejected-as-invalid-key).
+If your pasted UUID is rejected with `invalid key`, it is single-use: every claim attempt that presents the correct key regenerates a new one, including failed submissions. A request with a wrong key does not regenerate it. See [Pasted verification UUID rejected as invalid key](#pasted-verification-uuid-rejected-as-invalid-key).
 
 :::
 
