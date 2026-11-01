@@ -83,4 +83,5 @@ jobs:
           CARGO_TERM_COLOR: always
         run: |
           cargo --version
-          cargo test --locked --workspace --exclude netflow-plugin --exclude netipc
+          sh "$GITHUB_WORKSPACE/.github/scripts/ci-package.sh" cargo fetch --locked
+          cargo test --offline --locked --workspace --exclude netflow-plugin --exclude netipc

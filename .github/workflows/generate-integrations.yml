@@ -61,10 +61,10 @@ jobs:
       - name: Prepare Dependencies
         id: prep-deps
         run: |
-          sudo apt-get install python3-venv
+          sudo sh .github/scripts/ci-package.sh apt-get install python3-venv
           python3 -m venv ./virtualenv
           source ./virtualenv/bin/activate
-          ./integrations/pip.sh
+          sh .github/scripts/ci-package.sh ./integrations/pip.sh
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
