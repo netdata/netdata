@@ -86,6 +86,23 @@ All nodes automatically appear in the "All nodes" Room. Each Room has independen
 1. Click the ⚙️ next to the Room name
 2. Manage room access, node grouping, dashboard settings, and monitoring configurations
 
+### Move or Add Nodes to a Room
+
+Each node belongs to one Space but can be a member of **multiple Rooms** within that Space, so "moving" a node between Rooms means adding it to the destination Room and, optionally, removing it from the source Room.
+
+**Steps to add existing nodes to a Room:**
+
+1. Open the destination Room.
+2. Click the ⚙️ next to the Room name to open **Room settings**.
+3. Select the **Nodes** tab.
+4. Add the existing nodes from the Space to this Room.
+
+To move a node out of a Room, remove it from that Room's **Nodes** tab. A node's membership in one Room is independent of its membership in any other Room, so removing it from the source Room does not affect the destination Room.
+
+Only **Admins** and **Managers** can add existing nodes to a Room and remove nodes from a Room. See the [Room Management table in the RBAC reference](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md) for the full permissions matrix.
+
+Node memberships are either **STATIC** (added manually) or **RULE** (added automatically by label-based rules). For automated assignment based on host labels instead of manual moves, see [Node Rule-Based Room Assignment](/docs/netdata-cloud/node-rule-based-room-assignment.md).
+
 ### Leaving a Room
 
 Any user with Room access — **Admin**, **Manager**, **Troubleshooter**, or **Observer** — can leave a Room. **Billing** users do not have Room access and cannot leave a Room.
