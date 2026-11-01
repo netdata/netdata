@@ -18,12 +18,21 @@ static inline void pluginsd_sleep(const int seconds) {
 
 inline size_t pluginsd_initialize_plugin_directories()
 {
-    char plugins_dirs[(FILENAME_MAX * 2) + 1];
+    // Two quoted paths + literal overhead: "\"%s\" \"%s/custom-plugins.d\""
+    // adds 22 chars beyond the two path lengths; +32 gives a safe margin.
+    char plugins_dirs[(FILENAME_MAX * 2) + 32];
     static char *plugins_dir_list = NULL;
 
     // Get the configuration entry
     if (likely(!plugins_dir_list)) {
-        snprintfz(plugins_dirs, FILENAME_MAX * 2, "\"%s\" \"%s/custom-plugins.d\"", PLUGINS_DIR, CONFIG_DIR);
+        // Windows resolves install paths at runtime; POSIX keeps the compile-time config root.
+#if defined(OS_WINDOWS)
+        snprintfz(plugins_dirs, sizeof(plugins_dirs), "\"%s\" \"%s/custom-plugins.d\"",
+                  netdata_configured_primary_plugins_dir, netdata_configured_user_config_dir);
+#else
+        snprintfz(plugins_dirs, sizeof(plugins_dirs), "\"%s\" \"%s/custom-plugins.d\"",
+                  netdata_configured_primary_plugins_dir, CONFIG_DIR);
+#endif
         plugins_dir_list = strdupz(inicfg_get_quoted_path_list(&netdata_config, CONFIG_SECTION_DIRECTORIES, "plugins", plugins_dirs));
     }
 
@@ -431,14 +440,13 @@ void *pluginsd_main(void *ptr) {
 
                     {
                         const char *def = "";
-                        char buf[PLUGINSD_CMD_MAX + 1];
-
-                        snprintfz(
-                            buf, sizeof(buf), "exec %s %d %s", string2str(cd->fullfilename),
+                        CLEAN_BUFFER *command = buffer_create(0, NULL);
+                        buffer_sprintf(
+                            command, "exec \"%s\" %d %s", string2str(cd->fullfilename),
                             cd->update_every, inicfg_get(&netdata_config, string2str(cd->id), "command options", def));
 
                         string_freez(cd->cmd);
-                        cd->cmd = string_strdupz(buf);
+                        cd->cmd = string_strdupz(buffer_tostring(command));
                     }
 
                     // link it

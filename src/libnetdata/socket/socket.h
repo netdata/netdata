@@ -13,6 +13,10 @@ int wait_on_socket_or_cancel_with_timeout(NETDATA_SSL *ssl, int fd, int timeout_
 bool fd_is_socket(int fd);
 bool is_socket_closed(int fd);
 
+// Creates a connected socket pair suitable for Windows WSAPoll wakeups.
+// POSIX callers may continue to use pipes where that is the established contract.
+bool sock_create_loopback_pair(int fds[2]);
+
 // Returns -1 for errors, 0 if TCP_DEFER_ACCEPT is unset, 1 if TCP_DEFER_ACCEPT is set
 int sock_set_tcp_defer_accept(int fd, bool defer);
 
@@ -50,6 +54,13 @@ int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags);
 #define DEFAULT_SOCKET_FLAGS SOCK_CLOEXEC
 #else
 #define DEFAULT_SOCKET_FLAGS 0
+#endif
+
+// Portable socket close: Winsock SOCKETs require closesocket(), not CRT close()
+#if defined(OS_WINDOWS)
+#  define sock_close(fd) closesocket((SOCKET)(fd))
+#else
+#  define sock_close(fd) close(fd)
 #endif
 
 
