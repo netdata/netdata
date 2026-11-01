@@ -57,7 +57,7 @@ struct rrdengine_journalfile {
 
     struct {
         NJTF_STATE state;               // atomic; see journalfile-filter.h
-        uint8_t *map;                   // the mapped .njtf file, while state is NJTF_STATE_VALID
+        uint8_t *map;                   // the mapped .njtf file; kept until njtf_release() at journal close
         size_t map_size;
         uint64_t disk_bytes;            // atomic; the filter file size charged to the tier's disk space
     } njtf;

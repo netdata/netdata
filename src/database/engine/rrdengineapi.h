@@ -230,8 +230,9 @@ struct rrdeng_cache_efficiency_stats {
     PAD64(size_t) journal_v2_lookups_range_skipped;    // the metric is there, but its range misses the window
     PAD64(size_t) journal_v2_lookups_filter_skipped;   // the time filter rules the journal out
 
-    // the time filter's verdict on tier-0 lookups; each tier-0 lookup gets exactly one
-    PAD64(size_t) journal_v2_lookups_filter_passed;    // the filter says the metric may be there: searched
+    // the time filter's verdict on tier-0 lookups: each tier-0 lookup gets exactly one of filter skipped (above),
+    // filter passed or filter bypassed
+    PAD64(size_t) journal_v2_lookups_filter_passed;    // the filter says the metric may be there: the lookup goes on
     PAD64(size_t) journal_v2_lookups_filter_bypassed;  // no usable time filter, or too many hours to check
 };
 
