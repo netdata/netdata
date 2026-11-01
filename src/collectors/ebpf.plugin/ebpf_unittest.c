@@ -49,6 +49,189 @@ static uint32_t ebpf_ut_map_value_size(const struct bpf_map *map)
         }                                                                                                              \
     } while (0)
 
+_Static_assert(NETDATA_V5_16 == (1u << NETDATA_IDX_V5_16), "5.16 selector mismatch");
+_Static_assert(NETDATA_V5_17 == (1u << NETDATA_IDX_V5_17), "5.17 selector mismatch");
+_Static_assert(NETDATA_V6_8 == (1u << NETDATA_IDX_V6_8), "6.8 selector mismatch");
+_Static_assert(NETDATA_V6_12 == (1u << NETDATA_IDX_V6_12), "6.12 selector mismatch");
+_Static_assert(NETDATA_V7_0 == (1u << NETDATA_IDX_V7_0), "7.0 selector mismatch");
+_Static_assert(NETDATA_V6_16_2 == (1u << NETDATA_IDX_V6_16_2), "6.16.2 selector mismatch");
+
+static int test_disk_kernel_variants(void)
+{
+    for (size_t i = 0; ebpf_modules[i].info.thread_name; i++) {
+        if (!strcmp(ebpf_modules[i].info.thread_name, "disk")) {
+            const uint32_t expected = NETDATA_V5_11 | NETDATA_V5_16 | NETDATA_V5_17 | NETDATA_V6_8 | NETDATA_V6_12;
+            return (ebpf_modules[i].kernels & expected) == expected &&
+                   ebpf_select_disk_index(ebpf_modules[i].kernels, 10 * 256, NETDATA_EBPF_KERNEL_6_12) == NETDATA_IDX_V6_12 &&
+                   ebpf_select_disk_index(ebpf_modules[i].kernels, 10 * 256, NETDATA_EBPF_KERNEL_6_12 + 3) == NETDATA_IDX_V6_12 &&
+                   ebpf_select_disk_index(ebpf_modules[i].kernels, 10 * 256, NETDATA_EBPF_KERNEL_6_12 + 256) == NETDATA_IDX_V5_14 &&
+                   ebpf_select_disk_index(ebpf_modules[i].kernels, 10 * 256, NETDATA_EBPF_KERNEL_6_16) == NETDATA_IDX_V5_14 &&
+                   ebpf_select_disk_index(ebpf_modules[i].kernels, -1, NETDATA_EBPF_KERNEL_6_16_2 - 1) == NETDATA_IDX_V6_12 &&
+                   ebpf_select_disk_index(ebpf_modules[i].kernels, -1, NETDATA_EBPF_KERNEL_6_16_2) == NETDATA_IDX_V6_16_2 &&
+                   ebpf_select_disk_index(ebpf_modules[i].kernels, -1, NETDATA_EBPF_KERNEL_6_16_2 + 1) == NETDATA_IDX_V6_12 &&
+                   ebpf_select_disk_index(ebpf_modules[i].kernels, -1, NETDATA_EBPF_KERNEL_7_0) == NETDATA_IDX_V6_12 &&
+                   ebpf_select_disk_index(ebpf_modules[i].kernels, 11 * 256, NETDATA_EBPF_KERNEL_6_12) != NETDATA_IDX_V6_12 &&
+                   ebpf_select_disk_index(ebpf_modules[i].kernels, 9 * 256, NETDATA_EBPF_KERNEL_6_12) == NETDATA_IDX_V5_14 &&
+                   ebpf_select_disk_index(ebpf_modules[i].kernels, 9 * 256, NETDATA_EBPF_KERNEL_5_17) == NETDATA_IDX_V5_14 &&
+                   ebpf_select_disk_index(ebpf_modules[i].kernels, -1, NETDATA_EBPF_KERNEL_6_12) == NETDATA_IDX_V6_12;
+        }
+    }
+
+    return 0;
+}
+
+static int test_legacy_disk_support_window(void)
+{
+    return ebpf_legacy_disk_supported(9 * 256, NETDATA_EBPF_KERNEL_5_16) &&
+           !ebpf_legacy_disk_supported(9 * 256, NETDATA_EBPF_KERNEL_5_17) &&
+           !ebpf_legacy_disk_supported(10 * 256, NETDATA_EBPF_KERNEL_6_12 - 256) &&
+           ebpf_legacy_disk_supported(10 * 256, NETDATA_EBPF_KERNEL_6_12) &&
+           ebpf_legacy_disk_supported(10 * 256, NETDATA_EBPF_KERNEL_6_12 + 3) &&
+           !ebpf_legacy_disk_supported(10 * 256, NETDATA_EBPF_KERNEL_6_16) &&
+           !ebpf_legacy_disk_supported(11 * 256, NETDATA_EBPF_KERNEL_6_12) &&
+           ebpf_legacy_disk_supported(-1, NETDATA_EBPF_KERNEL_6_12) &&
+           ebpf_legacy_disk_supported(-1, NETDATA_EBPF_KERNEL_6_12 + 256) &&
+           ebpf_legacy_disk_supported(-1, NETDATA_EBPF_KERNEL_6_16);
+}
+
+static int test_legacy_artifact_family_support(void)
+{
+    return ebpf_legacy_artifact_family_supported("swap", 7 * 256, 3 * 65536 + 10 * 256) &&
+           !ebpf_legacy_artifact_family_supported("dns", 7 * 256, 3 * 65536 + 10 * 256) &&
+           ebpf_legacy_artifact_family_supported("disk", -1, NETDATA_EBPF_KERNEL_6_8 + 2 * 256) &&
+           ebpf_legacy_artifact_family_supported("process", -1, NETDATA_EBPF_KERNEL_6_8 + 2 * 256) &&
+           ebpf_legacy_artifact_family_supported("dns", -1, NETDATA_EBPF_KERNEL_6_12) &&
+           ebpf_legacy_artifact_family_supported("disk", -1, NETDATA_EBPF_KERNEL_6_16) &&
+           ebpf_legacy_artifact_family_supported("process", -1, NETDATA_EBPF_KERNEL_7_0) &&
+           ebpf_legacy_artifact_family_supported("dns", -1, NETDATA_EBPF_KERNEL_7_0) &&
+           ebpf_legacy_artifact_family_supported("dns", 10 * 256, NETDATA_EBPF_KERNEL_6_12) &&
+           !ebpf_legacy_artifact_family_supported("swap", 9 * 256, NETDATA_EBPF_KERNEL_5_17);
+}
+
+static int test_generic612_module_masks(void)
+{
+    for (size_t i = 0; ebpf_modules[i].info.thread_name; i++) {
+        if (ebpf_modules[i].kernels && !(ebpf_modules[i].kernels & NETDATA_V6_12))
+            return 0;
+    }
+
+    for (size_t i = 0; localfs[i].filesystem; i++) {
+        if (!(localfs[i].kernels & NETDATA_V6_12))
+            return 0;
+    }
+
+    return 1;
+}
+
+static int test_generic6162_artifact_masks(void)
+{
+    for (size_t i = 0; ebpf_modules[i].info.thread_name; i++) {
+        const char *name = ebpf_modules[i].info.thread_name;
+        bool expected = !strcmp(name, "disk") || !strcmp(name, "swap");
+        if (!!(ebpf_modules[i].kernels & NETDATA_V6_16_2) != expected ||
+            (ebpf_modules[i].rhel10_kernels & NETDATA_V6_16_2))
+            return 0;
+    }
+
+    return 1;
+}
+
+static int test_red_hat_kernel_lineage(void)
+{
+    return ebpf_rhf_kernel_lineage_matches("6.12.0-124.8.1.el10_1.x86_64", 10 * 256, 0) &&
+           ebpf_rhf_kernel_lineage_matches("5.14.0-503.el9.x86_64", 9 * 256, 0) &&
+           !ebpf_rhf_kernel_lineage_matches("6.12.1-1.el9.elrepo.x86_64", 9 * 256, 0) &&
+           !ebpf_rhf_kernel_lineage_matches("5.15.0-300.el8uek.x86_64", 8 * 256, 0) &&
+           ebpf_rhf_kernel_lineage_matches("5.4.17-2136.328.3.el8uek.x86_64", 8 * 256, 0) &&
+           !ebpf_rhf_kernel_lineage_matches("5.4.17-2136.328.3.el7uek.x86_64", 7 * 256, 0) &&
+           !ebpf_rhf_kernel_lineage_matches("5.4.17-2136.328.3.el8uek.x86_64", 9 * 256, 0) &&
+           !ebpf_rhf_kernel_lineage_matches("5.14.0-503.el8.x86_64", 9 * 256, 0) &&
+           ebpf_rhf_kernel_lineage_matches("3.10.0-1160.119.1.el7.x86_64", 7 * 256 + 9, 0) &&
+           !ebpf_rhf_kernel_lineage_matches("6.8.5-301.fc40.x86_64", 40 * 256, 0) &&
+           !ebpf_rhf_kernel_lineage_matches("4.14.355-277.643.amzn2.x86_64", 2 * 256, 0) &&
+           ebpf_rhf_kernel_lineage_matches("3.10.0-962.3.2.lve1.5.39.el7.x86_64", 7 * 256 + 9, 1) &&
+           ebpf_rhf_kernel_lineage_matches("4.18.0-553.177.1.lve.el7h.x86_64", 7 * 256 + 9, 1) &&
+           ebpf_rhf_kernel_lineage_matches("4.18.0-553.150.1.lve.1.el7h.x86_64", 7 * 256 + 9, 1) &&
+           !ebpf_rhf_kernel_lineage_matches("4.18.0-553.177.1.el7h.x86_64", 7 * 256 + 9, 1) &&
+           ebpf_rhf_kernel_lineage_matches("4.18.0-425.lve.el8.x86_64", 8 * 256, 1) &&
+           !ebpf_rhf_kernel_lineage_matches("3.10.0-962.3.2.lve1.5.39.el7.x86_64", 8 * 256, 1) &&
+           !ebpf_rhf_kernel_lineage_matches("3.10.0-962.3.2.lve1.5.39.x86_64", 7 * 256 + 9, 1) &&
+           !ebpf_rhf_kernel_lineage_matches("3.10.0-962.3.2.lve1.5.39.el7.x86_64", 7 * 256 + 9, 0) &&
+           !ebpf_rhf_kernel_lineage_matches("4.18.0-425.lve.el8.x86_64", 8 * 256, 0);
+}
+
+static int test_rhel10_selector_respects_module_mask(void)
+{
+    const uint32_t old_kernel_mask = NETDATA_V5_4 | NETDATA_V5_14 | NETDATA_V6_8;
+    const uint32_t with_612_mask = old_kernel_mask | NETDATA_V6_12;
+
+    return ebpf_select_index(old_kernel_mask, 10 * 256, NETDATA_EBPF_KERNEL_6_12) == NETDATA_IDX_V6_8 &&
+           ebpf_select_index(with_612_mask, 10 * 256, NETDATA_EBPF_KERNEL_6_12) == NETDATA_IDX_V6_12;
+}
+
+static int test_selector_bit_zero_and_empty_mask(void)
+{
+    const int kernel_3_10 = 3 * 65536 + 10 * 256;
+    return ebpf_select_index(NETDATA_V3_10, -1, kernel_3_10) == NETDATA_IDX_V3_10 &&
+           ebpf_select_index(NETDATA_V5_4, -1, kernel_3_10) == UINT32_MAX &&
+           ebpf_select_index(0, -1, NETDATA_EBPF_KERNEL_6_12) == UINT32_MAX;
+}
+
+static int test_rhel10_module_masks(void)
+{
+    for (size_t i = 0; ebpf_modules[i].info.thread_name; i++) {
+        ebpf_module_t *em = &ebpf_modules[i];
+        if (!em->kernels)
+            continue;
+
+        if (!(em->rhel10_kernels & NETDATA_V6_12) ||
+            ebpf_select_module_index(em, 10 * 256, NETDATA_EBPF_KERNEL_6_12) != NETDATA_IDX_V6_12 ||
+            ebpf_select_module_index(em, -1, NETDATA_EBPF_KERNEL_6_12) !=
+                ebpf_select_index(em->kernels, -1, NETDATA_EBPF_KERNEL_6_12))
+            return 0;
+    }
+
+    for (size_t i = 0; localfs[i].filesystem; i++) {
+        ebpf_module_t em = {.info.thread_name = localfs[i].filesystem,
+                            .kernels = localfs[i].kernels,
+                            .rhel10_kernels = localfs[i].rhel10_kernels};
+        if (!(em.rhel10_kernels & NETDATA_V6_12) ||
+            ebpf_select_module_index(&em, 10 * 256, NETDATA_EBPF_KERNEL_6_12) != NETDATA_IDX_V6_12 ||
+            ebpf_select_module_index(&em, -1, NETDATA_EBPF_KERNEL_6_12) !=
+                ebpf_select_index(em.kernels, -1, NETDATA_EBPF_KERNEL_6_12))
+            return 0;
+    }
+
+    return 1;
+}
+
+static int test_redhat_release_version_parser(void)
+{
+    return ebpf_parse_redhat_release_version("Red Hat Enterprise Linux release 10.0 (Coughlan)") == 2560 &&
+           ebpf_parse_redhat_release_version("CentOS Stream release 9") == 2304 &&
+           ebpf_parse_redhat_release_version("CentOS Linux release 7.9.2009 (Core)") == 1801 &&
+           ebpf_parse_redhat_release_version("AlmaLinux release 9.6 (Sage Margay)") == 2310 &&
+           ebpf_parse_redhat_release_version("CloudLinux release 7.9") == 1801 &&
+           ebpf_parse_redhat_release_version("CloudLinux release 8.10 (Shared)") == 2058 &&
+           ebpf_parse_redhat_release_version("Scientific Linux release 7.9 (Nitrogen)") == 1801 &&
+           ebpf_parse_redhat_release_version("EuroLinux release 9.4 (Kyiv)") == 2308 &&
+           ebpf_parse_redhat_release_version("MIRACLE LINUX release 8.4 (Peony)") == 2052 &&
+           ebpf_parse_redhat_release_version("release 7.9") == -1 &&
+           ebpf_parse_redhat_release_version("not a Red Hat release") == -1;
+}
+
+static int test_redhat_os_release_parser(void)
+{
+    return ebpf_parse_redhat_release_from_os_release("ID=almalinux\nVERSION_ID=10.1\n") == 2561 &&
+           ebpf_parse_redhat_release_from_os_release("ID=cloudlinux\nVERSION_ID=\"7.9\"\n") == 1801 &&
+           ebpf_parse_redhat_release_from_os_release("ID=cloudlinux\r\nVERSION_ID=\"8.10\"\r\n") == 2058 &&
+           ebpf_parse_redhat_release_from_os_release("ID=rocky\nVERSION_ID=9.6.1\n") == 2310 &&
+           ebpf_parse_redhat_release_from_os_release("ID=rocky\nVERSION_ID=9.6.bad\n") == -1 &&
+           ebpf_parse_redhat_release_from_os_release("ID=centos\nID_LIKE=\"rhel fedora\"\nVERSION_ID=9\n") == 2304 &&
+           ebpf_parse_redhat_release_from_os_release("ID=amzn\nID_LIKE=\"centos rhel fedora\"\nVERSION_ID=2\n") == -1 &&
+           ebpf_parse_redhat_release_from_os_release("ID=fedora\nID_LIKE=\"rhel\"\nVERSION_ID=42\n") == -1;
+}
+
 static int ebpf_ut_percpu_lookup_fits_nprocs(struct bpf_object *obj)
 {
     const int possible_cpus = libbpf_num_possible_cpus();
@@ -131,7 +314,9 @@ void ebpf_ut_initialize_structure(netdata_run_mode_t mode)
     test_em.info.thread_name = strdupz("process");
     test_em.info.config_name = test_em.info.thread_name;
     test_em.kernels =
-        NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_10 | NETDATA_V5_14;
+        NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_10 |
+        NETDATA_V5_14 | NETDATA_V6_12 | NETDATA_V7_0;
+    test_em.rhel10_kernels = test_em.kernels;
     test_em.pid_map_size = ND_EBPF_DEFAULT_PID_SIZE;
     test_em.apps_level = NETDATA_APPS_LEVEL_REAL_PARENT;
     test_em.mode = mode;
@@ -156,6 +341,17 @@ void ebpf_ut_cleanup_memory()
  */
 static int ebpf_ut_load_binary()
 {
+    if (!test_disk_kernel_variants() || !test_legacy_disk_support_window() ||
+        !test_legacy_artifact_family_support() || !test_generic612_module_masks() ||
+        !test_generic6162_artifact_masks() ||
+        !test_red_hat_kernel_lineage() ||
+        !test_rhel10_selector_respects_module_mask() || !test_selector_bit_zero_and_empty_mask() ||
+        !test_rhel10_module_masks() ||
+        !test_redhat_release_version_parser() || !test_redhat_os_release_parser()) {
+        fprintf(stderr, ">>> FAILED: kernel version parsing or legacy selectors are inconsistent\n");
+        return -1;
+    }
+
     test_em.probe_links = ebpf_load_program(ebpf_plugin_dir, &test_em, running_on_kernel, isrh, &test_em.objects);
     if (!test_em.probe_links)
         return -1;
