@@ -2881,9 +2881,9 @@ static int mrg_jv2_close_unavailable_referenced_check(void) {
         sleep_usec(10 * USEC_PER_MS);
 
     if(!__atomic_load_n(&c.done, __ATOMIC_ACQUIRE)) {
-        // the closing thread is stuck and still uses the fixture: report and leak it all
-        fprintf(stderr, "ERROR: closing an unavailable journal v2 did not finish after its reader released it\n");
-        return errors + 1;
+        // the closing thread is stuck and still uses t and c on this stack frame:
+        // returning would let it write into frames the next tests reuse, joining would hang
+        fatal("closing an unavailable journal v2 did not finish after its reader released it");
     }
     nd_thread_join(th);
 
