@@ -2,6 +2,8 @@
 
 package postgres
 
+import "strings"
+
 func queryServerVersion() string {
 	return "SHOW server_version_num;"
 }
@@ -553,13 +555,10 @@ ORDER BY datname,
 `
 }
 
-func queryUserTablesCount() string {
-	return "SELECT count(*) from  pg_stat_user_tables;"
-}
-
-func queryStatUserTables() string {
-	return `
+func queryStatUserTables(filtered bool) string {
+	q := `
 SELECT current_database()                                   as datname,
+       relid,
        schemaname,
        relname,
        inh.parent_relname,
@@ -594,11 +593,16 @@ LEFT JOIN(
   ) AS inh ON inh.child_oid = relid 
 WHERE has_schema_privilege(schemaname, 'USAGE');
 `
+	if filtered {
+		q = strings.Replace(q, "WHERE has_schema_privilege", "WHERE relid = ANY($1::oid[]) AND has_schema_privilege", 1)
+	}
+	return q
 }
 
-func queryStatIOUserTables() string {
-	return `
+func queryStatIOUserTables(filtered bool) string {
+	q := `
 SELECT current_database()                                       AS datname,
+       relid,
        schemaname,
        relname,
        inh.parent_relname,
@@ -622,15 +626,16 @@ LEFT JOIN(
   ) AS inh ON inh.child_oid = relid
 WHERE has_schema_privilege(schemaname, 'USAGE');
 `
+	if filtered {
+		q = strings.Replace(q, "WHERE has_schema_privilege", "WHERE relid = ANY($1::oid[]) AND has_schema_privilege", 1)
+	}
+	return q
 }
 
-func queryUserIndexesCount() string {
-	return "SELECT count(*) from  pg_stat_user_indexes;"
-}
-
-func queryStatUserIndexes() string {
-	return `
+func queryStatUserIndexes(filtered bool) string {
+	q := `
 SELECT current_database()                                as datname,
+       indexrelid,
        schemaname,
        relname,
        indexrelname,
@@ -651,6 +656,10 @@ LEFT JOIN(
   ) AS inh ON inh.child_oid = relid
 WHERE has_schema_privilege(schemaname, 'USAGE');
 `
+	if filtered {
+		q = strings.Replace(q, "WHERE has_schema_privilege", "WHERE indexrelid = ANY($1::oid[]) AND has_schema_privilege", 1)
+	}
+	return q
 }
 
 // The following query for bloat was taken from the venerable check_postgres
@@ -659,8 +668,8 @@ WHERE has_schema_privilege(schemaname, 'USAGE');
 // Copyright (c) 2007-2017 Greg Sabino Mullane
 //------------------------------------------------------------------------------
 
-func queryBloat() string {
-	return `
+func queryBloat(filtered bool) string {
+	q := `
 SELECT
   current_database() AS db, schemaname, tablename, reltuples::bigint AS tups, relpages::bigint AS pages, otta,
   ROUND(CASE WHEN otta=0 OR sml.relpages=0 OR sml.relpages=otta THEN 0.0 ELSE sml.relpages/otta::numeric END,1) AS tbloat,
@@ -732,10 +741,22 @@ FROM (
 ) AS sml
 WHERE sml.relpages - otta > 10 OR ipages - iotta > 10;
 `
+	if filtered {
+		q = `WITH selected_tables AS (
+ SELECT relid AS oid FROM pg_stat_user_tables
+ WHERE has_schema_privilege(schemaname, 'USAGE') AND ($1::oid[] IS NULL OR relid = ANY($1::oid[]))
+ UNION SELECT relid FROM pg_stat_user_indexes
+ WHERE has_schema_privilege(schemaname, 'USAGE') AND ($2::oid[] IS NULL OR indexrelid = ANY($2::oid[]))
+) ` + q
+		q = strings.Replace(q, "pg_class cc", "pg_class cc JOIN selected_tables selected_cc ON selected_cc.oid = cc.oid", 1)
+		q = strings.Replace(q, "WHERE att.attnum > 0", "WHERE tbl.oid IN (SELECT oid FROM selected_tables) AND att.attnum > 0", 1)
+		q = strings.Replace(q, "ON indrelid = cc.oid", "ON indrelid = cc.oid AND ($2::oid[] IS NULL OR i.indexrelid = ANY($2::oid[]))", 1)
+	}
+	return q
 }
 
-func queryColumnsStats() string {
-	return `
+func queryColumnsStats(filtered bool) string {
+	q := `
 SELECT current_database()        AS datname,
        nspname                   AS schemaname,
        relname,
@@ -764,7 +785,7 @@ FROM pg_class c
          JOIN
      pg_stats st
      ON
-         (st.tablename = relname AND st.attname = at.attname)
+         (st.schemaname = ns.nspname AND st.tablename = relname AND st.attname = at.attname)
 WHERE relkind = 'r'
   AND nspname NOT LIKE E'pg\\_%'
   AND nspname != 'information_schema'
@@ -775,4 +796,8 @@ ORDER BY nspname,
          relname,
          st.attname;
 `
+	if filtered {
+		q = strings.Replace(q, "WHERE relkind", "WHERE c.oid = ANY($1::oid[]) AND relkind", 1)
+	}
+	return q
 }
