@@ -328,6 +328,20 @@
 - FreeBSD network metrics ([#24459](https://github.com/netdata/netdata/issues/24459))
 - Regenerate integrations docs ([#24508](https://github.com/netdata/netdata/issues/24508))
 - Ml: keep the dimension anomaly score threshold reachable ([#24499](https://github.com/netdata/netdata/issues/24499))
+- Docs: explain interpolation of non-incremental metrics in dbengine ([#24487](https://github.com/netdata/netdata/issues/24487))
+- Build(deps): bump github.com/catonetworks/cato-go-sdk from 1.1.2 to 1.1.3 in /src/go ([#24513](https://github.com/netdata/netdata/issues/24513))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/credentials from 1.20.10 to 1.20.12 in /src/go ([#24514](https://github.com/netdata/netdata/issues/24514))
+- Build(deps): bump google.golang.org/grpc from 1.84.0 to 1.85.0 in /src/go ([#24517](https://github.com/netdata/netdata/issues/24517))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/service/s3 from 1.114.5 to 1.114.6 in /src/go ([#24518](https://github.com/netdata/netdata/issues/24518))
+- Build(deps): bump github.com/vmware/govmomi from 0.56.1 to 0.56.2 in /src/go ([#24523](https://github.com/netdata/netdata/issues/24523))
+- Build(deps): bump github.com/prometheus/common from 0.72.1 to 0.73.0 in /src/go ([#24522](https://github.com/netdata/netdata/issues/24522))
+- Build(deps): bump golang.org/x/net from 0.61.0 to 0.62.0 in /src/go ([#24521](https://github.com/netdata/netdata/issues/24521))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi from 1.41.4 to 1.41.7 in /src/go ([#24519](https://github.com/netdata/netdata/issues/24519))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/config from 1.33.10 to 1.33.12 in /src/go ([#24525](https://github.com/netdata/netdata/issues/24525))
+- Build(deps): bump k8s.io/client-go from 0.37.1 to 0.37.2 in /src/go ([#24526](https://github.com/netdata/netdata/issues/24526))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/service/cloudwatch from 1.75.1 to 1.75.2 in /src/go ([#24527](https://github.com/netdata/netdata/issues/24527))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/service/rds from 1.131.1 to 1.131.2 in /src/go ([#24520](https://github.com/netdata/netdata/issues/24520))
+- Test(go.d): fix restart continuation deadline flake ([#24524](https://github.com/netdata/netdata/issues/24524))
 
 ## [2.12.0] - 2026-09-30
 
