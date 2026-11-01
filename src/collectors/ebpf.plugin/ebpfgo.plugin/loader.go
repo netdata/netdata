@@ -91,7 +91,9 @@ const (
 )
 
 var kernelReleaseRe = regexp.MustCompile(`^([0-9]+)\.([0-9]+)\.([0-9]+)`)
-var redHatReleaseRe = regexp.MustCompile(`(?i)^\s*(red hat|centos|almalinux|rocky linux|cloudlinux).*?release[[:space:]]+([0-9]+)(\.([0-9]+))?`)
+
+// Any vendor name is accepted (RHEL rebuilds); redHatKernelLineageMatches decides Red Hat handling.
+var redHatReleaseRe = regexp.MustCompile(`(?i)^\s*(\S.*?)release[[:space:]]+([0-9]+)(\.([0-9]+))?`)
 var redHatKernelReleaseRe = regexp.MustCompile(`\.el([0-9]+)(?:_[0-9]+)?(?:\.|$)`)
 
 // CloudLinux 7 hybrid kernels (4.18-based) use an "el7h" suffix.

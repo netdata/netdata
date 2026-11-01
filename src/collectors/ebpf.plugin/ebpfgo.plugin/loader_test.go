@@ -209,6 +209,18 @@ func TestRedHatReleaseFromFile(t *testing.T) {
 			contents: "CloudLinux release 8.10 (Shared)",
 			want:     2058,
 		},
+		"scientific linux 7 rebuild": {
+			contents: "Scientific Linux release 7.9 (Nitrogen)",
+			want:     1801,
+		},
+		"eurolinux 9 rebuild": {
+			contents: "EuroLinux release 9.4 (Kyiv)",
+			want:     2308,
+		},
+		"miracle linux 8 rebuild": {
+			contents: "MIRACLE LINUX release 8.4 (Peony)",
+			want:     2052,
+		},
 	}
 
 	for name, tc := range tests {
@@ -502,6 +514,9 @@ func TestRedHatKernelLineageMatches(t *testing.T) {
 		"UEK6 on OL7":               {release: "5.4.17-2136.328.3.el7uek.x86_64", rhf: 7 * 256, want: false},
 		"UEK6 with wrong major":     {release: "5.4.17-2136.328.3.el8uek.x86_64", rhf: 9 * 256, want: false},
 		"wrong el major":            {release: "5.14.0-503.el8.x86_64", rhf: 9 * 256, want: false},
+		"EL7 rebuild kernel":        {release: "3.10.0-1160.119.1.el7.x86_64", rhf: 7*256 + 9, want: true},
+		"Fedora kernel":             {release: "6.8.5-301.fc40.x86_64", rhf: 40 * 256, want: false},
+		"Amazon Linux 2 kernel":     {release: "4.14.355-277.643.amzn2.x86_64", rhf: 2 * 256, want: false},
 		"CloudLinux 7 lve":          {release: "3.10.0-962.3.2.lve1.5.39.el7.x86_64", rhf: 7*256 + 9, cloudLinux: true, want: true},
 		"CloudLinux 7 hybrid":       {release: "4.18.0-553.177.1.lve.el7h.x86_64", rhf: 7*256 + 9, cloudLinux: true, want: true},
 		"CloudLinux 7 hybrid lve.1": {release: "4.18.0-553.150.1.lve.1.el7h.x86_64", rhf: 7*256 + 9, cloudLinux: true, want: true},

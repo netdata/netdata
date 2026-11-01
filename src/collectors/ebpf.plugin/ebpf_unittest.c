@@ -146,6 +146,9 @@ static int test_red_hat_kernel_lineage(void)
            !ebpf_rhf_kernel_lineage_matches("5.4.17-2136.328.3.el7uek.x86_64", 7 * 256, 0) &&
            !ebpf_rhf_kernel_lineage_matches("5.4.17-2136.328.3.el8uek.x86_64", 9 * 256, 0) &&
            !ebpf_rhf_kernel_lineage_matches("5.14.0-503.el8.x86_64", 9 * 256, 0) &&
+           ebpf_rhf_kernel_lineage_matches("3.10.0-1160.119.1.el7.x86_64", 7 * 256 + 9, 0) &&
+           !ebpf_rhf_kernel_lineage_matches("6.8.5-301.fc40.x86_64", 40 * 256, 0) &&
+           !ebpf_rhf_kernel_lineage_matches("4.14.355-277.643.amzn2.x86_64", 2 * 256, 0) &&
            ebpf_rhf_kernel_lineage_matches("3.10.0-962.3.2.lve1.5.39.el7.x86_64", 7 * 256 + 9, 1) &&
            ebpf_rhf_kernel_lineage_matches("4.18.0-553.177.1.lve.el7h.x86_64", 7 * 256 + 9, 1) &&
            ebpf_rhf_kernel_lineage_matches("4.18.0-553.150.1.lve.1.el7h.x86_64", 7 * 256 + 9, 1) &&
@@ -210,6 +213,10 @@ static int test_redhat_release_version_parser(void)
            ebpf_parse_redhat_release_version("AlmaLinux release 9.6 (Sage Margay)") == 2310 &&
            ebpf_parse_redhat_release_version("CloudLinux release 7.9") == 1801 &&
            ebpf_parse_redhat_release_version("CloudLinux release 8.10 (Shared)") == 2058 &&
+           ebpf_parse_redhat_release_version("Scientific Linux release 7.9 (Nitrogen)") == 1801 &&
+           ebpf_parse_redhat_release_version("EuroLinux release 9.4 (Kyiv)") == 2308 &&
+           ebpf_parse_redhat_release_version("MIRACLE LINUX release 8.4 (Peony)") == 2052 &&
+           ebpf_parse_redhat_release_version("release 7.9") == -1 &&
            ebpf_parse_redhat_release_version("not a Red Hat release") == -1;
 }
 

@@ -153,14 +153,8 @@ int ebpf_parse_redhat_release_version(const char *release)
     if (!version)
         return -1;
 
-    size_t vendor_len = (size_t)(version - release);
-    int is_supported_vendor =
-        (vendor_len >= 7 && !strncmp(release, "Red Hat", 7)) ||
-        (vendor_len >= 6 && !strncmp(release, "CentOS", 6)) ||
-        (vendor_len >= 9 && !strncmp(release, "AlmaLinux", 9)) ||
-        (vendor_len >= 11 && !strncmp(release, "Rocky Linux", 11)) ||
-        (vendor_len >= 10 && !strncmp(release, "CloudLinux", 10));
-    if (!is_supported_vendor)
+    // Any vendor name is accepted (RHEL rebuilds); the kernel ".elN" lineage check decides Red Hat handling.
+    if (version == release)
         return -1;
 
     version += strlen("release");
@@ -1145,13 +1139,19 @@ static struct bpf_link **ebpf_attach_programs(struct bpf_object *obj, size_t len
     size_t attached = 0;
     bpf_object__for_each_program(prog, obj)
     {
+#ifdef LIBBPF_MAJOR_VERSION
         if (!bpf_program__autoload(prog)) {
             i++;
             continue;
         }
+        const char *section_name = bpf_program__section_name(prog);
+#else
+        // libbpf 0.0.9 has no autoload control and names the section accessor "title".
+        const char *section_name = bpf_program__title(prog, false);
+#endif
 
         // These compatibility probes are compiled as alternatives; absence must not disable the collector.
-        if (ebpf_optional_legacy_target(bpf_program__section_name(prog))) {
+        if (ebpf_optional_legacy_target(section_name)) {
             i++;
             continue;
         }

@@ -935,9 +935,12 @@ static int ebpf_disk_load_bpf(ebpf_module_t *em)
             bpf_object__find_program_by_name(em->objects, NETDATA_DISK_ISSUE_PROGRAM));
         ebpf_disk_attach_scsi_completion(
             bpf_object__find_program_by_name(em->objects, NETDATA_DISK_COMPLETE_PROGRAM));
-    } else if (!ret && disk_bpf_obj) {
+    }
+#ifdef LIBBPF_MAJOR_VERSION
+    else if (!ret && disk_bpf_obj) {
         ebpf_disk_set_hash_table(disk_bpf_obj);
     }
+#endif
 
     if (ret)
         netdata_log_error("%s %s", EBPF_DEFAULT_ERROR_MSG, em->info.thread_name);

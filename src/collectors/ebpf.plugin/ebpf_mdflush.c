@@ -357,10 +357,12 @@ static int ebpf_mdflush_load_bpf(ebpf_module_t *em)
 #endif
 
     if (ret && (em->load & EBPF_LOAD_CORE)) {
+#ifdef LIBBPF_MAJOR_VERSION
         if (mdflush_bpf_obj) {
             mdflush_bpf__destroy(mdflush_bpf_obj);
             mdflush_bpf_obj = NULL;
         }
+#endif
         ret = ebpf_load_legacy_fallback(em, running_on_kernel, isrh);
     }
 
