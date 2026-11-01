@@ -151,6 +151,30 @@ The multiplication of all the **enabled** tiers `dbengine tier N update every it
 | stock Health config |                 `/usr/lib/netdata/conf.d/health.d`                 | Contains the stock Alert configuration files for each collector                                                                                                                    |
 |      registry       |              `/opt/netdata/var/lib/netdata/registry`               | Contains the [registry](/src/registry/README.md) database and GUID that uniquely identifies each Netdata Agent                                                                     |
 
+**Moving a directory to another filesystem.** Either set the option above to the new
+path, or bind-mount the new location onto the old path. Both are supported.
+
+**Symbolic links, and where they work.** At startup, while it still runs as `root`,
+the Agent gives these directories to the `netdata` user so that it can keep writing to
+them after it drops privileges. Whether it follows a symbolic link on the way depends
+on who else can write the directory that holds it:
+
+- A link that replaces one of the paths above is followed, and the directory it points
+  to is the one that changes ownership. `/var/cache/netdata` may be a link to another
+  filesystem, because only `root` can create entries in `/var/cache`.
+- A link deeper inside them - `/var/lib/netdata/cloud.d`, `/var/lib/netdata/registry`,
+  anything inside `/var/cache/netdata` - is not followed, because the `netdata` user
+  can write those directories and could therefore have planted it. The Agent changes
+  the ownership of the link itself, leaves the files behind it as they were, and may
+  then be unable to write them once it is no longer `root`. Relocate those with the
+  settings above or with a bind-mount instead.
+
+**The run directory is stricter.** A symbolic link at `NETDATA_RUN_DIR` is refused
+outright, and the Agent falls back to its next candidate and logs why. This is not
+about ownership: that directory holds the sockets the Agent creates while still
+`root`, under names that are easy to predict, so it has to be certain which directory
+those names live in.
+
 </details>
 
 <details>
