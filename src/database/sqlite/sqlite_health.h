@@ -10,6 +10,17 @@
 #define ALERT_TRANSITION_DELAY_SHORT (10)
 #define ALERT_TRANSITION_DELAY_NONE  (0)
 
+int calculate_delay(RRDCALC_STATUS old_status, RRDCALC_STATUS new_status, uint32_t flags);
+void insert_alert_queue(
+    RRDHOST *host,
+    uint64_t health_log_id,
+    int64_t unique_id,
+    uint32_t alarm_id,
+    RRDCALC_STATUS old_status,
+    RRDCALC_STATUS new_status,
+    uint32_t flags,
+    time_t trigger_time);
+
 struct sql_alert_transition_data;
 struct sql_alert_config_data;
 struct rrd_alert_prototype;

@@ -369,6 +369,11 @@ struct rrdhost {
 
     SPINLOCK rrdhost_update_lock;
 
+    // Serializes local vnode stop/start with receiver admission. Hold a lifetime pin while using it.
+    // Lock order: vnode transition, alert dictionary, receiver. Receiver teardown must not take this
+    // mutex: a local claim holds it while waiting for that receiver to drain.
+    netdata_mutex_t vnode_transition_mutex;
+
     // The host's lifetime lock: the admission protocol between the paths that make a host live and
     // the paths that remove it.
     // - Removers (remove-stale-node, the orphan/ephemeral reaper, the memory-mode replace in
