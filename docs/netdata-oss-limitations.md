@@ -34,7 +34,7 @@ Without authentication, anyone who can reach the Netdata dashboard could access 
 | Charts and dashboards              |      ✓      |     ✓      |     ✓     |
 | Anomaly detection (ML)             |      ✓      |     ✓      |     ✓     |
 | Alert notifications                |      ✓      |     ✓      |     ✓     |
-| Node dashboard access              |   5 nodes   |  5 nodes   | Unlimited |
+| Nodes in one multi-node dashboard  |   5 nodes   |  5 nodes   | Unlimited |
 | Custom dashboards                  | 1 per agent | 1 per room | Unlimited |
 
 ### Functions (Live Tab)
@@ -122,14 +122,16 @@ Dynamic Configuration requires a paid plan:
 
 ### Increase Node Limits
 
-The 5-node limit applies to both **Anonymous** and **Community** users, on Netdata Cloud dashboards and on the local dashboard of Agents and Parents. You can:
+The 5-node limit counts the nodes that one dashboard shows. It applies to both **Anonymous** and **Community** users, on the dashboards that show several nodes: Netdata Cloud, and the local dashboard of a Parent showing its Children. It does not limit how many Agents you run: a standalone Agent's dashboard shows that one node, so you can run any number of standalone Agents, each with its own dashboard, free and without signing in.
+
+To see more than 5 nodes in one dashboard, you can:
 
 1. **Upgrade to a paid plan** for unlimited nodes
 2. **Select preferred nodes** to choose which 5 nodes stay accessible
 
 This limit is a **plan entitlement**, not a streaming or connection limit. You can stream any number of nodes to a parent and chain parents across multiple levels — both are fully supported, and every node continues collecting and storing its data regardless of this limit. On a dashboard that shows more nodes than your limit, a node outside your preferred nodes shows as **Locked**: every per-node feature — its single-node dashboard, Functions, Configuration, silencing rules, Anomaly Advisor, and alert details — becomes inaccessible, and it is excluded from the combined Metrics tab, until you either select it as one of your preferred nodes or upgrade to a paid plan.
 
-The local dashboard of an Agent or Parent gets the limit of your plan from Netdata Cloud. When the Agent is not connected to Netdata Cloud, or Netdata Cloud cannot be reached, the local dashboard applies the 5-node limit.
+The local dashboard of a Parent gets the limit of your plan from Netdata Cloud. When the Parent is not connected to Netdata Cloud, or Netdata Cloud cannot be reached, its local dashboard applies the 5-node limit to the nodes it shows.
 
 ```mermaid
 flowchart LR
@@ -167,7 +169,7 @@ Netdata Cloud and each Agent keep separate preferred-node lists. Netdata Cloud s
 | **Network Flows & Traces** | Blocked     | Blocked       | Full access |
 | **AI Features**           | Blocked     | Not available | Full access |
 | **Dynamic Configuration** | Blocked     | Blocked       | Full access |
-| **Node Dashboard Access** | 5 nodes     | 5 nodes       | Unlimited   |
+| **Nodes per Multi-Node Dashboard** | 5 nodes | 5 nodes | Unlimited |
 | **Custom Dashboards**     | 1 per agent | 1 per room    | Unlimited   |
 | **RBAC & SSO**            | N/A         | Not available | Full access |
 
