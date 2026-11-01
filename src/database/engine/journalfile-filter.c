@@ -466,11 +466,11 @@ void njtf_unlink(struct rrdengine_datafile *datafile) {
     char path[RRDENG_PATH_MAX];
 
     njtf_generate_path(datafile, path, sizeof(path), false);
-    if(unlink(path) != 0 && errno != ENOENT)
+    // uncharged only when it is gone, like the datafile and journals: a file left on disk stays charged
+    if(unlink(path) == 0 || errno == ENOENT)
+        njtf_charge(datafile->journalfile, 0);
+    else
         nd_log(NDLS_DAEMON, NDLP_ERR, "DBENGINE: cannot delete journal time filter \"%s\"", path);
-
-    // uncharged even when it could not be deleted: the next startup removes it as an orphan
-    njtf_charge(datafile->journalfile, 0);
 
     njtf_generate_path(datafile, path, sizeof(path), true);
     (void)unlink(path);
