@@ -1397,8 +1397,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: macos-14-M1
-            runner: macos-14
           - name: macos-15-M1
             runner: macos-15
           - name: macos-26-M1
