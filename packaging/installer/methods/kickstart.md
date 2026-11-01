@@ -16,7 +16,7 @@ This installation script works on all major Linux distributions. It automaticall
 3. Installs using:
     - Native packages (preferred)
     - Static build (fallback)
-    - Build from source (last resort)
+    - Build from source when neither native packages nor static builds are available on Linux (best-effort support)
 4. Installs an auto-update cron job (unless disabled)
 5. Optionally connects your node to Netdata Cloud
 
@@ -86,6 +86,10 @@ Use these flags to customize your installation.
 |                         | `--claim-rooms`        | Assign node to specific Cloud Rooms |
 | **Reinstall/Uninstall** | `--reinstall`          | Reinstall existing Netdata          |
 |                         | `--uninstall`          | Uninstall Netdata completely        |
+| **Installation Method** | `--allow-local-build` | Allow Linux source fallback after binary installation failures (best-effort support) |
+|                         | `--build-only`        | Install directly from source (best-effort support) |
+
+On Linux, a failed binary installation does not automatically fall back to a local build when native packages or a static build are available. Fix the reported installation error, or use `--allow-local-build` to permit source fallback. Existing native-package error handling still applies: use `--install-type any` to continue past native-package installation failures. You can combine these two options. `--build-only` (or `--install-type build`) explicitly selects a local build regardless of binary availability. Support for local builds is best-effort. Installation on macOS and FreeBSD is unchanged.
 
 :::note
 
