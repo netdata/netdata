@@ -5,7 +5,6 @@ package runtimehost
 import (
 	"archive/tar"
 	"bytes"
-	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"fmt"
@@ -15,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/klauspost/compress/zstd"
 	"github.com/netdata/netdata/go/plugins/logger"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/stretchr/testify/require"
@@ -52,10 +52,11 @@ func testBundle(t *testing.T, version string) (runtime.Manifest, []byte) {
 		expanded += int64(len(f.data))
 	}
 	require.NoError(t, tw.Close())
-	gz := gzip.NewWriter(&compressed)
-	_, err := gz.Write(raw.Bytes())
+	encoder, err := zstd.NewWriter(&compressed, zstd.WithEncoderConcurrency(1))
 	require.NoError(t, err)
-	require.NoError(t, gz.Close())
+	_, err = encoder.Write(raw.Bytes())
+	require.NoError(t, err)
+	require.NoError(t, encoder.Close())
 	m := runtime.Manifest{
 		Format:   1,
 		Contract: 1,

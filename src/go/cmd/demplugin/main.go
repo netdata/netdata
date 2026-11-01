@@ -29,6 +29,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
 	"go.uber.org/automaxprocs/maxprocs"
 )
 
@@ -113,6 +114,9 @@ func main() {
 	}
 	runtimeHandle := dem.OpenRuntime(cfg.Runtime, pluginconfig.VarLibDir())
 	executor := runner.New(runtimeHandle.Source, synthetichistory.NewStore(history), captures)
+	if runtimeHandle.Store != nil && runtimeHandle.Host != nil {
+		runtimeHandle.Updater = runtimehost.NewUpdater(runtimeHandle.Host, executor, cfg.Runtime.ReleaseLoader("", true))
+	}
 	components := dem.New(
 		dem.Dependencies{
 			History:        history,
@@ -127,6 +131,9 @@ func main() {
 	services := []composition.ProcessService{components.Retention}
 	if runtimeHandle.Host != nil {
 		services = append(services, runtimeHandle.Host)
+	}
+	if runtimeHandle.Updater != nil {
+		services = append(services, runtimeHandle.Updater)
 	}
 	a := agent.New(agent.Config{
 		Name:                      executable.Name,

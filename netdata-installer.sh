@@ -225,7 +225,7 @@ USAGE: ${PROGRAM} [options]
   --disable-plugin-ibm       Explicitly disable the IBM ecosystem monitoring plugin.
   --enable-plugin-scripts    Enable the scripts.d plugin. Default: Enabled when possible.
   --disable-plugin-scripts   Explicitly disable the scripts.d plugin.
-  --enable-plugin-dem        Enable the experimental DEM plugin. Default: disabled.
+  --enable-plugin-dem        Enable the DEM plugin. Default: enabled on Linux.
   --disable-plugin-dem       Explicitly disable the DEM plugin.
   --enable-plugin-statsd     Enable the experimental Go StatsD plugin. Default: disabled.
   --disable-plugin-statsd    Explicitly disable the Go StatsD plugin.
@@ -280,6 +280,7 @@ ENABLE_SCRIPTS=1
 ENABLE_STATSD=0
 ENABLE_IPMI=0
 ENABLE_DEM=0
+[ "$(uname -s)" = Linux ] && ENABLE_DEM=1
 FORCE_LEGACY_CXX=0
 NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS-}"
 REMOVE_BUILD=1

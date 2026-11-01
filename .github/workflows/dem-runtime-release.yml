@@ -1,0 +1,196 @@
+---
+name: DEM Runtime Release
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish after protected-environment qualification approval
+        type: boolean
+        default: false
+      sequence:
+        description: Positive independent channel sequence (required to publish)
+        type: string
+        default: '0'
+      package_release:
+        description: Positive native package revision
+        type: string
+        default: '1'
+permissions:
+  contents: read
+# Never cancel a publisher or run two writers to the latest channel together.
+concurrency:
+  group: dem-runtime-release
+  cancel-in-progress: false
+jobs:
+  matrix:
+    name: Select native runners from the shared distro catalog
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install catalog reader
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-ruamel.yaml
+      - id: matrix
+        run: |
+          matrix="$(python3 packaging/dem-runtime/ci.py build-matrix)"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build ${{ matrix.arch }} portable/native runtime and sources
+    needs: matrix
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: src/go/go.mod
+          cache-dependency-path: src/go/go.sum
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake rpm zstd
+      - name: Build the release tool and portable runtime
+        env:
+          DEM_ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          (cd src/go && go build -trimpath -o "$RUNNER_TEMP/dem-runtime-release" ./tools/dem-runtime-release)
+          python3 packaging/dem-runtime/build.py --arch "$DEM_ARCH" --output "$RUNNER_TEMP/runtime"
+      - name: Assemble complete corresponding sources and native packages
+        env:
+          DEM_ARCH: ${{ matrix.arch }}
+          DEM_PACKAGE_RELEASE: ${{ inputs.package_release }}
+        run: |
+          set -euo pipefail
+          python3 packaging/dem-runtime/sources.py --runtime-output "$RUNNER_TEMP/runtime" \
+            --output "$RUNNER_TEMP/sources" --archive-output "$RUNNER_TEMP/source-archive"
+          python3 packaging/dem-runtime/release.py assemble --arch "$DEM_ARCH" \
+            --runtime-output "$RUNNER_TEMP/runtime" --source-archive "$RUNNER_TEMP/source-archive" \
+            --release-tool "$RUNNER_TEMP/dem-runtime-release" --package-release "$DEM_PACKAGE_RELEASE" \
+            --output "$RUNNER_TEMP/artifacts"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dem-runtime-${{ matrix.arch }}
+          path: ${{ runner.temp }}/artifacts/
+          compression-level: 0
+          retention-days: 30
+          if-no-files-found: error
+
+  publish:
+    name: Sign, publish and promote the qualified release
+    needs: build
+    if: inputs.publish && github.repository == 'netdata/netdata' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    # Configure required reviewers/branch restrictions before enabling this job.
+    # Reviewers verify both architecture artifacts, source/license completeness,
+    # real target qualification and confirmed publication routes/key custody.
+    environment: dem-runtime-release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: src/go/go.mod
+          cache-dependency-path: src/go/go.sum
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: dem-runtime-*
+          path: ${{ runner.temp }}/artifacts
+      - name: Require confirmed publication configuration
+        env:
+          PUBLIC_BASE: ${{ vars.DEM_RUNTIME_PUBLIC_BASE_URL }}
+          R2_REMOTE: ${{ vars.DEM_RUNTIME_R2_REMOTE }}
+        run: |
+          set -eu
+          test -n "$PUBLIC_BASE" && test -n "$R2_REMOTE"
+      - name: Install publication tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gnupg rclone rsync debsigs rpm python3-ruamel.yaml
+          (cd src/go && go build -trimpath -o "$RUNNER_TEMP/dem-runtime-release" ./tools/dem-runtime-release)
+      - name: Import package and runtime signing key
+        id: package-key
+        uses: crazy-max/ghaction-import-gpg@2dc316deee8e90f13e1a351ab510b4d5bc0c82cd # v7.0.0
+        with:
+          gpg_private_key: ${{ secrets.NETDATABOT_PACKAGE_SIGNING_KEY }}
+      - name: Fetch current package-signing public keyring
+        run: |
+          python3 packaging/dem-runtime/release.py fetch-public-key --output "$RUNNER_TEMP/release-public.gpg"
+      - name: Sign complete runtime descriptors
+        env:
+          PACKAGE_KEY: ${{ steps.package-key.outputs.fingerprint }}
+          PUBLIC_BASE: ${{ vars.DEM_RUNTIME_PUBLIC_BASE_URL }}
+          SEQUENCE: ${{ inputs.sequence }}
+        run: |
+          set -euo pipefail
+          python3 packaging/dem-runtime/release.py stage --artifacts "$RUNNER_TEMP/artifacts" \
+            --output "$RUNNER_TEMP/publication" --sequence "$SEQUENCE" \
+            --release-tool "$RUNNER_TEMP/dem-runtime-release" --signing-key "$PACKAGE_KEY" \
+            --public-key "$RUNNER_TEMP/release-public.gpg" --public-base "$PUBLIC_BASE"
+      - name: Publish and verify immutable R2 runtime/source objects
+        env:
+          PUBLIC_BASE: ${{ vars.DEM_RUNTIME_PUBLIC_BASE_URL }}
+          R2_REMOTE: ${{ vars.DEM_RUNTIME_R2_REMOTE }}
+          RCLONE_CONFIG_S3_TYPE: s3
+          RCLONE_CONFIG_S3_PROVIDER: Cloudflare
+          RCLONE_CONFIG_S3_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY }}
+          RCLONE_CONFIG_S3_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_R2_SECRET_KEY }}
+          RCLONE_CONFIG_S3_ENDPOINT: ${{ secrets.CLOUDFLARE_R2_RELEASE_ENDPOINT }}
+          RCLONE_CONFIG_S3_REGION: auto
+        run: |
+          set -euo pipefail
+          python3 packaging/dem-runtime/release.py publish --publication "$RUNNER_TEMP/publication" \
+            --release-tool "$RUNNER_TEMP/dem-runtime-release" --public-key "$RUNNER_TEMP/release-public.gpg" \
+            --public-base "$PUBLIC_BASE" --remote "$R2_REMOTE"
+      - name: Authenticate package upload
+        uses: shimataro/ssh-key-action@87a8f067114a8ce263df83e9ed5c849953548bc3 # v2.8.1
+        with:
+          key: ${{ secrets.NETDATABOT_PACKAGES_SSH_KEY }}
+          name: id_ecdsa
+          known_hosts: ${{ secrets.PACKAGES_KNOWN_HOSTS }}
+      - name: Sign native packages and submit to the existing repositories
+        env:
+          PACKAGE_KEY: ${{ steps.package-key.outputs.fingerprint }}
+        run: |
+          set -euo pipefail
+          for arch in amd64 arm64; do
+            artifacts="$RUNNER_TEMP/artifacts/dem-runtime-$arch"
+            debsigs --sign=origin --default-key="$PACKAGE_KEY" "$artifacts"/*.deb
+            rpmsign --define "_gpg_name $PACKAGE_KEY" --define '__gpg /usr/bin/gpg' --addsign "$artifacts"/*.rpm
+          done
+          python3 packaging/dem-runtime/ci.py upload-native --artifacts "$RUNNER_TEMP/artifacts"
+      - name: Promote latest after all immutable objects are publicly verified
+        env:
+          PUBLIC_BASE: ${{ vars.DEM_RUNTIME_PUBLIC_BASE_URL }}
+          R2_REMOTE: ${{ vars.DEM_RUNTIME_R2_REMOTE }}
+          RCLONE_CONFIG_S3_TYPE: s3
+          RCLONE_CONFIG_S3_PROVIDER: Cloudflare
+          RCLONE_CONFIG_S3_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY }}
+          RCLONE_CONFIG_S3_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_R2_SECRET_KEY }}
+          RCLONE_CONFIG_S3_ENDPOINT: ${{ secrets.CLOUDFLARE_R2_RELEASE_ENDPOINT }}
+          RCLONE_CONFIG_S3_REGION: auto
+        run: |
+          python3 packaging/dem-runtime/release.py promote --publication "$RUNNER_TEMP/publication" \
+            --release-tool "$RUNNER_TEMP/dem-runtime-release" --public-key "$RUNNER_TEMP/release-public.gpg" \
+            --public-base "$PUBLIC_BASE" --remote "$R2_REMOTE"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: dem-runtime-publication
+          path: ${{ runner.temp }}/publication/
+          compression-level: 0
+          retention-days: 30
+          if-no-files-found: ignore

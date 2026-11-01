@@ -10,8 +10,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
 type reservation struct {
@@ -20,19 +18,15 @@ type reservation struct {
 }
 
 type inventory struct {
-	selected           *Manifest
-	selectionError     error
-	generationErrors   map[string]error
-	generations        map[string]generation
-	processes          map[string]int
-	candidates         map[string]int
-	preparing          map[string]int
-	uses               map[string]int
-	uncertain          map[string]int
-	reservations       map[string]reservation
-	cleanupError       error
-	protectedRecords   map[string]bool
-	reclaimableRecords map[string]bool
+	ownershipInventory
+	selected         *Manifest
+	release          *Release
+	automaticUpdates bool
+	selectionError   error
+	generationErrors map[string]error
+	generations      map[string]generation
+	preparing        map[string]int
+	reservations     map[string]reservation
 }
 
 // Status describes logical managed files and protection. ReservedBytes is the
@@ -47,6 +41,8 @@ type Status struct {
 	GenerationErrors      map[string]string `json:"generation_errors,omitempty"`
 	InventoryError        string            `json:"inventory_error,omitempty"`
 	Selected              *Manifest         `json:"selected,omitempty"`
+	Release               *Release          `json:"release,omitempty"`
+	AutomaticUpdates      bool              `json:"automatic_updates"`
 	SelectedBytes         int64             `json:"selected_bytes"`
 	ProcessClaims         int               `json:"process_claims"`
 	UsedBytes             int64             `json:"used_bytes"`
@@ -69,111 +65,15 @@ type Status struct {
 }
 
 func (s *Store) ownershipInventoryLocked(reconcile bool) (inventory, error) {
+	owned, err := s.ownershipLedger.inventoryLocked(reconcile)
 	inv := inventory{
+		ownershipInventory: owned,
 		generations:        make(map[string]generation),
-		processes:          make(map[string]int),
-		candidates:         make(map[string]int),
 		preparing:          make(map[string]int),
-		uses:               make(map[string]int),
-		uncertain:          make(map[string]int),
 		reservations:       make(map[string]reservation),
-		protectedRecords:   make(map[string]bool),
-		reclaimableRecords: make(map[string]bool),
 	}
-	// Live completion proof also survives a successful rename followed by a
-	// failed directory sync. Retry these names even if enumeration cannot see
-	// the original record anymore.
-	if reconcile {
-		for name := range s.completedUses {
-			if err := s.removeOwned(name); err != nil {
-				inv.cleanupError = errors.Join(inv.cleanupError, err)
-			}
-		}
-	}
-	initializing, err := s.childDirectories("initializing")
 	if err != nil {
 		return inv, err
-	}
-	// Constructors hold coordination exclusion and expose no paths until the
-	// initialized record is durably moved to its final ownership namespace.
-	for _, name := range initializing {
-		inv.reclaimableRecords[name] = true
-		if !reconcile {
-			continue
-		}
-		if err := s.removeOwned(name); err != nil {
-			return inv, err
-		}
-	}
-	claims, err := s.childDirectories("claims")
-	if err != nil {
-		return inv, err
-	}
-	for _, name := range claims {
-		alive, err := s.ownerAlive(name)
-		if err != nil {
-			return inv, err
-		}
-		if !alive {
-			inv.reclaimableRecords[name] = true
-			if !reconcile {
-				continue
-			}
-			if err := s.removeOwned(name); err != nil {
-				return inv, err
-			}
-			continue
-		}
-		var claim claimRecord
-		if err := readJSON(s.root, filepath.Join(name, "owner.json"), &claim); err != nil {
-			return inv, err
-		}
-		if !validID(claim.Generation) {
-			return inv, errors.New("invalid runtime processes binding")
-		}
-		switch claim.Kind {
-		case "candidate":
-			inv.candidates[claim.Generation]++
-		case "process":
-			inv.processes[claim.Generation]++
-		default:
-			return inv, errors.New("invalid runtime claim kind")
-		}
-		inv.protectedRecords[name] = true
-	}
-	uses, err := s.childDirectories("uses")
-	if err != nil {
-		return inv, err
-	}
-	for _, name := range uses {
-		var use useRecord
-		if err := readJSON(s.root, filepath.Join(name, "owner.json"), &use); err != nil {
-			return inv, err
-		}
-		if !validID(use.Generation) || !validID(use.Invocation) || (use.Boot.Verified && !validBootID(use.Boot.ID)) {
-			return inv, errors.New("invalid runtime execution binding")
-		}
-		done, proofErr := ndexec.ReadTreeCompletion(filepath.Join(s.path, name), use.Invocation)
-		if done || s.boot.supersedes(use.Boot) || s.completedUses[name] {
-			inv.reclaimableRecords[name] = true
-			if !reconcile {
-				continue
-			}
-			if err := s.removeOwned(name); err != nil {
-				inv.cleanupError = errors.Join(inv.cleanupError, err)
-			}
-			continue
-		}
-		inv.uses[use.Generation]++
-		inv.protectedRecords[name] = true
-		alive, ownerErr := s.ownerAlive(name)
-		if ownerErr != nil || !alive {
-			inv.uncertain[use.Generation]++
-		}
-		// A missing receipt may be a live execution. No PID/age guess is made.
-		if proofErr != nil {
-			inv.cleanupError = errors.Join(inv.cleanupError, proofErr)
-		}
 	}
 	staging, err := s.childDirectories("staging")
 	if err != nil {
@@ -211,6 +111,8 @@ func (s *Store) ownershipInventoryLocked(reconcile bool) (inventory, error) {
 func (s *Store) statusLocked(inv inventory) (Status, error) {
 	status := Status{
 		Selected:              inv.selected,
+		Release:               inv.release,
+		AutomaticUpdates:      inv.automaticUpdates,
 		LimitBytes:            s.config.MaxBytes,
 		ProcessGenerations:    len(inv.processes),
 		BootRecoveryAvailable: s.boot.Verified,
@@ -339,18 +241,6 @@ func (s *Store) Sweep() error {
 	return result
 }
 
-// finishSweep publishes health after trash deletion, outside coordination
-// exclusion. A newer finalizer or sweep failure cannot be cleared by this sweep.
-func (s *Store) finishSweep(cleanupVersion uint64, result error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if result != nil {
-		s.recordCleanupErrorLocked(result)
-	} else if s.cleanupErrorVersion == cleanupVersion {
-		s.cleanupError = nil
-	}
-}
-
 func (s *Store) candidates(inv inventory, pressure bool) []string {
 	var ids []string
 	for id := range inv.generations {
@@ -426,29 +316,22 @@ func (s *Store) diskByteCounts(name string) (int64, map[string]int64, error) {
 func (s *Store) flushTrash() error {
 	var names []string
 	err := s.withLock(func() error {
-		var err error
-		names, err = s.childDirectories("trash")
-		if err != nil {
-			return err
-		}
 		if err := s.syncSelection(); err != nil {
 			return err
 		}
-		for _, parent := range []string{"generations", "uses", "claims", "staging", "trash", "initializing"} {
+		for _, parent := range []string{"generations", "staging"} {
 			if err := syncDirectory(s.root, parent); err != nil {
 				return err
 			}
 		}
-		return nil
+		var err error
+		names, err = s.trashSnapshotLocked()
+		return err
 	})
 	if err != nil {
 		return err
 	}
-	var result error
-	for _, name := range names {
-		result = errors.Join(result, s.root.RemoveAll(name))
-	}
-	return errors.Join(result, syncDirectory(s.root, "trash"))
+	return s.deleteTrash(names)
 }
 
 func (inv inventory) protected(id string) bool {

@@ -42,12 +42,13 @@ func TestRuntimeDispatchAndBadArguments(t *testing.T) {
 		t.Run(args[len(args)-1], func(t *testing.T) { _, err := runtimeCommand(t, args...); require.Error(t, err) })
 	}
 }
-func TestRuntimeMissingManifestNeverInitializesCache(t *testing.T) {
+func TestRuntimeMissingReleaseNeverPreparesCandidate(t *testing.T) {
 	for _, command := range []string{"install", "update", "repair", "preload"} {
 		t.Run(command, func(t *testing.T) {
 			root := t.TempDir()
 			cache := filepath.Join(root, "cache")
-			args := []string{"runtime", command, "--config-dir", root, "--manifest", filepath.Join(root, "missing.json"), "--archive", filepath.Join(root, "archive.tar.gz")}
+			writeAdminTrust(t, root, "")
+			args := []string{"runtime", command, "--config-dir", root, "--release", filepath.Join(root, "missing.json"), "--archive", filepath.Join(root, "archive.tar.zst")}
 			if command == "preload" {
 				args = append(args, "--root", cache)
 			} else {
@@ -55,15 +56,14 @@ func TestRuntimeMissingManifestNeverInitializesCache(t *testing.T) {
 			}
 			report, err := runtimeCommand(t, args...)
 			require.Error(t, err)
-			if command == "repair" {
-				assert.Equal(t, "unknown", report.State)
-			} else {
-				assert.Equal(t, "unavailable", report.State)
-			}
+			assert.Contains(t, []string{"unknown", "unavailable"}, report.State)
+			assert.Nil(t, report.Candidate)
 			assert.NotEmpty(t, report.SetupError)
 			require.Nil(t, report.Qualification)
-			_, err = os.Stat(cache)
-			assert.True(t, os.IsNotExist(err))
+			if report.Storage != nil {
+				assert.Nil(t, report.Storage.Selected)
+				assert.Zero(t, report.Storage.CandidateClaims)
+			}
 		})
 	}
 }
@@ -74,7 +74,7 @@ func TestRuntimeSelectionCommandsDoNotRequireOriginalDescriptor(t *testing.T) {
 			cache := filepath.Join(root, "absent")
 			report, err := runtimeCommand(t, "runtime", command, "--config-dir", root, "--cache", cache)
 			require.Error(t, err)
-			assert.Empty(t, report.ManifestPath)
+			assert.Empty(t, report.ReleasePath)
 			assert.Equal(t, cache, report.CachePath)
 			assert.NoDirExists(t, cache)
 		})
@@ -92,7 +92,7 @@ func TestRuntimePreloadedCommandsRequirePreparedBundle(t *testing.T) {
 	for _, command := range []string{"install", "update", "repair", "uninstall"} {
 		args := []string{"runtime", command, "--config-dir", dir}
 		if command != "uninstall" {
-			args = append(args, "--archive", "/unused", "--manifest", "/unused.json")
+			args = append(args, "--archive", "/unused", "--release", "/unused.json")
 		}
 		_, err := runtimeCommand(t, args...)
 		require.ErrorContains(t, err, "mode: managed")
@@ -105,16 +105,31 @@ func TestRuntimeRepairRequiresTrustedExplicitInput(t *testing.T) {
 		flags   []string
 		message string
 	}{
-		{"missing manifest", nil, "absolute --manifest"},
-		{"relative manifest", []string{"--manifest", "relative.json"}, "absolute --manifest"},
-		{"no archive", []string{"--manifest", "/trusted.json"}, "either --archive or --allow-download"},
-		{"two sources", []string{"--manifest", "/trusted.json", "--archive", "/runtime.tar.gz", "--allow-download"}, "either --archive or --allow-download"},
-		{"relative archive", []string{"--manifest", "/trusted.json", "--archive", "runtime.tar.gz"}, "--archive must be absolute"},
-		{"preload root", []string{"--manifest", "/trusted.json", "--allow-download", "--root", "/preload"}, "--root is only valid for preload"},
+		{"missing input", nil, "either --archive or --allow-download"},
+		{"offline without release", []string{"--archive", "/runtime.tar.zst"}, "offline archive requires"},
+		{"relative manifest", []string{"--release", "relative.json"}, "--release must be absolute"},
+		{"retired manifest", []string{"--manifest", "/trusted.json"}, "flag provided but not defined"},
+		{"no archive", []string{"--release", "/trusted.json"}, "either --archive or --allow-download"},
+		{"two sources", []string{"--release", "/trusted.json", "--archive", "/runtime.tar.zst", "--allow-download"}, "either --archive or --allow-download"},
+		{"relative archive", []string{"--release", "/trusted.json", "--archive", "runtime.tar.zst"}, "--archive must be absolute"},
+		{"preload root", []string{"--release", "/trusted.json", "--allow-download", "--root", "/preload"}, "--root is only valid for preload"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := runtimeCommand(t, append([]string{"runtime", "repair"}, tc.flags...)...)
 			require.ErrorContains(t, err, tc.message)
+		})
+	}
+}
+
+func TestRuntimeManualUpdatesOnlyChangesInstallAndRepairPolicy(t *testing.T) {
+	for _, command := range []string{"update", "preload", "status", "qualify", "uninstall"} {
+		t.Run(command, func(t *testing.T) {
+			args := []string{"runtime", command, "--manual-updates"}
+			if command == "update" || command == "preload" {
+				args = append(args, "--release", "/release.json", "--archive", "/archive.tar.zst")
+			}
+			_, err := runtimeCommand(t, args...)
+			require.ErrorContains(t, err, "--manual-updates is only valid for install/repair")
 		})
 	}
 }

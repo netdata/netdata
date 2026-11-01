@@ -16,6 +16,29 @@ import (
 var storeDirectories = []string{"generations", "claims", "uses", "staging", "trash", "initializing"}
 var storeLocks = []string{"coordination.lock", "installation.lock"}
 
+// The existing managed format is unchanged. Proof-only roots have a distinct
+// format so neither owner can reinterpret or bootstrap the other's state.
+type runtimeRootLayout int
+
+const (
+	managedRootLayout   runtimeRootLayout = 1
+	ownershipRootLayout runtimeRootLayout = 2
+)
+
+func (layout runtimeRootLayout) directories() []string {
+	if layout == managedRootLayout {
+		return storeDirectories
+	}
+	return []string{"claims", "uses", "trash", "initializing"}
+}
+
+func (layout runtimeRootLayout) locks() []string {
+	if layout == managedRootLayout {
+		return storeLocks
+	}
+	return []string{"coordination.lock"}
+}
+
 const layoutName = "layout.json"
 const layoutTemporaryPrefix = ".dem-layout-"
 const publicationName = ".dem-runtime-publication.json"
@@ -32,7 +55,11 @@ type storePublication struct {
 // The initialization record distinguishes interrupted bootstrap from lost safety
 // state. Ready stores never recreate ownership namespaces or lock identities.
 func openStoreRoot(path string) (string, *os.Root, error) {
-	canonical, err := ensureStoreRoot(filepath.Clean(path))
+	return openRuntimeRoot(path, managedRootLayout)
+}
+
+func openRuntimeRoot(path string, layout runtimeRootLayout) (string, *os.Root, error) {
+	canonical, err := ensureRuntimeRoot(filepath.Clean(path), layout)
 	if err != nil {
 		return "", nil, err
 	}
@@ -46,14 +73,14 @@ func openStoreRoot(path string) (string, *os.Root, error) {
 	if err != nil {
 		return "", nil, err
 	}
-	if err := openStoreLayout(root, canonical); err != nil {
+	if err := layout.open(root, canonical); err != nil {
 		return "", nil, errors.Join(err, root.Close())
 	}
 	return canonical, root, nil
 }
 
-func openStoreLayout(root *os.Root, path string) error {
-	record, err := readStoreLayout(root)
+func (layout runtimeRootLayout) open(root *os.Root, path string) error {
+	record, err := layout.read(root)
 	if errors.Is(err, os.ErrNotExist) {
 		// Only unpublished bootstrap temporaries may precede the first record.
 		// Existing state with a missing record is never a fresh installation.
@@ -77,12 +104,12 @@ func openStoreLayout(root *os.Root, path string) error {
 			}
 		}
 		if err := createInitialLayout(root, storeLayout{
-			Format: 1,
+			Format: int(layout),
 			Phase:  "initializing",
 		}); err != nil {
 			return err
 		}
-		record, err = readStoreLayout(root)
+		record, err = layout.read(root)
 	}
 	if err != nil {
 		return err
@@ -91,30 +118,30 @@ func openStoreLayout(root *os.Root, path string) error {
 		return err
 	}
 	if record.Phase == "ready" {
-		return validateStoreLayout(root)
+		return layout.validate(root)
 	}
 	// No executable access is allowed during initializing. Concurrent openers
 	// share this lock and reread the winning phase before filling missing state.
 	if err := ensureLock(root, "coordination.lock"); err != nil {
 		return err
 	}
-	lock := flock.New(filepath.Join(path, "coordination.lock"))
+	lock := flock.New(filepath.Join(path, "coordination.lock"), flock.SetFlag(os.O_RDWR))
 	if err := lock.Lock(); err != nil {
 		return errors.Join(err, lock.Close())
 	}
-	err = finishStoreInitialization(root)
+	err = layout.finishInitialization(root)
 	return errors.Join(err, lock.Close())
 }
 
-func finishStoreInitialization(root *os.Root) error {
-	record, err := readStoreLayout(root)
+func (layout runtimeRootLayout) finishInitialization(root *os.Root) error {
+	record, err := layout.read(root)
 	if err != nil {
 		return err
 	}
 	if record.Phase == "ready" {
-		return errors.Join(validateStoreLayout(root), syncDirectory(root, "."))
+		return errors.Join(layout.validate(root), syncDirectory(root, "."))
 	}
-	for _, name := range storeLocks {
+	for _, name := range layout.locks() {
 		if err := ensureLock(root, name); err != nil {
 			return err
 		}
@@ -123,7 +150,7 @@ func finishStoreInitialization(root *os.Root) error {
 			return err
 		}
 	}
-	for _, name := range storeDirectories {
+	for _, name := range layout.directories() {
 		if err := root.Mkdir(name, 0700); err != nil && !errors.Is(err, os.ErrExist) {
 			return err
 		}
@@ -131,24 +158,30 @@ func finishStoreInitialization(root *os.Root) error {
 			return err
 		}
 	}
-	if err := validateStoreLayout(root); err != nil {
+	if err := layout.validate(root); err != nil {
 		return err
 	}
-	if err := saveJSON(root, "selection.json", selection{}); err != nil {
-		return err
+	if layout == managedRootLayout {
+		if err := saveJSON(root, "selection.json", selection{}); err != nil {
+			return err
+		}
 	}
 	return saveJSON(root, layoutName, storeLayout{
-		Format: 1,
+		Format: int(layout),
 		Phase:  "ready",
 	})
 }
 
 func readStoreLayout(root *os.Root) (storeLayout, error) {
+	return managedRootLayout.read(root)
+}
+
+func (layout runtimeRootLayout) read(root *os.Root) (storeLayout, error) {
 	var record storeLayout
 	if err := readJSON(root, layoutName, &record); err != nil {
 		return record, err
 	}
-	if record.Format != 1 || (record.Phase != "initializing" && record.Phase != "ready") {
+	if record.Format != int(layout) || (record.Phase != "initializing" && record.Phase != "ready") {
 		return record, errors.New("invalid runtime initialization record")
 	}
 	return record, nil
@@ -242,6 +275,10 @@ func retireStorePublication(path string, origin storePublication) (result error)
 // Every directory of a missing suffix advertises its publication debt, including
 // to another store creating a different path beneath a shared new ancestor.
 func ensureStoreRoot(path string) (string, error) {
+	return ensureRuntimeRoot(path, managedRootLayout)
+}
+
+func ensureRuntimeRoot(path string, layout runtimeRootLayout) (string, error) {
 	ancestor := path
 	var missing []string
 	for {
@@ -300,7 +337,7 @@ func ensureStoreRoot(path string) (string, error) {
 		return "", err
 	}
 	err = createInitialLayout(staged, storeLayout{
-		Format: 1,
+		Format: int(layout),
 		Phase:  "initializing",
 	})
 	err = errors.Join(err, staged.Close())
@@ -325,7 +362,7 @@ func ensureStoreRoot(path string) (string, error) {
 		if err := errors.Join(syncDirectory(parent, "."), parent.Close()); err != nil {
 			return "", err
 		}
-		return ensureStoreRoot(path)
+		return ensureRuntimeRoot(path, layout)
 	}
 	if err != nil {
 		return "", err
@@ -334,7 +371,11 @@ func ensureStoreRoot(path string) (string, error) {
 }
 
 func validateStoreLayout(root *os.Root) error {
-	for _, name := range storeLocks {
+	return managedRootLayout.validate(root)
+}
+
+func (layout runtimeRootLayout) validate(root *os.Root) error {
+	for _, name := range layout.locks() {
 		info, err := root.Lstat(name)
 		if err != nil {
 			return err
@@ -343,7 +384,7 @@ func validateStoreLayout(root *os.Root) error {
 			return fmt.Errorf("invalid runtime lock: %s", name)
 		}
 	}
-	for _, name := range storeDirectories {
+	for _, name := range layout.directories() {
 		info, err := root.Lstat(name)
 		if err != nil {
 			return err

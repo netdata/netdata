@@ -7,10 +7,50 @@ Release inputs and adapters live in `src/dem-runtime` and `packaging/dem-runtime
 
 ## Trust and preparation
 
-An administrator-trusted format-1 descriptor identifies execution contract 1,
+A publisher-authenticated format-1 descriptor identifies execution contract 1,
 release version, platform, archive SHA256/size, tar/expanded bounds, entry count,
 layout and authenticated interpreter slots. The archive is not its own trust anchor.
-Production authentication and release discovery are separate delivery work.
+Production release discovery and CLI delivery integration are separate from these
+local installation primitives.
+
+### Signed release descriptors
+
+`VerifyRelease` authenticates version 1 of the release envelope. It contains the
+complete base64-encoded release JSON and one detached binary OpenPGP signature
+over the domain `netdata-dem-runtime-release-v1` followed by a NUL and the exact
+JSON bytes. The release tool uses the existing package GPG signer. Verification
+runs inside Go and requires SHA-256 or stronger signatures from a currently valid,
+unrevoked signing key. The envelope cannot supply keys or a key-discovery URL.
+
+The signed release includes the entire `Manifest`, including layout, extraction
+bounds and interpreter-binding instructions, and the source archive's HTTPS URL,
+digest and size. Signing only the executable archive digest would not authenticate
+the instructions used to prepare it. Publisher and verifier enforce a 1 MiB
+envelope limit; descriptors carry metadata and binding slots, not source bodies
+or complete file inventories. Public keyrings are limited to 1 MiB and detached
+signatures to 64 KiB before parsing. Unknown fields and trailing JSON are rejected.
+
+Publication sequence is monotonically increasing across architectures and execution
+contract changes in the release channel. `ReleaseUpdate` rejects regression below
+the current selected sequence and reuse of that sequence for different release
+content. Equal content is a no-op. This rule applies to ordinary latest checks,
+including an explicitly requested check; choosing an older authenticated offline
+release is a deliberate administrator recovery operation instead.
+
+Sequence describes publisher order, not component security. These primitives do
+not detect withheld updates, guarantee freshness for a fresh installation,
+or retain a historical high-water mark after explicit recovery.
+Online trust is fetched from the canonical package-key HTTPS endpoint for each
+preparation attempt. Endpoint control and system TLS trust authorize key replacement;
+fetching the key does not establish freshness or immediate revocation through caches.
+Signature validity also does not establish platform qualification or actual source
+availability. Key changes do not revoke already installed runtime execution.
+
+Archives use zstd only. The existing Go decoder limits the frame window and its
+decoding buffers to 8 MiB with one decoder worker; this is not a total process-memory
+limit. Compressed size/digest verification precedes extraction, and the signed tar,
+regular-file and entry bounds still apply through the complete decoded stream.
+No system `zstd` executable is required.
 
 Extraction rejects escaping paths, duplicate entries, privileged modes, devices,
 hard links and symlink parents. Preparation validates plain executables and the
@@ -21,7 +61,14 @@ before publishing. A prepared generation must never be relocated.
 The store reserves archive plus expanded workspace before opening the source.
 Explicit downloads use HTTPS with a 60-second network inactivity timeout; continuing
 network progress has no total deadline. Local writes suspend the inactivity timer.
-Offline import verifies the identical bounds and digest. Browser qualification is
+Online acquisition fetches a bounded public keyring once from
+`https://repository.netdata.cloud/netdatabot.gpg.key` under the same installation
+exclusion and consent checks. Failed refresh never falls back to local or cached
+keys. Offline import instead requires an explicit administrator-provisioned OpenPGP
+keyring and performs no network acquisition; a local descriptor combined with
+`--allow-download` remains an online operation. Both routes verify identical
+archive bounds and digests. Key lookup is not part of execution, status or native
+package operation, and an update lookup failure preserves the installed selection. Browser qualification is
 separate from preparation and belongs to the CLI caller before selection.
 
 ## Ownership
@@ -65,6 +112,21 @@ provenance. Container replacements and bind mounts of the per-read `uuid` source
 are rejected. Missing provenance disables reboot recovery, not ordinary receipts.
 
 ## Retirement and status
+
+`BeginPublishedInstall` serializes release discovery, candidate qualification and
+selection with explicit installation and uninstall. It takes installer exclusion
+before reading consent or fetching metadata, but never holds inventory exclusion
+across the network. Automatic checks do nothing when no authenticated installation
+has opted in. Cancellation releases installer exclusion; a progressing download
+has no total duration limit, so another installer or uninstall may wait.
+
+The selected descriptor, publication sequence and automatic-update policy share one
+atomic selection record. Failed candidates preserve them. The same publication
+sequence is a no-op only for identical complete release metadata; explicit
+reinstallation can change its update policy without downloading unchanged bytes.
+Normal checks reject regressions. Explicit repair can select an older authenticated
+release after all consumers/executions drain, with a newly specified update policy.
+Trusted-local imports remain manual and do not silently acquire download consent.
 
 The default allowance is 4 GiB of logical regular-file bytes, including archives,
 workspace, lifecycle records and trash. Active preparation reserves its unwritten

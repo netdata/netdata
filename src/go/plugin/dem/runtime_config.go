@@ -3,8 +3,12 @@
 package dem
 
 import (
+	"context"
 	"errors"
+	"fmt"
+	"net/url"
 	"path/filepath"
+	goruntime "runtime"
 	"time"
 
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
@@ -18,15 +22,21 @@ type RuntimeConfig struct {
 	MaxBytes              int64  `yaml:"max_bytes" json:"max_bytes"`
 	PreviousRetentionDays int    `yaml:"previous_retention_days" json:"previous_retention_days"`
 	PreloadPath           string `yaml:"preload_path" json:"preload_path,omitempty"`
+	ReleaseURL            string `yaml:"release_url" json:"release_url,omitempty"`
+	OfflineKeyring        string `yaml:"offline_keyring" json:"offline_keyring,omitempty"`
 }
 
+// DefaultRuntimeMode is set to native by DEB/RPM builds. Other installations use
+// explicitly installed managed bundles unless an administrator selects a preload.
+var DefaultRuntimeMode = "managed"
+
 func DefaultRuntimeConfig() RuntimeConfig {
-	return RuntimeConfig{Mode: "managed", MaxBytes: runtime.DefaultMaxBytes, PreviousRetentionDays: 7}
+	return RuntimeConfig{Mode: DefaultRuntimeMode, MaxBytes: runtime.DefaultMaxBytes, PreviousRetentionDays: 7}
 }
 
 func (c RuntimeConfig) validate() error {
-	if c.Mode != "managed" && c.Mode != "preloaded" {
-		return errors.New("mode must be managed or preloaded")
+	if c.Mode != "managed" && c.Mode != "preloaded" && c.Mode != "native" {
+		return errors.New("mode must be managed, native or preloaded")
 	}
 	if c.MaxBytes <= 0 {
 		return errors.New("max_bytes must be positive")
@@ -34,13 +44,60 @@ func (c RuntimeConfig) validate() error {
 	if c.PreviousRetentionDays < 0 || c.PreviousRetentionDays > 36500 {
 		return errors.New("previous_retention_days must be between 0 and 36500")
 	}
-	if c.Mode == "managed" && c.PreloadPath != "" {
+	if c.Mode != "preloaded" && c.PreloadPath != "" {
 		return errors.New("preload_path requires mode: preloaded")
 	}
-	if c.Mode == "preloaded" && c.CachePath != "" {
+	if c.Mode != "managed" && c.CachePath != "" {
 		return errors.New("cache_path is only valid in managed mode")
 	}
+	if c.ReleaseURL != "" {
+		u, err := url.Parse(c.ReleaseURL)
+		if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.Fragment != "" {
+			return errors.New("release_url requires HTTPS without credentials or a fragment")
+		}
+	}
+	if c.OfflineKeyring != "" && !filepath.IsAbs(c.OfflineKeyring) {
+		return errors.New("offline_keyring requires an absolute path to a public OpenPGP keyring")
+	}
 	return nil
+}
+
+// ReleaseLoader selects canonical online trust only with network consent.
+// Offline imports require an explicit administrator-provisioned public keyring.
+// Call it under installation exclusion, never before checking update consent.
+func (c RuntimeConfig) ReleaseLoader(path string, networkAllowed bool) func(context.Context) (runtime.Release, error) {
+	return func(ctx context.Context) (runtime.Release, error) {
+		var keys *runtime.ReleaseTrust
+		var trustErr error
+		if networkAllowed {
+			keys, trustErr = runtime.FetchReleaseKeyring(ctx)
+		} else {
+			if c.OfflineKeyring == "" {
+				return runtime.Release{}, errors.New("offline preparation requires runtime.offline_keyring; no runtime release verification key is configured")
+			}
+			keys, trustErr = runtime.ReadReleaseKeyring(c.OfflineKeyring)
+		}
+		if trustErr != nil {
+			return runtime.Release{}, fmt.Errorf("runtime verification key: %w", trustErr)
+		}
+		var release runtime.Release
+		var err error
+		if path == "" {
+			if !networkAllowed {
+				return runtime.Release{}, errors.New("release download requires explicit network consent")
+			}
+			release, err = runtime.FetchRelease(ctx, c.ReleaseURL, keys)
+		} else {
+			release, err = runtime.ReadRelease(path, keys)
+		}
+		if err != nil {
+			return runtime.Release{}, err
+		}
+		if release.Manifest.Platform != "linux/"+goruntime.GOARCH {
+			return runtime.Release{}, errors.New("runtime release does not match this architecture")
+		}
+		return release, nil
+	}
 }
 
 // StoreConfig resolves only explicit installation paths; debug mode cannot create

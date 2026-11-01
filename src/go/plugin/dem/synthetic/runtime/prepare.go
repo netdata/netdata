@@ -65,7 +65,7 @@ func (s *Store) prepare(ctx context.Context, m Manifest, open func() (io.ReadClo
 		return err
 	}
 	defer operation.Close()
-	archive, err := operation.OpenFile("archive.tar.gz", os.O_RDWR|os.O_CREATE|os.O_EXCL, 0600)
+	archive, err := operation.OpenFile("archive.tar.zst", os.O_RDWR|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
 		return err
 	}

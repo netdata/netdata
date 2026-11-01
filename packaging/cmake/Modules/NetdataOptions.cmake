@@ -87,7 +87,7 @@ option(ENABLE_PLUGIN_IPMI "Enable the experimental Go IPMI plugin (ipmi.plugin)"
 if(ENABLE_PLUGIN_IPMI AND NOT OS_LINUX)
   message(FATAL_ERROR "The experimental Go IPMI plugin requires Linux")
 endif()
-option(ENABLE_PLUGIN_DEM "Enable the experimental digital experience monitoring plugin" OFF)
+cmake_dependent_option(ENABLE_PLUGIN_DEM "Enable digital experience monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_OTEL "Enable collection of OpenTelemetry metrics and logs" ${DEFAULT_FEATURE_STATE} "OS_LINUX OR OS_MACOS" False)
 cmake_dependent_option(ENABLE_PLUGIN_NETFLOW "Enable NetFlow/IPFIX/sFlow flow analysis plugin" False "NOT OS_WINDOWS" False)
 option(ENABLE_PLUGIN_PYTHON "Enable metric collectors written in Python" ${DEFAULT_FEATURE_STATE})

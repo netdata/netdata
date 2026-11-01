@@ -12,9 +12,11 @@ release. These pins are not compiled into the Agent. `runtime.json` owns interna
 locations and the contract/version; the local builder stamps its release version
 over the source value `dev`. `runner/run.mjs` is the release entrypoint. The outer
 trusted descriptor owns the archive SHA256, bounds and entrypoint. The archive
-cannot embed its own digest. See `../../packaging/dem-runtime/README.md` for local
-assembly and exact source inventory. Production publication and native packages
-are separate delivery work; this remains an experimental, default-off integration.
+cannot embed its own digest. See `../../packaging/dem-runtime/README.md` for
+assembly, native package recipes and exact source inventory. Ordinary Linux Agent
+installations include DEM, but browser runtime installation remains explicit.
+Production publication requires confirmed infrastructure, source/license review
+and platform qualification.
 
 Managed preparation and protected preloads use complete verified bundles. Node,
 npm dependencies and system browsers cannot be selected independently. The runtime
