@@ -379,8 +379,8 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
                 mi->st_dev = 0;
             }
 
-            //try to detect devices with same minor and major modes. Within these,
-            //the larger mount point is considered a bind.
+            // mounts of the same filesystem have the same major:minor; keep the one with the
+            // shortest root and mark the others as bind (diskspace charts a filesystem once)
             struct mountinfo *mt;
             for(mt = root; mt; mt = mt->next) {
                 if(unlikely(mt->major == mi->major && mt->minor == mi->minor && !(mi->flags & MOUNTINFO_IS_BIND))) {
