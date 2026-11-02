@@ -44,9 +44,9 @@ use common::{
 };
 use sfsq::traces::{
     AttributeOwner, BuiltinField, CompareOp, Condition, DURATION_BIN_COUNT, DurationPercentiles,
-    OverviewData, OverviewQuery, OverviewRequestError, PartialReason, Predicate, PredicateTarget,
-    PredicateValue, QueryStatus, SearchQuery, SearchSources, TimeWindow, Token, TokenQuery,
-    TraceQuery, TraceSource, overview, search, trace_by_id,
+    HEATMAP_ROWS, OverviewData, OverviewQuery, OverviewRequestError, PartialReason, Predicate,
+    PredicateTarget, PredicateValue, QueryStatus, SearchQuery, SearchSources, TimeWindow, Token,
+    TokenQuery, TraceQuery, TraceSource, heatmap_row_bounds, overview, search, trace_by_id,
 };
 
 /// The suite's standard grid: 10 one-second buckets covering [0s, 10s).
@@ -436,6 +436,32 @@ fn per_bucket_percentiles_from_the_histogram() {
     }
 }
 
+/// Each bucket's traces per heatmap row, the explorer's rows: a trace
+/// lands in the row whose bound first exceeds its envelope duration, and
+/// a bucket's rows sum to its traces.
+#[test]
+fn per_bucket_duration_rows_count_traces_by_envelope() {
+    let dir = tempfile::tempdir().unwrap();
+    let wal = write_wal(dir.path(), vec![req(&percentile_corpus())], "rows");
+    let data = run(
+        vec![sealed_source(dir.path(), &wal, "a")],
+        OverviewQuery::new(grid()),
+    );
+    let bounds = heatmap_row_bounds();
+    let row_of = |duration_ns: i64| {
+        bounds
+            .iter()
+            .position(|bound| bound.is_none_or(|b| duration_ns < b))
+            .unwrap()
+    };
+    let mut expected = vec![[0u64; HEATMAP_ROWS]; 10];
+    for ms in 1..=10 {
+        expected[2][row_of(ms * 1_000_000)] += 1;
+    }
+    expected[5][row_of(42_000_000)] += 1;
+    assert_eq!(data.bucket_duration_rows, expected);
+}
+
 /// The all-or-empty paths keep the array at the grid's shape, so a
 /// consumer walking it beside `cells` never runs off its end.
 #[test]
@@ -450,6 +476,7 @@ fn a_cancelled_call_keeps_the_percentile_array_at_the_grid_shape() {
     )
     .unwrap();
     assert_eq!(data.bucket_percentiles, vec![None; 10]);
+    assert_eq!(data.bucket_duration_rows, vec![[0; HEATMAP_ROWS]; 10]);
 }
 
 // ── Filtered grid (the page's selections applied to the heatmap) ─────

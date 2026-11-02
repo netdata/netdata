@@ -30,8 +30,8 @@ use sfsq::traces::{PartialReason, QueryStatus};
 /// Request param names accepted by this function, advertised to the UI
 /// in `InfoResponse::accepted_params`. The rule: the list carries
 /// exactly the TOP-LEVEL keys — the mode selectors, `tenant`, and every
-/// field the implicit Functions view reads: its window and cursor, and
-/// the search bar's `conditions` and `text`. A field the implicit view
+/// field the implicit Functions view reads: its window and cursor, the
+/// search bar's `conditions` and `text`, and the `overview` switch. A field the implicit view
 /// honours but this list omits is unreachable.
 ///
 /// `timeout` is deliberately NOT listed: the implicit view accepts it
@@ -52,6 +52,7 @@ pub const ACCEPTED_PARAMS: &[&str] = &[
     "anchor",
     "conditions",
     "text",
+    "overview",
 ];
 
 /// The raw top-level shape: the three mode selectors and supported
@@ -91,6 +92,8 @@ struct RawOtelTracesRequest {
     conditions: Option<serde_json::Value>,
     #[serde(default, deserialize_with = "present")]
     text: Option<serde_json::Value>,
+    #[serde(default, deserialize_with = "present")]
+    overview: Option<serde_json::Value>,
     #[serde(default, deserialize_with = "present")]
     timeout: Option<serde_json::Value>,
     /// Tenant whose data the query reads — a scoping selector supplied
@@ -182,6 +185,7 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
             || raw.anchor.is_some()
             || raw.conditions.is_some()
             || raw.text.is_some()
+            || raw.overview.is_some()
             || raw.timeout.is_some();
 
         match present.as_slice() {
@@ -217,6 +221,7 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
                 ("anchor", raw.anchor.as_ref()),
                 ("conditions", raw.conditions.as_ref()),
                 ("text", raw.text.as_ref()),
+                ("overview", raw.overview.as_ref()),
                 ("timeout", raw.timeout.as_ref()),
             ] {
                 if let Some(value) = value {
@@ -283,6 +288,13 @@ pub struct FunctionsParams {
     /// [`REQUEST_TEXT_MAX_BYTES`].
     #[serde(default)]
     pub text: Vec<String>,
+    /// `false` skips the embedded window aggregate, for a list that
+    /// narrows a heatmap cell while the heatmap keeps drawing the
+    /// window's section: recomposing it would be a full-window pass for
+    /// numbers the caller does not draw. Default `true`; an anchor skips
+    /// it regardless ([`Self::anchor`]).
+    #[serde(default = "default_overview")]
+    pub overview: bool,
     /// Accepted for parity with the Functions protocol. Execution
     /// deadlines remain owned by the bridge call context.
     #[serde(default)]
@@ -409,6 +421,10 @@ pub const CONDITION_VALUES_MAX: usize = 64;
 /// Page size when the request omits `last` (the engine's default).
 fn default_limit() -> usize {
     sfsq::traces::DEFAULT_SEARCH_LIMIT
+}
+
+fn default_overview() -> bool {
+    true
 }
 
 /// Wire maximum for [`FunctionsParams::last`]. The cap lives at the wire,
@@ -625,12 +641,20 @@ pub struct OverviewGridWire {
     /// Per cell, the binned traces' STORED ERROR-status spans —
     /// index-parallel to `cells` in BOTH dimensions. It counts spans,
     /// not traces: a cell holding one trace with three failed spans
-    /// reads 3, not 1. Read beside `cells[bucket][bin]` to paint one
-    /// heatmap cell's count and error rate together.
+    /// reads 3, not 1.
     pub error_cells: Vec<Vec<u64>>,
     /// Per time bucket, the binned traces' envelope-duration
     /// percentiles, nanoseconds (within 1/32 of exact).
     pub duration_percentiles_ns: OverviewPercentilesWire,
+    /// The duration heatmap's rows: each one's exclusive upper bound,
+    /// nanoseconds, low to high; `null` for the last, unbounded row. The
+    /// explorer's rows (`ExploreHistogramWire::duration_rows`), so the
+    /// trace and span heatmaps share one scale. Index-parallel to every
+    /// bucket's `durations`.
+    pub duration_rows: Vec<Option<i64>>,
+    /// Per time bucket, the binned traces per heatmap row (`duration_rows`),
+    /// by envelope duration.
+    pub durations: Vec<Vec<u64>>,
 }
 
 /// The grid's per-bucket duration percentiles: one array per rank, each

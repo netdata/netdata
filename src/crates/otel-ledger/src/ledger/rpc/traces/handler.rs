@@ -575,8 +575,9 @@ impl OtelTracesHandler {
         // skipped and the section simply ABSENT (never a `null` on the
         // wire); consumers re-read it on the next anchor-less request,
         // the only kind that can move the window. Details on the wire
-        // (`SearchResult::overview`).
-        let aggregate = params.anchor.is_none();
+        // (`SearchResult::overview`). A caller that keeps drawing an
+        // earlier section (a heatmap cell's list) turns it off.
+        let aggregate = params.overview && params.anchor.is_none();
         let data = self
             .search_result(ctx, &search_params, tenant, aggregate)
             .await?;

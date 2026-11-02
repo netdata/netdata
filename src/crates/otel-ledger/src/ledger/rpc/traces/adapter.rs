@@ -991,6 +991,12 @@ pub(crate) fn to_overview_section(
             cells: data.cells.iter().map(|row| row.to_vec()).collect(),
             error_cells: data.error_cells.iter().map(|row| row.to_vec()).collect(),
             duration_percentiles_ns: to_percentiles(&data.bucket_percentiles),
+            duration_rows: heatmap_row_bounds().to_vec(),
+            durations: data
+                .bucket_duration_rows
+                .iter()
+                .map(|rows| rows.to_vec())
+                .collect(),
         },
         totals: OverviewTotals {
             traces: data.total_traces,

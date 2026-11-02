@@ -75,7 +75,7 @@ use std::sync::atomic::AtomicUsize;
 
 use tokio_util::sync::CancellationToken;
 
-use super::duration_hist::{DurationHistogram, DurationPercentiles};
+use super::duration_hist::{DurationHistogram, DurationPercentiles, HEATMAP_ROWS};
 use super::fold::{MergedTrace, SourceFoldSpec, TokenFilter, merge_trace_sources};
 use super::predicate::{PredicateError, PredicateTarget, TokenQuery};
 use super::sources::{SourceSetError, TraceSource, validate_sources};
@@ -230,6 +230,12 @@ pub struct OverviewData {
     /// index, `None` where nothing binned. Not derived from `cells`: the
     /// duration bins are decade-wide.
     pub bucket_percentiles: Vec<Option<DurationPercentiles>>,
+    /// Per time bucket, the binned traces per heatmap row
+    /// ([`heatmap_row_bounds`](super::heatmap_row_bounds)), from the same
+    /// histogram as the percentiles — the explorer's rows, so both views
+    /// draw one duration scale. Index-parallel to `cells`'s outer index;
+    /// all zeros where nothing binned.
+    pub bucket_duration_rows: Vec<[u64; HEATMAP_ROWS]>,
     pub status: QueryStatus,
 }
 
@@ -242,6 +248,7 @@ impl OverviewData {
             total_spans: 0,
             total_errors: 0,
             bucket_percentiles: vec![None; num_buckets],
+            bucket_duration_rows: vec![[0; HEATMAP_ROWS]; num_buckets],
             status,
         }
     }
@@ -344,6 +351,13 @@ pub fn overview(
         bucket_percentiles: bucket_histograms
             .iter()
             .map(|h| h.as_ref().and_then(DurationHistogram::percentiles))
+            .collect(),
+        bucket_duration_rows: bucket_histograms
+            .iter()
+            .map(|h| {
+                h.as_ref()
+                    .map_or([0; HEATMAP_ROWS], DurationHistogram::heatmap_rows)
+            })
             .collect(),
         status: status.finish(),
     })
