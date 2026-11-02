@@ -390,6 +390,8 @@ func TestCollector_TableChartRowsSharingKeyPickTheFunctionRow(t *testing.T) {
 		"new chart, empty alias first":         {aliases: []string{"", "uplink"}, want: "uplink"},
 		"new chart, empty alias last":          {aliases: []string{"uplink", ""}, want: "uplink"},
 		"existing empty alias, peer gains one": {prev: map[string]string{"eth0": ""}, aliases: []string{"", "uplink"}, want: "uplink"},
+		"existing larger alias first":          {prev: map[string]string{"eth0": "uplink-b"}, aliases: []string{"uplink-b", "uplink-a"}, want: "uplink-a"},
+		"existing larger alias last":           {prev: map[string]string{"eth0": "uplink-b"}, aliases: []string{"uplink-a", "uplink-b"}, want: "uplink-a"},
 	}
 
 	for name, test := range tests {
@@ -404,6 +406,8 @@ func TestCollector_TableChartRowsSharingKeyPickTheFunctionRow(t *testing.T) {
 			for _, alias := range test.aliases {
 				rows = append(rows, aliasTestMetric("ifTraffic", ifaceTags("eth0", alias)))
 			}
+			// A chart moving between two names is reset to its ID for one collection first.
+			collr.collectProfileTableMetrics(make(map[string]int64), rows)
 			collr.collectProfileTableMetrics(make(map[string]int64), rows)
 
 			chart := collr.Charts().Get("snmp_device_prof_ifTraffic_eth0")
