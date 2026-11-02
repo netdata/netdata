@@ -241,6 +241,7 @@ struct web_client {
 
     struct {
         nd_uuid_t bearer_token;
+        char registry_person_guid[UUID_STR_LEN]; // the netdata_registry_id cookie (if sent)
     } auth;
 
     struct {                            // A callback to check if the query should be interrupted / stopped
