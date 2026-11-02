@@ -33,8 +33,9 @@ static bool cmd_arg_sanitization_test(const char *src, const char *expected) {
         }
 
         if (ok && strcmp(expected, dst) != 0) {
-            fprintf(stderr, "src >>>%s<<<, dst_size %zu: expected >>>%s<<<, got >>>%s<<<\n",
-                    src, dst_size, expected, dst);
+            // bounded: a broken function may return true without terminating dst
+            fprintf(stderr, "src >>>%s<<<, dst_size %zu: expected >>>%s<<<, got >>>%.*s<<<\n",
+                    src, dst_size, expected, (int)dst_size, dst);
             return false;
         }
     }
