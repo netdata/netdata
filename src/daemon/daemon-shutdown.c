@@ -174,15 +174,17 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
 }
 #endif
 
-// The last thing shutdown does. When shutdown gave up on a SQLite user (see sqlite_teardown_is_unsafe()), that
-// thread may still be a libuv threadpool worker in the middle of a job, and exit() would run libuv's library
-// destructor, which joins every threadpool thread - so the process would wait for the job it already gave up on,
-// until systemd kills it. Shutdown is complete and its status saved by then: leave without running destructors.
+// set when shutdown stopped waiting for dbengine work that may still be running on the libuv threadpool
+static bool dbengine_work_abandoned = false;
+
+// The last thing shutdown does. When shutdown gave up on work that may still be running on a libuv threadpool
+// worker (a SQLite user, see sqlite_teardown_is_unsafe(), or undrained dbengine work), exit() would run libuv's
+// library destructor, which joins every threadpool thread - so the process would wait for the job it already gave
+// up on, until systemd kills it. Shutdown is complete and its status saved by then: leave without running
+// destructors. No stdio flush either: a thread stuck mid-write may hold a stdio lock (the logger uses raw write()).
 NORETURN void netdata_exit_process(int status) {
-    if(sqlite_teardown_is_unsafe()) {
-        fflush(NULL);
+    if(sqlite_teardown_is_unsafe() || __atomic_load_n(&dbengine_work_abandoned, __ATOMIC_RELAXED))
         _exit(status);
-    }
 
     exit(status);
 }
@@ -345,6 +347,8 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
             freez(th);
 
             dbengine_drained = dbengine_shutdown();
+            if(!dbengine_drained)
+                __atomic_store_n(&dbengine_work_abandoned, true, __ATOMIC_RELAXED);
             watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
         }
         else {
