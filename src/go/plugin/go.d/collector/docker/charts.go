@@ -165,8 +165,16 @@ func (c *Collector) addContainerCharts(name, image string) {
 func (c *Collector) removeContainerCharts(name string) {
 	// Match exact chart IDs: a prefix match would also remove the charts of
 	// other containers whose names start with this one (e.g. "foo" and "foo-bar").
+	ids := make(map[string]bool, len(containerChartsTmpl))
 	for _, tmpl := range containerChartsTmpl {
-		if chart := c.Charts().Get(fmt.Sprintf(tmpl.ID, name)); chart != nil {
+		ids[fmt.Sprintf(tmpl.ID, name)] = true
+	}
+
+	// Check every chart rather than Charts().Get, which returns only the first
+	// match: a container removed and recreated before the old charts are pruned
+	// has two charts with the same ID.
+	for _, chart := range *c.Charts() {
+		if ids[chart.ID] {
 			chart.MarkRemove()
 			chart.MarkNotCreated()
 		}
