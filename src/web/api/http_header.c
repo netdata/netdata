@@ -446,34 +446,64 @@ static inline bool http_header_is_ows(char c) {
     return c == ' ' || c == '\t';
 }
 
-char *http_header_parse_line(struct web_client *w, char *s) {
-    supported_headers_init();
-
-    // a line starting with whitespace is an obsolete folded continuation (RFC 9112 5.2)
+// Checks the syntax of the header line at s. Returns its terminating '\r' and sets *colon, returns the end of the
+// string when the line has not been received completely, or returns NULL when the line is malformed:
+// - it starts with whitespace, an obsolete folded continuation line (RFC 9112 5.2)
+// - it has no colon, an empty name, or whitespace before the colon (RFC 9112 5.1)
+// - it has a CR or LF that is not part of its terminating CRLF (RFC 9110 5.5)
+static const char *http_header_line_check(const char *s, const char **colon) {
     if(http_header_is_ows(*s))
         return NULL;
 
-    // find the colon, without leaving this line
-    char *e = s;
+    const char *e = s;
     while(*e && *e != ':' && *e != '\r' && *e != '\n') e++;
     if(!*e) return e;
-    if(*e != ':')
+    if(*e != ':' || e == s || http_header_is_ows(e[-1]))
         return NULL;
 
+    const char *ve = e + 1;
+    while(*ve && *ve != '\r' && *ve != '\n') ve++;
+    if(!*ve) return ve;
+    if(*ve == '\r' && !ve[1]) return &ve[1];
+    if(*ve != '\r' || ve[1] != '\n')
+        return NULL;
+
+    *colon = e;
+    return ve;
+}
+
+bool http_header_section_is_valid(const char *request) {
+    const char *headers_end = strstr(request, "\r\n\r\n");
+    if(!headers_end)
+        return true;
+
+    // from the end of the request line, one header line at a time
+    const char *s = strstr(request, "\r\n");
+    while(s < headers_end) {
+        const char *colon;
+        s = http_header_line_check(s + 2, &colon);
+        if(!s)
+            return false;
+    }
+
+    return true;
+}
+
+char *http_header_parse_line(struct web_client *w, char *s) {
+    supported_headers_init();
+
+    const char *colon;
+    char *ve = (char *)http_header_line_check(s, &colon);
+    if(!ve || !*ve)
+        return ve;
+
     // get the name
+    char *e = (char *)colon;
     *e = '\0';
 
     // find the value, without the optional whitespace before it
-    char *v = e + 1, *ve;
+    char *v = e + 1;
     while(http_header_is_ows(*v)) v++;
-    ve = v;
-
-    // find the \r
-    while(*ve && *ve != '\r') ve++;
-    if(!*ve || ve[1] != '\n') {
-        *e = ':';
-        return ve;
-    }
 
     // terminate the value, without the optional whitespace after it
     char *vt = ve;

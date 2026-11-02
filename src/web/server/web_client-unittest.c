@@ -175,10 +175,10 @@ int web_client_header_parsing_unittest(void)
         const char *forwarded_for;
         const char *host;
     } ows_cases[] = {
-        {"GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For: 10.0.0.1\r\nHost: h\r\n\r\n", "10.0.0.1", "h"},
-        {"GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For:\t10.0.0.1\r\nHost:\th\r\n\r\n", "10.0.0.1", "h"},
-        {"GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For: \t 10.0.0.1 \t\r\nHost: h  \r\n\r\n", "10.0.0.1", "h"},
-        {"GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For:10.0.0.1\r\nHost:h\r\n\r\n", "10.0.0.1", "h"},
+        {"GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For: client-1\r\nHost: h\r\n\r\n", "client-1", "h"},
+        {"GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For:\tclient-1\r\nHost:\th\r\n\r\n", "client-1", "h"},
+        {"GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For: \t client-1 \t\r\nHost: h  \r\n\r\n", "client-1", "h"},
+        {"GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For:client-1\r\nHost:h\r\n\r\n", "client-1", "h"},
         {"GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For: \t \r\nHost:\r\n\r\n", "", ""},
     };
 
@@ -218,11 +218,22 @@ int web_client_header_parsing_unittest(void)
 
     // a header line without a colon, or an obsolete folded continuation line, is rejected
     static const char *malformed_cases[] = {
-        "GET /api/v1/info HTTP/1.1\r\nJunk\r\nX-Forwarded-For: 10.0.0.1\r\n\r\n",
-        "GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For: 10.0.0.1\r\n continued\r\n\r\n",
-        "GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For: 10.0.0.1\r\n\tcontinued\r\n\r\n",
-        "GET /api/v1/info HTTP/1.1\r\nHost: h\r\n X-Forwarded-For: 10.0.0.1\r\n\r\n",
+        "GET /api/v1/info HTTP/1.1\r\nJunk\r\nX-Forwarded-For: client-1\r\n\r\n",
+        "GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For: client-1\r\n continued\r\n\r\n",
+        "GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For: client-1\r\n\tcontinued\r\n\r\n",
+        "GET /api/v1/info HTTP/1.1\r\nHost: h\r\n X-Forwarded-For: client-1\r\n\r\n",
         "POST /api/v1/info HTTP/1.1\r\nJunk\r\nContent-Length: 4\r\n\r\ntest",
+        // the header section is checked before waiting for a body: unframed, or not arrived yet
+        "POST /api/v1/info HTTP/1.1\r\nJunk\r\n\r\ntest",
+        "PUT /api/v1/info HTTP/1.1\r\nContent-Length: 4\r\n folded\r\n\r\n",
+        // empty name, whitespace before the colon
+        "GET /api/v1/info HTTP/1.1\r\n: value\r\n\r\n",
+        "GET /api/v1/info HTTP/1.1\r\nHost : h\r\n\r\n",
+        "GET /api/v1/info HTTP/1.1\r\nHost\t: h\r\n\r\n",
+        // a bare LF or CR inside a header line
+        "GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For: client-1\nHost: h\r\n\r\n",
+        "GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For: client-1\rHost: h\r\n\r\n",
+        "GET /api/v1/info HTTP/1.1\r\nX-Forward\ned-For: client-1\r\n\r\n",
     };
 
     for (size_t i = 0; i < sizeof(malformed_cases) / sizeof(malformed_cases[0]); i++) {
@@ -255,6 +266,20 @@ int web_client_header_parsing_unittest(void)
             "split malformed request was not rejected once complete");
     }
 
+    // a malformed POST is rejected when its header section completes, before the body arrives
+    {
+        static const char split_post[] = "POST /api/v1/info HTTP/1.1\r\nContent-Length: 4\r\nHost : h\r\n\r\ntest";
+        const size_t headers = sizeof(split_post) - 1 - 4;
+        web_client_reuse_from_cache(w);
+        buffer_memcat(w->response.data, split_post, headers - 3);
+        WEB_CLIENT_TEST(
+            http_request_validate(w) == HTTP_VALIDATION_INCOMPLETE, "malformed POST was not incomplete before its headers");
+        buffer_memcat(w->response.data, &split_post[headers - 3], 3);
+        WEB_CLIENT_TEST(
+            http_request_validate(w) == HTTP_VALIDATION_MALFORMED_HEADER,
+            "malformed POST was not rejected when its header section completed");
+    }
+
     // POST/PUT framing reads Content-Length and Content-Type only as header names at the start of a header line
     static const struct {
         const char *request;
@@ -279,8 +304,6 @@ int web_client_header_parsing_unittest(void)
         {"POST /api/v1/info HTTP/1.1\r\nX-A: b\r\n\r\nContent-Length: 4\r\n\r\ntest", false, CT_TEXT_PLAIN},
         {"POST /api/v1/info HTTP/1.1\r\nContent-Length: 4x\r\n\r\ntest", false, CT_TEXT_PLAIN},
         {"POST /api/v1/info HTTP/1.1\r\nContent-Length:\r\n\r\ntest", false, CT_TEXT_PLAIN},
-        // invalid framing keeps the request incomplete (until the read budget ends), even with a malformed line
-        {"POST /api/v1/info HTTP/1.1\r\nJunk\r\n\r\ntest", false, CT_TEXT_PLAIN},
     };
 
     for (size_t i = 0; i < sizeof(framing_cases) / sizeof(framing_cases[0]); i++) {
