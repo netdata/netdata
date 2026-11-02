@@ -94,6 +94,8 @@ void ws_client_reset(ws_client *client)
 
     freez(client->hs.http_reply_msg);
     client->hs.http_reply_msg = NULL;
+    client->hs.http_code = 0;
+    client->hs.http_11 = false;
 
     rbuf_flush(client->buf_read);
     rbuf_flush(client->buf_write);
@@ -219,13 +221,6 @@ exit_with_error:
     return rc;
 }
 
-#define BUF_READ_MEMCMP_CONST(const, err)                                                                              \
-    if (rbuf_memcmp_n(client->buf_read, const, strlen(const))) {                                                       \
-        nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: %s", err);                                                                \
-        rbuf_flush(client->buf_read);                                                                                  \
-        return WS_CLIENT_PROTOCOL_ERROR;                                                                               \
-    }
-
 #define BUF_READ_CHECK_AT_LEAST(x)                                                                                     \
     if (rbuf_bytes_available(client->buf_read) < x)                                                                    \
         return WS_CLIENT_NEED_MORE_BYTES;
@@ -233,6 +228,7 @@ exit_with_error:
 #define MAX_HTTP_LINE_LENGTH (1024 * 4)
 #define HTTP_SC_LENGTH 4 // "XXX " http status code as C string
 #define WS_CLIENT_HTTP_HDR "HTTP/1.1 "
+#define WS_CLIENT_HTTP_HDR_10 "HTTP/1.0 " // same length as WS_CLIENT_HTTP_HDR
 #define WS_CONN_ACCEPT "sec-websocket-accept"
 #define HTTP_HDR_SEPARATOR ":"
 #define WS_NONCE_STRLEN_B64 28
@@ -289,6 +285,12 @@ int ws_client_check_handshake_reply(const ws_client *client, char *err, size_t e
         return -1;
     }
 
+    // an upgrade exists only in HTTP/1.1
+    if (!client->hs.http_11) {
+        snprintfz(err, err_size, "Received HTTP/1.0 101 reply; a WebSocket upgrade requires HTTP/1.1");
+        return -1;
+    }
+
     // every accept header must match; a reply without one is not an upgrade
     bool accepted = false;
     for (const struct http_header *h = client->hs.headers; h; h = h->next) {
@@ -320,8 +322,17 @@ int ws_client_parse_handshake_resp(ws_client *client)
 
     switch (client->hs.hdr_state) {
         case WS_HDR_HTTP:
+            // a proxy may answer an HTTP/1.1 request with an HTTP/1.0 error; parse it so its status is reported
             BUF_READ_CHECK_AT_LEAST(strlen(WS_CLIENT_HTTP_HDR))
-            BUF_READ_MEMCMP_CONST(WS_CLIENT_HTTP_HDR, "Expected \"HTTP1.1\" header");
+            if (!rbuf_memcmp_n(client->buf_read, WS_CLIENT_HTTP_HDR, strlen(WS_CLIENT_HTTP_HDR)))
+                client->hs.http_11 = true;
+            else if (!rbuf_memcmp_n(client->buf_read, WS_CLIENT_HTTP_HDR_10, strlen(WS_CLIENT_HTTP_HDR_10)))
+                client->hs.http_11 = false;
+            else {
+                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Expected \"HTTP/1.1\" or \"HTTP/1.0\" status line");
+                rbuf_flush(client->buf_read);
+                return WS_CLIENT_PROTOCOL_ERROR;
+            }
             rbuf_bump_tail(client->buf_read, strlen(WS_CLIENT_HTTP_HDR));
             client->hs.hdr_state = WS_HDR_RC;
             break;

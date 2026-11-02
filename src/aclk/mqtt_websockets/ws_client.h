@@ -69,6 +69,7 @@ typedef struct websocket_client {
         enum websocket_client_hdr_parse_state hdr_state;
         char *nonce_reply;
         int http_code;
+        bool http_11;           // status line said HTTP/1.1 (else HTTP/1.0)
         char *http_reply_msg;
         struct http_header *headers;
         struct http_header *headers_tail;

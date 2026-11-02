@@ -545,6 +545,26 @@ static int ws_client_unittest_handshake(void)
     errors += ws_client_unittest_handshake_case("101 with padded matching accept", WS_UT_101 "Sec-WebSocket-Accept: \t " WS_UT_NONCE " \t\r\n\r\n", NULL);
     errors += ws_client_unittest_handshake_case("101 with empty accept", WS_UT_101 "Sec-WebSocket-Accept: \r\n\r\n",
                                                 "Received NONCE \"\" does not match expected nonce of \"" WS_UT_NONCE "\"");
+    // a proxy may answer with an HTTP/1.0 error page; its status is still reported, but 1.0 cannot upgrade
+    errors += ws_client_unittest_handshake_case("HTTP/1.0 503 from a proxy", "HTTP/1.0 503 Service Unavailable\r\nServer: haproxy\r\n\r\n",
+                                                "HTTP return code not 101. Received 503 with msg \"Service Unavailable\" (server: \"haproxy\").");
+    errors += ws_client_unittest_handshake_case("HTTP/1.0 101 with matching accept", "HTTP/1.0 101 Switching Protocols\r\nSec-WebSocket-Accept: " WS_UT_NONCE "\r\n\r\n",
+                                                "Received HTTP/1.0 101 reply; a WebSocket upgrade requires HTTP/1.1");
+
+    // a reply that is not HTTP/1.x fails while the status line is parsed
+    {
+        char *junk_host = (char *)"localhost";
+        ws_client *junk = ws_client_new(4096, &junk_host);
+        WS_TEST(junk != NULL, "junk status line: client");
+        if (junk) {
+            WS_TEST(ws_client_start_handshake(junk) == 0, "junk status line: handshake starts");
+            fprintf(stderr, "ws_client handshake case: junk status line\n");
+            WS_TEST(ws_client_unittest_handshake_reply(junk, "SSH-2.0-OpenSSH_9.6\r\n\r\n") == WS_CLIENT_PROTOCOL_ERROR,
+                    "junk status line: rejected");
+            WS_TEST(junk->state == WS_HANDSHAKE, "junk status line: not established");
+            ws_client_destroy(junk);
+        }
+    }
 
     // a reconnect must not inherit the previous connection's accepted handshake
     char *host = (char *)"localhost";
