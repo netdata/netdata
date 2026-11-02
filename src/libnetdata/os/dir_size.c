@@ -299,7 +299,8 @@ int dir_size_unittest(void) {
     DIR_SIZE_UT_CHECK(r.bytes == 10 + 20 + 30 + 40, "total bytes");
     DIR_SIZE_UT_CHECK(r.files == 4, "total files");
     DIR_SIZE_UT_CHECK(r.directories == 1 + 1 + deep + long_dirs, "total directories");
-    DIR_SIZE_UT_CHECK(r.depth == deep, "deepest level");
+    // a low RLIMIT_NOFILE caps the d/d/... chain, then the long chain is the deepest
+    DIR_SIZE_UT_CHECK(r.depth == MAX(deep, long_dirs), "deepest level");
     DIR_SIZE_UT_CHECK(r.errors == 1, "the file whose path does not fit is an error");
 
     // max_depth 1: the root and its subdirectories, nothing deeper
