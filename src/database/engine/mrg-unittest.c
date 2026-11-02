@@ -2762,9 +2762,146 @@ cleanup:
 
 #endif
 
+// A journal v2 that is no longer available (a failed mapping or populate clears the flag)
+// can still be indexed: closing it must drop the index entry and its fd anyway, or the
+// datafile is freed with ctx.njfv2idx still pointing at it.
+static int mrg_jv2_close_unavailable_indexed_check(void) {
+    int errors = 0;
+    enum { TEST_FILENO = 17 };
+
+    struct jv2_one_metric t = { 0 };
+    if(!jv2_journal_fixture_init(&t.fx, TEST_FILENO))
+        return 0;
+
+    if(!jv2_one_metric_publish(&t)) {
+        errors++;
+        goto cleanup;
+    }
+
+    struct rrdengine_journalfile *journalfile = t.fx.journalfile;
+    int v2 = journalfile->mmap.fd;
+    if(!journalfile->njfv2idx.indexed_as || v2 == -1) {
+        fprintf(stderr, "ERROR: the published journal v2 is not indexed or has no fd\n");
+        errors++;
+        goto cleanup;
+    }
+
+    spinlock_tracked_lock(&journalfile->data_spinlock);
+    journalfile->v2.flags &= ~JOURNALFILE_FLAG_IS_AVAILABLE;
+    spinlock_tracked_unlock(&journalfile->data_spinlock);
+
+    journalfile_close(journalfile, &t.fx.datafile);
+
+    if(journalfile->njfv2idx.indexed_as || JudyLCount(t.fx.ctx.njfv2idx.JudyL, 0, -1, PJE0)) {
+        fprintf(stderr, "ERROR: closing an unavailable journal v2 left it in the journal index\n");
+        errors++;
+    }
+    if(journalfile->mmap.fd != -1 || fd_is_open(v2)) {
+        fprintf(stderr, "ERROR: closing an unavailable journal v2 left its fd %d open\n", v2);
+        errors++;
+    }
+
+cleanup:
+    errors += jv2_one_metric_destroy(&t);
+    return errors;
+}
+
+struct jv2_close_in_thread {
+    struct jv2_journal_fixture *fx;
+    bool done;
+};
+
+static void jv2_close_in_thread(void *ptr) {
+    struct jv2_close_in_thread *c = ptr;
+    journalfile_close(c->fx->journalfile, &c->fx->datafile);
+    __atomic_store_n(&c->done, true, __ATOMIC_RELEASE);
+}
+
+// Closing an unavailable journal v2 that a reader still holds waits for the reader,
+// then finishes once it releases: the v2 is never unmapped under a live reference.
+static int mrg_jv2_close_unavailable_referenced_check(void) {
+    int errors = 0;
+    enum { TEST_FILENO = 18 };
+
+    struct jv2_one_metric t = { 0 };
+    if(!jv2_journal_fixture_init(&t.fx, TEST_FILENO))
+        return 0;
+
+    if(!jv2_one_metric_publish(&t)) {
+        errors++;
+        goto cleanup;
+    }
+
+    struct rrdengine_journalfile *journalfile = t.fx.journalfile;
+    size_t data_size = 0;
+    if(!journalfile_v2_data_acquire(journalfile, &data_size, 0, 0)) {
+        fprintf(stderr, "ERROR: cannot acquire the published journal v2\n");
+        errors++;
+        goto cleanup;
+    }
+
+    spinlock_tracked_lock(&journalfile->data_spinlock);
+    journalfile->v2.flags &= ~JOURNALFILE_FLAG_IS_AVAILABLE;
+    spinlock_tracked_unlock(&journalfile->data_spinlock);
+
+    struct jv2_close_in_thread c = { .fx = &t.fx };
+    ND_THREAD *th = nd_thread_create("JV2CLOSE", NETDATA_THREAD_OPTION_DONT_LOG, jv2_close_in_thread, &c);
+    if(!th) {
+        fprintf(stderr, "ERROR: cannot start the closing thread\n");
+        errors++;
+        journalfile_v2_data_release(journalfile);
+        goto cleanup;
+    }
+
+    // the close drops the index entry right before it waits for readers: once the entry
+    // is gone the thread is in teardown, and our reference must keep it there
+    bool in_teardown = false;
+    for(int i = 0; i < 500 && !in_teardown && !__atomic_load_n(&c.done, __ATOMIC_ACQUIRE); i++) {
+        rw_spinlock_read_lock(&t.fx.ctx.njfv2idx.spinlock);
+        in_teardown = !journalfile->njfv2idx.indexed_as;
+        rw_spinlock_read_unlock(&t.fx.ctx.njfv2idx.spinlock);
+
+        if(!in_teardown)
+            sleep_usec(10 * USEC_PER_MS);
+    }
+    if(!in_teardown) {
+        fprintf(stderr, "ERROR: closing an unavailable journal v2 did not drop its index entry\n");
+        errors++;
+    }
+
+    sleep_usec(100 * USEC_PER_MS);
+    if(__atomic_load_n(&c.done, __ATOMIC_ACQUIRE)) {
+        fprintf(stderr, "ERROR: an unavailable journal v2 was closed under a live reference\n");
+        errors++;
+    }
+
+    journalfile_v2_data_release(journalfile);
+
+    for(int i = 0; i < 1000 && !__atomic_load_n(&c.done, __ATOMIC_ACQUIRE); i++)
+        sleep_usec(10 * USEC_PER_MS);
+
+    if(!__atomic_load_n(&c.done, __ATOMIC_ACQUIRE)) {
+        // the closing thread is stuck and still uses t and c on this stack frame:
+        // returning would let it write into frames the next tests reuse, joining would hang
+        fatal("closing an unavailable journal v2 did not finish after its reader released it");
+    }
+    nd_thread_join(th);
+
+    if(journalfile->njfv2idx.indexed_as || JudyLCount(t.fx.ctx.njfv2idx.JudyL, 0, -1, PJE0)) {
+        fprintf(stderr, "ERROR: closing a referenced unavailable journal v2 left it in the journal index\n");
+        errors++;
+    }
+
+cleanup:
+    errors += jv2_one_metric_destroy(&t);
+    return errors;
+}
+
 static int mrg_jv2_rejected_journal_unittest(void) {
     fprintf(stderr, "\nTesting rejected journal v2 end states (mapping failure, v1 close, rebuild)...\n");
     int errors = mrg_jv2_close_owned_v1_check();
+    errors += mrg_jv2_close_unavailable_indexed_check();
+    errors += mrg_jv2_close_unavailable_referenced_check();
 #ifndef NETDATA_INTERNAL_CHECKS
     errors += mrg_jv2_rejected_on_mapping_failure_check();
     errors += mrg_jv2_rebuild_with_unusable_v1_check();

@@ -575,17 +575,29 @@ static int scan_data_files(struct rrdengine_instance *ctx)
             must_delete_pair = 1;
 
         journalfile = journalfile_alloc_and_init(datafile);
-        ret = journalfile_load(ctx, journalfile, datafile);
-        if (0 != ret) {
-            if (!must_delete_pair) /* If datafile is still open close it */
+
+        // the journal of a datafile that cannot be loaded is not replayed: its pages would
+        // point the open cache at a datafile that is deleted and freed below
+        if (!must_delete_pair) {
+            ret = journalfile_load(ctx, journalfile, datafile);
+            if (0 != ret) {
                 close_data_file(datafile);
-            must_delete_pair = 1;
+                must_delete_pair = 1;
+            }
         }
 
         if (must_delete_pair) {
             char path[RRDENG_PATH_MAX];
 
             netdata_log_error("DBENGINE: deleting invalid data and journal file pair.");
+
+            // a journal v2 loaded before the pair failed is indexed and charged: it must
+            // leave ctx->njfv2idx before the datafile is freed, and go with the pair
+            size_t journal_v2_size = journalfile_v2_data_size_get(journalfile);
+            (void)journalfile_close(journalfile, datafile);
+            if (!journalfile_v2_unlink(journalfile) && journal_v2_size)
+                ctx_current_disk_space_decrease(ctx, journal_v2_size);
+
             ret = journalfile_unlink(journalfile);
             if (!ret) {
                 journalfile_v1_generate_path(datafile, path, sizeof(path));
