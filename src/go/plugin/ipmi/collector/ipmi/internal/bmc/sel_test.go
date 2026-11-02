@@ -1,0 +1,723 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package bmc
+
+import (
+	"context"
+	"encoding/binary"
+	"errors"
+	"slices"
+	"testing"
+	"time"
+
+	"github.com/bougou/go-ipmi/pkg/command/storage"
+	"github.com/bougou/go-ipmi/pkg/types"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+const selRecordsWarning = "SEL records unavailable"
+
+// emptySEL is the SEL of newFakeBMC: no records, no UTC offset, and a clock in
+// step with the Agent.
+func emptySEL() *SEL {
+	return &SEL{
+		Loaded:    true,
+		ClockSkew: new(time.Duration(0)),
+	}
+}
+
+// tempEvent is an Upper Non-critical going high assertion of newFakeBMC's CPU
+// Temp sensor; its timestamp tells records with the same ID apart.
+func tempEvent(id uint16, timestamp uint32) [selRecordSize]byte {
+	return selEvent(id, timestamp, 0x0020, 0x01, 10, 0x01, 0x07, 0, 0)
+}
+
+func tempEvents(ids ...uint16) [][selRecordSize]byte {
+	var out [][selRecordSize]byte
+	for _, id := range ids {
+		out = append(out, tempEvent(id, 0x60000000+uint32(id)))
+	}
+	return out
+}
+
+// newSELTestReader returns a Reader whose clock advances by entryCost with
+// every Get SEL Entry the fake answers.
+func newSELTestReader(fake *fakeBMC, updateEvery, entryCost time.Duration) *Reader {
+	r := newTestReader(fake)
+	r.cfg.UpdateEvery = updateEvery
+	now := testNow
+	r.now = func() time.Time { return now }
+	fake.sel.onEntry = func() { now = now.Add(entryCost) }
+	return r
+}
+
+// collectSEL runs one collection that must succeed without warnings.
+func collectSEL(t *testing.T, r *Reader) *SEL {
+	t.Helper()
+	got, err := r.Collect(t.Context(), true)
+	require.NoError(t, err)
+	assert.Empty(t, got.Warnings)
+	require.NotNil(t, got.SEL)
+	return got.SEL
+}
+
+func recordIDs(s *SEL) []uint16 {
+	var ids []uint16
+	for _, rec := range s.Records {
+		ids = append(ids, rec.ID)
+	}
+	return ids
+}
+
+// entryReads returns the record IDs requested by Get SEL Entry since the last call.
+func entryReads(fake *fakeBMC) []uint16 {
+	var ids []uint16
+	for _, q := range fake.selEntryRequests() {
+		ids = append(ids, q.RecordID)
+	}
+	fake.requests = nil
+	return ids
+}
+
+func TestReader_SEL_InitialLoadIsBounded(t *testing.T) {
+	tests := map[string]struct {
+		updateEvery time.Duration
+		perCycle    []int // records read per collection until loaded
+	}{
+		"quarter of a short interval": {
+			updateEvery: 4 * time.Second,
+			perCycle:    []int{4, 4, 2},
+		},
+		"two seconds at most": {
+			updateEvery: 20 * time.Second,
+			perCycle:    []int{7, 3},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			fake := newFakeBMC()
+			fake.sel.records = tempEvents(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+			r := newSELTestReader(fake, tc.updateEvery, 300*time.Millisecond)
+
+			var snapshots []*SEL
+			var copies [][]SELRecord
+			read := 0
+			for i, n := range tc.perCycle {
+				sel := collectSEL(t, r)
+				read += n
+				assert.Len(t, entryReads(fake), n, "collection %d", i)
+				assert.Equal(t, []uint16{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}[:read], recordIDs(sel))
+				assert.Equal(t, i == len(tc.perCycle)-1, sel.Loaded)
+				assert.Equal(t, 10, sel.Entries)
+				snapshots = append(snapshots, sel)
+				copies = append(copies, slices.Clone(sel.Records))
+			}
+
+			assert.Empty(t, entryReads(fake), "a loaded, unchanged SEL is not read")
+			collectSEL(t, r)
+			assert.Empty(t, entryReads(fake))
+			for i, sel := range snapshots {
+				assert.Equal(t, copies[i], sel.Records, "published records never change")
+			}
+			for _, req := range fake.requests {
+				assert.NotEqual(t, &storage.ReserveSELRequest{}, req, "no reservation without 0xC5")
+			}
+		})
+	}
+}
+
+func TestReader_SEL_Changes(t *testing.T) {
+	changedThree := tempEvent(3, 0x70000000)
+	reusedOne := tempEvent(1, 0x70000001)
+	reusedTwo := tempEvent(2, 0x70000002)
+	tests := map[string]struct {
+		change    func(*fakeSEL)
+		wantReads []uint16
+		wantIDs   []uint16
+		// wantRaw, when set, is the expected content of the cached records.
+		wantRaw [][selRecordSize]byte
+	}{
+		"unchanged": {
+			change:  func(*fakeSEL) {},
+			wantIDs: []uint16{1, 2, 3},
+		},
+		"appended": {
+			change:    func(s *fakeSEL) { s.add(tempEvents(4, 5)...) },
+			wantReads: []uint16{0xffff, 3, 4, 5},
+			wantIDs:   []uint16{1, 2, 3, 4, 5},
+		},
+		"cleared": {
+			change: func(s *fakeSEL) {
+				s.clear()
+				s.add(reusedOne)
+			},
+			wantReads: []uint16{0x0000},
+			wantRaw:   [][selRecordSize]byte{reusedOne},
+		},
+		"emptied": {
+			change: func(s *fakeSEL) { s.clear() },
+		},
+		"rewritten without an erase time change": {
+			change: func(s *fakeSEL) {
+				s.records = nil
+				s.add(tempEvents(7, 8)...)
+			},
+			wantReads: []uint16{0xffff, 3, 0x0000, 8},
+			wantIDs:   []uint16{7, 8},
+		},
+		"newest record changed in place": {
+			change: func(s *fakeSEL) {
+				s.records = s.records[:2]
+				s.add(changedThree)
+			},
+			wantReads: []uint16{0xffff, 3, 0x0000, 2, 3},
+			wantRaw:   append(tempEvents(1, 2), changedThree),
+		},
+		"rollover drops the oldest records": {
+			change: func(s *fakeSEL) {
+				s.records = s.records[2:]
+				s.add(tempEvents(4, 5)...)
+			},
+			wantReads: []uint16{0xffff, 3, 4, 5},
+			wantIDs:   []uint16{3, 4, 5},
+		},
+		"rollover reuses a record ID": {
+			change: func(s *fakeSEL) {
+				s.records = s.records[1:]
+				s.add(reusedOne)
+			},
+			wantReads: []uint16{0xffff, 3, 1},
+			wantRaw:   append(tempEvents(2, 3), reusedOne),
+		},
+		"deleted record ID reused for a new event": {
+			change: func(s *fakeSEL) {
+				s.records = append(s.records[:1], s.records[2])
+				s.add(reusedTwo)
+			},
+			wantReads: []uint16{0xffff, 3, 2},
+			wantRaw:   append(tempEvents(1, 3), reusedTwo),
+		},
+		"chain loops back to a cached record": {
+			change: func(s *fakeSEL) {
+				s.add(tempEvents(4)...)
+				s.next = map[uint16]uint16{4: 2}
+			},
+			wantReads: []uint16{0xffff, 3, 4, 2},
+			wantIDs:   []uint16{1, 2, 3, 4},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			fake := newFakeBMC()
+			fake.sel.records = tempEvents(1, 2, 3)
+			r := newSELTestReader(fake, 0, 0)
+			before := collectSEL(t, r)
+			require.True(t, before.Loaded)
+			beforeRecords := slices.Clone(before.Records)
+			entryReads(fake)
+
+			tc.change(&fake.sel)
+			got := collectSEL(t, r)
+			assert.Equal(t, tc.wantReads, entryReads(fake))
+			assert.True(t, got.Loaded)
+			if tc.wantRaw != nil {
+				var raw [][selRecordSize]byte
+				for _, rec := range got.Records {
+					raw = append(raw, rec.Raw)
+				}
+				assert.Equal(t, tc.wantRaw, raw)
+			} else {
+				assert.Equal(t, tc.wantIDs, recordIDs(got))
+			}
+			assert.Equal(t, beforeRecords, before.Records, "published records never change")
+
+			collectSEL(t, r)
+			assert.Empty(t, entryReads(fake), "the next unchanged collection reads no record")
+		})
+	}
+}
+
+func TestReader_SEL_Reservation(t *testing.T) {
+	fake := newFakeBMC()
+	fake.sel.records = tempEvents(1, 2)
+	fake.sel.requireReservation = true
+	r := newSELTestReader(fake, 0, 0)
+
+	reserves := func() int {
+		n := 0
+		for _, req := range fake.requests {
+			if _, ok := req.(*storage.ReserveSELRequest); ok {
+				n++
+			}
+		}
+		fake.requests = nil
+		return n
+	}
+
+	assert.Equal(t, []uint16{1, 2}, recordIDs(collectSEL(t, r)))
+	assert.Equal(t, 1, reserves(), "reserved once after 0xC5, then reused")
+
+	fake.sel.add(tempEvents(3)...)
+	assert.Equal(t, []uint16{1, 2, 3}, recordIDs(collectSEL(t, r)))
+	assert.Equal(t, 1, reserves(), "a change cancels the reservation")
+
+	fake.onExchange = func(req types.Request) error {
+		if _, ok := req.(*storage.GetSELEntryRequest); ok {
+			return types.NewResponseError(types.CodeReservationCanceled, "reservation canceled")
+		}
+		return nil
+	}
+	fake.sel.add(tempEvents(4)...)
+	got, err := r.Collect(t.Context(), true)
+	require.NoError(t, err)
+	assert.Equal(t, []string{selRecordsWarning}, got.Warnings)
+	assert.True(t, got.SEL.ReadFailed)
+	assert.Equal(t, []uint16{1, 2, 3}, recordIDs(got.SEL))
+	assert.Equal(t, maxReservationRetries, reserves(), "reservation retries are bounded")
+}
+
+func TestReader_SEL_Clock(t *testing.T) {
+	logged := uint32(testNow.Unix())
+	tests := map[string]struct {
+		utcOffset    uint16
+		utcOffsetErr error
+		wantOffset   *time.Duration
+		wantTime     time.Time
+		wantWarning  bool
+	}{
+		"positive offset": {
+			utcOffset:  120,
+			wantOffset: new(2 * time.Hour),
+			wantTime:   testNow.Add(-2 * time.Hour),
+		},
+		"negative offset": {
+			utcOffset:  uint16(0x10000 - 300),
+			wantOffset: new(-5 * time.Hour),
+			wantTime:   testNow.Add(5 * time.Hour),
+		},
+		"unspecified offset": {
+			utcOffset: 0x07ff,
+			wantTime:  testNow,
+		},
+		"out of range offset": {
+			utcOffset: 1441,
+			wantTime:  testNow,
+		},
+		"command not supported": {
+			utcOffsetErr: types.NewResponseError(types.CodeInvalidCommand, "invalid command"),
+			wantTime:     testNow,
+		},
+		"transport failure": {
+			utcOffsetErr: errors.New("transport failed"),
+			wantWarning:  true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			fake := newFakeBMC()
+			fake.sel.records = [][selRecordSize]byte{tempEvent(1, logged)}
+			fake.sel.utcOffset, fake.sel.utcOffsetErr = tc.utcOffset, tc.utcOffsetErr
+			fake.sel.clock = uint32(testNow.Add(2*time.Hour + 400*time.Millisecond).Unix())
+			r := newSELTestReader(fake, 0, 0)
+
+			got, err := r.Collect(t.Context(), true)
+			require.NoError(t, err)
+			sel := got.SEL
+			if tc.wantWarning {
+				assert.Equal(t, []string{selRecordsWarning}, got.Warnings)
+				assert.True(t, sel.ReadFailed)
+				assert.Nil(t, sel.ClockSkew)
+				return
+			}
+			assert.Empty(t, got.Warnings)
+			assert.Equal(t, tc.wantOffset, sel.UTCOffset)
+			assert.Equal(t, new(2*time.Hour), sel.ClockSkew)
+			require.Len(t, sel.Records, 1)
+			at, ok := sel.Time(sel.Records[0])
+			require.True(t, ok)
+			assert.Equal(t, tc.wantTime, at)
+		})
+	}
+}
+
+func TestReader_SEL_ClockRefresh(t *testing.T) {
+	fake := newFakeBMC()
+	r := newTestReader(fake)
+	now := testNow
+	r.now = func() time.Time { return now }
+	clockReads := func() int {
+		n := 0
+		for _, req := range fake.requests {
+			switch req.(type) {
+			case *storage.GetSELTimeRequest, *storage.GetSELTimeUTCOffsetRequest:
+				n++
+			}
+		}
+		fake.requests = nil
+		return n
+	}
+
+	assert.Nil(t, collectSEL(t, r).UTCOffset)
+	assert.Equal(t, 2, clockReads())
+
+	fake.sel.utcOffset = 60
+	now = now.Add(selClockMaxAge - time.Second)
+	assert.Nil(t, collectSEL(t, r).UTCOffset)
+	assert.Zero(t, clockReads(), "the clock is read at most every selClockMaxAge")
+
+	now = now.Add(time.Second)
+	assert.Equal(t, new(time.Hour), collectSEL(t, r).UTCOffset)
+	assert.Equal(t, 2, clockReads())
+}
+
+func TestReader_SEL_Records(t *testing.T) {
+	const at = 0x60000000
+	lunSensor := fullRecord(3, 10, "LUN1 Temp")
+	lunSensor[recordOwnerLUN] = 0x01
+	tests := map[string]struct {
+		record [selRecordSize]byte
+		want   SELRecord
+		// wantUndated: SEL.Time reports no date.
+		wantUndated bool
+	}{
+		"threshold event with trigger values": {
+			record: selEvent(1, at, 0x0020, 0x01, 10, 0x01, 0x59, 90, 85),
+			want: SELRecord{
+				Sensor:     "CPU Temp",
+				SensorType: "Temperature",
+				Generator:  "BMC (0x20)",
+				Event:      "Upper Critical - going high (reading 90 Celsius, threshold 85 Celsius)",
+				Direction:  "Assertion",
+				State:      StateCritical,
+			},
+		},
+		"threshold deassertion without trigger values": {
+			record: selEvent(1, at, 0x0020, 0x01, 10, 0x81, 0x09, 90, 85),
+			want: SELRecord{
+				Sensor:     "CPU Temp",
+				SensorType: "Temperature",
+				Generator:  "BMC (0x20)",
+				Event:      "Upper Critical - going high",
+				Direction:  "Deassertion",
+				State:      StateWarning,
+			},
+		},
+		"sensor on another LUN": {
+			record: selEvent(1, at, 0x0120, 0x01, 10, 0x01, 0x07, 0, 0),
+			want: SELRecord{
+				Sensor:     "LUN1 Temp",
+				SensorType: "Temperature",
+				Generator:  "BMC (0x20)",
+				Event:      "Upper Non-critical - going high",
+				Direction:  "Assertion",
+				State:      StateWarning,
+			},
+		},
+		"discrete SDR sensor": {
+			record: selEvent(1, at, 0x0020, 0x07, 11, 0x6f, 0x0a, 0, 0),
+			want: SELRecord{
+				Sensor:     "CPU Presence",
+				SensorType: "Processor",
+				Generator:  "BMC (0x20)",
+				Event:      "Processor Automatically Throttled",
+				Direction:  "Assertion",
+				State:      StateWarning,
+			},
+		},
+		"BMC sensor without an SDR": {
+			record: selEvent(1, at, 0x0020, 0x12, 255, 0x6f, 0x05, 0, 0),
+			want: SELRecord{
+				Sensor:     "BMC #255",
+				SensorType: "System Event",
+				Generator:  "BMC (0x20)",
+				Event:      "Timestamp Clock Synch",
+				Direction:  "Assertion",
+				State:      StateWarning,
+			},
+		},
+		"BIOS": {
+			record: selEvent(1, at, 0x0001, 0x1f, 34, 0x6f, 0x06, 0, 0),
+			want: SELRecord{
+				Sensor:     "BIOS #34",
+				SensorType: "OS Boot",
+				Generator:  "BIOS (0x01)",
+				Event:      "boot completed - boot device not specified",
+				Direction:  "Assertion",
+				State:      StateWarning,
+			},
+		},
+		"SMI handler": {
+			record: selEvent(1, at, 0x0021, 0x0c, 0, 0x6f, 0x00, 0, 0),
+			want: SELRecord{
+				Sensor:     "SMI Handler #0",
+				SensorType: "Memory",
+				Generator:  "SMI Handler (0x21)",
+				Event:      "Correctable ECC / other correctable memory error",
+				Direction:  "Assertion",
+				State:      StateWarning,
+			},
+		},
+		"power unit deassertion": {
+			record: selEvent(1, at, 0x0041, 0x09, 3, 0xef, 0x05, 0, 0),
+			want: SELRecord{
+				Sensor:     "System Management Software #3",
+				SensorType: "Power Unit",
+				Generator:  "System Management Software (0x41)",
+				Event:      "Soft Power Control Failure",
+				Direction:  "Deassertion",
+				State:      StateCritical,
+			},
+		},
+		"other IPMB controller": {
+			record: selEvent(1, at, 0x002c, 0x01, 5, 0x01, 0x07, 0, 0),
+			want: SELRecord{
+				Sensor:     "Controller 0x2c #5",
+				SensorType: "Temperature",
+				Generator:  "Controller 0x2c",
+				Event:      "Upper Non-critical - going high",
+				Direction:  "Assertion",
+				State:      StateWarning,
+			},
+		},
+		"unrecognized OEM event": {
+			record: selEvent(1, at, 0x0061, 0xc0, 2, 0x70, 0x03, 0, 0),
+			want: SELRecord{
+				Sensor:     "OEM Software #2",
+				SensorType: "OEM",
+				Generator:  "OEM Software (0x61)",
+				Event:      "Unrecognized event: type 0x70, offset 3",
+				Direction:  "Assertion",
+				State:      StateUnknown,
+			},
+		},
+		"timestamped OEM record": {
+			record: oemRecord(1, 0xc1, at, 0x0a, 0x3c, 0x00),
+			want: SELRecord{
+				Event: "OEM record type 0xc1, manufacturer ID 15370",
+				State: StateUnknown,
+			},
+		},
+		"non-timestamped OEM record": {
+			record: oemRecord(1, 0xe0, at, 0, 0, 0),
+			want: SELRecord{
+				Event: "OEM record type 0xe0",
+				State: StateUnknown,
+			},
+			wantUndated: true,
+		},
+		"reserved record type with the system event layout": {
+			// Real BMC firmware logs power-off events from the BIOS this way.
+			record: withRecordType(selEvent(1, at, 0x0001, 0x09, 255, 0x6f, 0x05, 0, 0), 0x04),
+			want: SELRecord{
+				Sensor:     "BIOS #255",
+				SensorType: "Power Unit",
+				Generator:  "BIOS (0x01)",
+				Event:      "Soft Power Control Failure [record type 0x04]",
+				Direction:  "Assertion",
+				State:      StateUnknown,
+			},
+		},
+		"pre-init timestamp": {
+			record: selEvent(1, 35, 0x0001, 0x12, 0, 0x6f, 0x01, 0, 0),
+			want: SELRecord{
+				Sensor:     "BIOS #0",
+				SensorType: "System Event",
+				Generator:  "BIOS (0x01)",
+				Event:      "OEM System Boot Event",
+				Direction:  "Assertion",
+				State:      StateNominal,
+			},
+			wantUndated: true,
+		},
+		"unspecified timestamp": {
+			record: selEvent(1, 0xffffffff, 0x008f, 0x12, 0, 0x6f, 0x01, 0, 0),
+			want: SELRecord{
+				Sensor:     "Terminal Mode Remote Console #0",
+				SensorType: "System Event",
+				Generator:  "Terminal Mode Remote Console (0x8f)",
+				Event:      "OEM System Boot Event",
+				Direction:  "Assertion",
+				State:      StateNominal,
+			},
+			wantUndated: true,
+		},
+		"remote console": {
+			record: selEvent(1, at, 0x0083, 0x12, 0, 0x6f, 0x01, 0, 0),
+			want: SELRecord{
+				Sensor:     "Remote Console #0",
+				SensorType: "System Event",
+				Generator:  "Remote Console (0x83)",
+				Event:      "OEM System Boot Event",
+				Direction:  "Assertion",
+				State:      StateNominal,
+			},
+		},
+		"reserved software ID": {
+			record: selEvent(1, at, 0x0091, 0x12, 0, 0x6f, 0x01, 0, 0),
+			want: SELRecord{
+				Sensor:     "Software #0",
+				SensorType: "System Event",
+				Generator:  "Software (0x91)",
+				Event:      "OEM System Boot Event",
+				Direction:  "Assertion",
+				State:      StateNominal,
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			fake := newFakeBMC()
+			fake.records = append(fake.records, lunSensor)
+			fake.sel.records = [][selRecordSize]byte{tc.record}
+			sel := collectSEL(t, newSELTestReader(fake, 0, 0))
+
+			want := tc.want
+			want.ID = 1
+			want.Timestamp = binary.LittleEndian.Uint32(tc.record[3:])
+			// Only OEM record types from E0h carry no BMC timestamp.
+			want.Timestamped = tc.record[2] < 0xe0
+			want.Raw = tc.record
+			require.Len(t, sel.Records, 1)
+			assert.Equal(t, want, sel.Records[0])
+			_, dated := sel.Time(sel.Records[0])
+			assert.Equal(t, !tc.wantUndated, dated)
+		})
+	}
+}
+
+// oemRecord encodes an OEM record; timestamped types carry the manufacturer ID.
+func oemRecord(id uint16, recordType byte, timestamp uint32, manufacturer ...byte) [selRecordSize]byte {
+	var r [selRecordSize]byte
+	binary.LittleEndian.PutUint16(r[0:], id)
+	r[2] = recordType
+	binary.LittleEndian.PutUint32(r[3:], timestamp)
+	copy(r[7:], manufacturer)
+	return r
+}
+
+func TestReader_SEL_Failures(t *testing.T) {
+	transportFailure := errors.New("transport failed")
+	tests := map[string]struct {
+		// fail breaks the fake after the first three records were cached.
+		fail func(*fakeBMC)
+		// wantIDs are the records published by the failing collection.
+		wantIDs      []uint16
+		wantLoaded   bool
+		wantWarnings []string
+		wantEntries  bool
+	}{
+		"SEL Info fails": {
+			fail:         func(b *fakeBMC) { b.selErr = transportFailure },
+			wantIDs:      []uint16{1, 2, 3},
+			wantLoaded:   true,
+			wantWarnings: []string{"SEL entry count unavailable"},
+		},
+		"record read fails while appending": {
+			fail: func(b *fakeBMC) {
+				b.sel.add(tempEvents(4, 5)...)
+				b.onExchange = func(req types.Request) error {
+					if q, ok := req.(*storage.GetSELEntryRequest); ok && q.RecordID == 5 {
+						return transportFailure
+					}
+					return nil
+				}
+			},
+			wantIDs:      []uint16{1, 2, 3, 4},
+			wantLoaded:   true,
+			wantWarnings: []string{selRecordsWarning},
+			wantEntries:  true,
+		},
+		"truncated record": {
+			fail: func(b *fakeBMC) {
+				b.sel.add(tempEvents(4)...)
+				b.sel.truncate = true
+			},
+			wantIDs:      []uint16{1, 2, 3},
+			wantLoaded:   true,
+			wantWarnings: []string{selRecordsWarning},
+			wantEntries:  true,
+		},
+		"next record vanished": {
+			fail: func(b *fakeBMC) {
+				b.sel.add(tempEvents(4)...)
+				b.sel.next = map[uint16]uint16{4: 9}
+			},
+			wantWarnings: []string{selRecordsWarning},
+			wantEntries:  true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			fake := newFakeBMC()
+			fake.sel.records = tempEvents(1, 2, 3)
+			r := newSELTestReader(fake, 0, 0)
+			collectSEL(t, r)
+
+			tc.fail(fake)
+			got, err := r.Collect(t.Context(), true)
+			require.NoError(t, err, "SEL failures do not fail the collection")
+			assert.Equal(t, tc.wantWarnings, got.Warnings)
+			assert.Equal(t, tc.wantEntries, got.SELEntries != nil)
+			require.NotNil(t, got.SEL)
+			assert.True(t, got.SEL.ReadFailed)
+			assert.Equal(t, tc.wantLoaded, got.SEL.Loaded)
+			assert.Equal(t, tc.wantIDs, recordIDs(got.SEL))
+
+			fake.selErr, fake.onExchange, fake.sel.truncate, fake.sel.next = nil, nil, false, nil
+			recovered := collectSEL(t, r)
+			assert.True(t, recovered.Loaded)
+			assert.Equal(t, recordIDs(&SEL{
+				Records: decodeAll(fake.sel.records),
+			}), recordIDs(recovered))
+		})
+	}
+}
+
+func decodeAll(records [][selRecordSize]byte) []SELRecord {
+	var out []SELRecord
+	for _, raw := range records {
+		out = append(out, decodeSELRecord(raw, nil))
+	}
+	return out
+}
+
+func TestReader_SEL_Disabled(t *testing.T) {
+	fake := newFakeBMC()
+	fake.sel.records = tempEvents(1)
+	got, err := newTestReader(fake).Collect(t.Context(), false)
+	require.NoError(t, err)
+	assert.Nil(t, got.SEL)
+	assert.Nil(t, got.SELEntries)
+	for _, req := range fake.requests {
+		switch req.(type) {
+		case *storage.GetSELInfoRequest, *storage.GetSELEntryRequest, *storage.ReserveSELRequest,
+			*storage.GetSELTimeRequest, *storage.GetSELTimeUTCOffsetRequest:
+			t.Errorf("SEL command %T sent with SEL collection disabled", req)
+		}
+	}
+}
+
+func TestReader_SEL_CanceledDuringRecordRead(t *testing.T) {
+	fake := newFakeBMC()
+	fake.sel.records = tempEvents(1, 2)
+	r := newTestReader(fake)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	fake.onExchange = func(req types.Request) error {
+		if _, ok := req.(*storage.GetSELEntryRequest); ok {
+			cancel()
+		}
+		return nil
+	}
+
+	got, err := r.Collect(ctx, true)
+	require.ErrorIs(t, err, context.Canceled)
+	assert.Nil(t, got)
+	assert.Equal(t, 1, fake.closes)
+}

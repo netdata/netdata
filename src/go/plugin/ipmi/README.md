@@ -84,6 +84,22 @@ Metrics belong to the Agent host by default. To attach a remote job to a differe
 The command and session setup timeout defaults to five seconds. Cancellation interrupts local response waits and remote
 UDP exchanges. Remote session cleanup gets a separate two-second budget, including after a canceled collection.
 
+## System Event Log
+
+With `collect_sel: true` (the default), each job charts the SEL entry count and serves the `ipmi-sel` Function: the
+records the BMC retains, newest first, with sensor, event, direction and the default FreeIPMI state. The Function reads
+records the collector already holds and sends no BMC requests. `collect_sel: false` stops every SEL command and removes
+the job from `ipmi-sel`.
+
+The collector reads each record once, then only records the BMC adds; it rereads the log after the BMC clears it. The
+first read of a large log is spread over several collections, so the Function shows the oldest records until it
+completes. Records are kept in memory, so an Agent restart reads the log again. The plugin never clears or writes the
+SEL.
+
+Times are converted to UTC with the BMC's SEL UTC offset. Records logged before a daylight saving change can be off by
+an hour, because the BMC reports only its current offset. When the BMC reports no offset, times are the BMC clock shown
+as UTC, and the Function shows how far the BMC clock is from the Agent clock.
+
 ## Compatibility
 
 - Numeric contexts use `ipmi.*`; chart IDs, units and nominal/warning/critical/unknown states retain the C shape. The
@@ -94,8 +110,10 @@ UDP exchanges. Remote session cleanup gets a separate two-second budget, includi
 - The stock `local` job uses the `ipmi_local` chart type. Job names receive the standard framework job prefix;
   an existing job named `ipmi` keeps the `ipmi` chart type.
   Sensor keys remain stable when a reading becomes unavailable; the C library can change its reading-type key then.
-- SEL is the raw repository entry count, not FreeIPMI's interpreted/filtered count. The `ipmi_events` alert matches
-  `ipmi.sel`; the `ipmi_sensor_state` alert matches `ipmi.sensor_state`. Both apply to every Go job and to C.
+- `ipmi.sel` is the raw repository entry count, not FreeIPMI's interpreted/filtered count. The `ipmi_events` alert
+  matches `ipmi.sel`; the `ipmi_sensor_state` alert matches `ipmi.sensor_state`. Both apply to every Go job and to C.
+- `ipmi-sel` states use FreeIPMI's default SEL interpretation. OEM records, records with a reserved record type, OEM
+  event types and unlisted events are unknown. The C plugin has no SEL Function.
 - Bridged sensors, device-only SDR repositories, legacy direct KCS/SSIF/SUNBMC/INTELDCMI drivers, FreeBSD local access,
   custom interpretation files and OEM health policy remain covered by FreeIPMI. Kernel-backed local KCS/SSIF is accessed
   through OpenIPMI.

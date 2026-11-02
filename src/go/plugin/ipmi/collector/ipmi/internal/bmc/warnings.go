@@ -11,6 +11,7 @@ type collectionWarnings struct {
 	reading        int // unavailable or incomplete readings
 	conversion     int // unsupported units or conversions, and invalid results
 	selUnavailable bool
+	selRecords     bool // SEL record or clock reads failed
 }
 
 // messages returns one message per non-empty category, or nil.
@@ -33,6 +34,9 @@ func (w collectionWarnings) messages() []string {
 	}
 	if w.selUnavailable {
 		out = append(out, "SEL entry count unavailable")
+	}
+	if w.selRecords {
+		out = append(out, "SEL records unavailable")
 	}
 	return out
 }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Package bmc reads the sensors and the System Event Log size of a BMC
-// through local OpenIPMI or remote LAN/LAN+. It never changes BMC configuration.
+// Package bmc reads the sensors and the System Event Log of a BMC through
+// local OpenIPMI or remote LAN/LAN+. It never changes BMC configuration.
 package bmc
 
 import (
@@ -27,6 +27,8 @@ type Config struct {
 	Device int32
 	// Timeout bounds connection setup and each command.
 	Timeout time.Duration
+	// UpdateEvery is the collection interval; it bounds the time spent reading SEL records.
+	UpdateEvery time.Duration
 }
 
 // Reader reads the BMC one call at a time because the SDK client owns mutable
@@ -44,6 +46,9 @@ type Reader struct {
 	inventory       []descriptor
 	inventoryRepo   storage.GetSDRRepoInfoResponse
 	inventoryReadAt time.Time
+
+	// The SEL is cached across collections and connections; see updateSEL.
+	sel selCache
 }
 
 // New returns a Reader. It performs no I/O.
@@ -75,9 +80,9 @@ func (r *Reader) Check(ctx context.Context) error {
 	return nil
 }
 
-// Collect reads every inventory sensor and, when requested, the SEL entry
-// count. A completion-code error or an unusable reading of one sensor, and any
-// SEL failure, degrade only that data and are summarized in Snapshot.Warnings.
+// Collect reads every inventory sensor and, when requested, the SEL. A
+// completion-code error or an unusable reading of one sensor, and any SEL
+// failure, degrade only that data and are summarized in Snapshot.Warnings.
 // Inventory failures, other sensor command failures and cancellation fail the
 // collection and close the connection.
 func (r *Reader) Collect(ctx context.Context, collectSEL bool) (_ *Snapshot, err error) {
@@ -113,7 +118,7 @@ func (r *Reader) Collect(ctx context.Context, collectSEL bool) (_ *Snapshot, err
 		snapshot.Sensors = append(snapshot.Sensors, s)
 	}
 	if collectSEL {
-		snapshot.SELEntries = r.readSELEntries(ctx, &warnings)
+		snapshot.SELEntries, snapshot.SEL = r.readSEL(ctx, &warnings)
 	}
 	// A cancellation during the fail-soft SEL read surfaces here.
 	if err := ctx.Err(); err != nil {
@@ -183,15 +188,4 @@ func (r *Reader) exchange(ctx context.Context, req types.Request, res types.Resp
 		return ctxErr
 	}
 	return err
-}
-
-// readSELEntries returns the raw SEL entry count, or nil when the BMC does not provide it.
-func (r *Reader) readSELEntries(ctx context.Context, warnings *collectionWarnings) *int {
-	var res storage.GetSELInfoResponse
-	if err := r.exchange(ctx, &storage.GetSELInfoRequest{}, &res); err != nil {
-		warnings.selUnavailable = true
-		return nil
-	}
-	entries := int(res.Entries)
-	return &entries
 }

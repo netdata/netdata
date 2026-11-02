@@ -13,6 +13,7 @@ import (
 
 	ipmibmc "github.com/bougou/go-ipmi/pkg/bmc"
 	"github.com/bougou/go-ipmi/pkg/clock"
+	"github.com/bougou/go-ipmi/pkg/command/storage"
 	"github.com/bougou/go-ipmi/pkg/hal/mock"
 	"github.com/bougou/go-ipmi/pkg/handlers"
 	"github.com/bougou/go-ipmi/pkg/server"
@@ -38,6 +39,7 @@ func TestRemoteReaderLifecycle(t *testing.T) {
 				assertRemoteSnapshot(t, snapshot)
 				assert.Equal(t, 1, fixture.sessions(), "successful collection retains one session")
 			}
+			assert.Equal(t, int32(remoteSELEntries), fixture.selEntryReads.Load(), "an unchanged SEL is read once")
 			assert.Equal(t, int32(2), fixture.sessionSetups.Load(), "one Check session and one reused collection session")
 
 			fixture.malformedReading.Store(true)
@@ -200,9 +202,27 @@ func assertRemoteSnapshot(t *testing.T, snapshot *Snapshot) {
 	require.NotNil(t, reading.Value)
 	assert.Equal(t, float64(42), *reading.Value)
 	require.NotNil(t, snapshot.SELEntries)
-	assert.Equal(t, 7, *snapshot.SELEntries)
+	assert.Equal(t, remoteSELEntries, *snapshot.SELEntries)
 	assert.Empty(t, snapshot.Warnings)
+
+	sel := snapshot.SEL
+	require.NotNil(t, sel)
+	assert.True(t, sel.Loaded)
+	assert.Equal(t, remoteSELEntries, sel.Entries)
+	require.Len(t, sel.Records, remoteSELEntries)
+	assert.Equal(t, new(time.Hour), sel.UTCOffset)
+	assert.Equal(t, new(time.Hour), sel.ClockSkew, "the BMC clock keeps local time")
+	first := sel.Records[0]
+	assert.Equal(t, "CPU Temp", first.Sensor)
+	assert.Equal(t, "Upper Critical - going high (reading 90 Celsius, threshold 85 Celsius)", first.Event)
+	assert.Equal(t, StateCritical, first.State)
+	logged, ok := sel.Time(first)
+	require.True(t, ok)
+	assert.Equal(t, testNow.Add(-time.Hour), logged, "UTC is the BMC time minus its UTC offset")
 }
+
+// remoteSELEntries is the size of the remote fixture's SEL.
+const remoteSELEntries = 7
 
 type remoteFixture struct {
 	bmc              *ipmibmc.BMC
@@ -214,6 +234,7 @@ type remoteFixture struct {
 	blockReading     atomic.Bool
 	rejectPrivilege  atomic.Bool
 	sessionSetups    atomic.Int32
+	selEntryReads    atomic.Int32
 	readingStarted   chan struct{}
 	readingFinished  chan struct{}
 	releaseReading   chan struct{}
@@ -285,11 +306,35 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 		}
 		return []byte{42, 0xc0, 0, 0}, types.CodeOK, nil
 	})
+	sel := fakeSEL{
+		utcOffset: 60,
+		clock:     uint32(testNow.Add(time.Hour).Unix()),
+	}
+	for id := range uint16(remoteSELEntries) {
+		// CPU Temp upper critical going high, trigger reading and threshold in event data 2 and 3.
+		sel.records = append(sel.records, selEvent(id+1, uint32(testNow.Unix())+uint32(id), 0x0020, 0x01, 10, 0x01, 0x59, 90, 85))
+	}
 	registry.RegisterFunc(types.CommandGetSELInfo, func(context.Context, *handlers.HandlerContext, []byte) ([]byte, types.CompletionCode, error) {
-		data := make([]byte, 14)
-		data[0] = 0x51
-		binary.LittleEndian.PutUint16(data[1:3], 7)
-		return data, types.CodeOK, nil
+		return sel.info(), types.CodeOK, nil
+	})
+	registry.RegisterFunc(types.CommandGetSELEntry, func(_ context.Context, _ *handlers.HandlerContext, data []byte) ([]byte, types.CompletionCode, error) {
+		f.selEntryReads.Add(1)
+		var req storage.GetSELEntryRequest
+		if len(data) != 6 {
+			return nil, types.CodeRequestDataLengthInvalid, nil
+		}
+		req.RecordID = binary.LittleEndian.Uint16(data[2:])
+		res, err := sel.entry(&req)
+		if cc, ok := types.IsResponseError(err); ok {
+			return nil, cc.CompletionCode(), nil
+		}
+		return res, types.CodeOK, err
+	})
+	registry.RegisterFunc(types.CommandGetSELTime, func(context.Context, *handlers.HandlerContext, []byte) ([]byte, types.CompletionCode, error) {
+		return binary.LittleEndian.AppendUint32(nil, sel.clock), types.CodeOK, nil
+	})
+	registry.RegisterFunc(types.CommandGetSELTimeUTCOffset, func(context.Context, *handlers.HandlerContext, []byte) ([]byte, types.CompletionCode, error) {
+		return binary.LittleEndian.AppendUint16(nil, sel.utcOffset), types.CodeOK, nil
 	})
 	conn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
 	require.NoError(t, err)
@@ -326,6 +371,8 @@ func (f *remoteFixture) readerWithTimeout(t *testing.T, driver string, timeout t
 		PrivilegeLevel: "user",
 		Timeout:        timeout,
 	})
+	// The fixture's SEL clock is in step with testNow.
+	reader.now = func() time.Time { return testNow }
 	t.Cleanup(func() { assert.NoError(t, reader.Close(context.Background())) })
 	return reader
 }

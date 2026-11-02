@@ -37,25 +37,28 @@ func TestCollector_Init(t *testing.T) {
 	}{
 		"defaults": {
 			wantReader: bmc.Config{
-				Driver:  driverOpen,
-				Device:  0,
-				Timeout: 5 * time.Second,
+				Driver:      driverOpen,
+				Device:      0,
+				Timeout:     5 * time.Second,
+				UpdateEvery: 10 * time.Second,
 			},
 		},
 		"device and timeout": {
 			config: func(c *Config) {
 				c.Device = 2
 				c.Timeout = confopt.Duration(3 * time.Second)
+				c.UpdateEvery = 30
 			},
 			wantReader: bmc.Config{
-				Driver:  driverOpen,
-				Device:  2,
-				Timeout: 3 * time.Second,
+				Driver:      driverOpen,
+				Device:      2,
+				Timeout:     3 * time.Second,
+				UpdateEvery: 30 * time.Second,
 			},
 		},
 		"remote defaults": {
 			config:     func(c *Config) { c.Driver, c.Hostname, c.Device = driverLANPlus, " bmc.example ", -1 },
-			wantReader: bmc.Config{Driver: driverLANPlus, Hostname: "bmc.example", Port: 623, PrivilegeLevel: "user", Timeout: 5 * time.Second},
+			wantReader: bmc.Config{Driver: driverLANPlus, Hostname: "bmc.example", Port: 623, PrivilegeLevel: "user", Timeout: 5 * time.Second, UpdateEvery: 10 * time.Second},
 		},
 		"remote overrides": {
 			config: func(c *Config) {
@@ -63,7 +66,7 @@ func TestCollector_Init(t *testing.T) {
 				c.Username, c.Password, c.PrivilegeLevel = "monitor", "test-secret", "operator"
 				c.Timeout = confopt.Duration(3 * time.Second)
 			},
-			wantReader: bmc.Config{Driver: driverLAN, Hostname: "192.0.2.1", Port: 9623, Username: "monitor", Password: "test-secret", PrivilegeLevel: "operator", Timeout: 3 * time.Second},
+			wantReader: bmc.Config{Driver: driverLAN, Hostname: "192.0.2.1", Port: 9623, Username: "monitor", Password: "test-secret", PrivilegeLevel: "operator", Timeout: 3 * time.Second, UpdateEvery: 10 * time.Second},
 		},
 		"remote hostname missing": {
 			config:  func(c *Config) { c.Driver = "lanplus" },
@@ -174,14 +177,25 @@ func TestCollector_Collect_PartialWarningsAreRateLimited(t *testing.T) {
 	assert.Equal(t, 1, strings.Count(logs.String(), "unsupported sensors"))
 }
 
+func TestCollector_FunctionAvailable(t *testing.T) {
+	for _, collectSEL := range []bool{true, false} {
+		c := New()
+		c.CollectSEL = collectSEL
+		assert.True(t, c.FunctionAvailable("sensors"))
+		assert.Equal(t, collectSEL, c.FunctionAvailable("sel"), "collect_sel %v", collectSEL)
+	}
+}
+
 func TestCollector_ConcurrentFunctionReads(t *testing.T) {
 	c, _ := newTestCollector(t)
+	raw := c.funcRouter.(funcapi.RawMethodHandler)
 
 	var wg sync.WaitGroup
 	for range 4 {
 		wg.Go(func() {
 			for range 100 {
 				c.funcRouter.Handle(context.Background(), "sensors", funcapi.ResolvedParams{})
+				raw.HandleRaw(context.Background(), funcapi.RawMethodRequest{Method: "sel"})
 			}
 		})
 	}
@@ -225,6 +239,7 @@ func TestArtifacts(t *testing.T) {
 		Methods:       ipmiMethods(),
 		Handler:       c.funcRouter,
 		JobSelectable: true,
+		RawTables:     true,
 	})
 }
 
@@ -247,9 +262,11 @@ func TestArtifacts_PublicNames(t *testing.T) {
 		"ipmi.sel":                    "events",
 	}, actual)
 
-	methods := ipmiMethods()
-	require.Len(t, methods, 1)
-	assert.Equal(t, "ipmi-sensors", methods[0].FunctionName)
+	var names []string
+	for _, method := range ipmiMethods() {
+		names = append(names, method.FunctionName)
+	}
+	assert.Equal(t, []string{"ipmi-sensors", "ipmi-sel"}, names)
 }
 
 func TestArtifacts_AlertBindings(t *testing.T) {
@@ -310,10 +327,19 @@ func newTestCollector(t *testing.T) (*Collector, *fakeReader) {
 	return c, reader
 }
 
-// healthySnapshot has one nominal sensor per numeric unit and one discrete sensor.
+// healthySnapshot has one nominal sensor per numeric unit, one discrete sensor and a one-record SEL.
 func healthySnapshot() *bmc.Snapshot {
 	s := &bmc.Snapshot{
-		SELEntries:  new(12),
+		SELEntries: new(1),
+		SEL: &bmc.SEL{
+			Records: []bmc.SELRecord{{
+				ID:    1,
+				Event: "OEM record type 0xe0",
+				State: bmc.StateUnknown,
+			}},
+			Loaded:  true,
+			Entries: 1,
+		},
 		CollectedAt: time.Now(),
 	}
 	for _, unit := range []string{
