@@ -115,7 +115,24 @@ Currently, Netdata does not provide integration for most components with the sys
 Windows. Instead, certificates must be installed into the bundled MSYS2 environment shipped as part of Netdata
 using the following instructions:
 
-1. Ensure the certificate file to be installed is in PEM or DER format.
-2. Copy the certificate file to `C:\Program Files\Netdata\etc\pki\ca-trust\source\anchors`. You may need to create
-   this directory.
-3. In an administrative command prompt, run `C:\Program Files\Netdata\usr\bin\update-ca-trust.exe`
+1. Ensure the certificate file to be installed is in PEM or DER format, with a `.crt` extension.
+2. Create the directory `C:\Program Files\Netdata\etc\pki\ca-trust\source\anchors` if it does not exist, and
+   copy the certificate file into it.
+3. Refresh the certificate store by running `update-ca-trust` inside the bundled MSYS2 environment: start
+   `C:\Program Files\Netdata\msys2.exe` as administrator and run `update-ca-trust`. From an elevated PowerShell
+   session the same can be done with one line:
+   `& "C:\Program Files\Netdata\usr\bin\bash.exe" -lc /usr/bin/update-ca-trust`
+   The script has no `.exe` extension - it is a shell script provided by the MSYS2 `ca-certificates` package,
+   and it cannot be run from `cmd.exe` or PowerShell directly.
+4. Restart the agent: `Restart-Service Netdata`
+5. Check that the store was refreshed: the files under
+   `C:\Program Files\Netdata\etc\pki\ca-trust\extracted\` and `C:\Program Files\Netdata\usr\ssl\cert.pem`
+   should have fresh timestamps.
+
+Two things to keep in mind:
+
+- Upgrading the agent replaces `C:\Program Files\Netdata\etc\pki`, so `update-ca-trust` has to be run again
+  after every update.
+- `go.d.plugin` is a native Go binary and uses the Windows certificate store, not the MSYS2 bundle, unless the
+  collector job sets `tls_ca`. Behind a TLS-intercepting proxy, install the corporate CA in both places: the
+  directory above, and `Local Computer` > `Trusted Root Certification Authorities`.
