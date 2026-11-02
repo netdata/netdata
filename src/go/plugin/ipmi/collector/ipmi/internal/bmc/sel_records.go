@@ -76,8 +76,8 @@ type SEL struct {
 	// ClockSkew is the BMC SEL clock minus the Agent clock, before applying
 	// UTCOffset; nil before the first measurement.
 	ClockSkew *time.Duration
-	// ReadFailed reports that this collection's SEL commands failed; the other
-	// fields are from earlier collections.
+	// ReadFailed reports that this collection's Get SEL Info or record reads
+	// failed; the other fields are from earlier collections.
 	ReadFailed bool
 }
 

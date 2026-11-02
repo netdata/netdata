@@ -43,7 +43,8 @@ type selCache struct {
 	next   uint16
 	loaded bool
 	// checkOldest is set by a Get SEL Info change, after which the cache may
-	// hold records the BMC overwrote, until dropOverwritten succeeds.
+	// hold records the BMC overwrote. It stays set until a read reaches the
+	// newest record, because the surplus shows only then.
 	checkOldest bool
 	// info is the Get SEL Info response the records are current for.
 	info      storage.GetSELInfoResponse
@@ -86,14 +87,16 @@ func (r *Reader) readSEL(ctx context.Context, warnings *collectionWarnings) (*in
 	}
 	entries := int(info.Entries)
 	updateErr := r.updateSEL(ctx, info)
-	// The clock does not depend on the records: a failed record read must not
-	// leave the UTC offset unknown.
-	clockErr := r.refreshSELClock(ctx)
-	if updateErr != nil || clockErr != nil {
+	if updateErr != nil {
 		warnings.selRecords = true
-		return &entries, c.snapshot(true)
 	}
-	return &entries, c.snapshot(false)
+	// The clock does not depend on the records: a failed record read must not
+	// leave the UTC offset unknown, and a failed clock read keeps the earlier
+	// values without making the records stale.
+	if err := r.refreshSELClock(ctx); err != nil {
+		warnings.selClock = true
+	}
+	return &entries, c.snapshot(updateErr != nil)
 }
 
 func (c *selCache) snapshot(failed bool) *SEL {
@@ -145,7 +148,9 @@ func (r *Reader) updateSEL(ctx context.Context, info storage.GetSELInfoResponse)
 			return err
 		}
 	}
-	c.checkOldest = false
+	if c.next == endOfChainRecordID {
+		c.checkOldest = false
+	}
 	return nil
 }
 

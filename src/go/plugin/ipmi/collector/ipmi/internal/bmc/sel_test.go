@@ -16,7 +16,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const selRecordsWarning = "SEL records unavailable"
+const (
+	selRecordsWarning = "SEL records unavailable"
+	selClockWarning   = "SEL clock unavailable"
+)
 
 // emptySEL is the SEL of newFakeBMC: no records, no UTC offset, and a clock in
 // step with the Agent.
@@ -298,6 +301,68 @@ func TestReader_SEL_EventDuringRead(t *testing.T) {
 	}
 }
 
+func TestReader_SEL_RolloverDuringRead(t *testing.T) {
+	// A SEL with room for 10 records overwrites its oldest records while a read
+	// that spans several collections is in progress: the surplus appears only
+	// when the read reaches the new records, after Get SEL Info stopped changing.
+	tests := map[string]struct {
+		initial []uint16
+		// loaded reads the whole log before the rollover.
+		loaded    bool
+		rollover  func(*fakeSEL)
+		entryCost time.Duration
+		// wantIDs are the records after each collection that follows the rollover.
+		wantIDs [][]uint16
+	}{
+		"first read": {
+			initial: []uint16{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+			rollover: func(s *fakeSEL) {
+				s.records = s.records[2:]
+				s.add(tempEvents(11, 12)...)
+			},
+			entryCost: 300 * time.Millisecond, // 4 records per collection
+			wantIDs: [][]uint16{
+				{1, 2, 3, 4, 5, 6, 7, 8},
+				{3, 4, 5, 6, 7, 8, 9, 10, 11, 12},
+			},
+		},
+		"catching up after the first read": {
+			initial: []uint16{1, 2, 3, 4, 5, 6, 7, 8},
+			loaded:  true,
+			rollover: func(s *fakeSEL) {
+				s.records = s.records[4:]
+				s.add(tempEvents(9, 10, 11, 12, 13, 14)...)
+			},
+			entryCost: 500 * time.Millisecond, // 2 records per collection
+			wantIDs: [][]uint16{
+				{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+				{5, 6, 7, 8, 9, 10, 11, 12},
+				{5, 6, 7, 8, 9, 10, 11, 12, 13, 14},
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			fake := newFakeBMC()
+			fake.sel.records = tempEvents(tc.initial...)
+			r := newSELTestReader(fake, 4*time.Second, tc.entryCost)
+			sel := collectSEL(t, r)
+			for tc.loaded && !sel.Loaded {
+				sel = collectSEL(t, r)
+			}
+			tc.rollover(&fake.sel)
+
+			for i, want := range tc.wantIDs {
+				sel = collectSEL(t, r)
+				assert.Equal(t, want, recordIDs(sel), "collection %d after the rollover", i+1)
+			}
+			assert.True(t, sel.Loaded)
+			assert.Equal(t, 10, sel.Entries)
+		})
+	}
+}
+
 func TestReader_SEL_OldestRecordUnknown(t *testing.T) {
 	fake := newFakeBMC()
 	fake.sel.records = tempEvents(1, 2, 3)
@@ -407,8 +472,9 @@ func TestReader_SEL_Clock(t *testing.T) {
 			require.NoError(t, err)
 			sel := got.SEL
 			if tc.wantWarning {
-				assert.Equal(t, []string{selRecordsWarning}, got.Warnings)
-				assert.True(t, sel.ReadFailed)
+				assert.Equal(t, []string{selClockWarning}, got.Warnings)
+				assert.False(t, sel.ReadFailed, "the records are current")
+				assert.Len(t, sel.Records, 1)
 				assert.Nil(t, sel.ClockSkew)
 				return
 			}
@@ -491,7 +557,7 @@ func TestReader_SEL_ClockFailureRetry(t *testing.T) {
 
 	got, err := r.Collect(t.Context(), true)
 	require.NoError(t, err)
-	assert.Equal(t, []string{selRecordsWarning}, got.Warnings)
+	assert.Equal(t, []string{selClockWarning}, got.Warnings)
 	assert.Equal(t, 1, offsetReads())
 
 	now = now.Add(selClockMaxAge - time.Second)

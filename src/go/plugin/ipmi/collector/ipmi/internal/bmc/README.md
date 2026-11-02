@@ -47,10 +47,11 @@ compatibility layer.
 
 ## System Event Log
 
-Each collection with SEL enabled sends one `Get SEL Info`. Its entry count is the `ipmi.sel` sample; a failure omits
-the sample, with no previous value or zero substitute. `Snapshot.SEL` appears once the BMC first answers and then
-carries the cached records, the latest entry count, free bytes and overflow flag, and the clock information below. Any
-SEL command failure degrades only SEL data: the snapshot keeps the earlier records and marks the read failed.
+Each collection with SEL enabled sends one `Get SEL Info`. Its entry count is the `ipmi.sel` sample; a failure omits the
+sample, with no previous value or zero substitute. `Snapshot.SEL` appears once the BMC first answers and then carries
+the cached records, the latest entry count, free bytes and overflow flag, and the clock information below. Any SEL
+command failure degrades only SEL data: a failed `Get SEL Info` or record read keeps the earlier records and marks the
+read failed; a failed clock read keeps the earlier clock values.
 
 Records are cached per Reader, across collections and reconnects:
 
