@@ -417,6 +417,8 @@ fn the_window_prunes_sealed_and_unavailable_sources_but_never_the_tail() {
     assert_eq!(data.status, QueryStatus::Complete);
 }
 
+/// Every builtin but `trace_start` (the time picker's; a heatmap cell
+/// sends it) is suggested, with no source at all.
 #[test]
 fn every_builtin_is_a_key_without_any_source() {
     let data = run(Vec::new(), SuggestQuery::keys().max_items(200));
@@ -424,6 +426,7 @@ fn every_builtin_is_a_key_without_any_source() {
     keys.sort();
     let mut want: Vec<String> = BuiltinField::ALL
         .iter()
+        .filter(|b| **b != BuiltinField::TraceStart)
         .map(|b| b.key().to_string())
         .collect();
     want.sort();
@@ -708,7 +711,11 @@ fn keys_partition_by_owner_whatever_the_source_order() {
     }
     for builtin in BuiltinField::ALL {
         let key = builtin.key().to_string();
-        assert!(keys.contains(&key), "builtin {key} in {keys:?}");
+        assert_eq!(
+            keys.contains(&key),
+            builtin != BuiltinField::TraceStart,
+            "builtin {key} in {keys:?}"
+        );
     }
     for internal in ["_kind", "_status_code", "trace_state"] {
         assert!(

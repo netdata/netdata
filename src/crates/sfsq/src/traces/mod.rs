@@ -97,7 +97,7 @@ pub use explore::{
 };
 pub use overview::{
     DURATION_BIN_COUNT, DURATION_BIN_LABELS, OverviewData, OverviewQuery, OverviewRequestError,
-    overview,
+    is_axis, overview,
 };
 pub use predicate::{
     CompareOp, Condition, Predicate, PredicateError, PredicateTarget, PredicateValue,

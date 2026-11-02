@@ -177,9 +177,9 @@ impl Token {
     pub(crate) fn kind(&self) -> TokenKind {
         use BuiltinField::*;
         match self.group.conditions.first().map(|c| &c.target) {
-            Some(PredicateTarget::Builtin(RootName | RootServiceName | TraceDuration)) => {
-                TokenKind::TraceLevel
-            }
+            Some(PredicateTarget::Builtin(
+                RootName | RootServiceName | TraceDuration | TraceStart,
+            )) => TokenKind::TraceLevel,
             Some(PredicateTarget::Builtin(TraceId)) => TokenKind::TraceId,
             _ => TokenKind::SpanLocal,
         }
@@ -351,7 +351,7 @@ fn builtin_class(i: BuiltinField) -> BuiltinClass {
         | EventName
         | RootName
         | RootServiceName => BuiltinClass::Text,
-        Duration | TraceDuration | EventTimeSinceStart => BuiltinClass::Nanos,
+        Duration | TraceDuration | TraceStart | EventTimeSinceStart => BuiltinClass::Nanos,
         SpanId | ParentSpanId | TraceId | LinkSpanId | LinkTraceId => BuiltinClass::Id,
     }
 }
@@ -636,7 +636,7 @@ impl Condition {
                 PredicateTarget::Builtin(RootName | RootServiceName),
                 CompareOp::Eq | CompareOp::NotEq | CompareOp::Regex | CompareOp::NotRegex,
             ) => None,
-            (PredicateTarget::Builtin(TraceDuration), op)
+            (PredicateTarget::Builtin(TraceDuration | TraceStart), op)
                 if op.is_ordering() || matches!(op, CompareOp::Eq | CompareOp::NotEq) =>
             {
                 None
@@ -671,7 +671,8 @@ impl Predicate {
     }
 
     /// The first condition that is not span-local — a trace-level
-    /// builtin (`root_name`, `root_service_name`, `trace_duration`) or a
+    /// builtin (`root_name`, `root_service_name`, `trace_duration`,
+    /// `trace_start`) or a
     /// `trace_id` constraint — or `None` when every condition is
     /// span-local. Such a condition must be its token's only one; the
     /// list of fields is owned HERE so a wire cannot drift from the
@@ -681,7 +682,9 @@ impl Predicate {
         self.conditions.iter().map(|c| &c.target).find(|t| {
             matches!(
                 t,
-                PredicateTarget::Builtin(RootName | RootServiceName | TraceDuration | TraceId)
+                PredicateTarget::Builtin(
+                    RootName | RootServiceName | TraceDuration | TraceStart | TraceId
+                )
             )
         })
     }
@@ -1484,7 +1487,7 @@ impl LoweredTokens {
     }
 
     /// The trace-level verdict on an exact assembled trace's TRUE-root
-    /// values and envelope duration: every positive trace-level token
+    /// values and envelope (duration and start): every positive trace-level token
     /// holds and no negated one does (a rootless trace satisfies no
     /// root condition, so it passes a negated one).
     pub(crate) fn trace_level_matches(
@@ -1492,14 +1495,13 @@ impl LoweredTokens {
         root_name: Option<&str>,
         root_service: Option<&str>,
         trace_duration_ns: i64,
+        trace_start_ns: i64,
     ) -> bool {
-        self.trace_level
-            .as_ref()
-            .is_none_or(|tl| tl.matches(root_name, root_service, trace_duration_ns))
-            && !self
-                .trace_level_negated
-                .iter()
-                .any(|tl| tl.matches(root_name, root_service, trace_duration_ns))
+        let matches = |tl: &TraceLevelEval| {
+            tl.matches(root_name, root_service, trace_duration_ns, trace_start_ns)
+        };
+        self.trace_level.as_ref().is_none_or(matches)
+            && !self.trace_level_negated.iter().any(matches)
     }
 
     /// The rank of an assembled trace (spans in ascending start order)
@@ -1569,14 +1571,22 @@ enum TraceLevelCondition {
         intervals: Vec<(Option<i64>, Option<i64>)>,
         negated: bool,
     },
+    /// The trace's start (its earliest span's start), unix nanoseconds.
+    Start {
+        intervals: Vec<(Option<i64>, Option<i64>)>,
+        negated: bool,
+    },
 }
 
 impl TraceLevelEval {
     /// Whether a condition reads the root (name or service).
     pub(crate) fn reads_root(&self) -> bool {
-        self.conditions
-            .iter()
-            .any(|c| !matches!(c, TraceLevelCondition::Duration { .. }))
+        self.conditions.iter().any(|c| {
+            !matches!(
+                c,
+                TraceLevelCondition::Duration { .. } | TraceLevelCondition::Start { .. }
+            )
+        })
     }
 
     /// Compile the trace-level predicate half (validated, evaluable).
@@ -1620,6 +1630,22 @@ impl TraceLevelEval {
                             })
                             .collect();
                         TraceLevelCondition::Duration { intervals, negated }
+                    }
+                    PredicateTarget::Builtin(BuiltinField::TraceStart) => {
+                        let intervals = condition
+                            .values
+                            .iter()
+                            .map(|v| {
+                                let PredicateValue::Integer(n) = v else {
+                                    unreachable!("validated: nanos values are integers");
+                                };
+                                duration_bounds(
+                                    if negated { CompareOp::Eq } else { condition.op },
+                                    *n,
+                                )
+                            })
+                            .collect();
+                        TraceLevelCondition::Start { intervals, negated }
                     }
                     other => unreachable!("not a trace-level target: {other}"),
                 }
@@ -1720,7 +1746,13 @@ impl TraceLevelEval {
         root_name: Option<&str>,
         root_service: Option<&str>,
         trace_duration_ns: i64,
+        trace_start_ns: i64,
     ) -> bool {
+        let within = |intervals: &[(Option<i64>, Option<i64>)], value: i64| {
+            intervals
+                .iter()
+                .any(|&(lo, hi)| lo.is_none_or(|lo| value >= lo) && hi.is_none_or(|hi| value <= hi))
+        };
         let text = |value: Option<&str>, matcher: &EvalMatcher, negated: bool| match value {
             None => false, // absent never satisfies, negated included
             Some(v) => matcher.value_matches(v) != negated,
@@ -1733,11 +1765,10 @@ impl TraceLevelEval {
                 text(root_service, matcher, *negated)
             }
             TraceLevelCondition::Duration { intervals, negated } => {
-                let in_any = intervals.iter().any(|&(lo, hi)| {
-                    lo.is_none_or(|lo| trace_duration_ns >= lo)
-                        && hi.is_none_or(|hi| trace_duration_ns <= hi)
-                });
-                in_any != *negated
+                within(intervals, trace_duration_ns) != *negated
+            }
+            TraceLevelCondition::Start { intervals, negated } => {
+                within(intervals, trace_start_ns) != *negated
             }
         })
     }

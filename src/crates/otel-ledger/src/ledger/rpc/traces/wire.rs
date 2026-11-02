@@ -391,7 +391,9 @@ pub struct SearchParams {
 ///   `attributes.<key>`, `events.attributes.<key>`,
 ///   `links.attributes.<key>`, `name`, `kind`, `status.code`, ...),
 ///   including the trace-level keys (`root_name`, `root_service_name`,
-///   `trace_duration`, `trace_id`).
+///   `trace_duration`, `trace_start`, `trace_id`). `trace_start` (the
+///   trace's earliest span start, unix nanoseconds) is not suggested: a
+///   heatmap cell sends it to list the traces that started in its bucket.
 /// - `op`: `=` `!=` `=~` `!~` `>` `>=` `<` `<=` `^=` `!^=`. A `!` op means
 ///   NOT EXISTS: no span of the trace matches the positive form (for a
 ///   trace-level key: the trace does not). `=~` is a regex over the
@@ -510,7 +512,8 @@ pub struct ExploreParams {
     /// The search bar's chips, read PER SPAN: chips AND on the same span,
     /// and a `!` op keeps the spans that do not match its positive form.
     /// `trace_id` selects the spans of the given traces. The trace-level
-    /// keys (`root_name`, `root_service_name`, `trace_duration`) describe
+    /// keys (`root_name`, `root_service_name`, `trace_duration`,
+    /// `trace_start`) describe
     /// a whole trace and are refused. Otherwise as
     /// [`FunctionsParams::conditions`].
     #[serde(default)]

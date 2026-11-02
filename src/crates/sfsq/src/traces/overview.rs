@@ -116,6 +116,15 @@ const REMAINDER_TRACES_MAX: usize = 262_144;
 const DICT_BYTES_CEILING: u64 = 512 << 20;
 
 /// Which duration bin an envelope duration falls in.
+/// Whether `target` is one of the grid's axes — the trace's start (time)
+/// or its duration — which the grid draws rather than filters on.
+pub fn is_axis(target: &PredicateTarget) -> bool {
+    matches!(
+        target,
+        PredicateTarget::Builtin(BuiltinField::TraceDuration | BuiltinField::TraceStart)
+    )
+}
+
 fn duration_bin(duration_ns: i64) -> usize {
     DURATION_BIN_EDGES_NS.partition_point(|&edge| duration_ns >= edge)
 }
@@ -145,8 +154,8 @@ impl OverviewQuery {
     /// Bin only the traces that pass `tokens` (module docs, "Filtered
     /// population"); a flat [`Predicate`](super::Predicate) converts with
     /// its meaning kept. No tokens is the unfiltered grid; a
-    /// trace-duration token is rejected at request time
-    /// ([`OverviewRequestError::DurationToken`]). The filter's scans
+    /// trace-duration or trace-start token is rejected at request time
+    /// ([`OverviewRequestError::AxisToken`]). The filter's scans
     /// have their own budget.
     pub fn tokens(mut self, tokens: impl Into<TokenQuery>) -> Self {
         self.tokens = tokens.into();
@@ -193,10 +202,10 @@ pub enum OverviewRequestError {
     /// contract).
     #[error(transparent)]
     Window(#[from] WindowError),
-    /// A trace-duration token: the duration is the grid's own axis, so
-    /// the caller drops the token (or refuses the request).
-    #[error("the overview cannot filter on trace duration, its own axis")]
-    DurationToken,
+    /// A trace-duration or trace-start token: both are the grid's own
+    /// axes, so the caller drops the token (or refuses the request).
+    #[error("the overview cannot filter on trace duration or trace start, its own axes")]
+    AxisToken,
 }
 
 /// One overview's paint plus everything needed to interpret it honestly.
@@ -282,17 +291,15 @@ pub fn overview(
     let grid = query.grid;
     let grid_start = grid.bucket_start_ns;
 
-    // The filter: validated like search tokens, minus the duration
-    // axis.
+    // The filter: validated like search tokens, minus the grid's axes.
     query.tokens.validate()?;
-    let duration = PredicateTarget::Builtin(BuiltinField::TraceDuration);
     if query
         .tokens
         .tokens
         .iter()
-        .any(|t| t.group.conditions.iter().any(|c| c.target == duration))
+        .any(|t| t.group.conditions.iter().any(|c| is_axis(&c.target)))
     {
-        return Err(OverviewRequestError::DurationToken);
+        return Err(OverviewRequestError::AxisToken);
     }
     let filter = TokenFilter::new(&query.tokens, TimeWindow::new(grid_start, grid_end)?);
 

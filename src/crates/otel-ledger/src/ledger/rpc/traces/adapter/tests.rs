@@ -449,6 +449,7 @@ fn the_wire_keys_are_pinned() {
         ("root_name", RootName),
         ("root_service_name", RootServiceName),
         ("trace_duration", TraceDuration),
+        ("trace_start", TraceStart),
     ];
     assert_eq!(
         builtins.len(),

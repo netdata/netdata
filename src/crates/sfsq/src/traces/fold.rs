@@ -368,8 +368,8 @@ impl TokenFilter {
     fn root_bits(&self, name: Option<&str>, service: Option<&str>) -> u32 {
         let mut bits = 0;
         for (bit, eval) in &self.roots {
-            // Root tokens only: the duration is never read.
-            if eval.matches(name, service, 0) {
+            // Root tokens only: the duration and start are never read.
+            if eval.matches(name, service, 0, 0) {
                 bits |= bit;
             }
         }

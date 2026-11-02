@@ -1766,6 +1766,21 @@ async fn the_aggregate_bins_only_the_selected_traces() {
     assert_eq!(cells[40][0], 1);
 }
 
+/// `trace_start` keeps the traces whose earliest span starts in its
+/// range — a heatmap cell's own bucket — whatever their in-window spans.
+#[tokio::test]
+async fn trace_start_bounds_the_list_by_each_trace_start() {
+    let h = handler_with_search_corpus().await;
+    let listed = |op: &str, second: u64| {
+        let mut body = functions_body(20);
+        body["conditions"] = json!([{"key": "trace_start", "op": op, "values": [base_ns(second)]}]);
+        let h = &h;
+        async move { ids(&serde_json::to_value(call_on(h, body).await.unwrap()).unwrap()["data"]) }
+    };
+    assert_eq!(listed(">=", 20).await, ["0e", "0c", "0d", "0b"]);
+    assert_eq!(listed("<", 30).await, ["0b", "0a"]);
+}
+
 /// `skip_overview` keeps the page and drops the section, for a heatmap
 /// cell's list beside a section the caller already holds.
 #[tokio::test]

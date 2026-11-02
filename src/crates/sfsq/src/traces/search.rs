@@ -1155,10 +1155,12 @@ fn row_from_parts(
     };
     if scope.lowered.has_trace_level() {
         let (service, name) = root.clone().unwrap_or((None, None));
-        if !scope
-            .lowered
-            .trace_level_matches(name.as_deref(), service.as_deref(), duration_ns)
-        {
+        if !scope.lowered.trace_level_matches(
+            name.as_deref(),
+            service.as_deref(),
+            duration_ns,
+            start_ns,
+        ) {
             return RowOutcome::NoMatch;
         }
     }
@@ -2168,6 +2170,7 @@ pub fn search(
                         true_root_name.as_deref(),
                         true_root_service.as_deref(),
                         summary.duration_ns,
+                        summary.start_ns,
                     ) {
                         continue; // decided no-match
                     }

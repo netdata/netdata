@@ -840,7 +840,7 @@ fn grid_rejects_duration_tokens() {
             Arc::new(AtomicUsize::new(0)),
         )
         .unwrap_err();
-        assert!(matches!(err, OverviewRequestError::DurationToken), "{err}");
+        assert!(matches!(err, OverviewRequestError::AxisToken), "{err}");
     }
 }
 
@@ -892,6 +892,77 @@ fn filtered_grid_agrees_with_search_on_a_canonical_corpus() {
             grid_data.total_traces,
             list.traces.len() as u64,
             "{predicate:?}: heatmap population = list population"
+        );
+    }
+}
+
+/// A trace that started before the window but has a span inside it is
+/// listed, and a `trace_start` bound at the window's start drops it —
+/// which makes the list the grid's population: the grid bins a trace by
+/// its start and leaves an earlier-starting one out. Both search paths.
+#[test]
+fn a_trace_start_bound_lists_the_grid_population() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut child = sp(2, 1, 6_000_000_000, "x-child");
+    child.trace = [0x51; 16];
+    child.end = 6_100_000_000;
+    let spans = vec![
+        tspan(0x51, 1, 1_000_000_000, 9_000_000_000, "x-root"),
+        child,
+        tspan(0x52, 3, 6_000_000_000, 6_200_000_000, "y-root"),
+    ];
+    let wal = write_wal(dir.path(), vec![req(&spans)], "straddle");
+    let src = || vec![sealed_source(dir.path(), &wal, "s")];
+    let window = TimeWindow::new(5_000_000_000, 10_000_000_000).unwrap();
+    let started_in_window = Predicate {
+        conditions: vec![Condition {
+            target: PredicateTarget::Builtin(BuiltinField::TraceStart),
+            op: CompareOp::Gte,
+            values: vec![PredicateValue::Integer(5_000_000_000)],
+        }],
+    };
+
+    let grid = overview(
+        src(),
+        OverviewQuery::new(sfst::Grid::new(5_000_000_000, 1_000_000_000, 5)),
+        CancellationToken::new(),
+        Arc::new(AtomicUsize::new(0)),
+    )
+    .unwrap();
+    assert_eq!(
+        grid.total_traces, 1,
+        "the grid counts only the trace that started inside"
+    );
+
+    for rows in [true, false] {
+        let listed = |predicate: Predicate| {
+            search(
+                SearchSources {
+                    window: src(),
+                    completion: src(),
+                },
+                SearchQuery::new(predicate)
+                    .window(window)
+                    .limit(100)
+                    .rows_for_tests(rows),
+                CancellationToken::new(),
+                Arc::new(AtomicUsize::new(0)),
+            )
+            .unwrap()
+            .traces
+            .iter()
+            .map(|t| t.trace_id)
+            .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            listed(Predicate::all()).len(),
+            2,
+            "rows={rows}: any span in the window lists"
+        );
+        assert_eq!(
+            listed(started_in_window.clone()),
+            vec![sfst::TraceId::from([0x52; 16])],
+            "rows={rows}: the bound keeps the trace the grid counts"
         );
     }
 }

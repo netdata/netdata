@@ -860,16 +860,20 @@ fn chip_token(chip: &ConditionParams) -> Result<Token, String> {
     validated(token).map_err(|e| chip_error(&chip.key, &chip.op, e))
 }
 
-/// The heatmap's tokens: the page's, minus every trace-duration one —
-/// duration is the grid's own axis, so a cell click or a duration chip
-/// narrows the list beside the grid, not the grid.
+/// The heatmap's tokens: the page's, minus every trace-duration and
+/// trace-start one — they are the grid's own axes, so a cell click or a
+/// duration chip narrows the list beside the grid, not the grid.
 pub(crate) fn heatmap_tokens(tokens: &TokenQuery) -> TokenQuery {
-    let duration = PredicateTarget::Builtin(BuiltinField::TraceDuration);
     TokenQuery {
         tokens: tokens
             .tokens
             .iter()
-            .filter(|t| !t.group.conditions.iter().any(|c| c.target == duration))
+            .filter(|t| {
+                !t.group
+                    .conditions
+                    .iter()
+                    .any(|c| sfsq::traces::is_axis(&c.target))
+            })
             .cloned()
             .collect(),
     }

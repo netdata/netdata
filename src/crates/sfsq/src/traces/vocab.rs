@@ -102,11 +102,12 @@ pub enum BuiltinField {
     RootName,
     RootServiceName,
     TraceDuration,
+    TraceStart,
 }
 
 impl BuiltinField {
     /// Every builtin field, in declaration order (dictionary-backed first).
-    pub const ALL: [BuiltinField; 18] = [
+    pub const ALL: [BuiltinField; 19] = [
         BuiltinField::Name,
         BuiltinField::Kind,
         BuiltinField::Role,
@@ -125,12 +126,13 @@ impl BuiltinField {
         BuiltinField::RootName,
         BuiltinField::RootServiceName,
         BuiltinField::TraceDuration,
+        BuiltinField::TraceStart,
     ];
 
     /// The key: the OTLP field path (`status.code`, `scope.name`,
     /// `links.trace_id`), or the field's name when OTLP has no member for
     /// it (`duration`, `events.time_since_start`, `root_name`,
-    /// `root_service_name`, `trace_duration`).
+    /// `root_service_name`, `trace_duration`, `trace_start`).
     pub fn key(self) -> &'static str {
         match self {
             BuiltinField::Name => "name",
@@ -151,6 +153,7 @@ impl BuiltinField {
             BuiltinField::RootName => "root_name",
             BuiltinField::RootServiceName => "root_service_name",
             BuiltinField::TraceDuration => "trace_duration",
+            BuiltinField::TraceStart => "trace_start",
         }
     }
 

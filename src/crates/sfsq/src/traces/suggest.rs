@@ -329,6 +329,11 @@ pub fn suggest(
     });
     if let Resolved::Keys = target {
         for field in BuiltinField::ALL {
+            // The trace's start is the time picker's; only a heatmap cell
+            // sends it.
+            if field == BuiltinField::TraceStart {
+                continue;
+            }
             let key = AttributeKey::Builtin(field);
             let info = KeyInfo {
                 tier: None,
