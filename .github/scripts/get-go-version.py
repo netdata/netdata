@@ -4,27 +4,61 @@ import json
 import os
 import pathlib
 
-from packaging.version import parse
-
 SCRIPT_PATH = pathlib.Path(__file__).parents[0]
 REPO_ROOT = SCRIPT_PATH.parents[1]
 GO_SRC = REPO_ROOT / 'src' / 'go'
 
 GITHUB_OUTPUT = pathlib.Path(os.environ['GITHUB_OUTPUT'])
 
-version = parse('1.0.0')
-modules = []
+# Platforms the src/go programs are cross-compiled for.
+PLATFORMS = [
+    'linux/386',
+    'linux/amd64',
+    'linux/arm',
+    'linux/arm64',
+    'linux/ppc64le',
+    'windows/amd64',
+    'darwin/amd64',
+    'darwin/arm64',
+]
 
-for modfile in GO_SRC.glob('**/go.mod'):
-    moddata = modfile.read_text()
+# Programs (relative to their module) skipped on some platforms, mirroring where CMake builds them.
+UNSUPPORTED_PLATFORMS = {
+    # Linux only: ENABLE_PLUGIN_IPMI requires OS_LINUX (packaging/cmake/Modules/NetdataOptions.cmake).
+    'cmd/ipmiplugin': [platform for platform in PLATFORMS if not platform.startswith('linux/')],
+    # Not built on 32-bit targets (packaging/cmake/Modules/NetdataPluginNetflow.cmake).
+    'tools/topology-ip-intel-downloader': ['linux/386', 'linux/arm'],
+}
 
-    for line in moddata.splitlines():
+# Standalone Go modules outside src/go included in native Linux tests.
+EXTRA_TEST_MODULES = [
+    REPO_ROOT / 'src' / 'collectors' / 'cgroups.plugin' / 'cgroup-name',
+    REPO_ROOT / 'src' / 'collectors' / 'ebpf.plugin' / 'ebpfgo.plugin',
+    REPO_ROOT / 'src' / 'health' / 'notifications' / 'alarm-notify',
+]
+
+
+def go_version(modfile):
+    for line in modfile.read_text().splitlines():
         if line.startswith('go '):
-            version = max(version, parse(line.split()[1]))
-            break
+            return line.split()[1]
 
-    for main in modfile.parent.glob('**/main.go'):
-        mainpath = main.relative_to(modfile.parent).parent
+    raise SystemExit(f'{modfile}: no go directive')
+
+
+# One entry per module for the native Linux tests.
+matrix = []
+# One entry per src/go module and platform for the cross-compilation tests.
+build_matrix = []
+
+for modfile in sorted(GO_SRC.glob('**/go.mod')):
+    moddir = modfile.parent
+    modpath = moddir.relative_to(REPO_ROOT).as_posix()
+    version = go_version(modfile)
+    programs = []
+
+    for main in moddir.glob('**/main.go'):
+        mainpath = main.relative_to(moddir).parent
 
         if 'examples' in mainpath.parts:
             continue
@@ -33,46 +67,40 @@ for modfile in GO_SRC.glob('**/go.mod'):
         if 'ibmdplugin' in mainpath.parts:
             continue
 
-        modules.append({
-            'module': str(modfile.parent),
-            'version': str(version),
-            'build_target': f'github.com/netdata/netdata/go/plugins/{str(mainpath)}/',
+        programs.append(mainpath.as_posix())
+
+    programs.sort()
+
+    matrix.append({
+        'module': modpath,
+        'version': version,
+        'targets': ' '.join(f'./{program}' for program in programs),
+    })
+
+    for platform in PLATFORMS:
+        goos, goarch = platform.split('/')
+        supported = [program for program in programs if platform not in UNSUPPORTED_PLATFORMS.get(program, [])]
+
+        build_matrix.append({
+            'platform': platform,
+            'goos': goos,
+            'goarch': goarch,
+            'module': modpath,
+            'version': version,
+            'targets': ' '.join(f'./{program}' for program in supported),
         })
-
-# Preserve the existing multi-OS build matrix. The standalone cgroup helper is
-# Linux-only, but it still belongs in the native Linux test matrix below.
-build_modules = list(modules)
-
-# Standalone Go modules outside src/go included in native Linux tests.
-# Each build_target is the module's own import path read from go.mod.
-EXTRA_TEST_MODULES = [
-    REPO_ROOT / 'src' / 'collectors' / 'cgroups.plugin' / 'cgroup-name',
-    REPO_ROOT / 'src' / 'collectors' / 'ebpf.plugin' / 'ebpfgo.plugin',
-    REPO_ROOT / 'src' / 'health' / 'notifications' / 'alarm-notify',
-]
 
 for moddir in EXTRA_TEST_MODULES:
     modfile = moddir / 'go.mod'
     if not modfile.exists():
         continue
 
-    mod_version = parse('1.0.0')
-    module_path = None
-    for line in modfile.read_text().splitlines():
-        if line.startswith('go '):
-            mod_version = max(mod_version, parse(line.split()[1]))
-        elif line.startswith('module '):
-            module_path = line.split()[1]
-
-    if module_path is None:
-        continue
-
-    modules.append({
-        'module': str(moddir),
-        'version': str(mod_version),
-        'build_target': module_path,
+    matrix.append({
+        'module': moddir.relative_to(REPO_ROOT).as_posix(),
+        'version': go_version(modfile),
+        'targets': '.',
     })
 
 with GITHUB_OUTPUT.open('a') as f:
-    f.write(f'matrix={json.dumps(modules)}\n')
-    f.write(f'build_matrix={json.dumps(build_modules)}\n')
+    f.write(f'matrix={json.dumps(matrix)}\n')
+    f.write(f'build_matrix={json.dumps(build_matrix)}\n')
