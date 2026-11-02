@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
@@ -271,6 +273,31 @@ func TestCollector_Collect(t *testing.T) {
 	}
 }
 
+func TestCollector_Collect_RemovesOnlyChartsOfStalePeer(t *testing.T) {
+	m := &mockClient{peers: []uint16{1, 10}}
+	collr := prepareNTPdWithMock(m, true)
+	require.NoError(t, collr.Init(context.Background()))
+
+	require.NotNil(t, collr.Collect(context.Background()))
+
+	m.peers = []uint16{10}
+	collr.findPeersTime = time.Time{}
+	require.NotNil(t, collr.Collect(context.Background()))
+
+	expected := make(map[string]bool)
+	for _, tmpl := range peerChartsTmpl {
+		expected[fmt.Sprintf(tmpl.ID, "203_0_113_1")] = true
+		expected[fmt.Sprintf(tmpl.ID, "203_0_113_10")] = false
+	}
+	obsolete := make(map[string]bool)
+	for _, chart := range *collr.Charts() {
+		if strings.HasPrefix(chart.ID, "peer_") {
+			obsolete[chart.ID] = chart.Obsolete
+		}
+	}
+	assert.Equal(t, expected, obsolete)
+}
+
 func prepareNTPdWithMock(m *mockClient, collectPeers bool) *Collector {
 	collr := New()
 	collr.CollectPeers = collectPeers
@@ -287,6 +314,7 @@ type mockClient struct {
 	errOnPeerInfo   bool
 	errOnPeerIDs    bool
 	closeCalled     bool
+	peers           []uint16
 }
 
 func (m *mockClient) systemInfo() (map[string]string, error) {
@@ -365,6 +393,9 @@ func (m *mockClient) peerInfo(id uint16) (map[string]string, error) {
 func (m *mockClient) peerIDs() ([]uint16, error) {
 	if m.errOnPeerIDs {
 		return nil, errors.New("mockClient.peerIDs() error")
+	}
+	if m.peers != nil {
+		return m.peers, nil
 	}
 	return []uint16{1, 2, 3}, nil
 }

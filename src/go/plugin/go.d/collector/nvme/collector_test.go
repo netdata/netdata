@@ -451,6 +451,40 @@ func TestCollector_Collect(t *testing.T) {
 	}
 }
 
+func TestCollector_Collect_RemovesOnlyChartsOfRemovedDevice(t *testing.T) {
+	devList := func(paths ...string) []byte {
+		var devs []string
+		for _, path := range paths {
+			devs = append(devs, fmt.Sprintf(`{"DevicePath": %q, "ModelNumber": "model"}`, path))
+		}
+		return []byte(`{"Devices": [` + strings.Join(devs, ", ") + `]}`)
+	}
+
+	m := &mockNVMeCLIExec{
+		dataList:     devList("/dev/nvme1n1", "/dev/nvme10n1"),
+		dataSmartLog: dataVer23NVMeSmartLogJson,
+	}
+	collr := New()
+	collr.exec = m
+
+	require.NotNil(t, collr.Collect(context.Background()))
+
+	m.dataList = devList("/dev/nvme10n1")
+	collr.forceListDevices = true
+	require.NotNil(t, collr.Collect(context.Background()))
+
+	expected := make(map[string]bool)
+	for _, tmpl := range deviceChartsTmpl {
+		expected[fmt.Sprintf(tmpl.ID, "nvme1")] = true
+		expected[fmt.Sprintf(tmpl.ID, "nvme10")] = false
+	}
+	obsolete := make(map[string]bool)
+	for _, chart := range *collr.Charts() {
+		obsolete[chart.ID] = chart.Obsolete
+	}
+	assert.Equal(t, expected, obsolete)
+}
+
 func prepareCaseVer211OK(collr *Collector) {
 	collr.exec = &mockNVMeCLIExec{
 		dataList:     dataVer211NVMeListJson,

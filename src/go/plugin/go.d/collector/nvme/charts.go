@@ -4,7 +4,6 @@ package nvme
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
@@ -261,10 +260,15 @@ func (c *Collector) addDeviceCharts(devicePath, model string) {
 func (c *Collector) removeDeviceCharts(devicePath string) {
 	device := extractDeviceFromPath(devicePath)
 
-	px := fmt.Sprintf("device_%s", device)
+	// Match exact chart IDs: a prefix match would also remove the charts of
+	// other devices whose name starts with this one (e.g. nvme1 and nvme10).
+	ids := make(map[string]bool, len(deviceChartsTmpl))
+	for _, tmpl := range deviceChartsTmpl {
+		ids[fmt.Sprintf(tmpl.ID, device)] = true
+	}
 
 	for _, chart := range *c.Charts() {
-		if strings.HasPrefix(chart.ID, px) {
+		if ids[chart.ID] {
 			chart.MarkRemove()
 			chart.MarkNotCreated()
 		}

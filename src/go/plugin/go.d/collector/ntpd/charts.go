@@ -335,10 +335,16 @@ func (c *Collector) addPeerCharts(addr string) {
 }
 
 func (c *Collector) removePeerCharts(addr string) {
-	px := fmt.Sprintf("peer_%s", strings.ReplaceAll(addr, ".", "_"))
+	// Match exact chart IDs: a prefix match would also remove the charts of
+	// other peers whose address starts with this one (e.g. 10.0.0.1 and 10.0.0.10).
+	id := strings.ReplaceAll(addr, ".", "_")
+	ids := make(map[string]bool, len(peerChartsTmpl))
+	for _, tmpl := range peerChartsTmpl {
+		ids[fmt.Sprintf(tmpl.ID, id)] = true
+	}
 
 	for _, chart := range *c.Charts() {
-		if strings.HasPrefix(chart.ID, px) {
+		if ids[chart.ID] {
 			chart.MarkRemove()
 			chart.MarkNotCreated()
 		}
