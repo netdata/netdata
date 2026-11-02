@@ -36,6 +36,7 @@ env:
     apps-lookup-protocol-test
     apps-lookup-netipc-lock-test
     apps-cgroups-lookup-client-abort-test
+    apps-target-lifecycle-test
     cgroup-lookup-netipc-test
     cgroup-orchestrator-test
     cgroup-name-config-test

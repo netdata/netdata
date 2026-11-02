@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Test executables. None is installed or registered with CTest - the project
 # defines no add_test() - but they are NOT all orphans: the topology container
-# tests workflow (.github/workflows/topology-container-tests.yml) builds nine of
+# tests workflow (.github/workflows/topology-container-tests.yml) builds ten of
 # these targets by name (plus four more that live beside their plugins, in
 # NetdataPluginLocalListeners.cmake and NetdataPluginNetworkViewer.cmake).
 #
@@ -69,6 +69,10 @@ if(OS_LINUX)
     add_executable(apps-lookup-netipc-lock-test EXCLUDE_FROM_ALL
             src/collectors/apps.plugin/tests/test_apps_lookup_netipc_lock.c)
     target_link_libraries(apps-lookup-netipc-lock-test libnetdata)
+
+    add_executable(apps-target-lifecycle-test EXCLUDE_FROM_ALL
+            src/collectors/apps.plugin/tests/test_apps_target_lifecycle.c)
+    target_link_libraries(apps-target-lifecycle-test libnetdata)
 
     add_executable(apps-cgroups-lookup-client-abort-test EXCLUDE_FROM_ALL
             src/collectors/apps.plugin/tests/test_apps_cgroups_lookup_client_abort.c)
