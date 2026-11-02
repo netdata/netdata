@@ -92,7 +92,7 @@ The previous (crashed) session's agent state.
 | `agent.timings.exit` | `AE_AGENT_TIMINGS_EXIT` | int seconds | always | How long shutdown took, wall clock. On a shutdown-timeout event it is the time until the hung step began (the timeout save does not refresh it), not the full shutdown. |
 | `agent.timings.exit_ut` | `AE_AGENT_TIMINGS_EXIT_UT` | uint usec | v>=30 | Monotonic duration of a completed shutdown (all steps), set just before the final `exited` save; 0 on a watchdog abort or a crash. Also set on an abnormal (fatal) exit that ran the shutdown sequence, so filter on `exit_reason` for clean shutdowns. The next start imports it into the agent event log (shutdown-time median) only for a normal exit. |
 | `agent.shutdown.abandoned` | `AE_AGENT_SHUTDOWN_ABANDONED` | string | v>=30 | Services and thread names each bounded shutdown wait gave up on, in step order (`[ SERVICES ] THREAD, ...; ...`). Empty on a clean shutdown. Names the thread behind a "stop all remaining worker threads" 20 s or a later stall. |
-| `agent.shutdown.sqlite_unsafe` | `AE_AGENT_SHUTDOWN_SQLITE_UNSAFE` | string | v>=30 | First reason the SQLite teardown was suppressed (a metadata worker, health, ACLK job or command still using the databases). Empty when the teardown was safe. |
+| `agent.shutdown.sqlite_unsafe` | `AE_AGENT_SHUTDOWN_SQLITE_UNSAFE` | string | v>=30 | First reason recorded for suppressing the SQLite teardown: a metadata worker, health thread, ACLK job or command still using the databases, a failed join, leftover prepared statements, or an undrained SQLite operation. Empty means no reason was recorded, including a watchdog abort before the teardown ran. |
 
 ## `metrics.*` fields (`dsf_json_metrics`, `:158-193`)
 

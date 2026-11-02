@@ -120,14 +120,19 @@ static const char *sqlite_zombie_noted_db = NULL;
 // The first reason, kept for the status file (agent-events). Callers pass string literals.
 static const char *sqlite_teardown_unsafe_first_reason = NULL;
 
-// Every distinct reason is logged, not just the first: when several conditions fire, the list
-// is what tells a triage pass which one actually drove the decision.
-void sqlite_mark_teardown_unsafe(const char *reason)
+static void sqlite_teardown_unsafe_note_reason(const char *reason)
 {
     const char *expected = NULL;
     __atomic_compare_exchange_n(&sqlite_teardown_unsafe_first_reason, &expected,
                                 reason ? reason : "a SQLite user may still be running",
                                 false, __ATOMIC_RELEASE, __ATOMIC_RELAXED);
+}
+
+// Every distinct reason is logged, not just the first: when several conditions fire, the list
+// is what tells a triage pass which one actually drove the decision.
+void sqlite_mark_teardown_unsafe(const char *reason)
+{
+    sqlite_teardown_unsafe_note_reason(reason);
 
     bool was_set = __atomic_exchange_n(&sqlite_teardown_unsafe, true, __ATOMIC_RELEASE);
 
@@ -226,10 +231,13 @@ static bool sqlite_lease_acquire_library(void)
     bool refused_live = sqlite_library_initialized && sqlite_library_gate;
     if (ok)
         sqlite_leases++;
-    else if (refused_live)
+    else if (refused_live) {
         // Latch under the mutex: sqlite_library_shutdown() re-checks the latch under it after its drain,
         // so it cannot miss a handle we are about to leave open.
+        sqlite_teardown_unsafe_note_reason(
+            "a thread-local SQLite handle could not be closed while the library was shutting down");
         __atomic_store_n(&sqlite_teardown_unsafe, true, __ATOMIC_RELEASE);
+    }
     netdata_mutex_unlock(&sqlite_lifetime_mutex);
 
     if (refused_live)
@@ -989,6 +997,7 @@ int sqlite_library_init(void)
     // would silently turn every later sqlite_library_shutdown() into a no-op (only the -W
     // unittest drivers re-initialize the library in one process).
     __atomic_store_n(&sqlite_teardown_unsafe, false, __ATOMIC_RELEASE);
+    __atomic_store_n(&sqlite_teardown_unsafe_first_reason, NULL, __ATOMIC_RELEASE);
 
     // The ZOMBIE flag is deliberately NOT cleared. It records that a connection was closed with
     // statements still attached, so its real close is deferred - that is a property of the
@@ -1077,8 +1086,12 @@ void sqlite_library_shutdown(void)
     pools_registered = JudyL_thread_stmt_pool != NULL;
     spinlock_unlock(&JudyL_thread_stmt_lock);
 
-    if (!drained || pools_registered)
+    if (!drained || pools_registered) {
+        sqlite_teardown_unsafe_note_reason(!drained ?
+            "a SQLite operation was still running at library shutdown" :
+            "a thread still had prepared SQLite statements at library shutdown");
         __atomic_store_n(&sqlite_teardown_unsafe, true, __ATOMIC_RELEASE);
+    }
 
     // Re-check under the lock, after the drain, and immediately before sqlite3_shutdown(). A thread-local
     // close refused by the gate latches under this same mutex, so it cannot slip past this check.

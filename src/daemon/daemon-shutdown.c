@@ -199,7 +199,9 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     static bool run = false;
     if(run) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "EXIT: Recursion detected. Exiting immediately.");
-        netdata_exit_process(1);
+        // the first shutdown may be in the middle of a bounded wait, before it latched anything it gave up on:
+        // never run destructors here (libuv's would join threadpool workers that may still be running)
+        _exit(1);
     }
     run = true;
     daemon_status_file_update_status(DAEMON_STATUS_EXITING);

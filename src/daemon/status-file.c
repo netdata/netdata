@@ -1980,7 +1980,7 @@ void daemon_status_file_shutdown_gave_up(const char *services, const char *threa
     if(!services) services = "";
     if(!threads) threads = "";
     snprintfz(entry, sizeof(entry), "[ %s] %s", services, threads);
-    if(strlen(services) + strlen(threads) + 3 >= sizeof(entry))
+    if(strlen(services) + strlen(threads) + 4 >= sizeof(entry))
         memcpy(&entry[sizeof(entry) - 4], "...", 4);
 
     char *dst = session_status.shutdown.abandoned;
@@ -1988,7 +1988,7 @@ void daemon_status_file_shutdown_gave_up(const char *services, const char *threa
     size_t used = strlen(dst);
     if(used + 2 + strlen(entry) < size)
         snprintfz(&dst[used], size - used, "%s%s", used ? "; " : "", entry);
-    else if(used + 4 < size && (used < 3 || strcmp(&dst[used - 3], "...") != 0))
+    else if(used + 4 <= size && (used < 3 || strcmp(&dst[used - 3], "...") != 0))
         memcpy(&dst[used], "...", 4);
 
     dsf_release(session_status);

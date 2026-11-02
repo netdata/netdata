@@ -232,13 +232,16 @@ bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
         while((PValue = JudyLFirstThenNext(service_globals.pid_judy, &tid, &first))) {
             SERVICE_THREAD *sth = *PValue;
             if((__atomic_load_n(&sth->services, __ATOMIC_ACQUIRE) & service) && sth->tid != gettid_cached()) {
-                if(running) {
+                if(running)
                     buffer_strcat(thread_list, ", ");
-                    buffer_strcat(thread_names, ", ");
-                }
 
                 buffer_sprintf(thread_list, "'%s' (%d)", sth->name, sth->tid);
-                buffer_strcat(thread_names, sth->name);
+
+                if(sth->name[0]) {
+                    if(buffer_strlen(thread_names))
+                        buffer_strcat(thread_names, ", ");
+                    buffer_strcat(thread_names, sth->name);
+                }
 
                 running_services |= __atomic_load_n(&sth->services, __ATOMIC_ACQUIRE) & service;
                 running++;
