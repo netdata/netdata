@@ -211,16 +211,24 @@ void nd_thread_rwspinlock_write_unlocked(void) { if(_nd_thread_info) _nd_thread_
 // --------------------------------------------------------------------------------------------------------------------
 // stack size of the threads created by nd_thread_create()
 
-void nd_thread_set_stack_size(size_t stack_size) {
+// takes uint64_t, so a configured size is clamped before it can wrap in size_t on 32-bit
+void nd_thread_set_stack_size(uint64_t stack_size) {
     if(stack_size < ND_THREAD_STACK_SIZE_MIN) {
         errno_clear();
         nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "THREADS: stack size %zu bytes is below the minimum, using %zu bytes",
+               "THREADS: stack size %" PRIu64 " bytes is below the minimum, using %zu bytes",
                stack_size, (size_t)ND_THREAD_STACK_SIZE_MIN);
         stack_size = ND_THREAD_STACK_SIZE_MIN;
     }
+    else if(stack_size > ND_THREAD_STACK_SIZE_MAX) {
+        errno_clear();
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "THREADS: stack size %" PRIu64 " bytes is above the maximum, using %zu bytes",
+               stack_size, (size_t)ND_THREAD_STACK_SIZE_MAX);
+        stack_size = ND_THREAD_STACK_SIZE_MAX;
+    }
 
-    __atomic_store_n(&threads_globals.stack_size, stack_size, __ATOMIC_RELAXED);
+    __atomic_store_n(&threads_globals.stack_size, (size_t)stack_size, __ATOMIC_RELAXED);
 }
 
 size_t nd_thread_stack_size(void) {
@@ -732,16 +740,18 @@ int nd_thread_stack_size_unittest(void) {
 
 #if defined(OS_LINUX)
     size_t saved = nd_thread_stack_size();
-    const size_t wanted[] = { ND_THREAD_STACK_SIZE_MIN, 3 * 1024 * 1024, 4096 };
+    // the last one does not fit in a 32-bit size_t: it must clamp to the maximum, not wrap
+    const uint64_t wanted[] = { ND_THREAD_STACK_SIZE_MIN, 3 * 1024 * 1024, 4096, ND_THREAD_STACK_SIZE_MAX,
+                                (uint64_t)ND_THREAD_STACK_SIZE_MAX + 1, 5ULL * 1024 * 1024 * 1024 };
 
     for(size_t i = 0; i < sizeof(wanted) / sizeof(wanted[0]); i++) {
         nd_thread_set_stack_size(wanted[i]);
-        size_t expected = MAX(wanted[i], (size_t)ND_THREAD_STACK_SIZE_MIN);
+        size_t expected = (size_t)MIN(MAX(wanted[i], (uint64_t)ND_THREAD_STACK_SIZE_MIN), (uint64_t)ND_THREAD_STACK_SIZE_MAX);
 
         size_t got = 0;
         ND_THREAD *t = nd_thread_create("STACKTEST", NETDATA_THREAD_OPTION_DEFAULT, nd_thread_stack_size_unittest_thread, &got);
         if(!t || nd_thread_join(t) != 0) {
-            fprintf(stderr, "thread stack size unittest FAILED: cannot run a thread for %zu bytes\n", wanted[i]);
+            fprintf(stderr, "thread stack size unittest FAILED: cannot run a thread for %" PRIu64 " bytes\n", wanted[i]);
             errors++;
             continue;
         }
@@ -754,12 +764,12 @@ int nd_thread_stack_size_unittest(void) {
         size_t max_got = expected + 64 * 1024;
 #endif
         if(nd_thread_stack_size() != expected || got < expected || got > max_got) {
-            fprintf(stderr, "thread stack size unittest FAILED: asked %zu bytes, configured %zu, thread got %zu, expected %zu\n",
+            fprintf(stderr, "thread stack size unittest FAILED: asked %" PRIu64 " bytes, configured %zu, thread got %zu, expected %zu\n",
                     wanted[i], nd_thread_stack_size(), got, expected);
             errors++;
         }
         else
-            fprintf(stderr, "thread stack size unittest: asked %zu bytes, thread got %zu\n", wanted[i], got);
+            fprintf(stderr, "thread stack size unittest: asked %" PRIu64 " bytes, thread got %zu\n", wanted[i], got);
     }
 
     nd_thread_set_stack_size(saved);

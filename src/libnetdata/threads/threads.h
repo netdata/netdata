@@ -83,8 +83,15 @@ int nd_thread_has_tag(void);
 #define ND_THREAD_STACK_SIZE_DEFAULT (1 * 1024 * 1024)
 #endif
 #define ND_THREAD_STACK_SIZE_MIN (1 * 1024 * 1024)
+// above this a configured size is clamped: musl rejects about 1 GiB on 32-bit and libuv then aborts,
+// and 32-bit systems run out of address space with many big stacks
+#if SIZE_MAX > 0xFFFFFFFFULL
+#define ND_THREAD_STACK_SIZE_MAX (256 * 1024 * 1024)
+#else
+#define ND_THREAD_STACK_SIZE_MAX (16 * 1024 * 1024)
+#endif
 
-void nd_thread_set_stack_size(size_t stack_size);
+void nd_thread_set_stack_size(uint64_t stack_size);
 size_t nd_thread_stack_size(void);
 int nd_thread_stack_size_unittest(void);
 
