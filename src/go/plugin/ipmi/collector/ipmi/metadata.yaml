@@ -45,7 +45,7 @@ modules:
       default_behavior:
         auto_detection:
           description: On standard Linux installations, the stock job attempts to collect the local OpenIPMI device 0
-            every five seconds. Containers require ipmi=yes in the plugins section of netdata.conf and an exposed
+            every ten seconds. Containers require ipmi=yes in the plugins section of netdata.conf and an exposed
             device for local collection. Hosts without an accessible device do not collect local IPMI metrics.
             Netdata prefers this plugin when both IPMI implementations are installed and enabled. An existing
             freeipmi=no keeps collection disabled; non-blank legacy command options keep C when FreeIPMI is enabled.
@@ -120,7 +120,7 @@ modules:
               group: Connection
             - name: update_every
               description: "Data collection frequency in seconds."
-              default_value: 5
+              default_value: 10
               required: false
               group: Collection
             - name: timeout
@@ -181,8 +181,8 @@ modules:
         title: Metrics
         enabled: false
       description: Each sensor has its own reading and state chart. SEL is the raw repository entry count, including
-        records FreeIPMI may filter during interpretation. The stock SEL alarm targets the canonical local ipmi.events
-        chart; other job chart IDs include the job name.
+        records FreeIPMI may filter during interpretation. The stock ipmi_events alert template matches the ipmi.sel
+        context and applies to every Go job and to the C collector.
       scopes:
         - name: sensor
           description: A sensor on the selected BMC.

@@ -122,7 +122,7 @@ class PrepareFleetTests(unittest.TestCase):
                     self.assertEqual((target / binary).exists(), keep != 'none')
                     if keep == 'none':
                         self.assertIn('ipmi', next(line for line in result.stdout.splitlines()
-                                                  if line.startswith('Remove:')))
+                                                   if line.startswith('Remove:')))
             (self.source / binary).unlink()
 
     def test_ipmi_config_alone_does_not_provide_capability(self):
@@ -156,7 +156,8 @@ class PrepareFleetTests(unittest.TestCase):
 
     def test_package_path_inventory_tracks_retained_content(self):
         inventory = 'system/package-manifest'
-        original = '.\n./system\n./bin/netdata\n./usr/lib/netdata/conf.d/go.d\n./usr/lib/netdata/conf.d/go.d/custom.conf\n./usr/share/netdata/web\n'
+        original = ('.\n./system\n./bin/netdata\n./usr/lib/netdata/conf.d/go.d\n'
+                    './usr/lib/netdata/conf.d/go.d/custom.conf\n./usr/share/netdata/web\n')
         self.put(inventory, original)
         target, _ = self.prepare('none')
         self.assertEqual((target / inventory).read_text(), '.\n./system\n./bin/netdata\n./usr/share/netdata/web\n')

@@ -21,6 +21,7 @@ func TestConfig_Validate(t *testing.T) {
 	}{
 		"defaults":              {},
 		"another local device":  {change: func(c *Config) { c.Device = 3 }},
+		"minimum update_every":  {change: func(c *Config) { c.UpdateEvery = 5 }},
 		"update_every below 5s": {change: func(c *Config) { c.UpdateEvery = 1 }, wantErr: true},
 		"zero timeout":          {change: func(c *Config) { c.Timeout = 0 }, wantErr: true},
 		"unknown driver":        {change: func(c *Config) { c.Driver = "invalid" }, wantErr: true},
@@ -118,6 +119,7 @@ func TestConfigSchema(t *testing.T) {
 func TestCollector_Configuration(t *testing.T) {
 	// The effective configuration is available without Init or a device.
 	assert.Equal(t, defaultConfig(), New().Configuration())
+	assert.Equal(t, 10, New().UpdateEvery)
 }
 
 func TestCollector_ConfigurationSerialize(t *testing.T) {

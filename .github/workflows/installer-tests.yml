@@ -9,12 +9,20 @@ on:
       - '.github/workflows/installer-tests.yml'
       - '.github/ISSUE_TEMPLATE/BUG_REPORT.yml'
       - 'packaging/installer/**'
+      - 'packaging/docker/**'
+      - 'packaging/makeself/**'
+      - 'packaging/cmake/**'
+      - 'netdata-installer.sh'
       - 'src/go/plugin/go.d/collector/snmp_topology/testdata/*.zst'
   pull_request:
     paths:
       - '.github/workflows/installer-tests.yml'
       - '.github/ISSUE_TEMPLATE/BUG_REPORT.yml'
       - 'packaging/installer/**'
+      - 'packaging/docker/**'
+      - 'packaging/makeself/**'
+      - 'packaging/cmake/**'
+      - 'netdata-installer.sh'
       - 'src/go/plugin/go.d/collector/snmp_topology/testdata/*.zst'
 
 permissions:
@@ -346,6 +354,14 @@ jobs:
       - name: Run install state tests
         run:
           python3 -m unittest discover packaging/installer/tests test_install_state.py -v
+
+  ipmi-delivery:
+    name: IPMI delivery
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Run IPMI packaging and Docker tests
+        run: python3 -m unittest discover packaging/installer/tests 'test_*ipmi*.py' -v
 
   prepare-fleet:
     name: Prepare Fleet
