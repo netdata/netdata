@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "daemon-service.h"
+#include "status-file.h"
 
 typedef struct service_thread {
     pid_t tid;
@@ -167,6 +168,7 @@ static void service_to_buffer(BUFFER *wb, SERVICE_TYPE service) {
 bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
     BUFFER *service_list = buffer_create(1024, NULL);
     BUFFER *thread_list = buffer_create(1024, NULL);
+    BUFFER *thread_names = buffer_create(1024, NULL);
     usec_t started_ut = now_monotonic_usec(), ended_ut;
     size_t running;
     SERVICE_TYPE running_services = 0;
@@ -220,6 +222,7 @@ bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
         running = 0;
         running_services = 0;
         buffer_flush(thread_list);
+        buffer_flush(thread_names);
 
         spinlock_lock(&service_globals.lock);
 
@@ -229,10 +232,13 @@ bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
         while((PValue = JudyLFirstThenNext(service_globals.pid_judy, &tid, &first))) {
             SERVICE_THREAD *sth = *PValue;
             if((__atomic_load_n(&sth->services, __ATOMIC_ACQUIRE) & service) && sth->tid != gettid_cached()) {
-                if(running)
+                if(running) {
                     buffer_strcat(thread_list, ", ");
+                    buffer_strcat(thread_names, ", ");
+                }
 
                 buffer_sprintf(thread_list, "'%s' (%d)", sth->name, sth->tid);
+                buffer_strcat(thread_names, sth->name);
 
                 running_services |= __atomic_load_n(&sth->services, __ATOMIC_ACQUIRE) & service;
                 running++;
@@ -267,9 +273,13 @@ bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
                          "giving up on them...",
                          running, buffer_tostring(service_list),
                          buffer_tostring(thread_list));
+
+        // names only: thread ids would make every agent-events value unique
+        daemon_status_file_shutdown_gave_up(buffer_tostring(service_list), buffer_tostring(thread_names));
     }
 
     buffer_free(thread_list);
+    buffer_free(thread_names);
     buffer_free(service_list);
 
     return (running == 0);

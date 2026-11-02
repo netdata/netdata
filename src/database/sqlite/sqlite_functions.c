@@ -117,10 +117,18 @@ static bool sqlite_zombie_connection_created = false;
 static usec_t sqlite_zombie_noted_ut = 0;
 static const char *sqlite_zombie_noted_db = NULL;
 
+// The first reason, kept for the status file (agent-events). Callers pass string literals.
+static const char *sqlite_teardown_unsafe_first_reason = NULL;
+
 // Every distinct reason is logged, not just the first: when several conditions fire, the list
 // is what tells a triage pass which one actually drove the decision.
 void sqlite_mark_teardown_unsafe(const char *reason)
 {
+    const char *expected = NULL;
+    __atomic_compare_exchange_n(&sqlite_teardown_unsafe_first_reason, &expected,
+                                reason ? reason : "a SQLite user may still be running",
+                                false, __ATOMIC_RELEASE, __ATOMIC_RELAXED);
+
     bool was_set = __atomic_exchange_n(&sqlite_teardown_unsafe, true, __ATOMIC_RELEASE);
 
     nd_log_daemon(
@@ -134,6 +142,11 @@ void sqlite_mark_teardown_unsafe(const char *reason)
 bool sqlite_teardown_is_unsafe(void)
 {
     return __atomic_load_n(&sqlite_teardown_unsafe, __ATOMIC_ACQUIRE);
+}
+
+const char *sqlite_teardown_unsafe_reason(void)
+{
+    return __atomic_load_n(&sqlite_teardown_unsafe_first_reason, __ATOMIC_ACQUIRE);
 }
 
 // --------------------------------------------------------------------------------------------------------------------

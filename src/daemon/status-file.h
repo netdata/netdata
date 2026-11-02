@@ -72,6 +72,11 @@ typedef struct daemon_status_file {
         usec_t exit_ut;         // monotonic duration of a completed shutdown, set by the shutdown watcher
     } timings;
 
+    struct {
+        char abandoned[384];    // services and threads shutdown gave up waiting for, in step order
+        char sqlite_unsafe[192];// the first reason the SQLite teardown was suppressed
+    } shutdown;
+
     uint64_t oom_protection;
     uint64_t netdata_max_rss;
     OS_SYSTEM_MEMORY memory;
@@ -149,6 +154,7 @@ void daemon_status_file_check_crash(void);
 bool daemon_status_file_has_last_crashed(DAEMON_STATUS_FILE *ds);
 bool daemon_status_file_was_incomplete_shutdown(void);
 void daemon_status_file_set_shutdown_duration_ut(usec_t duration_ut);
+void daemon_status_file_shutdown_gave_up(const char *services, const char *threads);
 usec_t daemon_status_file_last_shutdown_duration_ut(void);
 
 void daemon_status_file_startup_step(const char *step);

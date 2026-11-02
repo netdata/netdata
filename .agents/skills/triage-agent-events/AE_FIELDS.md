@@ -91,6 +91,8 @@ The previous (crashed) session's agent state.
 | `agent.timings.init` | `AE_AGENT_TIMINGS_INIT` | int seconds | always | How long startup took. Long init + crash = startup bug. |
 | `agent.timings.exit` | `AE_AGENT_TIMINGS_EXIT` | int seconds | always | How long shutdown took, wall clock. On a shutdown-timeout event it is when the hung step began, not a duration. |
 | `agent.timings.exit_ut` | `AE_AGENT_TIMINGS_EXIT_UT` | uint usec | v>=30 | Monotonic duration of a completed shutdown (all steps), set just before the final `exited` save; 0 when shutdown did not complete. The next start imports it into the agent event log (shutdown-time median). |
+| `agent.shutdown.abandoned` | `AE_AGENT_SHUTDOWN_ABANDONED` | string | v>=30 | Services and thread names each bounded shutdown wait gave up on, in step order (`[ SERVICES ] THREAD, ...; ...`). Empty on a clean shutdown. Names the thread behind a "stop all remaining worker threads" 20 s or a later stall. |
+| `agent.shutdown.sqlite_unsafe` | `AE_AGENT_SHUTDOWN_SQLITE_UNSAFE` | string | v>=30 | First reason the SQLite teardown was suppressed (a metadata worker, health, ACLK job or command still using the databases). Empty when the teardown was safe. |
 
 ## `metrics.*` fields (`dsf_json_metrics`, `:158-193`)
 
