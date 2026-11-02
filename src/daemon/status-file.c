@@ -1975,11 +1975,21 @@ void daemon_status_file_shutdown_gave_up(const char *services, const char *threa
     daemon_status_file_session_status_writer_enter();
     dsf_acquire(session_status);
 
+    // cap each give-up, so a long early one cannot crowd out the later ones; mark any cut with "..."
+    char entry[160];
+    if(!services) services = "";
+    if(!threads) threads = "";
+    snprintfz(entry, sizeof(entry), "[ %s] %s", services, threads);
+    if(strlen(services) + strlen(threads) + 3 >= sizeof(entry))
+        memcpy(&entry[sizeof(entry) - 4], "...", 4);
+
     char *dst = session_status.shutdown.abandoned;
+    size_t size = sizeof(session_status.shutdown.abandoned);
     size_t used = strlen(dst);
-    if(used + 1 < sizeof(session_status.shutdown.abandoned))
-        snprintfz(&dst[used], sizeof(session_status.shutdown.abandoned) - used, "%s[ %s] %s",
-                  used ? "; " : "", services ? services : "", threads ? threads : "");
+    if(used + 2 + strlen(entry) < size)
+        snprintfz(&dst[used], size - used, "%s%s", used ? "; " : "", entry);
+    else if(used + 4 < size && (used < 3 || strcmp(&dst[used - 3], "...") != 0))
+        memcpy(&dst[used], "...", 4);
 
     dsf_release(session_status);
     daemon_status_file_session_status_writer_leave();

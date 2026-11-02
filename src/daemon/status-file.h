@@ -73,8 +73,8 @@ typedef struct daemon_status_file {
     } timings;
 
     struct {
-        char abandoned[384];    // services and threads shutdown gave up waiting for, in step order
-        char sqlite_unsafe[192];// the first reason the SQLite teardown was suppressed
+        char abandoned[640];    // services and threads shutdown gave up waiting for, in step order
+        char sqlite_unsafe[160];// the first reason the SQLite teardown was suppressed
     } shutdown;
 
     uint64_t oom_protection;
