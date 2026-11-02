@@ -25,6 +25,7 @@
   "manual_profiles": [
     "ok"
   ],
+  "alias_chart_names": true,
   "ping_only": true,
   "ping": {
     "enabled": true,

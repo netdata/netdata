@@ -299,3 +299,82 @@ func TestCollector_TableChartRowsSharingKeyDoNotFlap(t *testing.T) {
 		assert.True(t, chart.IsCreated())
 	}
 }
+
+func TestCollector_TableChartRowsSharingKeyInAnyOrderDoNotFlap(t *testing.T) {
+	collr := newTestSNMPCollector()
+	collr.sysInfo = &snmputils.SysInfo{Name: "switch"}
+	a := aliasTestMetric("ifTraffic", ifaceTags("eth0", "uplink-a"))
+	b := aliasTestMetric("ifTraffic", ifaceTags("eth0", "uplink-b"))
+
+	collr.collectProfileTableMetrics(make(map[string]int64), []ddsnmp.Metric{a, b})
+	collr.collectProfileTableMetrics(make(map[string]int64), []ddsnmp.Metric{b, a})
+	chart := collr.Charts().Get("snmp_device_prof_ifTraffic_eth0")
+	require.NotNil(t, chart)
+	name := chart.OverID
+	chart.SetCreated(true)
+
+	for i := range 10 {
+		rows := []ddsnmp.Metric{a, b}
+		if i%2 == 1 {
+			rows = []ddsnmp.Metric{b, a}
+		}
+		collr.collectProfileTableMetrics(make(map[string]int64), rows)
+		assert.Truef(t, chart.IsCreated(), "cycle %d re-sent the chart", i)
+		assert.Equalf(t, name, chart.OverID, "cycle %d renamed the chart", i)
+	}
+}
+
+func TestCollector_TableChartChangedRowsPickTheSameRowInAnyOrder(t *testing.T) {
+	for name, rows := range map[string][]ddsnmp.Metric{
+		"a then b": {
+			aliasTestMetric("ifTraffic", ifaceTags("eth0", "uplink-a")),
+			aliasTestMetric("ifTraffic", ifaceTags("eth0", "uplink-b")),
+		},
+		"b then a": {
+			aliasTestMetric("ifTraffic", ifaceTags("eth0", "uplink-b")),
+			aliasTestMetric("ifTraffic", ifaceTags("eth0", "uplink-a")),
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			collr := newTestSNMPCollector()
+			collr.sysInfo = &snmputils.SysInfo{Name: "switch"}
+			collectAliases(collr, "ifTraffic", map[string]string{"eth0": "old"})
+
+			collr.collectProfileTableMetrics(make(map[string]int64), rows)
+
+			chart := collr.Charts().Get("snmp_device_prof_ifTraffic_eth0")
+			require.NotNil(t, chart)
+			assert.Equal(t, "uplink-a", chartLabels(chart)["if_alias"])
+		})
+	}
+}
+
+func TestCollector_TableChartRemovedUnderscoreTagResendsChart(t *testing.T) {
+	collr := newTestSNMPCollector()
+	collr.sysInfo = &snmputils.SysInfo{Name: "switch"}
+
+	collectAliases(collr, "ifTraffic", map[string]string{"Gi0/1": "uplink"})
+	chart := collr.Charts().Get("snmp_device_prof_ifTraffic_Gi0/1")
+	require.NotNil(t, chart)
+	chart.SetCreated(true)
+
+	collr.collectProfileTableMetrics(make(map[string]int64), []ddsnmp.Metric{
+		aliasTestMetric("ifTraffic", map[string]string{tagInterface: "Gi0/1"}),
+	})
+
+	assert.False(t, chart.IsCreated())
+	assert.Equal(t, map[string]string{"address": "", "interface": "Gi0/1", "sysName": "switch"}, chartLabels(chart))
+}
+
+func TestCollector_TableChartNamesDisabled(t *testing.T) {
+	collr := newTestSNMPCollector()
+	collr.sysInfo = &snmputils.SysInfo{Name: "switch"}
+	collr.AliasChartNames = false
+
+	collectAliases(collr, "ifTraffic", map[string]string{"Gi0/1": "uplink"})
+
+	chart := collr.Charts().Get("snmp_device_prof_ifTraffic_Gi0/1")
+	require.NotNil(t, chart)
+	assert.Equal(t, "", chart.OverID)
+	assert.Equal(t, "uplink", chartLabels(chart)["if_alias"])
+}

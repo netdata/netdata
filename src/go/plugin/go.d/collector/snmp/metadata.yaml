@@ -422,6 +422,11 @@ modules:
               default_value: 60
               required: false
 
+            - name: alias_chart_names
+              group: Base
+              description: Name each interface chart after the interface alias (IF-MIB ifAlias) when the device reports one, so dashboards and alerts show the alias. Chart IDs are not affected; exporters that send chart names (the default) see new metric names when this is enabled or an alias changes.
+              default_value: true
+              required: false
             - name: ping_only
               group: Ping
               description: Collect only ICMP round-trip metrics and skip periodic SNMP polling. Implies ping is enabled regardless of the `ping.enabled` setting. A minimal SNMP sysInfo probe still runs at setup for naming/labels/metadata.
@@ -1118,7 +1123,7 @@ modules:
       description: |
         Metrics and charts are **defined by the matched SNMP profile(s)** at runtime. They differ by vendor/model/OS and may include, for example, interface counters, optics, CPU/memory, temperature, VLANs, and more. Use the **Metrics** tab on the device’s dashboard to see exactly what is collected for that device.
 
-        Per-interface charts are identified by the `interface` label (IF-MIB `ifName`, falling back to `ifDescr`). When the device reports an interface alias (IF-MIB `ifAlias`, the description an administrator assigns to a port), the chart also carries it as the `if_alias` label, so you can filter and group interfaces by their alias. Such charts are also named after the alias (for example `ifTraffic_Uplink_to_core`), so dashboards and alerts show the alias instead of the chart ID; spaces become underscores, and when several interfaces share an alias the interface name is appended to keep names unique. Chart IDs always keep the interface name, so history and alerts that reference chart IDs are unaffected. An alias changed on the device is picked up within about an hour, when the collector refreshes its cached interface tags.
+        Per-interface charts are identified by the `interface` label (IF-MIB `ifName`, falling back to `ifDescr`). When the device reports an interface alias (IF-MIB `ifAlias`, the description an administrator assigns to a port), the chart also carries it as the `if_alias` label, so you can filter and group interfaces by their alias. Interface charts identified by `interface` are also named after the alias, for example `ifTraffic_Uplink_to_core` (the `alias_chart_names` option turns this off), so dashboards and alerts show the alias instead of the chart ID; spaces become underscores, and when several interfaces share an alias the interface name is appended to keep names unique. Chart IDs always keep the interface name, so history and alerts that reference chart IDs are unaffected. Exporters send chart names by default, so exported metric names for these interfaces change when the alias naming takes effect or an alias is edited; disable `alias_chart_names` to keep them stable. An alias changed on the device is picked up within about an hour, when the collector refreshes its cached interface tags. When an interface is renumbered but keeps its alias, its new chart may show the chart ID until the agent restarts, because the agent keeps the name on the obsolete chart.
 
         Supported licensing profiles also emit a small set of shared **device-level licensing contexts**:
 

@@ -32,6 +32,7 @@ options:
   max_request_size: 123
   max_repetitions: 123
 
+alias_chart_names: yes
 ping_only: yes
 ping:
   enabled: yes

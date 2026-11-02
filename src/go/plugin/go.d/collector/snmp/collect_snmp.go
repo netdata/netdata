@@ -75,7 +75,8 @@ func (c *Collector) collectProfileScalarMetrics(mx map[string]int64, metrics []d
 }
 
 func (c *Collector) collectProfileTableMetrics(mx map[string]int64, metrics []ddsnmp.Metric) {
-	seen := make(map[string]bool)
+	seen := make(map[string]tableRowMatch)
+	var changed map[string]ddsnmp.Metric
 	namesStale := false
 
 	for _, m := range metrics {
@@ -97,19 +98,23 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, metrics []dd
 			continue
 		}
 
-		firstRow := !seen[key]
-		seen[key] = true
-
 		if st, ok := c.tableCharts[key]; !ok {
 			c.tableCharts[key] = newTableChartState(c.addProfileTableMetricChart(m), m)
+			seen[key] = tableRowMatched
 			namesStale = true
-		} else if firstRow && st.privateTagsChanged(m.Tags) {
-			st.update(m)
-			if st.chart != nil {
-				st.chart.Labels = c.profileTableChartLabels(m)
-				st.chart.MarkNotCreated()
+		} else if seen[key] != tableRowMatched {
+			if !st.privateTagsChanged(m.Tags) {
+				seen[key] = tableRowMatched
+				delete(changed, key)
+			} else {
+				seen[key] = tableRowChanged
+				if prev, ok := changed[key]; !ok || privateTagsLess(m.Tags, prev.Tags) {
+					if changed == nil {
+						changed = make(map[string]ddsnmp.Metric)
+					}
+					changed[key] = m
+				}
 			}
-			namesStale = true
 		}
 
 		if len(m.MultiValue) == 0 {
@@ -131,8 +136,18 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, metrics []dd
 		}
 	}
 
+	for key, m := range changed {
+		st := c.tableCharts[key]
+		st.update(m)
+		if st.chart != nil {
+			st.chart.Labels = c.profileTableChartLabels(m)
+			st.chart.MarkNotCreated()
+		}
+		namesStale = true
+	}
+
 	for key := range c.tableCharts {
-		if !seen[key] {
+		if _, ok := seen[key]; !ok {
 			delete(c.tableCharts, key)
 			c.removeProfileTableMetricChart(key)
 			namesStale = true

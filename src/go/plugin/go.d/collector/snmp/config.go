@@ -23,6 +23,8 @@ type (
 
 		ManualProfiles []string `yaml:"manual_profiles,omitempty" json:"manual_profiles"`
 
+		AliasChartNames bool `yaml:"alias_chart_names" json:"alias_chart_names"`
+
 		PingOnly bool       `yaml:"ping_only,omitempty" json:"ping_only"`
 		Ping     PingConfig `yaml:"ping,omitempty" json:"ping"`
 	}

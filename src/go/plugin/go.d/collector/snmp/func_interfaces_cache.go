@@ -27,6 +27,7 @@ const (
 	tagInterface = "interface"
 	tagIfType    = "_if_type"
 	tagIfTypeGrp = "_if_type_group"
+	tagIfAlias   = "_if_alias"
 )
 
 // ifaceCache holds interface metrics between collections for function queries.

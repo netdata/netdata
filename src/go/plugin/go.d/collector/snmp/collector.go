@@ -46,6 +46,7 @@ func defaultConfig() Config {
 	return Config{
 		CreateVnode:              true,
 		VnodeDeviceDownThreshold: 3,
+		AliasChartNames:          true,
 		Community:                "public",
 		Options: OptionsConfig{
 			Port:           161,

@@ -3,6 +3,7 @@
 package snmp
 
 import (
+	"sort"
 	"strings"
 	"unicode/utf8"
 
@@ -10,7 +11,14 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 )
 
-const tagIfAlias = "_if_alias"
+// tableRowMatch records, per chart key and collection, whether any row matched the chart's stored tags. Rows sharing
+// a key arrive in no fixed order, so a chart is refreshed only when no row matches, from a deterministic row.
+type tableRowMatch uint8
+
+const (
+	tableRowChanged tableRowMatch = iota + 1
+	tableRowMatched
+)
 
 // tableChartState tracks what a table chart was last sent with, so label and name changes are re-sent only when
 // the underlying underscore-prefixed tag values (which never affect the chart ID) change.
@@ -42,6 +50,29 @@ func (st *tableChartState) update(m ddsnmp.Metric) {
 		st.aliasName = sanitizeChartName(tableMetricKeyWith(m, tagInterface, alias))
 		st.uniqueName = sanitizeChartName(tableMetricKeyWith(m, tagInterface, alias+"_"+iface))
 	}
+}
+
+func privateTagsLess(a, b map[string]string) bool {
+	return strings.Compare(privateTagsString(a), privateTagsString(b)) < 0
+}
+
+func privateTagsString(tags map[string]string) string {
+	keys := make([]string, 0, len(tags))
+	for k := range tags {
+		if strings.HasPrefix(k, "_") {
+			keys = append(keys, k)
+		}
+	}
+	sort.Strings(keys)
+
+	var sb strings.Builder
+	for _, k := range keys {
+		sb.WriteString(k)
+		sb.WriteByte(0)
+		sb.WriteString(tags[k])
+		sb.WriteByte(0)
+	}
+	return sb.String()
 }
 
 func (st *tableChartState) privateTagsChanged(tags map[string]string) bool {
@@ -76,9 +107,12 @@ func (c *Collector) updateTableChartNames() {
 
 	c.tableChartNamesPending = false
 	for _, st := range c.tableCharts {
-		want := st.aliasName
-		if want != "" && counts[want] > 1 {
-			want = st.uniqueName
+		want := ""
+		if c.AliasChartNames {
+			want = st.aliasName
+			if want != "" && counts[want] > 1 {
+				want = st.uniqueName
+			}
 		}
 		if want == st.name || st.chart == nil {
 			continue

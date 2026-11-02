@@ -189,6 +189,12 @@
         },
         "uniqueItems": true
       },
+      "alias_chart_names": {
+        "title": "Name interface charts by alias",
+        "description": "Name each interface chart after the interface alias (IF-MIB ifAlias) when the device reports one, so dashboards and alerts show the alias. Chart IDs are not affected; exporters that send chart names (the default) see new metric names when this is enabled or an alias changes.",
+        "type": "boolean",
+        "default": true
+      },
       "ping_only": {
         "title": "Ping only",
         "description": "Collect only ICMP round-trip time and skip SNMP profile metrics. Implies ping is enabled regardless of the ping.enabled setting.",
@@ -334,6 +340,9 @@
         "ui:help": "Advanced. Usually left empty. Required when targeting a specific context on multi-context agents or when driving snmpsim virtual devices."
       }
     },
+    "alias_chart_names": {
+      "ui:help": "When several interfaces share an alias, the interface name is appended to keep chart names unique. Disable this if an external system (Prometheus, Graphite, OpenTSDB exporting) depends on stable chart names."
+    },
     "ping_only": {
       "ui:help": "A minimal SNMP sysInfo query still runs at startup for device identification, profile matching, and metadata."
     },
@@ -354,7 +363,8 @@
             "update_every",
             "hostname",
             "community",
-            "manual_profiles"
+            "manual_profiles",
+            "alias_chart_names"
           ]
         },
         {
