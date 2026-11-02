@@ -175,10 +175,10 @@ int web_client_header_parsing_unittest(void)
         const char *forwarded_for;
         const char *host;
     } ows_cases[] = {
-        {"GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For: client-1\r\nHost: h\r\n\r\n", "client-1", "h"},
-        {"GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For:\tclient-1\r\nHost:\th\r\n\r\n", "client-1", "h"},
-        {"GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For: \t client-1 \t\r\nHost: h  \r\n\r\n", "client-1", "h"},
-        {"GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For:client-1\r\nHost:h\r\n\r\n", "client-1", "h"},
+        {"GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For: 127.0.0.1\r\nHost: h\r\n\r\n", "127.0.0.1", "h"},
+        {"GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For:\t127.0.0.1\r\nHost:\th\r\n\r\n", "127.0.0.1", "h"},
+        {"GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For: \t 127.0.0.1 \t\r\nHost: h  \r\n\r\n", "127.0.0.1", "h"},
+        {"GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For:127.0.0.1\r\nHost:h\r\n\r\n", "127.0.0.1", "h"},
         {"GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For: \t \r\nHost:\r\n\r\n", "", ""},
     };
 
@@ -218,10 +218,10 @@ int web_client_header_parsing_unittest(void)
 
     // a header line without a colon, or an obsolete folded continuation line, is rejected
     static const char *malformed_cases[] = {
-        "GET /api/v1/info HTTP/1.1\r\nJunk\r\nX-Forwarded-For: client-1\r\n\r\n",
-        "GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For: client-1\r\n continued\r\n\r\n",
-        "GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For: client-1\r\n\tcontinued\r\n\r\n",
-        "GET /api/v1/info HTTP/1.1\r\nHost: h\r\n X-Forwarded-For: client-1\r\n\r\n",
+        "GET /api/v1/info HTTP/1.1\r\nJunk\r\nX-Forwarded-For: 127.0.0.1\r\n\r\n",
+        "GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For: 127.0.0.1\r\n continued\r\n\r\n",
+        "GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For: 127.0.0.1\r\n\tcontinued\r\n\r\n",
+        "GET /api/v1/info HTTP/1.1\r\nHost: h\r\n X-Forwarded-For: 127.0.0.1\r\n\r\n",
         "POST /api/v1/info HTTP/1.1\r\nJunk\r\nContent-Length: 4\r\n\r\ntest",
         // the header section is checked before waiting for a body: unframed, or not arrived yet
         "POST /api/v1/info HTTP/1.1\r\nJunk\r\n\r\ntest",
@@ -231,9 +231,9 @@ int web_client_header_parsing_unittest(void)
         "GET /api/v1/info HTTP/1.1\r\nHost : h\r\n\r\n",
         "GET /api/v1/info HTTP/1.1\r\nHost\t: h\r\n\r\n",
         // a bare LF or CR inside a header line
-        "GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For: client-1\nHost: h\r\n\r\n",
-        "GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For: client-1\rHost: h\r\n\r\n",
-        "GET /api/v1/info HTTP/1.1\r\nX-Forward\ned-For: client-1\r\n\r\n",
+        "GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For: 127.0.0.1\nHost: h\r\n\r\n",
+        "GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For: 127.0.0.1\rHost: h\r\n\r\n",
+        "GET /api/v1/info HTTP/1.1\r\nX-Forward\ned-For: 127.0.0.1\r\n\r\n",
     };
 
     for (size_t i = 0; i < sizeof(malformed_cases) / sizeof(malformed_cases[0]); i++) {

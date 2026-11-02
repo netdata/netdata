@@ -393,19 +393,16 @@ url_is_request_complete_and_extract_payload(
         if(!url_request_content_length(begin, &payload_offset, &content_length))
             return false;
 
-        const char *payload = begin + payload_offset;
         size_t payload_length = length - payload_offset;
+        if(payload_length != content_length)
+            return false;
 
-        if(payload_length == content_length) {
-            if(!*post_payload)
-                *post_payload = buffer_create(payload_length + 1, NULL);
+        if(!*post_payload)
+            *post_payload = buffer_create(payload_length + 1, NULL);
 
-            buffer_contents_replace(*post_payload, payload, payload_length);
-            (*post_payload)->content_type = url_request_content_type(begin);
-            return true;
-        }
-
-        return false;
+        buffer_contents_replace(*post_payload, begin + payload_offset, payload_length);
+        (*post_payload)->content_type = url_request_content_type(begin);
+        return true;
 
 invalid_content_length:
         *expected_size = SIZE_MAX;
