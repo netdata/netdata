@@ -251,6 +251,64 @@ exit_with_error:
         return WS_CLIENT_PROTOCOL_ERROR;                                                                               \
     }
 
+// Copies a peer-supplied string for logging: at most dst_size - 1 bytes, control bytes replaced by '?'.
+static const char *ws_client_log_safe(char *dst, size_t dst_size, const char *src)
+{
+    size_t i = 0;
+    for (; src && src[i] && i < dst_size - 1; i++) {
+        unsigned char c = (unsigned char)src[i];
+        dst[i] = (c < 0x20 || c == 0x7f) ? '?' : (char)c;
+    }
+    dst[i] = '\0';
+    return dst;
+}
+
+#define WS_LOG_VALUE_MAX 128
+
+// Decides a fully parsed upgrade reply: 0 when it completes the handshake, otherwise -1 with the
+// reason in err. The status is checked first: an ingress or proxy that does not upgrade answers
+// with its own status and usually no accept header, and that status is what explains the failure.
+int ws_client_check_handshake_reply(const ws_client *client, char *err, size_t err_size)
+{
+    char v1[WS_LOG_VALUE_MAX], v2[WS_LOG_VALUE_MAX];
+
+    if (client->hs.http_code != 101) {
+        const char *server = NULL;
+        for (const struct http_header *h = client->hs.headers; h && !server; h = h->next)
+            if (!strcmp(h->key, "server"))
+                server = h->value;
+
+        snprintfz(err, err_size, "HTTP return code not 101. Received %d with msg \"%s\"%s%s%s.",
+                  client->hs.http_code,
+                  ws_client_log_safe(v1, sizeof(v1), client->hs.http_reply_msg),
+                  server ? " (server: \"" : "",
+                  server ? ws_client_log_safe(v2, sizeof(v2), server) : "",
+                  server ? "\")" : "");
+        return -1;
+    }
+
+    // every accept header must match; a reply without one is not an upgrade
+    bool accepted = false;
+    for (const struct http_header *h = client->hs.headers; h; h = h->next) {
+        if (strcmp(h->key, WS_CONN_ACCEPT))
+            continue;
+
+        if (strcmp(client->hs.nonce_reply, h->value)) {
+            snprintfz(err, err_size, "Received NONCE \"%s\" does not match expected nonce of \"%s\"",
+                      ws_client_log_safe(v1, sizeof(v1), h->value), client->hs.nonce_reply);
+            return -1;
+        }
+        accepted = true;
+    }
+
+    if (!accepted) {
+        snprintfz(err, err_size, "Missing " WS_CONN_ACCEPT " header");
+        return -1;
+    }
+
+    return 0;
+}
+
 int ws_client_parse_handshake_resp(ws_client *client)
 {
     char buf[HTTP_SC_LENGTH];
@@ -344,23 +402,12 @@ int ws_client_parse_handshake_resp(ws_client *client)
             if (ws_client_add_http_header(client, hdr))
                 return WS_CLIENT_PROTOCOL_ERROR;
 
-            if (!strcmp(hdr->key, WS_CONN_ACCEPT)) {
-                if (strcmp(client->hs.nonce_reply, hdr->value)) {
-                    nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Received NONCE \"%s\" does not match expected nonce of \"%s\"", hdr->value, client->hs.nonce_reply);
-                    return WS_CLIENT_PROTOCOL_ERROR;
-                }
-                client->hs.nonce_matched = 1;
-            }
-
             break;
 
-        case WS_HDR_PARSE_DONE:
-            if (!client->hs.nonce_matched) {
-                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Missing " WS_CONN_ACCEPT " header");
-                return WS_CLIENT_PROTOCOL_ERROR;
-            }
-            if (client->hs.http_code != 101) {
-                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: HTTP return code not 101. Received %d with msg \"%s\".", client->hs.http_code, client->hs.http_reply_msg);
+        case WS_HDR_PARSE_DONE: {
+            char err[512];
+            if (ws_client_check_handshake_reply(client, err, sizeof(err))) {
+                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: %s", err);
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
 
@@ -368,6 +415,7 @@ int ws_client_parse_handshake_resp(ws_client *client)
             client->hs.hdr_state = WS_HDR_ALL_DONE;
             nd_log(NDLS_DAEMON, NDLP_INFO, "ACLK: Websocket Connection Accepted By Server");
             return WS_CLIENT_PARSING_DONE;
+        }
 
         case WS_HDR_ALL_DONE:
             nd_log(NDLS_DAEMON, NDLP_CRIT, "ACLK: This is error we should never come here!");

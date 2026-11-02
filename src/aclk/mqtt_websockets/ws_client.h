@@ -68,7 +68,6 @@ typedef struct websocket_client {
     struct ws_handshake {
         enum websocket_client_hdr_parse_state hdr_state;
         char *nonce_reply;
-        int nonce_matched;
         int http_code;
         char *http_reply_msg;
         struct http_header *headers;
@@ -104,6 +103,7 @@ void ws_client_destroy(ws_client *client);
 void ws_client_reset(ws_client *client);
 
 int ws_client_start_handshake(ws_client *client);
+int ws_client_check_handshake_reply(const ws_client *client, char *err, size_t err_size);
 
 int ws_client_want_write(const ws_client *client);
 
