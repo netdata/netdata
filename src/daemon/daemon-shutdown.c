@@ -178,7 +178,7 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
 // thread may still be a libuv threadpool worker in the middle of a job, and exit() would run libuv's library
 // destructor, which joins every threadpool thread - so the process would wait for the job it already gave up on,
 // until systemd kills it. Shutdown is complete and its status saved by then: leave without running destructors.
-static NORETURN void netdata_exit_process(int status) {
+NORETURN void netdata_exit_process(int status) {
     if(sqlite_teardown_is_unsafe()) {
         fflush(NULL);
         _exit(status);
