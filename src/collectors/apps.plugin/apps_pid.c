@@ -151,10 +151,12 @@ void del_pid_entry(pid_t pid) {
 
 #if (PROCESSES_HAVE_SID == 1)
     string_freez(p->sid_name);
+    string_freez(p->sid_overflow_key);
 #endif
 
 #if (PROCESSES_HAVE_SERVICE == 1)
     string_freez(p->service_name);
+    string_freez(p->service_overflow_key);
 #endif
 
 #if defined(OS_LINUX)

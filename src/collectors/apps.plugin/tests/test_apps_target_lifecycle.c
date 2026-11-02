@@ -78,12 +78,14 @@ static void test_uid_admission_overflow_and_retirement(void) {
     struct target *t10 = get_uid_target(10), *t11 = get_uid_target(11), *t12 = get_uid_target(12);
     CHECK(t10 && t11 && t12 && t10 != t11 && t11 != t12, "distinct uid targets");
     CHECK(target_families[TARGET_FAMILY_UID].dynamic == 3, "3 dynamic uid targets, got %zu", target_families[TARGET_FAMILY_UID].dynamic);
+    CHECK(target_families[TARGET_FAMILY_UID].generation == 3, "each real target bumps the generation, got %zu", target_families[TARGET_FAMILY_UID].generation);
 
     struct target *o = get_uid_target(0);
     CHECK(o && o->overflow, "uid 0 at the cap goes to the overflow target");
     CHECK(get_uid_target(13) == o, "every refused uid shares one overflow target");
     CHECK(o && strcmp(string2str(o->name), "other") == 0, "overflow target is named other");
     CHECK(target_families[TARGET_FAMILY_UID].dynamic == 3, "overflow is not counted as dynamic");
+    CHECK(target_families[TARGET_FAMILY_UID].generation == 3, "the overflow target does not bump the generation");
 
     // only uid 10 and uid 11 are still referenced; uid 11 only through a group-less process
     struct pid_stat *p1 = test_pid(100, "p1"), *p2 = test_pid(101, "p2");
@@ -103,6 +105,7 @@ static void test_uid_admission_overflow_and_retirement(void) {
     CHECK(target_families[TARGET_FAMILY_UID].overflow == NULL, "idle overflow target is retired");
     CHECK(target_families[TARGET_FAMILY_UID].dynamic == 2, "dynamic count follows retirement, got %zu", target_families[TARGET_FAMILY_UID].dynamic);
     CHECK(target_families[TARGET_FAMILY_UID].retired == 2, "two targets retired, got %zu", target_families[TARGET_FAMILY_UID].retired);
+    CHECK(target_families[TARGET_FAMILY_UID].generation == 4, "retiring a real target bumps the generation, the overflow does not, got %zu", target_families[TARGET_FAMILY_UID].generation);
     CHECK(obsoleted_count == 1, "only the exposed target emits obsoletion, got %zu", obsoleted_count);
 
     // below the cap again: uid 0 gets its own target, it is not captured by a zeroed overflow
