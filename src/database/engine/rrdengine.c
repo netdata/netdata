@@ -2491,8 +2491,11 @@ static void after_journal_filter(struct rrdengine_instance *ctx __maybe_unused, 
 // Give existing tier-0 journals their time filters, one journal at a time, for up to a second per run.
 // New journals get theirs when they are indexed (journalfile_migrate_to_v2_callback).
 static void *journal_filter_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
+    // the event loop runs while the tier loads its files: until every datafile is listed, the orphan
+    // cleanup would take the filters of the journals not loaded yet for orphans
     struct rrdengine_instance *ctx0 = multidb_ctx[0];
-    if(!dbengine_journal_time_filters || !ctx0 || !ctx_is_available_for_queries(ctx0))
+    if(!dbengine_journal_time_filters || !ctx0 || !ctx_is_available_for_queries(ctx0) ||
+       !__atomic_load_n(&ctx0->loading.files_loaded, __ATOMIC_ACQUIRE))
         return data;
 
     worker_is_busy(UV_EVENT_DBENGINE_JOURNAL_FILTER);

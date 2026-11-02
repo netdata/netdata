@@ -384,7 +384,7 @@ bool njtf_verify_and_map(struct rrdengine_journalfile *journalfile, const uint8_
 
     uint8_t *map = nd_mmap(NULL, file_size, PROT_READ, MAP_SHARED, fd, 0);
     close(fd);
-    if(!map)
+    if(map == MAP_FAILED)
         return false;
 
     madvise_sequential(map, file_size);

@@ -1280,6 +1280,7 @@ int rrdeng_init(
 
     ctx->atomic.transaction_id = 1;
     ctx->quiesce.enabled = false;
+    __atomic_store_n(&ctx->loading.files_loaded, false, __ATOMIC_RELEASE);
 
     ctx->atomic.first_time_s = LONG_MAX;
     // Global contexts may already have MRG prepopulation accounting from the first DBEngine spawn.
@@ -1287,6 +1288,7 @@ int rrdeng_init(
 
     if (rrdeng_dbengine_spawn(ctx) && !init_rrd_files(ctx)) {
         // success - we run this ctx too
+        __atomic_store_n(&ctx->loading.files_loaded, true, __ATOMIC_RELEASE);
         rrdeng_populate_mrg(ctx);
         return 0;
     }

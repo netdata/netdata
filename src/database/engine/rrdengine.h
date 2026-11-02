@@ -467,6 +467,7 @@ struct rrdengine_instance {
     struct {
         struct completion load_mrg;
         bool create_new_datafile_pair;
+        bool files_loaded;                          // atomic; every datafile of the tier is in datafiles.JudyL
     } loading;
 
     struct rrdengine_statistics stats;
