@@ -155,7 +155,7 @@ func selTable(ctx context.Context, sel *bmc.SEL, query selQuery) *funcapi.Functi
 func selStatus(sel *bmc.SEL) string {
 	var parts []string
 	if sel.ReadFailed {
-		parts = append(parts, "The latest SEL read failed; records are from earlier collections.")
+		parts = append(parts, "The latest SEL read failed; newer records may be missing.")
 	}
 	if !sel.Loaded {
 		parts = append(parts, fmt.Sprintf(
@@ -182,11 +182,12 @@ func selClock(sel *bmc.SEL) string {
 		}
 		return text
 	}
-	text := "The BMC reports no SEL UTC offset, so times are the BMC clock shown as UTC."
-	if sel.ClockSkew != nil {
-		text += " The BMC clock " + clockRelation(*sel.ClockSkew) + " the Agent clock."
+	// The offset and the clock are read together.
+	if sel.ClockSkew == nil {
+		return "The BMC SEL clock has not been read yet, so times are the BMC clock shown as UTC."
 	}
-	return text
+	return "The BMC reports no SEL UTC offset, so times are the BMC clock shown as UTC. The BMC clock " +
+		clockRelation(*sel.ClockSkew) + " the Agent clock."
 }
 
 func clockRelation(d time.Duration) string {

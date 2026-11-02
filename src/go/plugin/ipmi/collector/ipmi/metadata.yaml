@@ -26,8 +26,7 @@ modules:
         metrics_description: Monitor hardware sensor readings, sensor health and System Event Log entries through IPMI.
         method_description: Queries a local Linux OpenIPMI device or a remote BMC over IPMI 1.5 LAN or IPMI 2.0 LAN+
           using the configured account. The collector reads sensors and the System Event Log (SEL); it does not
-          change BMC configuration or clear the event log. It reads each SEL record once, then only records the BMC
-          adds.
+          change BMC configuration or clear the event log.
       supported_platforms:
         include:
           - Linux
@@ -58,7 +57,9 @@ modules:
             one IPMI implementation; switch implementations by changing netdata.conf and restarting the Agent.
         performance_impact:
           description: IPMI command latency grows with sensor count. Increase update_every when a complete sensor scan
-            takes longer than the configured interval.
+            takes longer than the configured interval. With collect_sel enabled, the first collections after a start
+            also read the existing System Event Log, for up to two seconds each (a quarter of update_every when
+            shorter), until all records are read; later collections read only new records.
     setup:
       prerequisites:
         list:
@@ -321,8 +322,8 @@ modules:
           function_name: ipmi-sel
           name: IPMI System Event Log
           description: Browse the hardware events the BMC recorded, such as threshold crossings, fan, power and memory
-            errors, processor throttling and boots, with UTC times and default FreeIPMI states. Use it to see when a
-            problem started and how often it recurs; the sensor charts show only the current state.
+            errors, processor throttling and boots, with default FreeIPMI states. Use it to see when a problem started
+            and how often it recurs; the sensor charts show only the current state.
           parameters:
             - id: __job
               name: Instance
@@ -399,7 +400,7 @@ modules:
                 type: string
                 unit: ''
                 description: Event description; threshold events include the trigger reading and threshold when the
-                  BMC records them.
+                  BMC records them and the sensor's SDR record describes their conversion.
               - name: Direction
                 type: string
                 unit: ''
@@ -436,6 +437,7 @@ modules:
           require_cloud: false
           performance: Reads the records the collector already read from the BMC; sends no BMC requests.
           security: Read-only hardware event records from the configured target.
-          availability: Available for jobs with collect_sel enabled while they run. Returns HTTP 503 before the first
-            successful collection, after a collection failure, or while the BMC has not answered SEL requests. On the
-            first collections of a large log, it shows the oldest records read so far.
+          availability: Available for jobs with collect_sel enabled while they run; when no job collects the SEL,
+            requests return HTTP 404. Returns HTTP 503 before the first successful collection, after a collection
+            failure, or while the BMC has not answered SEL requests. On the first collections of a large log, it shows
+            the oldest records read so far.

@@ -62,6 +62,14 @@ func collectSEL(t *testing.T, r *Reader) *SEL {
 	return got.SEL
 }
 
+func recordsRaw(s *SEL) [][selRecordSize]byte {
+	var raw [][selRecordSize]byte
+	for _, rec := range s.Records {
+		raw = append(raw, rec.Raw)
+	}
+	return raw
+}
+
 func recordIDs(s *SEL) []uint16 {
 	var ids []uint16
 	for _, rec := range s.Records {
@@ -89,7 +97,7 @@ func TestReader_SEL_InitialLoadIsBounded(t *testing.T) {
 			updateEvery: 4 * time.Second,
 			perCycle:    []int{4, 4, 2},
 		},
-		"two seconds at most": {
+		"two second budget": {
 			updateEvery: 20 * time.Second,
 			perCycle:    []int{7, 3},
 		},
@@ -175,12 +183,12 @@ func TestReader_SEL_Changes(t *testing.T) {
 			wantReads: []uint16{0xffff, 3, 0x0000, 2, 3},
 			wantRaw:   append(tempEvents(1, 2), changedThree),
 		},
-		"rollover drops the oldest records": {
+		"rollover drops the overwritten records": {
 			change: func(s *fakeSEL) {
 				s.records = s.records[2:]
 				s.add(tempEvents(4, 5)...)
 			},
-			wantReads: []uint16{0xffff, 3, 4, 5},
+			wantReads: []uint16{0xffff, 3, 4, 5, 0x0000},
 			wantIDs:   []uint16{3, 4, 5},
 		},
 		"rollover reuses a record ID": {
@@ -224,11 +232,7 @@ func TestReader_SEL_Changes(t *testing.T) {
 			assert.Equal(t, tc.wantReads, entryReads(fake))
 			assert.True(t, got.Loaded)
 			if tc.wantRaw != nil {
-				var raw [][selRecordSize]byte
-				for _, rec := range got.Records {
-					raw = append(raw, rec.Raw)
-				}
-				assert.Equal(t, tc.wantRaw, raw)
+				assert.Equal(t, tc.wantRaw, recordsRaw(got))
 			} else {
 				assert.Equal(t, tc.wantIDs, recordIDs(got))
 			}
@@ -238,6 +242,81 @@ func TestReader_SEL_Changes(t *testing.T) {
 			assert.Empty(t, entryReads(fake), "the next unchanged collection reads no record")
 		})
 	}
+}
+
+func TestReader_SEL_EventDuringRead(t *testing.T) {
+	// The BMC logs an event after Get SEL Info, while records are read, so the
+	// read ends with more records than the reported entry count.
+	tests := map[string]struct {
+		// appended is logged before the collection; none means the event
+		// interrupts the first read.
+		appended  [][selRecordSize]byte
+		event     [selRecordSize]byte
+		wantReads []uint16
+		want      [][selRecordSize]byte
+	}{
+		"first read": {
+			event:     tempEvent(4, 0x60000004),
+			wantReads: []uint16{0x0000, 2, 3, 4, 0x0000},
+			want:      tempEvents(1, 2, 3, 4),
+		},
+		"appending": {
+			appended:  tempEvents(4),
+			event:     tempEvent(5, 0x60000005),
+			wantReads: []uint16{0xffff, 3, 4, 5, 0x0000},
+			want:      tempEvents(1, 2, 3, 4, 5),
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			fake := newFakeBMC()
+			fake.sel.records = tempEvents(1, 2, 3)
+			r := newSELTestReader(fake, 0, 0)
+			if tc.appended != nil {
+				collectSEL(t, r)
+				entryReads(fake)
+				fake.sel.add(tc.appended...)
+			}
+			reads := 0
+			fake.sel.onEntry = func() {
+				if reads++; reads == 2 {
+					fake.sel.add(tc.event)
+				}
+			}
+
+			got := collectSEL(t, r)
+			assert.Equal(t, tc.wantReads, entryReads(fake), "the oldest record shows that nothing was overwritten")
+			assert.Equal(t, tc.want, recordsRaw(got), "no record the BMC holds is dropped")
+
+			got = collectSEL(t, r)
+			assert.Equal(t, []uint16{0xffff}, entryReads(fake), "the new count leads to one check of the newest record")
+			assert.Equal(t, tc.want, recordsRaw(got))
+			collectSEL(t, r)
+			assert.Empty(t, entryReads(fake))
+		})
+	}
+}
+
+func TestReader_SEL_OldestRecordUnknown(t *testing.T) {
+	fake := newFakeBMC()
+	fake.sel.records = tempEvents(1, 2, 3)
+	r := newSELTestReader(fake, 0, 0)
+	collectSEL(t, r)
+	entryReads(fake)
+
+	// The BMC's oldest record is none of the cached ones: the log was rewritten.
+	fake.sel.records = append([][selRecordSize]byte{tempEvent(9, 0x70000009)}, fake.sel.records[2])
+	fake.sel.add(tempEvents(4)...)
+	got := collectSEL(t, r)
+	assert.Equal(t, []uint16{0xffff, 3, 4, 0x0000}, entryReads(fake))
+	assert.Empty(t, got.Records)
+	assert.False(t, got.Loaded, "the log is read again")
+
+	got = collectSEL(t, r)
+	assert.Equal(t, []uint16{0x0000, 3, 4}, entryReads(fake))
+	assert.Equal(t, []uint16{9, 3, 4}, recordIDs(got))
+	assert.True(t, got.Loaded)
 }
 
 func TestReader_SEL_Reservation(t *testing.T) {
@@ -344,6 +423,24 @@ func TestReader_SEL_Clock(t *testing.T) {
 	}
 }
 
+func TestReader_SEL_ClockReadDespiteRecordFailure(t *testing.T) {
+	fake := newFakeBMC()
+	fake.sel.records = tempEvents(1, 2, 3)
+	fake.sel.utcOffset = 120
+	fake.onExchange = func(req types.Request) error {
+		if q, ok := req.(*storage.GetSELEntryRequest); ok && q.RecordID == 2 {
+			return types.NewResponseError(0xff, "unspecified error")
+		}
+		return nil
+	}
+	got, err := newSELTestReader(fake, 0, 0).Collect(t.Context(), true)
+	require.NoError(t, err)
+	assert.Equal(t, []string{selRecordsWarning}, got.Warnings)
+	assert.Equal(t, []uint16{1}, recordIDs(got.SEL))
+	assert.Equal(t, new(2*time.Hour), got.SEL.UTCOffset, "the clock read does not depend on the records")
+	assert.NotNil(t, got.SEL.ClockSkew)
+}
+
 func TestReader_SEL_ClockRefresh(t *testing.T) {
 	fake := newFakeBMC()
 	r := newTestReader(fake)
@@ -372,6 +469,40 @@ func TestReader_SEL_ClockRefresh(t *testing.T) {
 	now = now.Add(time.Second)
 	assert.Equal(t, new(time.Hour), collectSEL(t, r).UTCOffset)
 	assert.Equal(t, 2, clockReads())
+}
+
+func TestReader_SEL_ClockFailureRetry(t *testing.T) {
+	fake := newFakeBMC()
+	fake.sel.utcOffset = 60
+	fake.sel.utcOffsetErr = errors.New("transport failed")
+	r := newTestReader(fake)
+	now := testNow
+	r.now = func() time.Time { return now }
+	offsetReads := func() int {
+		n := 0
+		for _, req := range fake.requests {
+			if _, ok := req.(*storage.GetSELTimeUTCOffsetRequest); ok {
+				n++
+			}
+		}
+		fake.requests = nil
+		return n
+	}
+
+	got, err := r.Collect(t.Context(), true)
+	require.NoError(t, err)
+	assert.Equal(t, []string{selRecordsWarning}, got.Warnings)
+	assert.Equal(t, 1, offsetReads())
+
+	now = now.Add(selClockMaxAge - time.Second)
+	sel := collectSEL(t, r)
+	assert.Zero(t, offsetReads(), "a failed clock read is not retried every collection")
+	assert.Nil(t, sel.ClockSkew)
+
+	fake.sel.utcOffsetErr = nil
+	now = now.Add(time.Second)
+	assert.Equal(t, new(time.Hour), collectSEL(t, r).UTCOffset)
+	assert.Equal(t, 1, offsetReads())
 }
 
 func TestReader_SEL_Records(t *testing.T) {
@@ -638,6 +769,22 @@ func TestReader_SEL_Failures(t *testing.T) {
 				b.sel.truncate = true
 			},
 			wantIDs:      []uint16{1, 2, 3},
+			wantLoaded:   true,
+			wantWarnings: []string{selRecordsWarning},
+			wantEntries:  true,
+		},
+		"oldest record read fails after a rollover": {
+			fail: func(b *fakeBMC) {
+				b.sel.records = b.sel.records[2:]
+				b.sel.add(tempEvents(4, 5)...)
+				b.onExchange = func(req types.Request) error {
+					if q, ok := req.(*storage.GetSELEntryRequest); ok && q.RecordID == 0x0000 {
+						return transportFailure
+					}
+					return nil
+				}
+			},
+			wantIDs:      []uint16{1, 2, 3, 4, 5},
 			wantLoaded:   true,
 			wantWarnings: []string{selRecordsWarning},
 			wantEntries:  true,

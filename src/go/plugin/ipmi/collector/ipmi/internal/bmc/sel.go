@@ -19,7 +19,7 @@ const (
 	// spans several collections instead of delaying sensor collection.
 	maxSELReadBudget = 2 * time.Second
 	// selClockMaxAge refreshes the SEL clock and UTC offset, which change only
-	// when the BMC clock is set or adjusted.
+	// when the BMC clock is set or adjusted, and spaces out failed attempts.
 	selClockMaxAge = 5 * time.Minute
 	// lastSELRecordID asks Get SEL Entry for the newest record.
 	lastSELRecordID = 0xffff
@@ -42,6 +42,9 @@ type selCache struct {
 	// reached the newest record.
 	next   uint16
 	loaded bool
+	// checkOldest is set by a Get SEL Info change, after which the cache may
+	// hold records the BMC overwrote, until dropOverwritten succeeds.
+	checkOldest bool
 	// info is the Get SEL Info response the records are current for.
 	info      storage.GetSELInfoResponse
 	infoKnown bool
@@ -82,11 +85,11 @@ func (r *Reader) readSEL(ctx context.Context, warnings *collectionWarnings) (*in
 		return nil, c.snapshot(true)
 	}
 	entries := int(info.Entries)
-	if err := r.updateSEL(ctx, info); err != nil {
-		warnings.selRecords = true
-		return &entries, c.snapshot(true)
-	}
-	if err := r.refreshSELClock(ctx); err != nil {
+	updateErr := r.updateSEL(ctx, info)
+	// The clock does not depend on the records: a failed record read must not
+	// leave the UTC offset unknown.
+	clockErr := r.refreshSELClock(ctx)
+	if updateErr != nil || clockErr != nil {
 		warnings.selRecords = true
 		return &entries, c.snapshot(true)
 	}
@@ -111,6 +114,8 @@ func (c *selCache) snapshot(failed bool) *SEL {
 // starts a read of the records after the newest cached one; if that record is
 // gone or changed, the SEL was cleared or rewritten and is read again from the
 // start. Reading is bounded by the read budget and resumes next collection.
+// More cached records than the reported entry count are checked against the
+// oldest record the BMC holds before any is dropped.
 func (r *Reader) updateSEL(ctx context.Context, info storage.GetSELInfoResponse) error {
 	c := &r.sel
 	if c.infoKnown && !info.RecentEraseTime.Equal(c.info.RecentEraseTime) {
@@ -118,6 +123,7 @@ func (r *Reader) updateSEL(ctx context.Context, info storage.GetSELInfoResponse)
 	}
 	changed := !c.infoKnown || info.Entries != c.info.Entries ||
 		!info.RecentAdditionTime.Equal(c.info.RecentAdditionTime)
+	c.checkOldest = c.checkOldest || changed
 
 	switch {
 	case info.Entries == 0:
@@ -134,10 +140,36 @@ func (r *Reader) updateSEL(ctx context.Context, info storage.GetSELInfoResponse)
 			return err
 		}
 	}
-	// On rollover the BMC overwrites the oldest records.
-	if excess := len(c.records) - int(info.Entries); excess > 0 {
-		c.records = c.records[excess:]
+	if c.checkOldest && len(c.records) > int(info.Entries) {
+		if err := r.dropOverwritten(ctx); err != nil {
+			return err
+		}
 	}
+	c.checkOldest = false
+	return nil
+}
+
+// dropOverwritten drops the cached records older than the oldest record the
+// BMC holds: on rollover it overwrites its oldest records. The entry count
+// alone cannot tell, because records logged after Get SEL Info were read too.
+// A cache without the BMC's oldest record was rewritten and is read again.
+func (r *Reader) dropOverwritten(ctx context.Context) error {
+	c := &r.sel
+	oldest, _, err := r.readSELRecord(ctx, firstRecordID)
+	switch {
+	case errors.Is(err, errSELRecordGone):
+		c.reset()
+		return nil
+	case err != nil:
+		return err
+	}
+	for i, rec := range c.records {
+		if rec.Raw == oldest {
+			c.records = c.records[i:]
+			return nil
+		}
+	}
+	c.reset()
 	return nil
 }
 
@@ -286,15 +318,26 @@ func (r *Reader) readSELRecord(ctx context.Context, id uint16) ([selRecordSize]b
 }
 
 // refreshSELClock reads the SEL UTC offset and measures the BMC SEL clock
-// against the Agent clock when the last reading is older than selClockMaxAge.
-// A BMC that rejects Get SEL Time UTC Offset, an IPMI 2.0 addition, reports no
-// offset.
+// against the Agent clock when the last attempt is older than selClockMaxAge.
+// A failed attempt also waits for the next refresh, so a BMC that does not
+// answer cannot delay every collection by the command timeout; earlier values
+// stay.
 func (r *Reader) refreshSELClock(ctx context.Context) error {
 	c := &r.sel
-	if !c.clockReadAt.IsZero() && r.now().Sub(c.clockReadAt) < selClockMaxAge {
+	start := r.now()
+	if !c.clockReadAt.IsZero() && start.Sub(c.clockReadAt) < selClockMaxAge {
 		return nil
 	}
+	err := r.readSELClock(ctx)
+	if ctx.Err() == nil {
+		c.clockReadAt = start
+	}
+	return err
+}
 
+// readSELClock reads the clock values. A BMC that rejects Get SEL Time UTC
+// Offset, an IPMI 2.0 addition, reports no offset.
+func (r *Reader) readSELClock(ctx context.Context) error {
 	var offset *time.Duration
 	var res storage.GetSELTimeUTCOffsetResponse
 	err := r.exchange(ctx, &storage.GetSELTimeUTCOffsetRequest{}, &res)
@@ -310,10 +353,9 @@ func (r *Reader) refreshSELClock(ctx context.Context) error {
 	if err := r.exchange(ctx, &storage.GetSELTimeRequest{}, &clock); err != nil {
 		return err
 	}
-	now := r.now()
+	c := &r.sel
 	c.utcOffset = offset
-	c.clockSkew = new(clock.Time.Sub(now).Round(time.Second))
-	c.clockReadAt = now
+	c.clockSkew = new(clock.Time.Sub(r.now()).Round(time.Second))
 	return nil
 }
 

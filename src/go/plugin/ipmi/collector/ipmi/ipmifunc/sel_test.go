@@ -189,6 +189,17 @@ func TestRouter_SELFilters(t *testing.T) {
 			},
 			wantIDs: []any{"0x0010"},
 		},
+		"selections win over payload fields": {
+			req:     funcapi.RawMethodRequest{Payload: []byte(`{"state":"warning","selections":{"state":["critical"]}}`)},
+			wantIDs: []any{"0x0010"},
+		},
+		"time bounds are inclusive": {
+			req: funcapi.RawMethodRequest{
+				Payload: []byte(`{"after":` + strconv.FormatInt(utcMillis(60)/1000, 10) +
+					`,"before":` + strconv.FormatInt(utcMillis(60)/1000, 10) + `}`),
+			},
+			wantIDs: []any{"0x0013", "0x0012", "0x0011"},
+		},
 		"text query": {
 			req: funcapi.RawMethodRequest{
 				Payload: []byte(`{"query":"*FAN*"}`),
@@ -340,7 +351,7 @@ func TestRouter_SELHelp(t *testing.T) {
 				s.Overflow, s.ReadFailed = true, true
 			},
 			want: []string{
-				"The latest SEL read failed; records are from earlier collections.",
+				"The latest SEL read failed; newer records may be missing.",
 				"The overflow flag is set: the BMC dropped events because the SEL was full.",
 			},
 		},
@@ -352,6 +363,12 @@ func TestRouter_SELHelp(t *testing.T) {
 				"The BMC reports no SEL UTC offset, so times are the BMC clock shown as UTC.",
 				"The BMC clock is 2h0m0s ahead of the Agent clock.",
 			},
+		},
+		"clock not read yet": {
+			change: func(s *bmc.SEL) {
+				s.UTCOffset, s.ClockSkew = nil, nil
+			},
+			want: []string{"The BMC SEL clock has not been read yet, so times are the BMC clock shown as UTC."},
 		},
 		"no offset, clock behind": {
 			change: func(s *bmc.SEL) {

@@ -54,28 +54,30 @@ SEL command failure degrades only SEL data: the snapshot keeps the earlier recor
 
 Records are cached per Reader, across collections and reconnects:
 
-- The first read walks the chain from record 0000h with `Get SEL Entry`, oldest first. Each collection reads for at
-  most min(2 s, update interval / 4) and resumes where it stopped; at least one record is read. A full read of a
-  672-record SEL over local KCS took 5.4 s on real hardware.
+- The first read walks the chain from record 0000h with `Get SEL Entry`, oldest first. Each collection starts no new
+  read once min(2 s, update interval / 4) has passed and resumes where it stopped; at least one record is read. At
+  about 8 ms per record over local KCS, a full read of a large SEL would otherwise delay sensor collection by seconds.
 - Once the newest record has been read, an unchanged entry count and addition time send no `Get SEL Entry`. A change
   reads the newest record (FFFFh); if it differs from the newest cached record, that cached record is read again for
   its next-record ID and the walk continues from there.
 - A changed erase time, or a newest cached record that is gone or changed, means the SEL was cleared or rewritten:
   the cache is reset and the log is read again. A record that disappears during a walk fails that read and restarts
   the log from 0000h.
-- On rollover the BMC overwrites the oldest records: the cache keeps at most the reported entry count, dropping the
-  oldest. A cached record ID reported with new content was reused and replaces the old record. Reaching a cached record
-  with unchanged content means the chain loops back and ends the walk.
+- On rollover the BMC overwrites the oldest records. When a change leaves more cached records than the reported entry
+  count, the oldest record the BMC holds (0000h) shows which were overwritten: older cached records are dropped, and a
+  cache without that record is read again. The count alone cannot tell, because records logged after `Get SEL Info`
+  are read too. A cached record ID reported with new content was reused and replaces the old record. Reaching a cached
+  record with unchanged content means the chain loops back and ends the walk.
 - Like FreeIPMI, `Reserve SEL` is sent only after a 0xC5 completion code, and a read is retried with a new reservation
   up to four times. Whole 16-byte records are read; a shorter record fails the read.
 
 Published record slices only grow at the end, lose a prefix or are reallocated, so earlier snapshots never change.
 
-`Get SEL Time UTC Offset` and `Get SEL Time` are read at most every five minutes. SEL time is UTC plus the offset, so
-`SEL.Time` subtracts it. A completion-code failure, 07FFh or a value outside -1440..1440 minutes means no offset:
-times are then the BMC clock as UTC, and `ClockSkew` (BMC clock minus Agent clock) lets the Function show the
-difference instead of guessing an offset. Pre-init timestamps (below 20000000h, seconds since BMC initialization),
-FFFFFFFFh and non-timestamped OEM records have no date.
+`Get SEL Time UTC Offset` and `Get SEL Time` are read at most every five minutes, also when record reads fail. SEL time
+is UTC plus the offset, so `SEL.Time` subtracts it. A completion-code failure, 07FFh or a value outside -1440..1440
+minutes means no offset: times are then the BMC clock as UTC, and `ClockSkew` (BMC clock minus Agent clock) lets the
+Function show the difference instead of guessing an offset. Pre-init timestamps (below 20000000h, seconds since BMC
+initialization), FFFFFFFFh and non-timestamped OEM records have no date.
 
 Records are decoded when read. Sensor names come from the SDR inventory by generator owner ID, LUN and sensor number.
 Without an SDR record, the name is the generator class and sensor number, for example `BIOS #34`: software IDs
@@ -83,9 +85,9 @@ Without an SDR record, the name is the generator class and sensor number, for ex
 8Fh Terminal Mode Remote Console, other software IDs Software; IPMB address 20h is the BMC and others are controllers.
 Event text comes from go-ipmi; threshold events whose event data carries the trigger reading or threshold append them,
 converted with the sensor's SDR factors. OEM records are shown undecoded. Some firmware logs events with a reserved
-record type in the standard range (00h-BFh) and the system event layout; on the real hardware tested, 26 of 672 records
-were BIOS power-off events of type 04h. They are decoded for display, keep the unknown state of the FreeIPMI default
-policy, and name their record type in the event text.
+record type in the standard range (00h-BFh) and the system event layout, for example BIOS power-off events as type 04h.
+They are decoded for display, keep the unknown state of the FreeIPMI default policy, and name their record type in the
+event text.
 
 ## Cancellation and cleanup
 
