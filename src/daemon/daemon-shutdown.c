@@ -197,7 +197,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     static bool run = false;
     if(run) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "EXIT: Recursion detected. Exiting immediately.");
-        exit(1);
+        netdata_exit_process(1);
     }
     run = true;
     daemon_status_file_update_status(DAEMON_STATUS_EXITING);
