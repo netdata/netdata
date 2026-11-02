@@ -129,10 +129,3 @@ and it cannot be run from `cmd.exe` or PowerShell directly.
 `C:\Program Files\Netdata\etc\pki\ca-trust\extracted\` and `C:\Program Files\Netdata\usr\ssl\cert.pem`
 should have fresh timestamps.
 
-Two things to keep in mind:
-
-- Upgrading the agent replaces `C:\Program Files\Netdata\etc\pki`, so `update-ca-trust` has to be run again
-after every update.
-- `go.d.plugin` is a native Go binary and uses the Windows certificate store, not the MSYS2 bundle, unless the
-collector job sets `tls_ca`. Behind a TLS-intercepting proxy, install the corporate CA in both places: the
-directory above, and `Local Computer` > `Trusted Root Certification Authorities`.
