@@ -116,6 +116,8 @@ modules:
           default_value: ''
           required: false
           group: Transport
+          detailed_description: If the proxy URL contains credentials, use a secret reference such as `${env:MERAKI_PROXY_URL}`
+            instead of entering the authenticated URL directly into the form.
         - name: tls_ca
           description: Path to a CA certificate file used to verify the server certificate.
           default_value: ''
@@ -211,11 +213,30 @@ modules:
       enabled: false
     availability: []
   troubleshooting:
-    problems:
+    errors:
       list:
-      - name: Organization access fails
-        description: Verify organization_id, read permissions, API access and Dashboard IP restrictions. A successful
-          organization listing alone does not prove access to organization-scoped operations.
-      - name: Collection exceeds timeout
-        description: Increase timeout for a large paginated organization. The budget includes every page and request
-          pacing.
+      - error: configured organization_id is not visible to the Meraki credential
+        cause: The configured organization ID is incorrect, or the API identity cannot see that organization.
+        fix: Copy `organization_id` from Dashboard and grant the API identity read access to that organization.
+      - error: '`operation`: HTTP status 403'
+        cause: The API identity lacks access to the organization-scoped operation, or Dashboard IP restrictions
+          deny the Agent’s source address.
+        fix: Grant read access to the organization and its networks, then check the organization’s API source-IP
+          restrictions. A successful organization listing alone does not prove scoped access.
+      - error: context deadline exceeded
+        cause: A collection or initial check exceeded timeout. Slow network access, request pacing or a large paginated
+          fleet can exhaust this budget.
+        fix: Check connectivity to the regional Dashboard API. If requests succeed but the fleet cannot finish in
+          time, increase `timeout`.
+      - error: Meraki requires exactly one API key or bearer token file
+        cause: Both authentication fields are empty or both contain values.
+        fix: Set either `api_key` or `bearer_token_file` and clear the other field.
+      - error: Meraki API Retry-After delay has not elapsed
+        cause: Meraki has rate-limited this running collector and its requested wait has not elapsed.
+        fix: Allow the requested wait to elapse. If throttling recurs, increase `update_every` and review API usage
+          by other jobs and applications.
+      - error: Device inventory appears but availability is missing
+        cause: Meraki has not supplied a known status consistent with the assigned inventory. Availability can lag
+          an assignment or network move by a provider refresh interval.
+        fix: Check the device’s assignment and status in Dashboard and allow the next availability refresh. Run
+          the collector in debug mode to see the number of omitted status observations.
