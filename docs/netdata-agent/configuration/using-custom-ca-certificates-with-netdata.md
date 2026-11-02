@@ -140,6 +140,6 @@ install the corporate CA in both places: the directory above, and
 - The agent's C components (Netdata Cloud connection, claiming, streaming, exporting)
 verify peers against the OpenSSL bundle maintained by `update-ca-trust`, not the
 Windows certificate store.
-- `insecure = yes` in `stream.conf` (or `INSECURE=1`) is not a substitute for installing
-the certificate: it waives self-signed-certificate and hostname-mismatch checks, not
-an unknown issuing CA.
+- `ssl skip certificate verification = yes` in `stream.conf` disables certificate verification
+for streaming, including unknown issuing CAs; do not use it as a substitute for installing the certificate.
+- `INSECURE=1` affects the Cloud claiming connection only and is not a substitute for installing the certificate.
