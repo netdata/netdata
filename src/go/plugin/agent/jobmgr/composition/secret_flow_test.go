@@ -323,6 +323,11 @@ func testProcessCoreSecretMutationDependentRestart(
 		output.waitContains(t, "CONFIG go.d:collector:module:job status running")
 	}
 
+	// Initial secrets can serve collectors before the acquisition attempt releases.
+	// Wait so Store contention cannot mask the mutation and generation-fence checks.
+	client := &secretAdoptionProcess{t: t, process: process}
+	client.waitStoreAttemptReleased("vault:main")
+
 	uid := "secret-" + command
 	target := "go.d:secretstore:vault:main update"
 	if command == "add" {
