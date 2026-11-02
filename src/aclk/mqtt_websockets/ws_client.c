@@ -234,7 +234,7 @@ exit_with_error:
 #define HTTP_SC_LENGTH 4 // "XXX " http status code as C string
 #define WS_CLIENT_HTTP_HDR "HTTP/1.1 "
 #define WS_CONN_ACCEPT "sec-websocket-accept"
-#define HTTP_HDR_SEPARATOR ": "
+#define HTTP_HDR_SEPARATOR ":"
 #define WS_NONCE_STRLEN_B64 28
 #define WS_HTTP_NEWLINE "\r\n"
 #define HTTP_HEADER_NAME_MAX_LEN 256
@@ -371,13 +371,12 @@ int ws_client_parse_handshake_resp(ws_client *client)
                 return 0;
             }
 
+            // field-name ":" OWS field-value OWS (RFC 9112 5): the value may be empty and the
+            // whitespace around it is optional, so a proxy's "Server:" line does not fail the
+            // handshake before its status is reported
             ptr = rbuf_find_bytes(client->buf_read, HTTP_HDR_SEPARATOR, strlen(HTTP_HDR_SEPARATOR), &idx_sep);
             if (!ptr || idx_sep > idx_crlf) {
-                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Expected HTTP hdr field key/value separator \": \" before endline in non empty HTTP header line");
-                return WS_CLIENT_PROTOCOL_ERROR;
-            }
-            if (idx_crlf == idx_sep + strlen(HTTP_HDR_SEPARATOR)) {
-                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: HTTP Header value cannot be empty");
+                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Expected HTTP hdr field key/value separator \":\" before endline in non empty HTTP header line");
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
 
@@ -386,15 +385,26 @@ int ws_client_parse_handshake_resp(ws_client *client)
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
 
-            struct http_header *hdr = callocz(1, sizeof(struct http_header) + idx_crlf); //idx_crlf includes ": " that will be used as 2 \0 bytes
+            size_t value_len = idx_crlf - idx_sep - strlen(HTTP_HDR_SEPARATOR);
+
+            // key, its \0, value, its \0
+            struct http_header *hdr = callocz(1, sizeof(struct http_header) + idx_sep + 1 + value_len + 1);
             hdr->key = ((char*)hdr) + sizeof(struct http_header);
             hdr->value = hdr->key + idx_sep + 1;
 
             rbuf_pop(client->buf_read, hdr->key, idx_sep);
             rbuf_bump_tail(client->buf_read, strlen(HTTP_HDR_SEPARATOR));
 
-            rbuf_pop(client->buf_read, hdr->value, idx_crlf - idx_sep - strlen(HTTP_HDR_SEPARATOR));
+            rbuf_pop(client->buf_read, hdr->value, value_len);
             rbuf_bump_tail(client->buf_read, strlen(WS_HTTP_NEWLINE));
+
+            size_t ows = 0;
+            while (ows < value_len && (hdr->value[ows] == ' ' || hdr->value[ows] == '\t'))
+                ows++;
+            while (value_len > ows && (hdr->value[value_len - 1] == ' ' || hdr->value[value_len - 1] == '\t'))
+                value_len--;
+            memmove(hdr->value, hdr->value + ows, value_len - ows);
+            hdr->value[value_len - ows] = '\0';
 
             for (int i = 0; hdr->key[i]; i++)
                 hdr->key[i] = tolower((uint8_t)hdr->key[i]);

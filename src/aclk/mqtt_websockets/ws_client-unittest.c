@@ -488,6 +488,13 @@ static int ws_client_unittest_handshake(void)
                                                 "HTTP return code not 101. Received 502 with msg \"\".");
     errors += ws_client_unittest_handshake_case("403 with control bytes", "HTTP/1.1 403 Forbid\x01" "den\r\nServer: evil\x1b[31mred\r\n\r\n",
                                                 "HTTP return code not 101. Received 403 with msg \"Forbid?den\" (server: \"evil?[31mred\").");
+    // header values may be empty and have optional whitespace around them
+    errors += ws_client_unittest_handshake_case("404 with empty server value", "HTTP/1.1 404 Not Found\r\nServer: \r\n\r\n",
+                                                "HTTP return code not 101. Received 404 with msg \"Not Found\" (server: \"\").");
+    errors += ws_client_unittest_handshake_case("404 with bare server field", "HTTP/1.1 404 Not Found\r\nServer:\r\n\r\n",
+                                                "HTTP return code not 101. Received 404 with msg \"Not Found\" (server: \"\").");
+    errors += ws_client_unittest_handshake_case("404 with unpadded and padded fields", "HTTP/1.1 404 Not Found\r\nX-Id:1\r\nServer: \t envoy \t\r\n\r\n",
+                                                "HTTP return code not 101. Received 404 with msg \"Not Found\" (server: \"envoy\").");
     {
         // peer strings are cut to 127 bytes in the log
         char reply[700], expected[400], longval[301];
@@ -506,6 +513,10 @@ static int ws_client_unittest_handshake(void)
     errors += ws_client_unittest_handshake_case("101 with matching then wrong accept", WS_UT_101 "Sec-WebSocket-Accept: %s\r\n" WS_UT_WRONG_ACCEPT "\r\n", WS_UT_WRONG_ERR);
     errors += ws_client_unittest_handshake_case("101 with wrong then matching accept", WS_UT_101 WS_UT_WRONG_ACCEPT "Sec-WebSocket-Accept: %s\r\n\r\n", WS_UT_WRONG_ERR);
     errors += ws_client_unittest_handshake_case("101 with matching accept", WS_UT_101 "sec-websocket-accept: %s\r\n\r\n", NULL);
+    errors += ws_client_unittest_handshake_case("101 with unpadded matching accept", WS_UT_101 "Sec-WebSocket-Accept:%s\r\n\r\n", NULL);
+    errors += ws_client_unittest_handshake_case("101 with padded matching accept", WS_UT_101 "Sec-WebSocket-Accept: \t %s \t\r\n\r\n", NULL);
+    errors += ws_client_unittest_handshake_case("101 with empty accept", WS_UT_101 "Sec-WebSocket-Accept: \r\n\r\n",
+                                                "Received NONCE \"\" does not match expected nonce of \"%s\"");
 
     // a reconnect must not inherit the previous connection's accepted handshake
     char *host = (char *)"localhost";
