@@ -2,8 +2,10 @@
 """Validate IPMI platform defaults and native component staging without a full build."""
 import os
 from pathlib import Path
+import shlex
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -96,6 +98,40 @@ file(WRITE "${CMAKE_BINARY_DIR}/ipmi-enabled" "${ENABLE_PLUGIN_IPMI}")
 
 
 class IPMIPermissionTests(unittest.TestCase):
+    def test_docker_permissions_with_ipmi_installed_or_disabled(self):
+        source = (ROOT / 'packaging/docker/Dockerfile').read_text()
+        for directory, boundary in (
+                ('/app/usr/libexec/netdata/plugins.d', '# Group write permissions'),
+                ('/usr/libexec/netdata/plugins.d', 'cp -va /etc/netdata')):
+            end = source.index(boundary)
+            begin = source.rindex('done &&', 0, end) + len('done &&')
+            block = source[begin:end].replace('\\\n', '').strip()
+            self.assertTrue(block.endswith('&&'))
+            block = block[:-2].strip()
+            for installed in (False, True):
+                with self.subTest(directory=directory, installed=installed), \
+                        tempfile.TemporaryDirectory(prefix='netdata-ipmi-docker-') as temporary:
+                    plugin = Path(temporary) / 'ipmi.plugin'
+                    if installed:
+                        plugin.touch()
+                        plugin.chmod(0o755)
+                    script = 'chown() { printf "%s\\n" "$*"; }\n'
+                    if sys.platform == 'darwin':
+                        stat_mode = 'import os, sys; print(format(os.stat(sys.argv[1]).st_mode & 0o7777, "o"))'
+                        script += ('stat() { ' + shlex.quote(sys.executable) + ' -c '
+                                   + shlex.quote(stat_mode) + ' "$3"; }\n')
+                    script += block.replace(directory, temporary)
+                    result = subprocess.run(['sh', '-c', script], capture_output=True, text=True,
+                                            env=dict(os.environ, NETDATA_GID='1234'))
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    if installed:
+                        self.assertEqual(plugin.stat().st_mode & 0o7777, 0o4750)
+                        if directory.startswith('/usr/'):
+                            self.assertEqual(result.stdout.strip(), 'root:1234 ' + str(plugin))
+                    else:
+                        self.assertFalse(plugin.exists())
+                        self.assertEqual(result.stdout, '')
+
     def test_source_installer_platform_default_and_overrides(self):
         source = (ROOT / 'netdata-installer.sh').read_text()
         begin = source.index('DONOTSTART=0')
