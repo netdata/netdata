@@ -228,14 +228,14 @@ func TestArtifacts(t *testing.T) {
 	})
 }
 
-func TestArtifacts_ExperimentalPublicNames(t *testing.T) {
+func TestArtifacts_PublicNames(t *testing.T) {
 	charts, err := collecttest.ChartTemplateCharts(chartTemplateYAML)
 	require.NoError(t, err)
 	require.NotEmpty(t, charts)
 	for contextName, chart := range charts {
-		assert.True(t, strings.HasPrefix(contextName, "ipmi_go."), contextName)
+		assert.True(t, strings.HasPrefix(contextName, "ipmi."), contextName)
 		// Only contexts move: the C plugin's chart IDs stay, including SEL events.
-		wantID := strings.TrimPrefix(contextName, "ipmi_go.")
+		wantID := strings.TrimPrefix(contextName, "ipmi.")
 		if wantID == "sel" {
 			wantID = "events"
 		}
@@ -255,14 +255,15 @@ func TestArtifacts_SensorAlertBinding(t *testing.T) {
 
 	var bindings int
 	for _, alert := range collecttest.ParseHealthAlerts(health) {
-		if alert.On == "ipmi_go.sensor_state" {
+		if alert.On == "ipmi.sensor_state" {
 			bindings++
 		}
 	}
 	require.Equal(t, 1, bindings, "the renamed sensor context keeps one alert owner")
 
 	opts := collecttest.HealthAlertsCheck{
-		ContextPrefix: "ipmi_go.",
+		// The SEL alarm targets a chart ID, not a context. This check covers sensor templates.
+		ContextPrefix: "ipmi.sensor_state",
 	}
 	collecttest.AssertHealthAlertsTargetChartTemplateWith(t, health, chartTemplateYAML, opts)
 	collecttest.AssertHealthAlertsMatchMetadataWith(t, health, metadata, opts)

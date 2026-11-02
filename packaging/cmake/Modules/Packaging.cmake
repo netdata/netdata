@@ -262,6 +262,10 @@ if(ENABLE_PLUGIN_GO)
         list(APPEND _main_deps "netdata-plugin-go")
 endif()
 
+if(ENABLE_PLUGIN_IPMI)
+  list(APPEND _main_deps "netdata-plugin-ipmi")
+endif()
+
 if(ENABLE_PLUGIN_DEBUGFS)
         list(APPEND _main_deps "netdata-plugin-debugfs")
 endif()
@@ -322,6 +326,9 @@ if(ENABLE_PLUGIN_PYTHON)
 endif()
 if(ENABLE_PLUGIN_GO)
   list(APPEND _rpm_main_requires "netdata-plugin-go = ${CPACK_PACKAGE_VERSION}")
+endif()
+if(ENABLE_PLUGIN_IPMI)
+  list(APPEND _rpm_main_requires "netdata-plugin-ipmi = ${CPACK_PACKAGE_VERSION}")
 endif()
 if(ENABLE_PLUGIN_DEBUGFS)
   list(APPEND _rpm_main_requires "netdata-plugin-debugfs = ${CPACK_PACKAGE_VERSION}")
@@ -715,6 +722,33 @@ set(CPACK_RPM_PLUGIN-FREEIPMI_DEFAULT_USER "root")
 set(CPACK_RPM_PLUGIN-FREEIPMI_DEFAULT_GROUP "netdata")
 set(CPACK_RPM_PLUGIN-FREEIPMI_USER_FILELIST
     "%attr(4750,root,netdata) /usr/libexec/netdata/plugins.d/freeipmi.plugin")
+
+#
+# ipmi.plugin
+#
+
+set(CPACK_COMPONENT_PLUGIN-IPMI_DEPENDS "netdata")
+set(CPACK_COMPONENT_PLUGIN-IPMI_DESCRIPTION
+    "The Go IPMI metrics collection plugin for the Netdata Agent
+ This plugin collects local and remote hardware sensor metrics using IPMI.")
+
+set(CPACK_DEBIAN_PLUGIN-IPMI_PACKAGE_NAME "netdata-plugin-ipmi")
+set(CPACK_DEBIAN_PLUGIN-IPMI_PACKAGE_SECTION "net")
+set(CPACK_DEBIAN_PLUGIN-IPMI_PACKAGE_PREDEPENDS "netdata-user")
+set(CPACK_DEBIAN_PLUGIN-IPMI_PACKAGE_CONTROL_EXTRA
+    "${PKG_FILES_PATH}/deb/plugin-ipmi/postinst")
+set(CPACK_DEBIAN_PLUGIN-IPMI_DEBUGINFO_PACKAGE Off)
+
+set(CPACK_RPM_PLUGIN-IPMI_PACKAGE_NAME "netdata-plugin-ipmi")
+set(CPACK_RPM_PLUGIN-IPMI_PACKAGE_SUMMARY "The Go IPMI metrics collection plugin for the Netdata Agent")
+set(CPACK_RPM_PLUGIN-IPMI_PACKAGE_REQUIRES "netdata = ${CPACK_PACKAGE_VERSION}")
+if(NETDATA_RPM_USER_PREDEP)
+  set(CPACK_RPM_PLUGIN-IPMI_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
+endif()
+set(CPACK_RPM_PLUGIN-IPMI_DEFAULT_USER "root")
+set(CPACK_RPM_PLUGIN-IPMI_DEFAULT_GROUP "netdata")
+set(CPACK_RPM_PLUGIN-IPMI_USER_FILELIST
+    "%attr(4750,root,netdata) /usr/libexec/netdata/plugins.d/ipmi.plugin")
 
 #
 # go.plugin
@@ -1305,6 +1339,9 @@ if(ENABLE_LEGACY_EBPF_PROGRAMS)
 endif()
 if(ENABLE_PLUGIN_FREEIPMI)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-freeipmi")
+endif()
+if(ENABLE_PLUGIN_IPMI)
+  list(APPEND CPACK_COMPONENTS_ALL "plugin-ipmi")
 endif()
 if(ENABLE_PLUGIN_GO)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-go")

@@ -1,19 +1,36 @@
-# Experimental Go IPMI plugin
+# IPMI plugin
 
-This plugin is an opt-in replacement candidate for `freeipmi.plugin`. It is excluded from production builds. The executable
-supports Linux architectures supported by the Go toolchain, including 32-bit x86 and ARM. FreeIPMI remains available
-for production use and capabilities not yet supported by the experiment.
+This Go plugin collects local Linux OpenIPMI sensors and remote BMCs over LAN/LAN+. It is built and installed by default
+on Linux. `freeipmi.plugin` remains available for rollback and capabilities listed under Compatibility below.
+
+## Selection and rollback
+
+Netdata starts at most one of `ipmi.plugin` and `freeipmi.plugin`. It prefers Go when both are installed and enabled.
+The choice is made at Agent startup across all configured plugin directories and stays fixed until restart, including
+when the chosen plugin exits or fails collection. There is no automatic failover after a collection failure.
+
+Existing configuration intent is preserved when `[plugins] ipmi` is unset:
+
+- `freeipmi = no` keeps IPMI collection disabled.
+- Nonempty `[plugin:freeipmi] command options` keep the C implementation, preserving remote targets and legacy options.
+
+To migrate either case, configure the Go jobs, set `[plugins] ipmi = yes`, and restart Netdata. The Go plugin does not
+translate C command options. To switch back, install the FreeIPMI plugin if necessary and use:
+
+```ini
+[plugins]
+    ipmi = no
+    freeipmi = yes
+```
+
+Restart Netdata after changing the selection or installing an IPMI plugin. `enable running new plugins = no` disables
+automatic selection unless one plugin is explicitly enabled. In the Netdata container environment, IPMI requires explicit
+enablement and access to the device for local collection.
 
 ## Build and configure
 
-From the repository root:
-
-```sh
-sudo ./netdata-installer.sh --enable-plugin-ipmi
-```
-
-`--disable-plugin-ipmi` disables it explicitly. CMake users can set `-DENABLE_PLUGIN_IPMI=ON`. A standalone test binary
-needs no C compiler:
+Linux source builds enable the plugin by default. `--disable-plugin-ipmi` disables it; CMake users can set
+`-DENABLE_PLUGIN_IPMI=OFF`. A standalone binary needs no C compiler:
 
 ```sh
 cd src/go
@@ -21,10 +38,9 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /tmp/ipmi.plugin ./cmd/ipmiplu
 ```
 
 Set `GOARCH` for the target system; use `GOARCH=arm GOARM=6` or `GOARM=7` for ARM32. Cross-compilation verifies a
-binary can be built, while local device access also requires kernel OpenIPMI support and suitable hardware. Upstream
-validates the Linux ABI against target kernel headers; this does not establish physical BMC compatibility on every CPU.
+binary can be built; physical device access still needs kernel OpenIPMI support and suitable hardware.
 
-No jobs start until configured. In the Netdata configuration directory, add `ipmi/ipmi.conf`:
+The stock `ipmi/ipmi.conf` attempts local collection using this job:
 
 ```yaml
 jobs:
@@ -33,14 +49,13 @@ jobs:
     device: 0
 ```
 
-Before activating this job, disable `freeipmi` in the `[plugins]` section of `netdata.conf`. The canonical `ipmi` job
-retains chart IDs used by the C plugin, so run only one for a given monitored host with this job name. The Go collector
-uses separate `ipmi_go.*` contexts and the `ipmi-go-sensors` Function.
+Hosts without an accessible OpenIPMI device do not collect local IPMI metrics. Replace this job to collect remote BMCs,
+or set `jobs: []` to disable the local job. Retain the name `ipmi` for the canonical local chart IDs used by the C plugin.
 
-Installation grants no additional privileges. Local collection needs read/write access to `/dev/ipmi0` (or the selected
-device number). For a controlled test on a root-only device, invoke the binary with `sudo` and a trusted configuration
-directory. Normal Agent execution requires device access arranged by the operator. Do not grant broader privileges to
-`go.d.plugin`.
+The installers give the dedicated `ipmi.plugin` binary root ownership and setuid permission, restricted to the Netdata
+group, so it can open the local device. A manually built binary needs read/write access to `/dev/ipmi0` (or the selected
+device); use a trusted configuration and explicit `sudo` invocation for local debugging. Containers must also expose
+the device, for example with `--device /dev/ipmi0`.
 
 Remote collection uses an ordinary UDP connection to the BMC and needs no local device permissions. Prefer LAN+
 (IPMI 2.0); use `driver: lan` for BMCs that require IPMI 1.5. For example:
@@ -66,7 +81,7 @@ UDP exchanges. Remote session cleanup gets a separate two-second budget, includi
 
 ## Compatibility
 
-- Numeric contexts use `ipmi_go.*`; chart IDs, units and nominal/warning/critical/unknown states retain the C shape. The
+- Numeric contexts use `ipmi.*`; chart IDs, units and nominal/warning/critical/unknown states retain the C shape. The
   state interpretation uses FreeIPMI defaults, including nominal non-critical threshold assertions; custom
   interpretation files are not loaded.
 - Unavailable numeric data produces gaps. `ipmi-go-sensors` reads an immutable snapshot and reports null readings. Its
@@ -74,7 +89,7 @@ UDP exchanges. Remote session cleanup gets a separate two-second budget, includi
 - Canonical local job `ipmi` uses the `ipmi` chart type. Other job names receive the standard framework job prefix.
   Sensor keys remain stable when a reading becomes unavailable; the C library can change its reading-type key then.
 - SEL is the raw repository entry count, not FreeIPMI's interpreted/filtered count. The existing SEL alarm matches the
-  canonical local chart `ipmi.events`; the `ipmi_go_sensor_state` alert matches `ipmi_go.sensor_state` for every Go job.
+  canonical local chart `ipmi.events`; the `ipmi_sensor_state` alert matches `ipmi.sensor_state` for every Go job.
 - Bridged sensors, device-only SDR repositories, legacy direct KCS/SSIF/SUNBMC/INTELDCMI drivers, FreeBSD local access,
   custom interpretation files and OEM health policy remain covered by FreeIPMI. Kernel-backed local KCS/SSIF is accessed
   through OpenIPMI.

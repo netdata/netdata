@@ -97,6 +97,28 @@ class PrepareFleetTests(unittest.TestCase):
         result = self.run_script(*args, success=options.get('success', True))
         return target, result
 
+    def test_ipmi_capability_keeps_both_implementations_and_go_config(self):
+        paths = ('usr/libexec/netdata/plugins.d/ipmi.plugin',
+                 'usr/libexec/netdata/plugins.d/freeipmi.plugin',
+                 'usr/lib/netdata/conf.d/ipmi.conf',
+                 'usr/lib/netdata/conf.d/ipmi/ipmi.conf')
+        for path in paths:
+            self.put(path, 'stock IPMI')
+        target, _ = self.prepare('ipmi')
+        for path in paths:
+            self.assertTrue((target / path).is_file(), path)
+
+    def test_omitted_ipmi_removes_both_implementations_and_go_config(self):
+        paths = ('usr/libexec/netdata/plugins.d/ipmi.plugin',
+                 'usr/libexec/netdata/plugins.d/freeipmi.plugin',
+                 'usr/lib/netdata/conf.d/ipmi.conf',
+                 'usr/lib/netdata/conf.d/ipmi/ipmi.conf')
+        for path in paths:
+            self.put(path, 'stock IPMI')
+        target, _ = self.prepare('none')
+        for path in paths:
+            self.assertFalse((target / path).exists(), path)
+
     def test_dependency_and_shared_user_unknown_preservation(self):
         target, _ = self.prepare('network')
         for name in ('apps.plugin', 'network-viewer.plugin', 'ndsudo', 'loopsleepms.sh.inc'):

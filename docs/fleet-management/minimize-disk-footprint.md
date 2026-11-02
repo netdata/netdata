@@ -264,7 +264,7 @@ Save the package manifest and checksum with the image release. Use the [image-co
 | `perf` | Linux perf-event CPU counters, including cycles, instructions and cache events | You need CPU performance-counter monitoring and the hardware/kernel exposes the counters. Enable this plugin explicitly |
 | `slabinfo` | Per-cache Linux kernel slab allocator statistics from `/proc/slabinfo` | You need detailed kernel-memory troubleshooting. Enable it explicitly and retain its privileged permissions |
 | `nfacct` | Netfilter connection-tracking statistics and packet/byte totals for configured accounting objects | The device uses the relevant kernel facilities and accounting rules |
-| `ipmi` | `freeipmi.plugin`, for IPMI hardware sensors and event-log metrics | The hardware exposes an IPMI management interface and the input package includes this plugin |
+| `ipmi` | `ipmi.plugin` and `freeipmi.plugin`, with Go IPMI configuration, for hardware sensors and event-log metrics | The hardware exposes an IPMI management interface and the input package includes this plugin |
 | `xen` | `xenstat.plugin`, for Xen host and domain resource statistics | The device is a Xen hypervisor host (dom0); this is not a guest-VM collector |
 | `cups` | CUPS printer and print-job metrics | The device operates a CUPS print service and the input package includes this plugin |
 | `ebpf` | The packaged C and Go eBPF plugins for kernel instrumentation | You need their kernel/network/process monitoring and have a supported package, kernel and required privileges |

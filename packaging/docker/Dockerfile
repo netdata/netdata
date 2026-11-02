@@ -86,6 +86,7 @@ RUN mkdir -p /app/usr/sbin/ \
                 systemd-journal.plugin; do \
         [ -f "/app/usr/libexec/netdata/plugins.d/$name" ] && chmod 4755 "/app/usr/libexec/netdata/plugins.d/$name"; \
     done && \
+    chmod 4750 /app/usr/libexec/netdata/plugins.d/ipmi.plugin && \
     # Group write permissions due to: https://github.com/netdata/netdata/pull/6543
     find /app/var/lib/netdata /app/var/cache/netdata -type d -exec chmod 0770 {} \; && \
     find /app/var/lib/netdata /app/var/cache/netdata -type f -exec chmod 0660 {} \; && \
@@ -170,6 +171,9 @@ RUN addgroup --gid ${NETDATA_GID} --system "${DOCKER_GRP}" && \
                 systemd-journal.plugin; do \
         [ -f "/usr/libexec/netdata/plugins.d/$name" ] && test $(stat -c %a "/usr/libexec/netdata/plugins.d/$name") = "4755"; \
     done && \
+    chown root:${NETDATA_GID} /usr/libexec/netdata/plugins.d/ipmi.plugin && \
+    chmod 4750 /usr/libexec/netdata/plugins.d/ipmi.plugin && \
+    test $(stat -c %a /usr/libexec/netdata/plugins.d/ipmi.plugin) = "4750" && \
     cp -va /etc/netdata /etc/netdata.stock
 
 ENTRYPOINT ["/usr/sbin/run.sh"]
