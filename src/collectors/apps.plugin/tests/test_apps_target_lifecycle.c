@@ -159,6 +159,7 @@ static void test_tree_unique_names_cap_and_app_groups(void) {
 
     struct pid_stat *e = test_pid(204, "other");
     CHECK(get_tree_target(e) == tc, "a process called other matches the real target, not overflow");
+    CHECK(find_target_by_name(apps_groups_root_target, "other") == tc, "a Function filter for other selects the real target, not overflow");
 
     test_pids = NULL;
     iterate();
