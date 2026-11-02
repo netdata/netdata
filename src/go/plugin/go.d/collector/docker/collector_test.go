@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -781,6 +782,39 @@ func TestCollector_Collect_FailedCollectionLeavesChartsUnchanged(t *testing.T) {
 	assert.Equal(t, chartIDs(summaryCharts.Copy()), chartIDs(collr.Charts()))
 }
 
+func TestCollector_Collect_RemovesOnlyChartsOfRemovedContainer(t *testing.T) {
+	cntr := func(name string) typesContainer.Summary {
+		return typesContainer.Summary{Names: []string{"/" + name}, State: "running", Image: "example/example:v1", ImageID: "sha256:v1"}
+	}
+
+	m := &mockClient{}
+	collr := New()
+	collr.newClient = prepareNewClientFunc(m)
+	require.NoError(t, collr.Init(context.Background()))
+
+	m.containers = []typesContainer.Summary{cntr("foo"), cntr("foo-bar"), cntr("foo_state")}
+	require.NotNil(t, collr.Collect(context.Background()))
+
+	m.containers = []typesContainer.Summary{cntr("foo-bar"), cntr("foo_state")}
+	require.NotNil(t, collr.Collect(context.Background()))
+
+	var n int
+	for _, chart := range *collr.Charts() {
+		if !strings.HasPrefix(chart.ID, "container_") {
+			continue
+		}
+		n++
+		var name string
+		for _, l := range chart.Labels {
+			if l.Key == "container_name" {
+				name = l.Value
+			}
+		}
+		assert.Equalf(t, name == "foo", chart.Obsolete, "chart '%s' (container '%s') obsolete", chart.ID, name)
+	}
+	assert.Equal(t, 6, n)
+}
+
 func chartIDs(charts *collectorapi.Charts) []string {
 	var ids []string
 	for _, chart := range *charts {
@@ -855,6 +889,7 @@ type mockClient struct {
 	images             []typesImage.Summary
 	imageListCalls     int
 	containerImageID   string
+	containers         []typesContainer.Summary
 }
 
 func (m *mockClient) Info(_ context.Context, _ docker.InfoOptions) (docker.SystemInfoResult, error) {
@@ -919,6 +954,13 @@ func (m *mockClient) ContainerList(_ context.Context, opts docker.ContainerListO
 			{Names: []string{"container17"}, State: "dead", Image: "example/example:v5", ImageID: "sha256:v5",
 				Labels: map[string]string{"netdata.cloud/ignore": "true"},
 			},
+		}
+	}
+
+	if m.containers != nil {
+		containers = nil
+		if typesContainer.HealthStatus(status) == typesContainer.NoHealthcheck {
+			containers = slices.Clone(m.containers)
 		}
 	}
 

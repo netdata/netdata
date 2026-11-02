@@ -4,7 +4,6 @@ package docker
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
@@ -164,10 +163,10 @@ func (c *Collector) addContainerCharts(name, image string) {
 }
 
 func (c *Collector) removeContainerCharts(name string) {
-	px := fmt.Sprintf("container_%s", name)
-
-	for _, chart := range *c.Charts() {
-		if strings.HasPrefix(chart.ID, px) {
+	// Match exact chart IDs: a prefix match would also remove the charts of
+	// other containers whose names start with this one (e.g. "foo" and "foo-bar").
+	for _, tmpl := range containerChartsTmpl {
+		if chart := c.Charts().Get(fmt.Sprintf(tmpl.ID, name)); chart != nil {
 			chart.MarkRemove()
 			chart.MarkNotCreated()
 		}
