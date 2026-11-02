@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"sync"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
@@ -137,9 +136,9 @@ func (t *runtimeSettlementTransaction) Apply(ctx context.Context) (applied lifec
 	var delta *candidateDelta
 	var policyErr error
 	if failure != nil {
-		retryAfter := failure.retryDelay(time.Now())
+		retryAfter := failure.retryPolicy()
 		delta, policyErr = dcjc.candidates.prepareOutcome(t.scope.ID, t.current.continuation, candidateOutcome{
-			Kind: candidateFailed, RetryAfter: retryAfter, AfterReady: failure.afterReady, Listed: true,
+			Kind: candidateFailed, Retry: retryAfter, AfterReady: failure.afterReady, Listed: true,
 		}, dcjc.scheduler.retries.now())
 	} else {
 		delta, policyErr = dcjc.candidates.prepareReady(t.scope.ID, t.current.continuation)

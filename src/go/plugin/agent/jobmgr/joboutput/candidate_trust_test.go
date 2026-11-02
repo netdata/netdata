@@ -59,7 +59,7 @@ func TestCandidateTrustWithdrawalFencesObservedMembership(t *testing.T) {
 	assert.Nil(t, repeated.Decision.Work, "withdrawal is not permission to open a lower source tier")
 	assert.False(t, candidateAuthorized(c.snapshot(inv.FullName), old.Token.Candidate))
 	assert.Nil(t, c.snapshot(inv.FullName).Binding)
-	for _, outcome := range []candidateOutcome{{Kind: candidateAdmitted}, {Kind: candidateFailed, Listed: true, RetryAfter: 10}} {
+	for _, outcome := range []candidateOutcome{{Kind: candidateAdmitted}, {Kind: candidateFailed, Listed: true, Retry: candidateRetryPolicy{cadence: 10}}} {
 		assert.True(t, candidateResult(t, c, old, outcome, 2).Decision.Ignored)
 	}
 	lateReady, err := c.prepareReady(inv.FullName, old.Token)
@@ -150,7 +150,7 @@ func TestCandidateTrustWithdrawalPreservesUnrelatedRecovery(t *testing.T) {
 				work := candidateEnable(t, c, 4).Decision.Work
 				require.NotNil(t, work)
 				require.Equal(t, sibling.Token.Candidate, work.Token.Candidate)
-				candidateResult(t, c, work, candidateOutcome{Kind: candidateFrameworkBlocked, Block: candidateBlockFailedRetry, RetryAfter: 20, Listed: true}, 4)
+				candidateResult(t, c, work, candidateOutcome{Kind: candidateFrameworkBlocked, Block: candidateBlockFailedRetry, Retry: candidateRetryPolicy{cadence: 20}, Listed: true}, 4)
 			}
 			before := c.snapshot(inv.FullName)
 			inv.Version = 3
@@ -180,7 +180,7 @@ func TestCandidateTrustWithdrawalPreservesUnadmittedSibling(t *testing.T) {
 	sibling := trustedCandidateConfig("b", "sibling", true).SetDiscoveryPipelineID("other")
 	inv := candidateTestInventory(1, true, trustedCandidateConfig("a", "old", true), sibling)
 	old := candidateInventory(t, c, inv, 0).Decision.Work
-	pending := candidateResult(t, c, old, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 10}, 0).Decision.Work
+	pending := candidateResult(t, c, old, candidateOutcome{Kind: candidateFailed, Listed: true, Retry: candidateRetryPolicy{cadence: 10}}, 0).Decision.Work
 	require.NotNil(t, pending)
 	require.Equal(t, sibling, pending.Config)
 	inv.Version = 2

@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -162,8 +163,8 @@ type candidateOutcome struct {
 	Block candidateBlockPolicy
 	// AdmitWaiting preserves the source-specific dependency/vnode acceptance boundary.
 	AdmitWaiting bool
-	// RetryAfter is supplied only for a positively classified automatic retry.
-	RetryAfter int64
+	// Retry is supplied only for an eligible automatic retry.
+	Retry      candidateRetryPolicy
 	AfterReady bool
 	// Listed supplies source-specific failed-stock removal policy.
 	Listed bool
@@ -184,6 +185,7 @@ type candidateEntry struct {
 	Initial           bool
 	Due               int64
 	HasDue            bool
+	NotBefore         time.Time
 }
 
 // A source admission revokes memberships replaced by a candidate introduced at
@@ -247,6 +249,7 @@ type candidateController struct {
 	sequence uint64
 	records  map[string]*candidateRecord
 	closed   bool
+	wallNow  func() time.Time
 }
 
 type candidateDelta struct {
@@ -266,7 +269,7 @@ func finalizeCandidateDelta(result **candidateDelta) {
 }
 
 func newCandidateController(run uint64) *candidateController {
-	return &candidateController{run: run, records: make(map[string]*candidateRecord)}
+	return &candidateController{run: run, records: make(map[string]*candidateRecord), wallNow: time.Now}
 }
 
 func (c *candidateController) next() (uint64, error) {
@@ -927,7 +930,7 @@ func (c *candidateController) prepareEnable(name string, now int64) (delta *cand
 	}
 	for _, e := range r.entries() {
 		e.Initial = true
-		e.HasDue = false
+		e.clearRetry()
 	}
 	if err := c.admit(d, r.Binding.Key, dyncfg.StatusAccepted, r.Binding.Listed); err != nil {
 		return nil, err
@@ -1045,7 +1048,7 @@ func (c *candidateController) prepareExact(config confgroup.Config, enabled bool
 	}
 	entry.Admitted = true
 	entry.Initial = true
-	entry.HasDue = false
+	entry.clearRetry()
 
 	if err := c.admit(d, key, dyncfg.StatusAccepted, true); err != nil {
 		return nil, err
@@ -1113,7 +1116,7 @@ func (c *candidateController) prepareOutcome(name string, token candidateWorkTok
 			r.pruneRecoveryGrants()
 			for _, entry := range r.entries() {
 				entry.Initial = true
-				entry.HasDue = false
+				entry.clearRetry()
 			}
 		}
 		r.Proposal = nil
@@ -1138,7 +1141,7 @@ func (c *candidateController) prepareOutcome(name string, token candidateWorkTok
 	}
 	e := r.editEntry(token.Candidate)
 	e.Initial = false
-	e.HasDue = false
+	e.clearRetry()
 	switch outcome.Kind {
 	case candidateWaiting:
 		if err := c.admitOutcome(d, e.Key, dyncfg.StatusAccepted, true, tentative); err != nil {
@@ -1200,15 +1203,11 @@ func (c *candidateController) prepareOutcome(name string, token candidateWorkTok
 		if outcome.Block == candidateBlockAcceptedWait {
 			r.Phase = candidateWaitingPhase
 		}
-		if outcome.Block == candidateBlockFailedRetry && outcome.RetryAfter > 0 {
-			e.Due = now + int64(outcome.RetryAfter)
-			e.HasDue = true
-			schedule, err := c.next()
-			if err != nil {
+		if outcome.Block == candidateBlockFailedRetry && outcome.Retry.cadence > 0 {
+			e.setRetry(outcome.Retry, now)
+			if err := c.reconcileWake(d, e.retryWake(now, c.wallNow()), true); err != nil {
 				return nil, err
 			}
-			r.Wake = &candidateWake{Token: candidateWakeToken{Run: c.run, Intent: r.Intent, Schedule: schedule}, Due: e.Due}
-			d.Decision.Wake = r.Wake
 		}
 	case candidateAdmitted:
 		if err := c.admit(d, e.Key, dyncfg.StatusAccepted, true); err != nil {
@@ -1225,9 +1224,8 @@ func (c *candidateController) prepareOutcome(name string, token candidateWorkTok
 			r.Phase = candidateFailedManual
 			return d, nil
 		}
-		if outcome.RetryAfter > 0 {
-			e.Due = now + int64(outcome.RetryAfter)
-			e.HasDue = true
+		if outcome.Retry.cadence > 0 {
+			e.setRetry(outcome.Retry, now)
 		}
 		r.Phase = candidateDormant
 		return d, c.progress(d, now)
@@ -1325,6 +1323,13 @@ func (c *candidateController) prepareResume(name string, token candidateWorkToke
 
 func (c *candidateController) resumeCandidate(d *candidateDelta, work *candidateWork, now int64) error {
 	r := d.after
+	if r.FrameworkBlocked && work == r.Active && r.Block == candidateBlockFailedRetry {
+		e := r.entry(work.Token.Candidate)
+		wallNow := c.wallNow()
+		if !e.retryReady(now, wallNow) {
+			return c.reconcileWake(d, e.retryWake(now, wallNow), e.HasDue)
+		}
+	}
 	attempt, err := c.next()
 	if err != nil {
 		return err
@@ -1337,7 +1342,7 @@ func (c *candidateController) resumeCandidate(d *candidateDelta, work *candidate
 		r.Phase = candidatePreparing
 		d.Decision.Wake = nil
 		e := r.editEntry(work.Token.Candidate)
-		e.HasDue = false
+		e.clearRetry()
 		if err := c.admitOutcome(d, e.Key, dyncfg.StatusAccepted, true, false); err != nil {
 			return err
 		}
@@ -1349,6 +1354,7 @@ func (c *candidateController) resumeCandidate(d *candidateDelta, work *candidate
 func (c *candidateController) progress(d *candidateDelta, now int64) error {
 	c.reconcileWork(d)
 	r := d.after
+	wallNow := c.wallNow()
 	if !r.recoveryOpen() {
 		return c.reconcileWake(d, 0, false)
 	}
@@ -1374,6 +1380,9 @@ func (c *candidateController) progress(d *candidateDelta, now int64) error {
 				continue
 			}
 			e := r.editEntry(key)
+			if !e.Initial && e.HasDue && !e.retryReady(now, wallNow) {
+				continue
+			}
 			retrying := !e.Initial && e.HasDue
 			attempt, err := c.next()
 			if err != nil {
@@ -1384,7 +1393,7 @@ func (c *candidateController) progress(d *candidateDelta, now int64) error {
 			r.Wake = nil
 			r.Phase = candidatePreparing
 			e.Initial = false
-			e.HasDue = false
+			e.clearRetry()
 			d.Decision.Work = work
 			d.Decision.Wake = nil
 			// A retry of the admitted binding re-enters Accepted before slow
@@ -1405,11 +1414,13 @@ func (c *candidateController) progress(d *candidateDelta, now int64) error {
 			}
 			if e.Initial {
 				initial = append(initial, key)
-			} else if e.HasDue && e.Due <= now {
+			} else if e.retryReady(now, wallNow) {
 				due = append(due, key)
-			} else if e.HasDue && (!hasFuture || e.Due < earliest) {
-				earliest = e.Due
-				hasFuture = true
+			} else if e.HasDue {
+				if wake := e.retryWake(now, wallNow); !hasFuture || wake < earliest {
+					earliest = wake
+					hasFuture = true
+				}
 			}
 		}
 		order := func(a, b candidateKey) int {
@@ -1465,10 +1476,13 @@ func (c *candidateController) reconcileProposalWake(d *candidateDelta, now int64
 	tier := r.Binding.Config.SourceTypePriority()
 	var earliest int64
 	hasDue := false
+	wallNow := c.wallNow()
 	for key, entry := range r.entries() {
-		if entry.HasDue && r.recoveryEligible(key, tier) && (!hasDue || entry.Due < earliest) {
-			earliest = entry.Due
-			hasDue = true
+		if entry.HasDue && r.recoveryEligible(key, tier) {
+			if wake := entry.retryWake(now, wallNow); !hasDue || wake < earliest {
+				earliest = wake
+				hasDue = true
+			}
 		}
 	}
 	// Once the heap consumes a due capability, retain the candidate's deadline
@@ -1720,7 +1734,7 @@ func (r *candidateRecord) withdrawTrust(withdrawals map[string]*sourceObservatio
 		entry.TrustRevoked = true
 		entry.Admitted = false
 		entry.GrantIntent = 0
-		entry.HasDue = false
+		entry.clearRetry()
 		if r.Binding != nil && r.Binding.Key == key {
 			r.TrustWithdrawal = withdrawal
 			withdrewBinding = true
@@ -1732,7 +1746,7 @@ func (r *candidateRecord) withdrawTrust(withdrawals map[string]*sourceObservatio
 // prepareAdoptExact combines interactive acceptance and its health projection.
 // The caller supplies a retained checked stage for Accepted work, so execution
 // can continue under Work.Token without probing the submitted config twice.
-func (c *candidateController) prepareAdoptExact(config confgroup.Config, enabled bool, health dyncfg.Status, listed bool, retryAfter int, now int64) (delta *candidateDelta, err error) {
+func (c *candidateController) prepareAdoptExact(config confgroup.Config, enabled bool, health dyncfg.Status, listed bool, retry candidateRetryPolicy, now int64) (delta *candidateDelta, err error) {
 	defer finalizeCandidateDelta(&delta)
 	d, err := c.prepareExact(config, false, now)
 	if err != nil {
@@ -1758,9 +1772,8 @@ func (c *candidateController) prepareAdoptExact(config confgroup.Config, enabled
 		r.Phase = candidateRunning
 	case dyncfg.StatusFailed:
 		e.Initial = false
-		if retryAfter > 0 {
-			e.HasDue = true
-			e.Due = now + int64(retryAfter)
+		if retry.cadence > 0 {
+			e.setRetry(retry, now)
 		}
 		if err = c.progress(d, now); err != nil {
 			return nil, err

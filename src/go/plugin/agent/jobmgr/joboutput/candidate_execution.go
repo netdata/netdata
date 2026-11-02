@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
@@ -268,9 +267,9 @@ func (dcjc *DynCfgJobController) prepareControllerProbeFailure(ctx context.Conte
 	if dcjc.configModules.activationWaitsForDependency(config, failure) {
 		return dcjc.prepareControllerWait(ctx, attempt, current, scope, permit, failure, nil)
 	}
-	retry := failure.retryDelay(time.Now())
+	retry := failure.retryPolicy()
 	listed := config.SourceType() != confgroup.TypeStock || failure.keepsFailedStockListed()
-	delta, err := dcjc.candidates.prepareOutcome(scope.ID, attempt.spec.work.Token, candidateOutcome{Kind: candidateFailed, RetryAfter: retry, Listed: listed}, dcjc.scheduler.retries.now())
+	delta, err := dcjc.candidates.prepareOutcome(scope.ID, attempt.spec.work.Token, candidateOutcome{Kind: candidateFailed, Retry: retry, Listed: listed}, dcjc.scheduler.retries.now())
 	if err != nil {
 		return nil, err
 	}
@@ -388,8 +387,8 @@ func (dcjc *DynCfgJobController) prepareControllerWait(ctx context.Context, atte
 }
 
 func (dcjc *DynCfgJobController) prepareControllerBlocked(ctx context.Context, attempt acceptedActivationAttempt, current lifecycle.ReadyResource, scope lifecycle.ResourceTransactionScope, permit lifecycle.LongLivedPermit, cause error, block candidateBlockPolicy) (lifecycle.PreparedResourceTransaction, error) {
-	retryAfter := transientActivationFailure(attempt.spec.config, cause).retryDelay(time.Now())
-	delta, err := dcjc.candidates.prepareOutcome(scope.ID, attempt.spec.work.Token, candidateOutcome{Kind: candidateFrameworkBlocked, Block: block, RetryAfter: retryAfter, Listed: true}, dcjc.scheduler.retries.now())
+	retryAfter := transientActivationFailure(attempt.spec.config, cause).retryPolicy()
+	delta, err := dcjc.candidates.prepareOutcome(scope.ID, attempt.spec.work.Token, candidateOutcome{Kind: candidateFrameworkBlocked, Block: block, Retry: retryAfter, Listed: true}, dcjc.scheduler.retries.now())
 	if err != nil {
 		return nil, err
 	}
@@ -471,7 +470,7 @@ func (dcjc *DynCfgJobController) prepareControlCandidate(id string, postimage *d
 		}
 		status := dyncfg.Status(postimage.Status)
 		enabled := status != dyncfg.StatusDisabled && reply.command != dyncfg.CommandAdd
-		return dcjc.candidates.prepareAdoptExact(config, enabled, status, true, 0, dcjc.scheduler.retries.now())
+		return dcjc.candidates.prepareAdoptExact(config, enabled, status, true, candidateRetryPolicy{}, dcjc.scheduler.retries.now())
 	default:
 		return nil, nil
 	}

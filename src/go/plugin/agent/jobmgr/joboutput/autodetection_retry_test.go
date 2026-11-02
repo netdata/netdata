@@ -290,9 +290,9 @@ func TestSchedulerRetryPreparationAfterCandidateRetirement(t *testing.T) {
 	candidates := controller.candidates
 	inventory := candidateInventory(t, candidates, candidateTestInventory(1, true, candidateTestConfig("file", "one")), 0)
 	failed := candidateResult(t, candidates, inventory.Decision.Work, candidateOutcome{
-		Kind:       candidateFailed,
-		Listed:     true,
-		RetryAfter: 1,
+		Kind:   candidateFailed,
+		Listed: true,
+		Retry:  candidateRetryPolicy{cadence: 1},
 	}, 0)
 	require.NotNil(t, failed.Decision.Wake)
 	commands := &activationTestCommands{

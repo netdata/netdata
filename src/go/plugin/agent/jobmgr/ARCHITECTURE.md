@@ -924,12 +924,14 @@ retry of that candidate, while eligible siblings may still receive their initial
 
 An optional `collectorapi.WithRetryNotBefore` error annotation supplies an absolute minimum for an already-eligible
 startup retry. Failure metadata retains the latest annotated deadline through error redaction and collector disposal.
-Immediately before preparing the outcome, the remaining positive wait becomes ceiling seconds plus one guard tick,
-then the later of that value and the configured cadence is used. The guard accounts for an imminent boundary in the
-production one-second, unbuffered incrementing ticker; it can add up to approximately two seconds of granularity
-slack. Elapsed cleanup consumes the original wait rather than starting it again. Expired or absent minima leave the
-configured cadence unchanged, and conversion uses int64 seconds to avoid truncation on 32-bit platforms. This remains
-per-candidate recovery metadata, not a shared endpoint quota or a persistent deadline across explicit reload/restart.
+A typed retry policy carries configured cadence and the absolute provider deadline together into the candidate ledger.
+The controller admits automatic work only after both constraints have elapsed, including when revisiting a frozen pass
+or resuming a framework-blocked attempt. The heap's logical deadline is a wake estimate: an early wake rechecks the
+absolute timestamp and rearms without constructing a collector. This remains correct when pending ticks arrive in a
+burst; no tick-phase margin is used. Elapsed cleanup consumes the original provider wait rather than starting it again.
+Expired or absent minima leave configured cadence unchanged; logical deadline arithmetic uses saturating int64 seconds.
+This remains per-candidate recovery metadata, not a shared endpoint quota or a persistent deadline across explicit
+reload/restart.
 
 `joboutput/autodetection_retry.go` retains one earliest wake per job in the existing per-run map, heap and dispatcher:
 

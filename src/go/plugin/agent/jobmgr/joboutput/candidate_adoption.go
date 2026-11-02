@@ -82,7 +82,7 @@ func (dcjc *DynCfgJobController) prepareCandidateAdoption(
 		return nil, &candidatePreflightError{cause: err}
 	}
 	if reply.candidate == nil {
-		reply.candidate, err = dcjc.candidates.prepareAdoptExact(config, true, dyncfg.StatusAccepted, true, 0, dcjc.scheduler.retries.now())
+		reply.candidate, err = dcjc.candidates.prepareAdoptExact(config, true, dyncfg.StatusAccepted, true, candidateRetryPolicy{}, dcjc.scheduler.retries.now())
 		if err != nil {
 			adoption.release()
 			return nil, err
