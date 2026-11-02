@@ -252,78 +252,82 @@ class IPMIPermissionTests(unittest.TestCase):
                 self.assertLess(owner, mode)
             self.assertFalse(any('go.d.plugin' in line for line in operations))
 
-    def test_static_check_rejects_dynamic_missing_and_unreadable_binaries(self):
+    def test_static_check_scans_installed_elf_executables(self):
         with tempfile.TemporaryDirectory(prefix='netdata-ipmi-static-check-') as temporary:
             root = Path(temporary)
-            (root / 'functions.sh').write_text(
-                'run() { "$@"; }\n'
-                'build_path() { printf "%s\\n" "$NETDATA_INSTALL_PATH/build"; }\n')
-            build = root / 'build'
-            build.mkdir()
-            cache = build / 'CMakeCache.txt'
-            cache.write_text('ENABLE_PLUGIN_IPMI:BOOL=True\n')
+            (root / 'functions.sh').write_text('set -euo pipefail\nrun() { "$@"; }\n')
             commands = root / 'commands'
             commands.mkdir()
             readelf = commands / 'readelf'
-            readelf.write_text('#!/bin/sh\nprintf "%s\\n" "$ELF_HEADERS"\nexit "$ELF_STATUS"\n')
+            readelf.write_text('#!/bin/sh\nprintf "%s\\0" "$2" >> "$ELF_LOG"\n'
+                               'if [ "$2" = "$DYNAMIC_ELF" ]; then echo INTERP; else echo LOAD; fi\n'
+                               'exit "$ELF_STATUS"\n')
             readelf.chmod(0o755)
             ldd = commands / 'ldd'
             ldd.write_text('#!/bin/sh\nexit 0\n')
             ldd.chmod(0o755)
-            for path in ('bin/netdata', 'usr/libexec/netdata/plugins.d/ipmi.plugin'):
-                binary = root / path
+            binaries = [root / path for path in ('bin/netdata', 'usr/libexec/netdata/plugins.d/ipmi.plugin',
+                                                 'other tools/extra\nplugin')]
+            for binary in binaries:
+                binary.parent.mkdir(parents=True, exist_ok=True)
+                binary.write_bytes(b'\x7fELFfixture')
+                binary.chmod(0o755)
+            (root / 'non-executable').write_bytes(b'\x7fELFdata')
+            (root / 'non-executable').chmod(0o644)
+            (root / 'alias').symlink_to(binaries[0])
+            log = root / 'inspected'
+            environment = dict(os.environ, NETDATA_MAKESELF_PATH=str(root),
+                               NETDATA_INSTALL_PATH=str(root), GITHUB_ACTIONS='false',
+                               PATH=str(commands) + ':' + os.environ['PATH'], ELF_LOG=str(log),
+                               ELF_STATUS='0', DYNAMIC_ELF='')
+            job = ROOT / 'packaging/makeself/jobs/80-netdata-static-check.sh'
+
+            def run_check(**overrides):
+                log.write_text('')
+                return subprocess.run(['bash', str(job)], capture_output=True, text=True,
+                                      env=dict(environment, **overrides))
+
+            result = run_check()
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(set(log.read_text().strip('\0').split('\0')), set(map(str, binaries)))
+            for binary in binaries:
+                with self.subTest(dynamic=binary):
+                    result = run_check(DYNAMIC_ELF=str(binary))
+                    self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                    self.assertIn(str(binary) + ' is not a statically linked binary', result.stderr)
+            result = run_check(ELF_STATUS='7')
+            self.assertEqual(result.returncode, 7, result.stdout + result.stderr)
+            self.assertIn('Failed to inspect ELF program headers', result.stderr)
+
+            # File presence belongs to the runtime check, not this linkage scan.
+            binaries[1].unlink()
+            result = run_check()
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            result = run_check(NETDATA_INSTALL_PATH=str(root / 'missing-tree'))
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_runtime_check_requires_ipmi_plugin(self):
+        source = (ROOT / 'packaging/runtime-check.sh').read_text()
+        checks = source[source.index('NETDATA_LIBEXEC_PARTS="'):]
+        parts = checks.split('"', 2)[1].splitlines()
+        with tempfile.TemporaryDirectory(prefix='netdata-ipmi-runtime-check-') as temporary:
+            root = Path(temporary)
+            for part in filter(None, parts):
+                if part == 'plugins.d/ipmi.plugin':
+                    continue
+                binary = root / part
                 binary.parent.mkdir(parents=True, exist_ok=True)
                 binary.touch()
                 binary.chmod(0o755)
-            environment = dict(os.environ, NETDATA_MAKESELF_PATH=str(root),
-                               NETDATA_INSTALL_PATH=str(root), GITHUB_ACTIONS='false',
-                               PATH=str(commands) + ':' + os.environ['PATH'])
-            job = ROOT / 'packaging/makeself/jobs/80-netdata-static-check.sh'
-            for headers, status, expected in (('LOAD', '0', 0), ('INTERP', '0', 1), ('', '7', 7)):
-                with self.subTest(headers=headers, status=status):
-                    result = subprocess.run(['bash', str(job)], capture_output=True, text=True,
-                                            env=dict(environment, ELF_HEADERS=headers, ELF_STATUS=status))
+            script = 'check_systemd_capability_bounding_set() { return 0; }\n' + checks
+            for skip, expected in (('freeipmi|xenstat|cups', 1), ('freeipmi|xenstat|cups|ipmi', 0)):
+                with self.subTest(skip=skip):
+                    result = subprocess.run(['sh', '-c', script], capture_output=True, text=True,
+                                            env=dict(os.environ, NETDATA_LIBEXEC_PREFIX=str(root),
+                                                     NETDATA_SKIP_LIBEXEC_PARTS=skip))
                     self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
-            (root / 'usr/libexec/netdata/plugins.d/ipmi.plugin').chmod(0o644)
-            result = subprocess.run(['bash', str(job)], capture_output=True, text=True,
-                                    env=dict(environment, ELF_HEADERS='LOAD', ELF_STATUS='0'))
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            # Required binaries must fail when absent, independently of ELF inspection.
-            for path in ('bin/netdata', 'usr/libexec/netdata/plugins.d/ipmi.plugin'):
-                binary = root / path
-                binary.unlink()
-                result = subprocess.run(['bash', str(job)], capture_output=True, text=True,
-                                        env=dict(environment, ELF_HEADERS='LOAD', ELF_STATUS='0',
-                                                 EXTRA_INSTALL_FLAGS='--disable-plugin-ipmi'))
-                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-                self.assertIn('Missing required binary: ' + str(binary), result.stderr)
-                binary.touch()
-                binary.chmod(0o755)
-
-            # An explicitly disabled plugin is optional, but an installed one is still inspected.
-            cache.write_text('ENABLE_PLUGIN_IPMI:BOOL=False\n')
-            plugin = root / 'usr/libexec/netdata/plugins.d/ipmi.plugin'
-            plugin.unlink()
-            result = subprocess.run(['bash', str(job)], capture_output=True, text=True,
-                                    env=dict(environment, ELF_HEADERS='LOAD', ELF_STATUS='0'))
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            plugin.touch()
-            plugin.chmod(0o755)
-            readelf.write_text('#!/bin/sh\ncase "$1:$2" in *ipmi.plugin) echo INTERP;; *) echo LOAD;; esac\n')
-            result = subprocess.run(['bash', str(job)], capture_output=True, text=True,
-                                    env=environment)
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn('is not a statically linked binary', result.stderr)
-            for value in ('', 'ENABLE_PLUGIN_IPMI:BOOL=invalid\n'):
-                cache.write_text(value)
-                result = subprocess.run(['bash', str(job)], capture_output=True, text=True,
-                                        env=environment)
-                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-                self.assertIn('Invalid or missing ENABLE_PLUGIN_IPMI', result.stderr)
-            cache.unlink()
-            result = subprocess.run(['bash', str(job)], capture_output=True, text=True, env=environment)
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn('Failed to read IPMI feature state', result.stderr)
+                    if expected:
+                        self.assertIn(str(root / 'plugins.d/ipmi.plugin') + ' is missing', result.stdout)
 
     def test_debian_postinst_assigns_dedicated_privileges(self):
         with tempfile.TemporaryDirectory(prefix='netdata-ipmi-postinst-') as temporary:
