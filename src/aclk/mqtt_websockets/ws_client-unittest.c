@@ -416,13 +416,39 @@ static int ws_client_unittest_ping_payload_cleanup(void)
     return errors;
 }
 
+#define WS_UT_NONCE "{NONCE}"
+
+// Copies `tmpl` to `dst`, replacing every WS_UT_NONCE with `nonce`. Returns the length, or -1 if it does not fit.
+static int ws_client_unittest_fill(char *dst, size_t dst_size, const char *tmpl, const char *nonce)
+{
+    size_t len = 0, token_len = strlen(WS_UT_NONCE), nonce_len = strlen(nonce);
+    while (*tmpl) {
+        const char *add = tmpl;
+        size_t add_len = 1;
+        if (!strncmp(tmpl, WS_UT_NONCE, token_len)) {
+            add = nonce;
+            add_len = nonce_len;
+            tmpl += token_len;
+        }
+        else
+            tmpl++;
+
+        if (len + add_len >= dst_size)
+            return -1;
+        memcpy(dst + len, add, add_len);
+        len += add_len;
+    }
+    dst[len] = '\0';
+    return (int)len;
+}
+
 // Feeds one canned upgrade reply to a client that has sent its upgrade request.
-// `reply_fmt` may hold one "%s", replaced by the accept value the client expects.
-static int ws_client_unittest_handshake_reply(ws_client *client, const char *reply_fmt)
+// `reply_tmpl` may hold WS_UT_NONCE, replaced by the accept value the client expects.
+static int ws_client_unittest_handshake_reply(ws_client *client, const char *reply_tmpl)
 {
     char reply[1024];
-    int len = snprintf(reply, sizeof(reply), reply_fmt, client->hs.nonce_reply);
-    if (len < 0 || (size_t)len >= sizeof(reply) || rbuf_push(client->buf_read, reply, len) != (size_t)len)
+    int len = ws_client_unittest_fill(reply, sizeof(reply), reply_tmpl, client->hs.nonce_reply);
+    if (len < 0 || rbuf_push(client->buf_read, reply, len) != (size_t)len)
         return WS_CLIENT_INTERNAL_ERROR;
 
     int ret;
@@ -434,8 +460,8 @@ static int ws_client_unittest_handshake_reply(ws_client *client, const char *rep
 }
 
 // `expected_err` is the reason ws_client_check_handshake_reply() gives, NULL when the reply is accepted;
-// like `reply_fmt`, it may hold one "%s" for the expected accept value.
-static int ws_client_unittest_handshake_case(const char *name, const char *reply_fmt, const char *expected_err)
+// like `reply_tmpl`, it may hold WS_UT_NONCE for the expected accept value.
+static int ws_client_unittest_handshake_case(const char *name, const char *reply_tmpl, const char *expected_err)
 {
     int errors = 0;
     char *host = (char *)"localhost";
@@ -448,14 +474,14 @@ static int ws_client_unittest_handshake_case(const char *name, const char *reply
     WS_TEST(ws_client_start_handshake(client) == 0, name);
 
     fprintf(stderr, "ws_client handshake case: %s\n", name);
-    int ret = ws_client_unittest_handshake_reply(client, reply_fmt);
+    int ret = ws_client_unittest_handshake_reply(client, reply_tmpl);
     WS_TEST(ret == (expected_err ? WS_CLIENT_PROTOCOL_ERROR : WS_CLIENT_PARSING_DONE), name);
     WS_TEST(client->state == (expected_err ? WS_HANDSHAKE : WS_ESTABLISHED), name);
 
     char err[512] = "", expected[512] = "";
     int rc = ws_client_check_handshake_reply(client, err, sizeof(err));
     if (expected_err) {
-        snprintf(expected, sizeof(expected), expected_err, client->hs.nonce_reply);
+        WS_TEST(ws_client_unittest_fill(expected, sizeof(expected), expected_err, client->hs.nonce_reply) >= 0, name);
         WS_TEST(rc == -1, name);
         WS_TEST(!strcmp(err, expected), name);
         if (strcmp(err, expected))
@@ -473,7 +499,7 @@ static int ws_client_unittest_handshake_case(const char *name, const char *reply
 #define WS_UT_404_ERR "HTTP return code not 101. Received 404 with msg \"Not Found\" (server: \"nginx/1.25.3\")."
 #define WS_UT_WRONG "AAAAAAAAAAAAAAAAAAAAAAAAAAA="
 #define WS_UT_WRONG_ACCEPT "Sec-WebSocket-Accept: " WS_UT_WRONG "\r\n"
-#define WS_UT_WRONG_ERR "Received NONCE \"" WS_UT_WRONG "\" does not match expected nonce of \"%s\""
+#define WS_UT_WRONG_ERR "Received NONCE \"" WS_UT_WRONG "\" does not match expected nonce of \"" WS_UT_NONCE "\""
 #define WS_UT_MISSING_ERR "Missing sec-websocket-accept header"
 
 static int ws_client_unittest_handshake(void)
@@ -483,7 +509,7 @@ static int ws_client_unittest_handshake(void)
     // a non-101 reply fails whatever it says about the accept header, and the reason names the status
     errors += ws_client_unittest_handshake_case("404 without accept", WS_UT_404 "\r\n", WS_UT_404_ERR);
     errors += ws_client_unittest_handshake_case("404 with wrong accept", WS_UT_404 WS_UT_WRONG_ACCEPT "\r\n", WS_UT_404_ERR);
-    errors += ws_client_unittest_handshake_case("404 with matching accept", WS_UT_404 "Sec-WebSocket-Accept: %s\r\n\r\n", WS_UT_404_ERR);
+    errors += ws_client_unittest_handshake_case("404 with matching accept", WS_UT_404 "Sec-WebSocket-Accept: " WS_UT_NONCE "\r\n\r\n", WS_UT_404_ERR);
     errors += ws_client_unittest_handshake_case("502 with empty reason, no server", "HTTP/1.1 502 \r\n\r\n",
                                                 "HTTP return code not 101. Received 502 with msg \"\".");
     errors += ws_client_unittest_handshake_case("403 with control bytes", "HTTP/1.1 403 Forbid\x01" "den\r\nServer: evil\x1b[31mred\r\n\r\n",
@@ -511,14 +537,14 @@ static int ws_client_unittest_handshake(void)
     errors += ws_client_unittest_handshake_case("101 without accept", WS_UT_101 "\r\n", WS_UT_MISSING_ERR);
     errors += ws_client_unittest_handshake_case("101 with wrong accept", WS_UT_101 WS_UT_WRONG_ACCEPT "\r\n", WS_UT_WRONG_ERR);
     errors += ws_client_unittest_handshake_case("101 with control bytes in wrong accept", WS_UT_101 "Sec-WebSocket-Accept: \x07" "bell\r\n\r\n",
-                                                "Received NONCE \"?bell\" does not match expected nonce of \"%s\"");
-    errors += ws_client_unittest_handshake_case("101 with matching then wrong accept", WS_UT_101 "Sec-WebSocket-Accept: %s\r\n" WS_UT_WRONG_ACCEPT "\r\n", WS_UT_WRONG_ERR);
-    errors += ws_client_unittest_handshake_case("101 with wrong then matching accept", WS_UT_101 WS_UT_WRONG_ACCEPT "Sec-WebSocket-Accept: %s\r\n\r\n", WS_UT_WRONG_ERR);
-    errors += ws_client_unittest_handshake_case("101 with matching accept", WS_UT_101 "sec-websocket-accept: %s\r\n\r\n", NULL);
-    errors += ws_client_unittest_handshake_case("101 with unpadded matching accept", WS_UT_101 "Sec-WebSocket-Accept:%s\r\n\r\n", NULL);
-    errors += ws_client_unittest_handshake_case("101 with padded matching accept", WS_UT_101 "Sec-WebSocket-Accept: \t %s \t\r\n\r\n", NULL);
+                                                "Received NONCE \"?bell\" does not match expected nonce of \"" WS_UT_NONCE "\"");
+    errors += ws_client_unittest_handshake_case("101 with matching then wrong accept", WS_UT_101 "Sec-WebSocket-Accept: " WS_UT_NONCE "\r\n" WS_UT_WRONG_ACCEPT "\r\n", WS_UT_WRONG_ERR);
+    errors += ws_client_unittest_handshake_case("101 with wrong then matching accept", WS_UT_101 WS_UT_WRONG_ACCEPT "Sec-WebSocket-Accept: " WS_UT_NONCE "\r\n\r\n", WS_UT_WRONG_ERR);
+    errors += ws_client_unittest_handshake_case("101 with matching accept", WS_UT_101 "sec-websocket-accept: " WS_UT_NONCE "\r\n\r\n", NULL);
+    errors += ws_client_unittest_handshake_case("101 with unpadded matching accept", WS_UT_101 "Sec-WebSocket-Accept:" WS_UT_NONCE "\r\n\r\n", NULL);
+    errors += ws_client_unittest_handshake_case("101 with padded matching accept", WS_UT_101 "Sec-WebSocket-Accept: \t " WS_UT_NONCE " \t\r\n\r\n", NULL);
     errors += ws_client_unittest_handshake_case("101 with empty accept", WS_UT_101 "Sec-WebSocket-Accept: \r\n\r\n",
-                                                "Received NONCE \"\" does not match expected nonce of \"%s\"");
+                                                "Received NONCE \"\" does not match expected nonce of \"" WS_UT_NONCE "\"");
 
     // a reconnect must not inherit the previous connection's accepted handshake
     char *host = (char *)"localhost";
@@ -529,7 +555,7 @@ static int ws_client_unittest_handshake(void)
 
     WS_TEST(ws_client_start_handshake(client) == 0, "reconnect: first handshake starts");
     fprintf(stderr, "ws_client handshake case: reconnect, first 101 with matching accept\n");
-    WS_TEST(ws_client_unittest_handshake_reply(client, WS_UT_101 "Sec-WebSocket-Accept: %s\r\n\r\n") == WS_CLIENT_PARSING_DONE,
+    WS_TEST(ws_client_unittest_handshake_reply(client, WS_UT_101 "Sec-WebSocket-Accept: " WS_UT_NONCE "\r\n\r\n") == WS_CLIENT_PARSING_DONE,
             "reconnect: first handshake accepted");
 
     ws_client_reset(client);
