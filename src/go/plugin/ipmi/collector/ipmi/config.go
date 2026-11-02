@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	defaultUpdateEvery = 5
+	defaultUpdateEvery = 10
 	minUpdateEvery     = 5
 	defaultTimeout     = 5 * time.Second
 

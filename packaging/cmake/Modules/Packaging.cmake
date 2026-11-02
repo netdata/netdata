@@ -149,9 +149,9 @@ endif()
 # Scriptlets. openSUSE uses the %service_* macro family, everything else the
 # %systemd_* one; the choice happens at spec-generation time because the
 # macros expand when rpmbuild parses the generated spec. On distros where RPM
-# handles the shipped sysusers file natively (EL >= 10, Fedora >= 43) the
+# handles the shipped sysusers file natively (Fedora >= 43) the
 # netdata-user %post only manages supplemental groups; elsewhere it also
-# creates the user and group.
+# creates the user and group. EL disables RPM's native sysusers hook.
 #
 # CPack generates one spec per component whose Name: is the subpackage's
 # own, so the scriptlet files spell values out instead of using %{name}.
@@ -162,8 +162,7 @@ else()
 endif()
 
 if(NOT NETDATA_DISTRO_SUSE AND
-   ((NETDATA_DISTRO_EL AND NETDATA_DISTRO_VERSION_MAJOR GREATER_EQUAL 10) OR
-    (NETDATA_DISTRO_FEDORA AND NETDATA_DISTRO_VERSION_MAJOR GREATER_EQUAL 43)))
+   NETDATA_DISTRO_FEDORA AND NETDATA_DISTRO_VERSION_MAJOR GREATER_EQUAL 43)
   set(NETDATA_RPM_USER_POST "post.groups-only")
 else()
   set(NETDATA_RPM_USER_POST "post.create-user")
@@ -184,7 +183,6 @@ set(CPACK_RPM_USER_POST_INSTALL_SCRIPT_FILE
 # comes from the shipped sysusers file, elsewhere every payload package needs
 # netdata-user installed first.
 if(NETDATA_DISTRO_SUSE OR
-   (NETDATA_DISTRO_EL AND NETDATA_DISTRO_VERSION_MAJOR GREATER_EQUAL 10) OR
    (NETDATA_DISTRO_FEDORA AND NETDATA_DISTRO_VERSION_MAJOR GREATER_EQUAL 43))
   set(NETDATA_RPM_HAVE_SYSUSER TRUE)
 else()
@@ -231,7 +229,7 @@ set(CPACK_DEBIAN_NETDATA_PACKAGE_NAME "netdata")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_SECTION "net")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_PREDEPENDS "netdata-user, libcap2-bin")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_SUGGESTS
-		"netdata-plugin-cups, netdata-plugin-freeipmi, netdata-plugin-ibm")
+		"netdata-plugin-cups, netdata-plugin-freeipmi, netdata-plugin-ipmi, netdata-plugin-ibm")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_RECOMMENDS
 		"netdata-plugin-systemd-journal, netdata-plugin-systemd-units, \
 netdata-plugin-network-viewer, netdata-plugin-scripts")
@@ -345,6 +343,9 @@ if(NETDATA_RPM_HAVE_WEAK_DEPS)
   endif()
   if(ENABLE_PLUGIN_FREEIPMI)
     list(APPEND _rpm_main_suggests "netdata-plugin-freeipmi = ${CPACK_PACKAGE_VERSION}")
+  endif()
+  if(ENABLE_PLUGIN_IPMI)
+    list(APPEND _rpm_main_suggests "netdata-plugin-ipmi = ${CPACK_PACKAGE_VERSION}")
   endif()
   if(ENABLE_PLUGIN_CUPS)
     list(APPEND _rpm_main_suggests "netdata-plugin-cups = ${CPACK_PACKAGE_VERSION}")
@@ -715,6 +716,33 @@ set(CPACK_RPM_PLUGIN-FREEIPMI_DEFAULT_USER "root")
 set(CPACK_RPM_PLUGIN-FREEIPMI_DEFAULT_GROUP "netdata")
 set(CPACK_RPM_PLUGIN-FREEIPMI_USER_FILELIST
     "%attr(4750,root,netdata) /usr/libexec/netdata/plugins.d/freeipmi.plugin")
+
+#
+# ipmi.plugin
+#
+
+set(CPACK_COMPONENT_PLUGIN-IPMI_DEPENDS "netdata")
+set(CPACK_COMPONENT_PLUGIN-IPMI_DESCRIPTION
+    "The Go IPMI metrics collection plugin for the Netdata Agent
+ This plugin collects local and remote hardware sensor metrics using IPMI.")
+
+set(CPACK_DEBIAN_PLUGIN-IPMI_PACKAGE_NAME "netdata-plugin-ipmi")
+set(CPACK_DEBIAN_PLUGIN-IPMI_PACKAGE_SECTION "net")
+set(CPACK_DEBIAN_PLUGIN-IPMI_PACKAGE_PREDEPENDS "netdata-user")
+set(CPACK_DEBIAN_PLUGIN-IPMI_PACKAGE_CONTROL_EXTRA
+    "${PKG_FILES_PATH}/deb/plugin-ipmi/postinst")
+set(CPACK_DEBIAN_PLUGIN-IPMI_DEBUGINFO_PACKAGE Off)
+
+set(CPACK_RPM_PLUGIN-IPMI_PACKAGE_NAME "netdata-plugin-ipmi")
+set(CPACK_RPM_PLUGIN-IPMI_PACKAGE_SUMMARY "The Go IPMI metrics collection plugin for the Netdata Agent")
+set(CPACK_RPM_PLUGIN-IPMI_PACKAGE_REQUIRES "netdata = ${CPACK_PACKAGE_VERSION}")
+if(NETDATA_RPM_USER_PREDEP)
+  set(CPACK_RPM_PLUGIN-IPMI_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
+endif()
+set(CPACK_RPM_PLUGIN-IPMI_DEFAULT_USER "root")
+set(CPACK_RPM_PLUGIN-IPMI_DEFAULT_GROUP "netdata")
+set(CPACK_RPM_PLUGIN-IPMI_USER_FILELIST
+    "%attr(4750,root,netdata) /usr/libexec/netdata/plugins.d/ipmi.plugin")
 
 #
 # go.plugin
@@ -1305,6 +1333,9 @@ if(ENABLE_LEGACY_EBPF_PROGRAMS)
 endif()
 if(ENABLE_PLUGIN_FREEIPMI)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-freeipmi")
+endif()
+if(ENABLE_PLUGIN_IPMI)
+  list(APPEND CPACK_COMPONENTS_ALL "plugin-ipmi")
 endif()
 if(ENABLE_PLUGIN_GO)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-go")
