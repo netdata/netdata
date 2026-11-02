@@ -442,23 +442,30 @@ static inline void supported_headers_init(void) {
     spinlock_unlock(&supported_headers_init_spinlock);
 }
 
+static inline bool http_header_is_ows(char c) {
+    return c == ' ' || c == '\t';
+}
+
 char *http_header_parse_line(struct web_client *w, char *s) {
     supported_headers_init();
 
-    char *e = s;
+    // a line starting with whitespace is an obsolete folded continuation (RFC 9112 5.2)
+    if(http_header_is_ows(*s))
+        return NULL;
 
-    // find the colon
-    while(*e && *e != ':') e++;
+    // find the colon, without leaving this line
+    char *e = s;
+    while(*e && *e != ':' && *e != '\r' && *e != '\n') e++;
     if(!*e) return e;
+    if(*e != ':')
+        return NULL;
 
     // get the name
     *e = '\0';
 
-    // find the value
+    // find the value, without the optional whitespace before it
     char *v = e + 1, *ve;
-
-    // skip leading spaces from value
-    while(*v == ' ') v++;
+    while(http_header_is_ows(*v)) v++;
     ve = v;
 
     // find the \r
@@ -468,8 +475,11 @@ char *http_header_parse_line(struct web_client *w, char *s) {
         return ve;
     }
 
-    // terminate the value
-    *ve = '\0';
+    // terminate the value, without the optional whitespace after it
+    char *vt = ve;
+    while(vt > v && http_header_is_ows(vt[-1])) vt--;
+    char saved = *vt;
+    *vt = '\0';
 
     uint32_t hash = simple_uhash(s);
 
@@ -477,11 +487,12 @@ char *http_header_parse_line(struct web_client *w, char *s) {
         if(likely(hash != supported_headers[i].hash || strcasecmp(s, supported_headers[i].key) != 0))
             continue;
 
-        supported_headers[i].cb(w, v, ve - v);
+        supported_headers[i].cb(w, v, vt - v);
         break;
     }
 
+    // restore the request, it may be parsed again
+    *vt = saved;
     *e = ':';
-    *ve = '\r';
     return ve;
 }

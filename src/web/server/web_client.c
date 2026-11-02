@@ -900,6 +900,13 @@ HTTP_VALIDATION http_request_validate(struct web_client *w) {
 
             // another header line
             s = http_header_parse_line(w, s);
+            if(unlikely(!s)) {
+                w->header_parse_tries = 0;
+                w->header_parse_last_size = 0;
+                w->header_parse_expected_size = 0;
+                web_client_disable_wait_receive(w);
+                return HTTP_VALIDATION_MALFORMED_HEADER;
+            }
         }
     }
 
@@ -1656,6 +1663,14 @@ void web_client_process_request_from_web_server(struct web_client *w) {
 
             buffer_flush(w->response.data);
             buffer_strcat(w->response.data, "Malformed URL...\r\n");
+            w->response.code = HTTP_RESP_BAD_REQUEST;
+            break;
+
+        case HTTP_VALIDATION_MALFORMED_HEADER:
+            netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: Malformed request header line.", w->id);
+
+            buffer_flush(w->response.data);
+            buffer_strcat(w->response.data, "Malformed request header...\r\n");
             w->response.code = HTTP_RESP_BAD_REQUEST;
             break;
         case HTTP_VALIDATION_TOO_MANY_READ_RETRIES:

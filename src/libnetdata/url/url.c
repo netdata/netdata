@@ -251,6 +251,107 @@ fail_cleanup:
     return NULL;
 }
 
+// The header lines of a request whose header section is complete: returns the first header line and sets
+// *headers_end to the "\r\n\r\n" that ends the section, or returns NULL when the section is not complete yet.
+static const char *url_request_header_lines(const char *begin, const char **headers_end) {
+    *headers_end = strstr(begin, "\r\n\r\n");
+    if(!*headers_end)
+        return NULL;
+
+    // the request line always ends before the header section does
+    return strstr(begin, "\r\n") + 2;
+}
+
+// Finds the next header called `name` (case-insensitive, matched only as a whole field name at the start of a
+// header line), from *line up to headers_end. Returns its value without the whitespace around it, sets *value_len,
+// and moves *line past that header; returns NULL when there is no further such header.
+static const char *url_request_header_value(
+    const char **line, const char *headers_end, const char *name, size_t name_len, size_t *value_len) {
+    const char *s = *line;
+
+    while(s < headers_end) {
+        const char *eol = strstr(s, "\r\n");
+        if(!eol || eol > headers_end)
+            eol = headers_end;
+
+        if((size_t)(eol - s) > name_len && s[name_len] == ':' && strncasecmp(s, name, name_len) == 0) {
+            const char *v = &s[name_len + 1], *ve = eol;
+            while(v < ve && (*v == ' ' || *v == '\t')) v++;
+            while(ve > v && (ve[-1] == ' ' || ve[-1] == '\t')) ve--;
+
+            *line = eol + 2;
+            *value_len = ve - v;
+            return v;
+        }
+
+        s = eol + 2;
+    }
+
+    *line = headers_end;
+    return NULL;
+}
+
+// The body framing of a POST/PUT request with a complete header section. Fails when Content-Length is missing,
+// is not a plain decimal number, or appears more than once with different values (RFC 9112 6.3).
+static bool url_request_content_length(const char *begin, size_t *payload_offset, size_t *content_length) {
+    const char *headers_end;
+    const char *line = url_request_header_lines(begin, &headers_end);
+    if(!line)
+        return false;
+
+    bool found = false;
+    unsigned long long length = 0;
+    const char *v;
+    size_t v_len;
+    while((v = url_request_header_value(&line, headers_end, "Content-Length", 14, &v_len))) {
+        if(!v_len || !isdigit((uint8_t)*v))
+            return false;
+
+        char *v_end;
+        errno_clear();
+        unsigned long long parsed = strtoull(v, &v_end, 10);
+        if(errno != 0 || v_end != v + v_len || parsed > SIZE_MAX)
+            return false;
+
+        if(found && parsed != length)
+            return false;
+
+        length = parsed;
+        found = true;
+    }
+
+    if(!found)
+        return false;
+
+    size_t offset = (size_t)(headers_end + 4 - begin);
+    if(length > SIZE_MAX - offset)
+        return false;
+
+    *payload_offset = offset;
+    *content_length = (size_t)length;
+    return true;
+}
+
+static HTTP_CONTENT_TYPE url_request_content_type(const char *begin) {
+    const char *headers_end;
+    const char *line = url_request_header_lines(begin, &headers_end);
+    size_t ct_len;
+    const char *ct = line ? url_request_header_value(&line, headers_end, "Content-Type", 12, &ct_len) : NULL;
+    if(!ct)
+        return CT_TEXT_PLAIN;
+
+    // the media type, without its parameters
+    size_t type_len = 0;
+    while(type_len < ct_len && !isspace((uint8_t)ct[type_len]) && ct[type_len] != ';')
+        type_len++;
+
+    CLEAN_CHAR_P *ct_copy = mallocz(type_len + 1);
+    memcpy(ct_copy, ct, type_len);
+    ct_copy[type_len] = '\0';
+
+    return content_type_string2id(ct_copy);
+}
+
 inline bool
 url_is_request_complete_and_extract_payload(
     const char *begin, const char *end, size_t length, BUFFER **post_payload, size_t *expected_size) {
@@ -278,37 +379,8 @@ url_is_request_complete_and_extract_payload(
             if(!strstr(headers_search_from, "\r\n\r\n"))
                 return false;
 
-            const char *cl = strcasestr(begin, "Content-Length: ");
-            if(!cl)
-                goto invalid_content_length;
-            cl = &cl[16];
-
-            while(*cl == ' ' || *cl == '\t')
-                cl++;
-
-            if(!isdigit((uint8_t)*cl))
-                goto invalid_content_length;
-
-            char *content_length_end;
-            errno_clear();
-            unsigned long long parsed_content_length = strtoull(cl, &content_length_end, 10);
-            if(errno != 0 || parsed_content_length > SIZE_MAX)
-                goto invalid_content_length;
-
-            while(*content_length_end == ' ' || *content_length_end == '\t')
-                content_length_end++;
-
-            if(content_length_end[0] != '\r' || content_length_end[1] != '\n')
-                goto invalid_content_length;
-
-            const char *payload = strstr(cl, "\r\n\r\n");
-            if(!payload)
-                goto invalid_content_length;
-            payload += 4;
-
-            size_t payload_offset = payload - begin;
-            size_t content_length = (size_t)parsed_content_length;
-            if(content_length > SIZE_MAX - payload_offset)
+            size_t payload_offset, content_length;
+            if(!url_request_content_length(begin, &payload_offset, &content_length))
                 goto invalid_content_length;
 
             *expected_size = payload_offset + content_length;
@@ -317,60 +389,19 @@ url_is_request_complete_and_extract_payload(
         if(length != *expected_size)
             return false;
 
-        const char *cl = strcasestr(begin, "Content-Length: ");
-        if(!cl) return false;
-        cl = &cl[16];
-
-        while(*cl == ' ' || *cl == '\t')
-            cl++;
-
-        if(!isdigit((uint8_t)*cl))
+        size_t payload_offset, content_length;
+        if(!url_request_content_length(begin, &payload_offset, &content_length))
             return false;
 
-        char *content_length_end;
-        errno_clear();
-        unsigned long long parsed_content_length = strtoull(cl, &content_length_end, 10);
-        if(errno != 0 || parsed_content_length > SIZE_MAX)
-            return false;
-
-        while(*content_length_end == ' ' || *content_length_end == '\t')
-            content_length_end++;
-
-        if(content_length_end[0] != '\r' || content_length_end[1] != '\n')
-            return false;
-
-        size_t content_length = (size_t)parsed_content_length;
-
-        const char *payload = strstr(cl, "\r\n\r\n");
-        if(!payload) return false;
-        payload += 4;
-
-        size_t payload_length = length - (payload - begin);
+        const char *payload = begin + payload_offset;
+        size_t payload_length = length - payload_offset;
 
         if(payload_length == content_length) {
             if(!*post_payload)
                 *post_payload = buffer_create(payload_length + 1, NULL);
 
             buffer_contents_replace(*post_payload, payload, payload_length);
-
-            // parse the content type
-            const char *ct = strcasestr(begin, "Content-Type: ");
-            if(ct) {
-                ct = &ct[14];
-                while (*ct && isspace((uint8_t)*ct)) ct++;
-                const char *space = ct;
-                while (*space && !isspace((uint8_t)*space) && *space != ';') space++;
-                size_t ct_len = space - ct;
-
-                CLEAN_CHAR_P *ct_copy = mallocz(ct_len + 1);
-                memcpy(ct_copy, ct, ct_len);
-                ct_copy[ct_len] = '\0';
-
-                (*post_payload)->content_type = content_type_string2id(ct_copy);
-            }
-            else
-                (*post_payload)->content_type = CT_TEXT_PLAIN;
-
+            (*post_payload)->content_type = url_request_content_type(begin);
             return true;
         }
 
