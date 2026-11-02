@@ -257,7 +257,7 @@ exit_with_error:
 static const char *ws_client_log_safe(char *dst, size_t dst_size, const char *src)
 {
     size_t i = 0;
-    for (; src && src[i] && i < dst_size - 1; i++) {
+    for (; src && i < dst_size - 1 && src[i]; i++) {
         unsigned char c = (unsigned char)src[i];
         dst[i] = (c < 0x20 || c > 0x7e) ? '?' : (char)c;
     }
