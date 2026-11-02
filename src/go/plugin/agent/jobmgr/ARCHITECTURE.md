@@ -922,16 +922,33 @@ and newly due work wait for the next finite pass rather than extending the activ
 failure is not permanent proposal rejection. Zero cadence, permanent failures, and unclassified Init failures prevent automatic
 retry of that candidate, while eligible siblings may still receive their initial attempts.
 
-An optional `collectorapi.WithRetryNotBefore` error annotation supplies an absolute minimum for an already-eligible
-startup retry. Failure metadata retains the latest annotated deadline through error redaction and collector disposal.
-A typed retry policy carries configured cadence and the absolute provider deadline together into the candidate ledger.
-The controller admits automatic work only after both constraints have elapsed, including when revisiting a frozen pass
-or resuming a framework-blocked attempt. The heap's logical deadline is a wake estimate: an early wake rechecks the
-absolute timestamp and rearms without constructing a collector. This remains correct when pending ticks arrive in a
-burst; no tick-phase margin is used. Elapsed cleanup consumes the original provider wait rather than starting it again.
-Expired or absent minima leave configured cadence unchanged; logical deadline arithmetic uses saturating int64 seconds.
-This remains per-candidate recovery metadata, not a shared endpoint quota or a persistent deadline across explicit
-reload/restart.
+An optional `collectorapi.WithRetryNotBefore` error annotation supplies an absolute minimum for the next automatic
+startup activation of the same retained candidate. Failure metadata keeps the latest annotated deadline through
+redaction and collector disposal. The candidate owns this outstanding minimum independently of its ordinary retry
+permission, logical cadence, initial-pass state and admission grants. Zero cadence or permanent classification grants
+no ordinary retry, but does not erase metadata that constrains a separately permitted automatic source promotion.
+
+All new automatic activations check the same provider predicate: initial/retry passes, tentative source selection and
+failure-triggered framework recovery. Ordinary retries additionally require their configured logical cadence. A
+satisfied minimum is consumed at admission; physical resumption of that already-admitted activation renews execution
+fencing without reopening the provider wait. Automatic search reopening preserves other retained candidates' minima.
+Accepted exact UPDATE/RESTART resets only the selected candidate; a fresh ENABLE resets its reopened scope, while an
+already-enabled ENABLE preserves state. DISABLE cancels capabilities and deferred work; identity metadata survives
+until reset or candidate removal. Run retirement discards the ledger.
+
+A provider-blocked source transition retains only its source observation and predecessor intent as `DeferredSource`.
+It owns no executable Proposal or physical executor and retains the predecessor's public binding until admission.
+Ordinary recovery keeps the predecessor tier/exact scope while selection is deferred, so an eligible sibling can
+proceed. A source wake reruns current arbitration, membership and intent checks before creating executable work.
+Genuine source replacement can still proceed when ordinary recovery is closed or disabled; an explicit DISABLE
+cancels an already-deferred transition. The bounded transaction finalizer combines ordinary/blocked and deferred-source
+wake estimates. A provenance bit distinguishes source hints that may be discarded when selection changes. Readiness
+settlement retains an existing deferred hint without scanning candidate populations.
+
+The heap carries wake estimates, never authority to bypass the absolute timestamp. Early wakes rearm without
+constructing a collector, including when logical ticks arrive in a burst. Elapsed cleanup consumes the original wait.
+Expired/absent minima preserve cadence behavior; logical arithmetic saturates at int64. This is candidate-owned
+startup metadata, not an endpoint quota or persistence across explicit reload/restart.
 
 `joboutput/autodetection_retry.go` retains one earliest wake per job in the existing per-run map, heap and dispatcher:
 
@@ -939,7 +956,7 @@ reload/restart.
 - Heap entries carry job identity, due time and `{run epoch, intent generation, schedule generation}` only; they store
   no config and cannot select a candidate.
 - A due wake submits a short lane transaction in `joboutput/candidate_execution.go`. The controller checks the capability and
-  enabled/open search, chooses eligible work, and commits its state before releasing an executor effect. Waiting for
+  the appropriate source-transition or enabled/open recovery authority, chooses eligible work, and commits its state before releasing an executor effect. Waiting for
   a collector's Check never blocks deadline delivery for an unrelated job.
 - Identical inventory, sibling changes and rejected proposals do not reset another candidate's cooldown. An actual
   enablement transition resets attempt facts; disable/removal/supersession/run retirement revokes old deadline capabilities.

@@ -134,6 +134,7 @@ func TestRetryDeadlinePreservesLifecyclePolicy(t *testing.T) {
 						failure.keepsFailedStockListed(),
 					)
 					assert.Equal(t, tc.retry, failure.retryPolicy().cadence > 0)
+					assert.Equal(t, deadline, failure.retryPolicy().notBefore, "classification never discards provider metadata")
 					require.NoError(t, permit.AbortUnused())
 					requireFactoryAttemptsIdle(t, factory)
 				})
@@ -164,6 +165,8 @@ func TestCandidateRetryConstraints(t *testing.T) {
 			assert.Equal(t, int64(10), e.Due, "wake estimates do not restart the configured cadence")
 			e.clearRetry()
 			assert.False(t, e.retryReady(100, wall.Add(time.Hour)))
+			assert.Equal(t, wall.Add(200*time.Millisecond), e.NotBefore, "cadence clearing preserves the provider minimum")
+			e.resetRetry()
 			assert.True(t, e.NotBefore.IsZero())
 		})
 	}

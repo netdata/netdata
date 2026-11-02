@@ -5,7 +5,8 @@ package collectorapi
 import "time"
 
 // WithRetryNotBefore adds an absolute lower bound for an otherwise eligible
-// automatic startup retry. It does not enable retries or classify the error.
+// automatic startup retry, including source promotion of the retained candidate.
+// It does not enable retries or classify the error.
 // Capture the deadline when the provider requests a wait, rather than when the
 // framework later disposes the failed collector. Zero deadlines are ignored.
 // The original diagnostic text and error chain are preserved; nil stays nil.
