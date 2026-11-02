@@ -241,7 +241,8 @@ concern; see §1.5.) The bound is a per-domain decision, recorded in the design 
   the excluded coverage explicitly (for example a charted-versus-reported count). A cap alone silently truncates
   whatever lands in the first N entries, so pair it with a selector that lets the operator choose which entities
   survive. Worked example: apps.plugin (`src/collectors/apps.plugin/apps_targets.c`) - per-family `max-targets` cap,
-  an `other` target aggregated from per-process values, `apps_groups.conf` as the selector, idle retirement (§1.5).
+  an `other` target aggregated from per-process values, idle retirement (§1.5); `apps_groups.conf` selects permanent
+  application groups only, so the user, group, SID and service families have no selector.
 
 A public `max_*` option or selector is a config option like any other: it MUST name the operator decision it enables
 (`.agents/skills/collectors-go-design/operator-surface.md`). A bounded, low-cardinality entity set needs no knob.

@@ -310,8 +310,8 @@ services are created when their first process appears. Two command options bound
 - `max-targets N` (default `500`, minimum `1`): the maximum number of these groups, per family (application groups,
   users, user groups, SIDs, services), that get their own charts. New groups beyond the limit are aggregated into an
   `other` instance of their family (`app.other_*`, `user.other_*`, ...; `other_2_*` if a real group is already called
-  `other`), and an info message is logged once. A
-  process placed into `other` moves to its own group again once retirement frees a slot.
+  `other`), and an info message is logged once per family. A process placed into `other` moves to its own group
+  again once retirement frees a slot.
 
 Groups defined in `apps_groups.conf` are never retired and do not count against the limit, so define the processes
 that must always have their own charts there.
@@ -321,8 +321,8 @@ that must always have their own charts there.
   command options = retire-targets-after 7200 max-targets 1000
 ```
 
-The charts `netdata.apps_targets` and `netdata.apps_targets_retired` show the number of these groups per family and
-how many have been retired.
+The chart `netdata.apps_targets` shows the number of these groups per family, and `netdata.apps_targets_retired`
+the rate at which they are retired (targets/s).
 
 Two names can sanitize to the same chart ID (for example `a.b` and `a_b`); the later one gets a numeric suffix
 (`a_b_2`) so that each group keeps its own charts.
