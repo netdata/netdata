@@ -11,13 +11,14 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 )
 
-// tableRowMatch records, per chart key and collection, whether any row matched the chart's stored tags. Rows sharing
-// a key arrive in no fixed order, so a chart is refreshed only when no row matches, from a deterministic row.
+// tableRowMatch records, per chart key and collection, how the rows seen so far relate to the chart's stored tags.
+// Rows sharing a key arrive in no fixed order, so each chart follows the tableRowLess-smallest row of the collection.
 type tableRowMatch uint8
 
 const (
-	tableRowChanged tableRowMatch = iota + 1
-	tableRowMatched
+	tableRowChanged tableRowMatch = iota + 1 // only rows differing from the stored tags so far
+	tableRowMatched                          // a row matching the stored tags was seen
+	tableRowCreated                          // the chart was created in this collection
 )
 
 // tableChartState tracks what a table chart was last sent with, so label and name changes are re-sent only when
@@ -52,8 +53,17 @@ func (st *tableChartState) update(m ddsnmp.Metric) {
 	}
 }
 
-func privateTagsLess(a, b map[string]string) bool {
-	return strings.Compare(privateTagsString(a), privateTagsString(b)) < 0
+// tableRowLess orders rows sharing a chart key: a non-empty alias first, then the smallest alias, which is the alias
+// the interfaces Function shows for them (updateIfaceCacheEntry), then all underscore-prefixed tags.
+func tableRowLess(a, b map[string]string) bool {
+	aliasA, aliasB := a[tagIfAlias], b[tagIfAlias]
+	if (aliasA == "") != (aliasB == "") {
+		return aliasA != ""
+	}
+	if aliasA != aliasB {
+		return aliasA < aliasB
+	}
+	return privateTagsString(a) < privateTagsString(b)
 }
 
 func privateTagsString(tags map[string]string) string {

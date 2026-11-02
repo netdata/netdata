@@ -378,3 +378,38 @@ func TestCollector_TableChartNamesDisabled(t *testing.T) {
 	assert.Equal(t, "", chart.OverID)
 	assert.Equal(t, "uplink", chartLabels(chart)["if_alias"])
 }
+
+func TestCollector_TableChartRowsSharingKeyPickTheFunctionRow(t *testing.T) {
+	tests := map[string]struct {
+		prev    map[string]string
+		aliases []string
+		want    string
+	}{
+		"new chart, a then b":                  {aliases: []string{"uplink-a", "uplink-b"}, want: "uplink-a"},
+		"new chart, b then a":                  {aliases: []string{"uplink-b", "uplink-a"}, want: "uplink-a"},
+		"new chart, empty alias first":         {aliases: []string{"", "uplink"}, want: "uplink"},
+		"new chart, empty alias last":          {aliases: []string{"uplink", ""}, want: "uplink"},
+		"existing empty alias, peer gains one": {prev: map[string]string{"eth0": ""}, aliases: []string{"", "uplink"}, want: "uplink"},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			collr := newTestSNMPCollector()
+			collr.sysInfo = &snmputils.SysInfo{Name: "switch"}
+			if test.prev != nil {
+				collectAliases(collr, "ifTraffic", test.prev)
+			}
+
+			var rows []ddsnmp.Metric
+			for _, alias := range test.aliases {
+				rows = append(rows, aliasTestMetric("ifTraffic", ifaceTags("eth0", alias)))
+			}
+			collr.collectProfileTableMetrics(make(map[string]int64), rows)
+
+			chart := collr.Charts().Get("snmp_device_prof_ifTraffic_eth0")
+			require.NotNil(t, chart)
+			assert.Equal(t, test.want, chartLabels(chart)["if_alias"])
+			assert.Equal(t, "ifTraffic_"+test.want, chart.OverID)
+		})
+	}
+}

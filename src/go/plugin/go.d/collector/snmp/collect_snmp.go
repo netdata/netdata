@@ -98,22 +98,36 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, metrics []dd
 			continue
 		}
 
-		if st, ok := c.tableCharts[key]; !ok {
+		switch st, ok := c.tableCharts[key]; {
+		case !ok:
 			c.tableCharts[key] = newTableChartState(c.addProfileTableMetricChart(m), m)
-			seen[key] = tableRowMatched
+			seen[key] = tableRowCreated
 			namesStale = true
-		} else if seen[key] != tableRowMatched {
-			if !st.privateTagsChanged(m.Tags) {
-				seen[key] = tableRowMatched
-				delete(changed, key)
-			} else {
-				seen[key] = tableRowChanged
-				if prev, ok := changed[key]; !ok || privateTagsLess(m.Tags, prev.Tags) {
-					if changed == nil {
-						changed = make(map[string]ddsnmp.Metric)
-					}
-					changed[key] = m
+		case seen[key] == tableRowCreated:
+			if tableRowLess(m.Tags, st.privTags) {
+				st.update(m)
+				if st.chart != nil {
+					st.chart.Labels = c.profileTableChartLabels(m)
 				}
+			}
+		case !st.privateTagsChanged(m.Tags):
+			if prev, ok := changed[key]; ok && tableRowLess(st.privTags, prev.Tags) {
+				delete(changed, key)
+			}
+			seen[key] = tableRowMatched
+		default:
+			best := st.privTags
+			if prev, ok := changed[key]; ok {
+				best = prev.Tags
+			}
+			if seen[key] == 0 || tableRowLess(m.Tags, best) {
+				if changed == nil {
+					changed = make(map[string]ddsnmp.Metric)
+				}
+				changed[key] = m
+			}
+			if seen[key] == 0 {
+				seen[key] = tableRowChanged
 			}
 		}
 

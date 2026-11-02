@@ -427,6 +427,7 @@ modules:
               description: Name each interface chart after the interface alias (IF-MIB ifAlias) when the device reports one, so dashboards and alerts show the alias. Chart IDs are not affected; exporters that send chart names (the default) see new metric names when this is enabled or an alias changes.
               default_value: true
               required: false
+
             - name: ping_only
               group: Ping
               description: Collect only ICMP round-trip metrics and skip periodic SNMP polling. Implies ping is enabled regardless of the `ping.enabled` setting. A minimal SNMP sysInfo probe still runs at setup for naming/labels/metadata.
