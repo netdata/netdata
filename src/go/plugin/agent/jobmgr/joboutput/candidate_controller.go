@@ -716,16 +716,22 @@ func candidateSourceChoice(r *candidateRecord) *sourceSelection {
 			selected = e
 		}
 	}
-	if r.Cursor != nil {
-		previous := r.entry(r.Cursor.Key)
-		lifetime, present := r.Inventory.Sources[r.Cursor.Key.Source]
+	// An older executor's acceptance/rejection can update consumed history.
+	// The newer unconsumed source observation remains the selection cursor.
+	cursor := r.Cursor
+	if r.validDeferredSourceEntry() != nil {
+		cursor = &r.DeferredSource.Observation
+	}
+	if cursor != nil {
+		previous := r.entry(cursor.Key)
+		lifetime, present := r.Inventory.Sources[cursor.Key.Source]
 		observed := previous != nil && previous.Observed && !previous.Rejected && candidateAuthorized(r, previous.Key)
-		protected := present && lifetime == r.Cursor.Lifetime && (previous == nil || !previous.Rejected) && candidateSourceBlocked(r, r.Cursor.Key)
-		if (observed || protected) && (selected == nil || selected.Candidate.Config.SourceTypePriority() <= r.Cursor.Priority) {
+		protected := present && lifetime == cursor.Lifetime && (previous == nil || !previous.Rejected) && candidateSourceBlocked(r, cursor.Key)
+		if (observed || protected) && (selected == nil || selected.Candidate.Config.SourceTypePriority() <= cursor.Priority) {
 			if previous != nil && (previous.Rejected || !candidateAuthorized(r, previous.Key)) {
 				previous = nil
 			}
-			observation := *r.Cursor
+			observation := *cursor
 			if observed {
 				observation = *observeCandidate(previous)
 			}
@@ -834,7 +840,7 @@ func (c *candidateController) arbitrateSource(d *candidateDelta) error {
 	}
 	if !e.providerReady(c.wallNow()) {
 		if e.Observed && e.SourceOwned {
-			r.DeferredSource = &candidateDeferredSource{Observation: *observation, PredecessorIntent: r.Intent}
+			r.DeferredSource = &candidateDeferredSource{Observation: *observation}
 		}
 		return nil
 	}

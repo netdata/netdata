@@ -82,22 +82,31 @@ func retryLogicalDue(now, delay int64) int64 {
 }
 
 // Deferred source selection is an unconsumed inventory transition, not an
-// executor. Cursor alone also represents already-consumed source history.
+// executor. Automatic admission may advance Intent without consuming it;
+// explicit intent resets revoke it together with executable work.
 type candidateDeferredSource struct {
-	Observation       sourceObservation
-	PredecessorIntent uint64
+	Observation sourceObservation
 }
 
-func (r *candidateRecord) deferredSourceEntry() *candidateEntry {
+// Selection reads source authority without mutating pending state or its wake.
+func (r *candidateRecord) validDeferredSourceEntry() *candidateEntry {
 	pending := r.DeferredSource
 	if pending == nil {
 		return nil
 	}
 	e := r.entry(pending.Observation.Key)
-	if pending.PredecessorIntent != r.Intent || e == nil || !e.Observed || !e.SourceOwned || e.Rejected ||
+	lifetime, present := r.Inventory.Sources[pending.Observation.Key.Source]
+	if !present || lifetime != pending.Observation.Lifetime || e == nil || !e.Observed || !e.SourceOwned || e.Rejected ||
 		e.SourceLifetime != pending.Observation.Lifetime || !candidateAuthorized(r, e.Key) {
-		r.cancelDeferredSource()
 		return nil
+	}
+	return e
+}
+
+func (r *candidateRecord) deferredSourceEntry() *candidateEntry {
+	e := r.validDeferredSourceEntry()
+	if e == nil && r.DeferredSource != nil {
+		r.cancelDeferredSource()
 	}
 	return e
 }
