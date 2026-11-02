@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
@@ -267,10 +268,7 @@ func (dcjc *DynCfgJobController) prepareControllerProbeFailure(ctx context.Conte
 	if dcjc.configModules.activationWaitsForDependency(config, failure) {
 		return dcjc.prepareControllerWait(ctx, attempt, current, scope, permit, failure, nil)
 	}
-	retry := 0
-	if failure.retry {
-		retry = failure.retryAfter
-	}
+	retry := failure.retryDelay(time.Now())
 	listed := config.SourceType() != confgroup.TypeStock || failure.keepsFailedStockListed()
 	delta, err := dcjc.candidates.prepareOutcome(scope.ID, attempt.spec.work.Token, candidateOutcome{Kind: candidateFailed, RetryAfter: retry, Listed: listed}, dcjc.scheduler.retries.now())
 	if err != nil {
@@ -390,10 +388,7 @@ func (dcjc *DynCfgJobController) prepareControllerWait(ctx context.Context, atte
 }
 
 func (dcjc *DynCfgJobController) prepareControllerBlocked(ctx context.Context, attempt acceptedActivationAttempt, current lifecycle.ReadyResource, scope lifecycle.ResourceTransactionScope, permit lifecycle.LongLivedPermit, cause error, block candidateBlockPolicy) (lifecycle.PreparedResourceTransaction, error) {
-	retryAfter := 0
-	if failure := transientActivationFailure(attempt.spec.config, cause); failure.retry {
-		retryAfter = failure.retryAfter
-	}
+	retryAfter := transientActivationFailure(attempt.spec.config, cause).retryDelay(time.Now())
 	delta, err := dcjc.candidates.prepareOutcome(scope.ID, attempt.spec.work.Token, candidateOutcome{Kind: candidateFrameworkBlocked, Block: block, RetryAfter: retryAfter, Listed: true}, dcjc.scheduler.retries.now())
 	if err != nil {
 		return nil, err

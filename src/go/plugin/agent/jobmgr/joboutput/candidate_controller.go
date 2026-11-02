@@ -163,7 +163,7 @@ type candidateOutcome struct {
 	// AdmitWaiting preserves the source-specific dependency/vnode acceptance boundary.
 	AdmitWaiting bool
 	// RetryAfter is supplied only for a positively classified automatic retry.
-	RetryAfter int
+	RetryAfter int64
 	AfterReady bool
 	// Listed supplies source-specific failed-stock removal policy.
 	Listed bool
