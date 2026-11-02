@@ -347,6 +347,9 @@ static void dsf_json_agent(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         {
             buffer_json_member_add_time_t(wb, "init", ds->timings.init);
             buffer_json_member_add_time_t(wb, "exit", ds->timings.exit);
+
+            if(ds->v >= 30)
+                buffer_json_member_add_uint64(wb, "exit_ut", ds->timings.exit_ut);
         }
         buffer_json_object_close(wb);
     }
@@ -618,6 +621,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     unsigned required_v26 = version >= 26 ? strict : JSONC_OPTIONAL;
     unsigned required_v27 = version >= 27 ? strict : JSONC_OPTIONAL;
     unsigned required_v29 = version >= 29 ? strict : JSONC_OPTIONAL;
+    unsigned required_v30 = version >= 30 ? strict : JSONC_OPTIONAL;
 
     // Parse timestamp
     JSONC_PARSE_TXT2RFC3339_USEC_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", ds->timestamp_ut, error, required_v1);
@@ -656,6 +660,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
         JSONC_PARSE_SUBOBJECT(jobj, path, timings_key, error, required_v1, {
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "init", ds->timings.init, error, required_v1);
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "exit", ds->timings.exit, error, required_v1);
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "exit_ut", ds->timings.exit_ut, error, required_v30);
         });
 
         if(version >= 4)
@@ -1926,6 +1931,26 @@ bool daemon_status_file_has_last_crashed(DAEMON_STATUS_FILE *ds) {
 
 bool daemon_status_file_was_incomplete_shutdown(void) {
     return last_session_status.status == DAEMON_STATUS_EXITING;
+}
+
+// The shutdown watcher records how long a completed shutdown took, right before it saves DAEMON_STATUS_EXITED.
+// The next start imports it into the agent event log (see daemon_status_file_last_shutdown_duration_ut()).
+// Shutdown itself must not write it to SQLite: by then threads that shutdown gave up on may still hold db_meta,
+// and a write would wait for them until the shutdown watchdog aborts the agent.
+void daemon_status_file_set_shutdown_duration_ut(usec_t duration_ut) {
+    daemon_status_file_session_status_writer_enter();
+    session_status.timings.exit_ut = duration_ut;
+    daemon_status_file_session_status_writer_leave();
+}
+
+// The previous session's shutdown duration, only when that session completed a normal shutdown.
+// Zero for a crash, a fatal, a watchdog abort (it never reaches the watcher's final save), or a file
+// written by an agent that did not record it.
+usec_t daemon_status_file_last_shutdown_duration_ut(void) {
+    if(last_session_status.status != DAEMON_STATUS_EXITED || daemon_status_file_has_last_crashed(&last_session_status))
+        return 0;
+
+    return last_session_status.timings.exit_ut;
 }
 
 // --------------------------------------------------------------------------------------------------------------------

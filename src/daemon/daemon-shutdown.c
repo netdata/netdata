@@ -174,6 +174,19 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
 }
 #endif
 
+// The last thing shutdown does. When shutdown gave up on a SQLite user (see sqlite_teardown_is_unsafe()), that
+// thread may still be a libuv threadpool worker in the middle of a job, and exit() would run libuv's library
+// destructor, which joins every threadpool thread - so the process would wait for the job it already gave up on,
+// until systemd kills it. Shutdown is complete and its status saved by then: leave without running destructors.
+static NORETURN void netdata_exit_process(int status) {
+    if(sqlite_teardown_is_unsafe()) {
+        fflush(NULL);
+        _exit(status);
+    }
+
+    exit(status);
+}
+
 static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exit_when_done) {
     exit_initiated_set(reason);
 
@@ -193,7 +206,6 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     netdata_log_exit_reason();
 
     watcher_thread_start();
-    usec_t shutdown_start_time = now_monotonic_usec();
     watcher_shutdown_begin();
 
 #ifdef ENABLE_DBENGINE
@@ -351,9 +363,10 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
         watcher_step_complete(WATCHER_STEP_ID_STOP_METASYNC_THREADS);
     }
 
-    // Don't register a shutdown event if we crashed
-    if (!abnormal)
-        add_agent_event(EVENT_AGENT_SHUTDOWN_TIME, (int64_t)(now_monotonic_usec() - shutdown_start_time));
+    // Do not record the shutdown duration in SQLite here. The steps above may have given up on threads (the
+    // metadata worker, health) that are still inside db_meta, and any statement on that shared connection would
+    // wait for them until the shutdown watchdog aborts the agent. The watcher records the duration in the status
+    // file instead, and the next start imports it into the agent event log.
 
     nd_thread_join_threads();
     watcher_step_complete(WATCHER_STEP_ID_JOIN_STATIC_THREADS);
@@ -526,13 +539,13 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 
     nd_sentry_fini();
     curl_global_cleanup();
-    exit(abnormal ? 1 : 0);
+    netdata_exit_process(abnormal ? 1 : 0);
 #else
     if(abnormal)
         _exit(1);
     else {
         curl_global_cleanup();
-        exit(0);
+        netdata_exit_process(0);
     }
 #endif
 }

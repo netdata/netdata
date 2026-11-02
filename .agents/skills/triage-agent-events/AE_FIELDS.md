@@ -3,7 +3,7 @@
 Verified field map for the agent-events journal namespace.
 Every claim here is traceable to producer source at
 `<repo>/src/daemon/status-file.c` (the schema is
-`STATUS_FILE_VERSION = 29`, `src/daemon/status-file.h:14`).
+`STATUS_FILE_VERSION = 30`, `src/daemon/status-file.h:14`).
 
 The .local draft `agent-events-journals.md` was found to have
 14 high-severity divergences (wrong enums, missing fields,
@@ -89,7 +89,8 @@ The previous (crashed) session's agent state.
 | `agent.reliability` | `AE_AGENT_RELIABILITY` | int | always | Signed reliability counter (positive = healthy run streak; negative = crash streak). `<= -2` -> `crash-loop`. |
 | `agent.stack_traces` | `AE_AGENT_STACK_TRACES` | string | always | Backtrace backend name (`libbacktrace`, `none`). |
 | `agent.timings.init` | `AE_AGENT_TIMINGS_INIT` | int seconds | always | How long startup took. Long init + crash = startup bug. |
-| `agent.timings.exit` | `AE_AGENT_TIMINGS_EXIT` | int seconds | always | How long shutdown took. |
+| `agent.timings.exit` | `AE_AGENT_TIMINGS_EXIT` | int seconds | always | How long shutdown took, wall clock. On a shutdown-timeout event it is when the hung step began, not a duration. |
+| `agent.timings.exit_ut` | `AE_AGENT_TIMINGS_EXIT_UT` | uint usec | v>=30 | Monotonic duration of a completed shutdown (all steps), set just before the final `exited` save; 0 when shutdown did not complete. The next start imports it into the agent event log (shutdown-time median). |
 
 ## `metrics.*` fields (`dsf_json_metrics`, `:158-193`)
 
