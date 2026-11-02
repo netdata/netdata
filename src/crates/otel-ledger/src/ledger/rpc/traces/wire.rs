@@ -638,11 +638,10 @@ pub struct OverviewGridWire {
     /// Per time bucket, the per-duration-bin TRACE counts (each trace
     /// bins by its merged envelope).
     pub cells: Vec<Vec<u64>>,
-    /// Per cell, the binned traces' STORED ERROR-status spans —
-    /// index-parallel to `cells` in BOTH dimensions. It counts spans,
-    /// not traces: a cell holding one trace with three failed spans
-    /// reads 3, not 1.
-    pub error_cells: Vec<Vec<u64>>,
+    /// Per time bucket, the binned traces' STORED ERROR-status spans —
+    /// index-parallel to `cells`. It counts spans, not traces: a bucket
+    /// holding one trace with three failed spans reads 3, not 1.
+    pub error_spans: Vec<u64>,
     /// Per time bucket, the binned traces' envelope-duration
     /// percentiles, nanoseconds (within 1/32 of exact).
     pub duration_percentiles_ns: OverviewPercentilesWire,
@@ -987,7 +986,7 @@ pub struct AnchorWire {
 /// can have no cell).
 ///
 /// How the section's population relates to the page's: it applies the
-/// page's chips and text except the trace-duration ones, with
+/// page's chips and text except the trace-duration and trace-start ones, with
 /// stored-row semantics, like every other number in the section — a
 /// span-local chip holds when ANY stored copy of a span starting inside
 /// the grid matches (a `!` chip when none does), a root chip reads the

@@ -993,7 +993,7 @@ pub(crate) fn to_overview_section(
             bucket_width_s: (grid.bucket_width_ns / NS_PER_S) as u32,
             duration_bins: DURATION_BIN_LABELS.to_vec(),
             cells: data.cells.iter().map(|row| row.to_vec()).collect(),
-            error_cells: data.error_cells.iter().map(|row| row.to_vec()).collect(),
+            error_spans: data.error_spans,
             duration_percentiles_ns: to_percentiles(&data.bucket_percentiles),
             duration_rows: heatmap_row_bounds().to_vec(),
             durations: data

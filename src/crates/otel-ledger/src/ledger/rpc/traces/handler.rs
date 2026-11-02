@@ -352,8 +352,8 @@ impl OtelTracesHandler {
     ///
     /// `aggregate` adds the Functions view's full-window section: a
     /// SECOND engine pass in this same call, off the same capture, over
-    /// the page's tokens minus the trace-duration ones (duration is the
-    /// grid's own axis; `heatmap_tokens`). It cannot ride along with the
+    /// the page's tokens minus the trace-duration and trace-start ones
+    /// (the grid's own axes; `heatmap_tokens`). It cannot ride along with the
     /// first — search is top-K with early termination and hard-caps its
     /// assembly far below the window's population, so an accumulator on
     /// its scan loop would describe the few hundred traces the ranker
@@ -537,7 +537,7 @@ impl OtelTracesHandler {
                         "otel-traces internal error: captured source set is inconsistent: {e}"
                     )));
                 }
-                // The handler builds the grid and drops the duration chips,
+                // The handler builds the grid and drops the axis chips,
                 // and the list pass already accepted the same chips.
                 Err(e) => {
                     return Err(handler_err(format!(

@@ -28,7 +28,8 @@
 //!   bucket's binned durations (16 sub-bins per power of two), within
 //!   1/32 of the exact nearest-rank duration and never outside the
 //!   bucket's observed range — memory per bucket, not per trace. The
-//!   duration bins stay decade-wide: they serve cell-click narrowing,
+//!   same histogram gives the heatmap's power-of-two duration rows. The
+//!   duration bins stay decade-wide: they serve the trace-volume view,
 //!   and interpolating a percentile from them would carry up to an
 //!   order-of-magnitude error.
 //! - **Bin-by-envelope-start**: a trace whose MERGED envelope starts
@@ -52,9 +53,14 @@
 //!   `trace_id` tokens pin or
 //!   exclude. The filter SELECTS traces, it does not trim them: a binned
 //!   trace still contributes its WHOLE merged envelope and ALL its
-//!   stored spans, matching or not. Trace-duration tokens are REJECTED
-//!   at the request boundary — the duration is the grid's own axis —
-//!   never silently ignored.
+//!   stored spans, matching or not. Trace-duration and trace-start tokens
+//!   are REJECTED at the request boundary — they are the grid's own axes
+//!   — never silently ignored.
+//! - **Window files only**: the envelope merges the spans of the grid's
+//!   own sources. A long trace whose early spans sit only in older files
+//!   bins later than it started (the list, reading a wider completion
+//!   range, knows the earlier start) — a known approximation that keeps
+//!   the pass cheap.
 //!
 //! Engine contracts come from the shared fold (`super::fold`): sources
 //! process in `SourceId` order; a failed source is a
@@ -115,7 +121,6 @@ const REMAINDER_TRACES_MAX: usize = 262_144;
 /// reasoning: a free-text term over a day of files).
 const DICT_BYTES_CEILING: u64 = 512 << 20;
 
-/// Which duration bin an envelope duration falls in.
 /// Whether `target` is one of the grid's axes — the trace's start (time)
 /// or its duration — which the grid draws rather than filters on.
 pub fn is_axis(target: &PredicateTarget) -> bool {
@@ -125,6 +130,7 @@ pub fn is_axis(target: &PredicateTarget) -> bool {
     )
 }
 
+/// Which duration bin an envelope duration falls in.
 fn duration_bin(duration_ns: i64) -> usize {
     DURATION_BIN_EDGES_NS.partition_point(|&edge| duration_ns >= edge)
 }
@@ -219,11 +225,11 @@ pub struct OverviewData {
     /// under [`TraceFragments`](PartialReason::TraceFragments). Length =
     /// `grid.num_buckets`; each row = [`DURATION_BIN_COUNT`].
     pub cells: Vec<[u64; DURATION_BIN_COUNT]>,
-    /// Per cell, the binned traces' STORED ERROR-status spans —
-    /// index-parallel to `cells` in BOTH dimensions, summing to
-    /// `total_errors`. Sliced by the trace's cell, so a failed span
-    /// counts where its TRACE binned.
-    pub error_cells: Vec<[u64; DURATION_BIN_COUNT]>,
+    /// Per time bucket, the binned traces' STORED ERROR-status spans —
+    /// index-parallel to `cells`'s outer index, summing to
+    /// `total_errors`. A failed span counts in the bucket its TRACE
+    /// binned in.
+    pub error_spans: Vec<u64>,
     /// Distinct traces binned into the grid (= the sum of all cells).
     pub total_traces: u64,
     /// Their STORED spans, summed (resends included). Totals are
@@ -252,7 +258,7 @@ impl OverviewData {
     fn empty(num_buckets: usize, status: QueryStatus) -> Self {
         Self {
             cells: vec![[0; DURATION_BIN_COUNT]; num_buckets],
-            error_cells: vec![[0; DURATION_BIN_COUNT]; num_buckets],
+            error_spans: vec![0; num_buckets],
             total_traces: 0,
             total_spans: 0,
             total_errors: 0,
@@ -319,7 +325,7 @@ pub fn overview(
     // the search engine's start-in-window rule, applied to the
     // envelope.
     let mut cells = vec![[0u64; DURATION_BIN_COUNT]; grid.num_buckets];
-    let mut error_cells = vec![[0u64; DURATION_BIN_COUNT]; grid.num_buckets];
+    let mut error_spans = vec![0u64; grid.num_buckets];
     let mut total_traces = 0u64;
     let mut total_spans = 0u64;
     let mut total_errors = 0u64;
@@ -337,7 +343,7 @@ pub fn overview(
         let duration = m.max_end_ns.saturating_sub(m.min_start_ns);
         let bin = duration_bin(duration);
         cells[bucket][bin] += 1;
-        error_cells[bucket][bin] = error_cells[bucket][bin].saturating_add(m.error_count);
+        error_spans[bucket] = error_spans[bucket].saturating_add(m.error_count);
         total_traces = total_traces.saturating_add(1);
         total_spans = total_spans.saturating_add(m.span_count);
         total_errors = total_errors.saturating_add(m.error_count);
@@ -351,7 +357,7 @@ pub fn overview(
 
     Ok(OverviewData {
         cells,
-        error_cells,
+        error_spans,
         total_traces,
         total_spans,
         total_errors,

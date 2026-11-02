@@ -107,11 +107,12 @@ all tokens. Different tokens can match different spans of the trace. All
 four flags are repeatable. `explore` applies the tokens to each span
 instead: a span matches when it matches all tokens, and a `--not` token
 keeps the spans that do not match it. In `explore`, a token on the whole
-trace (`root_name`, `root_service_name`, `trace_duration`) is an error.
+trace (`root_name`, `root_service_name`, `trace_duration`, `trace_start`) is
+an error.
 
 - `--where COND` — one span must match all `--where` conditions together.
   A condition on the whole trace (`root_name`, `root_service_name`,
-  `trace_duration`) or on `trace_id` is a token of its own.
+  `trace_duration`, `trace_start`) or on `trace_id` is a token of its own.
 - `--and COND` — a token of its own: a span of the trace matches the
   condition.
 - `--not COND` — a token of its own: no span of the trace matches the
@@ -132,7 +133,8 @@ data. These are the same keys that the search of the Netdata Agent uses:
 - A field: `name`, `kind`, `role`, `status.code`, `status.message`, `scope.name`,
   `scope.version`, `events.name`, `duration`, `span_id`, `parent_span_id`,
   `trace_id`, `links.span_id`, `links.trace_id`, `events.time_since_start`,
-  `root_name`, `root_service_name`, `trace_duration`.
+  `root_name`, `root_service_name`, `trace_duration`, `trace_start` (the time the
+  trace's first span started, in epoch nanoseconds).
 
 The ops:
 
@@ -219,7 +221,8 @@ duration bins. `--buckets` sets the number of time buckets (default 60).
 The time from `--start-ns` to `--end-ns` must divide equally into the
 buckets. If it does not, the command stops with an error.
 The token flags filter the traces that it counts. A token on
-`trace-duration` is an error, because the duration is the grid's own axis.
+`trace_duration` or `trace_start` is an error, because they are the grid's own
+axes.
 The command is for measurements and does not print the grid. It prints one
 line: `N trace(s), N span(s), N error(s), status …, <time> ms`.
 

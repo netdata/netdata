@@ -937,8 +937,10 @@
             "bucket_width_s",
             "duration_bins",
             "cells",
-            "error_cells",
-            "duration_percentiles_ns"
+            "error_spans",
+            "duration_percentiles_ns",
+            "duration_rows",
+            "durations"
           ],
           "properties": {
             "bucket_start_s": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
@@ -954,7 +956,15 @@
                 "items": { "type": "integer", "minimum": 0 }
               }
             },
-            "error_cells": {
+            "error_spans": {
+              "type": "array",
+              "items": { "type": "integer", "minimum": 0 }
+            },
+            "duration_rows": {
+              "type": "array",
+              "items": { "type": ["integer", "null"], "minimum": 1 }
+            },
+            "durations": {
               "type": "array",
               "items": {
                 "type": "array",

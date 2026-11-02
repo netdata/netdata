@@ -293,7 +293,7 @@ pub enum PredicateError {
     TextValueRequired { op: CompareOp, target: String },
     #[error("{op:?} on {target} requires numeric values")]
     NumericValueRequired { op: CompareOp, target: String },
-    #[error("duration comparisons take integer nanoseconds")]
+    #[error("duration and time comparisons take integer nanoseconds")]
     NonIntegerDuration,
     #[error("invalid regex pattern {pattern:?}: {msg}")]
     InvalidPattern { pattern: String, msg: String },
@@ -1558,6 +1558,22 @@ pub(crate) enum GateRootField {
     Name,
 }
 
+/// The intervals of a nanosecond trace-level condition, one per value; a
+/// negated condition's values are points (its negation applies to the
+/// whole condition).
+fn nanos_intervals(condition: &Condition, negated: bool) -> Vec<(Option<i64>, Option<i64>)> {
+    condition
+        .values
+        .iter()
+        .map(|v| {
+            let PredicateValue::Integer(n) = v else {
+                unreachable!("validated: nanos values are integers");
+            };
+            duration_bounds(if negated { CompareOp::Eq } else { condition.op }, *n)
+        })
+        .collect()
+}
+
 enum TraceLevelCondition {
     RootName {
         matcher: EvalMatcher,
@@ -1616,36 +1632,16 @@ impl TraceLevelEval {
                         }
                     }
                     PredicateTarget::Builtin(BuiltinField::TraceDuration) => {
-                        let intervals = condition
-                            .values
-                            .iter()
-                            .map(|v| {
-                                let PredicateValue::Integer(n) = v else {
-                                    unreachable!("validated: nanos values are integers");
-                                };
-                                duration_bounds(
-                                    if negated { CompareOp::Eq } else { condition.op },
-                                    *n,
-                                )
-                            })
-                            .collect();
-                        TraceLevelCondition::Duration { intervals, negated }
+                        TraceLevelCondition::Duration {
+                            intervals: nanos_intervals(condition, negated),
+                            negated,
+                        }
                     }
                     PredicateTarget::Builtin(BuiltinField::TraceStart) => {
-                        let intervals = condition
-                            .values
-                            .iter()
-                            .map(|v| {
-                                let PredicateValue::Integer(n) = v else {
-                                    unreachable!("validated: nanos values are integers");
-                                };
-                                duration_bounds(
-                                    if negated { CompareOp::Eq } else { condition.op },
-                                    *n,
-                                )
-                            })
-                            .collect();
-                        TraceLevelCondition::Start { intervals, negated }
+                        TraceLevelCondition::Start {
+                            intervals: nanos_intervals(condition, negated),
+                            negated,
+                        }
                     }
                     other => unreachable!("not a trace-level target: {other}"),
                 }

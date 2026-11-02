@@ -74,7 +74,7 @@ impl AttributeOwner {
 /// columns (`Duration`, `SpanId`, `ParentSpanId`, `TraceId`), by the
 /// EVNB/LNKB event/link structures (`LinkSpanId`, `LinkTraceId`,
 /// `EventTimeSinceStart`), or by post-assembly derivation (`RootName`,
-/// `RootServiceName`, `TraceDuration`) — and value enumeration on them
+/// `RootServiceName`, `TraceDuration`, `TraceStart`) — and value enumeration on them
 /// is a request error.
 ///
 /// `trace_state` is deliberately NOT a builtin: the key

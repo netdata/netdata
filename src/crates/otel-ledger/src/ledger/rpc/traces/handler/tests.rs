@@ -1548,7 +1548,7 @@ async fn the_heatmap_matches_the_corpus_distribution() {
 }
 
 #[tokio::test]
-async fn the_grid_carries_error_counts_per_bucket_and_duration_bin() {
+async fn the_grid_carries_error_spans_per_bucket() {
     use crate::ledger::rpc::traces::fixtures::otlp_req_err;
     let registries = make_registries();
     install_wal(
@@ -1566,28 +1566,12 @@ async fn the_grid_carries_error_counts_per_bucket_and_duration_bin() {
     let v = heatmap_of(&h).await;
     assert_eq!(v["totals"], json!({"traces": 3}));
     let cells = v["grid"]["cells"].as_array().unwrap();
-    let errors = v["grid"]["error_cells"].as_array().unwrap();
-    assert_eq!(errors.len(), cells.len(), "index-parallel to the cells");
-    for row in errors {
-        assert_eq!(
-            row.as_array().unwrap().len(),
-            6,
-            "one column per duration bin"
-        );
-    }
-    // Every corpus envelope is sub-millisecond, so the failures land in
-    // the first duration bin of the second the traces started in.
-    assert_eq!(
-        errors[10],
-        json!([0, 0, 0, 0, 0, 0]),
-        "the healthy trace's bucket"
-    );
-    assert_eq!(errors[20], json!([2, 0, 0, 0, 0, 0]), "both failing traces");
-    let sum: u64 = errors
-        .iter()
-        .flat_map(|r| r.as_array().unwrap())
-        .map(|e| e.as_u64().unwrap())
-        .sum();
+    let errors = v["grid"]["error_spans"].as_array().unwrap();
+    assert_eq!(errors.len(), cells.len(), "index-parallel to the buckets");
+    // The failures count in the second the traces started in.
+    assert_eq!(errors[10], 0, "the healthy trace's bucket");
+    assert_eq!(errors[20], 2, "both failing traces");
+    let sum: u64 = errors.iter().map(|e| e.as_u64().unwrap()).sum();
     assert_eq!(sum, 2, "one failing span in each failing trace");
 }
 
