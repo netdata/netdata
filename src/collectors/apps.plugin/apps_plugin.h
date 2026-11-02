@@ -584,17 +584,27 @@ struct pid_stat {
     struct target *target;          // app_groups.conf/tree targets
     struct target *prev_target;
 
+    // A process placed in a family's overflow target keeps it only while its
+    // identity (the key) and the family's generation are unchanged.
 #if (PROCESSES_HAVE_UID == 1)
     struct target *uid_target;      // uid based targets
+    uid_t uid_overflow_key;
+    size_t uid_overflow_generation;
 #endif
 #if (PROCESSES_HAVE_GID == 1)
     struct target *gid_target;      // gid based targets
+    gid_t gid_overflow_key;
+    size_t gid_overflow_generation;
 #endif
 #if (PROCESSES_HAVE_SID == 1)
     struct target *sid_target;      // sid based targets
+    STRING *sid_overflow_key;       // own reference
+    size_t sid_overflow_generation;
 #endif
 #if (PROCESSES_HAVE_SERVICE == 1)
     struct target *service_target;  // service based targets
+    STRING *service_overflow_key;   // own reference
+    size_t service_overflow_generation;
 #endif
 
     STRING *comm_orig;              // the command, as-collected
@@ -829,6 +839,7 @@ struct target_family {
 
     size_t dynamic;             // dynamic targets linked, excluding the overflow target
     size_t retired;             // dynamic targets retired so far
+    size_t generation;          // bumped whenever a real target is linked or retired
     struct target *overflow;    // where new identities go while the family is at its cap
     bool cap_logged;
 };

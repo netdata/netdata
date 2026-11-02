@@ -117,8 +117,10 @@ static struct target *target_family_link(TARGET_FAMILY family, struct target *w)
     w->next = *f->root;
     *f->root = w;
 
-    if(!w->overflow)
+    if(!w->overflow) {
         f->dynamic++;
+        f->generation++;
+    }
 
     return w;
 }
@@ -246,8 +248,10 @@ void apps_targets_retire(void) {
 
             if(w->overflow)
                 f->overflow = NULL;
-            else
+            else {
                 f->dynamic--;
+                f->generation++;
+            }
 
             f->retired++;
 

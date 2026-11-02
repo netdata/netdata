@@ -149,10 +149,12 @@ static struct target *get_apps_groups_target_for_pid(struct pid_stat *p) {
     return NULL;
 }
 
-// A process in an overflow target is resolved again on every pass: its identity
-// may have changed to one that has a real target, or a slot may have been freed.
-static inline bool target_still_valid(struct target *w, bool identity_matches) {
-    return w && !w->overflow && identity_matches;
+// A process keeps a real target while its identity matches it. It keeps an
+// overflow target while its identity and the family's generation are the ones
+// it was placed there with: a real target linked or retired since then (a slot
+// freed, or its own identity got a target) makes it resolve again.
+static inline bool target_still_valid(struct target *w, bool identity_matches, bool overflow_matches) {
+    return w && (w->overflow ? overflow_matches : identity_matches);
 }
 
 static void assign_a_target_to_all_processes(void) {
@@ -308,13 +310,17 @@ void aggregate_processes_to_targets(void) {
 
 #if (PROCESSES_HAVE_UID == 1)
         o = p->uid_target;
-        if(likely(target_still_valid(p->uid_target, p->uid_target && p->uid_target->uid == p->uid)))
+        if(likely(target_still_valid(p->uid_target, p->uid_target && p->uid_target->uid == p->uid,
+                                     p->uid_overflow_key == p->uid &&
+                                     p->uid_overflow_generation == target_families[TARGET_FAMILY_UID].generation)))
             w = p->uid_target;
         else {
             if(unlikely(debug_enabled && p->uid_target))
                 debug_log("pid %d (%s) switched user from %u (%s) to %u.", p->pid, pid_stat_comm(p), p->uid_target->uid, string2str(p->uid_target->name), p->uid);
 
             w = p->uid_target = get_uid_target(p->uid);
+            p->uid_overflow_key = p->uid;
+            p->uid_overflow_generation = target_families[TARGET_FAMILY_UID].generation;
         }
 
         aggregate_pid_on_target(w, p, o);
@@ -326,13 +332,17 @@ void aggregate_processes_to_targets(void) {
 #if (PROCESSES_HAVE_GID == 1)
 
         o = p->gid_target;
-        if(likely(target_still_valid(p->gid_target, p->gid_target && p->gid_target->gid == p->gid)))
+        if(likely(target_still_valid(p->gid_target, p->gid_target && p->gid_target->gid == p->gid,
+                                     p->gid_overflow_key == p->gid &&
+                                     p->gid_overflow_generation == target_families[TARGET_FAMILY_GID].generation)))
             w = p->gid_target;
         else {
             if(unlikely(debug_enabled && p->gid_target))
                 debug_log("pid %d (%s) switched group from %u (%s) to %u.", p->pid, pid_stat_comm(p), p->gid_target->gid, string2str(p->gid_target->name), p->gid);
 
             w = p->gid_target = get_gid_target(p->gid);
+            p->gid_overflow_key = p->gid;
+            p->gid_overflow_generation = target_families[TARGET_FAMILY_GID].generation;
         }
 
         aggregate_pid_on_target(w, p, o);
@@ -343,10 +353,16 @@ void aggregate_processes_to_targets(void) {
 
 #if (PROCESSES_HAVE_SID == 1)
         o = p->sid_target;
-        if(likely(target_still_valid(p->sid_target, p->sid_target && p->sid_target->sid_name == p->sid_name)))
+        if(likely(target_still_valid(p->sid_target, p->sid_target && p->sid_target->sid_name == p->sid_name,
+                                     p->sid_overflow_key == p->sid_name &&
+                                     p->sid_overflow_generation == target_families[TARGET_FAMILY_SID].generation)))
             w = p->sid_target;
-        else
+        else {
             w = p->sid_target = get_sid_target(p->sid_name);
+            string_freez(p->sid_overflow_key);
+            p->sid_overflow_key = string_dup(p->sid_name);
+            p->sid_overflow_generation = target_families[TARGET_FAMILY_SID].generation;
+        }
 
         aggregate_pid_on_target(w, p, o);
 #endif
@@ -357,10 +373,16 @@ void aggregate_processes_to_targets(void) {
 #if (PROCESSES_HAVE_SERVICE == 1)
         if(enable_services_charts) {
             o = p->service_target;
-            if(likely(target_still_valid(p->service_target, p->service_target && p->service_target->service_name == p->service_name)))
+            if(likely(target_still_valid(p->service_target, p->service_target && p->service_target->service_name == p->service_name,
+                                         p->service_overflow_key == p->service_name &&
+                                         p->service_overflow_generation == target_families[TARGET_FAMILY_SERVICE].generation)))
                 w = p->service_target;
-            else
+            else {
                 w = p->service_target = get_service_target(p->service_name);
+                string_freez(p->service_overflow_key);
+                p->service_overflow_key = string_dup(p->service_name);
+                p->service_overflow_generation = target_families[TARGET_FAMILY_SERVICE].generation;
+            }
 
             aggregate_pid_on_target(w, p, o);
         }
