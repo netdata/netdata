@@ -1968,7 +1968,6 @@ void daemon_status_file_set_shutdown_duration_ut(usec_t duration_ut) {
     daemon_status_file_session_status_writer_leave();
 }
 
-// The previous session's shutdown duration, only when that session completed a normal shutdown.
 // A bounded shutdown wait gave up on still-running services (service_wait_exit()). Appended in step order, so the
 // status file says which threads were left behind when a later step stalls or the watchdog fires.
 void daemon_status_file_shutdown_gave_up(const char *services, const char *threads) {
@@ -1986,9 +1985,10 @@ void daemon_status_file_shutdown_gave_up(const char *services, const char *threa
     char *dst = session_status.shutdown.abandoned;
     size_t size = sizeof(session_status.shutdown.abandoned);
     size_t used = strlen(dst);
-    if(used + 2 + strlen(entry) < size)
+    // appends keep the last 3 bytes free (used <= size - 4), so the "..." for a dropped give-up always fits
+    if(used + 2 + strlen(entry) < size - 3)
         snprintfz(&dst[used], size - used, "%s%s", used ? "; " : "", entry);
-    else if(used + 4 <= size && (used < 3 || strcmp(&dst[used - 3], "...") != 0))
+    else if(used < 3 || strcmp(&dst[used - 3], "...") != 0)
         memcpy(&dst[used], "...", 4);
 
     dsf_release(session_status);

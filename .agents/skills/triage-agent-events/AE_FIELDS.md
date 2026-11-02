@@ -47,7 +47,7 @@ prefix in the journal field name.
 | `exit_cause` | `AE_EXIT_CAUSE` | string | yes | Human-readable label for why this session ended. The first thing to look at. See enum below. |
 | `message` | `AE_MESSAGE` | string | yes | One-line summary; subject of FTS search. |
 | `priority` | `AE_PRIORITY` | int | yes | Syslog priority (lower = more severe). |
-| `version_saved` | `AE_VERSION_SAVED` | uint | yes | The status file's own version (typically 29). |
+| `version_saved` | `AE_VERSION_SAVED` | uint | yes | The status file's own version (typically 30). |
 | `agent_version_now` | `AE_AGENT_VERSION_NOW` | string | yes | Posting agent's version (the agent that did the POST = next session, NOT the one that crashed). |
 | `agent_pid_now` | `AE_AGENT_PID_NOW` | uint | yes | PID of the agent that POSTed. |
 | `host_memory_critical` | `AE_HOST_MEMORY_CRITICAL` | bool | yes | Was the host under memory pressure at POST time? |
