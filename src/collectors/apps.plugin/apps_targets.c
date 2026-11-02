@@ -22,6 +22,241 @@ static inline STRING *get_numeric_string(uint64_t n) {
     return string_strdupz(buf);
 }
 
+// --------------------------------------------------------------------------------------------------------------------
+// Dynamic target lifecycle: admission, overflow, retirement
+
+time_t retire_targets_after_s = RETIRE_TARGETS_AFTER_DEFAULT_S;
+size_t max_targets_per_family = MAX_TARGETS_PER_FAMILY_DEFAULT;
+
+#if (PROCESSES_HAVE_UID == 1)
+struct target *users_root_target = NULL;
+#endif
+#if (PROCESSES_HAVE_GID == 1)
+struct target *groups_root_target = NULL;
+#endif
+#if (PROCESSES_HAVE_SID == 1)
+struct target *sids_root_target = NULL;
+#endif
+#if (PROCESSES_HAVE_SERVICE == 1)
+struct target *services_root_target = NULL;
+#endif
+struct target *apps_groups_root_target = NULL;
+
+struct target_family target_families[TARGET_FAMILY_MAX] = {
+    [TARGET_FAMILY_APPS] = {
+        .root = &apps_groups_root_target, .type = "app", .lbl_name = "app_group",
+        .title = "Applications Groups", .enabled = NULL,
+    },
+#if (PROCESSES_HAVE_UID == 1)
+    [TARGET_FAMILY_UID] = {
+        .root = &users_root_target, .type = "user", .lbl_name = "user",
+        .title = "User", .enabled = &enable_users_charts,
+    },
+#endif
+#if (PROCESSES_HAVE_GID == 1)
+    [TARGET_FAMILY_GID] = {
+        .root = &groups_root_target, .type = "usergroup", .lbl_name = "user_group",
+        .title = "User Group", .enabled = &enable_groups_charts,
+    },
+#endif
+#if (PROCESSES_HAVE_SID == 1)
+    [TARGET_FAMILY_SID] = {
+        .root = &sids_root_target, .type = "user", .lbl_name = "user",
+        .title = "User Processes", .enabled = &enable_users_charts,
+    },
+#endif
+#if (PROCESSES_HAVE_SERVICE == 1)
+    [TARGET_FAMILY_SERVICE] = {
+        .root = &services_root_target, .type = "service", .lbl_name = "service",
+        .title = "Windows Service", .enabled = &enable_services_charts,
+    },
+#endif
+};
+
+// Chart ids are built from clean_name, and get_clean_name() is lossy, so two
+// identities can map to the same id. Give a new dynamic target a clean name no
+// other reported target of its family uses, so they never write the same chart.
+static void target_set_unique_clean_name(struct target *root, struct target *w) {
+    STRING *base = get_clean_name(w->name);
+    STRING *candidate = string_dup(base);
+
+    for(size_t suffix = 2; ; suffix++) {
+        bool taken = false;
+        for(struct target *t = root; t ; t = t->next) {
+            if(t != w && !t->target && t->clean_name == candidate) {
+                taken = true;
+                break;
+            }
+        }
+
+        if(!taken)
+            break;
+
+        size_t len = string_strlen(base) + 1 + UINT64_MAX_LENGTH;
+        char *buf = mallocz(len);
+        snprintfz(buf, len - 1, "%s_%zu", string2str(base), suffix);
+        string_freez(candidate);
+        candidate = string_strdupz(buf);
+        freez(buf);
+    }
+
+    string_freez(base);
+    w->clean_name = candidate;
+}
+
+// Link a newly created dynamic target into its family. Stamps it active, so a
+// target is never retired before it had the chance to be referenced.
+static struct target *target_family_link(TARGET_FAMILY family, struct target *w) {
+    struct target_family *f = &target_families[family];
+
+    target_set_unique_clean_name(*f->root, w);
+
+    w->referenced_iteration = global_iterations_counter;
+    w->last_active_ut = now_monotonic_usec();
+
+    w->next = *f->root;
+    *f->root = w;
+
+    if(!w->overflow)
+        f->dynamic++;
+
+    return w;
+}
+
+// The family is at its cap: new identities aggregate into a single target that
+// identity lookups never match, so it cannot capture a real uid 0 or a real
+// process called "other".
+static struct target *target_family_overflow(TARGET_FAMILY family, TARGET_TYPE type) {
+    struct target_family *f = &target_families[family];
+
+    // logged once per family: under sustained churn the family stays at the cap,
+    // and every retirement would otherwise log it again
+    if(!f->cap_logged) {
+        f->cap_logged = true;
+        netdata_log_info("APPS: '%s' charts reached the limit of %zu targets; "
+                         "new identities are aggregated into '%s.other' until idle targets are retired "
+                         "(plugin options 'max-targets' and 'retire-targets-after')",
+                         f->type, max_targets_per_family, f->type);
+    }
+
+    if(f->overflow)
+        return f->overflow;
+
+    struct target *w = callocz(sizeof(struct target), 1);
+    w->type = type;
+    w->overflow = true;
+    w->id = string_strdupz("other");
+    w->name = string_strdupz("other");
+#if (PROCESSES_HAVE_SID == 1)
+    if(type == TARGET_TYPE_SID)
+        w->sid_name = string_dup(w->name);
+#endif
+#if (PROCESSES_HAVE_SERVICE == 1)
+    if(type == TARGET_TYPE_SERVICE)
+        w->service_name = string_dup(w->name);
+#endif
+
+    f->overflow = target_family_link(family, w);
+    return w;
+}
+
+static void target_free(struct target *w) {
+    string_freez(w->id);
+    string_freez(w->name);
+    string_freez(w->clean_name);
+    pid_match_cleanup(&w->match);
+#if (PROCESSES_HAVE_SID == 1)
+    string_freez(w->sid_name);
+#endif
+#if (PROCESSES_HAVE_SERVICE == 1)
+    string_freez(w->service_name);
+#endif
+#if (PROCESSES_HAVE_FDS == 1)
+    freez(w->target_fds);
+#endif
+
+    struct pid_on_target *pot = w->root_pid;
+    while(pot) {
+        struct pid_on_target *next = pot->next;
+        freez(pot);
+        pot = next;
+    }
+
+    freez(w);
+}
+
+static inline void target_mark_referenced(struct target *w, usec_t now_ut) {
+    if(w) {
+        w->referenced_iteration = global_iterations_counter;
+        w->last_active_ut = now_ut;
+    }
+}
+
+// Called after the exited processes are cleaned up: every target a remaining
+// process points to - including the previous-iteration one - is in use.
+void apps_targets_mark_referenced(void) {
+    usec_t now_ut = now_monotonic_usec();
+
+    for(struct pid_stat *p = root_of_pids(); p ; p = p->next) {
+        target_mark_referenced(p->target, now_ut);
+#if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
+        target_mark_referenced(p->prev_target, now_ut);
+#endif
+#if (PROCESSES_HAVE_UID == 1)
+        target_mark_referenced(p->uid_target, now_ut);
+#endif
+#if (PROCESSES_HAVE_GID == 1)
+        target_mark_referenced(p->gid_target, now_ut);
+#endif
+#if (PROCESSES_HAVE_SID == 1)
+        target_mark_referenced(p->sid_target, now_ut);
+#endif
+#if (PROCESSES_HAVE_SERVICE == 1)
+        target_mark_referenced(p->service_target, now_ut);
+#endif
+    }
+}
+
+// Retire the dynamic targets no process has referenced for retire_targets_after_s:
+// obsolete the charts they announced, unlink and free them. apps_groups.conf
+// targets are permanent. Must run under apps_and_stdout_mutex, after
+// apps_targets_mark_referenced(): no process can point to a retired target.
+void apps_targets_retire(void) {
+    usec_t now_ut = now_monotonic_usec();
+    usec_t retire_after_ut = (usec_t)retire_targets_after_s * USEC_PER_SEC;
+
+    for(size_t fi = 0; fi < TARGET_FAMILY_MAX ; fi++) {
+        struct target_family *f = &target_families[fi];
+
+        struct target **link = f->root;
+        while(*link) {
+            struct target *w = *link;
+
+            if(w->type == TARGET_TYPE_APP_GROUP ||
+                w->referenced_iteration == global_iterations_counter ||
+                now_ut - w->last_active_ut < retire_after_ut) {
+                link = &w->next;
+                continue;
+            }
+
+            if(w->exposed)
+                send_target_charts_obsolete(w, f);
+
+            *link = w->next;
+
+            if(w->overflow)
+                f->overflow = NULL;
+            else
+                f->dynamic--;
+
+            f->retired++;
+
+            debug_log("retired '%s' target '%s'", f->type, string2str(w->name));
+            target_free(w);
+        }
+    }
+}
+
 struct target *find_target_by_name(struct target *base, const char *name) {
     struct target *t;
     for(t = base; t ; t = t->next) {
@@ -208,10 +443,15 @@ struct target *get_tree_target(struct pid_stat *p) {
     // find an existing target with the required name
     struct target *w;
     for(w = apps_groups_root_target; w ; w = w->next) {
-        if (w->name == search_for) {
+        if (w->name == search_for && !w->overflow) {
             string_freez(search_for);
             return w;
         }
+    }
+
+    if(target_family_at_cap(TARGET_FAMILY_APPS)) {
+        string_freez(search_for);
+        return target_family_overflow(TARGET_FAMILY_APPS, TARGET_TYPE_TREE);
     }
 
     w = callocz(sizeof(struct target), 1);
@@ -221,24 +461,21 @@ struct target *get_tree_target(struct pid_stat *p) {
     w->match.pattern = NULL;
     w->id = search_for;
     w->name = string_dup(search_for);
-    w->clean_name = get_clean_name(w->name);
 
-    w->next = apps_groups_root_target;
-    apps_groups_root_target = w;
-
-    return w;
+    return target_family_link(TARGET_FAMILY_APPS, w);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
 // Users
 
 #if (PROCESSES_HAVE_UID == 1)
-struct target *users_root_target = NULL;
-
 struct target *get_uid_target(uid_t uid) {
     struct target *w;
     for(w = users_root_target ; w ; w = w->next)
-        if(w->uid == uid) return w;
+        if(w->uid == uid && !w->overflow) return w;
+
+    if(target_family_at_cap(TARGET_FAMILY_UID))
+        return target_family_overflow(TARGET_FAMILY_UID, TARGET_TYPE_UID);
 
     w = callocz(sizeof(struct target), 1);
     w->type = TARGET_TYPE_UID;
@@ -247,11 +484,9 @@ struct target *get_uid_target(uid_t uid) {
 
     CACHED_USERNAME cu = cached_username_get_by_uid(uid);
     w->name = string_dup(cu.username);
-    w->clean_name = get_clean_name(w->name);
     cached_username_release(cu);
 
-    w->next = users_root_target;
-    users_root_target = w;
+    target_family_link(TARGET_FAMILY_UID, w);
 
     debug_log("added uid %u ('%s') target", w->uid, string2str(w->name));
 
@@ -263,12 +498,13 @@ struct target *get_uid_target(uid_t uid) {
 // Groups
 
 #if (PROCESSES_HAVE_GID == 1)
-struct target *groups_root_target = NULL;
-
 struct target *get_gid_target(gid_t gid) {
     struct target *w;
     for(w = groups_root_target ; w ; w = w->next)
-        if(w->gid == gid) return w;
+        if(w->gid == gid && !w->overflow) return w;
+
+    if(target_family_at_cap(TARGET_FAMILY_GID))
+        return target_family_overflow(TARGET_FAMILY_GID, TARGET_TYPE_GID);
 
     w = callocz(sizeof(struct target), 1);
     w->type = TARGET_TYPE_GID;
@@ -277,13 +513,11 @@ struct target *get_gid_target(gid_t gid) {
 
     CACHED_GROUPNAME cg = cached_groupname_get_by_gid(gid);
     w->name = string_dup(cg.groupname);
-    w->clean_name = get_clean_name(w->name);
     cached_groupname_release(cg);
 
-    w->next = groups_root_target;
-    groups_root_target = w;
+    target_family_link(TARGET_FAMILY_GID, w);
 
-    debug_log("added gid %u ('%s') target", w->gid, w->name);
+    debug_log("added gid %u ('%s') target", w->gid, string2str(w->name));
 
     return w;
 }
@@ -293,24 +527,23 @@ struct target *get_gid_target(gid_t gid) {
 // SID
 
 #if (PROCESSES_HAVE_SID == 1)
-struct target *sids_root_target = NULL;
-
 struct target *get_sid_target(STRING *sid_name) {
     struct target *w;
     for(w = sids_root_target ; w ; w = w->next)
-        if(w->sid_name == sid_name) return w;
+        if(w->sid_name == sid_name && !w->overflow) return w;
+
+    if(target_family_at_cap(TARGET_FAMILY_SID))
+        return target_family_overflow(TARGET_FAMILY_SID, TARGET_TYPE_SID);
 
     w = callocz(sizeof(struct target), 1);
     w->type = TARGET_TYPE_SID;
     w->sid_name = string_dup(sid_name);
     w->id = string_dup(sid_name);
     w->name = string_dup(sid_name);
-    w->clean_name = get_clean_name(w->name);
 
-    w->next = sids_root_target;
-    sids_root_target = w;
+    target_family_link(TARGET_FAMILY_SID, w);
 
-    debug_log("added uid %s ('%s') target", string2str(w->sid_name), string2str(w->name));
+    debug_log("added sid %s ('%s') target", string2str(w->sid_name), string2str(w->name));
 
     return w;
 }
@@ -320,22 +553,21 @@ struct target *get_sid_target(STRING *sid_name) {
 // Service
 
 #if (PROCESSES_HAVE_SERVICE == 1)
-struct target *services_root_target = NULL;
-
 struct target *get_service_target(STRING *service_name) {
     struct target *w;
     for(w = services_root_target ; w ; w = w->next)
-        if(w->service_name == service_name) return w;
+        if(w->service_name == service_name && !w->overflow) return w;
+
+    if(target_family_at_cap(TARGET_FAMILY_SERVICE))
+        return target_family_overflow(TARGET_FAMILY_SERVICE, TARGET_TYPE_SERVICE);
 
     w = callocz(sizeof(struct target), 1);
     w->type = TARGET_TYPE_SERVICE;
     w->service_name = string_dup(service_name);
     w->id = string_dup(service_name);
     w->name = string_dup(service_name);
-    w->clean_name = get_clean_name(w->name);
 
-    w->next = services_root_target;
-    services_root_target = w;
+    target_family_link(TARGET_FAMILY_SERVICE, w);
 
     debug_log("added service '%s' target", string2str(w->service_name));
 
@@ -345,8 +577,6 @@ struct target *get_service_target(STRING *service_name) {
 
 // --------------------------------------------------------------------------------------------------------------------
 // apps_groups.conf
-
-struct target *apps_groups_root_target = NULL;
 
 // find or create a new target
 // there are targets that are just aggregated to other target (the second argument)

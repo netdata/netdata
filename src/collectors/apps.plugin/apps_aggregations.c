@@ -149,8 +149,22 @@ static struct target *get_apps_groups_target_for_pid(struct pid_stat *p) {
     return NULL;
 }
 
+// A process in an overflow target keeps it only while its family is at the cap;
+// once retirement frees a slot, the process is resolved again.
+static inline bool target_still_valid(struct target *w, TARGET_FAMILY family, bool identity_matches) {
+    return w && (w->overflow ? target_family_at_cap(family) : identity_matches);
+}
+
 static void assign_a_target_to_all_processes(void) {
     bool identity_changed = false;
+
+    if(!target_family_at_cap(TARGET_FAMILY_APPS)) {
+        for(struct pid_stat *p = root_of_pids(); p ; p = p->next) {
+            if(p->target && p->target->overflow)
+                p->target = NULL;
+        }
+    }
+
     // assign targets from app_groups.conf
     for(struct pid_stat *p = root_of_pids(); p ; p = p->next) {
         identity_changed |= p->identity_changed;
@@ -294,11 +308,11 @@ void aggregate_processes_to_targets(void) {
 
 #if (PROCESSES_HAVE_UID == 1)
         o = p->uid_target;
-        if(likely(p->uid_target && p->uid_target->uid == p->uid))
+        if(likely(target_still_valid(p->uid_target, TARGET_FAMILY_UID, p->uid_target && p->uid_target->uid == p->uid)))
             w = p->uid_target;
         else {
             if(unlikely(debug_enabled && p->uid_target))
-                debug_log("pid %d (%s) switched user from %u (%s) to %u.", p->pid, pid_stat_comm(p), p->uid_target->uid, p->uid_target->name, p->uid);
+                debug_log("pid %d (%s) switched user from %u (%s) to %u.", p->pid, pid_stat_comm(p), p->uid_target->uid, string2str(p->uid_target->name), p->uid);
 
             w = p->uid_target = get_uid_target(p->uid);
         }
@@ -312,11 +326,11 @@ void aggregate_processes_to_targets(void) {
 #if (PROCESSES_HAVE_GID == 1)
 
         o = p->gid_target;
-        if(likely(p->gid_target && p->gid_target->gid == p->gid))
+        if(likely(target_still_valid(p->gid_target, TARGET_FAMILY_GID, p->gid_target && p->gid_target->gid == p->gid)))
             w = p->gid_target;
         else {
             if(unlikely(debug_enabled && p->gid_target))
-                debug_log("pid %d (%s) switched group from %u (%s) to %u.", p->pid, pid_stat_comm(p), p->gid_target->gid, p->gid_target->name, p->gid);
+                debug_log("pid %d (%s) switched group from %u (%s) to %u.", p->pid, pid_stat_comm(p), p->gid_target->gid, string2str(p->gid_target->name), p->gid);
 
             w = p->gid_target = get_gid_target(p->gid);
         }
@@ -329,7 +343,7 @@ void aggregate_processes_to_targets(void) {
 
 #if (PROCESSES_HAVE_SID == 1)
         o = p->sid_target;
-        if(likely(p->sid_target && p->sid_target->sid_name == p->sid_name))
+        if(likely(target_still_valid(p->sid_target, TARGET_FAMILY_SID, p->sid_target && p->sid_target->sid_name == p->sid_name)))
             w = p->sid_target;
         else
             w = p->sid_target = get_sid_target(p->sid_name);
@@ -343,7 +357,7 @@ void aggregate_processes_to_targets(void) {
 #if (PROCESSES_HAVE_SERVICE == 1)
         if(enable_services_charts) {
             o = p->service_target;
-            if(likely(p->service_target && p->service_target->service_name == p->service_name))
+            if(likely(target_still_valid(p->service_target, TARGET_FAMILY_SERVICE, p->service_target && p->service_target->service_name == p->service_name)))
                 w = p->service_target;
             else
                 w = p->service_target = get_service_target(p->service_name);
@@ -366,6 +380,7 @@ void aggregate_processes_to_targets(void) {
     }
 
     cleanup_exited_pids();
+    apps_targets_mark_referenced();
 
 #if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
     for(struct pid_stat *p = root_of_pids(); p ; p = p->next) {
