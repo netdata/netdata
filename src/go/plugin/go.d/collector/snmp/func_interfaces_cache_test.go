@@ -400,6 +400,26 @@ func TestIfaceCache(t *testing.T) {
 				assert.Equal(t, "new", entry.ifAlias)
 			},
 		},
+		"duplicate interface names keep smallest alias in any row order": {
+			setup: func(c *Collector) {
+				for _, aliases := range [][]string{{"b-side", "a-side"}, {"a-side", "b-side"}} {
+					c.resetIfaceCache()
+					for _, alias := range aliases {
+						c.updateIfaceCacheEntry(ddsnmp.Metric{Name: "ifTraffic", IsTable: true, Tags: map[string]string{tagInterface: "eth0", tagIfAlias: alias}})
+					}
+					c.updateIfaceCacheEntry(ddsnmp.Metric{Name: "ifOperStatus", IsTable: true, Tags: map[string]string{tagInterface: "eth0"}})
+					c.finalizeIfaceCache()
+					if c.ifaceCache.interfaces["eth0"].ifAlias != "a-side" {
+						return
+					}
+				}
+			},
+			validate: func(t *testing.T, c *Collector) {
+				entry := c.ifaceCache.interfaces["eth0"]
+				require.NotNil(t, entry)
+				assert.Equal(t, "a-side", entry.ifAlias)
+			},
+		},
 		"alias cleared on device": {
 			setup: func(c *Collector) {
 				c.resetIfaceCache()

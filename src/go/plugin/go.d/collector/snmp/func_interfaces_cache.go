@@ -161,7 +161,9 @@ func (c *Collector) updateIfaceCacheEntry(m ddsnmp.Metric) {
 	if ifTypeGroup := m.Tags[tagIfTypeGrp]; ifTypeGroup != "" {
 		entry.ifTypeGroup = ifTypeGroup
 	}
-	if ifAlias := m.Tags[tagIfAlias]; ifAlias != "" {
+	// Rows sharing an interface name are merged into one entry; keep the smallest
+	// alias so the column does not flip with row order between cycles.
+	if ifAlias := m.Tags[tagIfAlias]; ifAlias != "" && (entry.pendingAlias == "" || ifAlias < entry.pendingAlias) {
 		entry.pendingAlias = ifAlias
 	}
 
