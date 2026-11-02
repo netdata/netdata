@@ -285,7 +285,7 @@ static void calculate_values_and_show_charts(
     if(m->do_inodes == CONFIG_BOOLEAN_AUTO && favail == (fsfilcnt_t)-1) {
         // this file system does not support inodes reporting
         // eg. cephfs
-        m->do_inodes = CONFIG_BOOLEAN_NO;
+        __atomic_store_n(&m->do_inodes, CONFIG_BOOLEAN_NO, __ATOMIC_RELAXED);
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -297,7 +297,7 @@ static void calculate_values_and_show_charts(
 
     if (m->do_space == CONFIG_BOOLEAN_YES || m->do_space == CONFIG_BOOLEAN_AUTO) {
         if(unlikely(!m->st_space) || m->st_space->update_every != update_every) {
-            m->do_space = CONFIG_BOOLEAN_YES;
+            __atomic_store_n(&m->do_space, CONFIG_BOOLEAN_YES, __ATOMIC_RELAXED);
             m->st_space = rrdset_find_active_bytype_localhost("disk_space", disk);
             if(unlikely(!m->st_space || m->st_space->update_every != update_every)) {
                 char title[4096 + 1];
@@ -335,7 +335,7 @@ static void calculate_values_and_show_charts(
 
     if (m->do_inodes == CONFIG_BOOLEAN_YES || m->do_inodes == CONFIG_BOOLEAN_AUTO) {
         if(unlikely(!m->st_inodes) || m->st_inodes->update_every != update_every) {
-            m->do_inodes = CONFIG_BOOLEAN_YES;
+            __atomic_store_n(&m->do_inodes, CONFIG_BOOLEAN_YES, __ATOMIC_RELAXED);
             m->st_inodes = rrdset_find_active_bytype_localhost("disk_inodes", disk);
             if(unlikely(!m->st_inodes) || m->st_inodes->update_every != update_every) {
                 char title[4096 + 1];
@@ -689,17 +689,24 @@ static inline bool do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
     struct mount_point_metadata *m = dictionary_acquired_item_value(item);
 
-    bool skip =
-        (m->do_space == CONFIG_BOOLEAN_NO && m->do_inodes == CONFIG_BOOLEAN_NO) ||
+    // the slow thread updates these on slow mount points while we read them
+    do_space = __atomic_load_n(&m->do_space, __ATOMIC_RELAXED);
+    do_inodes = __atomic_load_n(&m->do_inodes, __ATOMIC_RELAXED);
 
-        (mi->flags & MOUNTINFO_READONLY &&
+    // A slow mount point counts as collected exactly when the slow thread charts it, so it is skipped only by the
+    // gates the slow thread applies too. The read-only gate is not one of them: the slow thread charts read-only
+    // mount points, and m->collected of a slow mount point belongs to the slow thread.
+    bool skip =
+        (do_space == CONFIG_BOOLEAN_NO && do_inodes == CONFIG_BOOLEAN_NO) ||
+
+        (!m->slow &&
+         mi->flags & MOUNTINFO_READONLY &&
          !(mi->flags & MOUNTINFO_IS_IN_SYSD_PROTECTED_LIST) &&
          !m->collected &&
-         m->do_space != CONFIG_BOOLEAN_YES &&
-         m->do_inodes != CONFIG_BOOLEAN_YES) ||
+         do_space != CONFIG_BOOLEAN_YES &&
+         do_inodes != CONFIG_BOOLEAN_YES) ||
 
-        // Check if this ZFS dataset is excluded by path or by a cached decision (skip statvfs entirely);
-        // a slow mount must not count as collected when its slow thread would not chart it
+        // Check if this ZFS dataset is excluded by path or by a cached decision (skip statvfs entirely)
         zfs_dataset_excluded_before_statvfs(mi->filesystem, mi->mount_point, mi->mount_source);
 
     if (m->slow) {
