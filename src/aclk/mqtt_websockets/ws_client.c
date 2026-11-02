@@ -251,13 +251,15 @@ exit_with_error:
         return WS_CLIENT_PROTOCOL_ERROR;                                                                               \
     }
 
-// Copies a peer-supplied string for logging: at most dst_size - 1 bytes, control bytes replaced by '?'.
+// Copies a peer-supplied string for logging: at most dst_size - 1 bytes, anything but printable ASCII replaced by '?'.
+// Non-ASCII is masked too, so C1 controls (raw or UTF-8 encoded) never reach the log and truncation cannot split a
+// UTF-8 sequence.
 static const char *ws_client_log_safe(char *dst, size_t dst_size, const char *src)
 {
     size_t i = 0;
     for (; src && src[i] && i < dst_size - 1; i++) {
         unsigned char c = (unsigned char)src[i];
-        dst[i] = (c < 0x20 || c == 0x7f) ? '?' : (char)c;
+        dst[i] = (c < 0x20 || c > 0x7e) ? '?' : (char)c;
     }
     dst[i] = '\0';
     return dst;

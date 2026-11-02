@@ -488,6 +488,8 @@ static int ws_client_unittest_handshake(void)
                                                 "HTTP return code not 101. Received 502 with msg \"\".");
     errors += ws_client_unittest_handshake_case("403 with control bytes", "HTTP/1.1 403 Forbid\x01" "den\r\nServer: evil\x1b[31mred\r\n\r\n",
                                                 "HTTP return code not 101. Received 403 with msg \"Forbid?den\" (server: \"evil?[31mred\").");
+    errors += ws_client_unittest_handshake_case("403 with C1 and non-ASCII bytes", "HTTP/1.1 403 Forbid\x9b" "den\r\nServer: caf\xc3\xa9 \xc2\x9b" "2J\r\n\r\n",
+                                                "HTTP return code not 101. Received 403 with msg \"Forbid?den\" (server: \"caf?? ??2J\").");
     // header values may be empty and have optional whitespace around them
     errors += ws_client_unittest_handshake_case("404 with empty server value", "HTTP/1.1 404 Not Found\r\nServer: \r\n\r\n",
                                                 "HTTP return code not 101. Received 404 with msg \"Not Found\" (server: \"\").");
