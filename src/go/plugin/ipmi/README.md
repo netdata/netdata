@@ -1,7 +1,8 @@
 # IPMI plugin
 
-This Go plugin collects local Linux OpenIPMI sensors and remote BMCs over LAN/LAN+. It is built and installed by default
-on Linux. `freeipmi.plugin` remains available for rollback and capabilities listed under Compatibility below.
+This Go plugin collects local Linux OpenIPMI sensors and remote BMCs over LAN/LAN+. Linux source and static builds
+include it by default. For DEB/RPM installations, install the optional `netdata-plugin-ipmi` package separately.
+`freeipmi.plugin` remains available for rollback and capabilities listed under Compatibility below.
 
 ## Selection and rollback
 

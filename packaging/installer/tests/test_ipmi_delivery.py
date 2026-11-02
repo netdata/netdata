@@ -88,7 +88,10 @@ file(WRITE "${CMAKE_BINARY_DIR}/ipmi-enabled" "${ENABLE_PLUGIN_IPMI}")
             self.assertIn(fragment, config)
         for key in ('CPACK_DEBIAN_NETDATA_PACKAGE_DEPENDS', 'CPACK_RPM_NETDATA_PACKAGE_REQUIRES'):
             line = next(line for line in config.splitlines() if line.startswith('set(' + key + ' '))
-            self.assertIn('netdata-plugin-ipmi', line)
+            self.assertNotIn('netdata-plugin-ipmi', line)
+        suggests = next(line for line in config.splitlines()
+                        if line.startswith('set(CPACK_DEBIAN_NETDATA_PACKAGE_SUGGESTS '))
+        self.assertIn('netdata-plugin-ipmi', suggests)
         destination = build / 'stage'
         result = subprocess.run(['cmake', '--install', str(build), '--prefix', str(destination),
                                  '--component', 'plugin-ipmi'], capture_output=True, text=True)
@@ -99,6 +102,23 @@ file(WRITE "${CMAKE_BINARY_DIR}/ipmi-enabled" "${ENABLE_PLUGIN_IPMI}")
                      'usr/share/doc/netdata-plugin-ipmi/copyright'):
             self.assertTrue((destination / path).is_file(), path)
         self.assertTrue(os.access(destination / 'usr/libexec/netdata/plugins.d/ipmi.plugin', os.X_OK))
+
+    def test_rpm_ipmi_dependency_is_optional(self):
+        for distro, version, weak_deps in (
+                ('centos', '7', False), ('centos', '10', True),
+                ('amzn', '2', False), ('amzn', '2023', True), ('fedora', '43', True)):
+            for enabled in (True, False):
+                with self.subTest(distro=distro, version=version, enabled=enabled):
+                    build = self.configure('Linux', '-DNETDATA_PACKAGE_KIND=rpm',
+                                           '-DENABLE_PLUGIN_IPMI=' + ('ON' if enabled else 'OFF'),
+                                           os_release=f'ID={distro}\nVERSION_ID={version}\n')
+                    config = (build / 'CPackConfig.cmake').read_text().splitlines()
+                    requires = next(line for line in config
+                                    if line.startswith('set(CPACK_RPM_NETDATA_PACKAGE_REQUIRES '))
+                    suggests = next((line for line in config
+                                     if line.startswith('set(CPACK_RPM_NETDATA_PACKAGE_SUGGESTS ')), '')
+                    self.assertNotIn('netdata-plugin-ipmi', requires)
+                    self.assertEqual('netdata-plugin-ipmi = 1.2.3' in suggests, enabled and weak_deps)
 
     def test_rpm_account_creation_and_payload_ordering(self):
         for distro, version, post, predep in (

@@ -62,8 +62,9 @@ modules:
       prerequisites:
         list:
           - title: Install the IPMI plugin
-            description: The Go IPMI plugin is enabled by default in Linux builds. Official DEB/RPM installations
-              include it in netdata-plugin-ipmi. Source builds can disable it with --disable-plugin-ipmi.
+            description: Linux source and static builds include the Go IPMI plugin by default. For DEB/RPM
+              installations, install the optional netdata-plugin-ipmi package separately. Source builds can disable
+              it with --disable-plugin-ipmi.
           - title: Migrate an existing FreeIPMI configuration
             description: Configure the target in ipmi/ipmi.conf, set `ipmi = yes` in the `[plugins]` section of
               netdata.conf, and restart Netdata. C command options are not translated. To switch back, install
