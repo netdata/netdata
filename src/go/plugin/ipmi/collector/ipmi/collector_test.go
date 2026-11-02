@@ -231,39 +231,42 @@ func TestArtifacts(t *testing.T) {
 func TestArtifacts_PublicNames(t *testing.T) {
 	charts, err := collecttest.ChartTemplateCharts(chartTemplateYAML)
 	require.NoError(t, err)
-	require.NotEmpty(t, charts)
+	actual := make(map[string]string, len(charts))
 	for contextName, chart := range charts {
-		assert.True(t, strings.HasPrefix(contextName, "ipmi."), contextName)
-		// Only contexts move: the C plugin's chart IDs stay, including SEL events.
-		wantID := strings.TrimPrefix(contextName, "ipmi.")
-		if wantID == "sel" {
-			wantID = "events"
-		}
-		assert.Equal(t, wantID, chart.ID)
+		actual[contextName] = chart.ID
 	}
+	assert.Equal(t, map[string]string{
+		"ipmi.sensor_temperature_c":   "sensor_temperature_c",
+		"ipmi.sensor_temperature_f":   "sensor_temperature_f",
+		"ipmi.sensor_voltage":         "sensor_voltage",
+		"ipmi.sensor_ampere":          "sensor_ampere",
+		"ipmi.sensor_fan_speed":       "sensor_fan_speed",
+		"ipmi.sensor_power":           "sensor_power",
+		"ipmi.sensor_reading_percent": "sensor_reading_percent",
+		"ipmi.sensor_state":           "sensor_state",
+		"ipmi.sel":                    "events",
+	}, actual)
 
 	methods := ipmiMethods()
 	require.Len(t, methods, 1)
-	assert.Equal(t, "ipmi-go-sensors", methods[0].FunctionName)
+	assert.Equal(t, "ipmi-sensors", methods[0].FunctionName)
 }
 
-func TestArtifacts_SensorAlertBinding(t *testing.T) {
+func TestArtifacts_AlertBindings(t *testing.T) {
 	health, err := os.ReadFile("../../../../../health/health.d/ipmi.conf")
 	require.NoError(t, err)
 	metadata, err := os.ReadFile("metadata.yaml")
 	require.NoError(t, err)
 
-	var bindings int
+	bindings := make(map[string]int)
 	for _, alert := range collecttest.ParseHealthAlerts(health) {
-		if alert.On == "ipmi.sensor_state" {
-			bindings++
-		}
+		bindings[alert.On]++
 	}
-	require.Equal(t, 1, bindings, "the renamed sensor context keeps one alert owner")
+	require.Equal(t, map[string]int{"ipmi.sensor_state": 1, "ipmi.sel": 1}, bindings,
+		"both implementations and any job name share one alert owner per context")
 
 	opts := collecttest.HealthAlertsCheck{
-		// The SEL alarm targets a chart ID, not a context. This check covers sensor templates.
-		ContextPrefix: "ipmi.sensor_state",
+		ContextPrefix: "ipmi.",
 	}
 	collecttest.AssertHealthAlertsTargetChartTemplateWith(t, health, chartTemplateYAML, opts)
 	collecttest.AssertHealthAlertsMatchMetadataWith(t, health, metadata, opts)

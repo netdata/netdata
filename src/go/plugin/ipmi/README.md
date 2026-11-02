@@ -12,7 +12,8 @@ when the chosen plugin exits or fails collection. There is no automatic failover
 Existing configuration intent is preserved when `[plugins] ipmi` is unset:
 
 - `freeipmi = no` keeps IPMI collection disabled.
-- Nonempty `[plugin:freeipmi] command options` keep the C implementation, preserving remote targets and legacy options.
+- Non-blank `[plugin:freeipmi] command options` keep the C implementation when FreeIPMI is enabled, preserving remote
+  targets and legacy options.
 
 To migrate either case, configure the Go jobs, set `[plugins] ipmi = yes`, and restart Netdata. The Go plugin does not
 translate C command options. To switch back, install the FreeIPMI plugin if necessary and use:
@@ -26,6 +27,8 @@ translate C command options. To switch back, install the FreeIPMI plugin if nece
 Restart Netdata after changing the selection or installing an IPMI plugin. `enable running new plugins = no` disables
 automatic selection unless one plugin is explicitly enabled. In the Netdata container environment, IPMI requires explicit
 enablement and access to the device for local collection.
+
+The Function is now named `ipmi-sensors`; callers using the experimental `ipmi-go-sensors` name must update.
 
 ## Build and configure
 
@@ -44,13 +47,14 @@ The stock `ipmi/ipmi.conf` attempts local collection using this job:
 
 ```yaml
 jobs:
-  - name: ipmi
+  - name: local
     driver: open
     device: 0
 ```
 
 Hosts without an accessible OpenIPMI device do not collect local IPMI metrics. Replace this job to collect remote BMCs,
-or set `jobs: []` to disable the local job. Retain the name `ipmi` for the canonical local chart IDs used by the C plugin.
+or set `jobs: []` to disable the local job. Existing jobs named `ipmi` keep their previous chart IDs; renaming a job creates
+new chart IDs.
 
 The installers give the dedicated `ipmi.plugin` binary root ownership and setuid permission, restricted to the Netdata
 group, so it can open the local device. A manually built binary needs read/write access to `/dev/ipmi0` (or the selected
@@ -84,12 +88,13 @@ UDP exchanges. Remote session cleanup gets a separate two-second budget, includi
 - Numeric contexts use `ipmi.*`; chart IDs, units and nominal/warning/critical/unknown states retain the C shape. The
   state interpretation uses FreeIPMI defaults, including nominal non-critical threshold assertions; custom
   interpretation files are not loaded.
-- Unavailable numeric data produces gaps. `ipmi-go-sensors` reads an immutable snapshot and reports null readings. Its
+- Unavailable numeric data produces gaps. `ipmi-sensors` reads an immutable snapshot and reports null readings. Its
   summary charts show sensor counts by Component and State.
-- Canonical local job `ipmi` uses the `ipmi` chart type. Other job names receive the standard framework job prefix.
+- The stock `local` job uses the `ipmi_local` chart type. Job names receive the standard framework job prefix;
+  an existing job named `ipmi` keeps the `ipmi` chart type.
   Sensor keys remain stable when a reading becomes unavailable; the C library can change its reading-type key then.
-- SEL is the raw repository entry count, not FreeIPMI's interpreted/filtered count. The existing SEL alarm matches the
-  canonical local chart `ipmi.events`; the `ipmi_sensor_state` alert matches `ipmi.sensor_state` for every Go job.
+- SEL is the raw repository entry count, not FreeIPMI's interpreted/filtered count. The `ipmi_events` alert matches
+  `ipmi.sel`; the `ipmi_sensor_state` alert matches `ipmi.sensor_state`. Both apply to every Go job and to C.
 - Bridged sensors, device-only SDR repositories, legacy direct KCS/SSIF/SUNBMC/INTELDCMI drivers, FreeBSD local access,
   custom interpretation files and OEM health policy remain covered by FreeIPMI. Kernel-backed local KCS/SSIF is accessed
   through OpenIPMI.

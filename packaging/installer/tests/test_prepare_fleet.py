@@ -108,6 +108,28 @@ class PrepareFleetTests(unittest.TestCase):
         for path in paths:
             self.assertTrue((target / path).is_file(), path)
 
+    def test_ipmi_capability_accepts_either_implementation(self):
+        for implementation in ('ipmi.plugin', 'freeipmi.plugin'):
+            binary = 'usr/libexec/netdata/plugins.d/' + implementation
+            self.put(binary, 'stock IPMI')
+            for keep in ('ipmi', 'all', 'none'):
+                with self.subTest(implementation=implementation, keep=keep):
+                    target = self.root / (implementation + '-' + keep)
+                    result = self.run_script('--source', self.source, '--keep', keep,
+                                             '--strip-mode', 'none', '--apply', '--output', target)
+                    manifest = json.loads((target / 'usr/share/netdata/fleet-manifest.json').read_text())
+                    self.assertEqual('ipmi' in manifest['resolved'], keep != 'none')
+                    self.assertEqual((target / binary).exists(), keep != 'none')
+                    if keep == 'none':
+                        self.assertIn('ipmi', next(line for line in result.stdout.splitlines()
+                                                  if line.startswith('Remove:')))
+            (self.source / binary).unlink()
+
+    def test_ipmi_config_alone_does_not_provide_capability(self):
+        self.put('usr/lib/netdata/conf.d/ipmi.conf', 'stock config')
+        result = self.run_script('--source', self.source, '--keep', 'ipmi', success=False)
+        self.assertIn('requested capability ipmi is absent', result.stderr)
+
     def test_omitted_ipmi_removes_both_implementations_and_go_config(self):
         paths = ('usr/libexec/netdata/plugins.d/ipmi.plugin',
                  'usr/libexec/netdata/plugins.d/freeipmi.plugin',

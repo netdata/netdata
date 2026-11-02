@@ -141,13 +141,49 @@ class IPMIPermissionTests(unittest.TestCase):
         for platform, options, expected in (('Linux', (), '1'), ('FreeBSD', (), '0'),
                                             ('Darwin', (), '0'),
                                             ('Linux', ('--disable-plugin-ipmi',), '0'),
-                                            ('Linux', ('--enable-plugin-ipmi',), '1')):
+                                            ('Linux', ('--enable-plugin-ipmi',), '1'),
+                                            ('Linux', ('--disable-go',), '0'),
+                                            ('Linux', ('--enable-plugin-ipmi', '--disable-go'), '0'),
+                                            ('Linux', ('--disable-go', '--enable-plugin-ipmi'), '1'),
+                                            ('Linux', ('--disable-plugin-go',), '1'),
+                                            ('Linux', ('--enable-plugin-ipmi', '--disable-plugin-ipmi'), '0'),
+                                            ('Linux', ('--disable-plugin-ipmi', '--enable-plugin-ipmi'), '1')):
             with self.subTest(platform=platform, options=options):
                 result = subprocess.run(['bash', '-c', script, 'installer-fixture', *options],
                                         capture_output=True, text=True,
                                         env=dict(os.environ, TEST_PLATFORM=platform))
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(result.stdout.strip(), expected)
+
+    def test_disable_go_clears_all_components_and_skips_toolchain(self):
+        source = (ROOT / 'netdata-installer.sh').read_text()
+        begin = source.index('DONOTSTART=0')
+        end = source.index('\ndone', source.index('while [ -n "${1}" ]; do', begin)) + len('\ndone')
+        parser = 'uname() { echo Linux; }\n' + source[begin:end]
+        flags = ('ENABLE_GO', 'ENABLE_IBM', 'ENABLE_SCRIPTS', 'ENABLE_STATSD', 'ENABLE_IPMI', 'ENABLE_DEM')
+        output = '\nprintf "%s\\n" ' + ' '.join('"$' + flag + '"' for flag in flags)
+        for options, expected in (
+                (('--disable-go',), ['0'] * 6),
+                (('--enable-plugin-ibm', '--enable-plugin-scripts', '--enable-plugin-statsd',
+                  '--enable-plugin-ipmi', '--enable-plugin-dem', '--disable-go'), ['0'] * 6),
+                (('--enable-plugin-ipmi', '--disable-go'), ['0'] * 6),
+                (('--disable-go', '--enable-plugin-ipmi'), ['0', '0', '0', '0', '1', '0']),
+                (('--disable-go', '--enable-plugin-scripts'), ['0', '0', '1', '0', '0', '0']),
+                (('--disable-go', '--enable-plugin-go', '--enable-plugin-ibm', '--enable-plugin-scripts',
+                  '--enable-plugin-statsd', '--enable-plugin-ipmi', '--enable-plugin-dem'), ['1'] * 6),
+                (('--disable-plugin-go',), ['0', '0', '1', '0', '1', '0'])):
+            with self.subTest(options=options):
+                result = subprocess.run(['bash', '-c', parser + output, 'installer-fixture', *options],
+                                        capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout.splitlines(), expected)
+        begin = source.index('NEED_GO_TOOLCHAIN=0')
+        end = source.index('# If we\'re installing the IBM plugin', begin)
+        script = parser + '\n' + source[begin:end] + '\nprintf "%s\\n" "$NEED_GO_TOOLCHAIN"\n'
+        result = subprocess.run(['bash', '-e', '-c', script, 'installer-fixture', '--disable-go'],
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), '0')
 
     def test_static_installer_assigns_dedicated_privileges(self):
         with tempfile.TemporaryDirectory(prefix='netdata-ipmi-permissions-') as temporary:
@@ -174,7 +210,13 @@ class IPMIPermissionTests(unittest.TestCase):
     def test_static_check_rejects_dynamic_missing_and_unreadable_binaries(self):
         with tempfile.TemporaryDirectory(prefix='netdata-ipmi-static-check-') as temporary:
             root = Path(temporary)
-            (root / 'functions.sh').write_text('run() { "$@"; }\n')
+            (root / 'functions.sh').write_text(
+                'run() { "$@"; }\n'
+                'build_path() { printf "%s\\n" "$NETDATA_INSTALL_PATH/build"; }\n')
+            build = root / 'build'
+            build.mkdir()
+            cache = build / 'CMakeCache.txt'
+            cache.write_text('ENABLE_PLUGIN_IPMI:BOOL=True\n')
             commands = root / 'commands'
             commands.mkdir()
             readelf = commands / 'readelf'
@@ -201,6 +243,42 @@ class IPMIPermissionTests(unittest.TestCase):
             result = subprocess.run(['bash', str(job)], capture_output=True, text=True,
                                     env=dict(environment, ELF_HEADERS='LOAD', ELF_STATUS='0'))
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            # Required binaries must fail when absent, independently of ELF inspection.
+            for path in ('bin/netdata', 'usr/libexec/netdata/plugins.d/ipmi.plugin'):
+                binary = root / path
+                binary.unlink()
+                result = subprocess.run(['bash', str(job)], capture_output=True, text=True,
+                                        env=dict(environment, ELF_HEADERS='LOAD', ELF_STATUS='0',
+                                                 EXTRA_INSTALL_FLAGS='--disable-plugin-ipmi'))
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn('Missing required binary: ' + str(binary), result.stderr)
+                binary.touch()
+                binary.chmod(0o755)
+
+            # An explicitly disabled plugin is optional, but an installed one is still inspected.
+            cache.write_text('ENABLE_PLUGIN_IPMI:BOOL=False\n')
+            plugin = root / 'usr/libexec/netdata/plugins.d/ipmi.plugin'
+            plugin.unlink()
+            result = subprocess.run(['bash', str(job)], capture_output=True, text=True,
+                                    env=dict(environment, ELF_HEADERS='LOAD', ELF_STATUS='0'))
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            plugin.touch()
+            plugin.chmod(0o755)
+            readelf.write_text('#!/bin/sh\ncase "$1:$2" in *ipmi.plugin) echo INTERP;; *) echo LOAD;; esac\n')
+            result = subprocess.run(['bash', str(job)], capture_output=True, text=True,
+                                    env=environment)
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn('is not a statically linked binary', result.stderr)
+            for value in ('', 'ENABLE_PLUGIN_IPMI:BOOL=invalid\n'):
+                cache.write_text(value)
+                result = subprocess.run(['bash', str(job)], capture_output=True, text=True,
+                                        env=environment)
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn('Invalid or missing ENABLE_PLUGIN_IPMI', result.stderr)
+            cache.unlink()
+            result = subprocess.run(['bash', str(job)], capture_output=True, text=True, env=environment)
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn('Failed to read IPMI feature state', result.stderr)
 
     def test_debian_postinst_assigns_dedicated_privileges(self):
         with tempfile.TemporaryDirectory(prefix='netdata-ipmi-postinst-') as temporary:

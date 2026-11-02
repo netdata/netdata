@@ -580,6 +580,7 @@ int netdata_main(int argc, char **argv) {
                             if (nrpc_registry_unittest()) return 1;
                             if (pluginsd_functions_unittest()) return 1;
                             if (pluginsd_vnodes_unittest()) return 1;
+                            if (pluginsd_ipmi_unittest()) return 1;
                             if (nrpc_catalog_unittest()) return 1;
                             if (mcp_execute_function_access_unittest()) return 1;
                             if (mcp_jsonrpc_batch_unittest()) return 1;

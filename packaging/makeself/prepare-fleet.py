@@ -399,13 +399,19 @@ def validate_capability_bundle(name, available, records):
             fail(f'incomplete capability {name}: missing {companion}')
 
 
+def capability_present(name, records):
+    # IPMI can be delivered by either dedicated implementation, or by both.
+    paths = CAPS[name][0][:2] if name == 'ipmi' else CAPS[name][0][:1]
+    return any(present(records, path) for path in paths)
+
+
 def available_capabilities(keep, selected, records):
     if keep != 'all':
         for name in selected:
             primary = CAPS[name][0][0]
-            if not present(records, primary):
+            if not capability_present(name, records):
                 fail(f'requested capability {name} is absent ({primary})')
-    available = {name for name in selected if present(records, CAPS[name][0][0])}
+    available = {name for name in selected if capability_present(name, records)}
     for name in available:
         validate_capability_bundle(name, available, records)
     return available
@@ -423,7 +429,7 @@ def plan_package(args, input_path, records, requested, selected):
               'strip_mode': args.strip_mode, 'source_sha256': digest(input_path) if args.input else None,
               'original_regular_bytes': original_bytes, 'removed_regular_bytes': removed_bytes,
               'removed_paths': removed, 'stripped_files': []}
-    omitted_capabilities = sorted(name for name in CAPS if name not in selected and present(records, CAPS[name][0][0]))
+    omitted_capabilities = sorted(name for name in CAPS if name not in selected and capability_present(name, records))
     return report, omitted_capabilities
 
 

@@ -310,7 +310,14 @@ while [ -n "${1}" ]; do
     "--disable-dbengine") ENABLE_DBENGINE=0 ;;
     "--enable-plugin-go") ENABLE_GO=1 ;;
     "--disable-plugin-go") ENABLE_GO=0 ;;
-    "--disable-go") ENABLE_GO=0 ;;
+    "--disable-go")
+      ENABLE_GO=0
+      ENABLE_IBM=0
+      ENABLE_SCRIPTS=0
+      ENABLE_STATSD=0
+      ENABLE_IPMI=0
+      ENABLE_DEM=0
+      ;;
     "--enable-plugin-python") ENABLE_PYTHON=1 ;;
     "--disable-plugin-python") ENABLE_PYTHON=0 ;;
     "--enable-plugin-charts") ENABLE_CHARTS=1 ;;

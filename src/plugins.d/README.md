@@ -101,9 +101,9 @@ plugin directories and prefers an installed, executable Go plugin when both are 
 until Netdata restarts: plugin crashes, retries and newly installed binaries do not activate the other implementation.
 The selected plugin follows the normal restart policy above; there is no automatic failover after a failure.
 
-When `[plugins] ipmi` is unset, an existing `freeipmi = no` preserves disabled IPMI collection, and nonempty
-`[plugin:freeipmi] command options` preserve the C implementation. To migrate those installations, configure
-`ipmi/ipmi.conf`, set `[plugins] ipmi = yes`, and restart Netdata. C command options are not translated.
+When `[plugins] ipmi` is unset, an existing `freeipmi = no` preserves disabled IPMI collection, and non-blank
+`[plugin:freeipmi] command options` preserve the C implementation when FreeIPMI is enabled. To migrate those installations,
+configure `ipmi/ipmi.conf`, set `[plugins] ipmi = yes`, and restart Netdata. C command options are not translated.
 
 To switch back to C, install `freeipmi.plugin` if necessary and restart Netdata with:
 

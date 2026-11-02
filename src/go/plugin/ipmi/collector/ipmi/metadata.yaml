@@ -5,7 +5,7 @@ modules:
       plugin_name: ipmi.plugin
       module_name: ipmi
       monitored_instance:
-        name: IPMI (experimental Go collector)
+        name: IPMI (Go collector)
         link: https://www.intel.com/content/www/us/en/products/docs/servers/ipmi/ipmi-home.html
         icon_filename: microchip.svg
         categories:
@@ -44,10 +44,12 @@ modules:
           `--device /dev/ipmi0`. Remote collection needs no local device access.
       default_behavior:
         auto_detection:
-          description: The stock job attempts to collect the local OpenIPMI device 0 every five seconds. Hosts without
-            an accessible device do not collect local IPMI metrics. Netdata prefers this plugin when both IPMI
-            implementations are installed and enabled. An existing freeipmi=no or nonempty legacy command options
-            preserve the previous behavior until ipmi=yes is explicitly set in the plugins section of netdata.conf.
+          description: On standard Linux installations, the stock job attempts to collect the local OpenIPMI device 0
+            every five seconds. Containers require ipmi=yes in the plugins section of netdata.conf and an exposed
+            device for local collection. Hosts without an accessible device do not collect local IPMI metrics.
+            Netdata prefers this plugin when both IPMI implementations are installed and enabled. An existing
+            freeipmi=no keeps collection disabled; non-blank legacy command options keep C when FreeIPMI is enabled.
+            Set ipmi=yes explicitly in the plugins section of netdata.conf to migrate either case to Go.
         limits:
           description: This plugin requires Linux. Keep FreeIPMI for legacy direct drivers, bridged sensors,
             OEM interpretation or custom FreeIPMI interpretation files. Unknown or unavailable sensor readings leave
@@ -145,7 +147,7 @@ modules:
               description: Monitor the first kernel IPMI device.
               config: |
                 jobs:
-                  - name: ipmi
+                  - name: local
                     driver: open
             - name: Remote BMC
               description: Monitor a remote BMC using IPMI 2.0. Use driver lan for BMCs that require IPMI 1.5.
@@ -174,10 +176,6 @@ modules:
             fix: Check that the dedicated binary retains the ownership and setuid permissions installed by Netdata.
               In a container, expose the IPMI device. For a manually built binary, grant device access through the host
               security policy or run a trusted local test explicitly with sudo.
-    # ipmi_events is an alarm on chart id ipmi.events, which this collector creates under the ipmi.sel context,
-    # so no declared context derives it. The integrations generator derives every other alert row from `metrics`.
-    alerts:
-      - ipmi_events
     metrics:
       folding:
         title: Metrics
@@ -262,7 +260,7 @@ modules:
       description: Inspect the latest successful collection without issuing more IPMI commands.
       list:
         - id: sensors
-          function_name: ipmi-go-sensors
+          function_name: ipmi-sensors
           name: IPMI Sensors
           description: Show current readings and default FreeIPMI health states, with sensor counts by component and
             state.

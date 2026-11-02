@@ -34,8 +34,9 @@ modules:
       default_behavior:
         auto_detection:
           description: The plugin detects local IPMI sensors when selected. Netdata prefers the Go IPMI plugin
-            when both are installed and enabled. Existing nonempty FreeIPMI command options keep this implementation
-            unless ipmi=yes is explicitly set in the plugins section of netdata.conf.
+            when both are installed and enabled. Existing non-blank FreeIPMI command options keep this implementation
+            when FreeIPMI is enabled. An existing freeipmi=no keeps collection disabled. Set ipmi=yes explicitly in
+            the plugins section of netdata.conf to migrate either case to Go.
         limits:
           description: ""
         performance_impact:
@@ -273,10 +274,6 @@ modules:
               This instructs the kernel IPMI module to pause for a tick between checking IPMI. Querying IPMI will be a lot slower now (e.g. several seconds for IPMI to respond), but `kipmi` will not use any noticeable CPU.
 
               You can also use a higher number (this is the number of microseconds to poll IPMI for a response, before waiting for a tick).
-    # ipmi_events is an alarm on chart id ipmi.events, which this plugin creates under the ipmi.sel context,
-    # so no declared context derives it. The integrations generator derives every other alert row from `metrics`.
-    alerts:
-      - ipmi_events
     metrics:
       folding:
         title: Metrics
