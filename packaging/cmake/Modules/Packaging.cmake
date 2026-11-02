@@ -149,9 +149,9 @@ endif()
 # Scriptlets. openSUSE uses the %service_* macro family, everything else the
 # %systemd_* one; the choice happens at spec-generation time because the
 # macros expand when rpmbuild parses the generated spec. On distros where RPM
-# handles the shipped sysusers file natively (EL >= 10, Fedora >= 43) the
+# handles the shipped sysusers file natively (Fedora >= 43) the
 # netdata-user %post only manages supplemental groups; elsewhere it also
-# creates the user and group.
+# creates the user and group. EL disables RPM's native sysusers hook.
 #
 # CPack generates one spec per component whose Name: is the subpackage's
 # own, so the scriptlet files spell values out instead of using %{name}.
@@ -162,8 +162,7 @@ else()
 endif()
 
 if(NOT NETDATA_DISTRO_SUSE AND
-   ((NETDATA_DISTRO_EL AND NETDATA_DISTRO_VERSION_MAJOR GREATER_EQUAL 10) OR
-    (NETDATA_DISTRO_FEDORA AND NETDATA_DISTRO_VERSION_MAJOR GREATER_EQUAL 43)))
+   NETDATA_DISTRO_FEDORA AND NETDATA_DISTRO_VERSION_MAJOR GREATER_EQUAL 43)
   set(NETDATA_RPM_USER_POST "post.groups-only")
 else()
   set(NETDATA_RPM_USER_POST "post.create-user")
@@ -184,7 +183,6 @@ set(CPACK_RPM_USER_POST_INSTALL_SCRIPT_FILE
 # comes from the shipped sysusers file, elsewhere every payload package needs
 # netdata-user installed first.
 if(NETDATA_DISTRO_SUSE OR
-   (NETDATA_DISTRO_EL AND NETDATA_DISTRO_VERSION_MAJOR GREATER_EQUAL 10) OR
    (NETDATA_DISTRO_FEDORA AND NETDATA_DISTRO_VERSION_MAJOR GREATER_EQUAL 43))
   set(NETDATA_RPM_HAVE_SYSUSER TRUE)
 else()

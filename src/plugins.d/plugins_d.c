@@ -384,13 +384,13 @@ int pluginsd_ipmi_unittest(void) {
     }
     const char *files[] = { legacy, modern };
     for (size_t i = 0; i < _countof(files); i++) {
-        FILE *fp = fopen(files[i], "w");
-        if (!fp) {
+        // Selection only needs executable paths; these fixtures are never launched.
+        int fd = open(files[i], O_WRONLY | O_CREAT | O_EXCL, 0700);
+        if (fd == -1) {
             errors++;
             goto cleanup;
         }
-        fputs("#!/bin/sh\nexit 0\n", fp);
-        if (fclose(fp) || chmod(files[i], 0700)) {
+        if (close(fd) || chmod(files[i], 0700)) {
             errors++;
             goto cleanup;
         }

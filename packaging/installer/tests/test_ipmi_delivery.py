@@ -15,10 +15,14 @@ MODULES = ROOT / 'packaging/cmake/Modules'
 
 @unittest.skipUnless(shutil.which('cmake'), 'CMake is required')
 class IPMIDeliveryTests(unittest.TestCase):
-    def configure(self, platform='Linux', *options, success=True):
+    def configure(self, platform='Linux', *options, success=True, os_release=None):
         temporary = tempfile.TemporaryDirectory(prefix='netdata-ipmi-delivery-')
         self.addCleanup(temporary.cleanup)
         source = Path(temporary.name)
+        if os_release is not None:
+            release_file = source / 'os-release'
+            release_file.write_text(os_release)
+            options += ('-DOS_LINUX=ON', '-DOS_RELEASE_PATH=' + str(release_file))
         (source / 'src').symlink_to(ROOT / 'src', target_is_directory=True)
         for name in ('LICENSE', 'README.md'):
             (source / name).symlink_to(ROOT / name)
@@ -95,6 +99,27 @@ file(WRITE "${CMAKE_BINARY_DIR}/ipmi-enabled" "${ENABLE_PLUGIN_IPMI}")
                      'usr/share/doc/netdata-plugin-ipmi/copyright'):
             self.assertTrue((destination / path).is_file(), path)
         self.assertTrue(os.access(destination / 'usr/libexec/netdata/plugins.d/ipmi.plugin', os.X_OK))
+
+    def test_rpm_account_creation_and_payload_ordering(self):
+        for distro, version, post, predep in (
+                ('centos', '9', 'post.create-user', True),
+                ('centos', '10', 'post.create-user', True),
+                ('rocky', '10', 'post.create-user', True),
+                ('ol', '10', 'post.create-user', True),
+                ('fedora', '42', 'post.create-user', True),
+                ('fedora', '43', 'post.groups-only', False),
+                ('opensuse-leap', '15.6', 'post.create-user', False)):
+            with self.subTest(distro=distro, version=version):
+                build = self.configure('Linux', '-DNETDATA_PACKAGE_KIND=rpm',
+                                       os_release=f'ID={distro}\nVERSION_ID={version}\n')
+                config = (build / 'CPackConfig.cmake').read_text()
+                script = ROOT / 'packaging/cmake/pkg-files/rpm/user' / post
+                self.assertIn(f'set(CPACK_RPM_USER_POST_INSTALL_SCRIPT_FILE "{script}")', config)
+                for component in ('NETDATA', 'PLUGIN-IPMI', 'PLUGIN-FREEIPMI', 'PLUGIN-GO'):
+                    dependency = f'set(CPACK_RPM_{component}_PACKAGE_REQUIRES_PRE "netdata-user >= 1.2.3")'
+                    self.assertEqual(dependency in config, predep, component)
+                requires = '/usr/sbin/useradd, /usr/sbin/groupadd' if predep else 'systemd'
+                self.assertIn(f'set(CPACK_RPM_USER_PACKAGE_REQUIRES "{requires}")', config)
 
 
 class IPMIPermissionTests(unittest.TestCase):
