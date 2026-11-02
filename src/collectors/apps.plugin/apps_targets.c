@@ -257,14 +257,19 @@ void apps_targets_retire(void) {
     }
 }
 
+// A real target wins over its family's overflow target, which is also named
+// "other": the overflow one is returned only when no real target matches.
 struct target *find_target_by_name(struct target *base, const char *name) {
-    struct target *t;
-    for(t = base; t ; t = t->next) {
-        if (string_strcmp(t->name, name) == 0)
-            return t;
+    struct target *overflow = NULL;
+    for(struct target *t = base; t ; t = t->next) {
+        if (string_strcmp(t->name, name) == 0) {
+            if(!t->overflow)
+                return t;
+            overflow = t;
+        }
     }
 
-    return NULL;
+    return overflow;
 }
 
 // --------------------------------------------------------------------------------------------------------------------

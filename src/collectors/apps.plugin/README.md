@@ -311,11 +311,13 @@ Process groups found automatically in the process tree, users, user groups, and 
 services are created when their first process appears. Two command options bound how many of them have charts:
 
 - `retire-targets-after SECONDS` (default `3600`): when no process has belonged to such a group for this long, its
-  charts are marked obsolete and removed. If the group comes back later, its charts are created again under the same
-  name. The minimum is 2 data collection iterations.
+  charts are marked obsolete and removed. If the group comes back later, its charts are created again, normally under
+  the same name (a `_2`, `_3`, ... suffix is added only if another group took that chart name meanwhile). The minimum
+  is 2 data collection iterations.
 - `max-targets N` (default `500`, minimum `1`): the maximum number of these groups, per family (application groups,
   users, user groups, SIDs, services), that get their own charts. New groups beyond the limit are aggregated into an
-  `other` instance of their family (`app.other_*`, `user.other_*`, ...), and an info message is logged once. A
+  `other` instance of their family (`app.other_*`, `user.other_*`, ...; `other_2_*` if a real group is already called
+  `other`), and an info message is logged once. A
   process placed into `other` moves to its own group again once retirement frees a slot.
 
 Groups defined in `apps_groups.conf` are never retired and do not count against the limit, so define the processes
