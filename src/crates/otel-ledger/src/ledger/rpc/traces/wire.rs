@@ -31,7 +31,7 @@ use sfsq::traces::{PartialReason, QueryStatus};
 /// in `InfoResponse::accepted_params`. The rule: the list carries
 /// exactly the TOP-LEVEL keys — the mode selectors, `tenant`, and every
 /// field the implicit Functions view reads: its window and cursor, the
-/// search bar's `conditions` and `text`, and the `overview` switch. A field the implicit view
+/// search bar's `conditions` and `text`, and `skip_overview`. A field the implicit view
 /// honours but this list omits is unreachable.
 ///
 /// `timeout` is deliberately NOT listed: the implicit view accepts it
@@ -52,7 +52,7 @@ pub const ACCEPTED_PARAMS: &[&str] = &[
     "anchor",
     "conditions",
     "text",
-    "overview",
+    "skip_overview",
 ];
 
 /// The raw top-level shape: the three mode selectors and supported
@@ -93,7 +93,7 @@ struct RawOtelTracesRequest {
     #[serde(default, deserialize_with = "present")]
     text: Option<serde_json::Value>,
     #[serde(default, deserialize_with = "present")]
-    overview: Option<serde_json::Value>,
+    skip_overview: Option<serde_json::Value>,
     #[serde(default, deserialize_with = "present")]
     timeout: Option<serde_json::Value>,
     /// Tenant whose data the query reads — a scoping selector supplied
@@ -185,7 +185,7 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
             || raw.anchor.is_some()
             || raw.conditions.is_some()
             || raw.text.is_some()
-            || raw.overview.is_some()
+            || raw.skip_overview.is_some()
             || raw.timeout.is_some();
 
         match present.as_slice() {
@@ -221,7 +221,7 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
                 ("anchor", raw.anchor.as_ref()),
                 ("conditions", raw.conditions.as_ref()),
                 ("text", raw.text.as_ref()),
-                ("overview", raw.overview.as_ref()),
+                ("skip_overview", raw.skip_overview.as_ref()),
                 ("timeout", raw.timeout.as_ref()),
             ] {
                 if let Some(value) = value {
@@ -288,13 +288,14 @@ pub struct FunctionsParams {
     /// [`REQUEST_TEXT_MAX_BYTES`].
     #[serde(default)]
     pub text: Vec<String>,
-    /// `false` skips the embedded window aggregate, for a list that
+    /// `true` skips the embedded window aggregate, for a list that
     /// narrows a heatmap cell while the heatmap keeps drawing the
     /// window's section: recomposing it would be a full-window pass for
-    /// numbers the caller does not draw. Default `true`; an anchor skips
-    /// it regardless ([`Self::anchor`]).
-    #[serde(default = "default_overview")]
-    pub overview: bool,
+    /// numbers the caller does not draw. An anchor skips it regardless
+    /// ([`Self::anchor`]). A positive flag because the dashboard's
+    /// request builder drops falsy values.
+    #[serde(default)]
+    pub skip_overview: bool,
     /// Accepted for parity with the Functions protocol. Execution
     /// deadlines remain owned by the bridge call context.
     #[serde(default)]
@@ -421,10 +422,6 @@ pub const CONDITION_VALUES_MAX: usize = 64;
 /// Page size when the request omits `last` (the engine's default).
 fn default_limit() -> usize {
     sfsq::traces::DEFAULT_SEARCH_LIMIT
-}
-
-fn default_overview() -> bool {
-    true
 }
 
 /// Wire maximum for [`FunctionsParams::last`]. The cap lives at the wire,

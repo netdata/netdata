@@ -191,7 +191,7 @@ fn unknown_and_retired_top_level_keys_are_client_errors() {
         json!({"info": {}, "last": 5}),
         json!({"info": {}, "timeout": 30}),
         json!({"trace": {"id": "00"}, "anchor": "x"}),
-        json!({"explore": {}, "overview": false}),
+        json!({"explore": {}, "skip_overview": true}),
     ] {
         let err = req_err(body.clone());
         assert!(
@@ -410,7 +410,7 @@ fn info_response_shape_is_pinned() {
             "v": 3,
             "accepted_params": [
                 "info", "trace", "suggest", "explore", "tenant", "after", "before", "last", "anchor",
-                "conditions", "text", "overview"
+                "conditions", "text", "skip_overview"
             ],
             "required_params": [],
             "help": "Query and visualize OpenTelemetry traces.",

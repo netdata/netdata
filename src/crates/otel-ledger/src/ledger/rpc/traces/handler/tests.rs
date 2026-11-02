@@ -86,7 +86,7 @@ async fn info_returns_the_descriptor() {
             "anchor",
             "conditions",
             "text",
-            "overview"
+            "skip_overview"
         ])
     );
     assert_eq!(v["required_params"], json!([]));
@@ -1766,19 +1766,19 @@ async fn the_aggregate_bins_only_the_selected_traces() {
     assert_eq!(cells[40][0], 1);
 }
 
-/// `overview: false` keeps the page and drops the section, for a
-/// heatmap cell's list beside a section the caller already holds.
+/// `skip_overview` keeps the page and drops the section, for a heatmap
+/// cell's list beside a section the caller already holds.
 #[tokio::test]
-async fn overview_false_skips_the_aggregate() {
+async fn skip_overview_drops_the_aggregate() {
     let h = handler_with_search_corpus().await;
     let mut body = functions_body(20);
-    body["overview"] = json!(false);
+    body["skip_overview"] = json!(true);
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     assert_eq!(ids(&v["data"]).len(), 5);
     assert!(v["data"].get("overview").is_none(), "{}", v["data"]);
 
     let mut body = functions_body(20);
-    body["overview"] = json!(true);
+    body["skip_overview"] = json!(false);
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     assert_eq!(v["data"]["overview"]["totals"], json!({"traces": 5}));
 }

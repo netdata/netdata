@@ -577,7 +577,7 @@ impl OtelTracesHandler {
         // the only kind that can move the window. Details on the wire
         // (`SearchResult::overview`). A caller that keeps drawing an
         // earlier section (a heatmap cell's list) turns it off.
-        let aggregate = params.overview && params.anchor.is_none();
+        let aggregate = !params.skip_overview && params.anchor.is_none();
         let data = self
             .search_result(ctx, &search_params, tenant, aggregate)
             .await?;
