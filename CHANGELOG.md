@@ -342,6 +342,8 @@
 - Build(deps): bump github.com/aws/aws-sdk-go-v2/service/cloudwatch from 1.75.1 to 1.75.2 in /src/go ([#24527](https://github.com/netdata/netdata/issues/24527))
 - Build(deps): bump github.com/aws/aws-sdk-go-v2/service/rds from 1.131.1 to 1.131.2 in /src/go ([#24520](https://github.com/netdata/netdata/issues/24520))
 - Test(go.d): fix restart continuation deadline flake ([#24524](https://github.com/netdata/netdata/issues/24524))
+- Fix(rrddim): name a missing dimension id in the fatal message ([#24528](https://github.com/netdata/netdata/issues/24528))
+- Dbengine: never free a datafile that a journal index or cached page still points at ([#24509](https://github.com/netdata/netdata/issues/24509))
 
 ## [2.12.0] - 2026-09-30
 
