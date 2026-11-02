@@ -130,16 +130,22 @@ and it cannot be run from `cmd.exe` or PowerShell directly.
 `C:\Program Files\Netdata\etc\pki\ca-trust\extracted\` and `C:\Program Files\Netdata\usr\ssl\cert.pem`
 should have fresh timestamps.
 
-Four things to keep in mind:
-- Upgrading the agent replaces `C:\Program Files\Netdata\etc\pki`, so `update-ca-trust`
-has to be run again after every update.
-- `go.d.plugin` is a native Go binary and uses the Windows certificate store, not the
-MSYS2 bundle, unless the collector job sets `tls_ca`. Behind a TLS-intercepting proxy,
-install the corporate CA in both places: the directory above, and
-`Local Computer` -> `Trusted Root Certification Authorities`.
-- The agent's C components (Netdata Cloud connection, claiming, streaming, exporting)
-verify peers against the OpenSSL bundle maintained by `update-ca-trust`, not the
-Windows certificate store.
-- `ssl skip certificate verification = yes` in `stream.conf` disables certificate verification
-for streaming, including unknown issuing CAs; do not use it as a substitute for installing the certificate.
-- `INSECURE=1` affects the Cloud claiming connection only and is not a substitute for installing the certificate.
+Five things to keep in mind:
+
+- After upgrading the agent, run `update-ca-trust` again. The installer resets the trust-store
+files it owns under `C:\Program Files\Netdata\etc\pki`; certificates you copied into
+`ca-trust\source\anchors` are left in place, but the derived bundles are rebuilt.
+- `go.d.plugin` is a native Go binary and uses the Windows certificate store, not the MSYS2
+bundle, unless the collector job sets `tls_ca`. If a job sets `tls_ca`, the file it names must
+contain the corporate CA; otherwise remove `tls_ca` so the collector uses the Windows store.
+Behind a TLS-intercepting proxy, install the corporate CA in the MSYS2 anchors directory and,
+for jobs without `tls_ca`, in `Local Computer` > `Trusted Root Certification Authorities`.
+- The agent's C components (Netdata Cloud connection, claiming, streaming, exporting) verify
+peers against the OpenSSL bundle maintained by `update-ca-trust`, not the Windows store.
+- `ssl skip certificate verification = yes` in the `[stream]` section of `stream.conf` disables
+certificate verification on the child-to-parent sender, including unknown issuing CAs. To trust
+a private CA, use `CAfile` or `CApath` in the same section instead.
+- `INSECURE=1` is a Windows installer property for the Netdata Cloud connection - claiming and
+ACLK - not a `stream.conf` option. It relaxes certificate checks for Cloud only, not for
+streaming or the collectors, and is not a substitute for installing the certificate.
+
