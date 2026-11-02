@@ -76,6 +76,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/maxscale"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/megacli"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/memcached"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/meraki"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/mongodb"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/monit"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/mssql"

@@ -119,6 +119,26 @@ func (c *Client) ListDeviceAvailabilities(ctx context.Context, organizationID st
 	}, organizationID)
 }
 
+// ProbeOrganization checks operational access with one small assigned-device
+// page. It deliberately ignores pagination and returns no inventory.
+func (c *Client) ProbeOrganization(ctx context.Context, organizationID string) error {
+	op := operation{
+		name:        "getOrganizationDevices",
+		suffix:      "/devices",
+		pageSize:    3,
+		maxPageSize: 5000,
+	}
+	target, err := c.operationURL(op, organizationID)
+	if err != nil {
+		return err
+	}
+	_, _, _, err = readPage[Device](ctx, c, target, op.name, web.HTTPClientResponseBodyLimit(c.httpClient))
+	if err != nil {
+		return err
+	}
+	return ctx.Err()
+}
+
 type operation struct {
 	name        string
 	suffix      string
@@ -126,7 +146,7 @@ type operation struct {
 	maxPageSize int
 }
 
-func list[T any](ctx context.Context, c *Client, op operation, organizationID string) ([]T, error) {
+func (c *Client) operationURL(op operation, organizationID string) (*url.URL, error) {
 	path := "/organizations"
 	if op.suffix != "" {
 		if organizationID == "" || organizationID == "." || organizationID == ".." {
@@ -139,6 +159,14 @@ func list[T any](ctx context.Context, c *Client, op operation, organizationID st
 		return nil, fmt.Errorf("%s: invalid operation path", op.name)
 	}
 	next.RawQuery = fmt.Sprintf("perPage=%d", op.pageSize)
+	return next, nil
+}
+
+func list[T any](ctx context.Context, c *Client, op operation, organizationID string) ([]T, error) {
+	next, err := c.operationURL(op, organizationID)
+	if err != nil {
+		return nil, err
+	}
 	operationPath := next.EscapedPath()
 	seen := make(map[string]struct{})
 	result := make([]T, 0)

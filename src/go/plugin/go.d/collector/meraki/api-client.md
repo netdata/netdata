@@ -1,7 +1,6 @@
 # Meraki discovery and availability client
 
-`merakiapi` is a collector-local Go client for four read-only Dashboard API v1 operations. This initial delivery
-does not register a collector or publish metrics, charts, configuration forms or Functions.
+`merakiapi` is a collector-local Go client for four read-only Dashboard API v1 operations. The CollectorV2 integration uses it for assigned-device discovery and availability; the collector contract is in `ARCHITECTURE.md`.
 
 ## Supported operations
 
@@ -12,7 +11,9 @@ does not register a collector or publish metrics, charts, configuration forms or
 | `ListDevices` | `/organizations/{organizationId}/devices` | 1000 | 3–5000 |
 | `ListDeviceAvailabilities` | `/organizations/{organizationId}/devices/availabilities` | 1000 | 3–1000 |
 
-All four operations return bare arrays. There are no initial entity filters or generic request/query escape hatches.
+`ProbeOrganization` uses one small `/organizations/{organizationId}/devices?perPage=3` page to validate operational access. It validates the normal response contract, deliberately ignores pagination and returns no inventory. It does not call `/organizations`, which is exempt from organization IP restrictions.
+
+All four list operations return bare arrays. There are no initial entity filters or generic request/query escape hatches.
 `ListDevices` reads devices assigned to networks, rather than unused organization inventory.
 
 The response types are minimal projections of identity, names, tags and the selected device metadata. Physical
@@ -45,7 +46,7 @@ does not coordinate organization budgets between calls, jobs, processes or other
 
 ## Complete traversal and decoding
 
-Methods return a complete list or nil plus an error. A failed later page MUST NOT become an apparently complete
+List methods return a complete list or nil plus an error. A failed later page MUST NOT become an apparently complete
 inventory. A successful traversal is not an atomic snapshot: the provider may change data between pages.
 
 - Follow `rel=next` until absent, including empty intermediate pages.

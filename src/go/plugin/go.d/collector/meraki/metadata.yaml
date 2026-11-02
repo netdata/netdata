@@ -1,0 +1,221 @@
+plugin_name: go.d.plugin
+modules:
+- meta:
+    id: collector-go.d.plugin-meraki
+    plugin_name: go.d.plugin
+    module_name: meraki
+    monitored_instance:
+      name: Cisco Meraki
+      link: https://meraki.cisco.com/
+      icon_filename: network-wired.svg
+      categories:
+      - network-performance-monitoring.device-metrics
+    keywords:
+    - meraki
+    - cisco
+    - network
+    - availability
+    related_resources:
+      integrations:
+        list: []
+    info_provided_to_referring_integrations:
+      description: ''
+  overview:
+    data_collection:
+      metrics_description: Monitor Cisco Meraki device availability and assigned-device inventory. Each assigned
+        device appears as a separate Netdata node, with organization and network labels for fleet filtering.
+      method_description: The collector makes read-only HTTPS requests to the Meraki Dashboard API, using an API
+        key or a bearer-token file. It reads visible organizations, organization networks, assigned devices and
+        device availability every five minutes by default.
+    supported_platforms:
+      include: []
+      exclude: []
+    multi_instance: true
+    additional_permissions:
+      description: A Meraki Dashboard identity with read access to the selected organization and its networks is
+        required. Enable Dashboard API access for the organization.
+    default_behavior:
+      auto_detection:
+        description: Organizations and credentials are not auto-detected. Configure one job per organization; assigned
+          devices are discovered within that organization.
+      limits:
+        description: 'Meraki refreshes availability every five minutes and supplies no observation timestamp. Faster
+          polling does not create finer source sampling. Missing, unknown or inconsistent availability leaves a
+          gap; inventory membership does not imply that a device is online.
+
+
+          The organization budget is 10 API requests per second, shared with other applications; the source-IP budget
+          is 100 requests per second. The collector paces its requests and honors Retry-After. Other applications
+          or jobs can still exhaust the shared budget. See [Meraki API rate limits](https://developer.cisco.com/meraki/api-v1/rate-limit/).'
+      performance_impact:
+        description: Each collection makes at least four API requests, with more requests for paginated organizations,
+          networks, devices and availability. It creates one virtual node per assigned device. Increase update_every
+          to reduce API usage; increase timeout if a large fleet cannot finish within the collection budget.
+  setup:
+    prerequisites:
+      list:
+      - title: Enable Meraki Dashboard API access
+        description: Enable API access under Organization > Settings in Dashboard and create an API key for an identity
+          with read access to the organization. See the [Meraki API instructions](https://documentation.meraki.com/Platform_Management/Dashboard_Administration/Operate_and_Maintain/How-Tos/How_to_Use_the_Cisco_Meraki_Dashboard_API).
+    configuration:
+      file:
+        name: go.d/meraki.conf
+      options:
+        description: 'Configure one organization per job. The following options can be defined globally: update_every,
+          autodetection_retry.'
+        folding:
+          title: Config options
+          enabled: true
+        list:
+        - name: url
+          description: URL of the Meraki Dashboard API endpoint.
+          default_value: https://api.meraki.com/api/v1
+          required: false
+          group: Target
+        - name: organization_id
+          description: Meraki organization ID to monitor.
+          default_value: ''
+          required: true
+          group: Target
+        - name: api_key
+          description: Meraki API key. Set either this or bearer_token_file.
+          default_value: ''
+          required: false
+          group: Authentication
+        - name: bearer_token_file
+          description: Path to a file containing the Meraki bearer token, reread for each request. Set either this
+            or api_key.
+          default_value: ''
+          required: false
+          group: Authentication
+        - name: update_every
+          description: Data collection interval, in seconds.
+          default_value: 300
+          required: false
+          group: Collection
+        - name: autodetection_retry
+          description: How often to retry the initial connection when the job fails to start, in seconds. Zero disables
+            retries.
+          default_value: 0
+          required: false
+          group: Collection
+        - name: timeout
+          description: Complete collection or connection-check timeout, in seconds, including all pages and request
+            pacing.
+          default_value: 60
+          required: false
+          group: Collection
+        - name: vnode
+          description: Associates the organization summary with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+            Device nodes are created separately.
+          default_value: ''
+          required: false
+          group: Collection
+        - name: proxy_url
+          description: HTTP proxy URL. Empty value uses environment proxy variables.
+          default_value: ''
+          required: false
+          group: Transport
+        - name: tls_ca
+          description: Path to a CA certificate file used to verify the server certificate.
+          default_value: ''
+          required: false
+          group: Transport
+        - name: tls_cert
+          description: Path to a client certificate file. Requires tls_key.
+          default_value: ''
+          required: false
+          group: Transport
+        - name: tls_key
+          description: Path to the client certificate key file. Requires tls_cert.
+          default_value: ''
+          required: false
+          group: Transport
+        - name: tls_skip_verify
+          description: Skip verification of the server certificate and hostname.
+          default_value: false
+          required: false
+          group: Transport
+      examples:
+        folding:
+          title: Config
+          enabled: true
+        list:
+        - name: Basic organization monitoring
+          description: Read the API key from an environment variable.
+          config: "jobs:\n  - name: meraki\n    organization_id: \"123456\"\n    api_key: ${env:MERAKI_API_KEY}"
+        - name: Rotating mounted token
+          description: Read a mounted token file for each request. The file must be readable by the Netdata service
+            user.
+          config: "jobs:\n  - name: meraki\n    organization_id: \"123456\"\n    bearer_token_file: /run/secrets/meraki_token"
+        - name: Regional API endpoint
+          description: Use the API endpoint for the organization’s region.
+          config: "jobs:\n  - name: meraki-canada\n    url: https://api.meraki.ca/api/v1\n    organization_id: \"\
+            123456\"\n    api_key: ${env:MERAKI_API_KEY}"
+  metrics:
+    description: Organization counts appear on the collector node, or the configured job virtual node. Device charts
+      appear on generated device nodes. Device inventory membership is 1 while a device is assigned; missing availability
+      is omitted rather than reported as offline.
+    scopes:
+    - name: organization
+      description: One configured Meraki organization.
+      labels:
+      - name: organization_id
+        description: Meraki organization ID.
+      - name: organization_name
+        description: Meraki organization name.
+      metrics:
+      - name: meraki.organization_assigned_devices
+        description: Meraki Assigned Devices
+        unit: devices
+        chart_type: line
+        dimensions:
+        - name: assigned
+    - name: device
+      description: One assigned Meraki device on its own virtual node.
+      labels:
+      - name: organization_id
+        description: Meraki organization ID.
+      - name: organization_name
+        description: Meraki organization name.
+      - name: serial
+        description: Meraki device serial number.
+      - name: device_name
+        description: Device display name, when present.
+      - name: model
+        description: Device model, when present.
+      - name: product_type
+        description: Meraki product type, when present.
+      - name: network_id
+        description: Assigned network ID, when present.
+      - name: network_name
+        description: Assigned network name, when present.
+      metrics:
+      - name: meraki.device_assigned
+        description: Meraki Device Inventory Membership
+        unit: devices
+        chart_type: line
+        dimensions:
+        - name: assigned
+      - name: meraki.device_availability
+        description: Meraki Device Availability
+        unit: status
+        chart_type: stacked
+        dimensions:
+        - name: alerting
+        - name: dormant
+        - name: offline
+        - name: online
+    folding:
+      title: Metrics
+      enabled: false
+    availability: []
+  troubleshooting:
+    problems:
+      list:
+      - name: Organization access fails
+        description: Verify organization_id, read permissions, API access and Dashboard IP restrictions. A successful
+          organization listing alone does not prove access to organization-scoped operations.
+      - name: Collection exceeds timeout
+        description: Increase timeout for a large paginated organization. The budget includes every page and request
+          pacing.
