@@ -362,6 +362,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Install RPM packaging test tools
+        run: |
+          python3 -m venv "$RUNNER_TEMP/ipmi-test-tools"
+          "$RUNNER_TEMP/ipmi-test-tools/bin/pip" install 'cmake>=4.1,<5'
+          echo "$RUNNER_TEMP/ipmi-test-tools/bin" >> "$GITHUB_PATH"
       - name: Run IPMI packaging and Docker tests
         run: python3 -m unittest discover packaging/installer/tests 'test_*ipmi*.py' -v
 
