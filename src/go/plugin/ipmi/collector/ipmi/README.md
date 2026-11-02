@@ -1,1 +1,1 @@
-integrations/ipmi_experimental_go_collector.md
+integrations/ipmi_go_collector.md
