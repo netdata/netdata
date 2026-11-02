@@ -6439,7 +6439,7 @@ paths:
 
         **Security Features:**
         - Random session key verification prevents unauthorized claiming
-        - Key is regenerated after each claim attempt (successful or failed)
+        - Key is regenerated after a claim attempt that presented the correct key, and on a successful claim (a wrong key does not regenerate it)
         - Key stored in file system requires server access to retrieve
         - Parameter validation ensures only safe characters (alphanumeric, dots, commas, dashes, colons, slashes, underscores)
         - Different OS-specific commands for key retrieval (Linux/Docker/Windows)
@@ -6452,7 +6452,7 @@ paths:
         **Response Formats:**
         - **Info Response:** Returns cloud status, can_be_claimed flag, verification command, and agents info
         - **Success Response:** Includes success=true, message="ok", updated cloud status
-        - **Error Response:** Includes success=false, error message, can_be_claimed flag, new verification key
+        - **Error Response:** Includes success=false, error message, and can_be_claimed flag
 
         **Important Notes:**
         - Agent must be in AVAILABLE, OFFLINE, or INDIRECT state to be claimed
@@ -6460,7 +6460,7 @@ paths:
         - Base URL typically points to Netdata Cloud API (e.g., https://api.netdata.cloud)
         - Rooms parameter is optional - agent will be added to specified war rooms if provided
         - After successful claiming, agent automatically reloads connection and waits for online status
-        - Failed claim attempts regenerate the verification key for security
+        - Claim attempts that present the correct key regenerate the verification key for security; a wrong key does not
 
         **Example Workflow:**
         ```bash
@@ -6498,9 +6498,9 @@ paths:
             4. Use it in the claim request
 
             **Security Notes:**
-            - Key is randomly generated on each info request
-            - Key is regenerated after each claim attempt (prevents reuse)
-            - Mismatched key triggers new key generation (prevents brute force)
+            - Key is generated at startup (and on an info request if none exists yet)
+            - Key is regenerated after a claim attempt that presented the correct key, and on a successful claim (prevents reuse)
+            - A mismatched key does NOT regenerate it: the endpoint is unauthenticated, so a wrong key must not be able to reset the challenge
             - Validates server ownership through file system access
 
             **When to Include:**
