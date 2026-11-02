@@ -309,9 +309,9 @@ services are created when their first process appears. Two command options bound
   is 2 data collection iterations.
 - `max-targets N` (default `500`, minimum `1`): the maximum number of these groups, per family (application groups,
   users, user groups, SIDs, services), that get their own charts. New groups beyond the limit are aggregated into an
-  `other` instance of their family (`app.other_*`, `user.other_*`, ...; `other_2_*` if a real group is already called
-  `other`), and an info message is logged once per family. A process placed into `other` moves to its own group
-  again once retirement frees a slot.
+  `other` instance of their family (`app.other_*`, `user.other_*`, ...), and an info message is logged once per
+  family. If a real group is also called `other`, whichever of the two is created second gets the `_2` suffix
+  (`other_2_*`). A process placed into `other` moves to its own group again once retirement frees a slot.
 
 Groups defined in `apps_groups.conf` are never retired and do not count against the limit, so define the processes
 that must always have their own charts there.
