@@ -1,0 +1,29 @@
+version: v1
+context_namespace: meraki
+groups:
+  - family: Organization
+    metrics: [organization_assigned_devices]
+    charts:
+      - title: Meraki Assigned Devices
+        context: organization_assigned_devices
+        units: devices
+        instances:
+          by_labels: [organization_id]
+        dimensions:
+          - selector: organization_assigned_devices
+            name: assigned
+  - family: Device
+    metrics: [device_assigned, device_availability_status]
+    charts:
+      - title: Meraki Device Inventory Membership
+        context: device_assigned
+        units: devices
+        dimensions:
+          - selector: device_assigned
+            name: assigned
+      - title: Meraki Device Availability
+        context: device_availability
+        units: status
+        type: stacked
+        dimensions:
+          - selector: device_availability_status
