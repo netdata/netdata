@@ -44,12 +44,36 @@ type newRecordKey struct {
 	state     string
 }
 
-func countNew(records []SELRecord) map[newRecordKey]int {
+func countRecords(records []SELRecord) map[newRecordKey]int {
 	counts := make(map[newRecordKey]int)
 	for _, rec := range records {
 		counts[newRecordKey{rec.Threshold, rec.State}]++
 	}
 	return counts
+}
+
+func countNew(c SELCounts) map[newRecordKey]int {
+	all := map[newRecordKey]uint64{
+		{true, StateNominal}: c.Threshold.Nominal, {true, StateWarning}: c.Threshold.Warning,
+		{true, StateCritical}: c.Threshold.Critical, {true, StateUnknown}: c.Threshold.Unknown,
+		{false, StateNominal}: c.Discrete.Nominal, {false, StateWarning}: c.Discrete.Warning,
+		{false, StateCritical}: c.Discrete.Critical, {false, StateUnknown}: c.Discrete.Unknown,
+	}
+	counts := make(map[newRecordKey]int)
+	for key, n := range all {
+		if n != 0 {
+			counts[key] = int(n)
+		}
+	}
+	return counts
+}
+
+func countRaw(records [][selRecordSize]byte) map[newRecordKey]int {
+	decoded := make([]SELRecord, 0, len(records))
+	for _, raw := range records {
+		decoded = append(decoded, decodeSELRecord(raw, nil))
+	}
+	return countRecords(decoded)
 }
 
 // syntheticCriticalEvents are discrete events that the FreeIPMI default
@@ -125,15 +149,15 @@ func TestReader_SEL_Replay(t *testing.T) {
 		r := newSELTestReader(fake, 10*time.Second, 8*time.Millisecond)
 		require.True(t, collectSEL(t, r).NewKnown)
 
-		var got []SELRecord
+		got := make(map[newRecordKey]int)
 		for batch := range slices.Chunk(replayed, 100) {
 			fake.sel.add(batch...)
 			sel := collectSEL(t, r)
 			require.True(t, sel.NewKnown)
-			got = append(got, sel.New...)
+			addNewCounts(got, countNew(sel.New))
 		}
-		assert.Equal(t, wantReal, countNew(got))
-		assert.Zero(t, countNew(got)[newRecordKey{false, StateCritical}], "no critical discrete record")
+		assert.Equal(t, wantReal, got)
+		assert.Zero(t, got[newRecordKey{false, StateCritical}], "no critical discrete record")
 
 		fake.sel.add(synthetic...)
 		sel := collectSEL(t, r)

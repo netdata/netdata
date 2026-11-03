@@ -88,20 +88,25 @@ Records are cached per Reader, across collections and reconnects:
 
 Published record slices only grow at the end, lose a prefix or are reallocated, so earlier snapshots never change.
 
-`SEL.New` reports the records first read since the previous snapshot that reported new records; the collector charts
-them. Every record is accounted when `Get SEL Entry` returns it, before a reset or trim can drop it from the cache, so a
-record read just before a clear is still reported:
+`SEL.New` holds counts of newly observed records by event type and default FreeIPMI state. Event accounting is
+independent of the cached log's completeness:
 
-- Records read before the log was read completely once are history, so a restart counts nothing old. No event-accounting
-  state is retained during this initial load, even if sustained rollover prevents it from completing. The first verified
-  cache seeds deduplication, including when the log is empty.
-- Afterwards a record is new when its 16 bytes were not read or cached before. A reset keeps that content, so the
-  records a clear, rewrite or rollover makes the Reader read again are not new. Once a read is verified, only the
-  content of the cached records is kept; anything else is gone from the BMC.
-- `New` is in read order: the newest record, read to check a change, can come before records the walk reads later.
-- `NewKnown` is false while the log is read for the first time or again after a reset, and when a SEL read failed.
-  New records then wait in the Reader for the next snapshot with `NewKnown` set and are dropped only once `Collect`
-  returns that snapshot, so a failed read or collection neither loses nor repeats them.
+- Before the first verified read, records are history and no event-accounting state is retained. Sustained rollover
+  may keep the initial read incomplete; a restart never reports that history as new. The first verified cache seeds
+  accounting, including when the log is empty.
+- Afterwards, every successful `Get SEL Entry` observation is accounted before cache mutation. One latest 16-byte
+  occupant is retained per 16-bit record ID, so retention is bounded by the protocol ID space even if rescans never
+  complete. Equal content at the same ID is a reread; different content replaces the prior occupant and counts once.
+  An observed A -> B -> A transition counts the last A as a replacement. Identical content with no distinguishable
+  intervening observation cannot establish a new occupant.
+- Resets retain accounting. FIFO trim retires only the exact overwritten occupant; it cannot forget a newer occupant
+  observed by a boundary probe. Verified completion drops IDs absent from the cache and preserves newer observations
+  of retained IDs. The Function's mirror and its `Loaded` flag keep their existing verification rules.
+- Once the baseline exists, a successful collection reports observed events even during a rescan. `NewKnown` is false
+  before that baseline and on a failed SEL read. Cancellation fails the collection. Unpublished events are eight fixed
+  counters, retained across failures and copied into the next eligible snapshot; returning that snapshot clears them.
+  The backlog's duration therefore cannot grow event storage. Classification uses immutable event bytes, independently
+  of the SDR inventory used for display names.
 
 `SELRecord.Threshold` marks threshold events (event/reading type 01h), which the sensor state already reflects; every
 other record is discrete.

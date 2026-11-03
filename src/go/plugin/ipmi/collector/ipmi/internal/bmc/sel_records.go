@@ -82,14 +82,12 @@ type SEL struct {
 	// ReadFailed reports that this collection's Get SEL Info or record reads
 	// failed; the other fields are from earlier collections.
 	ReadFailed bool
-	// New holds the records first read since the previous snapshot that
-	// reported new records, in read order. A record is accounted when it is
-	// read: records read before the log was read completely once are history,
-	// and a record read again, for example after a clear or rewrite, is not new.
-	New []SELRecord
-	// NewKnown is false while the log is read for the first time or again
-	// after a clear or rewrite, and when ReadFailed is set; their new records
-	// are reported by the next snapshot with NewKnown set.
+	// New counts newly observed record occupants since the previous eligible
+	// snapshot. Initial loading is history; subsequent rescans do not delay
+	// event counts. Rereading the same occupant does not count it again.
+	New SELCounts
+	// NewKnown is false before the first verified baseline and when ReadFailed
+	// is set. Pending counts are reported by the next eligible snapshot.
 	NewKnown bool
 }
 
@@ -178,9 +176,8 @@ func decodeSELRecord(raw [selRecordSize]byte, sensors map[sensorAddress]*descrip
 	}
 	s := sel.Standard
 	eventType, sensorType := uint8(s.EventReadingType), uint8(s.SensorType)
-	r.Threshold = eventType == eventTypeThreshold
+	r.Threshold, r.State = selRecordClass(raw)
 	r.Direction = s.EventDir.String()
-	r.State = selState(recordType, eventType, sensorType, s.EventData.EventData1, bool(s.EventDir))
 	r.Generator = generatorName(s.GeneratorID)
 
 	d := sensors[sensorAddress{
@@ -207,6 +204,16 @@ func decodeSELRecord(raw [selRecordSize]byte, sensors map[sensorAddress]*descrip
 		r.Event += fmt.Sprintf(" [record type %#02x]", recordType)
 	}
 	return r
+}
+
+// selRecordClass reads the event fields from the IPMI 2.0 section 32.1 wire
+// layout. Classification is independent of SDR inventory and display decoding.
+func selRecordClass(raw [selRecordSize]byte) (threshold bool, state string) {
+	if raw[2] >= selTimestampedOEMFirst {
+		return false, StateUnknown
+	}
+	eventType := raw[12] & 0x7f
+	return eventType == eventTypeThreshold, selState(raw[2], eventType, raw[10], raw[13], raw[12]&0x80 != 0)
 }
 
 // thresholdTrigger formats the trigger reading and threshold that a threshold

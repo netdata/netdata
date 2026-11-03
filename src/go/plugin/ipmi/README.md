@@ -97,15 +97,16 @@ records that show where the log starts and ends; it rereads the log after the BM
 of a large log is spread over several collections, so the Function shows the oldest records until it completes. Records
 are kept in memory, so an Agent restart reads the log again. The plugin never clears or writes the SEL.
 
-`ipmi.sel_new_records` counts the records the BMC logged since the previous value, by default FreeIPMI state, in two
+`ipmi.sel_new_records` counts records newly observed since the previous value, by default FreeIPMI state, in two
 chart instances: `event_type: threshold` for threshold events, which also change their sensor's state, and
 `event_type: discrete` for every other record. Records already in the log when collection starts are history, so the
 chart appears once the first read completes; records logged while the Agent was stopped are not counted. After a clear
-or rewrite, only records the collector did not hold before count. A failed SEL read leaves a gap, and the records read
-during it count in the next value.
+or rewrite, rereading the same record does not count it again. After that initial baseline, observed events are
+reported during rescans even when rollover prevents the whole log from being read. A failed SEL read leaves a gap;
+records observed during it count in the next successful value.
 
-The `ipmi_sel_critical_events` alert raises CRITICAL when the new records of the last 10 minutes include a critical
-discrete record, for example a power supply failure, an uncorrectable memory error or a processor IERR. A SEL record
+The `ipmi_sel_critical_events` alert raises CRITICAL when records newly observed in the last 10 minutes include a
+critical discrete record, for example a power supply failure, an uncorrectable memory error or a processor IERR. A SEL record
 reports an event, not whether its cause is resolved, so the alert clears 10 minutes after the last such record without
 a clear notification; the `ipmi-sel` Function shows the records. Threshold
 events are left to `ipmi_sensor_state`, which alerts while a sensor reads critical at collection time; a critical

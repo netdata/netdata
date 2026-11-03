@@ -4,7 +4,9 @@ package bmc
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
+	"maps"
 	"math/rand/v2"
 	"slices"
 	"testing"
@@ -20,14 +22,15 @@ import (
 // and bursts, clears, deletions and deletions whose ID a new record takes at
 // once while a read is in progress) and failures
 // (Get SEL Info and Get SEL Entry errors, cancellations, cancelled
-// reservations, multi-collection reads). The fake BMC's own log is the oracle:
-// once the log stops changing, the cache equals it, and every record logged
-// after the first complete read that the Reader received or the BMC still
-// holds is reported exactly once; no earlier record and no record the Reader
-// never received is reported.
+// reservations, multi-collection reads). After a known baseline, each eligible
+// sample is checked against independently received wire identities, with mixed
+// event classes from the real-log fixture. Seeds alternate a known baseline and
+// changes during the initial load. Once changes stop, the cache must
+// equal the fake BMC's log. Ledger size is checked during changes too.
 func TestReader_SEL_RandomLogChanges(t *testing.T) {
+	templates := append(readReplaySEL(t), syntheticCriticalEvents(t, 1000, 0x60000000)...)
 	for seed := range uint64(500) {
-		if !runSELModel(t, seed+1, 150) {
+		if !runSELModel(t, seed+1, 150, templates) {
 			return
 		}
 	}
@@ -52,18 +55,18 @@ func (o *receivingTransport) Exchange(ctx context.Context, req types.Request, re
 // otherwise record IDs cycle through a small ID space, so rollover reuses the
 // IDs of overwritten records later.
 type selModel struct {
-	fake     *fakeBMC
-	capacity int
-	slot     bool
-	idSpace  uint16
-	lastID   uint16
-	ts       uint32
-	loggedAt map[[selRecordSize]byte]int
+	fake      *fakeBMC
+	capacity  int
+	slot      bool
+	idSpace   uint16
+	lastID    uint16
+	ts        uint32
+	templates [][selRecordSize]byte
 }
 
 // log logs a record. A hidden record leaves the addition time as it was, like
 // a record logged in the same second as the previous one.
-func (m *selModel) log(step int, hidden bool) {
+func (m *selModel) log(hidden bool) {
 	m.ts++
 	var rec [selRecordSize]byte
 	if m.slot && len(m.fake.sel.records) >= m.capacity {
@@ -89,13 +92,16 @@ func (m *selModel) log(step int, hidden bool) {
 		}
 		m.fake.sel.reservation = 0
 	}
-	m.loggedAt[rec] = step
+	template := m.templates[int(m.ts)%len(m.templates)]
+	binary.LittleEndian.PutUint16(template[:], binary16(rec))
+	binary.LittleEndian.PutUint32(template[3:], m.ts)
+	m.fake.sel.records[len(m.fake.sel.records)-1] = template
 }
 
 // clear empties the log; the BMC then logs that the log was cleared.
-func (m *selModel) clear(step int) {
+func (m *selModel) clear() {
 	m.fake.sel.clear()
-	m.log(step, false)
+	m.log(false)
 }
 
 // deleteOne deletes one record, which changes the erase time, and reports
@@ -114,11 +120,10 @@ func (m *selModel) deleteOne(rng *rand.Rand) (uint16, bool) {
 }
 
 // replaceOne deletes one record and logs a new record under its ID.
-func (m *selModel) replaceOne(step int, rng *rand.Rand) {
+func (m *selModel) replaceOne(rng *rand.Rand) {
 	if id, ok := m.deleteOne(rng); ok {
 		m.ts++
 		rec := tempEvent(id, m.ts)
-		m.loggedAt[rec] = step
 		m.fake.sel.add(rec)
 	}
 }
@@ -126,22 +131,22 @@ func (m *selModel) replaceOne(step int, rng *rand.Rand) {
 func binary16(rec [selRecordSize]byte) uint16 { return uint16(rec[0]) | uint16(rec[1])<<8 }
 
 // runSELModel runs one seed and reports whether its checks passed.
-func runSELModel(t *testing.T, seed uint64, steps int) bool {
+func runSELModel(t *testing.T, seed uint64, steps int, templates [][selRecordSize]byte) bool {
 	t.Helper()
 	rng := rand.New(rand.NewPCG(seed, seed*7+1))
 	fake := newFakeBMC()
 	capacity := []int{3, 6, 10}[rng.IntN(3)]
 	m := &selModel{
-		fake:     fake,
-		capacity: capacity,
-		slot:     rng.IntN(2) == 0,
-		idSpace:  []uint16{uint16(capacity + 1), uint16(2 * capacity), 40}[rng.IntN(3)],
-		ts:       0x60000000,
-		loggedAt: make(map[[selRecordSize]byte]int),
+		fake:      fake,
+		capacity:  capacity,
+		slot:      rng.IntN(2) == 0,
+		idSpace:   []uint16{uint16(capacity + 1), uint16(2 * capacity), 40}[rng.IntN(3)],
+		ts:        0x60000000,
+		templates: templates,
 	}
 	fake.sel.requireReservation = rng.IntN(2) == 0
 	for range 1 + rng.IntN(6) {
-		m.log(-1, false)
+		m.log(false)
 	}
 	history := slices.Clone(fake.sel.records)
 
@@ -162,21 +167,34 @@ func runSELModel(t *testing.T, seed uint64, steps int) bool {
 		switch rng.IntN(7) {
 		case 0:
 			for range 1 + rng.IntN(capacity+1) {
-				m.log(step, false)
+				m.log(false)
 			}
 		case 1:
-			m.clear(step)
+			m.clear()
 		case 2:
 			m.deleteOne(rng)
 		case 3:
-			m.replaceOne(step, rng)
+			m.replaceOne(rng)
 		default:
-			m.log(step, rng.IntN(4) == 0)
+			m.log(rng.IntN(4) == 0)
 		}
 	}
 
-	reported := make(map[[selRecordSize]byte]int)
-	firstLoaded := -1
+	// Half the seeds start from a known baseline; the others retain initial-
+	// load interleavings. No SEL entry is read after baseline verification in
+	// that collection, so its received records are still history.
+	started := seed%2 == 0
+	if started {
+		baseline, err := r.Collect(t.Context(), true)
+		if err != nil || baseline.SEL == nil || !baseline.SEL.Loaded {
+			t.Fatalf("seed %d: initial baseline: %v", seed, err)
+		}
+	}
+	accounted := make(map[[selRecordSize]byte]bool)
+	for _, raw := range history {
+		accounted[raw] = true
+	}
+	expected := make(map[newRecordKey]int)
 	collect := func(failures bool) *SEL {
 		entryCost = []time.Duration{0, 300 * time.Millisecond}[rng.IntN(2)] // all, or 4 records per collection
 		ctx, cancel := context.WithCancel(t.Context())
@@ -204,28 +222,28 @@ func runSELModel(t *testing.T, seed uint64, steps int) bool {
 		}
 		snapshot, err := r.Collect(ctx, true)
 		fake.selErr, fake.onExchange = nil, nil
-		if r.sel.seen == nil {
-			if len(r.sel.pending) != 0 {
-				t.Errorf("seed %d step %d: pending events before the baseline", seed, step)
+		if !started {
+			for raw := range receiving.received {
+				accounted[raw] = true
 			}
+			started = r.sel.seen != nil
 		} else {
-			for _, rec := range r.sel.records {
-				if !r.sel.seen[rec.Raw] {
-					t.Errorf("seed %d step %d: cached record %x is not in seen", seed, step, rec.Raw)
-				}
-			}
+			addNewCounts(expected, newlyReceivedSEL(receiving, accounted))
+		}
+		if len(r.sel.seen) > int(m.idSpace) {
+			t.Errorf("seed %d step %d: ledger has %d entries for %d IDs", seed, step, len(r.sel.seen), m.idSpace)
 		}
 		if err != nil || snapshot.SEL == nil {
 			return nil
 		}
 		sel := snapshot.SEL
 		if sel.NewKnown {
-			for _, rec := range sel.New {
-				reported[rec.Raw]++
+			if !maps.Equal(expected, countNew(sel.New)) {
+				t.Errorf("seed %d step %d: counts %v, want observed %v", seed, step, countNew(sel.New), expected)
 			}
-		}
-		if sel.Loaded && firstLoaded < 0 {
-			firstLoaded = step
+			clear(expected)
+		} else if started && !sel.ReadFailed {
+			t.Errorf("seed %d step %d: accounting unavailable during a successful rescan", seed, step)
 		}
 		return sel
 	}
@@ -235,17 +253,16 @@ func runSELModel(t *testing.T, seed uint64, steps int) bool {
 		case 0, 1, 2, 3:
 			hidden := rng.IntN(4) == 0
 			for range 1 + rng.IntN(3) {
-				m.log(step, hidden)
+				m.log(hidden)
 			}
 		case 4:
-			m.clear(step)
+			m.clear()
 		case 5:
 			m.deleteOne(rng)
 		case 6:
 			if n := len(fake.sel.records); n > 0 {
 				m.ts++
 				rec := tempEvent(binary16(fake.sel.records[n-1]), m.ts)
-				m.loggedAt[rec] = step
 				fake.sel.records = append(slices.Clone(fake.sel.records[:n-1]), rec)
 				fake.sel.additionTime++
 				fake.sel.reservation = 0
@@ -257,7 +274,7 @@ func runSELModel(t *testing.T, seed uint64, steps int) bool {
 	}
 	eventsDuringRead = 0
 	// Records Get SEL Info could not show stay unread until a change it shows.
-	m.log(step, false)
+	m.log(false)
 
 	var sel *SEL
 	for quiet := 0; quiet < 3; {
@@ -265,7 +282,7 @@ func runSELModel(t *testing.T, seed uint64, steps int) bool {
 			t.Errorf("seed %d: the Reader did not settle", seed)
 			return false
 		}
-		if sel = collect(false); sel != nil && sel.Loaded && sel.NewKnown && len(sel.New) == 0 {
+		if sel = collect(false); sel != nil && sel.Loaded && sel.NewKnown && sel.New == (SELCounts{}) {
 			quiet++
 		} else {
 			quiet = 0
@@ -278,24 +295,9 @@ func runSELModel(t *testing.T, seed uint64, steps int) bool {
 	if len(r.sel.seen) != len(r.sel.records) {
 		t.Errorf("seed %d: seen holds %d contents for %d cached records", seed, len(r.sel.seen), len(r.sel.records))
 	}
-	for rec, n := range reported {
-		switch {
-		case slices.Contains(history, rec):
-			t.Errorf("seed %d: record %x of the log at start reported", seed, rec)
-		case receiving.received[rec] == 0:
-			t.Errorf("seed %d: record %x reported but never received", seed, rec)
-		case n != 1:
-			t.Errorf("seed %d: record %x reported %d times", seed, rec, n)
-		}
-	}
-	for rec, at := range m.loggedAt {
-		// Records logged up to the step the first read completed may be history.
-		if at <= firstLoaded || reported[rec] == 1 {
-			continue
-		}
-		if receiving.received[rec] > 0 || slices.Contains(fake.sel.records, rec) {
-			t.Errorf("seed %d: record %x logged at step %d (first read complete at %d) reported %d times",
-				seed, rec, at, firstLoaded, reported[rec])
+	for _, rec := range sel.Records {
+		if r.sel.seen[rec.ID] != rec.Raw {
+			t.Errorf("seed %d: settled occupant differs at ID %d", seed, rec.ID)
 		}
 	}
 	return !t.Failed()

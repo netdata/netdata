@@ -53,7 +53,7 @@ func TestReader_SEL_BaselineDuringSustainedRollover(t *testing.T) {
 	newRecord := fake.sel.overwrite(timestamp, false)
 	got := collectSEL(t, r)
 	require.True(t, got.NewKnown)
-	assert.Equal(t, [][selRecordSize]byte{newRecord}, recordsRaw(&SEL{Records: got.New}))
+	assert.Equal(t, countRaw([][selRecordSize]byte{newRecord}), countNew(got.New))
 	assert.Empty(t, collectSEL(t, r).New)
 }
 
@@ -73,7 +73,7 @@ func TestReader_SEL_BaselineStartsNewRecordAccounting(t *testing.T) {
 			fake.sel.add(tempEvents(4)...)
 			got := collectSEL(t, r)
 			require.True(t, got.NewKnown)
-			assert.Equal(t, []uint16{4}, newIDs(got))
+			assert.Equal(t, countRaw(tempEvents(4)), countNew(got.New))
 			assert.Empty(t, collectSEL(t, r).New)
 		})
 	}

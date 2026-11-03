@@ -82,12 +82,6 @@ func recordIDs(s *SEL) []uint16 {
 	return ids
 }
 
-// newIDs returns the IDs of the new records a snapshot reports; nil when it
-// reports none or cannot tell.
-func newIDs(s *SEL) []uint16 {
-	return recordIDs(&SEL{Records: s.New})
-}
-
 // entryReads returns the record IDs requested by Get SEL Entry since the last call.
 func entryReads(fake *fakeBMC) []uint16 {
 	var ids []uint16
@@ -273,8 +267,7 @@ func TestReader_SEL_Changes(t *testing.T) {
 			}
 			assert.Equal(t, beforeRecords, before.Records, "published records never change")
 			assert.True(t, got.NewKnown)
-			assert.ElementsMatch(t, tc.wantNew, recordsRaw(&SEL{Records: got.New}), "records read again are not new")
-			assert.Subset(t, got.Records, got.New, "new records are decoded like the cached ones")
+			assert.Equal(t, countRaw(tc.wantNew), countNew(got.New), "records read again are not new")
 
 			got = collectSEL(t, r)
 			assert.Empty(t, entryReads(fake), "the next unchanged collection reads no record")
@@ -333,7 +326,7 @@ func TestReader_SEL_EventDuringRead(t *testing.T) {
 			assert.Equal(t, tc.wantReads, entryReads(fake), "the oldest record shows that nothing was overwritten")
 			assert.Equal(t, tc.want, recordsRaw(got), "no record the BMC holds is dropped")
 			assert.True(t, got.NewKnown)
-			assert.Equal(t, tc.wantNew, newIDs(got))
+			assert.Equal(t, countRaw(tempEvents(tc.wantNew...)), countNew(got.New))
 
 			got = collectSEL(t, r)
 			assert.Equal(t, []uint16{0xffff}, entryReads(fake), "the new count leads to one check of the newest record")
@@ -411,7 +404,7 @@ func TestReader_SEL_RolloverDuringRead(t *testing.T) {
 				sel = collectSEL(t, r)
 				assert.Equal(t, want, recordIDs(sel), "collection %d after the rollover", i+1)
 				assert.Equal(t, tc.wantNewKnown[i], sel.NewKnown, "collection %d after the rollover", i+1)
-				assert.ElementsMatch(t, tc.wantNew[i], newIDs(sel), "collection %d after the rollover", i+1)
+				assert.Equal(t, countRaw(tempEvents(tc.wantNew[i]...)), countNew(sel.New), "collection %d after the rollover", i+1)
 			}
 			assert.True(t, sel.Loaded)
 			assert.Equal(t, 10, sel.Entries)
@@ -433,14 +426,15 @@ func TestReader_SEL_OldestRecordUnknown(t *testing.T) {
 	assert.Equal(t, []uint16{0xffff, 3, 4, 0x0000}, entryReads(fake))
 	assert.Empty(t, got.Records)
 	assert.False(t, got.Loaded, "the log is read again")
-	assert.False(t, got.NewKnown)
+	assert.True(t, got.NewKnown)
+	assert.Equal(t, countRaw(tempEvents(4, 9)), countNew(got.New))
 
 	got = collectSEL(t, r)
 	assert.Equal(t, []uint16{0x0000, 3, 4, 0x0000}, entryReads(fake))
 	assert.Equal(t, []uint16{9, 3, 4}, recordIDs(got))
 	assert.True(t, got.Loaded)
 	assert.True(t, got.NewKnown)
-	assert.Equal(t, []uint16{4, 9}, newIDs(got), "records read again are not new; unseen ones are")
+	assert.Empty(t, got.New, "records read again are not new")
 }
 
 func TestReader_SEL_InventoryChange(t *testing.T) {
@@ -1012,7 +1006,7 @@ func TestReader_SEL_Failures(t *testing.T) {
 				Records: decodeAll(fake.sel.records),
 			}), recordIDs(recovered))
 			assert.True(t, recovered.NewKnown)
-			assert.ElementsMatch(t, tc.wantNew, newIDs(recovered), "records read before the failure count once")
+			assert.Equal(t, countRaw(tempEvents(tc.wantNew...)), countNew(recovered.New), "records read before the failure count once")
 			assert.Empty(t, collectSEL(t, r).New)
 		})
 	}
@@ -1087,7 +1081,7 @@ func TestReader_SEL_NewRecordsAfterCanceledCollection(t *testing.T) {
 	fake.onExchange = nil
 	got := collectSEL(t, r)
 	assert.True(t, got.NewKnown)
-	assert.Equal(t, []uint16{3}, newIDs(got), "a record of a canceled collection is reported later")
+	assert.Equal(t, countRaw(tempEvents(3)), countNew(got.New), "a record of a canceled collection is reported later")
 	assert.Empty(t, collectSEL(t, r).New)
 }
 
@@ -1104,14 +1098,16 @@ func TestReader_SEL_NewRecordsWhileReadingAgain(t *testing.T) {
 	fake.sel.records = fake.sel.records[:7]
 	fake.sel.add(changed, tempEvent(9, 0x60000009))
 	var known []bool
+	reported := make(map[newRecordKey]int)
 	var got *SEL
 	for got == nil || !got.Loaded {
 		got = collectSEL(t, r)
 		known = append(known, got.NewKnown)
+		addNewCounts(reported, countNew(got.New))
 	}
-	assert.Equal(t, []bool{false, false, true}, known, "no new-record count while reading again")
+	assert.Equal(t, []bool{true, true, true}, known, "observed events are reported during rescans")
 	want := [][selRecordSize]byte{changed, tempEvent(9, 0x60000009)}
-	assert.ElementsMatch(t, want, recordsRaw(&SEL{Records: got.New}))
+	assert.Equal(t, countRaw(want), reported)
 	assert.Len(t, r.sel.seen, len(got.Records), "a complete read keeps only the content of the cached records")
 	assert.Empty(t, collectSEL(t, r).New)
 }
@@ -1128,18 +1124,19 @@ func TestReader_SEL_ResetWhileReadingAgain(t *testing.T) {
 	changed := tempEvent(8, 0x70000008)
 	fake.sel.records = fake.sel.records[:7]
 	fake.sel.add(changed, tempEvent(9, 0x60000009))
-	require.False(t, collectSEL(t, r).Loaded)
+	first := collectSEL(t, r)
+	require.False(t, first.Loaded)
+	reported := countNew(first.New)
 	fake.sel.next = map[uint16]uint16{5: 0x99}
 	got, err := r.Collect(t.Context(), true)
 	require.NoError(t, err)
 	require.Equal(t, []string{selRecordsWarning}, got.Warnings)
 
 	fake.sel.next = nil
-	var reported []uint16
 	for range 4 {
-		reported = append(reported, newIDs(collectSEL(t, r))...)
+		addNewCounts(reported, countNew(collectSEL(t, r).New))
 	}
-	assert.ElementsMatch(t, []uint16{8, 9}, reported)
+	assert.Equal(t, countRaw(tempEvents(8, 9)), reported)
 }
 
 func TestReader_SEL_ReadRecordsSurviveClear(t *testing.T) {
@@ -1187,12 +1184,12 @@ func TestReader_SEL_ReadRecordsSurviveClear(t *testing.T) {
 			require.NoError(t, err)
 			fake.onExchange = nil
 
-			var reported [][selRecordSize]byte
-			reported = append(reported, recordsRaw(&SEL{Records: got.SEL.New})...)
+			reported := make(map[newRecordKey]int)
+			addNewCounts(reported, countNew(got.SEL.New))
 			for range 3 {
-				reported = append(reported, recordsRaw(&SEL{Records: collectSEL(t, r).New})...)
+				addNewCounts(reported, countNew(collectSEL(t, r).New))
 			}
-			assert.Equal(t, tc.want, reported)
+			assert.Equal(t, countRaw(tc.want), reported)
 		})
 	}
 }
@@ -1248,7 +1245,7 @@ func TestReader_SEL_OverwrittenPastTheRead(t *testing.T) {
 					logged = append(logged, fake.sel.overwrite(ts, hidden))
 				}
 			}
-			reported := make(map[[selRecordSize]byte]int)
+			reported := make(map[newRecordKey]int)
 			var sel *SEL
 			for _, c := range tc.collections {
 				overwrite(c.logged, c.hidden)
@@ -1265,9 +1262,7 @@ func TestReader_SEL_OverwrittenPastTheRead(t *testing.T) {
 				got, err := r.Collect(t.Context(), true)
 				require.NoError(t, err)
 				sel = got.SEL
-				for _, rec := range sel.New {
-					reported[rec.Raw]++
-				}
+				addNewCounts(reported, countNew(sel.New))
 			}
 
 			assertReportedOnce(t, fake, receiving, sel, logged, reported)
@@ -1302,13 +1297,11 @@ func TestReader_SEL_DeletedAheadOfTheRead(t *testing.T) {
 		return nil
 	}
 
-	reported := make(map[[selRecordSize]byte]int)
+	reported := make(map[newRecordKey]int)
 	var sel *SEL
 	for range 4 {
 		sel = collectSEL(t, r)
-		for _, rec := range sel.New {
-			reported[rec.Raw]++
-		}
+		addNewCounts(reported, countNew(sel.New))
 	}
 	assertReportedOnce(t, fake, receiving, sel, logged, reported)
 }
@@ -1330,7 +1323,7 @@ func TestReader_SEL_StormKeepsTheCacheWithinTheLog(t *testing.T) {
 	}
 
 	var logged [][selRecordSize]byte
-	reported := make(map[[selRecordSize]byte]int)
+	reported := make(map[newRecordKey]int)
 	var sel *SEL
 	for collection := range 50 {
 		if collection < 30 {
@@ -1343,9 +1336,7 @@ func TestReader_SEL_StormKeepsTheCacheWithinTheLog(t *testing.T) {
 		}
 		sel = collectSEL(t, r)
 		require.LessOrEqual(t, len(sel.Records), capacity, "collection %d", collection)
-		for _, rec := range sel.New {
-			reported[rec.Raw]++
-		}
+		addNewCounts(reported, countNew(sel.New))
 	}
 	assertReportedOnce(t, fake, receiving, sel, logged, reported)
 }
@@ -1360,17 +1351,17 @@ func assertReportedOnce(
 	receiving *receivingTransport,
 	sel *SEL,
 	logged [][selRecordSize]byte,
-	reported map[[selRecordSize]byte]int,
+	reported map[newRecordKey]int,
 ) {
 	t.Helper()
 	assert.Equal(t, fake.sel.records, recordsRaw(sel), "the cache holds the BMC's log")
-	want := make(map[[selRecordSize]byte]int)
+	var want [][selRecordSize]byte
 	for _, rec := range logged {
 		if receiving.received[rec] > 0 || slices.Contains(fake.sel.records, rec) {
-			want[rec] = 1
+			want = append(want, rec)
 		}
 	}
-	assert.Equal(t, want, reported, "every new record received or still held is reported once")
+	assert.Equal(t, countRaw(want), reported, "every new record received or still held is reported once")
 }
 
 func TestReader_SEL_ResumeFindsNewestRecord(t *testing.T) {

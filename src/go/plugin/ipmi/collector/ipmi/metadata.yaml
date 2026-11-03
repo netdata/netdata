@@ -189,10 +189,12 @@ modules:
         records FreeIPMI may filter during interpretation. The stock ipmi_events alert template matches the ipmi.sel
         context and applies to every Go job and to the C collector.
 
-        The SEL new records chart counts the records the BMC logged since the previous value, by default FreeIPMI state.
+        The SEL new records chart counts records newly observed since the previous value, by default FreeIPMI state.
         Records already in the log when collection starts are not counted: the chart appears once the first read of
-        the log completes. After the BMC log is cleared or rewritten, only records the collector did not hold before
-        count. A failed SEL read leaves a gap, and the records read during it count in the next value.
+        the log completes. After the BMC log is cleared or rewritten, rereading the same record does not count it
+        again. After the initial baseline, observed events are reported during rescans even if rollover prevents the
+        whole log from being read. A failed SEL read leaves a gap, and records observed during it count in the next
+        successful value.
       scopes:
         - name: sensor
           description: A sensor on the selected BMC.

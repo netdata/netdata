@@ -142,12 +142,9 @@ func TestCollector_Collect_MissingData(t *testing.T) {
 
 func TestCollector_Collect_NewSELRecordCounts(t *testing.T) {
 	c, reader := newTestCollector(t)
-	reader.snapshot.SEL.New = []bmc.SELRecord{
-		{ID: 4, State: bmc.StateCritical, Threshold: true},
-		{ID: 5, State: bmc.StateNominal, Threshold: true},
-		{ID: 6, State: bmc.StateCritical, Threshold: true},
-		{ID: 7, State: bmc.StateCritical},
-		{ID: 8, State: bmc.StateUnknown},
+	reader.snapshot.SEL.New = bmc.SELCounts{
+		Threshold: bmc.SELStateCounts{Nominal: 1, Critical: 2},
+		Discrete:  bmc.SELStateCounts{Critical: 1, Unknown: 1},
 	}
 
 	points, err := collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
@@ -170,7 +167,7 @@ func TestCollector_Collect_NewSELRecordCounts(t *testing.T) {
 	}, got)
 
 	// The Reader reports no new records when it cannot tell.
-	reader.snapshot.SEL.New, reader.snapshot.SEL.NewKnown = nil, false
+	reader.snapshot.SEL.New, reader.snapshot.SEL.NewKnown = bmc.SELCounts{}, false
 	points, err = collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
 	require.NoError(t, err)
 	assert.Equal(t, wantSeries(t, reader.snapshot), points, "unknown new records leave a gap, not zeros")
@@ -185,7 +182,7 @@ func TestCollector_SELChartsSurviveFailedReads(t *testing.T) {
 	healthy := healthySnapshot()
 	failed := healthySnapshot()
 	failed.SELEntries = nil
-	failed.SEL.ReadFailed, failed.SEL.New, failed.SEL.NewKnown = true, nil, false
+	failed.SEL.ReadFailed, failed.SEL.New, failed.SEL.NewKnown = true, bmc.SELCounts{}, false
 	created := make(map[string]bool)
 	// eventTypes are the event_type labels of the created charts, with their dimensions.
 	eventTypes := make(map[string][]string)
@@ -470,7 +467,7 @@ func healthySnapshot() *bmc.Snapshot {
 			Records:  records,
 			Loaded:   true,
 			Entries:  3,
-			New:      records[1:],
+			New:      bmc.SELCounts{Threshold: bmc.SELStateCounts{Critical: 1}, Discrete: bmc.SELStateCounts{Warning: 1}},
 			NewKnown: true,
 		},
 		CollectedAt: time.Now(),
@@ -548,11 +545,20 @@ func wantSeries(t *testing.T, s *bmc.Snapshot) map[string]metrix.SampleValue {
 	if s.SEL != nil && s.SEL.NewKnown {
 		for _, eventType := range []string{"threshold", "discrete"} {
 			for _, state := range []string{bmc.StateNominal, bmc.StateWarning, bmc.StateCritical, bmc.StateUnknown} {
+				states := s.SEL.New.Discrete
+				if eventType == "threshold" {
+					states = s.SEL.New.Threshold
+				}
 				var n metrix.SampleValue
-				for _, rec := range s.SEL.New {
-					if rec.Threshold == (eventType == "threshold") && rec.State == state {
-						n++
-					}
+				switch state {
+				case bmc.StateNominal:
+					n = metrix.SampleValue(states.Nominal)
+				case bmc.StateWarning:
+					n = metrix.SampleValue(states.Warning)
+				case bmc.StateCritical:
+					n = metrix.SampleValue(states.Critical)
+				case bmc.StateUnknown:
+					n = metrix.SampleValue(states.Unknown)
 				}
 				want[seriesKey("sel_new_records", map[string]string{"event_type": eventType, "state": state})] = n
 			}

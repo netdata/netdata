@@ -4,6 +4,7 @@ package bmc
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"time"
@@ -56,12 +57,12 @@ type selCache struct {
 	// decodedWith is the inventory generation the records were decoded with.
 	decodedWith uint64
 
-	// seen is nil until the first verified read seeds it with the cached
-	// records. Afterwards it also holds records read since the last verified
-	// read that the BMC may still hold. Resets keep it to avoid recounting.
-	seen map[[selRecordSize]byte]bool
-	// pending holds the new records no delivered snapshot reported yet.
-	pending [][selRecordSize]byte
+	// seen is nil until the first verified read. Afterwards it retains the
+	// latest observed occupant of each 16-bit record ID, bounding identities
+	// even when rollover prevents the mirror from completing another read.
+	seen map[uint16][selRecordSize]byte
+	// pending holds counts no delivered snapshot reported yet.
+	pending SELCounts
 
 	reservation uint16
 
@@ -79,28 +80,36 @@ func (c *selCache) reset() {
 
 // complete marks the cache verified to hold the whole log. The first verified
 // cache seeds event accounting; earlier reads are history and need no tracking.
-// Afterwards seen contains every cached record; if it is larger, the extra
-// records have left the log.
+// Later completion drops IDs absent from the verified cache, preserving newer
+// observations of retained IDs instead of overwriting them with cached content.
 func (c *selCache) complete() {
 	c.loaded = true
 	c.unverified = false
 	if c.seen == nil || len(c.seen) > len(c.records) {
-		seen := make(map[[selRecordSize]byte]bool, len(c.records))
+		seen := make(map[uint16][selRecordSize]byte, len(c.records))
 		for _, rec := range c.records {
-			seen[rec.Raw] = true
+			raw, ok := c.seen[rec.ID]
+			if !ok {
+				raw = rec.Raw
+			}
+			seen[rec.ID] = raw
 		}
 		c.seen = seen
 	}
 }
 
 // observe accounts for a record as it is read, before any cache change can
-// drop it: after the baseline is verified, a record not seen before is new.
+// drop it: after the baseline, a different occupant at a record ID is new.
 func (c *selCache) observe(raw [selRecordSize]byte) {
-	if c.seen == nil || c.seen[raw] {
+	if c.seen == nil {
 		return
 	}
-	c.seen[raw] = true
-	c.pending = append(c.pending, raw)
+	id := binary.LittleEndian.Uint16(raw[:])
+	if previous, ok := c.seen[id]; ok && previous == raw {
+		return
+	}
+	c.seen[id] = raw
+	c.pending.observe(raw)
 }
 
 func (c *selCache) last() *SELRecord {
@@ -138,7 +147,7 @@ func (r *Reader) readSEL(ctx context.Context, warnings *collectionWarnings) (*in
 	}
 	s := c.snapshot(updateErr != nil)
 	if s.NewKnown {
-		s.New = r.decodePending()
+		s.New = c.pending
 	}
 	// Completing a read asks Get SEL Info again; the count and the usage are
 	// from the same, latest answer.
@@ -157,27 +166,14 @@ func (c *selCache) snapshot(failed bool) *SEL {
 		ClockSkew:  c.clockSkew,
 		ReadFailed: failed,
 	}
-	s.NewKnown = c.loaded && !failed
+	s.NewKnown = c.seen != nil && !failed
 	return s
 }
 
-// decodePending decodes the new records with the current inventory.
-func (r *Reader) decodePending() []SELRecord {
-	if len(r.sel.pending) == 0 {
-		return nil
-	}
-	sensors := sensorsByAddress(r.inventory)
-	records := make([]SELRecord, 0, len(r.sel.pending))
-	for _, raw := range r.sel.pending {
-		records = append(records, decodeSELRecord(raw, sensors))
-	}
-	return records
-}
-
-// delivered forgets the new records of a snapshot the Reader returned.
+// delivered forgets the counts of a snapshot the Reader returned.
 func (c *selCache) delivered(s *SEL) {
 	if s != nil && s.NewKnown {
-		c.pending = nil
+		c.pending = SELCounts{}
 	}
 }
 
@@ -292,7 +288,9 @@ func (r *Reader) dropOverwritten(ctx context.Context) (bool, error) {
 	for i, rec := range c.records {
 		if rec.Raw == oldest {
 			for _, gone := range c.records[:i] {
-				delete(c.seen, gone.Raw)
+				if c.seen[gone.ID] == gone.Raw {
+					delete(c.seen, gone.ID)
+				}
 			}
 			c.records = c.records[i:]
 			return true, nil
