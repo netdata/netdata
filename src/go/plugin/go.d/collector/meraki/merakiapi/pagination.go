@@ -46,11 +46,10 @@ func (c *Client) pageURL(u *url.URL, operationPath string, maxPageSize int, win 
 				return nil, "", errors.New("changed pagination time window")
 			}
 		case "interval":
-			// Meraki derives the interval from the window and can echo it. Only a
-			// window of exactly one 300-second interval, the shortest, makes the
-			// echoed value certain. It is dropped: the window alone sets it.
-			if win == nil || win.end.Sub(win.start) != 300*time.Second || values[0] != "300" {
-				return nil, "", errors.New("changed pagination interval")
+			// Meraki derives the interval from the window and can echo it. The
+			// echo is dropped, so every page lets the same window decide it.
+			if win == nil {
+				return nil, "", errors.New("unexpected pagination query parameter")
 			}
 			query.Del(name)
 		default:

@@ -13,6 +13,24 @@ source of the integration page.
 **Path convention.** Code references are relative to `src/go/plugin/go.d/collector/meraki/`, except those starting
 with `src/go/`, which are repo-relative.
 
+> [!WARNING]
+> **Open item: the traffic read windows are not measured against a live Meraki organization.**
+>
+> Meraki documents no delay between the end of a traffic interval and its publication. The collector therefore looks
+> for the latest switch port usage interval in the last **15 minutes** (`usageLookback`) and reads uplink bytes for
+> the 5 minutes that ended **5 minutes** ago (`uplinkDelay`), both in `collect_traffic.go`. Both values are informed
+> guesses. If the real delay is longer, switch port traffic gaps and uplink traffic reads low.
+>
+> Measure on a real organization, then set both constants and the matching `metadata.yaml` and `config_schema.json`
+> text from the result:
+>
+> 1. Request `getOrganizationSwitchPortsUsageHistoryByDeviceByInterval` for the last 30 minutes at several offsets
+>    after a 5-minute boundary. Record how long after an interval ends it first appears.
+> 2. Request it for a 15-minute window and record the `interval` Meraki derives (the collector accepts 5 min, 20 min,
+>    4 h and 1 day).
+> 3. Read `getOrganizationApplianceUplinksUsageByNetwork` for one 5-minute window right after it ends and again 5, 10
+>    and 15 minutes later. Record when the byte totals stop growing.
+
 ## Contents
 
 **Orientation** — [Short Version](#short-version) | [Where The Collector Sits](#where-the-collector-sits) |
@@ -40,8 +58,9 @@ Every `update_every` (300 seconds by default, matching Meraki's availability ref
    availabilities.
 2. **Joins** them: the assigned-device list decides which devices exist; availability is attached only when it can be
    trusted.
-3. **Reads the enabled traffic**, each family behind its own option and off by default: switch port traffic, switch
-   port packet rates and MX/Z uplink traffic, all for the last five minutes.
+3. **Reads the enabled traffic**, each family behind its own option and off by default: switch port traffic (the
+   latest interval Meraki reported in the last 15 minutes), MX/Z uplink traffic (the 5 minutes that ended 5 minutes
+   ago) and switch port packet rates (the last 5 minutes).
 4. **Writes** the organization gauge and uplink traffic on the job's node, and for every assigned device an inventory
    gauge, an availability stateset and, for switches, port traffic on that device's own **virtual node**.
 
@@ -53,7 +72,7 @@ Four properties shape everything else:
   skips the remaining traffic reads. A timeout or cancellation aborts the whole cycle.
 - **Inventory decides membership; availability only decorates.** A missing, unknown or contradictory status leaves a
   gap. It is never turned into an offline observation, and an old status is never replayed as fresh.
-- **Traffic is what Meraki reported, or nothing.** Values are Meraki's five-minute averages, written as gauges. A
+- **Traffic is what Meraki reported, or nothing.** Values are averages Meraki reports for a window, written as gauges. A
   missing or contradictory value is a gap, never a zero or a sum, and uplink bytes, which Meraki can add up over
   several appliances, never land on a device node.
 - **The provider's budget wins.** Requests are paced to 10 per second per job, and after a 429 with `Retry-After` the
@@ -229,18 +248,23 @@ never become identity.
 ### Stage 4 — Read the enabled traffic
 
 `collectTraffic` (`collect_traffic.go`) runs after the join and before any write, and only when at least one traffic
-option is on. Usage history and uplink usage read one window that ends at the current time, truncated to the second,
-and starts five minutes earlier; packet requests ask for the last 300 seconds. `update_every` changes how often
-traffic is read, not the window.
+option is on. Every family has its own window, measured from the current time truncated to the second: switch port
+usage the last 15 minutes, uplink usage the 5 minutes that ended 5 minutes ago, packets the last 300 seconds.
+`update_every` changes how often traffic is read, not the windows.
+
+> [!WARNING]
+> The 15-minute lookback and the 5-minute uplink delay are not measured against a live organization. See the open item
+> at the top of this document.
 
 | Family | Option | Request | Taken from it |
 | --- | --- | --- | --- |
-| Switch port traffic | `collect_switch_port_traffic` | `getOrganizationSwitchPortsUsageHistoryByDeviceByInterval` with `t0`/`t1`, every page; skipped when no switch is assigned | Per port, `upstream`/`downstream` kilobits/s of the latest accepted interval as sent/received, and the interval's end |
-| Uplink traffic | `collect_appliance_uplink_traffic` | `getOrganizationApplianceUplinksUsageByNetwork` with `t0`/`t1` | Per network and interface, sent/received bytes × 8 / 300 / 1000 as kilobits/s |
+| Switch port traffic | `collect_switch_port_traffic` | `getOrganizationSwitchPortsUsageHistoryByDeviceByInterval` with `t0`/`t1` for the last 15 minutes, every page; skipped when no switch is assigned | Per port, `upstream`/`downstream` kilobits/s of the latest accepted interval as sent/received, and the interval's end |
+| Uplink traffic | `collect_appliance_uplink_traffic` | `getOrganizationApplianceUplinksUsageByNetwork` with `t0`/`t1` for the 5 minutes that ended 5 minutes ago | Per network and interface, sent/received bytes × 8 / 300 / 1000 as kilobits/s |
 | Switch port packets | `collect_switch_port_packets` | `getDeviceSwitchPortsStatusesPackets` with `timespan=300`, one per assigned switch in serial order | Per port, `ratePerSec.sent`/`recv` of the `Total` category |
 
-The families run in that order, so packets, the one family that costs a request per switch, runs last. Only assigned switches
-(`productType` `switch`) get port traffic, and only networks in the organization's network list get uplink traffic.
+The families run in that order, so packets, the one family that costs a request per switch, runs last. Only
+assigned switches (`productType` `switch`) get port traffic, and only networks in the organization's network list get
+uplink traffic.
 
 `normalize_traffic.go` turns the responses into values with one rule set:
 
@@ -253,15 +277,22 @@ The families run in that order, so packets, the one family that costs a request 
 | Identical duplicate observations of one port, interval or uplink | One observation |
 | Duplicates that disagree | Gap for that port or uplink, never a sum |
 | A usage row naming a network other than the switch's assigned one | No port traffic for that switch this cycle; packets unaffected |
-| An interval with an unparsable timestamp, that does not last exactly 300 s, or that ends at or before `t0` or after `t1` | Ignored; Meraki aligns intervals, so one may start before `t0` |
+| An interval with an unparsable timestamp, a length other than Meraki's 5 minutes, 20 minutes, 4 hours or 1 day (a clipped or unfinished one), or an end at or before `t0` or after `t1` | Ignored; Meraki aligns intervals, so one may start before `t0` |
 | Several accepted intervals for a port | The latest wins; if it holds no value, the port has a gap rather than an older value |
 
-Why: these are averages over Meraki's windows, not counters, so there is nothing to derive and nothing to carry over
-between cycles; a value Meraki did not report cannot be filled in. The interval age shows how old the accepted interval
-is, which is all the API reveals about freshness: Meraki warns that packet data for the latest five minutes can be
-incomplete and documents no refresh delay for uplink usage. When more than one appliance of a network was active,
-Meraki adds up their uplink bytes per interface, and the serial it reports cannot prove which appliance carried the
-traffic, so uplinks belong to the network.
+Why the windows: Meraki publishes an interval some time after it ends and documents no delay, and each job collects at
+a fixed offset from Meraki's 5-minute boundaries, because the go.d scheduler ticks from plugin start. A window as short
+as one interval would gap at every collection whenever the delay is longer than that offset; three intervals leave
+room for about ten minutes. Meraki derives the interval length from the window, so every documented length is
+accepted. Uplink bytes are read from a window that ended five minutes earlier because the newest bytes may not be
+counted yet; Meraki warns the same about the last five minutes of switch port and packet data. Packets have no
+earlier window to read: the endpoint only takes a time span ending now.
+
+Why the rules: these are averages over Meraki's windows, not counters, so there is nothing to derive and nothing to
+carry over between cycles; a value Meraki did not report cannot be filled in. The interval age shows how old the
+accepted interval is, which is all the API reveals about freshness. When more than one appliance of a network was
+active, Meraki adds up their uplink bytes per interface, and the serial it reports cannot prove which appliance carried
+the traffic, so uplinks belong to the network.
 
 A failed read goes through `stopTraffic`: it records a usable `Retry-After` at once (the cycle itself can still
 succeed), logs at most one warning per family per hour, and leaves that family's gaps, or one switch's gaps for a
@@ -420,7 +451,8 @@ switch Meraki lists for the organization, and the collector ignores serials that
 reuses the devices operation with `perPage=3` and returns no data. The path parameter is path-escaped; `.` and `..`
 are rejected because escaping keeps dot segments. The usage history and uplink usage requests carry a `t0`/`t1`
 window (RFC 3339, UTC), packet requests a `timespan` in seconds; Meraki derives the usage interval from the window. The
-client does not restate provider limits on these values: the collector always sends five minutes.
+client does not restate provider limits on these values: the collector sends 15-minute and 5-minute windows and a
+300-second time span.
 
 The response types (`merakiapi/types.go`) carry only fields the collector reads. Everything else in a payload
 (addresses, coordinates, notes, IMEI, enrollment strings, management details, the uplink row's serial) is discarded at
@@ -465,7 +497,7 @@ and a Meraki request must never go out unauthenticated. API keys can use the fra
   `startingAfter` and `endingBefore`, and a `perPage` within the operation's range.
 - For a windowed request (usage history), a next link may also repeat `t0` and `t1`, in any RFC 3339 spelling of the
   same instants, or leave them out; the window is put back either way, and a link that moves it is rejected. Meraki
-  may echo the `interval` it derived: it is accepted only as `300` for a 300-second window, and dropped.
+  may echo the `interval` it derived: it is dropped, so every page lets the same window decide it.
 - Request each page at the canonical URL the check produced (normalized query, window restored), and reject any
   canonical page URL seen before (a pagination cycle), as well as malformed or conflicting links.
 - A failed later page fails the whole list. There is no fixed page or record ceiling: the caller's context deadline

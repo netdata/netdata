@@ -5,6 +5,7 @@ package meraki
 import (
 	"iter"
 	"math"
+	"slices"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/meraki/merakiapi"
@@ -79,10 +80,15 @@ type portKey struct{ serial, portID string }
 
 type uplinkKey struct{ networkID, iface string }
 
+// usageIntervals are the interval lengths Meraki reports switch port usage in.
+// It picks one from the request window; any other length is a clipped or
+// unfinished interval.
+var usageIntervals = []time.Duration{5 * time.Minute, 20 * time.Minute, 4 * time.Hour, 24 * time.Hour}
+
 // latestPortTraffic returns the traffic of each port of an assigned switch in
-// its latest accepted interval. An interval is accepted when it lasts exactly
-// trafficWindow and ends inside (start, end]: Meraki aligns intervals, so one
-// can begin before start, but older or future data never passes as current. A
+// its latest accepted interval. An interval is accepted when it has one of the
+// usageIntervals lengths and ends inside (start, end]: Meraki aligns intervals,
+// so one can begin before start, but older or future data never passes as current. A
 // switch whose rows name a network other than its assigned one gets no traffic,
 // since those rows cannot be trusted to describe it.
 func latestPortTraffic(
@@ -117,7 +123,7 @@ func latestPortTraffic(
 			for _, interval := range port.Intervals {
 				from, fromErr := time.Parse(time.RFC3339Nano, interval.Start)
 				to, toErr := time.Parse(time.RFC3339Nano, interval.End)
-				if fromErr != nil || toErr != nil || to.Sub(from) != trafficWindow {
+				if fromErr != nil || toErr != nil || !slices.Contains(usageIntervals, to.Sub(from)) {
 					continue
 				}
 				if !to.After(start) || to.After(end) {

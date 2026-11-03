@@ -61,16 +61,18 @@ func TestTrafficCollection(t *testing.T) {
 	for _, call := range f.calls()[4:] {
 		traffic = append(traffic, request{call.path, call.query})
 	}
-	t0, t1 := now.Add(-5*time.Minute).Format(time.RFC3339), now.Format(time.RFC3339)
+	// Usage history is searched over the last 15 minutes; uplinks read the 5
+	// minutes that ended 5 minutes ago.
+	ago := func(d time.Duration) []string { return []string{now.Add(-d).Format(time.RFC3339)} }
 	assert.Equal(t, []request{
 		{switchUsageHistoryPath, url.Values{
 			"perPage": {"50"},
-			"t0":      {t0},
-			"t1":      {t1},
+			"t0":      ago(15 * time.Minute),
+			"t1":      ago(0),
 		}},
 		{applianceUplinkUsagePath, url.Values{
-			"t0": {t0},
-			"t1": {t1},
+			"t0": ago(10 * time.Minute),
+			"t1": ago(5 * time.Minute),
 		}},
 		{switchPacketsPath, url.Values{
 			"timespan": {"300"},
@@ -165,12 +167,34 @@ func TestSwitchPortTrafficIntervalSelection(t *testing.T) {
 			history: usageHistoryBody("S1", "N1", "1/0", current),
 			want:    accepted,
 		},
+		"interval ending 10 minutes ago": {
+			history: usageHistoryBody(
+				"S1",
+				"N1",
+				"1/0",
+				usageInterval(now.Add(-10*time.Minute), 300, `{"upstream":10.5,"downstream":20.25}`),
+			),
+			want: want{
+				sent:     []metrix.SampleValue{10.5},
+				received: []metrix.SampleValue{20.25},
+				age:      []metrix.SampleValue{600},
+			},
+		},
+		"20-minute interval": {
+			history: usageHistoryBody(
+				"S1",
+				"N1",
+				"1/0",
+				usageInterval(now.Add(-time.Minute), 1200, `{"upstream":10.5,"downstream":20.25}`),
+			),
+			want: accepted,
+		},
 		"interval ending at the window start": {
 			history: usageHistoryBody(
 				"S1",
 				"N1",
 				"1/0",
-				usageInterval(now.Add(-5*time.Minute), 300, `{"upstream":99,"downstream":99}`),
+				usageInterval(now.Add(-15*time.Minute), 300, `{"upstream":99,"downstream":99}`),
 			),
 			want: none,
 		},

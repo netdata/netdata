@@ -49,7 +49,7 @@ modules:
           | `getDeviceSwitchPortsStatusesPackets` | Switch port packet rates, one request per switch | With `collect_switch_port_packets` |
           | `getOrganizationApplianceUplinksUsageByNetwork` | Uplink traffic | With `collect_appliance_uplink_traffic` |
 
-          Traffic is always read for the last five minutes, whatever `update_every` is.
+          Whatever `update_every` is, switch port traffic is looked up in the last 15 minutes, uplink traffic is read for the 5 minutes that ended 5 minutes ago, and packet rates for the last 5 minutes.
 
           When a job starts, one small `getOrganizationDevices` request checks that the API key can reach the organization.
       supported_platforms:
@@ -65,8 +65,8 @@ modules:
             Nothing is detected automatically: each job monitors the one organization set in `organization_id`, with the API key you configure. Within that organization, every collection finds all assigned devices and adds a node for each new one.
         limits:
           description: |
-            - **Five-minute data.** Meraki refreshes device availability every 5 minutes without a sample time, and traffic values are 5-minute averages, so an `update_every` below 300 seconds adds requests, not detail. Above 300 seconds, each traffic value covers only the last 5 minutes of the collection interval.
-            - **Traffic is as recent as Meraki's reports.** Switch port traffic is the latest 5-minute interval that ended within the last 5 minutes; the interval age chart shows how old it is, and the chart has a gap when Meraki has not reported such an interval yet. Packet rates cover the last 5 minutes, which Meraki may not have finished reporting. Uplink traffic is the bytes Meraki has counted for the last 5 minutes divided by 5 minutes, so the latest values can read low. Missed collections are not backfilled.
+            - **Five-minute data.** Meraki refreshes device availability every 5 minutes without a sample time, and traffic values are averages over at least 5 minutes, so an `update_every` below 300 seconds adds requests, not detail. Above 300 seconds, each traffic value covers only one 5-minute window of the collection interval.
+            - **Traffic lags behind.** Meraki publishes traffic some minutes after it happens. Switch port traffic is the latest interval Meraki has reported within the last 15 minutes, so it can be up to 15 minutes old; the interval age chart shows how old it is, and the chart has a gap only when Meraki has reported no interval in that time. Uplink traffic covers the 5 minutes that ended 5 minutes earlier, which Meraki has finished counting. Packet rates cover the last 5 minutes, which Meraki may not have finished reporting. Missed collections are not backfilled.
             - **Uplinks belong to the network.** When more than one appliance of a network was active, such as a warm spare pair, Meraki adds up their bytes per interface. Uplink charts are therefore per network and interface, on the job's node or its virtual node, not on an appliance's node.
             - **Shared API budget.** Meraki allows 10 requests per second per organization and 100 per source IP address, shared with every other application using them. The collector sends at most 10 requests per second per job, and after a `429 Too Many Requests` answer it sends nothing until the `Retry-After` wait Meraki requested has passed. See [Meraki API rate limits](https://developer.cisco.com/meraki/api-v1/rate-limit/).
         performance_impact:
@@ -164,7 +164,7 @@ modules:
               required: false
               group: Traffic
               detailed_description: |
-                Adds two charts per port to each switch's node: sent and received kilobits/s from the latest 5-minute interval that ended in the last 5 minutes, or a gap when Meraki has not reported one yet, and how old that interval is.
+                Adds two charts per port to each switch's node: sent and received kilobits/s from the latest interval Meraki has reported within the last 15 minutes, usually 5 minutes long, or a gap when it has reported none, and how old that interval is.
             - name: collect_switch_port_packets
               description: Collect the packet rates of every switch port, at one API request per switch per collection.
               default_value: false
@@ -178,7 +178,7 @@ modules:
               required: false
               group: Traffic
               detailed_description: |
-                Adds a chart per network and uplink interface (for example `wan1`, `wan2` or `cellular`) with the sent and received kilobits/s of the last 5 minutes, on the job's node or `vnode`.
+                Adds a chart per network and uplink interface (for example `wan1`, `wan2` or `cellular`) with the sent and received kilobits/s of the 5 minutes that ended 5 minutes earlier, on the job's node or `vnode`.
             - name: update_every
               description: Data collection interval, in seconds.
               default_value: 300
@@ -505,5 +505,5 @@ modules:
             cause: A switch port traffic, switch port packets or appliance uplink traffic request failed. That traffic has gaps for this collection (for packets, only the ports of that switch); inventory, availability and the other traffic options still update. After an HTTP 429, no more traffic requests are sent in this collection. The warning is logged at most once an hour per kind of traffic.
             fix: 'Most messages continue with another error on this page, such as `getDeviceSwitchPortsStatusesPackets: HTTP status 403`; follow that entry. Inventory worked in the same collection, so an HTTP 403 or 404 here is about that traffic data, not about `organization_id`: check in Meraki Dashboard that the API key''s administrator can see the switch or network and that it reports this data.'
           - error: Switch port or uplink traffic charts are missing
-            cause: The traffic option is off, the organization has no switches or no MX or Z networks, or Meraki reported no usable value. Switch port traffic also has gaps while Meraki has not yet reported an interval that ended in the last 5 minutes.
+            cause: The traffic option is off, the organization has no switches or no MX or Z networks, or Meraki reported no usable value. Switch port traffic also has gaps while Meraki has reported no interval that ended in the last 15 minutes.
             fix: Enable `collect_switch_port_traffic`, `collect_switch_port_packets` or `collect_appliance_uplink_traffic`. If they are on, look for the traffic warning above in the logs, and compare with the traffic Meraki Dashboard shows for the switch or network.
