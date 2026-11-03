@@ -758,12 +758,12 @@ func TestReader_SEL_Records(t *testing.T) {
 		},
 		"reserved record type with the system event layout": {
 			// Real BMC firmware logs power-off events from the BIOS this way.
-			record: withRecordType(selEvent(1, at, 0x0001, 0x09, 255, 0x6f, 0x05, 0, 0), 0x04),
+			record: withRecordType(selEvent(1, at, 0x0001, 0x09, 255, 0x6f, 0x00, 0, 0), 0x04),
 			want: SELRecord{
 				Sensor:     "BIOS #255",
 				SensorType: "Power Unit",
 				Generator:  "BIOS (0x01)",
-				Event:      "Soft Power Control Failure [record type 0x04]",
+				Event:      "Power Off / Power Down [record type 0x04]",
 				Direction:  "Assertion",
 				State:      StateUnknown,
 			},
