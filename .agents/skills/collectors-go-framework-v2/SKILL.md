@@ -318,9 +318,9 @@ Tests are evidence only when they have an independent oracle:
   interleavings of every change the provider allows, reads and failures, checked
   against the fake's own state once changes stop. Also check retained-state bounds
   during sustained changes: convergence-only checks miss growth when reads never
-  catch up. For event streams, compare each eligible sample with the independent
-  oracle: final totals can hide compensating losses and duplicates. Case tests of
-  known races miss the next interleaving. Exemplar:
+  catch up. For event streams, compare each sample allowed by the measurement
+  contract with the independent oracle: final totals can hide compensating losses
+  and duplicates. Case tests of known races miss the next interleaving. Exemplar:
   `src/go/plugin/ipmi/collector/ipmi/internal/bmc/sel_model_test.go`.
 
 ## Pre-PR Check

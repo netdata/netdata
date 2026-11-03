@@ -88,12 +88,12 @@ Records are cached per Reader, across collections and reconnects:
 
 Published record slices only grow at the end, lose a prefix or are reallocated, so earlier snapshots never change.
 
-`SEL.New` holds counts of newly observed records by event type and default FreeIPMI state. Event accounting is
-independent of the cached log's completeness:
+`SEL.New` holds counts of newly observed records by event type and default FreeIPMI state. After the first verified
+read, event accounting is independent of the cached log's completeness:
 
-- Before the first verified read, records are history and no event-accounting state is retained. Sustained rollover
-  may keep the initial read incomplete; a restart never reports that history as new. The first verified cache seeds
-  accounting, including when the log is empty.
+- Before the first verified read, records are history and no event-accounting state is retained. If sustained rollover
+  prevents that read from completing, no new-event counts are reported. A restart never reports that history as new.
+  The first verified cache seeds accounting, including when the log is empty.
 - Afterwards, every successful `Get SEL Entry` observation is accounted before cache mutation. One latest 16-byte
   occupant is retained per 16-bit record ID, so retention is bounded by the protocol ID space even if rescans never
   complete. Equal content at the same ID is a reread; different content replaces the prior occupant and counts once.

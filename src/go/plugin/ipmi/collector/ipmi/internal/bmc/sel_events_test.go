@@ -203,15 +203,14 @@ func TestReader_SEL_EventsDuringSustainedRollover(t *testing.T) {
 // mirror and deduplication state. These generated workloads give every new
 // occupant unique content, so each first observation contributes once.
 func newlyReceivedSEL(receiving *receivingTransport, accounted map[[selRecordSize]byte]bool) map[newRecordKey]int {
-	counts := make(map[newRecordKey]int)
+	var fresh [][selRecordSize]byte
 	for raw := range receiving.received {
 		if !accounted[raw] {
 			accounted[raw] = true
-			rec := decodeSELRecord(raw, nil)
-			counts[newRecordKey{rec.Threshold, rec.State}]++
+			fresh = append(fresh, raw)
 		}
 	}
-	return counts
+	return countRaw(fresh)
 }
 
 func addNewCounts(dst, src map[newRecordKey]int) {

@@ -92,10 +92,15 @@ func (m *selModel) log(hidden bool) {
 		}
 		m.fake.sel.reservation = 0
 	}
-	template := m.templates[int(m.ts)%len(m.templates)]
-	binary.LittleEndian.PutUint16(template[:], binary16(rec))
-	binary.LittleEndian.PutUint32(template[3:], m.ts)
-	m.fake.sel.records[len(m.fake.sel.records)-1] = template
+	m.fake.sel.records[len(m.fake.sel.records)-1] = m.record(binary16(rec))
+}
+
+// record stamps the current timestamp and ID onto a mixed-class fixture.
+func (m *selModel) record(id uint16) [selRecordSize]byte {
+	raw := m.templates[int(m.ts)%len(m.templates)]
+	binary.LittleEndian.PutUint16(raw[:], id)
+	binary.LittleEndian.PutUint32(raw[3:], m.ts)
+	return raw
 }
 
 // clear empties the log; the BMC then logs that the log was cleared.
@@ -123,8 +128,7 @@ func (m *selModel) deleteOne(rng *rand.Rand) (uint16, bool) {
 func (m *selModel) replaceOne(rng *rand.Rand) {
 	if id, ok := m.deleteOne(rng); ok {
 		m.ts++
-		rec := tempEvent(id, m.ts)
-		m.fake.sel.add(rec)
+		m.fake.sel.add(m.record(id))
 	}
 }
 
@@ -142,8 +146,11 @@ func runSELModel(t *testing.T, seed uint64, steps int, templates [][selRecordSiz
 		slot:      rng.IntN(2) == 0,
 		idSpace:   []uint16{uint16(capacity + 1), uint16(2 * capacity), 40}[rng.IntN(3)],
 		ts:        0x60000000,
-		templates: templates,
+		templates: slices.Clone(templates),
 	}
+	rng.Shuffle(len(m.templates), func(i, j int) {
+		m.templates[i], m.templates[j] = m.templates[j], m.templates[i]
+	})
 	fake.sel.requireReservation = rng.IntN(2) == 0
 	for range 1 + rng.IntN(6) {
 		m.log(false)
@@ -262,7 +269,7 @@ func runSELModel(t *testing.T, seed uint64, steps int, templates [][selRecordSiz
 		case 6:
 			if n := len(fake.sel.records); n > 0 {
 				m.ts++
-				rec := tempEvent(binary16(fake.sel.records[n-1]), m.ts)
+				rec := m.record(binary16(fake.sel.records[n-1]))
 				fake.sel.records = append(slices.Clone(fake.sel.records[:n-1]), rec)
 				fake.sel.additionTime++
 				fake.sel.reservation = 0
