@@ -83,9 +83,9 @@ type SEL struct {
 	// failed; the other fields are from earlier collections.
 	ReadFailed bool
 	// New holds the records first read since the previous snapshot that
-	// reported new records, in read order. Records read before the log was
-	// read completely once are history, and records read again after a clear
-	// or rewrite are new only if they were not cached before.
+	// reported new records, in read order. A record is accounted when it is
+	// read: records read before the log was read completely once are history,
+	// and a record read again, for example after a clear or rewrite, is not new.
 	New []SELRecord
 	// NewKnown is false while the log is read for the first time or again
 	// after a clear or rewrite, and when ReadFailed is set; their new records

@@ -54,14 +54,15 @@ type selCache struct {
 	// decodedWith is the inventory generation the records were decoded with.
 	decodedWith uint64
 
-	// counting is set once the log was read completely; only records read
-	// after that can be new.
+	// counting is set once the log was read completely; only records first
+	// read after that are new.
 	counting bool
-	// known holds the content of the records cached before a reset until the
-	// log is read completely again, so records read again are not new.
-	known map[[selRecordSize]byte]bool
+	// seen holds the content of the cached records and of every record read
+	// since the log was last read completely. Resets keep it, so a record read
+	// again is not new.
+	seen map[[selRecordSize]byte]bool
 	// pending holds the new records no delivered snapshot reported yet.
-	pending []SELRecord
+	pending [][selRecordSize]byte
 
 	reservation uint16
 
@@ -71,28 +72,42 @@ type selCache struct {
 }
 
 // reset forgets every record; the next read starts from the first record.
-// Once counting, the forgotten records stay known, so reading them again does
-// not make them new.
 func (c *selCache) reset() {
-	if c.counting {
-		if c.known == nil {
-			c.known = make(map[[selRecordSize]byte]bool, len(c.records))
-		}
-		for _, rec := range c.records {
-			c.known[rec.Raw] = true
-		}
-	}
 	c.records = nil
 	c.next = firstRecordID
 	c.loaded = false
 }
 
-// readComplete marks the log read up to the newest record.
+// readComplete marks the log read up to the newest record. Records read
+// earlier that the cache does not hold are gone from the BMC, so seen keeps
+// only the cached records; it holds every cached record, so a larger seen has
+// content to forget.
 func (c *selCache) readComplete() {
 	c.next = endOfChainRecordID
 	c.loaded = true
 	c.counting = true
-	c.known = nil
+	if len(c.seen) > len(c.records) {
+		seen := make(map[[selRecordSize]byte]bool, len(c.records))
+		for _, rec := range c.records {
+			seen[rec.Raw] = true
+		}
+		c.seen = seen
+	}
+}
+
+// observe accounts for a record as it is read, before any cache change can
+// drop it: once counting, a record not seen before is new.
+func (c *selCache) observe(raw [selRecordSize]byte) {
+	if c.seen[raw] {
+		return
+	}
+	if c.seen == nil {
+		c.seen = make(map[[selRecordSize]byte]bool)
+	}
+	c.seen[raw] = true
+	if c.counting {
+		c.pending = append(c.pending, raw)
+	}
 }
 
 func (c *selCache) last() *SELRecord {
@@ -129,7 +144,11 @@ func (r *Reader) readSEL(ctx context.Context, warnings *collectionWarnings) (*in
 	if err := r.refreshSELClock(ctx); err != nil {
 		warnings.selClock = true
 	}
-	return &entries, c.snapshot(updateErr != nil)
+	s := c.snapshot(updateErr != nil)
+	if s.NewKnown {
+		s.New = r.decodePending()
+	}
+	return &entries, s
 }
 
 func (c *selCache) snapshot(failed bool) *SEL {
@@ -143,10 +162,21 @@ func (c *selCache) snapshot(failed bool) *SEL {
 		ClockSkew:  c.clockSkew,
 		ReadFailed: failed,
 	}
-	if c.loaded && !failed {
-		s.New, s.NewKnown = c.pending, true
-	}
+	s.NewKnown = c.loaded && !failed
 	return s
+}
+
+// decodePending decodes the new records with the current inventory.
+func (r *Reader) decodePending() []SELRecord {
+	if len(r.sel.pending) == 0 {
+		return nil
+	}
+	sensors := sensorsByAddress(r.inventory)
+	records := make([]SELRecord, 0, len(r.sel.pending))
+	for _, raw := range r.sel.pending {
+		records = append(records, decodeSELRecord(raw, sensors))
+	}
+	return records
 }
 
 // delivered forgets the new records of a snapshot the Reader returned.
@@ -287,7 +317,7 @@ func (r *Reader) resumeAfterNewest(ctx context.Context) error {
 // by the BMC and replaces the cached record; reaching a cached record with the
 // same content means the chain loops back, which ends the read. A record that
 // disappears while reading fails the read and restarts it from the first
-// record next collection. Once counting, records read are new unless known.
+// record next collection.
 func (r *Reader) walkSEL(ctx context.Context) error {
 	c := &r.sel
 	cached := make(map[uint16][selRecordSize]byte, len(c.records))
@@ -326,17 +356,10 @@ func (r *Reader) walkSEL(ctx context.Context) error {
 			break
 		}
 	}
-	if c.counting {
-		for _, rec := range added {
-			if !c.known[rec.Raw] {
-				c.pending = append(c.pending, rec)
-			}
-		}
-	}
+	c.append(added, reused)
 	if c.next == endOfChainRecordID {
 		c.readComplete()
 	}
-	c.append(added, reused)
 	return err
 }
 
@@ -366,7 +389,8 @@ func (c *selCache) append(added []SELRecord, reused map[uint16]bool) {
 }
 
 // readSELRecord reads one whole record and returns it with the next record ID.
-// Like FreeIPMI, it reserves the SEL only when the BMC reports the reservation
+// Every record read is accounted here, whatever the caller does with it. Like
+// FreeIPMI, it reserves the SEL only when the BMC reports the reservation
 // cancelled or invalid, and retries a bounded number of times.
 func (r *Reader) readSELRecord(ctx context.Context, id uint16) ([selRecordSize]byte, uint16, error) {
 	c := &r.sel
@@ -397,7 +421,9 @@ func (r *Reader) readSELRecord(ctx context.Context, id uint16) ([selRecordSize]b
 		if len(res.Data) != selRecordSize {
 			return [selRecordSize]byte{}, 0, fmt.Errorf("SEL record %#04x has %d bytes", id, len(res.Data))
 		}
-		return [selRecordSize]byte(res.Data), res.NextRecordID, nil
+		raw := [selRecordSize]byte(res.Data)
+		c.observe(raw)
+		return raw, res.NextRecordID, nil
 	}
 }
 

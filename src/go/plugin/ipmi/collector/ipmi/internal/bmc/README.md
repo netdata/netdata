@@ -77,13 +77,20 @@ Records are cached per Reader, across collections and reconnects:
 Published record slices only grow at the end, lose a prefix or are reallocated, so earlier snapshots never change.
 
 `SEL.New` reports the records first read since the previous snapshot that reported new records; the collector charts
-them. Records read before the log was read completely once are history, so a restart counts nothing old. A reset
-re-reads records the cache held, so it keeps their content until the log is read completely again, and only records
-with other content are new; this covers clears, rewrites and rollover detected through the oldest record. `NewKnown`
-is false while the log is read for the first time or again after a reset, and when a SEL read failed. New records then
-wait in the Reader for the next snapshot with `NewKnown` set and are dropped only once `Collect` returns that snapshot,
-so a failed read or collection neither loses nor repeats them. `SELRecord.Threshold` marks threshold events
-(event/reading type 01h), which the sensor state already reflects; every other record is discrete.
+them. Every record is accounted when `Get SEL Entry` returns it, before a reset or trim can drop it from the cache, so a
+record read just before a clear is still reported:
+
+- Records read before the log was read completely once are history, so a restart counts nothing old.
+- Afterwards a record is new when its 16 bytes were not read or cached before. A reset keeps that content, so the
+  records a clear, rewrite or rollover makes the Reader read again are not new. Once a read reaches the newest record,
+  only the content of the cached records is kept; anything else is gone from the BMC.
+- `New` is in read order: the newest record, read to check a change, can come before records the walk reads later.
+- `NewKnown` is false while the log is read for the first time or again after a reset, and when a SEL read failed.
+  New records then wait in the Reader for the next snapshot with `NewKnown` set and are dropped only once `Collect`
+  returns that snapshot, so a failed read or collection neither loses nor repeats them.
+
+`SELRecord.Threshold` marks threshold events (event/reading type 01h), which the sensor state already reflects; every
+other record is discrete.
 
 `Get SEL Time UTC Offset` and `Get SEL Time` are read at most every five minutes, also when record reads fail. SEL time
 is UTC plus the offset, so `SEL.Time` subtracts it. A completion-code failure, 07FFh or a value outside -1440..1440

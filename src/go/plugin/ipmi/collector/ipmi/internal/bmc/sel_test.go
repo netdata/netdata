@@ -269,7 +269,8 @@ func TestReader_SEL_Changes(t *testing.T) {
 			}
 			assert.Equal(t, beforeRecords, before.Records, "published records never change")
 			assert.True(t, got.NewKnown)
-			assert.Equal(t, tc.wantNew, recordsRaw(&SEL{Records: got.New}), "records read again are not new")
+			assert.ElementsMatch(t, tc.wantNew, recordsRaw(&SEL{Records: got.New}), "records read again are not new")
+			assert.Subset(t, got.Records, got.New, "new records are decoded like the cached ones")
 
 			got = collectSEL(t, r)
 			assert.Empty(t, entryReads(fake), "the next unchanged collection reads no record")
@@ -354,7 +355,8 @@ func TestReader_SEL_RolloverDuringRead(t *testing.T) {
 		// wantIDs are the records after each collection that follows the rollover.
 		wantIDs [][]uint16
 		// wantNewKnown and wantNew are the new-record report of each of those
-		// collections.
+		// collections. The newest record counts in the collection that first
+		// reads it, when the change is checked.
 		wantNewKnown []bool
 		wantNew      [][]uint16
 	}{
@@ -386,7 +388,7 @@ func TestReader_SEL_RolloverDuringRead(t *testing.T) {
 				{5, 6, 7, 8, 9, 10, 11, 12, 13, 14},
 			},
 			wantNewKnown: []bool{true, true, true},
-			wantNew:      [][]uint16{{9, 10}, {11, 12}, {13, 14}},
+			wantNew:      [][]uint16{{14, 9, 10}, {11, 12}, {13}},
 		},
 	}
 
@@ -405,7 +407,7 @@ func TestReader_SEL_RolloverDuringRead(t *testing.T) {
 				sel = collectSEL(t, r)
 				assert.Equal(t, want, recordIDs(sel), "collection %d after the rollover", i+1)
 				assert.Equal(t, tc.wantNewKnown[i], sel.NewKnown, "collection %d after the rollover", i+1)
-				assert.Equal(t, tc.wantNew[i], newIDs(sel), "collection %d after the rollover", i+1)
+				assert.ElementsMatch(t, tc.wantNew[i], newIDs(sel), "collection %d after the rollover", i+1)
 			}
 			assert.True(t, sel.Loaded)
 			assert.Equal(t, 10, sel.Entries)
@@ -1006,7 +1008,7 @@ func TestReader_SEL_Failures(t *testing.T) {
 				Records: decodeAll(fake.sel.records),
 			}), recordIDs(recovered))
 			assert.True(t, recovered.NewKnown)
-			assert.Equal(t, tc.wantNew, newIDs(recovered), "records read before the failure count once")
+			assert.ElementsMatch(t, tc.wantNew, newIDs(recovered), "records read before the failure count once")
 			assert.Empty(t, collectSEL(t, r).New)
 		})
 	}
@@ -1104,8 +1106,9 @@ func TestReader_SEL_NewRecordsWhileReadingAgain(t *testing.T) {
 		known = append(known, got.NewKnown)
 	}
 	assert.Equal(t, []bool{false, false, true}, known, "no new-record count while reading again")
-	assert.Equal(t, [][selRecordSize]byte{changed, tempEvent(9, 0x60000009)}, recordsRaw(&SEL{Records: got.New}))
-	assert.Nil(t, r.sel.known, "earlier content is kept only while reading again")
+	want := [][selRecordSize]byte{changed, tempEvent(9, 0x60000009)}
+	assert.ElementsMatch(t, want, recordsRaw(&SEL{Records: got.New}))
+	assert.Len(t, r.sel.seen, len(got.Records), "a complete read keeps only the content of the cached records")
 	assert.Empty(t, collectSEL(t, r).New)
 }
 
@@ -1132,5 +1135,60 @@ func TestReader_SEL_ResetWhileReadingAgain(t *testing.T) {
 	for range 4 {
 		reported = append(reported, newIDs(collectSEL(t, r))...)
 	}
-	assert.Equal(t, []uint16{8, 9}, reported)
+	assert.ElementsMatch(t, []uint16{8, 9}, reported)
+}
+
+func TestReader_SEL_ReadRecordsSurviveClear(t *testing.T) {
+	// The BMC clears its log in the middle of a collection, after the
+	// collection read the new records below; it then logs that the log was
+	// cleared. Every record read is reported once.
+	ierr := selEvent(4, 0x60000004, 0x0020, 0x07, 100, 0x6f, 0x00, 0xff, 0xff)
+	cleared := selEvent(1, 0x60000010, 0x0020, 0x10, 101, 0x6f, 0x02, 0xff, 0xff)
+	tests := map[string]struct {
+		appended [][selRecordSize]byte
+		// clearBefore is the Get SEL Entry request the BMC answers after the clear.
+		clearBefore uint16
+		// want are the records read before the clear (the newest first, from the
+		// check of the change) and the record of the clear.
+		want [][selRecordSize]byte
+	}{
+		"while reading the new records": {
+			appended:    [][selRecordSize]byte{ierr, tempEvent(5, 0x60000005)},
+			clearBefore: 5,
+			want:        [][selRecordSize]byte{tempEvent(5, 0x60000005), ierr, cleared},
+		},
+		"while checking where to resume": {
+			appended:    [][selRecordSize]byte{ierr},
+			clearBefore: 3,
+			want:        [][selRecordSize]byte{ierr, cleared},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			fake := newFakeBMC()
+			fake.sel.records = tempEvents(1, 2, 3)
+			r := newSELTestReader(fake, 0, 0)
+			collectSEL(t, r)
+
+			fake.sel.add(tc.appended...)
+			fake.onExchange = func(req types.Request) error {
+				q, ok := req.(*storage.GetSELEntryRequest)
+				if ok && q.RecordID == tc.clearBefore && len(fake.sel.records) > 1 {
+					fake.sel.clear()
+					fake.sel.add(cleared)
+				}
+				return nil
+			}
+			got, err := r.Collect(t.Context(), true)
+			require.NoError(t, err)
+			fake.onExchange = nil
+
+			var reported [][selRecordSize]byte
+			reported = append(reported, recordsRaw(&SEL{Records: got.SEL.New})...)
+			for range 3 {
+				reported = append(reported, recordsRaw(&SEL{Records: collectSEL(t, r).New})...)
+			}
+			assert.Equal(t, tc.want, reported)
+		})
+	}
 }
