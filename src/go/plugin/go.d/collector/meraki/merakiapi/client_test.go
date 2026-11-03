@@ -364,10 +364,10 @@ func TestNewRejectsInvalidConstructionWithoutEchoingInput(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestTransportErrorsKeepOnlySafeClassifications(t *testing.T) {
+func TestTransportErrorKeepsCauseWithoutURL(t *testing.T) {
 	for name, cause := range map[string]error{
-		"opaque error":     errors.New("SYNTHETIC_PRIVATE_BODY"),
-		"wrapped deadline": fmt.Errorf("SYNTHETIC_PRIVATE_BODY: %w", context.DeadlineExceeded),
+		"connection failure": errors.New("dial tcp 192.0.2.1:443: connect: connection refused"),
+		"wrapped deadline":   fmt.Errorf("i/o timeout: %w", context.DeadlineExceeded),
 	} {
 		t.Run(name, func(t *testing.T) {
 			client, err := merakiapi.New(merakiapi.Config{
@@ -377,15 +377,10 @@ func TestTransportErrorsKeepOnlySafeClassifications(t *testing.T) {
 			})
 			require.NoError(t, err)
 			got, err := client.ListOrganizations(t.Context())
-			require.Error(t, err)
 			assert.Nil(t, got)
-			for current := err; current != nil; current = errors.Unwrap(current) {
-				assert.NotContains(t, current.Error(), "SYNTHETIC_PRIVATE_BODY")
-				assert.NotContains(t, current.Error(), "api.meraki.com")
-			}
-			if errors.Is(cause, context.DeadlineExceeded) {
-				assert.ErrorIs(t, err, context.DeadlineExceeded)
-			}
+			require.ErrorIs(t, err, cause)
+			// The exact text proves the url.Error wrapper and its request URL are gone.
+			assert.Equal(t, "getOrganizations: HTTP request failed: "+cause.Error(), err.Error())
 		})
 	}
 }

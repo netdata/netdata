@@ -28,8 +28,8 @@ func (c *Collector) checkRetryAfter() error {
 // rememberRetryAfter records the wait requested by a 429 response and attaches
 // its deadline to err. Other errors, and nil, pass through unchanged.
 func (c *Collector) rememberRetryAfter(err error) error {
-	var httpErr *merakiapi.HTTPError
-	if !errors.As(err, &httpErr) || httpErr.StatusCode != http.StatusTooManyRequests || httpErr.RetryAfter <= 0 {
+	httpErr, ok := errors.AsType[*merakiapi.HTTPError](err)
+	if !ok || httpErr.StatusCode != http.StatusTooManyRequests || httpErr.RetryAfter <= 0 {
 		return err
 	}
 	c.retryNotBefore = c.now().Add(httpErr.RetryAfter)

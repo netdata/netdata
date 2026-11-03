@@ -101,7 +101,6 @@ func TestRedirectRejectsUntrustedTargetsBeforeSendingCredentials(t *testing.T) {
 		"different operation":    "https://n23.meraki.com/api/v1/organizations/other/devices?perPage=9000",
 		"different query":        "https://n23.meraki.com/api/v1/organizations?perPage=9000&startingAfter=2",
 		"malformed query":        "https://n23.meraki.com/api/v1/organizations?perPage=9000;private=SYNTHETIC_PRIVATE_BODY",
-		"bad Location":           "https://%SYNTHETIC_PRIVATE_BODY",
 	}
 	for name, target := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -119,13 +118,33 @@ func TestRedirectRejectsUntrustedTargetsBeforeSendingCredentials(t *testing.T) {
 			})
 			require.NoError(t, err)
 			got, err := client.ListOrganizations(t.Context())
-			require.Error(t, err)
+			require.ErrorContains(t, err, "Meraki redirect")
 			assert.Nil(t, got)
 			assert.Equal(t, 1, calls)
 			assert.NotContains(t, err.Error(), "SYNTHETIC_PRIVATE_BODY")
 			assert.NotContains(t, err.Error(), target)
 		})
 	}
+}
+
+func TestUnparsableRedirectLocationIsReported(t *testing.T) {
+	var calls int
+	client, err := merakiapi.New(merakiapi.Config{
+		APIKey: syntheticKey,
+	}, &http.Client{
+		Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+			calls++
+			return response(r, http.StatusFound, http.Header{
+				"Location": {"https://%zz"},
+			}, ""), nil
+		}),
+	})
+	require.NoError(t, err)
+	got, err := client.ListOrganizations(t.Context())
+	// net/http rejects the header before any redirect request; its reason is shown.
+	require.ErrorContains(t, err, "getOrganizations: HTTP request failed: failed to parse Location header")
+	assert.Nil(t, got)
+	assert.Equal(t, 1, calls)
 }
 
 func TestRedirectHopLimit(t *testing.T) {

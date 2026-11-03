@@ -421,10 +421,15 @@ fails with an error and needs evidence before the trust rule is widened.
   the past or overflowing). It keeps no body, URL or header. There are no automatic retries.
 - HTTP statuses are not interpreted as removal or missing capability: Meraki also answers 404 to some authorization
   failures, and a successful organization listing does not prove access to the organization.
-- `safeError` keeps only causes known to be safe to show: `context.Canceled`, `context.DeadlineExceeded` and
-  `web.ErrResponseTooLarge`, still matchable with `errors.Is`. URL, parser, transport and credential-file errors can
-  carry server-controlled text or file contents, so they are reduced to a fixed message such as `HTTP request failed`.
-  Error text never includes response bodies, complete URLs, `Link` or `Location` values, or credentials.
+- `transportError` reports a request that got no HTTP response as `<operation>: HTTP request failed: <cause>`, keeping
+  the cause (DNS, connection, TLS, proxy, refused redirect, timeout) so operators can tell failures apart, as other
+  go.d collectors do. It drops the `url.Error` wrapper, whose URL can be a server-supplied redirect or page target. The
+  cause can still carry server-supplied text, such as a certificate name or an unparsable `Location` header quoted by
+  `net/http`, but never credentials: the key travels in a header, and refused redirects and pages use fixed messages.
+- `safeError` covers credential-file reads and response decoding, whose errors can carry file contents or response
+  data. It keeps only `context.Canceled`, `context.DeadlineExceeded` and `web.ErrResponseTooLarge` (still matchable
+  with `errors.Is`) and otherwise reports a fixed message.
+- Error text never includes response bodies, the request URL, `Link` values or credentials.
 
 ## Configuration Surface
 
@@ -466,7 +471,7 @@ the form has no hidden branch state.
 | `merakiapi/client.go` | `Client`, `New`, the four operations and the probe, traversal, page fetch and decoding |
 | `merakiapi/pagination.go` | Next-link scope check and RFC 8288 Link parsing |
 | `merakiapi/redirect.go` | Host trust, regional roots and the redirect policy |
-| `merakiapi/errors.go` | `HTTPError`, Retry-After parsing, `safeError` |
+| `merakiapi/errors.go` | `HTTPError`, Retry-After parsing, `transportError`, `safeError` |
 | `merakiapi/types.go` | Response types |
 
 ## Key Invariants
@@ -493,7 +498,7 @@ the form has no hidden branch state.
 - Credentials go only to the configured origin or the same region's API and shard hosts.
 - Nothing is sent before a pending Retry-After deadline.
 - Request starts per job are at least 100 ms apart, including pages and redirect hops.
-- Error text carries no body, URL or credential.
+- Error text carries no response body, request URL or credential; transport failures keep their cause.
 
 ## Where To Change Things
 
@@ -519,7 +524,7 @@ the form has no hidden branch state.
 | `TestOperationDeadlineAndCancellation`, `TestPacingCoversRedirectsPagesAndCancellation` | `timeout`, cancellation, pacing across pages and redirects |
 | `TestDeviceHostIdentity`, `TestManagedDevicePublicationAndRetirement` | GUID stability, hostname fallback, real `JobV2` publication and retirement |
 | `TestIntegrationArtifacts`, `TestMetadataDocumentsEmittedLabels` | Chart template, metadata, schema and label drift |
-| `merakiapi` tests | Construction, credentials (through the shipped credential-file path with a subprocess peer), pagination, trusted redirects, gzip and body limits, cancellation, status and Retry-After errors, safe error text |
+| `merakiapi` tests | Construction, credentials (through the shipped credential-file path with a subprocess peer), pagination, trusted redirects, gzip and body limits, cancellation, status and Retry-After errors, transport error text |
 
 Run from `src/go`:
 

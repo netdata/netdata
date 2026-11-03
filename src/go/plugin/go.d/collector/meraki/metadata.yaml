@@ -331,19 +331,23 @@ modules:
         cause: The Meraki API had a temporary failure, or a proxy in between could not reach it.
         fix: Usually none; the next collection tries again. If it persists, check Meraki's service status and, when `proxy_url`
           is set, the proxy.
-      - error: '`operation`: HTTP request failed'
-        cause: |
-          The request got no usable HTTP answer: DNS, a firewall, a proxy or TLS certificate verification failed between the Agent and the API endpoint, or the request was redirected to a host the collector does not trust.
-
-          When the message ends in `context deadline exceeded`, the request timed out instead; see that entry.
+      - error: '`operation`: HTTP request failed: `reason`'
+        cause: The request got no HTTP answer. The end of the message says why; for `context deadline exceeded`, see that
+          entry.
         fix: |
-          Test the same path from the Agent host, as the `netdata` user if possible. For an organization in another region, replace the host with the one in `url`.
+          | Reason contains | Check |
+          |:----------------|:------|
+          | `no such host` | DNS resolution of the API host on the Agent |
+          | `connection refused`, `i/o timeout`, `connection reset` | Firewall rules for outbound HTTPS (port 443) to the API host and the Meraki shard hosts |
+          | `proxyconnect` | `proxy_url`, or the proxy environment variables when `proxy_url` is empty |
+          | `x509:` or `tls:` | Certificate trust: set `tls_ca` when a proxy or private endpoint uses its own CA |
+          | `Meraki redirect` | The API or a proxy redirected the request to a host the collector does not trust; see the `url` option |
+
+          To test the same path from the Agent host, preferably as the `netdata` user (replace the host with the one in `url` for another region):
 
           ```bash
           curl -sS -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $MERAKI_API_KEY" https://api.meraki.com/api/v1/organizations
           ```
-
-          A connection or certificate error points to DNS, outbound HTTPS on port 443, `proxy_url`, or `tls_ca`. A status code means the network path works.
       - error: context deadline exceeded
         cause: A collection or the startup check took longer than `timeout`. Every page counts toward it, and the collector
           sends at most 10 requests per second, so a very large organization or a slow network can run out of time.

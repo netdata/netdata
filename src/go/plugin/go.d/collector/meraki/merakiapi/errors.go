@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -54,8 +55,20 @@ func parseRetryAfter(value string, now time.Time) time.Duration {
 	return 0
 }
 
-// safeError keeps only causes known to be safe to show. URL, parser, transport
-// and credential-file errors can carry server-controlled text or file contents.
+// transportError reports a request that got no HTTP response. It keeps the
+// cause (DNS, connection, TLS, proxy, refused redirect, timeout) so the failure
+// can be diagnosed, but drops the url.Error wrapper: its URL can be a
+// server-supplied redirect or page target, and the operation name already
+// identifies the request. Credentials travel in headers, never in the URL.
+func transportError(opName string, err error) error {
+	if urlErr, ok := errors.AsType[*url.Error](err); ok {
+		err = urlErr.Err
+	}
+	return fmt.Errorf("%s: HTTP request failed: %w", opName, err)
+}
+
+// safeError keeps only causes known to be safe to show. Credential-file and
+// decoder errors can carry file contents or response data.
 func safeError(opName, message string, cause error) error {
 	for _, safe := range []error{context.Canceled, context.DeadlineExceeded, web.ErrResponseTooLarge} {
 		if errors.Is(cause, safe) {

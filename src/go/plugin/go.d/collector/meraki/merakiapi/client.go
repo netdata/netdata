@@ -248,7 +248,7 @@ func fetchPage[T any](ctx context.Context, c *Client, target *url.URL, opName st
 	}
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return page[T]{}, safeError(opName, "HTTP request failed", err)
+		return page[T]{}, transportError(opName, err)
 	}
 	// Clients built by web.NewHTTPClient already bound bodies; this keeps the
 	// bound for any other http.Client.
