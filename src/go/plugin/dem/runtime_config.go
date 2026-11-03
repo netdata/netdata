@@ -67,6 +67,14 @@ func (c RuntimeConfig) validate() error {
 // Call it under installation exclusion, never before checking update consent.
 func (c RuntimeConfig) ReleaseLoader(path string, networkAllowed bool) func(context.Context) (runtime.Release, error) {
 	return func(ctx context.Context) (runtime.Release, error) {
+		if path == "" {
+			if !networkAllowed {
+				return runtime.Release{}, errors.New("release download requires explicit network consent")
+			}
+			if c.ReleaseURL == "" {
+				return runtime.Release{}, errors.New("online runtime preparation requires runtime.release_url")
+			}
+		}
 		var keys *runtime.ReleaseTrust
 		var trustErr error
 		if networkAllowed {
@@ -83,9 +91,6 @@ func (c RuntimeConfig) ReleaseLoader(path string, networkAllowed bool) func(cont
 		var release runtime.Release
 		var err error
 		if path == "" {
-			if !networkAllowed {
-				return runtime.Release{}, errors.New("release download requires explicit network consent")
-			}
 			release, err = runtime.FetchRelease(ctx, c.ReleaseURL, keys)
 		} else {
 			release, err = runtime.ReadRelease(path, keys)

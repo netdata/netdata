@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -151,14 +152,20 @@ func TestRuntimeStatusReportsUnknownWhenSafetyStructureIsMissing(t *testing.T) {
 }
 
 // Only authentic release inputs can establish both workload qualifications.
-func TestRealRuntimeRepairQualifiesBothWorkloads(t *testing.T) {
+func realAdminInputs(t *testing.T) (manifest, archive, publicKey string) {
+	t.Helper()
 	manifest, archive, helper := os.Getenv("DEM_RUNTIME_TEST_RELEASE"), os.Getenv("DEM_RUNTIME_TEST_ARCHIVE"), os.Getenv("DEM_RUNTIME_TEST_HELPER")
-	publicKey := os.Getenv("DEM_RUNTIME_TEST_PUBLIC_KEY")
+	publicKey = os.Getenv("DEM_RUNTIME_TEST_PUBLIC_KEY")
 	if manifest == "" || archive == "" || helper == "" || publicKey == "" {
 		t.Skip("requires DEM_RUNTIME_TEST_RELEASE, DEM_RUNTIME_TEST_ARCHIVE, DEM_RUNTIME_TEST_PUBLIC_KEY and DEM_RUNTIME_TEST_HELPER")
 	}
 	require.NotZero(t, os.Geteuid())
 	t.Cleanup(ndexec.SetRunnerPathsForTests(helper, ""))
+	return manifest, archive, publicKey
+}
+
+func TestRealRuntimeRepairQualifiesBothWorkloads(t *testing.T) {
+	manifest, archive, publicKey := realAdminInputs(t)
 	root := t.TempDir()
 	writeRuntimeTrustConfig(t, root, "", publicKey)
 	cache := filepath.Join(root, "cache")
@@ -178,6 +185,30 @@ func TestRealRuntimeRepairQualifiesBothWorkloads(t *testing.T) {
 	assert.True(t, report.Qualification.SandboxedLocalLighthouse)
 	assert.True(t, report.Qualification.ProcessTreeDrained)
 	assert.Equal(t, report.Runtime, report.Qualification.Runtime)
+}
+
+func TestRealRuntimePreloadReportsPreparedCandidate(t *testing.T) {
+	manifest, archive, publicKey := realAdminInputs(t)
+	root := t.TempDir()
+	writeRuntimeTrustConfig(t, root, "", publicKey)
+	final := filepath.Join(root, "preload")
+	report, err := runtimeCommand(t, "runtime", "preload", "--config-dir", root,
+		"--root", final, "--release", manifest, "--archive", archive)
+	require.NoError(t, err)
+	assert.Equal(t, "installed", report.State)
+	assert.Equal(t, "prepared", report.CandidateState)
+	assert.FileExists(t, filepath.Join(final, "preload.json"))
+	data, err := os.ReadFile(filepath.Join(final, "selection.json"))
+	require.NoError(t, err)
+	var selection struct {
+		Manifest *runtime.Manifest `json:"manifest"`
+	}
+	require.NoError(t, json.Unmarshal(data, &selection))
+	assert.Nil(t, selection.Manifest)
+	require.NotNil(t, report.Qualification)
+	assert.True(t, report.Qualification.SandboxedLocalJourney)
+	assert.True(t, report.Qualification.SandboxedLocalLighthouse)
+	assert.True(t, report.Qualification.ProcessTreeDrained)
 }
 
 func TestRuntimeStatusReportsIncompleteOwnershipInventory(t *testing.T) {

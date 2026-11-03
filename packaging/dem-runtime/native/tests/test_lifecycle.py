@@ -113,7 +113,10 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(self.state()['active'], 'active')
         self.assertEqual(self.state()['gate'], 'ready')
         self.assertFalse(self.marker().exists())
-        self.assertFalse(any(name == 'systemctl' and 'stop' in args for name, args in self.calls()))
+        service_actions = [(name, args) for name, args in self.calls()
+                           if name in ('systemctl', 'deb-systemd-invoke') and args[0] in ('stop', 'start')]
+        self.assertEqual(service_actions, [('deb-systemd-invoke', ['stop', 'netdata.service']),
+                                          ('deb-systemd-invoke', ['start', 'netdata.service'])])
 
     def test_inactive_stays_inactive(self):
         self.state(active='inactive')

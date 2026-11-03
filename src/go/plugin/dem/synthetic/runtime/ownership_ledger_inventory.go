@@ -119,9 +119,7 @@ func (s *ownershipLedger) inventoryLocked(reconcile bool) (ownershipInventory, e
 			inv.uncertain[use.Generation]++
 		}
 		// A missing receipt may be a live execution. No PID/age guess is made.
-		if proofErr != nil {
-			inv.cleanupError = errors.Join(inv.cleanupError, proofErr)
-		}
+		inv.cleanupError = errors.Join(inv.cleanupError, ownerErr, proofErr)
 	}
 	return inv, nil
 }

@@ -194,3 +194,17 @@ func TestReleaseLoaderUsesAcquisitionConsentForTrust(t *testing.T) {
 	require.NoError(t, handle.Close())
 	require.Empty(t, requests, "synchronous runtime startup must never retrieve public keys or descriptors")
 }
+
+func TestReleaseLoaderRequiresDiscoveryURLBeforeNetworkAccess(t *testing.T) {
+	cfg := DefaultRuntimeConfig()
+	previous := http.DefaultTransport
+	t.Cleanup(func() { http.DefaultTransport = previous })
+	requests := 0
+	http.DefaultTransport = releaseSetupTransport(func(r *http.Request) (*http.Response, error) {
+		requests++
+		return &http.Response{StatusCode: http.StatusServiceUnavailable, Body: http.NoBody, Header: make(http.Header)}, nil
+	})
+	_, err := cfg.ReleaseLoader("", true)(context.Background())
+	require.ErrorContains(t, err, "runtime.release_url")
+	require.Zero(t, requests, "invalid local setup must not acquire remote trust")
+}

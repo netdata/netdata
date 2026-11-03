@@ -63,6 +63,8 @@ class SnapshotTests(unittest.TestCase):
             self.assertNotEqual(old['binary_packages'][0]['url'], new['binary_packages'][0]['url'])
             self.assertTrue(new['binary_packages'][0]['url'].startswith('https://snapshot.debian.org/file/'))
             new['binary_packages'][0]['url'] = old['binary_packages'][0]['url']
+            self.assertEqual('https://snapshot.debian.org/file/' + metadata['result']['source'][0]['hash'],
+                             new['sources']['example@1:2.0-3']['files'][0]['url'])
             new['sources']['example@1:2.0-3']['files'][0]['url'] = old['sources']['example@1:2.0-3']['files'][0]['url']
             self.assertEqual(old, new)
 
@@ -73,7 +75,8 @@ class SnapshotTests(unittest.TestCase):
         metadata['fileinfo'][wrong] = [{'name': lock['binary_packages'][0]['file'], 'size': 12}]
         bodies[wrong] = b'wrong! bytes'
         converted, urls = self.convert([lock], metadata, bodies)
-        self.assertNotIn(wrong, converted[0]['binary_packages'][0]['url'])
+        self.assertEqual('https://snapshot.debian.org/file/' + metadata['result']['binaries'][0]['files'][1]['hash'],
+                         converted[0]['binary_packages'][0]['url'])
         self.assertIn('https://snapshot.debian.org/file/' + wrong, urls)
 
     def test_missing_mismatched_and_wrong_identity_fail_without_mutating_locks(self):

@@ -262,9 +262,9 @@ func runRuntimeCommand(ctx context.Context, args []string, stdout, stderr io.Wri
 			if err = candidate.Select(); err != nil {
 				return true, err
 			}
+			report.CandidateState = "selected"
 			report.Notice = "Runtime installed and selected. Running DEM processes keep their acquired release; restart DEM to activate this selection."
 		}
-		report.CandidateState = "selected"
 		report.State = "installed"
 		return true, nil
 	}

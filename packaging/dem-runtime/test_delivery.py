@@ -129,8 +129,12 @@ class DeliveryTests(unittest.TestCase):
                         handler.http_error_302(urllib.request.Request(record['url']), io.BytesIO(),
                                                302, 'redirect', {'location': target})
 
-    def test_recipe_inventory_covers_native_policy(self):
-        self.assertIn('native/netdata-dem-browser', bundle.recipe_sources())
+    def test_recipe_inventory_covers_native_policy_and_tests(self):
+        expected = {'native/CMakeLists.txt', 'native/netdata-dem-browser', 'native/hook.sh.in',
+                    'native/lifecycle.sh', 'native/README.md'}
+        expected.update('native/tests/' + path.name for path in
+                        (Path(__file__).parent / 'native/tests').glob('test_*.py'))
+        self.assertEqual({name for name in bundle.recipe_sources() if name.startswith('native/')}, expected)
 
     def fixture(self, base):
         recipe = base / 'packaging/dem-runtime'

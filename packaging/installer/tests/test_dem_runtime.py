@@ -96,6 +96,7 @@ handle_major_version() { :; }
 detect_existing_install() {
   ndpath="$FIXTURE/bin/netdata"
   INSTALL_TYPE="$FIXTURE_TYPE"
+  EXISTING_INSTALL_IS_NATIVE="${FIXTURE_NATIVE:-0}"
   if [ "$FIXTURE_INSTALLED" = 1 ]; then ndprefix="$FIXTURE"; else ndprefix=; fi
 }
 install_on_linux() { FIXTURE_INSTALLED=1; INSTALL_TYPE="$FIXTURE_TYPE"; event agent-install; }
@@ -188,6 +189,21 @@ claim() { return "${FIXTURE_CLAIM_STATUS:-0}"; }
                 self.assertNotIn('99.0.0', ' '.join(args))
                 self.assertEqual(self.calls('dem.plugin')[-1]['args'][1], 'status')
         self.assertIn('Dpkg::Options::=--force-confold', self.calls('apt-get')[0]['args'])
+
+    def test_native_detection_overrides_packaged_install_marker(self):
+        self.settings['config']['global/run as user'] = 'netdata'
+        for distro, manager in [('debian', 'apt-get'), ('centos', 'dnf')]:
+            for marker in ('custom', 'unknown'):
+                with self.subTest(distro=distro, marker=marker):
+                    result = self.invoke(FIXTURE_TYPE=marker, FIXTURE_NATIVE=1,
+                                         DISTRO_COMPAT_NAME=distro)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(self.calls(manager)[-1]['args'][-1], 'netdata-dem-runtime')
+                    self.assertEqual(self.calls('dem.plugin')[-1]['args'][1], 'status')
+        count = len(self.calls('dem.plugin'))
+        result = self.invoke(FIXTURE_TYPE='custom', FIXTURE_NATIVE=0)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(len(self.calls('dem.plugin')), count)
 
     def test_native_interactive_policy_does_not_add_yes(self):
         self.settings['config']['global/run as user'] = 'netdata'

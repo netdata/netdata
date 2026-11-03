@@ -187,6 +187,10 @@ the staging tool's local Go build closure and module pins, runtime identity/prov
 `source-assembly.json` file inventory. Existing downloads are reverified on rerun. The output must stay outside the recipe
 directory; unexpected existing files are rejected and preserved, not included in
 the verified inventory.
+Agent-integration tests in the recipe require the matching full Agent checkout:
+they exercise core package metadata and maintainer scripts outside the runtime
+source archive. Run their repository-relative commands from that checkout, not
+directly from the archive's `recipe/` directory.
 The optional archive output must be a separate, new or empty directory. Before
 archiving, the command verifies every declared file's digest/size, the complete
 file set and the runtime identity again. It emits a deterministic

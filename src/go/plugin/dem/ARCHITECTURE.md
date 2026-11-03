@@ -27,8 +27,8 @@ relative to `src/go/`.
 
 ## Short version
 
-- `dem.plugin` measures how websites behave for the people using them. It is experimental and built only with
-  `ENABLE_PLUGIN_DEM=ON`.
+- `dem.plugin` measures how websites behave for the people using them. It remains experimental and is included
+  in default Linux builds; `ENABLE_PLUGIN_DEM=OFF` disables it. Browser runtime installation is separate and explicit.
 - It has two independent pipelines in one process:
   - **RUM** (real user monitoring): visitors' browsers *push* reports to a built-in HTTP receiver.
   - **Synthetics**: the plugin *pulls* by running scripted browsers on a schedule (Playwright journeys and Lighthouse

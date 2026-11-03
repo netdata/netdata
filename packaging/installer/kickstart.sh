@@ -1817,8 +1817,13 @@ setup_dem_runtime() {
       return 1
     fi
   fi
-  case "${INSTALL_TYPE}" in
-    binpkg-deb|binpkg-rpm)
+  dem_install_type=${INSTALL_TYPE}
+  if [ "${DRY_RUN}" -ne 1 ] && [ "${EXISTING_INSTALL_IS_NATIVE}" -eq 1 ]; then
+    # Package ownership takes precedence over the generic packaged type marker.
+    dem_install_type=native
+  fi
+  case "${dem_install_type}" in
+    native|binpkg-deb|binpkg-rpm)
       if [ "${DRY_RUN}" -ne 1 ] && [ "${dem_user}" != netdata ]; then
         warning "Native runtime packages require the named netdata service account. Use the runtime CLI for an explicitly configured managed installation under another account."
         return 1

@@ -65,7 +65,7 @@ func TestReleaseAcquisitionBoundsAndTransport(t *testing.T) {
 	_, err := FetchRelease(context.Background(), server.URL, keys)
 	require.ErrorContains(t, err, "exceeds protocol size limit")
 	_, err = FetchRelease(context.Background(), server.URL+"/redirect", keys)
-	require.Error(t, err)
+	require.ErrorIs(t, err, errDownloadRedirect)
 	_, err = FetchRelease(context.Background(), server.URL+"/failure", keys)
 	require.ErrorContains(t, err, "HTTP 503")
 	path := filepath.Join(t.TempDir(), "oversized.json")

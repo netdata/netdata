@@ -92,7 +92,8 @@ def recipe_sources():
             'locks/amd64.json', 'locks/arm64.json',
             'native/CMakeLists.txt', 'native/netdata-dem-browser', 'native/hook.sh.in', 'native/lifecycle.sh',
             'native/README.md',
-            'native/tests/test_agent_metadata.py', 'native/tests/test_lifecycle.py', 'native/tests/test_recipe.py',
+            'native/tests/test_agent_metadata.py', 'native/tests/test_agent_removal.py',
+            'native/tests/test_lifecycle.py', 'native/tests/test_recipe.py',
             'native/tests/test_package.py')
 
 
