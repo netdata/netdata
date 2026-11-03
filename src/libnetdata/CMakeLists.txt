@@ -346,7 +346,7 @@ target_link_libraries(libnetdata PUBLIC PkgConfig::TLS)
 # put it in <build>/src/libnetdata, so the output directory is pinned to
 # keep that path working.
 #
-add_executable(spawn-tester spawn_server/spawn-tester.c)
+add_executable(spawn-tester EXCLUDE_FROM_ALL spawn_server/spawn-tester.c)
 target_link_libraries(spawn-tester libnetdata)
 set_target_properties(spawn-tester PROPERTIES
                       RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
