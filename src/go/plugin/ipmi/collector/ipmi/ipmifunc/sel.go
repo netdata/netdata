@@ -5,11 +5,14 @@ package ipmifunc
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/ipmi/collector/ipmi/internal/bmc"
 )
 
@@ -24,6 +27,11 @@ const selDescription = "IPMI System Event Log records and their health states"
 
 const selHelp = "Browse every System Event Log record the BMC retains, newest first, read by the collector without extra BMC requests. The dashboard time range does not filter this table: SEL records are often weeks apart. Clearing or rollover on the BMC removes records."
 
+const (
+	paramState = "state"
+	stateAll   = "all"
+)
+
 // selStates are the FreeIPMI default interpretation states, worst first.
 var selStates = []string{bmc.StateCritical, bmc.StateWarning, bmc.StateNominal, bmc.StateUnknown}
 
@@ -37,7 +45,7 @@ func selMethod(updateEvery int) funcapi.FunctionConfig {
 		ResponseType:   "table",
 		RawRequest:     true,
 		ManagedInfo:    true,
-		AcceptedParams: []string{paramQuery},
+		AcceptedParams: []string{funcapi.ParamQuery},
 		RequiredParams: []funcapi.ParamConfig{selStateParam()},
 	}
 }
@@ -239,4 +247,29 @@ func optionalText(value string) any {
 		return nil
 	}
 	return value
+}
+
+type selQuery struct {
+	state string // empty or stateAll selects every state
+	text  matcher.Matcher
+}
+
+// parseSELQuery reads the state selection and the text query. Other inputs,
+// such as the dashboard's after and before, are ignored.
+func parseSELQuery(req funcapi.RawMethodRequest) (selQuery, error) {
+	params, err := funcapi.ParseRawParams(req)
+	if err != nil {
+		return selQuery{}, err
+	}
+	var q selQuery
+	if q.state, err = params.String(paramState); err != nil {
+		return q, err
+	}
+	if q.state != "" && q.state != stateAll && !slices.Contains(selStates, q.state) {
+		return q, errors.New("invalid state selection")
+	}
+	if q.text, err = params.QueryMatcher(); err != nil {
+		return q, err
+	}
+	return q, nil
 }
