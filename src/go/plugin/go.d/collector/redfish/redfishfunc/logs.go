@@ -25,7 +25,7 @@ func logsMethod(updateEvery int) funcapi.FunctionConfig {
 		RawRequest:     true,
 		ManagedInfo:    true,
 		HasHistory:     true,
-		AcceptedParams: []string{"after", "before", "query"},
+		AcceptedParams: []string{funcapi.ParamAfter, funcapi.ParamBefore, funcapi.ParamQuery},
 		RequiredParams: []funcapi.ParamConfig{logServiceParam(nil), logSeverityParam()},
 	}
 }
