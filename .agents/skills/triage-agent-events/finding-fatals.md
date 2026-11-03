@@ -102,6 +102,22 @@ Generic `fatal()` calls. Look at `AE_FATAL_MESSAGE` to find
 the panic message and `AE_FATAL_FUNCTION` to localize. Group
 by message to find the most common patterns.
 
+`DEADLOCK DETECTED: ... could not be acquired for N seconds`
+(3600 s spin) names the WAITER (`function '...'`), not the
+holder. A `[holder: ...]` suffix carries what the lock knows:
+
+- `SPINLOCK_TRACKED`: `tid=`, acquiring `func=`, `held_for=`;
+  or `NONE - lock shows unlocked, possible corruption/stuck
+  byte` when no holder is recorded.
+- `rw-spinlock read/write lock` (agents with the rw holder
+  change): `writer tid=` (or `no writer`), `same at the first
+  check`, `was tid=X at the first check` or `no writer at the
+  first check`, `(this thread)` on a self-deadlock, and
+  `reader count=` with min/max over the checks. These are samples about a minute apart: the reader
+  count includes readers caught mid-attempt, and `no writer`
+  can be a waiting writer's flicked bit. Treat them as leads.
+- No suffix: plain spinlock, waitq, or an older agent.
+
 ### `no last status`
 
 First-ever start, or the prior status file was corrupted /
