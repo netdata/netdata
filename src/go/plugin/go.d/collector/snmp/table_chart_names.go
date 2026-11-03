@@ -52,8 +52,8 @@ func (st *tableChartState) update(m ddsnmp.Metric) {
 	}
 }
 
-// tableRowLess orders rows sharing a chart key: a non-empty alias first, then the smallest alias, which is the alias
-// the interfaces Function shows for them (updateIfaceCacheEntry), then all underscore-prefixed tags.
+// tableRowLess orders rows sharing a chart key: a non-empty alias first, then the smallest alias, then all
+// underscore-prefixed tags. The order does not depend on the order rows arrive in.
 func tableRowLess(a, b map[string]string) bool {
 	aliasA, aliasB := a[tagIfAlias], b[tagIfAlias]
 	if (aliasA == "") != (aliasB == "") {
