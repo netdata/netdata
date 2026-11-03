@@ -67,8 +67,23 @@ BUFFER *sender_host_buffer_with_trace(struct rrdhost *host, const char *func) {
     return sender_commit_start_with_trace(host->sender, &host->stream.snd.commit, HOST_THREAD_BUFFER_INITIAL_SIZE, func);
 }
 
+// adaptive sizing of the circular buffer: let it hold a few messages of the size about to be added
+// (it only grows; reconnects reset it to the configured size). Called right before data enter the
+// circular buffer, so that a frame carrying many queued commits is covered, not only each commit.
+static void sender_scb_adapt_max_size_unsafe(struct sender_state *s, size_t len) {
+    if (unlikely(stream_circular_buffer_set_max_size_unsafe(
+            s->scb, len * STREAM_CIRCULAR_BUFFER_ADAPT_TO_TIMES_MAX_SIZE, false))) {
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "STREAM SND '%s' [to %s]: Increased max buffer size to %zu (message size %zu).",
+               s->host ? rrdhost_hostname(s->host) : "", s->remote_ip,
+               stream_circular_buffer_stats_unsafe(s->scb)->bytes_max_size, len + 1);
+    }
+}
+
 // compress src into the circular buffer as one or more framed messages
 static SENDER_COMPRESS_RC sender_compress_to_scb_unsafe(struct sender_state *s, const char *src, size_t src_len, STREAM_TRAFFIC_TYPE type) {
+    sender_scb_adapt_max_size_unsafe(s, src_len);
+
     while (src_len) {
         size_t size_to_compress = src_len;
 
@@ -272,14 +287,6 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
         return;
     }
 
-    if (unlikely(stream_circular_buffer_set_max_size_unsafe(
-            s->scb, src_len * STREAM_CIRCULAR_BUFFER_ADAPT_TO_TIMES_MAX_SIZE, false))) {
-        // adaptive sizing of the circular buffer
-        nd_log(NDLS_DAEMON, NDLP_NOTICE,
-               "STREAM SND '%s' [to %s]: Increased max buffer size to %zu (message size %zu).",
-               rrdhost_hostname(s->host), s->remote_ip, stats->bytes_max_size, src_len + 1);
-    }
-
     stream_sender_log_payload(s, wb, type, false);
 
     // if there are data already queued, we don't need to send an opcode
@@ -293,6 +300,7 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
     }
     else {
         // uncompressed traffic
+        sender_scb_adapt_max_size_unsafe(s, src_len);
 
         if (!stream_circular_buffer_add_unsafe(s->scb, src, src_len,
                                                src_len, type, false))
@@ -549,20 +557,97 @@ cleanup:
     return errors;
 }
 
+// unittest: with a small configured buffer, a frame carrying many small queued commits, and a message
+// larger than a frame, must fit: the circular buffer grows for what is added, not only for each commit
+
+#define UNITTEST_SMALL_SCB_MAX_SIZE 3000
+
+static int unittest_sender_small_buffer_one(compression_algorithm_t algorithm, const char *name, STREAM_CAPABILITIES caps) {
+    int errors = 0;
+
+    struct sender_state *s = callocz(1, sizeof(*s));
+    s->capabilities = caps;
+    s->scb = stream_circular_buffer_create();
+    stream_circular_buffer_flush_unsafe(s->scb, UNITTEST_SMALL_SCB_MAX_SIZE);
+    s->thread.compressor.algorithm = algorithm;
+    s->thread.compressor.level = stream_send.compression.levels[algorithm];
+    stream_compressor_init(&s->thread.compressor);
+
+    BUFFER *msg = buffer_create(0, NULL);
+    SENDER_COMPRESS_RC rc = SENDER_COMPRESS_OK;
+    size_t commits = 0, frames = 0;
+
+    // small commits of random hex (it compresses poorly), each far below the configured buffer size,
+    // until their queue is compressed into a frame larger than that
+    while(rc == SENDER_COMPRESS_OK && !frames && commits < 1000) {
+        buffer_flush(msg);
+        for(size_t l = 0; l < 4; l++)
+            buffer_sprintf(msg, "SMALL %08x%08x%08x%08x%08x%08x%08x%08x\n",
+                           os_random32(), os_random32(), os_random32(), os_random32(),
+                           os_random32(), os_random32(), os_random32(), os_random32());
+        commits++;
+
+        rc = sender_pending_add_unsafe(s, buffer_tostring(msg), buffer_strlen(msg), STREAM_TRAFFIC_TYPE_DATA);
+        frames = stream_circular_buffer_stats_unsafe(s->scb)->adds / 2;
+    }
+
+    if(rc == SENDER_COMPRESS_OK && !frames) {
+        fprintf(stderr, "%s: %zu commits did not fill a frame\n", name, commits);
+        errors++;
+    }
+    else if(rc != SENDER_COMPRESS_OK) {
+        fprintf(stderr, "%s: a frame of %zu small commits did not fit a %d bytes buffer (rc %d)\n",
+                name, commits, UNITTEST_SMALL_SCB_MAX_SIZE, (int)rc);
+        errors++;
+    }
+
+    if(!errors) {
+        // a message larger than a frame, after the circular buffer is reset to the configured size
+        stream_circular_buffer_flush_unsafe(s->scb, UNITTEST_SMALL_SCB_MAX_SIZE);
+        sender_pending_flush_unsafe(s);
+
+        buffer_flush(msg);
+        while(buffer_strlen(msg) < COMPRESSION_MAX_MSG_SIZE * 3)
+            buffer_sprintf(msg, "LARGE %08x%08x%08x%08x\n", os_random32(), os_random32(), os_random32(), os_random32());
+
+        rc = sender_pending_add_unsafe(s, buffer_tostring(msg), buffer_strlen(msg), STREAM_TRAFFIC_TYPE_DATA);
+        if(rc != SENDER_COMPRESS_OK) {
+            fprintf(stderr, "%s: a %zu bytes message did not fit a %d bytes buffer (rc %d)\n",
+                    name, buffer_strlen(msg), UNITTEST_SMALL_SCB_MAX_SIZE, (int)rc);
+            errors++;
+        }
+    }
+
+    fprintf(stderr, "Sender small buffer with %s%s: %s (%zu small commits in the first frame)\n",
+            name, (caps & STREAM_CAP_BINARY) ? " (binary)" : "", errors ? "FAILED" : "OK", commits);
+
+    buffer_free(msg);
+    sender_pending_free(s);
+    stream_compressor_destroy(&s->thread.compressor);
+    stream_circular_buffer_destroy(s->scb);
+    freez(s);
+
+    return errors;
+}
+
 int unittest_stream_sender_pending(void) {
     int errors = 0;
 
 #ifdef ENABLE_ZSTD
     errors += unittest_sender_pending_one(COMPRESSION_ALGORITHM_ZSTD, "ZSTD", STREAM_CAP_ZSTD);
     errors += unittest_sender_pending_one(COMPRESSION_ALGORITHM_ZSTD, "ZSTD", STREAM_CAP_ZSTD | STREAM_CAP_BINARY);
+    errors += unittest_sender_small_buffer_one(COMPRESSION_ALGORITHM_ZSTD, "ZSTD", STREAM_CAP_ZSTD);
 #endif
 #ifdef ENABLE_LZ4
     errors += unittest_sender_pending_one(COMPRESSION_ALGORITHM_LZ4, "LZ4", STREAM_CAP_LZ4);
+    errors += unittest_sender_small_buffer_one(COMPRESSION_ALGORITHM_LZ4, "LZ4", STREAM_CAP_LZ4);
 #endif
 #ifdef ENABLE_BROTLI
     errors += unittest_sender_pending_one(COMPRESSION_ALGORITHM_BROTLI, "BROTLI", STREAM_CAP_BROTLI);
+    errors += unittest_sender_small_buffer_one(COMPRESSION_ALGORITHM_BROTLI, "BROTLI", STREAM_CAP_BROTLI);
 #endif
     errors += unittest_sender_pending_one(COMPRESSION_ALGORITHM_GZIP, "GZIP", STREAM_CAP_GZIP);
+    errors += unittest_sender_small_buffer_one(COMPRESSION_ALGORITHM_GZIP, "GZIP", STREAM_CAP_GZIP);
 
     return errors;
 }
