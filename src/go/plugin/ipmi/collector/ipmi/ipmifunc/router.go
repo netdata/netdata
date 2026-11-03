@@ -13,8 +13,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/ipmi/collector/ipmi/internal/bmc"
 )
 
-// FunctionName is the public Function name, distinct from the C plugin's ipmi-sensors.
-const FunctionName = "ipmi-go-sensors"
+// FunctionName is shared with the C implementation; plugins.d starts only one.
+const FunctionName = "ipmi-sensors"
 
 const methodSensors = "sensors"
 

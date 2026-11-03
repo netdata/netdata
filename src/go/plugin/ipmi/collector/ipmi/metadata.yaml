@@ -5,7 +5,7 @@ modules:
       plugin_name: ipmi.plugin
       module_name: ipmi
       monitored_instance:
-        name: IPMI (experimental Go collector)
+        name: IPMI (Go collector)
         link: https://www.intel.com/content/www/us/en/products/docs/servers/ipmi/ipmi-home.html
         icon_filename: microchip.svg
         categories:
@@ -39,30 +39,36 @@ modules:
           | Read/write access to the selected OpenIPMI device | Collecting locally with `driver: open`. |
           | BMC account with User privilege and LAN access | Collecting remotely with `driver: lan` or `driver: lanplus`. Some BMC policies require a higher session privilege. |
 
-          Installation grants no setuid mode, capabilities or device permissions. Remote collection requires no
-          elevated privileges on the Agent host.
+          Installers give the dedicated `ipmi.plugin` binary root ownership and setuid permission, restricted to
+          the Netdata group, for local device access. Containers must expose the device, for example with
+          `--device /dev/ipmi0`. Remote collection needs no local device access.
       default_behavior:
         auto_detection:
-          description: No jobs start by default. Build the experimental plugin explicitly and configure the target.
+          description: On standard Linux installations, the stock job attempts to collect the local OpenIPMI device 0
+            every ten seconds. Containers require ipmi=yes in the plugins section of netdata.conf and an exposed
+            device for local collection. Hosts without an accessible device do not collect local IPMI metrics.
+            Netdata prefers this plugin when both IPMI implementations are installed and enabled. An existing
+            freeipmi=no keeps collection disabled; non-blank legacy command options keep C when FreeIPMI is enabled.
+            Set ipmi=yes explicitly in the plugins section of netdata.conf to migrate either case to Go.
         limits:
-          description: 'This experimental plugin requires Linux. Keep
-            FreeIPMI for legacy direct drivers, OEM interpretation or custom FreeIPMI interpretation files. Unknown or
-            unavailable sensor readings leave gaps. Default FreeIPMI policy treats non-critical threshold assertions as
-            nominal. Do not run both IPMI plugins against the same host with the canonical ipmi job name because chart
-            IDs overlap. The Go collector uses separate ipmi_go.* contexts and the ipmi-go-sensors Function.'
+          description: This plugin requires Linux. Keep FreeIPMI for legacy direct drivers, bridged sensors,
+            OEM interpretation or custom FreeIPMI interpretation files. Unknown or unavailable sensor readings leave
+            gaps. Default FreeIPMI policy treats non-critical threshold assertions as nominal. Netdata starts only
+            one IPMI implementation; switch implementations by changing netdata.conf and restarting the Agent.
         performance_impact:
           description: IPMI command latency grows with sensor count. Increase update_every when a complete sensor scan
             takes longer than the configured interval.
     setup:
       prerequisites:
         list:
-          - title: Build the experimental plugin
-            description: Run `sudo ./netdata-installer.sh --enable-plugin-ipmi` from a source checkout. The option is
-              OFF in production builds. Installation uses ordinary executable permissions.
-          - title: Select one IPMI plugin
-            description: Before collecting the same host with the canonical ipmi job name, set `freeipmi = no` in the `[plugins]` section of
-              netdata.conf. Use a trusted configuration and explicit sudo invocation for local debugging when the device
-              is root-only. For normal Agent execution, arrange device access according to the host security policy.
+          - title: Install the IPMI plugin
+            description: Linux source and static builds include the Go IPMI plugin by default. For DEB/RPM
+              installations, install the optional netdata-plugin-ipmi package separately. Source builds can disable
+              it with --disable-plugin-ipmi.
+          - title: Migrate an existing FreeIPMI configuration
+            description: Configure the target in ipmi/ipmi.conf, set `ipmi = yes` in the `[plugins]` section of
+              netdata.conf, and restart Netdata. C command options are not translated. To switch back, install
+              netdata-plugin-freeipmi if needed, set `ipmi = no` and `freeipmi = yes`, and restart Netdata.
           - title: Enable remote BMC access
             description: For LAN/LAN+, enable IPMI over LAN on the BMC, configure an account with User privilege,
               and allow UDP traffic from the Agent to the BMC port (623 by default). Select a higher privilege only
@@ -70,7 +76,8 @@ modules:
       configuration:
         file:
           name: ipmi/ipmi.conf
-          description: ''
+          description: |
+            Replace the stock local job to collect remote BMCs, or set `jobs: []` to disable local collection.
         options:
           description: Options apply to each IPMI job. Configure one local device or remote BMC per job.
           folding:
@@ -114,7 +121,7 @@ modules:
               group: Connection
             - name: update_every
               description: "Data collection frequency in seconds."
-              default_value: 5
+              default_value: 10
               required: false
               group: Collection
             - name: timeout
@@ -141,7 +148,7 @@ modules:
               description: Monitor the first kernel IPMI device.
               config: |
                 jobs:
-                  - name: ipmi
+                  - name: local
                     driver: open
             - name: Remote BMC
               description: Monitor a remote BMC using IPMI 2.0. Use driver lan for BMCs that require IPMI 1.5.
@@ -167,19 +174,16 @@ modules:
         list:
           - error: permission denied
             cause: The plugin account cannot open the local IPMI device for reading and writing.
-            fix: Grant device access through the host security policy, or run a trusted local test explicitly with sudo.
-              Rebuilding the plugin does not grant device access.
-    # ipmi_events is an alarm on chart id ipmi.events, which this collector creates under the ipmi_go.sel context,
-    # so no declared context derives it. The integrations generator derives every other alert row from `metrics`.
-    alerts:
-      - ipmi_events
+            fix: Check that the dedicated binary retains the ownership and setuid permissions installed by Netdata.
+              In a container, expose the IPMI device. For a manually built binary, grant device access through the host
+              security policy or run a trusted local test explicitly with sudo.
     metrics:
       folding:
         title: Metrics
         enabled: false
       description: Each sensor has its own reading and state chart. SEL is the raw repository entry count, including
-        records FreeIPMI may filter during interpretation. The stock SEL alarm targets the canonical local ipmi.events
-        chart; other job chart IDs include the job name.
+        records FreeIPMI may filter during interpretation. The stock ipmi_events alert template matches the ipmi.sel
+        context and applies to every Go job and to the C collector.
       scopes:
         - name: sensor
           description: A sensor on the selected BMC.
@@ -191,49 +195,49 @@ modules:
             - name: component
               description: Component inferred from the sensor name and type.
           metrics:
-            - name: ipmi_go.sensor_temperature_c
+            - name: ipmi.sensor_temperature_c
               description: IPMI Sensor Temperature
               unit: Celsius
               chart_type: line
               dimensions:
                 - name: temperature
-            - name: ipmi_go.sensor_temperature_f
+            - name: ipmi.sensor_temperature_f
               description: IPMI Sensor Temperature
               unit: Fahrenheit
               chart_type: line
               dimensions:
                 - name: temperature
-            - name: ipmi_go.sensor_voltage
+            - name: ipmi.sensor_voltage
               description: IPMI Sensor Voltage
               unit: Volts
               chart_type: line
               dimensions:
                 - name: voltage
-            - name: ipmi_go.sensor_ampere
+            - name: ipmi.sensor_ampere
               description: IPMI Sensor Current
               unit: Amps
               chart_type: line
               dimensions:
                 - name: ampere
-            - name: ipmi_go.sensor_fan_speed
+            - name: ipmi.sensor_fan_speed
               description: IPMI Sensor Fan Speed
               unit: RPM
               chart_type: line
               dimensions:
                 - name: rotations
-            - name: ipmi_go.sensor_power
+            - name: ipmi.sensor_power
               description: IPMI Sensor Power
               unit: Watts
               chart_type: line
               dimensions:
                 - name: power
-            - name: ipmi_go.sensor_reading_percent
+            - name: ipmi.sensor_reading_percent
               description: IPMI Sensor Percentage Reading
               unit: '%'
               chart_type: line
               dimensions:
                 - name: percentage
-            - name: ipmi_go.sensor_state
+            - name: ipmi.sensor_state
               description: IPMI Sensor State
               unit: state
               chart_type: stacked
@@ -246,7 +250,7 @@ modules:
           description: The selected BMC System Event Log.
           labels: []
           metrics:
-            - name: ipmi_go.sel
+            - name: ipmi.sel
               description: IPMI System Event Log Entries
               unit: events
               chart_type: line
@@ -257,7 +261,7 @@ modules:
       description: Inspect the latest successful collection without issuing more IPMI commands.
       list:
         - id: sensors
-          function_name: ipmi-go-sensors
+          function_name: ipmi-sensors
           name: IPMI Sensors
           description: Show current readings and default FreeIPMI health states, with sensor counts by component and
             state.

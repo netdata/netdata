@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# ipmi.plugin: the experimental Go IPMI plugin and its config tree.
+# ipmi.plugin: the Go IPMI plugin and its config tree.
 #
 # include()d from the root file, so paths resolve against the repository and
 # build roots; nothing here may use CMAKE_CURRENT_LIST_DIR.
@@ -24,4 +24,6 @@ if(ENABLE_PLUGIN_IPMI)
             COMPONENT plugin-ipmi
             DESTINATION ${LIBCONFIG_DEST}
             FILES_MATCHING PATTERN "*.conf")
+
+    netdata_add_deb_copyright(plugin-ipmi netdata-plugin-ipmi)
 endif()

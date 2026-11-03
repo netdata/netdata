@@ -1,6 +1,6 @@
 # IPMI command adapter
 
-This experimental adapter uses the published `bougou/go-ipmi` revision `b3670df57943628499e930a09cff21f24c2cda0f`. It
+This adapter uses the published `bougou/go-ipmi` revision `5dabd2f69282accf86ea815aa5d50cfbd5e767a1`. It
 reads the SDR repository, sensor readings, and optionally one SEL entry-count response. It does not write BMC
 configuration. Local OpenIPMI uses `NewOpenClient` and ordinary process/device permissions. LAN/LAN+ uses `NewClient`
 with the configured address, credentials and privilege. One Reader serializes commands for one connection; the SDK

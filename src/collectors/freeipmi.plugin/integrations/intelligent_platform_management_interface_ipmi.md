@@ -38,7 +38,7 @@ The plugin needs setuid.
 
 #### Auto-Detection
 
-This integration doesn't support auto-detection.
+The plugin detects local IPMI sensors when selected. Netdata prefers the Go IPMI plugin when both are installed and enabled. Existing non-blank FreeIPMI command options keep this implementation when FreeIPMI is enabled. An existing freeipmi=no keeps collection disabled. Set ipmi=yes explicitly in the plugins section of netdata.conf to migrate either case to Go.
 
 
 #### Performance Impact
@@ -57,6 +57,19 @@ When using our official DEB/RPM packages, the FreeIPMI plugin is included in a s
 When using a static build of Netdata, the FreeIPMI plugin will be included and installed automatically, though you will still need to have FreeIPMI installed on your system to be able to use the plugin.
 
 When using a local build of Netdata, you need to ensure that the FreeIPMI development packages (typically called `libipmimonitoring-dev`, `libipmimonitoring-devel`, or `freeipmi-devel`) are installed when building Netdata.
+
+
+#### Select the C implementation
+
+To switch from the Go plugin, set the following in `netdata.conf` and restart Netdata:
+
+```ini
+[plugins]
+    ipmi = no
+    freeipmi = yes
+```
+
+Netdata starts at most one IPMI implementation and keeps that choice until restart. A failure does not automatically switch implementations.
 
 
 #### Preliminary actions
@@ -216,7 +229,7 @@ The following alerts are available:
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
 | [ ipmi_sensor_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipmi.conf) | ipmi.sensor_state | IPMI sensor ${label:sensor} (${label:component}) state |
-| [ ipmi_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipmi.conf) | ipmi.events | number of events in the IPMI System Event Log (SEL) |
+| [ ipmi_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipmi.conf) | ipmi.sel | number of events in the IPMI System Event Log (SEL) |
 
 
 

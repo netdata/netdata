@@ -20,7 +20,7 @@
         "description": "Data collection frequency in seconds.",
         "type": "integer",
         "minimum": 5,
-        "default": 5
+        "default": 10
       },
       "timeout": {
         "title": "Timeout",
