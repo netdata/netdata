@@ -92,10 +92,10 @@ range does not filter it, because SEL records are often weeks apart. The Functio
 holds and sends no BMC requests. `collect_sel: false` stops every SEL command and removes
 the job from `ipmi-sel`.
 
-The collector reads each record once, then only records the BMC adds; it rereads the log after the BMC clears it. The
-first read of a large log is spread over several collections, so the Function shows the oldest records until it
-completes. Records are kept in memory, so an Agent restart reads the log again. The plugin never clears or writes the
-SEL.
+The collector keeps the records it read and, when the log changes, reads the records the BMC added plus a few boundary
+records that show where the log starts and ends; it rereads the log after the BMC clears or rewrites it. The first read
+of a large log is spread over several collections, so the Function shows the oldest records until it completes. Records
+are kept in memory, so an Agent restart reads the log again. The plugin never clears or writes the SEL.
 
 Times are converted to UTC with the BMC's SEL UTC offset. Records logged before a daylight saving change can be off by
 an hour, because the BMC reports only its current offset. When the BMC reports no offset, times are the BMC clock shown

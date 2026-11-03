@@ -46,9 +46,13 @@ type selCache struct {
 	// hold records the BMC overwrote. It stays set until a read reaches the
 	// newest record, because the surplus shows only then.
 	checkOldest bool
-	// info is the Get SEL Info response the records are current for.
+	// info is the Get SEL Info response the records are current for; latest
+	// is the latest answer, which the snapshot reports.
 	info      storage.GetSELInfoResponse
+	latest    storage.GetSELInfoResponse
 	infoKnown bool
+	// decodedWith is the inventory generation the records were decoded with.
+	decodedWith uint64
 
 	reservation uint16
 
@@ -86,6 +90,8 @@ func (r *Reader) readSEL(ctx context.Context, warnings *collectionWarnings) (*in
 		return nil, c.snapshot(true)
 	}
 	entries := int(info.Entries)
+	c.latest = info
+	r.redecodeSEL()
 	updateErr := r.updateSEL(ctx, info)
 	if updateErr != nil {
 		warnings.selRecords = true
@@ -103,12 +109,39 @@ func (c *selCache) snapshot(failed bool) *SEL {
 	return &SEL{
 		Records:    c.records,
 		Loaded:     c.loaded,
-		Entries:    int(c.info.Entries),
-		FreeBytes:  int(c.info.FreeBytes),
-		Overflow:   c.info.OperationSupport.Overflow,
+		Entries:    int(c.latest.Entries),
+		FreeBytes:  int(c.latest.FreeBytes),
+		Overflow:   c.latest.OperationSupport.Overflow,
 		UTCOffset:  c.utcOffset,
 		ClockSkew:  c.clockSkew,
 		ReadFailed: failed,
+	}
+}
+
+// redecodeSEL resolves the cached records against a replaced inventory, so a
+// renamed or retyped sensor renames its records. The published slice is
+// replaced only when a record changed.
+func (r *Reader) redecodeSEL() {
+	c := &r.sel
+	if c.decodedWith == r.inventoryGeneration {
+		return
+	}
+	c.decodedWith = r.inventoryGeneration
+	sensors := sensorsByAddress(r.inventory)
+	var records []SELRecord
+	for i, rec := range c.records {
+		decoded := decodeSELRecord(rec.Raw, sensors)
+		if records == nil {
+			if decoded == rec {
+				continue
+			}
+			records = make([]SELRecord, len(c.records))
+			copy(records, c.records[:i])
+		}
+		records[i] = decoded
+	}
+	if records != nil {
+		c.records = records
 	}
 }
 

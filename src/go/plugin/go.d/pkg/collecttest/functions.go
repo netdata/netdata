@@ -67,7 +67,10 @@ type ImplementedFunction struct {
 	// options are documentation only.
 	AcceptedParams []string
 	Columns        []MetadataFunctionColumn
-	RawRequest     bool
+	// RawRequest marks a raw-request method whose columns are not compared. A
+	// raw-request method compared through RawTables has it false, with its
+	// AcceptedParams and Columns set.
+	RawRequest bool
 }
 
 // FunctionJobParameter is the Instance selector the framework adds to every

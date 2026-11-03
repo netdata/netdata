@@ -59,7 +59,8 @@ modules:
           description: IPMI command latency grows with sensor count. Increase update_every when a complete sensor scan
             takes longer than the configured interval. With collect_sel enabled, the first collections after a start
             also read the existing System Event Log, for up to two seconds each (a quarter of update_every when
-            shorter), until all records are read; later collections read only new records.
+            shorter), until all records are read. Later collections read only new records, or the whole log again after
+            the BMC clears or rewrites it.
     setup:
       prerequisites:
         list:

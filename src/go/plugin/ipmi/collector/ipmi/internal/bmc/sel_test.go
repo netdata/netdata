@@ -132,9 +132,7 @@ func TestReader_SEL_InitialLoadIsBounded(t *testing.T) {
 			for i, sel := range snapshots {
 				assert.Equal(t, copies[i], sel.Records, "published records never change")
 			}
-			for _, req := range fake.requests {
-				assert.NotEqual(t, &storage.ReserveSELRequest{}, req, "no reservation without 0xC5")
-			}
+			assert.Zero(t, fake.sel.reserves, "no reservation without 0xC5")
 		})
 	}
 }
@@ -382,6 +380,58 @@ func TestReader_SEL_OldestRecordUnknown(t *testing.T) {
 	assert.Equal(t, []uint16{0x0000, 3, 4}, entryReads(fake))
 	assert.Equal(t, []uint16{9, 3, 4}, recordIDs(got))
 	assert.True(t, got.Loaded)
+}
+
+func TestReader_SEL_InventoryChange(t *testing.T) {
+	fake := newFakeBMC()
+	fake.sel.records = tempEvents(1, 2)
+	r := newTestReader(fake)
+	now := testNow
+	r.now = func() time.Time { return now }
+	before := collectSEL(t, r)
+	require.Equal(t, "CPU Temp", before.Records[0].Sensor)
+
+	// The periodic rediscovery of an unchanged repository keeps the published records.
+	now = now.Add(inventoryMaxAge)
+	same := collectSEL(t, r)
+	assert.Same(t, &before.Records[0], &same.Records[0], "unchanged names do not replace the records")
+
+	// A renamed sensor renames its cached records; the SEL itself is unchanged.
+	fake.records[0] = fullRecord(1, 10, "Renamed")
+	fake.additionTime++
+	fake.requests = nil
+	got := collectSEL(t, r)
+	assert.Empty(t, entryReads(fake))
+	assert.Equal(t, []string{"Renamed", "Renamed"}, []string{got.Records[0].Sensor, got.Records[1].Sensor})
+	assert.Equal(t, "CPU Temp", before.Records[0].Sensor, "published records never change")
+}
+
+func TestReader_SEL_UsageAfterFailedCheck(t *testing.T) {
+	fake := newFakeBMC()
+	fake.sel.records = tempEvents(1, 2)
+	fake.sel.freeBytes = 100
+	r := newSELTestReader(fake, 0, 0)
+	collectSEL(t, r)
+
+	fake.sel.add(tempEvents(3)...)
+	fake.sel.freeBytes = 84
+	fake.sel.overflow = true
+	fake.onExchange = func(req types.Request) error {
+		if q, ok := req.(*storage.GetSELEntryRequest); ok && q.RecordID == 0xffff {
+			return errors.New("transport failed")
+		}
+		return nil
+	}
+	got, err := r.Collect(t.Context(), true)
+	require.NoError(t, err)
+	assert.Equal(t, []string{selRecordsWarning}, got.Warnings)
+	assert.Equal(t, new(3), got.SELEntries)
+	assert.Equal(t, []uint16{1, 2}, recordIDs(got.SEL), "the records wait for the next read")
+	assert.Equal(t, []any{3, 84, true}, []any{got.SEL.Entries, got.SEL.FreeBytes, got.SEL.Overflow},
+		"usage is the latest Get SEL Info answer")
+
+	fake.onExchange = nil
+	assert.Equal(t, []uint16{1, 2, 3}, recordIDs(collectSEL(t, r)), "the failed check is retried")
 }
 
 func TestReader_SEL_Reservation(t *testing.T) {

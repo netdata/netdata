@@ -183,6 +183,7 @@ func (f *fakeBMC) respond(ctx context.Context, req types.Request) ([]byte, error
 	case *storage.GetSELEntryRequest:
 		return f.sel.entry(q)
 	case *storage.ReserveSELRequest:
+		f.sel.reserves++
 		f.sel.reservation++
 		return binary.LittleEndian.AppendUint16(nil, f.sel.reservation), nil
 	case *storage.GetSELTimeRequest:
@@ -305,6 +306,7 @@ type fakeSEL struct {
 	// requireReservation rejects reads without the current reservation with 0xC5.
 	requireReservation bool
 	reservation        uint16
+	reserves           int    // Reserve SEL commands answered
 	clock              uint32 // Get SEL Time
 	utcOffset          uint16 // raw Get SEL Time UTC Offset value
 	utcOffsetErr       error

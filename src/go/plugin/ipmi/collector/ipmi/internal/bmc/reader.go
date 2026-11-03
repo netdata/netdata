@@ -46,6 +46,9 @@ type Reader struct {
 	inventory       []descriptor
 	inventoryRepo   storage.GetSDRRepoInfoResponse
 	inventoryReadAt time.Time
+	// inventoryGeneration counts inventory replacements; cached SEL records
+	// resolve their sensor names against the inventory again when it changes.
+	inventoryGeneration uint64
 
 	// The SEL is cached across collections and connections; see updateSEL.
 	sel selCache

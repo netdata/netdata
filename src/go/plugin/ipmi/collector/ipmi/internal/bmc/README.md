@@ -51,12 +51,14 @@ Each collection with SEL enabled sends one `Get SEL Info`. Its entry count is th
 sample, with no previous value or zero substitute. `Snapshot.SEL` appears once the BMC first answers and then carries
 the cached records, the latest entry count, free bytes and overflow flag, and the clock information below. Any SEL
 command failure degrades only SEL data: a failed `Get SEL Info` or record read keeps the earlier records and marks the
-read failed; a failed clock read keeps the earlier clock values.
+read failed, except that a record vanishing during a walk resets the cache (see below); a failed clock read keeps the
+earlier clock values. Records resolve sensor names against the inventory again whenever it is replaced, so a renamed
+sensor renames its records.
 
 Records are cached per Reader, across collections and reconnects:
 
 - The first read walks the chain from record 0000h with `Get SEL Entry`, oldest first. Each collection starts no new
-  read once min(2 s, update interval / 4) has passed and resumes where it stopped; at least one record is read. At
+  read once min(2 s, update interval / 4) has passed and resumes where it stopped; a walk reads at least one record. At
   about 8 ms per record over local KCS, a full read of a large SEL would otherwise delay sensor collection by seconds.
 - Once the newest record has been read, an unchanged entry count and addition time send no `Get SEL Entry`. A change
   reads the newest record (FFFFh); if it differs from the newest cached record, that cached record is read again for
