@@ -21,7 +21,8 @@ import (
 type HTTPError struct {
 	Operation  string
 	StatusCode int
-	// RetryAfter is the parsed Retry-After delay, zero when absent or invalid.
+	// RetryAfter is the parsed Retry-After delay, zero when absent, invalid, past
+	// or overflowing.
 	RetryAfter time.Duration
 }
 
@@ -29,9 +30,9 @@ func (e *HTTPError) Error() string {
 	return fmt.Sprintf("%s: HTTP status %d", e.Operation, e.StatusCode)
 }
 
-func newHTTPError(op string, resp *http.Response) *HTTPError {
+func newHTTPError(opName string, resp *http.Response) *HTTPError {
 	return &HTTPError{
-		Operation:  op,
+		Operation:  opName,
 		StatusCode: resp.StatusCode,
 		RetryAfter: parseRetryAfter(resp.Header.Get("Retry-After"), time.Now()),
 	}
@@ -55,11 +56,11 @@ func parseRetryAfter(value string, now time.Time) time.Duration {
 
 // safeError keeps only causes known to be safe to show. URL, parser, transport
 // and credential-file errors can carry server-controlled text or file contents.
-func safeError(op, message string, cause error) error {
+func safeError(opName, message string, cause error) error {
 	for _, safe := range []error{context.Canceled, context.DeadlineExceeded, web.ErrResponseTooLarge} {
 		if errors.Is(cause, safe) {
-			return fmt.Errorf("%s: %s: %w", op, message, safe)
+			return fmt.Errorf("%s: %s: %w", opName, message, safe)
 		}
 	}
-	return fmt.Errorf("%s: %s", op, message)
+	return fmt.Errorf("%s: %s", opName, message)
 }

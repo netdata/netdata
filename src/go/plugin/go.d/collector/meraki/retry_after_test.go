@@ -62,9 +62,11 @@ func TestCheckExportsRetryAfterMinimum(t *testing.T) {
 
 func TestCheckDoesNotInventRetryAfterMinimum(t *testing.T) {
 	for name, response := range map[string]fixtureResponse{
-		"missing":    {status: http.StatusTooManyRequests},
-		"malformed":  {status: http.StatusTooManyRequests, retryAfter: "later"},
-		"other HTTP": {status: http.StatusServiceUnavailable, retryAfter: "600"},
+		"missing":        {status: http.StatusTooManyRequests},
+		"malformed":      {status: http.StatusTooManyRequests, retryAfter: "later"},
+		"explicit zero":  {status: http.StatusTooManyRequests, retryAfter: "0"},
+		"past HTTP date": {status: http.StatusTooManyRequests, retryAfter: "Wed, 21 Oct 2015 07:28:00 GMT"},
+		"other HTTP":     {status: http.StatusServiceUnavailable, retryAfter: "600"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			f, server := newFixtureAPI(t)

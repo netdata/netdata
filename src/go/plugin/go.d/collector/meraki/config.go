@@ -30,10 +30,11 @@ type Config struct {
 	tlscfg.TLSConfig   `yaml:",inline" json:""`
 }
 
-// validateConfig checks options the client does not validate itself. URL and
-// credential rules are enforced by merakiapi.New.
+// validateConfig rejects invalid options at Init, where the framework does not
+// retry them. URL and credential rules are enforced by merakiapi.New.
 func (c *Collector) validateConfig() error {
-	if c.OrganizationID == "" || strings.TrimSpace(c.OrganizationID) != c.OrganizationID {
+	id := c.OrganizationID
+	if id == "" || strings.TrimSpace(id) != id || id == "." || id == ".." {
 		return errors.New("organization_id must be a nonempty organization ID without surrounding whitespace")
 	}
 	if c.Timeout.Duration() <= 0 {

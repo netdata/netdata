@@ -241,14 +241,14 @@ func (p page[T]) next() (next *url.URL, found bool, err error) {
 }
 
 // fetchPage sends one authenticated GET and decodes its JSON array.
-func fetchPage[T any](ctx context.Context, c *Client, target *url.URL, op string) (page[T], error) {
+func fetchPage[T any](ctx context.Context, c *Client, target *url.URL, opName string) (page[T], error) {
 	req, err := c.newRequest(ctx, target)
 	if err != nil {
-		return page[T]{}, safeError(op, "cannot prepare authenticated request", err)
+		return page[T]{}, safeError(opName, "cannot prepare authenticated request", err)
 	}
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return page[T]{}, safeError(op, "HTTP request failed", err)
+		return page[T]{}, safeError(opName, "HTTP request failed", err)
 	}
 	// Clients built by web.NewHTTPClient already bound bodies; this keeps the
 	// bound for any other http.Client.
@@ -256,13 +256,13 @@ func fetchPage[T any](ctx context.Context, c *Client, target *url.URL, op string
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return page[T]{}, newHTTPError(op, resp)
+		return page[T]{}, newHTTPError(opName, resp)
 	}
 	// net/http decompresses gzip itself; any encoding still present is unreadable.
 	if enc := strings.TrimSpace(resp.Header.Get("Content-Encoding")); enc != "" && !strings.EqualFold(enc, "identity") {
-		return page[T]{}, fmt.Errorf("%s: unsupported response encoding", op)
+		return page[T]{}, fmt.Errorf("%s: unsupported response encoding", opName)
 	}
-	items, err := decodeArray[T](resp.Body, op)
+	items, err := decodeArray[T](resp.Body, opName)
 	if err != nil {
 		return page[T]{}, err
 	}
@@ -278,22 +278,22 @@ func fetchPage[T any](ctx context.Context, c *Client, target *url.URL, op string
 }
 
 // decodeArray requires exactly one non-null JSON array of non-null items.
-func decodeArray[T any](r io.Reader, op string) ([]T, error) {
+func decodeArray[T any](r io.Reader, opName string) ([]T, error) {
 	dec := json.NewDecoder(r)
 	var ptrs []*T
 	if err := dec.Decode(&ptrs); err != nil {
-		return nil, safeError(op, "invalid JSON array response", err)
+		return nil, safeError(opName, "invalid JSON array response", err)
 	}
 	if ptrs == nil {
-		return nil, fmt.Errorf("%s: expected a non-null JSON array", op)
+		return nil, fmt.Errorf("%s: expected a non-null JSON array", opName)
 	}
 	if err := dec.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
-		return nil, safeError(op, "unexpected trailing response data", err)
+		return nil, safeError(opName, "unexpected trailing response data", err)
 	}
 	items := make([]T, 0, len(ptrs))
 	for _, ptr := range ptrs {
 		if ptr == nil {
-			return nil, fmt.Errorf("%s: null array item", op)
+			return nil, fmt.Errorf("%s: null array item", opName)
 		}
 		items = append(items, *ptr)
 	}

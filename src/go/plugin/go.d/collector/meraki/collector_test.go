@@ -38,6 +38,10 @@ func TestInit(t *testing.T) {
 			change:  func(c *Collector) { c.OrganizationID = " org " },
 			wantErr: "organization_id",
 		},
+		"dot organization": {
+			change:  func(c *Collector) { c.OrganizationID = ".." },
+			wantErr: "organization_id",
+		},
 		"no credentials": {change: func(c *Collector) { c.APIKey = "" }, wantErr: "exactly one"},
 		"two credentials": {
 			change:  func(c *Collector) { c.BearerTokenFile = "unused" },
