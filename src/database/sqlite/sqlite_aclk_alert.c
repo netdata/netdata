@@ -1958,7 +1958,7 @@ int alert_queue_unittest(void)
 
         int64_t pending_uid = 0;
         int pending_status = 0;
-        int rows = aq_test_pending_for_alarm(hid, 1, &pending_uid, &pending_status);
+        rows = aq_test_pending_for_alarm(hid, 1, &pending_uid, &pending_status);
         AQ_CHECK(
             rows == 1 && pending_uid == 103 && pending_status == RRDCALC_STATUS_WARNING,
             "save order: the pending queue keeps the newest transition "
