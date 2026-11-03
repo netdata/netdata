@@ -75,7 +75,7 @@ The container then runs `packaging/makeself/run-all-jobs.sh`, which executes `pa
 | 70 | `netdata-git.install` | Builds Netdata itself (Rust crates + C/CMake + Go plugins) and installs into `/opt/netdata` |
 | 71 | `install-type` | Stamps `.install-type` so the post-installer knows it's a static install |
 | 72 | `conf-fixup` | Strips machine-specific configuration and sample files |
-| 80 | `netdata-static-check` | Verifies key binaries are statically linked |
+| 80 | `netdata-static-check` | Fails on any installed executable ELF with a `PT_INTERP` header (dynamically linked) |
 | 81 | `netdata-runtime-check` | Boots `/opt/netdata/bin/netdata`, waits for `localhost:19999`, checks `/api/v1/info` |
 | 82 | `cpu-arch-check` | Checks ELF class/machine for Netdata and go.d; does not prove the instruction-set baseline |
 | 89 | `buildinfo.install` | Writes `/opt/netdata/share/netdata/buildinfo.txt` |
@@ -222,7 +222,7 @@ slower runtime useful for valgrind/gdb. The `README.md` in `packaging/makeself/`
 | `No cached copy of build directory for X found, fetching sources instead.` (every run) | any third-party | `artifacts/cache/` removed or arch dir missing | Normal on first build; persists for the next run |
 | `Could not find a usable OCI runtime` | n/a | Neither docker nor podman in `$PATH` | Install one |
 | Runtime check times out waiting for localhost:19999 | 81 | Agent did not become reachable within the bounded wait; cause is not yet established | Inspect the job log and `netdata.log`, then diagnose startup |
-| `not statically linked` warning | 80 (static check) | A new dep introduced a dynamic link | Audit `ldd` of the built binary; `git grep target_link_libraries -- '*.cmake' '*CMakeLists.txt'` for a new shared lib -- links live in the root file, the modules, and the subdirectory CMakeLists (libnetdata, debugfs's vendored libsensors) |
+| `Ooops. <path> is not a statically linked binary!` | 80 (static check) | A CMake target gained a shared lib, or a binary built outside CMake's linker (a `go build` custom command with `CGO_ENABLED=1`) never got `-static` | Read the `ldd` output the job prints. CMake target: `git grep target_link_libraries -- '*.cmake' '*CMakeLists.txt'` -- links live in the root file, the modules, and the subdirectory CMakeLists (libnetdata, debugfs's vendored libsensors). cgo custom command: under `STATIC_BUILD` it needs `-linkmode=external -extldflags=-static` in `-ldflags` and the libs' `pkg-config --static` closure in `CGO_LDFLAGS` (see `packaging/cmake/Modules/NetdataPluginEBPF.cmake`) |
 | OOM kill mid-Rust compile under QEMU | 70 | QEMU + Rust LTO is memory-hungry | Use a suitably provisioned native builder or investigate actual job parallelism; the launcher exposes no `PROCESSORS` knob |
 
 The build script exits with `Build failed.` on any job failure (`packaging/makeself/build.sh:44-52`). For an
