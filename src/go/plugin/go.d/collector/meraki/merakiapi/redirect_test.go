@@ -135,7 +135,7 @@ func TestUnparsableRedirectLocationIsReported(t *testing.T) {
 		Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 			calls++
 			return response(r, http.StatusFound, http.Header{
-				"Location": {"https://%zz"},
+				"Location": {"https://redirect-secret.invalid/%zz?token=synthetic-redirect-secret"},
 			}, ""), nil
 		}),
 	})
@@ -143,6 +143,7 @@ func TestUnparsableRedirectLocationIsReported(t *testing.T) {
 	got, err := client.ListOrganizations(t.Context())
 	// net/http rejects the header before any redirect request; its reason is shown.
 	require.ErrorContains(t, err, "getOrganizations: HTTP request failed: failed to parse Location header")
+	assert.NotContains(t, err.Error(), "redirect-secret")
 	assert.Nil(t, got)
 	assert.Equal(t, 1, calls)
 }

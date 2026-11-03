@@ -33,6 +33,9 @@ func (c *Collector) collect(ctx context.Context) error {
 		return err
 	}
 
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	c.writeMetrics(org.Name, inventory)
-	return nil
+	return ctx.Err()
 }

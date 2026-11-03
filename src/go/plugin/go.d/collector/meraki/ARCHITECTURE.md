@@ -424,8 +424,9 @@ fails with an error and needs evidence before the trust rule is widened.
 - `transportError` reports a request that got no HTTP response as `<operation>: HTTP request failed: <cause>`, keeping
   the cause (DNS, connection, TLS, proxy, refused redirect, timeout) so operators can tell failures apart, as other
   go.d collectors do. It drops the `url.Error` wrapper, whose URL can be a server-supplied redirect or page target. The
-  cause can still carry server-supplied text, such as a certificate name or an unparsable `Location` header quoted by
-  `net/http`, but never credentials: the key travels in a header, and refused redirects and pages use fixed messages.
+  cause can still carry diagnostic names, such as a certificate name. An unparsable `Location` header gets a fixed
+  parse-failure message because `net/http` otherwise quotes the raw value before the redirect policy can inspect it.
+  Refused redirects and pages also use fixed messages; credentials travel only in headers.
 - `safeError` covers credential-file reads and response decoding, whose errors can carry file contents or response
   data. It keeps only `context.Canceled`, `context.DeadlineExceeded` and `web.ErrResponseTooLarge` (still matchable
   with `errors.Is`) and otherwise reports a fixed message.

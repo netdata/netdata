@@ -64,6 +64,11 @@ func transportError(opName string, err error) error {
 	if urlErr, ok := errors.AsType[*url.Error](err); ok {
 		err = urlErr.Err
 	}
+	// net/http embeds the raw Location in an untyped error before our redirect
+	// policy runs. Keep its reason without retaining the server-supplied value.
+	if strings.HasPrefix(err.Error(), "failed to parse Location header ") {
+		err = errors.New("failed to parse Location header")
+	}
 	return fmt.Errorf("%s: HTTP request failed: %w", opName, err)
 }
 

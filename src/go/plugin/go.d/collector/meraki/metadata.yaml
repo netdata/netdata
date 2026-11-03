@@ -1,410 +1,381 @@
 plugin_name: go.d.plugin
 modules:
-- meta:
-    id: collector-go.d.plugin-meraki
-    plugin_name: go.d.plugin
-    module_name: meraki
-    monitored_instance:
-      name: Cisco Meraki
-      link: https://meraki.cisco.com/
-      icon_filename: cisco.svg
-      categories:
-      - network-performance-monitoring.device-metrics
-    keywords:
-    - cisco meraki
-    - meraki
-    - meraki dashboard
-    - meraki api
-    - dashboard api
-    - cisco
-    related_resources:
-      integrations:
-        list: []
-    info_provided_to_referring_integrations:
-      description: ''
-  overview:
-    data_collection:
-      metrics_description: |
-        Monitor the availability of every device in a Cisco Meraki organization through the Meraki Dashboard API, with each device shown as its own Netdata node.
+  - meta:
+      id: collector-go.d.plugin-meraki
+      plugin_name: go.d.plugin
+      module_name: meraki
+      monitored_instance:
+        name: Cisco Meraki
+        link: https://meraki.cisco.com/
+        icon_filename: cisco.svg
+        categories:
+          - network-performance-monitoring.device-metrics
+      keywords:
+        - cisco meraki
+        - meraki
+        - meraki dashboard
+        - meraki api
+        - dashboard api
+        - cisco
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+    overview:
+      data_collection:
+        metrics_description: |
+          Monitor the availability of every device in a Cisco Meraki organization through the Meraki Dashboard API, with each device shown as its own Netdata node.
 
-        - **Device availability**: the status Meraki Dashboard reports for each device: `online`, `alerting`, `offline` or `dormant`.
-        - **Inventory**: how many devices are assigned to the organization's networks, and which ones.
-        - **Fleet filtering**: device nodes and charts carry organization, network, model and product type labels, so a large fleet can be grouped and filtered.
+          - **Device availability**: the status Meraki Dashboard reports for each device: `online`, `alerting`, `offline` or `dormant`.
+          - **Inventory**: how many devices are assigned to the organization's networks, and which ones.
+          - **Fleet filtering**: device nodes and charts carry organization, network, model and product type labels, so a large fleet can be grouped and filtered.
 
-        Every device type Meraki reports availability for is covered, including security appliances (MX), switches (MS), wireless access points (MR), cameras (MV), sensors (MT) and cellular gateways (MG).
-      method_description: |
-        The collector sends read-only HTTPS requests to the Meraki Dashboard API in the cloud, authenticated with an API key. It never connects to the devices: the Agent needs outbound HTTPS (port 443) to the regional API host and to the Meraki shard hosts the API redirects to, such as `n123.meraki.com`.
+          Every device type Meraki reports availability for is covered, including security appliances (MX), switches (MS), wireless access points (MR), cameras (MV), sensors (MT) and cellular gateways (MG).
+        method_description: |
+          The collector sends read-only HTTPS requests to the Meraki Dashboard API in the cloud, authenticated with an API key. It never connects to the devices: the Agent needs outbound HTTPS (port 443) to the regional API host and to the Meraki shard hosts the API redirects to, such as `n123.meraki.com`.
 
-        Every collection (every 5 minutes by default) reads these API operations completely, page by page:
+          Every collection (every 5 minutes by default) reads these API operations completely, page by page:
 
-        | Operation | Used for |
-        |:----------|:---------|
-        | `getOrganizations` | The name of the configured organization |
-        | `getOrganizationNetworks` | Network names for the device labels |
-        | `getOrganizationDevices` | The devices assigned to networks, one node each |
-        | `getOrganizationDevicesAvailabilities` | The status of each device |
+          | Operation | Used for |
+          |:----------|:---------|
+          | `getOrganizations` | The name of the configured organization |
+          | `getOrganizationNetworks` | Network names for the device labels |
+          | `getOrganizationDevices` | The devices assigned to networks, one node each |
+          | `getOrganizationDevicesAvailabilities` | The status of each device |
 
-        When a job starts, one small `getOrganizationDevices` request checks that the API key can reach the organization.
-    supported_platforms:
-      include: []
-      exclude: []
-    multi_instance: true
-    additional_permissions:
+          When a job starts, one small `getOrganizationDevices` request checks that the API key can reach the organization.
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: |
+          The collector needs an API key whose owner has at least read-only access to the organization. A Meraki API key acts with the permissions of the Dashboard administrator who created it; the collector only reads.
+      default_behavior:
+        auto_detection:
+          description: |
+            Nothing is detected automatically: each job monitors the one organization set in `organization_id`, with the API key you configure. Within that organization, every collection finds all assigned devices and adds a node for each new one.
+        limits:
+          description: |
+            - **Five-minute data.** Meraki refreshes device availability every 5 minutes and gives no sample time, so an `update_every` below 300 seconds repeats the same values instead of adding detail.
+            - **Shared API budget.** Meraki allows 10 requests per second per organization and 100 per source IP address, shared with every other application using them. The collector sends at most 10 requests per second per job, and after a `429 Too Many Requests` answer it sends nothing until the `Retry-After` wait Meraki requested has passed. See [Meraki API rate limits](https://developer.cisco.com/meraki/api-v1/rate-limit/).
+        performance_impact:
+          description: |
+            The load on the Agent host is negligible. On the Meraki side, each operation costs one request per page, plus one for each redirect Meraki answers with:
+
+            | Operation | Page size |
+            |:----------|:----------|
+            | `getOrganizations` | 9,000 organizations visible to the API key |
+            | `getOrganizationNetworks` | 1,000 networks |
+            | `getOrganizationDevices` | 1,000 assigned devices |
+            | `getOrganizationDevicesAvailabilities` | 1,000 devices |
+
+            An organization with 2,500 devices in 40 networks takes 1 + 1 + 3 + 3 = 8 requests per collection. Increase `update_every` to make fewer requests; increase `timeout` if a very large organization cannot finish within it.
+
+            Every assigned device becomes a Netdata node: an organization with 2,000 devices adds 2,000 nodes.
+    setup:
+      prerequisites:
+        list:
+          - title: Enable Dashboard API access for the organization
+            description: |
+              API requests are rejected until the organization allows them. In Meraki Dashboard, open **Organization > Settings** and enable **Dashboard API access**. See [How to use the Meraki Dashboard API](https://documentation.meraki.com/Platform_Management/Dashboard_Administration/Operate_and_Maintain/How-Tos/How_to_Use_the_Cisco_Meraki_Dashboard_API).
+          - title: Create an API key for a read-only administrator
+            description: |
+              A Meraki API key has the permissions of the administrator who creates it. Use a Dashboard administrator account with read-only access to the organization, and generate an API key from that account's **My profile** page. Keep the key out of the configuration file: put it in an environment variable of the Netdata service or in a file readable by the `netdata` user.
+
+              To verify the key, list the organizations it can see with the command shown for the `organization_id` option.
+          - title: Allow the Agent's address if the organization restricts API access by IP
+            description: |
+              This applies only when the organization limits Dashboard API access to specific source addresses. Add the public IP address the Agent's requests leave from; otherwise organization requests fail with HTTP 403.
+      configuration:
+        file:
+          name: go.d/meraki.conf
+        options:
+          description: 'Configure one organization per job. The following options can be defined globally: update_every, autodetection_retry.'
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: url
+              description: URL of the Meraki Dashboard API endpoint.
+              default_value: https://api.meraki.com/api/v1
+              required: false
+              group: Target
+              detailed_description: |
+                Use the API endpoint of the region that hosts the organization:
+
+                | Region | URL |
+                |:-------|:----|
+                | Global (default) | `https://api.meraki.com/api/v1` |
+                | Canada | `https://api.meraki.ca/api/v1` |
+                | China | `https://api.meraki.cn/api/v1` |
+                | India | `https://api.meraki.in/api/v1` |
+                | United States FedRAMP | `https://api.gov-meraki.com/api/v1` |
+
+                The URL must use HTTPS with the path exactly `/api/v1` (a prefix such as `/meraki/api/v1` is not accepted), without credentials, query or fragment.
+
+                A private endpoint or reverse proxy in front of the API also works, with one condition. Meraki's redirects and next-page links point at Meraki hosts, and with a custom endpoint the collector follows them only within that endpoint. The proxy must therefore rewrite the `Location` and `Link` headers to its own address; otherwise every list longer than one page fails with `invalid pagination target`.
+            - name: organization_id
+              description: Meraki organization ID to monitor.
+              default_value: ''
+              required: true
+              group: Target
+              detailed_description: |
+                The ID of the organization, not its name. The organizations an API key can see, with their IDs, are listed by the command below; for an organization in another region, replace the host with the one in `url`.
+
+                ```bash
+                curl -s -H "Authorization: Bearer $MERAKI_API_KEY" https://api.meraki.com/api/v1/organizations
+                ```
+            - name: api_key
+              description: Meraki API key. Set either this or bearer_token_file.
+              default_value: ''
+              required: false
+              group: Authentication
+            - name: bearer_token_file
+              description: Path to a file containing the Meraki API key, reread for every request. Set either this or api_key.
+              default_value: ''
+              required: false
+              group: Authentication
+              detailed_description: |
+                Use this when a secret manager rotates the key in place: the next request uses the new key without a restart. The file must be readable by the `netdata` user.
+            - name: update_every
+              description: Data collection interval, in seconds.
+              default_value: 300
+              required: false
+              group: Collection
+            - name: autodetection_retry
+              description: How often to retry the initial connection when the job fails to start, in seconds. Zero disables retries.
+              default_value: 0
+              required: false
+              group: Collection
+            - name: timeout
+              description: Complete collection or connection-check timeout, in seconds, including all pages and request pacing.
+              default_value: 60
+              required: false
+              group: Collection
+            - name: vnode
+              description: Associates the organization summary with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). Device nodes are created separately.
+              default_value: ''
+              required: false
+              group: Collection
+            - name: proxy_url
+              description: HTTP proxy URL. Empty value uses environment proxy variables.
+              default_value: ''
+              required: false
+              group: Transport
+              detailed_description: If the proxy URL contains credentials, use a secret reference such as `${env:MERAKI_PROXY_URL}` instead of entering the authenticated URL directly into the form.
+            - name: tls_ca
+              description: Path to a CA certificate file used to verify the server certificate.
+              default_value: ''
+              required: false
+              group: Transport
+            - name: tls_cert
+              description: Path to a client certificate file. Requires tls_key.
+              default_value: ''
+              required: false
+              group: Transport
+            - name: tls_key
+              description: Path to the client certificate key file. Requires tls_cert.
+              default_value: ''
+              required: false
+              group: Transport
+            - name: tls_skip_verify
+              description: Skip verification of the server certificate and hostname.
+              default_value: false
+              required: false
+              group: Transport
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: Monitor one organization, with the API key read from an environment variable.
+              config: |
+                jobs:
+                  - name: meraki
+                    organization_id: "123456"
+                    api_key: ${env:MERAKI_API_KEY}
+            - name: API key in a rotated file
+              description: Read the key from a file that a secret manager rotates. The file is read again for every request.
+              config: |
+                jobs:
+                  - name: meraki
+                    organization_id: "123456"
+                    bearer_token_file: /run/secrets/meraki_api_key
+            - name: Regional API endpoint
+              description: Monitor an organization hosted outside the global region, here Canada.
+              config: |
+                jobs:
+                  - name: meraki-canada
+                    url: https://api.meraki.ca/api/v1
+                    organization_id: "123456"
+                    api_key: ${env:MERAKI_API_KEY}
+            - name: Through an HTTP proxy
+              description: Reach the API through an outbound proxy.
+              config: |
+                jobs:
+                  - name: meraki
+                    organization_id: "123456"
+                    api_key: ${env:MERAKI_API_KEY}
+                    proxy_url: http://proxy.example.com:3128
+            - name: Several organizations
+              description: One job per organization. Each organization has its own API budget; the jobs share the per-IP budget.
+              config: |
+                jobs:
+                  - name: meraki-hq
+                    organization_id: "123456"
+                    api_key: ${env:MERAKI_API_KEY}
+
+                  - name: meraki-retail
+                    organization_id: "654321"
+                    api_key: ${env:MERAKI_API_KEY}
+    metrics:
       description: |
-        The collector needs an API key whose owner has at least read-only access to the organization. A Meraki API key acts with the permissions of the Dashboard administrator who created it; the collector only reads.
-    default_behavior:
-      auto_detection:
-        description: |
-          Nothing is detected automatically: each job monitors the one organization set in `organization_id`, with the API key you configure. Within that organization, every collection finds all assigned devices and adds a node for each new one.
-      limits:
-        description: |
-          - **Five-minute data.** Meraki refreshes device availability every 5 minutes and gives no sample time, so an `update_every` below 300 seconds repeats the same values instead of adding detail.
-          - **Shared API budget.** Meraki allows 10 requests per second per organization and 100 per source IP address, shared with every other application using them. The collector sends at most 10 requests per second per job, and after a `429 Too Many Requests` answer it sends nothing until the `Retry-After` wait Meraki requested has passed. See [Meraki API rate limits](https://developer.cisco.com/meraki/api-v1/rate-limit/).
-      performance_impact:
-        description: |
-          The load on the Agent host is negligible. On the Meraki side, each operation costs one request per page, plus one for each redirect Meraki answers with:
-
-          | Operation | Page size |
-          |:----------|:----------|
-          | `getOrganizations` | 9,000 organizations visible to the API key |
-          | `getOrganizationNetworks` | 1,000 networks |
-          | `getOrganizationDevices` | 1,000 assigned devices |
-          | `getOrganizationDevicesAvailabilities` | 1,000 devices |
-
-          An organization with 2,500 devices in 40 networks takes 1 + 1 + 3 + 3 = 8 requests per collection. Increase `update_every` to make fewer requests; increase `timeout` if a very large organization cannot finish within it.
-
-          Every assigned device becomes a Netdata node: an organization with 2,000 devices adds 2,000 nodes.
-  setup:
-    prerequisites:
-      list:
-      - title: Enable Dashboard API access for the organization
-        description: |
-          API requests are rejected until the organization allows them. In Meraki Dashboard, open **Organization > Settings** and enable **Dashboard API access**. See [How to use the Meraki Dashboard API](https://documentation.meraki.com/Platform_Management/Dashboard_Administration/Operate_and_Maintain/How-Tos/How_to_Use_the_Cisco_Meraki_Dashboard_API).
-      - title: Create an API key for a read-only administrator
-        description: |
-          A Meraki API key has the permissions of the administrator who creates it. Use a Dashboard administrator account with read-only access to the organization, and generate an API key from that account's **My profile** page. Keep the key out of the configuration file: put it in an environment variable of the Netdata service or in a file readable by the `netdata` user.
-
-          To verify the key, list the organizations it can see with the command shown for the `organization_id` option.
-      - title: Allow the Agent's address if the organization restricts API access by IP
-        description: |
-          This applies only when the organization limits Dashboard API access to specific source addresses. Add the public IP address the Agent's requests leave from; otherwise organization requests fail with HTTP 403.
-    configuration:
-      file:
-        name: go.d/meraki.conf
-      options:
-        description: 'Configure one organization per job. The following options can be defined globally: update_every,
-          autodetection_retry.'
-        folding:
-          title: Config options
-          enabled: true
+        - **Where charts appear.** The organization chart is on the node that runs the job, or on its virtual node when `vnode` is set. Device charts are on each device's own node, named after the device; `meraki-` followed by the serial when the device has no name; or `meraki-` followed by a generated ID when the name contains an apostrophe, backslash or line break.
+        - **Gaps, not offline.** A device whose status is missing, unknown or reported for another network has no availability value for that collection; it is never reported offline because of missing data. Its inventory chart stays at 1 while the device is assigned. A failed collection updates no chart.
+        - **Removed devices.** When a device leaves the inventory, its charts stop updating and become obsolete. Netdata keeps the node and its history.
+      scopes:
+        - name: organization
+          description: The configured Meraki organization.
+          labels:
+            - name: organization_id
+              description: Meraki organization ID, for example `123456`.
+            - name: organization_name
+              description: Meraki organization name.
+          metrics:
+            - name: meraki.organization_assigned_devices
+              description: Meraki Assigned Devices
+              unit: devices
+              chart_type: line
+              dimensions:
+                - name: assigned
+        - name: device
+          description: One device assigned to a network of the organization, shown as its own node.
+          labels:
+            - name: organization_id
+              description: Meraki organization ID.
+            - name: organization_name
+              description: Meraki organization name.
+            - name: serial
+              description: Device serial number, for example `Q2XX-XXXX-XXXX`.
+            - name: device_name
+              description: Device name in Dashboard; empty when unnamed.
+            - name: model
+              description: Device model, for example `MS120-8`.
+            - name: product_type
+              description: Meraki product type, for example `appliance`, `switch`, `wireless`, `camera`, `sensor` or `cellularGateway`.
+            - name: network_id
+              description: ID of the network the device is assigned to.
+            - name: network_name
+              description: Name of the network the device is assigned to.
+          metrics:
+            - name: meraki.device_assigned
+              description: Meraki Device Inventory Membership
+              unit: devices
+              chart_type: line
+              dimensions:
+                - name: assigned
+            - name: meraki.device_availability
+              description: Meraki Device Availability
+              unit: status
+              chart_type: stacked
+              dimensions:
+                - name: alerting
+                - name: dormant
+                - name: offline
+                - name: online
+      folding:
+        title: Metrics
+        enabled: false
+      availability: []
+    troubleshooting:
+      errors:
         list:
-        - name: url
-          description: URL of the Meraki Dashboard API endpoint.
-          default_value: https://api.meraki.com/api/v1
-          required: false
-          group: Target
-          detailed_description: |
-            Use the API endpoint of the region that hosts the organization:
+          - error: '`operation`: HTTP status 401'
+            cause: Meraki rejected the API key. It is mistyped, revoked, or belongs to a deleted administrator account.
+            fix: Generate a new API key and update `api_key` and restart the job, or replace the contents of the file named by `bearer_token_file`, which is read again on the next request.
+          - error: '`operation`: HTTP status 403'
+            cause: The API key's owner lacks permission for the request, or the organization restricts API access by source IP and the Agent's address is not allowed.
+            fix: Grant the key's owner read-only access to the organization and, if it restricts API access by IP, allow the Agent's public address. See the prerequisites.
+          - error: '`operation`: HTTP status 404'
+            cause: Meraki answers 404 when the API key cannot reach the organization at all. The organization ID is wrong, the key's owner has no access to it, or Dashboard API access is disabled for it.
+            fix: Check `organization_id` against the organizations the key can see (see the `organization_id` option), grant the key's owner read-only access, and enable Dashboard API access for the organization.
+          - error: configured organization_id is not visible to the Meraki credential
+            cause: The API key works, but the organization in `organization_id` is not among the organizations it can see.
+            fix: Check `organization_id` against the organizations the key can see (see the `organization_id` option), or use an API key of an administrator of that organization.
+          - error: '`operation`: HTTP status 429'
+            cause: Meraki rate-limited the request. The budgets of 10 requests per second per organization and 100 per source IP address are shared with every other application and job using them.
+            fix: |
+              The collector sends nothing until the `Retry-After` delay Meraki requested has passed. If this happens when the job starts, the job retries after that delay only when `autodetection_retry` is set.
 
-            | Region | URL |
-            |:-------|:----|
-            | Global (default) | `https://api.meraki.com/api/v1` |
-            | Canada | `https://api.meraki.ca/api/v1` |
-            | China | `https://api.meraki.cn/api/v1` |
-            | India | `https://api.meraki.in/api/v1` |
-            | United States FedRAMP | `https://api.gov-meraki.com/api/v1` |
+              If it happens regularly, reduce the organization's other API usage, move other API clients off the Agent's address, or increase `update_every`.
+          - error: Meraki API Retry-After delay has not elapsed
+            cause: An earlier request was rate-limited and the wait Meraki requested is still running, so the collector skipped this collection without contacting the API.
+            fix: No action is needed; collection resumes when the wait ends. If it recurs, see the HTTP status 429 entry.
+          - error: '`operation`: HTTP status `5xx`'
+            cause: The Meraki API had a temporary failure, or a proxy in between could not reach it.
+            fix: Usually none; the next collection tries again. If it persists, check Meraki's service status and, when `proxy_url` is set, the proxy.
+          - error: '`operation`: HTTP request failed: `reason`'
+            cause: The request got no HTTP answer. The end of the message says why; for `context deadline exceeded`, see that entry.
+            fix: |
+              | Reason contains | Check |
+              |:----------------|:------|
+              | `no such host` | DNS resolution of the API host on the Agent |
+              | `connection refused`, `i/o timeout`, `connection reset` | Firewall rules for outbound HTTPS (port 443) to the API host and the Meraki shard hosts |
+              | `proxyconnect` | `proxy_url`, or the proxy environment variables when `proxy_url` is empty |
+              | `x509:` or `tls:` | Certificate trust: set `tls_ca` when a proxy or private endpoint uses its own CA |
+              | `Meraki redirect` | The API or a proxy redirected the request to a host the collector does not trust; see the `url` option |
 
-            The URL must use HTTPS with the path exactly `/api/v1` (a prefix such as `/meraki/api/v1` is not accepted), without credentials, query or fragment.
+              To test the same path from the Agent host, preferably as the `netdata` user (replace the host with the one in `url` for another region):
 
-            A private endpoint or reverse proxy in front of the API also works, with one condition. Meraki's redirects and next-page links point at Meraki hosts, and with a custom endpoint the collector follows them only within that endpoint. The proxy must therefore rewrite the `Location` and `Link` headers to its own address; otherwise every list longer than one page fails with `invalid pagination target`.
-        - name: organization_id
-          description: Meraki organization ID to monitor.
-          default_value: ''
-          required: true
-          group: Target
-          detailed_description: |
-            The ID of the organization, not its name. The organizations an API key can see, with their IDs, are listed by the command below; for an organization in another region, replace the host with the one in `url`.
-
-            ```bash
-            curl -s -H "Authorization: Bearer $MERAKI_API_KEY" https://api.meraki.com/api/v1/organizations
-            ```
-        - name: api_key
-          description: Meraki API key. Set either this or bearer_token_file.
-          default_value: ''
-          required: false
-          group: Authentication
-        - name: bearer_token_file
-          description: Path to a file containing the Meraki API key, reread for every request. Set either this or api_key.
-          default_value: ''
-          required: false
-          group: Authentication
-          detailed_description: |
-            Use this when a secret manager rotates the key in place: the next request uses the new key without a restart. The file must be readable by the `netdata` user.
-        - name: update_every
-          description: Data collection interval, in seconds.
-          default_value: 300
-          required: false
-          group: Collection
-        - name: autodetection_retry
-          description: How often to retry the initial connection when the job fails to start, in seconds. Zero disables
-            retries.
-          default_value: 0
-          required: false
-          group: Collection
-        - name: timeout
-          description: Complete collection or connection-check timeout, in seconds, including all pages and request
-            pacing.
-          default_value: 60
-          required: false
-          group: Collection
-        - name: vnode
-          description: Associates the organization summary with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
-            Device nodes are created separately.
-          default_value: ''
-          required: false
-          group: Collection
-        - name: proxy_url
-          description: HTTP proxy URL. Empty value uses environment proxy variables.
-          default_value: ''
-          required: false
-          group: Transport
-          detailed_description: If the proxy URL contains credentials, use a secret reference such as `${env:MERAKI_PROXY_URL}`
-            instead of entering the authenticated URL directly into the form.
-        - name: tls_ca
-          description: Path to a CA certificate file used to verify the server certificate.
-          default_value: ''
-          required: false
-          group: Transport
-        - name: tls_cert
-          description: Path to a client certificate file. Requires tls_key.
-          default_value: ''
-          required: false
-          group: Transport
-        - name: tls_key
-          description: Path to the client certificate key file. Requires tls_cert.
-          default_value: ''
-          required: false
-          group: Transport
-        - name: tls_skip_verify
-          description: Skip verification of the server certificate and hostname.
-          default_value: false
-          required: false
-          group: Transport
-      examples:
-        folding:
-          title: Config
-          enabled: true
-        list:
-        - name: Basic
-          description: Monitor one organization, with the API key read from an environment variable.
-          config: |
-            jobs:
-              - name: meraki
-                organization_id: "123456"
-                api_key: ${env:MERAKI_API_KEY}
-        - name: API key in a rotated file
-          description: Read the key from a file that a secret manager rotates. The file is read again for every request.
-          config: |
-            jobs:
-              - name: meraki
-                organization_id: "123456"
-                bearer_token_file: /run/secrets/meraki_api_key
-        - name: Regional API endpoint
-          description: Monitor an organization hosted outside the global region, here Canada.
-          config: |
-            jobs:
-              - name: meraki-canada
-                url: https://api.meraki.ca/api/v1
-                organization_id: "123456"
-                api_key: ${env:MERAKI_API_KEY}
-        - name: Through an HTTP proxy
-          description: Reach the API through an outbound proxy.
-          config: |
-            jobs:
-              - name: meraki
-                organization_id: "123456"
-                api_key: ${env:MERAKI_API_KEY}
-                proxy_url: http://proxy.example.com:3128
-        - name: Several organizations
-          description: One job per organization. Each organization has its own API budget; the jobs share the per-IP budget.
-          config: |
-            jobs:
-              - name: meraki-hq
-                organization_id: "123456"
-                api_key: ${env:MERAKI_API_KEY}
-
-              - name: meraki-retail
-                organization_id: "654321"
-                api_key: ${env:MERAKI_API_KEY}
-  metrics:
-    description: |
-      - **Where charts appear.** The organization chart is on the node that runs the job, or on its virtual node when `vnode` is set. Device charts are on each device's own node, named after the device; `meraki-` followed by the serial when the device has no name; or `meraki-` followed by a generated ID when the name contains an apostrophe, backslash or line break.
-      - **Gaps, not offline.** A device whose status is missing, unknown or reported for another network has no availability value for that collection; it is never reported offline because of missing data. Its inventory chart stays at 1 while the device is assigned. A failed collection updates no chart.
-      - **Removed devices.** When a device leaves the inventory, its charts stop updating and become obsolete. Netdata keeps the node and its history.
-    scopes:
-    - name: organization
-      description: The configured Meraki organization.
-      labels:
-      - name: organization_id
-        description: Meraki organization ID, for example `123456`.
-      - name: organization_name
-        description: Meraki organization name.
-      metrics:
-      - name: meraki.organization_assigned_devices
-        description: Meraki Assigned Devices
-        unit: devices
-        chart_type: line
-        dimensions:
-        - name: assigned
-    - name: device
-      description: One device assigned to a network of the organization, shown as its own node.
-      labels:
-      - name: organization_id
-        description: Meraki organization ID.
-      - name: organization_name
-        description: Meraki organization name.
-      - name: serial
-        description: Device serial number, for example `Q2XX-XXXX-XXXX`.
-      - name: device_name
-        description: Device name in Dashboard; empty when unnamed.
-      - name: model
-        description: Device model, for example `MS120-8`.
-      - name: product_type
-        description: Meraki product type, for example `appliance`, `switch`, `wireless`, `camera`, `sensor` or `cellularGateway`.
-      - name: network_id
-        description: ID of the network the device is assigned to.
-      - name: network_name
-        description: Name of the network the device is assigned to.
-      metrics:
-      - name: meraki.device_assigned
-        description: Meraki Device Inventory Membership
-        unit: devices
-        chart_type: line
-        dimensions:
-        - name: assigned
-      - name: meraki.device_availability
-        description: Meraki Device Availability
-        unit: status
-        chart_type: stacked
-        dimensions:
-        - name: alerting
-        - name: dormant
-        - name: offline
-        - name: online
-    folding:
-      title: Metrics
-      enabled: false
-    availability: []
-  troubleshooting:
-    errors:
-      list:
-      - error: '`operation`: HTTP status 401'
-        cause: Meraki rejected the API key. It is mistyped, revoked, or belongs to a deleted administrator account.
-        fix: Generate a new API key and update `api_key` and restart the job, or replace the contents of the file named
-          by `bearer_token_file`, which is read again on the next request.
-      - error: '`operation`: HTTP status 403'
-        cause: The API key's owner lacks permission for the request, or the organization restricts API access by source
-          IP and the Agent's address is not allowed.
-        fix: Grant the key's owner read-only access to the organization and, if it restricts API access by IP, allow the
-          Agent's public address. See the prerequisites.
-      - error: '`operation`: HTTP status 404'
-        cause: Meraki answers 404 when the API key cannot reach the organization at all. The organization ID is wrong,
-          the key's owner has no access to it, or Dashboard API access is disabled for it.
-        fix: Check `organization_id` against the organizations the key can see (see the `organization_id` option), grant
-          the key's owner read-only access, and enable Dashboard API access for the organization.
-      - error: configured organization_id is not visible to the Meraki credential
-        cause: The API key works, but the organization in `organization_id` is not among the organizations it can see.
-        fix: Check `organization_id` against the organizations the key can see (see the `organization_id` option), or use
-          an API key of an administrator of that organization.
-      - error: '`operation`: HTTP status 429'
-        cause: Meraki rate-limited the request. The budgets of 10 requests per second per organization and 100 per source
-          IP address are shared with every other application and job using them.
-        fix: |
-          The collector sends nothing until the `Retry-After` delay Meraki requested has passed. If this happens when the job starts, the job retries after that delay only when `autodetection_retry` is set.
-
-          If it happens regularly, reduce the organization's other API usage, move other API clients off the Agent's address, or increase `update_every`.
-      - error: Meraki API Retry-After delay has not elapsed
-        cause: An earlier request was rate-limited and the wait Meraki requested is still running, so the collector skipped
-          this collection without contacting the API.
-        fix: No action is needed; collection resumes when the wait ends. If it recurs, see the HTTP status 429 entry.
-      - error: '`operation`: HTTP status `5xx`'
-        cause: The Meraki API had a temporary failure, or a proxy in between could not reach it.
-        fix: Usually none; the next collection tries again. If it persists, check Meraki's service status and, when `proxy_url`
-          is set, the proxy.
-      - error: '`operation`: HTTP request failed: `reason`'
-        cause: The request got no HTTP answer. The end of the message says why; for `context deadline exceeded`, see that
-          entry.
-        fix: |
-          | Reason contains | Check |
-          |:----------------|:------|
-          | `no such host` | DNS resolution of the API host on the Agent |
-          | `connection refused`, `i/o timeout`, `connection reset` | Firewall rules for outbound HTTPS (port 443) to the API host and the Meraki shard hosts |
-          | `proxyconnect` | `proxy_url`, or the proxy environment variables when `proxy_url` is empty |
-          | `x509:` or `tls:` | Certificate trust: set `tls_ca` when a proxy or private endpoint uses its own CA |
-          | `Meraki redirect` | The API or a proxy redirected the request to a host the collector does not trust; see the `url` option |
-
-          To test the same path from the Agent host, preferably as the `netdata` user (replace the host with the one in `url` for another region):
-
-          ```bash
-          curl -sS -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $MERAKI_API_KEY" https://api.meraki.com/api/v1/organizations
-          ```
-      - error: context deadline exceeded
-        cause: A collection or the startup check took longer than `timeout`. Every page counts toward it, and the collector
-          sends at most 10 requests per second, so a very large organization or a slow network can run out of time.
-        fix: Check connectivity to the API endpoint. If requests succeed but the organization cannot finish in time, increase
-          `timeout`.
-      - error: '`operation`: invalid pagination target'
-        cause: A next-page link pointed outside the endpoint in `url`. This happens when `url` is a proxy or private endpoint
-          that passes Meraki's `Link` headers through unchanged, and only for lists longer than one page.
-        fix: Configure the proxy to rewrite `Location` and `Link` headers to its own address, or set `url` to the Meraki API
-          endpoint of the organization's region.
-      - error: '`operation`: cannot prepare authenticated request'
-        when: '`bearer_token_file` is set.'
-        cause: The key file is missing, empty or not readable by the `netdata` user.
-        fix: Check the path in `bearer_token_file`, that the file contains the API key, and that the `netdata` user can
-          read it.
-      - error: '`operation`: invalid JSON array response'
-        cause: The endpoint answered with something other than Meraki API data, typically because `url` points to another
-          service or a proxy answered with its own page.
-        fix: Set `url` to a Meraki API endpoint with the path `/api/v1` (see the `url` option), and check `proxy_url`.
-      - error: Meraki requires exactly one API key or bearer token file
-        cause: Both authentication options are empty, both are set, or `api_key` contains a line break.
-        fix: Set either `api_key` or `bearer_token_file` and clear the other. Make sure the key is on one line.
-      - error: Meraki base URL must be an HTTPS /api/v1 URL without credentials, query or fragment
-        cause: '`url` is not an HTTPS URL with the path `/api/v1`, or it contains a user name, password, query or fragment.'
-        fix: Use one of the regional endpoints listed for the `url` option, or your endpoint's HTTPS URL with the path `/api/v1`.
-      - error: organization_id must be a nonempty organization ID without surrounding whitespace
-        cause: '`organization_id` is empty, has leading or trailing spaces, or is `.` or `..`.'
-        fix: Set `organization_id` to the organization's ID, quoted as a string in YAML (`"123456"`).
-      - error: cannot initialize Meraki HTTP transport; check proxy and TLS configuration
-        cause: '`proxy_url` is not a valid URL, or a TLS file in `tls_ca`, `tls_cert` or `tls_key` cannot be read or parsed.'
-        fix: Check `proxy_url`, and that the TLS files exist, are readable by the `netdata` user and contain PEM data.
-      - error: tls_cert and tls_key must be configured together
-        cause: Only one of the client certificate options is set.
-        fix: Set both `tls_cert` and `tls_key`, or neither.
-      - error: Meraki assigned device has no serial
-        cause: The assigned-device list from Meraki contained an entry without a serial number. The whole collection is
-          dropped rather than shown with a device missing.
-        fix: Usually temporary; the next collection reads the list again. If it persists, report it to Cisco Meraki support
-          with the time of the error.
-      - error: conflicting Meraki assigned-device records
-        cause: The assigned-device list listed the same serial twice with different details, typically because a device was
-          renamed or moved while the pages were read. The whole collection is dropped.
-        fix: Usually temporary; the next collection reads the list again. If it persists, report it to Cisco Meraki support.
-      - error: conflicting Meraki network records
-        cause: The network list listed the same network ID twice with different names, typically because a network was
-          renamed while the pages were read. The whole collection is dropped.
-        fix: Usually temporary; the next collection reads the list again. If it persists, report it to Cisco Meraki support.
-      - error: conflicting Meraki organization records
-        cause: The organization list listed the configured organization ID twice with different details. The whole collection
-          is dropped.
-        fix: Usually temporary; the next collection reads the list again. If it persists, report it to Cisco Meraki support.
-      - error: Meraki network belongs to a different organization
-        cause: The network list for the configured organization contained a network of another organization. The whole
-          collection is dropped.
-        fix: Usually temporary; the next collection reads the list again. If it persists, report it to Cisco Meraki support.
-      - error: Device node shows inventory but no availability chart
-        cause: Meraki did not report a usable status for the device in the last collection. Availability can lag a new
-          assignment or a network move by one refresh.
-        fix: Check the device's status in Dashboard and wait for the next 5-minute refresh. Run the collector in debug mode
-          (see Diagnostics) to see how many devices had no usable status.
+              ```bash
+              curl -sS -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $MERAKI_API_KEY" https://api.meraki.com/api/v1/organizations
+              ```
+          - error: context deadline exceeded
+            cause: A collection or the startup check took longer than `timeout`. Every page counts toward it, and the collector sends at most 10 requests per second, so a very large organization or a slow network can run out of time.
+            fix: Check connectivity to the API endpoint. If requests succeed but the organization cannot finish in time, increase `timeout`.
+          - error: '`operation`: invalid pagination target'
+            cause: A next-page link pointed outside the endpoint in `url`. This happens when `url` is a proxy or private endpoint that passes Meraki's `Link` headers through unchanged, and only for lists longer than one page.
+            fix: Configure the proxy to rewrite `Location` and `Link` headers to its own address, or set `url` to the Meraki API endpoint of the organization's region.
+          - error: '`operation`: cannot prepare authenticated request'
+            when: '`bearer_token_file` is set.'
+            cause: The key file is missing, empty or not readable by the `netdata` user.
+            fix: Check the path in `bearer_token_file`, that the file contains the API key, and that the `netdata` user can read it.
+          - error: '`operation`: invalid JSON array response'
+            cause: The endpoint answered with something other than Meraki API data, typically because `url` points to another service or a proxy answered with its own page.
+            fix: Set `url` to a Meraki API endpoint with the path `/api/v1` (see the `url` option), and check `proxy_url`.
+          - error: Meraki requires exactly one API key or bearer token file
+            cause: Both authentication options are empty, both are set, or `api_key` contains a line break.
+            fix: Set either `api_key` or `bearer_token_file` and clear the other. Make sure the key is on one line.
+          - error: Meraki base URL must be an HTTPS /api/v1 URL without credentials, query or fragment
+            cause: '`url` is not an HTTPS URL with the path `/api/v1`, or it contains a user name, password, query or fragment.'
+            fix: Use one of the regional endpoints listed for the `url` option, or your endpoint's HTTPS URL with the path `/api/v1`.
+          - error: organization_id must be a nonempty organization ID without surrounding whitespace
+            cause: '`organization_id` is empty, has leading or trailing spaces, or is `.` or `..`.'
+            fix: Set `organization_id` to the organization's ID, quoted as a string in YAML (`"123456"`).
+          - error: cannot initialize Meraki HTTP transport; check proxy and TLS configuration
+            cause: '`proxy_url` is not a valid URL, or a TLS file in `tls_ca`, `tls_cert` or `tls_key` cannot be read or parsed.'
+            fix: Check `proxy_url`, and that the TLS files exist, are readable by the `netdata` user and contain PEM data.
+          - error: tls_cert and tls_key must be configured together
+            cause: Only one of the client certificate options is set.
+            fix: Set both `tls_cert` and `tls_key`, or neither.
+          - error: Meraki assigned device has no serial
+            cause: The assigned-device list from Meraki contained an entry without a serial number. The whole collection is dropped rather than shown with a device missing.
+            fix: Usually temporary; the next collection reads the list again. If it persists, report it to Cisco Meraki support with the time of the error.
+          - error: conflicting Meraki assigned-device records
+            cause: The assigned-device list listed the same serial twice with different details, typically because a device was renamed or moved while the pages were read. The whole collection is dropped.
+            fix: Usually temporary; the next collection reads the list again. If it persists, report it to Cisco Meraki support.
+          - error: conflicting Meraki network records
+            cause: The network list listed the same network ID twice with different names, typically because a network was renamed while the pages were read. The whole collection is dropped.
+            fix: Usually temporary; the next collection reads the list again. If it persists, report it to Cisco Meraki support.
+          - error: conflicting Meraki organization records
+            cause: The organization list listed the configured organization ID twice with different details. The whole collection is dropped.
+            fix: Usually temporary; the next collection reads the list again. If it persists, report it to Cisco Meraki support.
+          - error: Meraki network belongs to a different organization
+            cause: The network list for the configured organization contained a network of another organization. The whole collection is dropped.
+            fix: Usually temporary; the next collection reads the list again. If it persists, report it to Cisco Meraki support.
+          - error: Device node shows inventory but no availability chart
+            cause: Meraki did not report a usable status for the device in the last collection. Availability can lag a new assignment or a network move by one refresh.
+            fix: Check the device's status in Dashboard and wait for the next 5-minute refresh. Run the collector in debug mode (see Diagnostics) to see how many devices had no usable status.

@@ -59,6 +59,9 @@ func TestPacingCoversRedirectsPagesAndCancellation(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Millisecond)
 	defer cancel()
+	transport.mu.Lock()
+	transport.lastStart = time.Now()
+	transport.mu.Unlock()
 	require.ErrorIs(t, client.ProbeOrganization(ctx, "org"), context.DeadlineExceeded)
 	require.Len(t, base.starts, 3, "canceled pacing must not send another request")
 	hc.CloseIdleConnections()

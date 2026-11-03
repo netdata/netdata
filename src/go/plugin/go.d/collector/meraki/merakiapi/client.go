@@ -266,6 +266,9 @@ func fetchPage[T any](ctx context.Context, c *Client, target *url.URL, opName st
 	if err != nil {
 		return page[T]{}, err
 	}
+	if err := ctx.Err(); err != nil {
+		return page[T]{}, safeError(opName, "request canceled", err)
+	}
 	finalURL := target
 	if resp.Request != nil && resp.Request.URL != nil {
 		finalURL = resp.Request.URL

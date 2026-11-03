@@ -42,5 +42,5 @@ func (c *Collector) initClient(ctx context.Context) error {
 	}
 	c.httpClient = httpClient
 	c.client = client
-	return nil
+	return ctx.Err()
 }
