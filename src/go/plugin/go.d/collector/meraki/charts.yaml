@@ -28,12 +28,17 @@ groups:
         dimensions:
           - selector: device_availability_status
   - family: Switch Ports
-    metrics: [switch_port_traffic_sent, switch_port_traffic_received, switch_port_traffic_interval_age, switch_port_packets_sent, switch_port_packets_received]
+    metrics:
+      - switch_port_traffic_sent
+      - switch_port_traffic_received
+      - switch_port_traffic_interval_age
+      - switch_port_packets_sent
+      - switch_port_packets_received
     chart_defaults:
       instances:
         by_labels: [port_id]
     charts:
-      - title: Meraki Switch Port Reported Traffic
+      - title: Meraki Switch Port Traffic
         context: switch_port_traffic
         units: kilobits/s
         type: area
@@ -50,7 +55,7 @@ groups:
         dimensions:
           - selector: switch_port_traffic_interval_age
             name: age
-      - title: Meraki Switch Port Reported Packet Rate
+      - title: Meraki Switch Port Packets
         context: switch_port_packets
         units: packets/s
         dimensions:
@@ -63,7 +68,7 @@ groups:
   - family: Appliance Uplinks
     metrics: [appliance_uplink_traffic_sent, appliance_uplink_traffic_received]
     charts:
-      - title: Meraki Appliance Uplink Reported Traffic
+      - title: Meraki Appliance Uplink Traffic
         context: appliance_uplink_traffic
         units: kilobits/s
         type: area

@@ -55,8 +55,8 @@ func TestMetadataDocumentsEmittedLabels(t *testing.T) {
 		"device":       slices.Sorted(maps.Keys(readDevices(c)["S1"].Labels)),
 	}
 	for scope, metric := range map[string]string{
-		"switch_port":      metricSwitchPortTrafficSent,
-		"appliance_uplink": metricApplianceUplinkTrafficSent,
+		"switch port":      metricSwitchPortTrafficSent,
+		"appliance uplink": metricApplianceUplinkTrafficSent,
 	} {
 		points := trafficPoints(c, metric)
 		require.NotEmpty(t, points)

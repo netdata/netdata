@@ -31,19 +31,19 @@
       },
       "collect_switch_port_traffic": {
         "title": "Collect switch port traffic",
-        "description": "Collect reported switch port traffic and interval age. Disabled by default.",
+        "description": "Collect the average traffic of every switch port, shown on its switch's node.",
         "type": "boolean",
         "default": false
       },
       "collect_switch_port_packets": {
         "title": "Collect switch port packets",
-        "description": "Collect reported switch port packet rates. Disabled by default; adds one request per assigned switch.",
+        "description": "Collect the packet rates of every switch port, at one API request per switch per collection.",
         "type": "boolean",
         "default": false
       },
       "collect_appliance_uplink_usage": {
         "title": "Collect appliance uplink usage",
-        "description": "Collect reported MX and Z network uplink traffic. Disabled by default; charts appear with the organization summary.",
+        "description": "Collect the average traffic of each uplink of every MX and Z network, shown with the organization chart.",
         "type": "boolean",
         "default": false
       },
@@ -70,7 +70,7 @@
       },
       "vnode": {
         "title": "Virtual node",
-        "description": "Associates the organization summary and appliance uplink charts with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). Device nodes are created separately.",
+        "description": "Associates the organization and appliance uplink charts with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). Device nodes are created separately.",
         "type": "string",
         "default": ""
       },
@@ -158,11 +158,16 @@
           ]
         },
         {
-          "title": "Collection",
+          "title": "Traffic",
           "fields": [
             "collect_switch_port_traffic",
             "collect_switch_port_packets",
-            "collect_appliance_uplink_usage",
+            "collect_appliance_uplink_usage"
+          ]
+        },
+        {
+          "title": "Collection",
+          "fields": [
             "update_every",
             "autodetection_retry",
             "timeout",
@@ -185,16 +190,16 @@
       "ui:widget": "password"
     },
     "timeout": {
-      "ui:help": "This budget covers a whole collection, including authentication-file reads, pagination and pacing. Increase it if a large organization cannot finish within the budget."
+      "ui:help": "This budget covers a whole collection, including authentication-file reads, pagination and pacing. Increase it if a large organization cannot finish within the budget. Collecting switch port packets adds one request per switch."
     },
     "collect_switch_port_traffic": {
-      "ui:help": "Uses five-minute intervals reported by Meraki. Interval age measures time since the accepted interval ended; it does not guarantee complete provider data."
+      "ui:help": "Shows the latest five-minute interval Meraki has reported, with a chart of how old it is. Costs one API request per 50 switches."
     },
     "collect_switch_port_packets": {
-      "ui:help": "Uses the latest five minutes reported by Meraki, which may be incomplete. For large switch fleets, increase Timeout or leave this option disabled: 1,000 switches add about 100 seconds of request pacing alone."
+      "ui:help": "Requests are paced at 10 per second, so 1,000 switches add about 100 seconds to every collection, more than the default Timeout of 60 seconds. Increase Timeout with it, or leave it off for large fleets.\n\nRates cover the last five minutes, which Meraki may not have finished reporting."
     },
     "collect_appliance_uplink_usage": {
-      "ui:help": "Reports average traffic for the requested five-minute window, aggregated by network and interface across active appliances. These charts are not attributed to a device, including during HA failover."
+      "ui:help": "Shows the bytes each uplink moved in the last five minutes as average kilobits per second. When more than one appliance of a network was active, such as a warm spare pair, Meraki adds up their bytes per interface, so the charts belong to the network, not to an appliance."
     }
   }
 }
