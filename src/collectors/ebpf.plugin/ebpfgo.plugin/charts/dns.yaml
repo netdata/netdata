@@ -1,0 +1,24 @@
+version: v1
+context_namespace: dns
+groups:
+  - family: dns
+    metrics:
+      - requests
+      - responses
+    charts:
+      - id: dns_requests
+        title: DNS requests
+        context: net.dns_requests
+        units: "requests/s"
+        type: area
+        dimensions:
+          - selector: requests
+            name: requests
+      - id: dns_responses
+        title: DNS responses
+        context: net.dns_responses
+        units: "responses/s"
+        type: area
+        dimensions:
+          - selector: responses
+            name: responses
