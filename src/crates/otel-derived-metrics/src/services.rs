@@ -127,8 +127,7 @@ impl Services {
     }
 }
 
-/// The labels of the service a resource belongs to. The first label names the
-/// charts, so `service.name` comes first.
+/// The labels of the service a resource belongs to.
 pub(crate) fn service_labels(tenant: &str, resource: Option<&Resource>) -> Labels {
     let attributes: &[KeyValue] = resource.map_or(&[], |r| &r.attributes);
     let mut name = None;
@@ -324,7 +323,7 @@ mod tests {
             out.contains("CLABEL 'resource.attributes.deployment.environment.name' 'staging' 1\n")
         );
         assert!(out.contains("CLABEL 'tenant' 'default' 1\n"));
-        assert!(out.contains("CHART otel_service_checkout_"));
+        assert!(out.contains("CHART otel_service.requests_"));
 
         let unnamed = render(
             &services,

@@ -20,16 +20,13 @@
 //! no record is lost and memory stays bounded.
 
 use crate::batch::Batch;
-use crate::family::{Family, FamilyInner, Labels, Value, is_id_byte};
+use crate::family::{Family, FamilyInner, Labels, Value};
 use netdata_plugin_protocol::{
     ChartLine, ChartOptions, DimensionAlgorithm, DimensionLine, DimensionOptions, LabelSource,
     write_begin, write_chart, write_clabel, write_clabel_commit, write_dimension, write_end_timed,
     write_set_empty, write_set_float,
 };
 use std::collections::{HashMap, VecDeque};
-
-/// Readable part of an instance's chart type, before the hash.
-const MAX_NAME_BYTES: usize = 48;
 
 /// Slots beyond the lateness that one catch-up renders at most.
 pub const MAX_BACKLOG_SLOTS: u64 = 60;
@@ -213,27 +210,18 @@ fn merge_cells(family: &FamilyInner, target: &mut [f64], cells: &[f64]) {
 }
 
 fn new_instance(family: &FamilyInner, labels: Labels, overflow: bool) -> Instance {
-    let chart_type_id = if labels.is_empty() {
-        family.type_prefix.clone()
-    } else if overflow {
-        format!("{}_overflow", family.type_prefix)
+    let suffix = if overflow {
+        "_overflow".to_string()
+    } else if labels.is_empty() {
+        String::new()
     } else {
-        let mut name = String::with_capacity(MAX_NAME_BYTES);
-        for b in labels.0[0].1.bytes().take(MAX_NAME_BYTES) {
-            name.push(if is_id_byte(b) { b as char } else { '_' });
-        }
-        format!(
-            "{}_{}_{:016x}",
-            family.type_prefix,
-            name,
-            label_hash(&labels)
-        )
+        format!("_{:016x}", label_hash(&labels))
     };
     Instance {
         chart_ids: family
             .charts
             .iter()
-            .map(|chart| format!("{chart_type_id}.{}", chart.id))
+            .map(|chart| format!("{}.{}{suffix}", family.type_prefix, chart.id))
             .collect(),
         labels,
         defined: false,
@@ -243,8 +231,8 @@ fn new_instance(family: &FamilyInner, labels: Labels, overflow: bool) -> Instanc
     }
 }
 
-/// FNV-1a over the labels: stable across processes and releases, so an
-/// instance keeps its chart ids over restarts.
+/// FNV-1a over the labels, which are sorted by key: stable across processes
+/// and releases, so an instance keeps its chart ids over restarts.
 fn label_hash(labels: &Labels) -> u64 {
     let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
     for (key, value) in &labels.0 {
@@ -518,27 +506,27 @@ mod tests {
         let mut store = Store::new(f.family.clone());
         record(&f, &mut store, "checkout", 100, 3, 1, 100);
         let first = text(&store.emit(101, usize::MAX));
-        let id = format!("svc_checkout_{:08x}", label_hash(&labels("checkout")));
+        let h = format!("{:016x}", label_hash(&labels("checkout")));
         assert_eq!(
             first,
             format!(
-                "CHART {id}.requests '' 'Requests' 'requests/s' 'requests' 'svc.requests' stacked 1 1 'store_first'\n\
+                "CHART svc.requests_{h} '' 'Requests' 'requests/s' 'requests' 'svc.requests' stacked 1 1 'store_first'\n\
                  CLABEL 'service.name' 'checkout' 1\nCLABEL_COMMIT\n\
                  DIMENSION ok 'ok' absolute 1 1 'type=float'\n\
                  DIMENSION error 'error' absolute 1 1 'type=float'\n\
-                 CHART {id}.duration '' 'Duration' 'seconds' 'requests' 'svc.duration' line 2 1 'store_first'\n\
+                 CHART svc.duration_{h} '' 'Duration' 'seconds' 'requests' 'svc.duration' line 2 1 'store_first'\n\
                  CLABEL 'service.name' 'checkout' 1\nCLABEL_COMMIT\n\
                  DIMENSION avg 'avg' absolute 1 1 'type=float'\n\
                  DIMENSION max 'max' absolute 1 1 'type=float'\n\
-                 CHART {id}.duration_histogram '' 'Duration histogram' 'requests/s' 'requests' \
+                 CHART svc.duration_histogram_{h} '' 'Duration histogram' 'requests/s' 'requests' \
                  'svc.duration_histogram' heatmap 3 1 'store_first'\n\
                  CLABEL 'service.name' 'checkout' 1\nCLABEL_COMMIT\n\
                  DIMENSION 0.1 '0.1' absolute 1 1 'type=float'\n\
                  DIMENSION 1 '1' absolute 1 1 'type=float'\n\
                  DIMENSION +Inf '+Inf' absolute 1 1 'type=float'\n\
-                 BEGIN {id}.requests 1000000\nSET ok = 2\nSET error = 1\nEND 101 0 1\n\
-                 BEGIN {id}.duration 1000000\nSET avg = 0.5\nSET max = 0.5\nEND 101 0 1\n\
-                 BEGIN {id}.duration_histogram 1000000\nSET 0.1 = 0\nSET 1 = 3\nSET +Inf = 0\nEND 101 0 1\n"
+                 BEGIN svc.requests_{h} 1000000\nSET ok = 2\nSET error = 1\nEND 101 0 1\n\
+                 BEGIN svc.duration_{h} 1000000\nSET avg = 0.5\nSET max = 0.5\nEND 101 0 1\n\
+                 BEGIN svc.duration_histogram_{h} 1000000\nSET 0.1 = 0\nSET 1 = 3\nSET +Inf = 0\nEND 101 0 1\n"
             )
         );
         // The next slot: zero rates, no average or maximum, no new definition.
@@ -546,9 +534,9 @@ mod tests {
         assert_eq!(
             second,
             format!(
-                "BEGIN {id}.requests 1000000\nSET ok = 0\nSET error = 0\nEND 102 0 1\n\
-                 BEGIN {id}.duration 1000000\nSET avg =\nSET max =\nEND 102 0 1\n\
-                 BEGIN {id}.duration_histogram 1000000\nSET 0.1 = 0\nSET 1 = 0\nSET +Inf = 0\nEND 102 0 1\n"
+                "BEGIN svc.requests_{h} 1000000\nSET ok = 0\nSET error = 0\nEND 102 0 1\n\
+                 BEGIN svc.duration_{h} 1000000\nSET avg =\nSET max =\nEND 102 0 1\n\
+                 BEGIN svc.duration_histogram_{h} 1000000\nSET 0.1 = 0\nSET 1 = 0\nSET +Inf = 0\nEND 102 0 1\n"
             )
         );
         validate_chart_stream(format!("{first}{second}").as_bytes()).unwrap();
@@ -618,7 +606,7 @@ mod tests {
         assert_eq!(stats.instances, 2);
         assert_eq!(stats.overflowed_records, 5);
         let out = text(&store.emit(11, usize::MAX));
-        assert!(out.contains("BEGIN svc_overflow.requests 1000000\nSET ok = 5\n"));
+        assert!(out.contains("BEGIN svc.requests_overflow 1000000\nSET ok = 5\n"));
         assert!(out.contains("CLABEL 'overflow' 'true' 1\n"));
         // Once "a" and the overflow instance expire, "b" gets its own charts.
         let expired = text(&store.emit(14, usize::MAX));
@@ -713,10 +701,25 @@ mod tests {
         assert_eq!(labels.0[0].1.len(), 800);
         let f = fixture(0, 900, None);
         let instance = new_instance(&f.family.0, labels, false);
-        assert!(instance.chart_ids[0].starts_with("svc_"));
+        assert!(instance.chart_ids[0].starts_with("svc.requests_"));
         assert!(netdata_plugin_protocol::is_valid_chart_id(
             &instance.chart_ids[0]
         ));
+    }
+
+    #[test]
+    fn push_order_does_not_change_the_instance_or_its_chart_ids() {
+        let mut ab = Labels::new();
+        ab.push("a", "1");
+        ab.push("b", "2");
+        let mut ba = Labels::new();
+        ba.push("b", "2");
+        ba.push("a", "1");
+        assert_eq!(ab, ba);
+        let f = fixture(0, 900, None);
+        let ids = |labels: Labels| new_instance(&f.family.0, labels, false).chart_ids;
+        assert_eq!(ids(ab), ids(ba));
+        assert_eq!(ids(Labels::new())[0], "svc.requests");
     }
 
     #[test]

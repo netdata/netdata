@@ -1,7 +1,8 @@
 //! Per-service charts from logs: log records per second by severity.
 //!
 //! Services are identified as for spans (`services::service_labels`), so a
-//! service's log and request charts carry the same labels and chart type.
+//! service's log and request charts carry the same labels and the same
+//! chart id suffix.
 //! The severity comes from the record's severity number alone (OTel ranges
 //! 1-4 trace, 5-8 debug, 9-12 info, 13-16 warn, 17-20 error, 21-24 fatal);
 //! anything else, including a record with only a severity text, is

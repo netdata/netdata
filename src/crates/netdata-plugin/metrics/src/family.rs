@@ -170,8 +170,9 @@ impl Dimension {
     }
 }
 
-/// One chart every instance of the family gets. The chart id is
-/// `<instance type>.<id>`.
+/// One chart every instance of the family gets. Its full chart id is the
+/// family's type prefix, a dot, `id` and the instance's suffix (see
+/// [`FamilyBuilder::new`]).
 #[derive(Debug, Clone)]
 pub struct ChartSpec {
     pub id: &'static str,
@@ -187,10 +188,11 @@ pub struct ChartSpec {
 
 /// The labels that identify an instance and are attached to its charts.
 ///
-/// Two equal label lists are the same instance. Values that are empty once
-/// the agent trims them (whitespace and control characters only) are left
-/// out, because the agent would store them as `[none]`; values are cut to
-/// the agent's label value limit at a character boundary. Keys come from
+/// Labels are kept sorted by key, so two lists with the same pairs are the
+/// same instance whatever order they were pushed in. Values that are empty
+/// once the agent trims them (whitespace and control characters only) are
+/// left out, because the agent would store them as `[none]`; values are cut
+/// to the agent's label value limit at a character boundary. Keys come from
 /// code: each must be non-empty, within the agent's key limit, and unique.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct Labels(pub(crate) Vec<(String, String)>);
@@ -206,10 +208,9 @@ impl Labels {
             !key.is_empty() && key.len() <= MAX_LABEL_KEY_BYTES,
             "invalid label key {key:?}"
         );
-        assert!(
-            self.0.iter().all(|(k, _)| k != key),
-            "duplicate label key {key:?}"
-        );
+        let Err(at) = self.0.binary_search_by(|(k, _)| k.as_str().cmp(key)) else {
+            panic!("duplicate label key {key:?}");
+        };
         if value.chars().all(|c| c.is_whitespace() || c.is_control()) {
             return;
         }
@@ -217,7 +218,8 @@ impl Labels {
         while !value.is_char_boundary(end) {
             end -= 1;
         }
-        self.0.push((key.to_string(), value[..end].to_string()));
+        self.0
+            .insert(at, (key.to_string(), value[..end].to_string()));
     }
 
     pub fn is_empty(&self) -> bool {
@@ -261,8 +263,10 @@ pub struct FamilyBuilder {
 
 impl FamilyBuilder {
     /// `type_prefix` starts every chart id of the family: an instance without
-    /// labels gets `<type_prefix>.<chart>`, any other instance
-    /// `<type_prefix>_<name>_<hash>.<chart>`.
+    /// labels gets `<type_prefix>.<chart>`, the overflow instance
+    /// `<type_prefix>.<chart>_overflow`, any other instance
+    /// `<type_prefix>.<chart>_<hash>`, where `<hash>` is 16 hex digits of a
+    /// hash of its sorted labels, stable across restarts and releases.
     pub fn new(type_prefix: &str) -> Self {
         assert!(
             !type_prefix.is_empty() && type_prefix.bytes().all(is_id_byte),
@@ -344,6 +348,12 @@ impl FamilyBuilder {
             "invalid chart id {:?}",
             spec.id
         );
+        // Instance suffixes must not be mistaken for part of a chart id.
+        assert!(
+            !spec.id.ends_with("_overflow") && !ends_with_hash_suffix(spec.id),
+            "chart id {:?} ends like an instance suffix",
+            spec.id
+        );
         assert!(
             !spec.dimensions.is_empty(),
             "chart {} has no dimensions",
@@ -384,4 +394,13 @@ impl FamilyBuilder {
 
 pub(crate) fn is_id_byte(b: u8) -> bool {
     b.is_ascii_alphanumeric() || b == b'_' || b == b'-'
+}
+
+/// Whether `id` ends in `_` and 16 hex digits, the shape of a labelled
+/// instance's suffix.
+fn ends_with_hash_suffix(id: &str) -> bool {
+    let bytes = id.as_bytes();
+    bytes.len() >= 17
+        && bytes[bytes.len() - 17] == b'_'
+        && bytes[bytes.len() - 16..].iter().all(u8::is_ascii_hexdigit)
 }
