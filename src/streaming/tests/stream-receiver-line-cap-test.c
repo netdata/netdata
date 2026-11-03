@@ -81,6 +81,15 @@ static int test_partial_line_crosses_limit(void) {
             expected_chunks);
         failed = 1;
     }
+    else if(ctx.line_buffer->len > PLUGINSD_LINE_MAX) {
+        fprintf(
+            stderr,
+            "line buffer grew past the limit before rejection "
+            "(len=%zu, max=%d)\n",
+            ctx.line_buffer->len,
+            PLUGINSD_LINE_MAX);
+        failed = 1;
+    }
 
     line_test_cleanup(&ctx);
     return failed;
@@ -161,10 +170,73 @@ static int test_overlong_newline_terminated_line(void) {
 
     int failed = 0;
 
-    if(!complete || !overflow) {
+    // The line is rejected before it is appended, so the buffer must not
+    // grow past the limit and the line is not complete.
+    if(!overflow ||
+       complete ||
+       ctx.line_buffer->len != PLUGINSD_LINE_MAX) {
         fprintf(
             stderr,
             "overlong newline-terminated line was not rejected "
+            "before append (complete=%d overflow=%d len=%zu)\n",
+            complete,
+            overflow,
+            ctx.line_buffer->len);
+        failed = 1;
+    }
+
+    line_test_cleanup(&ctx);
+    return failed;
+}
+
+static int test_byte_after_limit_is_rejected_before_append(void) {
+    line_test_context ctx;
+    line_test_init(&ctx);
+
+    bool overflow = false;
+
+    line_test_set_input(&ctx, 'E', PLUGINSD_LINE_MAX, false);
+
+    bool complete = stream_receiver_next_line_checked(
+        &ctx.reader,
+        ctx.line_buffer,
+        stream_receiver_line_max(false),
+        &overflow);
+
+    if(complete ||
+       overflow ||
+       ctx.line_buffer->len != PLUGINSD_LINE_MAX) {
+
+        fprintf(
+            stderr,
+            "unexpected state at line limit: "
+            "complete=%d overflow=%d len=%zu\n",
+            complete,
+            overflow,
+            ctx.line_buffer->len);
+
+        line_test_cleanup(&ctx);
+        return 1;
+    }
+
+    // One more byte without a newline would exceed the limit. It must be
+    // rejected before it is appended.
+    line_test_set_input(&ctx, 'F', 1, false);
+
+    complete = stream_receiver_next_line_checked(
+        &ctx.reader,
+        ctx.line_buffer,
+        stream_receiver_line_max(false),
+        &overflow);
+
+    int failed = 0;
+
+    if(!overflow ||
+       complete ||
+       ctx.line_buffer->len != PLUGINSD_LINE_MAX) {
+        fprintf(
+            stderr,
+            "byte after the line limit was not rejected before append "
             "(complete=%d overflow=%d len=%zu)\n",
             complete,
             overflow,
@@ -277,6 +349,7 @@ int main(void) {
     failed += test_partial_line_crosses_limit();
     failed += test_line_limit_boundary();
     failed += test_overlong_newline_terminated_line();
+    failed += test_byte_after_limit_is_rejected_before_append();
     failed += test_normal_complete_line();
     failed += test_deferred_line_can_exceed_normal_limit();
 

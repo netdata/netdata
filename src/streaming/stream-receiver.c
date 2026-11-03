@@ -815,9 +815,9 @@ static bool stream_receiver_process_lines(
     PARSER *parser, bool *removed) {
 
     for(;;) {
-        // Function result bodies are deferred, opaque data and can be a single
-        // line larger than PLUGINSD_LINE_MAX (for example minified JSON).
-        // The parser bounds the whole deferred response by
+        // Deferred payloads are opaque data and can be a single line larger than
+        // PLUGINSD_LINE_MAX (for example a minified function result or stream
+        // path JSON). The parser bounds the whole deferred response by
         // PLUGINSD_MAX_DEFERRED_SIZE, so use that as the line limit here.
         // Require a real deferred response: a bogus FUNCTION_RESULT_BEGIN with
         // an unknown transaction leaves defer.response NULL and must not
