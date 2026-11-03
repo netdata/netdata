@@ -62,8 +62,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
+          sudo sh .github/scripts/ci-package.sh apt-get update
+          sudo sh .github/scripts/ci-package.sh apt-get install -y \
             cmake ninja-build pkg-config flex bison g++ \
             libatomic1 libsystemd-dev libpcre2-dev libcurl4-openssl-dev \
             liblz4-dev libzstd-dev libuv1-dev libssl-dev libelf-dev \
@@ -168,8 +168,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
+          sudo sh .github/scripts/ci-package.sh apt-get update
+          sudo sh .github/scripts/ci-package.sh apt-get install -y \
             cmake ninja-build pkg-config flex bison g++ \
             libatomic1 libsystemd-dev libpcre2-dev libcurl4-openssl-dev \
             liblz4-dev libzstd-dev libuv1-dev libssl-dev libelf-dev \

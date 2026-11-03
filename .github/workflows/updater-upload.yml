@@ -26,8 +26,8 @@ jobs:
       - name: Install Rclone
         id: install-rclone
         run: |
-          sudo apt-get update || exit 1
-          sudo apt-get install -y rclone || exit 1
+          sudo sh .github/scripts/ci-package.sh apt-get update
+          sudo sh .github/scripts/ci-package.sh apt-get install -y rclone
       - name: Upload Updater
         id: upload
         env:

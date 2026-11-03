@@ -27,7 +27,7 @@ jobs:
       - name: Prepare environment
         id: prepare
         run: |
-          pip3 install requests python-dateutil
+          sh .github/scripts/ci-package.sh pip3 install requests python-dateutil
       - name: Run PackageCloud Cleanup
         id: cleanup
         env:

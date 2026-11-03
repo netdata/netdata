@@ -164,8 +164,8 @@ jobs:
       - name: Prepare tools
         id: prepare
         run: |
-          sudo apt-get update || true
-          sudo apt-get install -y python3-ruamel.yaml
+          sudo sh .github/scripts/ci-package.sh apt-get update
+          sudo sh .github/scripts/ci-package.sh apt-get install -y python3-ruamel.yaml
       - name: Read build matrix
         id: set-matrix
         run: |
@@ -228,9 +228,8 @@ jobs:
         id: qemu
         if: matrix.qemu && needs.file-check.outputs.run == 'true'
         run: |
-          sudo apt-get update
-          sudo apt-get upgrade -y
-          sudo apt-get install -y qemu-user-static
+          sudo sh .github/scripts/ci-package.sh apt-get update
+          sudo sh .github/scripts/ci-package.sh apt-get install -y qemu-user-static
       - name: Setup Buildx
         id: prepare
         if: needs.file-check.outputs.run == 'true'

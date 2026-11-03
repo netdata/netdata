@@ -42,7 +42,7 @@ jobs:
       - name: Setup python environment
         id: setup-python
         run: |
-          pip install -r .github/scripts/modules/requirements.txt
+          sh .github/scripts/ci-package.sh pip install -r .github/scripts/modules/requirements.txt
       - name: Check for newer versions
         id: check-newer-releases
         run: |

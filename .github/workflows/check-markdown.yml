@@ -57,8 +57,8 @@ jobs:
         run: |
           python3 -m venv ./venv
           source ./venv/bin/activate
-          python -m pip install --require-hashes -r learn/.learn_environment/ingest-requirements.txt
-          cd netdata && ./integrations/pip.sh
+          sh netdata/.github/scripts/ci-package.sh python -m pip install --require-hashes -r learn/.learn_environment/ingest-requirements.txt
+          cd netdata && sh .github/scripts/ci-package.sh ./integrations/pip.sh
 
       - name: Generate Source Metadata
         run: |
