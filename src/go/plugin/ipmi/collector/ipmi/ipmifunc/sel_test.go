@@ -140,13 +140,15 @@ func TestRouter_SELTable(t *testing.T) {
 	assert.Contains(t, response.Help, "converted with the BMC's SEL UTC offset of +120 minutes")
 	assert.Contains(t, response.Help, "The BMC reports 5 SEL entries and 6300 bytes free.")
 	assert.Contains(t, response.Help, "Returned 5 matching records of 5 read.")
-	assert.Contains(t, response.Help, "2 records have no date")
+	assert.Contains(t, response.Help, "The dashboard time range does not filter this table")
 	assert.NotContains(t, response.Help, "Reading the SEL")
 	require.Len(t, response.RequiredParams, 1)
 	assert.Equal(t, paramState, response.RequiredParams[0].ID)
 
-	// The history table envelope the framework serializes for this method.
+	// The table envelope the framework serializes for this method.
 	method := selMethod(10)
+	assert.False(t, method.HasHistory, "SEL records are often weeks apart; a time range would hide them")
+	assert.Empty(t, method.Tags, "listed with the other IPMI Functions")
 	validateFunctionPayload(t, map[string]any{
 		"v":                   3,
 		"update_every":        method.UpdateEvery,
@@ -193,13 +195,6 @@ func TestRouter_SELFilters(t *testing.T) {
 			req:     funcapi.RawMethodRequest{Payload: []byte(`{"state":"warning","selections":{"state":["critical"]}}`)},
 			wantIDs: []any{"0x0010"},
 		},
-		"time bounds are inclusive": {
-			req: funcapi.RawMethodRequest{
-				Payload: []byte(`{"after":` + strconv.FormatInt(utcMillis(60)/1000, 10) +
-					`,"before":` + strconv.FormatInt(utcMillis(60)/1000, 10) + `}`),
-			},
-			wantIDs: []any{"0x0013", "0x0012", "0x0011"},
-		},
 		"text query": {
 			req: funcapi.RawMethodRequest{
 				Payload: []byte(`{"query":"*FAN*"}`),
@@ -217,12 +212,13 @@ func TestRouter_SELFilters(t *testing.T) {
 				Payload: []byte(`{"query":"*fan*"}`),
 			},
 		},
-		"time range keeps undated records": {
+		"dashboard time range is ignored": {
 			req: funcapi.RawMethodRequest{
+				Args: []string{"after:-900", "before:0"},
 				Payload: []byte(`{"after":` + strconv.FormatInt(utcMillis(30)/1000, 10) +
 					`,"before":` + strconv.FormatInt(utcMillis(90)/1000, 10) + `}`),
 			},
-			wantIDs: []any{"0x0013", "0x0012", "0x0011"},
+			wantIDs: []any{"0x0014", "0x0013", "0x0012", "0x0011", "0x0010"},
 		},
 	}
 
@@ -284,12 +280,8 @@ func TestRouter_SELRequestErrors(t *testing.T) {
 		"invalid JSON":           `[`,
 		"unknown state":          `{"state":"error"}`,
 		"several states":         `{"state":["warning","critical"]}`,
-		"fractional time":        `{"after":1.5}`,
-		"null time":              `{"after":null}`,
-		"reversed range":         `{"after":10,"before":9}`,
 		"invalid pattern":        `{"query":"["}`,
 		"several query patterns": `{"query":["a","b"]}`,
-		"out of range time":      `{"before":99999999999}`,
 	} {
 		tests[name] = struct {
 			ctx        context.Context
@@ -398,21 +390,4 @@ func TestRouter_SELHelp(t *testing.T) {
 
 	response := handleSEL(t, testSEL(), funcapi.RawMethodRequest{})
 	assert.NotContains(t, response.Help, "After the offset", "a clock in step with its offset is not reported")
-}
-
-func TestParseSELQuery_RelativeTimes(t *testing.T) {
-	now := time.Unix(1700000000, 0)
-	q, err := parseSELQuery(funcapi.RawMethodRequest{
-		Args: []string{"after:-3600", "before:0"},
-	}, now)
-	require.NoError(t, err)
-	assert.Equal(t, now.Unix()-3600, *q.after)
-	assert.Equal(t, now.Unix(), *q.before)
-
-	q, err = parseSELQuery(funcapi.RawMethodRequest{
-		Payload: []byte(`{"after":-60,"before":-600}`),
-	}, now)
-	require.NoError(t, err)
-	assert.Equal(t, now.Unix()-600, *q.before, "before is relative to now")
-	assert.Equal(t, now.Unix()-660, *q.after, "after is relative to before")
 }

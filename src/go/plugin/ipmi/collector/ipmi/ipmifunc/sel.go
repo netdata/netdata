@@ -19,7 +19,10 @@ const SELFunctionName = "ipmi-sel"
 // MethodSEL is the System Event Log method.
 const MethodSEL = "sel"
 
-const selHelp = "Browse the System Event Log records retained by the BMC, read by the collector without extra BMC requests. Clearing or rollover on the BMC removes records."
+// selDescription is the short help of the Function list.
+const selDescription = "IPMI System Event Log records and their health states"
+
+const selHelp = "Browse every System Event Log record the BMC retains, newest first, read by the collector without extra BMC requests. The dashboard time range does not filter this table: SEL records are often weeks apart. Clearing or rollover on the BMC removes records."
 
 // selStates are the FreeIPMI default interpretation states, worst first.
 var selStates = []string{bmc.StateCritical, bmc.StateWarning, bmc.StateNominal, bmc.StateUnknown}
@@ -29,14 +32,12 @@ func selMethod(updateEvery int) funcapi.FunctionConfig {
 		ID:             MethodSEL,
 		FunctionName:   SELFunctionName,
 		Name:           "IPMI System Event Log",
-		Help:           selHelp,
+		Help:           selDescription,
 		UpdateEvery:    updateEvery,
-		Tags:           "logs",
 		ResponseType:   "table",
 		RawRequest:     true,
 		ManagedInfo:    true,
-		HasHistory:     true,
-		AcceptedParams: []string{paramAfter, paramBefore, paramQuery},
+		AcceptedParams: []string{paramQuery},
 		RequiredParams: []funcapi.ParamConfig{selStateParam()},
 	}
 }
@@ -78,7 +79,7 @@ func (r *router) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *f
 	if s.SEL == nil {
 		return funcapi.UnavailableResponse("The System Event Log is unavailable: the BMC has not answered SEL requests")
 	}
-	query, err := parseSELQuery(req, time.Now())
+	query, err := parseSELQuery(req)
 	if err != nil {
 		return funcapi.ErrorResponse(400, "%s", err)
 	}
@@ -87,18 +88,10 @@ func (r *router) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *f
 
 func selTable(ctx context.Context, sel *bmc.SEL, query selQuery) *funcapi.FunctionResponse {
 	rows := make([][]any, 0, len(sel.Records))
-	undated := 0
 	// Log order, newest first: timestamps are absent from some records and
 	// follow the BMC clock, which can be set backwards.
 	for i := len(sel.Records) - 1; i >= 0 && ctx.Err() == nil; i-- {
 		rec := sel.Records[i]
-		at, dated := sel.Time(rec)
-		if dated {
-			seconds := at.Unix()
-			if query.after != nil && seconds < *query.after || query.before != nil && seconds > *query.before {
-				continue
-			}
-		}
 		if query.state != "" && query.state != stateAll && query.state != rec.State {
 			continue
 		}
@@ -109,10 +102,8 @@ func selTable(ctx context.Context, sel *bmc.SEL, query selQuery) *funcapi.Functi
 			continue
 		}
 		var timestamp any
-		if dated {
+		if at, dated := sel.Time(rec); dated {
 			timestamp = at.UnixMilli()
-		} else {
-			undated++
 		}
 		rows = append(rows, []any{
 			len(sel.Records) - 1 - i,
@@ -135,10 +126,6 @@ func selTable(ctx context.Context, sel *bmc.SEL, query selQuery) *funcapi.Functi
 
 	help := []string{selHelp, selStatus(sel), selClock(sel)}
 	help = append(help, fmt.Sprintf("Returned %d matching records of %d read.", len(rows), len(sel.Records)))
-	if undated > 0 {
-		help = append(help, fmt.Sprintf(
-			"%d records have no date and remain visible because the time range cannot filter them.", undated))
-	}
 	help = append(help, "Text search uses case-sensitive, ordered simple patterns against sensor, type, event, "+
 		"direction, state, generator and record ID (for example *DIMM*; exclusions need a following positive pattern).")
 	return &funcapi.FunctionResponse{

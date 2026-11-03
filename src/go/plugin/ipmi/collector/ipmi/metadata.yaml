@@ -344,22 +344,6 @@ modules:
                 - {id: warning, name: Warning}
                 - {id: nominal, name: Nominal}
                 - {id: unknown, name: Unknown}
-            - id: after
-              name: After
-              type: integer
-              description: Inclusive lower time boundary in integer Unix seconds. A negative value is relative to
-                before, or to now when before is omitted.
-              required: false
-              default: No lower boundary
-              options: []
-            - id: before
-              name: Before
-              type: integer
-              description: Inclusive upper time boundary in integer Unix seconds. Zero or a negative value is relative
-                to now.
-              required: false
-              default: No upper boundary
-              options: []
             - id: query
               name: Search
               type: string
@@ -371,12 +355,12 @@ modules:
               options: []
           returns:
             description: |
-              One row per SEL record the BMC retains, newest first in log order. Times are converted to UTC with the
-              BMC's SEL UTC offset. When the BMC reports none, times are the BMC clock, and the view shows how far that
+              One row per SEL record the BMC retains, newest first in log order. The dashboard time range does not
+              filter the table, because SEL records are often weeks apart. Times are converted to UTC with the BMC's
+              SEL UTC offset. When the BMC reports none, times are the BMC clock, and the view shows how far that
               clock is from the Agent clock. Records logged before a daylight saving change can be off by an hour,
               because the BMC reports only its current offset. Records without a date (OEM records without a
-              timestamp, or records logged before the BMC clock was set) show Time as Unavailable and are not filtered
-              by the time range.
+              timestamp, or records logged before the BMC clock was set) show Time as Unavailable.
             columns:
               - name: Order
                 type: integer

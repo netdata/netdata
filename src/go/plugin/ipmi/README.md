@@ -86,9 +86,10 @@ UDP exchanges. Remote session cleanup gets a separate two-second budget, includi
 
 ## System Event Log
 
-With `collect_sel: true` (the default), each job charts the SEL entry count and serves the `ipmi-sel` Function: the
-records the BMC retains, newest first, with sensor, event, direction and the default FreeIPMI state. The Function reads
-records the collector already holds and sends no BMC requests. `collect_sel: false` stops every SEL command and removes
+With `collect_sel: true` (the default), each job charts the SEL entry count and serves the `ipmi-sel` Function: every
+record the BMC retains, newest first, with sensor, event, direction and the default FreeIPMI state. The dashboard time
+range does not filter it, because SEL records are often weeks apart. The Function reads records the collector already
+holds and sends no BMC requests. `collect_sel: false` stops every SEL command and removes
 the job from `ipmi-sel`.
 
 The collector reads each record once, then only records the BMC adds; it rereads the log after the BMC clears it. The
