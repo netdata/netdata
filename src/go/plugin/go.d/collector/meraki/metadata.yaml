@@ -65,8 +65,8 @@ modules:
             Nothing is detected automatically: each job monitors the one organization set in `organization_id`, with the API key you configure. Within that organization, every collection finds all assigned devices and adds a node for each new one.
         limits:
           description: |
-            - **Five-minute data.** Meraki refreshes device availability every 5 minutes without a sample time, and traffic values are averages over at least 5 minutes, so an `update_every` below 300 seconds adds requests, not detail. Above 300 seconds, each traffic value covers only one 5-minute window of the collection interval.
-            - **Traffic lags behind.** Meraki publishes traffic some minutes after it happens. Switch port traffic is the latest interval Meraki has reported within the last 15 minutes, so it can be up to 15 minutes old; the interval age chart shows how old it is, and the chart has a gap only when Meraki has reported no interval in that time. Uplink traffic covers the 5 minutes that ended 5 minutes earlier, which Meraki has finished counting. Packet rates cover the last 5 minutes, which Meraki may not have finished reporting. Missed collections are not backfilled.
+            - **Five-minute data.** Meraki refreshes device availability every 5 minutes without a sample time, and traffic values are averages over at least 5 minutes, so an `update_every` below 300 seconds adds requests, not detail. Above 300 seconds, each traffic value still covers only one Meraki window, usually 5 minutes, not the whole collection interval.
+            - **Traffic lags behind.** Meraki publishes traffic some minutes after it happens. Switch port traffic is the latest interval Meraki has reported within the last 15 minutes, so it can be up to 15 minutes old; the interval age chart shows how old it is, and the chart has a gap when Meraki has reported no usable interval in that time. Uplink traffic covers the 5 minutes that ended 5 minutes earlier, to give Meraki time to count the bytes. Packet rates cover the last 5 minutes, which Meraki may not have finished reporting. Missed collections are not backfilled.
             - **Uplinks belong to the network.** When more than one appliance of a network was active, such as a warm spare pair, Meraki adds up their bytes per interface. Uplink charts are therefore per network and interface, on the job's node or its virtual node, not on an appliance's node.
             - **Shared API budget.** Meraki allows 10 requests per second per organization and 100 per source IP address, shared with every other application using them. The collector sends at most 10 requests per second per job, and after a `429 Too Many Requests` answer it sends nothing until the `Retry-After` wait Meraki requested has passed. See [Meraki API rate limits](https://developer.cisco.com/meraki/api-v1/rate-limit/).
         performance_impact:
@@ -86,7 +86,7 @@ modules:
 
             | Option | Requests | Charts |
             |:-------|:---------|:-------|
-            | `collect_switch_port_traffic` | 1 per 50 assigned switches | 2 per switch port |
+            | `collect_switch_port_traffic` | 1 per 50 switches Meraki lists for the organization | 2 per switch port |
             | `collect_switch_port_packets` | 1 per assigned switch | 1 per switch port |
             | `collect_appliance_uplink_traffic` | 1 | 1 per uplink |
 

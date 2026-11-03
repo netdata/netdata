@@ -418,9 +418,10 @@ sequenceDiagram
   schedule collections; the framework's rules for manual and fresh activations still apply
   (`src/go/plugin/go.d/docs/how-to-write-a-collector.md#registration-and-lifecycle`).
 
-**Traffic cost.** For `S` assigned switches, the three traffic options add `ceil(S / 50) + S + 1` requests per cycle
-before redirects. At 1,000 switches that is 1,021 requests, about 102 seconds of pacing, beyond the default 60-second
-`timeout`. The collector adds no cap or tuning option for it; `metadata.yaml` tells operators to raise `timeout` with
+**Traffic cost.** For `S` switches, the three traffic options add `ceil(S / 50) + S + 1` requests per cycle
+before redirects; the usage history pages count every switch Meraki lists for the organization, the packet requests
+only the assigned ones. At 1,000 switches that is 1,021 requests, about 102 seconds of pacing, beyond the default
+60-second `timeout`. The collector adds no cap or tuning option for it; `metadata.yaml` tells operators to raise `timeout` with
 `collect_switch_port_packets` or leave it off.
 
 ## The API Client

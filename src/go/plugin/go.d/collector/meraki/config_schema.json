@@ -193,13 +193,13 @@
       "ui:help": "This budget covers a whole collection, including authentication-file reads, pagination and pacing. Increase it if a large organization cannot finish within the budget. Collecting switch port packets adds one request per switch."
     },
     "collect_switch_port_traffic": {
-      "ui:help": "Uses the latest interval Meraki has reported within the last 15 minutes, usually five minutes long; the chart has a gap only when it has reported none. A second chart shows how old the interval is. Costs one API request per 50 switches."
+      "ui:help": "Uses the latest interval Meraki has reported within the last 15 minutes, usually five minutes long; a port without a usable interval in that time has a gap. A second chart shows how old the interval is. Costs one API request per 50 switches."
     },
     "collect_switch_port_packets": {
       "ui:help": "Requests are paced at 10 per second, so 1,000 switches add about 100 seconds to every collection, more than the default Timeout of 60 seconds. A collection that runs past Timeout updates no chart, availability included. Increase Timeout with it, or leave it off for large fleets.\n\nRates cover the last five minutes, which Meraki may not have finished reporting."
     },
     "collect_appliance_uplink_traffic": {
-      "ui:help": "Shows the bytes each uplink moved in the five minutes that ended five minutes ago, which Meraki has finished counting, as average kilobits per second. When more than one appliance of a network was active, such as a warm spare pair, Meraki adds up their bytes per interface, so the charts belong to the network, not to an appliance."
+      "ui:help": "Shows the bytes each uplink moved in the five minutes that ended five minutes ago, leaving Meraki time to count them, as average kilobits per second. When more than one appliance of a network was active, such as a warm spare pair, Meraki adds up their bytes per interface, so the charts belong to the network, not to an appliance."
     }
   }
 }
