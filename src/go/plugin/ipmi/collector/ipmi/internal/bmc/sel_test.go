@@ -1192,3 +1192,58 @@ func TestReader_SEL_ReadRecordsSurviveClear(t *testing.T) {
 		})
 	}
 }
+
+func TestReader_SEL_ResumeAtReusedID(t *testing.T) {
+	// A full log of four records whose new records take the overwritten
+	// records' IDs. A catch-up read spanning collections must not resume at a
+	// saved record ID the BMC reused for a newer record meanwhile.
+	fake := newFakeBMC()
+	fake.sel.records = tempEvents(1, 2, 3, 4)
+	r := newSELTestReader(fake, 4*time.Second, 500*time.Millisecond) // 2 records per collection
+	for !collectSEL(t, r).Loaded {
+	}
+	ts := uint32(0x70000000)
+	overwrite := func(n int) (logged [][selRecordSize]byte) {
+		for range n {
+			ts++
+			rec := tempEvent(binary.LittleEndian.Uint16(fake.sel.records[0][:]), ts)
+			fake.sel.records = append(fake.sel.records[1:], rec)
+			fake.sel.additionTime++
+			fake.sel.reservation = 0
+			logged = append(logged, rec)
+		}
+		return logged
+	}
+
+	var logged, reported [][selRecordSize]byte
+	var sel *SEL
+	for _, n := range []int{3, 4, 1, 0, 0, 0} {
+		logged = append(logged, overwrite(n)...)
+		sel = collectSEL(t, r)
+		reported = append(reported, recordsRaw(&SEL{Records: sel.New})...)
+	}
+	assert.Equal(t, fake.sel.records, recordsRaw(sel), "the cache holds the BMC's log")
+	var held [][selRecordSize]byte
+	for _, rec := range logged {
+		if slices.Contains(reported, rec) || slices.Contains(fake.sel.records, rec) {
+			held = append(held, rec)
+		}
+	}
+	assert.ElementsMatch(t, held, reported, "every new record read or still held is reported once")
+}
+
+func TestReader_SEL_ResumeFindsNewestRecord(t *testing.T) {
+	// A read spanning collections resumes after a change at its newest cached
+	// record; when the BMC reports no record after it, the read is complete.
+	fake := newFakeBMC()
+	fake.sel.records = tempEvents(1, 2, 3, 4)
+	r := newSELTestReader(fake, 4*time.Second, 500*time.Millisecond) // 2 records per collection
+	require.False(t, collectSEL(t, r).Loaded)
+
+	fake.sel.records = fake.sel.records[:2]
+	fake.sel.additionTime++
+	got := collectSEL(t, r)
+	assert.True(t, got.Loaded)
+	assert.True(t, got.NewKnown)
+	assert.Equal(t, []uint16{1, 2}, recordIDs(got))
+}

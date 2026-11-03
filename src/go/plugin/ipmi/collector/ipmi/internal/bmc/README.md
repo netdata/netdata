@@ -60,9 +60,11 @@ Records are cached per Reader, across collections and reconnects:
 - The first read walks the chain from record 0000h with `Get SEL Entry`, oldest first. Each collection starts no new
   read once min(2 s, update interval / 4) has passed and resumes where it stopped; a walk reads at least one record. At
   about 8 ms per record over local KCS, a full read of a large SEL would otherwise delay sensor collection by seconds.
-- Once the newest record has been read, an unchanged entry count and addition time send no `Get SEL Entry`. A change
-  reads the newest record (FFFFh); if it differs from the newest cached record, that cached record is read again for
-  its next-record ID and the walk continues from there.
+- Once the newest record has been read, an unchanged entry count and addition time send no `Get SEL Entry`. After a
+  change, reading always resumes from the newest cached record, read again for its next-record ID, also when a read
+  spanning several collections is still in progress: on a full log a BMC can give a new record the ID of an
+  overwritten one, so a next-record ID saved earlier could lead past the records logged since. A cache that had
+  reached the newest record first reads the BMC's newest record (FFFFh) and reads nothing more when they match.
 - A changed erase time, or a newest cached record that is gone or changed, means the SEL was cleared or rewritten:
   the cache is reset and the log is read again. A record that disappears during a walk fails that read and restarts
   the log from 0000h.
@@ -154,6 +156,8 @@ complete source-derived discrete and SEL fixtures, threshold flags, missing byte
 conversion, nonlinear factors, and fractional EXP10 conversion. SEL tests cover the read budget and resume, appends,
 clears, rewrites, rollover and ID reuse, looping chains, reservations, UTC offsets, clock refresh, undated and OEM
 records, generator names, failures and which records are new, including a replay of a real BMC's log
-(`testdata/sel-replay.hex`) with synthetic critical discrete records. Real UDP tests use the upstream reference BMC with
+(`testdata/sel-replay.hex`) with synthetic critical discrete records. A randomized test (`sel_model_test.go`) mixes log
+changes, rollover with reused IDs and failures, and checks against the fake BMC's log that the cache converges and that
+every new record is reported exactly once. Real UDP tests use the upstream reference BMC with
 a User account for both LAN and LAN+: Check cleanup, sensor and SEL collection, session reuse, malformed responses,
 cancellation and failed setup recovery. These fixtures do not establish live-hardware parity for any particular vendor.

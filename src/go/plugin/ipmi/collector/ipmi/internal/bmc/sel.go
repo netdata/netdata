@@ -57,9 +57,9 @@ type selCache struct {
 	// counting is set once the log was read completely; only records first
 	// read after that are new.
 	counting bool
-	// seen holds the content of the cached records and of every record read
-	// since the log was last read completely. Resets keep it, so a record read
-	// again is not new.
+	// seen holds the content of the cached records and of the records read
+	// since the log was last read completely that the BMC may still hold.
+	// Resets keep it, so a record read again is not new.
 	seen map[[selRecordSize]byte]bool
 	// pending holds the new records no delivered snapshot reported yet.
 	pending [][selRecordSize]byte
@@ -214,12 +214,11 @@ func (r *Reader) redecodeSEL() {
 }
 
 // updateSEL brings the cache up to date with info. A changed erase time means
-// the SEL was cleared. Once up to date, a changed entry count or addition time
-// starts a read of the records after the newest cached one; if that record is
-// gone or changed, the SEL was cleared or rewritten and is read again from the
-// start. Reading is bounded by the read budget and resumes next collection.
-// More cached records than the reported entry count are checked against the
-// oldest record the BMC holds before any is dropped.
+// the SEL was cleared. A changed entry count or addition time makes reading
+// resume after the newest cached record (resumeAfterChange). Reading is bounded
+// by the read budget and continues next collection. More cached records than
+// the reported entry count are checked against the oldest record the BMC holds
+// before any is dropped.
 func (r *Reader) updateSEL(ctx context.Context, info storage.GetSELInfoResponse) error {
 	c := &r.sel
 	if c.infoKnown && !info.RecentEraseTime.Equal(c.info.RecentEraseTime) {
@@ -233,8 +232,8 @@ func (r *Reader) updateSEL(ctx context.Context, info storage.GetSELInfoResponse)
 	case info.Entries == 0:
 		c.records = nil
 		c.readComplete()
-	case c.next == endOfChainRecordID && changed:
-		if err := r.resumeAfterNewest(ctx); err != nil {
+	case changed:
+		if err := r.resumeAfterChange(ctx); err != nil {
 			return err
 		}
 	}
@@ -272,6 +271,9 @@ func (r *Reader) dropOverwritten(ctx context.Context) error {
 	}
 	for i, rec := range c.records {
 		if rec.Raw == oldest {
+			for _, gone := range c.records[:i] {
+				delete(c.seen, gone.Raw)
+			}
 			c.records = c.records[i:]
 			return nil
 		}
@@ -280,25 +282,34 @@ func (r *Reader) dropOverwritten(ctx context.Context) error {
 	return nil
 }
 
-// resumeAfterNewest sets the next record to read after a change, or resets the
-// cache when the newest cached record no longer exists unchanged.
-func (r *Reader) resumeAfterNewest(ctx context.Context) error {
+// resumeAfterChange sets where reading continues after the log changed: after
+// the newest cached record, which must still be held unchanged. On a full log
+// the BMC can give a new record the ID of an overwritten one, so a next-record
+// ID kept by an unfinished read could lead past the records logged since; the
+// unchanged newest cached record proves which records follow. A read that had
+// reached the newest record first compares it with the BMC's newest record and
+// has nothing to read when they match. A newest cached record that is gone or
+// changed means the log was cleared, rewritten or overwritten past it, and the
+// log is read again from the start.
+func (r *Reader) resumeAfterChange(ctx context.Context) error {
 	c := &r.sel
 	last := c.last()
 	if last == nil {
 		c.next = firstRecordID
 		return nil
 	}
-	newest, _, err := r.readSELRecord(ctx, lastSELRecordID)
-	switch {
-	case errors.Is(err, errSELRecordGone):
-		// Emptied after Get SEL Info.
-		c.reset()
-		return nil
-	case err != nil:
-		return err
-	case newest == last.Raw:
-		return nil
+	if c.next == endOfChainRecordID {
+		newest, _, err := r.readSELRecord(ctx, lastSELRecordID)
+		switch {
+		case errors.Is(err, errSELRecordGone):
+			// Emptied after Get SEL Info.
+			c.reset()
+			return nil
+		case err != nil:
+			return err
+		case newest == last.Raw:
+			return nil
+		}
 	}
 	cached, next, err := r.readSELRecord(ctx, last.ID)
 	switch {
@@ -306,6 +317,9 @@ func (r *Reader) resumeAfterNewest(ctx context.Context) error {
 		c.reset()
 	case err != nil:
 		return err
+	case next == endOfChainRecordID:
+		// The newest cached record is the BMC's newest.
+		c.readComplete()
 	default:
 		c.next = next
 	}
