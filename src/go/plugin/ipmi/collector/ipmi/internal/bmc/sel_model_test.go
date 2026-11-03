@@ -17,7 +17,8 @@ import (
 // TestReader_SEL_RandomLogChanges runs the Reader through random sequences of
 // BMC log changes (appends, rollover with free or slot-style reused record
 // IDs, records Get SEL Info cannot show, clears, single deletions, rewrites,
-// and bursts, clears and deletions while a read is in progress) and failures
+// and bursts, clears, deletions and deletions whose ID a new record takes at
+// once while a read is in progress) and failures
 // (Get SEL Info and Get SEL Entry errors, cancellations, cancelled
 // reservations, multi-collection reads). The fake BMC's own log is the oracle:
 // once the log stops changing, the cache equals it, and every record logged
@@ -97,13 +98,28 @@ func (m *selModel) clear(step int) {
 	m.log(step, false)
 }
 
-// deleteOne deletes one record, which changes the erase time.
-func (m *selModel) deleteOne(rng *rand.Rand) {
-	if n := len(m.fake.sel.records); n > 0 {
-		i := rng.IntN(n)
-		m.fake.sel.records = slices.Delete(slices.Clone(m.fake.sel.records), i, i+1)
-		m.fake.sel.eraseTime++
-		m.fake.sel.reservation = 0
+// deleteOne deletes one record, which changes the erase time, and reports
+// its record ID.
+func (m *selModel) deleteOne(rng *rand.Rand) (uint16, bool) {
+	n := len(m.fake.sel.records)
+	if n == 0 {
+		return 0, false
+	}
+	i := rng.IntN(n)
+	id := binary16(m.fake.sel.records[i])
+	m.fake.sel.records = slices.Delete(slices.Clone(m.fake.sel.records), i, i+1)
+	m.fake.sel.eraseTime++
+	m.fake.sel.reservation = 0
+	return id, true
+}
+
+// replaceOne deletes one record and logs a new record under its ID.
+func (m *selModel) replaceOne(step int, rng *rand.Rand) {
+	if id, ok := m.deleteOne(rng); ok {
+		m.ts++
+		rec := tempEvent(id, m.ts)
+		m.loggedAt[rec] = step
+		m.fake.sel.add(rec)
 	}
 }
 
@@ -143,7 +159,7 @@ func runSELModel(t *testing.T, seed uint64, steps int) bool {
 			return
 		}
 		eventsDuringRead--
-		switch rng.IntN(6) {
+		switch rng.IntN(7) {
 		case 0:
 			for range 1 + rng.IntN(capacity+1) {
 				m.log(step, false)
@@ -152,6 +168,8 @@ func runSELModel(t *testing.T, seed uint64, steps int) bool {
 			m.clear(step)
 		case 2:
 			m.deleteOne(rng)
+		case 3:
+			m.replaceOne(step, rng)
 		default:
 			m.log(step, rng.IntN(4) == 0)
 		}

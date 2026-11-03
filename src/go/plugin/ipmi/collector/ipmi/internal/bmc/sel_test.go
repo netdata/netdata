@@ -386,10 +386,9 @@ func TestReader_SEL_RolloverDuringRead(t *testing.T) {
 				s.add(tempEvents(9, 10, 11, 12, 13, 14)...)
 			},
 			entryCost: 500 * time.Millisecond, // 2 records per collection
-			// Overwritten records stay cached until the read is verified.
 			wantIDs: [][]uint16{
 				{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
-				{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12},
+				{5, 6, 7, 8, 9, 10, 11, 12},
 				{5, 6, 7, 8, 9, 10, 11, 12, 13, 14},
 			},
 			wantNewKnown: []bool{true, true, true},
@@ -1271,16 +1270,107 @@ func TestReader_SEL_OverwrittenPastTheRead(t *testing.T) {
 				}
 			}
 
-			assert.Equal(t, fake.sel.records, recordsRaw(sel), "the cache holds the BMC's log")
-			want := make(map[[selRecordSize]byte]int)
-			for _, rec := range logged {
-				if receiving.received[rec] > 0 || slices.Contains(fake.sel.records, rec) {
-					want[rec] = 1
-				}
-			}
-			assert.Equal(t, want, reported, "every new record received or still held is reported once")
+			assertReportedOnce(t, fake, receiving, sel, logged, reported)
 		})
 	}
+}
+
+func TestReader_SEL_DeletedAheadOfTheRead(t *testing.T) {
+	// While new records are read, the BMC deletes the next one (the erase time
+	// changes) and gives its ID to a new record, so the read jumps to the
+	// newest record. The BMC's oldest record is still cached; the erase time
+	// shows the read skipped records.
+	fake := newFakeBMC()
+	fake.sel.records = tempEvents(1, 2, 3)
+	receiving := &receivingTransport{fakeBMC: fake, received: make(map[[selRecordSize]byte]int)}
+	r := newSELTestReader(fake, 0, 0)
+	r.newTransport = func() (transport, error) { return receiving, nil }
+	collectSEL(t, r)
+
+	logged := tempEvents(4, 5, 6, 7)
+	fake.sel.add(logged...)
+	reusing := tempEvent(5, 0x70000005)
+	logged = append(logged, reusing)
+	fake.onExchange = func(req types.Request) error {
+		if q, ok := req.(*storage.GetSELEntryRequest); ok && q.RecordID == 5 && !slices.Contains(fake.sel.records, reusing) {
+			fake.sel.records = slices.DeleteFunc(slices.Clone(fake.sel.records), func(rec [selRecordSize]byte) bool {
+				return binary.LittleEndian.Uint16(rec[:]) == 5
+			})
+			fake.sel.eraseTime++
+			fake.sel.add(reusing)
+		}
+		return nil
+	}
+
+	reported := make(map[[selRecordSize]byte]int)
+	var sel *SEL
+	for range 4 {
+		sel = collectSEL(t, r)
+		for _, rec := range sel.New {
+			reported[rec.Raw]++
+		}
+	}
+	assertReportedOnce(t, fake, receiving, sel, logged, reported)
+}
+
+func TestReader_SEL_StormKeepsTheCacheWithinTheLog(t *testing.T) {
+	// A full log of twenty records with rollover gains one record more per
+	// collection than a collection reads, so the read falls further behind:
+	// the cache never grows past the log's size, and once the storm ends every
+	// new record still held is reported once.
+	const capacity = 20
+	fake := newFakeBMC()
+	for id := range uint16(capacity) {
+		fake.sel.records = append(fake.sel.records, tempEvent(id+1, 0x60000000+uint32(id)))
+	}
+	receiving := &receivingTransport{fakeBMC: fake, received: make(map[[selRecordSize]byte]int)}
+	r := newSELTestReader(fake, 4*time.Second, 300*time.Millisecond) // 4 records per collection
+	r.newTransport = func() (transport, error) { return receiving, nil }
+	for !collectSEL(t, r).Loaded {
+	}
+
+	var logged [][selRecordSize]byte
+	reported := make(map[[selRecordSize]byte]int)
+	var sel *SEL
+	for collection := range 50 {
+		if collection < 30 {
+			for range 5 {
+				rec := tempEvent(uint16(capacity+len(logged)+1), 0x70000000+uint32(len(logged)))
+				fake.sel.add(rec)
+				fake.sel.records = fake.sel.records[1:]
+				logged = append(logged, rec)
+			}
+		}
+		sel = collectSEL(t, r)
+		require.LessOrEqual(t, len(sel.Records), capacity, "collection %d", collection)
+		for _, rec := range sel.New {
+			reported[rec.Raw]++
+		}
+	}
+	assertReportedOnce(t, fake, receiving, sel, logged, reported)
+}
+
+// assertReportedOnce checks a settled SEL against the fake BMC: the cache
+// holds the BMC's log, and of the records logged during the test, each the
+// Reader received or the BMC still holds is reported exactly once and no other
+// record is reported.
+func assertReportedOnce(
+	t *testing.T,
+	fake *fakeBMC,
+	receiving *receivingTransport,
+	sel *SEL,
+	logged [][selRecordSize]byte,
+	reported map[[selRecordSize]byte]int,
+) {
+	t.Helper()
+	assert.Equal(t, fake.sel.records, recordsRaw(sel), "the cache holds the BMC's log")
+	want := make(map[[selRecordSize]byte]int)
+	for _, rec := range logged {
+		if receiving.received[rec] > 0 || slices.Contains(fake.sel.records, rec) {
+			want[rec] = 1
+		}
+	}
+	assert.Equal(t, want, reported, "every new record received or still held is reported once")
 }
 
 func TestReader_SEL_ResumeFindsNewestRecord(t *testing.T) {

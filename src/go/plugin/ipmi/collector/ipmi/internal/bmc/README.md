@@ -68,13 +68,18 @@ Records are cached per Reader, across collections and reconnects:
 - A changed erase time, or a newest cached record that is gone or changed, means the SEL was cleared or rewritten:
   the cache is reset and the log is read again. A record that disappears during a walk fails that read and restarts
   the log from 0000h.
-- A read that added records and reached the newest record is complete only once verified against the oldest record
-  the BMC holds (0000h). On rollover the BMC overwrites its oldest records, so older cached records are dropped; until
-  then a read in progress can still hold records the BMC overwrote. A cache without that record is read again: a burst
-  that overwrites records ahead of the read can make it follow a reused record ID to the newest record and skip the
-  records in between. Neither the end of the chain nor the entry count proves the cache holds the log. A cached record
-  ID reported with new content was reused and replaces the old record. Reaching a cached record with unchanged content
-  means the chain loops back and ends the walk.
+- A read that added records and reached the newest record is complete only once verified: neither the end of the
+  chain nor the entry count proves the cache holds the log, because a read that follows a record ID the BMC gave to a
+  newer record skips the records in between. The BMC frees an ID in two ways, and the verification covers both:
+  rollover overwrites the oldest records, so the oldest record the BMC holds (0000h) must be cached and older cached
+  records are dropped; a deletion changes the erase time, so a second `Get SEL Info` must show the erase time
+  unchanged. Otherwise the log is read again. A read still in progress also drops overwritten records once the cache
+  holds more records than the entry count, so a log changing faster than it is read cannot grow the cache past its
+  size. A cached record ID reported with new content was reused and replaces the old record. Reaching a cached record
+  with unchanged content means the chain loops back and ends the walk.
+- The Reader relies on IPMI 2.0 behavior: records leave the log only by rollover, which overwrites the oldest records,
+  or by deletion or clear, which changes the erase time; and the chain lists records oldest first. A BMC that deletes
+  records without changing the erase time can make it skip or repeat records.
 - Like FreeIPMI, `Reserve SEL` is sent only after a 0xC5 completion code, and a read is retried with a new reservation
   up to four times. Whole 16-byte records are read; a shorter record fails the read.
 

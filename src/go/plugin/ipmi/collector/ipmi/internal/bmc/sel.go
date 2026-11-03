@@ -244,27 +244,57 @@ func (r *Reader) updateSEL(ctx context.Context, info storage.GetSELInfoResponse)
 			return err
 		}
 	}
-	if c.next == endOfChainRecordID && c.unverified {
+	switch {
+	case c.next == endOfChainRecordID && c.unverified:
 		return r.completeRead(ctx)
+	case c.next != endOfChainRecordID && len(c.records) > int(info.Entries):
+		// A read still in progress drops the records the BMC overwrote, so a
+		// log changing faster than it is read cannot grow the cache past the
+		// log's size.
+		_, err := r.dropOverwritten(ctx)
+		return err
 	}
 	return nil
 }
 
-// completeRead verifies a read that reached the newest record against the
-// oldest record the BMC holds. Neither the end of the chain nor the entry count
-// proves the cache holds the log: on rollover the BMC overwrites its oldest
-// records, and a read that followed a record ID the BMC reused for a newer
-// record skipped the records in between. Cached records older than the BMC's
-// oldest record are dropped; a cache without that record is read again.
+// completeRead verifies a read that reached the newest record. Neither the end
+// of the chain nor the entry count proves the cache holds the log, because a
+// read that follows a record ID the BMC gave to a newer record skips the
+// records in between. The BMC frees an ID in two ways, which the verification
+// covers: rollover overwrites its oldest records, so its oldest record must be
+// cached (dropOverwritten), and a deletion changes the erase time, which must
+// not have changed since this collection's Get SEL Info. A BMC that deletes
+// records without changing the erase time is not supported.
 func (r *Reader) completeRead(ctx context.Context) error {
+	c := &r.sel
+	if found, err := r.dropOverwritten(ctx); !found || err != nil {
+		return err
+	}
+	var info storage.GetSELInfoResponse
+	if err := r.exchange(ctx, &storage.GetSELInfoRequest{}, &info); err != nil {
+		return err
+	}
+	c.latest = info
+	if !info.RecentEraseTime.Equal(c.info.RecentEraseTime) {
+		c.reset()
+		return nil
+	}
+	c.complete()
+	return nil
+}
+
+// dropOverwritten drops the cached records older than the oldest record the
+// BMC holds, which overwrote them on rollover, and reports whether the cache
+// holds that record. A cache without it is read again.
+func (r *Reader) dropOverwritten(ctx context.Context) (bool, error) {
 	c := &r.sel
 	oldest, _, err := r.readSELRecord(ctx, firstRecordID)
 	switch {
 	case errors.Is(err, errSELRecordGone):
 		c.reset()
-		return nil
+		return false, nil
 	case err != nil:
-		return err
+		return false, err
 	}
 	for i, rec := range c.records {
 		if rec.Raw == oldest {
@@ -272,12 +302,11 @@ func (r *Reader) completeRead(ctx context.Context) error {
 				delete(c.seen, gone.Raw)
 			}
 			c.records = c.records[i:]
-			c.complete()
-			return nil
+			return true, nil
 		}
 	}
 	c.reset()
-	return nil
+	return false, nil
 }
 
 // resumeAfterChange sets where reading continues after the log changed: after
