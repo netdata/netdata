@@ -229,7 +229,7 @@ USAGE: ${PROGRAM} [options]
   --disable-plugin-dem       Explicitly disable the DEM plugin.
   --enable-plugin-statsd     Enable the experimental Go StatsD plugin. Default: disabled.
   --disable-plugin-statsd    Explicitly disable the Go StatsD plugin.
-  --enable-plugin-ipmi       Enable the experimental Go IPMI plugin (Linux). Default: disabled.
+  --enable-plugin-ipmi       Enable the Go IPMI plugin (Linux). Default: enabled on Linux.
   --disable-plugin-ipmi      Explicitly disable the Go IPMI plugin.
   --enable-exporting-kinesis Enable AWS Kinesis exporting connector. Default: enable it when libaws_cpp_sdk_kinesis
                              and its dependencies are available.
@@ -279,6 +279,7 @@ ENABLE_IBM=0
 ENABLE_SCRIPTS=1
 ENABLE_STATSD=0
 ENABLE_IPMI=0
+[ "$(uname -s)" = "Linux" ] && ENABLE_IPMI=1
 ENABLE_DEM=0
 FORCE_LEGACY_CXX=0
 NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS-}"
@@ -309,7 +310,14 @@ while [ -n "${1}" ]; do
     "--disable-dbengine") ENABLE_DBENGINE=0 ;;
     "--enable-plugin-go") ENABLE_GO=1 ;;
     "--disable-plugin-go") ENABLE_GO=0 ;;
-    "--disable-go") ENABLE_GO=0 ;;
+    "--disable-go")
+      ENABLE_GO=0
+      ENABLE_IBM=0
+      ENABLE_SCRIPTS=0
+      ENABLE_STATSD=0
+      ENABLE_IPMI=0
+      ENABLE_DEM=0
+      ;;
     "--enable-plugin-python") ENABLE_PYTHON=1 ;;
     "--disable-plugin-python") ENABLE_PYTHON=0 ;;
     "--enable-plugin-charts") ENABLE_CHARTS=1 ;;
@@ -1022,6 +1030,11 @@ if [ "$(id -u)" -eq 0 ]; then
     if [ $capabilities -eq 0 ]; then
       run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/slabinfo.plugin"
     fi
+  fi
+
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ipmi.plugin" ]; then
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ipmi.plugin"
+    run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ipmi.plugin"
   fi
 
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/freeipmi.plugin" ]; then

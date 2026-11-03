@@ -8,6 +8,7 @@ import (
 	"context"
 	_ "embed"
 	"sync/atomic"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
@@ -89,11 +90,17 @@ func (c *Collector) Init(context.Context) error {
 		PrivilegeLevel: c.PrivilegeLevel,
 		Device:         c.Device,
 		Timeout:        c.Timeout.Duration(),
+		UpdateEvery:    time.Duration(c.UpdateEvery) * time.Second,
 	})
 	return nil
 }
 
 func (c *Collector) Check(ctx context.Context) error { return c.reader.Check(ctx) }
+
+// FunctionAvailable offers the SEL Function only for jobs that collect the SEL.
+func (c *Collector) FunctionAvailable(functionID string) bool {
+	return functionID != ipmifunc.MethodSEL || c.CollectSEL
+}
 
 func (c *Collector) Collect(ctx context.Context) error { return c.collect(ctx) }
 

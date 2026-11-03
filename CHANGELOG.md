@@ -344,6 +344,13 @@
 - Test(go.d): fix restart continuation deadline flake ([#24524](https://github.com/netdata/netdata/issues/24524))
 - Fix(rrddim): name a missing dimension id in the fatal message ([#24528](https://github.com/netdata/netdata/issues/24528))
 - Dbengine: never free a datafile that a journal index or cached page still points at ([#24509](https://github.com/netdata/netdata/issues/24509))
+- Ci: drop the retired macos-14 runner from the macOS build matrix ([#24532](https://github.com/netdata/netdata/issues/24532))
+- Claim: do not rotate the challenge on an unauthenticated wrong key ([#24531](https://github.com/netdata/netdata/issues/24531))
+- Test(go.d): synchronize secret store mutation tests ([#24535](https://github.com/netdata/netdata/issues/24535))
+- Registry: take netdata_registry_id from the Cookie header only ([#24494](https://github.com/netdata/netdata/issues/24494))
+- Keep only a valid client address from X-Forwarded-For ([#24452](https://github.com/netdata/netdata/issues/24452))
+- Feat(ipmi): make Go IPMI the default with exclusive plugin selection ([#24533](https://github.com/netdata/netdata/issues/24533))
+- Regenerate integrations docs ([#24544](https://github.com/netdata/netdata/issues/24544))
 
 ## [2.12.0] - 2026-09-30
 

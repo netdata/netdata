@@ -1231,6 +1231,17 @@ func TestV2DynCfgTestCommandReportsCheckErrorClasses(t *testing.T) {
 		"permanent error": {checkErr: collectorapi.PermanentError(errors.New("unknown profile")), wantCode: 422},
 		"temporary error": {checkErr: collectorapi.TemporaryError(errors.New("dependency not ready")), wantCode: 503},
 		"unclassified":    {checkErr: errors.New("endpoint unreachable"), wantCode: 422},
+		"delayed temporary": {
+			checkErr: collectorapi.WithRetryNotBefore(
+				collectorapi.TemporaryError(errors.New("provider wait")),
+				time.Now().Add(time.Hour),
+			),
+			wantCode: 503,
+		},
+		"delay without classification": {
+			checkErr: collectorapi.WithRetryNotBefore(errors.New("provider wait"), time.Now().Add(time.Hour)),
+			wantCode: 422,
+		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -1250,6 +1261,7 @@ func TestV2DynCfgTestCommandReportsCheckErrorClasses(t *testing.T) {
 				mustDynCfgMessage(test.wantCode, "job output: collector check: "+test.checkErr.Error()),
 				result,
 			)
+			require.False(t, runtimeTestHasRetry(controller, "module_job"), "manual test must not schedule recovery")
 		})
 	}
 }
@@ -2558,7 +2570,9 @@ func TestEnablePreservesFailedFrameworkBlockedBinding(t *testing.T) {
 	prepared, err := controller.Prepare(t.Context(), DynCfgJobRequest{
 		Args:         []string{controller.externalID(config.FullName()), "enable"},
 		CallerSource: "user=test",
-	}, nil, lifecycle.ResourceTransactionScope{ID: config.FullName()}, lifecycle.LongLivedPermit{})
+	}, nil, lifecycle.ResourceTransactionScope{
+		ID: config.FullName(),
+	}, lifecycle.LongLivedPermit{})
 	require.NoError(t, err)
 	applied, err := prepared.Apply(t.Context())
 	require.NoError(t, err)

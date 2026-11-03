@@ -1,19 +1,40 @@
-# Experimental Go IPMI plugin
+# IPMI plugin
 
-This plugin is an opt-in replacement candidate for `freeipmi.plugin`. It is excluded from production builds. The executable
-supports Linux architectures supported by the Go toolchain, including 32-bit x86 and ARM. FreeIPMI remains available
-for production use and capabilities not yet supported by the experiment.
+This Go plugin collects local Linux OpenIPMI sensors and remote BMCs over LAN/LAN+. Linux source and static builds
+include it by default. For DEB/RPM installations, install the optional `netdata-plugin-ipmi` package separately.
+`freeipmi.plugin` remains available for rollback and capabilities listed under Compatibility below.
+
+## Selection and rollback
+
+Netdata starts at most one of `ipmi.plugin` and `freeipmi.plugin`. It prefers Go when both are installed and enabled.
+The choice is made at Agent startup across all configured plugin directories and stays fixed until restart, including
+when the chosen plugin exits or fails collection. There is no automatic failover after a collection failure.
+
+Existing configuration intent is preserved when `[plugins] ipmi` is unset:
+
+- `freeipmi = no` keeps IPMI collection disabled.
+- Non-blank `[plugin:freeipmi] command options` keep the C implementation when FreeIPMI is enabled, preserving remote
+  targets and legacy options.
+
+To migrate either case, configure the Go jobs, set `[plugins] ipmi = yes`, and restart Netdata. The Go plugin does not
+translate C command options. To switch back, install the FreeIPMI plugin if necessary and use:
+
+```ini
+[plugins]
+    ipmi = no
+    freeipmi = yes
+```
+
+Restart Netdata after changing the selection or installing an IPMI plugin. `enable running new plugins = no` disables
+automatic selection unless one plugin is explicitly enabled. In the Netdata container environment, IPMI requires explicit
+enablement and access to the device for local collection.
+
+The Function is now named `ipmi-sensors`; callers using the experimental `ipmi-go-sensors` name must update.
 
 ## Build and configure
 
-From the repository root:
-
-```sh
-sudo ./netdata-installer.sh --enable-plugin-ipmi
-```
-
-`--disable-plugin-ipmi` disables it explicitly. CMake users can set `-DENABLE_PLUGIN_IPMI=ON`. A standalone test binary
-needs no C compiler:
+Linux source builds enable the plugin by default. `--disable-plugin-ipmi` disables it; CMake users can set
+`-DENABLE_PLUGIN_IPMI=OFF`. A standalone binary needs no C compiler:
 
 ```sh
 cd src/go
@@ -21,26 +42,25 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /tmp/ipmi.plugin ./cmd/ipmiplu
 ```
 
 Set `GOARCH` for the target system; use `GOARCH=arm GOARM=6` or `GOARM=7` for ARM32. Cross-compilation verifies a
-binary can be built, while local device access also requires kernel OpenIPMI support and suitable hardware. Upstream
-validates the Linux ABI against target kernel headers; this does not establish physical BMC compatibility on every CPU.
+binary can be built; physical device access still needs kernel OpenIPMI support and suitable hardware.
 
-No jobs start until configured. In the Netdata configuration directory, add `ipmi/ipmi.conf`:
+The stock `ipmi/ipmi.conf` attempts local collection using this job:
 
 ```yaml
 jobs:
-  - name: ipmi
+  - name: local
     driver: open
     device: 0
 ```
 
-Before activating this job, disable `freeipmi` in the `[plugins]` section of `netdata.conf`. The canonical `ipmi` job
-retains chart IDs used by the C plugin, so run only one for a given monitored host with this job name. The Go collector
-uses separate `ipmi_go.*` contexts and the `ipmi-go-sensors` Function.
+Hosts without an accessible OpenIPMI device do not collect local IPMI metrics. Replace this job to collect remote BMCs,
+or set `jobs: []` to disable the local job. Existing jobs named `ipmi` keep their previous chart IDs; renaming a job creates
+new chart IDs.
 
-Installation grants no additional privileges. Local collection needs read/write access to `/dev/ipmi0` (or the selected
-device number). For a controlled test on a root-only device, invoke the binary with `sudo` and a trusted configuration
-directory. Normal Agent execution requires device access arranged by the operator. Do not grant broader privileges to
-`go.d.plugin`.
+The installers give the dedicated `ipmi.plugin` binary root ownership and setuid permission, restricted to the Netdata
+group, so it can open the local device. A manually built binary needs read/write access to `/dev/ipmi0` (or the selected
+device); use a trusted configuration and explicit `sudo` invocation for local debugging. Containers must also expose
+the device, for example with `--device /dev/ipmi0`.
 
 Remote collection uses an ordinary UDP connection to the BMC and needs no local device permissions. Prefer LAN+
 (IPMI 2.0); use `driver: lan` for BMCs that require IPMI 1.5. For example:
@@ -64,17 +84,37 @@ Metrics belong to the Agent host by default. To attach a remote job to a differe
 The command and session setup timeout defaults to five seconds. Cancellation interrupts local response waits and remote
 UDP exchanges. Remote session cleanup gets a separate two-second budget, including after a canceled collection.
 
+## System Event Log
+
+With `collect_sel: true` (the default), each job charts the SEL entry count and serves the `ipmi-sel` Function: every
+record the BMC retains, newest first, with sensor, event, direction and the default FreeIPMI state. The dashboard time
+range does not filter it, because SEL records are often weeks apart. The Function reads records the collector already
+holds and sends no BMC requests. `collect_sel: false` stops every SEL command and removes
+the job from `ipmi-sel`.
+
+The collector keeps the records it read and, when the log changes, reads the records the BMC added plus a few boundary
+records that show where the log starts and ends; it rereads the log after the BMC clears or rewrites it. The first read
+of a large log is spread over several collections, so the Function shows the oldest records until it completes. Records
+are kept in memory, so an Agent restart reads the log again. The plugin never clears or writes the SEL.
+
+Times are converted to UTC with the BMC's SEL UTC offset. Records logged before a daylight saving change can be off by
+an hour, because the BMC reports only its current offset. When the BMC reports no offset, times are the BMC clock shown
+as UTC, and the Function shows how far the BMC clock is from the Agent clock.
+
 ## Compatibility
 
-- Numeric contexts use `ipmi_go.*`; chart IDs, units and nominal/warning/critical/unknown states retain the C shape. The
+- Numeric contexts use `ipmi.*`; chart IDs, units and nominal/warning/critical/unknown states retain the C shape. The
   state interpretation uses FreeIPMI defaults, including nominal non-critical threshold assertions; custom
   interpretation files are not loaded.
-- Unavailable numeric data produces gaps. `ipmi-go-sensors` reads an immutable snapshot and reports null readings. Its
+- Unavailable numeric data produces gaps. `ipmi-sensors` reads an immutable snapshot and reports null readings. Its
   summary charts show sensor counts by Component and State.
-- Canonical local job `ipmi` uses the `ipmi` chart type. Other job names receive the standard framework job prefix.
+- The stock `local` job uses the `ipmi_local` chart type. Job names receive the standard framework job prefix;
+  an existing job named `ipmi` keeps the `ipmi` chart type.
   Sensor keys remain stable when a reading becomes unavailable; the C library can change its reading-type key then.
-- SEL is the raw repository entry count, not FreeIPMI's interpreted/filtered count. The existing SEL alarm matches the
-  canonical local chart `ipmi.events`; the `ipmi_go_sensor_state` alert matches `ipmi_go.sensor_state` for every Go job.
+- `ipmi.sel` is the raw repository entry count, not FreeIPMI's interpreted/filtered count. The `ipmi_events` alert
+  matches `ipmi.sel`; the `ipmi_sensor_state` alert matches `ipmi.sensor_state`. Both apply to every Go job and to C.
+- `ipmi-sel` states use FreeIPMI's default SEL interpretation. OEM records, records with a reserved record type, OEM
+  event types and unlisted events are unknown. The C plugin has no SEL Function.
 - Bridged sensors, device-only SDR repositories, legacy direct KCS/SSIF/SUNBMC/INTELDCMI drivers, FreeBSD local access,
   custom interpretation files and OEM health policy remain covered by FreeIPMI. Kernel-backed local KCS/SSIF is accessed
   through OpenIPMI.

@@ -94,6 +94,29 @@ overridden for distinct plugins by modifying the appropriate plugin value config
 The setting `check for new plugins every` sets the interval between scans of the directory
 `/usr/libexec/netdata/plugins.d`. New plugins can be added any time, and Netdata will detect them in a timely manner.
 
+### IPMI implementation selection
+
+Netdata starts at most one of `ipmi.plugin` (Go) and `freeipmi.plugin` (C). At startup it searches all configured
+plugin directories and prefers an installed, executable Go plugin when both are enabled. The choice stays fixed
+until Netdata restarts: plugin crashes, retries and newly installed binaries do not activate the other implementation.
+The selected plugin follows the normal restart policy above; there is no automatic failover after a failure.
+
+When `[plugins] ipmi` is unset, an existing `freeipmi = no` preserves disabled IPMI collection, and non-blank
+`[plugin:freeipmi] command options` preserve the C implementation when FreeIPMI is enabled. To migrate those installations,
+configure `ipmi/ipmi.conf`, set `[plugins] ipmi = yes`, and restart Netdata. C command options are not translated.
+
+To switch back to C, install `freeipmi.plugin` if necessary and restart Netdata with:
+
+```ini
+[plugins]
+    ipmi = no
+    freeipmi = yes
+```
+
+Set both options to `no` to disable IPMI. The global `enable running new plugins` setting still controls the default
+for unspecified options. In the Netdata container environment, both IPMI implementations default to disabled;
+enable the desired one explicitly and expose the IPMI device when collecting locally.
+
 For each of the external plugins enabled, another `netdata.conf` section
 is created, in the form of `[plugin:NAME]`, where `NAME` is the name of the external plugin.
 This section allows controlling the update frequency of the plugin and provide

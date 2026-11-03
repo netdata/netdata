@@ -40,9 +40,9 @@ func TestCandidateWorkOwnershipEnableDuringSourceProposal(t *testing.T) {
 	inv := candidateTestInventory(1, true, discovered)
 	first := candidateInventory(t, c, inv, 0).Decision.Work
 	candidateResult(t, c, first, candidateOutcome{
-		Kind:       candidateFailed,
-		Listed:     true,
-		RetryAfter: 10,
+		Kind:   candidateFailed,
+		Listed: true,
+		Retry:  candidateRetryPolicy{cadence: 10},
 	}, 0)
 	user := candidateTestConfig("user", "invalid-payload")
 	inv.Version++
@@ -107,9 +107,9 @@ func TestCandidateWorkOwnershipEnableDuringSourceProposal(t *testing.T) {
 		c,
 		wake.Decision.Work,
 		candidateOutcome{
-			Kind:       candidateFailed,
-			Listed:     true,
-			RetryAfter: 10,
+			Kind:   candidateFailed,
+			Listed: true,
+			Retry:  candidateRetryPolicy{cadence: 10},
 		},
 		10,
 	)
@@ -133,9 +133,9 @@ func TestCandidateWorkOwnershipSiblingSurvivesPredecessorRemoval(t *testing.T) {
 		c,
 		first,
 		candidateOutcome{
-			Kind:       candidateFailed,
-			Listed:     true,
-			RetryAfter: 10,
+			Kind:   candidateFailed,
+			Listed: true,
+			Retry:  candidateRetryPolicy{cadence: 10},
 		},
 		1,
 	).Decision.Work

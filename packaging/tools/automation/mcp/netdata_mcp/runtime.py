@@ -61,9 +61,7 @@ def runtime_dir(agent_id: str) -> Path:
     """The agent's own netdata runtime dir, exported to it as ``NETDATA_RUN_DIR``.
 
     Without it netdata falls back to the host-wide ``/tmp/netdata``, where
-    parallel agents share the spawn-server and plugin socket paths: a second
-    agent's failed spawn-server start deletes the first agent's socket file, and
-    the first agent can no longer launch or relaunch any plugin.
+    parallel agents can collide on plugin socket paths and other runtime files.
     """
     return run_dir(agent_id) / "run"
 

@@ -176,9 +176,23 @@ An `Init()` or `Check()` error fails that candidate. By default, a `Check()` err
 the error when that default is wrong:
 
 - `collectorapi.PermanentError(err)`: a failure that retrying the same configuration cannot fix, such as an invalid
-  option or an unknown named profile. That config is not automatically retried.
+  option or an unknown named profile. Ordinary recovery does not retry that config.
 - `collectorapi.TemporaryError(err)`: a condition that may clear on its own, such as a dependency that is not ready
   yet. That config keeps its `autodetection_retry` schedule, even from `Init()`.
+
+If a provider requires a minimum wait before another startup attempt, return
+`collectorapi.WithRetryNotBefore(err, deadline)`, with the absolute deadline captured when the provider requests it
+(for a duration, `time.Now().Add(wait)`). This annotation only delays an already-eligible automatic retry; it does not
+classify the error, enable disabled retries or change DynCfg replies. It survives failed-collector disposal and
+secret-error redaction. When several wrapped or joined errors specify deadlines, the latest applies. The outstanding
+minimum follows the same retained configuration across automatic source promotion and search reopening, independently
+of ordinary retry permission. Other configurations keep their own eligibility. The minimum is consumed when a new
+automatic activation is admitted. Manual `test` and rejected `update` still return promptly; accepted exact
+`update`/`restart` resets the selected configuration, and a fresh `enable` resets its reopened scope. An already-enabled
+`enable` preserves deadlines.
+
+This startup annotation does not schedule retries or delay ordinary `Collect` calls. A running collector remains
+responsible for its own provider wait between collections.
 
 Several source configs can share a module/job name. Before any candidate reaches readiness, an enabled source-owned
 job tries eligible alternatives at the highest owning source tier, including alternatives in other files. Each gets

@@ -31,7 +31,7 @@ func TestEnablePreservesEnabledCandidateRetryState(t *testing.T) {
 				for range len(configs) {
 					require.NotNil(t, work)
 					delta, err := controller.candidates.prepareOutcome(a.FullName(), work.Token,
-						candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 10}, 0)
+						candidateOutcome{Kind: candidateFailed, Listed: true, Retry: candidateRetryPolicy{cadence: 10}}, 0)
 					applyCandidateDelta(t, delta, err)
 					work = delta.Decision.Work
 				}

@@ -85,10 +85,12 @@ func sanitizeLifecycleError(sanitize func(error) error, err error) (sanitized er
 	if err == nil || sanitize == nil {
 		return err
 	}
+	deadline := collectorapi.RetryNotBefore(err)
 	defer func() {
 		if recover() != nil {
 			sanitized = errors.New("jobruntime: lifecycle error sanitizer panicked")
 		}
+		sanitized = collectorapi.WithRetryNotBefore(sanitized, deadline)
 	}()
 	sanitized = sanitize(err)
 	if sanitized == nil {
