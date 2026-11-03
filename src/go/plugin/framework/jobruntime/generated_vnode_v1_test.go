@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"maps"
 	"strings"
 	"testing"
 	"time"
@@ -122,6 +123,103 @@ func TestJob_GeneratedVnodeRetainsAdoptedIdentity(t *testing.T) {
 			assert.Equal(t, "before", job.hostDefinition.Info().Hostname)
 		})
 	}
+}
+
+func TestJob_GeneratedVnodeRejectsInvalidRefresh(t *testing.T) {
+	for name, hostname := range map[string]string{
+		"quote":           "bad'hostname",
+		"backslash":       "bad\\hostname",
+		"newline":         "bad\nhostname",
+		"carriage return": "bad\rhostname",
+		"NUL":             "bad\x00hostname",
+		"whitespace":      "   ",
+	} {
+		t.Run(name, func(t *testing.T) {
+			var out bytes.Buffer
+			cfg, module := generatedV1Fixture(&out)
+			job := NewJob(cfg)
+			require.NoError(t, job.AutoDetectionManaged(context.Background()))
+			t.Cleanup(job.Cleanup)
+			job.runOnce()
+			oracle := newHostProtocolOracle()
+			oracle.apply(t, out.String())
+			before := maps.Clone(oracle.labels[sharedGUID])
+			staleAfter := confopt.Duration(time.Minute)
+			module.vnode = &vnodes.VirtualNode{
+				GUID:       sharedGUID,
+				Hostname:   hostname,
+				Labels:     map[string]string{"site": "rejected"},
+				StaleAfter: &staleAfter,
+			}
+			for range 2 {
+				out.Reset()
+				job.runOnce()
+				assert.Contains(t, out.String(), "HOST '"+sharedGUID+"'")
+				assert.Contains(t, out.String(), "SET 'value' = 1", "rejected metadata must not interrupt measurements")
+				assert.Contains(t, out.String(), "SET 'success' = 1")
+				assert.NotContains(t, out.String(), "HOST_DEFINE")
+				assert.NotContains(t, out.String(), "CHART '")
+				oracle.apply(t, out.String())
+				assert.Equal(t, before, oracle.labels[sharedGUID], "retain the whole usable snapshot")
+			}
+			module.vnode = nil
+			out.Reset()
+			job.runOnce()
+			assert.Contains(t, out.String(), "SET 'value' = 1", "a rejected candidate must not poison subsequent cycles")
+			module.vnode = &vnodes.VirtualNode{
+				GUID:     sharedGUID,
+				Hostname: "recovered",
+				Labels:   map[string]string{"site": "recovered"},
+			}
+			out.Reset()
+			job.runOnce()
+			assert.Contains(t, out.String(), "HOST_DEFINE '"+sharedGUID+"' 'recovered'")
+			assert.Contains(t, out.String(), "SET 'value' = 1")
+			assert.NotContains(t, out.String(), "CHART '")
+			oracle.apply(t, out.String())
+			assert.Equal(t, map[string]string{"_hostname": "recovered", "site": "recovered"}, oracle.labels[sharedGUID])
+		})
+	}
+}
+
+func TestJob_GeneratedVnodeRejectsInvalidRefreshBeforeFirstPublication(t *testing.T) {
+	var out bytes.Buffer
+	cfg, module := generatedV1Fixture(&out)
+	initialCharts := *module.ChartsFunc()
+	charts := collectorapi.Charts{}
+	module.ChartsFunc = func() *collectorapi.Charts { return &charts }
+	collect := module.CollectFunc
+	module.CollectFunc = func(context.Context) map[string]int64 { return nil }
+	job := NewJob(cfg)
+	require.NoError(t, job.AutoDetectionManaged(context.Background()))
+	t.Cleanup(job.Cleanup)
+	job.runOnce()
+	require.NotContains(t, out.String(), "HOST_DEFINE")
+	charts = initialCharts
+	module.CollectFunc = collect
+	module.vnode.Hostname = "bad'hostname"
+	out.Reset()
+	job.runOnce()
+	assert.Contains(t, out.String(), "HOST_DEFINE '"+sharedGUID+"' 'before'")
+	assert.Contains(t, out.String(), "SET 'value' = 1")
+}
+
+func TestJob_GeneratedVnodeInvalidInitialMetadataDoesNotUseLocalHost(t *testing.T) {
+	var out bytes.Buffer
+	cfg, module := generatedV1Fixture(&out)
+	module.vnode.Hostname = "bad'hostname"
+	job := NewJob(cfg)
+	require.NoError(t, job.AutoDetectionManaged(context.Background()))
+	t.Cleanup(job.Cleanup)
+	for range 2 {
+		out.Reset()
+		job.runOnce()
+		assert.Empty(t, out.String(), "an invalid initial target must not route device samples onto the local host")
+	}
+	module.vnode.Hostname = "recovered"
+	job.runOnce()
+	assert.Contains(t, out.String(), "HOST_DEFINE '"+sharedGUID+"' 'recovered'")
+	assert.Contains(t, out.String(), "SET 'value' = 1")
 }
 
 func TestJob_GeneratedVnodeUUIDAliasRetainsRouting(t *testing.T) {

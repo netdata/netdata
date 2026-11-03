@@ -10,6 +10,11 @@ update that target's hostname, labels, and lifecycle metadata while retaining it
 to the same target; the runtime preserves the adopted routing spelling. Nil, incomplete, and different-GUID snapshots
 retain the previous target. Changing generated routing identity requires a new job.
 
+Changed refreshes MUST pass host-definition validation before replacing adopted metadata. Rejected candidates retain
+the entire previous snapshot, including labels and lifecycle values, so ordinary measurements continue on that target.
+This also applies before its first publication. Invalid initial generated metadata retains the existing output failure
+behavior; rejection MUST NOT route device samples onto the local Agent instead.
+
 The getter MUST be cheap and MUST NOT perform network I/O. Calls run on the job goroutine, serialized with `Collect`.
 Collectors MUST synchronize any concurrent writes to returned data. The runtime owns its adopted labels and lifecycle
 values, compares metadata in O(labels), and copies only changed snapshots. Unchanged metadata adds no snapshot

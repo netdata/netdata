@@ -37,7 +37,9 @@ type CollectorV1 interface {
 	// VirtualNode supplies an optional generated vnode. V1 calls it after Collect
 	// when no configured vnode was supplied. It copies changed metadata, retaining
 	// the first adopted GUID. Nil, incomplete, or different-GUID snapshots retain
-	// the previous vnode. The getter must be cheap; calls are serialized with Collect.
+	// the previous vnode. Unencodable refreshes retain the adopted metadata so
+	// collection continues; invalid initial metadata still fails output validation.
+	// The getter must be cheap; calls are serialized with Collect.
 	VirtualNode() *vnodes.VirtualNode
 }
 

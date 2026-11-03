@@ -288,6 +288,16 @@ func (j *Job) refreshGeneratedVnode() {
 	if j.vnode.Equal(&next) {
 		return
 	}
+	if j.generatedVnode {
+		// An unusable refresh must not interrupt collection on the adopted target.
+		if _, err := hostoutput.NewDefinition(netdataapi.HostInfo{
+			GUID:     next.GUID,
+			Hostname: next.Hostname,
+			Labels:   next.HostLabels(),
+		}); err != nil {
+			return
+		}
+	}
 	snapshot := next.Copy()
 	j.vnodeMu.Lock()
 	j.vnode = *snapshot
