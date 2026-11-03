@@ -28,6 +28,8 @@ type fakeBMC struct {
 	selErr      error
 	closeErr    error
 	sel         fakeSEL
+	// thresholds holds Get Sensor Thresholds responses by sensor number.
+	thresholds map[uint8][]byte
 	// additionTime is the repository's most recent addition timestamp.
 	additionTime uint32
 	// recordCount overrides the repository record count; zero reports len(records).
@@ -175,6 +177,15 @@ func (f *fakeBMC) respond(ctx context.Context, req types.Request) ([]byte, error
 			return nil, fmt.Errorf("wrong factor input %d", q.Reading)
 		}
 		return []byte{0, 2, 0, 0, 0, 0, 0xf0}, nil
+	case *sensor.GetSensorThresholdsRequest:
+		if client.GetCommandContext(ctx) == nil {
+			return nil, errors.New("missing owner addressing context")
+		}
+		data, ok := f.thresholds[q.SensorNumber]
+		if !ok {
+			return nil, types.NewResponseError(types.CodeIllegalCommand, "no thresholds")
+		}
+		return data, nil
 	case *storage.GetSELInfoRequest:
 		if f.selErr != nil {
 			return nil, f.selErr
@@ -232,9 +243,16 @@ func (f *fakeBMC) respondSDR(q *storage.GetSDRRequest) ([]byte, error) {
 // Byte offsets within full and compact sensor records.
 const (
 	recordOwnerID         = 5
-	recordOwnerLUN        = 6 // channel in bits 7:4, LUN in bits 1:0
+	recordOwnerLUN        = 6  // channel in bits 7:4, LUN in bits 1:0
+	fullCapabilities      = 11 // threshold access in bits 3:2
+	fullReadableMask      = 18 // readable threshold mask; the settable mask follows
+	fullUnitsFormat       = 20 // analog data format in bits 7:6
+	fullBaseUnit          = 21
 	fullLinearization     = 23
+	fullM                 = 24
+	fullB                 = 26
 	fullExponents         = 29 // R exponent in bits 7:4, B exponent in bits 3:0
+	fullThresholds        = 36 // UNR, UCR, UNC, LNR, LCR, LNC
 	compactShareCount     = 23 // modifier type in bits 5:4, count in bits 3:0
 	compactModifierOffset = 24
 )
@@ -248,14 +266,41 @@ func fullRecord(id uint16, number uint8, name string) []byte {
 	data[4] = byte(len(data) - types.SDRRecordHeaderSize)
 	data[recordOwnerID] = types.BMC_SA
 	data[7] = number
-	data[12] = 0x01 // sensor type: temperature
-	data[13] = 0x01 // event/reading type: threshold
-	data[20] = 0x00 // unsigned analog, no rate or modifier
-	data[21] = byte(types.SensorUnitType_DegreesC)
-	data[24] = 1                      // M
+	data[12] = 0x01              // sensor type: temperature
+	data[13] = 0x01              // event/reading type: threshold
+	data[fullUnitsFormat] = 0x00 // unsigned analog, no rate or modifier
+	data[fullBaseUnit] = byte(types.SensorUnitType_DegreesC)
+	data[fullM] = 1
 	data[47] = 0xc0 | byte(len(name)) // 8-bit ASCII + Latin-1 ID string
 	copy(data[48:], name)
 	return data
+}
+
+// Threshold mask bits, shared by SDRs and Get Sensor Thresholds responses.
+const (
+	maskLNC = 1 << iota
+	maskLCR
+	maskLNR
+	maskUNC
+	maskUCR
+	maskUNR
+)
+
+// limits are raw threshold bytes.
+type limits struct{ lnr, lcr, lnc, unc, ucr, unr uint8 }
+
+// setThresholds sets a full record's threshold access, readable and settable
+// threshold masks, and threshold values.
+func setThresholds(record []byte, access types.SensorThresholdAccess, readable, settable uint8, l limits) {
+	record[fullCapabilities] = record[fullCapabilities]&^0x0c | byte(access)<<2
+	record[fullReadableMask] = readable
+	record[fullReadableMask+1] = settable
+	copy(record[fullThresholds:], []byte{l.unr, l.ucr, l.unc, l.lnr, l.lcr, l.lnc})
+}
+
+// thresholdsResponse encodes a Get Sensor Thresholds response after the completion code.
+func thresholdsResponse(readable uint8, l limits) []byte {
+	return []byte{readable, l.lnc, l.lcr, l.lnr, l.unc, l.ucr, l.unr}
 }
 
 // compactRecord encodes a BMC-owned sensor-specific discrete sensor.
@@ -279,6 +324,16 @@ func (f *fakeBMC) sensorReadingRequests() []uint8 {
 	var numbers []uint8
 	for _, req := range f.requests {
 		if q, ok := req.(*sensor.GetSensorReadingRequest); ok {
+			numbers = append(numbers, q.SensorNumber)
+		}
+	}
+	return numbers
+}
+
+func (f *fakeBMC) thresholdRequests() []uint8 {
+	var numbers []uint8
+	for _, req := range f.requests {
+		if q, ok := req.(*sensor.GetSensorThresholdsRequest); ok {
 			numbers = append(numbers, q.SensorNumber)
 		}
 	}

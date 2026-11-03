@@ -57,7 +57,8 @@ modules:
             one IPMI implementation; switch implementations by changing netdata.conf and restarting the Agent.
         performance_impact:
           description: IPMI command latency grows with sensor count. Increase update_every when a complete sensor scan
-            takes longer than the configured interval. With collect_sel enabled, the first collections after a start
+            takes longer than the configured interval. Sensor thresholds are read with the SDR inventory, about every
+            five minutes, one command per threshold sensor. With collect_sel enabled, the first collections after a start
             also read the existing System Event Log, for up to two seconds each (a quarter of update_every when
             shorter), until all records are read. Later collections read only new records, or the whole log again after
             the BMC clears or rewrites it.
@@ -290,8 +291,9 @@ modules:
         - id: sensors
           function_name: ipmi-sensors
           name: IPMI Sensors
-          description: Show current readings and default FreeIPMI health states, with sensor counts by component and
-            state.
+          description: Show current readings, the thresholds the BMC uses for each threshold sensor, and default
+            FreeIPMI health states, with sensor counts by component and state. Compare a reading with its thresholds to
+            see how close it is to a warning or critical state.
           parameters:
             - id: __job
               name: Instance
@@ -302,7 +304,8 @@ modules:
               options: []
           returns:
             description: One row per discovered full or compact sensor record, expanded for sharing. Unavailable numeric
-              readings are null.
+              readings are null. Thresholds are in the reading's units and are null when the sensor has none or they
+              could not be read.
             columns:
               - name: Sensor
                 type: string
@@ -328,6 +331,30 @@ modules:
                 type: string
                 unit: ''
                 description: Default FreeIPMI health interpretation.
+              - name: LNR
+                type: float
+                unit: ''
+                description: Lower non-recoverable threshold.
+              - name: LCR
+                type: float
+                unit: ''
+                description: Lower critical threshold.
+              - name: LNC
+                type: float
+                unit: ''
+                description: Lower non-critical threshold.
+              - name: UNC
+                type: float
+                unit: ''
+                description: Upper non-critical threshold.
+              - name: UCR
+                type: float
+                unit: ''
+                description: Upper critical threshold.
+              - name: UNR
+                type: float
+                unit: ''
+                description: Upper non-recoverable threshold.
               - name: Key
                 type: string
                 unit: ''

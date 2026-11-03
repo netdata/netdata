@@ -101,11 +101,11 @@ func (r *Reader) Collect(ctx context.Context, collectSEL bool) (_ *Snapshot, err
 		}
 	}()
 
-	if err := r.refreshInventory(ctx); err != nil {
+	var warnings collectionWarnings
+	if err := r.refreshInventory(ctx, &warnings); err != nil {
 		return nil, fmt.Errorf("read IPMI inventory: %w", err)
 	}
 
-	var warnings collectionWarnings
 	snapshot := &Snapshot{
 		Sensors:     make([]Sensor, 0, len(r.inventory)),
 		CollectedAt: r.now(),
