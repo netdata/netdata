@@ -523,6 +523,7 @@ int netdata_main(int argc, char **argv) {
                             if (unit_test_str2ld()) return 1;
                             if (buffer_unittest()) return 1;
                             if (url_unittest()) return 1;
+                            if (command_argument_sanitization_tests()) return 1;
                             if (api_v1_allmetrics_json_unittest()) return 1;
                             if (exporting_json_connector_unittest()) return 1;
                             if (exporting_graphite_unittest()) return 1;
