@@ -87,6 +87,7 @@ function(netdata_bundle_libbpf)
     )
     set(NETDATA_LIBBPF_INCLUDE_DIRECTORIES "${libbpf_SOURCE_DIR}/usr/include;${libbpf_SOURCE_DIR}/include;${ELF_INCLUDE_DIRECTORIES};${ZLIB_INCLUDE_DIRECTORIES}" PARENT_SCOPE)
     set(NETDATA_LIBBPF_COMPILE_OPTIONS "${ELF_CFLAGS_OTHER};${ZLIB_CFLAGS_OTHER}" PARENT_SCOPE)
+    set(ELF_STATIC_LDFLAGS "${ELF_STATIC_LDFLAGS}" PARENT_SCOPE)
 endfunction()
 
 # Add libbpf as a link dependency for the given target.
