@@ -105,7 +105,7 @@ func (m Manifest) Validate() error {
 }
 
 func reservedName(name string) bool {
-	for _, reserved := range []string{"prepared.json", "chrome", "fonts.conf"} {
+	for _, reserved := range []string{"prepared.json", "native.json", "chrome", "fonts.conf"} {
 		if name == reserved || strings.HasPrefix(name, reserved+"/") {
 			return true
 		}

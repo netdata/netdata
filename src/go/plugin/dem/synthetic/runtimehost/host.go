@@ -31,21 +31,29 @@ const (
 // new plugin process.
 type Config struct {
 	Store       *runtime.Store
+	Native      *runtime.Native
+	Mode        string
 	Unavailable error
 }
 
 type Snapshot struct {
+	Mode             string                     `json:"mode"`
 	Running          *synthetic.RuntimeIdentity `json:"running,omitempty"`
 	State            string                     `json:"state"`
 	SetupError       string                     `json:"setup_error,omitempty"`
 	MaintenanceError string                     `json:"maintenance_error,omitempty"`
-	Storage          runtime.Status             `json:"storage"`
+	Storage          *runtime.Status            `json:"storage,omitempty"`
+	Native           *runtime.NativeStatus      `json:"native,omitempty"`
 	StorageError     string                     `json:"storage_error,omitempty"`
+	RestartRequired  bool                       `json:"restart_required"`
+	Update           UpdateStatus               `json:"update"`
 }
 
 type Host struct {
 	store           *runtime.Store
-	consumer        *runtime.Consumer
+	native          *runtime.Native
+	mode            string
+	consumer        processConsumer
 	identity        *synthetic.RuntimeIdentity
 	mu              sync.Mutex
 	state           string
@@ -59,6 +67,12 @@ type Host struct {
 	sweepInterval   time.Duration
 	closeOnce       sync.Once
 	closeErr        error
+	update          UpdateStatus
+}
+
+type processConsumer interface {
+	Consumer
+	Close() error
 }
 
 var _ runner.Source = (*Host)(nil)
@@ -68,21 +82,44 @@ var _ runner.Source = (*Host)(nil)
 func New(config Config) *Host {
 	h := &Host{
 		store:       config.Store,
+		native:      config.Native,
+		mode:        config.Mode,
 		maintenance: make(map[string]error), log: logger.New(),
 		state: StateMissing, done: make(chan struct{}), sweepInterval: time.Hour,
 	}
-	err := config.Unavailable
-	if err == nil && h.store == nil {
-		err = errors.New("browser runtime store is unavailable")
+	if h.mode == "" {
+		h.mode = "managed"
 	}
+	err := config.Unavailable
 	if err == nil {
-		h.consumer, err = h.store.AcquireSelected()
+		if h.mode == "native" {
+			if h.native == nil {
+				err = errors.New("native browser runtime is unavailable")
+			} else {
+				var consumer *runtime.NativeConsumer
+				consumer, err = h.native.AcquireSelected()
+				if err == nil {
+					h.consumer = consumer
+				}
+			}
+		} else if h.store == nil {
+			err = errors.New("browser runtime store is unavailable")
+		} else {
+			var consumer *runtime.Consumer
+			consumer, err = h.store.AcquireSelected()
+			if err == nil {
+				h.consumer = consumer
+			}
+		}
 	}
 	if err != nil {
 		h.state, h.setupErr = StateUnavailable, err
 		if errors.Is(err, runtime.ErrUnavailable) {
 			h.state = StateMissing
 			h.setupErr = fmt.Errorf("install a browser runtime and restart dem.plugin: %w", err)
+			if h.mode == "native" {
+				h.setupErr = fmt.Errorf("install the optional netdata-dem-runtime package and restart dem.plugin: %w", err)
+			}
 		}
 		return h
 	}
@@ -120,15 +157,25 @@ func errorText(err error) string {
 
 func (h *Host) Status() Snapshot {
 	h.mu.Lock()
-	result := Snapshot{State: h.state, SetupError: errorText(h.setupErr), MaintenanceError: errorText(h.maintenanceErrorLocked())}
+	result := Snapshot{Mode: h.mode, State: h.state, SetupError: errorText(h.setupErr), MaintenanceError: errorText(h.maintenanceErrorLocked()), Update: h.update}
 	if h.identity != nil {
 		identity := *h.identity
 		result.Running = &identity
 	}
 	h.mu.Unlock()
 	if h.store != nil {
-		var err error
-		result.Storage, err = h.store.Inspect()
+		status, err := h.store.Inspect()
+		result.Storage = &status
+		result.StorageError = errorText(err)
+		if result.Storage.Selected != nil && result.Storage.SelectionError == "" && result.Storage.InventoryError == "" {
+			m := result.Storage.Selected
+			selected := synthetic.RuntimeIdentity{Version: m.Version, SHA256: m.Archive.SHA256, Contract: m.Contract}
+			result.RestartRequired = result.Running == nil || *result.Running != selected
+		}
+	}
+	if h.native != nil {
+		status, err := h.native.Inspect()
+		result.Native = &status
 		result.StorageError = errorText(err)
 	}
 	return result
@@ -157,7 +204,7 @@ func (u managedUse) Paths() runner.Paths {
 func (u managedUse) Completion() *ndexec.TreeCompletion { return u.use.Completion }
 func (u managedUse) Finish(drained bool) error {
 	err := u.use.Finish(drained)
-	if err != nil {
+	if err != nil && u.host != nil {
 		u.host.recordFinishError(err)
 	}
 	return err
@@ -194,13 +241,18 @@ func (h *Host) Run(ctx context.Context) {
 }
 
 func (h *Host) sweep() {
-	if h.store == nil {
+	if h.store == nil && h.native == nil {
 		return
 	}
 	h.mu.Lock()
 	version := h.finishVersion
 	h.mu.Unlock()
-	err := h.store.Sweep()
+	var err error
+	if h.native != nil {
+		err = h.native.Sweep()
+	} else {
+		err = h.store.Sweep()
+	}
 	h.setMaintenance("cleanup", err)
 	h.mu.Lock()
 	// A newer Finish failure must not be cleared by an older sweep.
