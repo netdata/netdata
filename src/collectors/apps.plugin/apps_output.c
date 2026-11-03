@@ -382,7 +382,10 @@ static inline const char *apps_ebpf_chart_id(const struct apps_ebpf_chart *chart
 
 /* with_errors selects whether the errors_only charts are included.  It MUST hold
  * the same value here and in send_ebpf_data_to_netdata for a given module: a SET
- * to a chart that was never declared makes pluginsd log an error every cycle. */
+ * to a chart that was never declared makes pluginsd log an error every cycle.
+ * eBPF charts exist for the app family only: send_charts_updates_to_netdata()
+ * announces them for that family alone, so the per-target TARGET_CHARTS_EBPF_*
+ * bits record exactly what was sent and the obsolete path follows them. */
 static void send_ebpf_charts_to_netdata(
     struct target *w,
     const struct target_family *f,
@@ -393,9 +396,6 @@ static void send_ebpf_charts_to_netdata(
     bool obsolete)
 {
     const char *type = f->type;
-    if (strcmp(type, NETDATA_APP_FAMILY) != 0)
-        return;
-
     const char *name = string2str(w->clean_name);
     const char *wname = string2str(w->name);
     for (size_t i = 0; i < count; i++) {
@@ -663,6 +663,10 @@ void send_charts_updates_to_netdata(struct target_family *f) {
     struct target *root = *f->root;
     struct target *w;
 
+#if defined(OS_LINUX)
+    const bool ebpf_charts = strcmp(f->type, NETDATA_APP_FAMILY) == 0;
+#endif
+
     for (w = root; w; w = w->next) {
         if (likely(w->exposed || (!w->values[PDF_PROCESSES]))) {
             // the file charts were disabled at runtime (too many open files)
@@ -679,12 +683,14 @@ void send_charts_updates_to_netdata(struct target_family *f) {
             send_file_charts_to_netdata(w, f, false);
 
 #if defined(OS_LINUX)
-        if (apps_ebpf_cachestat_is_available())
-            send_cachestat_charts_to_netdata(w, f, false);
-        if (apps_ebpf_dcstat_is_available())
-            send_dcstat_charts_to_netdata(w, f, false);
-        if (apps_ebpf_fd_is_available())
-            send_fd_charts_to_netdata(w, f, false);
+        if (ebpf_charts) {
+            if (apps_ebpf_cachestat_is_available())
+                send_cachestat_charts_to_netdata(w, f, false);
+            if (apps_ebpf_dcstat_is_available())
+                send_dcstat_charts_to_netdata(w, f, false);
+            if (apps_ebpf_fd_is_available())
+                send_fd_charts_to_netdata(w, f, false);
+        }
 #endif
     }
 
@@ -693,7 +699,7 @@ void send_charts_updates_to_netdata(struct target_family *f) {
      * chart-creation window above.  When a module becomes available, announce
      * its charts on every exposed target that does not have them yet.  The
      * per-target bits make this a no-op once every target has them. */
-    if (strcmp(f->type, NETDATA_APP_FAMILY) == 0) {
+    if (ebpf_charts) {
         bool cachestat = apps_ebpf_cachestat_is_available();
         bool dcstat = apps_ebpf_dcstat_is_available();
         bool fd = apps_ebpf_fd_is_available();
