@@ -127,6 +127,22 @@ int web_client_registry_cookie_unittest(void)
             "Cookie: netdata_registry_id=" REGISTRY_COOKIE_TEST_OURS "\r\n\r\n",
             REGISTRY_COOKIE_TEST_OURS,
         },
+        // optional whitespace (SP/HTAB) around a cookie pair is not part of it
+        {
+            "GET /api/v1/registry?action=access HTTP/1.1\r\n"
+            "Cookie: a=1;\tnetdata_registry_id=" REGISTRY_COOKIE_TEST_OURS "\r\n\r\n",
+            REGISTRY_COOKIE_TEST_OURS,
+        },
+        {
+            "GET /api/v1/registry?action=access HTTP/1.1\r\n"
+            "Cookie: a=1 \t; \t netdata_registry_id=" REGISTRY_COOKIE_TEST_OURS " \t; b=2\r\n\r\n",
+            REGISTRY_COOKIE_TEST_OURS,
+        },
+        {
+            "GET /api/v1/registry?action=access HTTP/1.1\r\n"
+            "Cookie: netdata_registry_id=short \t; b=2\r\n\r\n",
+            "short",
+        },
     };
 
     int errors = 0;

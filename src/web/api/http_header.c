@@ -5,6 +5,10 @@
 #include <string.h>
 #include <strings.h>
 
+static inline bool http_header_is_ows(char c) {
+    return c == ' ' || c == '\t';
+}
+
 static void web_client_enable_deflate(struct web_client *w, bool gzip) {
     if(gzip)
         web_client_flag_set(w, WEB_CLIENT_ENCODING_GZIP);
@@ -134,7 +138,7 @@ static void http_header_cookie(struct web_client *w, const char *v, size_t len _
     const size_t name_len = sizeof(NETDATA_REGISTRY_COOKIE_NAME) - 1;
 
     while(*v) {
-        while(*v == ';' || *v == ' ') v++;
+        while(*v == ';' || http_header_is_ows(*v)) v++;
 
         const char *pair = v;
         while(*v && *v != ';') v++;
@@ -143,6 +147,7 @@ static void http_header_cookie(struct web_client *w, const char *v, size_t len _
             strncmp(pair, NETDATA_REGISTRY_COOKIE_NAME, name_len) == 0) {
             const char *value = &pair[name_len + 1];
             size_t value_len = v - value;
+            while(value_len && http_header_is_ows(value[value_len - 1])) value_len--;
             strncpyz(w->auth.registry_person_guid, value,
                      MIN(value_len, sizeof(w->auth.registry_person_guid) - 1));
             return;
@@ -440,10 +445,6 @@ static inline void supported_headers_init(void) {
     }
 
     spinlock_unlock(&supported_headers_init_spinlock);
-}
-
-static inline bool http_header_is_ows(char c) {
-    return c == ' ' || c == '\t';
 }
 
 // Checks the syntax of the header line at s. Returns its terminating '\r' and sets *colon, returns the end of the
