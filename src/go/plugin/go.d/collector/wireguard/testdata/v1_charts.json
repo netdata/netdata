@@ -1,0 +1,290 @@
+[
+  {
+    "context": "wireguard.device_network_io",
+    "labels": {
+      "device": "wg0"
+    },
+    "title": "Device traffic",
+    "family": "device traffic",
+    "units": "B/s",
+    "type": "area",
+    "priority": 70000,
+    "dimensions": [
+      {
+        "name": "receive",
+        "algorithm": "incremental",
+        "multiplier": 1,
+        "divisor": 1,
+        "value": 1300
+      },
+      {
+        "name": "transmit",
+        "algorithm": "incremental",
+        "multiplier": -1,
+        "divisor": 1,
+        "value": 2400
+      }
+    ]
+  },
+  {
+    "context": "wireguard.device_network_io",
+    "labels": {
+      "device": "wg10"
+    },
+    "title": "Device traffic",
+    "family": "device traffic",
+    "units": "B/s",
+    "type": "area",
+    "priority": 70000,
+    "dimensions": [
+      {
+        "name": "receive",
+        "algorithm": "incremental",
+        "multiplier": 1,
+        "divisor": 1,
+        "value": 5
+      },
+      {
+        "name": "transmit",
+        "algorithm": "incremental",
+        "multiplier": -1,
+        "divisor": 1,
+        "value": 6
+      }
+    ]
+  },
+  {
+    "context": "wireguard.device_network_io",
+    "labels": {
+      "device": "wg1"
+    },
+    "title": "Device traffic",
+    "family": "device traffic",
+    "units": "B/s",
+    "type": "area",
+    "priority": 70000,
+    "dimensions": [
+      {
+        "name": "receive",
+        "algorithm": "incremental",
+        "multiplier": 1,
+        "divisor": 1,
+        "value": 0
+      },
+      {
+        "name": "transmit",
+        "algorithm": "incremental",
+        "multiplier": -1,
+        "divisor": 1,
+        "value": 0
+      }
+    ]
+  },
+  {
+    "context": "wireguard.device_peers",
+    "labels": {
+      "device": "wg0"
+    },
+    "title": "Device peers",
+    "family": "device peers",
+    "units": "peers",
+    "type": "line",
+    "priority": 70001,
+    "dimensions": [
+      {
+        "name": "peers",
+        "algorithm": "absolute",
+        "multiplier": 1,
+        "divisor": 1,
+        "value": 3
+      }
+    ]
+  },
+  {
+    "context": "wireguard.device_peers",
+    "labels": {
+      "device": "wg10"
+    },
+    "title": "Device peers",
+    "family": "device peers",
+    "units": "peers",
+    "type": "line",
+    "priority": 70001,
+    "dimensions": [
+      {
+        "name": "peers",
+        "algorithm": "absolute",
+        "multiplier": 1,
+        "divisor": 1,
+        "value": 1
+      }
+    ]
+  },
+  {
+    "context": "wireguard.device_peers",
+    "labels": {
+      "device": "wg1"
+    },
+    "title": "Device peers",
+    "family": "device peers",
+    "units": "peers",
+    "type": "line",
+    "priority": 70001,
+    "dimensions": [
+      {
+        "name": "peers",
+        "algorithm": "absolute",
+        "multiplier": 1,
+        "divisor": 1,
+        "value": 0
+      }
+    ]
+  },
+  {
+    "context": "wireguard.peer_latest_handshake_ago",
+    "labels": {
+      "device": "wg0",
+      "public_key": "cGFyaXR5LXBlZXItYQAAAAAAAAAAAAAAAAAAAAAAAAA="
+    },
+    "title": "Peer time elapsed since the latest handshake",
+    "family": "peer latest handshake",
+    "units": "seconds",
+    "type": "line",
+    "priority": 70003,
+    "dimensions": [
+      {
+        "name": "time",
+        "algorithm": "absolute",
+        "multiplier": 1,
+        "divisor": 1,
+        "value": 60
+      }
+    ]
+  },
+  {
+    "context": "wireguard.peer_latest_handshake_ago",
+    "labels": {
+      "device": "wg0",
+      "public_key": "cGFyaXR5LXBlZXItYgAAAAAAAAAAAAAAAAAAAAAAAAA="
+    },
+    "title": "Peer time elapsed since the latest handshake",
+    "family": "peer latest handshake",
+    "units": "seconds",
+    "type": "line",
+    "priority": 70003,
+    "dimensions": [
+      {
+        "name": "time",
+        "algorithm": "absolute",
+        "multiplier": 1,
+        "divisor": 1,
+        "value": 120
+      }
+    ]
+  },
+  {
+    "context": "wireguard.peer_latest_handshake_ago",
+    "labels": {
+      "device": "wg10",
+      "public_key": "cGFyaXR5LXBlZXItZAAAAAAAAAAAAAAAAAAAAAAAAAA="
+    },
+    "title": "Peer time elapsed since the latest handshake",
+    "family": "peer latest handshake",
+    "units": "seconds",
+    "type": "line",
+    "priority": 70003,
+    "dimensions": [
+      {
+        "name": "time",
+        "algorithm": "absolute",
+        "multiplier": 1,
+        "divisor": 1,
+        "value": 5
+      }
+    ]
+  },
+  {
+    "context": "wireguard.peer_network_io",
+    "labels": {
+      "device": "wg0",
+      "public_key": "cGFyaXR5LXBlZXItYQAAAAAAAAAAAAAAAAAAAAAAAAA="
+    },
+    "title": "Peer traffic",
+    "family": "peer traffic",
+    "units": "B/s",
+    "type": "area",
+    "priority": 70002,
+    "dimensions": [
+      {
+        "name": "receive",
+        "algorithm": "incremental",
+        "multiplier": 1,
+        "divisor": 1,
+        "value": 1000
+      },
+      {
+        "name": "transmit",
+        "algorithm": "incremental",
+        "multiplier": -1,
+        "divisor": 1,
+        "value": 2000
+      }
+    ]
+  },
+  {
+    "context": "wireguard.peer_network_io",
+    "labels": {
+      "device": "wg0",
+      "public_key": "cGFyaXR5LXBlZXItYgAAAAAAAAAAAAAAAAAAAAAAAAA="
+    },
+    "title": "Peer traffic",
+    "family": "peer traffic",
+    "units": "B/s",
+    "type": "area",
+    "priority": 70002,
+    "dimensions": [
+      {
+        "name": "receive",
+        "algorithm": "incremental",
+        "multiplier": 1,
+        "divisor": 1,
+        "value": 300
+      },
+      {
+        "name": "transmit",
+        "algorithm": "incremental",
+        "multiplier": -1,
+        "divisor": 1,
+        "value": 400
+      }
+    ]
+  },
+  {
+    "context": "wireguard.peer_network_io",
+    "labels": {
+      "device": "wg10",
+      "public_key": "cGFyaXR5LXBlZXItZAAAAAAAAAAAAAAAAAAAAAAAAAA="
+    },
+    "title": "Peer traffic",
+    "family": "peer traffic",
+    "units": "B/s",
+    "type": "area",
+    "priority": 70002,
+    "dimensions": [
+      {
+        "name": "receive",
+        "algorithm": "incremental",
+        "multiplier": 1,
+        "divisor": 1,
+        "value": 5
+      },
+      {
+        "name": "transmit",
+        "algorithm": "incremental",
+        "multiplier": -1,
+        "divisor": 1,
+        "value": 6
+      }
+    ]
+  }
+]
