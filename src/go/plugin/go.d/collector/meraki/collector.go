@@ -100,7 +100,7 @@ func (c *Collector) ready(ctx context.Context) error {
 		return errors.New("Meraki client is not initialized")
 	}
 	if c.now().Before(c.notBefore) {
-		return errors.New("Meraki API Retry-After delay has not elapsed")
+		return collectorapi.WithRetryNotBefore(errors.New("Meraki API Retry-After delay has not elapsed"), c.notBefore)
 	}
 	return nil
 }
@@ -109,6 +109,7 @@ func (c *Collector) operationError(err error) error {
 	var apiErr *merakiapi.HTTPError
 	if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusTooManyRequests && apiErr.HasRetryAfter {
 		c.notBefore = c.now().Add(apiErr.RetryAfter)
+		return collectorapi.WithRetryNotBefore(err, c.notBefore)
 	}
 	return err
 }

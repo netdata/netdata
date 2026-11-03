@@ -62,6 +62,10 @@ Actual HTTP starts are spaced by at least 100 ms per job, covering pages and red
 per second steady-state organization budget. Organization and source-IP quotas are shared with other jobs and apps;
 local pacing does not reserve quota. A 429 fails the cycle. A valid `Retry-After` sets a transient not-before time;
 Check and Collect issue no requests before it expires. There is no sleep until that time and no background retry.
+The error carries that absolute deadline through `collectorapi.WithRetryNotBefore`, so Job Manager also preserves
+the minimum when a failed startup instance is disposed and reconstructed. Repeated locally suppressed checks keep
+the original deadline. The annotation grants no retry permission and does not schedule ordinary collections;
+existing explicit manual acceptance and fresh enablement retain the framework's reset semantics.
 
 API keys can use framework secret references. Bearer-token files are reread through the shared reduced-authority
 credential helper for every page/redirect. TLS files use the same shared authority boundary at initialization. The
