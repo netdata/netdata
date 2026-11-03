@@ -349,8 +349,10 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
             freez(th);
 
             dbengine_drained = dbengine_shutdown();
-            if(!dbengine_drained)
+            if(!dbengine_drained) {
                 __atomic_store_n(&dbengine_work_abandoned, true, __ATOMIC_RELAXED);
+                daemon_status_file_shutdown_gave_up("DBENGINE ", "pool work may still be running");
+            }
             watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
         }
         else {
