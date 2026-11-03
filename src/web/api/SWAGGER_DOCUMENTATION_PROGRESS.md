@@ -2939,15 +2939,17 @@ Per dimension:
 1. ✅ `version` - integer - Current version number of the settings file (minimum 1)
 2. ✅ `[user-defined fields]` - any - Additional fields stored in the settings file
 
-### RESPONSE FIELDS - PUT SUCCESS (1 total)
-1. ✅ `message` - string - "OK"
+### RESPONSE FIELDS - PUT SUCCESS (2 total)
+1. ✅ `status` - integer - 200
+2. ✅ `errorMessage` - string - "OK"
 
 ### ERROR RESPONSES
 **All error responses contain:**
-1. ✅ `message` - string - Error description
+1. ✅ `status` - integer - HTTP status code
+2. ✅ `errorMessage` - string - Error description
 
 **Possible Error Scenarios:**
-- `400 Bad Request` - `file` other than `default`, invalid host, missing or non-integer version in payload, invalid JSON payload, missing payload on PUT, invalid HTTP method
+- `400 Bad Request` - `file` other than `default`, invalid host, missing, non-integer or non-incrementable version in payload, invalid JSON payload, missing payload on PUT, invalid HTTP method
 - `409 Conflict` - Version mismatch (caller must reload and reapply changes)
 - `413 Payload Too Large` - PUT payload exceeds 20 MiB (20,971,520 bytes)
 - `500 Internal Server Error` - Settings path creation failure, file I/O errors
@@ -2964,8 +2966,8 @@ Per dimension:
 **HTTP Methods Verified:** 2
 **Request Body Fields (PUT):** 1 required + unlimited optional
 **Response Fields (GET):** 1 guaranteed + user-defined
-**Response Fields (PUT):** 1
-**Error Response Fields:** 1
+**Response Fields (PUT):** 2
+**Error Response Fields:** 2
 **Security:** ACL=HTTP_ACL_DASHBOARD + ACCESS=HTTP_ACCESS_ANONYMOUS_DATA
 **Max Payload Size:** 20 MiB (20,971,520 bytes); larger PUT payloads return 413
 **File Storage:** `{varlib}/settings/default`

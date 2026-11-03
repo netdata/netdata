@@ -144,6 +144,8 @@ static int settings_test_only_default(void) {
                                  NULL, HTTP_RESP_BAD_REQUEST);
     errors += settings_test_code("a path in file is rejected", HTTP_REQUEST_MODE_GET, true, "file=../default",
                                  NULL, HTTP_RESP_BAD_REQUEST);
+    errors += settings_test_code("any non-default file parameter is rejected", HTTP_REQUEST_MODE_GET, true,
+                                 "file=my-dashboard&file=default", NULL, HTTP_RESP_BAD_REQUEST);
     return errors;
 }
 
@@ -178,6 +180,14 @@ static int settings_test_version_types(void) {
     errors += settings_test_code("PUT on a 64-bit version", HTTP_REQUEST_MODE_PUT, false, "file=default",
                                  "{\"version\":4294967296,\"marker\":\"big2\"}", HTTP_RESP_OK);
     errors += settings_test_stored("a 64-bit version increments", 4294967297LL, "big2");
+
+    // the largest valid stored version is served but cannot be incremented into an invalid one
+    settings_test_store("{\"version\":9223372036854775806,\"marker\":\"top\"}");
+    errors += settings_test_stored("the largest valid version is served", INT64_MAX - 1, "top");
+    errors += settings_test_code("the largest valid version cannot be incremented", HTTP_REQUEST_MODE_PUT, false,
+                                 "file=default", "{\"version\":9223372036854775806,\"marker\":\"over\"}",
+                                 HTTP_RESP_BAD_REQUEST);
+    errors += settings_test_stored("a refused increment keeps the object", INT64_MAX - 1, "top");
     return errors;
 }
 

@@ -4212,6 +4212,7 @@
                   "properties": {
                     "version": {
                       "type": "integer",
+                      "format": "int64",
                       "description": "Current version number (auto-incremented on updates)",
                       "minimum": 1
                     }
@@ -4278,7 +4279,7 @@
           }
         ],
         "requestBody": {
-          "description": "JSON object containing settings data with mandatory `version` field.\n\n**Required Fields:**\n- `version`: Integer matching the current version (1 when nothing is stored yet)\n\n**Optional Fields:**\n- Any user-defined fields\n\n**Size Limit:**\nMaximum 20 MiB (20,971,520 bytes); larger payloads return 413 Payload Too Large\n\n**Version Rules:**\n- MUST be a JSON integer greater than 0 (strings, decimals and booleans return 400)\n- Nothing stored yet: version MUST be 1\n- Existing object: version MUST match the stored version exactly\n- Mismatch causes 409 Conflict\n",
+          "description": "JSON object containing settings data with mandatory `version` field.\n\n**Required Fields:**\n- `version`: Integer matching the current version (1 when nothing is stored yet)\n\n**Optional Fields:**\n- Any user-defined fields\n\n**Size Limit:**\nMaximum 20 MiB (20,971,520 bytes); larger payloads return 413 Payload Too Large\n\n**Version Rules:**\n- MUST be a JSON integer from 1 to 9223372036854775806 (strings, decimals and booleans return 400)\n- A stored version that has reached 9223372036854775806 cannot be incremented; such a PUT returns 400\n- Nothing stored yet: version MUST be 1\n- Existing object: version MUST match the stored version exactly\n- Mismatch causes 409 Conflict\n",
           "required": true,
           "content": {
             "application/json": {
@@ -4330,7 +4331,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "message": {
+                    "status": {
+                      "type": "integer",
+                      "example": 200
+                    },
+                    "errorMessage": {
                       "type": "string",
                       "example": "OK"
                     }
@@ -4340,7 +4345,7 @@
             }
           },
           "400": {
-            "description": "Bad request. Common causes:\n- `file` is not `default`\n- Missing `version` field in payload, or `version` is not a positive integer\n- Invalid JSON payload\n- Empty payload\n"
+            "description": "Bad request. Common causes:\n- `file` is not `default`\n- Missing `version` field in payload, `version` is not a valid integer, or it cannot be incremented\n- Invalid JSON payload\n- Empty payload\n"
           },
           "409": {
             "description": "Conflict. Version mismatch detected.\n\n**Resolution Steps:**\n1. GET current settings to retrieve latest version\n2. Reapply your changes to the new version\n3. PUT again with updated version number\n\nThis prevents lost updates when multiple clients modify settings concurrently.\n",
@@ -4349,7 +4354,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "message": {
+                    "status": {
+                      "type": "integer",
+                      "example": 409
+                    },
+                    "errorMessage": {
                       "type": "string",
                       "example": "Payload version does not match the version of the stored object"
                     }

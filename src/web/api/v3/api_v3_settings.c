@@ -102,7 +102,7 @@ static inline void settings_get(BUFFER *wb, bool have_lock) {
     if(rc) {
         int64_t version = settings_extract_json_version(buffer_tostring(wb));
         if (!version) {
-            nd_log(NDLS_DAEMON, NDLP_ERR, "file '%s' cannot be parsed to extract version", filename);
+            nd_log(NDLS_DAEMON, NDLP_ERR, "settings file '%s' has no valid version; serving the initial object", filename);
             settings_initial_version(wb);
         }
         else {
@@ -201,7 +201,7 @@ static inline int settings_put(struct web_client *w) {
         return nrpc_call_error(
             w->response.data,
             "Settings path cannot be created or accessed.",
-            HTTP_RESP_BAD_REQUEST);
+            HTTP_RESP_INTERNAL_SERVER_ERROR);
     }
 
     int64_t old_version = settings_get_version(true);
@@ -243,12 +243,28 @@ static inline int settings_put(struct web_client *w) {
             HTTP_RESP_CONFLICT);
     }
 
+    // the stored version must stay valid after the increment
+    if (new_version >= INT64_MAX - 1) {
+        rw_spinlock_write_unlock(&settings_spinlock);
+        return nrpc_call_error(
+            w->response.data,
+            "Field version cannot be incremented any further",
+            HTTP_RESP_BAD_REQUEST);
+    }
+
     new_version++;
     // Set the new version back into the JSON object
     json_object_object_add(jobj, "version", json_object_new_int64(new_version));
 
     // Convert the updated JSON object back to a string
     const char *updated_json_str = json_object_to_json_string(jobj);
+    if (!updated_json_str) {
+        rw_spinlock_write_unlock(&settings_spinlock);
+        return nrpc_call_error(
+            w->response.data,
+            "Cannot serialize the payload",
+            HTTP_RESP_INTERNAL_SERVER_ERROR);
+    }
 
     char tmp_filename[FILENAME_MAX];
     settings_filename(tmp_filename, "new");
@@ -299,7 +315,7 @@ static inline int settings_put(struct web_client *w) {
 }
 
 int api_v3_settings(RRDHOST *host, struct web_client *w, char *url) {
-    char *file = NULL;
+    bool file_is_default = true;
 
     while(url) {
         char *value = strsep_skip_consecutive_separators(&url, "&");
@@ -312,11 +328,11 @@ int api_v3_settings(RRDHOST *host, struct web_client *w, char *url) {
         // name and value are now the parameters
         // they are not null and not empty
 
-        if(!strcmp(name, "file"))
-            file = value;
+        if(!strcmp(name, "file") && strcmp(value, SETTINGS_FILE) != 0)
+            file_is_default = false;
     }
 
-    if(file && strcmp(file, SETTINGS_FILE) != 0)
+    if(!file_is_default)
         return nrpc_call_error(
             w->response.data,
             "Only the '" SETTINGS_FILE "' settings file is supported.",

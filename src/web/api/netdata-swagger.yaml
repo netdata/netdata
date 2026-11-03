@@ -5773,6 +5773,7 @@ paths:
                 properties:
                   version:
                     type: integer
+                    format: int64
                     description: Current version number (auto-incremented on updates)
                     minimum: 1
                 additionalProperties: true
@@ -5893,7 +5894,8 @@ paths:
           Maximum 20 MiB (20,971,520 bytes); larger payloads return 413 Payload Too Large
 
           **Version Rules:**
-          - MUST be a JSON integer greater than 0 (strings, decimals and booleans return 400)
+          - MUST be a JSON integer from 1 to 9223372036854775806 (strings, decimals and booleans return 400)
+          - A stored version that has reached 9223372036854775806 cannot be incremented; such a PUT returns 400
           - Nothing stored yet: version MUST be 1
           - Existing object: version MUST match the stored version exactly
           - Mismatch causes 409 Conflict
@@ -5934,14 +5936,17 @@ paths:
               schema:
                 type: object
                 properties:
-                  message:
+                  status:
+                    type: integer
+                    example: 200
+                  errorMessage:
                     type: string
                     example: "OK"
         "400":
           description: |
             Bad request. Common causes:
             - `file` is not `default`
-            - Missing `version` field in payload, or `version` is not a positive integer
+            - Missing `version` field in payload, `version` is not a valid integer, or it cannot be incremented
             - Invalid JSON payload
             - Empty payload
         "409":
@@ -5959,7 +5964,10 @@ paths:
               schema:
                 type: object
                 properties:
-                  message:
+                  status:
+                    type: integer
+                    example: 409
+                  errorMessage:
                     type: string
                     example: "Payload version does not match the version of the stored object"
         "413":
