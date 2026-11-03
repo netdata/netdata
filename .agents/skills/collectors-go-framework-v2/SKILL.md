@@ -313,6 +313,12 @@ Tests are evidence only when they have an independent oracle:
   must fail the test without changing the fake. Inspect the production adapter
   and its construction order as well as the fake (transport set before the
   credential provider, deadlines per endpoint, error classification).
+- State that mirrors a remote log or table read in pieces while the source can
+  change between commands SHOULD also have a randomized model test: seeded
+  interleavings of every change the provider allows, reads and failures, checked
+  against the fake's own state once changes stop. Case tests of known races miss
+  the next interleaving. Exemplar:
+  `src/go/plugin/ipmi/collector/ipmi/internal/bmc/sel_model_test.go`.
 
 ## Pre-PR Check
 
