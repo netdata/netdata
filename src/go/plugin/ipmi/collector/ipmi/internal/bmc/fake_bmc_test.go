@@ -18,8 +18,6 @@ import (
 
 var testNow = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
-const fakeSELEntries = 659
-
 // fakeBMC answers commands with encoded response bytes, so every response goes
 // through the SDK's wire decoding. Record IDs are 1-based positions in records.
 type fakeBMC struct {
@@ -29,6 +27,7 @@ type fakeBMC struct {
 	repoErr     error
 	selErr      error
 	closeErr    error
+	sel         fakeSEL
 	// additionTime is the repository's most recent addition timestamp.
 	additionTime uint32
 	// recordCount overrides the repository record count; zero reports len(records).
@@ -66,6 +65,10 @@ func newFakeBMC() *fakeBMC {
 		},
 		readingErrs:  map[uint8]error{},
 		additionTime: 0xffffffff,
+		sel: fakeSEL{
+			clock:     uint32(testNow.Unix()),
+			utcOffset: 0x07ff, // unspecified
+		},
 	}
 }
 
@@ -176,9 +179,20 @@ func (f *fakeBMC) respond(ctx context.Context, req types.Request) ([]byte, error
 		if f.selErr != nil {
 			return nil, f.selErr
 		}
-		data := make([]byte, 14)
-		binary.LittleEndian.PutUint16(data[1:], fakeSELEntries)
-		return data, nil
+		return f.sel.info(), nil
+	case *storage.GetSELEntryRequest:
+		return f.sel.entry(q)
+	case *storage.ReserveSELRequest:
+		f.sel.reserves++
+		f.sel.reservation++
+		return binary.LittleEndian.AppendUint16(nil, f.sel.reservation), nil
+	case *storage.GetSELTimeRequest:
+		return binary.LittleEndian.AppendUint32(nil, f.sel.clock), nil
+	case *storage.GetSELTimeUTCOffsetRequest:
+		if f.sel.utcOffsetErr != nil {
+			return nil, f.sel.utcOffsetErr
+		}
+		return binary.LittleEndian.AppendUint16(nil, f.sel.utcOffset), nil
 	default:
 		return nil, fmt.Errorf("unexpected command %T", req)
 	}
@@ -275,6 +289,144 @@ func (f *fakeBMC) sdrRequests() []*storage.GetSDRRequest {
 	var out []*storage.GetSDRRequest
 	for _, req := range f.requests {
 		if q, ok := req.(*storage.GetSDRRequest); ok {
+			out = append(out, q)
+		}
+	}
+	return out
+}
+
+// fakeSEL is a System Event Log in chain order. Record IDs are the first two
+// bytes of each record, as on the wire.
+type fakeSEL struct {
+	records      [][selRecordSize]byte
+	additionTime uint32
+	eraseTime    uint32
+	freeBytes    uint16
+	overflow     bool
+	// requireReservation rejects reads without the current reservation with 0xC5.
+	requireReservation bool
+	reservation        uint16
+	reserves           int    // Reserve SEL commands answered
+	clock              uint32 // Get SEL Time
+	utcOffset          uint16 // raw Get SEL Time UTC Offset value
+	utcOffsetErr       error
+	// next overrides the next-record ID of a record, by record ID.
+	next map[uint16]uint16
+	// truncate drops the last byte of every record response.
+	truncate bool
+	// onEntry runs before each Get SEL Entry response.
+	onEntry func()
+}
+
+func (s *fakeSEL) info() []byte {
+	data := make([]byte, 14)
+	data[0] = 0x51 // SEL version
+	binary.LittleEndian.PutUint16(data[1:], uint16(len(s.records)))
+	binary.LittleEndian.PutUint16(data[3:], s.freeBytes)
+	binary.LittleEndian.PutUint32(data[5:], s.additionTime)
+	binary.LittleEndian.PutUint32(data[9:], s.eraseTime)
+	data[13] = 0x02 // Reserve SEL supported
+	if s.overflow {
+		data[13] |= 0x80
+	}
+	return data
+}
+
+// entry answers Get SEL Entry: 0000h is the first record, FFFFh the last.
+func (s *fakeSEL) entry(q *storage.GetSELEntryRequest) ([]byte, error) {
+	if s.onEntry != nil {
+		s.onEntry()
+	}
+	if s.requireReservation && (s.reservation == 0 || q.ReservationID != s.reservation) {
+		return nil, types.NewResponseError(types.CodeReservationCanceled, "reservation canceled")
+	}
+	index := -1
+	switch q.RecordID {
+	case 0x0000:
+		if len(s.records) > 0 {
+			index = 0
+		}
+	case 0xffff:
+		index = len(s.records) - 1
+	default:
+		for i, r := range s.records {
+			if binary.LittleEndian.Uint16(r[:]) == q.RecordID {
+				index = i
+			}
+		}
+	}
+	if index < 0 {
+		return nil, types.NewResponseError(types.CodeRequestedDataNotPresent, "record not present")
+	}
+	id := binary.LittleEndian.Uint16(s.records[index][:])
+	next := uint16(0xffff)
+	if index < len(s.records)-1 {
+		next = binary.LittleEndian.Uint16(s.records[index+1][:])
+	}
+	if override, ok := s.next[id]; ok {
+		next = override
+	}
+	record := s.records[index][:]
+	if s.truncate {
+		record = record[:len(record)-1]
+	}
+	return append(binary.LittleEndian.AppendUint16(nil, next), record...), nil
+}
+
+// add appends records like the BMC logging events: the addition time changes
+// and any reservation is canceled.
+func (s *fakeSEL) add(records ...[selRecordSize]byte) {
+	s.records = append(s.records, records...)
+	s.additionTime++
+	s.reservation = 0
+}
+
+// overwrite logs a record on a full log the way a BMC with rollover and
+// slot-style record IDs does: it replaces the oldest record and takes its ID.
+// A hidden record leaves the addition time as it was, like a record logged in
+// the same second as the previous one.
+func (s *fakeSEL) overwrite(timestamp uint32, hidden bool) [selRecordSize]byte {
+	rec := tempEvent(binary.LittleEndian.Uint16(s.records[0][:]), timestamp)
+	s.records = append(s.records[1:], rec)
+	if !hidden {
+		s.additionTime++
+	}
+	s.reservation = 0
+	return rec
+}
+
+// clear empties the log like Clear SEL.
+func (s *fakeSEL) clear() {
+	s.records = nil
+	s.eraseTime++
+	s.reservation = 0
+}
+
+// selEvent encodes a system event record (record type 02h). eventType carries
+// the direction in bit 7.
+func selEvent(
+	id uint16,
+	timestamp uint32,
+	generator uint16,
+	sensorType, sensorNumber, eventType, ed1, ed2, ed3 byte,
+) [selRecordSize]byte {
+	var r [selRecordSize]byte
+	binary.LittleEndian.PutUint16(r[0:], id)
+	r[2] = 0x02
+	binary.LittleEndian.PutUint32(r[3:], timestamp)
+	binary.LittleEndian.PutUint16(r[7:], generator)
+	r[9] = 0x04 // event message revision 2.0
+	r[10] = sensorType
+	r[11] = sensorNumber
+	r[12] = eventType
+	r[13], r[14], r[15] = ed1, ed2, ed3
+	return r
+}
+
+func (f *fakeBMC) selEntryRequests() []*storage.GetSELEntryRequest {
+	var out []*storage.GetSELEntryRequest
+	for _, req := range f.requests {
+		if q, ok := req.(*storage.GetSELEntryRequest); ok {
 			out = append(out, q)
 		}
 	}

@@ -27,7 +27,7 @@ func TestCandidateRecoveryPendingProposalUsesPredecessorScope(t *testing.T) {
 			if exact {
 				pinned, err := c.prepareExact(current.Config, true, 3)
 				applyCandidateDelta(t, pinned, err)
-				candidateResult(t, c, pinned.Decision.Work, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 100}, 3)
+				candidateResult(t, c, pinned.Decision.Work, candidateOutcome{Kind: candidateFailed, Listed: true, Retry: candidateRetryPolicy{cadence: 100}}, 3)
 			}
 			user := DiscoveredJobCandidate{Config: candidateTestConfig("user", "pending"), Source: "user", Incarnation: 8}
 			inv.Version = 3
@@ -106,7 +106,7 @@ func TestCandidateRecoveryWithdrawalKeepsFinitePassOrder(t *testing.T) {
 			}
 			require.NotNil(t, next)
 			assert.Equal(t, current.Token.Candidate, next.Token.Candidate, "the surviving finite pass precedes new arrivals")
-			remaining := candidateResult(t, c, next, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 100}, 105).Decision.Work
+			remaining := candidateResult(t, c, next, candidateOutcome{Kind: candidateFailed, Listed: true, Retry: candidateRetryPolicy{cadence: 100}}, 105).Decision.Work
 			require.NotNil(t, remaining)
 			assert.Equal(t, later, remaining.Config)
 		})
@@ -117,7 +117,7 @@ func TestCandidateRecoveryWithdrawalCancelsCurrentDeadline(t *testing.T) {
 	c := newCandidateController(1)
 	inv := candidateTestInventory(1, true, trustedCandidateConfig("a", "trusted", true))
 	old := candidateInventory(t, c, inv, 0).Decision.Work
-	failure := candidateResult(t, c, old, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 10}, 1)
+	failure := candidateResult(t, c, old, candidateOutcome{Kind: candidateFailed, Listed: true, Retry: candidateRetryPolicy{cadence: 10}}, 1)
 	require.NotNil(t, failure.Decision.Wake)
 	inv.Version = 2
 	inv.Candidates[0] = DiscoveredJobCandidate{Config: trustedCandidateConfig("a", "invalid", false), Source: "a", Incarnation: 2}

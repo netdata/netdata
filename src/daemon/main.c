@@ -234,6 +234,7 @@ int pluginsd_parser_unittest(void);
 int pluginsd_vnodes_unittest(void);
 int websocket_compression_unittest(void);
 int web_client_registry_cookie_unittest(void);
+int web_client_header_parsing_unittest(void);
 int web_client_request_size_unittest(void);
 int web_client_forwarded_for_unittest(void);
 int rrdhost_machine_guid_unittest(void);
@@ -521,6 +522,7 @@ int netdata_main(int argc, char **argv) {
                             if (pluginsd_parser_unittest()) return 1;
                             if (websocket_compression_unittest()) return 1;
                             if (web_client_registry_cookie_unittest()) return 1;
+                            if (web_client_header_parsing_unittest()) return 1;
                             if (web_client_request_size_unittest()) return 1;
                             if (web_client_forwarded_for_unittest()) return 1;
                             if (rrdhost_machine_guid_unittest()) return 1;
@@ -530,6 +532,7 @@ int netdata_main(int argc, char **argv) {
                             if (unit_test_str2ld()) return 1;
                             if (buffer_unittest()) return 1;
                             if (url_unittest()) return 1;
+                            if (command_argument_sanitization_tests()) return 1;
                             if (api_v1_allmetrics_json_unittest()) return 1;
                             if (exporting_json_connector_unittest()) return 1;
                             if (exporting_graphite_unittest()) return 1;

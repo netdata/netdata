@@ -38,29 +38,47 @@ type ArtifactStore interface {
 }
 
 type Engine struct {
-	source     Source
-	history    historyWriter
-	artifacts  ArtifactStore
+	*executionOwner
+	source    Source
+	history   historyWriter
+	artifacts ArtifactStore
+	start     startFunc
+	platform  func() error
+}
+
+// Candidate qualification and monitoring share admission and fail-stop state.
+// Keep sync.Once on this shared owner; never copy it into a candidate view.
+type executionOwner struct {
 	admission  chan struct{}
 	fatal      chan error
 	poisoned   chan struct{}
 	poisonOnce sync.Once
-	start      startFunc
-	platform   func() error
 }
 
 func New(source Source, history historyWriter, artifacts ArtifactStore) *Engine {
 	return &Engine{
+		executionOwner: &executionOwner{
+			admission: make(chan struct{}, 1),
+			fatal:     make(chan error, 1),
+			poisoned:  make(chan struct{}),
+		},
 		source:    source,
 		history:   history,
 		artifacts: artifacts,
-		admission: make(chan struct{}, 1),
-		fatal:     make(chan error, 1),
-		poisoned:  make(chan struct{}),
 		platform:  runtimeAllowed,
 		start: func(ctx context.Context, opts ndexec.TreeOptions, bin string, args ...string) (treeProcess, error) {
 			return ndexec.StartUnprivilegedProcessTree(ctx, opts, bin, args...)
 		},
+	}
+}
+
+func (e *Engine) qualificationView(source Source, artifacts ArtifactStore) *Engine {
+	return &Engine{
+		executionOwner: e.executionOwner,
+		source:         source,
+		artifacts:      artifacts,
+		start:          e.start,
+		platform:       e.platform,
 	}
 }
 

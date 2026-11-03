@@ -78,6 +78,16 @@ class LockedInputTests(unittest.TestCase):
             self.assertEqual(paths[0].read_bytes(), data)
             self.assertEqual(sorted(p.name for p in root.iterdir()), ['shared.deb'])
 
+    def test_content_address_url_retains_explicit_archive_name(self):
+        data = b'exact snapshot file'
+        record = {'name': 'example_1_all.deb', 'url': 'https://snapshot.debian.org/file/' + 'a' * 40,
+                  'sha256': hashlib.sha256(data).hexdigest(), 'bytes': len(data)}
+        with tempfile.TemporaryDirectory() as directory, \
+                patch.object(locked.HTTPS_OPENER, 'open', return_value=self.response(data, record['url'])):
+            path = locked.download(record, Path(directory))
+            self.assertEqual(path.name, record['name'])
+            self.assertEqual(path.read_bytes(), data)
+
     def test_exact_inventory_including_binary_source_versions(self):
         packages = [{'name': 'libexample1', 'version': '1:2.0-3+b2', 'architecture': 'arm64',
                      'source': 'example', 'source_version': '1:2.0-3'}]
@@ -120,8 +130,9 @@ class LockedInputTests(unittest.TestCase):
                                   for field in ('name', 'architecture', 'version', 'source', 'source_version')}
                     self.assertRegex(package['sha256'], '^[a-f0-9]{64}$')
                     self.assertGreater(package['bytes'], 0)
-                    self.assertTrue(package['url'].startswith('https://'))
-                    self.assertEqual(Path(package['url']).name, package['file'])
+                    self.assertRegex(package['url'], r'^https://snapshot\.debian\.org/file/[a-f0-9]{40}$')
+                    self.assertEqual(Path(package['file']).name, package['file'])
+                    self.assertNotIn(package['file'], ('', '.', '..'))
                 self.assertEqual(state, installed)
                 for name in ('chromium', 'chromium-common'):
                     package = installed[(name, architecture)]
@@ -135,6 +146,7 @@ class LockedInputTests(unittest.TestCase):
                         self.assertRegex(item['sha256'], '^[a-f0-9]{64}$')
                         self.assertGreater(item['bytes'], 0)
                         self.assertEqual(Path(item['name']).name, item['name'])
+                        self.assertRegex(item['url'], r'^https://snapshot\.debian\.org/file/[a-f0-9]{40}$')
 
     def test_source_lock_checksums_reject_unsafe_names(self):
         with self.assertRaisesRegex(ValueError, 'checksum'):

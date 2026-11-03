@@ -1,0 +1,170 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Meraki collector configuration",
+    "type": "object",
+    "properties": {
+      "url": {
+        "title": "URL",
+        "description": "URL of the Meraki Dashboard API endpoint.",
+        "type": "string",
+        "default": "https://api.meraki.com/api/v1",
+        "format": "uri"
+      },
+      "organization_id": {
+        "title": "Organization ID",
+        "description": "Meraki organization ID to monitor.",
+        "type": "string",
+        "minLength": 1
+      },
+      "api_key": {
+        "title": "API key",
+        "description": "Meraki API key. Set either this or bearer_token_file.",
+        "type": "string",
+        "default": ""
+      },
+      "bearer_token_file": {
+        "title": "Bearer token file",
+        "description": "Path to a file containing the Meraki API key, reread for every request. Set either this or api_key.",
+        "type": "string",
+        "default": ""
+      },
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, in seconds.",
+        "type": "integer",
+        "default": 300,
+        "minimum": 1
+      },
+      "autodetection_retry": {
+        "title": "Detection retry",
+        "description": "How often to retry the initial connection when the job fails to start, in seconds. Zero disables retries.",
+        "type": "integer",
+        "default": 0,
+        "minimum": 0
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Complete collection or connection-check timeout, in seconds, including all pages and request pacing.",
+        "type": "number",
+        "default": 60,
+        "exclusiveMinimum": 0
+      },
+      "vnode": {
+        "title": "Virtual node",
+        "description": "Associates the organization summary with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). Device nodes are created separately.",
+        "type": "string",
+        "default": ""
+      },
+      "proxy_url": {
+        "title": "Proxy URL",
+        "description": "HTTP proxy URL. Empty value uses environment proxy variables.",
+        "type": "string",
+        "default": ""
+      },
+      "tls_ca": {
+        "title": "TLS CA",
+        "description": "Path to a CA certificate file used to verify the server certificate.",
+        "type": "string",
+        "default": ""
+      },
+      "tls_cert": {
+        "title": "TLS certificate",
+        "description": "Path to a client certificate file. Requires tls_key.",
+        "type": "string",
+        "default": ""
+      },
+      "tls_key": {
+        "title": "TLS key",
+        "description": "Path to the client certificate key file. Requires tls_cert.",
+        "type": "string",
+        "default": ""
+      },
+      "tls_skip_verify": {
+        "title": "Skip TLS verification",
+        "description": "Skip verification of the server certificate and hostname.",
+        "type": "boolean",
+        "default": false
+      }
+    },
+    "required": [
+      "organization_id"
+    ],
+    "allOf": [
+      {
+        "not": {
+          "properties": {
+            "api_key": {
+              "maxLength": 0
+            },
+            "bearer_token_file": {
+              "maxLength": 0
+            }
+          }
+        }
+      },
+      {
+        "not": {
+          "required": [
+            "api_key",
+            "bearer_token_file"
+          ],
+          "properties": {
+            "api_key": {
+              "minLength": 1
+            },
+            "bearer_token_file": {
+              "minLength": 1
+            }
+          }
+        }
+      }
+    ]
+  },
+  "uiSchema": {
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Target",
+          "fields": [
+            "url",
+            "organization_id"
+          ]
+        },
+        {
+          "title": "Authentication",
+          "fields": [
+            "api_key",
+            "bearer_token_file"
+          ]
+        },
+        {
+          "title": "Collection",
+          "fields": [
+            "update_every",
+            "autodetection_retry",
+            "timeout",
+            "vnode"
+          ]
+        },
+        {
+          "title": "Transport",
+          "fields": [
+            "proxy_url",
+            "tls_ca",
+            "tls_cert",
+            "tls_key",
+            "tls_skip_verify"
+          ]
+        }
+      ]
+    },
+    "api_key": {
+      "ui:widget": "password"
+    },
+    "timeout": {
+      "ui:help": "This budget covers a whole collection, including authentication-file reads, pagination and pacing. Increase it if a large organization cannot finish within the budget."
+    }
+  }
+}

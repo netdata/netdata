@@ -15,6 +15,7 @@ require (
 	github.com/DataDog/sketches-go v1.4.8
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/PaloAltoNetworks/pango v0.10.2
+	github.com/ProtonMail/go-crypto v1.5.1
 	github.com/Wing924/ltsv v0.4.0
 	github.com/alexbrainman/odbc v0.0.0-20250601004241-49e6b2bc0cf0
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
@@ -30,7 +31,7 @@ require (
 	github.com/axiomhq/hyperloglog v0.3.0
 	github.com/blang/semver/v4 v4.0.0
 	github.com/bmatcuk/doublestar/v4 v4.10.4
-	github.com/bougou/go-ipmi v0.9.2-0.20261029040308-5dabd2f69282
+	github.com/bougou/go-ipmi v0.9.2-0.20261103040914-5691311a9607
 	github.com/catonetworks/cato-go-sdk v1.1.3
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/clbanning/rfile/v2 v2.0.0-20231024120205-ac3fca974b0e
@@ -127,6 +128,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sso v1.39.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.44.0 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
+	github.com/cloudflare/circl v1.6.3 // indirect
 	github.com/containerd/errdefs v1.0.0 // indirect
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect

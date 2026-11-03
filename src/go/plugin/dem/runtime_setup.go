@@ -3,16 +3,11 @@
 package dem
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
 	"path/filepath"
 	goruntime "runtime"
 	"sync"
 
-	"github.com/netdata/netdata/go/plugins/pkg/safefile"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
@@ -20,41 +15,14 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
-// LoadRuntimeManifest reads explicit administrator-controlled release trust. An archive,
-// monitor request, or download response can never replace this manifest.
-func LoadRuntimeManifest(path string) (*runtime.Manifest, error) {
-	if !filepath.IsAbs(path) {
-		return nil, errors.New("runtime manifest path must be absolute")
-	}
-	data, err := safefile.Read(path)
-	if err != nil {
-		return nil, fmt.Errorf("installed runtime manifest: %w", err)
-	}
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	var manifest runtime.Manifest
-	if err := decoder.Decode(&manifest); err != nil {
-		return nil, fmt.Errorf("installed runtime manifest: %w", err)
-	}
-	var trailing any
-	if err := decoder.Decode(&trailing); err != io.EOF {
-		return nil, errors.New("installed runtime manifest has trailing content")
-	}
-	if err := manifest.Validate(); err != nil {
-		return nil, fmt.Errorf("installed runtime manifest: %w", err)
-	}
-	if manifest.Platform != "linux/"+goruntime.GOARCH {
-		return nil, errors.New("installed runtime manifest does not match this architecture")
-	}
-	return &manifest, nil
-}
-
 // RuntimeHandle owns process resources. Close follows joined jobs and workers;
 // it must not run while a supervised browser invocation may still use the cache.
 type RuntimeHandle struct {
 	Source     runner.Source
 	Host       *runtimehost.Host
 	Store      *runtime.Store
+	Native     *runtime.Native
+	Updater    *runtimehost.Updater
 	Manifest   *runtime.Manifest
 	SetupError error
 	closeOnce  sync.Once
@@ -87,6 +55,15 @@ func OpenRuntime(cfg RuntimeConfig, varLibPath string) *RuntimeHandle {
 		}
 		return result
 	}
+	if cfg.Mode == "native" {
+		if result.SetupError == nil {
+			result.Native, result.SetupError = runtime.OpenNative(runtime.DefaultNativeConfig())
+		}
+		result.Host = runtimehost.New(runtimehost.Config{Native: result.Native, Mode: "native", Unavailable: result.SetupError})
+		result.SetupError = result.Host.Ready()
+		result.Source = result.Host
+		return result
+	}
 	if result.SetupError == nil {
 		storeConfig, err := cfg.StoreConfig(varLibPath)
 		if err == nil {
@@ -102,11 +79,17 @@ func OpenRuntime(cfg RuntimeConfig, varLibPath string) *RuntimeHandle {
 
 func (h *RuntimeHandle) Close() error {
 	h.closeOnce.Do(func() {
+		if h.Updater != nil {
+			h.closeErr = h.Updater.Close()
+		}
 		if h.Host != nil {
-			h.closeErr = h.Host.Close()
+			h.closeErr = errors.Join(h.closeErr, h.Host.Close())
 		}
 		if h.Store != nil {
 			h.closeErr = errors.Join(h.closeErr, h.Store.Close())
+		}
+		if h.Native != nil {
+			h.closeErr = errors.Join(h.closeErr, h.Native.Close())
 		}
 	})
 	return h.closeErr

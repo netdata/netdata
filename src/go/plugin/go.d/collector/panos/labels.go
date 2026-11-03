@@ -39,6 +39,20 @@ func ipsecTunnelLabelValues(tunnel ipsecTunnel) [6]string {
 	}
 }
 
+func ipsecTunnelStateKey(tunnel vpnFlowTunnel) [2]string {
+	return [2]string{
+		tunnel.Name,
+		labelValue(tunnel.ID, "unknown"),
+	}
+}
+
+func ipsecGatewayStateKey(gateway vpnGateway) [2]string {
+	return [2]string{
+		gateway.Name,
+		ipsecIKEVersion(gateway),
+	}
+}
+
 func peerLabelValues(peer bgpPeer) []string {
 	return []string{
 		labelValue(firstNonEmpty(peer.VR, "default"), "default"),

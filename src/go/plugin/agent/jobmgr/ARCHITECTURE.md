@@ -922,14 +922,49 @@ and newly due work wait for the next finite pass rather than extending the activ
 failure is not permanent proposal rejection. Zero cadence, permanent failures, and unclassified Init failures prevent automatic
 retry of that candidate, while eligible siblings may still receive their initial attempts.
 
+An optional `collectorapi.WithRetryNotBefore` error annotation supplies an absolute minimum for the next automatic
+startup activation of the same retained candidate. Failure metadata keeps the latest annotated deadline through
+redaction and collector disposal. The candidate owns this outstanding minimum independently of its ordinary retry
+permission, logical cadence, initial-pass state and admission grants. Zero cadence or permanent classification grants
+no ordinary retry, but does not erase metadata that constrains a separately permitted automatic source promotion.
+
+All new automatic activations check the same provider predicate: initial/retry passes, tentative source selection and
+failure-triggered framework recovery. Ordinary retries additionally require their configured logical cadence. A
+satisfied minimum is consumed at admission; physical resumption of that already-admitted activation renews execution
+fencing without reopening the provider wait. Automatic search reopening preserves other retained candidates' minima.
+Accepted exact UPDATE/RESTART resets only the selected candidate; a fresh ENABLE resets its reopened scope, while an
+already-enabled ENABLE preserves state. DISABLE cancels capabilities and deferred work; identity metadata survives
+until reset or candidate removal. Run retirement discards the ledger.
+
+A provider-blocked source transition retains only its unconsumed source observation as `DeferredSource`.
+It owns no executable Proposal or physical executor and retains the predecessor's public binding until admission.
+A pure membership/source/lifetime/authorization check makes a valid pending observation the effective cursor for
+source selection, ahead of historical admitted `Cursor`. Admission or rejection of an older proposal can change
+executable intent and history without consuming the newer observation. An actually observed equal/higher-priority
+admitted binding may supersede it; explicit reset and source invalidation still cancel it.
+
+Ordinary recovery keeps the predecessor tier/exact scope while selection is deferred, so an eligible sibling can
+proceed. A source wake validates its execution capability and reruns current source arbitration before creating work.
+Genuine source replacement can still proceed when ordinary recovery is closed or disabled; an explicit DISABLE
+cancels an already-deferred transition. The bounded transaction finalizer combines ordinary/blocked and deferred-source
+wake estimates under the current executable intent. Even an already-due observation schedules a wake rather than
+releasing another candidate while the current admission hands off its checked stage. A provenance bit distinguishes
+source hints that may be discarded when selection changes. Readiness settlement retains an existing deferred hint
+without scanning candidate populations.
+
+The heap carries wake estimates, never authority to bypass the absolute timestamp. Early wakes rearm without
+constructing a collector, including when logical ticks arrive in a burst. Elapsed cleanup consumes the original wait.
+Expired/absent minima preserve cadence behavior; logical arithmetic saturates at int64. This is candidate-owned
+startup metadata, not an endpoint quota or persistence across explicit reload/restart.
+
 `joboutput/autodetection_retry.go` retains one earliest wake per job in the existing per-run map, heap and dispatcher:
 
 - The process's one-second tick advances a logical clock.
 - Heap entries carry job identity, due time and `{run epoch, intent generation, schedule generation}` only; they store
   no config and cannot select a candidate.
 - A due wake submits a short lane transaction in `joboutput/candidate_execution.go`. The controller checks the capability and
-  enabled/open search, chooses eligible work, and commits its state before releasing an executor effect. Waiting for
-  a collector's Check never blocks deadline delivery for an unrelated job.
+  the appropriate source-transition or enabled/open recovery authority, chooses eligible work, and commits its state
+  before releasing an executor effect. Waiting for a collector's Check never blocks deadline delivery for an unrelated job.
 - Identical inventory, sibling changes and rejected proposals do not reset another candidate's cooldown. An actual
   enablement transition resets attempt facts; disable/removal/supersession/run retirement revokes old deadline capabilities.
 - Exact DynCfg recovery uses its admitted binding; source alternatives use the admitted continuation's tier. While

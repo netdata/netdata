@@ -240,6 +240,15 @@ Use `calc` when the source's current value is the full condition. Test start-up,
 obsoletion separately. `delay:` controls notification hysteresis, not the evaluated alert state; it is not a substitute
 for a Prometheus `for:` duration.
 
+### Event Counts
+
+A `sum` lookup adds the stored points of its window. Incremental dimensions are stored as per-second rates
+(`new_value /= st->update_every` in `src/database/rrdset-collection.c`), so a `sum` over a counter is the event count
+divided by the chart's update interval. When the alert value or its notification must be a count, read a gauge of the
+events since the previous sample, or multiply by `$update_every`. Either sum stays approximate: a missed update
+interpolates the stored points (`rrdset_done_interpolate`), which can add a fraction, so compare it with zero rather
+than with an exact count.
+
 ## Control Flapping With Three Combinable Layers
 
 Stability involves signal smoothing, threshold hysteresis and notification delay. Address them in that order.
