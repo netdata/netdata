@@ -375,6 +375,18 @@ static bool print_tree_and_exit = false;
 int pss_refresh_period = 0; // disabled by default
 #endif
 
+// A whole decimal number in [min, max]: no trailing characters, no overflow.
+static bool parse_option_number(const char *s, long long min, long long max, long long *result) {
+    char *end = NULL;
+    errno = 0;
+    long long v = strtoll(s, &end, 10);
+    if(end == s || *end || errno || v < min || v > max)
+        return false;
+
+    *result = v;
+    return true;
+}
+
 static void parse_args(int argc, char **argv)
 {
     int i, freq = 0;
@@ -428,7 +440,12 @@ static void parse_args(int argc, char **argv)
                 exit(1);
             }
             i++;
-            retire_targets_after_s = str2i(argv[i]);
+            long long seconds;
+            if(!parse_option_number(argv[i], 0, INT_MAX, &seconds)) {
+                fprintf(stderr, "Cannot parse 'retire-targets-after' value '%s': expected a number of seconds.\n", argv[i]);
+                exit(1);
+            }
+            retire_targets_after_s = (time_t)seconds;
             continue;
         }
 
@@ -438,8 +455,12 @@ static void parse_args(int argc, char **argv)
                 exit(1);
             }
             i++;
-            int n = str2i(argv[i]);
-            max_targets_per_family = (n < 1) ? 1 : (size_t)n;
+            long long n;
+            if(!parse_option_number(argv[i], 1, INT_MAX, &n)) {
+                fprintf(stderr, "Cannot parse 'max-targets' value '%s': expected a number of at least 1.\n", argv[i]);
+                exit(1);
+            }
+            max_targets_per_family = (size_t)n;
             continue;
         }
 
