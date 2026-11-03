@@ -1388,3 +1388,21 @@ func TestReader_SEL_ResumeFindsNewestRecord(t *testing.T) {
 	assert.True(t, got.NewKnown)
 	assert.Equal(t, []uint16{1, 2}, recordIDs(got))
 }
+
+func TestReader_SEL_EntryCountIsTheLatestAnswer(t *testing.T) {
+	// A record logged while the collection reads is in the second Get SEL
+	// Info answer, which completes the read; the count and the usage agree.
+	fake := newFakeBMC()
+	fake.sel.records = tempEvents(1, 2, 3)
+	r := newSELTestReader(fake, 0, 0)
+	fake.sel.onEntry = func() {
+		if len(fake.sel.records) == 3 {
+			fake.sel.add(tempEvent(4, 0x60000004))
+		}
+	}
+	got, err := r.Collect(t.Context(), true)
+	require.NoError(t, err)
+	require.NotNil(t, got.SELEntries)
+	assert.Equal(t, 4, *got.SELEntries)
+	assert.Equal(t, 4, got.SEL.Entries)
+}

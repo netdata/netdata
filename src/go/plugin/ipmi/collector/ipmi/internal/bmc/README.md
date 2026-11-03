@@ -47,8 +47,9 @@ compatibility layer.
 
 ## System Event Log
 
-Each collection with SEL enabled sends one `Get SEL Info`. Its entry count is the `ipmi.sel` sample; a failure omits the
-sample, with no previous value or zero substitute. `Snapshot.SEL` appears once the BMC first answers and then carries
+Each collection with SEL enabled sends `Get SEL Info`, and a second one when it completes a read (see below). The entry
+count of the latest answer is the `ipmi.sel` sample; a failed first request omits the sample, with no previous value or
+zero substitute. `Snapshot.SEL` appears once the BMC first answers and then carries
 the cached records, the latest entry count, free bytes and overflow flag, and the clock information below. Any SEL
 command failure degrades only SEL data: a failed `Get SEL Info` or record read keeps the earlier records and marks the
 read failed, except that a record vanishing during a walk resets the cache (see below); a failed clock read keeps the
@@ -78,8 +79,10 @@ Records are cached per Reader, across collections and reconnects:
   size. A cached record ID reported with new content was reused and replaces the old record. Reaching a cached record
   with unchanged content means the chain loops back and ends the walk.
 - The Reader relies on IPMI 2.0 behavior: records leave the log only by rollover, which overwrites the oldest records,
-  or by deletion or clear, which changes the erase time; and the chain lists records oldest first. A BMC that deletes
-  records without changing the erase time can make it skip or repeat records.
+  or by deletion or clear, which sets the erase time; and the chain lists records oldest first. The erase time counts
+  seconds, so a deletion in the same second as the erase time the Reader last saw goes unnoticed: the cache keeps the
+  deleted record until it would roll over, and if the BMC also gives its ID to a new record during a read, records
+  can be skipped. A BMC that deletes records without setting the erase time has the same effect at any time.
 - Like FreeIPMI, `Reserve SEL` is sent only after a 0xC5 completion code, and a read is retried with a new reservation
   up to four times. Whole 16-byte records are read; a shorter record fails the read.
 

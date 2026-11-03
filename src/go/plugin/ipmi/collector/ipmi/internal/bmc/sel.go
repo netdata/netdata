@@ -133,7 +133,6 @@ func (r *Reader) readSEL(ctx context.Context, warnings *collectionWarnings) (*in
 		}
 		return nil, c.snapshot(true)
 	}
-	entries := int(info.Entries)
 	c.latest = info
 	r.redecodeSEL()
 	updateErr := r.updateSEL(ctx, info)
@@ -150,6 +149,9 @@ func (r *Reader) readSEL(ctx context.Context, warnings *collectionWarnings) (*in
 	if s.NewKnown {
 		s.New = r.decodePending()
 	}
+	// Completing a read asks Get SEL Info again; the count and the usage are
+	// from the same, latest answer.
+	entries := int(c.latest.Entries)
 	return &entries, s
 }
 
