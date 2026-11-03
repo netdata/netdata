@@ -50,6 +50,9 @@ typedef struct metadata_expired_dimensions {
     struct metadata_expired_dimensions *prev, *next;
 } METADATA_EXPIRED_DIMENSIONS;
 
+// the contexts garbage collection queues a batch once it holds this many records (32 bytes each)
+#define METADATA_EXPIRED_DIMENSIONS_BATCH_MAX (65536)
+
 METADATA_EXPIRED_DIMENSIONS *metadata_expired_dimensions_create(const char *machine_guid);
 void metadata_expired_dimensions_add(METADATA_EXPIRED_DIMENSIONS *batch, UUIDMAP_ID uuid, STRING *chart_id, STRING *dim_id);
 void metadata_expired_dimensions_free(METADATA_EXPIRED_DIMENSIONS *batch);

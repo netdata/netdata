@@ -344,6 +344,13 @@ void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jobs) {
                                                     if(!expired)
                                                         expired = metadata_expired_dimensions_create(host->machine_guid);
                                                     metadata_expired_dimensions_add(expired, rm->uuid, ri->id, rm->id);
+
+                                                    // a pass that drops many metrics hands them over in bounded
+                                                    // batches; one batch above the backlog cap would be dropped whole
+                                                    if(expired->used >= METADATA_EXPIRED_DIMENSIONS_BATCH_MAX) {
+                                                        metaqueue_delete_expired_dimensions(expired);
+                                                        expired = NULL;
+                                                    }
                                                 }
                                             }
                                         }

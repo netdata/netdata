@@ -2298,6 +2298,21 @@ static void ctx_hosts_load(uv_work_t *req)
 
 static size_t expired_dimensions_dropped = 0;
 
+// the rows of dropped records wait for the dimension scan
+static void expired_dimensions_drop(size_t records, const char *reason)
+{
+    if (!records)
+        return;
+
+    size_t total = __atomic_add_fetch(&expired_dimensions_dropped, records, __ATOMIC_RELAXED);
+
+    nd_log_limit_static_global_var(erl, 600, 0);
+    nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
+                 "METADATA: expired dimensions: dropped %zu records (%s), %zu since start; "
+                 "their rows are left to the dimension scan",
+                 records, reason, total);
+}
+
 METADATA_EXPIRED_DIMENSIONS *metadata_expired_dimensions_create(const char *machine_guid)
 {
     METADATA_EXPIRED_DIMENSIONS *batch = callocz(1, sizeof(*batch));
@@ -2362,7 +2377,7 @@ static bool expired_dimensions_append(
 {
     size_t records = batch->used - batch->done;
     if (*pending + in_worker + records > max_pending) {
-        __atomic_add_fetch(&expired_dimensions_dropped, records, __ATOMIC_RELAXED);
+        expired_dimensions_drop(records, "backlog full");
         metadata_expired_dimensions_free(batch);
         return false;
     }
@@ -2415,6 +2430,8 @@ static bool expired_dimension_is_live(RRDHOST *host, const struct metadata_expir
     // The chart is collected again, but not this dimension: if it was its last row, deleting it also deletes the
     // chart row and its labels (triggers), while the re-created chart may have been stored already. Store the
     // chart and its labels again; this runs in the metadata worker, the only writer of these fields here.
+    // Unconditional on purpose: whether this row is the chart's last one is known only after the delete, and the
+    // rows of other expired dimensions of this chart may go in a later pass; a re-store is an upsert.
     if (!live) {
         st->rrdlabels_last_saved_version = 0;
         rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
@@ -2637,6 +2654,7 @@ static METADATA_EXPIRED_DIMENSIONS *do_pending_expired_dimensions(METADATA_EXPIR
         __atomic_load_n(&expired_dimensions_dropped, __ATOMIC_RELAXED),
         (double)(ended_ut - started_ut) / USEC_PER_MS);
 
+    worker_is_idle();
     return list;
 }
 
@@ -3608,7 +3626,7 @@ void metaqueue_delete_expired_dimensions(METADATA_EXPIRED_DIMENSIONS *batch)
     };
 
     if (!batch->used || !metadata_enq_cmd(&cmd, false)) {
-        __atomic_add_fetch(&expired_dimensions_dropped, batch->used, __ATOMIC_RELAXED);
+        expired_dimensions_drop(batch->used, "metadata queue full or stopped");
         metadata_expired_dimensions_free(batch);
     }
 }
@@ -3897,14 +3915,23 @@ static bool ut_expired_can_continue(void)
 }
 
 static size_t ut_expired_transactions_open;
+static size_t ut_expired_begins;
+static bool ut_expired_begin_fails;
+static bool ut_expired_commit_fails;
 
+// like expired_dimensions_transaction(): a failed begin or commit leaves nothing open
 static bool ut_expired_transaction(bool begin)
 {
-    if (begin)
+    if (begin) {
+        ut_expired_begins++;
+        if (ut_expired_begin_fails)
+            return false;
         ut_expired_transactions_open++;
-    else
-        ut_expired_transactions_open--;
-    return true;
+        return true;
+    }
+
+    ut_expired_transactions_open--;
+    return !ut_expired_commit_fails;
 }
 
 static bool ut_expired_never_live(RRDHOST *host __maybe_unused, const struct metadata_expired_dimension *e __maybe_unused)
@@ -4017,6 +4044,30 @@ int metadata_expired_dimensions_unittest(void)
                 rc = 1;
             }
             expired_dimensions_list_free(&list);
+
+            // a record whose dimension is not collected again marks its chart and labels to be stored again (its
+            // row may be the chart's last one, and the triggers delete the chart with it); a live one does not
+            struct metadata_expired_dimension live_e = { .chart_id = st->id, .dim_id = rd->id };
+            struct metadata_expired_dimension old_e = { .chart_id = st->id, .dim_id = rd->id };
+            (void)uuidmap_uuid(rd->uuid, live_e.uuid);
+            uuid_generate(old_e.uuid);
+
+            st->rrdlabels_last_saved_version = 1;
+            rrdset_flag_clear(st, RRDSET_FLAG_METADATA_UPDATE);
+            bool live = expired_dimension_is_live(localhost, &live_e);
+            bool live_untouched = !rrdset_flag_check(st, RRDSET_FLAG_METADATA_UPDATE) &&
+                                  st->rrdlabels_last_saved_version == 1;
+            bool old_live = expired_dimension_is_live(localhost, &old_e);
+            bool old_marked = rrdset_flag_check(st, RRDSET_FLAG_METADATA_UPDATE) &&
+                              st->rrdlabels_last_saved_version == 0 &&
+                              rrdhost_flag_check(localhost, RRDHOST_FLAG_METADATA_UPDATE);
+
+            if (!live || !live_untouched || old_live || !old_marked) {
+                fprintf(stderr, "%s: chart re-store: live %d (untouched %d), old uuid live %d (chart marked %d) "
+                                "(expected 1 (1), 0 (1))\n",
+                        __FUNCTION__, live, live_untouched, old_live, old_marked);
+                rc = 1;
+            }
 
             // a host being freed (its metadata lifetime lock held for writing) is left for the next pass
             batch = metadata_expired_dimensions_create(localhost->machine_guid);
@@ -4150,7 +4201,62 @@ int metadata_expired_dimensions_unittest(void)
         expired_dimensions_list_free(&list);
     }
 
-    // 4. the real delete removes the dimension row, and the triggers remove the chart with its labels when its
+    // 4. a failed commit counts its deletes as failed and stops the pass; a failed begin leaves the deletes to
+    //    commit one by one; neither leaves a transaction open
+    {
+        struct expired_dimensions_ops ops = {
+            .is_live = ut_expired_never_live,
+            .can_be_deleted = ut_expired_can_be_deleted,
+            .delete = ut_expired_delete,
+            .can_continue = ut_expired_can_continue,
+            .transaction = ut_expired_transaction,
+        };
+        ut_expired_fail_after = SIZE_MAX;
+        ut_expired_can_continue_calls = 0;
+        ut_expired_can_continue_limit = SIZE_MAX;
+        uuid_clear(ut_expired_retained_uuid);
+
+        METADATA_EXPIRED_DIMENSIONS *list = NULL;
+        size_t pending = 0;
+        (void)expired_dimensions_append(&list, &pending, 0, ut_expired_batch("ut-host", 300), SIZE_MAX);
+
+        ut_expired_deleted = 0;
+        ut_expired_commit_fails = true;
+        struct expired_dimensions_result lost = { 0 };
+        list = expired_dimensions_process(list, &ops, &lost);
+        ut_expired_commit_fails = false;
+
+        if (lost.checked != METADATA_WAL_CHECK_ROWS || lost.deleted != 0 || lost.failed != METADATA_WAL_CHECK_ROWS ||
+            expired_dimensions_list_remaining(list) != 300 - METADATA_WAL_CHECK_ROWS || ut_expired_transactions_open) {
+            fprintf(stderr, "%s: failed commit: checked %zu, deleted %zu, failed %zu, left %zu, open %zu "
+                            "(expected %d, 0, %d, %d, 0)\n",
+                    __FUNCTION__, lost.checked, lost.deleted, lost.failed, expired_dimensions_list_remaining(list),
+                    ut_expired_transactions_open, METADATA_WAL_CHECK_ROWS, METADATA_WAL_CHECK_ROWS,
+                    300 - METADATA_WAL_CHECK_ROWS);
+            rc = 1;
+        }
+        expired_dimensions_list_free(&list);
+
+        (void)expired_dimensions_append(&list, &pending, 0, ut_expired_batch("ut-host", 300), SIZE_MAX);
+        ut_expired_deleted = 0;
+        ut_expired_begins = 0;
+        ut_expired_begin_fails = true;
+        struct expired_dimensions_result unbatched = { 0 };
+        list = expired_dimensions_process(list, &ops, &unbatched);
+        ut_expired_begin_fails = false;
+
+        if (list || unbatched.deleted != 300 || unbatched.failed || ut_expired_begins != 300 ||
+            ut_expired_transactions_open) {
+            fprintf(stderr, "%s: failed begin: deleted %zu, failed %zu, begins %zu, open %zu, %s left "
+                            "(expected 300, 0, 300, 0, nothing left)\n",
+                    __FUNCTION__, unbatched.deleted, unbatched.failed, ut_expired_begins,
+                    ut_expired_transactions_open, list ? "batches" : "nothing");
+            rc = 1;
+        }
+        expired_dimensions_list_free(&list);
+    }
+
+    // 5. the real delete removes the dimension row, and the triggers remove the chart with its labels when its
     //    last dimension goes
     if (!db_meta) {
         fprintf(stderr, "%s: no metadata database to test the delete\n", __FUNCTION__);
