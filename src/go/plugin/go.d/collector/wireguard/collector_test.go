@@ -327,6 +327,32 @@ func TestCollector_Collect(t *testing.T) {
 				},
 			},
 		},
+		"device removed at run time, device with a longer name is kept": {
+			{
+				prepareMock: func(m *mockClient) {
+					m.devices = append(m.devices, prepareDevice(1))
+					m.devices = append(m.devices, prepareDevice(10))
+				},
+				check: func(t *testing.T, collr *Collector) {
+					_ = collr.Collect(context.Background())
+				},
+			},
+			{
+				prepareMock: func(m *mockClient) {
+					m.devices = m.devices[1:]
+				},
+				check: func(t *testing.T, collr *Collector) {
+					collr.cleanupEvery = time.Second
+					time.Sleep(time.Second)
+					_ = collr.Collect(context.Background())
+					assert.Equal(t, len(deviceChartsTmpl)*2, len(*collr.Charts()))
+					assert.Equal(t, len(deviceChartsTmpl)*1, calcObsoleteCharts(collr.Charts()))
+					for _, chart := range *collr.Charts() {
+						assert.Equalf(t, strings.HasPrefix(chart.ID, "device_wg1_"), chart.Obsolete, "chart %s", chart.ID)
+					}
+				},
+			},
+		},
 		"peer added at runtime": {
 			{
 				prepareMock: func(m *mockClient) {

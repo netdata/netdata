@@ -105,10 +105,15 @@ func (c *Collector) addNewDeviceCharts(device string) {
 }
 
 func (c *Collector) removeDeviceCharts(device string) {
-	prefix := fmt.Sprintf("device_%s", device)
+	// Match exact chart IDs: a prefix match would also remove the charts of
+	// other devices whose name starts with this one (e.g. wg1 and wg10).
+	ids := make(map[string]bool, len(deviceChartsTmpl))
+	for _, tmpl := range deviceChartsTmpl {
+		ids[fmt.Sprintf(tmpl.ID, device)] = true
+	}
 
 	for _, c := range *c.Charts() {
-		if strings.HasPrefix(c.ID, prefix) {
+		if ids[c.ID] {
 			c.MarkRemove()
 			c.MarkNotCreated()
 		}
