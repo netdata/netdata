@@ -55,6 +55,9 @@ type SELRecord struct {
 	// Direction is Assertion or Deassertion; empty for records without a sensor event.
 	Direction string
 	State     string
+	// Threshold marks threshold events (event/reading type 01h), which also
+	// change the state of their sensor.
+	Threshold bool
 	// Raw is the record as returned by the BMC.
 	Raw [selRecordSize]byte
 }
@@ -64,8 +67,8 @@ type SEL struct {
 	// Records are in log order, oldest first. The slice is shared between
 	// snapshots and never modified.
 	Records []SELRecord
-	// Loaded is false until reading reached the newest record once; Records are
-	// then the oldest part of the log.
+	// Loaded is false until a read of the whole log was verified once; Records
+	// are then the oldest part of the log.
 	Loaded bool
 	// Entries, FreeBytes and Overflow are from the latest Get SEL Info response.
 	Entries   int
@@ -79,6 +82,13 @@ type SEL struct {
 	// ReadFailed reports that this collection's Get SEL Info or record reads
 	// failed; the other fields are from earlier collections.
 	ReadFailed bool
+	// New counts newly observed record occupants since the previous eligible
+	// snapshot. Initial loading is history; subsequent rescans do not delay
+	// event counts. Rereading the same occupant does not count it again.
+	New SELCounts
+	// NewKnown is false before the first verified baseline and when ReadFailed
+	// is set. Pending counts are reported by the next eligible snapshot.
+	NewKnown bool
 }
 
 // Time returns the UTC time a record was logged. It reports false for records
@@ -166,8 +176,8 @@ func decodeSELRecord(raw [selRecordSize]byte, sensors map[sensorAddress]*descrip
 	}
 	s := sel.Standard
 	eventType, sensorType := uint8(s.EventReadingType), uint8(s.SensorType)
+	r.Threshold, r.State = selRecordClass(raw)
 	r.Direction = s.EventDir.String()
-	r.State = selState(recordType, eventType, sensorType, s.EventData.EventData1, bool(s.EventDir))
 	r.Generator = generatorName(s.GeneratorID)
 
 	d := sensors[sensorAddress{
@@ -194,6 +204,16 @@ func decodeSELRecord(raw [selRecordSize]byte, sensors map[sensorAddress]*descrip
 		r.Event += fmt.Sprintf(" [record type %#02x]", recordType)
 	}
 	return r
+}
+
+// selRecordClass reads the event fields from the IPMI 2.0 section 32.1 wire
+// layout. Classification is independent of SDR inventory and display decoding.
+func selRecordClass(raw [selRecordSize]byte) (threshold bool, state string) {
+	if raw[2] >= selTimestampedOEMFirst {
+		return false, StateUnknown
+	}
+	eventType := raw[12] & 0x7f
+	return eventType == eventTypeThreshold, selState(raw[2], eventType, raw[10], raw[13], raw[12]&0x80 != 0)
 }
 
 // thresholdTrigger formats the trigger reading and threshold that a threshold

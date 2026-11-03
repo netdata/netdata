@@ -4,6 +4,7 @@ package bmc
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"time"
@@ -40,12 +41,14 @@ type selCache struct {
 	records []SELRecord
 	// next is the next record ID to read; endOfChainRecordID once reading
 	// reached the newest record.
-	next   uint16
+	next uint16
+	// loaded is set once a read of the whole log was verified (completeRead)
+	// and stays set until a reset.
 	loaded bool
-	// checkOldest is set by a Get SEL Info change, after which the cache may
-	// hold records the BMC overwrote. It stays set until a read reaches the
-	// newest record, because the surplus shows only then.
-	checkOldest bool
+	// unverified is set when records were added to the cache since the last
+	// verified read: the BMC may have overwritten records meanwhile, and a read
+	// that follows a reused record ID can skip records.
+	unverified bool
 	// info is the Get SEL Info response the records are current for; latest
 	// is the latest answer, which the snapshot reports.
 	info      storage.GetSELInfoResponse
@@ -53,6 +56,13 @@ type selCache struct {
 	infoKnown bool
 	// decodedWith is the inventory generation the records were decoded with.
 	decodedWith uint64
+
+	// seen is nil until the first verified read. Afterwards it retains the
+	// latest observed occupant of each 16-bit record ID, bounding identities
+	// even when rollover prevents the mirror from completing another read.
+	seen map[uint16][selRecordSize]byte
+	// pending holds counts no delivered snapshot reported yet.
+	pending SELCounts
 
 	reservation uint16
 
@@ -66,6 +76,40 @@ func (c *selCache) reset() {
 	c.records = nil
 	c.next = firstRecordID
 	c.loaded = false
+}
+
+// complete marks the cache verified to hold the whole log. The first verified
+// cache seeds event accounting; earlier reads are history and need no tracking.
+// Later completion drops IDs absent from the verified cache, preserving newer
+// observations of retained IDs instead of overwriting them with cached content.
+func (c *selCache) complete() {
+	c.loaded = true
+	c.unverified = false
+	if c.seen == nil || len(c.seen) > len(c.records) {
+		seen := make(map[uint16][selRecordSize]byte, len(c.records))
+		for _, rec := range c.records {
+			raw, ok := c.seen[rec.ID]
+			if !ok {
+				raw = rec.Raw
+			}
+			seen[rec.ID] = raw
+		}
+		c.seen = seen
+	}
+}
+
+// observe accounts for a record as it is read, before any cache change can
+// drop it: after the baseline, a different occupant at a record ID is new.
+func (c *selCache) observe(raw [selRecordSize]byte) {
+	if c.seen == nil {
+		return
+	}
+	id := binary.LittleEndian.Uint16(raw[:])
+	if previous, ok := c.seen[id]; ok && previous == raw {
+		return
+	}
+	c.seen[id] = raw
+	c.pending.observe(raw)
 }
 
 func (c *selCache) last() *SELRecord {
@@ -89,7 +133,6 @@ func (r *Reader) readSEL(ctx context.Context, warnings *collectionWarnings) (*in
 		}
 		return nil, c.snapshot(true)
 	}
-	entries := int(info.Entries)
 	c.latest = info
 	r.redecodeSEL()
 	updateErr := r.updateSEL(ctx, info)
@@ -102,11 +145,18 @@ func (r *Reader) readSEL(ctx context.Context, warnings *collectionWarnings) (*in
 	if err := r.refreshSELClock(ctx); err != nil {
 		warnings.selClock = true
 	}
-	return &entries, c.snapshot(updateErr != nil)
+	s := c.snapshot(updateErr != nil)
+	if s.NewKnown {
+		s.New = c.pending
+	}
+	// Completing a read asks Get SEL Info again; the count and the usage are
+	// from the same, latest answer.
+	entries := int(c.latest.Entries)
+	return &entries, s
 }
 
 func (c *selCache) snapshot(failed bool) *SEL {
-	return &SEL{
+	s := &SEL{
 		Records:    c.records,
 		Loaded:     c.loaded,
 		Entries:    int(c.latest.Entries),
@@ -115,6 +165,15 @@ func (c *selCache) snapshot(failed bool) *SEL {
 		UTCOffset:  c.utcOffset,
 		ClockSkew:  c.clockSkew,
 		ReadFailed: failed,
+	}
+	s.NewKnown = c.seen != nil && !failed
+	return s
+}
+
+// delivered forgets the counts of a snapshot the Reader returned.
+func (c *selCache) delivered(s *SEL) {
+	if s != nil && s.NewKnown {
+		c.pending = SELCounts{}
 	}
 }
 
@@ -146,12 +205,10 @@ func (r *Reader) redecodeSEL() {
 }
 
 // updateSEL brings the cache up to date with info. A changed erase time means
-// the SEL was cleared. Once up to date, a changed entry count or addition time
-// starts a read of the records after the newest cached one; if that record is
-// gone or changed, the SEL was cleared or rewritten and is read again from the
-// start. Reading is bounded by the read budget and resumes next collection.
-// More cached records than the reported entry count are checked against the
-// oldest record the BMC holds before any is dropped.
+// the SEL was cleared. A changed entry count or addition time makes reading
+// resume after the newest cached record (resumeAfterChange). Reading is bounded
+// by the read budget and continues next collection. A read that reaches the
+// newest record is complete only once verified (completeRead).
 func (r *Reader) updateSEL(ctx context.Context, info storage.GetSELInfoResponse) error {
 	c := &r.sel
 	if c.infoKnown && !info.RecentEraseTime.Equal(c.info.RecentEraseTime) {
@@ -159,13 +216,13 @@ func (r *Reader) updateSEL(ctx context.Context, info storage.GetSELInfoResponse)
 	}
 	changed := !c.infoKnown || info.Entries != c.info.Entries ||
 		!info.RecentAdditionTime.Equal(c.info.RecentAdditionTime)
-	c.checkOldest = c.checkOldest || changed
 
 	switch {
 	case info.Entries == 0:
-		c.records, c.next, c.loaded = nil, endOfChainRecordID, true
-	case c.next == endOfChainRecordID && changed:
-		if err := r.resumeAfterNewest(ctx); err != nil {
+		c.records, c.next = nil, endOfChainRecordID
+		c.complete()
+	case changed:
+		if err := r.resumeAfterChange(ctx); err != nil {
 			return err
 		}
 	}
@@ -176,60 +233,101 @@ func (r *Reader) updateSEL(ctx context.Context, info storage.GetSELInfoResponse)
 			return err
 		}
 	}
-	if c.checkOldest && len(c.records) > int(info.Entries) {
-		if err := r.dropOverwritten(ctx); err != nil {
-			return err
-		}
-	}
-	if c.next == endOfChainRecordID {
-		c.checkOldest = false
+	switch {
+	case c.next == endOfChainRecordID && c.unverified:
+		return r.completeRead(ctx)
+	case c.next != endOfChainRecordID && len(c.records) > int(info.Entries):
+		// A read still in progress drops the records the BMC overwrote, so a
+		// log changing faster than it is read cannot grow the cache past the
+		// log's size.
+		_, err := r.dropOverwritten(ctx)
+		return err
 	}
 	return nil
 }
 
+// completeRead verifies a read that reached the newest record. Neither the end
+// of the chain nor the entry count proves the cache holds the log, because a
+// read that follows a record ID the BMC gave to a newer record skips the
+// records in between. The BMC frees an ID in two ways, which the verification
+// covers: rollover overwrites its oldest records, so its oldest record must be
+// cached (dropOverwritten), and a deletion changes the erase time, which must
+// not have changed since this collection's Get SEL Info. A BMC that deletes
+// records without changing the erase time is not supported.
+func (r *Reader) completeRead(ctx context.Context) error {
+	c := &r.sel
+	if found, err := r.dropOverwritten(ctx); !found || err != nil {
+		return err
+	}
+	var info storage.GetSELInfoResponse
+	if err := r.exchange(ctx, &storage.GetSELInfoRequest{}, &info); err != nil {
+		return err
+	}
+	c.latest = info
+	if !info.RecentEraseTime.Equal(c.info.RecentEraseTime) {
+		c.reset()
+		return nil
+	}
+	c.complete()
+	return nil
+}
+
 // dropOverwritten drops the cached records older than the oldest record the
-// BMC holds: on rollover it overwrites its oldest records. The entry count
-// alone cannot tell, because records logged after Get SEL Info were read too.
-// A cache without the BMC's oldest record was rewritten and is read again.
-func (r *Reader) dropOverwritten(ctx context.Context) error {
+// BMC holds, which overwrote them on rollover, and reports whether the cache
+// holds that record. A cache without it is read again.
+func (r *Reader) dropOverwritten(ctx context.Context) (bool, error) {
 	c := &r.sel
 	oldest, _, err := r.readSELRecord(ctx, firstRecordID)
 	switch {
 	case errors.Is(err, errSELRecordGone):
 		c.reset()
-		return nil
+		return false, nil
 	case err != nil:
-		return err
+		return false, err
 	}
 	for i, rec := range c.records {
 		if rec.Raw == oldest {
+			for _, gone := range c.records[:i] {
+				if c.seen[gone.ID] == gone.Raw {
+					delete(c.seen, gone.ID)
+				}
+			}
 			c.records = c.records[i:]
-			return nil
+			return true, nil
 		}
 	}
 	c.reset()
-	return nil
+	return false, nil
 }
 
-// resumeAfterNewest sets the next record to read after a change, or resets the
-// cache when the newest cached record no longer exists unchanged.
-func (r *Reader) resumeAfterNewest(ctx context.Context) error {
+// resumeAfterChange sets where reading continues after the log changed: after
+// the newest cached record, which must still be held unchanged. On a full log
+// the BMC can give a new record the ID of an overwritten one, so a next-record
+// ID kept by an unfinished read could lead past the records logged since; the
+// unchanged newest cached record proves which records follow. A read that had
+// reached the newest record first compares it with the BMC's newest record and
+// has nothing to read when they match. A newest cached record that is gone or
+// changed means the log was cleared, rewritten or overwritten past it, and the
+// log is read again from the start.
+func (r *Reader) resumeAfterChange(ctx context.Context) error {
 	c := &r.sel
 	last := c.last()
 	if last == nil {
 		c.next = firstRecordID
 		return nil
 	}
-	newest, _, err := r.readSELRecord(ctx, lastSELRecordID)
-	switch {
-	case errors.Is(err, errSELRecordGone):
-		// Emptied after Get SEL Info.
-		c.reset()
-		return nil
-	case err != nil:
-		return err
-	case newest == last.Raw:
-		return nil
+	if c.next == endOfChainRecordID {
+		newest, _, err := r.readSELRecord(ctx, lastSELRecordID)
+		switch {
+		case errors.Is(err, errSELRecordGone):
+			// Emptied after Get SEL Info.
+			c.reset()
+			return nil
+		case err != nil:
+			return err
+		case newest == last.Raw:
+			return nil
+		}
 	}
 	cached, next, err := r.readSELRecord(ctx, last.ID)
 	switch {
@@ -287,10 +385,10 @@ func (r *Reader) walkSEL(ctx context.Context) error {
 			break
 		}
 	}
-	if c.next == endOfChainRecordID {
-		c.loaded = true
+	if len(added) > 0 {
+		c.append(added, reused)
+		c.unverified = true
 	}
-	c.append(added, reused)
 	return err
 }
 
@@ -320,7 +418,8 @@ func (c *selCache) append(added []SELRecord, reused map[uint16]bool) {
 }
 
 // readSELRecord reads one whole record and returns it with the next record ID.
-// Like FreeIPMI, it reserves the SEL only when the BMC reports the reservation
+// Every record read is accounted here, whatever the caller does with it. Like
+// FreeIPMI, it reserves the SEL only when the BMC reports the reservation
 // cancelled or invalid, and retries a bounded number of times.
 func (r *Reader) readSELRecord(ctx context.Context, id uint16) ([selRecordSize]byte, uint16, error) {
 	c := &r.sel
@@ -351,7 +450,9 @@ func (r *Reader) readSELRecord(ctx context.Context, id uint16) ([selRecordSize]b
 		if len(res.Data) != selRecordSize {
 			return [selRecordSize]byte{}, 0, fmt.Errorf("SEL record %#04x has %d bytes", id, len(res.Data))
 		}
-		return [selRecordSize]byte(res.Data), res.NextRecordID, nil
+		raw := [selRecordSize]byte(res.Data)
+		c.observe(raw)
+		return raw, res.NextRecordID, nil
 	}
 }
 

@@ -47,8 +47,9 @@ compatibility layer.
 
 ## System Event Log
 
-Each collection with SEL enabled sends one `Get SEL Info`. Its entry count is the `ipmi.sel` sample; a failure omits the
-sample, with no previous value or zero substitute. `Snapshot.SEL` appears once the BMC first answers and then carries
+Each collection with SEL enabled sends `Get SEL Info`, and a second one when it completes a read (see below). The entry
+count of the latest answer is the `ipmi.sel` sample; a failed first request omits the sample, with no previous value or
+zero substitute. `Snapshot.SEL` appears once the BMC first answers and then carries
 the cached records, the latest entry count, free bytes and overflow flag, and the clock information below. Any SEL
 command failure degrades only SEL data: a failed `Get SEL Info` or record read keeps the earlier records and marks the
 read failed, except that a record vanishing during a walk resets the cache (see below); a failed clock read keeps the
@@ -60,21 +61,55 @@ Records are cached per Reader, across collections and reconnects:
 - The first read walks the chain from record 0000h with `Get SEL Entry`, oldest first. Each collection starts no new
   read once min(2 s, update interval / 4) has passed and resumes where it stopped; a walk reads at least one record. At
   about 8 ms per record over local KCS, a full read of a large SEL would otherwise delay sensor collection by seconds.
-- Once the newest record has been read, an unchanged entry count and addition time send no `Get SEL Entry`. A change
-  reads the newest record (FFFFh); if it differs from the newest cached record, that cached record is read again for
-  its next-record ID and the walk continues from there.
+- Once the newest record has been read, an unchanged entry count and addition time send no `Get SEL Entry`. After a
+  change, reading always resumes from the newest cached record, read again for its next-record ID, also when a read
+  spanning several collections is still in progress: on a full log a BMC can give a new record the ID of an
+  overwritten one, so a next-record ID saved earlier could lead past the records logged since. A cache that had
+  reached the newest record first reads the BMC's newest record (FFFFh) and reads nothing more when they match.
 - A changed erase time, or a newest cached record that is gone or changed, means the SEL was cleared or rewritten:
   the cache is reset and the log is read again. A record that disappears during a walk fails that read and restarts
   the log from 0000h.
-- On rollover the BMC overwrites the oldest records. When a change leaves more cached records than the reported entry
-  count, the oldest record the BMC holds (0000h) shows which were overwritten: older cached records are dropped, and a
-  cache without that record is read again. The count alone cannot tell, because records logged after `Get SEL Info`
-  are read too. A cached record ID reported with new content was reused and replaces the old record. Reaching a cached
-  record with unchanged content means the chain loops back and ends the walk.
+- A read that added records and reached the newest record is complete only once verified: neither the end of the
+  chain nor the entry count proves the cache holds the log, because a read that follows a record ID the BMC gave to a
+  newer record skips the records in between. The BMC frees an ID in two ways, and the verification covers both:
+  rollover overwrites the oldest records, so the oldest record the BMC holds (0000h) must be cached and older cached
+  records are dropped; a deletion changes the erase time, so a second `Get SEL Info` must show the erase time
+  unchanged. Otherwise the log is read again. A read still in progress also drops overwritten records once the cache
+  holds more records than the entry count, so a log changing faster than it is read cannot grow the cache past its
+  size. A cached record ID reported with new content was reused and replaces the old record. Reaching a cached record
+  with unchanged content means the chain loops back and ends the walk.
+- The Reader relies on IPMI 2.0 behavior: records leave the log only by rollover, which overwrites the oldest records,
+  or by deletion or clear, which sets the erase time; and the chain lists records oldest first. The erase time counts
+  seconds, so a deletion in the same second as the erase time the Reader last saw goes unnoticed: the cache keeps the
+  deleted record until it would roll over, and if the BMC also gives its ID to a new record during a read, records
+  can be skipped. A BMC that deletes records without setting the erase time has the same effect at any time.
 - Like FreeIPMI, `Reserve SEL` is sent only after a 0xC5 completion code, and a read is retried with a new reservation
   up to four times. Whole 16-byte records are read; a shorter record fails the read.
 
 Published record slices only grow at the end, lose a prefix or are reallocated, so earlier snapshots never change.
+
+`SEL.New` holds counts of newly observed records by event type and default FreeIPMI state. After the first verified
+read, event accounting is independent of the cached log's completeness:
+
+- Before the first verified read, records are history and no event-accounting state is retained. If sustained rollover
+  prevents that read from completing, no new-event counts are reported. A restart never reports that history as new.
+  The first verified cache seeds accounting, including when the log is empty.
+- Afterwards, every successful `Get SEL Entry` observation is accounted before cache mutation. One latest 16-byte
+  occupant is retained per 16-bit record ID, so retention is bounded by the protocol ID space even if rescans never
+  complete. Equal content at the same ID is a reread; different content replaces the prior occupant and counts once.
+  An observed A -> B -> A transition counts the last A as a replacement. Identical content with no distinguishable
+  intervening observation cannot establish a new occupant.
+- Resets retain accounting. FIFO trim retires only the exact overwritten occupant; it cannot forget a newer occupant
+  observed by a boundary probe. Verified completion drops IDs absent from the cache and preserves newer observations
+  of retained IDs. The Function's mirror and its `Loaded` flag keep their existing verification rules.
+- Once the baseline exists, a successful collection reports observed events even during a rescan. `NewKnown` is false
+  before that baseline and on a failed SEL read. Cancellation fails the collection. Unpublished events are eight fixed
+  counters, retained across failures and copied into the next eligible snapshot; returning that snapshot clears them.
+  The backlog's duration therefore cannot grow event storage. Classification uses immutable event bytes, independently
+  of the SDR inventory used for display names.
+
+`SELRecord.Threshold` marks threshold events (event/reading type 01h), which the sensor state already reflects; every
+other record is discrete.
 
 `Get SEL Time UTC Offset` and `Get SEL Time` are read at most every five minutes, also when record reads fail. SEL time
 is UTC plus the offset, so `SEL.Time` subtracts it. A completion-code failure, 07FFh or a value outside -1440..1440
@@ -137,6 +172,9 @@ Tests exercise actual command-response decoding through a narrow fake transport,
 complete source-derived discrete and SEL fixtures, threshold flags, missing bytes, ownership, sharing, unit/sign
 conversion, nonlinear factors, and fractional EXP10 conversion. SEL tests cover the read budget and resume, appends,
 clears, rewrites, rollover and ID reuse, looping chains, reservations, UTC offsets, clock refresh, undated and OEM
-records, generator names and failures. Real UDP tests use the upstream reference BMC with a User account for both LAN
-and LAN+: Check cleanup, sensor and SEL collection, session reuse, malformed responses, cancellation and failed setup
-recovery. These fixtures do not establish live-hardware parity for any particular vendor.
+records, generator names, failures and which records are new, including a replay of a real BMC's log
+(`testdata/sel-replay.hex`) with synthetic critical discrete records. A randomized test (`sel_model_test.go`) mixes log
+changes, rollover with reused IDs and failures, and checks against the fake BMC's log that the cache converges and that
+every new record is reported exactly once. Real UDP tests use the upstream reference BMC with
+a User account for both LAN and LAN+: Check cleanup, sensor and SEL collection, session reuse, malformed responses,
+cancellation and failed setup recovery. These fixtures do not establish live-hardware parity for any particular vendor.

@@ -127,6 +127,7 @@ func (r *Reader) Collect(ctx context.Context, collectSEL bool) (_ *Snapshot, err
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	r.sel.delivered(snapshot.SEL)
 	snapshot.Warnings = warnings.messages()
 	return snapshot, nil
 }

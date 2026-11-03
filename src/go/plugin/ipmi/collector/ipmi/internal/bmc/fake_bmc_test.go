@@ -381,6 +381,20 @@ func (s *fakeSEL) add(records ...[selRecordSize]byte) {
 	s.reservation = 0
 }
 
+// overwrite logs a record on a full log the way a BMC with rollover and
+// slot-style record IDs does: it replaces the oldest record and takes its ID.
+// A hidden record leaves the addition time as it was, like a record logged in
+// the same second as the previous one.
+func (s *fakeSEL) overwrite(timestamp uint32, hidden bool) [selRecordSize]byte {
+	rec := tempEvent(binary.LittleEndian.Uint16(s.records[0][:]), timestamp)
+	s.records = append(s.records[1:], rec)
+	if !hidden {
+		s.additionTime++
+	}
+	s.reservation = 0
+	return rec
+}
+
 // clear empties the log like Clear SEL.
 func (s *fakeSEL) clear() {
 	s.records = nil

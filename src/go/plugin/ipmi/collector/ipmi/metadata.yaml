@@ -133,7 +133,7 @@ modules:
               required: false
               group: Collection
             - name: collect_sel
-              description: "Read the System Event Log: the entry count chart and the ipmi-sel Live Data view."
+              description: "Read the System Event Log: the entry count and new records charts, and the ipmi-sel Live Data view."
               default_value: true
               required: false
               group: Collection
@@ -184,9 +184,17 @@ modules:
       folding:
         title: Metrics
         enabled: false
-      description: Each sensor has its own reading and state chart. SEL is the raw repository entry count, including
+      description: |
+        Each sensor has its own reading and state chart. SEL is the raw repository entry count, including
         records FreeIPMI may filter during interpretation. The stock ipmi_events alert template matches the ipmi.sel
         context and applies to every Go job and to the C collector.
+
+        The SEL new records chart counts records newly observed since the previous value, by default FreeIPMI state.
+        Records already in the log when collection starts are not counted: the chart appears once the first read of
+        the log completes. After the BMC log is cleared or rewritten, rereading the same record does not count it
+        again. After the initial baseline, observed events are reported during rescans even if rollover prevents the
+        whole log from being read. A failed SEL read leaves a gap, and records observed during it count in the next
+        successful value.
       scopes:
         - name: sensor
           description: A sensor on the selected BMC.
@@ -259,6 +267,22 @@ modules:
               chart_type: line
               dimensions:
                 - name: events
+        - name: SEL event type
+          description: New System Event Log records of one event type on the selected BMC.
+          labels:
+            - name: event_type
+              description: "`threshold` for threshold events, which also change the state of their sensor; `discrete`
+                for every other record, OEM records included."
+          metrics:
+            - name: ipmi.sel_new_records
+              description: IPMI System Event Log New Records
+              unit: records
+              chart_type: stacked
+              dimensions:
+                - name: nominal
+                - name: warning
+                - name: critical
+                - name: unknown
       availability: []
     functions:
       description: Inspect the latest successful collection without issuing more IPMI commands.
