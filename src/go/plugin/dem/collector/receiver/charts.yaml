@@ -1,0 +1,23 @@
+version: v1
+context_namespace: dem_receiver
+groups:
+  - family: Ingress
+    metrics: [receiver_state, http_success, http_client_errors, http_server_errors]
+    charts:
+      - context: state
+        title: RUM receiver availability
+        units: state
+        type: stacked
+        dimensions:
+          - selector: receiver_state
+      - context: requests
+        title: RUM HTTP requests
+        units: requests/s
+        type: stacked
+        dimensions:
+          - selector: http_success
+            name: success
+          - selector: http_client_errors
+            name: client_errors
+          - selector: http_server_errors
+            name: server_errors

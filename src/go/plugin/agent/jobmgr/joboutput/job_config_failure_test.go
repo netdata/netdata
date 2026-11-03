@@ -35,7 +35,9 @@ func (h *failureLifecycleHook) ProjectFailure(
 	case "nil":
 		return nil
 	case "wrong_identity":
-		return &recordingJobConfigLifecycleSnapshot{identity: collectorapi.JobConfigIdentity{1}}
+		return &recordingJobConfigLifecycleSnapshot{
+			identity: collectorapi.JobConfigIdentity{1},
+		}
 	}
 	cloned := *snapshot.(*recordingJobConfigLifecycleSnapshot)
 	return &cloned
@@ -65,7 +67,12 @@ func TestJobConfigFailureEnrichesOnlyCommittedSnapshot(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
 			events := []string{}
-			hook := &failureLifecycleHook{recordingJobConfigLifecycle: &recordingJobConfigLifecycle{events: &events}, mode: tc.mode}
+			hook := &failureLifecycleHook{
+				recordingJobConfigLifecycle: &recordingJobConfigLifecycle{
+					events: &events,
+				},
+				mode: tc.mode,
+			}
 			creator := controller.modules["module"]
 			creator.JobConfigLifecycle = hook
 			creator.Create = func() collectorapi.CollectorV1 {
@@ -81,25 +88,31 @@ func TestJobConfigFailureEnrichesOnlyCommittedSnapshot(t *testing.T) {
 			if tc.beforeConstruction {
 				config.Set("vnode", "missing-vnode")
 			}
-			seedDynCfgJobGraphRecord(t, graph, config, dyncfg.StatusRunning)
-			currentID := lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 1}
-			current := &transactionTestReadyResource{identity: currentID, prefix: "current", events: &events}
+			seedDynCfgJobGraphRecord(t, controller, graph, config, dyncfg.StatusDisabled)
+			var current lifecycle.ReadyResource
 			permit, _ := issueTestJobPermit(t, config.FullName(), 2)
 			scope := lifecycle.ResourceTransactionScope{
-				ID:        config.FullName(),
-				Current:   currentID,
-				Successor: lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 2},
+				ID: config.FullName(),
+				Successor: lifecycle.ResourceIdentity{
+					ID:         config.FullName(),
+					Generation: 2,
+				},
 			}
-			transaction, err := controller.prepareDiscovered(
+			transaction, err := prepareDiscoveryTestFixture(t, controller,
 				context.Background(),
-				DiscoveredJobChange{Config: config, Status: dyncfg.StatusRunning, Restart: true},
+				discoveryTestFixture{
+					Config:  config,
+					Status:  dyncfg.StatusRunning,
+					Restart: true,
+				},
 				current,
 				scope,
 				permit,
 			)
 			require.NoError(t, err)
-			require.Nil(t, hook.reconciled)
-			require.Empty(t, hook.reconciliations)
+			require.NotNil(t, hook.reconciled, "ENABLE publishes the Accepted baseline")
+			require.Len(t, hook.reconciliations, 1)
+			require.NotSame(t, hook.before, hook.reconciled, "failure evidence remains uncommitted")
 			require.True(t, hook.observed.Valid())
 			if tc.beforeConstruction {
 				require.Equal(t, "vnode", hook.observed.Stage)
@@ -108,13 +121,18 @@ func TestJobConfigFailureEnrichesOnlyCommittedSnapshot(t *testing.T) {
 			} else {
 				require.Equal(t, "autodetection", hook.observed.Stage)
 				require.Contains(t, events, "capture")
-				require.NotContains(t, events, "project", "failed Check evidence must not be replaced by a baseline")
+				require.Equal(t, 1, countTestEvent(events, "project"), "only the Accepted baseline is projected")
 			}
 			_, err = transaction.Apply(context.Background())
 			require.NoError(t, err)
 			require.Equal(t, jobConfigIdentity(config), hook.reconciled.Identity())
 			if tc.mode != "" {
-				require.Same(t, hook.before, hook.reconciled, "bad enrichment must preserve the valid captured snapshot")
+				require.Same(
+					t,
+					hook.before,
+					hook.reconciled,
+					"bad enrichment must preserve the valid captured snapshot",
+				)
 			} else {
 				require.NotSame(t, hook.before, hook.reconciled)
 			}
@@ -127,7 +145,10 @@ func TestJobConfigFailureEnrichesOnlyCommittedSnapshot(t *testing.T) {
 
 func TestPreparationFailureSurvivesSecretRedactionWithoutRetainingError(t *testing.T) {
 	original := withJobConfigFailure(
-		&secretresolver.AtomicResolveError{Kind: secretresolver.AtomicErrorProvider, Cause: errors.New("credential SECRET")},
+		&secretresolver.AtomicResolveError{
+			Kind:  secretresolver.AtomicErrorProvider,
+			Cause: errors.New("credential SECRET"),
+		},
 		"configuration",
 		"",
 	)

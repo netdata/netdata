@@ -1,7 +1,10 @@
-//! The OTLP metrics gRPC endpoint: a tonic `MetricsService` receiving
-//! `ExportMetricsServiceRequest`s and turning them into Netdata charts.
+//! The OTLP metrics ingestion service: receives
+//! `ExportMetricsServiceRequest`s and turns them into Netdata charts. The
+//! logic is transport-agnostic — it lives on the
+//! [`NetdataMetricsService::export_metrics`] core, which both the gRPC
+//! `MetricsService` wrapper and the OTLP/HTTP front end call.
 //!
-//! Per request (`process_request`): normalize the request (attribute order
+//! Per request (`export_metrics` → `process_request`): normalize the request (attribute order
 //! feeds the identity hash), then walk its data points via `iter.rs`'s
 //! `datapoint_iter`, which attaches each metric's matching per-metric config
 //! from chart_config.rs. Number data points ingest into one chart named
@@ -16,8 +19,8 @@
 //! Chart creation is budgeted per request (`max_new_charts_per_request`,
 //! from otel.yaml's `metrics.max_new_charts_per_request`, default 100); once
 //! the budget is exhausted, points for not-yet-created charts are dropped
-//! with one warn. `export` always answers Ok — problems are silent, never a
-//! gRPC error.
+//! with one warn. The export core always answers Ok — problems are silent,
+//! never a transport error.
 
 use std::collections::HashMap;
 use std::fmt::Write;
@@ -42,7 +45,7 @@ use crate::output::ChartType;
 
 /// All charts created from OTLP metrics, keyed by chart name
 /// (`<metric>.<identity-hash>` plus decomposition suffixes like `.bucket`).
-/// Written by the gRPC service on ingest; drained once per second by
+/// Written by the export core on ingest; drained once per second by
 /// lib.rs's tick loop via [`Self::emit`].
 pub struct ChartManager {
     charts: HashMap<String, Chart>,
@@ -128,8 +131,10 @@ impl ChartManager {
     }
 }
 
-/// The tonic `MetricsService` implementation: OTLP metric exports in, chart
-/// accumulations out. Shared with lib.rs, whose tick loop drains
+/// The OTLP metrics ingestion service: OTLP metric exports in, chart
+/// accumulations out. Transport-agnostic — the gRPC `MetricsService`
+/// wrapper and the OTLP/HTTP front end both funnel into the
+/// `export_metrics` core. Shared with lib.rs, whose tick loop drains
 /// `chart_manager` once per second.
 pub struct NetdataMetricsService {
     /// Per-metric chart configs and global timing defaults (chart_config.rs);
@@ -613,6 +618,23 @@ impl NetdataMetricsService {
             );
         }
     }
+
+    /// The transport-agnostic OTLP metrics export core: process the decoded
+    /// request and always answer Ok, even when points were dropped
+    /// (`partial_success` is never set). The gRPC `MetricsService::export`
+    /// wrapper and the OTLP/HTTP front end both call this, so both
+    /// transports share one behavior. Metrics carry no tenant, so unlike
+    /// logs/traces there is no header to resolve first.
+    pub(crate) async fn export_metrics(
+        &self,
+        mut request: ExportMetricsServiceRequest,
+    ) -> Result<ExportMetricsServiceResponse, Status> {
+        self.process_request(&mut request).await;
+
+        Ok(ExportMetricsServiceResponse {
+            partial_success: None,
+        })
+    }
 }
 
 /// Defaults for standalone use: stock per-metric configs, an empty chart
@@ -629,18 +651,14 @@ impl Default for NetdataMetricsService {
 
 #[tonic::async_trait]
 impl MetricsService for NetdataMetricsService {
-    /// Handle one OTLP metrics export: process it and always reply Ok, even
-    /// when points were dropped (`partial_success` is never set).
+    /// gRPC entry point: unwrap the request tonic decoded, then run the
+    /// transport-agnostic core both front ends share. Metrics carry no
+    /// tenant, so there is no header to resolve first.
     async fn export(
         &self,
         request: Request<ExportMetricsServiceRequest>,
     ) -> Result<Response<ExportMetricsServiceResponse>, Status> {
-        let mut req = request.into_inner();
-
-        self.process_request(&mut req).await;
-
-        Ok(Response::new(ExportMetricsServiceResponse {
-            partial_success: None,
-        }))
+        let response = self.export_metrics(request.into_inner()).await?;
+        Ok(Response::new(response))
     }
 }

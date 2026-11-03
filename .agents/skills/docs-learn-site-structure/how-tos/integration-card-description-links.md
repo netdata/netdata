@@ -9,9 +9,10 @@ Consequences:
 
 - A cross-reference written as a repository-relative `.md` path (for example `/docs/npm/network-flows/configuration.md`)
   is rewritten to the current Learn URL on every ingest and its anchor is validated.
-- A cross-reference written as an absolute `https://learn.netdata.cloud/...` URL is not touched: no anchor validation,
-  and no rewrite when the target is later moved or renamed in `map.yaml`. After such a move it reaches the page only
-  through the redirect ingest generates for the old route (`../redirects.md`), never directly.
+- A cross-reference written as an absolute `https://learn.netdata.cloud/...` URL is not rewritten when the target is
+  later moved or renamed in `map.yaml`. After such a move it reaches the page only through the redirect ingest
+  generates for the old route (`../redirects.md`), never directly, and ingest's absolute-link check
+  (`../mapping.md#links-between-pages`) then passes it without checking its anchor.
 - The generator rewrites a repository-relative `](/...` link to its `https://github.com/netdata/netdata/blob/master/...`
   form (`convert_local_links` in `integrations/gen_integrations.py`, whose `integrations.js` output the page generator
   reads), which is exactly the form `convert_github_links` resolves; an absolute Learn URL passes through both

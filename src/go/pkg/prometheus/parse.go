@@ -4,7 +4,6 @@ package prometheus
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"strings"
 
@@ -144,7 +143,8 @@ func (d *parseDriver) iterate(
 			if entry == textparse.EntryInvalid && strings.HasPrefix(err.Error(), "invalid metric type") {
 				continue
 			}
-			return fmt.Errorf("failed to parse prometheus metrics: %v", err)
+			// The parser error may contain fragments of the exposition.
+			return errors.New("failed to parse prometheus metrics: invalid exposition format")
 		}
 
 		switch entry {

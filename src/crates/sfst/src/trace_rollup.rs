@@ -126,7 +126,10 @@ impl TraceRollup {
         let ref_ok = |r: u32| r == ROLLUP_NO_REF || r < kv_total;
         if !self.root_service_refs.iter().all(|&r| ref_ok(r))
             || !self.root_name_refs.iter().all(|&r| ref_ok(r))
-            || !self.root_is_true_root.iter().all(|&f| f <= ROOT_CLAIM_WITHHELD)
+            || !self
+                .root_is_true_root
+                .iter()
+                .all(|&f| f <= ROOT_CLAIM_WITHHELD)
         {
             return Err(crate::Error::CorruptIndex(
                 "trace rollup carries out-of-range root refs or flags".into(),
@@ -414,7 +417,17 @@ mod tests {
         let mut rows = TraceRollupRows::new();
         rows.record_span(tid(1), sid(1), false, 100, 50, 0, false, None, None);
         rows.record_span(tid(1), sid(2), false, 20, 10, 0, false, None, None);
-        rows.record_span(tid(1), sid(3), false, i64::MAX - 1, 10, 0, false, None, None);
+        rows.record_span(
+            tid(1),
+            sid(3),
+            false,
+            i64::MAX - 1,
+            10,
+            0,
+            false,
+            None,
+            None,
+        );
         let sealed = rows.sealed(&[]);
         assert_eq!(sealed.min_start_ns, vec![20]);
         assert_eq!(sealed.max_end_ns, vec![i64::MAX], "saturating end");
@@ -501,7 +514,11 @@ mod tests {
             rows.record_span(tid(1), sid(7), true, 100, 5, first.0, first.1, None, None);
             rows.record_span(tid(1), sid(7), true, 100, 5, second.0, second.1, None, None);
             let sealed = rows.sealed(&[]);
-            assert_eq!(sealed.root_is_true_root, vec![ROOT_CLAIM_WITHHELD], "flip={flip}");
+            assert_eq!(
+                sealed.root_is_true_root,
+                vec![ROOT_CLAIM_WITHHELD],
+                "flip={flip}"
+            );
             assert!(sealed.root_span_ids.get(0).is_unset());
             assert_eq!(sealed.root_service_refs[0], ROLLUP_NO_REF);
             // The abstention drops only the CLAIM, not the row stats.
@@ -665,10 +682,9 @@ mod tests {
             tree: SchemaTree::flat(&Vec::new().into()),
             columns: ColumnsTable::default(), // no TRCE in the manifest
         };
-        let prim = crate::PrefixMap::<crate::BitmapValue>::build(
-            Vec::<(&str, crate::BitmapValue)>::new(),
-        )
-        .unwrap();
+        let prim =
+            crate::PrefixMap::<crate::BitmapValue>::build(Vec::<(&str, crate::BitmapValue)>::new())
+                .unwrap();
 
         let mut w = chunk_file::container::StreamingWriter::new(
             std::io::Cursor::new(Vec::new()),
@@ -677,14 +693,26 @@ mod tests {
             6,
         )
         .unwrap();
-        w.write_chunk(crate::CHUNK_SUMMARY, &crate::writer::pack(&summary, lvl).unwrap())
-            .unwrap();
-        w.write_chunk(crate::CHUNK_META, &crate::writer::pack(&metadata, lvl).unwrap())
-            .unwrap();
-        w.write_chunk(crate::CHUNK_TIMS, &crate::writer::pack(&[1i64][..], lvl).unwrap())
-            .unwrap();
-        w.write_chunk(crate::CHUNK_PRIMARY, &crate::writer::pack(&prim, lvl).unwrap())
-            .unwrap();
+        w.write_chunk(
+            crate::CHUNK_SUMMARY,
+            &crate::writer::pack(&summary, lvl).unwrap(),
+        )
+        .unwrap();
+        w.write_chunk(
+            crate::CHUNK_META,
+            &crate::writer::pack(&metadata, lvl).unwrap(),
+        )
+        .unwrap();
+        w.write_chunk(
+            crate::CHUNK_TIMS,
+            &crate::writer::pack(&[1i64][..], lvl).unwrap(),
+        )
+        .unwrap();
+        w.write_chunk(
+            crate::CHUNK_PRIMARY,
+            &crate::writer::pack(&prim, lvl).unwrap(),
+        )
+        .unwrap();
         w.write_chunk(
             crate::CHUNK_TRACE_ROLLUP,
             &crate::writer::pack(&TraceRollup::default(), lvl).unwrap(),

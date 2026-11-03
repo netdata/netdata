@@ -1,5 +1,5 @@
 //! OTel ledger: the logs + traces content bindings over the content-agnostic
-//! [`file_lifecycle`] substrate. It owns the `Ledger` coordinator (run-loop,
+//! `file-lifecycle` substrate. It owns the `Ledger` coordinator (run-loop,
 //! supervisor/writer IPC, shared workers), the Function-call dispatch and the
 //! `otel-logs`/`otel-traces` query handlers over the wire-neutral `sfsq`
 //! engines (`ledger::rpc`), and the shared seal component (`indexer`, spawned
@@ -48,7 +48,6 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
             .open()
             .await?;
 
-    // Wait for Configure message from supervisor
     let config = match supervisor.recv().await? {
         LedgerRequest::Configure(config) => {
             tracing::info!("received plugin configuration from supervisor");
@@ -90,13 +89,11 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
 
     // Log the error while `ledger` is still in scope: returning drops its
     // supervisor connection. The supervisor treats a worker disconnect as
-    // fatal (`otel-plugin/src/supervisor.rs` `Supervisor::run`) and tears
+    // fatal (`Supervisor::run` in `otel-plugin/src/supervisor.rs`) and tears
     // the whole plugin down — graceful `Shutdown` + ≤2s exit wait
-    // (`otel-plugin/src/supervisor.rs` `shutdown_workers`), ChildGuard
-    // SIGKILL only as last resort
-    // (`otel-plugin/src/supervisor.rs` `ChildGuard`) — so an error logged
-    // after the drop (e.g. in main) races that teardown and may never be
-    // recorded.
+    // (`shutdown_workers`), ChildGuard SIGKILL only as last resort — so an
+    // error logged after the drop (e.g. in `main`) races that teardown and
+    // may never be recorded.
     let result = ledger.run().await;
     if let Err(e) = &result {
         tracing::error!("ledger event loop error: {e:#}");

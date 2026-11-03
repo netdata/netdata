@@ -6,7 +6,7 @@
 //! Two layers:
 //!
 //! - **Raw TOC codec** (crate root): a TOC mapping 4-byte chunk ids to
-//!   byte ranges. Parsed zero-copy via [`zerocopy`]; [`ChunkMeta`]
+//!   byte ranges. Parsed zero-copy via `zerocopy`; [`ChunkMeta`]
 //!   exposes raw offsets so a reader can compute memory ranges for mmap
 //!   advice. It serves the container below and formats that bring their
 //!   own header and integrity story.
@@ -65,10 +65,11 @@
 //! reading them via [`container::Container`], and folding
 //! [`container::Error`] into its own error type — and `otel-catalog`,
 //! which serializes the catalog as a container file holding a single
-//! `JSON` chunk. Test-only dependents: `sfsq` (corruption tests flip
-//! CRCs located via the container TOC) and `file-lifecycle` (synthesizes
-//! a catalog container with an arbitrary envelope version for its heal
-//! test). The raw codec layer has no external consumer.
+//! `JSON` chunk. Test-only dependents: `sfsq` (corruption tests flip a
+//! chunk's first payload byte, located via the container TOC, so the
+//! chunk's CRC fails) and `file-lifecycle` (synthesizes a catalog
+//! container with an arbitrary envelope version for its heal test). The
+//! raw codec layer has no external consumer.
 
 pub mod container;
 
@@ -112,7 +113,7 @@ impl TocEntry {
         }
     }
 
-    /// Read the offset as a native `u64`.
+    /// The offset as a `u64`, decoded from little-endian bytes.
     #[inline]
     pub const fn offset(&self) -> u64 {
         u64::from_le_bytes(self.offset_le)
@@ -160,7 +161,8 @@ pub enum Error {
     #[error("non-monotonic offset at entry {index}: {prev} >= {curr}")]
     NonMonotonicOffset { index: usize, prev: u64, curr: u64 },
 
-    /// The first chunk's offset points inside the TOC itself.
+    /// The first chunk's offset points before the TOC's end — inside
+    /// the TOC, or before it.
     #[error("first chunk offset {offset} overlaps the TOC (chunks start at {chunks_start})")]
     ChunkOverlapsToc { offset: u64, chunks_start: u64 },
 
@@ -721,8 +723,7 @@ mod tests {
     #[test]
     fn rejects_reserved_zero_id_among_chunk_entries() {
         // A chunk entry carrying the end-marker id would be
-        // unaddressable; gix's decoder rejected mid-TOC sentinels and
-        // so do we.
+        // unaddressable by id lookups.
         let mut file = Vec::new();
         let toc_size = Toc::byte_size(2) as u64;
         file.extend_from_slice(IntoBytes::as_bytes(&TocEntry::new(*b"AAAA", toc_size)));

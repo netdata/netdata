@@ -46,7 +46,7 @@ It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The service principal or managed identity requires these Azure RBAC roles:
 
@@ -170,6 +170,19 @@ The following options can be defined globally: `update_every`, `autodetection_re
 User profile files with the same basename as a [stock profile](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/azure_monitor.profiles/default) override it.
 Custom profiles extend the collector's catalog -- they do not replace the discovery mechanism.
 
+**Resource properties in profiles:**
+
+Besides Azure Monitor metrics, a profile can read [Azure Resource Graph](https://learn.microsoft.com/en-us/azure/governance/resource-graph/overview) properties of each resource during discovery:
+
+| Profile key | Purpose |
+|:------------|:--------|
+| `resource_labels` | Adds a label to every series of the resource. Each entry has `name`, `property` (a dot-separated path under `properties` whose segments contain only letters and digits, for example `properties.hardwareProfile.vmSize`), and optional `value: arm_name` to keep only the last segment of an ARM resource ID. |
+| `resource_states` | Exports one enum metric named `<profile>.<id>` from a property such as `properties.extended.instanceView.powerState.code`. Each `states` entry maps a `name` to an Azure `value`, matched case-insensitively. A chart dimension with `selector: <id>` and neither `name` nor `name_from_label` expands into one 0/1 dimension per state; the collector supplies the state label for any valid ID, including `phase` or `power`. Missing or unrecognized values produce no state observation. |
+
+In `discovery.mode: query`, the custom KQL must return each property as a column named `nd_` followed by the property path with dots replaced by underscores (for example `nd_properties_hardwareProfile_vmSize`). Missing columns leave the label empty and the state unreported.
+
+Resource-state charts refresh with discovery (every 300 seconds by default). They remain available when Azure Monitor metrics fail, provided the discovery snapshot is still valid. If a scheduled discovery refresh fails, state charts show gaps until discovery succeeds again; ordinary metrics continue using the last known resource inventory. Setting `discovery.refresh_every: 0` disables resource-state output as well as rediscovery.
+
 
 <details open><summary>Config options</summary>
 
@@ -188,7 +201,7 @@ Custom profiles extend the collector's catalog -- they do not replace the discov
 |  | auth.mode_service_principal.client_id | Entra ID application (client) ID. Required for `service_principal` mode. |  | no |
 |  | auth.mode_service_principal.client_secret | Entra ID client secret. Required for `service_principal` mode. |  | no |
 |  | auth.mode_managed_identity.client_id | Client ID of a user-assigned managed identity. Leave empty for a system-assigned identity. |  | no |
-| **Discovery** | discovery.refresh_every | How often to refresh the discovered resources, in seconds. Zero disables rediscovery after startup. | 300 | no |
+| **Discovery** | discovery.refresh_every | How often to refresh resources and their states, in seconds. Zero disables rediscovery after startup and disables resource-state charts. | 300 | no |
 |  | [discovery.mode](#option-discovery-discovery-mode) | How resources are selected: `filters` (structured filters) or `query` (custom KQL). | filters | no |
 |  | discovery.mode_filters.resource_groups | Azure resource groups to include. Leave empty for all. | [] | no |
 |  | discovery.mode_filters.regions | Azure regions to include. Leave empty for all. | [] | no |
@@ -380,7 +393,7 @@ Configure the **azure_monitor** collector from the Netdata web interface:
 4. In the Search box, type _azure_monitor_ (or scroll the list) to locate the **azure_monitor** collector.
 5. Click the **+** next to the **azure_monitor** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -635,23 +648,23 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_iot_hub_d2c_telemetry_throttle ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.d2c_telemetry_throttle | IoT Hub telemetry throttling on ${label:resource_name} |
-| [ am_iot_hub_c2d_messages_expired ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.c2d_messages_expired | IoT Hub C2D messages expiring on ${label:resource_name} |
-| [ am_iot_hub_c2d_methods_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.c2d_methods | IoT Hub direct method failures on ${label:resource_name} |
-| [ am_iot_hub_c2d_twin_read_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.c2d_twin_reads | IoT Hub backend twin read failures on ${label:resource_name} |
-| [ am_iot_hub_c2d_twin_update_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.c2d_twin_updates | IoT Hub backend twin update failures on ${label:resource_name} |
-| [ am_iot_hub_d2c_twin_read_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.d2c_twin_reads | IoT Hub device twin read failures on ${label:resource_name} |
-| [ am_iot_hub_d2c_twin_update_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.d2c_twin_updates | IoT Hub device twin update failures on ${label:resource_name} |
-| [ am_iot_hub_routing_dropped ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.routing_deliveries | IoT Hub routing dropped messages on ${label:resource_name} |
-| [ am_iot_hub_routing_orphaned ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.routing_deliveries | IoT Hub routing orphaned messages on ${label:resource_name} |
-| [ am_iot_hub_routing_invalid ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.routing_deliveries | IoT Hub routing invalid messages on ${label:resource_name} |
-| [ am_iot_hub_routing_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.routing_latency | IoT Hub routing latency on ${label:resource_name} |
-| [ am_iot_hub_event_grid_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.event_grid_latency | IoT Hub Event Grid latency on ${label:resource_name} |
-| [ am_iot_hub_jobs_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.jobs_status | IoT Hub job failures on ${label:resource_name} |
-| [ am_iot_hub_twin_query_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.twin_queries | IoT Hub twin query failures on ${label:resource_name} |
-| [ am_iot_hub_c2d_commands_abandoned ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.c2d_commands | IoT Hub C2D commands abandoned on ${label:resource_name} |
-| [ am_iot_hub_c2d_commands_rejected ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.c2d_commands | IoT Hub C2D commands rejected on ${label:resource_name} |
-| [ am_iot_hub_routing_delivery_latency_preview ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.routing_delivery_latency_preview | IoT Hub routing delivery latency on ${label:resource_name} |
+| [ am_iot_hub_d2c_telemetry_throttle ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.d2c_telemetry_throttle | Device-to-cloud telemetry throttling errors on IoT Hub ${label:resource_name} in ${label:resource_group} (${label:region}). Throttling indicates the hub is exceeding its message rate limits |
+| [ am_iot_hub_c2d_messages_expired ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.c2d_messages_expired | Cloud-to-device messages expiring before delivery on IoT Hub ${label:resource_name} in ${label:resource_group} (${label:region}). Expired messages indicate devices are not receiving commands in time |
+| [ am_iot_hub_c2d_methods_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.c2d_methods | Failed cloud-to-device direct method invocations on IoT Hub ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_iot_hub_c2d_twin_read_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.c2d_twin_reads | Failed backend twin read operations on IoT Hub ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_iot_hub_c2d_twin_update_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.c2d_twin_updates | Failed backend twin update operations on IoT Hub ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_iot_hub_d2c_twin_read_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.d2c_twin_reads | Failed device-initiated twin read operations on IoT Hub ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_iot_hub_d2c_twin_update_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.d2c_twin_updates | Failed device-initiated twin update operations on IoT Hub ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_iot_hub_routing_dropped ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.routing_deliveries | Messages dropped by the routing engine on IoT Hub ${label:resource_name} in ${label:resource_group} (${label:region}). Dropped messages indicate dead endpoints or misconfigured routes |
+| [ am_iot_hub_routing_orphaned ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.routing_deliveries | Orphaned messages with no matching routing rule on IoT Hub ${label:resource_name} in ${label:resource_group} (${label:region}). Orphaned messages indicate missing or incomplete routing configuration |
+| [ am_iot_hub_routing_invalid ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.routing_deliveries | Invalid messages rejected by the routing engine on IoT Hub ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_iot_hub_routing_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.routing_latency | Maximum message routing latency across all endpoints on IoT Hub ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_iot_hub_event_grid_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.event_grid_latency | Average Event Grid delivery latency on IoT Hub ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_iot_hub_jobs_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.jobs_status | Failed jobs on IoT Hub ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_iot_hub_twin_query_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.twin_queries | Failed twin queries on IoT Hub ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_iot_hub_c2d_commands_abandoned ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.c2d_commands | Cloud-to-device commands abandoned by devices on IoT Hub ${label:resource_name} in ${label:resource_group} (${label:region}). Abandoned commands indicate devices are not properly handling received messages |
+| [ am_iot_hub_c2d_commands_rejected ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.c2d_commands | Cloud-to-device commands rejected by devices on IoT Hub ${label:resource_name} in ${label:resource_group} (${label:region}). Rejected commands indicate devices are explicitly refusing messages |
+| [ am_iot_hub_routing_delivery_latency_preview ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.routing_delivery_latency_preview | Average routing delivery latency (preview metric) on IoT Hub ${label:resource_name} in ${label:resource_group} (${label:region}) |
 
 
 

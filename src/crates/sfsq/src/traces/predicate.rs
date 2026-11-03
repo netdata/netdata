@@ -70,7 +70,10 @@ pub enum CompareOp {
 
 impl CompareOp {
     fn is_ordering(self) -> bool {
-        matches!(self, CompareOp::Gt | CompareOp::Lt | CompareOp::Gte | CompareOp::Lte)
+        matches!(
+            self,
+            CompareOp::Gt | CompareOp::Lt | CompareOp::Gte | CompareOp::Lte
+        )
     }
 
     fn is_regex(self) -> bool {
@@ -176,8 +179,15 @@ enum BuiltinClass {
 fn builtin_class(i: BuiltinField) -> BuiltinClass {
     use BuiltinField::*;
     match i {
-        Name | Kind | Status | StatusMessage | InstrumentationName | InstrumentationVersion
-        | EventName | RootName | RootServiceName => BuiltinClass::Text,
+        Name
+        | Kind
+        | Status
+        | StatusMessage
+        | InstrumentationName
+        | InstrumentationVersion
+        | EventName
+        | RootName
+        | RootServiceName => BuiltinClass::Text,
         Duration | TraceDuration | EventTimeSinceStart => BuiltinClass::Nanos,
         SpanId | ParentSpanId | TraceId | LinkSpanId | LinkTraceId => BuiltinClass::Id,
     }
@@ -198,14 +208,18 @@ impl Condition {
                 got: self.values.len(),
             });
         }
-        let all_text = self.values.iter().all(|v| matches!(v, PredicateValue::Text(_)));
+        let all_text = self
+            .values
+            .iter()
+            .all(|v| matches!(v, PredicateValue::Text(_)));
         let all_integer = self
             .values
             .iter()
             .all(|v| matches!(v, PredicateValue::Integer(_)));
-        let all_numeric = self.values.iter().all(|v| {
-            matches!(v, PredicateValue::Integer(_) | PredicateValue::Float(_))
-        });
+        let all_numeric = self
+            .values
+            .iter()
+            .all(|v| matches!(v, PredicateValue::Integer(_) | PredicateValue::Float(_)));
         // One condition compares against ONE value class: mixing text
         // and numbers has no coherent multi-value semantics (and the
         // form grammar never generates it).
@@ -229,27 +243,45 @@ impl Condition {
             // ordering needs numbers (the dictionary-numeric path).
             PredicateTarget::Attribute(..) => {
                 if self.op.is_regex() && !all_text {
-                    return Err(PredicateError::TextValueRequired { op: self.op, target });
+                    return Err(PredicateError::TextValueRequired {
+                        op: self.op,
+                        target,
+                    });
                 }
                 if self.op.is_ordering() && !all_numeric {
-                    return Err(PredicateError::NumericValueRequired { op: self.op, target });
+                    return Err(PredicateError::NumericValueRequired {
+                        op: self.op,
+                        target,
+                    });
                 }
             }
             PredicateTarget::Builtin(i) => match builtin_class(*i) {
                 BuiltinClass::Text => {
                     if self.op.is_ordering() {
-                        return Err(PredicateError::InvalidOpForTarget { op: self.op, target });
+                        return Err(PredicateError::InvalidOpForTarget {
+                            op: self.op,
+                            target,
+                        });
                     }
                     if !all_text {
-                        return Err(PredicateError::TextValueRequired { op: self.op, target });
+                        return Err(PredicateError::TextValueRequired {
+                            op: self.op,
+                            target,
+                        });
                     }
                 }
                 BuiltinClass::Id => {
                     if !matches!(self.op, CompareOp::Eq | CompareOp::NotEq) {
-                        return Err(PredicateError::InvalidOpForTarget { op: self.op, target });
+                        return Err(PredicateError::InvalidOpForTarget {
+                            op: self.op,
+                            target,
+                        });
                     }
                     if !all_text {
-                        return Err(PredicateError::TextValueRequired { op: self.op, target });
+                        return Err(PredicateError::TextValueRequired {
+                            op: self.op,
+                            target,
+                        });
                     }
                     // Ids are fixed-width hex text (W3C rendering):
                     // 16 chars for span ids, 32 for trace ids.
@@ -261,9 +293,7 @@ impl Condition {
                         let PredicateValue::Text(hex) = value else {
                             unreachable!("all_text checked above");
                         };
-                        if hex.len() != width
-                            || !hex.bytes().all(|b| b.is_ascii_hexdigit())
-                        {
+                        if hex.len() != width || !hex.bytes().all(|b| b.is_ascii_hexdigit()) {
                             return Err(PredicateError::InvalidIdValue {
                                 target,
                                 value: hex.clone(),
@@ -274,7 +304,10 @@ impl Condition {
                 }
                 BuiltinClass::Nanos => {
                     if self.op.is_regex() {
-                        return Err(PredicateError::InvalidOpForTarget { op: self.op, target });
+                        return Err(PredicateError::InvalidOpForTarget {
+                            op: self.op,
+                            target,
+                        });
                     }
                     if !all_integer {
                         return Err(PredicateError::NonIntegerDuration);
@@ -336,7 +369,11 @@ impl Condition {
             // Dictionary-backed builtins except event:name (refine).
             (
                 PredicateTarget::Builtin(
-                    Name | Kind | Status | StatusMessage | InstrumentationName
+                    Name
+                    | Kind
+                    | Status
+                    | StatusMessage
+                    | InstrumentationName
                     | InstrumentationVersion,
                 ),
                 CompareOp::Eq | CompareOp::Regex | CompareOp::NotEq | CompareOp::NotRegex,
@@ -350,32 +387,36 @@ impl Condition {
                 PredicateTarget::Builtin(SpanId | ParentSpanId | TraceId),
                 CompareOp::Eq | CompareOp::NotEq,
             ) => None,
-            (
-                PredicateTarget::Builtin(LinkSpanId | LinkTraceId),
-                CompareOp::Eq,
-            ) => None,
-            (PredicateTarget::Builtin(LinkSpanId | LinkTraceId), CompareOp::NotEq) => {
-                Some(format!("negated {} (subgroup semantics, refine step)", self.target))
-            }
+            (PredicateTarget::Builtin(LinkSpanId | LinkTraceId), CompareOp::Eq) => None,
+            (PredicateTarget::Builtin(LinkSpanId | LinkTraceId), CompareOp::NotEq) => Some(
+                format!("negated {} (subgroup semantics, refine step)", self.target),
+            ),
             // event:name POSITIVE forms evaluate through the event
             // subgroup (any number of conditions — a single event must
             // satisfy them all); negated forms wait for the
             // subgroup-semantics decision.
             (PredicateTarget::Builtin(EventName), CompareOp::Eq | CompareOp::Regex) => None,
-            (PredicateTarget::Builtin(EventName), CompareOp::NotEq | CompareOp::NotRegex) => {
-                Some(format!("negated {} (subgroup semantics, refine step)", self.target))
-            }
+            (PredicateTarget::Builtin(EventName), CompareOp::NotEq | CompareOp::NotRegex) => Some(
+                format!("negated {} (subgroup semantics, refine step)", self.target),
+            ),
             // Event/link-scoped attributes: POSITIVE forms evaluate
             // through the subgroup refine; negated forms sit on the
             // recorded open question (flat negation vs single-item
             // subgroup semantics).
             (
                 PredicateTarget::Attribute(AttributeOwner::Event | AttributeOwner::Link, _),
-                CompareOp::Eq | CompareOp::Regex | CompareOp::Gt | CompareOp::Lt
-                | CompareOp::Gte | CompareOp::Lte,
+                CompareOp::Eq
+                | CompareOp::Regex
+                | CompareOp::Gt
+                | CompareOp::Lt
+                | CompareOp::Gte
+                | CompareOp::Lte,
             ) => None,
             (PredicateTarget::Attribute(AttributeOwner::Event | AttributeOwner::Link, _), _) => {
-                Some(format!("negated {} (subgroup semantics, refine step)", self.target))
+                Some(format!(
+                    "negated {} (subgroup semantics, refine step)",
+                    self.target
+                ))
             }
             // event:timeSinceStart computes in the refine; != would be a
             // negated per-event condition — deferred with the fork for a
@@ -385,9 +426,10 @@ impl Condition {
             {
                 None
             }
-            (PredicateTarget::Builtin(EventTimeSinceStart), _) => {
-                Some(format!("negated {} (subgroup semantics, refine step)", self.target))
-            }
+            (PredicateTarget::Builtin(EventTimeSinceStart), _) => Some(format!(
+                "negated {} (subgroup semantics, refine step)",
+                self.target
+            )),
             // Trace-level builtins evaluate post-assembly (tri-state,
             // decision 15). Values are single-valued per trace, so
             // negation carries no subgroup fork.
@@ -435,15 +477,12 @@ impl Predicate {
     /// of fields is owned HERE so a wire cannot drift from the engine.
     pub fn trace_level_target(&self) -> Option<&PredicateTarget> {
         use BuiltinField::*;
-        self.conditions
-            .iter()
-            .map(|c| &c.target)
-            .find(|t| {
-                matches!(
-                    t,
-                    PredicateTarget::Builtin(RootName | RootServiceName | TraceDuration | TraceId)
-                )
-            })
+        self.conditions.iter().map(|c| &c.target).find(|t| {
+            matches!(
+                t,
+                PredicateTarget::Builtin(RootName | RootServiceName | TraceDuration | TraceId)
+            )
+        })
     }
 
     /// Split into `(span_local, trace_level)` (pin R3-2): trace-level
@@ -588,18 +627,12 @@ impl Predicate {
                         negated: matches!(op, CompareOp::NotEq),
                     });
                 }
-                (
-                    PredicateTarget::Builtin(BuiltinField::LinkSpanId),
-                    CompareOp::Eq,
-                ) => {
+                (PredicateTarget::Builtin(BuiltinField::LinkSpanId), CompareOp::Eq) => {
                     link_group.push(sfst::GroupCondition::LinkSpanIds(hex_span_ids(
                         &condition.values,
                     )));
                 }
-                (
-                    PredicateTarget::Builtin(BuiltinField::LinkTraceId),
-                    CompareOp::Eq,
-                ) => {
+                (PredicateTarget::Builtin(BuiltinField::LinkTraceId), CompareOp::Eq) => {
                     link_group.push(sfst::GroupCondition::LinkTraceIds(
                         condition
                             .values
@@ -635,7 +668,13 @@ impl Predicate {
                         .collect();
                     event_group.push(sfst::GroupCondition::TimeSinceStart { intervals });
                 }
-                (PredicateTarget::Attribute(scope @ (AttributeOwner::Event | AttributeOwner::Link), key), op) => {
+                (
+                    PredicateTarget::Attribute(
+                        scope @ (AttributeOwner::Event | AttributeOwner::Link),
+                        key,
+                    ),
+                    op,
+                ) => {
                     let field = format!(
                         "{}{key}",
                         scope.attribute_prefix().expect("attribute scope")
@@ -666,13 +705,15 @@ impl Predicate {
                             ),
                             format!(
                                 "{}{key}",
-                                AttributeOwner::Span.attribute_prefix().expect("attribute owner")
+                                AttributeOwner::Span
+                                    .attribute_prefix()
+                                    .expect("attribute owner")
                             ),
                         ],
                         PredicateTarget::Attribute(owner, key) => {
-                            let prefix = owner
-                                .attribute_prefix()
-                                .expect("validated: a concrete attribute owner (not Builtin or Any)");
+                            let prefix = owner.attribute_prefix().expect(
+                                "validated: a concrete attribute owner (not Builtin or Any)",
+                            );
                             vec![format!("{prefix}{key}")]
                         }
                         PredicateTarget::Builtin(i) => vec![
@@ -874,7 +915,10 @@ enum EvalTerm {
 /// event/link attributes PREFIX-STRIPPED and event names structured.
 enum EvalGroupCondition {
     EventName(EvalMatcher),
-    Attr { bare_key: String, matcher: EvalMatcher },
+    Attr {
+        bare_key: String,
+        matcher: EvalMatcher,
+    },
     TimeSince(Vec<(Option<i64>, Option<i64>)>),
     LinkSpanIds(Vec<sfst::SpanId>),
     LinkTraceIds(Vec<sfst::TraceId>),
@@ -960,7 +1004,11 @@ impl EvalPredicate {
                         }
                     }
                 }
-                if *negated { present && !any_match } else { any_match }
+                if *negated {
+                    present && !any_match
+                } else {
+                    any_match
+                }
             }
             EvalTerm::Duration { intervals, negated } => {
                 let in_any = intervals.iter().any(|&(lo, hi)| {
@@ -1092,8 +1140,14 @@ pub(crate) enum GateRootField {
 }
 
 enum TraceLevelCondition {
-    RootName { matcher: EvalMatcher, negated: bool },
-    RootService { matcher: EvalMatcher, negated: bool },
+    RootName {
+        matcher: EvalMatcher,
+        negated: bool,
+    },
+    RootService {
+        matcher: EvalMatcher,
+        negated: bool,
+    },
     Duration {
         intervals: Vec<(Option<i64>, Option<i64>)>,
         negated: bool,
@@ -1107,18 +1161,23 @@ impl TraceLevelEval {
             .conditions
             .iter()
             .map(|condition| {
-                let negated =
-                    matches!(condition.op, CompareOp::NotEq | CompareOp::NotRegex);
+                let negated = matches!(condition.op, CompareOp::NotEq | CompareOp::NotRegex);
                 match &condition.target {
                     PredicateTarget::Builtin(BuiltinField::RootName) => {
                         TraceLevelCondition::RootName {
-                            matcher: eval_matcher(&condition_matcher(condition.op, &condition.values)),
+                            matcher: eval_matcher(&condition_matcher(
+                                condition.op,
+                                &condition.values,
+                            )),
                             negated,
                         }
                     }
                     PredicateTarget::Builtin(BuiltinField::RootServiceName) => {
                         TraceLevelCondition::RootService {
-                            matcher: eval_matcher(&condition_matcher(condition.op, &condition.values)),
+                            matcher: eval_matcher(&condition_matcher(
+                                condition.op,
+                                &condition.values,
+                            )),
                             negated,
                         }
                     }
@@ -1155,12 +1214,14 @@ impl TraceLevelEval {
         &self,
     ) -> impl Iterator<Item = (GateRootField, &EvalMatcher)> {
         self.conditions.iter().filter_map(|c| match c {
-            TraceLevelCondition::RootName { matcher, negated: false } => {
-                Some((GateRootField::Name, matcher))
-            }
-            TraceLevelCondition::RootService { matcher, negated: false } => {
-                Some((GateRootField::Service, matcher))
-            }
+            TraceLevelCondition::RootName {
+                matcher,
+                negated: false,
+            } => Some((GateRootField::Name, matcher)),
+            TraceLevelCondition::RootService {
+                matcher,
+                negated: false,
+            } => Some((GateRootField::Service, matcher)),
             _ => None,
         })
     }
@@ -1180,7 +1241,11 @@ impl TraceLevelEval {
     pub(crate) fn duration_lower_bound(&self) -> Option<i64> {
         let mut best: Option<i64> = None;
         for c in &self.conditions {
-            let TraceLevelCondition::Duration { intervals, negated: false } = c else {
+            let TraceLevelCondition::Duration {
+                intervals,
+                negated: false,
+            } = c
+            else {
                 continue;
             };
             let mut cond_lo: Option<i64> = None;
@@ -1263,11 +1328,7 @@ impl TraceLevelEval {
 /// `predicate` must be validated and span-local (partitioned); a
 /// trace-level or stage-B condition here is an engine bug and panics
 /// loudly rather than under-approximating silently.
-pub fn span_matches(
-    span: &TraceSpan,
-    predicate: &Predicate,
-    window: Option<TimeWindow>,
-) -> bool {
+pub fn span_matches(span: &TraceSpan, predicate: &Predicate, window: Option<TimeWindow>) -> bool {
     EvalPredicate::new(&predicate.to_trace_plan()).matches(span, window)
 }
 
@@ -1291,11 +1352,27 @@ mod tests {
     /// stage boundary.
     #[test]
     fn structural_validation() {
-        let ok = |c: Condition| Predicate { conditions: vec![c] }.validate().unwrap();
-        let err = |c: Condition| Predicate { conditions: vec![c] }.validate().unwrap_err();
+        let ok = |c: Condition| {
+            Predicate {
+                conditions: vec![c],
+            }
+            .validate()
+            .unwrap()
+        };
+        let err = |c: Condition| {
+            Predicate {
+                conditions: vec![c],
+            }
+            .validate()
+            .unwrap_err()
+        };
 
         ok(cond(span_attr("x"), CompareOp::Eq, vec![text("v")]));
-        ok(cond(span_attr("x"), CompareOp::NotEq, vec![text("a"), text("b")]));
+        ok(cond(
+            span_attr("x"),
+            CompareOp::NotEq,
+            vec![text("a"), text("b")],
+        ));
         ok(cond(
             span_attr("x"),
             CompareOp::Gt,
@@ -1368,11 +1445,7 @@ mod tests {
             PredicateError::NonIntegerDuration
         ));
         assert!(matches!(
-            err(cond(
-                span_attr("x"),
-                CompareOp::Gte,
-                vec![text("nan")],
-            )),
+            err(cond(span_attr("x"), CompareOp::Gte, vec![text("nan")],)),
             PredicateError::NumericValueRequired { .. }
         ));
         assert!(matches!(
@@ -1395,17 +1468,29 @@ mod tests {
     #[test]
     fn evaluability_boundary() {
         let evaluable = |c: Condition| {
-            Predicate { conditions: vec![c] }.ensure_evaluable().unwrap();
+            Predicate {
+                conditions: vec![c],
+            }
+            .ensure_evaluable()
+            .unwrap();
         };
         let rejected = |c: Condition| -> String {
-            match (Predicate { conditions: vec![c] }).ensure_evaluable() {
+            match (Predicate {
+                conditions: vec![c],
+            })
+            .ensure_evaluable()
+            {
                 Err(PredicateError::NotYetEvaluable { construct }) => construct,
                 other => panic!("expected NotYetEvaluable, got {other:?}"),
             }
         };
 
         // Attribute owners and the any-owner disjunction: every op.
-        evaluable(cond(span_attr("x"), CompareOp::Eq, vec![text("a"), text("b")]));
+        evaluable(cond(
+            span_attr("x"),
+            CompareOp::Eq,
+            vec![text("a"), text("b")],
+        ));
         evaluable(cond(span_attr("x"), CompareOp::NotEq, vec![text("v")]));
         evaluable(cond(span_attr("x"), CompareOp::NotRegex, vec![text("v.*")]));
         evaluable(cond(
@@ -1429,7 +1514,11 @@ mod tests {
             vec![text("v.*")],
         ));
         // Dictionary numerics on attributes.
-        evaluable(cond(span_attr("x"), CompareOp::Gt, vec![PredicateValue::Integer(5)]));
+        evaluable(cond(
+            span_attr("x"),
+            CompareOp::Gt,
+            vec![PredicateValue::Integer(5)],
+        ));
         evaluable(cond(
             span_attr("x"),
             CompareOp::Eq,
@@ -1444,16 +1533,23 @@ mod tests {
             BuiltinField::InstrumentationName,
             BuiltinField::InstrumentationVersion,
         ] {
-            for op in [CompareOp::Eq, CompareOp::Regex, CompareOp::NotEq, CompareOp::NotRegex] {
-                evaluable(cond(
-                    PredicateTarget::Builtin(i),
-                    op,
-                    vec![text("v")],
-                ));
+            for op in [
+                CompareOp::Eq,
+                CompareOp::Regex,
+                CompareOp::NotEq,
+                CompareOp::NotRegex,
+            ] {
+                evaluable(cond(PredicateTarget::Builtin(i), op, vec![text("v")]));
             }
         }
         // Duration: bounds, multi-value equality, negated equality.
-        for op in [CompareOp::Gt, CompareOp::Lt, CompareOp::Gte, CompareOp::Lte, CompareOp::Eq] {
+        for op in [
+            CompareOp::Gt,
+            CompareOp::Lt,
+            CompareOp::Gte,
+            CompareOp::Lte,
+            CompareOp::Eq,
+        ] {
             evaluable(cond(
                 PredicateTarget::Builtin(BuiltinField::Duration),
                 op,
@@ -1488,25 +1584,26 @@ mod tests {
             vec![PredicateValue::Integer(5)],
         ));
         // …their NEGATED forms sit on the recorded open question.
-        assert!(rejected(cond(
-            PredicateTarget::Attribute(AttributeOwner::Event, "msg".into()),
-            CompareOp::NotEq,
-            vec![text("v")],
-        ))
-        .contains("subgroup"));
-        assert!(rejected(cond(
-            PredicateTarget::Attribute(AttributeOwner::Link, "rel".into()),
-            CompareOp::NotEq,
-            vec![text("v")],
-        ))
-        .contains("subgroup"));
+        assert!(
+            rejected(cond(
+                PredicateTarget::Attribute(AttributeOwner::Event, "msg".into()),
+                CompareOp::NotEq,
+                vec![text("v")],
+            ))
+            .contains("subgroup")
+        );
+        assert!(
+            rejected(cond(
+                PredicateTarget::Attribute(AttributeOwner::Link, "rel".into()),
+                CompareOp::NotEq,
+                vec![text("v")],
+            ))
+            .contains("subgroup")
+        );
         // The colon set: span/parent/trace ids both polarities; link
         // ids and event:name positive-only (the negated subgroup
         // semantics are the recorded open question).
-        for i in [
-            BuiltinField::SpanId,
-            BuiltinField::ParentSpanId,
-        ] {
+        for i in [BuiltinField::SpanId, BuiltinField::ParentSpanId] {
             for op in [CompareOp::Eq, CompareOp::NotEq] {
                 evaluable(cond(
                     PredicateTarget::Builtin(i),
@@ -1532,12 +1629,14 @@ mod tests {
             CompareOp::Eq,
             vec![text("4bf92f3577b34da6a3ce929d0e0e4736")],
         ));
-        assert!(rejected(cond(
-            PredicateTarget::Builtin(BuiltinField::LinkSpanId),
-            CompareOp::NotEq,
-            vec![text("00f067aa0ba902b7")],
-        ))
-        .contains("subgroup"));
+        assert!(
+            rejected(cond(
+                PredicateTarget::Builtin(BuiltinField::LinkSpanId),
+                CompareOp::NotEq,
+                vec![text("00f067aa0ba902b7")],
+            ))
+            .contains("subgroup")
+        );
         evaluable(cond(
             PredicateTarget::Builtin(BuiltinField::EventName),
             CompareOp::Eq,
@@ -1548,12 +1647,14 @@ mod tests {
             CompareOp::Regex,
             vec![text("v.*")],
         ));
-        assert!(rejected(cond(
-            PredicateTarget::Builtin(BuiltinField::EventName),
-            CompareOp::NotEq,
-            vec![text("v")],
-        ))
-        .contains("subgroup"));
+        assert!(
+            rejected(cond(
+                PredicateTarget::Builtin(BuiltinField::EventName),
+                CompareOp::NotEq,
+                vec![text("v")],
+            ))
+            .contains("subgroup")
+        );
         // TWO event:name conditions form a single-event subgroup —
         // well-defined (one event named both = unsatisfiable) and
         // evaluable through the refine.
@@ -1585,7 +1686,12 @@ mod tests {
             Err(PredicateError::InvalidIdValue { width: 16, .. })
         ));
         // Trace-level builtins are evaluable post-assembly.
-        for op in [CompareOp::Eq, CompareOp::NotEq, CompareOp::Regex, CompareOp::NotRegex] {
+        for op in [
+            CompareOp::Eq,
+            CompareOp::NotEq,
+            CompareOp::Regex,
+            CompareOp::NotRegex,
+        ] {
             evaluable(cond(
                 PredicateTarget::Builtin(BuiltinField::RootServiceName),
                 op,
@@ -1668,7 +1774,11 @@ mod tests {
                     CompareOp::Eq,
                     vec![text("ERROR")],
                 ),
-                cond(span_attr("http.method"), CompareOp::Regex, vec![text("GET|PUT")]),
+                cond(
+                    span_attr("http.method"),
+                    CompareOp::Regex,
+                    vec![text("GET|PUT")],
+                ),
                 cond(
                     PredicateTarget::Builtin(BuiltinField::Duration),
                     CompareOp::Gt,
@@ -1760,10 +1870,7 @@ mod tests {
                     negated: true,
                 },
                 PlanTerm::Fields {
-                    fields: vec![
-                        "resource.attributes.env".into(),
-                        "attributes.env".into(),
-                    ],
+                    fields: vec!["resource.attributes.env".into(), "attributes.env".into(),],
                     matcher: sfst::PlanMatcher::Tokens {
                         exact: vec!["prod".into()],
                         patterns: vec![],
@@ -1945,7 +2052,11 @@ mod tests {
             None
         ));
         assert!(!matches(
-            vec![cond(span_attr("absent"), CompareOp::NotRegex, vec![text("v.*")])],
+            vec![cond(
+                span_attr("absent"),
+                CompareOp::NotRegex,
+                vec![text("v.*")]
+            )],
             None
         ));
         // Negated regex.
@@ -1990,7 +2101,15 @@ mod tests {
             ],
             ..span.clone()
         };
-        let m2 = |c: Condition| span_matches(&span2, &Predicate { conditions: vec![c] }, None);
+        let m2 = |c: Condition| {
+            span_matches(
+                &span2,
+                &Predicate {
+                    conditions: vec![c],
+                },
+                None,
+            )
+        };
         assert!(m2(cond(
             span_attr("code"),
             CompareOp::Gte,

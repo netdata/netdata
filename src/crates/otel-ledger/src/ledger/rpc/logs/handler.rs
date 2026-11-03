@@ -443,10 +443,8 @@ impl FunctionHandler for OtelLogsHandler {
                     // response, but the cancel `select!` can race and
                     // deliver it — so it must be the same well-formed
                     // empty envelope as every other path, selector included.
-                    let mut result = to_result(
-                        LogsData::empty(query.histogram_field(), query.grid()),
-                        last,
-                    );
+                    let mut result =
+                        to_result(LogsData::empty(query.histogram_field(), query.grid()), last);
                     result.required_params = required_params;
                     return Ok(OtelLogsResponse::Logs(result));
                 }
@@ -500,8 +498,9 @@ impl FunctionHandler for OtelLogsHandler {
         // shard completes, and the bridge's 250ms ticker emits FUNCTION_PROGRESS
         // lines from it. Cancellation is cooperative — a `spawn_blocking` closure
         // cannot be aborted, so the engine polls the token per source and bails
-        // early; the bridge's cancel `select!` already returns the 499 to the
-        // caller and discards this partial result.
+        // early; the bridge's cancel `select!` surfaces the loss as a 500 to
+        // the caller and discards this partial result (the 499 mapping is the
+        // rt engine's adapter, not the bridge's).
         let cancel = ctx.cancellation.clone();
         // The failure fallback needs the grid and histogram field, but
         // `query` moves into the closure — hoist them out first (`Grid`

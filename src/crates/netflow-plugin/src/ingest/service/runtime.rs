@@ -431,8 +431,9 @@ impl IngestService {
     }
 
     /// Mirror each tier slot's commit telemetry into the chart atomics.
-    /// Three short mutex holds per second; the workers touch those mutexes
-    /// at most once per anniversary.
+    /// Three short mutex holds per tick (the operator-configurable
+    /// `listener.sync_interval`, 1s by default); the workers touch those
+    /// mutexes at most once per anniversary.
     fn mirror_tier_commit_telemetry(&self, now_usec: u64) {
         for (index, tier) in MATERIALIZED_TIERS.iter().enumerate() {
             let telemetry = self.tier_handoff.commit_telemetry(index);

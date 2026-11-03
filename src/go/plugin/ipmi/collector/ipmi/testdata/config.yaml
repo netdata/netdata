@@ -1,0 +1,5 @@
+driver: open
+device: 0
+update_every: 5
+timeout: 5
+collect_sel: false

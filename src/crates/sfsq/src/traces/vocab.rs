@@ -215,12 +215,22 @@ mod tests {
     /// round-trips back to the storage name.
     #[test]
     fn storage_table_is_pinned_and_round_trips() {
-        let attr = |scope: AttributeOwner, k: &str| Some((scope, AttributeKey::Attribute(k.to_string())));
+        let attr =
+            |scope: AttributeOwner, k: &str| Some((scope, AttributeKey::Attribute(k.to_string())));
         let intr = |i: BuiltinField| Some((AttributeOwner::Builtin, AttributeKey::Builtin(i)));
         let table: [(&str, Option<(AttributeOwner, AttributeKey)>); 15] = [
-            ("resource.attributes.host", attr(AttributeOwner::Resource, "host")),
-            ("attributes.http.method", attr(AttributeOwner::Span, "http.method")),
-            ("scope.attributes.lib", attr(AttributeOwner::Instrumentation, "lib")),
+            (
+                "resource.attributes.host",
+                attr(AttributeOwner::Resource, "host"),
+            ),
+            (
+                "attributes.http.method",
+                attr(AttributeOwner::Span, "http.method"),
+            ),
+            (
+                "scope.attributes.lib",
+                attr(AttributeOwner::Instrumentation, "lib"),
+            ),
             ("events.attributes.msg", attr(AttributeOwner::Event, "msg")),
             ("links.attributes.rel", attr(AttributeOwner::Link, "rel")),
             ("name", intr(BuiltinField::Name)),
@@ -259,11 +269,17 @@ mod tests {
     fn attribute_named_like_a_builtin_does_not_collide() {
         assert_eq!(
             storage_to_attribute("attributes.trace_state"),
-            Some((AttributeOwner::Span, AttributeKey::Attribute("trace_state".to_string())))
+            Some((
+                AttributeOwner::Span,
+                AttributeKey::Attribute("trace_state".to_string())
+            ))
         );
         assert_eq!(
             storage_to_attribute("attributes.name"),
-            Some((AttributeOwner::Span, AttributeKey::Attribute("name".to_string())))
+            Some((
+                AttributeOwner::Span,
+                AttributeKey::Attribute("name".to_string())
+            ))
         );
     }
 

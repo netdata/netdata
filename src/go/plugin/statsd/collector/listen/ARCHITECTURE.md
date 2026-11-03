@@ -126,8 +126,9 @@ are rejected. `template` is a `charttpl` group whose selectors name final output
   it stays outside the relabel record, invisible to rules, and is restored unchanged.
 - Activation: every profile with a template whose root `match` accepts the original name of a fully admitted record
   becomes active. Rejected input activates nothing. Membership only grows until restart; silence does not deactivate.
-- Lifetimes: omitted chart and dimension expiry resolve to five successful cycles, authored positive values are kept,
-  and a `lifecycle.dimensions` block without a positive `expire_after_cycles` is rejected.
+- Lifetimes: omitted chart and dimension expiry resolve to five successful cycles. StatsD also normalizes explicit
+  chart expiry zero to five to keep profile retention finite; authored positive values are kept. A
+  `lifecycle.dimensions` block without a positive `expire_after_cycles` is rejected.
 
 ## Measurements
 

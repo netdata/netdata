@@ -346,8 +346,8 @@ func compileLifecycle(in *charttpl.Lifecycle) program.LifecyclePolicy {
 		return out
 	}
 	out.MaxInstances = in.MaxInstances
-	if in.ExpireAfterCycles > 0 {
-		out.ExpireAfterCycles = in.ExpireAfterCycles
+	if in.ExpireAfterCycles != nil {
+		out.ExpireAfterCycles = *in.ExpireAfterCycles
 	}
 	if in.Dimensions != nil {
 		out.Dimensions.MaxDims = in.Dimensions.MaxDims

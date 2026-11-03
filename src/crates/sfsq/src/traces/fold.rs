@@ -167,13 +167,16 @@ impl SpanFilter {
                 timestamps.len(),
             )));
         }
-        let Some(compiled) = reader.compile_trace_plan(&self.plan, (lo, hi), ceiling, work)?
-        else {
+        let Some(compiled) = reader.compile_trace_plan(&self.plan, (lo, hi), ceiling, work)? else {
             return Ok(false);
         };
         // Refuse an extraction that would breach: emission is the
         // budget unit and a counter alone would overshoot by the file.
-        if work.rows_visited.saturating_add(compiled.count_in_range(lo, hi)) > ceiling {
+        if work
+            .rows_visited
+            .saturating_add(compiled.count_in_range(lo, hi))
+            > ceiling
+        {
             return Ok(false);
         }
         for pos in compiled.matched_in_range(lo, hi, work) {

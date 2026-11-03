@@ -36,6 +36,7 @@ STRING *rrdmetric_acquired_name_dup(RRDMETRIC_ACQUIRED *rma);
 NETDATA_DOUBLE rrdmetric_acquired_last_stored_value(RRDMETRIC_ACQUIRED *rma);
 time_t rrdmetric_acquired_first_entry(RRDMETRIC_ACQUIRED *rma);
 time_t rrdmetric_acquired_last_entry(RRDMETRIC_ACQUIRED *rma);
+bool rrdmetric_acquired_stored_as_rates(RRDMETRIC_ACQUIRED *rma);
 bool rrdmetric_acquired_belongs_to_instance(RRDMETRIC_ACQUIRED *rma, RRDINSTANCE_ACQUIRED *ria);
 
 const char *rrdinstance_acquired_id(RRDINSTANCE_ACQUIRED *ria);
@@ -43,8 +44,18 @@ const char *rrdinstance_acquired_name(RRDINSTANCE_ACQUIRED *ria);
 bool rrdinstance_acquired_has_name(RRDINSTANCE_ACQUIRED *ria);
 const char *rrdinstance_acquired_units(RRDINSTANCE_ACQUIRED *ria);
 STRING *rrdinstance_acquired_units_dup(RRDINSTANCE_ACQUIRED *ria);
-RRDLABELS *rrdinstance_acquired_labels(RRDINSTANCE_ACQUIRED *ria);
-RRDSET *rrdinstance_acquired_rrdset(RRDINSTANCE_ACQUIRED *ria);
+
+// An instance's labels belong to its chart while it is linked to one, and to the instance once archived.
+// The acquire keeps the chart alive when the labels are the chart's. The caller MUST release the ref when it
+// stops using .labels, and MUST hold the instance until then. .labels is NULL when none are available.
+typedef struct rrdinstance_labels_ref {
+    RRDSET_ACQUIRED *rsa;   // the chart holding the labels, NULL when they are the instance's own
+    RRDLABELS *labels;
+} RRDINSTANCE_LABELS_REF;
+
+RRDINSTANCE_LABELS_REF rrdinstance_acquired_labels_acquire(RRDINSTANCE_ACQUIRED *ria);
+void rrdinstance_labels_release(RRDINSTANCE_LABELS_REF *ref);
+
 RRDHOST *rrdinstance_acquired_rrdhost(RRDINSTANCE_ACQUIRED *ria);
 RRDSET_ACQUIRED *rrdinstance_acquired_rrdset_acquire(RRDINSTANCE_ACQUIRED *ria);
 
@@ -199,6 +210,8 @@ typedef struct _query_instance {
     RRDINSTANCE_ACQUIRED *ria;
     STRING *id_fqdn;        // never access this directly - it is created on demand via query_instance_id_fqdn()
     STRING *name_fqdn;      // never access this directly - it is created on demand via query_instance_name_fqdn()
+    RRDINSTANCE_LABELS_REF labels; // never access this directly - it is acquired on demand via query_instance_labels()
+    bool labels_acquired;
 
     STORAGE_POINT query_points;
     QUERY_METRICS_COUNTS metrics;
@@ -260,8 +273,15 @@ struct group_by_pass {
     RRDR_GROUP_BY_FUNCTION aggregation;
 };
 
+typedef enum __attribute__((packed)) query_target_cancel {
+    QUERY_TARGET_CANCEL_NONE = 0,
+    QUERY_TARGET_CANCEL_TIMEOUT,                // the request timeout expired while building the target
+    QUERY_TARGET_CANCEL_INTERRUPTED,            // the requester went away (client closed, cloud cancelled)
+} QUERY_TARGET_CANCEL;
+
 typedef struct query_target_request {
     size_t version;
+    size_t instances_version; // the version of the instance names instances and scope_instances match; 0 = version
 
     const char *scope_nodes;
     const char *scope_contexts;
@@ -397,7 +417,6 @@ typedef struct query_target {
         SIMPLE_PATTERN *scope_labels_pattern;
         SIMPLE_PATTERN *alerts_pattern;
         SIMPLE_PATTERN *chart_label_key_pattern;
-        SIMPLE_PATTERN *scope_chart_label_key_pattern;
         struct pattern_array *labels_pa;
         struct pattern_array *scope_labels_pa;
     } instances;
@@ -431,6 +450,7 @@ typedef struct query_target {
         SPINLOCK spinlock;
         bool used;                              // when true, this query is currently being used
         bool relative;                          // when true, this query uses relative timestamps
+        QUERY_TARGET_CANCEL cancelled;          // set when the build stopped early; the target is incomplete
         size_t queries;                         // how many query we have done so far with this QUERY_TARGET - not related to database queries
         struct query_target *prev;
         struct query_target *next;
@@ -497,6 +517,7 @@ struct sql_alert_config_data {
             const char *method;
             ALERT_LOOKUP_TIME_GROUP_CONDITION time_group_condition;
             NETDATA_DOUBLE time_group_value;
+            const char *time_group_options;
             ALERT_LOOKUP_DIMS_GROUPING dims_group;
             ALERT_LOOKUP_DATA_SOURCE data_source;
             uint32_t options;
@@ -606,6 +627,9 @@ struct storage *query_metric_storage_engine(QUERY_TARGET *qt, QUERY_METRIC *qm, 
 STRING *query_instance_id_fqdn(QUERY_INSTANCE *qi, size_t version);
 STRING *query_instance_name_fqdn(QUERY_INSTANCE *qi, size_t version, const STRING *host_hostname);
 
+// the instance's labels, acquired on first use and held until the query target releases the instance
+RRDLABELS *query_instance_labels(QUERY_INSTANCE *qi);
+
 void query_target_free(void);
 void query_target_release(QUERY_TARGET *qt);
 
@@ -696,8 +720,13 @@ ssize_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN 
                                   struct query_versions *versions,
                                   char *host_node_id_str);
 
+size_t query_scope_hosts_pin(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN *hosts_sp,
+                             RRDHOST ***hosts, struct query_versions *versions);
+void query_scope_hosts_unpin(RRDHOST **hosts, size_t count);
+
 typedef ssize_t (*foreach_context_cb_t)(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context);
-ssize_t query_scope_foreach_context(RRDHOST *host, const char *scope_contexts, SIMPLE_PATTERN *scope_contexts_sp, SIMPLE_PATTERN *contexts_sp, foreach_context_cb_t cb, bool queryable_host, void *data);
+typedef bool (*foreach_stop_cb_t)(void *data);  // optional: true stops a scan, also over entries the scope rejects
+ssize_t query_scope_foreach_context(RRDHOST *host, const char *scope_contexts, SIMPLE_PATTERN *scope_contexts_sp, SIMPLE_PATTERN *contexts_sp, foreach_context_cb_t cb, bool queryable_host, void *data, foreach_stop_cb_t stop_cb);
 
 // ----------------------------------------------------------------------------
 // public API for weights
@@ -771,14 +800,99 @@ static inline bool query_target_needs_all_dimensions(QUERY_TARGET *qt) {
     return query_target_has_percentage_of_group(qt);
 }
 
-static inline bool query_target_has_percentage_units(QUERY_TARGET *qt) {
-    if(qt->window.time_group_method == RRDR_GROUPING_CV)
-        return true;
-
+// The units a query REPLACES the metric's own units with, or NULL to keep
+// them. Some time-aggregations answer a different question from the one the
+// metric measures - a share, a number of transitions, a number of events -
+// so reporting the metric's units would be wrong.
+static inline const char *query_target_units_override(QUERY_TARGET *qt) {
+    // a percentage transform rewrites the VALUES, so it wins over the
+    // grouping's own units - a flap count turned into a share of its group
+    // is a percentage, not a number of flaps
     if((qt->request.options & RRDR_OPTION_PERCENTAGE) && !(qt->window.options & RRDR_OPTION_RETURN_RAW))
-        return true;
+        return "%";
 
-    return query_target_has_percentage_of_group(qt);
+    if(query_target_has_percentage_of_group(qt))
+        return "%";
+
+    switch(qt->window.time_group_method) {
+        case RRDR_GROUPING_CV:
+        case RRDR_GROUPING_COUNTIF:            // percentage-of-samples
+        case RRDR_GROUPING_PERCENTAGE_OF_TIME:
+            return "%";
+
+        case RRDR_GROUPING_NUMBER_OF_FLAPS:
+            return "flaps";
+
+        case RRDR_GROUPING_NUMBER_OF_TIMES:
+            return "events";
+
+        default:
+            break;
+    }
+
+    return NULL;
+}
+
+// True when EVERY metric of the query is stored as a per-second rate.
+// The rate flag is per-metric (query_target.c), while the units string is
+// per-result, so a query mixing counters and gauges has no single honest
+// answer - and leaves the units alone.
+static inline bool query_target_all_metrics_stored_as_rates(QUERY_TARGET *qt) {
+    if(!qt->query.used)
+        return false;
+
+    for(uint32_t i = 0; i < qt->query.used ; i++)
+        if(!qt->query.array[i].values_stored_as_rates)
+            return false;
+
+    return true;
+}
+
+// sum-over-time multiplies each point by its duration, so summing a rate
+// yields a VOLUME: "requests/s" summed over a window is "requests". Only a
+// trailing "/s" can be removed deterministically; anything else is left
+// untouched.
+static inline const char *query_target_rate_adjusted_units_for(
+    QUERY_TARGET *qt, bool stored_as_rates, const char *units, char *buf, size_t buf_size) {
+
+    if(!units || !*units)
+        return units;
+
+    if(qt->window.time_group_method != RRDR_GROUPING_SUM)
+        return units;
+
+    if(!stored_as_rates)
+        return units;
+
+    size_t len = strlen(units);
+    if(len < 3 || strcmp(units + len - 2, "/s") != 0)
+        return units;
+
+    if(len - 2 >= buf_size)
+        return units;
+
+    memcpy(buf, units, len - 2);
+    buf[len - 2] = '\0';
+    return buf;
+}
+
+// The units a RESULT carries: the grouping's own units when it answers a
+// different question, otherwise the metric's units with a rate's trailing
+// "/s" removed if the query integrated it into a volume. Every consumer
+// that labels or keys a result should go through here, so the label a user
+// sees and the key a group is built from cannot disagree.
+//
+// `stored_as_rates` is the answer for the THING being labelled. A key built
+// per metric passes that metric's own flag: asking the whole query would let
+// one gauge anywhere keep the "/s" on an unrelated group.
+static inline const char *query_target_result_units_for(
+    QUERY_TARGET *qt, bool stored_as_rates, const char *metric_units, char *buf, size_t buf_size) {
+
+    const char *units = query_target_units_override(qt);
+    if(units)
+        return units;
+
+    return query_target_rate_adjusted_units_for(qt, stored_as_rates, metric_units, buf, buf_size);
 }
 
 uint32_t rrdcontext_queue_version(RRDCONTEXT_QUEUE_JudyLSet *queue);

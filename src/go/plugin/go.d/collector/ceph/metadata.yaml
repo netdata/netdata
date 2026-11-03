@@ -323,15 +323,6 @@ modules:
               mixin/Alertmanager rules for conditions without an explicitly implemented and tested Netdata equivalent,
               including any required PG, OSD, MON, scrub, or RGW policy. Slack, webhook, and PagerDuty are notification
               transports, not Ceph threshold definitions.
-    alerts:
-      - name: ceph_component_collection_failed
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
-        metric: ceph.component_collection_status
-        info: "Metric collection for the Ceph ${label:component} component is failing while other Ceph metrics continue to be collected"
-      - name: ceph_cluster_physical_capacity_utilization
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
-        metric: ceph.cluster_physical_capacity_utilization
-        info: 'Ceph cluster ${label:fsid} disk space utilization. This stock capacity policy is silent by default; explicitly route it when notifications are required.'
     metrics:
       folding:
         title: Metrics

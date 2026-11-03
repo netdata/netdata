@@ -53,7 +53,12 @@ fn parses_hex_ids_case_insensitively_and_trimmed() {
 
 #[test]
 fn rejects_wrong_length_and_non_hex() {
-    for bad in ["", "0102", "zz02030405060708090a0b0c0d0e0f10", "0102030405060708090a0b0c0d0e0f1"] {
+    for bad in [
+        "",
+        "0102",
+        "zz02030405060708090a0b0c0d0e0f10",
+        "0102030405060708090a0b0c0d0e0f1",
+    ] {
         let err = parse_trace_id(bad).expect_err("must reject");
         assert!(err.contains("32 hex"), "{err}");
     }
@@ -122,11 +127,22 @@ fn trace_result_shape_is_pinned() {
             link_attributes: vec![],
         },
     };
-    let v = serde_json::to_value(to_trace_result(&trace_id, data, CoverageWire { after: 0, before: u32::MAX })).unwrap();
+    let v = serde_json::to_value(to_trace_result(
+        &trace_id,
+        data,
+        CoverageWire {
+            after: 0,
+            before: u32::MAX,
+        },
+    ))
+    .unwrap();
 
     assert_eq!(v["version"], 1);
     assert_eq!(v["trace_id"], "11111111111111111111111111111111");
-    assert_eq!(v["coverage"], json!({"after": 0, "before": 4_294_967_295_u32}));
+    assert_eq!(
+        v["coverage"],
+        json!({"after": 0, "before": 4_294_967_295_u32})
+    );
     assert_eq!(v["status"], json!({"complete": true}));
     assert_eq!(v["items"], json!({"returned": 2}));
     assert_eq!(v["summary_root"], 0);
@@ -248,11 +264,20 @@ fn rendered_keys_round_trip_through_the_selection_grammar() {
 
 #[test]
 fn owner_words_parse_including_builtin() {
-    assert_eq!(parse_owner_word("resource").unwrap(), AttributeOwner::Resource);
-    assert_eq!(parse_owner_word("builtin").unwrap(), AttributeOwner::Builtin);
+    assert_eq!(
+        parse_owner_word("resource").unwrap(),
+        AttributeOwner::Resource
+    );
+    assert_eq!(
+        parse_owner_word("builtin").unwrap(),
+        AttributeOwner::Builtin
+    );
     assert!(parse_owner_word("any").is_err(), "Any stays un-nameable");
     assert!(parse_owner_word("bogus").is_err());
-    assert!(parse_owner_word("Resource").is_err(), "case-sensitive by design");
+    assert!(
+        parse_owner_word("Resource").is_err(),
+        "case-sensitive by design"
+    );
 }
 
 #[test]
@@ -340,8 +365,8 @@ fn cursor_round_trips_and_rejects_malformed() {
         "t1:1:1",
         "t2:1:2:3:zz:1",
         "t2:1:2:3:1",
-        "t2:9000:10000:5:00ff:0",   // served 0
-        "t2:10000:9000:5:00ff:1",   // inverted window
+        "t2:9000:10000:5:00ff:0", // served 0
+        "t2:10000:9000:5:00ff:1", // inverted window
         &format!("t2:9000:10000:5:{}:1:extra", "ab".repeat(16)),
     ] {
         assert!(parse_cursor(bad).is_err(), "{bad:?} must not parse");
@@ -429,15 +454,9 @@ const WIN_COVERAGE: CoverageWire = CoverageWire {
 #[test]
 fn completion_capture_range_clamps_and_saturates() {
     assert_eq!(completion_capture_range(&(9_000..10_000)), 5_400..13_600);
-    assert_eq!(
-        completion_capture_range(&(0..20_000)),
-        0..40_000
-    );
+    assert_eq!(completion_capture_range(&(0..20_000)), 0..40_000);
     let day = 86_400;
-    assert_eq!(
-        completion_capture_range(&(day..day * 3)),
-        0..day * 4
-    );
+    assert_eq!(completion_capture_range(&(day..day * 3)), 0..day * 4);
     assert_eq!(
         completion_capture_range(&(u32::MAX - 100..u32::MAX)),
         u32::MAX - 100 - 3_600..u32::MAX
@@ -504,7 +523,13 @@ fn full_page_emits_a_cursor_and_short_page_does_not() {
         format!("t2:9000:10000:200:{}:2", "02".repeat(16))
     );
 
-    let r = to_search_result(search_data(vec![summary(1, 300)]), 2, None, WIN, WIN_COVERAGE);
+    let r = to_search_result(
+        search_data(vec![summary(1, 300)]),
+        2,
+        None,
+        WIN,
+        WIN_COVERAGE,
+    );
     assert!(r.anchor.is_none(), "a short page ends the walk");
 }
 
@@ -514,14 +539,17 @@ fn anchor_page_drops_everything_at_or_above_the_after_key() {
     // engine re-emits the whole prefix — same query, larger limit).
     let c = cursor(WIN.0, WIN.1, 200, 0x02, 2);
     let data = search_data(vec![
-        summary(1, 300),  // above the key → served
-        summary(2, 200),  // the key itself → served
-        summary(3, 200),  // rank tie, id above the key → fresh
+        summary(1, 300), // above the key → served
+        summary(2, 200), // the key itself → served
+        summary(3, 200), // rank tie, id above the key → fresh
         summary(4, 100),
     ]);
     let r = to_search_result(data, 2, Some(&c), WIN, WIN_COVERAGE);
     let ids: Vec<&str> = r.traces.iter().map(|t| t.trace_id.as_str()).collect();
-    assert_eq!(ids, vec!["03".repeat(16).as_str(), "04".repeat(16).as_str()]);
+    assert_eq!(
+        ids,
+        vec!["03".repeat(16).as_str(), "04".repeat(16).as_str()]
+    );
     // served accumulates: 2 before + 2 this page.
     assert_eq!(
         r.anchor.as_ref().unwrap().next,
@@ -553,7 +581,11 @@ fn a_walk_at_the_served_cap_emits_no_further_cursor() {
     // plus a full page exceeds CURSOR_SERVED_CAP (10_000), so the
     // final page fills but carries no continuation.
     let c = cursor(WIN.0, WIN.1, 500, 0x01, 9_999);
-    let data = search_data(vec![summary(0x02, 400), summary(0x03, 300), summary(0x04, 200)]);
+    let data = search_data(vec![
+        summary(0x02, 400),
+        summary(0x03, 300),
+        summary(0x04, 200),
+    ]);
     let r = to_search_result(data, 2, Some(&c), WIN, WIN_COVERAGE);
     assert_eq!(r.items.returned, 2, "the page itself still fills");
     assert!(
@@ -636,7 +668,15 @@ fn empty_trace_maps_to_complete_zero_span_result() {
         status: QueryStatus::Complete,
         field_kinds: FieldKinds::default(),
     };
-    let v = serde_json::to_value(to_trace_result(&trace_id, data, CoverageWire { after: 0, before: u32::MAX })).unwrap();
+    let v = serde_json::to_value(to_trace_result(
+        &trace_id,
+        data,
+        CoverageWire {
+            after: 0,
+            before: u32::MAX,
+        },
+    ))
+    .unwrap();
     assert_eq!(v["status"], json!({"complete": true}));
     assert_eq!(v["items"]["returned"], 0);
     assert_eq!(v["summary_root"], serde_json::Value::Null);

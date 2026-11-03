@@ -27,10 +27,12 @@
 //!
 //! Gotchas:
 //! - every `x-config-*` attribute is required and its value must have the
-//!   expected JSON type: unknown keys panic in the collector; missing,
-//!   unrecognized or wrong-typed values panic at the builder's
-//!   `Option::unwrap` — except an unrecognized `cmds` word, which silently
-//!   degrades to the empty set.
+//!   expected JSON type: unknown keys panic in the collector, and so does a
+//!   known key given a string where an integer is expected or vice versa;
+//!   values of any other JSON type are dropped and surface at the builder's
+//!   `Option::unwrap`, like missing attributes and out-of-vocabulary words
+//!   — except `cmds`, where one unrecognized word degrades the whole list
+//!   to the empty set.
 //! - the vocabulary words must match `DynCfgType`, `DynCfgStatus` and
 //!   `DynCfgSourceType` exactly, lowercase and untrimmed (`single`,
 //!   `running` and `stock` here); `schema|get|update` is parsed by

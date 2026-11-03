@@ -55,7 +55,6 @@ const (
 	PipelineReasonSelectorDenied          PipelineReason = "selector_denied"
 	PipelineReasonTypedFamilyCorruption   PipelineReason = "typed_family_corruption"
 	PipelineReasonInfoFamily              PipelineReason = "info_family"
-	PipelineReasonSeriesLimit             PipelineReason = "series_limit"
 	PipelineReasonUnsupportedType         PipelineReason = "unsupported_type"
 	PipelineReasonInvalidFamilySchema     PipelineReason = "invalid_family_schema"
 	PipelineReasonInvalidSeriesSchema     PipelineReason = "invalid_series_schema"

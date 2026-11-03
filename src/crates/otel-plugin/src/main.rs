@@ -106,6 +106,16 @@ async fn run_worker(kind: WorkerKind) -> anyhow::Result<()> {
 
 #[tokio::main]
 async fn main() {
+    // rustls cannot pick a crypto provider on its own here: tonic brings
+    // `ring` and opendal's reqwest brings `aws-lc-rs`, and with both compiled
+    // in, every default `ServerConfig::builder()` (tonic's gRPC TLS and the
+    // OTLP/HTTP listener's) panics at startup. Select `ring`, the workspace's
+    // pinned rustls backend, once for the whole process before any worker
+    // builds a TLS config.
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("no rustls crypto provider is installed before main");
+
     let cli = Cli::parse();
 
     // Each arm installs the global tracing subscriber exactly once, then

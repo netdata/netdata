@@ -17,7 +17,7 @@
 //!
 //! Consumers (grep-verified): path build — `otel-catalog::Registry`,
 //! `file-lifecycle::catalog_builder` and `file-lifecycle::recovery`;
-//! strict walk — `otel_catalog::scan_max_sequence` (the seq-counter
+//! strict walk — `otel-catalog::scan_max_sequence` (the seq-counter
 //! seed must not be under-read); lossy walk —
 //! `otel-catalog::Registry::recover`. [`date_dir_name`] and
 //! [`parse_date_dir`] currently have no callers outside this module and
@@ -48,7 +48,8 @@ pub fn parse_date_dir(name: &str) -> Option<NaiveDate> {
 /// `{base}/{date}/{tenant}`; the file name is the caller's to join.
 /// `tenant` is used verbatim — this module does not validate it, so the
 /// caller must hand in a path-safe segment (the `TenantId` validators
-/// reject `.`/`..` because this join would otherwise escape `base`).
+/// reject `.`/`..`; a `..` here would resolve the join to `base` itself,
+/// not a tenant directory).
 pub fn date_tenant_dir(base: &Path, date: NaiveDate, tenant: &str) -> PathBuf {
     base.join(date_dir_name(date)).join(tenant)
 }
@@ -76,30 +77,32 @@ pub struct DateTenantDir {
 /// not the target's, must be a directory); results come in `read_dir`
 /// order — sort when order matters.
 ///
-/// Error policy (strict): the only failures that surface are `read_dir`
-/// calls failing to open `base` or a date directory; they propagate, so
-/// a caller whose correctness depends on seeing every openable
-/// partition — like the seq high-water scan, where a silently short
-/// list could under-seed the counter — gets the full list or an error.
-/// Entry-level misbehavior (an iteration error, a failed type lookup)
-/// is skipped silently in both modes. Callers that prefer a partial
-/// result use [`date_tenant_dirs_lossy`].
+/// Error policy (strict): the only failures that surface are
+/// non-`NotFound` failures of the `read_dir` calls that open `base` or
+/// a date directory; those propagate. Skipped silently in both modes:
+/// a vanished date directory (`NotFound` on open) and entry-level
+/// misbehavior (an iteration error, a failed type lookup) — so even
+/// the strict walk can return a partial list without an error. Callers
+/// that prefer a partial result use [`date_tenant_dirs_lossy`].
 pub fn date_tenant_dirs(base: &Path) -> io::Result<Vec<DateTenantDir>> {
     collect(base, OnErr::Propagate)
 }
 
 /// Like [`date_tenant_dirs`], same structural policy, different error
 /// policy: for recovery-style walks where a partial result beats none,
-/// a `read_dir` that fails to open a directory — `base` or a date dir —
-/// is warned about and skipped, and the readable partitions are still
-/// returned. The lossy consumer is `otel-catalog::Registry::recover`.
+/// a `read_dir` that fails to open a directory with anything but
+/// `NotFound` — `base` or a date dir — is warned about and skipped, a
+/// vanished directory is skipped silently, and the readable partitions
+/// are still returned. The lossy consumer is
+/// `otel-catalog::Registry::recover`.
 pub fn date_tenant_dirs_lossy(base: &Path) -> Vec<DateTenantDir> {
     // Infallible: `WarnSkip` converts every error into a skip.
     collect(base, OnErr::WarnSkip).unwrap_or_default()
 }
 
 /// Error policy for [`collect`]: strict walks propagate a failed
-/// directory open, lossy walks warn about it and skip.
+/// directory open, lossy walks warn about it and skip. `NotFound` never
+/// reaches this choice — both modes skip it silently.
 #[derive(Clone, Copy)]
 enum OnErr {
     Propagate,

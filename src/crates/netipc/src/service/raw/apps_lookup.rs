@@ -1,10 +1,10 @@
 use super::client::{ClientConfig, RawCallKind, RawClient};
 use super::common::lookup_raw_response_size;
-use super::dispatch::{dispatch_error_from_protocol, DispatchHandler};
+use super::dispatch::{DispatchHandler, dispatch_error_from_protocol};
 use crate::protocol::{
-    self, AppsLookupBuilder, AppsLookupRequestView, AppsLookupResponseView, NipcError,
-    APPS_LOOKUP_KEY_SIZE, APPS_LOOKUP_REQ_HDR_SIZE, APPS_LOOKUP_RESP_HDR_SIZE,
-    LOOKUP_DIR_ENTRY_SIZE, METHOD_APPS_LOOKUP, PID_LOOKUP_PAYLOAD_EXCEEDED,
+    self, APPS_LOOKUP_KEY_SIZE, APPS_LOOKUP_REQ_HDR_SIZE, APPS_LOOKUP_RESP_HDR_SIZE,
+    AppsLookupBuilder, AppsLookupRequestView, AppsLookupResponseView, LOOKUP_DIR_ENTRY_SIZE,
+    METHOD_APPS_LOOKUP, NipcError, PID_LOOKUP_PAYLOAD_EXCEEDED,
 };
 use std::sync::Arc;
 

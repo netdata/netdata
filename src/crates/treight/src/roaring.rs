@@ -1,8 +1,7 @@
 //! `RoaringBitmap` interop for [`RawBitmap`]: two thin delegation methods,
 //! behind the optional `roaring` feature (the `#[cfg(feature = "roaring")]`
 //! module gate in `lib.rs`; the dep is the netdata/roaring-rs fork pinned in
-//! `src/crates/Cargo.toml`). Only
-//! sfst enables the feature in the workspace
+//! `src/crates/Cargo.toml`). Only sfst enables the feature in the workspace
 //! (`sfst/Cargo.toml`'s `treight` dependency); the standalone fuzz workspace turns it
 //! on too, so cargo unifies the two roaring copies (`fuzz/Cargo.toml`'s pins).
 //! No wrapper type, no `From`/`Into` impls, no bridge on inverted `Bitmap`.

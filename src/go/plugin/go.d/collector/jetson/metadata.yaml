@@ -1,0 +1,223 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-jetson
+      plugin_name: go.d.plugin
+      module_name: jetson
+      monitored_instance:
+        name: NVIDIA Jetson
+        link: https://www.nvidia.com/en-us/autonomous-machines/embedded-systems/
+        icon_filename: nvidia.svg
+        categories:
+          - data-collection.hardware-and-sensors
+      keywords:
+        - nvidia jetson
+        - jetson
+        - nvidia
+        - tegra
+        - tegrastats
+        - l4t
+        - orin
+        - xavier
+        - thor
+        - emc
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+    overview:
+      data_collection:
+        metrics_description: |
+          Monitor GPU and memory controller activity, power consumption, and SoC temperatures on NVIDIA Jetson devices.
+
+          You get:
+
+          - GPU utilization.
+          - GPU clock frequency, as one value or, on devices that report it, one value per graphics processing cluster (GPC).
+          - External memory controller (EMC) bandwidth utilization and clock frequency. The CPU and GPU share this memory, so high EMC utilization can reveal memory-bandwidth-bound workloads.
+          - Current power consumption for each reported power rail, in watts.
+          - SoC temperatures for `cpu`, `gpu`, `soc0`, `soc1`, `soc2`, and `tj`, in degrees Celsius when reported as single values.
+
+          CPU, memory, and swap usage come from Netdata's standard Linux system monitoring; this collector adds Jetson GPU, EMC, power rail, and SoC temperature readings. Power and temperature readings help correlate workload activity with power consumption and heating. Existing generic sensor monitoring remains available.
+        method_description: |
+          The collector runs NVIDIA's `tegrastats --interval 1000` on the local host and reads the line of readings it prints every second. One `tegrastats` process runs for as long as the job runs. By default, Netdata's restricted `ndsudo` helper runs `/usr/bin/tegrastats` as root to recover readings that may be unavailable to the Netdata service account, including GPU clocks and EMC activity.
+
+          If privileged execution is unavailable before the first producer starts, the collector logs a warning and uses `tegrastats` from Netdata's `PATH` under its service account (usually `netdata`). Set `allow_privileged: false` to use only this unprivileged mode. The selected mode remains in use until the job is recreated.
+
+          It stops only the `tegrastats` process it started; other instances on the host, such as one you run in a terminal, are not affected.
+      supported_platforms:
+        include:
+          - Linux
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: |
+          Privileged collection requires Netdata's installed `ndsudo` helper and NVIDIA's native executable at `/usr/bin/tegrastats`. For this route, the executable and its parent directories must be root-owned, must not be writable by other users, and must not be symlinks. The helper accepts no custom command path or arguments.
+
+          Unprivileged collection requires the Netdata service account to be able to run `tegrastats` from its `PATH`. Readings that your Jetson Linux release shows only to root are then unavailable.
+      default_behavior:
+        auto_detection:
+          description: |
+            The stock configuration runs one job named `localhost`, which looks for `tegrastats` in Netdata's `PATH` or, when `allow_privileged` is enabled, at `/usr/bin/tegrastats`. Detection does not execute the utility; collection starts after detection succeeds.
+            If `tegrastats` is missing when Netdata starts, the job does not start; restart Netdata after making it available.
+        limits:
+          description: |
+            - The readings depend on the Jetson module, the Jetson Linux release, and permissions. For example, `tegrastats` on Jetson Thor can report GPU clocks without GPU utilization. A reading that `tegrastats` does not report leaves a gap; it is never charted as zero.
+            - Rail names and coverage vary by device. Rails can overlap, so adding their values does not give total device power. On Thor, the total-system `VIN` rail may also appear in Netdata's sensors charts.
+            - Power charts use the current reading from supported current/average pairs. Averages and unfamiliar three-value forms are not collected.
+            - Temperature charts retain the six supported source names and fractional values. Once observed, these sensor charts are retained when readings are unavailable, including the documented `-256C` sentinel. Missing readings leave gaps. Other names and multi-value temperature forms are not collected.
+            - If `tegrastats` stops printing readings, the charts show a gap after three seconds instead of repeating the last values.
+        performance_impact:
+          description: |
+            Each job keeps one `tegrastats --interval 1000` process running, plus a supervising helper in privileged mode. Netdata parses one line of its output per second. CPU and memory overhead have not been measured on Jetson hardware.
+            A longer `update_every` reduces how often Netdata stores readings, not how often `tegrastats` samples.
+    setup:
+      prerequisites:
+        list:
+          - title: Make tegrastats available to Netdata
+            description: |
+              The collector needs Netdata installed natively on the Jetson device and the `tegrastats` utility that NVIDIA Jetson Linux (installed with JetPack) provides. Netdata running in a container is not supported.
+
+              To inspect the readings available with the default privileged mode, run:
+
+              ```bash
+              sudo /usr/bin/tegrastats --interval 1000
+              ```
+
+              Each line should contain a `GR3D_FREQ` (GPU), `EMC_FREQ` (memory controller), a power rail reading such as `VDD_GPU 10687mW/9815mW`, or a supported temperature such as `cpu@39.218C`; stop the command with Ctrl+C. Readings missing from this output cannot be collected by this integration. This manual command checks the vendor utility; it does not verify Netdata's packaged helper.
+
+              For unprivileged mode or fallback, compare the output of `sudo -u netdata tegrastats --interval 1000`. GPU clocks and EMC readings may be absent in that output.
+
+              If the command is not found, restore `tegrastats` with NVIDIA's [tegrastats deployment instructions](https://docs.nvidia.com/jetson/archives/r39.2/DeveloperGuide/AT/JetsonLinuxDevelopmentTools/TegrastatsUtility.html#re-deploying-tegrastats). Netdata searches its own `PATH`, which adds `/sbin`, `/usr/sbin`, `/usr/local/bin`, and `/usr/local/sbin` to the `PATH` it starts with. Privileged execution always uses `/usr/bin/tegrastats`; changing `PATH` affects only unprivileged execution. If `tegrastats` is in another directory, set `PATH` in the `[environment variables]` section of `netdata.conf` to a list that includes it, then restart Netdata.
+      configuration:
+        file:
+          name: go.d/jetson.conf
+        options:
+          description: |
+            The options can be set globally or per job. One job covers the whole Jetson device.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection interval, in seconds. `tegrastats` samples once per second regardless; a longer interval charts the latest reading, not an average.
+              default_value: 1
+              required: false
+            - name: allow_privileged
+              description: Allow restricted privileged execution of tegrastats to collect readings that require root, such as GPU clocks and EMC activity.
+              default_value: "yes"
+              required: false
+              detailed_description: |
+                Enabled by default. If the helper or fixed vendor executable is unavailable before the first producer starts, the collector warns once and uses unprivileged collection for the lifetime of that job. Recreate the job or restart Netdata to retry privileged collection after repairing the installation.
+
+                Unsafe executable permissions, helper protocol/setup errors, and failures after privileged startup do not trigger fallback. Set this option to `false` to avoid privileged execution entirely; root-only readings may then be missing.
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: The stock configuration, with one job for the local Jetson device.
+              config: |
+                jobs:
+                  - name: localhost
+    troubleshooting:
+      errors:
+        list:
+          - error: tegrastats executable not found in PATH
+            cause: No executable named `tegrastats` is in Netdata's `PATH`, and the privileged fixed-path candidate is missing or disabled. This is expected on Linux hosts that are not Jetson devices, and when Netdata runs in a container.
+            fix: |
+              On a Jetson device, make `tegrastats` available as described in Prerequisites, then restart Netdata. On other hosts, ignore the message or set `jetson: no` in the `modules` section of `go.d.conf`.
+          - error: "start tegrastats: `error`"
+            cause: Netdata could not acquire or start its `tegrastats` producer.
+            fix: Read the error text. Repair or reinstall Netdata if a packaged helper is missing or incompatible. For unsafe vendor executable errors, restore the native NVIDIA installation and its permissions; these failures do not trigger fallback.
+          - error: "restricted privileged tegrastats unavailable (`error`); selected unprivileged collection; GPU clocks and EMC readings may be missing"
+            cause: The initial privileged attempt could not start a producer, so the job selected unprivileged collection. GPU clocks and EMC readings may be missing.
+            fix: |
+              Restore the packaged Netdata helper and native NVIDIA utility, then recreate the job or restart Netdata to retry privileged collection. Set `allow_privileged: false` if unprivileged collection is intentional.
+          - error: previous acquisition still owns this job
+            cause: An earlier producer for the same job has not completed verified cleanup. Replacement collection is blocked even when privileged execution is disabled.
+            fix: Inspect the collector log and the earlier producer. Collection can resume after verified cleanup. Changing the job name bypasses the shared ownership check and can create a second producer; do not use a rename to work around this error.
+          - error: "tegrastats source unavailable: `error`"
+            cause: The running `tegrastats` exited or stopped printing readings. Netdata retries with a delay of up to 30 seconds; replacement remains blocked while earlier cleanup is incomplete.
+            fix: |
+              Run the check in Prerequisites and compare its output with the error text. `tegrastats exited: exit status N` means the utility failed; `tegrastats stopped producing records` means it kept running without printing complete lines.
+          - error: no fresh tegrastats sample
+            cause: Netdata has not received a complete `tegrastats` line in the last three seconds, usually because `tegrastats` is starting, has stopped, or is being restarted.
+            fix: If the error persists, look for `tegrastats source unavailable` messages in the collector log (see Diagnostics) and run the check in Prerequisites.
+          - error: tegrastats sample contains no supported GPU, EMC, power or temperature readings
+            cause: The latest `tegrastats` line has no valid `GR3D_FREQ` (GPU), `EMC_FREQ` (memory controller), supported power rail reading, or supported scalar temperature. Which readings `tegrastats` prints depends on the Jetson module, the Jetson Linux release, and the account that runs it.
+            fix: Run the check in Prerequisites. If its output has no supported GPU, memory controller, power rail, or temperature readings, this collector has nothing to chart on this device.
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: |
+        Charts show only readings present in the latest `tegrastats` line. A missing or invalid reading leaves a gap; a reported zero is charted as zero.
+      availability: []
+      scopes:
+        - name: global
+          description: The Jetson device's integrated GPU and external memory controller (EMC).
+          labels: []
+          metrics:
+            - name: jetson.gpu_utilization
+              description: GPU Utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: utilization
+            - name: jetson.gpu_frequency
+              description: GPU Frequency
+              unit: MHz
+              chart_type: line
+              dimensions:
+                - name: frequency
+            - name: jetson.emc_utilization
+              description: Memory Controller Bandwidth Utilization at Current Frequency
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: utilization
+            - name: jetson.emc_frequency
+              description: Memory Controller Frequency
+              unit: MHz
+              chart_type: line
+              dimensions:
+                - name: frequency
+        - name: GPU graphics processing cluster
+          description: One graphics processing cluster (GPC) of the GPU, present when `tegrastats` reports a clock for each GPC.
+          labels:
+            - name: gpc
+              description: Position of the cluster in the `tegrastats` GPU clock list, starting at 0.
+          metrics:
+            - name: jetson.gpu_gpc_frequency
+              description: GPU Graphics Processing Cluster Frequency
+              unit: MHz
+              chart_type: line
+              dimensions:
+                - name: frequency
+        - name: power rail
+          description: One power rail reported by `tegrastats` with a valid current/average milliwatt pair.
+          labels:
+            - name: rail
+              description: NVIDIA's power rail name, such as VDD_GPU, VDD_CPU_CV, or VIN; a rail can supply several components.
+          metrics:
+            - name: jetson.power_rail_power
+              description: Power Rail Consumption
+              unit: Watts
+              chart_type: line
+              dimensions:
+                - name: power
+        - name: temperature sensor
+          description: One of the supported SoC sensors with a valid scalar Celsius reading in the latest tegrastats record.
+          labels:
+            - name: sensor
+              description: Source sensor name, preserved as cpu, gpu, soc0, soc1, soc2, or tj.
+          metrics:
+            - name: jetson.sensor_temperature
+              description: SoC Temperature
+              unit: Celsius
+              chart_type: line
+              dimensions:
+                - name: temperature

@@ -1,11 +1,14 @@
-//! The OTLP logs ingestion service: the gRPC `LogsService` implementation that
-//! receives `ExportLogsServiceRequest`s and lands them in per-tenant WALs.
+//! The OTLP logs ingestion service: receives `ExportLogsServiceRequest`s
+//! and lands them in per-tenant WALs. The logic is transport-agnostic — it
+//! lives on the [`NetdataLogsService::export_logs`] core, which both the
+//! gRPC `LogsService` wrapper and the OTLP/HTTP front end call.
 //!
-//! `export` flow: resolve the tenant (`x-scope-orgid` header) → group
-//! `ResourceLogs` by [`ServiceStream`] identity → drop identities too large
+//! Export flow: the transport wrapper resolves the tenant (`x-scope-orgid`
+//! header) and calls the core, which groups
+//! `ResourceLogs` by `ServiceStream` identity → drop identities too large
 //! for the substrate's `content_meta` caps → reject streams whose `ns_hash`
 //! is already claimed by a different identity (first write wins, per tenant)
-//! → prepare flattened frames lock-free via [`ng_flatten::prepare_log_frame`]
+//! → prepare flattened frames lock-free via `ng_flatten::prepare_log_frame`
 //! (normalization + flattening + the ingestion time-window; `Some(bounds)`
 //! here — production enforces the window, `ng-ingest` and the benches pass
 //! `None`) → under the tenant's writer lock: write frames, one `sync_all`,
@@ -43,8 +46,8 @@ use crate::tenant::extract_tenant_id;
 ///
 /// An absent attribute and an empty-string attribute collapse to the same
 /// empty-string field — they identify the same stream (see
-/// [`ServiceStream::ns_hash`]). The `ns_hash` is derived from the returned
-/// [`ServiceStream`] at the point it is needed, not stored alongside it.
+/// `ServiceStream::ns_hash`). The `ns_hash` is derived from the returned
+/// `ServiceStream` at the point it is needed, not stored alongside it.
 fn extract_stream(rl: &ResourceLogs) -> ServiceStream {
     let attrs = match rl.resource.as_ref() {
         Some(r) => &r.attributes,
@@ -92,14 +95,14 @@ struct Collision {
     rejected_log_records: usize,
 }
 
-/// One group of `ResourceLogs` that share an exact [`ServiceStream`]. The
+/// One group of `ResourceLogs` that share an exact `ServiceStream`. The
 /// identifying stream lives in the `HashMap` key in [`group_by_stream`].
 struct StreamGroup {
     log_record_count: usize,
     resource_logs: Vec<ResourceLogs>,
 }
 
-/// Group `ResourceLogs` by their [`ServiceStream`] identity. A `ResourceLogs`
+/// Group `ResourceLogs` by their `ServiceStream` identity. A `ResourceLogs`
 /// carrying zero log records contributes nothing (no group, no identity
 /// registration) — this is the single owner of the emptiness rule, so a
 /// request of only-empty `ResourceLogs` yields an empty map.
@@ -161,9 +164,9 @@ struct CollisionCheck {
 /// - If the entry mismatches, reject as a collision and record it for the
 ///   response's `partial_success`.
 ///
-/// Pure with respect to the I/O of the gRPC handler — the only side
-/// effect is mutating the canonical table. Extracted from `export` so it
-/// can be unit-tested without spinning up a writer or a tonic Request.
+/// Pure with respect to the I/O of the export path — the only side effect
+/// is mutating the canonical table. Extracted from `export_logs` so it can
+/// be unit-tested without spinning up a writer or a request.
 fn check_collisions(
     canonical: &mut HashMap<(TenantId, u64), ServiceStream>,
     tenant_id: &TenantId,
@@ -329,9 +332,11 @@ fn identity_preview(s: &str) -> String {
     s.chars().take(IDENTITY_LOG_PREVIEW_CHARS).collect()
 }
 
-/// gRPC sink for OTLP log exports: polices per-tenant stream identities,
-/// appends flattened frames to per-tenant WALs, and forwards lifecycle events
-/// to the ledger. See the module docs for the request flow.
+/// Transport-agnostic sink for OTLP log exports: polices per-tenant stream
+/// identities, appends flattened frames to per-tenant WALs, and forwards
+/// lifecycle events to the ledger. The gRPC path reaches it via the thin
+/// `LogsService` wrapper; the OTLP/HTTP front end calls the same core. See
+/// the module docs for the request flow.
 pub struct NetdataLogsService {
     /// Per-tenant WAL writers. The map mutex is held only for lookup/insert
     /// (a tenant's first request creates its writer under it); each request
@@ -339,7 +344,7 @@ pub struct NetdataLogsService {
     /// region, so tenants ingest in parallel and same-tenant requests overlap
     /// everything before that region.
     writers: Mutex<HashMap<TenantId, Arc<Mutex<wal::Writer>>>>,
-    /// Canonical [`ServiceStream`] per `(tenant, ns_hash)`. First write
+    /// Canonical `ServiceStream` per `(tenant, ns_hash)`. First write
     /// wins; subsequent writes whose stream doesn't match are rejected via
     /// `partial_success`. In-memory only — on restart the table is empty and
     /// the first write of a tenant's stream re-establishes the canonical
@@ -357,7 +362,7 @@ pub struct NetdataLogsService {
     sender: Arc<LedgerSender>,
     wal_base_dir: PathBuf,
     wal_config: bridge::config::WalConfig,
-    /// Global ingestion time-bounds (P3): reject records whose resolved
+    /// Global ingestion time-bounds: reject records whose resolved
     /// timestamp is older than `max_age` or more than `future_skew` ahead.
     /// Applied per record inside `prepare_log_frame`.
     ingest_bounds: bridge::config::IngestConfig,
@@ -412,9 +417,12 @@ impl NetdataLogsService {
 
     /// The default (non-overridden) WAL rotation `max_duration` — the value the
     /// idle-rotation sweep enforces for most streams. Used at startup to warn
-    /// when it is below the sweep granularity.
+    /// when it is at or below the sweep interval.
     pub fn default_max_file_duration(&self) -> std::time::Duration {
-        self.wal_config.rotation.resolve("default").max_file_duration
+        self.wal_config
+            .rotation
+            .resolve("default")
+            .max_file_duration
     }
 
     /// The resolved ingestion `future_skew`. Used at startup to warn when it is
@@ -430,7 +438,7 @@ impl NetdataLogsService {
     }
 
     /// Rotate any per-tenant WAL stream whose active file has passed a rotation
-    /// threshold as of now, without a new frame (the idle-rotation sweep, I2/P4).
+    /// threshold as of now, without a new frame (the idle-rotation sweep).
     /// Called periodically off the write path so a quiet stream still seals,
     /// gets indexed, and (with remote storage) uploaded.
     ///
@@ -536,24 +544,28 @@ fn encode_identity_or_drop(
     Ok(content_meta)
 }
 
-#[tonic::async_trait]
-impl LogsService for NetdataLogsService {
-    #[tracing::instrument(skip_all)]
-    async fn export(
+impl NetdataLogsService {
+    /// The transport-agnostic OTLP logs export core: everything between
+    /// "tenant resolved, request decoded" and the response. The gRPC
+    /// `LogsService::export` wrapper resolves the tenant from tonic
+    /// metadata and calls this; the OTLP/HTTP front end resolves the tenant
+    /// from HTTP headers and calls the same code — one behavior for both
+    /// transports. The caller owns transport concerns (metadata/headers,
+    /// request decoding, response framing); this core owns every rejection,
+    /// ordering, and durability decision.
+    pub(crate) async fn export_logs(
         &self,
-        request: Request<ExportLogsServiceRequest>,
-    ) -> Result<Response<ExportLogsServiceResponse>, Status> {
-        let tenant_id = extract_tenant_id(request.metadata(), &self.auth)?;
-        let req = request.into_inner();
-
+        tenant_id: &TenantId,
+        request: ExportLogsServiceRequest,
+    ) -> Result<ExportLogsServiceResponse, Status> {
         // Empty `ResourceLogs` contribute nothing (group_by_stream owns that
         // rule), so an all-empty request yields no groups.
-        let groups = group_by_stream(req.resource_logs);
+        let groups = group_by_stream(request.resource_logs);
 
         if groups.is_empty() {
-            return Ok(Response::new(ExportLogsServiceResponse {
+            return Ok(ExportLogsServiceResponse {
                 partial_success: None,
-            }));
+            });
         }
 
         // Validate identity encodability BEFORE the collision check mutates the
@@ -581,13 +593,12 @@ impl LogsService for NetdataLogsService {
             })
             .collect();
 
-        // Run the collision check only over storable streams.
         let CollisionCheck {
             accepted,
             collisions,
         } = {
             let mut canonical = self.canonical.lock().unwrap();
-            check_collisions(&mut canonical, &tenant_id, storable)
+            check_collisions(&mut canonical, tenant_id, storable)
         };
 
         for c in &collisions {
@@ -603,17 +614,17 @@ impl LogsService for NetdataLogsService {
         // collision, or every group was dropped as oversized). Still report the
         // rejected records — collisions and oversized drops — to the client.
         if accepted.is_empty() {
-            return Ok(Response::new(ExportLogsServiceResponse {
+            return Ok(ExportLogsServiceResponse {
                 partial_success: build_partial_success(&collisions, &oversized, 0),
-            }));
+            });
         }
 
         // Phase 1 — prepare every frame WITHOUT holding any writer lock:
         // `prepare_log_frame` consumes an owned request and needs nothing
         // shared, so concurrent exports overlap all of this CPU work. The
         // single clock tick below is both the base for synthesized fallback
-        // timestamps and the reference "now" for the ingestion time-bounds
-        // (P3); reading it once per request gives every stream group the same
+        // timestamps and the reference "now" for the ingestion time-bounds;
+        // reading it once per request gives every stream group the same
         // window and the same fallback base. The frame header's `ingestion_ns`
         // is ticked separately at write time, inside the writer lock, so it
         // stays monotonic per file. A prepare error aborts the request before
@@ -621,8 +632,9 @@ impl LogsService for NetdataLogsService {
         let fallback_base_ns = self.clock.lock().unwrap().now_ns().as_u64();
         // Inclusive window [now - max_age, now + future_skew] on the RESOLVED
         // per-record timestamp. Loop-invariant (one base per request), so it is
-        // built once. Synthesized (now-based) fallbacks land inside by
-        // construction, so timestamp-less records are never rejected.
+        // built once. `prepare_log_frame` exempts synthesized (now-based)
+        // fallbacks from the window entirely, so timestamp-less records are
+        // never rejected, whatever `future_skew` is.
         let bounds = ng_flatten::TimeBounds {
             min_ns: fallback_base_ns.saturating_sub(self.ingest_bounds.max_age_ns()),
             max_ns: fallback_base_ns.saturating_add(self.ingest_bounds.future_skew_ns()),
@@ -664,20 +676,19 @@ impl LogsService for NetdataLogsService {
         // Every accepted stream was fully rejected as out-of-window: nothing to
         // write, but still report the rejected records to the client.
         if prepared.is_empty() {
-            return Ok(Response::new(ExportLogsServiceResponse {
+            return Ok(ExportLogsServiceResponse {
                 partial_success: build_partial_success(&collisions, &oversized, out_of_window),
-            }));
+            });
         }
 
         // Phase 2 — the serialized region, under THIS TENANT's writer lock
         // only: frame writes, one durability sync (the ack is only returned
         // after `sync_all` succeeds, so a 200 implies the frames are on
-        // disk), event drain. The writer-map lock above is held just for
-        // lookup/insert (a tenant's first request creates its writer under
-        // it). All sync code — no `.await` while a guard is held.
+        // disk), event drain. All sync code — no `.await` while a guard is
+        // held.
         let writer = {
             let mut writers = self.writers.lock().unwrap();
-            if let Some(w) = writers.get(&tenant_id) {
+            if let Some(w) = writers.get(tenant_id) {
                 Arc::clone(w)
             } else {
                 let path = self.wal_base_dir.join(tenant_id.as_str());
@@ -744,12 +755,30 @@ impl LogsService for NetdataLogsService {
             // is synchronous and non-blocking (unbounded channel), so no
             // `.await` is held under the lock.
             let events = writer.take_all_events();
-            self.sender.send_events(tenant_id, events);
+            // `send_events` takes the tenant by value and the core only
+            // borrows it, so clone here — the last use of the id in this
+            // request either way.
+            self.sender.send_events(tenant_id.clone(), events);
         }
 
-        Ok(Response::new(ExportLogsServiceResponse {
+        Ok(ExportLogsServiceResponse {
             partial_success: build_partial_success(&collisions, &oversized, out_of_window),
-        }))
+        })
+    }
+}
+
+#[tonic::async_trait]
+impl LogsService for NetdataLogsService {
+    /// gRPC entry point: resolve the tenant from request metadata, then run
+    /// the transport-agnostic core both front ends share.
+    #[tracing::instrument(skip_all)]
+    async fn export(
+        &self,
+        request: Request<ExportLogsServiceRequest>,
+    ) -> Result<Response<ExportLogsServiceResponse>, Status> {
+        let tenant_id = extract_tenant_id(request.metadata(), &self.auth)?;
+        let response = self.export_logs(&tenant_id, request.into_inner()).await?;
+        Ok(Response::new(response))
     }
 }
 
@@ -769,6 +798,7 @@ mod tests {
                 value: Some(AnyValue {
                     value: Some(Value::StringValue(ns.to_string())),
                 }),
+                key_strindex: 0,
             });
         }
         if let Some(n) = name {
@@ -777,6 +807,7 @@ mod tests {
                 value: Some(AnyValue {
                     value: Some(Value::StringValue(n.to_string())),
                 }),
+                key_strindex: 0,
             });
         }
         ResourceLogs {
@@ -979,7 +1010,7 @@ mod tests {
     /// `LedgerSender` points at a path that intentionally won't accept a
     /// connection — `send_events` is fire-and-forget over an internal
     /// channel, so the unconnected sender doesn't block the service. The
-    /// background reconnect task gets dropped at end of test along with
+    /// background connect-retry task gets dropped at end of test along with
     /// the tokio runtime.
     fn test_service(wal_dir: std::path::PathBuf) -> NetdataLogsService {
         // Existing tests use arbitrary fixed timestamps and do not exercise the
@@ -1159,7 +1190,10 @@ mod tests {
             .expect("a Closed event must reach the ledger");
 
         assert_eq!(entry_count, 1, "Closed carries the record count");
-        assert!(valid_up_to.0 > 0, "Closed carries a non-zero durable prefix");
+        assert!(
+            valid_up_to.0 > 0,
+            "Closed carries a non-zero durable prefix"
+        );
 
         let _ = std::fs::remove_file(&socket);
     }

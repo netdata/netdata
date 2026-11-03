@@ -29,7 +29,7 @@
 //! the stream never loses sync.
 //!
 //! Payload blocks are framed by the line layer
-//! (`line_parser::parse_payload_block`): one data command carries a block's
+//! (`LineParser::parse_payload_block`): one data command carries a block's
 //! entire payload and the END marker is consumed by the line layer itself.
 //! Payload-mode calls and results therefore complete at different points; see
 //! `process_command`.
@@ -140,9 +140,9 @@ impl MessageParser {
     ///
     /// Single-line commands (FUNCTION, FUNCTION_CANCEL, FUNCTION_PROGRESS,
     /// QUIT) complete immediately. Payload blocks differ because of the line
-    /// layer's framing: the whole block arrives as one data command with its
-    /// END marker already consumed, so a payload-mode `FunctionCall` is
-    /// returned together with its data. A `FunctionResult` built from a
+    /// layer's framing: the whole payload arrives as one data command with the
+    /// END marker already consumed by the line layer, so a payload-mode
+    /// `FunctionCall` is returned together with its data. A `FunctionResult` built from a
     /// well-formed FUNCTION_RESULT_BEGIN..FUNCTION_RESULT_END block, in
     /// contrast, is never completed by the block itself — no
     /// `FunctionResultEnd` command exists on that path — so the assembled
@@ -172,7 +172,7 @@ impl MessageParser {
             }
 
             Command::FunctionPayloadData { data } => {
-                // The line layer delivers a whole payload block as this one
+                // The line layer delivers a whole block's payload as this one
                 // command (its END marker is consumed there), so the held call
                 // is complete and is returned now.
                 if let Some(Message::FunctionCall(func_call)) = &mut self.current_message {
@@ -398,8 +398,8 @@ impl MessageParser {
     }
 
     /// Parse a progress request sent by the agent:
-    /// `FUNCTION_PROGRESS transaction`. Asks the plugin to re-report progress
-    /// for that transaction; the plugin answers with a progress report.
+    /// `FUNCTION_PROGRESS transaction`. A nudge asking the plugin to report
+    /// progress for that transaction.
     fn parse_function_progress_request(&self, args: &[u8]) -> Option<Message> {
         let mut words = WordIterator::new(args);
 

@@ -10,11 +10,12 @@ pub(crate) struct PrefixMapEntry<T> {
 /// IP prefix map optimized for longest-prefix-match lookups.
 ///
 /// Entries are separated by address family (IPv4 vs IPv6) and sorted by prefix length
-/// descending. Lookup returns the first match, which is the longest prefix match.
-/// This avoids scanning entries of the wrong address family and terminates early.
+/// descending. `lookup()` resolves matches through the trie index built by `finalize()`,
+/// so it never scans the entry vectors.
 #[derive(Clone)]
 pub(crate) struct PrefixMap<T> {
-    // Sorted by prefix_len descending after finalize() for longest-match-first.
+    // Sorted by prefix_len descending after finalize(); matching_entries_ascending()
+    // relies on this order for its output sequence.
     pub(crate) v4_entries: Vec<PrefixMapEntry<T>>,
     pub(crate) v6_entries: Vec<PrefixMapEntry<T>>,
     lookup_index: IpnetTrie<PrefixLookupRef>,
@@ -55,7 +56,9 @@ impl<T> PrefixMap<T> {
         }
     }
 
-    /// Sort entries by prefix length descending. Must be called after all inserts.
+    /// Sort entries by prefix length descending and rebuild the trie lookup index.
+    /// `lookup()` is empty before the first call; an `insert()` after a finalize is
+/// invisible to it (earlier matches still resolve) until this runs again.
     pub(crate) fn finalize(&mut self) {
         self.v4_entries
             .sort_by(|a, b| b.prefix.prefix_len().cmp(&a.prefix.prefix_len()));

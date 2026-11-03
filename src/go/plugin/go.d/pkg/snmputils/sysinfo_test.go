@@ -5,6 +5,7 @@ package snmputils
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -44,6 +45,45 @@ func TestGetSysInfoRecordsProbeDiagnostics(t *testing.T) {
 		SeenSysName:     true,
 		SeenSysLocation: true,
 	}, si.Probe)
+}
+
+func TestGetSysInfoNormalizesMetadata(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	client := snmpmock.NewMockHandler(ctrl)
+	client.EXPECT().MaxOids().Return(len(sysInfoOIDs()))
+	client.EXPECT().Version().Return(gosnmp.Version2c)
+	const input = "device\u0085a\u2028b\u2029c\x1fd\x7fe\x00'\"`\\"
+	var pdus []gosnmp.SnmpPDU
+	for _, oid := range []string{OidSysDescr, OidSysContact, OidSysName, OidSysLocation} {
+		pdus = append(pdus, gosnmp.SnmpPDU{
+			Name:  oid,
+			Type:  gosnmp.OctetString,
+			Value: []byte(input),
+		})
+	}
+	client.EXPECT().Get(sysInfoOIDs()).Return(testSysInfoResponse(pdus), nil)
+	si, err := GetSysInfo(client)
+	require.NoError(t, err)
+	for name, value := range map[string]string{"description": si.Descr, "contact": si.Contact, "name": si.Name, "location": si.Location} {
+		t.Run(name, func(t *testing.T) { assert.Equal(t, "device a b c d e", value) })
+	}
+}
+
+func TestSanitizeMetadata(t *testing.T) {
+	for _, bounds := range [][2]rune{{1, 0x1f}, {0x7f, 0x9f}, {0x2028, 0x2029}} {
+		for r := bounds[0]; r <= bounds[1]; r++ {
+			t.Run(fmt.Sprintf("U+%04X", r), func(t *testing.T) {
+				assert.Equal(t, "left right", sanitizeMetadata("left"+string(r)+"right"))
+			})
+		}
+	}
+	for name, test := range map[string]struct{ input, want string }{
+		"legacy removals":  {input: "a'\"`\\\x00b", want: "ab"},
+		"ordinary Unicode": {input: "router-é 路由器: west #1", want: "router-é 路由器: west #1"},
+		"empty":            {input: "", want: ""},
+	} {
+		t.Run(name, func(t *testing.T) { assert.Equal(t, test.want, sanitizeMetadata(test.input)) })
+	}
 }
 
 func TestGetSysInfoChunksRequestsByMaxOids(t *testing.T) {

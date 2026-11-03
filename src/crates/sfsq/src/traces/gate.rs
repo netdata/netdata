@@ -308,13 +308,17 @@ impl<'r, 'a, 'e> TraceGate<'r, 'a, 'e> {
         // stays freely borrowable without cloning the list per pop.
         // Withheld claims hide real unset-parent spans of unknown
         // value — all-claims-fail is unprovable, so the rule is skipped.
-        let positive_conditions = if any_withheld { 0 } else { self.root_conditions.len() };
+        let positive_conditions = if any_withheld {
+            0
+        } else {
+            self.root_conditions.len()
+        };
         'condition: for ci in 0..positive_conditions {
             let (field, matcher) = self.root_conditions[ci];
             let mut claiming = 0usize;
             for &RowEvidence { file, row, claim } in &rows {
                 if self.files[file].failed {
-                    continue; // failed mid-check while testing this candidate
+                    continue; // defensive: never read evidence from a failed file
                 }
                 let RollupState::Ready(rollup) = &self.files[file].rollup else {
                     unreachable!("evidence rows come from Ready rollups")
@@ -344,8 +348,9 @@ impl<'r, 'a, 'e> TraceGate<'r, 'a, 'e> {
             }
             if claiming > 0 {
                 // Every claiming row failed the condition. (No claim at
-                // all would mean the assembled root may be an orphan
-                // promotion the rollup never records — unprunable.)
+                // all is an evidence gap, never a proven non-match: zero
+                // evidence proves nothing, and the corruption-onset
+                // candidate reaches exactly this state.)
                 self.stats.prunes += 1;
                 return GateDecision::Prune;
             }
@@ -361,8 +366,7 @@ impl<'r, 'a, 'e> TraceGate<'r, 'a, 'e> {
                 let RollupState::Ready(rollup) = &self.files[file].rollup else {
                     unreachable!("evidence rows come from Ready rollups")
                 };
-                let (min_start, max_end) =
-                    (rollup.min_start_ns[row], rollup.max_end_ns[row]);
+                let (min_start, max_end) = (rollup.min_start_ns[row], rollup.max_end_ns[row]);
                 envelope = Some(match envelope {
                     None => (min_start, max_end),
                     Some((lo, hi)) => (lo.min(min_start), hi.max(max_end)),
@@ -422,9 +426,7 @@ impl<'r, 'a, 'e> TraceGate<'r, 'a, 'e> {
                 match reader.trace_id_bloom() {
                     Ok(bloom) => BloomState::Ready(bloom),
                     Err(e) => {
-                        tracing::warn!(
-                            "sfsq traces gate: trace-id bloom failed to decode: {e}"
-                        );
+                        tracing::warn!("sfsq traces gate: trace-id bloom failed to decode: {e}");
                         self.mark_failed(idx);
                         return false;
                     }
@@ -452,9 +454,7 @@ impl<'r, 'a, 'e> TraceGate<'r, 'a, 'e> {
                 match reader.trace_rollup() {
                     Ok(rollup) => RollupState::Ready(Box::new(rollup)),
                     Err(e) => {
-                        tracing::warn!(
-                            "sfsq traces gate: trace rollup failed to decode: {e}"
-                        );
+                        tracing::warn!("sfsq traces gate: trace rollup failed to decode: {e}");
                         self.mark_failed(idx);
                         return RollupProbe::Failed;
                     }

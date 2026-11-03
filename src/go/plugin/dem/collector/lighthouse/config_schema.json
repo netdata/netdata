@@ -1,0 +1,73 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Lighthouse collector configuration.",
+    "type": "object",
+    "properties": {
+      "name": {
+        "title": "Name",
+        "description": "Native job name used to identify this monitor and its history. Renaming creates a separate monitor.",
+        "type": "string",
+        "minLength": 1
+      },
+      "url": {
+        "title": "URL",
+        "description": "Absolute HTTP or HTTPS URL of the page to audit. Embedded credentials are not accepted.",
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^[Hh][Tt][Tt][Pp][Ss]?://[^\\s/:@?#][^\\s/@?#]*(?:[/?#][^\\r\\n]*)?$"
+      },
+      "save_report": {
+        "title": "Save HTML report",
+        "description": "Save the full Lighthouse HTML report. Reports can contain sensitive URLs and page content.",
+        "type": "boolean",
+        "default": false
+      },
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1800
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Browser attempt timeout, in seconds. Waiting for another browser attempt is excluded.",
+        "type": "number",
+        "default": 180,
+        "minimum": 0.001
+      }
+    },
+    "required": [
+      "name",
+      "url"
+    ]
+  },
+  "uiSchema": {
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Target",
+          "fields": [
+            "name",
+            "url"
+          ]
+        },
+        {
+          "title": "Diagnosis",
+          "fields": [
+            "save_report"
+          ]
+        },
+        {
+          "title": "Collection",
+          "fields": [
+            "update_every",
+            "timeout"
+          ]
+        }
+      ]
+    }
+  }
+}

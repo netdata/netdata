@@ -68,6 +68,7 @@ struct spawn_instance {
     int read_fd;        // the child's output pipe, reading side
     int stderr_fd;
     pid_t child_pid;
+    bool process_group;
 
 #if defined(SPAWN_SERVER_VERSION_UV)
     uv_process_t process;

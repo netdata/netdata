@@ -44,9 +44,13 @@ static void rrddim_reinitialize_collection(RRDDIM *rd) {
     RRDSET *st = rd->rrdset;
 
     for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
+        // published under the same lock that finalizes it (rrddim_free), so a reader holding the tier
+        // spinlock (storage_engine_store_page_time_to_close_s() callers) sees either NULL or a live handle
+        spinlock_lock(&rd->tiers[tier].spinlock);
         if (!rd->tiers[tier].sch)
             rd->tiers[tier].sch =
                 storage_metric_store_init(rd->tiers[tier].seb, rd->tiers[tier].smh, st->rrdhost->db[tier].tier_grouping * st->update_every, rd->rrdset->smg[tier]);
+        spinlock_unlock(&rd->tiers[tier].spinlock);
     }
 }
 
@@ -538,6 +542,13 @@ RRDDIM *rrddim_add_custom(RRDSET *st
     RRD_DB_MODE memory_mode
                           ) {
 
+    // The dimension index refuses an insert without a name, so the loop below
+    // would report it as index destruction. Name the real fault instead, as
+    // rrdset_create_custom() does for a chart without an id.
+    if(unlikely(!id || !*id))
+        fatal("RRDDIM: cannot add a dimension without an id to chart '%s' on host '%s' (name '%s').",
+              rrdset_id(st), rrdhost_hostname(st->rrdhost), (name && *name) ? name : "<unset>");
+
     RRDDIM *rd = NULL;
     while(!rd) {
         const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(st->rrddim_root_index, id);
@@ -569,7 +580,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st
         rd = dictionary_set_advanced(st->rrddim_root_index, tmp.id, -1, NULL, rrddim_size(), &tmp);
 
         if(unlikely(!rd))
-            // The index refused the insert, which only happens once
+            // With a valid id, the index refuses the insert only once
             // rrddim_index_destroy() has destroyed it - and that runs from
             // rrdset_free(), i.e. this chart is already being freed. Retrying
             // can never succeed: the loop above would spin at 100% CPU forever

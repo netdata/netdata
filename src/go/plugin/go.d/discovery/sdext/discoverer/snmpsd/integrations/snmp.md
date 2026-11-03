@@ -268,16 +268,16 @@ services:
 
 ## Service Rules
 
-A `services:` rule turns each discovered SNMP device into one or more `snmp` collector jobs. Each rule has an `id`, a Go-template `match` expression that decides whether the rule applies to the device, and an optional `config_template` that renders the collector job YAML when the rule matches.
+A `services:` rule turns each discovered SNMP device into one or more `snmp` collector jobs. Each rule has an `id`, a Go-template `match` expression that decides whether the rule applies to the device, and an optional `config_template` that creates collector jobs when the rule matches.
 
 The default rule shipped with Netdata (`{{ true }}`) creates one job per discovered device and handles both SNMPv2 and SNMPv3 — most users never change it. Customise rules when you want vendor-specific configs (Cisco vs. Juniper, printers vs. routers), per-VLAN overrides, or multiple jobs per device.
 
-The shared rule model — function reference (sprig + Netdata helpers `match`, `glob`, `promPort`, `toYaml`), `config_template` rendering rules, and the strict-missing-key error semantics — lives on the [Service Discovery](https://github.com/netdata/netdata/blob/master/src/collectors/SERVICE-DISCOVERY.md) hub page. The notes below are SNMP-specific.
+The shared rule model — function reference (sprig + Netdata helpers `match`, `glob`, `promPort`, `job`), `config_template` rendering rules, and the strict-missing-key error semantics — lives on the [Service Discovery](https://github.com/netdata/netdata/blob/master/src/collectors/SERVICE-DISCOVERY.md) hub page. The notes below are SNMP-specific.
 
 
 ### How rules are evaluated
 
-Quick reference — see [Rule evaluation semantics](https://github.com/netdata/netdata/blob/master/src/collectors/SERVICE-DISCOVERY.md#rule-evaluation-semantics) on the hub page for the full model (sequence-output multi-job rendering, module inference from `id`, `missingkey=error`, ordering recommendations).
+Quick reference — see [Rule evaluation semantics](https://github.com/netdata/netdata/blob/master/src/collectors/SERVICE-DISCOVERY.md#rule-evaluation-semantics) on the hub page for the full model (multiple `job` calls, module inference from `id`, `missingkey=error`, ordering recommendations).
 
 
 
@@ -287,7 +287,7 @@ Quick reference — see [Rule evaluation semantics](https://github.com/netdata/n
 
 ### Template Variables
 
-Available inside both `match` expressions and `config_template` bodies. All variables are strings; empty values render as the empty string.
+Available inside both `match` expressions and `config_template` bodies. All variables are strings. System description, contact, name, location, and organization are normalized to single-line text without control characters. Use the `job` helper to create collector jobs with automatic encoding, as shown below; normalization alone does not make raw YAML interpolation safe.
 
 
 
@@ -325,25 +325,27 @@ Generate one `snmp` collector job per discovered device. This is the rule produc
 - id: snmp
   match: '{{ true }}'
   config_template: |
-    {{- if .SysInfo.Name }}
-    name: {{ .SysInfo.Name }}-ip-{{ .IPAddress }}
-    {{- else }}
-    name: ip-{{ .IPAddress }}
-    {{- end }}
-    hostname: {{ .IPAddress }}
-    options:
-      version: {{ .Credential.Version }}
-    {{- if eq .Credential.Version "1" "2" "2c" }}
-    community: {{ .Credential.Community }}
-    {{- else }}
-    user:
-      name: {{ .Credential.UserName }}
-      level: {{ .Credential.SecurityLevel }}
-      auth_proto: {{ .Credential.AuthProtocol }}
-      auth_key: {{ .Credential.AuthPassphrase }}
-      priv_proto: {{ .Credential.PrivacyProtocol }}
-      priv_key: {{ .Credential.PrivacyPassphrase }}
-    {{- end }}
+    {{ $job := dict
+      "name" (printf "ip-%s" .IPAddress)
+      "hostname" .IPAddress
+      "options" (dict "version" .Credential.Version)
+    }}
+    {{ if .SysInfo.Name }}
+    {{ $_ := set $job "name" (printf "%s-ip-%s" .SysInfo.Name .IPAddress) }}
+    {{ end }}
+    {{ if eq .Credential.Version "1" "2" "2c" }}
+    {{ $_ := set $job "community" .Credential.Community }}
+    {{ else }}
+    {{ $_ := set $job "user" (dict
+      "name" .Credential.UserName
+      "level" .Credential.SecurityLevel
+      "auth_proto" .Credential.AuthProtocol
+      "auth_key" .Credential.AuthPassphrase
+      "priv_proto" .Credential.PrivacyProtocol
+      "priv_key" .Credential.PrivacyPassphrase
+    ) }}
+    {{ end }}
+    {{ job $job }}
 
 ```
 
@@ -375,22 +377,20 @@ Apply a Cisco-specific config to devices whose vendor matches `Cisco*`, then pre
 - id: cisco
   match: '{{ glob .SysInfo.Vendor "Cisco*" }}'
   config_template: |
-    module: snmp
-    name: cisco-{{ .SysInfo.Name }}-{{ .IPAddress }}
-    hostname: {{ .IPAddress }}
-    options:
-      version: {{ .Credential.Version }}
-    {{- if eq .Credential.Version "1" "2" "2c" }}
-    community: {{ .Credential.Community }}
-    {{- else }}
-    user:
-      name: {{ .Credential.UserName }}
-      level: {{ .Credential.SecurityLevel }}
-      auth_proto: {{ .Credential.AuthProtocol }}
-      auth_key: {{ .Credential.AuthPassphrase }}
-      priv_proto: {{ .Credential.PrivacyProtocol }}
-      priv_key: {{ .Credential.PrivacyPassphrase }}
-    {{- end }}
+    {{ $job := dict "module" "snmp" "name" (printf "cisco-%s-%s" .SysInfo.Name .IPAddress) "hostname" .IPAddress "options" (dict "version" .Credential.Version) }}
+    {{ if eq .Credential.Version "1" "2" "2c" }}
+    {{ $_ := set $job "community" .Credential.Community }}
+    {{ else }}
+    {{ $_ := set $job "user" (dict
+      "name" .Credential.UserName
+      "level" .Credential.SecurityLevel
+      "auth_proto" .Credential.AuthProtocol
+      "auth_key" .Credential.AuthPassphrase
+      "priv_proto" .Credential.PrivacyProtocol
+      "priv_key" .Credential.PrivacyPassphrase
+    ) }}
+    {{ end }}
+    {{ job $job }}
 
 - id: skip-cisco-from-catchall
   match: '{{ glob .SysInfo.Vendor "Cisco*" }}'
@@ -411,13 +411,14 @@ Match by `.SysInfo.Category` to apply a printer-specific config. Category values
 - id: hp-printer
   match: '{{ and (eq .SysInfo.Category "printer") (glob .SysInfo.Vendor "HP*" "Hewlett*") }}'
   config_template: |
-    module: snmp
-    name: printer-{{ .SysInfo.Name }}-{{ .IPAddress }}
-    hostname: {{ .IPAddress }}
-    update_every: 30
-    options:
-      version: {{ .Credential.Version }}
-    community: {{ .Credential.Community }}
+    {{ job
+      "module" "snmp"
+      "name" (printf "printer-%s-%s" .SysInfo.Name .IPAddress)
+      "hostname" .IPAddress
+      "update_every" 30
+      "options" (dict "version" .Credential.Version)
+      "community" .Credential.Community
+    }}
 
 ```
 
@@ -483,6 +484,6 @@ Rule order matters — see [How rules are evaluated](#how-rules-are-evaluated). 
 
 The discoverer creates jobs but does not run them — the `snmp` collector does. Check the `snmp` collector log and the rendered job YAML in the agent's debug output. Common causes:
 
-- The rendered `config_template` produces invalid YAML for some discovered field values (for example, unescaped colons in `sysName`). YAML-quote dynamic values when in doubt.
+- The rendered `config_template` produces invalid YAML for some discovered field values (for example, unescaped colons in `sysName`). Use the `job` helper for automatic encoding, as shown in the examples above. Legacy templates that interpolate values into YAML need this migration.
 - Module name mismatch — the rule `id` (or explicit `module:` field) does not match `snmp`.
 - SNMPv3 credentials succeeded for `system` MIB during discovery but the collector cannot read other OIDs (different VACM view); confirm with `snmpwalk` against the device.

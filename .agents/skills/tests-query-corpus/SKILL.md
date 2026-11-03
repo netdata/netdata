@@ -193,6 +193,9 @@ its test as the regression guard and records `FixedBy: "#PR"`.
 
 - Build the daemon first: `ninja -C build netdata` from the repo root. By
   default the suite pairs `../../build/netdata` with `../../src`.
+- The binary's configured stock-config and plugin paths must exist; the
+  harness isolates writable state but still uses those packaged assets.
+  A missing asset directory is a startup failure, not a query verdict.
 - For another checkout, set both paths:
   `QUERY_CORPUS_NETDATA=/absolute/path/to/build/netdata
   QUERY_CORPUS_SRC=/absolute/path/to/src go test ...`. One-sided overrides
@@ -206,12 +209,18 @@ its test as the regression guard and records `FixedBy: "#PR"`.
   palette is unavailable. A prerequisite skip is not correctness evidence.
 - Keep the daemon run dir for inspection: `QUERY_CORPUS_KEEP=1` (it is
   always kept on failure; the path is printed as `daemon run dir kept:`).
+- Slow filesystem commits can exhaust startup, shutdown, or phase-control
+  deadlines. Diagnose daemon logs and I/O waits first. If a restart loses
+  the shared daemon, later connection failures are infrastructure fallout.
+  Repeat with a private `TMPDIR` on suitable local storage rather than
+  relaxing correctness limits.
 - Capture the verdict honestly: `go test ... ; echo "exit=$?"` — piping
   through `tail` masks the exit code.
 - **Before every push of the corpus branch, run the full suite and compare
-  the broken list to the previous run.** It must not grow, and no case may
-  break that was holding before. The list being non-empty is expected while
-  the query engine still has open defects.
+  existing contract verdicts to a source-matched baseline.** No previously
+  holding contract may break or lose required scope coverage. New bug cases
+  may add truthful failures; account for them separately. The list being
+  non-empty is expected while the query engine still has open defects.
 
 ## Authoring fixtures
 

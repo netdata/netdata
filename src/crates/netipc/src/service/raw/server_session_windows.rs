@@ -1,17 +1,17 @@
-use super::common::{ensure_client_scratch, SERVER_POLL_TIMEOUT_MS};
+use super::common::{SERVER_POLL_TIMEOUT_MS, ensure_client_scratch};
 use super::dispatch::{
-    dispatch_single_internal, method_supported_internal, server_note_payload_capacity,
-    DispatchError, DispatchHandler,
+    DispatchError, DispatchHandler, dispatch_single_internal, method_supported_internal,
+    server_note_payload_capacity,
 };
 use crate::protocol::{
-    self, batch_item_get, BatchBuilder, Header, FLAG_BATCH, HEADER_SIZE, KIND_REQUEST,
-    KIND_RESPONSE, MAGIC_MSG, STATUS_BAD_ENVELOPE, STATUS_INTERNAL_ERROR, STATUS_LIMIT_EXCEEDED,
-    STATUS_OK, VERSION,
+    self, BatchBuilder, FLAG_BATCH, HEADER_SIZE, Header, KIND_REQUEST, KIND_RESPONSE, MAGIC_MSG,
+    STATUS_BAD_ENVELOPE, STATUS_INTERNAL_ERROR, STATUS_LIMIT_EXCEEDED, STATUS_OK, VERSION,
+    batch_item_get,
 };
 use crate::transport::win_shm::WinShmContext;
 use crate::transport::windows::NpSession;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 /// Windows: handle one client session over Named Pipe + optional Win SHM.
 /// Standalone function for use in per-session threads.

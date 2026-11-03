@@ -105,7 +105,7 @@ func TestProfileMetricRuntimeMaxInstancesSkipsOnlyNewMetricInstance(t *testing.T
 
 func TestProfileMetricRuntimeChartMaxInstancesSkipsOnlyNewChartInstance(t *testing.T) {
 	idx := newPopulatedTestCatalog(t)
-	idx = idx.withChartLifecycle("cisco_config_changes", charttpl.Lifecycle{MaxInstances: 1, ExpireAfterCycles: 60})
+	idx = idx.withChartLifecycle("cisco_config_changes", charttpl.Lifecycle{MaxInstances: 1, ExpireAfterCycles: new(60)})
 	rt := sourceRuntimeWithLimits(t, idx, profileMetricLimitsPolicy{MaxSources: 10, MaxInstancesPerJob: 10})
 	first := ciscoConfigTrapEntry(testProfileMetricJobName)
 	second := ciscoConfigTrapEntryFromSource(testProfileMetricJobName, "192.0.2.11")
@@ -122,7 +122,7 @@ func TestProfileMetricRuntimeChartMaxInstancesSkipsOnlyNewChartInstance(t *testi
 
 func TestProfileMetricRuntimeReleasesChartMaxInstancesAfterLifecycleExpiry(t *testing.T) {
 	idx := newPopulatedTestCatalog(t)
-	idx = idx.withChartLifecycle("cisco_config_changes", charttpl.Lifecycle{MaxInstances: 1, ExpireAfterCycles: 1})
+	idx = idx.withChartLifecycle("cisco_config_changes", charttpl.Lifecycle{MaxInstances: 1, ExpireAfterCycles: new(1)})
 	rt := sourceRuntimeWithLimits(t, idx, profileMetricLimitsPolicy{MaxSources: 10, MaxInstancesPerJob: 10})
 	first := ciscoConfigTrapEntry(testProfileMetricJobName)
 	second := ciscoConfigTrapEntryFromSource(testProfileMetricJobName, "192.0.2.11")
@@ -183,7 +183,7 @@ func TestProfileMetricRuntimeMaxInstancesUsesDeterministicRuleOrder(t *testing.T
 				Type:      "line",
 				Lifecycle: &charttpl.Lifecycle{
 					MaxInstances:      catalog.DefaultMetricChartMaxInstances,
-					ExpireAfterCycles: catalog.DefaultMetricExpireAfterCycles,
+					ExpireAfterCycles: new(catalog.DefaultMetricExpireAfterCycles),
 				},
 			},
 			{
@@ -195,7 +195,7 @@ func TestProfileMetricRuntimeMaxInstancesUsesDeterministicRuleOrder(t *testing.T
 				Type:      "line",
 				Lifecycle: &charttpl.Lifecycle{
 					MaxInstances:      catalog.DefaultMetricChartMaxInstances,
-					ExpireAfterCycles: catalog.DefaultMetricExpireAfterCycles,
+					ExpireAfterCycles: new(catalog.DefaultMetricExpireAfterCycles),
 				},
 			},
 		},
@@ -223,7 +223,7 @@ func TestProfileMetricRuntimeMaxInstancesUsesDeterministicRuleOrder(t *testing.T
 
 func TestProfileMetricRuntimeReleasesSourceCapAfterLifecycleExpiry(t *testing.T) {
 	idx := newPopulatedTestCatalog(t)
-	idx = idx.withChartLifecycle("cisco_config_changes", charttpl.Lifecycle{MaxInstances: 10, ExpireAfterCycles: 1})
+	idx = idx.withChartLifecycle("cisco_config_changes", charttpl.Lifecycle{MaxInstances: 10, ExpireAfterCycles: new(1)})
 	rt := sourceRuntimeWithLimits(t, idx, profileMetricLimitsPolicy{MaxSources: 1})
 	first := ciscoConfigTrapEntry(testProfileMetricJobName)
 	second := ciscoConfigTrapEntryFromSource(testProfileMetricJobName, "192.0.2.11")
@@ -266,7 +266,7 @@ func TestProfileMetricRuntimeResourceCapSkipsOnlyNewResource(t *testing.T) {
 
 func TestProfileMetricRuntimeReleasesResourceCapAfterLifecycleExpiry(t *testing.T) {
 	idx := newPopulatedTestCatalog(t)
-	idx = idx.withChartLifecycle("port_security_violations", charttpl.Lifecycle{MaxInstances: 10, ExpireAfterCycles: 1})
+	idx = idx.withChartLifecycle("port_security_violations", charttpl.Lifecycle{MaxInstances: 10, ExpireAfterCycles: new(1)})
 	idx = idx.withDefinitions([]catalog.MetricRule{{
 		Name:     "cisco.port_security.ifindex_lifecycle_cap",
 		Type:     catalog.MetricTypeCounter,

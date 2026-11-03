@@ -45,7 +45,7 @@
 //! Consumers (grep-verified): file-lifecycle (builder, helpers, query,
 //! registry, remote_keys, remote_read, ipc, recovery), otel-ledger (rotation
 //! tracking, retention mark/clear, rpc handlers) and otel-ingestor (startup
-//! seq seed). Query filtering uses [`file_registry::Query`] — the same type
+//! seq seed). Query filtering uses `file_registry::Query` — the same type
 //! the SFST and WAL registries accept, so a single query value flows through
 //! the whole planner stack.
 
@@ -71,7 +71,7 @@ pub const FORMAT_VERSION: u32 = 1;
 pub const CONTAINER_MAGIC: [u8; 4] = *b"NCAT";
 
 /// On-disk container framing version (magic + TOC + per-chunk crc32 via
-/// [`chunk_file::container`]). The JSON schema inside the `JSON`
+/// `chunk_file::container`). The JSON schema inside the `JSON`
 /// chunk is versioned separately by [`FORMAT_VERSION`].
 pub const CONTAINER_VERSION: u32 = 1;
 

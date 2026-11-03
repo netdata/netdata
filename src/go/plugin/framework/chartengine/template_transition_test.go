@@ -49,7 +49,7 @@ func TestTemplateTransitionPreservesUnchangedAndReorderedEntries(t *testing.T) {
 	store := metrix.NewCollectorStore()
 	a, b := nativeEntry("z", "shared", "requests"), nativeEntry("a", "shared", "requests")
 	a.Groups[0].Charts[0].Lifecycle = &charttpl.Lifecycle{
-		ExpireAfterCycles: 3,
+		ExpireAfterCycles: new(3),
 	}
 	first := testTemplateSet(t, a, b)
 	attempt := templateAttempt(t, e, store, first, map[string]float64{"requests": 1})

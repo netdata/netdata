@@ -138,7 +138,9 @@ pub enum AttributeRequestError {
     /// The static virtual/dictionary split is known at the boundary
     /// (decision 18B), so asking for a virtual builtin's values is a
     /// caller bug, not a data condition.
-    #[error("builtin field {0:?} is virtual (no value dictionary); its values cannot be enumerated")]
+    #[error(
+        "builtin field {0:?} is virtual (no value dictionary); its values cannot be enumerated"
+    )]
     NotEnumerable(BuiltinField),
     #[error("a builtin key requires the Builtin owner, got {0:?} (pin C4)")]
     BuiltinKeyOutsideBuiltinOwner(AttributeOwner),
@@ -186,21 +188,26 @@ pub struct AttributeValuesData {
 /// only under the Builtin owner, attribute keys only under a concrete
 /// attribute owner, `Any` never. A virtual builtin — no value dictionary
 /// anywhere (decision 18B) — has no field to resolve and is rejected.
-fn storage_field_of(owner: AttributeOwner, key: &AttributeKey) -> Result<String, AttributeRequestError> {
+fn storage_field_of(
+    owner: AttributeOwner,
+    key: &AttributeKey,
+) -> Result<String, AttributeRequestError> {
     match (owner, key) {
         (AttributeOwner::Any, _) => Err(AttributeRequestError::AnyOwnerNotEnumerable),
         (AttributeOwner::Builtin, AttributeKey::Builtin(i)) => i
             .dictionary_field()
             .map(str::to_string)
             .ok_or(AttributeRequestError::NotEnumerable(*i)),
-        (AttributeOwner::Builtin, AttributeKey::Attribute(a)) => {
-            Err(AttributeRequestError::AttributeKeyUnderBuiltinOwner(a.clone()))
-        }
+        (AttributeOwner::Builtin, AttributeKey::Attribute(a)) => Err(
+            AttributeRequestError::AttributeKeyUnderBuiltinOwner(a.clone()),
+        ),
         (owner, AttributeKey::Builtin(_)) => {
             Err(AttributeRequestError::BuiltinKeyOutsideBuiltinOwner(owner))
         }
         (owner, AttributeKey::Attribute(bare)) => {
-            let prefix = owner.attribute_prefix().expect("validated: a concrete attribute owner");
+            let prefix = owner
+                .attribute_prefix()
+                .expect("validated: a concrete attribute owner");
             Ok(format!("{prefix}{bare}"))
         }
     }
@@ -294,7 +301,10 @@ pub fn attribute_names(
                             }
                         },
                         Err(e) => {
-                            tracing::warn!("sfsq traces: source {} failed to map: {e}", c.source_id);
+                            tracing::warn!(
+                                "sfsq traces: source {} failed to map: {e}",
+                                c.source_id
+                            );
                             status.add(PartialReason::SourceFailure);
                         }
                     }
@@ -423,7 +433,10 @@ pub fn attribute_values(
                             }
                         },
                         Err(e) => {
-                            tracing::warn!("sfsq traces: source {} failed to map: {e}", c.source_id);
+                            tracing::warn!(
+                                "sfsq traces: source {} failed to map: {e}",
+                                c.source_id
+                            );
                             status.add(PartialReason::SourceFailure);
                         }
                     }

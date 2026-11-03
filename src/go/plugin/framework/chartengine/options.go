@@ -14,10 +14,12 @@ import (
 )
 
 type engineConfig struct {
-	autogen           AutogenPolicy
-	autogenRules      []charttpl.ValidatedAutogenRule
-	autogenCounterRaw charttpl.ValidatedCounterRawCharts
-	autogenTypeID     string
+	maxOutputSeriesPerContext int
+	outputLimitOverride       policyOverride[int]
+	autogen                   AutogenPolicy
+	autogenRules              []charttpl.ValidatedAutogenRule
+	autogenCounterRaw         charttpl.ValidatedCounterRawCharts
+	autogenTypeID             string
 	// autogenContextNamespace prefixes autogen chart contexts (the spec's root
 	// context_namespace), so autogen and template charts share one namespace.
 	autogenContextNamespace string
@@ -63,6 +65,11 @@ type AutogenRule = runtimecomp.AutogenRule
 
 // EnginePolicy controls chartengine matching/materialization behavior.
 type EnginePolicy struct {
+	// MaxOutputSeriesPerContext limits distinct current chart/dimension pairs
+	// after routing and aggregation. An oversized context is omitted as a whole.
+	// Nil keeps the existing policy; zero disables it; negative values are invalid.
+	MaxOutputSeriesPerContext *int
+
 	// Selector filters input series globally before template/autogen routing.
 	// Nil means "no override", and an explicitly empty expr means "override to allow all".
 	Selector *metrixselector.Expr
@@ -147,6 +154,17 @@ func WithEnginePolicy(policy EnginePolicy) Option {
 		compiledSelector, selectorErr = compileEngineSelector(*policy.Selector)
 	}
 	return func(cfg *engineConfig) error {
+		if policy.MaxOutputSeriesPerContext != nil {
+			limit := *policy.MaxOutputSeriesPerContext
+			if limit < 0 {
+				return fmt.Errorf("max output series per context must be non-negative, got %d", limit)
+			}
+			cfg.maxOutputSeriesPerContext = limit
+			cfg.outputLimitOverride = policyOverride[int]{
+				set:   true,
+				value: limit,
+			}
+		}
 		if autogenErr != nil {
 			return autogenErr
 		}
@@ -174,6 +192,10 @@ func WithEnginePolicy(policy EnginePolicy) Option {
 
 func cloneEnginePolicy(policy EnginePolicy) EnginePolicy {
 	out := policy
+	if policy.MaxOutputSeriesPerContext != nil {
+		limit := *policy.MaxOutputSeriesPerContext
+		out.MaxOutputSeriesPerContext = &limit
+	}
 	if policy.Autogen != nil {
 		autogen := cloneAutogenPolicy(*policy.Autogen)
 		out.Autogen = &autogen

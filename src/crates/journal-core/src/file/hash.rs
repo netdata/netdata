@@ -15,10 +15,10 @@
 //! create and never changes; `create_successor` inherits the keyed/legacy
 //! mode flag for the next file but gives it a new id (file/file.rs). Stored
 //! object `hash` fields and hash-table buckets (`hash % n_buckets`,
-//! file/object.rs) were computed under the file's own key, and lookups
-//! re-check the recomputed hash against the stored one (file/file.rs,
-//! `PayloadMatcher`) — changing the key or either algorithm strands every
-//! existing object.
+//! file/object.rs) were computed with the file's own hash mode (keyed by
+//! `file_id`, or unkeyed for legacy files), and lookups re-check the
+//! recomputed hash against the stored one (file/file.rs, `PayloadMatcher`)
+//! — changing the key or either algorithm strands every existing object.
 //!
 //! Consumers (grep-verified): [`journal_hash_data`] has one caller,
 //! `JournalFile::hash` (file/file.rs), which reads the header flag and

@@ -45,15 +45,15 @@
 //! `Registry` ([`crate::Registry`]) serializes its `Repository` behind
 //! `Arc<parking_lot::RwLock>` and is its only consumer;
 //! journal-log-writer drives a `Chain` inside its `OwnedChain`, reading the
-//! live file's header through `back` and pruning with `pop_front`/`drain`
+//! newest file's header through `back` and pruning with `pop_front`/`drain`
 //! (`journal-log-writer/src/log/chain.rs`). Both types are
 //! `#[doc(hidden)]` re-exports reached by full path
 //! ([`crate::repository::Chain`], [`crate::repository::Repository`]) and
 //! through journal-core's repository shim
 //! (`journal-core/src/lib.rs`). Containers use the
 //! `journal_common::collections` aliases — `FxHashMap` and `std::VecDeque`
-//! (`journal-common/src/collections.rs`); journal-registry's only
-//! workspace dependency is journal-common (journal-registry/Cargo.toml).
+//! (`journal-common/src/collections.rs`); journal-common is the crate's
+//! only journal-stack dependency (journal-registry/Cargo.toml).
 //! The `allocative` feature derives memory-profiling impls on both types.
 use crate::repository::error::Result;
 use crate::repository::{File, Origin, Status};
@@ -89,7 +89,6 @@ impl Chain {
         // Binary-search where the file would sit in the sorted chain.
         let pos = self.files.partition_point(|f| f < file);
 
-        // Remove only on an exact match.
         if pos < self.files.len() && self.files[pos] == *file {
             self.files.remove(pos);
         }

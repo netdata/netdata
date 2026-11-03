@@ -9,7 +9,10 @@
 
 typedef enum __attribute__((packed)) {
     SPAWN_INSTANCE_TYPE_EXEC = 0,
-    SPAWN_INSTANCE_TYPE_CALLBACK = 1
+    SPAWN_INSTANCE_TYPE_CALLBACK = 1,
+    // Trusted, non-daemonizing tools: the spawn server cleans the private group before reaping its leader.
+    // Abrupt server failure can prevent cleanup.
+    SPAWN_INSTANCE_TYPE_EXEC_GROUP = 2
 } SPAWN_INSTANCE_TYPE;
 
 typedef enum __attribute__((packed)) {
@@ -30,6 +33,8 @@ typedef struct spawn_request {
     const void *data;                   // the data structure for the callback
     size_t data_size;                   // the data structure size
     SPAWN_INSTANCE_TYPE type;           // the type of the request
+    uint64_t group_kill_deadline_ut;     // server-owned cancellation grace; 0 until cancellation
+    bool group_kill_sent;
 
     struct spawn_request *prev, *next;  // linking of active requests at the spawn server
 } SPAWN_REQUEST;

@@ -20,10 +20,12 @@
 //! test. Every entry is stamped with
 //! `_SOURCE_REALTIME_TIMESTAMP=<microseconds>` - the tests index that
 //! field explicitly, so each file's entry list is time-ordered by it
-//! (`journal-index/src/file_indexer.rs` `FileIndexer::index`) - and carries a unique
-//! `ENTRY_ID=fileN_<i>`: the prefix identifies the source file in the
-//! distribution assertions, the value is the dedup key wherever
-//! timestamps repeat. Several tests also stamp and index a per-file
+//! (`journal-index/src/file_indexer.rs` `FileIndexer::index`). Tests
+//! that need per-entry identity also stamp a unique `ENTRY_ID=fileN_<i>`:
+//! the prefix identifies the source file in the distribution
+//! assertions, the value is the dedup key wherever timestamps repeat -
+//! the two non-overlapping tests dedup on timestamps alone and stamp
+//! no `ENTRY_ID`. Several tests also stamp and index a per-file
 //! `FILE` field that no assertion reads back.
 //!
 //! How a page is built (`logs/query.rs` `retrieve_log_entries`): files are
@@ -3170,8 +3172,9 @@ fn test_multi_file_pagination_anchor_at_file_boundary() {
 
     let file_indexes = vec![index1, index2, index3];
 
-    // Anchor exactly on the 200 boundary: forward, only file2 has
-    // entries at-or-after it.
+    // Anchor exactly on the 200 boundary: forward, file1's walk is
+    // past its end, so page 1 draws wholly from file2 (200-279) and
+    // file3 only joins from 300 on page 2.
     let anchor = Anchor::Timestamp(Microseconds(200));
 
     let (first_page_fwd, state1_fwd) = LogQuery::new(&file_indexes, anchor, Direction::Forward)

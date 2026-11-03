@@ -27,7 +27,7 @@ Collect information about semaphore.
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -36,9 +36,6 @@ This collector supports collecting metrics from multiple instances of this integ
 
 This integration doesn't support auto-detection.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 
@@ -100,13 +97,7 @@ There are no configuration examples.
 
 ## Alerts
 
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ semaphores_used ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipc.conf) | system.ipc_semaphores | IPC semaphore utilization |
-| [ semaphore_arrays_used ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipc.conf) | system.ipc_semaphore_arrays | IPC semaphore arrays utilization |
+There are no alerts configured by default for this integration.
 
 
 

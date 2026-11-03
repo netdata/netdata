@@ -9,10 +9,11 @@
 //! Each metric struct declares one chart. Its schemars `x-chart-*`
 //! extensions are the chart's identity (id, title, units, family,
 //! context, type), read from the generated JSON schema at runtime
-//! runtime by `NetdataChart::chart_metadata` (`netdata-plugin/rt/src/charts/chart_trait.rs`);
-//! the `NetdataChart` derive turns every public field into a DIMENSION
-//! named after the field (the derive macro in
-//! `netdata-plugin/charts-derive/src/lib.rs`).
+//! by `NetdataChart::chart_metadata` (`netdata-plugin/rt/src/charts/chart_trait.rs`);
+//! the `NetdataChart` derive emits one SET per non-instance field,
+//! keyed by field name (the derive macro in
+//! `netdata-plugin/charts-derive/src/lib.rs`); the DIMENSION lines
+//! come from the same schema read, keyed the same way.
 //! `x-dimension-algorithm` tells the Agent how to process each value:
 //! `incremental` = counter (the Agent keeps the per-update delta, so with
 //! the 1s sampling below the `indexes/s` / `buckets/s` units read as
@@ -52,9 +53,8 @@ pub struct JournalMetrics {
 impl JournalMetrics {
     /// Registers all three charts on the plugin runtime with a 1s update
     /// interval; values arrive through the returned handles. The registry
-    /// samples them every second, emitting the definition once and then an
-    /// update per sample whether or not values changed, as Netdata's
-    /// protocol requires (`ChartRegistry::run` / `sample_to_buffer` in
+    /// emits each chart's definition once, then an update every tick whether
+    /// or not values changed (`ChartRegistry::run` / `sample_to_buffer` in
     /// `netdata-plugin/rt/src/charts/registry.rs`).
     pub fn new(runtime: &mut StdPluginRuntime) -> Self {
         Self {
@@ -114,7 +114,7 @@ pub struct BucketCacheMetrics {
     pub complete: u64,
 }
 
-/// Bucket response lifecycle rates: served, created, promoted, evicted.
+/// Bucket response lifecycle rates: served, created, promoted, invalidated.
 #[derive(JsonSchema, NetdataChart, Default, Clone, PartialEq, Serialize, Deserialize)]
 #[schemars(
     extend("x-chart-id" = "journal.bucket_operations"),

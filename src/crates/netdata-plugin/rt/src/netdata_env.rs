@@ -20,8 +20,9 @@
 //! and otel-plugin's supervisor for the IPC socket directory, node identity,
 //! and cache dir.
 #![allow(dead_code)]
-// The struct mirrors the agent's full export surface, not the subset any one
-// plugin reads, so some fields have no consumer in a given plugin.
+// The struct snapshots the plugin-facing `NETDATA_*` variables — directories,
+// identity, log settings — a broader set than any one plugin reads, so some
+// fields have no consumer in a given plugin.
 
 use std::env;
 use std::path::PathBuf;

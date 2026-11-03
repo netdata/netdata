@@ -210,8 +210,8 @@ pub fn is_tmp(path: &Path) -> bool {
 
 /// Remove one stale temp file, logging the outcome; a missing file is
 /// ignored. For recovery walks that already iterate the directory
-/// entries themselves (otel-catalog's); callers without a walk use
-/// [`sweep_tmp`].
+/// entries themselves (otel-catalog's recovery walk); callers without a
+/// walk use [`sweep_tmp`].
 pub fn remove_stale_tmp(path: &Path) {
     match std::fs::remove_file(path) {
         Ok(()) => tracing::info!("removed stale tmp file path={}", path.display()),

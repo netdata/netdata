@@ -61,7 +61,9 @@ func TestAcceptedActivationInstallsV1AndV2Collectors(t *testing.T) {
 
 			releaseSubmission := make(chan struct{})
 			var releaseOnce sync.Once
-			commands := &autoDetectionRetryTestCommands{block: releaseSubmission}
+			commands := &autoDetectionRetryTestCommands{
+				block: releaseSubmission,
+			}
 			require.NoError(t, controller.BindBackgroundWorkers(commands, 9, func(error) {}))
 			var active lifecycle.ReadyResource
 			t.Cleanup(func() {
@@ -77,7 +79,7 @@ func TestAcceptedActivationInstallsV1AndV2Collectors(t *testing.T) {
 			})
 
 			config := acceptedActivationTestConfig(confgroup.TypeUser)
-			seedDynCfgJobGraphRecord(t, graph, config, dyncfg.StatusAccepted)
+			seedDynCfgJobGraphRecord(t, controller, graph, config, dyncfg.StatusAccepted)
 			applyAcceptedEnableForTest(t, controller, graph, config, 1)
 
 			commands.waitForSubmissions(t, 1)
@@ -94,7 +96,8 @@ func TestAcceptedActivationInstallsV1AndV2Collectors(t *testing.T) {
 				lifecycle.ResourceTransactionScope{
 					ID: config.FullName(),
 					Successor: lifecycle.ResourceIdentity{
-						ID: config.FullName(), Generation: 2,
+						ID:         config.FullName(),
+						Generation: 2,
 					},
 				},
 				permit,
@@ -140,7 +143,9 @@ func TestAcceptedActivationCoalescesRepeatedEnableForSameConfig(t *testing.T) {
 	releaseSubmission := make(chan struct{})
 	var checkReleaseOnce sync.Once
 	var submissionReleaseOnce sync.Once
-	commands := &autoDetectionRetryTestCommands{block: releaseSubmission}
+	commands := &autoDetectionRetryTestCommands{
+		block: releaseSubmission,
+	}
 	require.NoError(t, controller.BindBackgroundWorkers(commands, 9, func(error) {}))
 	t.Cleanup(func() {
 		checkReleaseOnce.Do(func() { close(checkRelease) })
@@ -152,7 +157,7 @@ func TestAcceptedActivationCoalescesRepeatedEnableForSameConfig(t *testing.T) {
 	})
 
 	config := acceptedActivationTestConfig(confgroup.TypeUser)
-	seedDynCfgJobGraphRecord(t, graph, config, dyncfg.StatusAccepted)
+	seedDynCfgJobGraphRecord(t, controller, graph, config, dyncfg.StatusAccepted)
 	applyAcceptedEnableForTest(t, controller, graph, config, 1)
 	require.Eventually(t, func() bool {
 		return checkCalls.Load() == 1
@@ -187,7 +192,7 @@ func TestAcceptedActivationArmsOnlyAfterEnableApplies(t *testing.T) {
 	})
 
 	config := acceptedActivationTestConfig(confgroup.TypeUser)
-	seedDynCfgJobGraphRecord(t, graph, config, dyncfg.StatusAccepted)
+	seedDynCfgJobGraphRecord(t, controller, graph, config, dyncfg.StatusAccepted)
 	record, exists := graph.Lookup(config.FullName())
 	require.True(t, exists)
 	permit, tasks := issueTestJobPermit(t, config.FullName(), 1)
@@ -205,7 +210,8 @@ func TestAcceptedActivationArmsOnlyAfterEnableApplies(t *testing.T) {
 		lifecycle.ResourceTransactionScope{
 			ID: config.FullName(),
 			Successor: lifecycle.ResourceIdentity{
-				ID: config.FullName(), Generation: 1,
+				ID:         config.FullName(),
+				Generation: 1,
 			},
 		},
 		permit,
@@ -226,7 +232,9 @@ func TestAcceptedActivationArmsOnlyAfterEnableApplies(t *testing.T) {
 func TestAcceptedActivationFailsRunWhenTerminalSubmissionFails(t *testing.T) {
 	controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
 	sentinel := errors.New("terminal submission failed")
-	commands := &autoDetectionRetryTestCommands{submitErr: sentinel}
+	commands := &autoDetectionRetryTestCommands{
+		submitErr: sentinel,
+	}
 	failed := make(chan error, 1)
 	require.NoError(t, controller.BindBackgroundWorkers(commands, 9, func(err error) {
 		failed <- err
@@ -239,7 +247,7 @@ func TestAcceptedActivationFailsRunWhenTerminalSubmissionFails(t *testing.T) {
 	})
 
 	config := acceptedActivationTestConfig(confgroup.TypeUser)
-	seedDynCfgJobGraphRecord(t, graph, config, dyncfg.StatusAccepted)
+	seedDynCfgJobGraphRecord(t, controller, graph, config, dyncfg.StatusAccepted)
 	applyAcceptedEnableForTest(t, controller, graph, config, 1)
 
 	select {
@@ -265,7 +273,9 @@ func TestAcceptedActivationCurrentContentionRetainsAcceptedIntent(t *testing.T) 
 			state *factoryTestState,
 			config confgroup.Config,
 		) {
-			scopeState := &factoryTestAtomicScope{value: "resolved"}
+			scopeState := &factoryTestAtomicScope{
+				value: "resolved",
+			}
 			creator := controller.modules["module"]
 			creator.Create = func() collectorapi.CollectorV1 {
 				module := state.module(func(context.Context) error {
@@ -277,10 +287,14 @@ func TestAcceptedActivationCurrentContentionRetainsAcceptedIntent(t *testing.T) 
 				return module
 			}
 			controller.modules["module"] = creator
-			controller.factory.config.ConfigModules.config.Configs = testConfigResolver(t, testAtomicResolver(t), func([]string) (secretresolver.AtomicScope, error) {
-				scopeState.current.Store(true)
-				return scopeState, nil
-			})
+			controller.factory.config.ConfigModules.config.Configs = testConfigResolver(
+				t,
+				testAtomicResolver(t),
+				func([]string) (secretresolver.AtomicScope, error) {
+					scopeState.current.Store(true)
+					return scopeState, nil
+				},
+			)
 			config["option_str"] = "${store:vault:test:key}"
 		},
 	}
@@ -293,7 +307,9 @@ func TestAcceptedActivationCurrentContentionRetainsAcceptedIntent(t *testing.T) 
 
 			releaseSubmission := make(chan struct{})
 			var releaseOnce sync.Once
-			commands := &autoDetectionRetryTestCommands{block: releaseSubmission}
+			commands := &autoDetectionRetryTestCommands{
+				block: releaseSubmission,
+			}
 			require.NoError(t, controller.BindBackgroundWorkers(commands, 9, func(error) {}))
 			t.Cleanup(func() {
 				releaseOnce.Do(func() { close(releaseSubmission) })
@@ -303,7 +319,7 @@ func TestAcceptedActivationCurrentContentionRetainsAcceptedIntent(t *testing.T) 
 				require.NoError(t, controller.scheduler.WaitBackgroundWorkers(ctx))
 			})
 
-			seedDynCfgJobGraphRecord(t, graph, config, dyncfg.StatusAccepted)
+			seedDynCfgJobGraphRecord(t, controller, graph, config, dyncfg.StatusAccepted)
 			applyAcceptedEnableForTest(t, controller, graph, config, 1)
 			commands.waitForSubmissions(t, 1)
 			_, plans, waited := commands.snapshot()
@@ -317,7 +333,8 @@ func TestAcceptedActivationCurrentContentionRetainsAcceptedIntent(t *testing.T) 
 				lifecycle.ResourceTransactionScope{
 					ID: config.FullName(),
 					Successor: lifecycle.ResourceIdentity{
-						ID: config.FullName(), Generation: 2,
+						ID:         config.FullName(),
+						Generation: 2,
 					},
 				},
 				permit,
@@ -376,7 +393,8 @@ func applyAcceptedEnableForTest(
 		lifecycle.ResourceTransactionScope{
 			ID: config.FullName(),
 			Successor: lifecycle.ResourceIdentity{
-				ID: config.FullName(), Generation: generation,
+				ID:         config.FullName(),
+				Generation: generation,
 			},
 		},
 		permit,

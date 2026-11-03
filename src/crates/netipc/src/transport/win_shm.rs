@@ -1125,7 +1125,7 @@ fn validate_service_name(name: &str) -> Result<(), WinShmError> {
                 return Err(WinShmError::BadParam(format!(
                     "service name contains invalid character: {:?}",
                     c as char,
-                )))
+                )));
             }
         }
     }

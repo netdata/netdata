@@ -24,8 +24,8 @@
 //! idle-rotation sweeps),
 //! `ng-ingest` (per-binary instances feeding `write_request`), `wal`
 //! (consumes the resulting `TimestampNs` values; docs-only reference to this
-//! type), and test/fixture code in `sfsq`, `otel-ledger`, `ng-index`, and
-//! `ng-ingest` that needs realistic ordered stamps.
+//! type), and test/fixture code in `sfsq`, `otel-ingestor`, `otel-ledger`,
+//! `ng-index`, and `ng-ingest` that needs realistic ordered stamps.
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::TimestampNs;
@@ -41,8 +41,8 @@ use crate::TimestampNs;
 /// time itself). A stalled or backward-jumping system clock — the same
 /// nanosecond twice, NTP stepping the clock back — is bridged by inventing
 /// `last + 1`, so the output stays a usable wall timestamp: it tracks real
-/// time whenever the system clock does and only runs ahead of it while the
-/// clock misbehaves.
+/// time whenever the system clock does and runs ahead of it only until the
+/// system clock catches back up.
 pub struct MonotonicClock {
     last_ns: u64,
 }

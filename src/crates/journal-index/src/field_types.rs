@@ -19,10 +19,10 @@
 //! normalizes, trims or case-folds.
 //! [`parse_timestamp`] re-reads one field's data-object payload as a u64
 //! (the `_SOURCE_REALTIME_TIMESTAMP` path). Other consumers: journal-engine
-//! aggregates per-pair counts under these keys (`journal-engine/src/
-//! histogram.rs`) and carries query-result fields as pairs
-//! (`journal-engine/src/logs/query.rs`); otel-legacy-logs parses request
-//! selections into filters (`otel-legacy-logs/src/handler.rs`);
+//! aggregates per-pair counts under these keys
+//! (`journal-engine/src/histogram.rs`) and carries query-result fields as
+//! pairs (`journal-engine/src/logs/query.rs`); otel-legacy-logs parses
+//! request selections into filters (`otel-legacy-logs/src/handler.rs`);
 //! journal-function counts facet values per pair
 //! (`journal-function/src/netdata/facets.rs`).
 //!
@@ -50,8 +50,10 @@ impl FieldName {
     /// For strings the code already trusts: field-table names during
     /// indexing (`src/file_indexer.rs`) and hardcoded names such as the
     /// default facet list (`journal-engine/src/facets.rs`). An embedded
-    /// '=' is not rejected here; [`FieldValuePair::new_unchecked`] treats
-    /// it as a split point.
+    /// '=' is not rejected here; [`FieldValuePair::new_unchecked`] splits
+    /// at the name's length, so such a name keeps the '=' in its field
+    /// portion (and the pair stops equaling [`FieldValuePair::parse`] of
+    /// the same string).
     pub fn new_unchecked(name: impl Into<String>) -> Self {
         Self(name.into())
     }
@@ -123,11 +125,7 @@ impl AsRef<str> for FieldName {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, Ord, PartialOrd)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub struct FieldValuePair {
-    // The full "field=value" string: what Eq/Hash/Ord effectively compare
-    // and what gets serialized inside FileIndex.
     key: String,
-    // Offset of the '=' between field and value, so field()/value() are
-    // slices instead of a fresh search for '='.
     split_pos: usize,
 }
 
@@ -228,19 +226,16 @@ impl FieldValuePair {
     /// assert_eq!(FieldValuePair::strip_field_prefix(b"PRIORITY", b"PRIORITY6"), None);
     /// ```
     pub fn strip_field_prefix<'a>(field_name: &[u8], payload: &'a [u8]) -> Option<&'a [u8]> {
-        // The payload must start with the exact field name
         if !payload.starts_with(field_name) {
             return None;
         }
 
         let offset = field_name.len();
 
-        // ...followed by '=' ("PRIORITYX=6" is a different field)
         if payload.len() <= offset || payload[offset] != b'=' {
             return None;
         }
 
-        // Everything after '=' is the value
         Some(&payload[offset + 1..])
     }
 }

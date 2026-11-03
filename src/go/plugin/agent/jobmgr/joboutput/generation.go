@@ -28,6 +28,7 @@ type autoDetectionFailure struct {
 	retryAfter         int
 	class              collectorapi.LifecycleErrorClass // collector classification of the failure
 	runtime            bool                             // Run startup failed after the incumbent was stopped
+	afterReady         bool                             // readiness occurred even if Running was not yet published
 	jobConfigLifecycle collectorapi.JobConfigLifecycleSnapshot
 }
 
@@ -141,13 +142,14 @@ type PreparedJob struct {
 }
 
 type preparedJobState struct {
-	mu          sync.Mutex                // guards consumed
-	consumed    bool                      // the prepared job has been taken (accept/dispose/reject)
-	id          string                    // job full name
-	generation  uint64                    // job generation this candidate targets
-	constructed ConstructedJob            // the assembled but not-yet-started job
-	permit      lifecycle.LongLivedPermit // long-lived permit held until accepted or disposed
-	owner       *stagedJobOwner           // process owner for staged candidates
+	continuation candidateWorkToken
+	mu           sync.Mutex                // guards consumed
+	consumed     bool                      // the prepared job has been taken (accept/dispose/reject)
+	id           string                    // job full name
+	generation   uint64                    // job generation this candidate targets
+	constructed  ConstructedJob            // the assembled but not-yet-started job
+	permit       lifecycle.LongLivedPermit // long-lived permit held until accepted or disposed
+	owner        *stagedJobOwner           // process owner for staged candidates
 }
 
 func prepareCandidateJob(
@@ -294,6 +296,7 @@ func (pj PreparedJob) Accept(ctx context.Context, generation uint64) (*JobGenera
 	}
 	state.constructed = accepted
 	return &JobGeneration{
+		continuation: state.continuation,
 		ID:           state.id,
 		Generation:   state.generation,
 		resources:    state.constructed,
@@ -403,6 +406,7 @@ func autoDetectionFailureFor(constructed ConstructedJob, err error) *autoDetecti
 }
 
 type JobGeneration struct {
+	continuation   candidateWorkToken
 	opMu           sync.Mutex                // serializes bounded initiation, publication and retirement
 	resources      ConstructedJob            // the constructed job this generation owns
 	permit         lifecycle.LongLivedPermit // long-lived permit backing the generation

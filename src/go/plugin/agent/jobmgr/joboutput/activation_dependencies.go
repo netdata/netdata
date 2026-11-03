@@ -8,6 +8,7 @@ import (
 
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 )
 
@@ -34,13 +35,89 @@ func (cmf *ConfigModuleFactory) dependencyKeys(config confgroup.Config) ([]activ
 			name: name,
 		})
 	}
+	dependencies, err := cmf.namedDependencies(config)
+	if err != nil {
+		return nil, err
+	}
+	for _, dependency := range dependencies {
+		keys = append(keys, activationDependency{
+			kind: dependency.Kind,
+			name: dependency.Name,
+		})
+	}
 	return keys, nil
+}
+
+// Selectors receive raw configuration and must not resolve secrets or acquire
+// resources. Keep selection separate from readiness so subscriptions precede lookup.
+func (cmf *ConfigModuleFactory) namedDependencies(config confgroup.Config) (dependencies []collectorapi.ActivationDependency, err error) {
+	creator, ok := cmf.config.Modules.Lookup(config.Module())
+	if !ok || creator.ActivationDependencies == nil {
+		return nil, nil
+	}
+	defer func() {
+		if recover() != nil {
+			dependencies = nil
+			err = invalidJobConfiguration(errors.New("job output: activation dependency selection panicked"))
+		}
+	}()
+	dependencies, err = creator.ActivationDependencies(map[string]any(config))
+	if err != nil {
+		return nil, invalidJobConfiguration(err)
+	}
+	seen := make(map[activationDependency]struct{}, len(dependencies))
+	for _, dependency := range dependencies {
+		if dependency.Kind == "" || dependency.Name == "" || dependency.Ready == nil || dependency.Kind == "vnode" || dependency.Kind == "secretstore" {
+			return nil, invalidJobConfiguration(errors.New("job output: invalid named activation dependency"))
+		}
+		key := activationDependency{dependency.Kind, dependency.Name}
+		if _, exists := seen[key]; exists {
+			return nil, invalidJobConfiguration(errors.New("job output: duplicate named activation dependency"))
+		}
+		seen[key] = struct{}{}
+	}
+	return dependencies, nil
+}
+
+func (cmf *ConfigModuleFactory) checkNamedDependencies(config confgroup.Config) (err error) {
+	dependencies, err := cmf.namedDependencies(config)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if recover() != nil {
+			err = invalidJobConfiguration(errors.New("job output: activation dependency lookup panicked"))
+		}
+	}()
+	for _, dependency := range dependencies {
+		if err := dependency.Ready(); err != nil {
+			return &collectorapi.ActivationDependencyUnavailableError{
+				Kind:  dependency.Kind,
+				Name:  dependency.Name,
+				Cause: err,
+			}
+		}
+	}
+	return nil
 }
 
 // activationWaitsForDependency distinguishes missing framework-owned names from
 // provider failures, which retain the collector's operational retry policy.
 func (cmf *ConfigModuleFactory) activationWaitsForDependency(config confgroup.Config, err error) bool {
 	if err == nil {
+		return false
+	}
+	var named *collectorapi.ActivationDependencyUnavailableError
+	if errors.As(err, &named) {
+		keys, keyErr := cmf.dependencyKeys(config)
+		if keyErr != nil {
+			return false
+		}
+		for _, key := range keys {
+			if key.kind == named.Kind && key.name == named.Name {
+				return true
+			}
+		}
 		return false
 	}
 	failure := jobConfigFailure(err, "")

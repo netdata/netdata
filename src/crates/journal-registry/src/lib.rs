@@ -2,8 +2,9 @@
 //! monitoring systemd journal files, and the data model the journal stack
 //! queries.
 //!
-//! Position in the stack: depends only on journal-common (`Seconds` and the
-//! collection aliases, `journal-registry/Cargo.toml`) and is depended on by
+//! Position in the stack: its only journal-stack dependency is
+//! journal-common (`Seconds` and the collection aliases,
+//! `journal-registry/Cargo.toml`); it is depended on by
 //! journal-core (`journal-core/Cargo.toml`), which re-exports the
 //! `repository` namespace under `journal_core::repository`
 //! (`journal-core/src/lib.rs`).
@@ -94,7 +95,7 @@ pub mod time_range;
 // with Registry and reports the bounds back with update_time_range
 // (journal-engine/src/indexing.rs); journal-function re-exports
 // Monitor/Registry onward (journal-function/src/lib.rs) for
-// otel-legacy-logs' watch → process_event → find_files_in_range loop
+// otel-legacy-logs' watch_directory → process_event → find_files_in_range loop
 // (otel-legacy-logs/src/handler.rs); RegistryError is folded
 // into the engine and log-writer error enums (journal-engine/src/error.rs,
 // journal-log-writer/src/error.rs).

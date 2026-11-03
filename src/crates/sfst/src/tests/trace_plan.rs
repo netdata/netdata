@@ -20,8 +20,7 @@ use std::io::Cursor;
 use bumpalo::Bump;
 
 use crate::{
-    CompiledTracePlan, Durations, IndexReader, IndexWriter, PlanTerm, RowIndex, ScanWork,
-    TracePlan,
+    CompiledTracePlan, Durations, IndexReader, IndexWriter, PlanTerm, RowIndex, ScanWork, TracePlan,
 };
 
 /// One fixture row's field values, mirrored for the oracle.
@@ -83,8 +82,7 @@ fn fixture() -> (Vec<u8>, Vec<FixtureRow>) {
         rows.push(row);
     }
     ri.durations = Some(Durations(durations));
-    let (buf, _s, _m) =
-        IndexWriter::write_into(&ri, Cursor::new(Vec::new()), Vec::new()).unwrap();
+    let (buf, _s, _m) = IndexWriter::write_into(&ri, Cursor::new(Vec::new()), Vec::new()).unwrap();
     (buf.into_inner(), rows)
 }
 
@@ -182,10 +180,7 @@ fn tier_matrix_matches_the_oracle() {
             Box::new(|r: &FixtureRow| r.m == "v01" || r.m == "v02"),
         ),
         // Regex per tier (full-value anchored).
-        (
-            plan(vec![tokens("l", &[], &["a|b"])]),
-            Box::new(|_| true),
-        ),
+        (plan(vec![tokens("l", &[], &["a|b"])]), Box::new(|_| true)),
         (
             plan(vec![tokens("m", &[], &["v0[12]"])]),
             Box::new(|r: &FixtureRow| r.m == "v01" || r.m == "v02"),
@@ -201,9 +196,7 @@ fn tier_matrix_matches_the_oracle() {
                 tokens("m", &["v02"], &[]),
                 tokens("h", &[], &["w0.."]),
             ]),
-            Box::new(|r: &FixtureRow| {
-                r.l == "a" && r.m == "v02" && r.h.starts_with("w0")
-            }),
+            Box::new(|r: &FixtureRow| r.l == "a" && r.m == "v02" && r.h.starts_with("w0")),
         ),
         // Two high-card terms (the shared stream-batch pass).
         (
@@ -249,7 +242,10 @@ fn tier_matrix_matches_the_oracle() {
             Box::new(|r: &FixtureRow| r.h != "w005"),
         ),
         // A negated term on an ABSENT field matches nothing.
-        (plan(vec![not_tokens("absent", &["x"], &[])]), Box::new(|_| false)),
+        (
+            plan(vec![not_tokens("absent", &["x"], &[])]),
+            Box::new(|_| false),
+        ),
         // ── Multi-field OR (the unscoped disjunction) ──────
         (
             plan(vec![PlanTerm::Fields {
@@ -260,9 +256,7 @@ fn tier_matrix_matches_the_oracle() {
                 },
                 negated: false,
             }]),
-            Box::new(|r: &FixtureRow| {
-                r.s.as_deref() == Some("yes") || r.l == "a"
-            }),
+            Box::new(|r: &FixtureRow| r.s.as_deref() == Some("yes") || r.l == "a"),
         ),
         // Negated multi-field: present in either, matching in neither.
         (
@@ -275,8 +269,7 @@ fn tier_matrix_matches_the_oracle() {
                 negated: true,
             }]),
             Box::new(|r: &FixtureRow| {
-                let matches =
-                    r.s.as_deref() == Some("yes") || r.l == "a";
+                let matches = r.s.as_deref() == Some("yes") || r.l == "a";
                 !matches // l is always present, so presence always holds
             }),
         ),
@@ -384,7 +377,10 @@ fn absent_field_collapses_the_conjunction() {
     let mut work = ScanWork::default();
     let compiled = compile(
         &idx,
-        &plan(vec![tokens("l", &["a"], &[]), tokens("absent", &["x"], &[])]),
+        &plan(vec![
+            tokens("l", &["a"], &[]),
+            tokens("absent", &["x"], &[]),
+        ]),
         &mut work,
     );
     assert_eq!(compiled.count_in_range(0, N as u32), 0);
@@ -470,8 +466,7 @@ fn narrow_high_terms_visit_only_their_masked_batches() {
         let slots = vec![ri.intern(None, &kv)];
         ri.row(1_000 + i as i64, &slots);
     }
-    let (buf, _s, _m) =
-        IndexWriter::write_into(&ri, Cursor::new(Vec::new()), Vec::new()).unwrap();
+    let (buf, _s, _m) = IndexWriter::write_into(&ri, Cursor::new(Vec::new()), Vec::new()).unwrap();
     let bytes = buf.into_inner();
     let idx = IndexReader::open(&bytes).unwrap();
 
@@ -531,14 +526,15 @@ fn extraction_edges() {
     let compiled = compile(&idx, &p, &mut work);
     let matched = oracle(&rows, |r| r.m == "v03", 0, N as u32, N);
 
-    assert!(compiled.newest_in_range(0, N as u32, 0, &mut work).is_empty());
+    assert!(
+        compiled
+            .newest_in_range(0, N as u32, 0, &mut work)
+            .is_empty()
+    );
     assert!(compiled.newest_in_range(50, 50, 5, &mut work).is_empty());
     assert!(compiled.newest_in_range(60, 50, 5, &mut work).is_empty());
     // hi past the universe clamps.
-    assert_eq!(
-        compiled.newest_in_range(0, u32::MAX, N, &mut work),
-        matched
-    );
+    assert_eq!(compiled.newest_in_range(0, u32::MAX, N, &mut work), matched);
     // k beyond the match count returns all matches.
     assert_eq!(
         compiled.newest_in_range(0, N as u32, N * 10, &mut work),
@@ -587,8 +583,7 @@ fn duration_term_requires_the_durn_column() {
     let mut ri = RowIndex::new(&arena, 10);
     let t = ri.intern(None, "l=a");
     ri.row(1_000, &[t]);
-    let (buf, _s, _m) =
-        IndexWriter::write_into(&ri, Cursor::new(Vec::new()), Vec::new()).unwrap();
+    let (buf, _s, _m) = IndexWriter::write_into(&ri, Cursor::new(Vec::new()), Vec::new()).unwrap();
     let bytes = buf.into_inner();
     let idx = IndexReader::open(&bytes).unwrap();
     let mut work = ScanWork::default();
@@ -622,7 +617,12 @@ fn compile_budget_stops_the_stream_batch_scan() {
     // still compiles them.
     let mut w2 = ScanWork::default();
     let low = idx
-        .compile_trace_plan(&plan(vec![tokens("l", &["a"], &[])]), (0, N as u32), 0, &mut w2)
+        .compile_trace_plan(
+            &plan(vec![tokens("l", &["a"], &[])]),
+            (0, N as u32),
+            0,
+            &mut w2,
+        )
         .unwrap();
     assert!(low.is_some());
     assert_eq!(w2.rows_visited, 0);
@@ -722,8 +722,7 @@ fn empty_event_kvid_set_short_circuits_with_the_chunk_present() {
         events.end_row(0);
     }
     ri.events = Some(events);
-    let (buf, _s, _m) =
-        IndexWriter::write_into(&ri, Cursor::new(Vec::new()), Vec::new()).unwrap();
+    let (buf, _s, _m) = IndexWriter::write_into(&ri, Cursor::new(Vec::new()), Vec::new()).unwrap();
     let bytes = buf.into_inner();
     let idx = IndexReader::open(&bytes).unwrap();
     assert!(idx.has_event_index(), "the fixture must carry EVNB");
@@ -764,5 +763,9 @@ fn empty_event_kvid_set_short_circuits_with_the_chunk_present() {
         .compile_trace_plan(&p, (0, ROWS as u32), u64::MAX, &mut work)
         .unwrap()
         .expect("within budget");
-    assert_eq!(compiled.count_in_range(0, ROWS as u32), 1, "only row 5 carries e005");
+    assert_eq!(
+        compiled.count_in_range(0, ROWS as u32),
+        1,
+        "only row 5 carries e005"
+    );
 }

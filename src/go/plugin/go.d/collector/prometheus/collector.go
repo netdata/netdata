@@ -13,6 +13,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/pkg/relabel"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
 )
@@ -44,9 +45,11 @@ func DefaultConfig() Config {
 				Timeout: confopt.Duration(time.Second * 10),
 			},
 		},
-		MaxTS:          2000,
-		MaxTSPerMetric: 200,
-		Profiles:       ProfilesConfig{Mode: profilesModeAuto},
+		MaxInputSeries:            10000,
+		MaxOutputSeriesPerContext: 1000,
+		Profiles: ProfilesConfig{
+			Mode: profilesModeAuto,
+		},
 	}
 }
 
@@ -74,6 +77,7 @@ type Collector struct {
 	jobRelabel       *relabel.Pipeline
 	store            metrix.CollectorStore
 	writer           *metricFamilyWriter
+	inputRejected    bool
 	runtime          *promRuntime
 	pipelineObserver PipelineDiagnosticObserver
 
@@ -114,7 +118,6 @@ func (c *Collector) Init(ctx context.Context) error {
 	}
 
 	c.writer = newMetricFamilyWriter(c.store, metricFamilyWriterPolicy{
-		maxTSPerMetric:        c.MaxTSPerMetric,
 		isFallbackTypeGauge:   gaugeFallback,
 		isFallbackTypeCounter: counterFallback,
 		observePipeline:       c.pipelineObserver,
@@ -148,3 +151,11 @@ func (c *Collector) ChartTemplateYAML() string {
 	}
 	return c.runtime.chartTemplate
 }
+
+func (c *Collector) EnginePolicy() chartengine.EnginePolicy {
+	return chartengine.EnginePolicy{
+		MaxOutputSeriesPerContext: &c.MaxOutputSeriesPerContext,
+	}
+}
+
+var _ collectorapi.CollectorV2EnginePolicy = (*Collector)(nil)

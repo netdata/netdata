@@ -14,10 +14,11 @@
 //!
 //! Serde: entries serialize under their Rust field names inside the `JSON`
 //! chunk; `remote_etag` is the only `#[serde(default)]` field, and this
-//! module's roundtrip test pins the shape. Parse failures surface as
-//! `Error::Json` through `Catalog::from_json`; a well-formed body with wrong
-//! values is not checked here — recovery's `validate_catalog` rejects it by
-//! cross-checking every entry against its catalog and remote key.
+//! module's roundtrip test pins a lossless serialize↔parse round trip.
+//! Parse failures surface as `Error::Json` through `Catalog::from_json`; a
+//! well-formed body with wrong values is not checked here — recovery's
+//! `validate_catalog` rejects it by cross-checking every entry against its
+//! catalog and remote key.
 //!
 //! Consumers (grep-verified): sibling `catalog.rs` (map values, `find`
 //! yields) and `registry.rs` (`read_entries` returns them); file-lifecycle
@@ -54,11 +55,12 @@ pub struct CatalogEntry {
     pub remote_key: String,
     /// Earliest record timestamp in the file, seconds since the Unix epoch.
     /// From the SFST summary; drives the inclusive `[min, max]` overlap
-    /// filter in `Catalog::find` and the filename fields `Catalog::fold`
-    /// stamps.
+    /// filter in `Catalog::find` and the min-ts filename field
+    /// `Catalog::fold` computes.
     pub min_timestamp_s: u32,
     /// Latest record timestamp in the file, seconds since the Unix epoch.
-    /// From the SFST summary; the max of the range `Catalog::fold` stamps.
+    /// From the SFST summary; the max-ts of the range `Catalog::fold`
+    /// computes.
     pub max_timestamp_s: u32,
     /// Number of records (rows) the file holds, from the SFST summary.
     /// Production entries are never empty: otel-ledger deletes an empty
@@ -73,7 +75,8 @@ pub struct CatalogEntry {
     /// The SFST's file size in bytes, from the registered `sfst::File`.
     /// Sums into the remote plan's footprint (`RemotePlanInput::plan_within`)
     /// and bounds the fetch-back download (`remote_read.rs` sizes the
-    /// deadline and verifies the object against it).
+    /// deadline from it, and the download cache verifies the returned bytes
+    /// against it).
     pub size: ByteSize,
     /// Nanoseconds since the Unix epoch, stamped at entry construction: the
     /// upload-completion time on the normal path, "now" on the remote-LIST

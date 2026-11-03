@@ -238,15 +238,6 @@ modules:
               TLS verification failed. Options:
               1. Provide the correct CA certificate path in `tls_ca`
               2. Set `tls_skip_verify: yes` (not recommended for production)
-    alerts:
-      - name: k8s_apiserver_request_errors
-        metric: k8s_apiserver.requests_by_code
-        info: "high rate of API server request errors (5xx responses)"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf
-      - name: k8s_apiserver_latency
-        metric: k8s_apiserver.request_latency
-        info: "API server request latency is high"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf
     metrics:
       folding:
         title: Metrics

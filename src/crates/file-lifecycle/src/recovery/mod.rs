@@ -16,9 +16,9 @@
 //!    cleaner's WAL-delete responses, seed uploaded/rotated state from local
 //!    catalog files, and evict per retention policy.
 //! 3. `remote` — per tenant, only with storage enabled: object-storage
-//!    reconciliation — queue un-uploaded SFST uploads fire-and-forget (never
-//!    blocks startup), LIST the remote to mark uploaded SFSTs and re-send
-//!    uploaded-but-uncataloged ones as `AddEntry`, and re-upload local
+//!    reconciliation — LIST the remote to mark uploaded SFSTs and re-send
+//!    uploaded-but-uncataloged ones as `AddEntry`, queue un-uploaded SFST
+//!    uploads fire-and-forget (never blocks startup), and re-upload local
 //!    catalogs missing from the remote while seeding the `remote_cataloged`
 //!    set that gates SFST eviction.
 //!

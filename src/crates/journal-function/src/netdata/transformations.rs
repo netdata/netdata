@@ -12,8 +12,7 @@
 //! pre-registers only the journal field set listed there. All mappers live
 //! in this file; the only construction sites are
 //! [`crate::netdata::build_ui_response`] and `otel-legacy-logs/src/handler.rs`
-//! (`LegacyLogsHandler::on_call`). The duplicate at
-//! journal-engine/src/logs/transformations.rs is not compiled.
+//! (`LegacyLogsHandler::on_call`).
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -643,7 +642,7 @@ impl FieldTransformation for MessageIdTransformation {
 /// _SOURCE_REALTIME_TIMESTAMP (both µs → RFC3339); the two severity mappers,
 /// "PRIORITY" and the OTel "log.severity_number"; "SYSLOG_FACILITY";
 /// "ERRNO"; the passthrough stub "_BOOT_ID"; "_UID"/"_GID" plus their
-/// OBJECT_*/audit aliases; "_CAP_EFFECTIVE"; "MESSAGE_ID". Fields outside
+/// OBJECT_*, owner and audit aliases; "_CAP_EFFECTIVE"; "MESSAGE_ID". Fields outside
 /// this list keep display = raw (`transform_field` / `transform_value`).
 /// Sole callers: [`crate::netdata::build_ui_response`] and
 /// `otel-legacy-logs/src/handler.rs` (`LegacyLogsHandler::on_call`).
@@ -672,7 +671,7 @@ pub fn systemd_transformations() -> TransformationRegistry {
         Arc::new(OtelSeverityNumberTransformation),
     );
 
-    // UID/GID aliases seen in the wild (owner, audit login UID); GID only gets OBJECT_GID.
+    // UID/GID aliases seen in the wild (OBJECT_*, owner, audit login UID); GID only gets OBJECT_GID.
     registry.register("OBJECT_UID", Arc::new(UidTransformation));
     registry.register("OBJECT_GID", Arc::new(GidTransformation));
     registry.register("_SYSTEMD_OWNER_UID", Arc::new(UidTransformation));

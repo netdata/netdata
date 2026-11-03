@@ -13,19 +13,47 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 )
 
-// restartObservers retains only active callers, keyed by the generation they
-// restarted. Runtime ownership and retries remain independent of these waits.
+// Observation follows accepted intent across reconstruction. Physical attempts
+// still fence execution; installed runtimes settle through their exact identity.
 type restartObservers struct {
 	mu          sync.Mutex
 	sequence    uint64
+	closed      bool
 	entries     map[lifecycle.ResourceIdentity]*restartReceipt
-	activations map[acceptedActivationToken]*restartReceipt
+	activations map[restartContinuation]*restartReceipt
+}
+
+type restartContinuation struct {
+	run       uint64
+	intent    uint64
+	candidate candidateKey
+}
+
+func observedContinuation(token candidateWorkToken) restartContinuation {
+	return restartContinuation{run: token.Run, intent: token.Intent, candidate: token.Candidate}
+}
+
+// These effects belong to the adapter, not the pure candidate policy. They run
+// after its delta commits and before retirement or retry can release effects.
+type activationRestartSettlement struct {
+	work   candidateWorkToken
+	result lifecycle.SealedResult
+}
+
+type restartPause struct {
+	work     candidateWorkToken
+	identity lifecycle.ResourceIdentity
+}
+
+type restartObservationTransition struct {
+	settlement *activationRestartSettlement
+	pause      *restartPause
 }
 
 type restartReceipt struct {
 	result     chan lifecycle.SealedResult
 	identity   lifecycle.ResourceIdentity // protected by restartObservers.mu
-	activation acceptedActivationToken    // protected by restartObservers.mu
+	activation restartContinuation        // protected by restartObservers.mu
 	detached   bool                       // protected by restartObservers.mu
 }
 
@@ -41,6 +69,9 @@ func (observers *restartObservers) register(identity lifecycle.ResourceIdentity,
 	defer observers.mu.Unlock()
 	if receipt.detached {
 		return nil
+	}
+	if observers.closed {
+		return jobmgr.ErrProcessAttemptRetired
 	}
 	if !identity.Valid() || receipt.identity.Valid() || observers.entries[identity] != nil {
 		return errors.New("job output: invalid restart observer registration")
@@ -74,11 +105,11 @@ func (dcjc *DynCfgJobController) deferRestartToActivation(identity lifecycle.Res
 	if receipt := observers.entries[identity]; receipt != nil {
 		delete(observers.entries, identity)
 		if observers.activations == nil {
-			observers.activations = make(map[acceptedActivationToken]*restartReceipt)
+			observers.activations = make(map[restartContinuation]*restartReceipt)
 		}
 		receipt.identity = lifecycle.ResourceIdentity{}
-		receipt.activation = token
-		observers.activations[token] = receipt
+		receipt.activation = observedContinuation(token.work)
+		observers.activations[receipt.activation] = receipt
 	}
 }
 
@@ -86,29 +117,100 @@ func (dcjc *DynCfgJobController) installActivationRestart(token acceptedActivati
 	observers := &dcjc.restartObservers
 	observers.mu.Lock()
 	defer observers.mu.Unlock()
-	if receipt := observers.activations[token]; receipt != nil {
-		delete(observers.activations, token)
-		receipt.activation = acceptedActivationToken{}
+	key := observedContinuation(token.work)
+	if receipt := observers.activations[key]; receipt != nil {
+		delete(observers.activations, key)
+		receipt.activation = restartContinuation{}
 		receipt.identity = identity
 		observers.entries[identity] = receipt
 	}
 }
 
-func (dcjc *DynCfgJobController) completeActivationRestart(token acceptedActivationToken, result lifecycle.SealedResult) {
-	observers := &dcjc.restartObservers
-	observers.mu.Lock()
-	defer observers.mu.Unlock()
-	if receipt := observers.activations[token]; receipt != nil {
-		delete(observers.activations, token)
-		receipt.result <- result
+func restartRetiredResult() lifecycle.SealedResult {
+	return rejectedResult(jobFailure{
+		class:   failureUnavailable,
+		message: "the restarted job was stopped or replaced before becoming ready.",
+	})
+}
+
+func (observers *restartObservers) completeLocked(receipt *restartReceipt, result lifecycle.SealedResult) {
+	if observers.entries[receipt.identity] == receipt {
+		delete(observers.entries, receipt.identity)
+	}
+	if observers.activations[receipt.activation] == receipt {
+		delete(observers.activations, receipt.activation)
+	}
+	receipt.identity = lifecycle.ResourceIdentity{}
+	receipt.activation = restartContinuation{}
+	receipt.result <- result
+}
+
+// Work slots provide semantic authority even while no executor is registered.
+// Capture only the bounded slot identities; delta.apply consumes its predecessor.
+func (dcjc *DynCfgJobController) prepareRestartObservationCommit(delta *candidateDelta, transition restartObservationTransition) func() {
+	var previous, surviving [2]candidateWorkToken
+	for index, record := range []*candidateRecord{delta.before, delta.after} {
+		if record == nil {
+			continue
+		}
+		for role, work := range []*candidateWork{record.Active, record.Proposal} {
+			if work != nil && delta.owner.validRecord(record, work.Token) {
+				if index == 0 {
+					previous[role] = work.Token
+				} else {
+					surviving[role] = work.Token
+				}
+			}
+		}
+	}
+	return func() {
+		observers := &dcjc.restartObservers
+		observers.mu.Lock()
+		defer observers.mu.Unlock()
+		if pause := transition.pause; pause != nil && surviving[0].Run != 0 {
+			receipt := observers.activations[observedContinuation(pause.work)]
+			if receipt == nil && pause.identity.Valid() {
+				receipt = observers.entries[pause.identity]
+			}
+			if receipt != nil {
+				delete(observers.entries, receipt.identity)
+				delete(observers.activations, receipt.activation)
+				if observers.activations == nil {
+					observers.activations = make(map[restartContinuation]*restartReceipt)
+				}
+				receipt.identity = lifecycle.ResourceIdentity{}
+				receipt.activation = observedContinuation(surviving[0])
+				observers.activations[receipt.activation] = receipt
+			}
+		}
+		if settlement := transition.settlement; settlement != nil &&
+			(settlement.work == previous[0] || settlement.work == previous[1]) {
+			if receipt := observers.activations[observedContinuation(settlement.work)]; receipt != nil {
+				observers.completeLocked(receipt, settlement.result)
+			}
+		}
+		for _, token := range previous {
+			key := observedContinuation(token)
+			if token.Run == 0 || key == observedContinuation(surviving[0]) || key == observedContinuation(surviving[1]) {
+				continue
+			}
+			if receipt := observers.activations[key]; receipt != nil {
+				observers.completeLocked(receipt, restartRetiredResult())
+			}
+		}
 	}
 }
 
-func (dcjc *DynCfgJobController) retireActivationRestart(token acceptedActivationToken) {
-	dcjc.completeActivationRestart(token, rejectedResult(jobFailure{
-		class:   failureUnavailable,
-		message: "the restarted job was stopped or replaced before becoming ready.",
-	}))
+func (observers *restartObservers) retire() {
+	observers.mu.Lock()
+	defer observers.mu.Unlock()
+	observers.closed = true
+	for _, receipt := range observers.activations {
+		observers.completeLocked(receipt, restartRetiredResult())
+	}
+	for _, receipt := range observers.entries {
+		observers.completeLocked(receipt, restartRetiredResult())
+	}
 }
 
 // completeRestart is called only after the exact generation's graph settlement
@@ -118,17 +220,13 @@ func (dcjc *DynCfgJobController) completeRestart(identity lifecycle.ResourceIden
 	observers.mu.Lock()
 	defer observers.mu.Unlock()
 	if receipt := observers.entries[identity]; receipt != nil {
-		delete(observers.entries, identity)
-		receipt.result <- result
+		observers.completeLocked(receipt, result)
 	}
 }
 
 // Specific failure settlement runs before this generic retirement fallback.
 func (dcjc *DynCfgJobController) retireRestart(identity lifecycle.ResourceIdentity) {
-	dcjc.completeRestart(identity, rejectedResult(jobFailure{
-		class:   failureUnavailable,
-		message: "the restarted job was stopped or replaced before becoming ready.",
-	}))
+	dcjc.completeRestart(identity, restartRetiredResult())
 }
 
 func (dcjc *DynCfgJobController) restart(ctx context.Context, request DynCfgJobRequest, target dynCfgTarget) (lifecycle.SealedResult, error) {

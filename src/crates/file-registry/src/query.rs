@@ -30,7 +30,7 @@
 //! and re-applies [`range_overlaps`] over `u64` bounds), `sfst::registry`,
 //! `otel-catalog` (`Catalog::find` and the registry-side file filter), and
 //! `file-lifecycle` (the candidate pass-throughs in `registry.rs`;
-//! `query.rs::select_remote_only` is the only `matches_partition` caller).
+//! `query.rs::select_remote_only` is the method's only non-test caller).
 //! `otel-ledger`'s logs/traces RPC handlers build the queries; `sfsq-cli`
 //! discovers offline SFST candidates with one.
 use std::ops::Range;

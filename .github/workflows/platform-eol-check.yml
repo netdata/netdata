@@ -22,7 +22,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Prepare tools
         id: prepare
         run: |
@@ -35,7 +35,7 @@ jobs:
           echo "Generated matrix: ${matrix}"
           echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -67,7 +67,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Actually check the EOL date for the platform.
       - name: Check EOL Date
         id: check
@@ -117,7 +117,7 @@ jobs:
       - name: Create EOL Issue
         id: create-issue
         if: steps.check.outputs.pending == 'true' && steps.existing.outputs.exists == 'false'
-        uses: imjohnbo/issue-bot@v3
+        uses: imjohnbo/issue-bot@3188c6ce06249206709d3b1f274d0d4c5a521601 # v3.4.5
         with:
           assignees: Ferroin
           labels: area/packaging, needs triage
@@ -131,7 +131,7 @@ jobs:
             - [ ] Verify any other platform support code that needs to be cleaned up.
       # Send a notification to Slack if a job failed.
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''

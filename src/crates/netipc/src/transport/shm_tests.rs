@@ -1349,9 +1349,11 @@ fn test_cleanup_stale_invalid_entries() {
         !short_path.exists(),
         "short invalid entry should be removed"
     );
-    assert!(!build_shm_path(TEST_RUN_DIR, svc, magic_sid)
-        .unwrap()
-        .exists());
+    assert!(
+        !build_shm_path(TEST_RUN_DIR, svc, magic_sid)
+            .unwrap()
+            .exists()
+    );
     // An unreadable entry at a matching name is junk: it cannot be a live
     // endpoint we can verify, so cleanup reclaims it (under root chmod 000
     // has no effect and the file is opened, inspected, and removed instead).

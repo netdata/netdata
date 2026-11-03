@@ -49,8 +49,9 @@ impl ProjectedRowSink for ProjectedGroupingSink<'_> {
         match self.grouped_aggregates.find_field_value(field_index, value) {
             Some(field_id) => self.row_group_field_ids[field_index] = Some(field_id),
             None => {
-                // Keep an observed value distinct from a missing field after
-                // the group cap is full so the row reaches overflow.
+                // Stage rather than drop: a dropped field defaults to field
+                // id 0 (the empty group), while a staged value earns its own
+                // group below the cap and reaches overflow at the cap.
                 self.row_missing_values[field_index] = Some(value.to_string());
             }
         }
@@ -131,6 +132,11 @@ impl ProjectedRowSink for ProjectedTimeseriesSink<'_> {
         _handle: RecordHandle,
         metrics: QueryFlowMetrics,
     ) -> Result<()> {
+        // Top-N keys map to their dimension. A key retained from pass 1 but
+        // ranked out of the top N is skipped: it has no dimension, and its
+        // records were already counted in pass 1 under the key's own row.
+        // Unknown group values take the overflow dimension only when the
+        // overflow row is in the top N; otherwise the record is skipped.
         let dimension_index = if self.row_values_known {
             self.top_group_keys
                 .get(self.row_group_field_ids.as_slice())

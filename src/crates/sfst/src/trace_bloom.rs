@@ -8,7 +8,7 @@
 //! and skips the file; the ~5% false positives each cost one wasted `TIDX`
 //! lookup; false negatives cannot happen.
 //!
-//! The filter is a [`fastbloom::BloomFilter`] serialized verbatim inside the
+//! The filter is a `fastbloom::BloomFilter` serialized verbatim inside the
 //! chunk via serde, so the payload is self-describing: bit length, hash
 //! count, and seeded hasher state all travel with it. The crate is pinned
 //! and audited `unsafe`-free per version (see the workspace `Cargo.toml`).
@@ -250,7 +250,7 @@ mod tests {
 
     #[test]
     fn bincode_round_trip_through_the_chunk_codec() {
-        // The crate tests its serde support with serde_cbor; OUR chunk codec
+        // fastbloom tests its serde support with serde_cbor; OUR chunk codec
         // is bincode+zstd (`writer::pack` / `reader::unpack`). Round-trip
         // through the real codec — seed/hasher state must survive, proven by
         // identical membership answers.
@@ -432,10 +432,9 @@ mod tests {
             tree: SchemaTree::flat(&Vec::new().into()),
             columns: ColumnsTable::default(), // no TRCE in the manifest
         };
-        let prim = crate::PrefixMap::<crate::BitmapValue>::build(
-            Vec::<(&str, crate::BitmapValue)>::new(),
-        )
-        .unwrap();
+        let prim =
+            crate::PrefixMap::<crate::BitmapValue>::build(Vec::<(&str, crate::BitmapValue)>::new())
+                .unwrap();
 
         let mut w = chunk_file::container::StreamingWriter::new(
             std::io::Cursor::new(Vec::new()),
@@ -444,16 +443,31 @@ mod tests {
             7,
         )
         .unwrap();
-        w.write_chunk(crate::CHUNK_SUMMARY, &crate::writer::pack(&summary, lvl).unwrap())
-            .unwrap();
-        w.write_chunk(crate::CHUNK_META, &crate::writer::pack(&metadata, lvl).unwrap())
-            .unwrap();
-        w.write_chunk(crate::CHUNK_TIMS, &crate::writer::pack(&[1i64][..], lvl).unwrap())
-            .unwrap();
-        w.write_chunk(crate::CHUNK_PRIMARY, &crate::writer::pack(&prim, lvl).unwrap())
-            .unwrap();
-        w.write_chunk(crate::CHUNK_TRACE_INDEX, &crate::writer::pack(&idx, lvl).unwrap())
-            .unwrap();
+        w.write_chunk(
+            crate::CHUNK_SUMMARY,
+            &crate::writer::pack(&summary, lvl).unwrap(),
+        )
+        .unwrap();
+        w.write_chunk(
+            crate::CHUNK_META,
+            &crate::writer::pack(&metadata, lvl).unwrap(),
+        )
+        .unwrap();
+        w.write_chunk(
+            crate::CHUNK_TIMS,
+            &crate::writer::pack(&[1i64][..], lvl).unwrap(),
+        )
+        .unwrap();
+        w.write_chunk(
+            crate::CHUNK_PRIMARY,
+            &crate::writer::pack(&prim, lvl).unwrap(),
+        )
+        .unwrap();
+        w.write_chunk(
+            crate::CHUNK_TRACE_INDEX,
+            &crate::writer::pack(&idx, lvl).unwrap(),
+        )
+        .unwrap();
         w.write_chunk(
             crate::CHUNK_TRACE_BLOOM,
             &crate::writer::pack(&bloom, lvl).unwrap(),
@@ -468,6 +482,9 @@ mod tests {
 
         let reader = crate::reader::ChunkReader::open(&buf).unwrap();
         assert!(reader.has_trace_id_bloom() && reader.has_trace_id_index());
-        assert!(reader.trace_id_bloom().is_err(), "missing TRCE column rejected");
+        assert!(
+            reader.trace_id_bloom().is_err(),
+            "missing TRCE column rejected"
+        );
     }
 }

@@ -19,7 +19,7 @@
 //!   it.
 //! - `ConfigDeclaration` view/edit access: the permissions needed to view or
 //!   edit the entry. An empty mask is replaced at registration by the agent's
-//!   role defaults, not read as "no access" (dyncfg_add_low_level,
+//!   defaults, not read as "no access" (dyncfg_add_low_level,
 //!   src/daemon/dyncfg/dyncfg.c).
 //!
 //! Rendering:
@@ -38,10 +38,10 @@
 //! [`HttpAccess::from_slice`] accepts hex (with or without `0x`) and the
 //! legacy role words any/all, member(s), admin(s) — the words the agent's
 //! declaration parser also accepts (http_access_from_hex_mapping_old_roles,
-//! src/plugins.d/pluginsd_functions.c) — mapping anything else, including
-//! invalid UTF-8, to the empty mask. [`HttpAccess::from_hex`] is the strict
-//! half: it returns `None` on non-hex words where the C strtoull would
-//! partially decode them ("7zz" → 0x7).
+//! called by that parser in src/plugins.d/pluginsd_functions.c) — mapping
+//! anything else, including invalid UTF-8, to the empty mask.
+//! [`HttpAccess::from_hex`] is the strict half: it returns `None` on non-hex
+//! words where the C strtoull would partially decode them ("7zz" → 0x7).
 //!
 //! `has`, `as_u32` and `from_hex` have no callers outside this file's tests;
 //! the file carries the same file-level allow(dead_code) as the sibling
@@ -80,8 +80,8 @@ bitflags! {
     }
 }
 
-/// Serializes the raw u32 bit pattern (a plain number), so
-/// FunctionDeclaration/FunctionCall carry the mask as a plain number.
+/// Serializes the raw u32 bit pattern as a plain number, the form
+/// FunctionDeclaration/FunctionCall carry through serde.
 impl serde::Serialize for HttpAccess {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         self.bits().serialize(serializer)
@@ -123,8 +123,9 @@ impl HttpAccess {
 
     /// Parse an access mask from hex text: optional `0x` prefix, hex digits,
     /// surrounding whitespace allowed; an empty string is the empty mask;
-    /// unknown bits are masked off; `None` for any other text. The strict
-    /// half of [`Self::from_slice`]'s wire-word parsing.
+    /// unknown bits are masked off; other text is `None` (a leading `+`
+    /// before the digits still parses, as `u32::from_str_radix` allows).
+    /// The strict half of [`Self::from_slice`]'s wire-word parsing.
     pub fn from_hex(s: &str) -> Option<Self> {
         let s = s.trim();
         if s.is_empty() {
@@ -244,11 +245,9 @@ mod tests {
 
     #[test]
     fn test_u32_conversion() {
-        // Test from_u32 and as_u32
         let access = HttpAccess::from_u32(0x9);
         assert_eq!(access.as_u32(), 0x9);
 
-        // Test From traits
         let access: HttpAccess = 0x9u32.into();
         assert_eq!(access, HttpAccess::from_bits_truncate(0x9));
 

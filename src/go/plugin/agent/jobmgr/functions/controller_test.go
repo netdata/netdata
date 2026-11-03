@@ -496,7 +496,7 @@ func TestFunctionControllerAgentAvailabilityIsMonotonic(t *testing.T) {
 
 	require.NoError(t, controller.ReconcileModule(context.Background(), "module"))
 	require.Eventually(t, func() bool {
-		return !controller.plans["module"].agentBundle.available("delayed")
+		return !controller.plans[functionOwner{name: "module"}].agentBundle.available("delayed")
 	}, time.Second, time.Millisecond)
 
 	got := publicationPort.eventsSnapshot()
@@ -744,7 +744,7 @@ func TestMethodGenerationCleansPartialHandlerConstruction(t *testing.T) {
 		"generation",
 		"module",
 		methodGenerationShared,
-		creator,
+		creator.InstancePolicy,
 		[]funcapi.FunctionConfig{{ID: "method"}},
 		map[string]*functionBundle{
 			"a": bundle,

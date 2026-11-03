@@ -144,8 +144,9 @@ impl BucketResponse {
         }
     }
 
-    /// Fields with at least one counted value in this bucket
-    /// (fields of the `fv_counts` keys).
+    /// Fields of the `fv_counts` keys: every field=value pair an
+    /// overlapping file indexes is counted here, even when this bucket
+    /// holds zero of its entries.
     pub fn indexed_fields(&self) -> HashSet<FieldName> {
         self.fv_counts
             .keys()
@@ -223,7 +224,8 @@ impl Histogram {
 /// and shareable: otel-legacy-logs keeps a single engine in `Arc`-shared
 /// handler state, so all concurrent queries hit the same cache
 /// (`otel-legacy-logs/src/handler.rs` `LegacyLogsHandlerInner`). Counting runs outside the
-/// lock; the lock guards only membership checks and inserts.
+/// lock; the lock guards only membership checks, inserts and the
+/// LRU-updating reads that assemble the result.
 /// `compute_from_indexes` is synchronous and runs on the caller's thread -
 /// in the handler, on a runtime worker between the `spawn_blocking`
 /// indexing and log-query steps
@@ -309,7 +311,6 @@ impl HistogramEngine {
         };
 
         if !buckets_to_compute.is_empty() {
-            // Initialize responses for buckets we need to compute
             let mut new_responses: HashMap<BucketRequest, BucketResponse> = buckets_to_compute
                 .iter()
                 .map(|br| (br.clone(), BucketResponse::new()))
@@ -321,14 +322,11 @@ impl HistogramEngine {
                 .map(|br| (br.clone(), true))
                 .collect();
 
-            // Process all file indexes and update responses
             for (_, file_index) in indexed_files {
                 let is_online = file_index.online();
-                // Get file's time range from the index
                 let file_start = file_index.start_time();
                 let file_end = file_index.end_time();
 
-                // Find all bucket requests that need data from this file
                 for bucket_request in &buckets_to_compute {
                     // Always present: both maps above come from buckets_to_compute
                     let response = match new_responses.get_mut(bucket_request) {
@@ -400,7 +398,7 @@ impl HistogramEngine {
                     // Fields the file carries but that are outside the facet set: no
                     // bitmaps, so they surface only as names for the viewer's column
                     // schema. Journal field names are recorded unvalidated
-                    // (`journal-index/src/file_indexer.rs` `FileIndexer::build_entries_index`), so the `FieldName::new`
+                    // (`journal-index/src/file_indexer.rs` `FileIndexer::index`), so the `FieldName::new`
                     // guard below drops any that cannot round-trip (empty, or containing
                     // '=').
                     for field in file_index.fields() {
@@ -411,7 +409,6 @@ impl HistogramEngine {
                         }
                     }
 
-                    // Count field=value pairs in this file for this bucket's time range
                     for (indexed_field, field_bitmap) in file_index.bitmaps() {
                         let unfiltered_count = file_index
                             .count_entries_in_time_range(

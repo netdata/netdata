@@ -10,8 +10,9 @@
 //! an empty one.
 //!
 //! [`Source`] is the only `pub` item here (re-exported as `sfsq::Source`
-//! and `sfsq::logs::Source`); the rest is `pub(crate)`, reaching the
-//! logs modules via the `super::mmap` facade and the traces operations
+//! and `sfsq::logs::Source`); the shared items are `pub(crate)` and the
+//! `map_file`/`page_size` helpers private. The logs modules reach the
+//! shared items through the `super::mmap` facade, the traces operations
 //! directly.
 
 use std::fs::File;
@@ -45,8 +46,8 @@ impl Source {
 }
 
 /// A candidate's bytes, however they are backed: a memory-mapped file or
-/// an in-memory chunk image. Both deref to `&[u8]` for
-/// [`sfst::IndexReader::open`]; only the file variant participates in
+/// an in-memory chunk image. Both yield `&[u8]` via `bytes()` for
+/// `sfst::IndexReader::open`; only the file variant participates in
 /// cold-suffix page-cache release (an in-memory chunk has no file pages
 /// to advise away).
 ///
@@ -71,11 +72,10 @@ impl Mapped {
 
 /// A failure obtaining a source's bytes.
 ///
-/// Each variant names the failed operation (`open` or `mmap`) and pairs
-/// the path with the OS error; the logs engine embeds that `Display` in
-/// its degrade warning, traces turns the error into a partial-result
-/// reason — a broken source surfaces as a failure, never silently as an
-/// empty one (the design-record status model).
+/// The logs engine embeds the error's `Display` (failed operation, path,
+/// OS error) in its degrade warning, traces turns the error into a
+/// partial-result reason — a broken source surfaces as a failure, never
+/// silently as an empty one (the design-record status model).
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum MapError {
     #[error("open {path}: {source}")]
@@ -90,11 +90,10 @@ pub(crate) enum MapError {
     },
 }
 
-/// Obtain a candidate's bytes from its [`Source`]. A `File` is
-/// memory-mapped; a `Memory` chunk's `Arc` is cloned — cheap, cannot
-/// fail, and keeps the bytes alive for the query even if the producing
-/// cache evicts the entry. Failures are structured — the caller decides
-/// whether to degrade (logs) or report (traces).
+/// Obtain a candidate's bytes from its [`Source`]: a `File` is
+/// memory-mapped, a `Memory` chunk's `Arc` is cloned (cheap, cannot
+/// fail). Failures are structured — the caller decides whether to
+/// degrade (logs) or report (traces).
 pub(crate) fn map_source(source: &Source) -> Result<Mapped, MapError> {
     match source {
         Source::File(path) => map_file(path).map(|m| Mapped::File(Arc::new(m))),
@@ -119,7 +118,7 @@ fn map_file(path: &Path) -> Result<Mmap, MapError> {
 
 /// Advise the kernel to drop a file's cold suffix from the page cache.
 /// `region` is the raw `(offset, len)` from
-/// [`sfst::IndexReader::cold_region`]; it is aligned **inward** to whole
+/// `sfst::IndexReader::cold_region`; it is aligned **inward** to whole
 /// pages so the advice never frees a hot-prefix edge page (e.g. the
 /// primary FST's tail), then released in a single `madvise` call.
 pub(crate) fn release_cold_region(mapping: &Mmap, region: (usize, usize)) {

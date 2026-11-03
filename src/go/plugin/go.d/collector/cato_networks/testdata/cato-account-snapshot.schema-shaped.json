@@ -40,8 +40,8 @@
                   "info": {
                     "id": "wan1",
                     "name": "WAN 1",
-                    "upstreamBandwidth": 100000,
-                    "downstreamBandwidth": 200000
+                    "upstreamBandwidthMbpsPrecision": 100000,
+                    "downstreamBandwidthMbpsPrecision": 200000
                   }
                 }
               ],

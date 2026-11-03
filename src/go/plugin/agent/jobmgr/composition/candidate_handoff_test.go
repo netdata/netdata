@@ -24,6 +24,7 @@ type handoffCollector struct {
 	inits, checks *atomic.Int32
 	cleanupGate   <-chan struct{}
 	check         func() error
+	stopped       *atomic.Bool
 }
 
 func (c *handoffCollector) Init(context.Context) error { c.inits.Add(1); return nil }
@@ -35,6 +36,9 @@ func (c *handoffCollector) Check(context.Context) error {
 	return nil
 }
 func (c *handoffCollector) Run(ctx context.Context, ready func()) error {
+	if c.stopped != nil {
+		defer c.stopped.Store(true)
+	}
 	ready()
 	<-ctx.Done()
 	return ctx.Err()

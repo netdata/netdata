@@ -88,7 +88,7 @@
 //!   (`startup`/`local`/`remote`).
 //! - [`upload_retry`] — the capped exponential-backoff retry queue that
 //!   re-issues failed SFST and catalog uploads.
-//! - [`helpers`] — pure mapping helpers: the config ↔ storage-type
+//! - [`helpers`] — pure mapping helpers: the config ↔ format/catalog-struct
 //!   conversions, summary → date, registry → upload request, and the
 //!   retention-policy builders.
 //! - `redact` (crate-private) — journal-safety redaction of

@@ -22,7 +22,7 @@
 //! The result also carries a field→schema-kind map, so consumers type
 //! values from the declared schema kinds instead of inferring them from
 //! rendered strings. Its sectioning and the cross-source coalescing
-//! rule (the [`sfst::join_value_kinds`] lattice over exactly the
+//! rule (the `sfst::join_value_kinds` lattice over exactly the
 //! sources that contributed retained spans) live on [`FieldKinds`].
 
 use std::collections::BTreeMap;
@@ -95,11 +95,11 @@ pub enum TraceRequestError {
 /// The coalesced field→schema-kind maps for typed reconstruction,
 /// SECTIONED to mirror how the trace exposes names: span-level `fields`
 /// keep their storage names; event/link attribute keys are the
-/// prefix-stripped names [`sfst::TraceEvent`]/[`sfst::TraceLink`] expose
+/// prefix-stripped names `sfst::TraceEvent`/`sfst::TraceLink` expose
 /// (a flat result map would collide an event attr `foo` with a link
 /// attr `foo` whose kinds differ). Every section is FILTERED to exactly
 /// the names the returned trace exposes; the KINDS coalesce — via the
-/// [`sfst::join_value_kinds`] lattice — from exactly the sources whose
+/// `sfst::join_value_kinds` lattice — from exactly the sources whose
 /// spans the result retained. Sorted by name.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct FieldKinds {

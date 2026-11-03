@@ -2,7 +2,7 @@
 // `COMMAND_MAP` static is the pluginsd keyword table that `src/line_parser.rs`
 // includes at compile time (`include!(concat!(env!("OUT_DIR"), "/tokens.rs"))`).
 //
-// `COMMAND_MAP` maps every pluginsd wire keyword — the first word of a line,
+// `COMMAND_MAP` maps the pluginsd wire keywords — the first word of a line,
 // looked up byte-exact — to the `Token` variant `parse_normal_line` dispatches
 // on, so keyword resolution is a single phf lookup.
 //
@@ -20,12 +20,12 @@
 // renamed without updating its entry here fails to compile in line_parser.rs.
 //
 // Mapping a keyword does not make the decoder understand it:
-// `parse_normal_line` converts only the tokens it matches — the chart and
-// function-protocol subsets — to `Command`s; any other mapped token hits its
-// `panic!` arm when that keyword arrives, and a keyword missing from this
-// table parses as `Command::Unknown` and is dropped by the message layer. A
-// `Token` variant added without an entry therefore leaves its keyword
-// silently unrecognized.
+// `parse_normal_line` converts only the tokens it matches — the chart,
+// function/payload, `JSON`, and `QUIT` tokens — to `Command`s; any other
+// mapped token hits its `panic!` arm when that keyword arrives, and a keyword
+// missing from this table parses as `Command::Unknown` and is dropped by the
+// message layer. A `Token` variant added without an entry therefore leaves
+// its keyword unrecognized.
 //
 // No `cargo:rerun-if-*` directives are emitted, so cargo falls back to
 // rerunning this script whenever any file in the package changes.

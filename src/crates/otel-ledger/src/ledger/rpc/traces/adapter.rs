@@ -1,5 +1,5 @@
 //! Mapping between the `otel-traces` wire types ([`super::wire`]) and
-//! the wire-neutral [`sfsq::traces`] engine — the traces analogue of
+//! the wire-neutral `sfsq::traces` engine — the traces analogue of
 //! the logs `adapter`: a pure translation layer, no I/O of its own.
 //!
 //! * wire → engine — request-side parsing: hex ids, the selection-key
@@ -15,16 +15,16 @@
 use std::collections::HashMap;
 
 use sfsq::traces::{
-    AttributeKey, AttributeNamesData, AttributeOwner, AttributeValuesData, BuiltinField,
-    CompareOp, Condition, DURATION_BIN_LABELS, DurationPercentiles, FieldKinds, OverviewData,
-    Predicate, PredicateTarget, PredicateValue, SearchData, SlowestData, TraceData,
+    AttributeKey, AttributeNamesData, AttributeOwner, AttributeValuesData, BuiltinField, CompareOp,
+    Condition, DURATION_BIN_LABELS, DurationPercentiles, FieldKinds, OverviewData, Predicate,
+    PredicateTarget, PredicateValue, SearchData, SlowestData, TraceData,
 };
 
 use super::wire::{
     AnchorWire, AttributeValueWire, AttributeValuesResult, AttributesResult, CoverageWire,
-    EventWire, FacetListWire, FacetValueWire, FieldKindsWire, LinkWire,
-    OverviewGridWire, OverviewPercentilesWire, OverviewResult, OverviewSection, OverviewTotals,
-    SearchItems, SearchResult, ServiceBreakdownWire, ServiceSpansWire, SlowestResult, SlowestTraceWire,
+    EventWire, FacetListWire, FacetValueWire, FieldKindsWire, LinkWire, OverviewGridWire,
+    OverviewPercentilesWire, OverviewResult, OverviewSection, OverviewTotals, SearchItems,
+    SearchResult, ServiceBreakdownWire, ServiceSpansWire, SlowestResult, SlowestTraceWire,
     SpanWire, StatusWire, TraceItems, TraceResult, TraceSummaryWire,
 };
 
@@ -189,7 +189,10 @@ const BUILTIN_WORDS: [(&str, BuiltinField); 17] = [
     ("status", BuiltinField::Status),
     ("status_message", BuiltinField::StatusMessage),
     ("instrumentation_name", BuiltinField::InstrumentationName),
-    ("instrumentation_version", BuiltinField::InstrumentationVersion),
+    (
+        "instrumentation_version",
+        BuiltinField::InstrumentationVersion,
+    ),
     ("event_name", BuiltinField::EventName),
     ("duration", BuiltinField::Duration),
     ("span_id", BuiltinField::SpanId),
@@ -207,9 +210,9 @@ const BUILTIN_WORDS: [(&str, BuiltinField); 17] = [
 /// The engine enum has two further owners that stay un-named here:
 /// `Builtin` is spelled as the bare builtin words above, and the
 /// predicates-only `Any` is not wire-nameable at all. Enumeration emits
-/// owner-qualified keys ([`render_attribute_key`]), so selections are
-/// always qualified; its `.expect` keeps this table in lockstep with
-/// the engine enum.
+/// attribute keys owner-qualified ([`render_attribute_key`]), so
+/// attribute selections are always qualified; its `.expect` keeps this
+/// table in lockstep with the engine enum.
 const OWNER_WORDS: [(&str, AttributeOwner); 5] = [
     ("resource", AttributeOwner::Resource),
     ("span", AttributeOwner::Span),

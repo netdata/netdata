@@ -76,6 +76,91 @@ web_client_test_payload_request(const char *method, size_t payload_length, size_
     return request;
 }
 
+int web_client_registry_cookie_unittest(void)
+{
+    fprintf(stderr, "\n%s() running...\n", __FUNCTION__);
+
+#define REGISTRY_COOKIE_TEST_OURS   "b5dd255b-a36c-44ad-a598-115c1e06b964"
+#define REGISTRY_COOKIE_TEST_OTHER  "38992aab-c97a-490c-b9f7-660b0d78965b"
+
+    static const struct {
+        const char *request;
+        const char *expected;
+    } cases[] = {
+        {
+            "GET /api/v1/registry?action=hello HTTP/1.1\r\n"
+            "Cookie: netdata_registry_id=" REGISTRY_COOKIE_TEST_OURS "\r\n\r\n",
+            REGISTRY_COOKIE_TEST_OURS,
+        },
+        {
+            "GET /api/v1/registry?action=access&x=netdata_registry_id=" REGISTRY_COOKIE_TEST_OTHER " HTTP/1.1\r\n"
+            "Cookie: netdata_registry_id=" REGISTRY_COOKIE_TEST_OURS "\r\n\r\n",
+            REGISTRY_COOKIE_TEST_OURS,
+        },
+        {
+            "GET /api/v1/registry?action=access&x=netdata_registry_id=" REGISTRY_COOKIE_TEST_OTHER " HTTP/1.1\r\n\r\n",
+            "",
+        },
+        {
+            "GET /api/v1/registry?action=access HTTP/1.1\r\n"
+            "Referer: http://example.com/?netdata_registry_id=" REGISTRY_COOKIE_TEST_OTHER "\r\n\r\n",
+            "",
+        },
+        {
+            "GET /api/v1/registry?action=access HTTP/1.1\r\n"
+            "Cookie: a=1; netdata_registry_id=" REGISTRY_COOKIE_TEST_OURS "; b=2\r\n\r\n",
+            REGISTRY_COOKIE_TEST_OURS,
+        },
+        {
+            "GET /api/v1/registry?action=access HTTP/1.1\r\n"
+            "Cookie: other_netdata_registry_id=" REGISTRY_COOKIE_TEST_OTHER "\r\n\r\n",
+            "",
+        },
+        {
+            "GET /api/v1/registry?action=access HTTP/1.1\r\n"
+            "Cookie: netdata_registry_id=" REGISTRY_COOKIE_TEST_OURS "; netdata_registry_id=" REGISTRY_COOKIE_TEST_OTHER "\r\n\r\n",
+            REGISTRY_COOKIE_TEST_OURS,
+        },
+        {
+            "GET /api/v1/registry?action=access HTTP/1.1\r\n"
+            "Cookie: a=1\r\n"
+            "Cookie: netdata_registry_id=" REGISTRY_COOKIE_TEST_OURS "\r\n\r\n",
+            REGISTRY_COOKIE_TEST_OURS,
+        },
+    };
+
+    int errors = 0;
+    size_t memory_accounting = 0;
+    struct web_client *w = web_client_create(&memory_accounting);
+
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        web_client_reuse_from_cache(w);
+        buffer_flush(w->response.data);
+        buffer_strcat(w->response.data, cases[i].request);
+
+        WEB_CLIENT_TEST(http_request_validate(w) == HTTP_VALIDATION_OK, "case %zu: request did not validate", i);
+        WEB_CLIENT_TEST(
+            strcmp(w->auth.registry_person_guid, cases[i].expected) == 0,
+            "case %zu: registry cookie is '%s', expected '%s'",
+            i,
+            w->auth.registry_person_guid,
+            cases[i].expected);
+    }
+
+    web_client_free(w);
+    WEB_CLIENT_TEST(memory_accounting == 0, "web client leaked %zu accounted bytes", memory_accounting);
+
+#undef REGISTRY_COOKIE_TEST_OURS
+#undef REGISTRY_COOKIE_TEST_OTHER
+
+    if (errors)
+        fprintf(stderr, "%s() failed with %d error(s)\n", __FUNCTION__, errors);
+    else
+        fprintf(stderr, "%s() passed\n", __FUNCTION__);
+
+    return errors;
+}
+
 int web_client_request_size_unittest(void)
 {
     fprintf(stderr, "\n%s() running...\n", __FUNCTION__);
@@ -89,7 +174,7 @@ int web_client_request_size_unittest(void)
         w->url_decode_buffer_size == 0, "new client URL decode capacity is %zu, expected 0", w->url_decode_buffer_size);
 
     const char small_target[] = "/api/v1/info?value=a%20b";
-    WEB_CLIENT_TEST(web_client_decode_path_and_query_string(w, small_target), "small target was rejected");
+    WEB_CLIENT_TEST(web_client_decode_path_and_query_string(w, small_target) == HTTP_VALIDATION_OK, "small target was rejected");
     WEB_CLIENT_TEST(
         w->url_decode_buffer_size == NETDATA_WEB_REQUEST_URL_DECODE_INITIAL_SIZE,
         "small target capacity is %zu, expected %zu",
@@ -101,6 +186,31 @@ int web_client_request_size_unittest(void)
         strcmp(buffer_tostring(w->url_query_string_decoded), "?value=a b") == 0,
         "small target query decoded incorrectly");
 
+    WEB_CLIENT_TEST(
+        web_client_decode_path_and_query_string(w, "/api/v1/info%zz") == HTTP_VALIDATION_MALFORMED_URL,
+        "malformed percent escape in the path was accepted");
+    WEB_CLIENT_TEST(
+        web_client_decode_path_and_query_string(w, "/api/v1/info?value=%C3xA9") == HTTP_VALIDATION_MALFORMED_URL,
+        "malformed UTF-8 escape in the query was accepted");
+    WEB_CLIENT_TEST(
+        web_client_decode_path_and_query_string(w, "/api/v1/info?value=%C0%AF") == HTTP_VALIDATION_MALFORMED_URL,
+        "overlong UTF-8 in the query was accepted");
+    WEB_CLIENT_TEST(
+        web_client_decode_path_and_query_string(w, small_target) == HTTP_VALIDATION_OK, "small target was rejected after a malformed one");
+
+    HTTP_REQUEST_MODE original_mode = w->mode;
+    w->mode = HTTP_REQUEST_MODE_STREAM;
+    WEB_CLIENT_TEST(
+        web_client_decode_path_and_query_string(w, "key=abc&hostname=a%zz") == HTTP_VALIDATION_MALFORMED_URL,
+        "malformed percent escape in a stream request was accepted");
+    WEB_CLIENT_TEST(
+        web_client_decode_path_and_query_string(w, "key=abc&hostname=a%20b") == HTTP_VALIDATION_OK,
+        "valid stream request was rejected");
+    WEB_CLIENT_TEST(
+        strcmp(buffer_tostring(w->url_query_string_decoded), "key=abc&hostname=a b") == 0,
+        "stream request decoded incorrectly");
+    w->mode = original_mode;
+
     char *retained = w->url_decode_buffer;
     web_client_reuse_from_cache(w);
     WEB_CLIENT_TEST(w->url_decode_buffer == retained, "cached 4 KiB buffer was not retained");
@@ -109,7 +219,7 @@ int web_client_request_size_unittest(void)
         "cached 4 KiB capacity was not retained");
 
     char *target = web_client_test_target(NETDATA_WEB_REQUEST_URL_DECODE_CACHE_MAX_SIZE - 1);
-    WEB_CLIENT_TEST(web_client_decode_path_and_query_string(w, target), "target fitting 64 KiB was rejected");
+    WEB_CLIENT_TEST(web_client_decode_path_and_query_string(w, target) == HTTP_VALIDATION_OK, "target fitting 64 KiB was rejected");
     WEB_CLIENT_TEST(
         w->url_decode_buffer_size == NETDATA_WEB_REQUEST_URL_DECODE_CACHE_MAX_SIZE,
         "target fitting 64 KiB grew to %zu",
@@ -120,7 +230,7 @@ int web_client_request_size_unittest(void)
 
     freez(target);
     target = web_client_test_target(NETDATA_WEB_REQUEST_URL_DECODE_CACHE_MAX_SIZE);
-    WEB_CLIENT_TEST(web_client_decode_path_and_query_string(w, target), "target requiring 128 KiB was rejected");
+    WEB_CLIENT_TEST(web_client_decode_path_and_query_string(w, target) == HTTP_VALIDATION_OK, "target requiring 128 KiB was rejected");
     WEB_CLIENT_TEST(
         w->url_decode_buffer_size == 2 * NETDATA_WEB_REQUEST_URL_DECODE_CACHE_MAX_SIZE,
         "target requiring 128 KiB grew to %zu",
@@ -136,7 +246,7 @@ int web_client_request_size_unittest(void)
 
     freez(target);
     target = web_client_test_target(NETDATA_WEB_REQUEST_MAX_SIZE - 1);
-    WEB_CLIENT_TEST(web_client_decode_path_and_query_string(w, target), "largest fitting target was rejected");
+    WEB_CLIENT_TEST(web_client_decode_path_and_query_string(w, target) == HTTP_VALIDATION_OK, "largest fitting target was rejected");
     WEB_CLIENT_TEST(
         w->url_decode_buffer_size == NETDATA_WEB_REQUEST_MAX_SIZE,
         "largest fitting target capacity is %zu",
@@ -145,7 +255,7 @@ int web_client_request_size_unittest(void)
     char *maximum_buffer = w->url_decode_buffer;
     freez(target);
     target = web_client_test_target(NETDATA_WEB_REQUEST_MAX_SIZE);
-    WEB_CLIENT_TEST(!web_client_decode_path_and_query_string(w, target), "oversized target was accepted");
+    WEB_CLIENT_TEST(web_client_decode_path_and_query_string(w, target) == HTTP_VALIDATION_URI_TOO_LONG, "oversized target was accepted");
     WEB_CLIENT_TEST(w->url_decode_buffer == maximum_buffer, "oversized target replaced the 1 MiB buffer");
     WEB_CLIENT_TEST(
         w->url_decode_buffer_size == NETDATA_WEB_REQUEST_MAX_SIZE,
@@ -157,7 +267,8 @@ int web_client_request_size_unittest(void)
     WEB_CLIENT_TEST(
         w->url_decode_buffer_size == 0, "trimmed 1 MiB buffer retained capacity %zu", w->url_decode_buffer_size);
     WEB_CLIENT_TEST(
-        !web_client_decode_path_and_query_string(w, target), "oversized target with NULL scratch buffer was accepted");
+        web_client_decode_path_and_query_string(w, target) == HTTP_VALIDATION_URI_TOO_LONG,
+        "oversized target with NULL scratch buffer was accepted");
     WEB_CLIENT_TEST(!w->url_decode_buffer, "oversized target allocated scratch before failing");
 
     freez(target);
@@ -460,6 +571,88 @@ int web_client_request_size_unittest(void)
     WEB_CLIENT_TEST(HTTP_RESP_URI_TOO_LONG == 414, "URI-too-long HTTP status is not 414");
 
     freez(request);
+    web_client_free(w);
+    WEB_CLIENT_TEST(memory_accounting == 0, "web client leaked %zu accounted bytes", memory_accounting);
+
+    if (errors)
+        fprintf(stderr, "%s() failed with %d error(s)\n", __FUNCTION__, errors);
+    else
+        fprintf(stderr, "%s() passed\n", __FUNCTION__);
+
+    return errors;
+}
+
+int web_client_forwarded_for_unittest(void)
+{
+    fprintf(stderr, "\n%s() running...\n", __FUNCTION__);
+
+    int errors = 0;
+    size_t memory_accounting = 0;
+    struct web_client *w = web_client_create(&memory_accounting);
+
+    // The stored value is serialized into the comma separated key=value source
+    // string of function calls and quoted into the FUNCTION lines sent to plugins
+    // and children, so only the first entry of the list is kept, and only when it
+    // is an IPv4 or IPv6 address.
+    static const struct {
+        const char *header;
+        const char *expected;
+    } cases[] = {
+        { "203.0.113.7", "203.0.113.7" },
+        { "2001:db8::7", "2001:db8::7" },
+        { "\t203.0.113.7", "203.0.113.7" },
+        { "203.0.113.7, 198.51.100.1", "203.0.113.7" },
+        { "203.0.113.7 , 198.51.100.1", "203.0.113.7" },
+        { "203.0.113.7,role=admin", "203.0.113.7" },
+        { "role=admin", "" },
+        { "203.0.113.7 role=admin", "" },
+        { "203.0.113.7\" \"x", "" },
+        { "203.0.113.7:8080", "" },
+        { "unknown", "" },
+        { "", "" },
+    };
+
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        web_client_reuse_from_cache(w);
+        buffer_flush(w->response.data);
+        buffer_sprintf(w->response.data, "GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For: %s\r\n\r\n", cases[i].header);
+        WEB_CLIENT_TEST(
+            http_request_validate(w) == HTTP_VALIDATION_OK,
+            "request with X-Forwarded-For '%s' did not validate",
+            cases[i].header);
+        WEB_CLIENT_TEST(
+            strcmp(w->user_auth.forwarded_for, cases[i].expected) == 0,
+            "X-Forwarded-For '%s' was stored as '%s', expected '%s'",
+            cases[i].header,
+            w->user_auth.forwarded_for,
+            cases[i].expected);
+    }
+
+    // the identity serialized for plugins must parse back unchanged
+    web_client_reuse_from_cache(w);
+    buffer_flush(w->response.data);
+    buffer_strcat(
+        w->response.data,
+        "GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For: 203.0.113.7,method=api-bearer,role=admin,permissions=ffff\r\n\r\n");
+    WEB_CLIENT_TEST(http_request_validate(w) == HTTP_VALIDATION_OK, "request with a key=value X-Forwarded-For did not validate");
+
+    CLEAN_BUFFER *source = buffer_create(0, NULL);
+    user_auth_to_source_buffer(&w->user_auth, source);
+
+    USER_AUTH parsed;
+    WEB_CLIENT_TEST(user_auth_from_source(buffer_tostring(source), &parsed), "source '%s' could not be parsed", buffer_tostring(source));
+    WEB_CLIENT_TEST(
+        parsed.method == w->user_auth.method && parsed.user_role == w->user_auth.user_role &&
+            parsed.access == w->user_auth.access,
+        "source '%s' parsed back with method %d, role %d, access 0x%llx, expected method %d, role %d, access 0x%llx",
+        buffer_tostring(source),
+        (int)parsed.method,
+        (int)parsed.user_role,
+        (unsigned long long)parsed.access,
+        (int)w->user_auth.method,
+        (int)w->user_auth.user_role,
+        (unsigned long long)w->user_auth.access);
+
     web_client_free(w);
     WEB_CLIENT_TEST(memory_accounting == 0, "web client leaked %zu accounted bytes", memory_accounting);
 

@@ -28,11 +28,9 @@ func TestJob_CriticalStartupAndRecovery(t *testing.T) {
 	assert.Contains(t, first, "CLABEL 'region' 'east'")
 	depthID := chartID(first, "fixture.depth")
 	require.NotEmpty(t, depthID)
-	// Atomic file replacement avoids intentionally torn fixtures between ticks.
 	next := strings.Replace(snapshotJSON("ok"), `"east"`, `"west"`, 1)
-	require.NoError(t, os.WriteFile(file+".next", []byte(next), 0644))
-	require.NoError(t, os.Rename(file+".next", file))
 	out.Reset()
+	replaceResponse(t, file, next)
 	tickUntil(t, job, func() bool { return strings.Contains(out.String(), "SET 'ok' = 1") })
 	second := out.String()
 	assert.Contains(t, second, "SET 'critical' = 0")

@@ -27,10 +27,11 @@ pub fn count_log_records(req: &ExportLogsServiceRequest) -> usize {
         .sum()
 }
 
-/// One WAL file, no rotation, frames always LZ4-compressed: a single `part_key`
-/// plus rotation thresholds set to effectively infinite so the writer never
-/// starts a second file. `wal::Reader` decompresses transparently, so the
-/// artifact stays directly consumable by a downstream reader.
+/// One WAL file, no rotation, frames always LZ4-compressed: rotation
+/// thresholds set to effectively infinite so the writer never starts a second
+/// file, and callers pass the single `PART_KEY` so every frame lands in that
+/// one file. `wal::Reader` decompresses transparently, so the artifact stays
+/// directly consumable by a downstream reader.
 pub fn one_file_config() -> wal::Config {
     wal::Config {
         rotation: wal::RotationConfig {
@@ -43,12 +44,12 @@ pub fn one_file_config() -> wal::Config {
     }
 }
 
-/// Prepare `req` as a flattened frame ([`ng_flatten::prepare_log_frame`]: one
+/// Prepare `req` as a flattened frame (`ng_flatten::prepare_log_frame`: one
 /// normalize walk, then flatten — which hashes each entry at emit time — and
-/// bincode-encode) and append it as
-/// a single WAL frame, returning the number of log records written. The
-/// frame's `log_min/max_ts` carry the resolved timestamp range. A request with
-/// zero log records writes no frame and returns `0`.
+/// bincode-encode) and append it as a single WAL frame, returning the number
+/// of log records written. The prepared frame's `ts_range` (the resolved
+/// timestamp range) becomes the WAL frame meta's `log_ts_range`. A request
+/// with zero log records writes no frame and returns `0`.
 pub fn write_request(
     writer: &mut wal::Writer,
     clock: &mut MonotonicClock,
@@ -59,8 +60,8 @@ pub fn write_request(
     let fallback_base_ns = clock.now_ns().as_u64();
     // `None` bounds: this dev/bench tool enforces no ingestion time window — the
     // production window is applied only by the otel-ingestor service.
-    let frame =
-        ng_flatten::prepare_log_frame(req, fallback_base_ns, None).context("prepare flattened frame")?;
+    let frame = ng_flatten::prepare_log_frame(req, fallback_base_ns, None)
+        .context("prepare flattened frame")?;
     // `ts_range` is None exactly when the request has no records.
     if frame.ts_range.is_none() {
         return Ok(0);
@@ -121,12 +122,12 @@ pub fn count_spans(req: &ExportTraceServiceRequest) -> usize {
 }
 
 /// Prepare `req` as a flattened **traces** frame
-/// ([`ng_flatten::prepare_trace_frame`]: one normalize walk, then flatten —
-/// which hashes each entry at emit time — and bincode-encode) and append it as
-/// a single WAL frame, returning the number of spans written. The traces
-/// analog of [`write_request`]. The frame's `log_min/max_ts` carry the
-/// resolved span-start time range. A request with zero spans writes no frame
-/// and returns `0`.
+/// (`ng_flatten::prepare_trace_frame`: one normalize walk, then flatten —
+/// which hashes each entry at emit time — and bincode-encode) and append it
+/// as a single WAL frame, returning the number of spans written. The traces
+/// analog of [`write_request`]. The prepared frame's `ts_range` (the resolved
+/// span-start time range) becomes the WAL frame meta's `log_ts_range`. A
+/// request with zero spans writes no frame and returns `0`.
 pub fn write_trace_request(
     writer: &mut wal::Writer,
     clock: &mut MonotonicClock,

@@ -115,6 +115,7 @@ bool nd_sock_connect_to_this(ND_SOCK *s, const char *definition, int default_por
     s->fd = connect_to_this(definition, default_port, &tv);
     if(s->fd < 0) {
         s->error = -s->fd;
+        s->fd = -1;
         return false;
     }
 

@@ -1,0 +1,11 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+set -e
+
+case "$1" in
+  configure|reconfigure)
+    chown root:@netdata_group_POST@ "@PLUGINS_DIR@/dem.plugin"
+    chmod 0750 "@PLUGINS_DIR@/dem.plugin"
+    ;;
+esac

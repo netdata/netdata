@@ -53,6 +53,9 @@ RRDHOST *rrdhost_find_by_node_id(const char *node_id) {
 // rrdhost_free___consume_metadata_lifetime_writelock() too, which frees with no lock held: by the
 // time it gets there the host is already out of the index, so it can no longer be found here.
 //
+// The same bridge is how a host is kept beyond the read lock: pinning it (rrdhost_pin_try(), the read
+// side of metadata_lifetime_lock) while the lock is still held stops every remover from taking it.
+//
 // `may_block` selects how the read lock is taken, and a caller that can run on more than one thread
 // MUST decide it per call rather than once:
 //   true  - wait for the lock. Correct for any thread nobody can be waiting on while holding
@@ -332,23 +335,16 @@ void rrdhost_metadata_identity_release(RRDHOST_METADATA_IDENTITY *identity) {
 //   address reuse harmless - a later RRDHOST allocated at the same address
 //   finds no entry to inherit.
 //
-// WHAT THIS HOST DOES NOT GUARANTEE, deliberately recorded so nobody builds on
-// the opposite: init and destroy CAN overlap for one host. The create-side
-// init runs under rrd_wrlock, but the un-archive init (rrdhost_update(), below)
-// does NOT - rrdhost_find_or_create() releases rrd_wrlock before calling it,
-// and rrdhost_update_lock is the only lock it takes. The orphan reaper in
-// svc_rrdhost_cleanup_orphan_hosts() holds rrd_wrlock and the host's
-// metadata_lifetime_lock, neither of which excludes that init. So a child
-// reconnecting to a long-archived host can un-archive it at the same moment
-// the reaper tears it down.
-//
-// The component tolerates this - every interleaving is memory-safe, and the
-// worst case is that the host comes out live with no function registry until
-// its next archive/un-archive cycle. It is also not new: the same window
-// existed when entries were keyed on the machine guid. Note that the same
-// interleaving has a larger, pre-existing problem that has nothing to do with
-// nRPC: rrdhost_update() writes into a host that rrdhost_free_unlinked() may be
-// freeing. Fixing that serialization is what would close this properly.
+// - init and destroy do not overlap for one host. The create-side init runs
+//   under rrd_wrlock. The un-archive init (rrdhost_update(), below) runs
+//   without the rrd lock, but with the host pinned (the read side of
+//   metadata_lifetime_lock, taken by rrdhost_find_or_create()), and every
+//   destroy - the orphan reaper in svc_rrdhost_cleanup_orphan_hosts(), the
+//   remove-stale-node CLI - holds the write side, so a child reconnecting to a
+//   long-archived host either un-archives it before the reaper can take it, or
+//   is refused (and retries) while the reaper holds it. rrdhost_free_all() at
+//   shutdown takes no lifetime lock; it runs after the streaming and collector
+//   threads were stopped.
 
 static void rrdhost_nrpc_changed(NRPC_OWNER id, bool arm_manifest) {
     RRDHOST *host = rrdhost_from_nrpc_owner(id);
@@ -445,7 +441,6 @@ static RRDHOST *prepare_host_for_unittest(RRDHOST *host)
 static void rrdhost_set_replication_parameters(RRDHOST *host, RRD_DB_MODE memory_mode, time_t period, time_t step) {
     host->stream.replication.period = period;
     host->stream.replication.step = step;
-    host->stream.rcv.status.replication.percent = 100.0;
 
     switch(memory_mode) {
         default:
@@ -510,7 +505,8 @@ RRDHOST *rrdhost_create(
         time_t replication_step,
         struct rrdhost_system_info *system_info,
         int is_localhost,
-        bool archived
+        bool archived,
+        bool pin
 ) {
     if(memory_mode == RRD_DB_MODE_DBENGINE && !dbengine_enabled) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
@@ -637,11 +633,19 @@ RRDHOST *rrdhost_create(
 
     rrd_wrlock();
 
+    // pin before the host becomes visible in the index, so no remover can take it before our caller
+    // has marked it live (see metadata_lifetime_lock); nobody else can hold this lock yet
+    if(pin)
+        rw_spinlock_read_lock(&host->metadata_lifetime_lock);
+
     RRDHOST *t = rrdhost_index_add_by_guid(host);
     if(t != host) {
         nd_log(NDLS_DAEMON, NDLP_NOTICE,
                "Host '%s': cannot add host with machine guid '%s' to index. It already exists as host '%s' with machine guid '%s'.",
                rrdhost_hostname(host), host->machine_guid, rrdhost_hostname(t), t->machine_guid);
+
+        if(pin)
+            rrdhost_pin_release(host);
 
         if (!is_localhost)
             rrdhost_free___while_having_rrd_wrlock(host);
@@ -859,6 +863,15 @@ static void rrdhost_update(RRDHOST *host
     spinlock_unlock(&host->rrdhost_update_lock);
 }
 
+// An archived host whose stored memory mode differs from the wanted one has its archived state
+// discarded (the host is freed and created again) - unless it is still loading its contexts and this
+// is not the archived-host load, in which case it is returned as it is.
+static inline bool rrdhost_archived_mode_mismatch(RRDHOST *host, RRD_DB_MODE mode, bool archived) {
+    return host->rrd_memory_mode != mode &&
+           rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED) &&
+           !(!archived && rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD));
+}
+
 RRDHOST *rrdhost_find_or_create(
       const char *hostname
     , const char *registry_hostname
@@ -884,20 +897,24 @@ RRDHOST *rrdhost_find_or_create(
     , struct rrdhost_system_info *system_info
     , bool archived
 ) {
+    // Every host returned is pinned (see metadata_lifetime_lock). The lookup and the pin happen under
+    // the rrd lock: a remover unlinks the host under rrd_wrlock() before freeing it, so a host found
+    // here is still allocated when we pin it, and once pinned no remover can take it.
+    rrd_rdlock();
     RRDHOST *host = rrdhost_find_by_guid(guid);
-    if (unlikely(host && host->rrd_memory_mode != mode && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))) {
+    bool replace = host && rrdhost_archived_mode_mismatch(host, mode, archived);
+    if (host && !replace && !rrdhost_pin_try(host)) {
+        rrd_rdunlock();
+        return NULL;
+    }
+    rrd_rdunlock();
 
-        if (likely(!archived && rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)))
-            return host;
-
+    // The memory-mode replace is a removal, so it runs with no pin of ours held: it needs the write
+    // side, and a pin can never be upgraded to it.
+    if (unlikely(replace)) {
         rrd_wrlock();
         host = rrdhost_find_by_guid(guid);
-        if (host && host->rrd_memory_mode != mode && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
-            if (likely(!archived && rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))) {
-                rrd_wrunlock();
-                return host;
-            }
-
+        if (host && rrdhost_archived_mode_mismatch(host, mode, archived)) {
             if (!rw_spinlock_trywrite_lock(&host->metadata_lifetime_lock)) {
                 rrd_wrunlock();
                 return NULL;
@@ -913,6 +930,10 @@ RRDHOST *rrdhost_find_or_create(
             rw_spinlock_write_unlock(&host->metadata_lifetime_lock);
             rrdhost_free___while_having_rrd_wrlock(host);
             host = NULL;
+        }
+        else if (host && !rrdhost_pin_try(host)) {
+            rrd_wrunlock();
+            return NULL;
         }
         rrd_wrunlock();
     }
@@ -942,6 +963,7 @@ RRDHOST *rrdhost_find_or_create(
                 , system_info
                 , 0
                 , archived
+                , true
          );
     }
     else {
@@ -972,6 +994,232 @@ RRDHOST *rrdhost_find_or_create(
     }
 
     return host;
+}
+
+#ifdef NETDATA_INTERNAL_CHECKS
+// Test-only pause point, compiled out of production builds. It blocks ONE claiming thread in the
+// window between the accounting increment and the flag publish - the exact interleaving the claim-before-
+// publish ordering exists to make safe - so a unit test can drive a deterministic race instead of a
+// thread-soup that passes by luck. Same shape as the hooks in src/libnetdata/aral/aral.c.
+static struct {
+    RRDSET *st;             // fire only for this chart
+    bool enabled;
+    bool waiting;           // set by the paused claimer
+    bool release;           // set by the test to let it continue
+} rrdhost_receiver_replication_race_hook = { 0 };
+
+void rrdhost_receiver_replication_race_hook_arm(RRDSET *st) {
+    rrdhost_receiver_replication_race_hook.st = st;
+    rrdhost_receiver_replication_race_hook.waiting = false;
+    rrdhost_receiver_replication_race_hook.release = false;
+    __atomic_store_n(&rrdhost_receiver_replication_race_hook.enabled, true, __ATOMIC_RELEASE);
+}
+
+bool rrdhost_receiver_replication_race_hook_is_waiting(void) {
+    return __atomic_load_n(&rrdhost_receiver_replication_race_hook.waiting, __ATOMIC_ACQUIRE);
+}
+
+void rrdhost_receiver_replication_race_hook_release(void) {
+    __atomic_store_n(&rrdhost_receiver_replication_race_hook.release, true, __ATOMIC_RELEASE);
+}
+
+void rrdhost_receiver_replication_race_hook_disarm(void) {
+    __atomic_store_n(&rrdhost_receiver_replication_race_hook.enabled, false, __ATOMIC_RELEASE);
+    rrdhost_receiver_replication_race_hook.st = NULL;
+}
+
+static ALWAYS_INLINE void rrdhost_receiver_replication_race_pause(RRDSET *st) {
+    if(likely(!__atomic_load_n(&rrdhost_receiver_replication_race_hook.enabled, __ATOMIC_ACQUIRE)))
+        return;
+
+    if(rrdhost_receiver_replication_race_hook.st != st)
+        return;
+
+    __atomic_store_n(&rrdhost_receiver_replication_race_hook.waiting, true, __ATOMIC_RELEASE);
+    while(!__atomic_load_n(&rrdhost_receiver_replication_race_hook.release, __ATOMIC_ACQUIRE))
+        tinysleep();
+}
+#else
+#define rrdhost_receiver_replication_race_pause(st) debug_dummy()
+#endif
+
+// ONE implementation of the receiver-replication claim, used by the parser and by the tests.
+// Returns true when THIS call caused the not-replicating -> replicating transition, i.e. when the
+// caller now owns the chart's contribution.
+//
+// Ordering, which the whole accounting rests on: both accounting halves are incremented together, and
+// only then is RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS published. Publishing first would make the
+// flag visible while the contribution does not yet exist, and any release site would then decrement
+// something nobody owns.
+//
+// The publish edge is atomic_flags_set_and_clear()'s CAS, which is __ATOMIC_RELEASE on success - that
+// is what keeps the relaxed accounting add above from being reordered after it. The matching ACQUIRE
+// is a fence in the release, NOT part of the flag op: the same helper's load is relaxed, so observing
+// the flag does not on its own order the observer against this add on a weak-memory target.
+bool rrdhost_receiver_replication_claim(RRDSET *st) {
+    // `st` cannot be freed under us: svc_rrdset_lock_for_deletion() (daemon/service.c) frees a chart
+    // only after last_accessed, last_updated and last_collected are ALL older than
+    // rrdset_free_obsolete_time_s (default 3600s), and the CHART that put this chart in the parser's
+    // scope touched it microseconds ago.
+    RRDHOST *host = st->rrdhost;
+
+    __atomic_add_fetch(&host->stream.rcv.status.replication.charts_started_and_remaining,
+                       RRDHOST_RCV_REPLICATION_UNIT, __ATOMIC_RELAXED);
+
+    rrdhost_receiver_replication_race_pause(st);
+
+    RRDSET_FLAGS old = rrdset_flag_set_and_clear(
+        st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
+
+    if(old & RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS) {
+        // Lost the race, or a duplicate CHART_DEFINITION_END: the chart already holds a contribution,
+        // so ours is one too many. Withdraw our own increment - this is NOT a release of the chart's
+        // contribution and deliberately does not clear the flag. Withdraw both speculative accounting
+        // halves together, so a duplicate CHART_DEFINITION_END changes neither the cohort nor completion.
+        // Checked like a release: our own increment keeps the outstanding half above zero, so a refusal
+        // here means that reasoning has broken and a raw subtract would have eaten the cohort half.
+        if(rrdhost_receiver_replication_withdraw(host) == 0)
+            pulse_host_status(host, PULSE_HOST_STATUS_RCV_RUNNING, 0);
+
+        return false;
+    }
+
+    // Decide the pulse AFTER the CAS, the way the pre-extraction code did: the winner asks whether the
+    // host now holds exactly one outstanding contribution. Deciding it from this thread's own increment
+    // BEFORE the CAS is wrong - a claimer can increment 0->1, be preempted, and lose the CAS to a second
+    // claimer whose increment made it 2, so the winner would publish replication while nobody emits
+    // RCV_REPLICATING.
+    //
+    // Residual, test-only: this is still a read separated from the CAS, so a concurrent duplicate claim
+    // that has added its unit but not yet withdrawn it makes the winner read 2 and skip the pulse, and
+    // the duplicate publishes nothing when it withdraws. Production never interleaves two claims on one
+    // host: the only caller is pluginsd_chart_definition_end(), on the parser thread of the host's single
+    // receiver (stream-receiver.c attaches one only while host->receiver is NULL). Only the stress test
+    // claims concurrently, and it does not assert on the gauge. Were it reachable, it would be bounded to
+    // the pulse gauge: the accounting word, and with it `InStatus`, `InReplInstances`,
+    // `InReplCompletion` and the idle-disconnect suppression, are unaffected.
+    if(rrdhost_receiver_replicating_charts(host) == 1)
+        pulse_host_status(host, PULSE_HOST_STATUS_RCV_REPLICATING, 0);
+
+    return true;
+}
+
+// ONE implementation of the receiver-replication release, used by every release site listed in rrdset.h
+// and by the tests. `also_clear` carries any extra flags the caller wants cleared in the same atomic
+// transition (RRDSET_FLAG_SYNC_CLOCK for the replay paths).
+//
+// Returns the OLD flags, so a caller can additionally test what it found - the replay path uses it to
+// decide whether to log "there was no replication in progress for this chart".
+//
+// The contribution is released ONLY when this call is the one that cleared
+// RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS. Releasing on "was not FINISHED" is wrong: a chart can
+// be not-FINISHED without holding a contribution.
+RRDSET_FLAGS rrdhost_receiver_replication_release_with_caller(RRDSET *st, RRDSET_FLAGS also_clear, const char *function, bool pulse) {
+    RRDHOST *host = st->rrdhost;
+
+    RRDSET_FLAGS old = rrdset_flag_set_and_clear(
+        st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED,
+        RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS | also_clear);
+
+    if(old & RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS) {
+        // We won the clear, so the claim that set the flag is the one whose contribution we are about
+        // to consume. atomic_flags_set_and_clear() is RELEASE on success and RELAXED on its load, so
+        // observing the flag does NOT by itself order us against that claim's accounting increment:
+        // on a weak-memory target (netdata ships armv6l, armv7l and aarch64) we could see the flag and
+        // a stale word, refuse the decrement, and leak the contribution - pinning the host in
+        // `replicating`, the exact failure this whole path exists to prevent. This ACQUIRE fence pairs
+        // with the claim's releasing flag CAS, which our load above read from.
+        __atomic_thread_fence(__ATOMIC_ACQUIRE);
+
+        // `pulse` is false only for the connect/disconnect reset, which is draining the whole
+        // generation and whose caller has already published the receiver state this host is really in.
+        // Pulsing RCV_RUNNING from there would overwrite the RCV_OFFLINE that
+        // stream_receiver_remove_internal() published moments earlier and latch the disconnected child
+        // as running until it reconnects.
+        if(rrdhost_receiver_replicating_charts_decrement(host, function) == 0 && pulse)
+            pulse_host_status(host, PULSE_HOST_STATUS_RCV_RUNNING, 0);
+    }
+
+    return old;
+}
+
+NETDATA_DOUBLE rrdhost_receiver_replication_completion(RRDHOST *host, uint32_t *instances) {
+    uint64_t accounting = rrdhost_receiver_replication_accounting(host);
+    uint32_t remaining = (uint32_t)accounting;
+    uint32_t started = (uint32_t)(accounting >> 32);
+
+    if(instances)
+        *instances = remaining;
+
+    // nothing outstanding: complete, whatever the cohort was
+    if(!remaining)
+        return 100.0;
+
+    // Outstanding work with no cohort to measure it against. Unreachable by construction: every unit
+    // of `remaining` was added together with a unit of `started`, and releases only lower `remaining`.
+    // Retained as a corruption / lifecycle diagnostic: report an explicit unknown rather than invent a
+    // ratio. Reaches the API as `null`, so seeing one in the field means this reasoning has broken.
+    if(!started || started < remaining)
+        return NAN;
+
+    return (NETDATA_DOUBLE)(started - remaining) * 100.0 / (NETDATA_DOUBLE)started;
+}
+
+#ifdef NETDATA_INTERNAL_CHECKS
+// Counts refused (would-be-underflow) releases. A test cannot see an over-release from the counter
+// alone: the refusal is exactly what stops it going below zero, so the counter still lands on its
+// baseline and the fault is invisible. Tests assert this is unchanged across their run.
+size_t rrdhost_receiver_replication_refusals = 0;
+#endif
+
+// Subtract `delta` from the packed accounting word, refusing when either half would underflow.
+// Returns the outstanding count after the subtraction or, on refusal, the one in the word the refusal
+// was decided on - so a caller testing for zero acts on what the counter holds, and a refused
+// withdrawal with work still outstanding does not read as "nothing left". Both callers must be
+// checked: on a 64-bit word an unguarded subtract does not merely wrap the outstanding half to
+// UINT32_MAX and pin the host in `replicating`, it BORROWS out of the cohort half and destroys the
+// completion denominator too.
+static uint32_t rrdhost_receiver_replication_subtract(RRDHOST *host, uint64_t delta, const char *what, const char *function) {
+    // Test EACH half against the matching half of delta. Testing only the outstanding half would be
+    // right for the release (delta moves that half alone) but not for the withdrawal (delta moves
+    // both): a word with an empty cohort and outstanding work would pass and the subtract would
+    // borrow the cohort down to UINT32_MAX - the corruption this guard exists to prevent.
+    uint32_t need_remaining = rrdhost_receiver_replication_remaining_of(delta);
+    uint32_t need_started = rrdhost_receiver_replication_started_of(delta);
+
+    uint64_t cur = rrdhost_receiver_replication_accounting(host);
+
+    while(rrdhost_receiver_replication_remaining_of(cur) >= need_remaining
+       && rrdhost_receiver_replication_started_of(cur) >= need_started) {
+        if(__atomic_compare_exchange_n(&host->stream.rcv.status.replication.charts_started_and_remaining, &cur, cur - delta,
+                                       true, __ATOMIC_RELAXED, __ATOMIC_RELAXED))
+            return rrdhost_receiver_replication_remaining_of(cur - delta);
+        // cur has been reloaded by the failed exchange; re-test it
+    }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    __atomic_add_fetch(&rrdhost_receiver_replication_refusals, 1, __ATOMIC_RELAXED);
+#endif
+
+    nd_log(NDLS_DAEMON, NDLP_ERR,
+           "STREAM REPLAY ERROR: 'host:%s': %s() %s a receiver replication contribution it does not own - "
+           "started=%u remaining=%u. Refusing to wrap it.",
+           rrdhost_hostname(host), function, what,
+           rrdhost_receiver_replication_started_of(cur), rrdhost_receiver_replication_remaining_of(cur));
+
+    return rrdhost_receiver_replication_remaining_of(cur);
+}
+
+uint32_t rrdhost_receiver_replicating_charts_decrement(RRDHOST *host, const char *function) {
+    return rrdhost_receiver_replication_subtract(host, 1, "released", function);
+}
+
+// The duplicate-CHART_DEFINITION_END rollback: withdraw the speculative increment this same thread
+// just made. Both halves move together, so the attempt leaves the completion figure untouched. This
+// is NOT a release - it does not clear the flag, because the chart still holds its own contribution.
+uint32_t rrdhost_receiver_replication_withdraw(RRDHOST *host) {
+    return rrdhost_receiver_replication_subtract(host, RRDHOST_RCV_REPLICATION_UNIT, "withdrew",
+                                                 "rrdhost_receiver_replication_claim");
 }
 
 bool rrdhost_should_be_cleaned_up(RRDHOST *host, RRDHOST *protected_host, time_t now_s) {

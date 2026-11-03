@@ -11,15 +11,14 @@ use std::fmt;
 /// One table cell: the field's raw journal value kept beside the string
 /// rendered for it.
 ///
-/// `new` fills both with the same string; the transformation registries
-/// split them via `with_display`
+/// `new` fills both with the same string; the transformation registry
+/// splits them via `with_display`
 /// (`journal-function/src/netdata/transformations.rs` `TransformationRegistry::transform_field`), so `raw` stays
 /// verbatim while `display` carries the user-facing form. Consumers read
 /// them differently: `table_to_netdata_response` parses the timestamp
 /// column's `raw` as u64 microseconds and reads PRIORITY's `raw` for
-/// severity, but renders field values from `display`
-/// (`journal-function/src/netdata/response.rs` `table_to_netdata_response`). `None` means
-/// the entry has no such field: `Display` below prints "-", the UI
+/// severity, but renders field values from `display`. `None` means the
+/// entry has no such field: `Display` below prints "-", the UI
 /// conversion emits `null`.
 #[derive(Debug, Clone)]
 pub struct CellValue {
@@ -80,10 +79,13 @@ impl ColumnInfo {
 /// renders a `Table` into the logs UI's JSON rows. All names here are
 /// re-exported flat (crate root; `journal-function/src/lib.rs`).
 ///
-/// Nothing enforces the row/column shape: constructors keep row width at
-/// `columns.len()`, and `Display` renders whatever a row carries. The
-/// `Display` impl at the bottom of the file is a human-readable ASCII dump;
-/// nothing in-repo renders through it.
+/// Nothing enforces the row/column shape: `add_row` appends unchecked and
+/// the builders here emit `columns.len()` cells per row. `Display` zips
+/// rows against the column widths, so short rows render short; an
+/// oversized row panics before the zip - `calculate_column_widths` walks
+/// every cell against the per-column `widths` vector and indexes past its
+/// end. The `Display` impl at the bottom of the file is a human-readable
+/// ASCII dump; nothing in-repo renders through it.
 #[derive(Debug, Clone)]
 pub struct Table {
     /// Column headers; `index` in each matches the cell offset in rows.
@@ -134,13 +136,13 @@ impl Table {
 
     /// Width per column for `Display`: the larger of the column name's
     /// length and its longest cell display string ("-" when `None` counts
-    /// as 1), with the MESSAGE column capped at `MESSAGE_MAX_WIDTH`.
+    /// as 1), with the MESSAGE column capped at `MESSAGE_MAX_WIDTH`;
+    /// `Display` truncates longer display strings to this width.
     fn calculate_column_widths(&self) -> Vec<usize> {
         const MESSAGE_MAX_WIDTH: usize = 80;
 
         let mut widths: Vec<usize> = self.columns.iter().map(|col| col.name.len()).collect();
 
-        // Widen each column to its longest display string
         for row in &self.data {
             for (col_idx, cell) in row.iter().enumerate() {
                 let display_len = cell.display.as_deref().unwrap_or("-").len();
@@ -150,7 +152,6 @@ impl Table {
             }
         }
 
-        // Cap the MESSAGE column; Display truncates longer values to this width
         for (col_idx, col) in self.columns.iter().enumerate() {
             if col.name == "MESSAGE" && widths[col_idx] > MESSAGE_MAX_WIDTH {
                 widths[col_idx] = MESSAGE_MAX_WIDTH;
@@ -175,20 +176,16 @@ impl fmt::Display for Table {
         // " {value} |").
         let total_width: usize = widths.iter().sum::<usize>() + (widths.len() - 1) * 3 + 2;
 
-        // Print top border
         writeln!(f, "{}", "=".repeat(total_width))?;
 
-        // Print header
         write!(f, "|")?;
         for (col, width) in self.columns.iter().zip(&widths) {
             write!(f, " {:<width$} |", col.name, width = width)?;
         }
         writeln!(f)?;
 
-        // Print separator
         writeln!(f, "{}", "=".repeat(total_width))?;
 
-        // Print rows
         for row in &self.data {
             write!(f, "|")?;
             for (cell, width) in row.iter().zip(&widths) {
@@ -205,7 +202,6 @@ impl fmt::Display for Table {
             writeln!(f)?;
         }
 
-        // Print bottom border
         writeln!(f, "{}", "=".repeat(total_width))?;
 
         Ok(())
@@ -226,42 +222,27 @@ impl fmt::Display for Table {
 /// production renders through journal-function's transformation wrapper
 /// (`journal-function/src/netdata/builder.rs`
 /// `entry_data_to_table_with_transformations`).
-///
-/// # Arguments
-///
-/// * `entry_data` - Extracted entries, already in output order
-/// * `column_names` - Fields to include; `timestamp` is prepended
-///   automatically
-///
-/// # Returns
-///
-/// The table (`Ok` always).
 pub fn entry_data_to_table(
     entry_data: &[LogEntryData],
     column_names: Vec<String>,
 ) -> Result<Table> {
-    // Always prepend "timestamp" as the first column
     let mut all_columns = vec!["timestamp".to_string()];
     all_columns.extend(column_names.clone());
 
     let mut table = Table::new(all_columns);
 
-    // Create a mapping from column name to index for fast lookup
     let column_map: HashMap<&str, usize> = column_names
         .iter()
         .enumerate()
         .map(|(idx, name)| (name.as_str(), idx + 1)) // +1 because timestamp is at index 0
         .collect();
 
-    // One row per entry; pre-filled cells keep missing fields at None
     for data in entry_data {
         let num_cols = column_names.len() + 1;
         let mut row = vec![CellValue::new(None); num_cols];
 
-        // First column: timestamp
         row[0] = CellValue::new(Some(data.timestamp.to_string()));
 
-        // Extract requested fields
         for pair in &data.fields {
             if let Some(&col_idx) = column_map.get(pair.field()) {
                 row[col_idx] = CellValue::new(Some(pair.value().to_string()));

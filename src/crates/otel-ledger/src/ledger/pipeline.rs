@@ -7,8 +7,7 @@
 //! caller's `make_handler` closure), and detaches the per-pipeline worker
 //! response streams into Signal-tagged forwarders feeding the coordinator's merged
 //! channel. The caller pre-spawns the per-signal seal/index worker (it owns the
-//! concrete [`Component`](file_lifecycle::component::Component) type) and hands
-//! its handle in.
+//! concrete `Component` implementor) and hands its handle in.
 //!
 //! [`build_logs_pipeline`] is the thin logs binding: it spawns the logs
 //! [`Indexer`], builds the logs [`OtelLogsHandler`], and delegates to
@@ -50,9 +49,9 @@ use super::OtelLogsHandler;
 use file_lifecycle::remote_read::RemoteRead;
 
 /// Minimum records per chunk when indexing an active WAL's prefix at
-/// query time. Shared by the logs and traces handlers (both import it).
-/// A fixed default for now; made configurable with the rest of
-/// chunk-cache governance.
+/// query time. Shared by the logs and traces handlers (the traces pipeline
+/// imports it). A fixed default for now; tuning is deferred with the rest
+/// of cache governance.
 pub(crate) const CHUNK_MIN_ENTRIES: u64 = 16_384;
 /// Maximum time startup waits on remote object storage (LIST/stat
 /// reconciliation) per tenant before proceeding to Ready. A slow/unreachable
@@ -66,9 +65,6 @@ const STARTUP_REMOTE_BUDGET: std::time::Duration = std::time::Duration::from_sec
 
 /// Assemble a pipeline for any signal; the module docs describe the steps.
 ///
-/// The caller pre-spawns the per-signal seal/index worker — it owns the concrete
-/// `Component` type, which is erased the instant it is spawned to
-/// `ComponentHandle<IndexerRequest, IndexerResponse>` — and hands the handle in.
 /// `make_handler` is invoked once with the wrapped registries to produce the
 /// signal's `(handler, arg_shim)`; the declaration is derived from the handler.
 ///
@@ -136,9 +132,7 @@ where
         registries.discover_tenants();
     }
 
-    // The seal/index worker was spawned by the caller (it owns the concrete
-    // Component type); the catalog builder is signal-neutral, so it is spawned
-    // here. The log lines carry the segment so the two signals' startups stay
+    // The log lines carry the segment so the two signals' startups stay
     // distinguishable.
     tracing::info!(signal = segment, "indexer spawned");
 
@@ -233,10 +227,7 @@ where
                 }
             };
 
-            // Queue the local un-uploaded backlog regardless of remote
-            // reachability — fire-and-forget, so it never blocks startup;
-            // responses (and any failures → the retry queue) are handled
-            // once the run loop starts.
+            // Fire-and-forget; runs even when the remote is unreachable.
             recover_unuploaded(registry, segment, uploader, tenant_id);
 
             // Catalog re-upload probes the remote per file (`stat`), so it
@@ -311,9 +302,6 @@ where
     // a Call arrives.
     let registries = Arc::new(RwLock::new(registries));
 
-    // The caller's closure builds the signal's handler (capturing whatever it
-    // needs — e.g. the chunk cache and the download cache) and supplies the
-    // args→payload shim; the declaration is read back off the boxed handler.
     let (handler, arg_shim) = make_handler(registries.clone());
     let declaration = handler.declaration();
 
@@ -403,8 +391,9 @@ pub(crate) async fn build_logs_pipeline(
         pipeline_tx,
         move |registries| {
             // Remote-read capability for the query path: present only when
-            // storage is enabled (so the handler can fetch evicted SFSTs back
-            // through the cache).
+            // both the storage handle and the read cache exist (remote
+            // storage enabled), so the handler can fetch evicted SFSTs back
+            // through the cache.
             let remote = match (remote_storage, remote_cache) {
                 (Some(s), Some(c)) => Some(RemoteRead::new(s, c)),
                 _ => None,

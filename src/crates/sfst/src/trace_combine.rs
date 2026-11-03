@@ -185,7 +185,10 @@ pub fn combine(
     cap: Option<usize>,
     cancel: &dyn Fn() -> bool,
 ) -> CombineOutcome {
-    debug_assert!(cap != Some(0), "a zero span cap is rejected at the request boundary");
+    debug_assert!(
+        cap != Some(0),
+        "a zero span cap is rejected at the request boundary"
+    );
 
     let mut failures: Vec<(usize, crate::Error)> = Vec::new();
 
@@ -760,9 +763,18 @@ mod tests {
         // compare equal (the collision-safety half of the comparator).
         let a = (42u64, vec![1u8, 2, 3]);
         let b = (42u64, vec![1u8, 2, 4]);
-        assert_eq!(content_order((a.0, &a.1), (b.0, &b.1)), std::cmp::Ordering::Less);
-        assert_eq!(content_order((b.0, &b.1), (a.0, &a.1)), std::cmp::Ordering::Greater);
-        assert_eq!(content_order((a.0, &a.1), (a.0, &a.1)), std::cmp::Ordering::Equal);
+        assert_eq!(
+            content_order((a.0, &a.1), (b.0, &b.1)),
+            std::cmp::Ordering::Less
+        );
+        assert_eq!(
+            content_order((b.0, &b.1), (a.0, &a.1)),
+            std::cmp::Ordering::Greater
+        );
+        assert_eq!(
+            content_order((a.0, &a.1), (a.0, &a.1)),
+            std::cmp::Ordering::Equal
+        );
     }
 
     #[test]
@@ -977,18 +989,54 @@ mod tests {
         };
         let reference = canonical_bytes(&base);
         let mutations: Vec<TraceSpan> = vec![
-            TraceSpan { span_id: SpanId::from([9; 8]), ..base.clone() },
-            TraceSpan { parent_span_id: SpanId::from([9; 8]), ..base.clone() },
-            TraceSpan { start_ns: 101, ..base.clone() },
-            TraceSpan { duration_ns: 11, ..base.clone() },
-            TraceSpan { kind: 3, ..base.clone() },
-            TraceSpan { flags: 2, ..base.clone() },
-            TraceSpan { dropped_attributes_count: 2, ..base.clone() },
-            TraceSpan { dropped_events_count: 2, ..base.clone() },
-            TraceSpan { dropped_links_count: 2, ..base.clone() },
-            TraceSpan { fields: vec![("name".into(), "m".into())], ..base.clone() },
-            TraceSpan { events: Vec::new(), ..base.clone() },
-            TraceSpan { links: Vec::new(), ..base.clone() },
+            TraceSpan {
+                span_id: SpanId::from([9; 8]),
+                ..base.clone()
+            },
+            TraceSpan {
+                parent_span_id: SpanId::from([9; 8]),
+                ..base.clone()
+            },
+            TraceSpan {
+                start_ns: 101,
+                ..base.clone()
+            },
+            TraceSpan {
+                duration_ns: 11,
+                ..base.clone()
+            },
+            TraceSpan {
+                kind: 3,
+                ..base.clone()
+            },
+            TraceSpan {
+                flags: 2,
+                ..base.clone()
+            },
+            TraceSpan {
+                dropped_attributes_count: 2,
+                ..base.clone()
+            },
+            TraceSpan {
+                dropped_events_count: 2,
+                ..base.clone()
+            },
+            TraceSpan {
+                dropped_links_count: 2,
+                ..base.clone()
+            },
+            TraceSpan {
+                fields: vec![("name".into(), "m".into())],
+                ..base.clone()
+            },
+            TraceSpan {
+                events: Vec::new(),
+                ..base.clone()
+            },
+            TraceSpan {
+                links: Vec::new(),
+                ..base.clone()
+            },
         ];
         for (i, m) in mutations.iter().enumerate() {
             assert_ne!(

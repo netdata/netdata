@@ -1,7 +1,7 @@
 //! Acceptance suite for sfsq's attribute / attribute-value enumeration —
 //! the phase-4b `attribute_names` / `attribute_values` operations (engine:
-//! src/traces/attributes.rs), driven end to end over real corpora. Every
-//! test writes fresh traces WALs and offers their data in the three source
+//! src/traces/attributes.rs), driven end to end over real corpora. Tests
+//! that need data write fresh traces WALs and offer it in the three source
 //! shapes of tests/common/mod.rs — a sealed SFST file, an in-memory chunk,
 //! and the WAL tail — plus the two failure shapes (a missing file, an
 //! unavailable remote).
@@ -11,32 +11,33 @@
 //! - Keys come back as the typed, wire-neutral vocabulary: sorted,
 //!   partitioned by owner (each key under exactly one), the full static
 //!   builtin set present regardless of data (seeded up front by
-//!   [`sfsq::traces::attribute_names`]), and the internal
+//!   `sfsq::traces::attribute_names`), and the internal
 //!   facets (`_kind`/`_status_code`) plus the bare `trace_state` field
-//!   never surfacing ([`sfsq::traces::storage_to_attribute`]) — while a
+//!   never surfacing (`sfsq::traces::storage_to_attribute`) — while a
 //!   span ATTRIBUTE literally named `trace_state` does.
 //! - Values merge the dictionaries of every tier and the tail's pair
 //!   table: deduplicated, sorted by value bytes, one exact `truncated`
-//!   flag ([`sfsq::traces::attribute_values`]). Merge-then-limit makes
+//!   flag (`sfsq::traces::attribute_values`). Merge-then-limit makes
 //!   source order irrelevant (the same rule in both entry points), so
 //!   results are identical under permutation.
 //! - Cancellation is ALL-OR-EMPTY (pin C2; the cancel checks at the head
-//!   of [`sfsq::traces::attribute_names`] and
-//!   [`sfsq::traces::attribute_values`]): an empty result
+//!   of `sfsq::traces::attribute_names` and
+//!   `sfsq::traces::attribute_values`): an empty result
 //!   with `Cancelled` — even the static builtins are withheld.
-//! - The optional window prunes files by summary overlap, file-granular
-//!   and conservative (pin C3; `pruned` in `src/traces/attributes.rs`);
-//!   the tail is never pruned.
+//! - The optional window prunes sealed files and unavailable sources by
+//!   summary overlap, file-granular and conservative (pin C3; `pruned`
+//!   in `src/traces/attributes.rs` guards both source kinds); the tail
+//!   is never pruned.
 //! - Failure honesty (src/traces/status.rs): a source that fails is a
 //!   `SourceFailure` reason, an in-window unavailable remote a distinct
 //!   `RemoteUnavailable` — never a silent skip; the rest still serve.
 //! - Bad requests (zero limits, pin C4 owner/key pairings, duplicate
 //!   source ids) are errors before anything is queried — the validation
-//!   heads of [`sfsq::traces::attribute_names`] and
-//!   [`sfsq::traces::attribute_values`].
+//!   heads of `sfsq::traces::attribute_names` and
+//!   `sfsq::traces::attribute_values`.
 //! - A null-only attribute stays in the vocabulary, its values carrying
-//!   `kind: None` (pin C1; [`sfsq::traces::storage_to_attribute`] keeps
-//!   the key, [`sfsq::traces::attribute_values`] folds `kind` to `None`).
+//!   `kind: None` (pin C1; `sfsq::traces::storage_to_attribute` keeps
+//!   the key, `sfsq::traces::attribute_values` folds `kind` to `None`).
 //!
 //! Not pinned here: WHICH storage chunks the enumeration reads — the
 //! suite sees results, not access paths (sfst pins per-tier dictionary
@@ -59,15 +60,18 @@ use common::{
 };
 use sfsq::Source;
 use sfsq::traces::{
-    PartialReason, QueryStatus, SourceId, AttributeKey, AttributeNamesQuery, AttributeRequestError, AttributeOwner,
-    AttributeValuesQuery, TimeWindow, BuiltinField, TraceSfstCandidate, TraceSource, WalCoverage,
-    attribute_names, attribute_values,
+    AttributeKey, AttributeNamesQuery, AttributeOwner, AttributeRequestError, AttributeValuesQuery,
+    BuiltinField, PartialReason, QueryStatus, SourceId, TimeWindow, TraceSfstCandidate,
+    TraceSource, WalCoverage, attribute_names, attribute_values,
 };
 
 /// Run `attribute_names` with a live token and a throwaway progress
 /// counter; panics on request-validation errors (they have their own
 /// test).
-fn names(sources: Vec<TraceSource>, query: AttributeNamesQuery) -> sfsq::traces::AttributeNamesData {
+fn names(
+    sources: Vec<TraceSource>,
+    query: AttributeNamesQuery,
+) -> sfsq::traces::AttributeNamesData {
     attribute_names(
         sources,
         query,
@@ -77,8 +81,11 @@ fn names(sources: Vec<TraceSource>, query: AttributeNamesQuery) -> sfsq::traces:
     .expect("valid request")
 }
 
-/// Run `attribute_values` under the same terms as [`names`].
-fn values(sources: Vec<TraceSource>, query: AttributeValuesQuery) -> sfsq::traces::AttributeValuesData {
+/// Run `attribute_values` under the same terms as `names`.
+fn values(
+    sources: Vec<TraceSource>,
+    query: AttributeValuesQuery,
+) -> sfsq::traces::AttributeValuesData {
     attribute_values(
         sources,
         query,
@@ -106,10 +113,11 @@ fn owner_attrs(data: &sfsq::traces::AttributeNamesData, owner: AttributeOwner) -
 }
 
 /// Keys spread across every scope and all three source shapes, written
-/// under distinct part_keys (per-WAL meta_tags — the engine must not
-/// care): the key set must partition by owner, include the full static
-/// builtin set, exclude the internal facets and the bare `trace_state`
-/// field, and be identical under source permutations.
+/// as separate WALs under distinct per-WAL meta_tags (content_meta —
+/// the engine must not care): the key set must partition by owner,
+/// include the full static builtin set, exclude the internal facets
+/// and the bare `trace_state` field, and be identical under source
+/// permutations.
 #[test]
 fn keys_partition_scopes_deterministically_under_permutation() {
     let dir = tempfile::tempdir().unwrap();
@@ -151,7 +159,10 @@ fn keys_partition_scopes_deterministically_under_permutation() {
     assert_eq!(data.status, QueryStatus::Complete);
     assert!(!data.truncated);
 
-    assert_eq!(owner_attrs(&data, AttributeOwner::Resource), ["host", "service.name"]);
+    assert_eq!(
+        owner_attrs(&data, AttributeOwner::Resource),
+        ["host", "service.name"]
+    );
     // The span attribute named trace_state IS vocabulary: the
     // exclusion drops only the BARE `trace_state` storage field
     // (`storage_to_attribute` in `src/traces/vocab.rs`), so typed keys
@@ -160,7 +171,10 @@ fn keys_partition_scopes_deterministically_under_permutation() {
         owner_attrs(&data, AttributeOwner::Span),
         ["ratio", "retries", "trace_state"]
     );
-    assert_eq!(owner_attrs(&data, AttributeOwner::Instrumentation), ["lang"]);
+    assert_eq!(
+        owner_attrs(&data, AttributeOwner::Instrumentation),
+        ["lang"]
+    );
     assert_eq!(owner_attrs(&data, AttributeOwner::Event), ["attempt"]);
     assert_eq!(owner_attrs(&data, AttributeOwner::Link), ["rel"]);
 
@@ -194,9 +208,20 @@ fn keys_partition_scopes_deterministically_under_permutation() {
     sources.rotate_left(1);
     let rotated = names(sources, AttributeNamesQuery::new());
     assert_eq!(data.keys, rotated.keys);
-    let only_span = names(build(), AttributeNamesQuery::new().owner(AttributeOwner::Span));
-    assert!(only_span.keys.iter().all(|(s, _)| *s == AttributeOwner::Span));
-    assert_eq!(owner_attrs(&only_span, AttributeOwner::Span), ["ratio", "retries", "trace_state"]);
+    let only_span = names(
+        build(),
+        AttributeNamesQuery::new().owner(AttributeOwner::Span),
+    );
+    assert!(
+        only_span
+            .keys
+            .iter()
+            .all(|(s, _)| *s == AttributeOwner::Span)
+    );
+    assert_eq!(
+        owner_attrs(&only_span, AttributeOwner::Span),
+        ["ratio", "retries", "trace_state"]
+    );
 }
 
 /// Values merge across a low-tier file, a mid-tier file (>100 distinct
@@ -274,7 +299,10 @@ fn values_merge_all_tiers_across_sources_with_exact_truncation() {
     // corpus — four sources all carrying `svc` collapse to one value.
     let svc = values(
         sources(),
-        AttributeValuesQuery::new(AttributeOwner::Resource, AttributeKey::Attribute("service.name".into())),
+        AttributeValuesQuery::new(
+            AttributeOwner::Resource,
+            AttributeKey::Attribute("service.name".into()),
+        ),
     );
     assert_eq!(value_strings(&svc), ["svc"]);
 }
@@ -310,7 +338,11 @@ fn kinds_coalesce_and_kindless_values_carry_none() {
         sealed_source(dir.path(), &wal_dbl, "dbl"),
     ]);
     assert_eq!(value_strings(&d), ["8.5", "80"]);
-    assert!(d.values.iter().all(|v| v.kind == Some(sfst::ValueKind::Double)));
+    assert!(
+        d.values
+            .iter()
+            .all(|v| v.kind == Some(sfst::ValueKind::Double))
+    );
 
     // Int ⊔ Str → Str (sealed + TAIL — the tail folds through the same
     // lattice).
@@ -319,7 +351,11 @@ fn kinds_coalesce_and_kindless_values_carry_none() {
         tail_source(&wal_str, "str-tail"),
     ]);
     assert_eq!(value_strings(&s), ["80", "www"]);
-    assert!(s.values.iter().all(|v| v.kind == Some(sfst::ValueKind::Str)));
+    assert!(
+        s.values
+            .iter()
+            .all(|v| v.kind == Some(sfst::ValueKind::Str))
+    );
 
     // Null-only: enumerated as a key, value is the empty rendering,
     // kind None — from a sealed file AND from a tail.
@@ -337,13 +373,19 @@ fn kinds_coalesce_and_kindless_values_carry_none() {
     }
     let g = values(
         vec![sealed_source(dir.path(), &wal_null, "null-sealed-2")],
-        AttributeValuesQuery::new(AttributeOwner::Span, AttributeKey::Attribute("ghost".into())),
+        AttributeValuesQuery::new(
+            AttributeOwner::Span,
+            AttributeKey::Attribute("ghost".into()),
+        ),
     );
     assert_eq!(value_strings(&g), [""]);
     assert_eq!(g.values[0].kind, None);
     let gt = values(
         vec![tail_source(&wal_null, "null-tail-2")],
-        AttributeValuesQuery::new(AttributeOwner::Span, AttributeKey::Attribute("ghost".into())),
+        AttributeValuesQuery::new(
+            AttributeOwner::Span,
+            AttributeKey::Attribute("ghost".into()),
+        ),
     );
     assert_eq!(value_strings(&gt), [""]);
     assert_eq!(gt.values[0].kind, None);
@@ -351,7 +393,7 @@ fn kinds_coalesce_and_kindless_values_carry_none() {
 
 /// Dictionary-backed builtins serve values as the STORAGE labels
 /// (mapping them to a wire vocabulary is the adapter's job —
-/// [`sfsq::traces::BuiltinField::dictionary_field`]); virtual builtins
+/// `sfsq::traces::BuiltinField::dictionary_field`); virtual builtins
 /// are a request error
 /// (the virtual/dictionary split is static); the builtin key list never
 /// depends on the data — a status-less corpus still lists `Status`.
@@ -424,21 +466,27 @@ fn builtin_values_serve_and_virtual_builtins_reject() {
         vec![sealed_source(dir.path(), &plain, "bare")],
         AttributeNamesQuery::new().owner(AttributeOwner::Builtin),
     );
-    assert!(
-        keys.keys
-            .contains(&(AttributeOwner::Builtin, AttributeKey::Builtin(BuiltinField::Status)))
-    );
+    assert!(keys.keys.contains(&(
+        AttributeOwner::Builtin,
+        AttributeKey::Builtin(BuiltinField::Status)
+    )));
     // Its spans were sent without a status or kind: the OTel defaults are
     // stored, so they are the values.
     let sv = values(
         vec![sealed_source(dir.path(), &plain, "bare2")],
-        AttributeValuesQuery::new(AttributeOwner::Builtin, AttributeKey::Builtin(BuiltinField::Status)),
+        AttributeValuesQuery::new(
+            AttributeOwner::Builtin,
+            AttributeKey::Builtin(BuiltinField::Status),
+        ),
     );
     assert_eq!(value_strings(&sv), ["UNSET"]);
     assert_eq!(sv.status, QueryStatus::Complete);
     let kv = values(
         vec![sealed_source(dir.path(), &plain, "bare3")],
-        AttributeValuesQuery::new(AttributeOwner::Builtin, AttributeKey::Builtin(BuiltinField::Kind)),
+        AttributeValuesQuery::new(
+            AttributeOwner::Builtin,
+            AttributeKey::Builtin(BuiltinField::Kind),
+        ),
     );
     assert_eq!(value_strings(&kv), ["UNSPECIFIED"]);
 
@@ -452,12 +500,18 @@ fn builtin_values_serve_and_virtual_builtins_reject() {
     );
     let status = values(
         vec![sealed_source(dir.path(), &mixed, "mixed-status")],
-        AttributeValuesQuery::new(AttributeOwner::Builtin, AttributeKey::Builtin(BuiltinField::Status)),
+        AttributeValuesQuery::new(
+            AttributeOwner::Builtin,
+            AttributeKey::Builtin(BuiltinField::Status),
+        ),
     );
     assert_eq!(value_strings(&status), ["ERROR", "OK", "UNSET"]);
     let kind = values(
         vec![sealed_source(dir.path(), &mixed, "mixed-kind")],
-        AttributeValuesQuery::new(AttributeOwner::Builtin, AttributeKey::Builtin(BuiltinField::Kind)),
+        AttributeValuesQuery::new(
+            AttributeOwner::Builtin,
+            AttributeKey::Builtin(BuiltinField::Kind),
+        ),
     );
     assert_eq!(value_strings(&kind), ["SERVER", "UNSPECIFIED"]);
 }
@@ -612,16 +666,13 @@ fn cancellation_is_all_or_empty() {
 
 /// A key absent from every source is a data condition, not an error:
 /// empty values, `Complete`, not truncated (the engine skips files
-/// without the field — [`sfsq::traces::attribute_values`]).
+/// without the field — `sfsq::traces::attribute_values`).
 #[test]
 fn absent_key_is_a_complete_empty() {
     let dir = tempfile::tempdir().unwrap();
     let wal = write_wal(dir.path(), vec![req(&[sp(1, 0, 1, "x")])], "a");
     let data = values(
-        vec![
-            sealed_source(dir.path(), &wal, "f"),
-            tail_source(&wal, "t"),
-        ],
+        vec![sealed_source(dir.path(), &wal, "f"), tail_source(&wal, "t")],
         AttributeValuesQuery::new(AttributeOwner::Link, AttributeKey::Attribute("nope".into())),
     );
     assert!(data.values.is_empty());
@@ -629,24 +680,30 @@ fn absent_key_is_a_complete_empty() {
     assert_eq!(data.status, QueryStatus::Complete);
 }
 
-/// Request validation: zero limits, an empty or inverted window, the
-/// invalid owner/key pairings of pin C4, and duplicate source ids are
-/// errors — nothing is queried (the validation heads of
-/// [`sfsq::traces::attribute_names`] and
-/// [`sfsq::traces::attribute_values`]).
+/// Request validation: zero limits, the invalid owner/key pairings of
+/// pin C4, and duplicate source ids are errors before anything is
+/// queried (the validation heads of `sfsq::traces::attribute_names` and
+/// `sfsq::traces::attribute_values`); an empty or inverted window is
+/// rejected earlier still, by `TimeWindow::new`.
 #[test]
 fn request_validation_rejects_bad_requests() {
     let cancel = CancellationToken::new;
     let counter = || Arc::new(AtomicUsize::new(0));
 
     assert!(matches!(
-        attribute_names(Vec::new(), AttributeNamesQuery::new().max_keys(0), cancel(), counter()),
+        attribute_names(
+            Vec::new(),
+            AttributeNamesQuery::new().max_keys(0),
+            cancel(),
+            counter()
+        ),
         Err(AttributeRequestError::ZeroLimit)
     ));
     assert!(matches!(
         attribute_values(
             Vec::new(),
-            AttributeValuesQuery::new(AttributeOwner::Span, AttributeKey::Attribute("k".into())).max_values(0),
+            AttributeValuesQuery::new(AttributeOwner::Span, AttributeKey::Attribute("k".into()))
+                .max_values(0),
             cancel(),
             counter()
         ),
@@ -685,11 +742,16 @@ fn request_validation_rejects_bad_requests() {
     assert!(matches!(
         attribute_values(
             Vec::new(),
-            AttributeValuesQuery::new(AttributeOwner::Span, AttributeKey::Builtin(BuiltinField::Name)),
+            AttributeValuesQuery::new(
+                AttributeOwner::Span,
+                AttributeKey::Builtin(BuiltinField::Name)
+            ),
             cancel(),
             counter()
         ),
-        Err(AttributeRequestError::BuiltinKeyOutsideBuiltinOwner(AttributeOwner::Span))
+        Err(AttributeRequestError::BuiltinKeyOutsideBuiltinOwner(
+            AttributeOwner::Span
+        ))
     ));
     // …and attribute keys inside it.
     assert!(matches!(
@@ -730,7 +792,7 @@ fn request_validation_rejects_bad_requests() {
 
 /// An empty source set with a live token is a Complete result: the
 /// static builtin vocabulary does not depend on sources existing
-/// ([`sfsq::traces::attribute_names`] seeds it unconditionally), and
+/// (`sfsq::traces::attribute_names` seeds it unconditionally), and
 /// attribute scopes are simply empty — pinned so a future change
 /// cannot gate the static set on "saw a source".
 #[test]
@@ -751,7 +813,10 @@ fn empty_sources_still_yield_the_static_builtins() {
     assert_eq!(got, want);
 
     // A non-Builtin owner filter on zero sources: zero keys, Complete.
-    let span_only = names(Vec::new(), AttributeNamesQuery::new().owner(AttributeOwner::Span));
+    let span_only = names(
+        Vec::new(),
+        AttributeNamesQuery::new().owner(AttributeOwner::Span),
+    );
     assert!(span_only.keys.is_empty());
     assert_eq!(span_only.status, QueryStatus::Complete);
 
@@ -768,7 +833,7 @@ fn empty_sources_still_yield_the_static_builtins() {
 /// (`RemoteUnavailable`) beside a missing file's (`SourceFailure`), for
 /// both operations, while the healthy source still serves; alone, it is
 /// never Complete and never a source failure — the two reasons are
-/// distinct ([`sfsq::traces::PartialReason::RemoteUnavailable`]).
+/// distinct (`sfsq::traces::PartialReason::RemoteUnavailable`).
 #[test]
 fn unavailable_sources_are_reported_and_the_rest_served() {
     let dir = tempfile::tempdir().unwrap();

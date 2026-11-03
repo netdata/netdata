@@ -23,8 +23,10 @@
 //! re-centered on the request (sequential appends then slide one window
 //! forward instead of growing a single mapping from the file start), or
 //! opens a new window, evicting the oldest at `max_windows`. Sizing is
-//! caller policy: JournalFile passes 64 KiB chunks and 16 windows after
-//! `open` / 32 after `create`, 8 MiB chunks on rotation
+//! caller policy: JournalFile passes 16 windows after `open` / 32 after
+//! `create` but takes chunk sizes from its callers - the
+//! [`JournalFileOptions`](crate::file::JournalFileOptions) default is 64 KiB,
+//! rotation switches to 8 MiB
 //! ([`JournalFile::open`](crate::file::JournalFile::open),
 //! [`JournalFile::create`](crate::file::JournalFile::create),
 //! [`JournalFile::create_successor`](crate::file::JournalFile::create_successor)).
@@ -47,12 +49,9 @@
 //! `Send`/`Sync` follow `M` (both memmap2 types are); the journal file type
 //! is `!Sync` because of its `GuardedCell` wrapper, not this module.
 //!
-//! Consumers (grep-verified): `JournalFile` (file/file.rs) is the only
-//! `WindowManager` user; cursor/reader/writer/offset-array only carry the
-//! trait bounds through `JournalFile<M>`, and journal-log-writer imports
-//! `MmapMut` from here directly (journal-log-writer/src/log/mod.rs).
-//! netflow-plugin instead queries the published sdk twin
-//! (systemd-journal-sdk-core); this module's near-twin is
+//! Consumers: `JournalFile` (file/file.rs) is the only `WindowManager` user,
+//! and journal-log-writer imports `MmapMut` from here directly
+//! (journal-log-writer/src/log/mod.rs). This module's near-twin is
 //! src/crates/jf/window_manager/src/lib.rs (keeps the old window start on
 //! remap, no `flush`/`sync`, no failure logging).
 //!
@@ -69,9 +68,7 @@ use std::ops::{Deref, DerefMut};
 use tracing::error;
 
 // Re-exports memmap2 so dependents can name these types without a direct
-// memmap2 dependency: `Mmap`/`MmapMut` flow through file/mod.rs
-// (JournalFileMap) and journal-log-writer imports `MmapMut` from here;
-// `MmapOptions` is used unqualified below.
+// memmap2 dependency; `MmapOptions` is also used unqualified below.
 pub use memmap2::{Mmap, MmapMut, MmapOptions};
 
 // Page size; used only to assert that window (chunk) sizes are page-aligned
@@ -97,8 +94,8 @@ pub trait MemoryMapMut: MemoryMap + DerefMut {
 
 impl MemoryMap for Mmap {
     fn create(file: &File, offset: u64, size: u64) -> Result<Self> {
-        // Read-only: maps the range as-is - pages past the file end are
-        // unbacked (SIGBUS when touched); syscall failures are Io errors.
+        // Read-only: maps the range as-is - pages past the file end stay
+        // unbacked (SIGBUS when touched).
         let mmap = unsafe {
             MmapOptions::new()
                 .offset(offset)
@@ -113,8 +110,7 @@ impl MemoryMap for Mmap {
 impl MemoryMap for MmapMut {
     fn create(file: &File, offset: u64, size: u64) -> Result<Self> {
         // Writable: extend the file to cover [offset, offset+size) with a
-        // zero-filled hole first, so the whole mapped range is backed -
-        // this is how journal appends grow a file.
+        // zero-filled hole first, so the whole mapped range is backed.
         let required_size = offset + size;
 
         if required_size > file.metadata()?.len() {
@@ -212,8 +208,9 @@ impl<M: MemoryMap> WindowManager<M> {
     /// is the unit and minimum window size (debug-asserted non-zero and
     /// page-aligned; `is_multiple_of` is the MSRV backport of
     /// `u64::is_multiple_of`) and `max_windows` caps the window count
-    /// (debug-asserted non-zero). Callers set both: JournalFile passes
-    /// 64 KiB chunks with 16 (open) / 32 (create) windows
+    /// (debug-asserted non-zero). Callers set both: JournalFile passes 16
+    /// (open) / 32 (create) windows but takes chunk sizes from its callers -
+    /// the `JournalFileOptions` default is 64 KiB, rotation uses 8 MiB
     /// ([`JournalFile::open`](crate::file::JournalFile::open) /
     /// [`JournalFile::create`](crate::file::JournalFile::create)).
     pub fn new(file: File, chunk_size: u64, max_windows: usize) -> Result<Self> {
@@ -241,7 +238,7 @@ impl<M: MemoryMap> WindowManager<M> {
     }
 
     // Maps `chunk_count * chunk_size` bytes at `window_start`; failures
-    // are logged with the requested range and raised as JournalError::Io.
+    // are logged with the requested range and propagated.
     fn create_window(&self, window_start: u64, chunk_count: u64) -> Result<Window<M>> {
         debug_assert_ne!(chunk_count, 0);
 
@@ -315,11 +312,8 @@ impl<M: MemoryMap> WindowManager<M> {
     // existing window, remapping a partial hit, or creating a new one.
     fn get_window(&mut self, position: u64, size_needed: u64) -> Result<&mut Window<M>> {
         if let Some(idx) = self.lookup_window_by_range(position, size_needed) {
-            // Hit: an existing window covers the whole range.
             Ok(&mut self.windows[idx])
         } else if let Some(idx) = self.lookup_window_by_position(position) {
-            // Partial hit: the position is inside a window but the range
-            // is not - remap it.
 
             let _window = self.windows.remove(idx);
             // The removal above shifts (or drops) indices, so clear the
@@ -340,7 +334,6 @@ impl<M: MemoryMap> WindowManager<M> {
             self.active_window_idx = Some(self.windows.len() - 1);
             Ok(self.windows.last_mut().unwrap())
         } else {
-            // Miss: no window even contains the position - open a new one.
 
             if self.windows.len() >= self.max_windows {
                 self.windows.remove(self.find_window_to_evict());
@@ -443,7 +436,6 @@ mod tests {
         }
     }
 
-    // Thread-local controller for the mock
     thread_local! {
         static MOCK_CONTROLLER: Rc<MockController> = Rc::new(MockController::new());
     }

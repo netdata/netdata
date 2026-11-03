@@ -119,10 +119,8 @@ impl BuildHasher for BuildIdentityHasher {
 }
 
 /// Maps `key=value` strings to unique [`KvSlot`] IDs, keyed by
-/// pre-computed xxhash64.
-///
-/// Crate-internal; owned by `RowIndex`. The module docs cover the hash
-/// fast path, collision handling, and the tier/canonical-order contract.
+/// pre-computed xxhash64. The module docs cover the hash fast path,
+/// collision handling, and the tier/canonical-order contract.
 pub struct KeyValueInterner<'a> {
     arena: &'a Bump,
     /// xxhash64 → first intern ID with this hash
@@ -133,7 +131,7 @@ pub struct KeyValueInterner<'a> {
     strings: Vec<&'a str>,
     /// Field name → the key=value slots carrying it. The field is the
     /// part before the first `=`. Slots are appended only when a new one
-    /// is created (string-match hits skip [`track_field`](Self::track_field)).
+    /// is created (string-match hits skip `track_field`).
     field_slots: HashMap<&'a str, Vec<KvSlot>>,
     /// Tier boundary `T`: a field with `< T` slots is low (primary FST),
     /// `[T, 10·T)` mid, `≥ 10·T` high.
@@ -165,8 +163,6 @@ impl<'a> KeyValueInterner<'a> {
     /// a slot is registered in `field_slots` exactly once, when first interned.
     /// Re-tracking a returned slot would double-count it under its field.
     pub fn intern_with_hash(&mut self, hash: u64, s: &str) -> KvSlot {
-        // Identity hasher: `entry(hash)` matches the removed raw-entry
-        // API (`from_hash(hash, |&k| k == hash)`).
         let kv_slot = match self.map.entry(hash) {
             Entry::Occupied(entry) => {
                 let &existing_id = entry.get();
@@ -258,16 +254,14 @@ impl<'a> KeyValueInterner<'a> {
     /// name; within each field, values are sorted by their resolved string.
     /// Returns three vectors of [`KvSlot`]s, one per tier.
     ///
-    /// This ordering is the contract the build's ID translation depends
-    /// on: concatenating the three tiers and numbering the result 0..
-    /// gives each slot its on-disk `KvId` — `build_id_translation` in
-    /// `src/crates/sfst/src/build.rs`.
+    /// This ordering is the on-disk `KvId` order: `build_id_translation`
+    /// in `src/crates/sfst/src/build.rs` numbers the concatenated tiers.
     pub fn tier_assignment(&self) -> [Vec<KvSlot>; 3] {
         // Reusable decorate buffer of (value suffix, slot). Cheaper than
         // sorting the slots directly by `self.strings[idx]`:
-        //   - sorting the value *suffix* (past the `field=` prefix every
-        //     value in the field shares) gives the same order as sorting
-        //     full strings;
+        //   - every value in the field shares the same `field=` prefix,
+        //     so sorting the remaining suffix gives the same order as
+        //     sorting full strings;
         //   - the `&str` sits inline in the tuple, so comparisons don't
         //     re-index `self.strings`;
         //   - `sort_unstable_by` skips the stable sort's scratch allocation

@@ -8,8 +8,9 @@
 //! applied per entry after the bitmap stage by
 //! [`crate::FileIndex::find_log_entries`].
 //! Matching is case-sensitive: names and values are used verbatim, the
-//! index normalizes nothing (`src/field_types.rs` `FieldName`/
-//! `FieldValuePair` derive the inner string's `Eq`).
+//! index normalizes nothing
+//! (`src/field_types.rs` `FieldName`/`FieldValuePair` derive the inner
+//! string's `Eq`).
 //!
 //! Evaluation is infallible. `Filter::evaluate` resolves each leaf to
 //! its bitmap (`FilterExpr::resolve`) and folds the result into one
@@ -21,19 +22,18 @@
 //! Consumers: otel-legacy-logs builds one from request selections, ORing
 //! the values within a field and ANDing the fields together
 //! (`otel-legacy-logs/src/handler.rs` `build_filter_from_selections`);
-//! journal-engine applies the
-//! same `Filter` per histogram bucket (`journal-engine/src/histogram.rs`)
-//! and carries it through per-file query params (`journal-engine/src/
-//! logs/query.rs`). `Filter::none()` evaluates to an empty bitmap;
-//! callers check `is_none()` and skip applying it (`journal-engine/src/
-//! histogram.rs`, `otel-legacy-logs/src/handler.rs`), leaving
-//! `LogQueryParams::filter` as `None` for the unfiltered full-coverage
-//! path ([`crate::FileIndex::find_log_entries`]).
+//! journal-engine applies the same `Filter` per histogram bucket
+//! (`journal-engine/src/histogram.rs`) and carries it through per-file
+//! query params (`journal-engine/src/logs/query.rs`). `Filter::none()`
+//! evaluates to an empty bitmap; callers check `is_none()` and skip
+//! applying it (`journal-engine/src/histogram.rs`,
+//! `otel-legacy-logs/src/handler.rs`), leaving `LogQueryParams::filter`
+//! as `None` for the unfiltered full-coverage path
+//! ([`crate::FileIndex::find_log_entries`]).
 //!
 //! Same-named but unrelated: journal-core/src/file/filter.rs has its own
-//! `FilterExpr` (`journal-core/src/file/filter.rs`), and
-//! journal-core/src/file/index_filter.rs is an older orphan that
-//! file/mod.rs never declares - neither is this type.
+//! `FilterExpr`, and journal-core/src/file/index_filter.rs is an orphan
+//! that file/mod.rs never declares - neither is this type.
 use crate::{Bitmap, FieldName, FieldValuePair, FileIndex};
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
@@ -115,8 +115,9 @@ impl Filter {
     /// Create a filter that matches nothing.
     ///
     /// Callers also read this as "no filter": they check
-    /// [`Filter::is_none`] and skip applying it (`journal-engine/src/
-    /// histogram.rs`, `otel-legacy-logs/src/handler.rs`). Evaluated
+    /// [`Filter::is_none`] and skip applying it
+    /// (`journal-engine/src/histogram.rs`,
+    /// `otel-legacy-logs/src/handler.rs`). Evaluated
     /// directly it yields an empty bitmap; the unfiltered case is
     /// expressed by leaving `LogQueryParams::filter` unset, which gets a
     /// full-coverage bitmap instead ([`FileIndex::find_log_entries`]).
@@ -189,9 +190,11 @@ impl Eq for FilterExpr<FilterTarget> {}
 
 impl Hash for FilterExpr<FilterTarget> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        // Discriminant + payload: same members in a Conjunction vs a
-        // Disjunction hash differently, and operand order is preserved
-        // (Vec hashing and the derived Eq both keep call order).
+        // Hand-written: a derive would bound Hash on `T`, and only the
+        // `FilterTarget` instantiation needs it. Discriminant + payload:
+        // same members in a Conjunction vs a Disjunction hash differently,
+        // and operand order is preserved (Vec hashing and the derived
+        // `PartialEq` both keep call order).
         std::mem::discriminant(self).hash(state);
 
         match self {

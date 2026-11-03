@@ -2,16 +2,16 @@
 //! ledger's terms: this module owns its side of the single ferryboat IPC
 //! connection the ledger accepts on `writer_socket_path` (both processes
 //! pass that path down from the plugin config: the ingestor's
-//! `create_shared_writer_state` in `otel-ingestor/src/lib.rs`, the ledger's
-//! `Ledger::new` in `otel-ledger/src/lib.rs`; the accept: the
-//! `accept_writer` call in `otel-ledger/src/ledger/mod.rs`).
+//! `create_shared_writer_state` in `otel-ingestor/src/lib.rs`, the ledger
+//! shell's `Ledger::new` call in `otel-ledger/src/lib.rs`; the constructor
+//! and the `accept_writer` call both live in `otel-ledger/src/ledger/mod.rs`).
 //!
 //! What crosses is notification, not data: a per-signal `frame_seq`, a tenant
 //! id, and a `wal::FileEvent` (a WAL file was Created/Synced/Closed). The
 //! ledger applies them to its live per-tenant registries — how a sealed file
 //! gets indexed/uploaded promptly — while the WAL files on disk stay the
 //! source of truth: the ledger's startup recovery rebuilds from them
-//! (file-lifecycle/src/recovery).
+//! (`file-lifecycle/src/recovery`).
 //!
 //! Delivery is fire-and-forget and lossy by design, so the WAL write path
 //! never waits on the ledger. Connecting retries forever, but a connection
@@ -59,13 +59,13 @@ impl LedgerSender {
         }
     }
 
-    /// Queues every event of a [`wal::FileEvent`] slice for delivery to the
+    /// Queues every event of a `wal::FileEvent` vec for delivery to the
     /// ledger, tagged with `tenant_id`. Callers drain their writers with
     /// `wal::Writer::take_all_events` (`wal/src/writer.rs`) and forward
     /// while still holding the writer lock, so one file's
     /// Created→Synced→Closed events are enqueued in lifecycle order. Each
     /// event's `frame_seq` comes from its own signal's counter
-    /// (`event.pipeline_id`).
+    /// (`event.pipeline_id()`).
     pub fn send_events(&self, tenant_id: TenantId, events: Vec<wal::FileEvent>) {
         for event in events {
             let msg = wal::Message {

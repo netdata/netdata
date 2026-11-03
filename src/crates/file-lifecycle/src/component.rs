@@ -47,15 +47,15 @@
 //!   steady-state routing goes through [`ComponentHandle::into_parts`],
 //!   which drops it; recovery tests assert it to pin fire-and-forget request
 //!   counts. Nothing else observes backlog.
-//! - Single owner: every handle method takes `&mut self` and the response
-//!   channel is single-consumer, so a handle is driven by one task at a
-//!   time. The shared cleaner/uploader handles live on the ledger and are
+//! - Single owner: the handle's mutating methods take `&mut self` and the
+//!   response channel is single-consumer, so a handle is driven by one task
+//!   at a time. The shared cleaner/uploader handles live on the ledger and are
 //!   polled by its run loop's `select!` (`Ledger::run`); per-pipeline indexer
 //!   and catalog-builder handles are born inside the ledger's pipeline
 //!   builders, driven by recovery through `&mut`, then split by
 //!   [`ComponentHandle::into_parts`] — the sender becomes the `Pipeline`'s
-//!   request sender and the receiver moves into a pid-tagging forwarder task
-//!   feeding the run loop's merged response channel.
+//!   request sender and the receiver moves into a signal-tagging forwarder
+//!   task feeding the run loop's merged response channel.
 //! - Error semantics: the machinery raises no errors of its own. A dead
 //!   component surfaces only as closed channels; [`batch_recover`] and
 //!   [`drain_pending`] translate that into the fatal `anyhow` errors that
@@ -122,7 +122,8 @@ pub trait Component: Send + 'static {
 ///
 /// Exists only as [`ComponentHandle::spawn`]'s return value — the fields are
 /// private, so the channel pair cannot be rebuilt except through
-/// [`ComponentHandle::into_parts`]. All methods take `&mut self`; a handle
+/// [`ComponentHandle::into_parts`]. The mutating methods take `&mut self`
+/// (`pending` only reads it, `into_parts` consumes the handle); a handle
 /// belongs to one driving task at a time.
 pub struct ComponentHandle<Req, Resp> {
     tx: mpsc::UnboundedSender<Req>,
@@ -197,13 +198,14 @@ impl<Req: Send + 'static, Resp: Send + 'static> ComponentHandle<Req, Resp> {
     /// Used once per per-pipeline worker at the end of recovery
     /// (`otel-ledger/src/ledger/pipeline.rs`): the owning `Pipeline` keeps
     /// the sender for steady-state requests, while the receiver moves into a
-    /// forwarder task that tags each response with the pipeline id and feeds
-    /// the run loop's single merged channel. Responses still queued on the
-    /// receiver — e.g. catalog-builder `AddEntry`s enqueued fire-and-forget
-    /// by `reconcile_remote_uploads` — are preserved: the live receiver
-    /// carries them into the forwarder and on to the run loop. The dropped
-    /// counter was only ever consulted by the synchronous recovery drains
-    /// (`batch_recover` / `drain_pending`); steady-state routing ignores it.
+    /// forwarder task that tags each response with the signal and feeds the
+    /// run loop's single merged channel. Responses still queued on the
+    /// receiver — e.g. the `EntryAccepted`/`Rotated` answers to the
+    /// catalog-builder `AddEntry`s `reconcile_remote_uploads` enqueues
+    /// fire-and-forget — are preserved: the live receiver carries them into
+    /// the forwarder and on to the run loop. The dropped counter was only
+    /// ever consulted by the synchronous recovery drains (`batch_recover` /
+    /// `drain_pending`); steady-state routing ignores it.
     pub fn into_parts(self) -> (mpsc::UnboundedSender<Req>, mpsc::UnboundedReceiver<Resp>) {
         (self.tx, self.rx)
     }

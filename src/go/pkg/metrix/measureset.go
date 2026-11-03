@@ -24,12 +24,20 @@ type snapshotMeasureSetGaugeInstrument struct {
 	base    []LabelSet
 }
 
+func (i *snapshotMeasureSetGaugeInstrument) hostScope() HostScope {
+	return i.scope
+}
+
 // snapshotMeasureSetCounterInstrument writes sampled MeasureSet counter totals.
 type snapshotMeasureSetCounterInstrument struct {
 	backend meterBackend
 	desc    *instrumentDescriptor
 	scope   HostScope
 	base    []LabelSet
+}
+
+func (i *snapshotMeasureSetCounterInstrument) hostScope() HostScope {
+	return i.scope
 }
 
 // statefulMeasureSetGaugeInstrument writes maintained MeasureSet gauge points.
@@ -40,12 +48,20 @@ type statefulMeasureSetGaugeInstrument struct {
 	base    []LabelSet
 }
 
+func (i *statefulMeasureSetGaugeInstrument) hostScope() HostScope {
+	return i.scope
+}
+
 // statefulMeasureSetCounterInstrument writes maintained MeasureSet counter deltas.
 type statefulMeasureSetCounterInstrument struct {
 	backend meterBackend
 	desc    *instrumentDescriptor
 	scope   HostScope
 	base    []LabelSet
+}
+
+func (i *statefulMeasureSetCounterInstrument) hostScope() HostScope {
+	return i.scope
 }
 
 func appendMeasureSetSemantics(opts []InstrumentOption, semantics MeasureSetSemantics) []InstrumentOption {

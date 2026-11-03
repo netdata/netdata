@@ -566,10 +566,10 @@ app_keep 1
 app_drop 2
 `, "app")
 	defer srv.Close()
-	collr.MaxTS = 1
+	collr.MaxInputSeries = 1
 	require.NoError(t, collr.Init(context.Background()))
 
-	require.NoError(t, collr.Check(context.Background()), "the final one-series output must satisfy MaxTS")
+	require.NoError(t, collr.Check(context.Background()), "the final one-series output must satisfy MaxInputSeries")
 	collectProfileRelabelOnce(t, collr)
 	got := collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten())
 	assert.InDelta(t, 1, value(t, got, "app_keep", nil), 1e-9)

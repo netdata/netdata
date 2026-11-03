@@ -15,26 +15,27 @@ const (
 
 // Report is the deterministic machine-readable result of Validate.
 type Report struct {
-	Verdict             string                               `json:"verdict"`
-	Profiles            profileCompositionReport             `json:"profiles"`
-	Job                 effectiveJobReport                   `json:"job"`
-	Counts              countReport                          `json:"counts"`
-	RawFamilies         []rawFamilyReport                    `json:"raw_families,omitempty"`
-	PipelineExcluded    []pipelineExcludedReport             `json:"pipeline_excluded,omitempty"`
-	PipelineRenamed     []pipelineRenamedReport              `json:"pipeline_renamed,omitempty"`
-	AuthoredMapping     []authoredChartMappingReport         `json:"authored_mapping,omitempty"`
-	Charts              []materializedChart                  `json:"charts,omitempty"`
-	DeadCharts          []deadChartReport                    `json:"dead_charts,omitempty"`
-	DeadDimensions      []deadDimensionReport                `json:"dead_dimensions,omitempty"`
-	DimensionLosses     []dimensionMaterializationLossReport `json:"dimension_materialization_losses,omitempty"`
-	Collisions          []collisionReport                    `json:"collisions,omitempty"`
-	InstanceLosses      []instanceMaterializationLossReport  `json:"instance_materialization_losses,omitempty"`
-	ChartWireCollisions []wireChartCollisionReport           `json:"chart_wire_collisions,omitempty"`
-	ContextCollisions   []wireContextCollisionReport         `json:"context_wire_collisions,omitempty"`
-	DimensionCollisions []dimensionCollisionReport           `json:"dimension_collisions,omitempty"`
-	Findings            []finding                            `json:"findings,omitempty"`
-	EvidenceLimits      []string                             `json:"evidence_limits,omitempty"`
-	semantics           *promreplay.SemanticSnapshot
+	Verdict                string                               `json:"verdict"`
+	Profiles               profileCompositionReport             `json:"profiles"`
+	Job                    effectiveJobReport                   `json:"job"`
+	Counts                 countReport                          `json:"counts"`
+	RawFamilies            []rawFamilyReport                    `json:"raw_families,omitempty"`
+	PipelineExcluded       []pipelineExcludedReport             `json:"pipeline_excluded,omitempty"`
+	PipelineRenamed        []pipelineRenamedReport              `json:"pipeline_renamed,omitempty"`
+	AuthoredMapping        []authoredChartMappingReport         `json:"authored_mapping,omitempty"`
+	Charts                 []materializedChart                  `json:"charts,omitempty"`
+	DeadCharts             []deadChartReport                    `json:"dead_charts,omitempty"`
+	DeadDimensions         []deadDimensionReport                `json:"dead_dimensions,omitempty"`
+	ContextSeriesOmissions []contextSeriesOmissionReport        `json:"context_series_omissions,omitempty"`
+	DimensionLosses        []dimensionMaterializationLossReport `json:"dimension_materialization_losses,omitempty"`
+	Collisions             []collisionReport                    `json:"collisions,omitempty"`
+	InstanceLosses         []instanceMaterializationLossReport  `json:"instance_materialization_losses,omitempty"`
+	ChartWireCollisions    []wireChartCollisionReport           `json:"chart_wire_collisions,omitempty"`
+	ContextCollisions      []wireContextCollisionReport         `json:"context_wire_collisions,omitempty"`
+	DimensionCollisions    []dimensionCollisionReport           `json:"dimension_collisions,omitempty"`
+	Findings               []finding                            `json:"findings,omitempty"`
+	EvidenceLimits         []string                             `json:"evidence_limits,omitempty"`
+	semantics              *promreplay.SemanticSnapshot
 }
 
 // Passed reports whether validation found no errors.
@@ -86,17 +87,17 @@ type profileCompositionReport struct {
 }
 
 type effectiveJobReport struct {
-	Name                 string   `json:"name"`
-	App                  string   `json:"app,omitempty"`
-	SelectorAllow        []string `json:"selector_allow,omitempty"`
-	SelectorDeny         []string `json:"selector_deny,omitempty"`
-	RelabelBlocks        int      `json:"relabel_blocks"`
-	FallbackGauge        []string `json:"fallback_gauge,omitempty"`
-	FallbackCounter      []string `json:"fallback_counter,omitempty"`
-	ExpectedPrefix       string   `json:"expected_prefix,omitempty"`
-	MaxTimeSeries        int      `json:"max_time_series"`
-	MaxSeriesPerMetric   int      `json:"max_time_series_per_metric"`
-	DeclaredFutureInputs int      `json:"declared_future_inputs"`
+	Name                      string   `json:"name"`
+	App                       string   `json:"app,omitempty"`
+	SelectorAllow             []string `json:"selector_allow,omitempty"`
+	SelectorDeny              []string `json:"selector_deny,omitempty"`
+	RelabelBlocks             int      `json:"relabel_blocks"`
+	FallbackGauge             []string `json:"fallback_gauge,omitempty"`
+	FallbackCounter           []string `json:"fallback_counter,omitempty"`
+	ExpectedPrefix            string   `json:"expected_prefix,omitempty"`
+	MaxInputSeries            int      `json:"max_input_series"`
+	MaxOutputSeriesPerContext int      `json:"max_output_series_per_context"`
+	DeclaredFutureInputs      int      `json:"declared_future_inputs"`
 }
 
 type countReport struct {
@@ -188,6 +189,12 @@ type deadDimensionReport struct {
 	Path     string `json:"path"`
 	Selector string `json:"selector"`
 	Name     string `json:"name,omitempty"`
+}
+
+type contextSeriesOmissionReport struct {
+	Context        string `json:"context"`
+	ObservedSeries int    `json:"observed_series"`
+	Limit          int    `json:"limit"`
 }
 
 type dimensionMaterializationLossReport struct {

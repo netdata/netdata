@@ -26,14 +26,14 @@
       },
       "timeout": {
         "title": "Timeout",
-        "description": "The maximum duration, in seconds, to wait for an `nvidia-smi` command to complete.",
+        "description": "Command execution timeout, in seconds. In loop mode, it limits the wait for each `nvidia-smi` sample instead.",
         "type": "number",
         "minimum": 0.5,
         "default": 10
       },
       "loop_mode": {
-        "title": "Loop Mode",
-        "description": "When enabled, `nvidia-smi` is executed continuously in a separate thread using the `-l` option.",
+        "title": "Loop mode",
+        "description": "Keep `nvidia-smi` running and reading GPU data on a fixed interval (the `-l` option) instead of starting it for every collection.",
         "type": "boolean",
         "default": true
       }
@@ -47,10 +47,10 @@
       "ui:help": "If an absolute path is provided, the collector will use it directly; otherwise, it will search for the binary in directories specified in the PATH environment variable."
     },
     "timeout": {
-      "ui:help": "This setting applies differently based on the collector's mode. **Loop Mode:** In loop mode, the timeout primarily determines how long to wait for the initial `nvidia-smi` execution. If the initial query takes longer than the timeout, the collector may report an error. For systems with multiple GPUs, the initial load time can sometimes be significant (e.g., 5-10 seconds). **Regular Mode:** If the collector is in regular mode, the timeout specifies how long to wait for each individual `nvidia-smi` execution."
+      "ui:help": "Raise it on hosts with several GPUs, where `nvidia-smi` can take 5 to 10 seconds to return data. In loop mode, a sample later than the loop interval plus this timeout leaves a gap and restarts `nvidia-smi`."
     },
     "loop_mode": {
-      "ui:help": "In loop mode, `nvidia-smi` will repeatedly query GPU data at specified intervals, defined by the `-l SEC` or `--loop=SEC` parameter, rather than just running the query once. This enables ongoing performance tracking by putting the application to sleep between queries."
+      "ui:help": "Turn it off to run `nvidia-smi` once per collection. The loop interval follows the data collection interval, capped at 5 seconds; Windows always runs `nvidia-smi` once per collection."
     }
   }
 }

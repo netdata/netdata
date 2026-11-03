@@ -182,8 +182,9 @@ impl Registry {
         min_timestamp_s: u32,
         max_timestamp_s: u32,
     ) -> PathBuf {
-        file_registry::layout::date_tenant_dir(&self.base_dir, date, self.tenant_id.as_str())
-            .join(filename(identity, max_seq, min_timestamp_s, max_timestamp_s))
+        file_registry::layout::date_tenant_dir(&self.base_dir, date, self.tenant_id.as_str()).join(
+            filename(identity, max_seq, min_timestamp_s, max_timestamp_s),
+        )
     }
 
     /// Register a catalog file that has been written to disk. Called from
@@ -661,12 +662,11 @@ mod tests {
     #[test]
     fn recover_picks_up_files_written_on_disk() {
         let tmp = tempfile::tempdir().unwrap();
-        let expected = tmp.path().join("2026-04-17").join(TENANT).join(filename(
-            ident(),
-            42,
-            100,
-            200,
-        ));
+        let expected =
+            tmp.path()
+                .join("2026-04-17")
+                .join(TENANT)
+                .join(filename(ident(), 42, 100, 200));
         write_catalog_at(&expected);
 
         let mut reg = Registry::new(tmp.path(), TenantId::from(TENANT));
@@ -726,12 +726,11 @@ mod tests {
     #[test]
     fn recover_sweeps_stale_catalog_tmp_files() {
         let tmp = tempfile::tempdir().unwrap();
-        let good = tmp.path().join("2026-04-17").join(TENANT).join(filename(
-            ident(),
-            42,
-            100,
-            200,
-        ));
+        let good = tmp
+            .path()
+            .join("2026-04-17")
+            .join(TENANT)
+            .join(filename(ident(), 42, 100, 200));
         write_catalog_at(&good);
         // An interrupted rotation's leftover: same dir, `.catalog.tmp`.
         let stale = good.with_extension("catalog.tmp");
@@ -809,14 +808,7 @@ mod tests {
     ) -> PathBuf {
         let path = reg.file_path(d, ident(), max_seq, min_ts, max_ts);
         reg.track(
-            File::new(
-                d,
-                ident(),
-                max_seq,
-                min_ts,
-                max_ts,
-                ByteSize(1024),
-            ),
+            File::new(d, ident(), max_seq, min_ts, max_ts, ByteSize(1024)),
             path.clone(),
         );
         path
@@ -898,14 +890,7 @@ mod tests {
         std::fs::write(&path, cat.to_container_bytes().unwrap()).unwrap();
         let size = ByteSize(std::fs::metadata(&path).unwrap().len());
         reg.track(
-            File::new(
-                date(),
-                ident(),
-                max_seq,
-                min_ts,
-                max_ts,
-                size,
-            ),
+            File::new(date(), ident(), max_seq, min_ts, max_ts, size),
             path.clone(),
         );
         path

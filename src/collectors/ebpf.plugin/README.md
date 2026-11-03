@@ -74,6 +74,13 @@ To edit the `ebpf.d.conf`:
 
     You can now edit the behavior of the eBPF collector. The following sections describe each configuration option in detail.
 
+> **Note**
+>
+> `ebpf.plugin` and `ebpf-go.plugin` run with elevated privileges, so they read `ebpf.d.conf` and load their eBPF
+> programs only from the directories Netdata was installed with (normally `/etc/netdata`,
+> `/usr/lib/netdata/conf.d` and `/usr/libexec/netdata/plugins.d`). A `[directories]` override in `netdata.conf`
+> does not apply to them, and they log a line when they ignore one.
+
 ### `[global]` configuration options
 
 The `[global]` section defines settings for the whole eBPF collector. For `update every`, the configuration file value

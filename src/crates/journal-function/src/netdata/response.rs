@@ -97,7 +97,6 @@ pub fn table_to_netdata_response(
         .collect();
     schema_cols.sort_by_key(|col| col.index);
 
-    // Render each table row
     for table_row in table.rows() {
         let mut ui_row = Vec::with_capacity(2 + schema_cols.len());
 

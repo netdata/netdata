@@ -628,27 +628,25 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
         // stores it on the HTTP response it serves for the call. Error results
         // below are sent with `expires: 0`.
         match result {
-            Ok(response) => {
-                match serde_json::to_vec_pretty(&response) {
-                    Ok(payload) => FunctionResult {
+            Ok(response) => match serde_json::to_vec_pretty(&response) {
+                Ok(payload) => FunctionResult {
+                    transaction,
+                    status: 200,
+                    expires,
+                    format: "application/json".to_string(),
+                    payload,
+                },
+                Err(e) => {
+                    error!("failed to serialize response: {}", e);
+                    FunctionResult {
                         transaction,
-                        status: 200,
-                        expires,
-                        format: "application/json".to_string(),
-                        payload,
-                    },
-                    Err(e) => {
-                        error!("failed to serialize response: {}", e);
-                        FunctionResult {
-                            transaction,
-                            status: 500,
-                            expires: 0,
-                            format: "text/plain".to_string(),
-                            payload: format!("Serialization error: {}", e).as_bytes().to_vec(),
-                        }
+                        status: 500,
+                        expires: 0,
+                        format: "text/plain".to_string(),
+                        payload: format!("Serialization error: {}", e).as_bytes().to_vec(),
                     }
                 }
-            }
+            },
             Err(e) => {
                 // 499 marks a cancelled call (client closed the request);
                 // anything else is an internal error.

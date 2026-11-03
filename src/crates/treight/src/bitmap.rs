@@ -29,7 +29,20 @@
 //! payload beside it; the `roaring` feature (roaring.rs) bridges
 //! `RoaringBitmap` and feeds the differential fuzz target
 //! fuzz/fuzz_targets/against_roaring.rs.
+use crate::ceil_log8;
 use crate::raw::{Iter, RawBitmap};
+
+/// Bytes in the canonical tree holding every value of `0..universe_size`:
+/// one node per distinct prefix at each height, `ceil(universe / 8^h)` for
+/// `h = 1..=levels`. Equals `estimate_data_size(universe_size,
+/// 0..universe_size)` (lib.rs) in O(levels) instead of O(universe).
+pub(crate) fn full_tree_len(universe_size: u32) -> usize {
+    let mut total = 0;
+    for height in 1..=ceil_log8(universe_size) {
+        total += (universe_size as u64).div_ceil(1u64 << (3 * height)) as usize;
+    }
+    total
+}
 
 /// A bitmap that may store its complement for better compression: a
 /// [`RawBitmap`] tree plus an `inverted` flag, with every accessor flipping
@@ -118,10 +131,17 @@ impl Bitmap {
         }
     }
 
-    /// Returns `true` if no bits are set.
+    /// Returns `true` if no bits are set. For the inverted form that means
+    /// the stored tree holds the whole universe. Every node of a valid tree
+    /// is also a node of that full tree, so a blob of any other length is
+    /// rejected without a walk; a blob of the full length can still miss
+    /// values (a leaf keeps another bit), so only then is the tree counted.
+    /// `and`/`or` check both operands here, and sfst's `PosSet::is_empty`
+    /// (sfst/src/index_reader.rs) delegates here.
     pub fn is_empty(&self, data: &[u8]) -> bool {
         if self.inverted {
-            self.inner.len(data) == self.inner.universe_size() as u64
+            let universe = self.inner.universe_size();
+            data.len() == full_tree_len(universe) && self.inner.len(data) == universe as u64
         } else {
             self.inner.is_empty(data)
         }
@@ -160,9 +180,12 @@ impl Bitmap {
     /// tree bytes to `out`. The end bound is clamped to the universe size;
     /// a range that is empty or starts at/after the clamped end yields an
     /// empty bitmap. Ranges covering more than half the universe store
-    /// their complement instead (the descriptor comes back inverted) — the
-    /// density trade [`from_sorted_iter_complemented`](Self::from_sorted_iter_complemented)
-    /// exists for.
+    /// their complement `[0, start) ∪ [end, universe)` instead (the
+    /// descriptor comes back inverted), the density trade
+    /// [`from_sorted_iter_complemented`](Self::from_sorted_iter_complemented)
+    /// makes for value lists. Either form is written range-wise
+    /// (`RawBitmap::from_disjoint_ranges`), so cost tracks the stored
+    /// bytes, not the range length.
     pub fn from_range(
         range: impl std::ops::RangeBounds<u32>,
         universe_size: u32,
@@ -189,10 +212,27 @@ impl Bitmap {
         let half_universe = universe_size as u64 / 2;
 
         if range_len > half_universe {
-            let complement = (0..start).chain(end..universe_size);
-            Self::from_sorted_iter_complemented(complement, universe_size, out)
+            // The complement's two pieces; either is empty when the range
+            // touches that end of the universe.
+            let mut complement = [(0, 0); 2];
+            let mut pieces = 0;
+            if start > 0 {
+                complement[pieces] = (0, start);
+                pieces += 1;
+            }
+            if end < universe_size {
+                complement[pieces] = (end, universe_size);
+                pieces += 1;
+            }
+            Self {
+                inner: RawBitmap::from_disjoint_ranges(&complement[..pieces], universe_size, out),
+                inverted: true,
+            }
         } else {
-            Self::from_sorted_iter(start..end, universe_size, out)
+            Self {
+                inner: RawBitmap::from_disjoint_ranges(&[(start, end)], universe_size, out),
+                inverted: false,
+            }
         }
     }
 

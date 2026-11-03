@@ -16,7 +16,7 @@
 //! `otel-ledger/src/ledger/rpc/logs/wire.rs`) and
 //! is not a consumer.
 
-use super::ui_types as ui; // ui_types.rs: the flat serde types the builders emit
+use super::ui_types as ui; // ui_types: the flat serde types the builders emit
 use journal_index::Direction;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -256,8 +256,7 @@ pub struct Items {
 /// The systemd-journal function's response envelope (Functions-protocol
 /// v3, `type: "table"` with history). Every field is filled by the sole
 /// consumer's `on_call` in one literal
-/// (`LegacyLogsHandler::on_call` in `otel-legacy-logs/src/handler.rs`); the per-field comments name
-/// each field's producer.
+/// (`LegacyLogsHandler::on_call` in `otel-legacy-logs/src/handler.rs`).
 #[derive(Debug, Serialize, Deserialize)]
 pub struct JournalResponse {
     /// Completion percent of the call. The final result always says 100 -
@@ -287,29 +286,26 @@ pub struct JournalResponse {
     pub required_params: Vec<RequiredParam>,
 
     /// Facet filter options, one block per requested facet field
-    /// ([`crate::netdata::facets::facets`]). Filled by `LegacyLogsHandler::on_call`.
+    /// ([`crate::netdata::facets::facets`]).
     pub facets: Vec<ui::Facet>,
 
     /// Histogram fields the UI can switch the chart to - one per indexed
     /// field the query's buckets carry
     /// ([`crate::netdata::available_histograms`]).
-    /// Filled by `LegacyLogsHandler::on_call`.
     pub available_histograms: Vec<ui::AvailableHistogram>,
     /// The chart rendered for the requested field - "PRIORITY" when the
     /// request leaves it empty (`LegacyLogsHandler::on_call`) - built by
-    /// [`crate::netdata::histogram()`] and filled by `on_call`. Its total
-    /// also feeds `items.matched` ([`crate::netdata::Histogram::count`]).
+    /// [`crate::netdata::histogram()`]. Its total also feeds
+    /// `items.matched` ([`crate::netdata::Histogram::count`]).
     pub histogram: ui::Histogram,
     /// Logs-table column schema as JSON with keys in index order
     /// ([`crate::netdata::columns::columns_to_sorted_json`]). From
-    /// [`crate::netdata::build_ui_response`], called by
-    /// `LegacyLogsHandler::on_call`.
+    /// [`crate::netdata::build_ui_response`].
     pub columns: Value,
     /// One array per table row - `[µs timestamp, {"severity": ...}, field,
     /// ...]` - rendered by
     /// [`crate::netdata::response::table_to_netdata_response`]. From
-    /// [`crate::netdata::build_ui_response`], called by
-    /// `LegacyLogsHandler::on_call`.
+    /// [`crate::netdata::build_ui_response`].
     pub data: Value,
     /// Log-explorer chart selection
     /// (`src/plugins.d/FUNCTION_UI_REFERENCE.md`, `default_charts`); both Rust logs
@@ -318,12 +314,12 @@ pub struct JournalResponse {
     pub default_charts: Vec<u32>,
 
     /// Result counters for the UI's pagination and stats bar (see
-    /// [`Items`]); built by `LegacyLogsHandler::on_call`.
+    /// [`Items`]).
     pub items: Items,
 
-    // Static identity fields - identical on every call, mirroring the C
-    // facets table config (`facets_table_config()` in
-    // `src/libnetdata/facets/facets.c`):
+    // Static identity fields - identical on every call; show_ids, has_history
+    // and pagination mirror the C facets table config (`facets_table_config()`
+    // in `src/libnetdata/facets/facets.c`):
     /// Facets-protocol flag (`facets_table_config()` in
     /// `src/libnetdata/facets/facets.c`); this
     /// consumer always sends false (`LegacyLogsHandler::on_call`).

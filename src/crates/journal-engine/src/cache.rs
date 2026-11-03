@@ -1,6 +1,6 @@
 //! Cache for journal file indexes.
 //!
-//! [`FileIndex`] is the searchable snapshot of one journal file
+//! `FileIndex` is the searchable snapshot of one journal file
 //! (in `journal-index/src/file_index.rs`); this file defines what identifies
 //! it in the cache — [`FileIndexKey`] — and the [`FileIndexCache`] handle
 //! over foyer's hybrid cache (foyer 0.20, workspace `Cargo.toml`).
@@ -18,8 +18,9 @@
 //! (in `batch_compute_file_indexes`).
 //!
 //! Stack position: journal-engine consumes journal-index (`FileIndex`,
-//! `FileIndexer`) and journal-registry (`File`); journal-function
-//! re-exports these types (`journal-function/src/lib.rs`). The cache is
+//! `FileIndexer`) and journal-registry (`File`); journal-function re-exports
+//! `File` and the engine's cache types, while `FileIndex`/`FileIndexer` come
+//! straight from journal-index (`journal-function/src/lib.rs`). The cache is
 //! constructed only by [`crate::indexing::FileIndexCacheBuilder`] — in
 //! production by otel-legacy-logs
 //! (`otel-legacy-logs/src/handler.rs` `LegacyLogsHandler::new`), which also builds

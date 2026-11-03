@@ -39,9 +39,6 @@ This collector only supports collecting metrics from a single instance of this i
 
 This integration will run by default on all supported systems.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

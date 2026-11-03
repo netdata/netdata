@@ -40,12 +40,12 @@ use crate::signals::Signal;
 /// [`base_dir`](Self::base_dir) roots everything, and each signal's WAL, index
 /// and catalog live under `{base_dir}/{signal}/...` (see
 /// [`lifecycle_for`](Self::lifecycle_for)). Remote storage, its download cache
-/// and tenant auth are global (one policy for the process); only
-/// rotation/retention/crc tuning is per signal.
+/// and tenant auth are global (one policy for the process); each signal's
+/// tuning (rotation, retention, crc/compression, catalog, ingest) is separate.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PluginConfig {
-    pub endpoint: EndpointConfig,
+    pub receivers: ReceiversConfig,
     pub metrics: MetricsConfig,
     /// Single mandatory root for all signal storage. The plugin derives each
     /// signal's subtree as `{base_dir}/{signal}/{wal,index,catalog}`; the
@@ -56,11 +56,11 @@ pub struct PluginConfig {
     /// Remote object storage — global across signals (one on/off + one
     /// backend). Each signal uploads under its own `v2/{signal}/...` prefix.
     pub remote_storage: RemoteStorageConfig,
-    /// Tenant authentication — global across signals (one gRPC tenant policy
-    /// for the process).
+    /// Tenant authentication — global across signals (one tenant policy for
+    /// the process, applied on both transports).
     #[serde(default)]
     pub auth: AuthConfig,
-    /// Per-signal tuning for logs (rotation, retention, catalog rotation count,
+    /// Per-signal tuning for logs (rotation, retention, catalog, ingest,
     /// crc/compression). Carries no dirs (derived from `base_dir`) and no
     /// storage (global).
     pub logs: SignalConfig,
@@ -82,7 +82,7 @@ pub struct PluginConfig {
     /// distinct identity). Runtime-only: `None` after YAML load; the supervisor
     /// resolves the machine GUID and generates the instance id, setting this to
     /// `Some` before configuring any worker. Workers therefore always observe
-    /// `Some`. The [`Identity`](file_registry::Identity) newtypes make the pair
+    /// `Some`. The `file_registry::Identity` newtypes make the pair
     /// non-nil and un-transposable by construction.
     #[serde(default)]
     pub identity: Option<file_registry::Identity>,
@@ -169,8 +169,8 @@ pub struct LegacyLogsConfig {
     /// Max distinct values indexed per field; fields exceeding the cap have
     /// their value indexing truncated (cardinality cap).
     pub max_unique_values_per_field: usize,
-    /// Max field-value payload size (bytes) that gets indexed; larger values
-    /// (and compressed ones) are skipped.
+    /// Max field-value payload size (bytes) that gets indexed; values at or
+    /// above the cap (and compressed ones) are skipped.
     pub max_field_payload_size: usize,
 }
 
@@ -189,21 +189,55 @@ impl LegacyLogsConfig {
     }
 }
 
-/// gRPC server endpoint configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// The `receivers:` section: the listeners that accept OTLP from senders.
+/// OTLP is the only receiver.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct EndpointConfig {
-    /// Bind address (e.g., "127.0.0.1:4317").
-    pub path: String,
-    /// TLS certificate file path.
+pub struct ReceiversConfig {
+    pub otlp: OtlpReceiverConfig,
+}
+
+/// `receivers.otlp`: the OTLP receiver, one listener per transport.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OtlpReceiverConfig {
+    pub protocols: OtlpProtocols,
+}
+
+/// `receivers.otlp.protocols`: the OTLP/gRPC and OTLP/HTTP listeners. Both
+/// serve the same signals (HTTP as `POST /v1/{logs,traces,metrics}`); config
+/// validation requires at least one of them to be enabled.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OtlpProtocols {
+    pub grpc: ProtocolConfig,
+    pub http: ProtocolConfig,
+}
+
+/// One OTLP listener. A disabled listener keeps its `endpoint` and `tls`
+/// values (an override layer may enable it again) but is not bound.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProtocolConfig {
+    pub enabled: bool,
+    /// Bind address (`host:port`, e.g. "127.0.0.1:4317").
+    pub endpoint: String,
     #[serde(default)]
-    pub tls_cert_path: Option<String>,
-    /// TLS private key file path.
+    pub tls: TlsServerConfig,
+}
+
+/// Server-side TLS for one listener. TLS is on when `cert_file` and
+/// `key_file` are both set; `client_ca_file` additionally requires senders to
+/// present a client certificate signed by that CA (mutual TLS).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TlsServerConfig {
     #[serde(default)]
-    pub tls_key_path: Option<String>,
-    /// CA certificate for client authentication.
+    pub cert_file: Option<String>,
     #[serde(default)]
-    pub tls_ca_cert_path: Option<String>,
+    pub key_file: Option<String>,
+    #[serde(default)]
+    pub client_ca_file: Option<String>,
 }
 
 /// Metrics ingestion configuration.
@@ -224,9 +258,9 @@ pub struct MetricsConfig {
     /// Seconds before removing inactive charts.
     #[serde(default)]
     pub expiry_duration_secs: Option<u64>,
-    /// New-chart budget per gRPC request (cardinality limit): once exhausted,
-    /// data points for not-yet-existing charts are dropped until the next
-    /// request; existing charts keep ingesting.
+    /// New-chart budget per export request on either transport (cardinality
+    /// limit): once exhausted, data points for not-yet-existing charts are
+    /// dropped until the next request; existing charts keep ingesting.
     pub max_new_charts_per_request: usize,
 }
 
@@ -863,14 +897,15 @@ impl From<RetentionPolicy> for HashMap<String, RetentionEntry> {
 #[serde(deny_unknown_fields)]
 pub struct AuthConfig {
     /// When false, all data routes to the "default" tenant. When true, every
-    /// logs/traces request must carry [`AuthConfig::TENANT_HEADER`] (missing
-    /// or invalid values are gRPC errors).
+    /// logs/traces request must carry [`AuthConfig::TENANT_HEADER`] on either
+    /// transport: missing is `UNAUTHENTICATED`, invalid is `INVALID_ARGUMENT`
+    /// (HTTP 401 / 400 on OTLP/HTTP).
     #[serde(default)]
     pub enabled: bool,
 }
 
 impl AuthConfig {
-    /// The gRPC metadata key used for tenant identification.
+    /// The tenant header: gRPC metadata key and OTLP/HTTP header name.
     pub const TENANT_HEADER: &str = "x-scope-orgid";
 }
 
@@ -914,8 +949,15 @@ mod tests {
     /// tuning for logs and traces (different rotation/retention so the
     /// derivation per signal is observable).
     const FULL_YAML: &str = r#"
-endpoint:
-  path: "127.0.0.1:4317"
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        enabled: true
+        endpoint: "127.0.0.1:4317"
+      http:
+        enabled: false
+        endpoint: "127.0.0.1:4318"
 metrics:
   max_new_charts_per_request: 100
 base_dir: /var/lib/netdata/otel
@@ -995,6 +1037,38 @@ traces:
             default_catalog_rotation_count()
         );
         assert!(c.traces.crc_enabled); // default_true when omitted
+    }
+
+    #[test]
+    fn receivers_tls_defaults_absent_and_survive_bincode_ipc() {
+        // `tls` omitted → every TLS field unset.
+        let c = full_config();
+        assert_eq!(
+            c.receivers.otlp.protocols.grpc.tls,
+            TlsServerConfig::default()
+        );
+        assert_eq!(
+            c.receivers.otlp.protocols.http.tls,
+            TlsServerConfig::default()
+        );
+
+        // The whole PluginConfig travels supervisor→worker over bincode
+        // (ferryboat); the receiver fields must round-trip the compact wire
+        // form, not just human-readable YAML.
+        let mut config = full_config();
+        config.receivers.otlp.protocols.http = ProtocolConfig {
+            enabled: true,
+            endpoint: "127.0.0.1:4318".to_string(),
+            tls: TlsServerConfig {
+                cert_file: Some("/http/cert.pem".to_string()),
+                key_file: Some("/http/key.pem".to_string()),
+                client_ca_file: Some("/http/ca.pem".to_string()),
+            },
+        };
+        let bytes = bincode::serde::encode_to_vec(&config, bincode::config::standard()).unwrap();
+        let (back, _): (PluginConfig, usize) =
+            bincode::serde::decode_from_slice(&bytes, bincode::config::standard()).unwrap();
+        assert_eq!(back.receivers, config.receivers);
     }
 
     #[test]
@@ -1115,7 +1189,10 @@ traces:
             "default:\n  max_files: 10\n  max_total_size: \"1GB\"\n  max_age: \"7 days\"\n",
         )
         .unwrap();
-        assert_eq!(policy.resolve("default").horizon, default_retention_horizon());
+        assert_eq!(
+            policy.resolve("default").horizon,
+            default_retention_horizon()
+        );
         policy.validate().unwrap();
 
         // Explicit default + per-tenant override both resolve.
@@ -1163,7 +1240,7 @@ traces:
     }
 }
 
-/// Serde for a required `Duration`, dual-mode like [`opt_duration`]: a humantime
+/// Serde for a required `Duration`, dual-mode like `opt_duration`: a humantime
 /// string in human-readable formats (YAML), a `(secs, nanos)` tuple otherwise
 /// (bincode IPC — a humantime string would not round-trip through bincode).
 mod duration {
@@ -1191,7 +1268,7 @@ mod duration {
     }
 }
 
-/// Serde for an optional `Duration`, dual-mode like [`duration`]: a humantime
+/// Serde for an optional `Duration`, dual-mode like `duration`: a humantime
 /// string in human-readable formats (YAML), a `(secs, nanos)` tuple otherwise
 /// (bincode IPC — a humantime string would not round-trip through bincode).
 mod opt_duration {

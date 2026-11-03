@@ -235,63 +235,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: postgres_total_connection_utilization
-        metric: postgres.connections_utilization
-        info: average total connection utilization over the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf
-      - name: postgres_acquired_locks_utilization
-        metric: postgres.locks_utilization
-        info: average acquired locks utilization over the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf
-      - name: postgres_txid_exhaustion_perc
-        metric: postgres.txid_exhaustion_perc
-        info: percent towards TXID wraparound
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf
-      - name: postgres_db_cache_io_ratio
-        metric: postgres.db_cache_io_ratio
-        info: average cache hit ratio in db ${label:database} over the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf
-      - name: postgres_db_transactions_rollback_ratio
-        metric: postgres.db_cache_io_ratio
-        info: average aborted transactions percentage in db ${label:database} over the last five minutes
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf
-      - name: postgres_db_deadlocks_rate
-        metric: postgres.db_deadlocks_rate
-        info: number of deadlocks detected in db ${label:database} in the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf
-      - name: postgres_table_cache_io_ratio
-        metric: postgres.table_cache_io_ratio
-        info: average cache hit ratio in db ${label:database} table ${label:table} over the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf
-      - name: postgres_table_index_cache_io_ratio
-        metric: postgres.table_index_cache_io_ratio
-        info: average index cache hit ratio in db ${label:database} table ${label:table} over the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf
-      - name: postgres_table_toast_cache_io_ratio
-        metric: postgres.table_toast_cache_io_ratio
-        info: average TOAST hit ratio in db ${label:database} table ${label:table} over the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf
-      - name: postgres_table_toast_index_cache_io_ratio
-        metric: postgres.table_toast_index_cache_io_ratio
-        info: average index TOAST hit ratio in db ${label:database} table ${label:table} over the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf
-      - name: postgres_table_bloat_size_perc
-        metric: postgres.table_bloat_size_perc
-        info: bloat size percentage in db ${label:database} table ${label:table}
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf
-      - name: postgres_table_last_autovacuum_time
-        metric: postgres.table_autovacuum_since_time
-        info: time elapsed since db ${label:database} table ${label:table} was vacuumed by the autovacuum daemon
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf
-      - name: postgres_table_last_autoanalyze_time
-        metric: postgres.table_autoanalyze_since_time
-        info: time elapsed since db ${label:database} table ${label:table} was analyzed by the autovacuum daemon
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf
-      - name: postgres_index_bloat_size_perc
-        metric: postgres.index_bloat_size_perc
-        info: bloat size percentage in db ${label:database} table ${label:table} index ${label:index}
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf
     functions:
       description: |
         This collector exposes real-time functions for interactive troubleshooting in the Live tab.

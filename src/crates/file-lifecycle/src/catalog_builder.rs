@@ -147,12 +147,19 @@ async fn add_entry(
 ) -> CatalogBuilderResponse {
     let seq = entry.id.seq;
     let identity = Identity::new(entry.id.machine_id, entry.id.instance_id);
-    let key: ScopeKey = (tenant_id.clone(), date, entry.id.machine_id, entry.id.instance_id);
+    let key: ScopeKey = (
+        tenant_id.clone(),
+        date,
+        entry.id.machine_id,
+        entry.id.instance_id,
+    );
 
-    let acc = accumulators.entry(key.clone()).or_insert_with(|| Accumulator {
-        catalog: Catalog::new(tenant_id, date, identity),
-        created_at: Instant::now(),
-    });
+    let acc = accumulators
+        .entry(key.clone())
+        .or_insert_with(|| Accumulator {
+            catalog: Catalog::new(tenant_id, date, identity),
+            created_at: Instant::now(),
+        });
     acc.catalog.add(entry);
 
     if acc.catalog.entries.len() < args.rotation_count {

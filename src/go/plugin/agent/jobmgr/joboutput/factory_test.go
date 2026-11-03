@@ -954,7 +954,7 @@ func TestFactoryCandidateWaitYieldsGraphClaimForWholeMaterialization(t *testing.
 
 func TestCandidateWaitDoesNotStartAfterYieldedContextCancellation(t *testing.T) {
 	factory, _ := newFactoryTestHarness(t, collectorapi.Creator{}, nil)
-	attempts := &unexpectedPendingJobAuthority{}
+	attempts := &unexpectedProcessAttemptAuthority{}
 	factory.config.Epoch = 1
 	factory.config.Attempts = attempts
 	factory.runWithoutClaims = func(

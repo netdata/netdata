@@ -906,31 +906,6 @@ modules:
               read the bucket, and that the policy delivers the object under exactly the same key. Persistent waits
               usually mean replication is slower than your objectives and timeouts assume; align them with what the
               replication setup promises.
-    alerts:
-      - name: s3check_runtime_failed
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/s3check.conf
-        metric: s3check.runtime_status
-        info: The collector could not validate provider safety or persist ownership state. Inspect the collector log for the raw provider or local-state error.
-      - name: s3check_probe_failed
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/s3check.conf
-        metric: s3check.probe_status
-        info: The active or last terminal probe failed with a bounded reason. Raw provider errors are available only in the collector log.
-      - name: s3check_payload_mismatch
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/s3check.conf
-        metric: s3check.payload_mismatch
-        info: The verification read returned different bytes for the exact key written by the probe.
-      - name: s3check_write_visibility_objective
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/s3check.conf
-        metric: s3check.write_visibility_objective
-        info: The exact source key has not become readable with the expected payload at ${label:destination} within write_objective.
-      - name: s3check_delete_visibility_objective
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/s3check.conf
-        metric: s3check.delete_visibility_objective
-        info: The destination current object remains readable after the source delete for longer than delete_objective.
-      - name: s3check_mutation_backpressure
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/s3check.conf
-        metric: s3check.mutation_backpressure
-        info: The bounded ownership queue is full. Cleanup and observation continue, but no new probe object is created until a slot is released.
     metrics:
       folding:
         title: Metrics

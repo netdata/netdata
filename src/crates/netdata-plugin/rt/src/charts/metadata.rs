@@ -10,10 +10,11 @@
 //! The `format!`-based `emit_*` helpers below render the same commands into
 //! strings. Nothing in this repository calls them — the registry path writes
 //! through `ChartWriter` buffers instead — but they remain public crate API
-//! (`rt::ChartMetadata`). The two paths differ only in optional timing fields:
+//! (`rt::ChartMetadata`). The two paths differ only in trailing fields:
 //! `ChartWriter::begin_chart` appends the update interval in microseconds and
 //! `ChartWriter::end_chart` the collection timestamp, both of which the agent
-//! treats as optional.
+//! treats as optional, and the string `DIMENSION` line always carries the
+//! flags field (empty when not hidden) that the writer emits only when hidden.
 
 use std::collections::HashMap;
 
@@ -109,8 +110,9 @@ impl DimensionMetadata {
     /// divisor and the `hidden` flag (always present, empty when not hidden).
     ///
     /// Called only by [`ChartMetadata::emit_definition`], which is itself
-    /// uncalled; `ChartWriter::write_dimension_definition` writes the same
-    /// line into its buffer without the `String` allocation.
+    /// uncalled; `ChartWriter::write_dimension_definition` writes the
+    /// equivalent line into its buffer without the `String` allocation,
+    /// leaving out the flag field when the dimension is not hidden.
     pub fn emit(&self) -> String {
         let flags = if self.hidden { "hidden" } else { "" };
         format!(
@@ -209,7 +211,7 @@ impl ChartMetadata {
             priority: self.priority,
             update_every: self.update_every,
             dimensions: self.dimensions.clone(),
-            instance_field: None, // No longer a template after instantiation
+            instance_field: None,
         }
     }
 

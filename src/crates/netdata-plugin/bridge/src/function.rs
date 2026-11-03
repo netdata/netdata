@@ -46,10 +46,10 @@ use tracing::{error, info};
 /// `ND_SD_JOURNAL_PROGRESS_EVERY_UT` of the systemd-journal reference plugin
 /// (which instead fires after 250ms of accumulated per-file query work).
 ///
-/// Progress also keeps a call alive: the agent extends a function's deadline
-/// by 10s on every progress update (`functions_evloop.h`'s
+/// Progress also keeps a call alive: every progress update pushes the
+/// function's deadline out so at least 10s remain (`functions_evloop.h`'s
 /// `FUNCTIONS_EXTENDED_TIME_ON_PROGRESS_UT`, applied on both the plugin and
-/// nrpc paths), so steady progress keeps the agent from timing the call out.
+/// nrpc paths), keeping steady progress from timing the call out.
 const PROGRESS_INTERVAL: Duration = Duration::from_millis(250);
 
 /// The fixed denominator progress always travels with: the wire carries
@@ -123,7 +123,7 @@ impl ProgressState {
         }
     }
 
-    /// Update both done and total. Safe from any context.
+    /// Update both counters; safe from any thread or context.
     pub fn update(&self, done: usize, total: usize) {
         self.done.store(done, Ordering::Relaxed);
         self.total.store(total, Ordering::Relaxed);
@@ -235,10 +235,10 @@ pub trait FunctionHandler: Send + Sync + 'static {
     /// Execute the call.
     ///
     /// The future is selected against the cancellation token: once the driver
-    /// cancels, the future is dropped at its next suspension point. Check
-    /// `ctx.cancellation.is_cancelled()` in synchronous stretches that never
-    /// await. An `Err` is surfaced to the caller as a 500 result (mapping on
-    /// `HandlerAdapter::handle_raw`).
+    /// cancels, the handler future is dropped where it is currently parked.
+    /// Check `ctx.cancellation.is_cancelled()` in synchronous stretches that
+    /// never await. An `Err` is surfaced to the caller as a 500 result
+    /// (mapping on `HandlerAdapter::handle_raw`).
     async fn on_call(
         &self,
         ctx: FunctionCallContext,
@@ -261,8 +261,8 @@ pub trait RawFunctionHandler: Send + Sync {
     /// Run one function call to completion and return its `FunctionResult`.
     ///
     /// Progress is emitted as `Message::FunctionProgressResponse` on
-    /// `ctx.outbound_tx` every 250ms until this returns; the result itself is
-    /// the return value, never a channel message. `ctx.function_call.timeout`
+    /// `ctx.outbound_tx` every 250ms until the call ends; the result itself
+    /// is the return value, never a channel message. `ctx.function_call.timeout`
     /// is not enforced here: a call ends when the handler returns or the
     /// driver cancels its token.
     async fn handle_raw(&self, ctx: Arc<FunctionContext>) -> FunctionResult;

@@ -32,17 +32,19 @@ func TestRuntimeSettlementRetirementPreservesOwnership(t *testing.T) {
 				commands := dynCfgTestActivationCommands(t, controller)
 				started := make(chan struct{})
 				configureRuntimeTestCollector(controller, func() *runtimeTestCollector {
-					return &runtimeTestCollector{run: func(ctx context.Context, ready func()) error {
-						close(started)
-						if duringPublication {
-							ready()
-						}
-						<-ctx.Done()
-						return ctx.Err()
-					}}
+					return &runtimeTestCollector{
+						run: func(ctx context.Context, ready func()) error {
+							close(started)
+							if duringPublication {
+								ready()
+							}
+							<-ctx.Done()
+							return ctx.Err()
+						},
+					}
 				})
 				cfg := factoryTestConfig(false)
-				seedDynCfgJobGraphRecord(t, graph, cfg, dyncfg.StatusDisabled)
+				seedDynCfgJobGraphRecord(t, controller, graph, cfg, dyncfg.StatusDisabled)
 				applyAcceptedEnableForTest(t, controller, graph, cfg, 1)
 				current := applyActivationTestSubmission(t, commands.next(t, "internal/jobs/accepted-activation"), nil, 2).(*JobGeneration)
 				t.Cleanup(func() { stopRuntimeTestResource(t, current) })
@@ -71,7 +73,10 @@ func TestRuntimeSettlementRetirementPreservesOwnership(t *testing.T) {
 					cut()
 				}
 				plan := commands.next(t, "internal/jobs/runtime-ready").plan
-				scope := lifecycle.ResourceTransactionScope{ID: cfg.FullName(), Current: current.Identity()}
+				scope := lifecycle.ResourceTransactionScope{
+					ID:      cfg.FullName(),
+					Current: current.Identity(),
+				}
 				prepared, err := plan.Transaction.Prepare(t.Context(), current, scope, lifecycle.LongLivedPermit{})
 				require.NoError(t, err)
 				applied, err := prepared.Apply(t.Context())
@@ -102,21 +107,26 @@ func TestRuntimeSettlementPublicationErrorPreservesOwnership(t *testing.T) {
 			controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
 			commands := dynCfgTestActivationCommands(t, controller)
 			configureRuntimeTestCollector(controller, func() *runtimeTestCollector {
-				return &runtimeTestCollector{run: func(ctx context.Context, ready func()) error {
-					ready()
-					<-ctx.Done()
-					return ctx.Err()
-				}}
+				return &runtimeTestCollector{
+					run: func(ctx context.Context, ready func()) error {
+						ready()
+						<-ctx.Done()
+						return ctx.Err()
+					},
+				}
 			})
 			cfg := factoryTestConfig(false)
-			seedDynCfgJobGraphRecord(t, graph, cfg, dyncfg.StatusDisabled)
+			seedDynCfgJobGraphRecord(t, controller, graph, cfg, dyncfg.StatusDisabled)
 			applyAcceptedEnableForTest(t, controller, graph, cfg, 1)
 			current := applyActivationTestSubmission(t, commands.next(t, "internal/jobs/accepted-activation"), nil, 2).(*JobGeneration)
 			t.Cleanup(func() { stopRuntimeTestResource(t, current) })
 			plan := commands.next(t, "internal/jobs/runtime-ready").plan
 			publish := current.resources.publishRuntime
 			current.resources.publishRuntime = func() error { return errors.Join(publish(), test.err) }
-			scope := lifecycle.ResourceTransactionScope{ID: cfg.FullName(), Current: current.Identity()}
+			scope := lifecycle.ResourceTransactionScope{
+				ID:      cfg.FullName(),
+				Current: current.Identity(),
+			}
 			prepared, err := plan.Transaction.Prepare(t.Context(), current, scope, lifecycle.LongLivedPermit{})
 			require.NoError(t, err)
 			applied, err := prepared.Apply(t.Context())

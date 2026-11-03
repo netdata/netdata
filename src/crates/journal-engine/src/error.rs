@@ -1,8 +1,9 @@
 //! Crate-wide error type for journal engine operations: the `Result` alias
-//! below is the return type of the crate's fallible calls -
+//! below is the return type the crate's fallible calls share -
 //! [`crate::indexing::FileIndexCacheBuilder::build`],
 //! [`crate::indexing::batch_compute_file_indexes`],
-//! [`crate::histogram::HistogramEngine::compute_from_indexes`],
+//! [`crate::histogram::HistogramEngine::compute_from_indexes`] (whose `Err`
+//! is unreachable: nothing inside is fallible),
 //! [`crate::logs::LogQuery::execute`]/[`crate::logs::LogQuery::execute_page`] and
 //! [`crate::QueryTimeRange::new`] (which spells out
 //! `Result<Self, EngineError>` instead of the alias) - and lib.rs re-exports
@@ -42,8 +43,8 @@ pub enum EngineError {
     #[error("Journal error: {0}")]
     Journal(#[from] journal_core::JournalError),
 
-    /// `LogQueryParamsBuilder::build` rejections are the only ones that
-    /// propagate out of [`crate::logs::LogQuery::execute`]/[`crate::logs::LogQuery::execute_page`];
+    /// `LogQueryParamsBuilder::build` rejections are the only `IndexError`s
+    /// that propagate out of [`crate::logs::LogQuery::execute`]/[`crate::logs::LogQuery::execute_page`];
     /// per-file failures are logged instead - `FileIndexer::index` results
     /// (in `batch_compute_file_indexes`) and `find_log_entries` results
     /// (in `retrieve_log_entries`) - so
@@ -110,11 +111,12 @@ pub enum EngineError {
 
 // Compile-time size cap, keeping the per-file `Result` values cheap to
 // return through the indexing hot path. Measured on x86-64: `EngineError`
-// is 64 bytes today - exactly at the bound. The widest payloads are the
-// wrapped registry errors (`RegistryError` 64, `RepositoryError` 56, built
-// on 56-byte `notify::Error`/`walkdir::Error`) and foyer's boxed-error
-// types (`foyer::Error` 40, `foyer::IoError` 32); `Journal` and `Index`
-// stay at 16 each because journal-core and journal-index cap their types
+// is 64 bytes today - exactly at the bound. The widest payload is the
+// wrapped `RegistryError` (56: `notify::Error` 32 and `RepositoryError` 48,
+// the latter built on a 40-byte `walkdir::Error`); then foyer's wrapped
+// errors (`foyer::Error` 48, `foyer::IoError` 32); `Journal` and `Index`
+// stay at 16 each - journal-core caps `JournalError` at 16, and
+// `IndexError` measures 16 under journal-index's 32-byte cap
 // (`journal-core/src/error.rs` `JournalError`, `journal-index/src/error.rs` `IndexError`). Nothing
 // embeds `EngineError` by value - it travels inside `Result` returns - so
 // this assert is the only guard, and any wider payload fails the build.

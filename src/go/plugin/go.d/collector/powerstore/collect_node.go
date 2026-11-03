@@ -22,15 +22,15 @@ func (c *Collector) collectNodes(ctx context.Context) {
 				c.Warningf("error collecting node %s perf metrics: %v", id, err)
 			} else if len(pm) > 0 {
 				last := pm[len(pm)-1]
-				c.mx.node.perf.readIops.WithLabelValues(name).Observe(last.ReadIops)
-				c.mx.node.perf.writeIops.WithLabelValues(name).Observe(last.WriteIops)
-				c.mx.node.perf.readBandwidth.WithLabelValues(name).Observe(last.ReadBandwidth)
-				c.mx.node.perf.writeBandwidth.WithLabelValues(name).Observe(last.WriteBandwidth)
+				c.mx.node.perf.readIops.WithLabelValues(name).Observe(last.AvgReadIops)
+				c.mx.node.perf.writeIops.WithLabelValues(name).Observe(last.AvgWriteIops)
+				c.mx.node.perf.readBandwidth.WithLabelValues(name).Observe(last.AvgReadBandwidth)
+				c.mx.node.perf.writeBandwidth.WithLabelValues(name).Observe(last.AvgWriteBandwidth)
 				c.mx.node.perf.avgReadLatency.WithLabelValues(name).Observe(last.AvgReadLatency)
 				c.mx.node.perf.avgWriteLatency.WithLabelValues(name).Observe(last.AvgWriteLatency)
 				c.mx.node.perf.avgLatency.WithLabelValues(name).Observe(last.AvgLatency)
-				if last.CurrentLogins != nil {
-					c.mx.node.currentLogins.WithLabelValues(name).Observe(float64(*last.CurrentLogins))
+				if last.AvgCurrentLogins != nil {
+					c.mx.node.currentLogins.WithLabelValues(name).Observe(*last.AvgCurrentLogins)
 				}
 			}
 		}(id, node.Name)

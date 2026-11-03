@@ -46,6 +46,7 @@ fn request(n: usize) -> ExportLogsServiceRequest {
                 value: Some(AnyValue {
                     value: Some(Av::IntValue(i as i64)),
                 }),
+                key_strindex: 0,
             }],
             ..Default::default()
         })
@@ -303,12 +304,14 @@ fn request_typed() -> ExportLogsServiceRequest {
                     KeyValue {
                         key: "poly".to_string(),
                         value: Some(AnyValue { value: Some(poly) }),
+                        key_strindex: 0,
                     },
                     KeyValue {
                         key: "n".to_string(),
                         value: Some(AnyValue {
                             value: Some(Av::IntValue(i)),
                         }),
+                        key_strindex: 0,
                     },
                 ],
                 ..Default::default()
@@ -526,6 +529,7 @@ fn attribute_key_containing_eq_is_sanitized_and_queryable() {
                         value: Some(AnyValue {
                             value: Some(Av::StringValue("x".to_string())),
                         }),
+                        key_strindex: 0,
                     }],
                     ..Default::default()
                 }],

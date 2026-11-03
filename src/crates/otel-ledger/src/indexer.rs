@@ -2,18 +2,18 @@
 //!
 //! One component type serves both signals — each pipeline spawns its own
 //! [`Indexer`] and injects the seal as the [`SealFn`] argument: the logs
-//! pipeline passes [`ng_index::build_sfst_file`], the traces pipeline
-//! [`ng_index::build_sfst_traces_file`] (`ledger/pipeline.rs`,
+//! pipeline passes `ng_index::build_sfst_file`, the traces pipeline
+//! `ng_index::build_sfst_traces_file` (`ledger/pipeline.rs`,
 //! `ledger/traces_pipeline.rs`). Both share this queueing loop and the
 //! `Indexed`/`IndexFailed` response mapping; only the WAL-decoding seal
 //! differs.
 //!
 //! Requests arrive from the ingestor on a WAL `FileEvent::Closed`
 //! (`ledger/ingestor.rs`) and from startup recovery of unindexed WALs
-//! ([`file_lifecycle::recovery::recover_unindexed`]); responses go back to
+//! (`file_lifecycle::recovery::recover_unindexed`); responses go back to
 //! the ledger's `handle_indexer_resp` (`ledger/indexer.rs` — a different
 //! indexer.rs: the response handler, not this component) or to the recovery
-//! drains. Live-tail chunk range builds ([`ng_index::build_sfst_range`])
+//! drains. Live-tail chunk range builds (`ng_index::build_sfst_range`)
 //! bypass this component.
 //!
 //! Seals are serial (`max_concurrent` is 1) and excess requests queue.
@@ -47,7 +47,7 @@ struct IndexerTask {
 }
 
 /// The seal-running component: a unit struct — all state lives in
-/// [`Component::run`]'s locals; one instance per signal pipeline.
+/// `Component::run`'s locals; one instance per signal pipeline.
 pub struct Indexer;
 
 impl Component for Indexer {

@@ -76,6 +76,16 @@ def test_run_info_ready_exposes_url():
     assert info.url == "http://127.0.0.1:12345"
 
 
+def test_run_info_reports_both_otlp_endpoints():
+    r = _run("ready")
+    r.otlp_endpoint, r.otlp_http_endpoint = "127.0.0.1:1", "127.0.0.1:2"
+    info = run_info(r)
+    assert (info.otlp_endpoint, info.otlp_http_endpoint) == ("127.0.0.1:1", "127.0.0.1:2")
+    # a disabled OTLP/HTTP listener reports null, not ""
+    r.otlp_http_endpoint = ""
+    assert run_info(r).otlp_http_endpoint is None
+
+
 def test_run_info_not_ready_has_no_url():
     assert run_info(_run("starting")).url is None
 

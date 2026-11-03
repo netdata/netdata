@@ -4,6 +4,8 @@ on:
     branches: [master]
     paths:
       - 'CMakeLists.txt'
+      - 'src/**/CMakeLists.txt'
+      - '**.cmake'
       - '**.c'
       - '**.cc'
       - '**.cpp'
@@ -42,7 +44,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Trigger Full Cloud Regression
-        uses: aurelien-baudet/workflow-dispatch@v2
+        uses: aurelien-baudet/workflow-dispatch@3133c5d135c7dbe4be4f9793872b6ef331b53bc7 # v4.0.0
         with:
           repo: netdata/test-automation
           ref: refs/heads/master
@@ -57,7 +59,7 @@ jobs:
           wait-for-completion: false
 
       - name: Trigger Agent Parent/Child with Cloud Integration tests
-        uses: aurelien-baudet/workflow-dispatch@v2
+        uses: aurelien-baudet/workflow-dispatch@3133c5d135c7dbe4be4f9793872b6ef331b53bc7 # v4.0.0
         with:
           repo: netdata/test-automation
           ref: refs/heads/master

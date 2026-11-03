@@ -16,6 +16,7 @@ func TestStaticTestCatalogSnapshotsMutableInputs(t *testing.T) {
 	absent := false
 	whereValues := []any{"original"}
 	stateRange := []any{1, 2}
+	expiry := new(4)
 	dimensions := &charttpl.DimensionLifecycle{MaxDims: 5, ExpireAfterCycles: 6}
 	inlineVarbind := map[any]any{
 		"name": "inlineVarbind",
@@ -60,7 +61,7 @@ func TestStaticTestCatalogSnapshotsMutableInputs(t *testing.T) {
 		Units:     "state",
 		Algorithm: "absolute",
 		Type:      "line",
-		Lifecycle: &charttpl.Lifecycle{Dimensions: dimensions},
+		Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: expiry, Dimensions: dimensions},
 	}
 
 	idx := newStaticTestCatalog([]*catalog.TrapDef{trap}, []catalog.MetricRule{rule}, []catalog.MetricChart{chart})
@@ -71,6 +72,7 @@ func TestStaticTestCatalogSnapshotsMutableInputs(t *testing.T) {
 	whereValues[0] = "changed"
 	stateRange[0] = 99
 	dimensions.MaxDims = 99
+	*expiry = 99
 	inlineVarbind["name"] = "changed"
 	inlineVarbind["enum"].(map[any]any)["1"] = "changed"
 	labels["site"] = "changed"
@@ -78,6 +80,7 @@ func TestStaticTestCatalogSnapshotsMutableInputs(t *testing.T) {
 
 	defs, err := idx.Definitions([]string{"test.rule"})
 	require.NoError(t, err)
+	require.Equal(t, new(4), defs.ChartsByID["test_chart"].Lifecycle.ExpireAfterCycles)
 	gotRule := defs.RulesByName["test.rule"]
 	require.True(t, *gotRule.Enabled)
 	require.Equal(t, "original", gotRule.Where[0].In[0])

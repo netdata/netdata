@@ -13,7 +13,7 @@
 //! ```
 //!
 //! `test-util` is required because `sections` reads raw chunk bytes through the
-//! feature-gated [`sfst::ChunkReader`]. Together the subcommands exercise a
+//! feature-gated `sfst::ChunkReader`. Together the subcommands exercise a
 //! representative slice of the reader API (`IndexReader::open`, `field_table`,
 //! `histogram`, `build_string_table`, `load_all_stream_entries`,
 //! `load_timestamps`).
@@ -290,7 +290,8 @@ fn sections(path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     print_section("stream chunks total", stream_total, file_size);
     print_section("sections total", total_sections, file_size);
     println!("{:<40} {:>10}", "file size", format_size(file_size));
-    // What the listed chunks don't account for: header + TOC.
+    // What the listed chunks don't account for: header + TOC, plus the chunks
+    // this tool doesn't list — SUMR, TIMS, and any optional column/index chunks.
     let overhead = file_size.saturating_sub(total_sections);
     print_section("overhead (header + TOC)", overhead, file_size);
 

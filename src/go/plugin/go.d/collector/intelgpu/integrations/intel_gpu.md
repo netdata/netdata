@@ -23,16 +23,15 @@ Module: intelgpu
 ## Overview
 
 This collector gathers performance metrics for Intel integrated GPUs.
-It relies on the [`intel_gpu_top`](https://manpages.debian.org/testing/intel-gpu-tools/intel_gpu_top.1.en.html) CLI tool but avoids directly executing the binary.
-Instead, it utilizes `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment.
-This approach eliminates the need to grant the CAP_PERFMON capability to `intel_gpu_top`, improving security and potentially simplifying permission management.
 
 
+The collector runs the [`intel_gpu_top`](https://manpages.debian.org/testing/intel-gpu-tools/intel_gpu_top.1.en.html) CLI tool through `ndsudo`, a Netdata helper that runs a fixed set of privileged commands, so `intel_gpu_top` needs no CAP_PERFMON capability grant.
+Each job keeps `intel_gpu_top` running as root, sampling the GPU every 0.9 to 2.5 seconds depending on `update_every`, and charts its latest sample.
 
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -43,7 +42,9 @@ This integration doesn't support auto-detection.
 
 #### Limits
 
-The default configuration for this integration does not impose any limits on data collection.
+- If `intel_gpu_top` exits or stops printing samples, the charts show a gap after two sampling intervals instead of repeating the last values, and the collector restarts it.
+- Netdata runs unprivileged and cannot stop an `intel_gpu_top` that hangs without printing anything. The gap then lasts until that process ends (see Troubleshooting).
+
 
 #### Performance Impact
 
@@ -103,7 +104,7 @@ Configure the **intelgpu** collector from the Netdata web interface:
 4. In the Search box, type _intelgpu_ (or scroll the list) to locate the **intelgpu** collector.
 5. Click the **+** next to the **intelgpu** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -262,3 +263,88 @@ If your Netdata runs in a Docker container named "netdata" (replace if different
 ```bash
 docker logs netdata 2>&1 | grep intelgpu
 ```
+
+### Known Errors
+
+#### intel_gpu_top exited: exit status 4
+
+**Cause**
+
+`ndsudo` did not find `intel_gpu_top` in its fixed search path (`/bin`, `/sbin`, `/usr/bin`, `/usr/sbin`, `/usr/local/bin`, `/usr/local/sbin`): `intel-gpu-tools` is not installed, or is installed elsewhere.
+
+**Fix**
+
+Install `intel-gpu-tools` with your distribution's package manager, as described in Prerequisites.
+
+#### intel_gpu_top exited: exit status 1
+
+**Cause**
+
+`intel_gpu_top` itself failed: the host has no Intel GPU it supports (it does not support Xe GPUs), the `device` filter matched no GPU, or the kernel does not provide the GPU's performance counters.
+
+**Fix**
+
+Run `sudo intel_gpu_top -L` to list the GPUs and compare them with `device`, then run `sudo intel_gpu_top -J -s 1000` (add `-d` and the `device` value if set) and read its error message.
+
+
+#### intel_gpu_top exited: exit status 2
+
+**Cause**
+
+The `device` value contains characters that `ndsudo` rejects. It accepts letters, digits, spaces, and `_ - / . , : =`.
+
+**Fix**
+
+Correct the `device` value. Filters such as `pci:vendor=8086,card=0` or `drm:/dev/dri/card0` are accepted.
+
+#### intel_gpu_top exited: exit status 7
+
+**Cause**
+
+`ndsudo` could not switch to root: its setuid permission was lost, or the Netdata service runs with `NoNewPrivileges` enabled.
+
+**Fix**
+
+Reinstall Netdata to restore the permissions of `ndsudo`, and do not enable `NoNewPrivileges` for the Netdata service.
+
+#### start intel_gpu_top: `error`
+
+**Cause**
+
+Netdata could not start its privileged command helper, `ndsudo`.
+
+**Fix**
+
+Read the error text. If `ndsudo` is missing or cannot be executed, repair or reinstall Netdata.
+
+#### intel_gpu_top source unavailable: `error`
+
+**Cause**
+
+The running `intel_gpu_top` exited or stopped printing samples. Netdata keeps restarting it, at most 30 seconds apart.
+
+**Fix**
+
+Compare the error text with the entries above. `intel_gpu_top stopped producing records` means it kept running without printing complete samples; run `sudo intel_gpu_top -J -s 1000` to see its output.
+
+
+#### intel_gpu_top has not exited `duration` after termination; no replacement starts until it does
+
+**Cause**
+
+`intel_gpu_top` hangs without printing anything. It runs as root, so Netdata cannot stop it, and the collector starts no new `intel_gpu_top` while it runs. The charts show a gap until then.
+
+**Fix**
+
+Stop the hung process as root; the collector then starts a new one. Find it with `pgrep -a intel_gpu_top` (the collector's runs with `-J -s`) and run `sudo kill` with its process ID.
+
+
+#### no fresh intel_gpu_top sample
+
+**Cause**
+
+Netdata has not received a complete `intel_gpu_top` sample within the last two sampling intervals, usually because `intel_gpu_top` is starting, has stopped, or is being restarted.
+
+**Fix**
+
+If the error persists, look for `intel_gpu_top source unavailable` or `has not exited` messages in the collector log (see Diagnostics).

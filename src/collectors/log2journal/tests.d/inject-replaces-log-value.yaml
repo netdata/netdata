@@ -1,0 +1,8 @@
+# injections replace values from the log, and later injections see earlier ones
+pattern: json
+
+inject:
+  - key: X
+    value: new
+  - key: Y
+    value: '${X}2'

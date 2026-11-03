@@ -148,6 +148,17 @@ For detailed instructions, see [Update your Netdata Docker container](/packaging
 
 ## Additional Configuration
 
+Source and static installations download updates from `https://artifacts.netdata.cloud/<channel>/latest`,
+where `<channel>` is `stable` or `nightly`. The updater uses `Version` to check the available version and
+`Manifest` to select an archive and verify its size and SHA256 checksum before installation. When the default
+hosting does not provide a Manifest, the updater falls back to GitHub releases, including legacy releases
+with `sha256sums.txt`. Offline sources support both metadata formats.
+
+To use a mirror, set `NETDATA_ARTIFACT_URL_PREFIX` in `netdata-updater.conf` to the directory containing the
+release's `Manifest`, `Version`, and archives. An explicit artifact prefix or offline source is used directly
+without falling back to GitHub for archive downloads. The legacy `NETDATA_BASE_URL` release/repository override
+remains supported; an explicit artifact prefix takes precedence for archive downloads.
+
 ### Control runtime behavior of the updater script
 
 Starting with v1.40.0, the `netdata-updater.sh` script supports a config file called `netdata-updater.conf`, located in the same directory as the main `netdata.conf` file. This file uses POSIX shell script syntax to define variables that are used by the updater.

@@ -2,8 +2,11 @@ use super::super::*;
 use super::parse::{parse_mac, parse_prefix_ip};
 
 impl FlowRecord {
-    /// Construct from FlowFields. Used for cold-path bridging (V9/IPFIX special
-    /// record decode) and tests. Not on the hot path.
+    /// Construct from FlowFields. Missing fields default to zero, empty, or
+    /// None. The live V9/IPFIX decode builds records directly, so the only
+    /// production caller is the startup journal replay (tier rebuild via
+    /// `observe_tiers_with_cutoffs`) — the reader half of the journal
+    /// round-trip. All other callers are tests.
     pub(crate) fn from_fields(fields: &FlowFields) -> Self {
         let get_str = |k: &str| fields.get(k).map(|s| s.as_str()).unwrap_or("");
         let get_u8 = |k: &str| {

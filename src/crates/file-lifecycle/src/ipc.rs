@@ -14,7 +14,7 @@
 //!   shared across signals and which are per-pipeline).
 //! - [`accept_writer`] and [`WRITER_SOCKET_PATH`]: the ledger's end of the
 //!   single ingestor → ledger WAL-event link, a ferryboat IPC connection
-//!   carrying [`wal::Message`]. Those wire types live in the `wal` crate;
+//!   carrying `wal::Message`. Those wire types live in the `wal` crate;
 //!   this module owns only the accept plumbing, and the connecting side is
 //!   otel-ingestor's `LedgerSender`. The supervisor↔worker links are
 //!   `bridge`'s — its documented lib.rs records the carve-out that keeps
@@ -46,7 +46,7 @@ pub const WRITER_SOCKET_PATH: &str = "/tmp/netdata-ledger-writer.sock";
 /// the pipeline that owns the file so the cleaner can echo it back on the
 /// response, letting the run-loop route the registry mutation to the right
 /// pipeline: `id.pipeline_id` for requests built from a
-/// [`FileId`](file_registry::FileId), the sending pipeline's own id for the
+/// `file_registry::FileId`, the sending pipeline's own id for the
 /// path-keyed catalog delete (catalog files carry no signal axis). Senders:
 /// the indexer-response handler (post-index WAL cleanup), the retention pass,
 /// and recovery (`recovery/local.rs`). What a response means on disk —
@@ -334,10 +334,11 @@ pub enum CatalogBuilderResponse {
 ///
 /// The leading unlink is belt-and-suspenders: ferryboat's `Listener::open`
 /// already removes a stale Unix socket file at the same path, and Windows
-/// named pipes need no file removal, so the ignored error only covers the
-/// no-file / not-a-file cases. Both ends run at ferryboat's default 8 MiB
+/// named pipes need no file removal — ignoring the error is safe, since
+/// absence is the common case and a file that survives removal fails the
+/// bind below with its own error. Both ends run at ferryboat's default 8 MiB
 /// limit and no compression (see the module docs); bind and accept errors
-/// surface as [`ferryboat::Error`].
+/// surface as `ferryboat::Error`.
 pub async fn accept_writer(
     socket_path: &str,
 ) -> Result<Connection<(), wal::Message>, ferryboat::Error> {

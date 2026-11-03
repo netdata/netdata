@@ -120,6 +120,29 @@ func buildProfileRuntime(resolved azureprofiles.ResolvedProfile, entry ProfileEn
 		return out.Metrics[i].ID < out.Metrics[j].ID
 	})
 
+	for _, label := range resolved.Config.ResourceLabels {
+		name := stringsTrim(label.Name)
+		out.ResourceLabels = append(out.ResourceLabels, azureprofiles.ResourceLabel{
+			Name:     name,
+			Property: stringsTrim(label.Property),
+			Value:    azureprofiles.NormalizeResourceLabelValue(label.Value),
+		})
+	}
+
+	for _, state := range resolved.Config.ResourceStates {
+		sr := &resourceStateRuntime{
+			Name:     azureprofiles.ExportedStateName(profileName, state.ID),
+			Property: stringsTrim(state.Property),
+			Values:   make(map[string]string, len(state.States)),
+		}
+		for _, option := range state.States {
+			name := stringsTrim(option.Name)
+			sr.States = append(sr.States, name)
+			sr.Values[stringsLowerTrim(option.Value)] = name
+		}
+		out.ResourceStates = append(out.ResourceStates, sr)
+	}
+
 	out.Template = resolved.Config.Template.Clone()
 	out.Template.Metrics = profileMetricsList(out)
 	return out, nil
@@ -145,6 +168,9 @@ func profileMetricsList(p *profileRuntime) []string {
 		for _, series := range metric.Series {
 			list = append(list, series.Instrument)
 		}
+	}
+	for _, state := range p.ResourceStates {
+		list = append(list, state.Name)
 	}
 	sort.Strings(list)
 	return list

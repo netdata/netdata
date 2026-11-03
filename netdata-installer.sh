@@ -225,8 +225,12 @@ USAGE: ${PROGRAM} [options]
   --disable-plugin-ibm       Explicitly disable the IBM ecosystem monitoring plugin.
   --enable-plugin-scripts    Enable the scripts.d plugin. Default: Enabled when possible.
   --disable-plugin-scripts   Explicitly disable the scripts.d plugin.
+  --enable-plugin-dem        Enable the experimental DEM plugin. Default: disabled.
+  --disable-plugin-dem       Explicitly disable the DEM plugin.
   --enable-plugin-statsd     Enable the experimental Go StatsD plugin. Default: disabled.
   --disable-plugin-statsd    Explicitly disable the Go StatsD plugin.
+  --enable-plugin-ipmi       Enable the Go IPMI plugin (Linux). Default: enabled on Linux.
+  --disable-plugin-ipmi      Explicitly disable the Go IPMI plugin.
   --enable-exporting-kinesis Enable AWS Kinesis exporting connector. Default: enable it when libaws_cpp_sdk_kinesis
                              and its dependencies are available.
   --disable-exporting-kinesis Explicitly disable AWS Kinesis exporting connector.
@@ -274,6 +278,9 @@ ENABLE_OTEL=""
 ENABLE_IBM=0
 ENABLE_SCRIPTS=1
 ENABLE_STATSD=0
+ENABLE_IPMI=0
+[ "$(uname -s)" = "Linux" ] && ENABLE_IPMI=1
+ENABLE_DEM=0
 FORCE_LEGACY_CXX=0
 NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS-}"
 REMOVE_BUILD=1
@@ -303,7 +310,14 @@ while [ -n "${1}" ]; do
     "--disable-dbengine") ENABLE_DBENGINE=0 ;;
     "--enable-plugin-go") ENABLE_GO=1 ;;
     "--disable-plugin-go") ENABLE_GO=0 ;;
-    "--disable-go") ENABLE_GO=0 ;;
+    "--disable-go")
+      ENABLE_GO=0
+      ENABLE_IBM=0
+      ENABLE_SCRIPTS=0
+      ENABLE_STATSD=0
+      ENABLE_IPMI=0
+      ENABLE_DEM=0
+      ;;
     "--enable-plugin-python") ENABLE_PYTHON=1 ;;
     "--disable-plugin-python") ENABLE_PYTHON=0 ;;
     "--enable-plugin-charts") ENABLE_CHARTS=1 ;;
@@ -323,8 +337,12 @@ while [ -n "${1}" ]; do
     "--disable-plugin-ibm") ENABLE_IBM=0 ;;
     "--enable-plugin-scripts") ENABLE_SCRIPTS=1 ;;
     "--disable-plugin-scripts") ENABLE_SCRIPTS=0 ;;
+    "--enable-plugin-dem") ENABLE_DEM=1 ;;
+    "--disable-plugin-dem") ENABLE_DEM=0 ;;
     "--enable-plugin-statsd") ENABLE_STATSD=1 ;;
     "--disable-plugin-statsd") ENABLE_STATSD=0 ;;
+    "--enable-plugin-ipmi") ENABLE_IPMI=1 ;;
+    "--disable-plugin-ipmi") ENABLE_IPMI=0 ;;
     "--enable-exporting-kinesis" | "--enable-backend-kinesis")
       # TODO: Needs CMake Support
       ;;
@@ -575,7 +593,7 @@ trap build_error EXIT
 # -----------------------------------------------------------------------------
 # If we’re building any Go-based component, ensure a working Go toolchain exists.
 NEED_GO_TOOLCHAIN=0
-if [ "${ENABLE_GO}" -eq 1 ] || [ "${ENABLE_IBM}" -eq 1 ] || [ "${ENABLE_SCRIPTS}" -eq 1 ] || [ "${ENABLE_STATSD}" -eq 1 ]; then
+if [ "${ENABLE_GO}" -eq 1 ] || [ "${ENABLE_IBM}" -eq 1 ] || [ "${ENABLE_SCRIPTS}" -eq 1 ] || [ "${ENABLE_STATSD}" -eq 1 ] || [ "${ENABLE_IPMI}" -eq 1 ] || [ "${ENABLE_DEM}" -eq 1 ]; then
   NEED_GO_TOOLCHAIN=1
 fi
 
@@ -585,11 +603,13 @@ if [ "${NEED_GO_TOOLCHAIN}" -eq 1 ]; then
   . "${NETDATA_SOURCE_DIR}/packaging/check-for-go-toolchain.sh"
 
   if ! ensure_go_toolchain; then
-    warning "Go ${GOLANG_MIN_VERSION} needed to build Go-based plugins (go.d, scripts.d, Go StatsD, IBM), but could not find or install a usable toolchain: ${GOLANG_FAILURE_REASON}. Disabling those components."
+    warning "Go ${GOLANG_MIN_VERSION} needed to build Go-based plugins (go.d, scripts.d, Go StatsD, Go IPMI, DEM, IBM), but could not find or install a usable toolchain: ${GOLANG_FAILURE_REASON}. Disabling those components."
     ENABLE_GO=0
     ENABLE_IBM=0
     ENABLE_SCRIPTS=0
     ENABLE_STATSD=0
+    ENABLE_IPMI=0
+    ENABLE_DEM=0
   fi
 fi
 
@@ -1010,6 +1030,11 @@ if [ "$(id -u)" -eq 0 ]; then
     if [ $capabilities -eq 0 ]; then
       run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/slabinfo.plugin"
     fi
+  fi
+
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ipmi.plugin" ]; then
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ipmi.plugin"
+    run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ipmi.plugin"
   fi
 
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/freeipmi.plugin" ]; then

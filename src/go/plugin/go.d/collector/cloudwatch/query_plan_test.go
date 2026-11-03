@@ -385,7 +385,7 @@ func TestBuildQueryPlan_FirstEmittingScopeSuppliesSiblingTagLabels(t *testing.T)
 	plan := requireBuildQueryPlan(t, c)
 	require.Len(t, plan, 3)
 	for _, query := range plan {
-		assert.Equal(t, "first", labelValue(query.tagLabels, "owner"), query.seriesName)
+		assert.Equal(t, "first", labelValue(query.enrichmentLabels, "owner"), query.seriesName)
 	}
 }
 

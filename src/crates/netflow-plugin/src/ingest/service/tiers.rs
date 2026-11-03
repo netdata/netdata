@@ -2,6 +2,9 @@ use super::super::*;
 use super::IngestService;
 
 impl IngestService {
+    /// Hot path: observe a live flow on every materialized tier. The startup
+    /// replay goes through `observe_tiers_with_cutoffs` instead, which skips
+    /// rows those tiers already flushed.
     pub(in crate::ingest) fn observe_tiers_record(
         &mut self,
         timestamp_usec: u64,
@@ -29,9 +32,9 @@ impl IngestService {
         }
     }
 
-    /// Cold path: observe tiers from FlowFields (journal replay at startup).
-    /// Skips flows that fall into already-flushed
-    /// buckets to prevent duplicate entries on restart.
+    /// Cold path: observe tiers from `FlowFields` (journal replay at
+    /// startup). Skips flows at or before each tier's last flushed timestamp
+    /// so restarts do not re-add rows the tier journals already hold.
     pub(in crate::ingest) fn observe_tiers_with_cutoffs(
         &mut self,
         timestamp_usec: u64,

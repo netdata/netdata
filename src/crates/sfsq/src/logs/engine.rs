@@ -257,7 +257,9 @@ pub fn run(
         .cloned()
         .collect();
     let columns: Vec<String> = stats.fields.names().map(str::to_owned).collect();
-    let histogram = stats.timeline.unwrap_or_else(|| sfst::Timeline::empty(grid));
+    let histogram = stats
+        .timeline
+        .unwrap_or_else(|| sfst::Timeline::empty(grid));
 
     // Step 2: paginate across every source under the unified cursor
     // order — on-disk SFSTs and in-memory chunks (`Part::Indexed`), and

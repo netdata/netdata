@@ -106,7 +106,8 @@ impl TenantId {
     /// key or a local directory name (never from a client). Same length and
     /// `[a-zA-Z0-9._-]` charset as [`validate_ingest`](Self::validate_ingest)
     /// (`/` and control bytes impossible — no path traversal), still rejects
-    /// `.`/`..` (a `date_tenant_dir(base, date, "..")` segment would escape),
+    /// `.`/`..` (a `..` tenant would make `date_tenant_dir` resolve the
+    /// partition path to `base` itself),
     /// but ALLOWS the literal [`DEFAULT`](TenantId::DEFAULT): a catalog this
     /// node itself wrote under the auth-disabled tenant is a legitimate
     /// object to parse. The `default` rejection is an ingest-side client
@@ -656,13 +657,19 @@ mod tests {
         // file routes to the recovery warn+skip path rather than becoming a
         // queryable zero-provenance file.
         let nil = "00000000000000000000000000000000";
-        let good = MachineId::new(test_machine_id()).unwrap().as_uuid().simple().to_string();
+        let good = MachineId::new(test_machine_id())
+            .unwrap()
+            .as_uuid()
+            .simple()
+            .to_string();
         assert!(
-            FileId::parse_stem(&format!("{nil}-{good}-00000-0000000001-0000000000000000")).is_none(),
+            FileId::parse_stem(&format!("{nil}-{good}-00000-0000000001-0000000000000000"))
+                .is_none(),
             "nil machine_id must be rejected"
         );
         assert!(
-            FileId::parse_stem(&format!("{good}-{nil}-00000-0000000001-0000000000000000")).is_none(),
+            FileId::parse_stem(&format!("{good}-{nil}-00000-0000000001-0000000000000000"))
+                .is_none(),
             "nil instance_id must be rejected"
         );
     }

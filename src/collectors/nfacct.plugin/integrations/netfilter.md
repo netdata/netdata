@@ -27,7 +27,7 @@ Netdata uses libmnl (https://www.netfilter.org/projects/libmnl/index.html) to co
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 This plugin needs setuid.
 
@@ -37,9 +37,6 @@ This plugin needs setuid.
 
 This plugin uses socket to connect with netfilter to collect data
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

@@ -19,12 +19,12 @@
 //!   and the otel-legacy-logs and netflow-plugin handlers. `Runtime`, `Config`
 //!   and `Closed` have no constructor in the tree.
 //!
-//! Consumers type function handlers with [`Result`]: `rt`'s `FunctionHandler`
-//! trait and `PluginRuntime::run`, `bridge`'s `Function` trait, and the
-//! otel-ledger, otel-legacy-logs and netflow-plugin handlers. At the
-//! boundary, `bridge` renders any handler error as an HTTP 500 result whose
-//! JSON body is the variant's Display text; the otel-plugin supervisor
-//! converts transport errors into anyhow with `?` (adding its own context).
+//! Consumers type function handlers with [`Result`]: the `FunctionHandler`
+//! traits in `rt` and `bridge`, `PluginRuntime::run`, and the otel-ledger,
+//! otel-legacy-logs and netflow-plugin handlers. At the boundary, `bridge`
+//! renders any handler error as an HTTP 500 result whose JSON body carries
+//! the variant's Display text; the otel-plugin supervisor converts transport
+//! errors into anyhow with `?` (adding its own context).
 //!
 //! netdata-plugin-protocol re-exports [`NetdataPluginError`] and [`Result`]
 //! and defines the `TransportError` alias (in `transport.rs`); there is no
@@ -47,11 +47,9 @@ pub type Result<T> = std::result::Result<T, NetdataPluginError>;
 #[derive(Error, Debug)]
 pub enum NetdataPluginError {
     /// I/O failure from the plugin's streams (its stdin/stdout wiring, or any
-    /// other `AsyncRead`/`AsyncWrite` the transport wraps). Never built by
-    /// name: the `#[from] std::io::Error` impl turns `?` on every I/O call in
-    /// the transport writer paths into this variant. Transparent so the I/O
-    /// error prints once: `Display` and `source()` both delegate to the
-    /// wrapped error, which anyhow chains already carry.
+    /// other `AsyncRead`/`AsyncWrite` the transport wraps). Transparent so
+    /// the I/O error prints once: `Display` and `source()` both delegate to
+    /// the wrapped error, which anyhow chains already carry.
     #[error(transparent)]
     Transport(#[from] std::io::Error),
 

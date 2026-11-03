@@ -15,7 +15,8 @@
 //! ordinary byte. Differences from the C splitter:
 //!
 //! - Separators are only `' '` and `'\t'`; the C pluginsd set also splits
-//!   on `\r`, `\f`, `\v` and `=`.
+//!   on `\r`, `\n`, `\f`, `\v` and `=` (a `\n` never occurs: callers feed
+//!   it bytes of a single line).
 //! - Escapes work only inside a quoted field: the `\` + byte pair is
 //!   skipped while scanning, so `\"` and `\'` cannot close the field, and
 //!   the pair's bytes stay in the word (the C side keeps them too —
@@ -24,7 +25,7 @@
 //!   splitting; here `\` is an ordinary byte.
 //! - An unclosed quote turns the rest of the input into one word with the
 //!   opening quote stripped, as on the C side; a lone quote at the end of
-//!   the input yields an empty word here and no word there.
+//!   the input yields an empty word on both sides.
 //! - The C splitter stops after `PLUGINSD_MAX_WORDS` (30) words; this
 //!   iterator yields all of them.
 //!

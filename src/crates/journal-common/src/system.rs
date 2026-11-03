@@ -8,20 +8,23 @@
 //!
 //! Consumers (grep-verified): journal-log-writer imports the functions flat
 //! via the crate-root re-export ([`crate::load_machine_id`],
-//! [`crate::load_boot_id`], [`crate::load_hostname`]) — machine ID becomes
-//! the journal directory name `<path>/<machine-id>`
-//! (`journal-log-writer/src/log/mod.rs` `create_chain`) and boot ID resumes
-//! the per-boot monotonic tail (`journal-log-writer/src/log/mod.rs`
-//! `Log::new`); ng-ingest calls `journal_common::load_machine_id`/
-//! `load_boot_id` directly for its file-registry identity
-//! (`ng-ingest/src/main.rs` `main` and `ng-ingest/src/bin/traces.rs` `main`).
-//! `load_hostname` is re-exported at the root but no crate calls it.
+//! [`crate::load_boot_id`]) — machine ID becomes the journal directory name
+//! `<path>/<machine-id>` (`journal-log-writer/src/log/mod.rs`
+//! `create_chain`) and boot ID resumes the per-boot monotonic tail
+//! (`journal-log-writer/src/log/mod.rs` `Log::new`); ng-ingest calls
+//! `journal_common::load_machine_id`/`load_boot_id` directly for its
+//! file-registry identity (`ng-ingest/src/main.rs` `main` and
+//! `ng-ingest/src/bin/traces.rs` `main`). [`crate::load_hostname`] is
+//! re-exported at the root but no crate calls it.
 //!
 //! `src/crates/jf/journal_file/src/file.rs` (`read_host_file`,
 //! `load_machine_id`, `load_boot_id`) carries a near-identical copy of the
 //! same lookups (same `/host` fallback and macOS parsing, but `[u8; 16]` +
-//! `JournalError` instead of `Uuid` + `io::Error`); the two must be edited in
-//! step by hand.
+//! `JournalError` instead of `Uuid` + `io::Error`, and the Linux parsers
+//! decode hex by hand instead of `Uuid::try_parse`: there the machine-ID
+//! parser accepts only the 32-hex undashed form (`hex::decode` rejects
+//! hyphens), while the boot-ID parser strips hyphens first); the two must
+//! be edited in step by hand.
 
 use std::io;
 

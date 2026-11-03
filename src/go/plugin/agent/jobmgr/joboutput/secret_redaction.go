@@ -66,6 +66,10 @@ func redactResolvedLifecycleError(err error) error {
 	if errors.Is(err, lifecycle.ErrTaskPanic) {
 		safe = errors.Join(safe, lifecycle.ErrTaskPanic)
 	}
+	var dependency *collectorapi.ActivationDependencyUnavailableError
+	if errors.As(err, &dependency) {
+		safe = &collectorapi.ActivationDependencyUnavailableError{Kind: dependency.Kind, Name: dependency.Name, Cause: safe}
+	}
 	var resolveErr *secretresolver.AtomicResolveError
 	if errors.As(err, &resolveErr) {
 		if resolveErr.Kind == secretresolver.AtomicErrorScope && errors.Is(err, secretstore.ErrStoreNotFound) {

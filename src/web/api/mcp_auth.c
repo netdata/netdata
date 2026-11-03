@@ -176,7 +176,7 @@ bool mcp_api_key_verify(const char *api_key, bool silent) {
     }
 
     // Compare the keys
-    bool valid = (strcmp(api_key, mcp_dev_preview_api_key) == 0);
+    bool valid = streq_constant_time(api_key, mcp_dev_preview_api_key);
 
     if (!valid && !silent) {
         netdata_log_error("MCP: Invalid API key provided");

@@ -3,17 +3,20 @@
 //! surface - filtered entry iteration (`step` plus the `add_match`
 //! family), current-entry metadata reads (`get_realtime_usec`,
 //! `get_seqnum`, `get_entry_offset`), and field/data enumeration
-//! (`fields_enumerate`, `field_data_*`, `entry_data_offsets`). The file
-//! is borrowed per call and never stored: a reader carries no
-//! open/attach state and no `JournalState`; it starts empty from
-//! `Default` and is driven against one `&JournalFile` at a time.
+//! (`fields_enumerate`, `field_data_*`, `entry_data_offsets`). Every
+//! call takes the file by reference; a reader carries no open/attach
+//! state and no `JournalState` (only the enumeration iterators a call
+//! creates keep the file's borrow), starts empty from `Default`, and
+//! is driven against one `&JournalFile` at a time.
 //!
-//! Filter flow: `add_match`/`add_conjunction`/`add_disjunction` queue a
-//! pending [`JournalFilter`]; the first [`JournalReader::step`] - or
-//! [`JournalReader::build_filter`] - resolves it against the file's
-//! hash tables into a [`FilterExpr`] (file/filter.rs). `step` installs
-//! the result on the cursor and consumes the pending filter; a filter
-//! that matches nothing simply ends iteration with `Ok(false)`.
+//! Filter flow: `add_match` queues `FIELD=VALUE` matches into a pending
+//! [`JournalFilter`] and `add_conjunction`/`add_disjunction` close match
+//! groups inside it (resolving what they flush right away); the first
+//! [`JournalReader::step`] - or [`JournalReader::build_filter`] -
+//! resolves what is left against the file's hash tables into a
+//! [`FilterExpr`] (file/filter.rs). `step` installs the result on the
+//! cursor and consumes the pending filter; a filter that matches
+//! nothing simply ends iteration with `Ok(false)`.
 //!
 //! Field-name remapping (field_map.rs):
 //! [`JournalReader::load_remappings`] rebuilds the reader's
@@ -47,8 +50,9 @@ use crate::file::{
 };
 use std::num::NonZeroU64;
 
-/// Stateful read side of one journal file; the file is borrowed per
-/// call and never stored.
+/// Stateful read side of one journal file; every call takes the file
+/// by reference - only the enumeration iterators a call spawns keep
+/// its borrow.
 ///
 /// State, all empty under `Default`:
 /// - `cursor` + `filter`: entry iteration - the cursor's position and
@@ -72,8 +76,6 @@ pub struct JournalReader<'a, M: MemoryMap> {
     field_guard: Option<ValueGuard<'a, FieldObject<&'a [u8]>>>,
     data_guard: Option<ValueGuard<'a, DataObject<&'a [u8]>>>,
 
-    // Original -> stored field names; rebuilt by load_remappings,
-    // read by add_match.
     remapping_registry: FieldMap,
 }
 
@@ -188,7 +190,10 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
     /// Re-anchors the cursor for the next [`Self::step`] without
     /// touching any filter; discards the entry-array chain position,
     /// so the next step re-establishes it from the new anchor
-    /// ([`JournalCursor::set_location`]).
+    /// ([`JournalCursor::set_location`]). A `ResolvedEntry` anchor has
+    /// no chain position to re-establish: an unfiltered step from one
+    /// panics (a filter installed on the cursor resolves from the
+    /// offset instead).
     pub fn set_location(&mut self, location: Location) {
         self.cursor.set_location(location)
     }
@@ -288,11 +293,14 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
         self.filter.get_or_insert_default().add_match(data);
     }
 
-    /// Folds the matches accumulated so far into the pending expression
-    /// under `Conjunction` ([`JournalFilter::set_operation`]): matches
-    /// are resolved against `journal_file` right away, so lookup errors
-    /// surface here. With nothing accumulated, only the operation is
-    /// recorded for the next resolution ([`JournalFilter::set_operation`]).
+    /// Flushes the matches accumulated so far into the pending
+    /// expression and records `Conjunction` as the operator that will
+    /// attach the next flushed group ([`JournalFilter::set_operation`]);
+    /// the flushed matches themselves attach under the previously
+    /// recorded operator (`Conjunction` for the first group). The flush
+    /// resolves matches against `journal_file` right away, so lookup
+    /// errors surface here. With nothing accumulated, only the operator
+    /// is recorded.
     pub fn add_conjunction(&mut self, journal_file: &'a JournalFile<M>) -> Result<()> {
         self.filter
             .get_or_insert_default()
@@ -317,7 +325,7 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
 
     /// Wall-clock time (microseconds since the epoch) of the current
     /// entry, read from its entry object at the cursor position. Fails
-    /// with `UnsetCursor` until a [`Self::step`] has resolved an entry
+    /// with `UnsetCursor` until the cursor holds a resolved entry
     /// ([`JournalCursor::position`]).
     pub fn get_realtime_usec(&self, journal_file: &'a JournalFile<M>) -> Result<u64> {
         let entry_offset = self.cursor.position()?;
@@ -386,9 +394,8 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
     /// Binds the data enumeration to `field_name`: creates a fresh
     /// iterator over every DATA object carrying that field. Hash-table
     /// lookup; a field the file does not have yields an iterator that
-    /// ends immediately ([`JournalFile::field_data_objects`]). This is the
-    /// only way to
-    /// start (or restart) the enumeration -
+    /// ends immediately ([`JournalFile::field_data_objects`]). This is
+    /// the only way to start (or restart) the enumeration -
     /// [`Self::field_data_restart`] does not reset it.
     pub fn field_data_query_unique(
         &mut self,
@@ -611,14 +618,13 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
                 if field_name.starts_with(b"ND_") && field_name.len() == 35 {
                     // Gate: only rdp::encode_full's MD5-fallback shape
                     // passes - "ND_" + 32 hex chars = 35 bytes
-                    // (rdp/src/lib.rs). Normal-shape names
+                    // (src/crates/rdp/src/lib.rs). Normal-shape names
                     // (ND<checksum><structure>_<NAME>) never start with
-                    // "ND_": chars after "ND" come from the checksum
-                    // (A-Z/0-9) or the structure alphabet (A-X/0-9 after
-                    // uppercasing), never '_' (rdp's structure alphabet) -
-                    // so such mappings are silently dropped here, while
-                    // JournalFile::load_fields has no
-                    // gate.
+                    // "ND_": the char after "ND" is a checksum char
+                    // (A-Z/0-9) or a structure char (a-x, uppercased to
+                    // A-X, plus 3-9 run-length digits), never '_' - so
+                    // such mappings are silently dropped here, while
+                    // JournalFile::load_fields has no gate.
                     //
                     // '=' exists: extract_field_name found it.
                     let eq_pos = payload.iter().position(|&b| b == b'=').unwrap();

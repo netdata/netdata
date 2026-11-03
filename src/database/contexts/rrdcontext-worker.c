@@ -248,7 +248,7 @@ static inline bool rrdinstance_should_be_deleted(RRDINSTANCE *ri) {
     if(likely(rrd_flag_check(ri, RRD_FLAGS_PREVENTING_DELETIONS)))
         return false;
 
-    if(likely(ri->rrdset))
+    if(likely(rrdinstance_rrdset_atomic_load(ri)))
         return false;
 
     if(unlikely(dictionary_referenced_items(ri->rrdmetrics) != 0))
@@ -545,7 +545,7 @@ static bool rrdinstance_forcefully_clear_retention(RRDCONTEXT *rc, size_t count,
     size_t metrics_deleted = 0;
     RRDINSTANCE *ri;
     dfe_start_read(rc->rrdinstances, ri) {
-        if(!rrd_flag_check(ri, RRD_FLAG_NO_TIER0_RETENTION) || rrd_flag_is_collected(ri) || ri->rrdset)
+        if(!rrd_flag_check(ri, RRD_FLAG_NO_TIER0_RETENTION) || rrd_flag_is_collected(ri) || rrdinstance_rrdset_atomic_load(ri))
             continue;
 
         size_t metrics_cleared = 0;

@@ -17,7 +17,7 @@ use std::sync::Arc;
 ///
 /// The registry keeps its own clone, so dropping the last plugin handle does
 /// not stop emission: the chart keeps publishing the last written value until
-/// shutdown. Locking a handle while holding one of its guards deadlocks:
+/// shutdown. Locking a handle while holding one of its guards can deadlock:
 /// write locks are not reentrant, and a queued writer makes even a recursive
 /// read block (parking_lot's task-fair policy).
 #[derive(Clone)]
@@ -74,8 +74,8 @@ impl<T> ChartHandle<T> {
     }
 }
 
-/// Formats the chart value under a read lock; calling this while a write guard
-/// on the same handle is held deadlocks.
+/// Formats the chart value under a read lock; calling this while the calling
+/// thread holds a write guard on the same handle deadlocks.
 impl<T: std::fmt::Debug> std::fmt::Debug for ChartHandle<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ChartHandle")

@@ -1,7 +1,7 @@
 //! The logs engine's view of the shared source plumbing
-//! ([`crate::source`]): the same `Mapped`/`release_cold_region`
+//! (`crate::source`): the same `Mapped`/`release_cold_region`
 //! re-exported unchanged, plus the logs-historical **log-and-degrade**
-//! wrapper over [`crate::source::map_source`] — a source that fails to
+//! wrapper over `crate::source::map_source` — a source that fails to
 //! map is logged and contributes nothing, so one bad source never sinks
 //! a query. (The traces engine deliberately does NOT share this shape:
 //! it consumes the structured error and reports the failure as an

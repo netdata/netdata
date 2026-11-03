@@ -31,6 +31,8 @@ from pathlib import Path
 
 from ruamel.yaml import YAML
 
+from health_alerts import agent_internal_alerts, alert_rows, alert_subject, load_stock_rules
+
 REPO_PATH = Path(__file__).resolve().parent.parent
 PROFILES_DIR = REPO_PATH / 'src' / 'go' / 'plugin' / 'go.d' / 'config' / 'go.d' / 'snmp.profiles' / 'default'
 TRAP_CATALOGUE = (REPO_PATH / 'src' / 'go' / 'plugin' / 'go.d' / 'config' / 'go.d'
@@ -479,8 +481,9 @@ SYSLOG_SETUP = setup_block(
     '[Syslog via the OpenTelemetry Collector](/docs/npm/syslog/otel-collector.md). '
     'The endpoint listens on loopback by default, which accepts '
     'only local senders. Running the Collector on another host means binding a non-loopback address, and an OTLP '
-    'endpoint reachable off-host must be protected with TLS or mutual TLS (`endpoint.tls_cert_path`, '
-    '`endpoint.tls_key_path`, and `endpoint.tls_ca_cert_path` for mTLS) plus network access controls — otherwise '
+    'endpoint reachable off-host must be protected with TLS or mutual TLS '
+    '(`receivers.otlp.protocols.grpc.tls.cert_file`, `receivers.otlp.protocols.grpc.tls.key_file`, and '
+    '`receivers.otlp.protocols.grpc.tls.client_ca_file` for mTLS) plus network access controls — otherwise '
     'anyone who can reach it can inject telemetry. Prefer keeping the Collector on the same host as the Agent.',
     [('The OpenTelemetry plugin',
       'The Netdata Agent must include the `otel` plugin, which is available on Linux and macOS. See the '
@@ -491,16 +494,16 @@ SYSLOG_SETUP = setup_block(
      ('Devices pointed at it',
       'The routers, switches, and firewalls must be configured to send syslog to the collector\'s listener.')],
     options=[
-        {'name': 'endpoint.path', 'description': 'OTLP/gRPC endpoint the Agent listens on. The default accepts '
-                                                 'only local senders; bind a non-loopback address to accept a '
-                                                 'Collector on another host, and protect it when you do.',
+        {'name': 'receivers.otlp.protocols.grpc.endpoint',
+         'description': 'OTLP/gRPC endpoint the Agent listens on. The default accepts only local senders; bind a '
+                        'non-loopback address to accept a Collector on another host, and protect it when you do.',
          'default_value': '127.0.0.1:4317', 'required': False},
-        {'name': 'endpoint.tls_cert_path', 'description': 'Server TLS certificate. Set together with '
-                                                          '`endpoint.tls_key_path`.',
+        {'name': 'receivers.otlp.protocols.grpc.tls.cert_file',
+         'description': 'Server TLS certificate. Set together with `receivers.otlp.protocols.grpc.tls.key_file`.',
          'default_value': '', 'required': False},
-        {'name': 'endpoint.tls_key_path', 'description': 'Server TLS private key.',
+        {'name': 'receivers.otlp.protocols.grpc.tls.key_file', 'description': 'Server TLS private key.',
          'default_value': '', 'required': False},
-        {'name': 'endpoint.tls_ca_cert_path',
+        {'name': 'receivers.otlp.protocols.grpc.tls.client_ca_file',
          'description': 'CA certificate used to verify client certificates. Setting it enables mutual TLS and '
                         'therefore also requires the server certificate and key.',
          'default_value': '', 'required': False},
@@ -511,11 +514,15 @@ SYSLOG_SETUP = setup_block(
         'description': 'Binds a routable address and requires client certificates, so only Collectors holding a '
                        'certificate signed by your CA can send. Without the TLS keys this endpoint would accept '
                        'telemetry from anyone who can reach it.',
-        'config': 'endpoint:\n'
-                  '  path: 0.0.0.0:4317\n'
-                  '  tls_cert_path: /etc/netdata/ssl/otel.crt\n'
-                  '  tls_key_path: /etc/netdata/ssl/otel.key\n'
-                  '  tls_ca_cert_path: /etc/netdata/ssl/ca.crt\n',
+        'config': 'receivers:\n'
+                  '  otlp:\n'
+                  '    protocols:\n'
+                  '      grpc:\n'
+                  '        endpoint: 0.0.0.0:4317\n'
+                  '        tls:\n'
+                  '          cert_file: /etc/netdata/ssl/otel.crt\n'
+                  '          key_file: /etc/netdata/ssl/otel.key\n'
+                  '          client_ca_file: /etc/netdata/ssl/ca.crt\n',
     }],
 )
 
@@ -574,12 +581,12 @@ METRICS = {'folding': {'title': 'Metrics', 'enabled': False}, 'description': '',
 
 
 def make_entry(name, link, categories, icon, keywords, ov, plugin_name=PLUGIN_GO_D, module_name='snmp', metrics=None,
-               setup=None):
+               setup=None, alerts=()):
     monitored_instance = {'name': name, 'link': link, 'categories': categories, 'icon_filename': icon}
     if name in PAGE_DESCRIPTIONS:
         monitored_instance['description'] = PAGE_DESCRIPTIONS[name]
 
-    return {
+    entry = {
         'meta': {
             'plugin_name': plugin_name,
             'module_name': module_name,
@@ -591,9 +598,11 @@ def make_entry(name, link, categories, icon, keywords, ov, plugin_name=PLUGIN_GO
         'overview': ov,
         'setup': setup if setup is not None else SETUP,
         'troubleshooting': TROUBLESHOOTING if module_name in ('snmp', 'snmp_topology') else EMPTY_TROUBLESHOOTING,
-        'alerts': [],
-        'metrics': metrics if metrics is not None else METRICS,
     }
+    if alerts:
+        entry['alerts'] = list(alerts)
+    entry['metrics'] = metrics if metrics is not None else METRICS
+    return entry
 
 
 def metrics_block(description_md):
@@ -732,9 +741,29 @@ def render_profile_metrics_md(metrics, display):
     return '\n'.join(lines)
 
 
-def build_device_modules(profiles):
+def profile_virtual_contexts(name, profiles):
+    """Chart contexts of the virtual metrics across the resolved extends chain (same naming as symbols)."""
+    chain = resolve_extends(name, profiles) | {name}
+    return sorted({
+        _ctx(vm['name'])
+        for m in chain
+        for vm in ((profiles.get(m, {}).get('data') or {}).get('virtual_metrics') or [])
+        if isinstance(vm, dict) and vm.get('name') and not vm['name'].startswith('_')
+    })
+
+
+def device_alert_names(contexts, rules, internal):
+    """Stock alerts on the profile's chart contexts. A device entry documents its contexts in Markdown, not in
+    `metrics.scopes`, so the integrations generator cannot derive them and the entry lists them by name."""
+    subject = alert_subject('', PLUGIN_GO_D, 'snmp', contexts)
+    return list(dict.fromkeys(row['name'] for row in alert_rows(rules, subject, internal)))
+
+
+def build_device_modules(profiles, rules=None):
     """One catalog page per concrete device profile (per profile, not per vendor),
-    each listing the metrics it adds, grouped by family."""
+    each listing the metrics it adds, grouped by family, and the stock alerts on them."""
+    rules = load_stock_rules() if rules is None else rules
+    internal = agent_internal_alerts(rules)
     modules = []
     for name in sorted(n for n in profiles if is_device_catalog_profile(n)):
         data = profiles[name]['data']
@@ -762,6 +791,8 @@ def build_device_modules(profiles):
                 f'Auto-detected as {display} via sysObjectID/sysDescr.',
             ),
             metrics=metrics_block(render_profile_metrics_md(mets, display)),
+            alerts=device_alert_names(
+                [met['context'] for met in mets] + profile_virtual_contexts(name, profiles), rules, internal),
         ))
     return modules
 

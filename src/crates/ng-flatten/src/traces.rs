@@ -121,8 +121,7 @@ pub struct LinkRecord {
     pub attributes: Vec<Entry>,
 }
 
-/// The three outputs of flattening one span: its own entries plus the
-/// structured event/link lists. See [`Flattener::flatten_span`].
+/// The three outputs of flattening one span — see [`Flattener::flatten_span`].
 #[derive(Debug, Clone, Default)]
 pub struct FlattenedSpan {
     pub entries: Vec<Entry>,
@@ -130,10 +129,10 @@ pub struct FlattenedSpan {
     pub links: Vec<LinkRecord>,
 }
 
-/// Span duration in nanoseconds (`end - start`), clamped to `0` when the end time
-/// is unset (`0`) or precedes the start (clock skew). Saturates a `u64` past
-/// `i64::MAX`. Absolute end is recoverable as `ts + duration` only when `ts` did
-/// not saturate (start ≤ `i64::MAX`).
+/// Span duration in nanoseconds (`end - start`), clamped to `0` on an unset or
+/// before-start end (clock skew); a difference past `i64::MAX` saturates to
+/// `i64::MAX`. Absolute end is recoverable as `ts + duration` only when the end
+/// itself fits `i64` (then neither value saturates).
 fn span_duration(span: &Span) -> i64 {
     if span.end_time_unix_nano == 0 || span.end_time_unix_nano < span.start_time_unix_nano {
         return 0;
@@ -173,8 +172,7 @@ pub fn flatten_trace_into(
                     // from_bytes(empty) → UNSET; unwrap_or_default is exact.
                     let trace_id = TraceId::from_bytes(&sp.trace_id).unwrap_or_default();
                     let span_id = SpanId::from_bytes(&sp.span_id).unwrap_or_default();
-                    let parent_span_id =
-                        SpanId::from_bytes(&sp.parent_span_id).unwrap_or_default();
+                    let parent_span_id = SpanId::from_bytes(&sp.parent_span_id).unwrap_or_default();
                     let flags = sp.flags;
                     let dropped_attributes_count = sp.dropped_attributes_count;
                     let dropped_events_count = sp.dropped_events_count;

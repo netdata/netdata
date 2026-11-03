@@ -54,8 +54,9 @@ bool rrdcontext_matches_alert(struct rrdcontext_to_json_v2_data *ctl, RRDCONTEXT
     size_t matches = 0;
     RRDINSTANCE *ri;
     dfe_start_read(rc->rrdinstances, ri) {
-        if(ri->rrdset) {
-            RRDSET *st = ri->rrdset;
+        RRDSET_ACQUIRED *rsa = rrdinstance_rrdset_acquire((RRDINSTANCE_ACQUIRED *)ri_dfe.item);
+        if(rsa) {
+            RRDSET *st = rrdset_acquired_to_rrdset(rsa);
             rw_spinlock_read_lock(&st->alerts.spinlock);
             for (RRDCALC *rcl = st->alerts.base; rcl; rcl = rcl->next) {
                 if(ctl->alerts.alert_name_pattern && !simple_pattern_matches_string(ctl->alerts.alert_name_pattern, rcl->config.name))
@@ -173,6 +174,7 @@ bool rrdcontext_matches_alert(struct rrdcontext_to_json_v2_data *ctl, RRDCONTEXT
                 }
             }
             rw_spinlock_read_unlock(&st->alerts.spinlock);
+            rrdset_acquired_release(rsa);
         }
     }
     dfe_done(ri);
@@ -256,7 +258,8 @@ static void alerts_v2_insert_callback(const DICTIONARY_ITEM *item __maybe_unused
     struct rrdcontext_to_json_v2_data *ctl = data;
     struct alert_v2_entry *t = value;
     RRDCALC *rc = t->tmp;
-    t->name = rc->config.name;
+    // the entry outlives the chart reference held while the alerts are walked, so it owns its strings
+    t->name = string_dup(rc->config.name);
     t->summary = string_dup(rc->config.summary); // the original summary
     t->context = rrdlabels_create();
     t->recipient = rrdlabels_create();
@@ -301,6 +304,7 @@ static bool alerts_v2_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
 static void alerts_v2_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct alert_v2_entry *t = value;
 
+    string_freez(t->name);
     string_freez(t->summary);
     rrdlabels_destroy(t->context);
     rrdlabels_destroy(t->recipient);
@@ -700,18 +704,19 @@ static void alert_instances_v2_insert_callback(const DICTIONARY_ITEM *item __may
     struct sql_alert_instance_v2_entry *t = value;
     RRDCALC *rc = t->tmp;
 
-    t->context = rc->rrdset->context;
-    t->chart_id = rc->rrdset->id;
-    t->chart_name = rc->rrdset->name;
-    t->family = rc->rrdset->family;
-    t->units = rc->config.units;
-    t->classification = rc->config.classification;
-    t->type = rc->config.type;
-    t->recipient = rc->config.recipient;
-    t->component = rc->config.component;
-    t->name = rc->config.name;
-    t->source = rc->config.source;
-    t->info = rc->config.info;
+    // the entry outlives the chart reference held while the alerts are walked, so it owns its strings
+    t->context = string_dup(rc->rrdset->context);
+    t->chart_id = string_dup(rc->rrdset->id);
+    t->chart_name = string_dup(rc->rrdset->name);
+    t->family = string_dup(rc->rrdset->family);
+    t->units = string_dup(rc->config.units);
+    t->classification = string_dup(rc->config.classification);
+    t->type = string_dup(rc->config.type);
+    t->recipient = string_dup(rc->config.recipient);
+    t->component = string_dup(rc->config.component);
+    t->name = string_dup(rc->config.name);
+    t->source = string_dup(rc->config.source);
+    t->info = string_dup(rc->config.info);
     rrdcalc_runtime_strings_acquire(rc, &t->summary, NULL);
     t->host = rc->rrdset->rrdhost;
     t->alarm_id = rc->id;
@@ -727,6 +732,18 @@ static bool alert_instances_v2_conflict_callback(const DICTIONARY_ITEM *item __m
 
 static void alert_instances_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct sql_alert_instance_v2_entry *t = value;
+    string_freez(t->context);
+    string_freez(t->chart_id);
+    string_freez(t->chart_name);
+    string_freez(t->family);
+    string_freez(t->units);
+    string_freez(t->classification);
+    string_freez(t->type);
+    string_freez(t->recipient);
+    string_freez(t->component);
+    string_freez(t->name);
+    string_freez(t->source);
+    string_freez(t->info);
     string_freez(t->summary);
 }
 

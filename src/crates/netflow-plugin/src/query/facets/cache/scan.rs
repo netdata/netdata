@@ -87,6 +87,7 @@ where
         0,
         &prefilter_matches,
         "targeted facet vocabulary scan",
+        JournalScanReadErrors::RequireComplete,
         check_cancelled,
         |file_path, journal, _timestamp_usec, data_offsets, decompress_buf, check_cancelled| {
             check_cancelled()?;

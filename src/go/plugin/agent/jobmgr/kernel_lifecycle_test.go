@@ -2395,6 +2395,8 @@ func TestKernelSchedulesExpiredCooperativeFunctionAfterItsLanePredecessor(t *tes
 		time.Second,
 	)
 	setTestFunctionResource(t, kernel, func(FunctionLookup) string { return "same-lane" })
+	observer := &kernelRuntimeObserver{}
+	require.NoError(t, kernel.BindRuntimeObserver(observer))
 
 	require.NoError(t, run.OpenAdmission())
 
@@ -2429,6 +2431,9 @@ func TestKernelSchedulesExpiredCooperativeFunctionAfterItsLanePredecessor(t *tes
 	}
 	clock.advance(time.Second + time.Nanosecond)
 	kernel.NotifyControlReady()
+	require.Eventually(t, func() bool {
+		return observer.operationTimeouts.Load() == 1
+	}, time.Second, time.Millisecond, "queued cooperative deadline was not observed")
 	barrierCtx, barrierCancel := context.WithTimeout(context.Background(), time.Second)
 	defer barrierCancel()
 
@@ -2549,20 +2554,22 @@ func TestKernelCancelBeforeQueuedCooperativeDeadlineDisposesOperation(t *testing
 		require.FailNow(t, "test failed", "queued cooperative deadline was not armed")
 	}
 
-	clock.advance(time.Second + time.Nanosecond)
+	// Settle cancellation while the deadline is still in the future and the lane is occupied.
 	require.NoError(t, kernel.Cancel(context.Background(), "cancel-before-deadline"))
+	select {
+	case err := <-deadlineResult:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "cancelled cooperative-deadline operation retained ownership")
+	}
+
+	clock.advance(time.Second + time.Nanosecond)
 	close(releaseHolder)
 	select {
 	case err := <-holderResult:
 		require.NoError(t, err)
 	case <-time.After(time.Second):
 		require.FailNow(t, "test failed", "holder operation did not finish")
-	}
-	select {
-	case err := <-deadlineResult:
-		require.NoError(t, err)
-	case <-time.After(time.Second):
-		require.FailNow(t, "test failed", "cancelled cooperative-deadline operation retained ownership")
 	}
 
 	require.False(t, deadlineWorkStarted.Load())
@@ -2571,6 +2578,7 @@ func TestKernelCancelBeforeQueuedCooperativeDeadlineDisposesOperation(t *testing
 
 	require.NoError(t, kernel.Wait(context.Background()))
 
+	require.Contains(t, output.String(), "FUNCTION_RESULT_BEGIN cancel-before-deadline 499 application/json ")
 	require.Empty(t, kernel.operations)
 	require.Empty(t, kernel.lanes)
 	require.EqualValues(t, 0, tasks.Active())

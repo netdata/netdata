@@ -174,9 +174,9 @@ persistent result maps. V2 instrument reuse and expensive parser/client reuse re
 
 ### 2.3 Error handling
 
-Every error log answers three questions: **what operation, what target, what was expected vs observed**. Wrap errors
-with context (Go: `fmt.Errorf("...: %w", err)`); preserve the cause; check return codes from system calls and library
-functions.
+Every error log identifies the operation, target and failure reason using safe context. Wrap errors and preserve
+causes only when their messages are safe to expose; configured-file errors follow
+`./collector-practices.md#file-content-diagnostics`. Check return codes from system calls and library functions.
 
 Don't return a bare `err` with no context. Don't log `"failed"`. Don't ignore syscall returns or library NULLs.
 
@@ -193,6 +193,32 @@ milestones, reserve error logs for actionable failures, and preserve contextual 
 runtime. A transient partial condition may warrant a limited warning. Do not suppress the failure signal merely to
 avoid logs, and never log raw credentials. The repeated per-PID logging failure class matters; a blanket ban on every
 per-cycle diagnostic does not express it correctly.
+
+#### File-content diagnostics
+
+Contents of files selected through collector configuration, including DynCfg, MUST be treated as potentially
+sensitive. Trust in the configuration author or permission to read the file does not authorize disclosing its contents.
+
+- Collectors and parsers MUST NOT echo raw file contents, sampled lines, rejected source values or whole parsed-config
+  dumps through diagnostics. This includes debug logs, returned errors and their cause chains, rejected chart/dimension
+  identifiers, and errors serialized into Function or DynCfg responses. Derived values such as a file-built DSN need
+  the same treatment.
+- Replace input-bearing library errors at the parser or collector that owns the read. Use a safe reason, known field
+  name, line/sample number and configured path where useful. Do not retain unsafe text through wrapping (Go: `%w`),
+  cause chaining or a later debug statement. Preserve safe sentinels and error classifications needed by callers.
+  Secret-reference redaction MUST NOT be the only protection: ordinary file-path jobs may have no secret references.
+- Preserve output explicitly required by the collector's documented contract, such as parsed metrics, labels or
+  intentional log forwarding, and its existing file-access and privilege model. Reading a file for monitoring does
+  not make its unrelated contents or rejected values suitable diagnostic context.
+- When adding or changing these reads or diagnostics, regression tests MUST cover reachable disclosures using
+  synthetic markers: malformed input, and unused fields of valid samples where the format permits. Check captured
+  logs at debug level, returned error chains and reachable serialized Init/Check or Function failures without relying
+  on secret-reference substitution. Also verify successful parsing and caller-visible error classification. A fix's
+  tests SHOULD fail against the original disclosure path.
+
+For Go examples, see `src/go/plugin/go.d/pkg/logs/collector_diagnostics_test.go` for sampled/parsed logs and rejected
+identifiers, `src/go/plugin/agent/jobmgr/joboutput/content_errors_test.go` for real DynCfg serialization, and
+`src/go/plugin/go.d/pkg/collecttest/diagnostics.go` for reusable error-chain and parser assertions.
 
 ### 2.5 Cardinality bounding
 
@@ -350,7 +376,8 @@ A collector is *production-quality* when it satisfies all of:
 4. Are gaps preserved (no zero defaults for missing values)?
 5. Does the cycle rebuild expensive stable state, incur material avoidable cost, flood logs, or reconnect needlessly?
    Are legitimate snapshots preserved, and values authorizing dangerous operations re-checked at that operation?
-6. Do error logs answer *what operation, what target, what was expected vs observed*?
+6. Do errors retain useful safe context, and do configured-file reads satisfy
+   `./collector-practices.md#file-content-diagnostics`?
 7. Did I run the collector consistency checklist in `.agents/skills/integrations-lifecycle/consistency.md`, including
    the rule that generated integration pages are not hand-authored sources?
 8. For remote targets: is the vnode decision recorded (job-level `vnode` option, or a product decision for generated

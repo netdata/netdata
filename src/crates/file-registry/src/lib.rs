@@ -25,8 +25,11 @@
 //!   parses the prefix with this codec — the reason the module is public.
 //! - `durable` (public): the one temp+fsync+rename+dir-fsync write path and
 //!   the reserved `.tmp` suffix with its stale-temp sweep. Every
-//!   tmp+rename producer in the otel stack (WAL, SFST, catalogs, the seq
-//!   high-water file) writes through it.
+//!   tmp+rename producer in the otel stack (SFST, remote catalogs, the seq
+//!   high-water file, file-cache entries) writes through it; the WAL is not
+//!   one — it creates files with `create_new` and calls `fsync_dir` for
+//!   the directory entry only; the contents wait for the file's first
+//!   fsync.
 //! - `dir` (private): [`FileDir`], a flat directory+extension handle for
 //!   path derivation, scanning and per-directory max-seq reads; plus
 //!   [`scan_max_sequence_recursive`], the one-level walk that re-seeds the
@@ -75,9 +78,11 @@
 //!
 //! `durable` annotates every I/O error with the operation and path while
 //! preserving its `ErrorKind`; scans treat a missing directory as empty and
-//! per-entry failures as warn-and-skip; `layout` exposes the strict walk
-//! (errors propagate, for callers that need completeness) next to the lossy
-//! one (partial results); unparseable filenames are warn-and-skip.
+//! skip per-entry failures (warned in `FileDir::scan`, silent in the layout
+//! walks and the seq-seed walk's own iteration/type-lookup steps);
+//! `layout` exposes the strict walk (errors propagate,
+//! for callers that need completeness) next to the lossy one (partial
+//! results); unparseable filenames are warn-and-skip.
 //!
 //! # Concurrency
 //!
@@ -90,7 +95,7 @@
 //!
 //! # Consumers in this tree
 //!
-//! Direct dependents, grep-verified over `src/crates/*/Cargo.toml`: the
+//! Direct dependents, grep-verified over `src/crates/**/Cargo.toml`: the
 //! data planes `wal` and `sfst` (identity, FileDir/FileRegistry, seq
 //! recovery, range rule); `file-lifecycle`, the heaviest user (layout,
 //! durable, SeqKey, SelectedFile, Query); `otel-ingestor` (identity, the
@@ -98,11 +103,11 @@
 //! SelectedFile/Query/FileSummary accounting); `otel-catalog` (identity,
 //! the stem prefix for its own tail, layout walks, durable sweeps);
 //! `file-cache` (durable) and `sfsq` (SelectedFile, FileDir/Query;
-//! `sfsq-cli` uses FileDir/Query only); `ng-ingest` and `ng-index` (value
-//! types and clock; ng-index only from tests); and `otel-plugin`/`bridge`,
-//! identity types
-//! only (the supervisor builds the per-process `Identity` for the plugin
-//! config). The crate does not depend on ferryboat and carries no IPC.
+//! `sfsq-cli` FileDir/Query only, `FileId`/`TimestampNs` in tests);
+//! `ng-ingest` and `ng-index` (value types and clock; ng-index only from
+//! tests); and `otel-plugin`/`bridge`, identity types only (the
+//! supervisor builds the per-process `Identity` for the plugin config).
+//! The crate does not depend on ferryboat and carries no IPC.
 pub mod durable;
 pub mod layout;
 pub mod stem;

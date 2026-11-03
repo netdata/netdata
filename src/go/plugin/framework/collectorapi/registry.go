@@ -60,6 +60,12 @@ type (
 		Config             func() any
 		JobConfigLifecycle JobConfigLifecycle
 
+		// ActivationDependencies selects named prerequisites without acquiring
+		// them. Changed enabled bindings are structurally validated before admission
+		// so unavailable prerequisites cannot hide malformed configuration.
+		// The borrowed raw configuration must not be retained or mutated.
+		ActivationDependencies func(map[string]any) ([]ActivationDependency, error)
+
 		// InstancePolicy defaults to InstancePolicyPerJob when omitted.
 		InstancePolicy InstancePolicy
 

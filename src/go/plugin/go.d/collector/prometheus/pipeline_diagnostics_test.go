@@ -187,8 +187,9 @@ ignored 1
 		}),
 	)
 	collector.URL = "file://" + dumpPath
-	collector.Selector = promselector.Expr{Allow: []string{"raw_*"}}
-	collector.MaxTSPerMetric = 1
+	collector.Selector = promselector.Expr{
+		Allow: []string{"raw_*"},
+	}
 	collector.Relabeling = []relabel.Block{{
 		Match: "raw_*",
 		MetricRelabelConfigs: []relabel.Config{
@@ -243,9 +244,7 @@ ignored 1
 			len(fact.OutputLabels) == 1 && fact.OutputLabels[0] == (PipelineLabel{Name: "state", Value: "keep"})
 	})
 	assertPipelineFact(t, facts, func(fact PipelineDiagnostic) bool {
-		return fact.Decision == PipelineWriterFamilyRejected &&
-			fact.Reason == PipelineReasonSeriesLimit &&
-			fact.MetricName == "app_many"
+		return fact.Decision == PipelineWriterSeriesAccepted && fact.Destination.Family == "app_many"
 	})
 	assertPipelineFact(t, facts, func(fact PipelineDiagnostic) bool {
 		return fact.Decision == PipelineWriterSeriesAccepted && fact.Destination.Family == "app_value"

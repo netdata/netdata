@@ -231,7 +231,7 @@ func validateLifecycle(lifecycle *Lifecycle, path string) error {
 	if lifecycle.MaxInstances < 0 {
 		errs = append(errs, semErr(path+".lifecycle.max_instances", "must be >= 0"))
 	}
-	if lifecycle.ExpireAfterCycles < 0 {
+	if lifecycle.ExpireAfterCycles != nil && *lifecycle.ExpireAfterCycles < 0 {
 		errs = append(errs, semErr(path+".lifecycle.expire_after_cycles", "must be >= 0"))
 	}
 	if lifecycle.Dimensions != nil {

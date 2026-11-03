@@ -265,6 +265,9 @@ func (f *Factory) build(
 			),
 		)
 	}
+	if err := f.config.ConfigModules.checkNamedDependencies(config); err != nil {
+		return ConstructedJob{}, err
+	}
 	vnode, err := f.lookupVNode(config)
 	if err != nil {
 		return ConstructedJob{}, err

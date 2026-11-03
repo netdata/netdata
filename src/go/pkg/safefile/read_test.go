@@ -117,3 +117,42 @@ func TestReadBoundedUnderreportedSize(t *testing.T) {
 		})
 	}
 }
+
+func TestOpenHasNoSmallFileLimitAndFollowsSymlinks(t *testing.T) {
+	dir := t.TempDir()
+	target, link := filepath.Join(dir, "target"), filepath.Join(dir, "link")
+	require.NoError(t, os.WriteFile(target, []byte("archive"), 0600))
+	require.NoError(t, os.Truncate(target, MaxSize+1))
+	if err := os.Symlink(target, link); err != nil {
+		t.Skipf("symlinks are unavailable: %v", err)
+	}
+	for _, path := range []string{target, link} {
+		file, err := Open(path)
+		require.NoError(t, err)
+		info, err := file.Stat()
+		require.NoError(t, err)
+		require.Equal(t, MaxSize+1, info.Size())
+		value := make([]byte, len("archive"))
+		_, err = file.Read(value)
+		require.NoError(t, err)
+		require.Equal(t, "archive", string(value))
+		require.NoError(t, file.Close())
+	}
+}
+
+func TestOpenRejectsNonregularAndPreservesCauses(t *testing.T) {
+	for name, tc := range map[string]struct {
+		path  string
+		cause error
+	}{
+		"directory": {t.TempDir(), ErrNotRegular},
+		"missing":   {filepath.Join(t.TempDir(), "missing"), os.ErrNotExist},
+	} {
+		t.Run(name, func(t *testing.T) {
+			file, err := Open(tc.path)
+			require.Nil(t, file)
+			require.ErrorIs(t, err, ErrFile)
+			require.ErrorIs(t, err, tc.cause)
+		})
+	}
+}

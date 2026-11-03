@@ -333,7 +333,10 @@ mod tests {
     #[test]
     fn overlapping_ranges_of_one_wal_rejected() {
         // Chunk [0, 100) and tail [90, 200) of the same WAL intersect.
-        let set = [sfst("chunk", Some(("wal-1", 0, 100))), tail("tail", "wal-1", 90, 200)];
+        let set = [
+            sfst("chunk", Some(("wal-1", 0, 100))),
+            tail("tail", "wal-1", 90, 200),
+        ];
         assert!(matches!(
             validate_sources(&set),
             Err(SourceSetError::OverlappingCoverage { .. })

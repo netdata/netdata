@@ -1,7 +1,9 @@
 //! Example: encode a dyncfg [`ConfigDeclaration`] to stdout with
 //! [`MessageWriter::send`] — the `CONFIG <id> CREATE ...` line a plugin
 //! sends the agent to register a configuration entry (`pluginsd_config()`
-//! in src/plugins.d/pluginsd_dyncfg.c).
+//! in src/plugins.d/pluginsd_dyncfg.c, which matches the action word
+//! case-sensitively against lowercase `create` — this uppercase CREATE is
+//! logged as an unknown action and registers nothing).
 //!
 //! Run:
 //! `cargo run -p netdata-plugin-protocol --example config_declaration_encode`
@@ -43,8 +45,7 @@ async fn main() {
     let mut writer = MessageWriter::new(stdout);
 
     match writer.send(message).await {
-        Ok(()) => {
-        }
+        Ok(()) => {}
         Err(e) => {
             eprintln!("Error sending message: {}", e);
         }

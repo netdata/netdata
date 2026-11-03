@@ -58,8 +58,8 @@ pub mod field_map;
 // namespace under `journal_core::repository` (File, Chain, Repository, ...).
 // Pure convenience: the consumers also depend on journal-registry directly
 // (journal-index/src/file_indexer.rs imports journal_registry::File
-// directly), and only journal-index/src/file_index.rs (repository::File)
-// and the stack's tests import through this path.
+// directly); among the consumers, only journal-index/src/file_index.rs
+// (repository::File) and the stack's tests import through this path.
 pub mod repository {
     pub use journal_registry::repository::*;
 }

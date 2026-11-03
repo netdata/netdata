@@ -106,11 +106,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: dnsmasq_dhcp_dhcp_range_utilization
-        metric: dnsmasq_dhcp.dhcp_range_utilization
-        info: DHCP range utilization
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dnsmasq_dhcp.conf
     metrics:
       folding:
         title: Metrics

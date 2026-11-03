@@ -18,7 +18,7 @@
 //!   registry — WAL → `wal::Registry::remove_by_seq`, SFST →
 //!   `crate::registry::Registry::evict_seq` +
 //!   `TenantRegistries::forget_seq`, catalog → `catalog_files.remove` (see
-//!   otel-ledger's `handle_cleaner_resp` and `recovery::local`).
+//!   otel-ledger's `handle_cleaner_resp` and this crate's `recovery::local`).
 //! - A `*Failed` response carries the error string and the file is still on
 //!   disk; the caller clears the entry's `pending_deletion` flag (SFST /
 //!   catalog registries) so it returns to the query candidates. The WAL
@@ -147,7 +147,7 @@ fn process(req: CleanerRequest) -> CleanerResponse {
     }
 }
 
-/// Blocking [`std::fs::remove_file`]. `NotFound` is success — deletion is
+/// Blocking `std::fs::remove_file`. `NotFound` is success — deletion is
 /// idempotent (see the module contract). Any other error is returned as a
 /// string; it only feeds the response's `error` field, and the cleaner never
 /// retries.
@@ -163,7 +163,7 @@ fn remove_file(path: &Path) -> Result<(), String> {
 }
 
 /// Best-effort removal of up to `max_levels` ancestor directories above
-/// `path`. [`std::fs::remove_dir`] succeeds only on empty directories, so
+/// `path`. `std::fs::remove_dir` succeeds only on empty directories, so
 /// the walk aborts at the first non-empty ancestor (or any other failure) —
 /// the worst case is a directory left in place, never lost data.
 ///

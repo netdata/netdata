@@ -3,9 +3,10 @@ use std::net::IpAddr;
 
 const MAX_CANONICAL_JOURNAL_FIELDS: usize = crate::flow::CANONICAL_FLOW_DEFAULTS.len();
 
-/// Reusable buffer for encoding flow fields into journal entries.
-/// Avoids ~60 `Vec<u8>` allocations per flow by writing all fields into
-/// a single contiguous buffer and tracking offsets.
+/// Reusable buffer for encoding flow fields into journal entries. Fields
+/// are appended as `KEY=value` payloads into one contiguous `data` buffer;
+/// `refs` records each payload's range and `value_starts` where its value
+/// begins, so writers borrow slices instead of allocating per field.
 pub(crate) struct JournalEncodeBuffer {
     data: Vec<u8>,
     refs: Vec<std::ops::Range<usize>>,
@@ -23,9 +24,10 @@ impl JournalEncodeBuffer {
         }
     }
 
-    /// Encode a FlowRecord and write to journal in one call.
-    /// Uses a stack-allocated array for field slices — zero heap allocation.
-    /// The borrow of self.data is contained within this method.
+    /// Encode a FlowRecord and write to journal in one call. Field slices are
+    /// staged in a stack array sized by the canonical schema; a record with
+    /// more fields fails with `WriterError::Serialization` rather than being
+    /// truncated, and `trusted_unique_payloads` requires unique entry payloads.
     pub(super) fn encode_record_and_write(
         &mut self,
         record: &crate::flow::FlowRecord,
@@ -36,9 +38,9 @@ impl JournalEncodeBuffer {
         debug_assert_eq!(self.refs.len(), self.value_starts.len());
         self.debug_assert_unique_payloads();
 
-        // The schema-derived stack array avoids a heap allocation. The flow
-        // encoder already split each canonical field, so do not make the
-        // journal writer scan every `KEY=value` payload again.
+        // The flow encoder already split each canonical field, so hand the
+        // writer pre-split key/value slices rather than making it rescan
+        // every `KEY=value` payload for its `=` separator.
         let mut fields =
             [journal_sdk_log_writer::StructuredField::new(&[], &[]); MAX_CANONICAL_JOURNAL_FIELDS];
         let n = self.refs.len();
@@ -119,7 +121,9 @@ impl JournalEncodeBuffer {
         journal: &mut journal_sdk_log_writer::Log,
         timestamps: journal_sdk_log_writer::EntryTimestamps,
     ) -> journal_sdk_log_writer::Result<()> {
-        // Tier rows currently emit <= 73 fields; keep slack for schema growth.
+        // Tier rows emit at most 56 fields today (54 rollup dimensions plus
+        // BYTES and PACKETS); the 96 slots leave slack for schema growth, and
+        // rows beyond 96 fields are silently truncated by the `min` below.
         let mut slices = [&[] as &[u8]; 96];
         let n = self.refs.len().min(slices.len());
         for (index, range) in self.refs[..n].iter().enumerate() {

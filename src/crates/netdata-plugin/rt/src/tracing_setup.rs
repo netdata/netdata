@@ -17,8 +17,10 @@
 //! the variable's presence is tested — its value is unused, and the journald
 //! layer connects to the standard journald socket (/run/systemd/journal/socket)
 //! on its own. Unparseable method names matter on Windows, where the agent
-//! exports its ETW/WEL method: those arrive as `None`, which (like `Syslog`)
-//! is not implemented and uses the stderr sink.
+//! exports its ETW/WEL method as `etw`/`wel`: those fail to parse and fall
+//! back to auto-detection — stderr, since journald is never in play on
+//! Windows. The explicit `none` method (like `Syslog`) is not implemented and
+//! uses the stderr sink.
 //!
 //! # Where the stderr sink lands
 //!

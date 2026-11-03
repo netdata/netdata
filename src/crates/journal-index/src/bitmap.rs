@@ -12,9 +12,10 @@
 //! histogram bucket's unfiltered entry count
 //! (`journal-engine/src/histogram.rs`).
 //!
-//! This file touches only `roaring` and `serde`; the crate's journal-core,
-//! journal-common and journal-registry dependencies sit in the other
-//! modules. The workspace pins `roaring` to Netdata's fork
+//! This file touches only `roaring` and `serde` (plus the feature-gated
+//! `allocative` derive below); the crate's journal-core, journal-common
+//! and journal-registry dependencies sit in the other modules. The
+//! workspace pins `roaring` to Netdata's fork
 //! (`src/crates/Cargo.toml`), which carries the allocative support the
 //! crate's `allocative` feature forwards (`roaring/allocative`), and the
 //! `serde` feature supplies the inner serialization that
@@ -26,8 +27,8 @@ use serde::{Deserialize, Serialize};
 /// A compressed set of `u32` journal entry indices, backed by the Roaring
 /// bitmap compression scheme.
 ///
-/// Newtype over [`RoaringBitmap`] with a public tuple field. The
-/// `BitAnd`/`BitOr` impls below intersect and union sets; `Deref` exposes
+/// Newtype over `RoaringBitmap` with a public tuple field. The
+/// `BitAnd`/`BitOrAssign` impls below intersect and union sets; `Deref` exposes
 /// the rest of the `RoaringBitmap` API. Serialization is `transparent`, so
 /// within a serialized `FileIndex` each bitmap is the inner bitmap's bytes
 /// in Roaring's standard on-disk format.
@@ -45,7 +46,7 @@ impl Bitmap {
     /// Create a bitmap from a sorted iterator of entry indices.
     ///
     /// The values must be strictly increasing; otherwise this fails with
-    /// [`roaring::NonSortedIntegers`], whose `valid_until` reports how many
+    /// `roaring::NonSortedIntegers`, whose `valid_until` reports how many
     /// values were consumed before the first out-of-order one. In-crate
     /// callers pre-sort (`build_entries_index` in `src/file_indexer.rs`).
     pub fn from_sorted_iter<I: IntoIterator<Item = u32>>(
@@ -100,11 +101,11 @@ impl From<Bitmap> for RoaringBitmap {
     }
 }
 
-// Intersection (`&`) and union (`|`) in every by-value/by-reference
-// combination, each delegating to the matching `RoaringBitmap` operation.
-// The by-reference forms avoid consuming either operand; `filter` folds a
-// resolved filter expression into a single entry set with `&=`/`|=`
-// (`src/filter.rs` `FilterExpr::evaluate`).
+// Intersection (`&`) in every by-value/by-reference combination and union
+// only as `|=` (there is no by-value `|` impl), each delegating to the
+// matching `RoaringBitmap` operation. Only borrowed operands remain
+// unconsumed; `filter` folds a resolved filter expression into a single
+// entry set with `&=`/`|=` (`src/filter.rs` `FilterExpr::evaluate`).
 impl std::ops::BitAndAssign<&Bitmap> for Bitmap {
     fn bitand_assign(&mut self, rhs: &Bitmap) {
         self.0 &= &rhs.0;

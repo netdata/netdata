@@ -260,6 +260,10 @@ metrics:
     series:
       - aggregation: total
         kind: counter
+resource_labels:
+  - name: app_service_plan
+    property: properties.serverFarmId
+    value: arm_name
 template:
   family: Azure App Service
   context_namespace: app_service
@@ -270,6 +274,8 @@ template:
       - region
       - resource_type
       - profile
+      - subscription_id
+      - app_service_plan
     instances:
       by_labels:
         - resource_uid

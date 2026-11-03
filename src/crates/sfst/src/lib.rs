@@ -95,10 +95,10 @@ mod reader;
 mod row_index;
 mod schema;
 mod span_extras;
-mod trace_rollup;
 mod trace_bloom;
 pub mod trace_combine;
 mod trace_index;
+mod trace_rollup;
 mod writer;
 
 pub mod registry;
@@ -119,15 +119,15 @@ pub use query::{
 pub use reader::{read_summary, read_summary_path};
 pub use registry::{File, Registry, RetentionPolicy};
 pub use row_index::RowIndex;
+pub use schema::join_value_kinds;
 pub use span_extras::{EventIndex, EventRef, EventRows, LinkIndex, LinkRef, LinkRows};
+pub use trace_bloom::TraceIdBloom;
+pub use trace_combine::{CombineOutcome, SpanRef, SpanSource};
+pub use trace_index::TraceIdIndex;
 pub use trace_rollup::{
     ROLLUP_NO_REF, ROOT_CLAIM_NONE, ROOT_CLAIM_TRUE, ROOT_CLAIM_WITHHELD, TraceRollup,
     TraceRollupRows,
 };
-pub use schema::join_value_kinds;
-pub use trace_bloom::TraceIdBloom;
-pub use trace_combine::{CombineOutcome, SpanRef, SpanSource};
-pub use trace_index::TraceIdIndex;
 
 /// Deterministic opaque partition key for tests. SFST treats `part_key` as an
 /// opaque `u64` and never decodes it, so tests fabricate distinct keys per

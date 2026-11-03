@@ -1,6 +1,7 @@
 //! The query-engine layer of the journal stack: caches and (re)builds
 //! per-file journal indexes, aggregates them into bucket histograms, and
-//! answers log-entry queries over them, returning result tables.
+//! answers log-entry queries over them, returning log entries that
+//! `entry_data_to_table` lays out as result tables.
 //!
 //! Position: journal-core supplies the journal-file reads, journal-index
 //! the per-file `FileIndex`/`FileIndexer` pair, journal-registry the

@@ -33,7 +33,7 @@ You can start exploring OpenTelemetry logs on the "Logs" tab of the Netdata UI.
 
 ## Key features
 
-- Views logs ingested via **OpenTelemetry OTLP/gRPC** protocol.
+- Views logs ingested via **OpenTelemetry OTLP** (gRPC or HTTP) protocol.
 - Allows filtering on **any log field** or **field value**, for any time-frame.
 - Allows **full text search** (`grep`) on all log fields, for any time-frame.
 - Provides a **histogram** for log entries over time, with a breakdown per field-value, for any field and any time-frame.
@@ -47,7 +47,7 @@ You can start exploring OpenTelemetry logs on the "Logs" tab of the Netdata UI.
 ### Prerequisites
 
 - A Netdata Cloud account (the `otel-logs` view is access-gated and requires a Netdata Cloud sign-in).
-- The `otel.plugin` enabled, with its OTLP/gRPC endpoint configured in `otel.yaml` (see the [plugin reference](https://github.com/netdata/netdata/blob/master/src/crates/otel-plugin/README.md)).
+- The `otel.plugin` enabled, with its OTLP endpoint (gRPC or HTTP) configured in `otel.yaml` (see the [plugin reference](https://github.com/netdata/netdata/blob/master/src/crates/otel-plugin/README.md)).
 - An OpenTelemetry exporter (an OTel Collector or an SDK) pointed at that endpoint to send OTLP logs.
 
 

@@ -29,7 +29,7 @@ use std::hash::{Hash, Hasher};
  * tag: compare
  */
 
-/// Total order over OTLP value types — the sort key [`Normalize`] uses to
+/// Total order over OTLP value types — the sort key `Normalize` uses to
 /// bring attribute lists into a canonical order. Values of different types
 /// order by type tag; vecs compare by length before element-wise; doubles use
 /// `total_cmp` so NaN does not break the order.
@@ -48,6 +48,7 @@ impl Compare for Value {
                 Value::ArrayValue(_) => 5,
                 Value::KvlistValue(_) => 6,
                 Value::BytesValue(_) => 7,
+                Value::StringValueStrindex(_) => 8,
             }
         }
 
@@ -60,6 +61,7 @@ impl Compare for Value {
                 (Value::ArrayValue(a), Value::ArrayValue(b)) => a.compare(b),
                 (Value::KvlistValue(a), Value::KvlistValue(b)) => a.compare(b),
                 (Value::BytesValue(a), Value::BytesValue(b)) => a.cmp(b),
+                (Value::StringValueStrindex(a), Value::StringValueStrindex(b)) => a.cmp(b),
                 _ => unreachable!("tags were equal"),
             },
             ord => ord,
@@ -67,9 +69,20 @@ impl Compare for Value {
     }
 }
 
+/// The value an `AnyValue` carries for ordering and identity. OTLP says
+/// signals other than profiling process `string_value_strindex` (a reference
+/// into the profiles string table) as an absent value, as flatten-otel does
+/// for the chart labels.
+fn present_value(any_value: &AnyValue) -> Option<&Value> {
+    match &any_value.value {
+        Some(Value::StringValueStrindex(_)) | None => None,
+        Some(value) => Some(value),
+    }
+}
+
 impl Compare for AnyValue {
     fn compare(&self, other: &Self) -> Ordering {
-        match (&self.value, &other.value) {
+        match (present_value(self), present_value(other)) {
             (None, None) => Ordering::Equal,
             (None, Some(_)) => Ordering::Less,
             (Some(_), None) => Ordering::Greater,
@@ -132,7 +145,7 @@ impl Compare for Option<AnyValue> {
  */
 
 /// Bring OTLP structures into a canonical form: normalize nested values
-/// recursively, then sort every attribute list with [`Compare`] — kvlists,
+/// recursively, then sort every attribute list with `Compare` — kvlists,
 /// resource/scope attributes, metric metadata, and data-point attributes.
 /// Array order is preserved. Paired with [`MetricIdentityHash`] (which hashes
 /// vecs in slice order), this makes identity hashes independent of the order
@@ -312,7 +325,7 @@ impl Normalize for Metric {
 }
 
 /// Normalize a whole export request: resource and scope attributes, metric
-/// metadata, and every data point's attributes (see [`Normalize`]). Called by
+/// metadata, and every data point's attributes (see `Normalize`). Called by
 /// `metrics_service.rs::process_request` before chart matching and hashing.
 pub fn normalize_request(request: &mut ExportMetricsServiceRequest) {
     for rm in &mut request.resource_metrics {
@@ -351,6 +364,7 @@ impl MetricIdentityHash for Value {
             Value::ArrayValue(_) => 5,
             Value::KvlistValue(_) => 6,
             Value::BytesValue(_) => 7,
+            Value::StringValueStrindex(_) => 8,
         };
         tag.hash(state);
 
@@ -362,13 +376,20 @@ impl MetricIdentityHash for Value {
             Value::ArrayValue(v) => v.identity_hash(state),
             Value::KvlistValue(v) => v.identity_hash(state),
             Value::BytesValue(v) => v.hash(state),
+            Value::StringValueStrindex(v) => v.hash(state),
         }
     }
 }
 
 impl MetricIdentityHash for AnyValue {
     fn identity_hash<H: Hasher>(&self, state: &mut H) {
-        self.value.identity_hash(state);
+        present_value(self).identity_hash(state);
+    }
+}
+
+impl<T: MetricIdentityHash> MetricIdentityHash for &T {
+    fn identity_hash<H: Hasher>(&self, state: &mut H) {
+        (**self).identity_hash(state);
     }
 }
 
@@ -486,7 +507,8 @@ impl<'a> DataPointRef<'a> {
 
     /// Dimension name for this data point: the string value of the attribute
     /// named `dimension_attr_key`, or the literal "value" when no key is
-    /// given, the attribute is missing, or its value is not a string.
+    /// given, the attribute is missing, or its value is unset or not a
+    /// string.
     pub fn dimension_name(&self, dimension_attr_key: Option<&str>) -> &str {
         let Some(key) = dimension_attr_key else {
             return "value";
@@ -607,5 +629,32 @@ impl DataPointIterExt for Metric {
             None => DataPointIterInner::Empty,
         };
         DataPointIter { inner }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::hash_map::DefaultHasher;
+
+    fn hash_of(value: &AnyValue) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        value.identity_hash(&mut hasher);
+        hasher.finish()
+    }
+
+    #[test]
+    fn profiling_string_table_reference_orders_and_hashes_as_absent() {
+        let unset = AnyValue { value: None };
+        let strindex = AnyValue {
+            value: Some(Value::StringValueStrindex(3)),
+        };
+        let other_strindex = AnyValue {
+            value: Some(Value::StringValueStrindex(4)),
+        };
+        assert_eq!(strindex.compare(&unset), Ordering::Equal);
+        assert_eq!(strindex.compare(&other_strindex), Ordering::Equal);
+        assert_eq!(hash_of(&strindex), hash_of(&unset));
+        assert_eq!(hash_of(&strindex), hash_of(&other_strindex));
     }
 }

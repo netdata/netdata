@@ -190,9 +190,9 @@ impl FileIndexer {
 
         // "Online" if either signal says so: the header state (1 =
         // JournalState::Online, `journal-core/src/file/object.rs`) or the
-        // file's scan-time status, which is Active exactly when the name
-        // lacks the archived `@seqnum_id-head_seqnum-head_realtime` pattern
-        // (`journal-registry/src/repository/file.rs` `Status::parse`).
+        // file's scan-time status, Active exactly for `<stem>.journal` names
+        // with no `@` suffix (`journal-registry/src/repository/file.rs`
+        // `Status::parse`).
         //
         // The OR is deliberate: a still-written file can transiently report
         // a non-online header state (e.g. while journald flushes or
@@ -276,9 +276,9 @@ impl FileIndexer {
     /// Skipped without failing the pass: fields absent from the field map or
     /// whose data chain fails to read; values that fail to load, sit at or
     /// above the payload cap, are compressed, do not parse as field=value,
-    /// reference no entry, or whose entry-offset walk fails; and
-    /// bookkeeping-only data objects whose every entry is an ND_REMAPPING
-    /// record. A field stops early at the unique-value cap.
+    /// reference no entry, or whose entry-offset walk fails; and values none
+    /// of whose entries survive the snapshot bound and the bookkeeping
+    /// exclusion. A field stops early at the unique-value cap.
     fn build_entries_index(
         &mut self,
         journal_file: &JournalFile<Mmap>,
@@ -395,19 +395,18 @@ impl FileIndexer {
                     self.entry_indices.push(*entry_index as u32);
                 }
 
-                // Every entry carrying this data object is a bookkeeping
-                // record, so the value only describes the field mapping (e.g.
-                // NDABE_LOG_SEVERITY_NUMBER=log.severity_number) and must not
-                // surface as an indexable value.
+                // No in-snapshot, non-bookkeeping entry carries this data
+                // object: the value describes a field mapping
+                // (ND_<md5>=<otel-name>), or its entries fall outside the
+                // snapshot, so it must not surface as an indexable value.
                 if self.entry_indices.is_empty() {
                     continue;
                 }
                 self.entry_indices.sort_unstable();
 
-                // sort_unstable above satisfies from_sorted_iter's strictly
-                // increasing requirement (`src/bitmap.rs`
-                // `Bitmap::from_sorted_iter`); `optimize()` compacts
-                // the roaring containers.
+                // sort_unstable above gives `Bitmap::from_sorted_iter` the
+                // ascending order it requires; `optimize()` compacts the
+                // roaring containers.
                 let mut bitmap = Bitmap::from_sorted_iter(self.entry_indices.iter().copied())
                     .expect("sorted entry indices");
                 bitmap.optimize();
@@ -472,8 +471,7 @@ impl FileIndexer {
     /// Collect the entry offsets of `ND_REMAPPING=1` bookkeeping records.
     ///
     /// The OTel log writer emits these records to carry the OTel→systemd
-    /// field-name mapping (ND_<md5>=<otel-name>, e.g.
-    /// NDABE_LOG_SEVERITY_NUMBER=log.severity_number); they are metadata, not
+    /// field-name mapping (ND_<md5>=<otel-name>); they are metadata, not
     /// log entries, so every offset found here is excluded from the
     /// histogram, the time-ordered list and the bitmaps. Journals without
     /// remappings leave the set empty, and only offsets within the snapshot
@@ -682,8 +680,6 @@ impl FileIndexer {
                 continue;
             }
 
-            // Not covered by the source field: fall back to the entry's own
-            // realtime timestamp.
 
             let timestamp = {
                 let entry = journal_file.entry_ref(entry_offset)?;
@@ -693,9 +689,6 @@ impl FileIndexer {
             self.realtime_entry_offset_pairs
                 .push((Microseconds(timestamp), entry_offset));
         }
-
-        // realtime_entry_offset_pairs now holds every entry the source field
-        // did not cover, stamped with its realtime timestamp.
 
         // Entries whose time came from the realtime fallback need a rebuild:
         // merge them into the pair list and re-sort.

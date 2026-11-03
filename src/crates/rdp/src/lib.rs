@@ -26,18 +26,16 @@
 //! at write time (`journal-log-writer/src/log/mod.rs`
 //! `write_entry_with_timestamps`) and persists the otel→systemd mapping as
 //! `ND_REMAPPING=1` entries (same file, `write_remapping_entry`);
-//! journal-core's reader rebuilds the reverse mapping by accepting only
+//! journal-core's reader rebuilds the same otel→systemd mapping by accepting only
 //! fields that start with `ND_` and are exactly 35 bytes
 //! (`journal-core/src/file/reader.rs` `parse_remapping_entry`), so
 //! normal-shape mappings are written but silently dropped on load — only
 //! MD5-fallback mappings round-trip; journal-core's FieldMap tests drive
 //! `encode_full` directly (`journal-core/src/field_map.rs` test
-//! `test_remapping_registry`). The
-//! published systemd-journal-sdk-* crates carry no twin (grep-verified
-//! 0.8.1; their engine's cache notes v3 dropped ND_REMAPPING-specific
-//! indexing). The `rdp` bin (main.rs) prints the encodings of a fixed key
+//! `test_remapping_registry`). The published systemd-journal-sdk-* crates
+//! carry no twin. The `rdp` bin (main.rs) prints the encodings of a fixed key
 //! list with a checksum of the whole output — a dev tool. Dependency: `md5`
-//! only (Cargo.toml). Nothing in the repo expands the crate name.
+//! only (Cargo.toml). No other workspace crate depends on `rdp`.
 
 // The character classes `tokenize` recognizes; digits classify as uppercase.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -172,7 +170,6 @@ fn tokenize(s: &[u8]) -> Option<Vec<Token>> {
     let mut chars = s.iter().enumerate().peekable();
     let mut prev_type: Option<CharType> = None;
 
-    // track the current word characteristics
     let mut first_type: Option<CharType> = None;
     let mut has_lowercase = false;
     let mut has_uppercase = false;
@@ -425,8 +422,8 @@ fn parse<'a>(source: &'a [u8], tokens: &[Token]) -> Vec<Node<'a>> {
 // The structure alphabet: one character per (field shape, what follows) —
 // the following separator kind, another field with no separator in between,
 // or end of input. 24 codes (a-x): five per field shape plus Empty's four
-// (u-x), since an `Empty` field only ever faces a separator. `encode_full`
-// uppercases these to A-X.
+// (u-x), since an `Empty` field is only ever followed by a separator or the
+// end of input. `encode_full` uppercases these to A-X.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum FieldSeparatorPair {
     // Lowercase field followed by...
@@ -591,7 +588,6 @@ fn has_checksum(encoded: &str) -> bool {
 // resulting first-character split. Consecutive separators survive as
 // Empty+separator pairs, so separator kinds and counts are preserved.
 fn encode_nodes(source: &str, nodes: &[Node]) -> String {
-    // Check if any field is camel case
     let has_camel_case = nodes.iter().any(|node| {
         matches!(
             node,
@@ -601,7 +597,6 @@ fn encode_nodes(source: &str, nodes: &[Node]) -> String {
 
     let mut result = String::new();
 
-    // Add checksum at the beginning if there's any camel case
     if has_camel_case {
         result.push_str(&compute_checksum(source));
     }
@@ -746,11 +741,12 @@ fn encode(b: &[u8]) -> String {
 }
 
 /// Run-length-compresses runs of 3 or more identical characters as
-/// `count` + character, splitting runs longer than 9 into 9-character chunks
-/// with a literal remainder; runs of 1-2 stay literal. Only the structure
-/// encoding goes through this (the checksum is exempt — see `encode_full`),
-/// and its characters are a-x, so the digits in the output are unambiguously
-/// run counts. Pinned by `tests::compress_runs_examples_match_private_contract`.
+/// `count` + character, splitting runs longer than 9 into 9-character chunks;
+/// runs of 1-2, and any 1-2 remainder of a longer run, stay literal. Only the
+/// structure encoding goes through this (the checksum is exempt — see
+/// `encode_full`), and its characters are a-x, so the digits in the output
+/// are unambiguously run counts. Pinned by
+/// `tests::compress_runs_examples_match_private_contract`.
 fn compress_runs(s: &str) -> String {
     if s.is_empty() {
         return String::new();
@@ -769,7 +765,6 @@ fn compress_runs(s: &str) -> String {
             count += 1;
         }
 
-        // Process the run
         if count <= 2 {
             // Output as-is for runs of 1 or 2
             for _ in 0..count {
@@ -897,7 +892,6 @@ pub fn encode_full(field_name: &[u8]) -> String {
     let s = unsafe { String::from_utf8_unchecked(field_name.to_vec()) };
     let mut normalized = s.to_uppercase().replace(['.', '-'], "_");
 
-    // Replace common prefixes with shorter versions
     if let Some(suffix) = normalized.strip_prefix("RESOURCE_ATTRIBUTES_") {
         normalized = format!("RA_{}", suffix);
     } else if let Some(suffix) = normalized.strip_prefix("LOG_ATTRIBUTES_") {

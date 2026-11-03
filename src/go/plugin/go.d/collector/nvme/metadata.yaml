@@ -102,11 +102,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: nvme_device_critical_warnings_state
-        metric: nvme.device_critical_warnings_state
-        info: "NVMe device ${label:device} has critical warnings"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/nvme.conf
     metrics:
       folding:
         title: Metrics

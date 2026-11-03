@@ -38,7 +38,8 @@
 //! by the ingestor's `LedgerSender`, which retries forever. Message contracts
 //! live in the `bridge` crate and `file_lifecycle::ipc`; socket naming and
 //! child-process lifecycle in otel-plugin/src/supervisor.rs. Tests across the
-//! family bind and connect over PID-scoped `/tmp` paths.
+//! family bind and connect over unique temp paths (PID-suffixed `/tmp` names
+//! or `tempfile` dirs).
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -67,7 +68,7 @@ impl Listener {
     /// is there (lifecycle and path-hijack caveat in the module docs).
     ///
     /// The parent directory must already exist; nothing here creates it (the
-    /// supervisor's `socket_dir()` does; tests use PID-scoped `/tmp` paths).
+    /// supervisor's `socket_dir()` does; tests use unique temp paths).
     /// Errors are `UnixListener::bind`'s `io::Error`s verbatim, surfaced as
     /// `ferryboat::Error::Io` by `ListenerBuilder::open`.
     pub fn bind(path: impl AsRef<Path>) -> io::Result<Self> {

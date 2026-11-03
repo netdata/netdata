@@ -6,11 +6,38 @@ import (
 	"fmt"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/tests/query-corpus/canon"
+	"github.com/netdata/netdata/tests/query-corpus/daemon"
+	"github.com/netdata/netdata/tests/query-corpus/fixture"
 )
 
 const queryCorpusStorageTiers = 3
+
+func waitChartsRetention(t *testing.T, host string, charts ...fixture.Chart) {
+	t.Helper()
+	// A sibling can satisfy context retention before this chart arrives.
+	for _, chart := range charts {
+		params := daemon.DataParams(chart.Context, chart.FirstT()-1, chart.LastT(), 1)
+		params.Set("scope_instances", chart.ID)
+		params.Set("options", "jsonwrap|unaligned")
+		deadline := time.Now().Add(15 * time.Second)
+		for {
+			doc, err := td.DataV3(host, params)
+			if err == nil {
+				retention, ok := daemon.QueryRetention(doc)
+				if ok && retention.FirstEntry == chart.FirstT() && retention.LastEntry == chart.LastT() {
+					break
+				}
+			}
+			if time.Now().After(deadline) {
+				t.Fatalf("chart %q did not finish ingestion", chart.ID)
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+}
 
 // expectedColumnPoint is the exact fixture-derived shape of one json2
 // dimension point. A nil Value means the row must be null and carry EMPTY.

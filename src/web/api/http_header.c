@@ -126,6 +126,30 @@ static void http_header_x_auth_token(struct web_client *w, const char *v, size_t
     w->auth_bearer_token = strdupz(v);
 }
 
+static void http_header_cookie(struct web_client *w, const char *v, size_t len __maybe_unused) {
+    // the browser may send multiple cookies with our name - the first one wins
+    if(w->auth.registry_person_guid[0])
+        return;
+
+    const size_t name_len = sizeof(NETDATA_REGISTRY_COOKIE_NAME) - 1;
+
+    while(*v) {
+        while(*v == ';' || *v == ' ') v++;
+
+        const char *pair = v;
+        while(*v && *v != ';') v++;
+
+        if((size_t)(v - pair) > name_len && pair[name_len] == '=' &&
+            strncmp(pair, NETDATA_REGISTRY_COOKIE_NAME, name_len) == 0) {
+            const char *value = &pair[name_len + 1];
+            size_t value_len = v - value;
+            strncpyz(w->auth.registry_person_guid, value,
+                     MIN(value_len, sizeof(w->auth.registry_person_guid) - 1));
+            return;
+        }
+    }
+}
+
 static void http_header_host(struct web_client *w, const char *v, size_t len) {
     char buffer[NI_MAXHOST];
     strncpyz(buffer, v, (len < sizeof(buffer) - 1 ? len : sizeof(buffer) - 1));
@@ -152,9 +176,34 @@ static void http_header_x_forwarded_host(struct web_client *w, const char *v, si
 }
 
 static void http_header_x_forwarded_for(struct web_client *w, const char *v, size_t len) {
-    if(len)
-        strncpyz(w->user_auth.forwarded_for, v,
-                 (len < sizeof(w->user_auth.forwarded_for) - 1 ? len : sizeof(w->user_auth.forwarded_for) - 1));
+    // X-Forwarded-For is a comma separated list of addresses, the first one being the client.
+    // The stored value is serialized into the comma separated key=value source string of
+    // function calls and quoted into the FUNCTION lines sent to plugins and children,
+    // so keep only the first entry, and only when it is an IPv4 or IPv6 address.
+    const char *end = v + len;
+    while(v < end && isspace((uint8_t)*v))
+        v++;
+
+    const char *e = v;
+    while(e < end && *e != ',')
+        e++;
+
+    while(e > v && isspace((uint8_t)e[-1]))
+        e--;
+
+    size_t address_len = (size_t)(e - v);
+    if(!address_len || address_len >= sizeof(w->user_auth.forwarded_for))
+        return;
+
+    char buffer[INET6_ADDRSTRLEN];
+    memcpy(buffer, v, address_len);
+    buffer[address_len] = '\0';
+
+    unsigned char address[sizeof(struct in6_addr)];
+    if(inet_pton(AF_INET, buffer, address) != 1 && inet_pton(AF_INET6, buffer, address) != 1)
+        return;
+
+    memcpy(w->user_auth.forwarded_for, buffer, address_len + 1);
 }
 
 static void http_header_x_transaction_id(struct web_client *w, const char *v, size_t len) {
@@ -369,6 +418,7 @@ struct {
     { .hash = 0, .key = "User-Agent",            .cb = http_header_user_agent},
     { .hash = 0, .key = "Accept",                .cb = http_header_accept },
     { .hash = 0, .key = "X-Auth-Token",          .cb = http_header_x_auth_token },
+    { .hash = 0, .key = "Cookie",                .cb = http_header_cookie },
     { .hash = 0, .key = "Host",                  .cb = http_header_host },
     { .hash = 0, .key = "Accept-Encoding",       .cb = http_header_accept_encoding },
     { .hash = 0, .key = "X-Forwarded-Host",      .cb = http_header_x_forwarded_host },

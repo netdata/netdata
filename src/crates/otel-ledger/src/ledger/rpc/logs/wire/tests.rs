@@ -8,17 +8,6 @@
 //! no files, engine, or handler involved. These pin transport shapes only;
 //! the mapping onto the `sfsq::logs` engine is `adapter/tests.rs`.
 //!
-//! Pins:
-//!
-//! - `anchor` accepts both forms the UI sends, JSON type alone picking the
-//!   untagged variant: string → opaque row cursor, number → microsecond
-//!   timestamp;
-//! - `DataPoint` serializes to the exact flat
-//!   `[timestamp_ms, [v, arp, pa], …]` array the cloud-frontend chart
-//!   renderer expects;
-//! - `DataPoint`'s hand-written deserializer inverts its hand-written
-//!   serializer.
-//!
 //! Not pinned here: `AnchorParam` serialization, rejection of an `anchor`
 //! that is neither string nor number, the timestamp-only bucket (an array
 //! with no `[v, arp, pa]` triples — currently accepted), and the rest of

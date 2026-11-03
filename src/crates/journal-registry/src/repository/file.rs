@@ -20,11 +20,10 @@
 //!   hex u64s; a corrupted file renamed with the `~` suffix (README.md).
 //! - source basename: `system`, `user-<uid>` (u32), `remote-<host>`, or
 //!   anything else → `Unknown`. The basename must sit in a directory.
-//! - machine-id directory: the component above the basename's directory is
-//!   either `<machine-id>` or `<machine-id>.<namespace>` (journal
-//!   namespace). A plain dirname that is not a UUID simply leaves the origin
-//!   empty; a dotted one whose machine-id half does not parse rejects the
-//!   file.
+//! - machine-id directory: the basename's directory, named either
+//!   `<machine-id>` or `<machine-id>.<namespace>` (journal namespace). A
+//!   plain dirname that is not a UUID simply leaves the machine id unset;
+//!   a dotted one whose machine-id half does not parse rejects the file.
 //!
 //! Every parse mismatch is a silent `None` — path errors never become
 //! `RepositoryError` ([`RepositoryError::InvalidPath`] has no producing
@@ -263,7 +262,8 @@ impl Source {
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub struct Origin {
     /// The machine the journal belongs to; `None` when there is no
-    /// machine-id directory above the file (module docs).
+    /// machine-id directory above the file, or when the directory's name
+    /// is not a UUID (module docs).
     #[cfg_attr(feature = "allocative", allocative(skip))]
     pub machine_id: Option<Uuid>,
     /// Journal namespace (isolated journal instances); the part after `.`
@@ -358,10 +358,9 @@ impl File {
         let (status, path_after_status) = Status::parse(path)?;
         let (source, path_after_source) = Source::parse(path_after_status)?;
 
-        // The machine-id/namespace directory sits directly above the
-        // basename's directory.
+        // The machine-id/namespace directory is the basename's directory.
         let (machine_id, namespace) = if !path_after_source.is_empty() {
-            // The last component of what is left above the source directory.
+            // Its last component.
             let dirname = if let Some((_parent, dir)) = path_after_source.rsplit_once('/') {
                 dir
             } else {
@@ -375,7 +374,7 @@ impl File {
                 (Some(machine_id), Some(ns.to_string()))
             } else {
                 // A plain dirname parses to a machine-id when it is a UUID;
-                // otherwise the origin stays empty but the file is kept.
+                // otherwise the machine id stays unset but the file is kept.
                 let machine_id = Uuid::try_parse(dirname).ok();
                 (machine_id, None)
             }
@@ -499,8 +498,8 @@ impl PartialOrd for File {
 /// the module docs).
 ///
 /// Walks with `walkdir` and does not descend into symlinked directories;
-/// entries whose path parses as a journal file (`File::from_path`) are
-/// collected, everything else is skipped silently. Results come back in
+/// file entries whose path parses as a journal file (`File::from_path`)
+/// are collected, everything else is skipped silently. Results come back in
 /// walk order, unsorted — chains sort on insert
 /// ([`crate::repository::Chain::insert_file`]). The walk is the only error
 /// source: any

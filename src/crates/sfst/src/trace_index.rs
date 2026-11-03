@@ -1,7 +1,7 @@
 //! The `trace_id` index (`TIDX` chunk): O(log) trace-by-id lookup over the
 //! time-ordered `TRCE` column.
 //!
-//! Logs never needed it; traces do — a span carries a near-unique 16-byte
+//! Traces need it; logs never did — a span carries its trace's 16-byte
 //! `trace_id` and the core tracing query is "give me every span of this trace".
 //! The `TRCE` per-row column stays **chronological** (position-aligned to `TIMS`
 //! and every other column); this index adds the *sorted order* in a small
@@ -13,9 +13,8 @@
 //!   chronological (structural, not reliant on sort stability — see `build`).
 //!   Only rows with a set (non-zero) id are indexed; the all-zero W3C "unset"
 //!   sentinel forms no trace and is skipped.
-//! - `fanout[256]` — cumulative count of indexed positions whose `trace_id`
-//!   first byte is `<= b` (git-packfile fanout). Narrows a lookup to the
-//!   first-byte bucket before the binary search.
+//! - `fanout[256]` — first-byte fanout (`Fanout`): narrows a lookup to the
+//!   positions sharing the id's first byte before the binary search.
 //!
 //! All spans of one trace are a **contiguous run** in `sort_perm`, so the
 //! "posting list" for a trace is that slice — the permutation IS the index, with
@@ -24,9 +23,9 @@
 //!
 //! # Lifecycle
 //!
-//! Built at seal from the just-written chronological `TRCE` column (`build.rs`;
-//! traces only — the logs path leaves the TIDX flag unset). Written as the
-//! bincode `TIDX` chunk (zstd-packed, cold region, `writer.rs`). On read,
+//! Built at seal from the just-written chronological `TRCE` column (`build.rs`)
+//! and written as the bincode `TIDX` chunk (zstd-packed, cold region,
+//! `writer.rs`). On read,
 //! `reader.rs` decodes and [`validate`](TraceIdIndex::validate)s it;
 //! `index_reader.rs` re-exposes it and `session.rs` resolves each bloom
 //! "maybe" with [`positions`](TraceIdIndex::positions) — the exact-lookup path
@@ -116,7 +115,7 @@ impl<'de> Deserialize<'de> for Fanout {
 /// `TRCE` column the index was built from (positions are indices into it).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TraceIdIndex {
-    /// First-byte fanout over the indexed ids (see [`Fanout`]).
+    /// First-byte fanout over the indexed ids (see `Fanout`).
     fanout: Fanout,
     /// Row positions sorted ascending by 16-byte `trace_id`. Length is the
     /// number of indexed (set-id) rows, `<= record_count`.
@@ -373,8 +372,8 @@ mod tests {
         assert!(idx.validate(t.len()).is_ok());
     }
 
-    /// Round-trip a `Vec<u32>` through the chunk codec and decode it as a
-    /// `Fanout` — the path a malformed on-disk fanout would take.
+    /// Encode a `Vec<u32>` as raw bincode and decode it as a `Fanout` — the
+    /// bincode parse layer a malformed on-disk fanout reaches after unpacking.
     fn decode_fanout(raw: &[u32]) -> Result<Fanout, bincode::error::DecodeError> {
         let bytes = bincode::serde::encode_to_vec(raw, bincode::config::standard()).unwrap();
         bincode::serde::decode_from_slice(&bytes, bincode::config::standard()).map(|(f, _)| f)
@@ -458,7 +457,7 @@ mod tests {
             state = state
                 .wrapping_mul(6364136223846793005)
                 .wrapping_add(1442695040888963407);
-            // Only ~12 distinct first bytes so traces share buckets and repeat.
+            // Only 12 distinct first bytes so traces share buckets and repeat.
             let mut a = [0u8; 16];
             a[0] = (state >> 56) as u8 % 12 + 1;
             a[1] = (state >> 48) as u8 % 5;

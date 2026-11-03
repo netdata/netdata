@@ -668,6 +668,10 @@ func c4dFindFineSeam(t *testing.T, dd *daemon.Daemon, lastT int64) (c4dFineSeam,
 		candidateBoundary := retention[1].FirstEntry
 		candidateCoarseEnd := c4AlignUp(
 			candidateBoundary, c4dConditionEpoch, c4dTier2Granularity)
+		if candidateBoundary == candidateCoarseEnd {
+			// FirstEntry is an interval end; its oldest fine record is still retained.
+			candidateBoundary -= c4dTier1Grouping
+		}
 		fineSuffix := candidateCoarseEnd - candidateBoundary
 		if fineSuffix < c4dTier1Grouping || fineSuffix >= c4dTier2Granularity {
 			continue

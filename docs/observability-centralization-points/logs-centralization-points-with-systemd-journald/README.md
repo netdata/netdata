@@ -12,7 +12,7 @@ Each platform centralizes logs with its own native mechanism, and Netdata works 
 |:----------|:---------|:-------------------------------|
 | `systemd-journal-remote` / `systemd-journal-upload` | Linux | Native journal files per sender, explorable under the `systemd-journal` source |
 | Windows Event Forwarding (WEF) | Windows | Native event channels with events from all forwarders, explorable under the `windows-events` source |
-| [OpenTelemetry](/docs/logs/centralizing-logs-with-opentelemetry.md) (OTLP/gRPC) | Any | Netdata's indexed log store with its own retention and optional `fs`/`s3` archiving, explorable under the `otel-logs` source |
+| [OpenTelemetry](/docs/logs/centralizing-logs-with-opentelemetry.md) (OTLP over gRPC or HTTP) | Any | Netdata's indexed log store with its own retention and optional `fs`/`s3` archiving, explorable under the `otel-logs` source |
 
 Because the first two transports keep logs in the OS-native format, the aggregated data remains readable by the platform's own tools (`journalctl`, Event Viewer) and by SIEM agents on the aggregation point.
 

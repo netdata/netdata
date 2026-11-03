@@ -109,9 +109,13 @@ func main() {
 	a.Infof("directories → config: %s | collectors: %s | sd: %s | varlib: %s",
 		a.ConfigDir, a.CollectorsConfDir, a.ServiceDiscoveryConfigDir, a.VarLibDir)
 
-	if err := agenthost.Run(a); err != nil {
-		a.Errorf("plugin exiting after Agent failure: %v", err)
+	result := agenthost.Run(a)
+	if result.Err != nil {
+		a.Errorf("plugin exiting after Agent failure: %v", result.Err)
 		os.Exit(1)
+	}
+	if result.ExitRequired {
+		os.Exit(0)
 	}
 }
 

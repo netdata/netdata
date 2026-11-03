@@ -149,28 +149,33 @@ func TestProfileLifetimes(t *testing.T) {
 	}{
 		// Omitted lifetimes become finite; metrix retention (10+10) dominates the horizon.
 		"omitted": {testProfiles["app"], []charttpl.Lifecycle{
-			{ExpireAfterCycles: 5, Dimensions: &charttpl.DimensionLifecycle{
+			{ExpireAfterCycles: new(5), Dimensions: &charttpl.DimensionLifecycle{
 				ExpireAfterCycles: 5,
 			}},
-			{ExpireAfterCycles: 5, Dimensions: &charttpl.DimensionLifecycle{
+			{ExpireAfterCycles: new(5), Dimensions: &charttpl.DimensionLifecycle{
 				ExpireAfterCycles: 5,
 			}},
 		}, 20},
 		// Authored positive values are preserved and extend metadata authority.
 		"authored": {authored, []charttpl.Lifecycle{
-			{ExpireAfterCycles: 30, Dimensions: &charttpl.DimensionLifecycle{
+			{ExpireAfterCycles: new(30), Dimensions: &charttpl.DimensionLifecycle{
 				ExpireAfterCycles: 12,
 			}},
-			{ExpireAfterCycles: 5, Dimensions: &charttpl.DimensionLifecycle{
+			{ExpireAfterCycles: new(5), Dimensions: &charttpl.DimensionLifecycle{
 				ExpireAfterCycles: 5,
 			}},
 		}, 31},
-		// Chart expiry zero inherits the native default; it is not a disabled sentinel.
+		// StatsD keeps finite chart retention even for an explicit zero.
+		"explicit zero keeps finite expiry": {appWithLifecycle(`
+        expire_after_cycles: 0`), []charttpl.Lifecycle{
+			{ExpireAfterCycles: new(5), Dimensions: &charttpl.DimensionLifecycle{ExpireAfterCycles: 5}},
+			{ExpireAfterCycles: new(5), Dimensions: &charttpl.DimensionLifecycle{ExpireAfterCycles: 5}},
+		}, 20},
 		"inherited chart expiry": {inherited, []charttpl.Lifecycle{
-			{ExpireAfterCycles: 5, Dimensions: &charttpl.DimensionLifecycle{
+			{ExpireAfterCycles: new(5), Dimensions: &charttpl.DimensionLifecycle{
 				ExpireAfterCycles: 7,
 			}},
-			{ExpireAfterCycles: 5, Dimensions: &charttpl.DimensionLifecycle{
+			{ExpireAfterCycles: new(5), Dimensions: &charttpl.DimensionLifecycle{
 				ExpireAfterCycles: 5,
 			}},
 		}, 20},

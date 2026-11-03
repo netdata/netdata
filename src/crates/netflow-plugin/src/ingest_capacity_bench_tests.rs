@@ -304,9 +304,9 @@ struct CapacityPeakSearchReport {
     lowest_capacity_failure_records_per_sec: Option<u64>,
 }
 
-/// A complete strict-lossless peak measurement for one protocol, packet shape,
-/// and cardinality profile. This is intentionally a test-only engineering
-/// report, not an operator-facing capacity claim.
+/// Full record of one strict-lossless peak search for one protocol, packet
+/// shape, and cardinality profile. This is intentionally a test-only
+/// engineering report, not an operator-facing capacity claim.
 #[derive(Debug, Serialize)]
 struct CapacityPeakCaseReport {
     protocol: WireProtocol,

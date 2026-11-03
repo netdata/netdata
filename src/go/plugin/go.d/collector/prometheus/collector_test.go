@@ -59,8 +59,8 @@ func TestDefaultConfigMatchesNewAndReturnsIndependentValues(t *testing.T) {
 
 	first.Profiles.Mode = "none"
 	assert.Equal(t, "auto", second.Profiles.Mode)
-	assert.Equal(t, 2000, second.MaxTS)
-	assert.Equal(t, 200, second.MaxTSPerMetric)
+	assert.Equal(t, 10000, second.MaxInputSeries)
+	assert.Equal(t, 1000, second.MaxOutputSeriesPerContext)
 }
 
 func TestCollector_Init(t *testing.T) {
@@ -308,24 +308,7 @@ test_counter_no_meta_metric_1_total{label1="value2"} 11
 					}))
 				collr = New()
 				collr.URL = srv.URL
-				collr.MaxTS = 1
-
-				return collr, srv.Close
-			},
-		},
-		"fail if the num time series in the metric exceeds the limit": {
-			wantFail: true,
-			prepare: func() (collr *Collector, cleanup func()) {
-				srv := httptest.NewServer(http.HandlerFunc(
-					func(w http.ResponseWriter, r *http.Request) {
-						_, _ = w.Write([]byte(`
-test_counter_no_meta_metric_1_total{label1="value1"} 11
-test_counter_no_meta_metric_1_total{label1="value2"} 11
-`))
-					}))
-				collr = New()
-				collr.URL = srv.URL
-				collr.MaxTSPerMetric = 1
+				collr.MaxInputSeries = 1
 
 				return collr, srv.Close
 			},
@@ -548,26 +531,6 @@ test_pg_info 7
 				_, ok := fr.Value("test_metric_info", metrix.Labels{"version": "1.2.3"})
 				assert.False(t, ok, "a gauge _info family must be skipped")
 				assert.InDelta(t, 7, value(t, fr, "test_pg_info", nil), 1e-9)
-			},
-		},
-		"per-metric series limit skips the family": {
-			prepare: func() *Collector {
-				c := New()
-				c.MaxTSPerMetric = 1
-				return c
-			},
-			input: `
-# TYPE test_gauge_metric gauge
-test_gauge_metric{label1="value1"} 11
-test_gauge_metric{label1="value2"} 12
-`,
-			checkInput: `
-# TYPE test_gauge_metric gauge
-test_gauge_metric{label1="value1"} 11
-`,
-			want: func(t *testing.T, fr metrix.Reader) {
-				_, ok := fr.Value("test_gauge_metric", metrix.Labels{"label1": "value1"})
-				assert.False(t, ok, "a family over the per-metric series limit must be skipped entirely")
 			},
 		},
 		"relabel applies before assembly (drop + rename via __name__)": {
@@ -1959,37 +1922,13 @@ func TestCollector_CephS3CheckManifestMatchesCollectorArtifacts(t *testing.T) {
 	}
 	require.NotEmpty(t, expected)
 
-	var metadata struct {
-		Modules []struct {
-			Alerts []struct {
-				Name   string `yaml:"name"`
-				Metric string `yaml:"metric"`
-				Info   string `yaml:"info"`
-			} `yaml:"alerts"`
-		} `yaml:"modules"`
-	}
-	content, err := os.ReadFile(filepath.Join("..", "s3check", "metadata.yaml"))
-	require.NoError(t, err)
-	require.NoError(t, yaml.Unmarshal(content, &metadata))
-	require.Len(t, metadata.Modules, 1)
-
-	metadataMetrics := make(map[string]string)
-	info := make(map[string]string)
-	for _, alert := range metadata.Modules[0].Alerts {
-		metadataMetrics[alert.Name] = alert.Metric
-		info[alert.Name] = alert.Info
-	}
-	require.Len(t, metadataMetrics, len(expected))
-
 	templates := healthAlertTemplatesFromFile(t, filepath.Join("..", "..", "..", "..", "..",
 		"health", "health.d", "s3check.conf"))
 	for name, extension := range expected {
-		require.Equalf(t, extension.Context, metadataMetrics[name], "%s metadata context", name)
 		require.Equalf(t, extension.Context, templates[name]["on"], "%s health context", name)
 		require.Equalf(t, extension.Calc, templates[name]["calc"], "%s calculation", name)
 		require.Equalf(t, extension.Units, templates[name]["units"], "%s units", name)
 		require.Equalf(t, extension.Recipient, templates[name]["to"], "%s recipient", name)
-		require.Equalf(t, info[name], templates[name]["info"], "%s metadata info", name)
 	}
 }
 
@@ -2306,62 +2245,6 @@ func TestCollector_CephNVMeoFAlertsAreOwnedByLocalExporter(t *testing.T) {
 	}
 }
 
-func TestCollector_CephMetadataAlertsMatchMGRAlertTemplates(t *testing.T) {
-	manifest := loadCephAlertManifest(t)
-	var metadata struct {
-		Modules []struct {
-			Meta struct {
-				ID string `yaml:"id"`
-			} `yaml:"meta"`
-			Alerts []struct {
-				Name   string `yaml:"name"`
-				Metric string `yaml:"metric"`
-				Info   string `yaml:"info"`
-			} `yaml:"alerts"`
-		} `yaml:"modules"`
-	}
-	content, err := os.ReadFile("metadata.yaml")
-	require.NoError(t, err)
-	require.NoError(t, yaml.Unmarshal(content, &metadata))
-
-	actual := make(map[string]string)
-	for _, module := range metadata.Modules {
-		if module.Meta.ID != "collector-go.d.plugin-prometheus-ceph" {
-			continue
-		}
-		for _, alert := range module.Alerts {
-			actual[alert.Name] = alert.Metric
-		}
-		break
-	}
-	expected := make(map[string]string)
-	publicMapping := func(disposition string) bool {
-		return disposition != "reuse" && disposition != "reject" &&
-			disposition != "internal-helper" && disposition != "subsumed-helper"
-	}
-	for name, mapping := range manifest.Alerts {
-		if publicMapping(mapping.Netdata.Disposition) {
-			expected[name] = mapping.Netdata.Context
-		}
-	}
-	for name, extension := range manifest.NetdataExtensions {
-		if extension.Owner == "s3check" {
-			continue
-		}
-		if extension.Context != "" && extension.Condition != "" {
-			expected[name] = extension.Context
-		}
-	}
-	assert.Equal(t, expected, actual)
-	health, err := os.ReadFile("../../../../../health/health.d/ceph.conf")
-	require.NoError(t, err)
-	// ceph.conf also carries the go.d ceph collector's own alerts.
-	collecttest.AssertMetadataAlertsMatchHealthConfigWith(t, content, health, collecttest.MetadataAlertsCheck{
-		ModuleID:           "collector-go.d.plugin-prometheus-ceph",
-		SharedHealthConfig: true,
-	})
-}
-
 type cephAlertManifest struct {
 	NetdataAlertCadence string                            `yaml:"netdata_alert_cadence"`
 	Sources             map[string]cephAlertSource        `yaml:"sources"`
@@ -2457,8 +2340,10 @@ func collectCephPlan(t *testing.T, body []byte) cephCollectorPlan {
 
 	collr := New()
 	collr.URL = srv.URL
-	collr.Profiles = ProfilesConfig{Mode: "auto"}
-	collr.MaxTS = 20_000
+	collr.Profiles = ProfilesConfig{
+		Mode: "auto",
+	}
+	collr.MaxInputSeries = 20_000
 	require.NoError(t, collr.Init(context.Background()))
 	require.NoError(t, collr.Check(context.Background()))
 	t.Cleanup(func() { collr.Cleanup(context.Background()) })

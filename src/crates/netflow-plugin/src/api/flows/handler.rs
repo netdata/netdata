@@ -288,23 +288,49 @@ impl FunctionHandler for NetflowFlowsHandler {
     }
 
     fn declaration(&self) -> FunctionDeclaration {
-        let mut func_decl = FunctionDeclaration::new(
-            FLOWS_FUNCTION_NAME,
-            "NetFlow/IPFIX/sFlow flow analysis data",
-        );
-        func_decl.global = true;
-        func_decl.tags = Some("flows".to_string());
-        func_decl.access =
-            Some(HttpAccess::SIGNED_ID | HttpAccess::SAME_SPACE | HttpAccess::SENSITIVE_DATA);
-        func_decl.timeout = 30;
-        func_decl.version = Some(FLOWS_FUNCTION_VERSION);
-        func_decl
+        flows_function_declaration()
     }
+}
+
+/// Network Flows is a commercial feature: callers need a signed-in user of the
+/// Agent's space on a paid plan, plus SENSITIVE_DATA since flows expose traffic
+/// endpoints.
+fn flows_function_declaration() -> FunctionDeclaration {
+    let mut func_decl = FunctionDeclaration::new(
+        FLOWS_FUNCTION_NAME,
+        "NetFlow/IPFIX/sFlow flow analysis data",
+    );
+    func_decl.global = true;
+    func_decl.tags = Some("flows".to_string());
+    func_decl.access = Some(
+        HttpAccess::SIGNED_ID
+            | HttpAccess::SAME_SPACE
+            | HttpAccess::COMMERCIAL_SPACE
+            | HttpAccess::SENSITIVE_DATA,
+    );
+    func_decl.timeout = 30;
+    func_decl.version = Some(FLOWS_FUNCTION_VERSION);
+    func_decl
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn declaration_requires_commercial_space() {
+        let decl = flows_function_declaration();
+        assert_eq!(decl.name, "flows:netflow");
+        assert_eq!(
+            decl.access,
+            Some(
+                HttpAccess::SIGNED_ID
+                    | HttpAccess::SAME_SPACE
+                    | HttpAccess::COMMERCIAL_SPACE
+                    | HttpAccess::SENSITIVE_DATA
+            )
+        );
+    }
 
     fn test_call(args: &[&str], payload: Option<&str>) -> FunctionCall {
         FunctionCall {

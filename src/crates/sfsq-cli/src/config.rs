@@ -1,10 +1,6 @@
 //! Resolve the WAL and SFST directories from `otel.yaml` config files and/or
 //! explicit flags.
 //!
-//! Resolution is per-dir, explicit flag first, then user config, then stock
-//! config (mirroring the agent's own stock→user override order). An
-//! unresolved dir is a hard error.
-//!
 //! The agent's `otel.yaml` no longer configures per-signal dirs: it sets one
 //! `base_dir` and the plugin derives `{base_dir}/{signal}/{wal,index,catalog}`
 //! (see `PluginConfig::lifecycle_for`). This module serves only the logs query
@@ -18,8 +14,8 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use serde::Deserialize;
 
-/// Minimal view of `otel.yaml`: only the base dir we need. Unknown fields are
-/// ignored; a missing `base_dir` deserializes to `None`.
+/// Minimal view of `otel.yaml`: unknown fields are ignored, and a missing
+/// `base_dir` deserializes to `None`.
 #[derive(Debug, Default, Deserialize)]
 struct OtelYaml {
     base_dir: Option<PathBuf>,
@@ -42,8 +38,8 @@ fn load(path: &Path) -> Result<OtelYaml> {
     serde_yaml::from_str(&contents).with_context(|| format!("parsing config {}", path.display()))
 }
 
-/// The resolved base directories. Per-tenant subdirs (`{dir}/{tenant}`) are
-/// applied downstream during discovery.
+/// The resolved WAL and SFST directories, before the per-tenant subdirectory
+/// (`{dir}/{tenant}`) is appended during discovery.
 #[derive(Debug, Clone)]
 pub struct Dirs {
     pub wal: PathBuf,
@@ -59,8 +55,9 @@ pub struct DirInputs<'a> {
     pub sfst_dir: Option<&'a Path>,
 }
 
-/// Resolve the WAL and SFST dirs. Explicit flag wins, then user `--config`, then
-/// `--stock-config`. An unresolved dir is an error naming the ways to set it.
+/// Resolve the WAL and SFST dirs, each independently: explicit flag wins, then
+/// user `--config`, then `--stock-config`. An unresolved dir is an error
+/// naming the ways to set it.
 pub fn resolve_dirs(inputs: &DirInputs) -> Result<Dirs> {
     let user = inputs.config.map(load).transpose()?;
     let stock = inputs.stock_config.map(load).transpose()?;
@@ -86,7 +83,6 @@ pub fn resolve_dirs(inputs: &DirInputs) -> Result<Dirs> {
     Ok(Dirs { wal, sfst })
 }
 
-/// Per-dir precedence: explicit flag, then user config value, then stock value.
 fn pick(flag: Option<&Path>, user: Option<PathBuf>, stock: Option<PathBuf>) -> Option<PathBuf> {
     flag.map(Path::to_path_buf).or(user).or(stock)
 }

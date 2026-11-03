@@ -118,6 +118,7 @@ impl FacetStore {
                 }
                 Self::IpAddr(store)
             }
+            // Persisted payload for a different value kind: start empty.
             (kind, _) => Self::new(kind),
         }
     }
@@ -349,6 +350,10 @@ impl FacetStore {
     }
 }
 
+/// Bit set over values in `0..N`. `bits` stays empty until the first
+/// in-range insert resizes it to N bits (out-of-range inserts return
+/// before resizing), so a set that never receives a value allocates
+/// nothing; `contains` bounds-checks for that unallocated case.
 #[derive(Debug, Clone)]
 pub(super) struct DenseBitSet<const N: usize> {
     bits: BitVec<usize, Lsb0>,
@@ -578,6 +583,8 @@ impl TextValueStore {
     }
 }
 
+/// Fixed-size address value: `family` is 4 or 6; for IPv4 the first four
+/// bytes of `bytes` hold the octets in network order, zero-padded.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, allocative::Allocative)]
 pub(super) struct PackedIpAddr {
     family: u8,
@@ -719,6 +726,8 @@ impl IpValueStore {
     }
 
     fn mark_matching_networks(&self, networks: &[IpNet], matched: &mut [bool]) {
+        // A V4 network matches when a stored address falls in [start, end]:
+        // rank(end) > rank(start - 1) means at least one value is inside.
         for (index, network) in networks.iter().enumerate() {
             if matched[index] {
                 continue;

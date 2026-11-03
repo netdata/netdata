@@ -166,7 +166,7 @@ const _: () = assert!(
         && (CatalogStage::RotatedLocal as u8) < (CatalogStage::Remote as u8)
 );
 
-/// Per-seq lifecycle state, held in one map keyed by SFST `seq`. Two independent
+/// Per-seq lifecycle state, held in one map keyed by [`SeqKey`]. Two independent
 /// axes (upload of the SFST bytes; catalog-entry progression) in one record, so
 /// `evict_seq` is a single removal and a future axis is a new field — no parallel
 /// container to keep in sync.
@@ -707,14 +707,14 @@ impl Registry {
 #[derive(Debug, Default)]
 pub struct LocalStreams {
     by_part: HashMap<u64, PartitionStat>,
-    /// Identities+seqs folded from a local file (every in-window SFST and WAL,
-    /// even an unsynced one), so a catalog entry for one of them — that same
-    /// file's remote copy — is never counted twice.
+    /// Identities+seqs folded from a local file (every in-window SFST and WAL
+    /// candidate, with no durable-prefix check), so a catalog entry for one of
+    /// them — that same file's remote copy — is never counted twice.
     folded: HashSet<SeqKey>,
 }
 
 impl LocalStreams {
-    /// Complete the selector with the remote-only partitions of `catalog` (the
+    /// Complete the selector with the remote-only streams of `catalog` (the
     /// window's catalog entries, read off the lock): entries whose identity+seq
     /// was not folded locally, one per identity+seq. Sorted by the opaque
     /// `part_key`; the signal's query layer decodes `content_meta` and re-sorts

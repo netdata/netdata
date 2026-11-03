@@ -22,6 +22,7 @@ func TestGroupClone(t *testing.T) {
 	require.NotSame(t, orig.ChartDefaults.Instances, clone.ChartDefaults.Instances)
 	require.NotSame(t, orig.Charts[0].Instances, clone.Charts[0].Instances)
 	require.NotSame(t, orig.Charts[0].Lifecycle, clone.Charts[0].Lifecycle)
+	require.NotSame(t, orig.Charts[0].Lifecycle.ExpireAfterCycles, clone.Charts[0].Lifecycle.ExpireAfterCycles)
 	require.NotSame(t, orig.Charts[0].Lifecycle.Dimensions, clone.Charts[0].Lifecycle.Dimensions)
 	require.NotSame(t, orig.Charts[0].Dimensions[0].Options, clone.Charts[0].Dimensions[0].Options)
 	require.NotSame(t, orig.Groups[0].Charts[0].Dimensions[0].Options, clone.Groups[0].Charts[0].Dimensions[0].Options)
@@ -38,6 +39,7 @@ func TestGroupClone(t *testing.T) {
 	clone.Charts[0].Instances.ByLabels[0] = "mutated"
 	clone.Charts[0].Instances.OptionalByLabels[0] = "mutated"
 	clone.Charts[0].Lifecycle.MaxInstances = 999
+	*clone.Charts[0].Lifecycle.ExpireAfterCycles = 999
 	clone.Charts[0].Lifecycle.Dimensions.MaxDims = 999
 	clone.Charts[0].Dimensions[0].Name = "MUTATED"
 	clone.Charts[0].Dimensions[0].Options.Multiplier = 999
@@ -86,7 +88,7 @@ func richGroup() Group {
 				},
 				Lifecycle: &Lifecycle{
 					MaxInstances:      10,
-					ExpireAfterCycles: 5,
+					ExpireAfterCycles: new(5),
 					Dimensions: &DimensionLifecycle{
 						MaxDims:           100,
 						ExpireAfterCycles: 3,

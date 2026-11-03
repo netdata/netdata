@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -46,12 +47,8 @@ func testMetrics() []MetadataMetric {
 
 func testHealthAlerts() []HealthAlert {
 	return []HealthAlert{
-		{Name: "app_requests_failed", On: "app.requests", Info: "failed requests", Units: "requests/s", Lookup: "max -1m unaligned of failed"},
+		{Name: "app_requests_failed", On: "app.requests", Units: "requests/s", Lookup: "max -1m unaligned of failed"},
 	}
-}
-
-func testMetadataAlerts() []MetadataAlert {
-	return []MetadataAlert{{Name: "app_requests_failed", Metric: "app.requests", Info: "failed requests"}}
 }
 
 func TestChartTemplateCharts(t *testing.T) {
@@ -89,15 +86,72 @@ groups:
 	require.ErrorContains(t, err, `duplicate chart context "app.requests"`)
 }
 
+func TestV1ChartsByContext(t *testing.T) {
+	requests := &collectorapi.Chart{
+		ID:    "requests_%s",
+		Title: "Requests",
+		Units: "requests/s",
+		Ctx:   "app.requests",
+		Dims:  collectorapi.Dims{{ID: "app_%s_ok", Name: "ok"}, {ID: "failed"}},
+	}
+	latency := &collectorapi.Chart{
+		ID:    "latency_%s",
+		Title: "Latency",
+		Units: "ms",
+		Ctx:   "app.latency",
+		Type:  collectorapi.Stacked,
+	}
+	tests := map[string]struct {
+		charts  collectorapi.Charts
+		want    map[string]charttpl.Chart
+		wantErr string
+	}{
+		"renders as the V1 renderer": {
+			charts: collectorapi.Charts{requests, latency},
+			want: map[string]charttpl.Chart{
+				"app.requests": {
+					Context:    "app.requests",
+					Title:      "Requests",
+					Units:      "requests/s",
+					Type:       "line",
+					Dimensions: []charttpl.Dimension{{Name: "ok"}, {Name: "failed"}},
+				},
+				"app.latency": {
+					Context:    "app.latency",
+					Title:      "Latency",
+					Units:      "ms",
+					Type:       "stacked",
+					Dimensions: []charttpl.Dimension{{NameFromLabel: "runtime"}},
+				},
+			},
+		},
+		"chart ID used twice": {
+			charts:  collectorapi.Charts{requests, &collectorapi.Chart{ID: requests.ID, Ctx: "app.other"}},
+			wantErr: `chart ID "requests_%s" is used twice`,
+		},
+		"context used twice": {
+			charts:  collectorapi.Charts{requests, &collectorapi.Chart{ID: "other", Ctx: requests.Ctx}},
+			wantErr: `context "app.requests" is used by two charts`,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, err := V1ChartsByContext(test.charts)
+			if test.wantErr != "" {
+				require.EqualError(t, err, test.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, test.want, got)
+		})
+	}
+}
+
 func TestDecodeMetadataModule(t *testing.T) {
 	const single = `
 modules:
   - meta:
       id: collector-app
-    alerts:
-      - name: app_requests_failed
-        metric: app.requests
-        info: "failed requests"
     metrics:
       scopes:
         - name: global
@@ -113,14 +167,14 @@ modules:
 	const other = `
   - meta:
       id: collector-other
-    alerts:
-      - name: other_alert
-        metric: other.chart
-        info: other
+    metrics:
+      scopes:
+        - name: global
+          metrics:
+            - name: other.chart
 `
 	app := MetadataModule{
-		ID:     "collector-app",
-		Alerts: []MetadataAlert{{Name: "app_requests_failed", Metric: "app.requests", Info: "failed requests"}},
+		ID: "collector-app",
 		Metrics: []MetadataMetric{
 			{Scope: "global", Name: "app.requests", Description: "Requests", Unit: "requests/s", ChartType: "line", Dimensions: []string{"ok", "failed"}},
 		},
@@ -134,7 +188,7 @@ modules:
 		"single module":            {metadata: single, want: app},
 		"single module by id":      {metadata: single, moduleID: "collector-app", want: app},
 		"selected among several":   {metadata: single + other, moduleID: "collector-app", want: app},
-		"other selected":           {metadata: single + other, moduleID: "collector-other", want: MetadataModule{ID: "collector-other", Alerts: []MetadataAlert{{Name: "other_alert", Metric: "other.chart", Info: "other"}}}},
+		"other selected":           {metadata: single + other, moduleID: "collector-other", want: MetadataModule{ID: "collector-other", Metrics: []MetadataMetric{{Scope: "global", Name: "other.chart"}}}},
 		"several without selector": {metadata: single + other, wantErr: "expected exactly one module, got 2"},
 		"unknown id":               {metadata: single + other, moduleID: "ghost", wantErr: `no module with meta.id "ghost"`},
 		"duplicate id":             {metadata: single + other + other, moduleID: "collector-other", wantErr: `several modules with meta.id "collector-other"`},
@@ -168,11 +222,13 @@ func TestParseHealthAlerts(t *testing.T) {
        on: app.latency
      calc: $p99
     units: seconds
+     crit: $this > \
+           $p50 * 10
      info: slow requests
 `
 	assert.Equal(t, []HealthAlert{
-		{Name: "app_requests_failed", On: "app.requests", Info: "failed requests", Units: "requests/s", Lookup: "max -1m unaligned of failed"},
-		{Name: "app_latency_high", On: "app.latency", Info: "slow requests", Units: "seconds"},
+		{Name: "app_requests_failed", On: "app.requests", Units: "requests/s", Lookup: "max -1m unaligned of failed", Expressions: []string{"$this > 0"}},
+		{Name: "app_latency_high", On: "app.latency", Units: "seconds", Expressions: []string{"$p99", "$this >             $p50 * 10"}},
 	}, ParseHealthAlerts([]byte(health)))
 }
 
@@ -310,62 +366,6 @@ func TestCheckHealthAlertsTargetCharts(t *testing.T) {
 	}
 }
 
-func TestCheckMetadataAlertsMatchHealthAlerts(t *testing.T) {
-	other := HealthAlert{Name: "app_other", On: "app.latency", Info: "other"}
-	tests := map[string]struct {
-		documented []MetadataAlert
-		shipped    []HealthAlert
-		shared     bool
-		wantErr    string
-	}{
-		"aligned":            {documented: testMetadataAlerts(), shipped: testHealthAlerts()},
-		"undocumented alert": {documented: testMetadataAlerts(), shipped: append(testHealthAlerts(), other), wantErr: "app_other: in the health configuration but not documented"},
-		"shared health file": {documented: testMetadataAlerts(), shipped: append(testHealthAlerts(), other), shared: true},
-		"unknown alert": {
-			documented: []MetadataAlert{{Name: "app_requests_dropped", Metric: "app.requests", Info: "failed requests"}},
-			shipped:    testHealthAlerts(),
-			wantErr:    "app_requests_dropped: documented but not in the health configuration",
-		},
-		"documented twice": {
-			documented: append(testMetadataAlerts(), testMetadataAlerts()...),
-			shipped:    testHealthAlerts(),
-			wantErr:    "app_requests_failed: documented twice",
-		},
-		"metric drift": {
-			documented: []MetadataAlert{{Name: "app_requests_failed", Metric: "app.latency", Info: "failed requests"}},
-			shipped:    testHealthAlerts(),
-			wantErr:    `app_requests_failed: metric "app.latency", alert on "app.requests"`,
-		},
-		"info drift": {
-			documented: []MetadataAlert{{Name: "app_requests_failed", Metric: "app.requests", Info: "requests failing"}},
-			shipped:    testHealthAlerts(),
-			wantErr:    `app_requests_failed: info "requests failing", alert info "failed requests"`,
-		},
-		"identical variants": {documented: testMetadataAlerts(), shipped: append(testHealthAlerts(), testHealthAlerts()...)},
-		"conflicting variant": {
-			documented: testMetadataAlerts(),
-			shipped:    append(testHealthAlerts(), HealthAlert{Name: "app_requests_failed", On: "app.latency", Info: "failed requests"}),
-			wantErr:    `app_requests_failed: metric "app.requests", alert on "app.latency"`,
-		},
-		"shared file still checks documented alerts": {
-			documented: []MetadataAlert{{Name: "app_requests_failed", Metric: "app.requests", Info: "drifted"}},
-			shipped:    append(testHealthAlerts(), other),
-			shared:     true,
-			wantErr:    `app_requests_failed: info "drifted"`,
-		},
-	}
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			err := CheckMetadataAlertsMatchHealthAlerts(test.documented, test.shipped, test.shared)
-			if test.wantErr == "" {
-				require.NoError(t, err)
-				return
-			}
-			require.ErrorContains(t, err, test.wantErr)
-		})
-	}
-}
-
 func TestCheckHealthAlertsMatchMetadataMetrics(t *testing.T) {
 	alert := func(mutate func(*HealthAlert)) []HealthAlert {
 		alerts := testHealthAlerts()
@@ -397,6 +397,21 @@ func TestCheckHealthAlertsMatchMetadataMetrics(t *testing.T) {
 		"foreach without of":         {alerts: alert(func(a *HealthAlert) { a.Lookup = "average -5m anomaly-bit foreach *" })},
 		"lookup without dimensions":  {alerts: alert(func(a *HealthAlert) { a.Lookup = "min -5m unaligned" })},
 		"calc without lookup":        {alerts: alert(func(a *HealthAlert) { a.Lookup = "" })},
+		"expressions read documented dimensions": {
+			alerts: alert(func(a *HealthAlert) { a.Expressions = []string{"$failed * 100 / ($ok + ${failed})", "$this > 0"} }),
+		},
+		"expression reads an undocumented dimension": {
+			alerts:  alert(func(a *HealthAlert) { a.Expressions = []string{"$failed_requests_total"} }),
+			wantErr: `app_requests_failed: variable "failed_requests_total" is not a documented dimension of app.requests`,
+		},
+		"built-ins, alert values and qualified references": {
+			alerts: alert(func(a *HealthAlert) {
+				a.Expressions = []string{"$this > ($app_requests_failed + $status + $WARNING + $green + ${app.latency.p99} + $update_every)"}
+			}),
+		},
+		"raw and collection-time suffixes name the dimension": {
+			alerts: alert(func(a *HealthAlert) { a.Expressions = []string{"$failed_raw + $ok_last_collected_t - $now"} }),
+		},
 		"shared file with prefix": {
 			alerts: append(testHealthAlerts(), HealthAlert{Name: "other_alert", On: "other.chart", Units: "x"}),
 			opts:   HealthAlertsCheck{ContextPrefix: "app."},

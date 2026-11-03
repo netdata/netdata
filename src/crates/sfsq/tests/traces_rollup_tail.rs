@@ -1,8 +1,8 @@
 //! The tail/seal rollup parity contract — the test pin behind the
 //! "Parity contract (test-pinned)" note in `src/traces/rollup.rs`:
-//! folding a WAL tail's decoded spans ([`tail_trace_aggregates`])
-//! equals reading the `TRSU` rollup of sealing the SAME data
-//! ([`sealed_trace_aggregates`]) — value-for-value across envelopes,
+//! folding a WAL tail's decoded spans (`tail_trace_aggregates`) equals
+//! reading the `TRSU` rollup of sealing the SAME data
+//! (`sealed_trace_aggregates`) — value-for-value across envelopes,
 //! stored-row counts, and honest roots.
 //!
 //! Coverage: the wholesale parity plus the roots-free envelope view,
@@ -12,7 +12,7 @@
 //! reach them): the u32::MAX count clamp and the saturating envelope
 //! end. Fixtures come from `tests/common/mod.rs`; the sibling
 //! `tests/traces_*.rs` suites pin the surrounding query ops — for the
-//! aggregate modes these per-source aggregates merge in
+//! aggregate modes, these per-source aggregates merge in
 //! `src/traces/fold.rs`.
 
 mod common;
@@ -22,7 +22,8 @@ use sfsq::traces::{
     TraceWalScan, sealed_trace_aggregates, sealed_trace_envelopes, tail_trace_aggregates,
 };
 
-/// A corpus covering every rollup semantic (one trace per bullet):
+/// A corpus covering the rollup semantics the fixture can reach
+/// (one trace id per bullet):
 /// - trace A: a true root (unset parent, SERVER kind) + a child + a
 ///   RESENT copy of the child (stored-row counts) + an ERROR span;
 /// - trace B: NO unset-parent span (honest root absence);

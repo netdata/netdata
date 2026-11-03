@@ -2,46 +2,42 @@
 //!
 //! Journal objects are zerocopy views into the window manager's mmap windows
 //! (file/mmap.rs), which keeps a bounded set of windows (`max_windows`) and
-//! remaps or evicts them on demand, invalidating any view handed
-//! out earlier. `JournalFile` therefore allows at most one window-backed object
-//! view at a time via the in-use flag of its `GuardedCell`
-//! (file/guarded_cell.rs, wrapping the `window_manager` field), and this
-//! guard is the RAII piece that releases it:
-//! `GuardedCell::with_guarded` raises the flag and returns a
-//! `ValueGuard`, whose `Drop` clears the flag again. A
-//! conflicting access returns `Err(JournalError::ValueGuardInUse)`
-//! instead of racing or panicking.
+//! remaps or evicts them on demand, invalidating any view handed out earlier.
+//! `JournalFile` therefore allows at most one window-backed object view at a
+//! time via the in-use flag of its `GuardedCell` (file/guarded_cell.rs,
+//! wrapping the `window_manager` field), and this guard is the RAII piece that
+//! releases it: `GuardedCell::with_guarded` raises the flag and returns a
+//! `ValueGuard`, whose `Drop` clears the flag again. A conflicting access
+//! returns `Err(JournalError::ValueGuardInUse)` instead of racing or panicking.
 //!
 //! The flag is the entire protection; the guard adds no unsafe code. `Drop` runs
 //! during unwinding too, so a panic while a guard is live still frees the slot.
 //! Threading: `!Send` and `!Sync` for every `T` (the `&RefCell<bool>` field is
 //! neither), so a guard never leaves its creating thread.
 //!
-//! Consumers (grep-verified): built only by `GuardedCell::with_guarded`
-//! via `JournalFile::journal_object_ref` and
-//! `journal_object_mut` plus their `*_ref`/`*_mut`
-//! wrappers (file/file.rs); held across reader steps by
+//! Consumers (grep-verified): built only by `GuardedCell::with_guarded` via
+//! `JournalFile::journal_object_ref` and `journal_object_mut` plus their
+//! `*_ref`/`*_mut` wrappers (file/file.rs); held across reader steps by
 //! [`JournalReader`](crate::file::JournalReader) (file/reader.rs); mutated
-//! through by `JournalWriter::add_data` and `object_added`
-//! (file/writer.rs). Crate-internal: `mod value_guard;` is private
-//! (file/mod.rs) and
-//! lib.rs re-exports neither this type nor `GuardedCell`. Near-twin with different
+//! through by `JournalWriter::add_data` and `object_added` (file/writer.rs).
+//! Crate-internal: `mod value_guard;` is private (file/mod.rs) and lib.rs
+//! re-exports neither this type nor `GuardedCell`. Near-twin with different
 //! trait plumbing: src/crates/jf/journal_file/src/value_guard.rs.
 use std::cell::RefCell;
 use std::ops::{Deref, DerefMut};
 
 /// One live journal object plus the flag slot that keeps it exclusive.
 ///
-/// `value` is the object — a view into an mmap window — whose validity is covered
-/// by the raised in-use flag; `in_use_flag` is a shared reference to the
-/// `GuardedCell`'s flag (file/guarded_cell.rs), cleared by `Drop`; `offset` is
-/// caller metadata (the object offset, passed by `journal_object_ref`/
-/// `journal_object_mut`) kept for retrieval
-/// via `ValueGuard::offset()`.
+/// `value` is the object — a view into an mmap window — whose validity is
+/// covered by the raised in-use flag; `in_use_flag` is a shared reference to
+/// the `GuardedCell`'s flag (file/guarded_cell.rs), cleared by `Drop`;
+/// `offset` is caller metadata (the object offset, passed by
+/// `journal_object_ref`/`journal_object_mut`) kept for retrieval via
+/// `ValueGuard::offset()`.
 ///
-/// `Deref`/`DerefMut` and the trait impls below expose the wrapped value directly,
-/// so callers read and mutate through the guard — e.g. `data_guard.header.hash =
-/// hash` and `set_payload` in `JournalWriter::add_data`.
+/// `Deref`/`DerefMut` and the trait impls below expose the wrapped value
+/// directly, so callers read and mutate through the guard — e.g.
+/// `data_guard.header.hash = hash` and `set_payload` in `JournalWriter::add_data`.
 #[derive(Debug)]
 pub struct ValueGuard<'a, T> {
     offset: NonZeroU64,
@@ -93,16 +89,16 @@ impl<T> Drop for ValueGuard<'_, T> {
 }
 
 // Load-bearing import: `HashableObjectMut` is not among file/mod.rs's explicit
-// re-exports and `mod object;` is private, so it
-// resolves only through the crate-flat glob `pub(crate) use object::*`
-// (file/mod.rs). Removing the glob breaks this file's compilation.
+// re-exports and `mod object;` is private, so it resolves only through the
+// crate-flat glob `pub(crate) use object::*` (file/mod.rs). Removing the glob
+// breaks this file's compilation.
 use crate::file::{HashableObject, HashableObjectMut};
 use std::num::NonZeroU64;
 
-/// Forwards all methods to the wrapped object so bucket visitors match through the
-/// guard unchanged (the
-/// [`BucketVisitor::visit`](crate::file::file::BucketVisitor::visit)
-/// contract in `file/file.rs`).
+/// Forwards all methods to the wrapped object so bucket visitors match through
+/// the guard unchanged (the
+/// [`BucketVisitor::visit`](crate::file::file::BucketVisitor::visit) contract
+/// in `file/file.rs`).
 impl<T: HashableObject> HashableObject for ValueGuard<'_, T> {
     fn hash(&self) -> u64 {
         self.value.hash()

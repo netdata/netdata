@@ -1005,11 +1005,11 @@ static const char *page_identity(PGC *cache, PGC_PAGE *page, size_t partition) {
     static __thread char buf[PGC_PAGE_IDENTITY_MAX];
 
     snprintfz(buf, sizeof(buf),
-              "cache '%s', partition %zu (metric_id maps to %zu), section %p, metric_id %p, "
+              "cache '%s', partition %zu (metric_id maps to %zu), section %p, metric_id %lu, "
               "start_time %ld, end_time %ld, update_every %u, assumed_size %u, "
               "flags 0x%02x, refcount %d, page %p, data %p",
               cache->config.name, partition, pgc_indexing_partition(cache, page->metric_id),
-              (void *)page->section, (void *)page->metric_id,
+              (void *)page->section, (unsigned long)page->metric_id,
               (long)page->start_time_s,
               (long)__atomic_load_n(&page->end_time_s, __ATOMIC_RELAXED),
               (unsigned)page->update_every_s, (unsigned)page->assumed_size,
@@ -1119,19 +1119,37 @@ static void remove_this_page_from_index_unsafe(PGC *cache, PGC_PAGE *page, size_
                    "DBENGINE CACHE: attempted to remove this page from the wrong partition of the cache - %s",
                    page_identity(cache, page, partition));
 
+    // PJERR is (Pvoid_t)-1, so it is NOT NULL: without this check it passes the test below
+    // and is then dereferenced, turning index corruption into a SIGSEGV with no diagnostic.
+    // page_find_and_acquire_once() reports the same corruption cleanly.
     Pvoid_t *metrics_judy_pptr = JudyLGet(cache->index[partition].sections_judy, page->section, PJE0);
+    if(unlikely(metrics_judy_pptr == PJERR)) {
+        fatal("DBENGINE CACHE: corrupted sections judy array - %s",
+              page_identity(cache, page, partition));
+    }
+
     if(unlikely(!metrics_judy_pptr)) {
         fatal("DBENGINE CACHE: section should exist in the index, but it does not - %s",
               page_identity(cache, page, partition));
     }
 
     Pvoid_t *pages_judy_pptr = JudyLGet(*metrics_judy_pptr, page->metric_id, PJE0);
+    if(unlikely(pages_judy_pptr == PJERR)) {
+        fatal("DBENGINE CACHE: corrupted metrics judy array - %s",
+              page_identity(cache, page, partition));
+    }
+
     if(unlikely(!pages_judy_pptr)) {
         fatal("DBENGINE CACHE: metric should exist in its section, but it does not - %s",
               page_identity(cache, page, partition));
     }
 
     Pvoid_t *page_ptr = JudyLGet(*pages_judy_pptr, page->start_time_s, PJE0);
+    if(unlikely(page_ptr == PJERR)) {
+        fatal("DBENGINE CACHE: corrupted pages judy array - %s",
+              page_identity(cache, page, partition));
+    }
+
     if(unlikely(!page_ptr)) {
         fatal("DBENGINE CACHE: page should exist in its metric, but it does not - %s",
               page_identity(cache, page, partition));
@@ -1800,6 +1818,9 @@ static void all_hot_pages_to_dirty(PGC *cache, Word_t section) {
         if(section != PGC_SECTION_ALL && last_section != section)
             break;
 
+        if(unlikely(section_pages_pptr == PJERR))
+            fatal("DBENGINE CACHE: cache '%s': corrupted queue sections judy array", cache->config.name);
+
         struct section_pages *sp = *section_pages_pptr;
 
         PGC_PAGE *page = sp->base;
@@ -1861,6 +1882,9 @@ static bool flush_pages(PGC *cache, size_t max_flushes, Word_t section, bool wai
     while (have_dirty_lock && (section_pages_pptr = JudyLFirstThenNext(cache->dirty.sections_judy, &last_section, &first))) {
         if(section != PGC_SECTION_ALL && last_section != section)
             break;
+
+        if(unlikely(section_pages_pptr == PJERR))
+            fatal("DBENGINE CACHE: cache '%s': corrupted queue sections judy array", cache->config.name);
 
         struct section_pages *sp = *section_pages_pptr;
         if(!all_of_them && sp->entries < optimal_flush_size)
@@ -2662,6 +2686,9 @@ void pgc_open_cache_to_journal_v2(
     size_t master_extent_index_id = 0;
 
     Pvoid_t *section_pages_pptr = JudyLGet(cache->hot.sections_judy, section, PJE0);
+    if(unlikely(section_pages_pptr == PJERR))
+        fatal("DBENGINE CACHE: cache '%s': corrupted hot sections judy array", cache->config.name);
+
     if(!section_pages_pptr) {
         pgc_queue_unlock(cache, &cache->hot);
         return;
@@ -2699,19 +2726,14 @@ void pgc_open_cache_to_journal_v2(
             continue;
         }
 
-        // Resolve the metric by uuidmap id, NEVER by dereferencing
-        // page->metric_id.
+        // Resolve by uuidmap id, never by dereferencing anything the page carries.
         //
-        // page->metric_id is a bare METRIC pointer with no reference behind it
-        // (see pgc_open_add_hot_page()), so it can outlive the METRIC. It must
-        // not be dereferenced, not even to validate it: ARAL writes its
-        // free-list header over the first 16 bytes of a freed element, which on
-        // 64bit overlays metric->uuid and metric->refcount with the halves of
-        // the free-list 'next' pointer. mrg_metric_dup() would CAS that
-        // refcount, so merely attempting the acquire corrupts the free list --
-        // and when 'next' is NULL the refcount reads 0, a legal
-        // unreferenced-but-alive value, so the acquire SUCCEEDS and returns a
-        // pointer into the free list.
+        // page->metric_id is itself the metric's UUIDMAP_ID now (mrg_metric_id()), so it is
+        // no longer dereferenceable at all -- it used to be a bare METRIC pointer, which is
+        // why this path was written to use xio->uuid_id instead. Either value would do here;
+        // xio->uuid_id is kept because the journal wants one entry per UUID and this is the
+        // field the extent descriptor already carries. Neither is a reference: an id can go
+        // dead, which is why the acquire below is allowed to fail.
         //
         // mrg_metric_get_and_acquire_by_id() is an indexed lookup under the
         // partition read lock. It cannot touch freed memory, and a metric that
@@ -2751,12 +2773,15 @@ void pgc_open_cache_to_journal_v2(
         // only ever find one group, so two groups for the same uuid would make
         // one group's pages invisible.
         //
-        // page->metric_id cannot provide that guarantee. If a metric is deleted
-        // and recreated for the same uuid it gets a NEW pointer, so older pages
-        // can still carry the old one while newer pages carry the new one - two
-        // keys, one uuid. (Before metrics were resolved by id, such an old page
-        // failed to resolve and was skipped, which hid this; resolving by id
-        // makes both pages index successfully and exposes it.)
+        // Keying on xio->uuid_id rather than page->metric_id is now belt-and-braces
+        // rather than a necessity. It USED to matter: while page->metric_id was a bare
+        // METRIC pointer, a metric deleted and recreated for the same uuid got a NEW
+        // pointer, so older pages carried the old one and newer pages the new one - two
+        // keys, one uuid, and one group's pages invisible to the journal reader. Now
+        // page->metric_id IS the uuidmap id, so both incarnations share one key and the
+        // divergence cannot arise from any production caller. Keep resolving by
+        // xio->uuid_id: it is the field the extent descriptor carries, and it keeps this
+        // path independent of how PGC happens to key its index.
         Pvoid_t *PValue = JudyLIns(&JudyL_metrics, (Word_t)xio->uuid_id, PJE0);
         if(!PValue || PValue == PJERR)
             fatal("CACHE: JudyLIns(JudyL_metrics, uuid_id %" PRIu32 ") failed, JudyL_metrics = %p, result = %p",
@@ -3057,6 +3082,9 @@ size_t pgc_count_hot_pages_having_data_ptr(PGC *cache, Word_t section, void *ptr
 
     pgc_queue_lock(cache, &cache->hot, PGC_QUEUE_LOCK_PRIO_LOW);
     Pvoid_t *section_pages_pptr = JudyLGet(cache->hot.sections_judy, section, PJE0);
+    if(unlikely(section_pages_pptr == PJERR))
+        fatal("DBENGINE CACHE: cache '%s': corrupted hot sections judy array", cache->config.name);
+
     if(section_pages_pptr) {
         struct section_pages *sp = *section_pages_pptr;
         for(PGC_PAGE *page = sp->base; page ;page = page->link.next)

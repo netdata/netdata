@@ -1,19 +1,18 @@
 //! Hard dependency guard: the manifest of `file-lifecycle` — the
 //! content-agnostic file substrate (the `Cargo.toml` header comment says
-//! so), reused by both signals through `otel-ledger` — must never declare a
-//! log-content crate, so the traces signal never compiles the logs
-//! ones. Cargo already makes importing an undeclared crate impossible;
-//! this test backstops the declaration side: the whole manifest, read
-//! comment-free, must not mention a forbidden crate. A future edit that
-//! adds one of these fails here instead of silently re-coupling the
-//! substrate.
+//! so), reused by both signals through `otel-ledger` — must never declare
+//! a log-content crate, so a second signal (traces) can reuse the
+//! substrate without inheriting the logs content plane through it. Cargo
+//! already makes importing an undeclared crate impossible; this test
+//! backstops the declaration side: the whole manifest, read comment-free,
+//! must not mention a forbidden crate; a future edit that adds one fails
+//! here.
 
 /// The log-content crates: `sfsq` (the logs/traces query engines over
 /// SFST; see the `sfsq/src/lib.rs` crate docs) and `otel-logs-identity`
 /// (OTel logs content-plane identity; see the
-/// `otel-logs-identity/src/lib.rs` crate docs). The
-/// neutral crates `sfst` and `otel-catalog` stay allowed; they are not
-/// listed here.
+/// `otel-logs-identity/src/lib.rs` crate docs). The neutral crates
+/// `sfst` and `otel-catalog` stay allowed.
 const FORBIDDEN: &[&str] = &["sfsq", "otel-logs-identity"];
 
 #[test]

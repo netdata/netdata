@@ -109,7 +109,11 @@ fn bench(c: &mut Criterion) {
             || pristine.clone(),
             |mut reqs| {
                 for req in &mut reqs {
-                    black_box(ng_flatten::normalize_log_request(req, FALLBACK_BASE_NS, None));
+                    black_box(ng_flatten::normalize_log_request(
+                        req,
+                        FALLBACK_BASE_NS,
+                        None,
+                    ));
                 }
                 reqs
             },
@@ -183,7 +187,8 @@ fn bench(c: &mut Criterion) {
                 let mut out = Vec::with_capacity(reqs.len());
                 for req in reqs {
                     out.push(
-                        ng_flatten::prepare_log_frame(req, FALLBACK_BASE_NS, None).expect("prepare"),
+                        ng_flatten::prepare_log_frame(req, FALLBACK_BASE_NS, None)
+                            .expect("prepare"),
                     );
                 }
                 out

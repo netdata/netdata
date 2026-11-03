@@ -163,6 +163,9 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
     // find the host for this receiver
     {
         // this will also update the host with our system_info
+        // the host comes back pinned (see metadata_lifetime_lock): no remover can free it until we
+        // release it, which we do once we are attached to it or have given up on it - and before any
+        // socket send, so a slow child cannot hold off a removal
         RRDHOST *host = rrdhost_find_or_create(
             rpt->hostname,
             rpt->registry_hostname,
@@ -193,7 +196,7 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
         if(!host) {
             stream_receiver_log_status(
                 rpt,
-                "rejecting streaming connection; host creation is busy, retry later",
+                "rejecting streaming connection; host is being created or removed, retry later",
                 STREAM_HANDSHAKE_PARENT_BUSY_TRY_LATER, NDLP_NOTICE);
 
             stream_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_BUSY_TRY_LATER);
@@ -201,6 +204,8 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
         }
 
         if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))) {
+            rrdhost_pin_release(host);
+
             stream_receiver_log_status(
                 rpt,
                 "rejecting streaming connection; host is initializing, retry later",
@@ -222,6 +227,10 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
 //        }
 
         RRDHOST_SET_RECEIVER_RESULT result = rrdhost_set_receiver(host, rpt);
+
+        // attached, the host is online and every remover refuses it; refused, we no longer use it
+        rrdhost_pin_release(host);
+
         if (result == RRDHOST_SET_RECEIVER_CLEANUP_BUSY) {
             stream_receiver_log_status(
                 rpt,
@@ -622,7 +631,12 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
     }
 
     {
+        // under the rrd lock: a remover unlinks the host under rrd_wrlock() before freeing it
+        rrd_rdlock();
         RRDHOST *existing = rrdhost_find_by_guid(rpt->machine_guid);
+        bool is_local_vnode = existing && rrdhost_is_virtual(existing);
+        rrd_rdunlock();
+
         // RRDHOST_FLAG_VIRTUAL_HOST is only set by local collectors (pluginsd_host_define_end),
         // never by streaming. The stale detection in pluginsd_host() clears it when a vnode stops
         // being collected, so archived/orphaned vnodes will not have this flag set.
@@ -631,7 +645,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
         // This is the fast path: it rejects before we take over the socket and before host creation.
         // It is not authoritative - the collector may claim the vnode while this connection is still
         // being set up - so rrdhost_set_receiver() re-checks the flag under the receiver lock.
-        if(existing && rrdhost_is_virtual(existing)) {
+        if(is_local_vnode) {
             stream_receiver_takeover_web_connection(w, rpt);
 
             stream_receiver_log_status(
@@ -694,6 +708,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
         usec_t age_s = 0;
         bool receiver_stale = false;
         bool receiver_working = false;
+        bool pinned = false;
 
         rrd_rdlock();
         RRDHOST *host = rrdhost_find_by_guid(rpt->machine_guid);
@@ -713,10 +728,27 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
                     receiver_stale = true;
             }
             rrdhost_receiver_unlock(host);
+
+            // the stale receiver path below keeps using the host after the rrd lock is released:
+            // pin it (see metadata_lifetime_lock), so a removal cannot free it meanwhile
+            if (receiver_stale)
+                pinned = rrdhost_pin_try(host);
         }
         rrd_rdunlock();
 
+        if (receiver_stale && !pinned) {
+            stream_receiver_log_status(
+                rpt,
+                "rejecting streaming connection; host is being removed, retry later",
+                STREAM_HANDSHAKE_PARENT_BUSY_TRY_LATER, NDLP_NOTICE);
+
+            stream_receiver_free(rpt);
+            return stream_receiver_response_too_busy_now(w);
+        }
+
         if (receiver_stale && string_strcmp(host->hostname, rpt->hostname) != 0) {
+            rrdhost_pin_release(host);
+
             stream_receiver_log_status(
                 rpt,
                 "rejecting streaming connection; machine GUID is connected with a different hostname",
@@ -737,6 +769,9 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
                           , rpt->hostname
                           , rpt->remote_ip, rpt->remote_port);
         }
+
+        if (pinned)
+            rrdhost_pin_release(host);
 
         if (receiver_working || receiver_stale) {
             // another receiver is already connected

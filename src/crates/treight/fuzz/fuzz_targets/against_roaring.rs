@@ -1,8 +1,9 @@
 // Differential fuzz target: replays random op sequences on a
 // `treight::RawBitmap` and a `roaring::RoaringBitmap` (the oracle) built
 // from the same values, asserting the two implementations always agree on
-// len, min/max, emptiness, membership, ranges, ascending iteration, set-op
-// results and the serialize roundtrip.
+// len, min/max, emptiness, membership, ranges, ascending iteration,
+// range construction and set-op results; the serialize roundtrip checks
+// treight alone.
 //
 // A treight bitmap is a `Copy` descriptor whose tree bytes live in an
 // external blob (src/crates/treight/src/raw.rs `RawBitmap`), so each side
@@ -10,7 +11,11 @@
 //
 // Run with `cargo fuzz run against_roaring` from src/crates/treight/fuzz
 // (nightly pinned by src/crates/treight/fuzz/rust-toolchain.toml
-// `channel`). The fuzz workspace pins the same netdata/roaring-rs fork as
+// `channel`); a time-boxed run appends `-- -max_total_time=600`. One-time
+// setup: `rustup toolchain install nightly` and `cargo install cargo-fuzz`.
+// Corpus, crash artifacts and Cargo.lock stay local (fuzz/.gitignore).
+// Ops that leave large sets behind slow every later op in a sequence, so
+// keep op payloads small (see `FromRange`). The fuzz workspace pins the same netdata/roaring-rs fork as
 // the main workspace so both sides test one roaring implementation
 // (src/crates/treight/fuzz/Cargo.toml, the `roaring` dependency); the
 // in-crate proptest twin of this file is
@@ -24,22 +29,22 @@ use std::mem;
 // Universe sizes hitting the minimum and maximum value at every tree depth
 // 1-8, per treight::ceil_log8 (src/crates/treight/src/lib.rs).
 const UNIVERSES: [u32; 16] = [
-    1,           // 1 level
-    8,           // 1 level (max)
-    9,           // 2 levels (min)
-    64,          // 2 levels (max)
-    65,          // 3 levels (min)
-    512,         // 3 levels (max)
-    513,         // 4 levels (min)
-    4_096,       // 4 levels (max)
-    4_097,       // 5 levels (min)
-    32_768,      // 5 levels (max)
-    32_769,      // 6 levels (min)
-    262_144,     // 6 levels (max)
-    262_145,     // 7 levels (min)
-    2_097_152,   // 7 levels (max)
-    2_097_153,   // 8 levels (min)
-    16_777_216,  // 8 levels (max)
+    1,          // 1 level
+    8,          // 1 level (max)
+    9,          // 2 levels (min)
+    64,         // 2 levels (max)
+    65,         // 3 levels (min)
+    512,        // 3 levels (max)
+    513,        // 4 levels (min)
+    4_096,      // 4 levels (max)
+    4_097,      // 5 levels (min)
+    32_768,     // 5 levels (max)
+    32_769,     // 6 levels (min)
+    262_144,    // 6 levels (max)
+    262_145,    // 7 levels (min)
+    2_097_152,  // 7 levels (max)
+    2_097_153,  // 8 levels (min)
+    16_777_216, // 8 levels (max)
 ];
 
 /// Value payload for the value-carrying ops, read straight from the fuzz
@@ -67,6 +72,7 @@ enum Operation {
     CheckIter,
     RangeCardinality(Num, Num),
     RemoveRange(Num, Num),
+    FromRange(Num, Num),
     And,
     Or,
     Sub,
@@ -75,8 +81,6 @@ enum Operation {
     SerializeRoundtrip,
 }
 
-/// Generated input: which universe to use, the two starting value lists and
-/// the op sequence.
 #[derive(Arbitrary, Debug)]
 struct FuzzInput {
     universe_idx: u8,
@@ -88,7 +92,13 @@ struct FuzzInput {
 /// Assert the treight and roaring sides hold the same set: len, min, max,
 /// emptiness and full ascending iteration must all agree.
 fn check_equal(t: &treight::RawBitmap, td: &[u8], r: &roaring::RoaringBitmap) {
-    assert_eq!(t.len(td), r.len(), "len mismatch: treight={} roaring={}", t.len(td), r.len());
+    assert_eq!(
+        t.len(td),
+        r.len(),
+        "len mismatch: treight={} roaring={}",
+        t.len(td),
+        r.len()
+    );
     assert_eq!(t.min(td), r.min(), "min mismatch");
     assert_eq!(t.max(td), r.max(), "max mismatch");
     assert_eq!(t.is_empty(td), r.is_empty(), "is_empty mismatch");
@@ -195,6 +205,22 @@ fuzz_target!(|input: FuzzInput| {
                 lhs_t.remove_range(&mut lhs_d, lo..hi);
                 lhs_r.remove_range(lo..hi);
             }
+            Operation::FromRange(Num(a), Num(b)) => {
+                // Replace LHS with a freshly built lo..hi range; later ops
+                // and the closing size check then run on a range-built
+                // blob. The length is capped at 4,096 values so every
+                // iteration stays fast; ranges of millions of values are
+                // pinned by the unit tests (src/crates/treight/src/
+                // tests_raw.rs `test_from_range_bytes_large_universes`).
+                let lo = a % universe;
+                let hi = lo.saturating_add(b % 4_096 + 1).min(universe);
+                let mut data = Vec::new();
+                lhs_t = treight::RawBitmap::from_range(lo..hi, universe, &mut data);
+                lhs_d = data;
+                lhs_r = roaring::RoaringBitmap::new();
+                lhs_r.insert_range(lo..hi);
+                check_equal(&lhs_t, &lhs_d, &lhs_r);
+            }
             Operation::And => {
                 let mut out = Vec::new();
                 lhs_t = lhs_t.intersect(&lhs_d, &rhs_t, &rhs_d, &mut out);
@@ -231,7 +257,8 @@ fuzz_target!(|input: FuzzInput| {
                 // identically to the original.
                 let mut buf = Vec::new();
                 lhs_t.serialize_into(&lhs_d, &mut buf).unwrap();
-                let (restored, restored_data) = treight::RawBitmap::deserialize_from(&buf[..]).unwrap();
+                let (restored, restored_data) =
+                    treight::RawBitmap::deserialize_from(&buf[..]).unwrap();
                 assert_eq!(
                     lhs_t.iter(&lhs_d).collect::<Vec<_>>(),
                     restored.iter(&restored_data).collect::<Vec<_>>(),

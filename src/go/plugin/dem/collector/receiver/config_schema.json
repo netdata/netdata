@@ -1,0 +1,115 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "RUM receiver collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 10
+      },
+      "listen": {
+        "title": "Listen address",
+        "description": "Address and port that accept browser telemetry. The default accepts connections from this host only.",
+        "type": "string",
+        "default": "127.0.0.1:19938"
+      },
+      "public_url": {
+        "title": "Public URL",
+        "description": "Public receiver base URL used to generate installation snippets. If neither receiver nor site sets a public URL, no snippet is offered.",
+        "type": "string"
+      },
+      "tls_cert": {
+        "title": "TLS certificate",
+        "description": "Server certificate file. Leave empty with TLS key to serve HTTP.",
+        "type": "string"
+      },
+      "tls_key": {
+        "title": "TLS key",
+        "description": "Server private key file. Set together with TLS certificate to serve HTTPS.",
+        "type": "string"
+      },
+      "trusted_proxies": {
+        "title": "Trusted proxies",
+        "description": "Proxy IP addresses or CIDR ranges allowed to supply forwarded client addresses. Leave empty to distrust forwarded headers.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "type": "string"
+        }
+      },
+      "geoip_db": {
+        "title": "GeoIP database",
+        "description": "Geographic MMDB file; an explicit path uses only that file. Leave empty to try the Agent cache and then stock IP intelligence database; unavailable geography does not stop collection.",
+        "type": "string"
+      },
+      "max_body_bytes": {
+        "title": "Maximum payload size",
+        "description": "Maximum accepted browser payload size, in bytes. Larger requests are rejected.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 262144
+      },
+      "rate_limit": {
+        "title": "Rate limits",
+        "description": "Limits for browser telemetry requests.",
+        "type": "object",
+        "properties": {
+          "per_ip_per_min": {
+            "title": "Requests per IP",
+            "description": "Maximum requests per client IP per minute.",
+            "type": "integer",
+            "minimum": 1,
+            "default": 120
+          },
+          "per_site_per_sec": {
+            "title": "Requests per site",
+            "description": "Maximum requests per site per second.",
+            "type": "integer",
+            "minimum": 1,
+            "default": 500
+          }
+        }
+      }
+    }
+  },
+  "uiSchema": {
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Connection",
+          "fields": [
+            "listen",
+            "public_url",
+            "tls_cert",
+            "tls_key",
+            "trusted_proxies"
+          ]
+        },
+        {
+          "title": "Limits",
+          "fields": [
+            "max_body_bytes",
+            "rate_limit"
+          ]
+        },
+        {
+          "title": "Collection",
+          "fields": [
+            "update_every",
+            "geoip_db"
+          ]
+        }
+      ]
+    },
+    "geoip_db": {
+      "ui:help": "Supported database types are Netdata-Topology-GEO, GeoLite2-City, GeoLite2-Country, GeoIP2-City, GeoIP2-Country, DBIP-City-Lite and DBIP-Country-Lite. Provision a readable file separately; DEM does not download it.\n\nSources are checked at receiver startup and every 60 seconds. Publish updates by atomic file replacement, never by overwriting or truncating the active file. Check collector.geoip in rum-sites for source availability; each site still controls capture.geolocation."
+    }
+  }
+}

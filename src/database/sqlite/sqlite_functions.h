@@ -33,7 +33,8 @@ void analytics_set_data_str(char **name, const char *value);
         if ((res)) {                                                                                                   \
             int _rc = sqlite3_finalize((res));                                                                         \
             if (_rc != SQLITE_OK) {                                                                                    \
-                nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to finalize statement rc=%d in %s", _rc, __FUNCTION__);          \
+                nd_log(NDLS_DAEMON, NDLP_ERR, "SQLite statement finalize in %s returned rc=%d (%s)",                 \
+                       __FUNCTION__, _rc, sqlite3_errstr(_rc));                                                        \
             }                                                                                                          \
         }                                                                                                              \
     } while (0)
@@ -43,7 +44,8 @@ void analytics_set_data_str(char **name, const char *value);
         if ((res)) {                                                                                                   \
             int _rc = sqlite3_reset((res));                                                                            \
             if (_rc != SQLITE_OK) {                                                                                    \
-                nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to reset statement rc=%d in %s", _rc, __FUNCTION__);             \
+                nd_log(NDLS_DAEMON, NDLP_ERR, "SQLite statement reset in %s returned rc=%d (%s)",                    \
+                       __FUNCTION__, _rc, sqlite3_errstr(_rc));                                                        \
             }                                                                                                          \
         }                                                                                                              \
     } while (0)

@@ -83,6 +83,7 @@ mod tests {
         KeyValue {
             key: key.to_string(),
             value: Some(av(v)),
+            key_strindex: 0,
         }
     }
     /// All values at `path`, in document order (handles array-collapsed dups).
@@ -100,6 +101,21 @@ mod tests {
         (0..tree.len() as NodeId)
             .find(|&id| tree.path(id) == path)
             .unwrap_or_else(|| panic!("no node for path {path:?}"))
+    }
+
+    #[test]
+    fn profiling_string_table_reference_flattens_as_null() {
+        let record = LogRecord {
+            attributes: vec![kv("ref", Av::StringValueStrindex(3))],
+            ..Default::default()
+        };
+
+        let mut f = Flattener::new();
+        let entries = f.flatten_record(record);
+        let tree = f.into_tree();
+        let leaves = tree.resolve(&entries);
+
+        assert_eq!(at(&leaves, "attributes.ref"), [&Value::Null]);
     }
 
     #[test]
@@ -419,19 +435,20 @@ mod tests {
         };
         let mut req = trace_req(span(0, 0), None, None);
         req.resource_spans[0].scope_spans[0].spans = vec![
-            span(500, 1_500),  // start before the window → rejected (past bound)
-            span(1_200, 2_500),// end past the window → rejected (future bound)
-            span(2_500, 2_600),// entirely future: caught via end > max_ns → rejected
-            span(1_200, 1_800),// whole interval inside → kept
-            span(1_300, 0),    // unset end clamps to start (in-window) → kept
-            span(1_400, 700),  // end < start clamps to start (in-window) → kept
-            span(0, 0),        // synthesized start (base 1_500) → kept
-            span(0, 9_999),    // synthesized start BUT absurd client end → rejected
+            span(500, 1_500),   // start before the window → rejected (past bound)
+            span(1_200, 2_500), // end past the window → rejected (future bound)
+            span(2_500, 2_600), // entirely future: caught via end > max_ns → rejected
+            span(1_200, 1_800), // whole interval inside → kept
+            span(1_300, 0),     // unset end clamps to start (in-window) → kept
+            span(1_400, 700),   // end < start clamps to start (in-window) → kept
+            span(0, 0),         // synthesized start (base 1_500) → kept
+            span(0, 9_999),     // synthesized start BUT absurd client end → rejected
         ];
         let norm = normalize_trace_request(&mut req, 1_500, bounds);
         assert_eq!(norm.rejected, 4);
         assert_eq!(norm.records, 4);
-        let kept: Vec<u64> = req.resource_spans[0].scope_spans[0].spans
+        let kept: Vec<u64> = req.resource_spans[0].scope_spans[0]
+            .spans
             .iter()
             .map(|s| s.start_time_unix_nano)
             .collect();
@@ -482,11 +499,11 @@ mod tests {
         };
         let mut req = trace_req(span(0, 0), None, None);
         req.resource_spans[0].scope_spans[0].spans = vec![
-            span(0, 0),            // synthesized, no client end → kept
-            span(0, base - 500),   // synthesized, client end < synth start (clamp
-                                   // would judge OUR value) → kept
-            span(0, base + 500),   // synthesized, raw client end past the edge → rejected
-            span(base - 100, 0),   // client start in-window, unset end → kept
+            span(0, 0),          // synthesized, no client end → kept
+            span(0, base - 500), // synthesized, client end < synth start (clamp
+            // would judge OUR value) → kept
+            span(0, base + 500), // synthesized, raw client end past the edge → rejected
+            span(base - 100, 0), // client start in-window, unset end → kept
             span(base - 100, base + 1), // client end 1ns past the edge → rejected
         ];
         let norm = normalize_trace_request(&mut req, base, bounds);
@@ -516,8 +533,7 @@ mod tests {
         assert_eq!(decoded.resources[0].scopes[0].spans[0].ts, 1_000);
 
         // Zero spans → nothing prepared, nothing to write.
-        let frame =
-            prepare_trace_frame(ExportTraceServiceRequest::default(), 1, None).unwrap();
+        let frame = prepare_trace_frame(ExportTraceServiceRequest::default(), 1, None).unwrap();
         assert_eq!((frame.records, frame.rejected), (0, 0));
         assert!(frame.data.is_empty() && frame.ts_range.is_none());
 
@@ -643,10 +659,7 @@ mod tests {
         let names = tree.resolve(&[e.events[0].name.clone(), e.events[1].name.clone()]);
         assert_eq!(
             at(&names, "events.name"),
-            [
-                &Value::Str("exception".into()),
-                &Value::Str("retry".into())
-            ]
+            [&Value::Str("exception".into()), &Value::Str("retry".into())]
         );
         let attrs = tree.resolve(&e.events[1].attributes);
         assert_eq!(at(&attrs, "events.attributes.attempt"), [&Value::Int(3)]);
@@ -1504,13 +1517,13 @@ mod tests {
         // pre-check; `{not json}` passes the pre-check but fails to parse; a
         // string with leading text before `{` fails the pre-check.
         for body in [
-            "hello world", // plain non-JSON
-            "42",          // parses to a number
-            "true",        // parses to a bool
-            "[1, 2]",      // parses to an array
-            "null",        // parses to null
-            "\"quoted\"",  // parses to a bare string
-            "{not json}",  // passes brace pre-check, fails to parse
+            "hello world",     // plain non-JSON
+            "42",              // parses to a number
+            "true",            // parses to a bool
+            "[1, 2]",          // parses to an array
+            "null",            // parses to null
+            "\"quoted\"",      // parses to a bare string
+            "{not json}",      // passes brace pre-check, fails to parse
             "log: {\"a\": 1}", // leading text — fails the pre-check
         ] {
             let (norm, leaves) = flatten_string_body(body);
