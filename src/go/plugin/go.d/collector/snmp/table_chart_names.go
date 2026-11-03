@@ -3,7 +3,6 @@
 package snmp
 
 import (
-	"sort"
 	"strings"
 	"unicode/utf8"
 
@@ -63,26 +62,38 @@ func tableRowLess(a, b map[string]string) bool {
 	if aliasA != aliasB {
 		return aliasA < aliasB
 	}
-	return privateTagsString(a) < privateTagsString(b)
+	return privateTagsLess(a, b)
 }
 
-func privateTagsString(tags map[string]string) string {
-	keys := make([]string, 0, len(tags))
-	for k := range tags {
-		if strings.HasPrefix(k, "_") {
-			keys = append(keys, k)
+// privateTagsLess compares the underscore-prefixed tags of a and b as key-sorted (key, value) sequences. It walks the
+// maps instead of building sorted copies because it runs for every duplicate row on every collection; the tag sets
+// are a handful of entries, so the quadratic walk is cheaper than allocating.
+func privateTagsLess(a, b map[string]string) bool {
+	var ka, kb string
+	for {
+		var okA, okB bool
+		ka, okA = nextPrivateTag(a, ka)
+		kb, okB = nextPrivateTag(b, kb)
+		switch {
+		case !okA || !okB:
+			return !okA && okB
+		case ka != kb:
+			return ka < kb
+		case a[ka] != b[kb]:
+			return a[ka] < b[kb]
 		}
 	}
-	sort.Strings(keys)
+}
 
-	var sb strings.Builder
-	for _, k := range keys {
-		sb.WriteString(k)
-		sb.WriteByte(0)
-		sb.WriteString(tags[k])
-		sb.WriteByte(0)
+// nextPrivateTag returns the smallest underscore-prefixed key of tags greater than after.
+func nextPrivateTag(tags map[string]string, after string) (string, bool) {
+	next, found := "", false
+	for k := range tags {
+		if strings.HasPrefix(k, "_") && k > after && (!found || k < next) {
+			next, found = k, true
+		}
 	}
-	return sb.String()
+	return next, found
 }
 
 func (st *tableChartState) privateTagsChanged(tags map[string]string) bool {

@@ -417,3 +417,27 @@ func TestCollector_TableChartRowsSharingKeyPickTheFunctionRow(t *testing.T) {
 		})
 	}
 }
+
+func TestPrivateTagsLess(t *testing.T) {
+	tests := map[string]struct {
+		a, b map[string]string
+		want bool
+	}{
+		"equal":                      {a: map[string]string{"_a": "1", "x": "9"}, b: map[string]string{"_a": "1", "x": "0"}, want: false},
+		"smaller value":              {a: map[string]string{"_a": "1"}, b: map[string]string{"_a": "2"}, want: true},
+		"larger value":               {a: map[string]string{"_a": "2"}, b: map[string]string{"_a": "1"}, want: false},
+		"first key decides":          {a: map[string]string{"_a": "2", "_b": "1"}, b: map[string]string{"_a": "1", "_b": "2"}, want: false},
+		"later key decides":          {a: map[string]string{"_a": "1", "_b": "1"}, b: map[string]string{"_a": "1", "_b": "2"}, want: true},
+		"smaller key sorts first":    {a: map[string]string{"_a": "9"}, b: map[string]string{"_b": "0"}, want: true},
+		"prefix sequence is smaller": {a: map[string]string{"_a": "1"}, b: map[string]string{"_a": "1", "_b": ""}, want: true},
+		"longer sequence is larger":  {a: map[string]string{"_a": "1", "_b": ""}, b: map[string]string{"_a": "1"}, want: false},
+		"no private tags":            {a: map[string]string{"x": "1"}, b: map[string]string{"y": "1"}, want: false},
+		"value prefix is smaller":    {a: map[string]string{"_a": "ab"}, b: map[string]string{"_a": "abc"}, want: true},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, privateTagsLess(tc.a, tc.b))
+		})
+	}
+}
