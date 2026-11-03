@@ -92,15 +92,16 @@ flowchart LR
 flowchart LR
     Collect("collect.go<br/>cycle orchestration")
     Gate("retry_after.go<br/>429 gate")
-    Client("merakiapi.Client<br/>URLs · auth · pages · redirects")
+    Client("merakiapi.Client<br/>URLs · auth · pages · redirect policy")
+    HTTP("http.Client<br/>timeout · body limit")
     Pace("transport.go<br/>10 req/s pacing")
-    Web("pkg/web transport<br/>TLS · proxy · body limit")
+    Web("pkg/web transport<br/>TLS · proxy")
     API("Dashboard API")
     Join("normalize.go<br/>membership + trusted status")
     Write("write_metrics.go<br/>host_scope.go")
     Store("metrix store<br/>charts.yaml")
 
-    Gate --> Collect --> Client --> Pace --> Web --> API
+    Gate --> Collect --> Client --> HTTP --> Pace --> Web --> API
     Client --> Join --> Write --> Store
 
     classDef ext fill:#dbeafe,stroke:#2563eb,color:#0b1021;
@@ -109,7 +110,7 @@ flowchart LR
     classDef out fill:#e5e7eb,stroke:#4b5563,color:#0b1021;
     classDef core fill:#fef3c7,stroke:#d97706,color:#0b1021;
     class API ext;
-    class Client,Pace,Web recv;
+    class Client,HTTP,Pace,Web recv;
     class Join mean;
     class Write,Store out;
     class Collect,Gate core;
@@ -143,7 +144,7 @@ flowchart TD
     Remember("remember Retry-After<br/>on a 429")
 
     Start --> Pending
-    Pending -->|"yes"| FailFast
+    Pending -->|"yes"| FailFast --> Abort
     Pending -->|"no"| Orgs --> Nets --> Devs --> Avail --> Join --> Write --> Commit
     Orgs & Nets & Devs & Avail & Join -->|"error"| Remember --> Abort
 
@@ -254,20 +255,22 @@ all. The inventory gauge anchors the node; the availability chart comes and goes
 **No Vec cache.** Device instruments are bound to the host scope and labels inside each cycle instead of living in a
 `Vec`. A `Vec` keeps every label tuple it has seen forever, and device and network names change.
 
-**Lifecycle.** Host publication and ownership, chart expiry and host retirement belong to the framework. Retirement
-stops the node's charts; it does not promise deletion of the node's history.
+**Lifecycle.** Host publication and ownership (including configured host authority), chart expiry and host retirement
+belong to the framework. Retirement stops the node's charts; it does not promise deletion of the node's history.
 
 **Cardinality.** One node per assigned serial, each with one inventory chart and, while its status is trusted, one
-availability chart. This was an explicit product decision; there is no device filter.
+availability chart. There is no device filter.
 
 ## Startup And Shutdown
 
 **Init** (`collector.go`, `init.go`):
 
-1. `validateConfig` checks what the client does not: a nonempty `organization_id` without surrounding whitespace, a
-   positive `timeout`, and `tls_cert` together with `tls_key`.
+1. `validateConfig` checks what the client does not: a nonempty `organization_id` without surrounding whitespace and
+   other than `.` or `..`, a positive `timeout`, and `tls_cert` together with `tls_key`. Failing here, rather than in
+   Check, matters: the framework never retries an Init error.
 2. `initClient` builds the shared `pkg/web` transport (TLS files, proxy), wraps it in `pacedTransport`, then in the
-   standard `web` client policy (a per-request timeout equal to `timeout`, the default response body limit).
+   standard `web` client policy (a per-request timeout equal to `timeout`, the default response body limit). TLS files
+   are read through the same reduced-authority credential-file helper as the bearer token file.
 3. `merakiapi.New` validates the base URL and credentials and installs the redirect policy. Nothing touches the
    network.
 
@@ -339,8 +342,8 @@ All four are `GET` operations returning a bare JSON array, without entity filter
 reuses the devices operation with `perPage=3` and returns no data. The organization ID is path-escaped; `.` and `..`
 are rejected because escaping keeps dot segments.
 
-The response types (`types.go`) carry only the fields the collector reads. Everything else in a payload (addresses,
-coordinates, notes, IMEI, enrollment strings, management details) is discarded at decode time.
+The response types (`merakiapi/types.go`) carry only the fields the collector reads. Everything else in a payload
+(addresses, coordinates, notes, IMEI, enrollment strings, management details) is discarded at decode time.
 
 ### Construction and ownership
 
@@ -396,7 +399,9 @@ validating the destination:
   of the form `n<digits>.<root>` and `n<digits>.dashboard.<root>`.
 
 Cross-region hosts, lookalikes and every other host are rejected. A non-official origin (a proxy or private endpoint)
-trusts only itself. Next links pass the same check, and every operation starts again at the configured base.
+trusts only itself. Next links pass the same check, and every operation starts again at the configured base. A proxy
+must therefore rewrite Meraki's `Location` and `Link` headers to its own address; otherwise any list longer than one
+page fails with `invalid pagination target`.
 
 The shard grammar is a conservative reading of Cisco's published examples, not an exhaustive vendor list. A new form
 fails with an error and needs evidence before the trust rule is widened.
@@ -494,9 +499,9 @@ the form has no hidden branch state.
 
 | Change | Where | Watch out for |
 | --- | --- | --- |
-| Add a metric from data already read | `types.go` (field), `normalize.go`, `metrix.go`, `write_metrics.go`, `charts.yaml`, `metadata.yaml` | Label documentation is checked against emitted series (`TestMetadataDocumentsEmittedLabels`) |
+| Add a metric from data already read | `merakiapi/types.go` (field), `normalize.go`, `metrix.go`, `write_metrics.go`, `charts.yaml`, `metadata.yaml` | Label documentation is checked against emitted series (`TestMetadataDocumentsEmittedLabels`) |
 | Add an API operation | `merakiapi/client.go` (new `operation`, method), `collect.go` | Its page-size range, its effect on request count in `metadata.yaml`, and whether its failure must fail the cycle |
-| Trust a new shard host form | `isShardName` / `trustedTarget` in `merakiapi/redirect.go` | Needs published evidence; add accept and reject cases to `redirect_test.go` |
+| Trust a new shard host form | `isShardName` / `trustedTarget` in `merakiapi/redirect.go` | Needs published evidence; add accept and reject cases to `merakiapi/redirect_test.go` |
 | Add a region | `regionalRoots` in `merakiapi/redirect.go`, the `url` option text in `metadata.yaml` | Shard hosts follow automatically |
 | Change the status trust rule | `availabilityStatus.trusted` in `normalize.go` | The truth table above and `TestMissingOrAmbiguousAvailability` |
 | Change pacing | `requestSpacing` in `transport.go` | Meraki's published budget; `metadata.yaml` limits text |
