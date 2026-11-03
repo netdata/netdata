@@ -39,6 +39,14 @@ func (c *Collector) collect(ctx context.Context) (bool, error) {
 	if result.addContextError(ctx) {
 		return result.hasMetrics, errors.Join(result.errs...)
 	}
+	result.add(c.collectIPSecTunnelStateMetrics(ctx))
+	if result.addContextError(ctx) {
+		return result.hasMetrics, errors.Join(result.errs...)
+	}
+	result.add(c.collectIPSecGatewayMetrics(ctx))
+	if result.addContextError(ctx) {
+		return result.hasMetrics, errors.Join(result.errs...)
+	}
 
 	peers, err := c.collectBGPPeers(ctx)
 	result.add(false, err)

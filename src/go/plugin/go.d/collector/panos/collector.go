@@ -74,6 +74,9 @@ type Collector struct {
 
 	apiClient panosAPIClient
 
+	ipsecTunnelInventory  map[[2]string]metrix.LabelSet
+	ipsecGatewayInventory map[[2]string]metrix.LabelSet
+
 	routingEngine  routingEngine
 	bgpCommand     string
 	noBGPProbedAt  time.Time
