@@ -49,8 +49,8 @@ Four properties shape everything else:
 
 - **All or nothing for inventory, gaps for traffic.** No metric is written until every list has been read and joined
   and the enabled traffic has been read. A failed list or an invalid inventory aborts the cycle, so a partial read can
-  never look like removed devices. A failed traffic read only leaves gaps in its own charts. A timeout or cancellation
-  aborts the whole cycle.
+  never look like removed devices. A failed traffic read only leaves gaps in its own charts, except a 429, which also
+  skips the remaining traffic reads. A timeout or cancellation aborts the whole cycle.
 - **Inventory decides membership; availability only decorates.** A missing, unknown or contradictory status leaves a
   gap. It is never turned into an offline observation, and an old status is never replayed as fresh.
 - **Traffic is what Meraki reported, or nothing.** Values are Meraki's five-minute averages, written as gauges. A
@@ -236,10 +236,10 @@ traffic is read, not the window.
 | Family | Option | Request | Taken from it |
 | --- | --- | --- | --- |
 | Switch port traffic | `collect_switch_port_traffic` | `getOrganizationSwitchPortsUsageHistoryByDeviceByInterval` with `t0`/`t1`, every page; skipped when no switch is assigned | Per port, `upstream`/`downstream` kilobits/s of the latest accepted interval as sent/received, and the interval's end |
-| Switch port packets | `collect_switch_port_packets` | `getDeviceSwitchPortsStatusesPackets` with `timespan=300`, one per assigned switch in serial order | Per port, `ratePerSec.sent`/`recv` of the `Total` category |
 | Uplink traffic | `collect_appliance_uplink_usage` | `getOrganizationApplianceUplinksUsageByNetwork` with `t0`/`t1` | Per network and interface, sent/received bytes × 8 / 300 / 1000 as kilobits/s |
+| Switch port packets | `collect_switch_port_packets` | `getDeviceSwitchPortsStatusesPackets` with `timespan=300`, one per assigned switch in serial order | Per port, `ratePerSec.sent`/`recv` of the `Total` category |
 
-The families run in that order, so the one whose cost grows with the fleet (packets) runs last. Only assigned switches
+The families run in that order, so packets, the one family that costs a request per switch, runs last. Only assigned switches
 (`productType` `switch`) get port traffic, and only networks in the organization's network list get uplink traffic.
 
 `normalize_traffic.go` turns the responses into values with one rule set:
@@ -253,7 +253,7 @@ The families run in that order, so the one whose cost grows with the fleet (pack
 | Identical duplicate observations of one port, interval or uplink | One observation |
 | Duplicates that disagree | Gap for that port or uplink, never a sum |
 | A usage row naming a network other than the switch's assigned one | No port traffic for that switch this cycle; packets unaffected |
-| An interval that does not last exactly 300 s, or ends at or before `t0`, or after `t1` | Ignored; Meraki aligns intervals, so one may start before `t0` |
+| An interval with an unparsable timestamp, that does not last exactly 300 s, or that ends at or before `t0` or after `t1` | Ignored; Meraki aligns intervals, so one may start before `t0` |
 | Several accepted intervals for a port | The latest wins; if it holds no value, the port has a gap rather than an older value |
 
 Why: these are averages over Meraki's windows, not counters, so there is nothing to derive and nothing to carry over
@@ -403,7 +403,8 @@ what they rely on, because the provider schema marks none of these fields requir
 
 Every operation is one `operation` value in `client.go`: its OpenAPI operationId (used in errors), its OpenAPI path,
 its page sizes, and whether the array arrives wrapped in an `items` object. Paginated operations go through `list`,
-the others through `get`.
+the others through `get`. No request uses an entity filter or a generic query option, so usage history covers every
+switch Meraki lists for the organization, and the collector ignores serials that are not assigned.
 
 | Method | OpenAPI path below `/api/v1` | First `perPage` | Accepted `perPage` | Response |
 | --- | --- | --- | --- | --- |
@@ -624,7 +625,7 @@ the form has no hidden branch state.
 | `TestTrafficCollection`, `TestTrafficOptionsAreIndependent`, `TestManagedTrafficPlacementAndFloatValues` | Values, labels, exact traffic requests, independent options, real `JobV2` placement and float output |
 | `TestTrafficZeroIsAValueAndMissingIsAGap`, `TestSwitchPortTrafficIntervalSelection`, `TestSwitchPortPacketsDuplicates`, `TestApplianceUplinkTrafficAttribution` | The traffic rule set: zero versus gap, interval selection, duplicates, network attribution |
 | `TestTrafficFailureLeavesOnlyItsGaps`, `TestTraffic429StopsTrafficRequests`, `TestTrafficDeadlineAbortsCycle`, `TestCollectAbortsCancellationDuringMetricWrites` | Per-family failure and recovery, the 429 stop and deadline, whole-cycle abort |
-| `TestTrafficMethods`, `TestSwitchUsagePagination`, `TestSwitchUsageLatePageFailure`, `TestSwitchUsageEnvelopeHTTPPolicy`, `TestTrafficDecodeFailures` | Traffic queries, windowed next links, complete-history reads, the `items` object |
+| `TestTrafficMethods`, `TestSwitchUsagePagination`, `TestSwitchUsageLatePageFailure`, `TestSwitchUsageHTTPPolicy`, `TestTrafficDecodeFailures` | Traffic queries, windowed next links, complete-history reads, the `items` object |
 | `merakiapi` tests | Construction, credentials (through the shipped credential-file path with a subprocess peer), pagination, trusted redirects, gzip and body limits, cancellation, status and Retry-After errors, transport error text |
 
 Run from `src/go`:

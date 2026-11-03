@@ -43,7 +43,7 @@
       },
       "collect_appliance_uplink_usage": {
         "title": "Collect appliance uplink usage",
-        "description": "Collect the average traffic of each uplink of every MX and Z network, shown with the organization chart.",
+        "description": "Collect the average traffic of each uplink of every MX and Z network, shown on the job's node or its virtual node.",
         "type": "boolean",
         "default": false
       },
@@ -193,13 +193,13 @@
       "ui:help": "This budget covers a whole collection, including authentication-file reads, pagination and pacing. Increase it if a large organization cannot finish within the budget. Collecting switch port packets adds one request per switch."
     },
     "collect_switch_port_traffic": {
-      "ui:help": "Shows the latest five-minute interval Meraki has reported, with a chart of how old it is. Costs one API request per 50 switches."
+      "ui:help": "Uses the latest five-minute interval that ended in the last five minutes; the chart has a gap until Meraki reports one. A second chart shows how old the interval is. Costs one API request per 50 switches."
     },
     "collect_switch_port_packets": {
-      "ui:help": "Requests are paced at 10 per second, so 1,000 switches add about 100 seconds to every collection, more than the default Timeout of 60 seconds. Increase Timeout with it, or leave it off for large fleets.\n\nRates cover the last five minutes, which Meraki may not have finished reporting."
+      "ui:help": "Requests are paced at 10 per second, so 1,000 switches add about 100 seconds to every collection, more than the default Timeout of 60 seconds. A collection that runs past Timeout updates no chart, availability included. Increase Timeout with it, or leave it off for large fleets.\n\nRates cover the last five minutes, which Meraki may not have finished reporting."
     },
     "collect_appliance_uplink_usage": {
-      "ui:help": "Shows the bytes each uplink moved in the last five minutes as average kilobits per second. When more than one appliance of a network was active, such as a warm spare pair, Meraki adds up their bytes per interface, so the charts belong to the network, not to an appliance."
+      "ui:help": "Shows the bytes Meraki has counted for each uplink in the last five minutes as average kilobits per second, so the latest values can read low. When more than one appliance of a network was active, such as a warm spare pair, Meraki adds up their bytes per interface, so the charts belong to the network, not to an appliance."
     }
   }
 }
