@@ -328,8 +328,8 @@ that must always have their own charts there.
   command options = retire-targets-after 7200 max-targets 1000
 ```
 
-Both values are whole numbers. apps.plugin exits with an error if either value is not a number, or if `max-targets`
-is below `1`.
+Both values must be whole numbers: `retire-targets-after` from `0` and `max-targets` from `1`, up to `2147483647`.
+apps.plugin exits with an error otherwise.
 
 The chart `netdata.apps_targets` shows the number of these groups per family, and `netdata.apps_targets_retired`
 the rate at which they are retired (targets/s).
