@@ -47,7 +47,7 @@ To install a Netdata Parent:
 
 4. Connect your Parent to Netdata Cloud.
 
-   Claiming the Parent lets Netdata Cloud query it and registers all connected Children to Netdata Cloud automatically, adding a unified view across multiple Parents, mobile alert notifications ([paid plans](/docs/netdata-cloud/view-plan-and-billing.md)), and deduplication of alert notifications when more than one Parent evaluates the same Child. See the [Connect Agent to Cloud guide](/src/claim/README.md) for instructions.
+   Claiming the Parent lets Netdata Cloud query it and registers all connected Children to Netdata Cloud automatically, adding a unified view across multiple Parents, mobile alert notifications, and deduplication of alert notifications when more than one Parent evaluates the same Child. See the [Connect Agent to Cloud guide](/src/claim/README.md) for instructions.
 
 <details>
 <summary><strong>Deploying a Parent with Docker</strong></summary><br/>
