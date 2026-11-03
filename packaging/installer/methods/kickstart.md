@@ -142,3 +142,18 @@ Systems such as XCP-ng and XOA ship Netdata through their own package repositori
 - [Release Channels & Versions](/packaging/PLATFORM_SUPPORT.md)
 - [Uninstall Guide](/packaging/installer/UNINSTALL.md)
 - [Offline Installation Guide](/packaging/installer/methods/offline.md)
+
+## Release signature verification
+
+Static installs and local builds require a valid OpenPGP signature for the release
+`Manifest`, as well as matching archive hashes. Install any one of `gpg`, `gpgv`,
+`sq`, `sqv`, `rnp`, or `enc` before running kickstart. The script reuses the Netdata
+repository key from your GPG keyring when available, or downloads it from
+`https://repository.netdata.cloud/netdatabot.gpg.key` into temporary storage.
+Downloaded keys are never imported into your personal keyring.
+
+To explicitly disable release authentication, pass
+`--no-release-signature-verification`. This is required for historical releases
+without a signed Manifest and for offline bundles whose Manifest was generated
+locally. Archive checksum checks still run. **Skipping signature verification can
+allow a tampered release to execute malicious code on your system.**

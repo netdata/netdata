@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F052F
+# Next unused error code: F0533
 
 # ======================================================================
 # Constants
@@ -63,6 +63,7 @@ RELEASE_ARTIFACT_URL_PREFIX="https://artifacts.netdata.cloud"
 # Defaults for environment variables
 
 DRY_RUN=0
+NETDATA_VERIFY_RELEASE_SIGNATURES=1
 SELECTED_INSTALL_METHOD="none"
 INSTALL_TYPE="unknown"
 INSTALL_PREFIX=""
@@ -201,6 +202,7 @@ USAGE: kickstart.sh [options]
   --native-only                    Only install if native binary packages are available.
   --static-only                    Only install if a static build is available.
   --build-only                     Only install using a local build.
+  --no-release-signature-verification Skip release authentication (unsafe; permits tampered releases).
   --install-type <type>            Specify what installation type to use (native, static, build, auto, or any).
   --install-prefix <path>          Specify an installation prefix for local builds (default: autodetect based on system type).
   --old-install-prefix <path>      Specify an old local builds installation prefix for uninstall/reinstall (if it's not default).
@@ -957,6 +959,116 @@ get_redirect() {
 
   fatal "${ERROR_F0003}" F0003
 }
+
+# Signature policy is independent of archive checksums. Add new signature formats
+# here, and OpenPGP command adapters in verify_openpgp_signature below.
+verify_release_signature() (
+  if [ "${NETDATA_VERIFY_RELEASE_SIGNATURES}" -eq 0 ]; then
+    warning "Release signature verification is disabled. Tampered releases may execute malicious code on this system."
+    return 0
+  fi
+
+  if [ "${NETDATA_MANIFEST_INSTALL}" -ne 1 ]; then
+    fatal "This release has no signed Manifest. Use a signed release or explicitly pass --no-release-signature-verification (unsafe: tampered releases may execute malicious code)." F052F
+  fi
+
+  if [ "${DRY_RUN}" -eq 1 ]; then
+    progress "Would verify the release Manifest signature."
+    return 0
+  fi
+
+  signature_tool=""
+  for candidate in gpg gpgv sq sqv rnp enc; do
+    if command -v "${candidate}" >/dev/null 2>&1; then
+      signature_tool="${candidate}"
+      break
+    fi
+  done
+  if [ -z "${signature_tool}" ]; then
+    fatal "Release signature verification requires gpg, gpgv, sq, sqv, rnp, or enc. Install one of these tools or explicitly pass --no-release-signature-verification. Skipping verification is unsafe: tampered releases may execute malicious code on this system." F0530
+  fi
+
+  # download() uses global variables; this subshell keeps its callers' state intact.
+  signature_url="${1}/Manifest.sig"
+  signature_manifest="${PWD}/Manifest"
+  set_tmpdir
+  signature_dir="$(mktemp -d "${tmpdir}/release-signature.XXXXXXXXXX")" || fatal "Unable to create signature verification directory." F0531
+  signature_key="${signature_dir}/netdatabot.key"
+  signature_file="${signature_dir}/Manifest.sig"
+  signature_fingerprint="6E155DC153906B73765A74A99DD4A74CECFA8F4F"
+
+  download "${signature_url}" "${signature_file}" || fatal "Unable to download release Manifest signature. ${BADNET_MSG}" F0531
+
+  # Export only the expected repository key, never an arbitrary signature issuer.
+  # Avoid creating a default GnuPG home on machines that do not have one yet.
+  if [ -d "${GNUPGHOME:-${HOME}/.gnupg}" ] && command -v gpg >/dev/null 2>&1; then
+    gpg --no-options --batch --lock-never --no-auto-check-trustdb --export "${signature_fingerprint}" > "${signature_key}" 2>/dev/null || true
+  fi
+  if [ ! -s "${signature_key}" ]; then
+    download "https://repository.netdata.cloud/netdatabot.gpg.key" "${signature_key}" || fatal "Unable to fetch release signing key. ${BADNET_MSG}" F0531
+  fi
+
+  if ! verify_openpgp_signature "${signature_tool}" "${signature_key}" "${signature_file}" "${signature_manifest}" "${signature_dir}"; then
+    fatal "Release Manifest signature verification failed. Refusing to install an unauthenticated release." F0532
+  fi
+)
+
+# Arguments: tool, public key, detached signature, signed data, private work dir.
+# Every adapter is noninteractive and confined to the supplied key/work directory.
+verify_openpgp_signature() (
+  case "${1}" in
+    gpg)
+      mkdir "${5}/gnupg" && chmod 700 "${5}/gnupg" || return 1
+      gpg --no-options --homedir "${5}/gnupg" --batch --quiet --import "${2}" &&
+        gpg --no-options --homedir "${5}/gnupg" --batch --no-auto-key-retrieve --no-auto-key-import --verify "${3}" "${4}"
+      ;;
+    gpgv)
+      # gpgv needs a binary keyring. Decode ASCII armor using existing awk,
+      # without requiring gpg, base64, or another conversion tool.
+      if LC_ALL=C grep -q '^-----BEGIN PGP PUBLIC KEY BLOCK-----' "${2}"; then
+        LC_ALL=C awk '
+          BEGIN { alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/" }
+          { sub(/\r$/, "") }
+          /^-----BEGIN/ { armor = 1; next }
+          armor && /^$/ { body = 1; next }
+          /^-----END/ { exit }
+          body && !/^=/ {
+            gsub(/\r/, "")
+            for (i = 1; i <= length($0); i++) {
+              c = substr($0, i, 1)
+              if (c == "=") break
+              v = index(alphabet, c) - 1
+              if (v < 0) exit 1
+              bits = bits * 64 + v; count += 6
+              if (count >= 8) {
+                count -= 8; divisor = 2 ^ count
+                printf "%c", int(bits / divisor)
+                bits %= divisor
+              }
+            }
+          }
+        ' "${2}" > "${5}/keyring.gpg" || return 1
+      else
+        cp "${2}" "${5}/keyring.gpg" || return 1
+      fi
+      gpgv --homedir "${5}" --keyring "${5}/keyring.gpg" "${3}" "${4}"
+      ;;
+    sq)
+      # sq renamed --detached to --signature-file in newer releases.
+      if sq verify --help 2>&1 | grep -q -- '--signature-file'; then
+        sq --home none --cert-store none --key-store none --batch verify --signer-file "${2}" --signature-file "${3}" "${4}"
+      elif sq verify --help 2>&1 | grep -q -- '--signer-file'; then
+        sq verify --signer-file "${2}" --detached "${3}" "${4}"
+      else
+        sq verify --signer-cert "${2}" --detached "${3}" "${4}"
+      fi
+      ;;
+    sqv) sqv --keyring "${2}" "${3}" "${4}" ;;
+    rnp) rnp --homedir "${5}" --notty --keyfile "${2}" --verify "${3}" --source "${4}" ;;
+    enc) enc sig verify --key "${2}" --signature "${3}" < "${4}" ;;
+    *) return 1 ;;
+  esac
+)
 
 verify_manifest() {
   dir="${1}"
@@ -2241,10 +2353,16 @@ try_static_install() {
     progress "Attempting to install using static build..."
   fi
 
+  if [ "${NETDATA_MANIFEST_INSTALL}" -ne 1 ]; then
+    verify_release_signature "${NETDATA_STATIC_ARCHIVE_URL_PREFIX}" || fatal "Release authentication failed; refusing to continue." F0532
+  fi
+
   if [ "${NETDATA_MANIFEST_INSTALL}" -eq 1 ]; then
     if ! download "${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/Manifest" "./Manifest" "force"; then
       fatal "Unable to download release manifest file. ${BADNET_MSG}" F0526
     fi
+
+    verify_release_signature "${NETDATA_STATIC_ARCHIVE_URL_PREFIX}" || fatal "Release authentication failed; refusing to continue." F0532
 
     archive_info="$(grep -E "^netdata-${SYSARCH}-.*\\.run " ./Manifest)"
 
@@ -2477,10 +2595,16 @@ try_build_install() {
   zstd="$(command -v zstd 2>/dev/null || true)"
   archive_name=""
 
+  if [ "${NETDATA_MANIFEST_INSTALL}" -ne 1 ]; then
+    verify_release_signature "${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}" || fatal "Release authentication failed; refusing to continue." F0532
+  fi
+
   if [ "${NETDATA_MANIFEST_INSTALL}" -eq 1 ]; then
     if ! download "${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/Manifest" "./Manifest" "force"; then
       fatal "Unable to download release manifest file. ${BADNET_MSG}" F0526
     fi
+
+    verify_release_signature "${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}" || fatal "Release authentication failed; refusing to continue." F0532
 
     zstd_info="$(grep -E "^netdata-.*\\.tar\\.zst " ./Manifest)"
     gzip_info="$(grep -E "^netdata-.*\\.tar\\.gz " ./Manifest)"
@@ -3046,6 +3170,7 @@ parse_args() {
       "--native-only") NETDATA_REQUESTED_INSTALL_TYPE="native" ;;
       "--static-only") NETDATA_REQUESTED_INSTALL_TYPE="static" ;;
       "--build-only") NETDATA_REQUESTED_INSTALL_TYPE="build" ;;
+      "--no-release-signature-verification") NETDATA_VERIFY_RELEASE_SIGNATURES=0 ;;
       "--install-type")
         case "${2}" in
           native|static|build|auto|any) NETDATA_REQUESTED_INSTALL_TYPE="${2}" ;;
