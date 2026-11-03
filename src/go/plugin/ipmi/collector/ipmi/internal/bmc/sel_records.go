@@ -67,8 +67,8 @@ type SEL struct {
 	// Records are in log order, oldest first. The slice is shared between
 	// snapshots and never modified.
 	Records []SELRecord
-	// Loaded is false until reading reached the newest record once; Records are
-	// then the oldest part of the log.
+	// Loaded is false until a read of the whole log was verified once; Records
+	// are then the oldest part of the log.
 	Loaded bool
 	// Entries, FreeBytes and Overflow are from the latest Get SEL Info response.
 	Entries   int

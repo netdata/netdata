@@ -40,12 +40,14 @@ type selCache struct {
 	records []SELRecord
 	// next is the next record ID to read; endOfChainRecordID once reading
 	// reached the newest record.
-	next   uint16
+	next uint16
+	// loaded is set once a read of the whole log was verified (completeRead)
+	// and stays set until a reset.
 	loaded bool
-	// checkOldest is set by a Get SEL Info change, after which the cache may
-	// hold records the BMC overwrote. It stays set until a read reaches the
-	// newest record, because the surplus shows only then.
-	checkOldest bool
+	// unverified is set when records were added to the cache since the last
+	// verified read: the BMC may have overwritten records meanwhile, and a read
+	// that follows a reused record ID can skip records.
+	unverified bool
 	// info is the Get SEL Info response the records are current for; latest
 	// is the latest answer, which the snapshot reports.
 	info      storage.GetSELInfoResponse
@@ -78,14 +80,14 @@ func (c *selCache) reset() {
 	c.loaded = false
 }
 
-// readComplete marks the log read up to the newest record. Records read
-// earlier that the cache does not hold are gone from the BMC, so seen keeps
-// only the cached records; it holds every cached record, so a larger seen has
-// content to forget.
-func (c *selCache) readComplete() {
-	c.next = endOfChainRecordID
+// complete marks the cache verified to hold the whole log. Records first read
+// from now on are new. Records read earlier that the cache does not hold are
+// gone from the BMC, so seen keeps only the cached records; it holds every
+// cached record, so a larger seen has content to forget.
+func (c *selCache) complete() {
 	c.loaded = true
 	c.counting = true
+	c.unverified = false
 	if len(c.seen) > len(c.records) {
 		seen := make(map[[selRecordSize]byte]bool, len(c.records))
 		for _, rec := range c.records {
@@ -216,9 +218,8 @@ func (r *Reader) redecodeSEL() {
 // updateSEL brings the cache up to date with info. A changed erase time means
 // the SEL was cleared. A changed entry count or addition time makes reading
 // resume after the newest cached record (resumeAfterChange). Reading is bounded
-// by the read budget and continues next collection. More cached records than
-// the reported entry count are checked against the oldest record the BMC holds
-// before any is dropped.
+// by the read budget and continues next collection. A read that reaches the
+// newest record is complete only once verified (completeRead).
 func (r *Reader) updateSEL(ctx context.Context, info storage.GetSELInfoResponse) error {
 	c := &r.sel
 	if c.infoKnown && !info.RecentEraseTime.Equal(c.info.RecentEraseTime) {
@@ -226,12 +227,11 @@ func (r *Reader) updateSEL(ctx context.Context, info storage.GetSELInfoResponse)
 	}
 	changed := !c.infoKnown || info.Entries != c.info.Entries ||
 		!info.RecentAdditionTime.Equal(c.info.RecentAdditionTime)
-	c.checkOldest = c.checkOldest || changed
 
 	switch {
 	case info.Entries == 0:
-		c.records = nil
-		c.readComplete()
+		c.records, c.next = nil, endOfChainRecordID
+		c.complete()
 	case changed:
 		if err := r.resumeAfterChange(ctx); err != nil {
 			return err
@@ -244,22 +244,19 @@ func (r *Reader) updateSEL(ctx context.Context, info storage.GetSELInfoResponse)
 			return err
 		}
 	}
-	if c.checkOldest && len(c.records) > int(info.Entries) {
-		if err := r.dropOverwritten(ctx); err != nil {
-			return err
-		}
-	}
-	if c.next == endOfChainRecordID {
-		c.checkOldest = false
+	if c.next == endOfChainRecordID && c.unverified {
+		return r.completeRead(ctx)
 	}
 	return nil
 }
 
-// dropOverwritten drops the cached records older than the oldest record the
-// BMC holds: on rollover it overwrites its oldest records. The entry count
-// alone cannot tell, because records logged after Get SEL Info were read too.
-// A cache without the BMC's oldest record was rewritten and is read again.
-func (r *Reader) dropOverwritten(ctx context.Context) error {
+// completeRead verifies a read that reached the newest record against the
+// oldest record the BMC holds. Neither the end of the chain nor the entry count
+// proves the cache holds the log: on rollover the BMC overwrites its oldest
+// records, and a read that followed a record ID the BMC reused for a newer
+// record skipped the records in between. Cached records older than the BMC's
+// oldest record are dropped; a cache without that record is read again.
+func (r *Reader) completeRead(ctx context.Context) error {
 	c := &r.sel
 	oldest, _, err := r.readSELRecord(ctx, firstRecordID)
 	switch {
@@ -275,6 +272,7 @@ func (r *Reader) dropOverwritten(ctx context.Context) error {
 				delete(c.seen, gone.Raw)
 			}
 			c.records = c.records[i:]
+			c.complete()
 			return nil
 		}
 	}
@@ -317,9 +315,6 @@ func (r *Reader) resumeAfterChange(ctx context.Context) error {
 		c.reset()
 	case err != nil:
 		return err
-	case next == endOfChainRecordID:
-		// The newest cached record is the BMC's newest.
-		c.readComplete()
 	default:
 		c.next = next
 	}
@@ -370,9 +365,9 @@ func (r *Reader) walkSEL(ctx context.Context) error {
 			break
 		}
 	}
-	c.append(added, reused)
-	if c.next == endOfChainRecordID {
-		c.readComplete()
+	if len(added) > 0 {
+		c.append(added, reused)
+		c.unverified = true
 	}
 	return err
 }

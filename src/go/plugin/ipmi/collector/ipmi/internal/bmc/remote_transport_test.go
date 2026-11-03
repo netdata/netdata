@@ -39,7 +39,8 @@ func TestRemoteReaderLifecycle(t *testing.T) {
 				assertRemoteSnapshot(t, snapshot)
 				assert.Equal(t, 1, fixture.sessions(), "successful collection retains one session")
 			}
-			assert.Equal(t, int32(remoteSELEntries), fixture.selEntryReads.Load(), "an unchanged SEL is read once")
+			// Each record once, and the oldest record again to verify the read.
+			assert.Equal(t, int32(remoteSELEntries+1), fixture.selEntryReads.Load(), "an unchanged SEL is read once")
 			assert.Equal(t, int32(2), fixture.sessionSetups.Load(), "one Check session and one reused collection session")
 
 			fixture.malformedReading.Store(true)

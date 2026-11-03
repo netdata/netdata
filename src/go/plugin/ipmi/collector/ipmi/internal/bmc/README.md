@@ -68,11 +68,13 @@ Records are cached per Reader, across collections and reconnects:
 - A changed erase time, or a newest cached record that is gone or changed, means the SEL was cleared or rewritten:
   the cache is reset and the log is read again. A record that disappears during a walk fails that read and restarts
   the log from 0000h.
-- On rollover the BMC overwrites the oldest records. When a change leaves more cached records than the reported entry
-  count, the oldest record the BMC holds (0000h) shows which were overwritten: older cached records are dropped, and a
-  cache without that record is read again. The count alone cannot tell, because records logged after `Get SEL Info`
-  are read too. A cached record ID reported with new content was reused and replaces the old record. Reaching a cached
-  record with unchanged content means the chain loops back and ends the walk.
+- A read that added records and reached the newest record is complete only once verified against the oldest record
+  the BMC holds (0000h). On rollover the BMC overwrites its oldest records, so older cached records are dropped; until
+  then a read in progress can still hold records the BMC overwrote. A cache without that record is read again: a burst
+  that overwrites records ahead of the read can make it follow a reused record ID to the newest record and skip the
+  records in between. Neither the end of the chain nor the entry count proves the cache holds the log. A cached record
+  ID reported with new content was reused and replaces the old record. Reaching a cached record with unchanged content
+  means the chain loops back and ends the walk.
 - Like FreeIPMI, `Reserve SEL` is sent only after a 0xC5 completion code, and a read is retried with a new reservation
   up to four times. Whole 16-byte records are read; a shorter record fails the read.
 
@@ -84,8 +86,8 @@ record read just before a clear is still reported:
 
 - Records read before the log was read completely once are history, so a restart counts nothing old.
 - Afterwards a record is new when its 16 bytes were not read or cached before. A reset keeps that content, so the
-  records a clear, rewrite or rollover makes the Reader read again are not new. Once a read reaches the newest record,
-  only the content of the cached records is kept; anything else is gone from the BMC.
+  records a clear, rewrite or rollover makes the Reader read again are not new. Once a read is verified, only the
+  content of the cached records is kept; anything else is gone from the BMC.
 - `New` is in read order: the newest record, read to check a change, can come before records the walk reads later.
 - `NewKnown` is false while the log is read for the first time or again after a reset, and when a SEL read failed.
   New records then wait in the Reader for the next snapshot with `NewKnown` set and are dropped only once `Collect`

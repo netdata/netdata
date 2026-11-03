@@ -15,13 +15,15 @@ import (
 )
 
 // TestReader_SEL_RandomLogChanges runs the Reader through random sequences of
-// BMC log changes (appends, rollover with reused record IDs, clears, single
-// deletions, rewrites, events while a read is in progress) and failures (Get
-// SEL Info and Get SEL Entry errors, cancellations, multi-collection reads).
-// The fake BMC's own log is the oracle: once the log stops changing, the cache
-// equals it, and every record logged after the first complete read that the
-// Reader received or the BMC still holds is reported exactly once; no earlier
-// record and no record the Reader never received is reported.
+// BMC log changes (appends, rollover with free or slot-style reused record
+// IDs, records Get SEL Info cannot show, clears, single deletions, rewrites,
+// and bursts, clears and deletions while a read is in progress) and failures
+// (Get SEL Info and Get SEL Entry errors, cancellations, cancelled
+// reservations, multi-collection reads). The fake BMC's own log is the oracle:
+// once the log stops changing, the cache equals it, and every record logged
+// after the first complete read that the Reader received or the BMC still
+// holds is reported exactly once; no earlier record and no record the Reader
+// never received is reported.
 func TestReader_SEL_RandomLogChanges(t *testing.T) {
 	for seed := range uint64(500) {
 		if !runSELModel(t, seed+1, 150) {
@@ -44,35 +46,64 @@ func (o *receivingTransport) Exchange(ctx context.Context, req types.Request, re
 	return err
 }
 
-// selModel logs records into a fake BMC log with a fixed capacity. Record IDs
-// cycle through a small ID space, so rollover reuses the IDs of overwritten
-// records.
+// selModel logs records into a fake BMC log with a fixed capacity. On a full
+// log a slot-style BMC gives a new record the ID of the record it overwrites;
+// otherwise record IDs cycle through a small ID space, so rollover reuses the
+// IDs of overwritten records later.
 type selModel struct {
 	fake     *fakeBMC
 	capacity int
+	slot     bool
 	idSpace  uint16
 	lastID   uint16
 	ts       uint32
 	loggedAt map[[selRecordSize]byte]int
 }
 
-func (m *selModel) log(step int) {
-	present := make(map[uint16]bool)
-	for _, rec := range m.fake.sel.records {
-		present[binary16(rec)] = true
-	}
-	for {
-		m.lastID = m.lastID%m.idSpace + 1
-		if !present[m.lastID] {
-			break
-		}
-	}
+// log logs a record. A hidden record leaves the addition time as it was, like
+// a record logged in the same second as the previous one.
+func (m *selModel) log(step int, hidden bool) {
 	m.ts++
-	rec := tempEvent(m.lastID, m.ts)
+	var rec [selRecordSize]byte
+	if m.slot && len(m.fake.sel.records) >= m.capacity {
+		rec = m.fake.sel.overwrite(m.ts, hidden)
+	} else {
+		present := make(map[uint16]bool)
+		for _, held := range m.fake.sel.records {
+			present[binary16(held)] = true
+		}
+		for {
+			m.lastID = m.lastID%m.idSpace + 1
+			if !present[m.lastID] {
+				break
+			}
+		}
+		rec = tempEvent(m.lastID, m.ts)
+		m.fake.sel.records = append(m.fake.sel.records, rec)
+		if len(m.fake.sel.records) > m.capacity {
+			m.fake.sel.records = m.fake.sel.records[1:]
+		}
+		if !hidden {
+			m.fake.sel.additionTime++
+		}
+		m.fake.sel.reservation = 0
+	}
 	m.loggedAt[rec] = step
-	m.fake.sel.add(rec)
-	if len(m.fake.sel.records) > m.capacity {
-		m.fake.sel.records = m.fake.sel.records[1:]
+}
+
+// clear empties the log; the BMC then logs that the log was cleared.
+func (m *selModel) clear(step int) {
+	m.fake.sel.clear()
+	m.log(step, false)
+}
+
+// deleteOne deletes one record, which changes the erase time.
+func (m *selModel) deleteOne(rng *rand.Rand) {
+	if n := len(m.fake.sel.records); n > 0 {
+		i := rng.IntN(n)
+		m.fake.sel.records = slices.Delete(slices.Clone(m.fake.sel.records), i, i+1)
+		m.fake.sel.eraseTime++
+		m.fake.sel.reservation = 0
 	}
 }
 
@@ -87,12 +118,14 @@ func runSELModel(t *testing.T, seed uint64, steps int) bool {
 	m := &selModel{
 		fake:     fake,
 		capacity: capacity,
+		slot:     rng.IntN(2) == 0,
 		idSpace:  []uint16{uint16(capacity + 1), uint16(2 * capacity), 40}[rng.IntN(3)],
 		ts:       0x60000000,
 		loggedAt: make(map[[selRecordSize]byte]int),
 	}
+	fake.sel.requireReservation = rng.IntN(2) == 0
 	for range 1 + rng.IntN(6) {
-		m.log(-1)
+		m.log(-1, false)
 	}
 	history := slices.Clone(fake.sel.records)
 
@@ -106,9 +139,21 @@ func runSELModel(t *testing.T, seed uint64, steps int) bool {
 	var entryCost time.Duration
 	fake.sel.onEntry = func() {
 		now = now.Add(entryCost)
-		if eventsDuringRead > 0 && rng.IntN(3) == 0 {
-			eventsDuringRead--
-			m.log(step)
+		if eventsDuringRead == 0 || rng.IntN(3) != 0 {
+			return
+		}
+		eventsDuringRead--
+		switch rng.IntN(6) {
+		case 0:
+			for range 1 + rng.IntN(capacity+1) {
+				m.log(step, false)
+			}
+		case 1:
+			m.clear(step)
+		case 2:
+			m.deleteOne(rng)
+		default:
+			m.log(step, rng.IntN(4) == 0)
 		}
 	}
 
@@ -164,19 +209,14 @@ func runSELModel(t *testing.T, seed uint64, steps int) bool {
 	for step = 0; step < steps; step++ {
 		switch rng.IntN(10) {
 		case 0, 1, 2, 3:
+			hidden := rng.IntN(4) == 0
 			for range 1 + rng.IntN(3) {
-				m.log(step)
+				m.log(step, hidden)
 			}
 		case 4:
-			fake.sel.clear()
-			m.log(step) // the BMC logs that the log was cleared
+			m.clear(step)
 		case 5:
-			if n := len(fake.sel.records); n > 0 {
-				i := rng.IntN(n)
-				fake.sel.records = slices.Delete(slices.Clone(fake.sel.records), i, i+1)
-				fake.sel.eraseTime++
-				fake.sel.reservation = 0
-			}
+			m.deleteOne(rng)
 		case 6:
 			if n := len(fake.sel.records); n > 0 {
 				m.ts++
@@ -192,6 +232,8 @@ func runSELModel(t *testing.T, seed uint64, steps int) bool {
 		collect(true)
 	}
 	eventsDuringRead = 0
+	// Records Get SEL Info could not show stay unread until a change it shows.
+	m.log(step, false)
 
 	var sel *SEL
 	for quiet := 0; quiet < 3; {
