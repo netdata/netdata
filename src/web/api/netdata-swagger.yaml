@@ -6453,6 +6453,7 @@ paths:
         - **Info Response:** Returns cloud status, can_be_claimed flag, verification command, and agent info
         - **Success Response:** Includes success=true, message="ok", updated cloud status, and agent info
         - **Error Response:** Includes success=false, error message, cloud status, can_be_claimed flag, verification command, and agent info. A wrong key or invalid parameters return HTTP 400; a claim that Netdata Cloud rejects returns HTTP 200
+        - The verification command (`key_filename`, `cmd`, `help`) is present only after the verification key file has been published successfully at least once
 
         **Important Notes:**
         - Agent must be in AVAILABLE, OFFLINE, or INDIRECT state to be claimed
@@ -6590,7 +6591,7 @@ paths:
       responses:
         "200":
           description: |
-            Claiming request processed successfully. Check the `success` field to determine if claiming succeeded.
+            Claiming request processed successfully. When `success` is present, it tells whether claiming succeeded; info responses do not carry it.
             - **Info response** (no key provided, or the agent cannot be claimed): Returns cloud status, verification command, and can_be_claimed flag
             - **Success response** (key provided, claim succeeded): Returns success=true with updated cloud status
             - **Action failed response** (valid key and parameters, claim failed): Returns success=false with failure reason
@@ -6599,7 +6600,7 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [cloud]
+                required: [cloud, agent]
                 properties:
                   success:
                     type: boolean
@@ -6734,7 +6735,7 @@ paths:
                     cloud:
                       id: 1
                       status: online
-                      since: 1720000120
+                      since: 1720000125
                       age: 0
                       url: "https://app.netdata.cloud"
                       reason: ""
@@ -6755,7 +6756,7 @@ paths:
                       since: 1720000000
                       age: 120
                       url: "https://app.netdata.cloud"
-                      reason: "Agent is not claimed yet"
+                      reason: "Failed: token is expired, not found, or invalid"
                     can_be_claimed: true
                     key_filename: "/var/lib/netdata/netdata_random_session_id"
                     cmd: "sudo cat /var/lib/netdata/netdata_random_session_id"
@@ -6769,8 +6770,8 @@ paths:
         "400":
           description: |
             The claim request was rejected before contacting Netdata Cloud. The body is JSON with the same
-            fields as the 200 error response (`success`=false, `message`, `cloud`, `can_be_claimed`,
-            `key_filename`, `cmd`, `help`, `agent`). Reasons:
+            fields as the 200 error response (`success`=false, `message`, `cloud`, `can_be_claimed`, `agent`, and
+            `key_filename`, `cmd`, `help` once the verification key file has been published). Reasons:
             - `invalid key`: the key does not match the current verification key
             - `invalid parameters`: missing token/url, or invalid characters in token, url or rooms
           content:
