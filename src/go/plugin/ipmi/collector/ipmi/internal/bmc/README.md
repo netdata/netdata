@@ -76,6 +76,15 @@ Records are cached per Reader, across collections and reconnects:
 
 Published record slices only grow at the end, lose a prefix or are reallocated, so earlier snapshots never change.
 
+`SEL.New` reports the records first read since the previous snapshot that reported new records; the collector charts
+them. Records read before the log was read completely once are history, so a restart counts nothing old. A reset
+re-reads records the cache held, so it keeps their content until the log is read completely again, and only records
+with other content are new; this covers clears, rewrites and rollover detected through the oldest record. `NewKnown`
+is false while the log is read for the first time or again after a reset, and when a SEL read failed. New records then
+wait in the Reader for the next snapshot with `NewKnown` set and are dropped only once `Collect` returns that snapshot,
+so a failed read or collection neither loses nor repeats them. `SELRecord.Threshold` marks threshold events
+(event/reading type 01h), which the sensor state already reflects; every other record is discrete.
+
 `Get SEL Time UTC Offset` and `Get SEL Time` are read at most every five minutes, also when record reads fail. SEL time
 is UTC plus the offset, so `SEL.Time` subtracts it. A completion-code failure, 07FFh or a value outside -1440..1440
 minutes means no offset: times are then the BMC clock as UTC, and `ClockSkew` (BMC clock minus Agent clock) lets the
@@ -137,6 +146,7 @@ Tests exercise actual command-response decoding through a narrow fake transport,
 complete source-derived discrete and SEL fixtures, threshold flags, missing bytes, ownership, sharing, unit/sign
 conversion, nonlinear factors, and fractional EXP10 conversion. SEL tests cover the read budget and resume, appends,
 clears, rewrites, rollover and ID reuse, looping chains, reservations, UTC offsets, clock refresh, undated and OEM
-records, generator names and failures. Real UDP tests use the upstream reference BMC with a User account for both LAN
-and LAN+: Check cleanup, sensor and SEL collection, session reuse, malformed responses, cancellation and failed setup
-recovery. These fixtures do not establish live-hardware parity for any particular vendor.
+records, generator names, failures and which records are new, including a replay of a real BMC's log
+(`testdata/sel-replay.hex`) with synthetic critical discrete records. Real UDP tests use the upstream reference BMC with
+a User account for both LAN and LAN+: Check cleanup, sensor and SEL collection, session reuse, malformed responses,
+cancellation and failed setup recovery. These fixtures do not establish live-hardware parity for any particular vendor.

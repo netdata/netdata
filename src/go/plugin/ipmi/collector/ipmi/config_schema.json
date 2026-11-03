@@ -30,7 +30,7 @@
       },
       "collect_sel": {
         "title": "Collect SEL",
-        "description": "Read the System Event Log: the entry count chart and the ipmi-sel Live Data view.",
+        "description": "Read the System Event Log: the entry count and new records charts, and the ipmi-sel Live Data view.",
         "type": "boolean",
         "default": true
       },

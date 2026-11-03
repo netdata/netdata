@@ -54,6 +54,15 @@ type selCache struct {
 	// decodedWith is the inventory generation the records were decoded with.
 	decodedWith uint64
 
+	// counting is set once the log was read completely; only records read
+	// after that can be new.
+	counting bool
+	// known holds the content of the records cached before a reset until the
+	// log is read completely again, so records read again are not new.
+	known map[[selRecordSize]byte]bool
+	// pending holds the new records no delivered snapshot reported yet.
+	pending []SELRecord
+
 	reservation uint16
 
 	utcOffset   *time.Duration
@@ -62,10 +71,28 @@ type selCache struct {
 }
 
 // reset forgets every record; the next read starts from the first record.
+// Once counting, the forgotten records stay known, so reading them again does
+// not make them new.
 func (c *selCache) reset() {
+	if c.counting {
+		if c.known == nil {
+			c.known = make(map[[selRecordSize]byte]bool, len(c.records))
+		}
+		for _, rec := range c.records {
+			c.known[rec.Raw] = true
+		}
+	}
 	c.records = nil
 	c.next = firstRecordID
 	c.loaded = false
+}
+
+// readComplete marks the log read up to the newest record.
+func (c *selCache) readComplete() {
+	c.next = endOfChainRecordID
+	c.loaded = true
+	c.counting = true
+	c.known = nil
 }
 
 func (c *selCache) last() *SELRecord {
@@ -106,7 +133,7 @@ func (r *Reader) readSEL(ctx context.Context, warnings *collectionWarnings) (*in
 }
 
 func (c *selCache) snapshot(failed bool) *SEL {
-	return &SEL{
+	s := &SEL{
 		Records:    c.records,
 		Loaded:     c.loaded,
 		Entries:    int(c.latest.Entries),
@@ -115,6 +142,17 @@ func (c *selCache) snapshot(failed bool) *SEL {
 		UTCOffset:  c.utcOffset,
 		ClockSkew:  c.clockSkew,
 		ReadFailed: failed,
+	}
+	if c.loaded && !failed {
+		s.New, s.NewKnown = c.pending, true
+	}
+	return s
+}
+
+// delivered forgets the new records of a snapshot the Reader returned.
+func (c *selCache) delivered(s *SEL) {
+	if s != nil && s.NewKnown {
+		c.pending = nil
 	}
 }
 
@@ -163,7 +201,8 @@ func (r *Reader) updateSEL(ctx context.Context, info storage.GetSELInfoResponse)
 
 	switch {
 	case info.Entries == 0:
-		c.records, c.next, c.loaded = nil, endOfChainRecordID, true
+		c.records = nil
+		c.readComplete()
 	case c.next == endOfChainRecordID && changed:
 		if err := r.resumeAfterNewest(ctx); err != nil {
 			return err
@@ -248,7 +287,7 @@ func (r *Reader) resumeAfterNewest(ctx context.Context) error {
 // by the BMC and replaces the cached record; reaching a cached record with the
 // same content means the chain loops back, which ends the read. A record that
 // disappears while reading fails the read and restarts it from the first
-// record next collection.
+// record next collection. Once counting, records read are new unless known.
 func (r *Reader) walkSEL(ctx context.Context) error {
 	c := &r.sel
 	cached := make(map[uint16][selRecordSize]byte, len(c.records))
@@ -287,8 +326,15 @@ func (r *Reader) walkSEL(ctx context.Context) error {
 			break
 		}
 	}
+	if c.counting {
+		for _, rec := range added {
+			if !c.known[rec.Raw] {
+				c.pending = append(c.pending, rec)
+			}
+		}
+	}
 	if c.next == endOfChainRecordID {
-		c.loaded = true
+		c.readComplete()
 	}
 	c.append(added, reused)
 	return err

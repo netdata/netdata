@@ -55,6 +55,9 @@ type SELRecord struct {
 	// Direction is Assertion or Deassertion; empty for records without a sensor event.
 	Direction string
 	State     string
+	// Threshold marks threshold events (event/reading type 01h), which also
+	// change the state of their sensor.
+	Threshold bool
 	// Raw is the record as returned by the BMC.
 	Raw [selRecordSize]byte
 }
@@ -79,6 +82,15 @@ type SEL struct {
 	// ReadFailed reports that this collection's Get SEL Info or record reads
 	// failed; the other fields are from earlier collections.
 	ReadFailed bool
+	// New holds the records first read since the previous snapshot that
+	// reported new records, in read order. Records read before the log was
+	// read completely once are history, and records read again after a clear
+	// or rewrite are new only if they were not cached before.
+	New []SELRecord
+	// NewKnown is false while the log is read for the first time or again
+	// after a clear or rewrite, and when ReadFailed is set; their new records
+	// are reported by the next snapshot with NewKnown set.
+	NewKnown bool
 }
 
 // Time returns the UTC time a record was logged. It reports false for records
@@ -166,6 +178,7 @@ func decodeSELRecord(raw [selRecordSize]byte, sensors map[sensorAddress]*descrip
 	}
 	s := sel.Standard
 	eventType, sensorType := uint8(s.EventReadingType), uint8(s.SensorType)
+	r.Threshold = eventType == eventTypeThreshold
 	r.Direction = s.EventDir.String()
 	r.State = selState(recordType, eventType, sensorType, s.EventData.EventData1, bool(s.EventDir))
 	r.Generator = generatorName(s.GeneratorID)

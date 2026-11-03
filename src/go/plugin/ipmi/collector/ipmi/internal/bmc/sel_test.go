@@ -21,12 +21,13 @@ const (
 	selClockWarning   = "SEL clock unavailable"
 )
 
-// emptySEL is the SEL of newFakeBMC: no records, no UTC offset, and a clock in
-// step with the Agent.
+// emptySEL is the SEL of newFakeBMC: no records, no new records, no UTC
+// offset, and a clock in step with the Agent.
 func emptySEL() *SEL {
 	return &SEL{
 		Loaded:    true,
 		ClockSkew: new(time.Duration(0)),
+		NewKnown:  true,
 	}
 }
 
@@ -81,6 +82,12 @@ func recordIDs(s *SEL) []uint16 {
 	return ids
 }
 
+// newIDs returns the IDs of the new records a snapshot reports; nil when it
+// reports none or cannot tell.
+func newIDs(s *SEL) []uint16 {
+	return recordIDs(&SEL{Records: s.New})
+}
+
 // entryReads returns the record IDs requested by Get SEL Entry since the last call.
 func entryReads(fake *fakeBMC) []uint16 {
 	var ids []uint16
@@ -121,6 +128,8 @@ func TestReader_SEL_InitialLoadIsBounded(t *testing.T) {
 				assert.Len(t, entryReads(fake), n, "collection %d", i)
 				assert.Equal(t, []uint16{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}[:read], recordIDs(sel))
 				assert.Equal(t, i == len(tc.perCycle)-1, sel.Loaded)
+				assert.Equal(t, sel.Loaded, sel.NewKnown, "no new-record count before the first complete read")
+				assert.Empty(t, sel.New, "records of the first read are history")
 				assert.Equal(t, 10, sel.Entries)
 				snapshots = append(snapshots, sel)
 				copies = append(copies, slices.Clone(sel.Records))
@@ -147,6 +156,8 @@ func TestReader_SEL_Changes(t *testing.T) {
 		wantIDs   []uint16
 		// wantRaw, when set, is the expected content of the cached records.
 		wantRaw [][selRecordSize]byte
+		// wantNew is the content of the records the change logged.
+		wantNew [][selRecordSize]byte
 	}{
 		"unchanged": {
 			change:  func(*fakeSEL) {},
@@ -156,6 +167,7 @@ func TestReader_SEL_Changes(t *testing.T) {
 			change:    func(s *fakeSEL) { s.add(tempEvents(4, 5)...) },
 			wantReads: []uint16{0xffff, 3, 4, 5},
 			wantIDs:   []uint16{1, 2, 3, 4, 5},
+			wantNew:   tempEvents(4, 5),
 		},
 		"cleared": {
 			change: func(s *fakeSEL) {
@@ -164,6 +176,7 @@ func TestReader_SEL_Changes(t *testing.T) {
 			},
 			wantReads: []uint16{0x0000},
 			wantRaw:   [][selRecordSize]byte{reusedOne},
+			wantNew:   [][selRecordSize]byte{reusedOne},
 		},
 		"emptied": {
 			change: func(s *fakeSEL) { s.clear() },
@@ -175,6 +188,7 @@ func TestReader_SEL_Changes(t *testing.T) {
 			},
 			wantReads: []uint16{0xffff, 3, 0x0000, 8},
 			wantIDs:   []uint16{7, 8},
+			wantNew:   tempEvents(7, 8),
 		},
 		"newest record changed in place": {
 			change: func(s *fakeSEL) {
@@ -183,6 +197,7 @@ func TestReader_SEL_Changes(t *testing.T) {
 			},
 			wantReads: []uint16{0xffff, 3, 0x0000, 2, 3},
 			wantRaw:   append(tempEvents(1, 2), changedThree),
+			wantNew:   [][selRecordSize]byte{changedThree},
 		},
 		"rollover drops the overwritten records": {
 			change: func(s *fakeSEL) {
@@ -191,6 +206,7 @@ func TestReader_SEL_Changes(t *testing.T) {
 			},
 			wantReads: []uint16{0xffff, 3, 4, 5, 0x0000},
 			wantIDs:   []uint16{3, 4, 5},
+			wantNew:   tempEvents(4, 5),
 		},
 		"rollover reuses a record ID": {
 			change: func(s *fakeSEL) {
@@ -199,6 +215,7 @@ func TestReader_SEL_Changes(t *testing.T) {
 			},
 			wantReads: []uint16{0xffff, 3, 1},
 			wantRaw:   append(tempEvents(2, 3), reusedOne),
+			wantNew:   [][selRecordSize]byte{reusedOne},
 		},
 		"deleted record ID reused for a new event": {
 			change: func(s *fakeSEL) {
@@ -207,6 +224,7 @@ func TestReader_SEL_Changes(t *testing.T) {
 			},
 			wantReads: []uint16{0xffff, 3, 2},
 			wantRaw:   append(tempEvents(1, 3), reusedTwo),
+			wantNew:   [][selRecordSize]byte{reusedTwo},
 		},
 		"chain loops back to a cached record": {
 			change: func(s *fakeSEL) {
@@ -215,6 +233,7 @@ func TestReader_SEL_Changes(t *testing.T) {
 			},
 			wantReads: []uint16{0xffff, 3, 4, 2},
 			wantIDs:   []uint16{1, 2, 3, 4},
+			wantNew:   tempEvents(4),
 		},
 	}
 
@@ -225,6 +244,8 @@ func TestReader_SEL_Changes(t *testing.T) {
 			r := newSELTestReader(fake, 0, 0)
 			before := collectSEL(t, r)
 			require.True(t, before.Loaded)
+			require.True(t, before.NewKnown)
+			require.Empty(t, before.New)
 			beforeRecords := slices.Clone(before.Records)
 			entryReads(fake)
 
@@ -238,9 +259,13 @@ func TestReader_SEL_Changes(t *testing.T) {
 				assert.Equal(t, tc.wantIDs, recordIDs(got))
 			}
 			assert.Equal(t, beforeRecords, before.Records, "published records never change")
+			assert.True(t, got.NewKnown)
+			assert.Equal(t, tc.wantNew, recordsRaw(&SEL{Records: got.New}), "records read again are not new")
 
-			collectSEL(t, r)
+			got = collectSEL(t, r)
 			assert.Empty(t, entryReads(fake), "the next unchanged collection reads no record")
+			assert.True(t, got.NewKnown)
+			assert.Empty(t, got.New, "new records are reported once")
 		})
 	}
 }
@@ -255,6 +280,9 @@ func TestReader_SEL_EventDuringRead(t *testing.T) {
 		event     [selRecordSize]byte
 		wantReads []uint16
 		want      [][selRecordSize]byte
+		// wantNew are the new records of the collection; an event during the
+		// first read is history.
+		wantNew []uint16
 	}{
 		"first read": {
 			event:     tempEvent(4, 0x60000004),
@@ -266,6 +294,7 @@ func TestReader_SEL_EventDuringRead(t *testing.T) {
 			event:     tempEvent(5, 0x60000005),
 			wantReads: []uint16{0xffff, 3, 4, 5, 0x0000},
 			want:      tempEvents(1, 2, 3, 4, 5),
+			wantNew:   []uint16{4, 5},
 		},
 	}
 
@@ -289,10 +318,14 @@ func TestReader_SEL_EventDuringRead(t *testing.T) {
 			got := collectSEL(t, r)
 			assert.Equal(t, tc.wantReads, entryReads(fake), "the oldest record shows that nothing was overwritten")
 			assert.Equal(t, tc.want, recordsRaw(got), "no record the BMC holds is dropped")
+			assert.True(t, got.NewKnown)
+			assert.Equal(t, tc.wantNew, newIDs(got))
 
 			got = collectSEL(t, r)
 			assert.Equal(t, []uint16{0xffff}, entryReads(fake), "the new count leads to one check of the newest record")
 			assert.Equal(t, tc.want, recordsRaw(got))
+			assert.True(t, got.NewKnown)
+			assert.Empty(t, got.New, "the event is counted once")
 			collectSEL(t, r)
 			assert.Empty(t, entryReads(fake))
 		})
@@ -311,6 +344,10 @@ func TestReader_SEL_RolloverDuringRead(t *testing.T) {
 		entryCost time.Duration
 		// wantIDs are the records after each collection that follows the rollover.
 		wantIDs [][]uint16
+		// wantNewKnown and wantNew are the new-record report of each of those
+		// collections.
+		wantNewKnown []bool
+		wantNew      [][]uint16
 	}{
 		"first read": {
 			initial: []uint16{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
@@ -323,6 +360,8 @@ func TestReader_SEL_RolloverDuringRead(t *testing.T) {
 				{1, 2, 3, 4, 5, 6, 7, 8},
 				{3, 4, 5, 6, 7, 8, 9, 10, 11, 12},
 			},
+			wantNewKnown: []bool{false, true},
+			wantNew:      [][]uint16{nil, nil},
 		},
 		"catching up after the first read": {
 			initial: []uint16{1, 2, 3, 4, 5, 6, 7, 8},
@@ -337,6 +376,8 @@ func TestReader_SEL_RolloverDuringRead(t *testing.T) {
 				{5, 6, 7, 8, 9, 10, 11, 12},
 				{5, 6, 7, 8, 9, 10, 11, 12, 13, 14},
 			},
+			wantNewKnown: []bool{true, true, true},
+			wantNew:      [][]uint16{{9, 10}, {11, 12}, {13, 14}},
 		},
 	}
 
@@ -354,6 +395,8 @@ func TestReader_SEL_RolloverDuringRead(t *testing.T) {
 			for i, want := range tc.wantIDs {
 				sel = collectSEL(t, r)
 				assert.Equal(t, want, recordIDs(sel), "collection %d after the rollover", i+1)
+				assert.Equal(t, tc.wantNewKnown[i], sel.NewKnown, "collection %d after the rollover", i+1)
+				assert.Equal(t, tc.wantNew[i], newIDs(sel), "collection %d after the rollover", i+1)
 			}
 			assert.True(t, sel.Loaded)
 			assert.Equal(t, 10, sel.Entries)
@@ -375,11 +418,14 @@ func TestReader_SEL_OldestRecordUnknown(t *testing.T) {
 	assert.Equal(t, []uint16{0xffff, 3, 4, 0x0000}, entryReads(fake))
 	assert.Empty(t, got.Records)
 	assert.False(t, got.Loaded, "the log is read again")
+	assert.False(t, got.NewKnown)
 
 	got = collectSEL(t, r)
 	assert.Equal(t, []uint16{0x0000, 3, 4}, entryReads(fake))
 	assert.Equal(t, []uint16{9, 3, 4}, recordIDs(got))
 	assert.True(t, got.Loaded)
+	assert.True(t, got.NewKnown)
+	assert.Equal(t, []uint16{4, 9}, newIDs(got), "records read again are not new; unseen ones are")
 }
 
 func TestReader_SEL_InventoryChange(t *testing.T) {
@@ -640,6 +686,7 @@ func TestReader_SEL_Records(t *testing.T) {
 				Event:      "Upper Critical - going high (reading 90 Celsius, threshold 85 Celsius)",
 				Direction:  "Assertion",
 				State:      StateCritical,
+				Threshold:  true,
 			},
 		},
 		"threshold deassertion without trigger values": {
@@ -651,6 +698,7 @@ func TestReader_SEL_Records(t *testing.T) {
 				Event:      "Upper Critical - going high",
 				Direction:  "Deassertion",
 				State:      StateWarning,
+				Threshold:  true,
 			},
 		},
 		"sensor on another LUN": {
@@ -662,6 +710,7 @@ func TestReader_SEL_Records(t *testing.T) {
 				Event:      "Upper Non-critical - going high",
 				Direction:  "Assertion",
 				State:      StateWarning,
+				Threshold:  true,
 			},
 		},
 		"discrete SDR sensor": {
@@ -728,6 +777,7 @@ func TestReader_SEL_Records(t *testing.T) {
 				Event:      "Upper Non-critical - going high",
 				Direction:  "Assertion",
 				State:      StateWarning,
+				Threshold:  true,
 			},
 		},
 		"unrecognized OEM event": {
@@ -857,6 +907,8 @@ func TestReader_SEL_Failures(t *testing.T) {
 		wantLoaded   bool
 		wantWarnings []string
 		wantEntries  bool
+		// wantNew are the new records reported after recovery.
+		wantNew []uint16
 	}{
 		"SEL Info fails": {
 			fail:         func(b *fakeBMC) { b.selErr = transportFailure },
@@ -878,6 +930,7 @@ func TestReader_SEL_Failures(t *testing.T) {
 			wantLoaded:   true,
 			wantWarnings: []string{selRecordsWarning},
 			wantEntries:  true,
+			wantNew:      []uint16{4, 5},
 		},
 		"truncated record": {
 			fail: func(b *fakeBMC) {
@@ -888,6 +941,7 @@ func TestReader_SEL_Failures(t *testing.T) {
 			wantLoaded:   true,
 			wantWarnings: []string{selRecordsWarning},
 			wantEntries:  true,
+			wantNew:      []uint16{4},
 		},
 		"oldest record read fails after a rollover": {
 			fail: func(b *fakeBMC) {
@@ -904,6 +958,7 @@ func TestReader_SEL_Failures(t *testing.T) {
 			wantLoaded:   true,
 			wantWarnings: []string{selRecordsWarning},
 			wantEntries:  true,
+			wantNew:      []uint16{4, 5},
 		},
 		"next record vanished": {
 			fail: func(b *fakeBMC) {
@@ -912,6 +967,7 @@ func TestReader_SEL_Failures(t *testing.T) {
 			},
 			wantWarnings: []string{selRecordsWarning},
 			wantEntries:  true,
+			wantNew:      []uint16{4},
 		},
 	}
 
@@ -931,6 +987,8 @@ func TestReader_SEL_Failures(t *testing.T) {
 			assert.True(t, got.SEL.ReadFailed)
 			assert.Equal(t, tc.wantLoaded, got.SEL.Loaded)
 			assert.Equal(t, tc.wantIDs, recordIDs(got.SEL))
+			assert.False(t, got.SEL.NewKnown, "a failed read leaves a gap")
+			assert.Empty(t, got.SEL.New)
 
 			fake.selErr, fake.onExchange, fake.sel.truncate, fake.sel.next = nil, nil, false, nil
 			recovered := collectSEL(t, r)
@@ -938,6 +996,9 @@ func TestReader_SEL_Failures(t *testing.T) {
 			assert.Equal(t, recordIDs(&SEL{
 				Records: decodeAll(fake.sel.records),
 			}), recordIDs(recovered))
+			assert.True(t, recovered.NewKnown)
+			assert.Equal(t, tc.wantNew, newIDs(recovered), "records read before the failure count once")
+			assert.Empty(t, collectSEL(t, r).New)
 		})
 	}
 }
@@ -983,4 +1044,58 @@ func TestReader_SEL_CanceledDuringRecordRead(t *testing.T) {
 	require.ErrorIs(t, err, context.Canceled)
 	assert.Nil(t, got)
 	assert.Equal(t, 1, fake.closes)
+}
+
+func TestReader_SEL_NewRecordsAfterCanceledCollection(t *testing.T) {
+	fake := newFakeBMC()
+	fake.sel.records = tempEvents(1, 2)
+	r := newTestReader(fake)
+	now := testNow
+	r.now = func() time.Time { return now }
+	collectSEL(t, r)
+
+	// The collection is canceled after the new record was read, while the
+	// due clock refresh runs.
+	fake.sel.add(tempEvents(3)...)
+	now = now.Add(selClockMaxAge)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	fake.onExchange = func(req types.Request) error {
+		if _, ok := req.(*storage.GetSELTimeUTCOffsetRequest); ok {
+			cancel()
+		}
+		return nil
+	}
+	_, err := r.Collect(ctx, true)
+	require.ErrorIs(t, err, context.Canceled)
+
+	fake.onExchange = nil
+	got := collectSEL(t, r)
+	assert.True(t, got.NewKnown)
+	assert.Equal(t, []uint16{3}, newIDs(got), "a record of a canceled collection is reported later")
+	assert.Empty(t, collectSEL(t, r).New)
+}
+
+func TestReader_SEL_NewRecordsWhileReadingAgain(t *testing.T) {
+	// A rewritten newest record resets the cache; the log is read again over
+	// several collections, and only the records it did not hold are new.
+	fake := newFakeBMC()
+	fake.sel.records = tempEvents(1, 2, 3, 4, 5, 6, 7, 8)
+	r := newSELTestReader(fake, 4*time.Second, 300*time.Millisecond) // 4 records per collection
+	for !collectSEL(t, r).Loaded {
+	}
+
+	changed := tempEvent(8, 0x70000008)
+	fake.sel.records = fake.sel.records[:7]
+	fake.sel.add(changed, tempEvent(9, 0x60000009))
+	var known []bool
+	var got *SEL
+	for got == nil || !got.Loaded {
+		got = collectSEL(t, r)
+		known = append(known, got.NewKnown)
+	}
+	assert.Equal(t, []bool{false, false, true}, known, "no new-record count while reading again")
+	assert.Equal(t, [][selRecordSize]byte{changed, tempEvent(9, 0x60000009)}, recordsRaw(&SEL{Records: got.New}))
+	assert.Nil(t, r.sel.known, "earlier content is kept only while reading again")
+	assert.Empty(t, collectSEL(t, r).New)
 }

@@ -41,4 +41,37 @@ func (c *Collector) writeMetrics(s *bmc.Snapshot) {
 	if s.SELEntries != nil {
 		m.selEntries.Observe(float64(*s.SELEntries))
 	}
+	if s.SEL != nil && s.SEL.NewKnown {
+		c.writeNewSELRecords(s.SEL.New)
+	}
+}
+
+// writeNewSELRecords counts new records by event type and state, zeros
+// included.
+func (c *Collector) writeNewSELRecords(records []bmc.SELRecord) {
+	type key struct{ eventType, state string }
+	counts := make(map[key]int)
+	for _, rec := range records {
+		eventType := selEventDiscrete
+		if rec.Threshold {
+			eventType = selEventThreshold
+		}
+		counts[key{eventType, rec.State}]++
+	}
+	m := c.metrics
+	for _, eventType := range selEventTypes {
+		for _, state := range sensorStates {
+			labels := m.meter.LabelSet(
+				metrix.Label{
+					Key:   "event_type",
+					Value: eventType,
+				},
+				metrix.Label{
+					Key:   "state",
+					Value: state,
+				},
+			)
+			m.selNew.Observe(float64(counts[key{eventType, state}]), labels)
+		}
+	}
 }

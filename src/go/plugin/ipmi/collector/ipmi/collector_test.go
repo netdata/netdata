@@ -130,6 +130,7 @@ func TestCollector_Collect_MissingData(t *testing.T) {
 	c, reader := newTestCollector(t)
 	c.CollectSEL = false
 	reader.snapshot.SELEntries = nil
+	reader.snapshot.SEL = nil
 	reader.snapshot.Sensors[0].Value = nil
 	reader.snapshot.Sensors[0].State = bmc.StateUnknown
 
@@ -137,6 +138,68 @@ func TestCollector_Collect_MissingData(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, reader.collectSEL)
 	assert.Equal(t, wantSeries(t, reader.snapshot), points, "unavailable readings and SEL leave gaps")
+}
+
+func TestCollector_Collect_NewSELRecordsUnknown(t *testing.T) {
+	tests := map[string]func(*bmc.SEL){
+		"first read in progress": func(s *bmc.SEL) { s.Loaded = false },
+		"SEL read failed":        func(s *bmc.SEL) { s.ReadFailed = true },
+	}
+	for name, change := range tests {
+		t.Run(name, func(t *testing.T) {
+			c, reader := newTestCollector(t)
+			change(reader.snapshot.SEL)
+			// The Reader reports no new records when it cannot tell.
+			reader.snapshot.SEL.New, reader.snapshot.SEL.NewKnown = nil, false
+
+			points, err := collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
+			require.NoError(t, err)
+			assert.Equal(t, wantSeries(t, reader.snapshot), points, "unknown new records leave a gap, not zeros")
+		})
+	}
+}
+
+func TestCollector_SELChartsSurviveFailedReads(t *testing.T) {
+	c, reader := newTestCollector(t)
+	engine, err := chartengine.New()
+	require.NoError(t, err)
+	require.NoError(t, engine.LoadYAML([]byte(c.ChartTemplateYAML()), defaultUpdateEvery))
+
+	healthy := healthySnapshot()
+	failed := healthySnapshot()
+	failed.SELEntries = nil
+	failed.SEL.ReadFailed, failed.SEL.New, failed.SEL.NewKnown = true, nil, false
+	created := make(map[string]bool)
+	for phase, tc := range []struct {
+		snapshot *bmc.Snapshot
+		cycles   int
+	}{
+		{snapshot: healthy, cycles: 1},
+		// Sensors keep collecting beyond chart expiry and series retention.
+		{snapshot: failed, cycles: 25},
+		{snapshot: healthy, cycles: 1},
+	} {
+		reader.snapshot = tc.snapshot
+		for cycle := range tc.cycles {
+			points, err := collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
+			require.NoError(t, err)
+			assert.Equal(t, wantSeries(t, tc.snapshot), points)
+
+			attempt, err := engine.PreparePlan(c.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()))
+			require.NoError(t, err)
+			for _, action := range attempt.Plan().Actions {
+				switch action := action.(type) {
+				case chartengine.CreateChartAction:
+					assert.Zero(t, phase, "chart %s created again after a failed SEL read", action.ChartID)
+					created[action.ChartID] = true
+				case chartengine.RemoveChartAction:
+					assert.Fail(t, "chart removed", "%s at phase %d cycle %d", action.ChartID, phase, cycle+1)
+				}
+			}
+			require.NoError(t, attempt.Commit())
+		}
+	}
+	assert.NotEmpty(t, created)
 }
 
 func TestCollector_Collect_FailureAndRecovery(t *testing.T) {
@@ -260,6 +323,7 @@ func TestArtifacts_PublicNames(t *testing.T) {
 		"ipmi.sensor_reading_percent": "sensor_reading_percent",
 		"ipmi.sensor_state":           "sensor_state",
 		"ipmi.sel":                    "events",
+		"ipmi.sel_new_records":        "sel_new_records",
 	}, actual)
 
 	var names []string
@@ -279,14 +343,34 @@ func TestArtifacts_AlertBindings(t *testing.T) {
 	for _, alert := range collecttest.ParseHealthAlerts(health) {
 		bindings[alert.On]++
 	}
-	require.Equal(t, map[string]int{"ipmi.sensor_state": 1, "ipmi.sel": 1}, bindings,
+	require.Equal(t, map[string]int{"ipmi.sensor_state": 1, "ipmi.sel": 1, "ipmi.sel_new_records": 1}, bindings,
 		"both implementations and any job name share one alert owner per context")
+
+	// Chart label filters must select labels the collector emits.
+	emitted := map[string][]string{"event_type": selEventTypes}
+	for _, filter := range healthChartLabelFilters(health) {
+		key, value, ok := strings.Cut(filter, "=")
+		require.True(t, ok, filter)
+		assert.Contains(t, emitted[key], value, "chart label filter %q", filter)
+	}
 
 	opts := collecttest.HealthAlertsCheck{
 		ContextPrefix: "ipmi.",
 	}
 	collecttest.AssertHealthAlertsTargetChartTemplateWith(t, health, chartTemplateYAML, opts)
 	collecttest.AssertHealthAlertsMatchMetadataWith(t, health, metadata, opts)
+}
+
+// healthChartLabelFilters returns the key=value terms of every chart labels line.
+func healthChartLabelFilters(health []byte) []string {
+	var out []string
+	for line := range strings.SplitSeq(string(health), "\n") {
+		key, value, ok := strings.Cut(line, ":")
+		if ok && strings.TrimSpace(key) == "chart labels" {
+			out = append(out, strings.Fields(value)...)
+		}
+	}
+	return out
 }
 
 type fakeReader struct {
@@ -327,18 +411,35 @@ func newTestCollector(t *testing.T) (*Collector, *fakeReader) {
 	return c, reader
 }
 
-// healthySnapshot has one nominal sensor per numeric unit, one discrete sensor and a one-record SEL.
+// healthySnapshot has one nominal sensor per numeric unit, one discrete sensor
+// and a three-record SEL whose two newest records are new.
 func healthySnapshot() *bmc.Snapshot {
+	records := []bmc.SELRecord{
+		{
+			ID:    1,
+			Event: "OEM record type 0xe0",
+			State: bmc.StateUnknown,
+		},
+		{
+			ID:        2,
+			Event:     "Upper Critical - going high",
+			State:     bmc.StateCritical,
+			Threshold: true,
+		},
+		{
+			ID:    3,
+			Event: "Timestamp Clock Synch",
+			State: bmc.StateWarning,
+		},
+	}
 	s := &bmc.Snapshot{
-		SELEntries: new(1),
+		SELEntries: new(3),
 		SEL: &bmc.SEL{
-			Records: []bmc.SELRecord{{
-				ID:    1,
-				Event: "OEM record type 0xe0",
-				State: bmc.StateUnknown,
-			}},
-			Loaded:  true,
-			Entries: 1,
+			Records:  records,
+			Loaded:   true,
+			Entries:  3,
+			New:      records[1:],
+			NewKnown: true,
 		},
 		CollectedAt: time.Now(),
 	}
@@ -372,16 +473,18 @@ func healthySnapshot() *bmc.Snapshot {
 }
 
 // wantSeries derives the expected flattened series of a snapshot: a state
-// set per sensor, a reading per available value and the SEL count. A reading
-// belongs to the chart template's metric whose chart has the sensor's unit.
+// set per sensor, a reading per available value, the SEL count and, when
+// known, the new SEL records per event type and state. A reading belongs to
+// the chart template's metric whose chart has the sensor's unit.
 func wantSeries(t *testing.T, s *bmc.Snapshot) map[string]metrix.SampleValue {
 	t.Helper()
 	charts, err := collecttest.ChartTemplateCharts(chartTemplateYAML)
 	require.NoError(t, err)
 	metricOfUnit := make(map[string]string)
 	for _, chart := range charts {
-		require.Len(t, chart.Dimensions, 1, chart.ID)
-		metricOfUnit[chart.Units] = chart.Dimensions[0].Selector
+		if len(chart.Dimensions) == 1 {
+			metricOfUnit[chart.Units] = chart.Dimensions[0].Selector
+		}
 	}
 
 	want := make(map[string]metrix.SampleValue)
@@ -409,6 +512,19 @@ func wantSeries(t *testing.T, s *bmc.Snapshot) map[string]metrix.SampleValue {
 	}
 	if s.SELEntries != nil {
 		want["sel_events"] = metrix.SampleValue(*s.SELEntries)
+	}
+	if s.SEL != nil && s.SEL.NewKnown {
+		for _, eventType := range []string{"threshold", "discrete"} {
+			for _, state := range []string{bmc.StateNominal, bmc.StateWarning, bmc.StateCritical, bmc.StateUnknown} {
+				var n metrix.SampleValue
+				for _, rec := range s.SEL.New {
+					if rec.Threshold == (eventType == "threshold") && rec.State == state {
+						n++
+					}
+				}
+				want[seriesKey("sel_new_records", map[string]string{"event_type": eventType, "state": state})] = n
+			}
+		}
 	}
 	return want
 }

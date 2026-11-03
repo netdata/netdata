@@ -14,17 +14,7 @@ import (
 )
 
 func TestSELState_FreeIPMIDefaults(t *testing.T) {
-	// The fixture enumerates FreeIPMI's named default SEL states, independently
-	// of the compressed masks in sel_states.go. Provenance: sel_states.go and README.md.
-	f, err := os.Open("testdata/freeipmi-default-sel-states.csv")
-	require.NoError(t, err)
-	defer func() { _ = f.Close() }()
-	reader := csv.NewReader(f)
-	reader.Comment = '#'
-	rows, err := reader.ReadAll()
-	require.NoError(t, err)
-	require.Equal(t, []string{"event", "sensor", "offset", "option", "assertion", "deassertion"}, rows[0])
-	rows = rows[1:]
+	rows := readSELStatesFixture(t)
 	require.Len(t, rows, 474, "FreeIPMI default SEL entries")
 
 	type table struct{ event, sensor int }
@@ -102,6 +92,23 @@ func TestSELState_Dispatch(t *testing.T) {
 			assert.Equal(t, tc.want, decodeSELRecord(tc.record, nil).State)
 		})
 	}
+}
+
+// readSELStatesFixture returns the rows of the fixture that enumerates
+// FreeIPMI's named default SEL states, independently of the compressed masks
+// in sel_states.go: event, sensor (-1 for the threshold table), offset,
+// option, assertion and deassertion state. Provenance: sel_states.go and README.md.
+func readSELStatesFixture(t *testing.T) [][]string {
+	t.Helper()
+	f, err := os.Open("testdata/freeipmi-default-sel-states.csv")
+	require.NoError(t, err)
+	defer func() { _ = f.Close() }()
+	reader := csv.NewReader(f)
+	reader.Comment = '#'
+	rows, err := reader.ReadAll()
+	require.NoError(t, err)
+	require.Equal(t, []string{"event", "sensor", "offset", "option", "assertion", "deassertion"}, rows[0])
+	return rows[1:]
 }
 
 // selRecordState decodes a system event record built from the arguments.
