@@ -200,6 +200,7 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
     w->websocket.protocol = WS_PROTOCOL_DEFAULT;
     w->websocket.client_max_window_bits = 0;
     w->websocket.server_max_window_bits = 0;
+    web_client_flag_clear(w, WEB_CLIENT_FLAG_WEBSOCKET_CLIENT | WEB_CLIENT_FLAG_WEBSOCKET_HANDSHAKE);
 
     // if we had enabled compression, release it
     if(w->response.zinitialized) {
@@ -762,7 +763,10 @@ static inline char *web_client_valid_method(struct web_client *w, char *s) {
     return s;
 }
 
+// Header lines before the malformed one were already dispatched and may have enabled keep-alive; a client that sent
+// a malformed header section gets its 400 and the connection is closed.
 static HTTP_VALIDATION http_request_malformed_header(struct web_client *w) {
+    web_client_disable_keepalive(w);
     w->header_parse_tries = 0;
     w->header_parse_last_size = 0;
     w->header_parse_expected_size = 0;

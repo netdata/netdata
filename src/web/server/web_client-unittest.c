@@ -280,6 +280,22 @@ int web_client_header_parsing_unittest(void)
             "malformed POST was not rejected when its header section completed");
     }
 
+    // a malformed header section closes a keep-alive connection, and no request carries websocket state to the next
+    {
+        web_client_reuse_from_cache(w);
+        buffer_strcat(
+            w->response.data,
+            "GET /api/v1/info HTTP/1.1\r\nConnection: keep-alive, upgrade\r\nUpgrade: websocket\r\nJunk\r\n\r\n");
+        WEB_CLIENT_TEST(
+            http_request_validate(w) == HTTP_VALIDATION_MALFORMED_HEADER, "keep-alive malformed request was not rejected");
+        WEB_CLIENT_TEST(!web_client_has_keepalive(w), "a malformed header section kept the connection alive");
+
+        web_client_request_done(w);
+        WEB_CLIENT_TEST(
+            !web_client_has_websocket_handshake(w) && !web_client_is_websocket(w),
+            "websocket flags survived to the next request on the connection");
+    }
+
     // POST/PUT framing reads Content-Length and Content-Type only as header names at the start of a header line
     static const struct {
         const char *request;

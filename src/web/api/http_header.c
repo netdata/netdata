@@ -480,7 +480,7 @@ bool http_header_section_is_valid(const char *request) {
     // from the end of the request line, one header line at a time
     const char *s = strstr(request, "\r\n");
     while(s < headers_end) {
-        const char *colon;
+        const char *colon = NULL;
         s = http_header_line_check(s + 2, &colon);
         if(!s)
             return false;
@@ -492,7 +492,7 @@ bool http_header_section_is_valid(const char *request) {
 char *http_header_parse_line(struct web_client *w, char *s) {
     supported_headers_init();
 
-    const char *colon;
+    const char *colon = NULL;
     char *ve = (char *)http_header_line_check(s, &colon);
     if(!ve || !*ve)
         return ve;
