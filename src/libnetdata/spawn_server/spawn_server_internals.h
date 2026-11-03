@@ -23,7 +23,6 @@
 #endif
 
 struct spawn_server {
-    size_t id;
     size_t request_id;
     const char *name;
 
@@ -40,13 +39,12 @@ struct spawn_server {
 #if defined(SPAWN_SERVER_VERSION_NOFORK)
     SPAWN_SERVER_OPTIONS options;
 
-    ND_UUID magic;          // for authorizing requests, the client needs to know our random UUID
-                            // it is ignored for PING requests
-
     int pipe[2];
-    int sock;               // the listening socket of the server
+    int control_fd;         // creator's private control socket
+    int control_peer_fd;    // forked server's private control socket
+    pid_t creator_pid;
     pid_t server_pid;
-    char *path;
+    usec_t request_ack_timeout_ut; // how long a request waits for the server to take its socket
     spawn_request_callback_t cb;
 
     int argc;
