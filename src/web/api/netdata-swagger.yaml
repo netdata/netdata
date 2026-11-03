@@ -6450,9 +6450,9 @@ paths:
         - **Windows:** `more C:\path\to\netdata_random_session_id`
 
         **Response Formats:**
-        - **Info Response:** Returns cloud status, can_be_claimed flag, verification command, and agents info
-        - **Success Response:** Includes success=true, message="ok", updated cloud status
-        - **Error Response:** Includes success=false, error message, and can_be_claimed flag
+        - **Info Response:** Returns cloud status, can_be_claimed flag, verification command, and agent info
+        - **Success Response:** Includes success=true, message="ok", updated cloud status, and agent info
+        - **Error Response:** Includes success=false, error message, cloud status, can_be_claimed flag, verification command, and agent info. A wrong key or invalid parameters return HTTP 400; a claim that Netdata Cloud rejects returns HTTP 200
 
         **Important Notes:**
         - Agent must be in AVAILABLE, OFFLINE, or INDIRECT state to be claimed
@@ -6591,9 +6591,10 @@ paths:
         "200":
           description: |
             Claiming request processed successfully. Check the `success` field to determine if claiming succeeded.
-            - **Info response** (no key provided): Returns cloud status, verification command, and can_be_claimed flag
+            - **Info response** (no key provided, or the agent cannot be claimed): Returns cloud status, verification command, and can_be_claimed flag
             - **Success response** (key provided, claim succeeded): Returns success=true with updated cloud status
-            - **Action failed response** (key provided, claim failed): Returns success=false with failure reason
+            - **Action failed response** (valid key and parameters, claim failed): Returns success=false with failure reason
+            A wrong key or invalid parameters return HTTP 400 instead (see below).
           content:
             application/json:
               schema:
@@ -6611,7 +6612,8 @@ paths:
                     description: |
                       Result message. Present only for claim action responses.
                       - Success: "ok"
-                      - Failure: Reason for failure (e.g., "invalid key", "invalid parameters", cloud connection error)
+                      - Failure: Reason the claim failed (e.g., "Failed: token is expired, not found, or invalid", "Failed: Netdata Cloud is unavailable")
+                      - HTTP 400: "invalid key" or "invalid parameters"
                   cloud:
                     type: object
                     description: Current Netdata Cloud connection state.
@@ -6687,11 +6689,24 @@ paths:
                     description: |
                       Human-readable instructions for obtaining the verification key.
                       Present in info and error responses after the verification key file has been published successfully at least once.
-                  agents:
-                    type: array
-                    description: Agent information for the claimed node(s)
-                    items:
-                      type: object
+                  agent:
+                    type: object
+                    description: Identity of this agent. Present in every response.
+                    properties:
+                      mg:
+                        type: string
+                        description: Machine GUID.
+                      nd:
+                        type: string
+                        nullable: true
+                        description: Node ID (UUID); null until the node has one.
+                      nm:
+                        type: string
+                        description: Hostname.
+                      now:
+                        type: integer
+                        format: int64
+                        description: Unix timestamp the response was generated.
               examples:
                 info_response:
                   value:
@@ -6706,9 +6721,11 @@ paths:
                     key_filename: "/var/lib/netdata/netdata_random_session_id"
                     cmd: "sudo cat /var/lib/netdata/netdata_random_session_id"
                     help: "We need to verify this server is yours. SSH to this server and run this command. It will give you a UUID. Copy and paste this UUID to this box:"
-                    agents:
-                      - hostname: "my-server"
-                        machine_guid: "12345678-1234-1234-1234-123456789abc"
+                    agent:
+                      mg: "12345678-1234-1234-1234-123456789abc"
+                      nd: null
+                      nm: "my-server"
+                      now: 1720000120
                   summary: Info response (no claim attempt)
                 success_response:
                   value:
@@ -6722,12 +6739,46 @@ paths:
                       url: "https://app.netdata.cloud"
                       reason: ""
                       claim_id: "12345678-1234-1234-1234-123456789abc"
-                    agents:
-                      - hostname: "my-server"
-                        machine_guid: "12345678-1234-1234-1234-123456789abc"
-                        claimed_id: "cloud-node-id-123"
+                    agent:
+                      mg: "12345678-1234-1234-1234-123456789abc"
+                      nd: "87654321-4321-4321-4321-cba987654321"
+                      nm: "my-server"
+                      now: 1720000125
                   summary: Successful claim
                 error_response:
+                  value:
+                    success: false
+                    message: "Failed: token is expired, not found, or invalid"
+                    cloud:
+                      id: 0
+                      status: available
+                      since: 1720000000
+                      age: 120
+                      url: "https://app.netdata.cloud"
+                      reason: "Agent is not claimed yet"
+                    can_be_claimed: true
+                    key_filename: "/var/lib/netdata/netdata_random_session_id"
+                    cmd: "sudo cat /var/lib/netdata/netdata_random_session_id"
+                    help: "We need to verify this server is yours. SSH to this server and run this command. It will give you a UUID. Copy and paste this UUID to this box:"
+                    agent:
+                      mg: "12345678-1234-1234-1234-123456789abc"
+                      nd: null
+                      nm: "my-server"
+                      now: 1720000120
+                  summary: Failed claim (rejected by Netdata Cloud)
+        "400":
+          description: |
+            The claim request was rejected before contacting Netdata Cloud. The body is JSON with the same
+            fields as the 200 error response (`success`=false, `message`, `cloud`, `can_be_claimed`,
+            `key_filename`, `cmd`, `help`, `agent`). Reasons:
+            - `invalid key`: the key does not match the current verification key
+            - `invalid parameters`: missing token/url, or invalid characters in token, url or rooms
+          content:
+            application/json:
+              schema:
+                type: object
+              examples:
+                invalid_key:
                   value:
                     success: false
                     message: "invalid key"
@@ -6742,17 +6793,12 @@ paths:
                     key_filename: "/var/lib/netdata/netdata_random_session_id"
                     cmd: "sudo cat /var/lib/netdata/netdata_random_session_id"
                     help: "We need to verify this server is yours. SSH to this server and run this command. It will give you a UUID. Copy and paste this UUID to this box:"
-                    agents:
-                      - hostname: "my-server"
-                        machine_guid: "12345678-1234-1234-1234-123456789abc"
-                  summary: Failed claim (invalid key)
-        "400":
-          description: |
-            Bad request (only in v2 API or earlier). V3 returns errors as JSON with HTTP 200.
-            Reasons include:
-            - Invalid key (doesn't match generated session ID)
-            - Invalid parameters (missing token/url, or invalid characters)
-            - Cloud connection failure
+                    agent:
+                      mg: "12345678-1234-1234-1234-123456789abc"
+                      nd: null
+                      nm: "my-server"
+                      now: 1720000120
+                  summary: Wrong verification key
   /api/v3/bearer_protection:
     get:
       operationId: bearerProtection3
