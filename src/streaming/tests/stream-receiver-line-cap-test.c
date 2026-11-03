@@ -50,6 +50,7 @@ static int test_partial_line_crosses_limit(void) {
         bool complete = stream_receiver_next_line_checked(
             &ctx.reader,
             ctx.line_buffer,
+            stream_receiver_line_max(false),
             &overflow);
 
         if(complete) {
@@ -94,7 +95,7 @@ static int test_line_limit_boundary(void) {
     line_buffer->len = PLUGINSD_LINE_MAX;
     line_buffer->buffer[line_buffer->len] = '\0';
 
-    if(stream_receiver_line_buffer_overflow(line_buffer)) {
+    if(stream_receiver_line_buffer_overflow(line_buffer, stream_receiver_line_max(false))) {
         fprintf(
             stderr,
             "overflow reported at exactly PLUGINSD_LINE_MAX (%d)\n",
@@ -105,7 +106,7 @@ static int test_line_limit_boundary(void) {
     line_buffer->len = PLUGINSD_LINE_MAX + 1;
     line_buffer->buffer[line_buffer->len] = '\0';
 
-    if(!stream_receiver_line_buffer_overflow(line_buffer)) {
+    if(!stream_receiver_line_buffer_overflow(line_buffer, stream_receiver_line_max(false))) {
         fprintf(
             stderr,
             "overflow not reported at PLUGINSD_LINE_MAX + 1\n");
@@ -131,6 +132,7 @@ static int test_overlong_newline_terminated_line(void) {
     bool complete = stream_receiver_next_line_checked(
         &ctx.reader,
         ctx.line_buffer,
+        stream_receiver_line_max(false),
         &overflow);
 
     if(complete ||
@@ -154,6 +156,7 @@ static int test_overlong_newline_terminated_line(void) {
     complete = stream_receiver_next_line_checked(
         &ctx.reader,
         ctx.line_buffer,
+        stream_receiver_line_max(false),
         &overflow);
 
     int failed = 0;
@@ -183,6 +186,7 @@ static int test_normal_complete_line(void) {
     bool complete = stream_receiver_next_line_checked(
         &ctx.reader,
         ctx.line_buffer,
+        stream_receiver_line_max(false),
         &overflow);
 
     int failed = 0;
@@ -202,6 +206,71 @@ static int test_normal_complete_line(void) {
     return failed;
 }
 
+static int test_deferred_line_can_exceed_normal_limit(void) {
+    line_test_context ctx;
+    line_test_init(&ctx);
+
+    int failed = 0;
+
+    if(stream_receiver_line_max(false) != PLUGINSD_LINE_MAX) {
+        fprintf(stderr, "normal line limit is not PLUGINSD_LINE_MAX\n");
+        failed = 1;
+    }
+
+    if(stream_receiver_line_max(true) != PLUGINSD_MAX_DEFERRED_SIZE) {
+        fprintf(
+            stderr,
+            "deferred line limit is not PLUGINSD_MAX_DEFERRED_SIZE\n");
+        failed = 1;
+    }
+
+    if(failed) {
+        line_test_cleanup(&ctx);
+        return failed;
+    }
+
+    // A function result body is opaque: the sender writes it verbatim between
+    // FUNCTION_RESULT_BEGIN and FUNCTION_RESULT_END, and a minified JSON body
+    // can be a single line much larger than PLUGINSD_LINE_MAX.
+    const size_t chunk_size = 4096;
+    const size_t chunks = (PLUGINSD_LINE_MAX / chunk_size) + 2;
+    const size_t deferred_max = stream_receiver_line_max(true);
+    bool overflow = false;
+
+    for(size_t i = 0; i < chunks; i++) {
+        bool last = (i + 1 == chunks);
+        line_test_set_input(&ctx, 'F', chunk_size, last);
+
+        bool complete = stream_receiver_next_line_checked(
+            &ctx.reader,
+            ctx.line_buffer,
+            deferred_max,
+            &overflow);
+
+        if(overflow || complete != last) {
+            fprintf(
+                stderr,
+                "deferred line failed at chunk %zu/%zu "
+                "(complete=%d overflow=%d len=%zu)\n",
+                i + 1, chunks, complete, overflow, ctx.line_buffer->len);
+            failed = 1;
+            break;
+        }
+    }
+
+    if(!failed && ctx.line_buffer->len <= PLUGINSD_LINE_MAX) {
+        fprintf(
+            stderr,
+            "deferred test line did not exceed PLUGINSD_LINE_MAX "
+            "(len=%zu, max=%d)\n",
+            ctx.line_buffer->len, PLUGINSD_LINE_MAX);
+        failed = 1;
+    }
+
+    line_test_cleanup(&ctx);
+    return failed;
+}
+
 int main(void) {
     int failed = 0;
 
@@ -209,6 +278,7 @@ int main(void) {
     failed += test_line_limit_boundary();
     failed += test_overlong_newline_terminated_line();
     failed += test_normal_complete_line();
+    failed += test_deferred_line_can_exceed_normal_limit();
 
     if(failed) {
         fprintf(

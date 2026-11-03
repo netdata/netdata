@@ -796,16 +796,18 @@ static bool stream_receiver_dequeue_senders(struct stream_thread *sth, struct re
 }
 
 static void stream_receiver_overlong_line(
-    struct stream_thread *sth, struct receiver_state *rpt, bool *removed) {
+    struct stream_thread *sth, struct receiver_state *rpt, size_t line_max, bool *removed) {
 
-    nd_log(NDLS_DAEMON, NDLP_ERR,
+    nd_log_limit_static_global_var(erl, 1, 0);
+    nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
            "STREAM RCV[%zu] '%s' [from [%s]:%s]: line is %zu bytes (max %zu). "
            "Disconnecting the sender.",
            sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port,
-           rpt->thread.line_buffer->len, (size_t)PLUGINSD_LINE_MAX);
+           (size_t)rpt->thread.line_buffer->len, line_max);
 
     *removed = true;
-    stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_DISCONNECT_BUFFER_OVERFLOW);
+    // An overlong line is a protocol violation, not a send-buffer issue.
+    stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_RCV_DISCONNECT_PARSER_FAILED);
 }
 
 static bool stream_receiver_process_lines(
@@ -813,14 +815,25 @@ static bool stream_receiver_process_lines(
     PARSER *parser, bool *removed) {
 
     for(;;) {
+        // Function result bodies are deferred, opaque data and can be a single
+        // line larger than PLUGINSD_LINE_MAX (for example minified JSON).
+        // The parser bounds the whole deferred response by
+        // PLUGINSD_MAX_DEFERRED_SIZE, so use that as the line limit here.
+        // Require a real deferred response: a bogus FUNCTION_RESULT_BEGIN with
+        // an unknown transaction leaves defer.response NULL and must not
+        // unlock the larger limit.
+        bool deferred_payload =
+            (parser->flags & PARSER_DEFER_UNTIL_KEYWORD) && parser->defer.response;
+        size_t line_max = stream_receiver_line_max(deferred_payload);
         bool overflow = false;
         bool complete = stream_receiver_next_line_checked(
             &rpt->thread.uncompressed,
             rpt->thread.line_buffer,
+            line_max,
             &overflow);
 
         if(unlikely(overflow)) {
-            stream_receiver_overlong_line(sth, rpt, removed);
+            stream_receiver_overlong_line(sth, rpt, line_max, removed);
             return false;
         }
 

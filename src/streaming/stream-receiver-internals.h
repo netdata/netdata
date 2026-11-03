@@ -34,18 +34,28 @@ static inline bool stream_receiver_parse_hops(const char *value, int16_t *hops) 
     return true;
 }
 
+// A normal protocol line is bounded by PLUGINSD_LINE_MAX. Function results are
+// different: the sender writes the response body verbatim between
+// FUNCTION_RESULT_BEGIN and FUNCTION_RESULT_END, and a minified JSON body can
+// legitimately be a single line much larger than PLUGINSD_LINE_MAX. The parser
+// already bounds the whole deferred response with PLUGINSD_MAX_DEFERRED_SIZE,
+// so use the same bound while a deferred response is being received.
+static inline size_t stream_receiver_line_max(bool deferred) {
+    return deferred ? PLUGINSD_MAX_DEFERRED_SIZE : PLUGINSD_LINE_MAX;
+}
+
 // The receiver accumulates input into line_buffer across reads until a newline
-// shows up. Reject a line as soon as its accumulated size exceeds the protocol
-// limit, regardless of whether the current input completed the line.
-static inline bool stream_receiver_line_buffer_overflow(const BUFFER *line_buffer) {
-    return line_buffer->len > PLUGINSD_LINE_MAX;
+// shows up. Reject a line as soon as its accumulated size exceeds the limit,
+// regardless of whether the current input completed the line.
+static inline bool stream_receiver_line_buffer_overflow(const BUFFER *line_buffer, size_t line_max) {
+    return line_buffer->len > line_max;
 }
 
 static inline bool stream_receiver_next_line_checked(
-    struct buffered_reader *reader, BUFFER *line_buffer, bool *overflow) {
+    struct buffered_reader *reader, BUFFER *line_buffer, size_t line_max, bool *overflow) {
 
     bool complete = buffered_reader_next_line(reader, line_buffer);
-    *overflow = stream_receiver_line_buffer_overflow(line_buffer);
+    *overflow = stream_receiver_line_buffer_overflow(line_buffer, line_max);
 
     return complete;
 }
