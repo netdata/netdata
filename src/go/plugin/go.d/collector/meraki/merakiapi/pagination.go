@@ -4,11 +4,51 @@ package merakiapi
 
 import (
 	"errors"
+	"net"
+	"net/url"
+	"strconv"
 	"strings"
 )
 
-// Link values can contain commas inside URI references and quoted parameters.
-// Parse the RFC5988 framing rather than splitting the header on commas.
+// Meraki paginates with Link headers (RFC 8288): the server owns the cursor, and
+// the last page is the one without rel="next". The client never builds a cursor
+// itself or infers the end from a short page.
+
+// pageKey checks that a page URL stays on a trusted host, on the operation's
+// path, with only documented pagination parameters. It returns the URL in a
+// canonical form, used to detect pagination cycles.
+func (c *Client) pageKey(u *url.URL, operationPath string, maxPageSize int) (string, error) {
+	if !c.trustedTarget(u) || u.EscapedPath() != operationPath {
+		return "", errors.New("unsafe pagination scope")
+	}
+	query, err := url.ParseQuery(u.RawQuery)
+	if err != nil {
+		return "", errors.New("invalid pagination query")
+	}
+	for name, values := range query {
+		if len(values) != 1 {
+			return "", errors.New("ambiguous pagination query")
+		}
+		switch name {
+		case "startingAfter", "endingBefore":
+		case "perPage":
+			n, err := strconv.Atoi(values[0])
+			if err != nil || n < minPageSize || n > maxPageSize {
+				return "", errors.New("invalid pagination page size")
+			}
+			query.Set(name, strconv.Itoa(n))
+		default:
+			return "", errors.New("unexpected pagination query parameter")
+		}
+	}
+	host := net.JoinHostPort(strings.ToLower(u.Hostname()), effectivePort(u))
+	return u.Scheme + "://" + host + operationPath + "?" + query.Encode(), nil
+}
+
+// nextLink returns the rel="next" target from Link header values. Targets and
+// quoted parameters can contain commas, so it parses the RFC 8288 framing instead
+// of splitting on commas. Malformed or conflicting links are an error rather than
+// an apparent last page.
 func nextLink(headers []string) (string, bool, error) {
 	var next string
 	var found bool
@@ -29,7 +69,7 @@ func nextLink(headers []string) (string, bool, error) {
 			for rest != "" && rest[0] == ';' {
 				rest = strings.TrimSpace(rest[1:])
 				nameEnd := 0
-				for nameEnd < len(rest) && tokenByte(rest[nameEnd]) {
+				for nameEnd < len(rest) && isTokenChar(rest[nameEnd]) {
 					nameEnd++
 				}
 				if nameEnd == 0 {
@@ -41,16 +81,16 @@ func nextLink(headers []string) (string, bool, error) {
 					if strings.EqualFold(name, "rel") || strings.EqualFold(name, "anchor") {
 						return "", false, errors.New("missing Link parameter value")
 					}
-					continue // RFC5988 permits extension parameters without a value.
+					continue // extension parameters may have no value
 				}
-				value, remaining, err := linkValue(strings.TrimSpace(rest[1:]))
+				value, remaining, err := linkParamValue(strings.TrimSpace(rest[1:]))
 				if err != nil {
 					return "", false, err
 				}
 				rest = strings.TrimSpace(remaining)
 				hasAnchor = hasAnchor || strings.EqualFold(name, "anchor")
 				if strings.EqualFold(name, "rel") && !hasRelation {
-					// RFC5988 requires ignoring later occurrences of rel.
+					// RFC 8288: occurrences of rel after the first are ignored.
 					hasRelation = true
 					relations := strings.Fields(value)
 					if len(relations) == 0 {
@@ -62,6 +102,7 @@ func nextLink(headers []string) (string, bool, error) {
 				}
 			}
 			if isNext {
+				// An anchor changes the link context; it is not this page's next.
 				if hasAnchor {
 					return "", false, errors.New("unsupported pagination context")
 				}
@@ -81,13 +122,15 @@ func nextLink(headers []string) (string, bool, error) {
 	return next, found, nil
 }
 
-func linkValue(value string) (string, string, error) {
+// linkParamValue reads one token or quoted-string parameter value and returns it
+// with the unparsed remainder.
+func linkParamValue(value string) (string, string, error) {
 	if value == "" {
 		return "", "", errors.New("empty Link parameter")
 	}
 	if value[0] != '"' {
 		end := 0
-		for end < len(value) && (tokenByte(value[end]) || strings.ContainsRune("()/:<=>?@[]{}", rune(value[end]))) {
+		for end < len(value) && (isTokenChar(value[end]) || strings.ContainsRune("()/:<=>?@[]{}", rune(value[end]))) {
 			end++
 		}
 		if end == 0 {
@@ -114,7 +157,8 @@ func linkValue(value string) (string, string, error) {
 	return "", "", errors.New("unterminated quoted Link value")
 }
 
-func tokenByte(b byte) bool {
+// isTokenChar reports whether b is an RFC 9110 token character.
+func isTokenChar(b byte) bool {
 	return b >= 'a' && b <= 'z' || b >= 'A' && b <= 'Z' || b >= '0' && b <= '9' ||
 		strings.ContainsRune("!#$%&'*+-.^_`|~", rune(b))
 }

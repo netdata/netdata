@@ -51,7 +51,9 @@ func TestCheckExportsRetryAfterMinimum(t *testing.T) {
 			require.Len(t, f.calls(), 1)
 
 			now = deadline
-			f.set("/organizations/org/devices", fixtureResponse{body: `[]`})
+			f.set("/organizations/org/devices", fixtureResponse{
+				body: `[]`,
+			})
 			require.NoError(t, c.Check(t.Context()))
 			require.Len(t, f.calls(), 2, "the minimum permits requests at its deadline")
 		})

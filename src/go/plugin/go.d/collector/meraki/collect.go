@@ -2,28 +2,19 @@
 
 package meraki
 
-import (
-	"context"
-	"errors"
-)
+import "context"
 
+// collect reads the four organization lists completely, joins them, and only
+// then writes metrics. Any failed request or invalid inventory fails the whole
+// cycle, so a partial read never looks like removed devices.
 func (c *Collector) collect(ctx context.Context) error {
 	organizations, err := c.client.ListOrganizations(ctx)
 	if err != nil {
 		return err
 	}
-	var organizationName string
-	found := false
-	for _, org := range organizations {
-		if org.ID == c.OrganizationID {
-			if found && organizationName != org.Name {
-				return errors.New("conflicting Meraki organization records")
-			}
-			organizationName, found = org.Name, true
-		}
-	}
-	if !found {
-		return errors.New("configured organization_id is not visible to the Meraki credential")
+	org, err := findOrganization(organizations, c.OrganizationID)
+	if err != nil {
+		return err
 	}
 	networks, err := c.client.ListNetworks(ctx, c.OrganizationID)
 	if err != nil {
@@ -33,17 +24,15 @@ func (c *Collector) collect(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	availability, err := c.client.ListDeviceAvailabilities(ctx, c.OrganizationID)
+	availabilities, err := c.client.ListDeviceAvailabilities(ctx, c.OrganizationID)
 	if err != nil {
 		return err
 	}
-	snapshot, err := normalize(networks, devices, availability, c.OrganizationID)
+	inventory, err := buildInventory(c.OrganizationID, networks, devices, availabilities)
 	if err != nil {
 		return err
 	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	c.writeMetrics(organizationName, snapshot)
-	return ctx.Err()
+
+	c.writeMetrics(org.Name, inventory)
+	return nil
 }

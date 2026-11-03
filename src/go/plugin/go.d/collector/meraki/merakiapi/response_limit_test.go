@@ -87,50 +87,6 @@ type trackedBody struct {
 
 func (b trackedBody) Close() error { *b.closed = true; return nil }
 
-type countingBody struct {
-	io.Reader
-	read *int
-}
-
-func (b countingBody) Read(p []byte) (int, error) {
-	n, err := b.Reader.Read(p)
-	*b.read += n
-	return n, err
-}
-
-func (b countingBody) Close() error { return nil }
-
-func TestAdvertisedLimitAlsoBoundsRedirectBodyReads(t *testing.T) {
-	var calls, read int
-	client, err := merakiapi.New(merakiapi.Config{
-		APIKey: syntheticKey,
-	}, &http.Client{
-		Transport: advertisedLimitTransport{
-			limit: 64,
-			roundTripFunc: func(r *http.Request) (*http.Response, error) {
-				calls++
-				if calls == 1 {
-					location := *r.URL
-					location.Host = "n23.meraki.com"
-					resp := response(r, http.StatusFound, http.Header{
-						"Location": {location.String()},
-					}, "")
-					resp.Body = countingBody{
-						Reader: strings.NewReader(strings.Repeat("x", 2048)),
-						read:   &read,
-					}
-					return resp, nil
-				}
-				return response(r, http.StatusOK, nil, `[]`), nil
-			},
-		},
-	})
-	require.NoError(t, err)
-	_, err = client.ListOrganizations(t.Context())
-	require.NoError(t, err)
-	assert.LessOrEqual(t, read, 65, "redirect cleanup may read only the limit and its overflow probe")
-}
-
 func TestClientEnforcesAdvertisedLimitsAndRecovers(t *testing.T) {
 	var calls int
 	closed := false

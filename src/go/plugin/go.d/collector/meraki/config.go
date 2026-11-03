@@ -12,6 +12,7 @@ import (
 )
 
 const (
+	// Meraki refreshes device availability every five minutes.
 	defaultUpdateEvery = 300
 	defaultTimeout     = confopt.Duration(60 * time.Second)
 )
@@ -29,16 +30,16 @@ type Config struct {
 	tlscfg.TLSConfig   `yaml:",inline" json:""`
 }
 
-func (cfg Config) validate() error {
-	if cfg.OrganizationID == "" || strings.TrimSpace(cfg.OrganizationID) != cfg.OrganizationID ||
-		cfg.OrganizationID == "." ||
-		cfg.OrganizationID == ".." {
+// validateConfig checks options the client does not validate itself. URL and
+// credential rules are enforced by merakiapi.New.
+func (c *Collector) validateConfig() error {
+	if c.OrganizationID == "" || strings.TrimSpace(c.OrganizationID) != c.OrganizationID {
 		return errors.New("organization_id must be a nonempty organization ID without surrounding whitespace")
 	}
-	if cfg.Timeout.Duration() <= 0 {
+	if c.Timeout.Duration() <= 0 {
 		return errors.New("timeout must be greater than zero")
 	}
-	if (cfg.TLSCert == "") != (cfg.TLSKey == "") {
+	if (c.TLSCert == "") != (c.TLSKey == "") {
 		return errors.New("tls_cert and tls_key must be configured together")
 	}
 	return nil

@@ -3,10 +3,12 @@
 package meraki
 
 import (
+	"maps"
 	"os"
 	"slices"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
@@ -26,7 +28,7 @@ func TestIntegrationArtifacts(t *testing.T) {
 		t,
 		metadata,
 		chartTemplateYAML,
-		map[string][]string{"device_availability_status": availabilityStates},
+		map[string][]string{metricDeviceAvailabilityStatus: availabilityStates},
 	)
 	collecttest.AssertConfigSchemaMatchesMetadataWith(
 		t,
@@ -38,7 +40,22 @@ func TestIntegrationArtifacts(t *testing.T) {
 	)
 }
 
-func TestDocumentedLabels(t *testing.T) {
+func TestMetadataDocumentsEmittedLabels(t *testing.T) {
+	_, server := newFixtureAPI(t)
+	c := newTestCollector(t, server)
+	require.NoError(t, collectCycle(t.Context(), c))
+
+	var orgLabels []string
+	c.store.Read(metrix.ReadFlatten()).ForEachSeries(func(name string, labels metrix.LabelView, _ metrix.SampleValue) {
+		if name == metricOrganizationAssignedDevices {
+			orgLabels = slices.Sorted(maps.Keys(labels.CloneMap()))
+		}
+	})
+	emitted := map[string][]string{
+		"organization": orgLabels,
+		"device":       slices.Sorted(maps.Keys(readDevices(c)["S1"].Labels)),
+	}
+
 	var metadata struct {
 		Modules []struct {
 			Metrics struct {
@@ -60,12 +77,6 @@ func TestDocumentedLabels(t *testing.T) {
 		}
 		slices.Sort(documented[scope.Name])
 	}
-	want := map[string][]string{
-		"organization": slices.Clone(OrganizationLabelKeys),
-		"device":       slices.Clone(DeviceLabelKeys),
-	}
-	for _, labels := range want {
-		slices.Sort(labels)
-	}
-	require.Equal(t, want, documented)
+
+	require.Equal(t, emitted, documented)
 }

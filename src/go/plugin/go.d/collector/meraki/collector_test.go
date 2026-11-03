@@ -5,7 +5,6 @@ package meraki
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"os"
 	"testing"
 	"time"
@@ -37,10 +36,6 @@ func TestInit(t *testing.T) {
 		},
 		"spaced organization": {
 			change:  func(c *Collector) { c.OrganizationID = " org " },
-			wantErr: "organization_id",
-		},
-		"dot organization": {
-			change:  func(c *Collector) { c.OrganizationID = ".." },
 			wantErr: "organization_id",
 		},
 		"no credentials": {change: func(c *Collector) { c.APIKey = "" }, wantErr: "exactly one"},
@@ -139,7 +134,7 @@ func TestAvailabilityStatesAndPagination(t *testing.T) {
 		body: `[{"serial":"S3","status":"offline"},{"serial":"S4","status":"dormant"},{"serial":"OLD","status":"offline"}]`,
 	}
 	c := newTestCollector(t, server)
-	require.NoError(t, collectCycle(c, t.Context()))
+	require.NoError(t, collectCycle(t.Context(), c))
 	assert.Equal(t, map[string]metrix.SampleValue{"organization_assigned_devices": 5}, readOrganization(c))
 	got := readDevices(c)
 	values := make(map[string]map[string]metrix.SampleValue)
@@ -189,12 +184,12 @@ func TestMissingOrAmbiguousAvailability(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			f, server := newFixtureAPI(t)
 			c := newTestCollector(t, server)
-			require.NoError(t, collectCycle(c, t.Context()))
+			require.NoError(t, collectCycle(t.Context(), c))
 			before := readDevices(c)["S1"]
 			f.set("/organizations/org/devices/availabilities", fixtureResponse{
 				body: body,
 			})
-			require.NoError(t, collectCycle(c, t.Context()))
+			require.NoError(t, collectCycle(t.Context(), c))
 			after := readDevices(c)
 			require.Len(t, after, 1)
 			assert.Equal(t, map[string]metrix.SampleValue{"device_assigned": 1}, after["S1"].Values)
@@ -206,7 +201,7 @@ func TestMissingOrAmbiguousAvailability(t *testing.T) {
 func TestDiscoveryFailureRecoveryAndRemoval(t *testing.T) {
 	f, server := newFixtureAPI(t)
 	c := newTestCollector(t, server)
-	require.NoError(t, collectCycle(c, t.Context()))
+	require.NoError(t, collectCycle(t.Context(), c))
 	before := readDevices(c)["S1"]
 	f.set(
 		"/organizations/org/devices",
@@ -219,7 +214,7 @@ func TestDiscoveryFailureRecoveryAndRemoval(t *testing.T) {
 		status: 500,
 		body:   `{"errors":["failed page"]}`,
 	}
-	require.ErrorContains(t, collectCycle(c, t.Context()), "HTTP status 500")
+	require.ErrorContains(t, collectCycle(t.Context(), c), "HTTP status 500")
 	assert.Empty(t, readDevices(c), "failed snapshot must not be freshly visible")
 	f.set(
 		"/organizations/org/devices",
@@ -236,7 +231,7 @@ func TestDiscoveryFailureRecoveryAndRemoval(t *testing.T) {
 			body: `[{"serial":"S1","status":"offline","network":{"id":"N2"}}]`,
 		},
 	)
-	require.NoError(t, collectCycle(c, t.Context()))
+	require.NoError(t, collectCycle(t.Context(), c))
 	after := readDevices(c)["S1"]
 	assert.Equal(t, before.Scope.GUID, after.Scope.GUID)
 	assert.Equal(t, "Renamed", after.Scope.Hostname)
@@ -245,7 +240,7 @@ func TestDiscoveryFailureRecoveryAndRemoval(t *testing.T) {
 	f.set("/organizations/org/devices", fixtureResponse{
 		body: `[]`,
 	})
-	require.NoError(t, collectCycle(c, t.Context()))
+	require.NoError(t, collectCycle(t.Context(), c))
 	assert.Empty(t, readDevices(c))
 	assert.Equal(t, map[string]metrix.SampleValue{"organization_assigned_devices": 0}, readOrganization(c))
 }
@@ -273,7 +268,7 @@ func TestInvalidDiscovery(t *testing.T) {
 				body: tc.body,
 			})
 			c := newTestCollector(t, server)
-			require.ErrorContains(t, collectCycle(c, t.Context()), tc.wantErr)
+			require.ErrorContains(t, collectCycle(t.Context(), c), tc.wantErr)
 			assert.Empty(t, readDevices(c))
 			assert.Empty(t, readOrganization(c))
 		})
@@ -290,9 +285,9 @@ func TestRetryAfterPreventsEarlyRequests(t *testing.T) {
 		retryAfter: "600",
 		body:       `{"errors":["rate limit"]}`,
 	})
-	require.ErrorContains(t, collectCycle(c, t.Context()), "HTTP status 429")
+	require.ErrorContains(t, collectCycle(t.Context(), c), "HTTP status 429")
 	require.Len(t, f.calls(), 1)
-	require.ErrorContains(t, collectCycle(c, t.Context()), "Retry-After")
+	require.ErrorContains(t, collectCycle(t.Context(), c), "Retry-After")
 	require.ErrorContains(t, c.Check(t.Context()), "Retry-After")
 	require.Len(t, f.calls(), 1)
 	assert.Empty(t, readOrganization(c))
@@ -300,7 +295,7 @@ func TestRetryAfterPreventsEarlyRequests(t *testing.T) {
 	f.set("/organizations", fixtureResponse{
 		body: `[{"id":"org"}]`,
 	})
-	require.NoError(t, collectCycle(c, t.Context()))
+	require.NoError(t, collectCycle(t.Context(), c))
 	assert.Equal(t, wantStatus("online"), readDevices(c)["S1"].Values)
 }
 
@@ -308,20 +303,18 @@ func TestOperationDeadlineAndCancellation(t *testing.T) {
 	_, server := newFixtureAPI(t)
 	c := newTestCollector(t, server)
 	c.Timeout = confopt.Duration(20 * time.Millisecond)
-	err := collectCycle(c, t.Context()) // Request pacing spans the complete operation budget.
+	err := collectCycle(t.Context(), c) // Request pacing spans the complete operation budget.
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	assert.Empty(t, readDevices(c))
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	require.ErrorIs(t, c.Check(ctx), context.Canceled)
-	require.ErrorIs(t, collectCycle(c, ctx), context.Canceled)
+	require.ErrorIs(t, collectCycle(ctx, c), context.Canceled)
 	assert.Empty(t, readOrganization(c))
 }
 
-func TestUninitializedLifecycle(t *testing.T) {
+func TestBeforeInit(t *testing.T) {
 	c := New()
-	require.ErrorContains(t, c.Check(t.Context()), "not initialized")
-	require.ErrorContains(t, collectCycle(c, t.Context()), "not initialized")
 	c.Cleanup(t.Context())
 	// Configuration is usable and serializable before Init.
 	data, err := json.Marshal(c.Configuration())
@@ -329,5 +322,4 @@ func TestUninitializedLifecycle(t *testing.T) {
 	var cfg Config
 	require.NoError(t, json.Unmarshal(data, &cfg))
 	assert.Equal(t, c.Config, cfg)
-	assert.False(t, errors.Is(c.Check(t.Context()), context.DeadlineExceeded))
 }

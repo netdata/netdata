@@ -4,7 +4,7 @@ package meraki
 
 import "github.com/netdata/netdata/go/plugins/pkg/metrix"
 
-func (c *Collector) writeMetrics(organizationName string, devices []deviceSnapshot) {
+func (c *Collector) writeMetrics(organizationName string, inventory []device) {
 	m := c.metrics
 	orgLabels := m.meter.LabelSet(
 		metrix.Label{
@@ -16,48 +16,51 @@ func (c *Collector) writeMetrics(organizationName string, devices []deviceSnapsh
 			Value: organizationName,
 		},
 	)
-	m.assigned.Observe(metrix.SampleValue(len(devices)), orgLabels)
-	missing := 0
-	for _, d := range devices {
-		labels := m.meter.LabelSet(
+	m.organizationAssigned.Observe(metrix.SampleValue(len(inventory)), orgLabels)
+
+	unknownStatus := 0
+	for _, dev := range inventory {
+		devLabels := m.meter.LabelSet(
 			metrix.Label{
 				Key:   "serial",
-				Value: d.serial,
+				Value: dev.serial,
 			},
 			metrix.Label{
 				Key:   "device_name",
-				Value: d.name,
+				Value: dev.name,
 			},
 			metrix.Label{
 				Key:   "model",
-				Value: d.model,
+				Value: dev.model,
 			},
 			metrix.Label{
 				Key:   "product_type",
-				Value: d.productType,
+				Value: dev.productType,
 			},
 			metrix.Label{
 				Key:   "network_id",
-				Value: d.networkID,
+				Value: dev.networkID,
 			},
 			metrix.Label{
 				Key:   "network_name",
-				Value: d.networkName,
+				Value: dev.networkName,
 			},
 		)
-		meter := m.meter.WithHostScope(deviceHostScope(c.OrganizationID, d)).WithLabelSet(orgLabels, labels)
-		meter.Gauge("device_assigned").Observe(1)
-		if d.status == "" {
-			missing++
+		meter := m.meter.WithHostScope(deviceHostScope(c.OrganizationID, dev)).WithLabelSet(orgLabels, devLabels)
+
+		// Always written, so the device node exists even without a status.
+		meter.Gauge(metricDeviceAssigned).Observe(1)
+		if dev.status == "" {
+			unknownStatus++
 			continue
 		}
-		meter.StateSet("device_availability_status", metrix.WithStateSetMode(metrix.ModeEnum), metrix.WithStateSetStates(availabilityStates...)).
-			Enable(d.status)
+		meter.StateSet(metricDeviceAvailabilityStatus, availabilityStateSet...).Enable(dev.status)
 	}
-	if missing > 0 {
+
+	if unknownStatus > 0 {
 		c.Debugf(
 			"Meraki availability omitted for %d assigned devices with missing, unknown or inconsistent status",
-			missing,
+			unknownStatus,
 		)
 	}
 }

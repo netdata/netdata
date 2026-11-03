@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -14,49 +15,46 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
-// HTTPError preserves status and retry information without retaining response
-// bodies, URLs or headers. A 404 does not establish removal or lack of support.
+// HTTPError reports a non-200 response without its body, URL or headers. A 404
+// does not mean the entity is gone: Meraki also answers 404 to some
+// authorization failures.
 type HTTPError struct {
-	Operation     string
-	StatusCode    int
-	RetryAfter    time.Duration
-	HasRetryAfter bool
+	Operation  string
+	StatusCode int
+	// RetryAfter is the parsed Retry-After delay, zero when absent or invalid.
+	RetryAfter time.Duration
 }
 
 func (e *HTTPError) Error() string {
 	return fmt.Sprintf("%s: HTTP status %d", e.Operation, e.StatusCode)
 }
 
-func newHTTPError(op string, response *http.Response) *HTTPError {
-	delay, known := retryAfter(response.Header.Get("Retry-After"), time.Now())
+func newHTTPError(op string, resp *http.Response) *HTTPError {
 	return &HTTPError{
-		Operation:     op,
-		StatusCode:    response.StatusCode,
-		RetryAfter:    delay,
-		HasRetryAfter: known,
+		Operation:  op,
+		StatusCode: resp.StatusCode,
+		RetryAfter: parseRetryAfter(resp.Header.Get("Retry-After"), time.Now()),
 	}
 }
 
-func retryAfter(value string, now time.Time) (time.Duration, bool) {
+// parseRetryAfter accepts delta-seconds and HTTP dates. Invalid, past and
+// overflowing values return zero.
+func parseRetryAfter(value string, now time.Time) time.Duration {
 	value = strings.TrimSpace(value)
-	if value == "" {
-		return 0, false
-	}
 	if seconds, err := strconv.ParseUint(value, 10, 64); err == nil {
-		const maxSeconds = uint64((1<<63 - 1) / time.Second)
-		if seconds > maxSeconds {
-			return 0, false
+		if seconds > math.MaxInt64/uint64(time.Second) {
+			return 0
 		}
-		return time.Duration(seconds) * time.Second, true
+		return time.Duration(seconds) * time.Second
 	}
 	if at, err := http.ParseTime(value); err == nil {
-		return max(0, at.Sub(now)), true
+		return max(0, at.Sub(now))
 	}
-	return 0, false
+	return 0
 }
 
-// Only known safe causes survive; URL, parser, transport and credential errors
-// can contain server-controlled values or credential-file contents.
+// safeError keeps only causes known to be safe to show. URL, parser, transport
+// and credential-file errors can carry server-controlled text or file contents.
 func safeError(op, message string, cause error) error {
 	for _, safe := range []error{context.Canceled, context.DeadlineExceeded, web.ErrResponseTooLarge} {
 		if errors.Is(cause, safe) {

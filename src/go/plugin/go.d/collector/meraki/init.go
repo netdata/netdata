@@ -21,12 +21,13 @@ func (c *Collector) initClient(ctx context.Context) error {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		// Proxy URLs and TLS parser errors may contain sensitive configuration.
+		// The underlying error can echo the proxy URL, which may hold credentials.
 		return errors.New("cannot initialize Meraki HTTP transport; check proxy and TLS configuration")
 	}
 	httpClient := web.NewHTTPClientWithTransport(cfg, &pacedTransport{
 		base: transport,
 	})
+
 	client, err := merakiapi.New(
 		merakiapi.Config{
 			BaseURL:         c.URL,
@@ -41,5 +42,5 @@ func (c *Collector) initClient(ctx context.Context) error {
 	}
 	c.httpClient = httpClient
 	c.client = client
-	return ctx.Err()
+	return nil
 }

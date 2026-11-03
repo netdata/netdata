@@ -12,27 +12,37 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartemit"
 )
 
-func deviceHostScope(organizationID string, d deviceSnapshot) metrix.HostScope {
-	// A length-prefixed organization ID keeps opaque components unambiguous.
-	identity := fmt.Sprintf("meraki:%d:%s%s", len(organizationID), organizationID, d.serial)
+// deviceHostScope returns the virtual node of an assigned device. Its GUID
+// depends only on the organization ID and serial, so renames and network moves
+// keep the node. Names and network are metadata.
+func deviceHostScope(organizationID string, dev device) metrix.HostScope {
+	// The length prefix keeps the two opaque IDs from running into each other.
+	identity := fmt.Sprintf("meraki:%d:%s%s", len(organizationID), organizationID, dev.serial)
 	guid := uuid.NewSHA1(uuid.NameSpaceDNS, []byte(identity)).String()
-	name := strings.TrimSpace(d.name)
-	if name == "" {
-		name = "meraki-" + d.serial
+
+	hostname := strings.TrimSpace(dev.name)
+	if hostname == "" {
+		hostname = "meraki-" + dev.serial
 	}
 	info := netdataapi.HostInfo{
 		GUID:     guid,
-		Hostname: name,
+		Hostname: hostname,
 		Labels: map[string]string{
-			"_vnode_type": "meraki_device", "organization_id": organizationID, "serial": d.serial,
-			"device_name": d.name, "model": d.model, "product_type": d.productType,
-			"network_id": d.networkID, "network_name": d.networkName,
+			"_vnode_type":     "meraki_device",
+			"organization_id": organizationID,
+			"serial":          dev.serial,
+			"device_name":     dev.name,
+			"model":           dev.model,
+			"product_type":    dev.productType,
+			"network_id":      dev.networkID,
+			"network_name":    dev.networkName,
 		},
 	}
 	prepared, err := chartemit.PrepareHostInfo(info)
 	if err != nil {
+		// The name is not wire-safe; the GUID-based hostname always is.
 		info.Hostname = "meraki-" + guid
-		prepared, _ = chartemit.PrepareHostInfo(info) // Deterministic UUID fallback is wire-safe.
+		prepared, _ = chartemit.PrepareHostInfo(info)
 	}
 	return metrix.HostScope{
 		ScopeKey: guid,

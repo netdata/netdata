@@ -19,7 +19,6 @@ func TestHTTPStatusAndRetryAfter(t *testing.T) {
 		status int
 		header string
 		delay  time.Duration
-		known  bool
 	}{
 		"bad request":                          {status: http.StatusBadRequest},
 		"unauthorized":                         {status: http.StatusUnauthorized},
@@ -31,13 +30,11 @@ func TestHTTPStatusAndRetryAfter(t *testing.T) {
 			status: http.StatusTooManyRequests,
 			header: "120",
 			delay:  120 * time.Second,
-			known:  true,
 		},
-		"explicit zero": {status: http.StatusTooManyRequests, header: "0", known: true},
+		"explicit zero": {status: http.StatusTooManyRequests, header: "0"},
 		"past HTTP date": {
 			status: http.StatusTooManyRequests,
 			header: "Wed, 21 Oct 2015 07:28:00 GMT",
-			known:  true,
 		},
 		"missing":           {status: http.StatusTooManyRequests},
 		"negative":          {status: http.StatusTooManyRequests, header: "-1"},
@@ -70,10 +67,9 @@ func TestHTTPStatusAndRetryAfter(t *testing.T) {
 			var status *merakiapi.HTTPError
 			require.ErrorAs(t, err, &status)
 			assert.Equal(t, &merakiapi.HTTPError{
-				Operation:     "getOrganizations",
-				StatusCode:    test.status,
-				RetryAfter:    test.delay,
-				HasRetryAfter: test.known,
+				Operation:  "getOrganizations",
+				StatusCode: test.status,
+				RetryAfter: test.delay,
 			}, status)
 			assert.NotContains(t, err.Error(), "SYNTHETIC_PRIVATE_BODY")
 			assert.Nil(t, errors.Unwrap(status))
@@ -102,6 +98,5 @@ func TestHTTPDateRetryAfter(t *testing.T) {
 	_, err = client.ListOrganizations(t.Context())
 	var status *merakiapi.HTTPError
 	require.ErrorAs(t, err, &status)
-	assert.True(t, status.HasRetryAfter)
 	assert.InDelta(t, time.Until(at).Seconds(), status.RetryAfter.Seconds(), 1)
 }

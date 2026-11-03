@@ -4,61 +4,68 @@ package meraki
 
 import (
 	"errors"
-	"sort"
+	"slices"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/meraki/merakiapi"
 )
 
-type deviceSnapshot struct {
-	serial, name, model, productType string
-	networkID, networkName           string
-	status                           string
+// device is one assigned device of the organization, joined with its network
+// name and, when trustworthy, its availability status.
+type device struct {
+	serial      string
+	name        string
+	model       string
+	productType string
+	networkID   string
+	networkName string
+	status      string // one of availabilityStates, or "" when unknown
 }
 
-type availabilityRecord struct {
-	status, networkID string
-	ambiguous         bool
-}
-
-func normalize(
-	networks []merakiapi.Network,
-	devices []merakiapi.Device,
-	availability []merakiapi.DeviceAvailability,
-	organizationID string,
-) ([]deviceSnapshot, error) {
-	networkNames := make(map[string]string, len(networks))
-	for _, n := range networks {
-		if n.ID == "" {
-			continue // Optional metadata cannot establish or remove device membership.
-		}
-		if n.OrganizationID != "" && n.OrganizationID != organizationID {
-			return nil, errors.New("Meraki network belongs to a different organization")
-		}
-		if name, ok := networkNames[n.ID]; ok && name != n.Name {
-			return nil, errors.New("conflicting Meraki network records")
-		}
-		networkNames[n.ID] = n.Name
-	}
-	statuses := make(map[string]availabilityRecord, len(availability))
-	for _, a := range availability {
-		if a.Serial == "" {
+// findOrganization returns the configured organization from the visible list.
+func findOrganization(organizations []merakiapi.Organization, id string) (merakiapi.Organization, error) {
+	var org merakiapi.Organization
+	found := false
+	for _, o := range organizations {
+		if o.ID != id {
 			continue
 		}
-		record := availabilityRecord{
-			status:    a.Status,
-			networkID: a.Network.ID,
+		if found && o != org {
+			return merakiapi.Organization{}, errors.New("conflicting Meraki organization records")
 		}
-		if previous, ok := statuses[a.Serial]; ok && previous != record {
-			record.ambiguous = true
-		}
-		statuses[a.Serial] = record
+		org, found = o, true
 	}
-	assigned := make(map[string]deviceSnapshot, len(devices))
+	if !found {
+		return merakiapi.Organization{}, errors.New(
+			"configured organization_id is not visible to the Meraki credential",
+		)
+	}
+	return org, nil
+}
+
+// buildInventory joins the organization lists into the assigned devices. The
+// assigned-device list alone decides membership. Availability is attached only
+// when it is a known state for the same serial, consistent across duplicate
+// rows, and not reported for a different network. Otherwise the status stays
+// unknown: the provider lists are not one atomic snapshot, and a status that
+// cannot be trusted must not become a reported outage.
+func buildInventory(
+	organizationID string,
+	networks []merakiapi.Network,
+	devices []merakiapi.Device,
+	availabilities []merakiapi.DeviceAvailability,
+) ([]device, error) {
+	networkNames, err := networkNamesByID(organizationID, networks)
+	if err != nil {
+		return nil, err
+	}
+	statuses := statusesBySerial(availabilities)
+
+	assigned := make(map[string]device, len(devices))
 	for _, d := range devices {
 		if d.Serial == "" {
 			return nil, errors.New("Meraki assigned device has no serial")
 		}
-		device := deviceSnapshot{
+		dev := device{
 			serial:      d.Serial,
 			name:        d.Name,
 			model:       d.Model,
@@ -66,28 +73,67 @@ func normalize(
 			networkID:   d.NetworkID,
 			networkName: networkNames[d.NetworkID],
 		}
-		if previous, ok := assigned[d.Serial]; ok && previous != device {
+		if prev, ok := assigned[d.Serial]; ok && prev != dev {
 			return nil, errors.New("conflicting Meraki assigned-device records")
 		}
-		assigned[d.Serial] = device
+		assigned[d.Serial] = dev
 	}
-	result := make([]deviceSnapshot, 0, len(assigned))
-	for _, d := range assigned {
-		if a, ok := statuses[d.serial]; ok && !a.ambiguous && knownAvailability(a.status) &&
-			(d.networkID == "" || a.networkID == "" || d.networkID == a.networkID) {
-			d.status = a.status
+
+	inventory := make([]device, 0, len(assigned))
+	for _, dev := range assigned {
+		if s, ok := statuses[dev.serial]; ok && s.trusted(dev.networkID) {
+			dev.status = s.status
 		}
-		result = append(result, d)
+		inventory = append(inventory, dev)
 	}
-	sort.Slice(result, func(i, j int) bool { return result[i].serial < result[j].serial })
-	return result, nil
+	return inventory, nil
 }
 
-func knownAvailability(status string) bool {
-	switch status {
-	case "online", "alerting", "offline", "dormant":
-		return true
-	default:
-		return false
+func networkNamesByID(organizationID string, networks []merakiapi.Network) (map[string]string, error) {
+	names := make(map[string]string, len(networks))
+	for _, n := range networks {
+		if n.ID == "" {
+			continue // a network without an ID cannot be joined to devices
+		}
+		if n.OrganizationID != "" && n.OrganizationID != organizationID {
+			return nil, errors.New("Meraki network belongs to a different organization")
+		}
+		if name, ok := names[n.ID]; ok && name != n.Name {
+			return nil, errors.New("conflicting Meraki network records")
+		}
+		names[n.ID] = n.Name
 	}
+	return names, nil
+}
+
+// availabilityStatus is the availability reported for one serial.
+type availabilityStatus struct {
+	status    string
+	networkID string
+	ambiguous bool // duplicate rows for the serial disagree
+}
+
+func statusesBySerial(availabilities []merakiapi.DeviceAvailability) map[string]availabilityStatus {
+	statuses := make(map[string]availabilityStatus, len(availabilities))
+	for _, a := range availabilities {
+		if a.Serial == "" {
+			continue
+		}
+		s := availabilityStatus{
+			status:    a.Status,
+			networkID: a.Network.ID,
+		}
+		if prev, ok := statuses[a.Serial]; ok && prev != s {
+			s.ambiguous = true
+		}
+		statuses[a.Serial] = s
+	}
+	return statuses
+}
+
+// trusted reports whether the status can be attached to a device on networkID.
+// A blank network ID on either side does not count as a mismatch.
+func (s availabilityStatus) trusted(networkID string) bool {
+	return !s.ambiguous && slices.Contains(availabilityStates, s.status) &&
+		(networkID == "" || s.networkID == "" || networkID == s.networkID)
 }

@@ -1,47 +1,44 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Package merakiapi implements Meraki Dashboard API v1 discovery and availability
-// reads. It returns provider data without inventing metric semantics.
 package merakiapi
 
-// Organization is the minimal projection needed to identify an organization.
+// The response types keep only the fields the collector reads. IDs stay opaque
+// strings, and missing fields decode as empty values: the provider does not mark
+// them required, so callers validate what they rely on.
+
+// Organization is an organization visible to the credential.
 type Organization struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 }
 
-// Network describes a network visible to the authenticated identity.
+// Network is a network of an organization.
 type Network struct {
-	ID             string   `json:"id"`
-	OrganizationID string   `json:"organizationId"`
-	Name           string   `json:"name"`
-	ProductTypes   []string `json:"productTypes"`
-	Tags           []string `json:"tags"`
+	ID             string `json:"id"`
+	OrganizationID string `json:"organizationId"`
+	Name           string `json:"name"`
 }
 
-// Device describes assigned inventory, excluding unused organization inventory.
+// Device is a device assigned to a network. Unused organization inventory is
+// not listed.
 type Device struct {
-	Serial      string   `json:"serial"`
-	NetworkID   string   `json:"networkId"`
-	Name        string   `json:"name"`
-	Model       string   `json:"model"`
-	ProductType string   `json:"productType"`
-	Firmware    string   `json:"firmware"`
-	MAC         string   `json:"mac"`
-	Tags        []string `json:"tags"`
+	Serial      string `json:"serial"`
+	NetworkID   string `json:"networkId"`
+	Name        string `json:"name"`
+	Model       string `json:"model"`
+	ProductType string `json:"productType"`
 }
 
-// DeviceAvailability preserves the provider's status string, including unknown
-// or absent values. Meraki refreshes this endpoint every five minutes and does
-// not supply a sample timestamp.
+// DeviceAvailability is the provider-reported status of a device. Status keeps
+// the provider string as-is, including unknown or empty values. Meraki refreshes
+// availability every five minutes and supplies no sample timestamp.
 type DeviceAvailability struct {
-	Serial      string   `json:"serial"`
-	Name        string   `json:"name"`
-	ProductType string   `json:"productType"`
-	MAC         string   `json:"mac"`
-	Status      string   `json:"status"`
-	Tags        []string `json:"tags"`
-	Network     struct {
-		ID string `json:"id"`
-	} `json:"network"`
+	Serial  string     `json:"serial"`
+	Status  string     `json:"status"`
+	Network NetworkRef `json:"network"`
+}
+
+// NetworkRef references a network by ID.
+type NetworkRef struct {
+	ID string `json:"id"`
 }

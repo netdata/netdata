@@ -11,12 +11,12 @@ import (
 )
 
 func TestDeviceHostIdentity(t *testing.T) {
-	first := deviceHostScope("org", deviceSnapshot{
+	first := deviceHostScope("org", device{
 		serial:    "S1",
 		name:      "Old",
 		networkID: "N1",
 	})
-	second := deviceHostScope("org", deviceSnapshot{
+	second := deviceHostScope("org", device{
 		serial:    "S1",
 		name:      "New",
 		networkID: "N2",
@@ -24,19 +24,19 @@ func TestDeviceHostIdentity(t *testing.T) {
 	assert.Equal(t, "1acd32e0-81c6-5eaa-a7b9-7c99ec62bfe9", first.GUID)
 	assert.Equal(t, first.GUID, second.GUID)
 	assert.Equal(t, first.GUID, first.ScopeKey)
-	assert.NotEqual(t, first.GUID, deviceHostScope("other", deviceSnapshot{
+	assert.NotEqual(t, first.GUID, deviceHostScope("other", device{
 		serial: "S1",
 	}).GUID)
 	assert.NotEqual(
 		t,
-		deviceHostScope("a", deviceSnapshot{
+		deviceHostScope("a", device{
 			serial: "b:c",
 		}).GUID,
-		deviceHostScope("a:b", deviceSnapshot{
+		deviceHostScope("a:b", device{
 			serial: "c",
 		}).GUID,
 	)
-	badName := deviceHostScope("org", deviceSnapshot{
+	badName := deviceHostScope("org", device{
 		serial: "S1",
 		name:   "invalid\nname",
 	})

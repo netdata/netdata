@@ -110,8 +110,8 @@ func newTestCollector(t *testing.T, server *httptest.Server) *Collector {
 	return c
 }
 
-// Unlike the older generic helper, check the commit result as well as Collect.
-func collectCycle(c *Collector, ctx context.Context) error {
+// collectCycle runs one metric-store cycle and reports the commit result too.
+func collectCycle(ctx context.Context, c *Collector) error {
 	managed, _ := metrix.AsCycleManagedStore(c.MetricStore())
 	cc := managed.CycleController()
 	cc.BeginCycle()

@@ -73,8 +73,9 @@ func TestListOperations(t *testing.T) {
 				return c.ListNetworks(ctx, "12345678901234567890")
 			},
 			expected: []merakiapi.Network{{
-				ID: "N_EXAMPLE", OrganizationID: "12345678901234567890", Name: "Example network",
-				ProductTypes: []string{"switch", "wireless"}, Tags: []string{"test"},
+				ID:             "N_EXAMPLE",
+				OrganizationID: "12345678901234567890",
+				Name:           "Example network",
 			}},
 		},
 		"devices": {
@@ -83,8 +84,11 @@ func TestListOperations(t *testing.T) {
 				return c.ListDevices(ctx, "12345678901234567890")
 			},
 			expected: []merakiapi.Device{{
-				Serial: "Q234-ABCD-5678", NetworkID: "N_EXAMPLE", Name: "Example switch", Model: "MS120-8",
-				ProductType: "switch", Firmware: "switch-17-1", MAC: "00:11:22:33:44:55", Tags: []string{"test"},
+				Serial:      "Q234-ABCD-5678",
+				NetworkID:   "N_EXAMPLE",
+				Name:        "Example switch",
+				Model:       "MS120-8",
+				ProductType: "switch",
 			}},
 		},
 		"availabilities": {
@@ -94,10 +98,11 @@ func TestListOperations(t *testing.T) {
 			},
 			expected: []merakiapi.DeviceAvailability{
 				{
-					Serial: "Q234-ABCD-5678", Name: "Example switch", ProductType: "switch", MAC: "00:11:22:33:44:55",
-					Status: "online", Tags: []string{"test"}, Network: struct {
-						ID string `json:"id"`
-					}{ID: "N_EXAMPLE"},
+					Serial: "Q234-ABCD-5678",
+					Status: "online",
+					Network: merakiapi.NetworkRef{
+						ID: "N_EXAMPLE",
+					},
 				},
 				{Serial: "Q234-ABCD-5679", Status: "alerting"},
 				{Serial: "Q234-ABCD-5680", Status: "offline"},
