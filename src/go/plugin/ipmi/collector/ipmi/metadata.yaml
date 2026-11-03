@@ -25,8 +25,8 @@ modules:
       data_collection:
         metrics_description: Monitor hardware sensor readings, sensor health and System Event Log entries through IPMI.
         method_description: Queries a local Linux OpenIPMI device or a remote BMC over IPMI 1.5 LAN or IPMI 2.0 LAN+
-          using the configured account. The collector reads sensors and SEL metadata; it does not change BMC
-          configuration or clear the event log.
+          using the configured account. The collector reads sensors and the System Event Log (SEL); it does not
+          change BMC configuration or clear the event log.
       supported_platforms:
         include:
           - Linux
@@ -57,7 +57,10 @@ modules:
             one IPMI implementation; switch implementations by changing netdata.conf and restarting the Agent.
         performance_impact:
           description: IPMI command latency grows with sensor count. Increase update_every when a complete sensor scan
-            takes longer than the configured interval.
+            takes longer than the configured interval. With collect_sel enabled, the first collections after a start
+            also read the existing System Event Log, for up to two seconds each (a quarter of update_every when
+            shorter), until all records are read. Later collections read only new records, or the whole log again after
+            the BMC clears or rewrites it.
     setup:
       prerequisites:
         list:
@@ -130,7 +133,7 @@ modules:
               required: false
               group: Collection
             - name: collect_sel
-              description: "Collect the System Event Log entry count."
+              description: "Read the System Event Log: the entry count chart and the ipmi-sel Live Data view."
               default_value: true
               required: false
               group: Collection
@@ -316,3 +319,110 @@ modules:
           security: Read-only sensor data from the configured target.
           availability: Available while a collection job runs. Returns HTTP 503 before the first successful collection
             or after a collection failure.
+        - id: sel
+          function_name: ipmi-sel
+          name: IPMI System Event Log
+          description: Browse the hardware events the BMC recorded, such as threshold crossings, fan, power and memory
+            errors, processor throttling and boots, with default FreeIPMI states. Use it to see when a problem started
+            and how often it recurs; the sensor charts show only the current state.
+          parameters:
+            - id: __job
+              name: Instance
+              type: select
+              description: Select the IPMI collection job.
+              required: false
+              default: First available job
+              options: []
+            - id: state
+              name: State
+              type: select
+              description: Show only records with this default FreeIPMI state.
+              required: false
+              default: all
+              options:
+                - {id: all, name: All states, default: true}
+                - {id: critical, name: Critical}
+                - {id: warning, name: Warning}
+                - {id: nominal, name: Nominal}
+                - {id: unknown, name: Unknown}
+            - id: query
+              name: Search
+              type: string
+              description: 'Case-sensitive Netdata simple patterns against sensor, type, event, direction, state,
+                generator and record ID. Use `*DIMM*` for a substring. Space-separated patterns are checked in order;
+                the first match decides, `!` excludes, and no match excludes the row.'
+              required: false
+              default: No text filter
+              options: []
+          returns:
+            description: |
+              One row per SEL record the BMC retains, newest first in log order. The dashboard time range does not
+              filter the table, because SEL records are often weeks apart. Times are converted to UTC with the BMC's
+              SEL UTC offset. When the BMC reports none, times are the BMC clock, and the view shows how far that
+              clock is from the Agent clock. Records logged before a daylight saving change can be off by an hour,
+              because the BMC reports only its current offset. Records without a date (OEM records without a
+              timestamp, or records logged before the BMC clock was set) show Time as Unavailable.
+            columns:
+              - name: Order
+                type: integer
+                unit: ''
+                description: Position in the log, newest first.
+                visibility: hidden
+              - name: Time
+                type: timestamp
+                unit: ''
+                description: When the BMC logged the record, in UTC; Unavailable when the record has no date.
+              - name: Sensor
+                type: string
+                unit: ''
+                description: "SDR sensor name, or the event generator and sensor number (for example BIOS #34) when
+                  the BMC has no record of that sensor."
+              - name: Sensor Type
+                type: string
+                unit: ''
+                description: IPMI sensor type.
+              - name: Event
+                type: string
+                unit: ''
+                description: Event description; threshold events include the trigger reading and threshold when the
+                  BMC records them and the sensor's SDR record describes their conversion.
+              - name: Direction
+                type: string
+                unit: ''
+                description: Assertion (the condition started) or Deassertion (it ended).
+              - name: State
+                type: string
+                unit: ''
+                description: Default FreeIPMI interpretation of the record.
+              - name: Record ID
+                type: string
+                unit: ''
+                description: SEL record identifier.
+                visibility: hidden
+              - name: Generator
+                type: string
+                unit: ''
+                description: Event generator, such as the BMC, BIOS or SMI handler, and its ID.
+                visibility: hidden
+              - name: BMC Time
+                type: string
+                unit: ''
+                description: Timestamp as the BMC recorded it, before UTC conversion.
+                visibility: hidden
+              - name: Raw
+                type: string
+                unit: ''
+                description: Record bytes as returned by the BMC.
+                visibility: hidden
+              - name: rowOptions
+                type: none
+                unit: ''
+                description: Row health severity.
+                visibility: hidden
+          require_cloud: false
+          performance: Reads the records the collector already read from the BMC; sends no BMC requests.
+          security: Read-only hardware event records from the configured target.
+          availability: Available for jobs with collect_sel enabled while they run; when no job collects the SEL,
+            requests return HTTP 404. Returns HTTP 503 before the first successful collection, after a collection
+            failure, or while the BMC has not answered SEL requests. On the first collections of a large log, it shows
+            the oldest records read so far.

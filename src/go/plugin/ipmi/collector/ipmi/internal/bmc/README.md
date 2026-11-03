@@ -1,10 +1,10 @@
 # IPMI command adapter
 
-This adapter uses the published `bougou/go-ipmi` revision `5dabd2f69282accf86ea815aa5d50cfbd5e767a1`. It
-reads the SDR repository, sensor readings, and optionally one SEL entry-count response. It does not write BMC
-configuration. Local OpenIPMI uses `NewOpenClient` and ordinary process/device permissions. LAN/LAN+ uses `NewClient`
-with the configured address, credentials and privilege. One Reader serializes commands for one connection; the SDK
-serializes remote exchanges with its automatic keepalive. SDK UDP retries are disabled.
+This adapter uses the published `bougou/go-ipmi` revision `5dabd2f69282accf86ea815aa5d50cfbd5e767a1`. It reads the SDR
+repository, sensor readings, and optionally the System Event Log (SEL). It does not write BMC configuration or the SEL.
+Local OpenIPMI uses `NewOpenClient` and ordinary process/device permissions. LAN/LAN+ uses `NewClient` with the
+configured address, credentials and privilege. One Reader serializes commands for one connection; the SDK serializes
+remote exchanges with its automatic keepalive. SDK UDP retries are disabled.
 
 ## Discovery and missing data
 
@@ -30,9 +30,8 @@ A disabled scanner or unavailable reading produces unknown state and no numeric 
 unknown state even when the independent numeric reading is valid. Completion-code errors for individual sensors leave
 healthy sensors collectable. Inventory failures, other sensor command failures and caller cancellation fail collection
 and close the connection. A response decoding error is fatal even when the SDK wraps it in a `ResponseError` with
-completion code zero. Closing a local device releases its descriptor without sending an IPMI command. Optional SEL failures omit its sample; no previous value or zero
-substitute is returned. Each requested SEL collection performs a real, single `Get SEL Info` command rather than
-rereading the log. Warnings are counts in four fixed categories, never an unbounded list of records.
+completion code zero. Closing a local device releases its descriptor without sending an IPMI command. Warnings are
+counts in fixed categories, never an unbounded list of records.
 
 Supported numeric units are Celsius, Fahrenheit, volts, amps, RPM, watts, and unitless percentages. Other unit
 combinations retain status but omit numeric samples. Signed readings and standard linearizations are supported.
@@ -45,6 +44,53 @@ transition. Expanded shared sensors and correctly decoded non-ASCII names can ha
 collector's default shared-sensor/name handling. Type labels follow the C collector; components use its ordered
 case-insensitive name patterns, Other fallback, and fixed sensor-type overrides. This is not a complete FreeIPMI
 compatibility layer.
+
+## System Event Log
+
+Each collection with SEL enabled sends one `Get SEL Info`. Its entry count is the `ipmi.sel` sample; a failure omits the
+sample, with no previous value or zero substitute. `Snapshot.SEL` appears once the BMC first answers and then carries
+the cached records, the latest entry count, free bytes and overflow flag, and the clock information below. Any SEL
+command failure degrades only SEL data: a failed `Get SEL Info` or record read keeps the earlier records and marks the
+read failed, except that a record vanishing during a walk resets the cache (see below); a failed clock read keeps the
+earlier clock values. Records resolve sensor names against the inventory again whenever it is replaced, so a renamed
+sensor renames its records.
+
+Records are cached per Reader, across collections and reconnects:
+
+- The first read walks the chain from record 0000h with `Get SEL Entry`, oldest first. Each collection starts no new
+  read once min(2 s, update interval / 4) has passed and resumes where it stopped; a walk reads at least one record. At
+  about 8 ms per record over local KCS, a full read of a large SEL would otherwise delay sensor collection by seconds.
+- Once the newest record has been read, an unchanged entry count and addition time send no `Get SEL Entry`. A change
+  reads the newest record (FFFFh); if it differs from the newest cached record, that cached record is read again for
+  its next-record ID and the walk continues from there.
+- A changed erase time, or a newest cached record that is gone or changed, means the SEL was cleared or rewritten:
+  the cache is reset and the log is read again. A record that disappears during a walk fails that read and restarts
+  the log from 0000h.
+- On rollover the BMC overwrites the oldest records. When a change leaves more cached records than the reported entry
+  count, the oldest record the BMC holds (0000h) shows which were overwritten: older cached records are dropped, and a
+  cache without that record is read again. The count alone cannot tell, because records logged after `Get SEL Info`
+  are read too. A cached record ID reported with new content was reused and replaces the old record. Reaching a cached
+  record with unchanged content means the chain loops back and ends the walk.
+- Like FreeIPMI, `Reserve SEL` is sent only after a 0xC5 completion code, and a read is retried with a new reservation
+  up to four times. Whole 16-byte records are read; a shorter record fails the read.
+
+Published record slices only grow at the end, lose a prefix or are reallocated, so earlier snapshots never change.
+
+`Get SEL Time UTC Offset` and `Get SEL Time` are read at most every five minutes, also when record reads fail. SEL time
+is UTC plus the offset, so `SEL.Time` subtracts it. A completion-code failure, 07FFh or a value outside -1440..1440
+minutes means no offset: times are then the BMC clock as UTC, and `ClockSkew` (BMC clock minus Agent clock) lets the
+Function show the difference instead of guessing an offset. Pre-init timestamps (below 20000000h, seconds since BMC
+initialization), FFFFFFFFh and non-timestamped OEM records have no date.
+
+Records are decoded when read. Sensor names come from the SDR inventory by generator owner ID, LUN and sensor number.
+Without an SDR record, the name is the generator class and sensor number, for example `BIOS #34`: software IDs
+01h-1Fh BIOS, 21h-3Fh SMI Handler, 41h-5Fh System Management Software, 61h-7Fh OEM Software, 81h-8Dh Remote Console,
+8Fh Terminal Mode Remote Console, other software IDs Software; IPMB address 20h is the BMC and others are controllers.
+Event text comes from go-ipmi; threshold events whose event data carries the trigger reading or threshold append them,
+converted with the sensor's SDR factors. OEM records are shown undecoded. Some firmware logs events with a reserved
+record type in the standard range (00h-BFh) and the system event layout, for example BIOS power-off events as type 04h.
+They are decoded for display, keep the unknown state of the FreeIPMI default policy, and name their record type in the
+event text.
 
 ## Cancellation and cleanup
 
@@ -67,11 +113,20 @@ Closing a local device sends no command and needs no detached cleanup budget.
 - `libfreeipmi/interpret/ipmi-interpret.c`: dispatch, aggregation, unknown offsets.
 - `libipmimonitoring/ipmi_monitoring_sensor_reading.c`: units and missing readings.
 
+`sel_states.go` ports the default SEL interpretation of the same release: all 82 tables with their 474 assertion and
+deassertion states (`libfreeipmi/interpret/ipmi-interpret-config-sel.c`) and the dispatch of `ipmi_interpret_sel` in
+`ipmi-interpret.c`. Only system event records (type 02h) are interpreted; OEM records, OEM and reserved event types,
+pairs without a table and offsets past a table's end are unknown. FreeIPMI applies its Intel Node Manager and Supermicro
+OEM tables, and treats invalid record types as system events, only with non-default flags. One table initializes only
+the assertion state; its deassertion state is the zero value, nominal (`IPMI_INTERPRET_STATE_NOMINAL` is 0x00).
+`testdata/freeipmi-default-sel-states.csv` lists every entry with its FreeIPMI option name, mechanically extracted from
+those two files with each table mapped to its event/reading type and sensor type through the dispatch.
+
 The source tables are GPL-3.0-or-later, copyright FreeIPMI Core Team (2003–2015), Lawrence Livermore National Security,
 LLC (2007–2015), and The Regents of the University of California (2006–2007), written by Albert Chu at Lawrence
-Livermore National Laboratory. Notices are retained in `states.go`; the source-derived
-`testdata/freeipmi-default-states.csv` carries the same license. The repository LICENSE supplies its terms. Data and
-software are supplied without warranty.
+Livermore National Laboratory. Notices are retained in `states.go` and `sel_states.go`; the source-derived
+`testdata/freeipmi-default-states.csv` and `testdata/freeipmi-default-sel-states.csv` carry the same license. The
+repository LICENSE supplies its terms. Data and software are supplied without warranty.
 
 FreeIPMI defaults lower/upper **non-critical** thresholds to **nominal**, while critical and nonrecoverable thresholds
 are critical. Supported discrete states use their worst mapped severity. Unknown asserted offsets override recognized
@@ -79,7 +134,9 @@ severity; bit 15 is ignored. Unsupported event/sensor pairs are unknown even wit
 local FreeIPMI configuration overrides, bridged satellites, and device-only SDR repositories are not implemented.
 
 Tests exercise actual command-response decoding through a narrow fake transport, Reader collection/recovery/refresh, the
-complete source-derived discrete fixture, threshold flags, missing bytes, ownership, sharing, unit/sign conversion,
-nonlinear factors, and fractional EXP10 conversion. Real UDP tests use the upstream reference BMC with a User account
-for both LAN and LAN+: Check cleanup, sensor/SEL collection, session reuse, malformed responses, cancellation and failed
-setup recovery. These fixtures do not establish live-hardware parity for any particular vendor.
+complete source-derived discrete and SEL fixtures, threshold flags, missing bytes, ownership, sharing, unit/sign
+conversion, nonlinear factors, and fractional EXP10 conversion. SEL tests cover the read budget and resume, appends,
+clears, rewrites, rollover and ID reuse, looping chains, reservations, UTC offsets, clock refresh, undated and OEM
+records, generator names and failures. Real UDP tests use the upstream reference BMC with a User account for both LAN
+and LAN+: Check cleanup, sensor and SEL collection, session reuse, malformed responses, cancellation and failed setup
+recovery. These fixtures do not establish live-hardware parity for any particular vendor.

@@ -266,7 +266,7 @@ func TestRouter_MethodParams(t *testing.T) {
 // serializes, including charting, against the Function UI schema.
 func assertMatchesFunctionSchema(t *testing.T, response *funcapi.FunctionResponse) {
 	t.Helper()
-	payload := map[string]any{
+	validateFunctionPayload(t, map[string]any{
 		"status":              response.Status,
 		"type":                "table",
 		"columns":             response.Columns,
@@ -275,7 +275,12 @@ func assertMatchesFunctionSchema(t *testing.T, response *funcapi.FunctionRespons
 		"help":                response.Help,
 		"charts":              response.Charts,
 		"default_charts":      response.DefaultCharts.Build(),
-	}
+	})
+}
+
+// validateFunctionPayload validates a serialized Function response against the Function UI schema.
+func validateFunctionPayload(t *testing.T, payload map[string]any) {
+	t.Helper()
 	raw, err := json.Marshal(payload)
 	require.NoError(t, err)
 	var decoded any

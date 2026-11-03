@@ -56,12 +56,20 @@ type MetadataFunction struct {
 // it: its registered id, its effective parameters (static FunctionConfig
 // parameters merged with the handler's dynamic ones, as the framework does)
 // and the columns of a table response. A RawRequest Function owns its own
-// response contract, so its columns are not compared.
+// response contract, so its columns are not compared unless the check asks
+// for its table (MetadataFunctionsCheck.RawTables).
 type ImplementedFunction struct {
 	ID         string
 	PublicName string // as funcapi.FunctionName resolves it; empty skips the name comparison
 	Parameters []funcapi.ParamConfig
-	Columns    []MetadataFunctionColumn
+	// AcceptedParams are inputs a raw-request handler parses itself
+	// (FunctionConfig.AcceptedParams). They must be documented; their type and
+	// options are documentation only.
+	AcceptedParams []string
+	Columns        []MetadataFunctionColumn
+	// RawRequest marks a raw-request method whose columns are not compared. A
+	// raw-request method compared through RawTables has it false, with its
+	// AcceptedParams and Columns set.
 	RawRequest bool
 }
 
@@ -186,7 +194,9 @@ func checkFunctionParameters(documented MetadataFunction, actual ImplementedFunc
 		}
 		config, ok := expected[param.ID]
 		if !ok {
-			problems = append(problems, fmt.Errorf("%s: parameter %s documented but not declared", documented.ID, param.ID))
+			if !slices.Contains(actual.AcceptedParams, param.ID) {
+				problems = append(problems, fmt.Errorf("%s: parameter %s documented but not declared", documented.ID, param.ID))
+			}
 			continue
 		}
 		if param.Name != config.Name {
@@ -209,6 +219,11 @@ func checkFunctionParameters(documented MetadataFunction, actual ImplementedFunc
 	for id := range expected {
 		if !seen[id] {
 			problems = append(problems, fmt.Errorf("%s: parameter %s declared but not documented", documented.ID, id))
+		}
+	}
+	for _, id := range actual.AcceptedParams {
+		if !seen[id] {
+			problems = append(problems, fmt.Errorf("%s: parameter %s accepted but not documented", documented.ID, id))
 		}
 	}
 	return problems
@@ -249,6 +264,10 @@ type MetadataFunctionsCheck struct {
 	Params func(method string) funcapi.ResolvedParams
 	// JobSelectable is true for per-job collectors, whose Functions get the framework's Instance selector.
 	JobSelectable bool
+	// RawTables compares the columns of raw-request methods too: the handler
+	// must implement funcapi.RawMethodHandler and answer a request without
+	// inputs with a table.
+	RawTables bool
 }
 
 // CheckMetadataDocumentsFunctions decodes metadata.yaml, resolves every
@@ -276,15 +295,24 @@ func CheckMetadataDocumentsFunctions(metadataYAML []byte, check MetadataFunction
 
 // implementedFunction mirrors the framework's parameter resolution: static
 // FunctionConfig.RequiredParams, overridden by the handler's MethodParams and
-// then by the response's RequiredParams. Raw-request methods use only the
-// static parameters and are not asked for a table.
+// then by the response's RequiredParams. Raw-request methods use the static
+// parameters and their accepted inputs, and are asked for a table only with
+// RawTables.
 func implementedFunction(ctx context.Context, method funcapi.FunctionConfig, check MetadataFunctionsCheck) (ImplementedFunction, error) {
 	function := ImplementedFunction{ID: method.ID, Parameters: method.RequiredParams, RawRequest: method.RawRequest}
 	if check.Module != "" {
 		function.PublicName = funcapi.FunctionName(check.Module, method)
 	}
 	if method.RawRequest {
-		return function, nil
+		function.AcceptedParams = method.AcceptedParams
+		if !check.RawTables {
+			return function, nil
+		}
+		raw, ok := check.Handler.(funcapi.RawMethodHandler)
+		if !ok {
+			return function, fmt.Errorf("%s: raw-request method without a raw handler", method.ID)
+		}
+		return withTable(function, raw.HandleRaw(ctx, funcapi.RawMethodRequest{Method: method.ID}))
 	}
 	dynamic, err := check.Handler.MethodParams(ctx, method.ID)
 	if err != nil {
@@ -295,10 +323,16 @@ func implementedFunction(ctx context.Context, method funcapi.FunctionConfig, che
 	if check.Params != nil {
 		params = check.Params(method.ID)
 	}
-	response := check.Handler.Handle(ctx, method.ID, params)
+	return withTable(function, check.Handler.Handle(ctx, method.ID, params))
+}
+
+// withTable adds the columns and response parameters of a table response.
+func withTable(function ImplementedFunction, response *funcapi.FunctionResponse) (ImplementedFunction, error) {
+	var err error
 	if function.Columns, err = FunctionResponseColumns(response); err != nil {
-		return function, fmt.Errorf("%s: table: %w", method.ID, err)
+		return function, fmt.Errorf("%s: table: %w", function.ID, err)
 	}
+	function.RawRequest = false
 	if len(response.RequiredParams) != 0 {
 		function.Parameters = funcapi.MergeParamConfigs(function.Parameters, response.RequiredParams)
 	}

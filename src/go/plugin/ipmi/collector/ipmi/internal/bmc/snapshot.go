@@ -27,7 +27,10 @@ const (
 type Snapshot struct {
 	Sensors []Sensor
 	// SELEntries is the raw System Event Log entry count; nil when not requested or unavailable.
-	SELEntries  *int
+	SELEntries *int
+	// SEL is the cached System Event Log; nil when not requested or before the
+	// BMC first answered Get SEL Info.
+	SEL         *SEL
 	CollectedAt time.Time
 	// Warnings summarize partially collected data in a fixed vocabulary.
 	Warnings []string
