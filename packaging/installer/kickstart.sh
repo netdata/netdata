@@ -1841,7 +1841,7 @@ setup_dem_runtime() {
   esac
 
   if [ "${DRY_RUN}" -eq 1 ]; then
-    progress "Would run dem.plugin runtime ${dem_action} as the configured nonroot service user, using the installed Agent's directories and publisher configuration."
+    progress "Would run dem.plugin runtime ${dem_action} as the configured nonroot service user, using the installed Agent's directories and DEM runtime configuration."
     return 0
   fi
   dem_config=$(dem_runtime_config directories config) || return $?
@@ -1860,7 +1860,7 @@ setup_dem_runtime() {
       progress "DEM runtime prepared with daily automatic preparation enabled. Restart the Agent explicitly to activate it; kickstart does not restart it for managed runtime activation."
     else
       dem_cli_status=$?
-      warning "Managed runtime installation failed. Check the CLI error and dem.conf publisher release_url/verification_keys; kickstart does not invent trust or bypass qualification. For manual updates, use runtime install --allow-download --manual-updates as the service user."
+      warning "Managed runtime installation failed. Check the CLI error and the dem.conf runtime.release_url setting; kickstart does not invent trust or bypass qualification. For manual updates, use runtime install --allow-download --manual-updates as the service user."
       return "${dem_cli_status}"
     fi
   else

@@ -126,7 +126,10 @@ sequence is a no-op only for identical complete release metadata; explicit
 reinstallation can change its update policy without downloading unchanged bytes.
 Normal checks reject regressions. Explicit repair can select an older authenticated
 release after all consumers/executions drain, with a newly specified update policy.
-Trusted-local imports remain manual and do not silently acquire download consent.
+The CLI's explicit install and repair commands, including signed offline imports,
+enable future automatic online preparation unless `--manual-updates` is supplied.
+Offline import describes acquisition for that invocation, which uses only local
+files; it does not select a manual update policy. Protected preloads remain manual.
 
 The default allowance is 4 GiB of logical regular-file bytes, including archives,
 workspace, lifecycle records and trash. Active preparation reserves its unwritten

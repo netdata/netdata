@@ -74,8 +74,9 @@ modules:
               `netdata-dem-runtime` package on live systemd hosts; package hooks may restart the Agent. Other installation
               methods use managed bundles or protected preloads. Production publication still requires release and platform qualification.
 
-              For managed bundles, configure the publisher verification key in dem.conf, obtain a signed release descriptor
-              and matching archive, then run as the service account:
+              For offline managed installation, set `runtime.offline_keyring` in `dem.conf` to the path of an
+              administrator-provisioned public OpenPGP keyring. Obtain a signed release descriptor and matching archive,
+              then run as the service account:
 
               ```sh
               dem.plugin runtime install --release /absolute/path/release.json --archive /absolute/path/runtime.tar.zst

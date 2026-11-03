@@ -225,7 +225,7 @@ claim() { return "${FIXTURE_CLAIM_STATUS:-0}"; }
         self.settings['cli_exit'] = 29
         result = self.invoke('main', FIXTURE_INSTALLED=0)
         self.assertEqual(result.returncode, 29, result.stderr)
-        self.assertIn('publisher release_url/verification_keys', result.stderr)
+        self.assertIn('dem.conf runtime.release_url', result.stderr)
         self.assertNotIn('Successfully installed', result.stderr)
 
     def test_root_account_missing_plugin_and_bad_config_refuse(self):
