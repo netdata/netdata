@@ -362,10 +362,7 @@ func (dcjc *DynCfgJobController) prepareTransientConstructionFailure(
 ) (lifecycle.PreparedResourceTransaction, error) {
 	failure := transientActivationFailure(config, err)
 	if reply.command != "" && reply.candidate == nil {
-		after := 0
-		if failure.retry {
-			after = failure.retryAfter
-		}
+		after := failure.retryPolicy()
 		delta, policyErr := dcjc.candidates.prepareAdoptExact(config, true, dyncfg.StatusFailed, true, after, dcjc.scheduler.retries.now())
 		if policyErr != nil {
 			return nil, policyErr
@@ -413,10 +410,7 @@ func (dcjc *DynCfgJobController) prepareProbeFailure(
 		if err := yaml.Unmarshal(plan.postimage.Payload, &config); err != nil {
 			return nil, err
 		}
-		after := 0
-		if failure.retry {
-			after = failure.retryAfter
-		}
+		after := failure.retryPolicy()
 		delta, err := dcjc.candidates.prepareAdoptExact(config, true, dyncfg.StatusFailed, !removed, after, dcjc.scheduler.retries.now())
 		if err != nil {
 			return nil, err

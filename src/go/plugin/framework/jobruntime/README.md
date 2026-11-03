@@ -24,6 +24,15 @@ be retried. UPDATE that accepts a replacement for activation and ENABLE that tra
 acknowledge configuration with 202 before this runtime outcome; Job Manager publishes later health separately.
 ENABLE on an already-enabled job preserves its work and retry deadlines regardless of health. It returns 202 while
 health is Accepted and 200 otherwise, including Failed.
+
+Collectors may attach `collectorapi.WithRetryNotBefore(err, deadline)` to an Init, Check or retryable Run startup
+failure. The absolute minimum survives diagnostic sanitization and failed-candidate cleanup; Job Manager applies it
+only when existing policy permits an automatic retry. It neither enables a zero retry cadence nor overrides permanent
+classification or post-readiness failure policy. Outstanding minima also constrain automatic source promotion and
+reopened initial passes for the same retained candidate. A satisfied minimum is consumed at activation admission;
+physical continuation preserves that admission. Manual exact acceptance/fresh enablement retains its reset semantics.
+The annotation does not delay manual diagnostic calls or ordinary collection.
+
 RESTART observes the exact activation outside the mutation lane.
 Logical stop revokes output and Function admission promptly; physical cleanup still waits for their admitted work.
 A startup error classified with

@@ -263,7 +263,7 @@ func seedTestCandidateRetry(
 		true,
 		dyncfg.StatusFailed,
 		true,
-		after,
+		candidateRetryPolicy{cadence: int64(after)},
 		controller.scheduler.retries.now(),
 	)
 	require.NoError(t, err)
@@ -305,7 +305,7 @@ func seedTestCandidateBinding(
 		status == dyncfg.StatusRunning || status == dyncfg.StatusFailed,
 		status,
 		true,
-		0,
+		candidateRetryPolicy{},
 		controller.scheduler.retries.now(),
 	)
 	require.NoError(t, err)
