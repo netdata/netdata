@@ -222,8 +222,17 @@ slower runtime useful for valgrind/gdb. The `README.md` in `packaging/makeself/`
 | `No cached copy of build directory for X found, fetching sources instead.` (every run) | any third-party | `artifacts/cache/` removed or arch dir missing | Normal on first build; persists for the next run |
 | `Could not find a usable OCI runtime` | n/a | Neither docker nor podman in `$PATH` | Install one |
 | Runtime check times out waiting for localhost:19999 | 81 | Agent did not become reachable within the bounded wait; cause is not yet established | Inspect the job log and `netdata.log`, then diagnose startup |
-| `not statically linked` warning | 80 (static check) | A new dep introduced a dynamic link | Audit `ldd` of the built binary; `git grep target_link_libraries -- '*.cmake' '*CMakeLists.txt'` for a new shared lib -- links live in the root file, the modules, and the subdirectory CMakeLists (libnetdata, debugfs's vendored libsensors) |
+| `Ooops. <path> is not a statically linked binary!` | 80 (static check) | An installed executable ELF has a `PT_INTERP` header (dynamically linked) | See "Dynamic binary in job 80" below |
 | OOM kill mid-Rust compile under QEMU | 70 | QEMU + Rust LTO is memory-hungry | Use a suitably provisioned native builder or investigate actual job parallelism; the launcher exposes no `PROCESSORS` knob |
+
+### Dynamic binary in job 80
+
+- **Likely cause:** CMake targets get `-static` from `CMAKE_EXE_LINKER_FLAGS`. A binary linked by a custom command,
+  such as `go build` with `CGO_ENABLED=1`, does not.
+- **Find it:** read the `ldd` output the job prints, then the command that linked that binary.
+- **cgo fix:** under `STATIC_BUILD`, add `-linkmode=external -extldflags=-static` to `-ldflags` and every
+  dependency's static link flags to `CGO_LDFLAGS`. Example: `packaging/cmake/Modules/NetdataPluginEBPF.cmake` uses
+  libelf's `pkg-config --static` flags plus `-lbpf` and `-lz`.
 
 The build script exits with `Build failed.` on any job failure (`packaging/makeself/build.sh:44-52`). For an
 interactive TTY launch, `DEBUG_BUILD_INFRA=1` is forwarded and opens a `bash` shell on failure; the non-TTY
