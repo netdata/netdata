@@ -1,0 +1,726 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+//go:build linux || freebsd || openbsd || netbsd || dragonfly || darwin
+
+package runit
+
+import (
+	"bytes"
+	"errors"
+	"maps"
+	"os"
+	"testing"
+
+	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+)
+
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON": dataConfigJSON,
+		"dataConfigYAML": dataConfigYAML,
+	} {
+		require.NotNil(t, data, name)
+	}
+}
+
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
+}
+
+func TestNew(t *testing.T) {
+	collr := New()
+
+	assert.IsType(t, (*Collector)(nil), collr)
+	assert.NotNil(t, collr.MetricStore())
+	assert.NotNil(t, collr.metrics)
+}
+
+func TestCollector_Init(t *testing.T) {
+	t.Setenv("SVDIR", "testdata")
+
+	tests := map[string]struct {
+		wantFail bool
+		config   Config
+	}{
+		"success on default config": {
+			config: New().Config,
+		},
+		"success when 'dir' is existing directory": {
+			config: Config{
+				Dir: "testdata",
+			},
+		},
+		"fails when 'dir' is empty": {
+			wantFail: true,
+			config: Config{
+				Dir: "",
+			},
+		},
+		"fails when 'dir' is not a directory": {
+			wantFail: true,
+			config: Config{
+				Dir: "collector_test.go",
+			},
+		},
+		"fails when 'dir' is not exist": {
+			wantFail: true,
+			config: Config{
+				Dir: "nosuch",
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			collr := New()
+			collr.Config = test.config
+
+			if test.wantFail {
+				assert.Error(t, collr.Init(t.Context()))
+			} else {
+				assert.NoError(t, collr.Init(t.Context()))
+			}
+		})
+	}
+}
+
+func TestCollector_ChartTemplateYAML(t *testing.T) {
+	collecttest.AssertChartTemplateSchema(t, chartTemplateYAML)
+
+	spec, err := charttpl.DecodeYAML([]byte(chartTemplateYAML))
+	require.NoError(t, err)
+	_, err = chartengine.Compile(spec, 1)
+	require.NoError(t, err)
+}
+
+func TestArtifacts(t *testing.T) {
+	metadata, err := os.ReadFile("metadata.yaml")
+	require.NoError(t, err)
+	health, err := os.ReadFile("../../../../../health/health.d/runit.conf")
+	require.NoError(t, err)
+
+	collecttest.AssertMetadataDocumentsChartTemplate(t, metadata, chartTemplateYAML, nil)
+	collecttest.AssertHealthAlertsTargetChartTemplate(t, health, chartTemplateYAML)
+}
+
+func TestCollector_Check(t *testing.T) {
+	tests := map[string]struct {
+		prepare  func() *Collector
+		wantFail bool
+	}{
+		"success on valid response": {
+			prepare: func() *Collector {
+				return prepareMockCollector(&mockSvCli{
+					data: dataSvStatusMultipleServices,
+				})
+			},
+		},
+		"fails on error": {
+			wantFail: true,
+			prepare: func() *Collector {
+				return prepareMockCollector(&mockSvCli{
+					err: errors.New("mock error"),
+				})
+			},
+		},
+		"success on empty response": {
+			prepare: func() *Collector {
+				return prepareMockCollector(&mockSvCli{
+					data: []byte{},
+				})
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			collr := test.prepare()
+
+			if test.wantFail {
+				assert.Error(t, collr.Check(t.Context()))
+			} else {
+				assert.NoError(t, collr.Check(t.Context()))
+			}
+		})
+	}
+}
+
+func TestCollector_Collect(t *testing.T) {
+	tests := map[string]struct {
+		prepare    func(t *testing.T) *Collector
+		wantSeries map[string]metrix.SampleValue
+		wantFail   bool
+	}{
+		"multiple services in various states": {
+			prepare: func(*testing.T) *Collector {
+				return prepareMockCollector(&mockSvCli{
+					data: dataSvStatusMultipleServices,
+				})
+			},
+			wantSeries: mergeSeries(
+				// sshd: run, 12345s — running (no "normally down").
+				serviceSeries("sshd", serviceTypeService, stateRunning, 12345),
+				// cron: run, (pid 123) 999s, paused — paused.
+				serviceSeries("cron", serviceTypeService, statePaused, 999),
+				// getty-5: down, 60s, normally up — down_manual.
+				serviceSeries("getty-5", serviceTypeService, stateDownManual, 60),
+				// socklog: down, 5s, normally up, want up — starting.
+				serviceSeries("socklog", serviceTypeService, stateStarting, 5),
+				// ntpd: down, 100s — down (no "normally up").
+				serviceSeries("ntpd", serviceTypeService, stateDown, 100),
+				// dhclient: finish, 3s — stopping.
+				serviceSeries("dhclient", serviceTypeService, stateStopping, 3),
+			),
+		},
+		"service with log subprocess": {
+			prepare: func(*testing.T) *Collector {
+				return prepareMockCollector(&mockSvCli{
+					data: dataSvStatusWithLog,
+				})
+			},
+			wantSeries: mergeSeries(
+				// socklog: run, 500s; log subprocess also running.
+				serviceSeries("socklog", serviceTypeService, stateRunning, 500),
+				serviceSeries("socklog/log", serviceTypeLog, stateRunning, 500),
+			),
+		},
+		"running but normally down": {
+			prepare: func(*testing.T) *Collector {
+				return prepareMockCollector(&mockSvCli{
+					data: []byte("run: /service/oneshot: (pid 99) 5s, normally down\n"),
+				})
+			},
+			wantSeries: mergeSeries(
+				serviceSeries("oneshot", serviceTypeService, stateRunningManual, 5),
+			),
+		},
+		"running but asked to go down": {
+			prepare: func(*testing.T) *Collector {
+				return prepareMockCollector(&mockSvCli{
+					data: []byte("run: /service/nginx: (pid 42) 10s, want down, got TERM\n"),
+				})
+			},
+			// The process got TERM after `sv down` and has not exited yet.
+			wantSeries: mergeSeries(
+				serviceSeries("nginx", serviceTypeService, stateStopping, 10),
+			),
+		},
+		"running once": {
+			prepare: func(*testing.T) *Collector {
+				return prepareMockCollector(&mockSvCli{
+					data: []byte("run: /service/backup: (pid 42) 10s, normally down, want down\n"),
+				})
+			},
+			// `sv once` runs the service without restarting it after it exits.
+			wantSeries: serviceSeries("backup", serviceTypeService, stateRunningManual, 10),
+		},
+		"running once, normally up": {
+			prepare: func(*testing.T) *Collector {
+				return prepareMockCollector(&mockSvCli{
+					data: []byte("run: /service/sshd: (pid 42) 10s, want down\n"),
+				})
+			},
+			// runsv will not restart the service after it exits.
+			wantSeries: serviceSeries("sshd", serviceTypeService, stateRunningManual, 10),
+		},
+		"service disappears on second collect": {
+			prepare: func(t *testing.T) *Collector {
+				mock := &mockSvCli{
+					data: dataSvStatusMultipleServices,
+				}
+				collr := prepareMockCollector(mock)
+				_, err := collectSeries(t, collr)
+				require.NoError(t, err)
+				mock.data = dataSvStatusSingleService
+				return collr
+			},
+			wantSeries: mergeSeries(
+				serviceSeries("sshd", serviceTypeService, stateRunning, 12345),
+			),
+		},
+		"empty response": {
+			prepare: func(*testing.T) *Collector {
+				return prepareMockCollector(&mockSvCli{
+					data: []byte{},
+				})
+			},
+			wantSeries: mergeSeries(),
+		},
+		"error response": {
+			prepare: func(*testing.T) *Collector {
+				return prepareMockCollector(&mockSvCli{
+					err: errors.New("mock error"),
+				})
+			},
+			wantFail: true,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			collr := test.prepare(t)
+
+			series, err := collectSeries(t, collr)
+
+			if test.wantFail {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, test.wantSeries, series)
+			collecttest.AssertChartCoverage(t, collr, collecttest.ChartCoverageExpectation{})
+		})
+	}
+}
+
+func TestCollector_Collect_Restarts(t *testing.T) {
+	tests := map[string]struct {
+		statuses     []string // sv status output of consecutive collections.
+		wantRestarts metrix.SampleValue
+	}{
+		"first observation is not a restart": {
+			statuses:     []string{"run: /service/x: (pid 10) 100s\n"},
+			wantRestarts: 0,
+		},
+		"same process": {
+			statuses: []string{
+				"run: /service/x: (pid 10) 100s\n",
+				"run: /service/x: (pid 10) 101s\n",
+			},
+			wantRestarts: 0,
+		},
+		"new process between collections": {
+			statuses: []string{
+				"run: /service/x: (pid 10) 100s\n",
+				"run: /service/x: (pid 11) 1s\n",
+			},
+			wantRestarts: 1,
+		},
+		"new process after finish and down": {
+			statuses: []string{
+				"run: /service/x: (pid 10) 100s\n",
+				"finish: /service/x: (pid 12) 0s\n",
+				"down: /service/x: 0s, normally up, want up\n",
+				"run: /service/x: (pid 13) 1s\n",
+			},
+			wantRestarts: 1,
+		},
+		"stopped service started": {
+			statuses: []string{
+				"down: /service/x: 100s\n",
+				"run: /service/x: (pid 10) 1s, normally down\n",
+			},
+			wantRestarts: 1,
+		},
+		"crash loop": {
+			statuses: []string{
+				"run: /service/x: (pid 10) 1s\n",
+				"run: /service/x: (pid 11) 0s\n",
+				"down: /service/x: 0s, normally up, want up\n",
+				"run: /service/x: (pid 12) 1s\n",
+				"run: /service/x: (pid 13) 0s\n",
+			},
+			wantRestarts: 3,
+		},
+		"counting starts over when a service reappears": {
+			statuses: []string{
+				"run: /service/x: (pid 10) 100s\n",
+				"run: /service/x: (pid 11) 1s\n",
+				"",
+				"run: /service/x: (pid 12) 1s\n",
+			},
+			wantRestarts: 0,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			mock := &mockSvCli{}
+			collr := prepareMockCollector(mock)
+
+			var series map[string]metrix.SampleValue
+			for _, status := range test.statuses {
+				mock.data = []byte(status)
+				var err error
+				series, err = collectSeries(t, collr)
+				require.NoError(t, err)
+			}
+
+			assert.Equal(t, test.wantRestarts, series[`service_restarts{service_name="x",service_type="service"}`])
+		})
+	}
+}
+
+func TestCollector_Cleanup(t *testing.T) {
+	collr := New()
+	assert.NotPanics(t, func() { collr.Cleanup(t.Context()) })
+}
+
+func serviceSeries(name, typ, state string, duration metrix.SampleValue) map[string]metrix.SampleValue {
+	label := `{service_name="` + name + `",service_type="` + typ + `"}`
+	series := map[string]metrix.SampleValue{
+		"service_restarts" + label:       0,
+		"service_state_duration" + label: duration,
+	}
+	for _, s := range serviceStates {
+		var v metrix.SampleValue
+		if s == state {
+			v = 1
+		}
+		series[`service_state{service_name="`+name+`",service_state="`+s+`",service_type="`+typ+`"}`] = v
+	}
+	return series
+}
+
+func mergeSeries(parts ...map[string]metrix.SampleValue) map[string]metrix.SampleValue {
+	out := make(map[string]metrix.SampleValue)
+	for _, part := range parts {
+		maps.Copy(out, part)
+	}
+	return out
+}
+
+func TestClassifyState(t *testing.T) {
+	tests := map[string]struct {
+		status *ServiceStatus
+		want   string
+	}{
+		"run state": {
+			status: &ServiceStatus{
+				State:   ServiceStateRun,
+				Enabled: true,
+			},
+			want: stateRunning,
+		},
+		"run, not enabled (running_manual)": {
+			status: &ServiceStatus{
+				State: ServiceStateRun,
+			},
+			want: stateRunningManual,
+		},
+		"run, want down, got TERM (stopping)": {
+			status: &ServiceStatus{State: ServiceStateRun, Enabled: true, WantDown: true, GotTERM: true},
+			want:   stateStopping,
+		},
+		"run, not enabled, want down, got TERM (stopping)": {
+			status: &ServiceStatus{State: ServiceStateRun, WantDown: true, GotTERM: true},
+			want:   stateStopping,
+		},
+		"run, want down (once)": {
+			status: &ServiceStatus{State: ServiceStateRun, Enabled: true, WantDown: true},
+			want:   stateRunningManual,
+		},
+		"run, not enabled, want down (once)": {
+			status: &ServiceStatus{State: ServiceStateRun, WantDown: true},
+			want:   stateRunningManual,
+		},
+		"run, want down, got TERM, paused": {
+			status: &ServiceStatus{State: ServiceStateRun, WantDown: true, GotTERM: true, Paused: true},
+			want:   statePaused,
+		},
+		"run but paused": {
+			status: &ServiceStatus{
+				State:  ServiceStateRun,
+				Paused: true,
+			},
+			want: statePaused,
+		},
+		"finish state": {
+			status: &ServiceStatus{
+				State: ServiceStateFinish,
+			},
+			want: stateStopping,
+		},
+		"finish but paused": {
+			status: &ServiceStatus{
+				State:  ServiceStateFinish,
+				Paused: true,
+			},
+			want: statePaused,
+		},
+		"down, not enabled": {
+			status: &ServiceStatus{
+				State:   ServiceStateDown,
+				Enabled: false,
+			},
+			want: stateDown,
+		},
+		"down, enabled (down_manual)": {
+			status: &ServiceStatus{
+				State:   ServiceStateDown,
+				Enabled: true,
+			},
+			want: stateDownManual,
+		},
+		"down, want up (starting)": {
+			status: &ServiceStatus{
+				State:  ServiceStateDown,
+				WantUp: true,
+			},
+			want: stateStarting,
+		},
+		"down, enabled, want up (starting wins)": {
+			status: &ServiceStatus{
+				State:   ServiceStateDown,
+				Enabled: true,
+				WantUp:  true,
+			},
+			want: stateStarting,
+		},
+		"down, paused": {
+			status: &ServiceStatus{
+				State:  ServiceStateDown,
+				Paused: true,
+			},
+			want: statePaused,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, test.want, classifyState(test.status))
+		})
+	}
+}
+
+func TestServicesCli(t *testing.T) {
+	tests := map[string]struct {
+		data     []byte
+		wantKeys []string
+		wantNil  []string
+		wantLog  []string // Expected parts of the logged warning; nothing is logged if empty.
+	}{
+		"fail: lines are skipped": {
+			data: []byte("" +
+				"run: /service/sshd: 100s\n" +
+				"fail: /service/broken: unable to change to service directory: file does not exist\n",
+			),
+			wantKeys: []string{"sshd"},
+			wantNil:  []string{"broken"},
+		},
+		"warning: lines are skipped": {
+			data: []byte("" +
+				"run: /service/sshd: 100s\n" +
+				"warning: /service/nosuper: unable to open supervise/ok: file does not exist\n",
+			),
+			wantKeys: []string{"sshd"},
+			wantNil:  []string{"nosuper"},
+		},
+		"got TERM flag is parsed": {
+			data:     []byte("run: /service/nginx: (pid 42) 10s, want down, got TERM\n"),
+			wantKeys: []string{"nginx"},
+		},
+		"normally down running service": {
+			data:     []byte("run: /service/oneshot: (pid 99) 5s, normally down\n"),
+			wantKeys: []string{"oneshot"},
+		},
+		"log subprocess in down state": {
+			data: []byte("" +
+				"run: /service/socklog: (pid 456) 500s; down: log: 3s, normally up, want up\n",
+			),
+			wantKeys: []string{"socklog", "socklog/log"},
+		},
+		// Outputs of `sv status` (runit 2.1.2) for a service with a symlink loop as its `down` file.
+		"unreadable down file": {
+			data: []byte("" +
+				"run: /service/sshd: (pid 39) 2s\n" +
+				"\n",
+			),
+			wantKeys: []string{"sshd"},
+			wantLog:  []string{"sv could not stat the 'down' file of a service, its status is unknown: "},
+		},
+		"unreadable down file of service with log": {
+			data: []byte("" +
+				"run: /service/sshd: (pid 39) 2s\n" +
+				"; run: log: (pid 38) 2s\n",
+			),
+			wantKeys: []string{"sshd"},
+			wantLog:  []string{"sv could not stat the 'down' file of a service, its status is unknown: ", "; run: log: (pid 38) 2s"},
+		},
+		"unreadable down file of log service": {
+			data: []byte("" +
+				"run: /service/sshd: (pid 39) 2s\n" +
+				"run: /service/socklog: (pid 40) 2s; \n",
+			),
+			wantKeys: []string{"sshd", "socklog"},
+			wantNil:  []string{"socklog/log"},
+			wantLog:  []string{"sv could not stat the 'log/down' file of service 'socklog', its log status is unknown"},
+		},
+		"unreadable down files of service and its log service": {
+			data: []byte("" +
+				"run: /service/sshd: (pid 39) 2s\n" +
+				"; \n",
+			),
+			wantKeys: []string{"sshd"},
+			wantLog:  []string{"sv could not stat the 'down' file of a service, its status is unknown: "},
+		},
+		"unknown line": {
+			data: []byte("" +
+				"run: /service/sshd: (pid 39) 2s\n" +
+				"unknown: /service/socklog\n",
+			),
+			wantKeys: []string{"sshd"},
+			wantNil:  []string{"socklog"},
+			wantLog:  []string{"failed to parse sv status: ", "unknown: /service/socklog"},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			var logs bytes.Buffer
+			collr := prepareMockCollector(&mockSvCli{
+				data: test.data,
+			})
+			collr.Logger = logger.NewWithWriter(&logs)
+			services, err := collr.servicesCli()
+			require.NoError(t, err)
+			for _, k := range test.wantKeys {
+				assert.Contains(t, services, k)
+			}
+			for _, k := range test.wantNil {
+				assert.NotContains(t, services, k)
+			}
+			if len(test.wantLog) == 0 {
+				assert.Empty(t, logs.String())
+			} else {
+				assert.Contains(t, logs.String(), "level=warn")
+			}
+			for _, want := range test.wantLog {
+				assert.Contains(t, logs.String(), want)
+			}
+		})
+	}
+}
+
+func TestParseServiceStatus(t *testing.T) {
+	tests := map[string]struct {
+		data []byte
+		name string
+		want ServiceStatus
+	}{
+		"running, normally down (not enabled)": {
+			data: []byte("run: /service/oneshot: (pid 99) 5s, normally down\n"),
+			name: "oneshot",
+			want: ServiceStatus{
+				State:         ServiceStateRun,
+				PID:           99,
+				StateDuration: 5 * 1e9, // 5s as time.Duration
+				Enabled:       false,
+			},
+		},
+		"running, log status unknown (unreadable log/down)": {
+			data: []byte("run: /service/socklog: (pid 40) 2s; \n"),
+			name: "socklog",
+			want: ServiceStatus{
+				State:         ServiceStateRun,
+				PID:           40,
+				StateDuration: 2 * 1e9,
+				Enabled:       true,
+			},
+		},
+		"running with got TERM": {
+			data: []byte("run: /service/nginx: (pid 42) 10s, want down, got TERM\n"),
+			name: "nginx",
+			want: ServiceStatus{
+				State:         ServiceStateRun,
+				PID:           42,
+				StateDuration: 10 * 1e9,
+				Enabled:       true,
+				WantDown:      true,
+				GotTERM:       true,
+			},
+		},
+		"log service of a running service": {
+			data: []byte("run: /service/socklog: (pid 456) 500s; run: log: (pid 789) 400s\n"),
+			name: "socklog/log",
+			want: ServiceStatus{
+				State:         ServiceStateRun,
+				PID:           789,
+				StateDuration: 400 * 1e9,
+				Enabled:       true,
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			collr := prepareMockCollector(&mockSvCli{
+				data: test.data,
+			})
+			services, err := collr.servicesCli()
+			require.NoError(t, err)
+			require.Contains(t, services, test.name)
+			got := services[test.name]
+			assert.Equal(t, test.want.State, got.State)
+			assert.Equal(t, test.want.PID, got.PID)
+			assert.Equal(t, test.want.StateDuration, got.StateDuration)
+			assert.Equal(t, test.want.Enabled, got.Enabled)
+			assert.Equal(t, test.want.Paused, got.Paused)
+			assert.Equal(t, test.want.WantUp, got.WantUp)
+			assert.Equal(t, test.want.WantDown, got.WantDown)
+			assert.Equal(t, test.want.GotTERM, got.GotTERM)
+		})
+	}
+}
+
+// --- helpers ---
+
+func prepareMockCollector(mock svCli) *Collector {
+	collr := New()
+	collr.Dir = "/service"
+	collr.exec = mock
+	return collr
+}
+
+func collectSeries(t *testing.T, collr *Collector) (map[string]metrix.SampleValue, error) {
+	t.Helper()
+	return collecttest.CollectScalarSeries(collr, metrix.ReadFlatten())
+}
+
+type mockSvCli struct {
+	data []byte
+	err  error
+}
+
+func (m *mockSvCli) StatusAll(string) ([]byte, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.data, nil
+}
+
+// Test data: sv status output lines.
+// Each line ends with \n and represents one service.
+var (
+	// 6 services in different states.
+	dataSvStatusMultipleServices = []byte("" +
+		"run: /service/sshd: 12345s\n" +
+		"run: /service/cron: (pid 123) 999s, paused\n" +
+		"down: /service/getty-5: 60s, normally up\n" +
+		"down: /service/socklog: 5s, normally up, want up\n" +
+		"down: /service/ntpd: 100s\n" +
+		"finish: /service/dhclient: 3s\n",
+	)
+
+	// Single running service.
+	dataSvStatusSingleService = []byte("" +
+		"run: /service/sshd: 12345s\n",
+	)
+
+	// Service with log subprocess.
+	dataSvStatusWithLog = []byte("" +
+		"run: /service/socklog: (pid 456) 500s; run: log: (pid 789) 500s\n",
+	)
+)
