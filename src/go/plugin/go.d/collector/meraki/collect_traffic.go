@@ -25,11 +25,11 @@ type trafficSnapshot struct {
 }
 
 func (c *Collector) trafficEnabled() bool {
-	return c.CollectSwitchPortTraffic || c.CollectSwitchPortPackets || c.CollectApplianceUplinkUsage
+	return c.CollectSwitchPortTraffic || c.CollectSwitchPortPackets || c.CollectApplianceUplinkTraffic
 }
 
 // collectTraffic reads the enabled traffic families for the window ending now:
-// switch port traffic, MX/Z uplink usage, then switch port packets, the one
+// switch port traffic, MX/Z uplink traffic, then switch port packets, the one
 // family that costs a request per switch. A failed read leaves that family's
 // gaps; a 429 or the end of ctx skips every remaining request. The caller still
 // checks ctx before writing anything.
@@ -54,11 +54,11 @@ func (c *Collector) collectTraffic(
 			return traffic
 		}
 	}
-	if c.CollectApplianceUplinkUsage {
+	if c.CollectApplianceUplinkTraffic {
 		rows, err := c.client.ListApplianceUplinkUsage(ctx, c.OrganizationID, start, end)
 		if err == nil {
 			traffic.uplinks = uplinkTrafficRates(rows, networkNames)
-		} else if c.stopTraffic(ctx, "appliance uplink usage", err) {
+		} else if c.stopTraffic(ctx, "appliance uplink traffic", err) {
 			return traffic
 		}
 	}

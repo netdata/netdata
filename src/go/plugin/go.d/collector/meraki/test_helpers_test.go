@@ -226,7 +226,7 @@ func newTrafficFixture(t *testing.T) (*fixtureAPI, *Collector, time.Time) {
 	c.now = func() time.Time { return now }
 	c.CollectSwitchPortTraffic = true
 	c.CollectSwitchPortPackets = true
-	c.CollectApplianceUplinkUsage = true
+	c.CollectApplianceUplinkTraffic = true
 	return f, c, now
 }
 

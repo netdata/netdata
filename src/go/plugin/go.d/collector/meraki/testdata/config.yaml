@@ -10,4 +10,4 @@ tls_cert: testdata/client.pem
 tls_key: testdata/client.key
 collect_switch_port_traffic: true
 collect_switch_port_packets: true
-collect_appliance_uplink_usage: true
+collect_appliance_uplink_traffic: true

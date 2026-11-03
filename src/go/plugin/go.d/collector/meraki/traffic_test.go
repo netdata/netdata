@@ -83,23 +83,23 @@ func TestTrafficOptionsAreIndependent(t *testing.T) {
 	defaults := New()
 	assert.False(t, defaults.CollectSwitchPortTraffic)
 	assert.False(t, defaults.CollectSwitchPortPackets)
-	assert.False(t, defaults.CollectApplianceUplinkUsage)
+	assert.False(t, defaults.CollectApplianceUplinkTraffic)
 
 	tests := map[string]struct {
 		portTraffic, portPackets, uplinks bool
 		wantRequests                      int
 	}{
-		"all disabled":           {wantRequests: 4},
-		"switch port traffic":    {portTraffic: true, wantRequests: 5},
-		"switch port packets":    {portPackets: true, wantRequests: 5},
-		"appliance uplink usage": {uplinks: true, wantRequests: 5},
+		"all disabled":             {wantRequests: 4},
+		"switch port traffic":      {portTraffic: true, wantRequests: 5},
+		"switch port packets":      {portPackets: true, wantRequests: 5},
+		"appliance uplink traffic": {uplinks: true, wantRequests: 5},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			f, c, _ := newTrafficFixture(t)
 			c.CollectSwitchPortTraffic = tc.portTraffic
 			c.CollectSwitchPortPackets = tc.portPackets
-			c.CollectApplianceUplinkUsage = tc.uplinks
+			c.CollectApplianceUplinkTraffic = tc.uplinks
 
 			require.NoError(t, c.Check(t.Context()))
 			require.Len(t, f.calls(), 1, "Check stays one probe")
@@ -459,7 +459,7 @@ func TestSwitchPortPacketsRequestEverySwitchInSerialOrder(t *testing.T) {
 		body: `[]`,
 	})
 	c.CollectSwitchPortTraffic = false
-	c.CollectApplianceUplinkUsage = false
+	c.CollectApplianceUplinkTraffic = false
 	require.NoError(t, collectCycle(t.Context(), c))
 
 	var paths []string

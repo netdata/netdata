@@ -236,7 +236,7 @@ traffic is read, not the window.
 | Family | Option | Request | Taken from it |
 | --- | --- | --- | --- |
 | Switch port traffic | `collect_switch_port_traffic` | `getOrganizationSwitchPortsUsageHistoryByDeviceByInterval` with `t0`/`t1`, every page; skipped when no switch is assigned | Per port, `upstream`/`downstream` kilobits/s of the latest accepted interval as sent/received, and the interval's end |
-| Uplink traffic | `collect_appliance_uplink_usage` | `getOrganizationApplianceUplinksUsageByNetwork` with `t0`/`t1` | Per network and interface, sent/received bytes × 8 / 300 / 1000 as kilobits/s |
+| Uplink traffic | `collect_appliance_uplink_traffic` | `getOrganizationApplianceUplinksUsageByNetwork` with `t0`/`t1` | Per network and interface, sent/received bytes × 8 / 300 / 1000 as kilobits/s |
 | Switch port packets | `collect_switch_port_packets` | `getDeviceSwitchPortsStatusesPackets` with `timespan=300`, one per assigned switch in serial order | Per port, `ratePerSec.sent`/`recv` of the `Total` category |
 
 The families run in that order, so packets, the one family that costs a request per switch, runs last. Only assigned switches
@@ -534,7 +534,7 @@ Every option maps to an operator decision; implementation tuning (page sizes, pa
 | `timeout` | Budget of one whole Init, Check or Collect | 60 s | `validateConfig` (must be positive) |
 | `collect_switch_port_traffic` | Switch port traffic, at one request per 50 switches | false | YAML/JSON boolean |
 | `collect_switch_port_packets` | Switch port packet rates, at one request per switch | false | YAML/JSON boolean |
-| `collect_appliance_uplink_usage` | MX/Z uplink traffic, at one request | false | YAML/JSON boolean |
+| `collect_appliance_uplink_traffic` | MX/Z uplink traffic, at one request | false | YAML/JSON boolean |
 | `vnode` | Placement of organization and uplink charts; device nodes are unaffected | empty | framework |
 | `proxy_url` | Egress route | environment | `pkg/web` |
 | `tls_ca`, `tls_cert`, `tls_key`, `tls_skip_verify` | Trust and client identity for a proxy or private endpoint | empty, `no` | `validateConfig` (cert and key together), `pkg/tlscfg` |

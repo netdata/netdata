@@ -47,7 +47,7 @@ modules:
           | `getOrganizationDevicesAvailabilities` | The status of each device | Always |
           | `getOrganizationSwitchPortsUsageHistoryByDeviceByInterval` | Switch port traffic | With `collect_switch_port_traffic` |
           | `getDeviceSwitchPortsStatusesPackets` | Switch port packet rates, one request per switch | With `collect_switch_port_packets` |
-          | `getOrganizationApplianceUplinksUsageByNetwork` | Uplink traffic | With `collect_appliance_uplink_usage` |
+          | `getOrganizationApplianceUplinksUsageByNetwork` | Uplink traffic | With `collect_appliance_uplink_traffic` |
 
           Traffic is always read for the last five minutes, whatever `update_every` is.
 
@@ -88,7 +88,7 @@ modules:
             |:-------|:---------|:-------|
             | `collect_switch_port_traffic` | 1 per 50 assigned switches | 2 per switch port |
             | `collect_switch_port_packets` | 1 per assigned switch | 1 per switch port |
-            | `collect_appliance_uplink_usage` | 1 | 1 per uplink |
+            | `collect_appliance_uplink_traffic` | 1 | 1 per uplink |
 
             Requests are paced at 10 per second, so packet rates for 1,000 switches add about 100 seconds to every collection, more than the default `timeout` of 60 seconds. A collection that runs past `timeout` updates no chart, availability included. For a large fleet, raise `timeout` with `collect_switch_port_packets`, or leave it off.
 
@@ -172,7 +172,7 @@ modules:
               group: Traffic
               detailed_description: |
                 Adds a chart of the sent and received packets/s of each port, counting every packet type, to each switch's node. Because it costs a request per switch, it is the option that decides `timeout` on large fleets; see Performance Impact.
-            - name: collect_appliance_uplink_usage
+            - name: collect_appliance_uplink_traffic
               description: Collect the average traffic of each uplink of every MX and Z network, shown on the job's node or its virtual node.
               default_value: false
               required: false
@@ -245,7 +245,7 @@ modules:
                     organization_id: "123456"
                     api_key: ${env:MERAKI_API_KEY}
                     collect_switch_port_traffic: yes
-                    collect_appliance_uplink_usage: yes
+                    collect_appliance_uplink_traffic: yes
             - name: Switch port packets on a large fleet
               description: Also collect packet rates, which cost one request per switch. The longer `timeout` leaves room for about 1,500 switches.
               config: |
@@ -388,7 +388,7 @@ modules:
                 - name: received
                 - name: sent
         - name: appliance uplink
-          description: One uplink interface of an MX or Z network, on the job's node or its virtual node, when `collect_appliance_uplink_usage` is enabled.
+          description: One uplink interface of an MX or Z network, on the job's node or its virtual node, when `collect_appliance_uplink_traffic` is enabled.
           labels:
             - name: organization_id
               description: Meraki organization ID.
@@ -502,8 +502,8 @@ modules:
             cause: Meraki did not report a usable status for the device in the last collection. Availability can lag a new assignment or a network move by one refresh.
             fix: Check the device's status in Dashboard and wait for the next 5-minute refresh. Run the collector in debug mode (see Diagnostics) to see how many devices had no usable status.
           - error: 'Meraki `traffic` unavailable: `error`'
-            cause: A switch port traffic, switch port packets or appliance uplink usage request failed. That traffic has gaps for this collection (for packets, only the ports of that switch); inventory, availability and the other traffic options still update. After an HTTP 429, no more traffic requests are sent in this collection. The warning is logged at most once an hour per kind of traffic.
+            cause: A switch port traffic, switch port packets or appliance uplink traffic request failed. That traffic has gaps for this collection (for packets, only the ports of that switch); inventory, availability and the other traffic options still update. After an HTTP 429, no more traffic requests are sent in this collection. The warning is logged at most once an hour per kind of traffic.
             fix: 'Most messages continue with another error on this page, such as `getDeviceSwitchPortsStatusesPackets: HTTP status 403`; follow that entry. Inventory worked in the same collection, so an HTTP 403 or 404 here is about that traffic data, not about `organization_id`: check in Meraki Dashboard that the API key''s administrator can see the switch or network and that it reports this data.'
           - error: Switch port or uplink traffic charts are missing
             cause: The traffic option is off, the organization has no switches or no MX or Z networks, or Meraki reported no usable value. Switch port traffic also has gaps while Meraki has not yet reported an interval that ended in the last 5 minutes.
-            fix: Enable `collect_switch_port_traffic`, `collect_switch_port_packets` or `collect_appliance_uplink_usage`. If they are on, look for the traffic warning above in the logs, and compare with the traffic Meraki Dashboard shows for the switch or network.
+            fix: Enable `collect_switch_port_traffic`, `collect_switch_port_packets` or `collect_appliance_uplink_traffic`. If they are on, look for the traffic warning above in the logs, and compare with the traffic Meraki Dashboard shows for the switch or network.
