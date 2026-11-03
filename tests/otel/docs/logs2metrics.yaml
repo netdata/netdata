@@ -1,0 +1,40 @@
+receivers:
+  journald:
+    directory: /var/log/journal
+    identifiers:
+      - myapp
+      - myapp-worker
+    priority: info
+    start_at: end
+
+connectors:
+  count:
+    logs:
+      warning.log.count:
+        description: Number of warning or higher severity log entries.
+        conditions:
+          - 'Int(body["PRIORITY"]) <= 4'
+
+processors:
+  transform:
+    error_mode: ignore
+    metric_statements:
+      - context: metric
+        statements:
+          - set(unit, "{message}") where IsMatch(name, "log.count$")
+
+exporters:
+  otlp:
+    endpoint: "localhost:4317"
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    logs:
+      receivers: [journald]
+      exporters: [count, otlp]
+    metrics:
+      receivers: [count]
+      processors: [transform]
+      exporters: [otlp]
