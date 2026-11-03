@@ -4188,7 +4188,7 @@
             "name": "file",
             "in": "query",
             "required": false,
-            "description": "Name of the settings object. Only `default` is supported; omitting the parameter selects `default`.\nAny other value returns 400 Bad Request.\n",
+            "description": "Name of the settings object. Only `default` is supported; omitting the parameter (or giving it an empty\nvalue) selects `default`. Any other value returns 400 Bad Request.\n",
             "schema": {
               "type": "string",
               "enum": [
@@ -4267,7 +4267,7 @@
             "name": "file",
             "in": "query",
             "required": false,
-            "description": "Name of the settings object. Only `default` is supported; omitting the parameter selects `default`.\nAny other value returns 400 Bad Request.\n",
+            "description": "Name of the settings object. Only `default` is supported; omitting the parameter (or giving it an empty\nvalue) selects `default`. Any other value returns 400 Bad Request.\n",
             "schema": {
               "type": "string",
               "enum": [

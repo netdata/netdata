@@ -2919,7 +2919,7 @@ Per dimension:
 - ACCESS: `HTTP_ACCESS_ANONYMOUS_DATA`
 
 ### PARAMETERS (1 total)
-1. ✅ `file` - string, optional - Only `default` is supported (omitted = `default`); any other value returns 400. There is one Agent-wide object shared by every admitted caller, anonymous or bearer.
+1. ✅ `file` - string, optional - Only `default` is supported (omitted or empty = `default`); any other value returns 400. There is one Agent-wide object shared by every admitted caller, anonymous or bearer.
 
 ### HTTP METHODS SUPPORTED (2 total)
 1. ✅ `GET` - Retrieve the settings object

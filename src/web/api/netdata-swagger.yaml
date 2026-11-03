@@ -5749,8 +5749,8 @@ paths:
           in: query
           required: false
           description: |
-            Name of the settings object. Only `default` is supported; omitting the parameter selects `default`.
-            Any other value returns 400 Bad Request.
+            Name of the settings object. Only `default` is supported; omitting the parameter (or giving it an empty
+            value) selects `default`. Any other value returns 400 Bad Request.
           schema:
             type: string
             enum:
@@ -5872,8 +5872,8 @@ paths:
           in: query
           required: false
           description: |
-            Name of the settings object. Only `default` is supported; omitting the parameter selects `default`.
-            Any other value returns 400 Bad Request.
+            Name of the settings object. Only `default` is supported; omitting the parameter (or giving it an empty
+            value) selects `default`. Any other value returns 400 Bad Request.
           schema:
             type: string
             enum:

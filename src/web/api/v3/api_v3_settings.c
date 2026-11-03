@@ -9,7 +9,8 @@
  * agent's local space).
  *
  * QUERY STRING PARAMETERS:
- * - file=default (optional; any other value is rejected)
+ * - file=default (optional; an empty value counts as omitted;
+ *   any other value is rejected)
  *
  * HTTP METHODS
  * - GET to retrieve the settings object
