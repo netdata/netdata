@@ -609,24 +609,30 @@ static inline bool do_disk_space_stats(struct mountinfo *mi, int update_every) {
             usec_t start_time = now_monotonic_high_precision_usec();
             struct stat bs;
 
+            // a bind mount is only a fallback for a filesystem without a chart, and many are files that never get
+            // one (each container network namespace is an nsfs bind), so it is skipped without an error
+            bool log_errors = !(mi->flags & MOUNTINFO_IS_BIND);
+
             if(stat(mi->mount_point_stat_path, &bs) == -1) {
-                collector_error("DISKSPACE: Cannot stat() mount point '%s' (disk '%s', filesystem '%s', root '%s')."
-                               , mi->mount_point_stat_path
-                               , disk
-                               , mi->filesystem?mi->filesystem:""
-                               , mi->root?mi->root:""
-                               );
-                def_space = CONFIG_BOOLEAN_NO;
-                def_inodes = CONFIG_BOOLEAN_NO;
-            }
-            else {
-                if((bs.st_mode & S_IFMT) != S_IFDIR) {
-                    collector_error("DISKSPACE: Mount point '%s' (disk '%s', filesystem '%s', root '%s') is not a directory."
+                if(log_errors)
+                    collector_error("DISKSPACE: Cannot stat() mount point '%s' (disk '%s', filesystem '%s', root '%s')."
                                    , mi->mount_point_stat_path
                                    , disk
                                    , mi->filesystem?mi->filesystem:""
                                    , mi->root?mi->root:""
                                    );
+                def_space = CONFIG_BOOLEAN_NO;
+                def_inodes = CONFIG_BOOLEAN_NO;
+            }
+            else {
+                if((bs.st_mode & S_IFMT) != S_IFDIR) {
+                    if(log_errors)
+                        collector_error("DISKSPACE: Mount point '%s' (disk '%s', filesystem '%s', root '%s') is not a directory."
+                                       , mi->mount_point_stat_path
+                                       , disk
+                                       , mi->filesystem?mi->filesystem:""
+                                       , mi->root?mi->root:""
+                                       );
                     def_space = CONFIG_BOOLEAN_NO;
                     def_inodes = CONFIG_BOOLEAN_NO;
                 }
