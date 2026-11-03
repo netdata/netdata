@@ -39,16 +39,16 @@ func ipsecTunnelLabelValues(tunnel ipsecTunnel) [6]string {
 	}
 }
 
-func ipsecTunnelStateLabelValues(tunnel vpnFlowTunnel) []string {
-	return []string{
-		labelValue(tunnel.Name, "unknown"),
+func ipsecTunnelStateKey(tunnel vpnFlowTunnel) [2]string {
+	return [2]string{
+		tunnel.Name,
 		labelValue(tunnel.ID, "unknown"),
 	}
 }
 
-func ipsecGatewayLabelValues(gateway vpnGateway) []string {
-	return []string{
-		labelValue(gateway.Name, "unknown"),
+func ipsecGatewayStateKey(gateway vpnGateway) [2]string {
+	return [2]string{
+		gateway.Name,
 		ipsecIKEVersion(gateway),
 	}
 }

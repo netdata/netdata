@@ -43,6 +43,7 @@ modules:
             IPsec states describe local VPN state, not end-to-end reachability. On-demand VPNs may have no SA until traffic triggers negotiation.
             Gateway `up` means an IKE SA with establishment and expiration times was reported; `down` means no matching SA was reported in a valid response.
             Failed queries and incomplete SA data leave gateway-state gaps.
+            Configured tunnel and gateway charts remain visible during telemetry failures. Confirmed inventory removals retire their charts immediately.
 
             Gateway and tunnel states are independent. An IKE gateway can be `up` before its tunnel leaves `init`, and an IKEv1 tunnel can remain `active` after its parent IKE SA is cleared.
             Tunnel flow states `active`, `inactive`, and `init` are preserved; `unknown` means an unrecognized nonempty state, and missing state data leaves a gap.
@@ -439,8 +440,8 @@ modules:
               unit: state
               chart_type: stacked
               dimensions:
-                - name: up
                 - name: down
+                - name: up
         - name: BGP peer
           description: These metrics refer to a single BGP peer on a PAN-OS virtual router or logical router.
           labels:

@@ -33,6 +33,17 @@ before accepting the SA list. A missing or blank time invalidates gateway observ
 treated as a down gateway. This conservative check covers an unsupported/incomplete response without inventing XML
 status codes. The yearless device-local times are not parsed or compared with the Agent's clock.
 
+The collector retains only the identities from each last complete validated flow/gateway inventory. Failed or
+malformed inventory cannot establish removals. Valid inventory still updates membership when SA telemetry is
+unavailable, so a confirmed removal does not depend on successful SA collection.
+
+The two state families use snapshot gauge fields to distinguish present-but-unavailable telemetry from absence.
+Unavailable fields emit empty chart values; known identities keep their charts through repeated failures without
+replaying old state. Complete inventory removal stops refreshing an identity and retires its chart in that cycle.
+The public chart IDs, dimensions, labels and numeric state meanings are preserved. Persistent-planner tests cover
+failure, recovery, complete/invalid inventory, removals and retained-state bounds; an HTTP fixture also exercises the
+shipped SDK's per-operation API-error path. These lifecycle tests are synthetic, not additional firewall captures.
+
 The inline payloads in `collect_ipsec_state_test.go` and the gateway benchmark are synthetic. They test invalid
 payload handling, identity matching, incomplete-time gaps, independent gateway/tunnel states, transitions, and
 scaling; they are not evidence of device output. The incomplete-time cases are synthetic contract checks, not a

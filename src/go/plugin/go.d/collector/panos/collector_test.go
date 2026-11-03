@@ -414,14 +414,15 @@ func TestCollector_ChartTemplateYAML(t *testing.T) {
 }
 
 type collectStep struct {
-	name        string
-	setup       func(*Collector, *mockAPIClient)
-	wantErr     string
-	wantMetrics map[string]metrix.SampleValue
-	wantMissing []string
-	wantLog     []string
-	notWantLog  []string
-	check       func(*testing.T, *Collector, *mockAPIClient, map[string]metrix.SampleValue)
+	name            string
+	setup           func(*Collector, *mockAPIClient)
+	wantErr         string
+	wantMetrics     map[string]metrix.SampleValue
+	wantMissing     []string
+	wantUnavailable []string
+	wantLog         []string
+	notWantLog      []string
+	check           func(*testing.T, *Collector, *mockAPIClient, map[string]metrix.SampleValue)
 }
 
 type collectScenario struct {
@@ -1797,6 +1798,7 @@ func runCollectScenario(t *testing.T, tc collectScenario) {
 			require.NoError(t, err)
 			assertExpectedMetrics(t, mx, step.wantMetrics)
 			assertMissingMetrics(t, mx, step.wantMissing)
+			assertUnavailableMetrics(t, mx, step.wantUnavailable)
 			assertExpectedLogs(t, logOutput, step.wantLog, step.notWantLog)
 			if step.check != nil {
 				step.check(t, collr, api, mx)
@@ -1856,7 +1858,12 @@ func TestCollector_Collect_ReturnsMetricsetAPIErrors(t *testing.T) {
 			mx, err := collecttest.CollectScalarSeries(collr, metrix.ReadFlatten())
 			require.NoError(t, err)
 			assertMetricPresent(t, mx, tc.wantMetric)
-			assertMissingMetrics(t, mx, []string{tc.wantMissing})
+			if tc.wantMissing != "" {
+				assertMissingMetrics(t, mx, []string{tc.wantMissing})
+			}
+			if tc.wantUnavailable != "" {
+				assertUnavailableMetrics(t, mx, []string{tc.wantUnavailable})
+			}
 			assert.Contains(t, logBuf.String(), tc.wantLog)
 		})
 	}
@@ -1921,7 +1928,12 @@ func TestCollector_Collect_ReportsMalformedXMLResponse(t *testing.T) {
 			mx, err := collecttest.CollectScalarSeries(collr, metrix.ReadFlatten())
 			require.NoError(t, err)
 			assertMetricPresent(t, mx, tc.wantMetric)
-			assertMissingMetrics(t, mx, []string{tc.wantMissing})
+			if tc.wantMissing != "" {
+				assertMissingMetrics(t, mx, []string{tc.wantMissing})
+			}
+			if tc.wantUnavailable != "" {
+				assertUnavailableMetrics(t, mx, []string{tc.wantUnavailable})
+			}
 			assert.Contains(t, logBuf.String(), tc.wantLog)
 		})
 	}
@@ -3097,22 +3109,23 @@ func ipsecLabels(tunnel, gateway, remote, tunnelID, protocol, encryption string)
 
 // metricsetErrorCase describes a metricset whose command fails while the system metricset still commits.
 type metricsetErrorCase struct {
-	command     string
-	wantMetric  string
-	wantMissing string
-	wantLog     string
+	command         string
+	wantMetric      string
+	wantMissing     string
+	wantUnavailable string
+	wantLog         string
 }
 
 // ipsecStateErrorCases returns the error cases of the IPsec state metricsets, shared by the
 // API error and malformed XML tables, which differ only in the expected log line.
 func ipsecStateErrorCases(flowLog, gatewayLog, ikeSALog string) map[string]metricsetErrorCase {
 	systemUptime := metricKey("system_uptime", systemLabels())
-	tunnelState := stateMetricKey("ipsec_tunnel_state", "active", ipsecTunnelStateLabels("branch-a", "1"))
-	gatewayState := stateMetricKey("ipsec_gateway_state", "up", ipsecGatewayLabels("gw-branch-a", "ikev1"))
+	tunnelState := ipsecStateMetricKey("ipsec_tunnel_state", "active", ipsecTunnelStateLabels("branch-a", "1"))
+	gatewayState := ipsecStateMetricKey("ipsec_gateway_state", "up", ipsecGatewayLabels("gw-branch-a", "ikev1"))
 	return map[string]metricsetErrorCase{
 		"ipsec tunnel flow": {command: ipsecFlowCommand, wantMetric: systemUptime, wantMissing: tunnelState, wantLog: flowLog},
 		"ipsec gateway":     {command: ipsecGatewayCommand, wantMetric: systemUptime, wantMissing: gatewayState, wantLog: gatewayLog},
-		"ipsec IKE SA":      {command: ipsecIKESACommand, wantMetric: systemUptime, wantMissing: gatewayState, wantLog: ikeSALog},
+		"ipsec IKE SA":      {command: ipsecIKESACommand, wantMetric: systemUptime, wantUnavailable: gatewayState, wantLog: ikeSALog},
 	}
 }
 
@@ -3131,11 +3144,29 @@ func ipsecGatewayLabels(gateway, ikeVersion string) metrix.Labels {
 }
 
 func ipsecTunnelStateMetrics(tunnel, tunnelID, active string) map[string]metrix.SampleValue {
-	return stateSetMetrics("ipsec_tunnel_state", ipsecTunnelStates, active, ipsecTunnelStateLabels(tunnel, tunnelID))
+	return ipsecStateMetrics("ipsec_tunnel_state", ipsecTunnelStates, active, ipsecTunnelStateLabels(tunnel, tunnelID))
 }
 
 func ipsecGatewayStateMetrics(gateway, ikeVersion, active string) map[string]metrix.SampleValue {
-	return stateSetMetrics("ipsec_gateway_state", ipsecGatewayStates, active, ipsecGatewayLabels(gateway, ikeVersion))
+	return ipsecStateMetrics("ipsec_gateway_state", ipsecGatewayStates, active, ipsecGatewayLabels(gateway, ikeVersion))
+}
+
+func ipsecStateMetricKey(name, state string, labels metrix.Labels) string {
+	labels = maps.Clone(labels)
+	labels[metrix.MeasureSetFieldLabel] = state
+	return metricKey(name+"_"+state, labels)
+}
+
+func ipsecStateMetrics(name string, states []string, active string, labels metrix.Labels) map[string]metrix.SampleValue {
+	out := make(map[string]metrix.SampleValue, len(states))
+	for _, state := range states {
+		var value metrix.SampleValue
+		if state == active {
+			value = 1
+		}
+		out[ipsecStateMetricKey(name, state, labels)] = value
+	}
+	return out
 }
 
 // stateSetMetrics returns every state of a state set: 1 for the active state, 0 for the rest.

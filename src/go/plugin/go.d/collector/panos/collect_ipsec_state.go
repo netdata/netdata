@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 )
 
 type vpnFlowResult struct {
@@ -15,7 +17,9 @@ type vpnFlowResult struct {
 }
 
 type vpnFlowEntries struct {
-	Entries []vpnFlowTunnel `xml:"entry"`
+	Entries []vpnFlowTunnel        `xml:"entry"`
+	Text    string                 `xml:",chardata"`
+	Other   []vpnUnexpectedElement `xml:",any"`
 }
 
 type vpnFlowTunnel struct {
@@ -29,7 +33,9 @@ type vpnGatewayResult struct {
 }
 
 type vpnGatewayEntries struct {
-	Entries []vpnGateway `xml:"entry"`
+	Entries []vpnGateway           `xml:"entry"`
+	Text    string                 `xml:",chardata"`
+	Other   []vpnUnexpectedElement `xml:",any"`
 }
 
 type vpnGateway struct {
@@ -65,29 +71,41 @@ type vpnIKESA struct {
 func (c *Collector) collectIPSecTunnelStateMetrics(ctx context.Context) (bool, error) {
 	body, err := c.apiClient.op(ctx, ipsecFlowCommand)
 	if err != nil {
+		observeIPSecUnavailable(c.metrics.ipsec.tunnelState, ipsecTunnelStates, c.ipsecTunnelInventory)
 		return false, fmt.Errorf("ipsec tunnel state metricset: %s API call: %w", panosCommandName(ipsecFlowCommand), err)
 	}
 
 	tunnels, err := parseVPNFlow(body)
 	if err != nil {
+		observeIPSecUnavailable(c.metrics.ipsec.tunnelState, ipsecTunnelStates, c.ipsecTunnelInventory)
 		return false, fmt.Errorf("ipsec tunnel state metricset: %s response: %w", panosCommandName(ipsecFlowCommand), err)
 	}
+
+	// Membership changes only after the complete inventory has been validated.
+	inventory := make(map[[2]string]metrix.LabelSet, len(tunnels))
+	for _, tunnel := range tunnels {
+		key := ipsecTunnelStateKey(tunnel)
+		labels, ok := c.ipsecTunnelInventory[key]
+		if !ok {
+			labels = c.store.Write().SnapshotMeter("").LabelSet(
+				metrix.Label{Key: "tunnel", Value: key[0]},
+				metrix.Label{Key: "tunnel_id", Value: key[1]},
+			)
+		}
+		inventory[key] = labels
+	}
+	c.ipsecTunnelInventory = inventory
 
 	var errs []error
 	var hasMetrics bool
 	for _, tunnel := range tunnels {
-		name := strings.TrimSpace(tunnel.Name)
-		if name == "" {
-			errs = append(errs, errors.New("IPsec flow entry: missing tunnel name"))
-			continue
-		}
 		state := normalizeIPSecTunnelState(tunnel.State)
 		if state == "" {
-			errs = append(errs, fmt.Errorf("IPsec tunnel %s state: missing status", name))
-			continue
+			errs = append(errs, fmt.Errorf("IPsec tunnel %s state: missing status", tunnel.Name))
+		} else {
+			hasMetrics = true
 		}
-		observeStateSetVec(c.metrics.ipsec.tunnelState, state, ipsecTunnelStateLabelValues(tunnel)...)
-		hasMetrics = true
+		observeIPSecState(c.metrics.ipsec.tunnelState, ipsecTunnelStates, state, inventory[ipsecTunnelStateKey(tunnel)])
 	}
 	return hasMetrics, errors.Join(errs...)
 }
@@ -98,14 +116,29 @@ func (c *Collector) collectIPSecTunnelStateMetrics(ctx context.Context) (bool, e
 func (c *Collector) collectIPSecGatewayMetrics(ctx context.Context) (bool, error) {
 	body, err := c.apiClient.op(ctx, ipsecGatewayCommand)
 	if err != nil {
+		observeIPSecUnavailable(c.metrics.ipsec.gatewayState, ipsecGatewayStates, c.ipsecGatewayInventory)
 		return false, fmt.Errorf("ipsec gateway metricset: %s API call: %w", panosCommandName(ipsecGatewayCommand), err)
 	}
 
 	gateways, err := parseVPNGateways(body)
 	if err != nil {
+		observeIPSecUnavailable(c.metrics.ipsec.gatewayState, ipsecGatewayStates, c.ipsecGatewayInventory)
 		return false, fmt.Errorf("ipsec gateway metricset: %s response: %w", panosCommandName(ipsecGatewayCommand), err)
 	}
-	if len(gateways) == 0 {
+	inventory := make(map[[2]string]metrix.LabelSet, len(gateways))
+	for _, gateway := range gateways {
+		key := ipsecGatewayStateKey(gateway)
+		labels, ok := c.ipsecGatewayInventory[key]
+		if !ok {
+			labels = c.store.Write().SnapshotMeter("").LabelSet(
+				metrix.Label{Key: "gateway", Value: key[0]},
+				metrix.Label{Key: "ike_version", Value: key[1]},
+			)
+		}
+		inventory[key] = labels
+	}
+	c.ipsecGatewayInventory = inventory
+	if len(inventory) == 0 {
 		return false, nil
 	}
 
@@ -113,10 +146,12 @@ func (c *Collector) collectIPSecGatewayMetrics(ctx context.Context) (bool, error
 	// would turn an API error into a false outage.
 	body, err = c.apiClient.op(ctx, ipsecIKESACommand)
 	if err != nil {
+		observeIPSecUnavailable(c.metrics.ipsec.gatewayState, ipsecGatewayStates, inventory)
 		return false, fmt.Errorf("ipsec gateway metricset: %s API call: %w", panosCommandName(ipsecIKESACommand), err)
 	}
 	sas, err := parseVPNIKESAs(body)
 	if err != nil {
+		observeIPSecUnavailable(c.metrics.ipsec.gatewayState, ipsecGatewayStates, inventory)
 		return false, fmt.Errorf("ipsec gateway metricset: %s response: %w", panosCommandName(ipsecIKESACommand), err)
 	}
 	byID := make(map[string]bool, len(sas))
@@ -130,21 +165,15 @@ func (c *Collector) collectIPSecGatewayMetrics(ctx context.Context) (bool, error
 		}
 	}
 
-	var errs []error
-	var hasMetrics bool
 	for _, gateway := range gateways {
-		if gateway.Name == "" {
-			errs = append(errs, errors.New("IPsec gateway entry: missing gateway name"))
-			continue
-		}
-		observeStateSetVec(
+		observeIPSecState(
 			c.metrics.ipsec.gatewayState,
+			ipsecGatewayStates,
 			boolState(byID[gateway.ID] || byName[gateway.Name], "up", "down"),
-			ipsecGatewayLabelValues(gateway)...,
+			inventory[ipsecGatewayStateKey(gateway)],
 		)
-		hasMetrics = true
 	}
-	return hasMetrics, errors.Join(errs...)
+	return true, nil
 }
 
 func parseVPNFlow(body []byte) ([]vpnFlowTunnel, error) {
@@ -154,6 +183,16 @@ func parseVPNFlow(body []byte) ([]vpnFlowTunnel, error) {
 	}
 	if result.IPSec == nil {
 		return nil, missingPANOSResultError{expected: "<IPSec>"}
+	}
+	if err := validateVPNEntryList(result.IPSec.Text, result.IPSec.Other); err != nil {
+		return nil, fmt.Errorf("parse PAN-OS IPsec flow response result: %w", err)
+	}
+	for i := range result.IPSec.Entries {
+		tunnel := &result.IPSec.Entries[i]
+		tunnel.Name = strings.TrimSpace(tunnel.Name)
+		if tunnel.Name == "" {
+			return nil, errors.New("IPsec flow entry: missing tunnel name")
+		}
 	}
 	return result.IPSec.Entries, nil
 }
@@ -166,10 +205,16 @@ func parseVPNGateways(body []byte) ([]vpnGateway, error) {
 	if result.Entries == nil {
 		return nil, missingPANOSResultError{expected: "<entries>"}
 	}
+	if err := validateVPNEntryList(result.Entries.Text, result.Entries.Other); err != nil {
+		return nil, fmt.Errorf("parse PAN-OS IPsec gateway response result: %w", err)
+	}
 	for i := range result.Entries.Entries {
 		gateway := &result.Entries.Entries[i]
 		gateway.ID = strings.TrimSpace(gateway.ID)
 		gateway.Name = strings.TrimSpace(gateway.Name)
+		if gateway.Name == "" {
+			return nil, errors.New("IPsec gateway entry: missing gateway name")
+		}
 	}
 	return result.Entries.Entries, nil
 }
@@ -182,11 +227,8 @@ func parseVPNIKESAs(body []byte) ([]vpnIKESA, error) {
 	if err := decodePANOSResult(body, "PAN-OS IPsec IKE SA response", &result); err != nil {
 		return nil, err
 	}
-	if len(result.Other) > 0 {
-		return nil, fmt.Errorf("parse PAN-OS IPsec IKE SA response result: unexpected element <%s>", result.Other[0].XMLName.Local)
-	}
-	if strings.TrimSpace(result.Text) != "" {
-		return nil, errors.New("parse PAN-OS IPsec IKE SA response result: unexpected text")
+	if err := validateVPNEntryList(result.Text, result.Other); err != nil {
+		return nil, fmt.Errorf("parse PAN-OS IPsec IKE SA response result: %w", err)
 	}
 	for i := range result.Entries {
 		sa := &result.Entries[i]
@@ -205,6 +247,16 @@ func parseVPNIKESAs(body []byte) ([]vpnIKESA, error) {
 		}
 	}
 	return result.Entries, nil
+}
+
+func validateVPNEntryList(text string, other []vpnUnexpectedElement) error {
+	if len(other) > 0 {
+		return fmt.Errorf("unexpected element <%s>", other[0].XMLName.Local)
+	}
+	if strings.TrimSpace(text) != "" {
+		return errors.New("unexpected text")
+	}
+	return nil
 }
 
 func normalizeIPSecTunnelState(state string) string {
