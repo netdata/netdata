@@ -35,7 +35,7 @@ def main():
     if not true_command:
         parser.error("a true executable is required to suppress notifications")
 
-    # Keep paths short enough for the Agent's Unix-domain spawn-server sockets.
+    # Keep the run directory path short enough for the Agent's Unix-domain sockets.
     root = pathlib.Path(tempfile.mkdtemp(prefix="nd-native-", dir="/tmp"))
     repo = pathlib.Path(__file__).resolve().parents[5]
     for name in (
