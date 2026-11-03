@@ -242,6 +242,11 @@ func (p page[T]) next() (next *url.URL, found bool, err error) {
 
 // fetchPage sends one authenticated GET and decodes its JSON array.
 func fetchPage[T any](ctx context.Context, c *Client, target *url.URL, opName string) (page[T], error) {
+	return fetchDecodedPage(ctx, c, target, opName, decodeArray[T])
+}
+
+// fetchDecodedPage shares request safety between array and items-envelope responses.
+func fetchDecodedPage[T any](ctx context.Context, c *Client, target *url.URL, opName string, decode func(io.Reader, string) ([]T, error)) (page[T], error) {
 	req, err := c.newRequest(ctx, target)
 	if err != nil {
 		return page[T]{}, safeError(opName, "cannot prepare authenticated request", err)
@@ -262,7 +267,7 @@ func fetchPage[T any](ctx context.Context, c *Client, target *url.URL, opName st
 	if enc := strings.TrimSpace(resp.Header.Get("Content-Encoding")); enc != "" && !strings.EqualFold(enc, "identity") {
 		return page[T]{}, fmt.Errorf("%s: unsupported response encoding", opName)
 	}
-	items, err := decodeArray[T](resp.Body, opName)
+	items, err := decode(resp.Body, opName)
 	if err != nil {
 		return page[T]{}, err
 	}

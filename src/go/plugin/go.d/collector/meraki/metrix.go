@@ -8,6 +8,13 @@ const (
 	metricOrganizationAssignedDevices = "organization_assigned_devices"
 	metricDeviceAssigned              = "device_assigned"
 	metricDeviceAvailabilityStatus    = "device_availability_status"
+	metricPortTrafficSent             = "switch_port_traffic_sent"
+	metricPortTrafficReceived         = "switch_port_traffic_received"
+	metricPortTrafficIntervalAge      = "switch_port_traffic_interval_age"
+	metricPortPacketsSent             = "switch_port_packets_sent"
+	metricPortPacketsReceived         = "switch_port_packets_received"
+	metricUplinkTrafficSent           = "appliance_uplink_traffic_sent"
+	metricUplinkTrafficReceived       = "appliance_uplink_traffic_received"
 )
 
 // availabilityStates are the device states Meraki documents.

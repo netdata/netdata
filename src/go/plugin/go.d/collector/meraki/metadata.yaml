@@ -25,10 +25,11 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          Monitor the availability of every device in a Cisco Meraki organization through the Meraki Dashboard API, with each device shown as its own Netdata node.
+          Monitor device availability and optional switch port and MX/Z uplink traffic in a Cisco Meraki organization through the Meraki Dashboard API.
 
           - **Device availability**: the status Meraki Dashboard reports for each device: `online`, `alerting`, `offline` or `dormant`.
           - **Inventory**: how many devices are assigned to the organization's networks, and which ones.
+          - **Optional traffic**: independently enable switch port traffic, switch port packet rates, and MX/Z uplink traffic. Switch port charts appear on each switch's node; MX/Z charts show network/interface usage alongside the organization summary. All three options are disabled by default.
           - **Fleet filtering**: device nodes and charts carry organization, network, model and product type labels, so a large fleet can be grouped and filtered.
 
           Every device type Meraki reports availability for is covered, including security appliances (MX), switches (MS), wireless access points (MR), cameras (MV), sensors (MT) and cellular gateways (MG).
@@ -44,6 +45,14 @@ modules:
           | `getOrganizationDevices` | The devices assigned to networks, one node each |
           | `getOrganizationDevicesAvailabilities` | The status of each device |
 
+          Enabled traffic options add these operations, using a five-minute window independently of `update_every`:
+
+          | Option | Operation |
+          |:-------|:----------|
+          | `collect_switch_port_traffic` | `getOrganizationSwitchPortsUsageHistoryByDeviceByInterval` |
+          | `collect_switch_port_packets` | `getDeviceSwitchPortsStatusesPackets`, once per assigned switch |
+          | `collect_appliance_uplink_usage` | `getOrganizationApplianceUplinksUsageByNetwork` |
+
           When a job starts, one small `getOrganizationDevices` request checks that the API key can reach the organization.
       supported_platforms:
         include: []
@@ -58,11 +67,13 @@ modules:
             Nothing is detected automatically: each job monitors the one organization set in `organization_id`, with the API key you configure. Within that organization, every collection finds all assigned devices and adds a node for each new one.
         limits:
           description: |
-            - **Five-minute data.** Meraki refreshes device availability every 5 minutes and gives no sample time, so an `update_every` below 300 seconds repeats the same values instead of adding detail.
+            - **Reported traffic.** Switch traffic uses reported five-minute intervals; its interval-age chart shows time since the accepted interval ended, not a guarantee that Meraki has finished reporting. Packet rates use Meraki's latest five minutes, which may be incomplete. MX/Z traffic is the reported bytes divided by the requested five-minute window; Meraki does not document its refresh delay. Charts appear at collection time, without historical backfill.
+            - **Network uplink scope.** MX/Z bytes are aggregated by network and interface when more than one appliance was active during the window. Uplink charts therefore appear with the organization summary, never on an individual appliance node.
+            - **Five-minute availability.** Meraki refreshes device availability every 5 minutes and gives no sample time, so an `update_every` below 300 seconds repeats the same values instead of adding detail.
             - **Shared API budget.** Meraki allows 10 requests per second per organization and 100 per source IP address, shared with every other application using them. The collector sends at most 10 requests per second per job, and after a `429 Too Many Requests` answer it sends nothing until the `Retry-After` wait Meraki requested has passed. See [Meraki API rate limits](https://developer.cisco.com/meraki/api-v1/rate-limit/).
         performance_impact:
           description: |
-            The load on the Agent host is negligible. On the Meraki side, each operation costs one request per page, plus one for each redirect Meraki answers with:
+            By default, each inventory operation costs one request per page, plus one for each redirect Meraki answers with:
 
             | Operation | Page size |
             |:----------|:----------|
@@ -72,6 +83,8 @@ modules:
             | `getOrganizationDevicesAvailabilities` | 1,000 devices |
 
             An organization with 2,500 devices in 40 networks takes 1 + 1 + 3 + 3 = 8 requests per collection. Increase `update_every` to make fewer requests; increase `timeout` if a very large organization cannot finish within it.
+
+            Traffic is disabled by default. For `S` assigned switches, enabling all three traffic options adds approximately `ceil(S / 50) + S + 1` requests per collection, before redirects: switch traffic pages of 50 devices, one packet request per switch, and one MX/Z organization request. With 1,000 switches this adds 1,021 requests, or about 102 seconds of pacing alone, exceeding the default 60-second `timeout`. Increase `timeout` appropriately or leave packet collection disabled. Each switch port adds up to three charts, and each MX/Z network uplink adds one chart.
 
             Every assigned device becomes a Netdata node: an organization with 2,000 devices adds 2,000 nodes.
     setup:
@@ -139,6 +152,21 @@ modules:
               group: Authentication
               detailed_description: |
                 Use this when a secret manager rotates the key in place: the next request uses the new key without a restart. The file must be readable by the `netdata` user.
+            - name: collect_switch_port_traffic
+              description: Collect reported switch port traffic and interval age. Disabled by default.
+              default_value: false
+              required: false
+              group: Collection
+            - name: collect_switch_port_packets
+              description: Collect reported switch port packet rates. Disabled by default; adds one request per assigned switch.
+              default_value: false
+              required: false
+              group: Collection
+            - name: collect_appliance_uplink_usage
+              description: Collect reported MX and Z network uplink traffic. Disabled by default; charts appear with the organization summary.
+              default_value: false
+              required: false
+              group: Collection
             - name: update_every
               description: Data collection interval, in seconds.
               default_value: 300
@@ -155,7 +183,7 @@ modules:
               required: false
               group: Collection
             - name: vnode
-              description: Associates the organization summary with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). Device nodes are created separately.
+              description: Associates the organization summary and appliance uplink charts with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). Device nodes are created separately.
               default_value: ''
               required: false
               group: Collection
@@ -197,6 +225,17 @@ modules:
                   - name: meraki
                     organization_id: "123456"
                     api_key: ${env:MERAKI_API_KEY}
+            - name: Enable traffic collection
+              description: Enable all three traffic families independently. Set a longer timeout for a large switch fleet; packet rates require one request per switch.
+              config: |
+                jobs:
+                  - name: meraki
+                    organization_id: "123456"
+                    api_key: ${env:MERAKI_API_KEY}
+                    collect_switch_port_traffic: yes
+                    collect_switch_port_packets: yes
+                    collect_appliance_uplink_usage: yes
+                    timeout: 180
             - name: API key in a rotated file
               description: Read the key from a file that a secret manager rotates. The file is read again for every request.
               config: |
@@ -233,8 +272,8 @@ modules:
                     api_key: ${env:MERAKI_API_KEY}
     metrics:
       description: |
-        - **Where charts appear.** The organization chart is on the node that runs the job, or on its virtual node when `vnode` is set. Device charts are on each device's own node, named after the device; `meraki-` followed by the serial when the device has no name; or `meraki-` followed by a generated ID when the name contains an apostrophe, backslash or line break.
-        - **Gaps, not offline.** A device whose status is missing, unknown or reported for another network has no availability value for that collection; it is never reported offline because of missing data. Its inventory chart stays at 1 while the device is assigned. A failed collection updates no chart.
+        - **Where charts appear.** The organization and MX/Z uplink charts are on the node that runs the job, or on its virtual node when `vnode` is set. Switch port charts are on the assigned switch's node. Device charts are on each device's own node, named after the device; `meraki-` followed by the serial when the device has no name; or `meraki-` followed by a generated ID when the name contains an apostrophe, backslash or line break.
+        - **Gaps, not offline.** A device whose status is missing, unknown or reported for another network has no availability value for that collection; it is never reported offline because of missing data. Its inventory chart stays at 1 while the device is assigned. A failed inventory read, collection timeout or cancellation updates no chart. A traffic API failure leaves gaps in the affected traffic charts while inventory and independent traffic measurements can still update.
         - **Removed devices.** When a device leaves the inventory, its charts stop updating and become obsolete. Netdata keeps the node and its history.
       scopes:
         - name: organization
@@ -286,6 +325,69 @@ modules:
                 - name: dormant
                 - name: offline
                 - name: online
+        - name: switch_port
+          description: One port of an assigned switch, shown on the switch node when its traffic options are enabled.
+          labels:
+            - name: organization_id
+              description: Meraki organization ID.
+            - name: organization_name
+              description: Meraki organization name.
+            - name: serial
+              description: Device serial number, for example `Q2XX-XXXX-XXXX`.
+            - name: device_name
+              description: Device name in Dashboard; empty when unnamed.
+            - name: model
+              description: Device model, for example `MS120-8`.
+            - name: product_type
+              description: Meraki product type, for example `appliance`, `switch`, `wireless`, `camera`, `sensor` or `cellularGateway`.
+            - name: network_id
+              description: ID of the network the device is assigned to.
+            - name: network_name
+              description: Name of the network the device is assigned to.
+            - name: port_id
+              description: Switch port identifier.
+          metrics:
+            - name: meraki.switch_port_traffic
+              description: Meraki Switch Port Reported Traffic
+              unit: kilobits/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: meraki.switch_port_traffic_interval_age
+              description: Meraki Switch Port Traffic Interval Age
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: age
+            - name: meraki.switch_port_packets
+              description: Meraki Switch Port Reported Packet Rate
+              unit: packets/s
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+        - name: appliance_uplink
+          description: One MX/Z network uplink, aggregated across active appliances and shown with the organization summary when enabled.
+          labels:
+            - name: organization_id
+              description: Meraki organization ID.
+            - name: organization_name
+              description: Meraki organization name.
+            - name: network_id
+              description: Meraki network ID.
+            - name: network_name
+              description: Meraki network name.
+            - name: interface
+              description: Uplink interface name, for example `wan1`.
+          metrics:
+            - name: meraki.appliance_uplink_traffic
+              description: Meraki Appliance Uplink Reported Traffic
+              unit: kilobits/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
       folding:
         title: Metrics
         enabled: false
@@ -335,7 +437,7 @@ modules:
               ```
           - error: context deadline exceeded
             cause: A collection or the startup check took longer than `timeout`. Every page counts toward it, and the collector sends at most 10 requests per second, so a very large organization or a slow network can run out of time.
-            fix: Check connectivity to the API endpoint. If requests succeed but the organization cannot finish in time, increase `timeout`.
+            fix: Check connectivity to the API endpoint. If requests succeed but the organization cannot finish in time, increase `timeout`. Packet collection adds one request per assigned switch; disable `collect_switch_port_packets` if that cost is not needed.
           - error: '`operation`: invalid pagination target'
             cause: A next-page link pointed outside the endpoint in `url`. This happens when `url` is a proxy or private endpoint that passes Meraki's `Link` headers through unchanged, and only for lists longer than one page.
             fix: Configure the proxy to rewrite `Location` and `Link` headers to its own address, or set `url` to the Meraki API endpoint of the organization's region.
@@ -379,3 +481,6 @@ modules:
           - error: Device node shows inventory but no availability chart
             cause: Meraki did not report a usable status for the device in the last collection. Availability can lag a new assignment or a network move by one refresh.
             fix: Check the device's status in Dashboard and wait for the next 5-minute refresh. Run the collector in debug mode (see Diagnostics) to see how many devices had no usable status.
+          - error: Traffic charts are missing or have gaps
+            cause: The corresponding traffic option is disabled, Meraki returned missing or unusable data, or the traffic API request failed. A missing measurement is never reported as zero. A 429 stops remaining traffic requests in that collection.
+            fix: Enable the required traffic option and check the warning log for the affected API operation. Verify access and device support in Meraki Dashboard. For switch traffic, check the interval-age chart when present; it describes the accepted interval, not provider completeness. For timeout failures, increase `timeout` or disable packet collection for large fleets.

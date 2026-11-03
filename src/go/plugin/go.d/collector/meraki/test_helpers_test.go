@@ -6,6 +6,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync"
 	"testing"
@@ -23,6 +24,7 @@ type fixtureResponse struct {
 type fixtureRequest struct {
 	path, cursor, pageSize, authorization string
 	at                                    time.Time
+	query                                 url.Values
 }
 
 type fixtureAPI struct {
@@ -57,6 +59,7 @@ func newFixtureAPI(t *testing.T) (*fixtureAPI, *httptest.Server) {
 				pageSize:      r.URL.Query().Get("perPage"),
 				authorization: r.Header.Get("Authorization"),
 				at:            time.Now(),
+				query:         r.URL.Query(),
 			},
 		)
 		response, ok := f.responses[path+":"+cursor]

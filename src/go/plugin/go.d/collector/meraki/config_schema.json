@@ -29,6 +29,24 @@
         "type": "string",
         "default": ""
       },
+      "collect_switch_port_traffic": {
+        "title": "Collect switch port traffic",
+        "description": "Collect reported switch port traffic and interval age. Disabled by default.",
+        "type": "boolean",
+        "default": false
+      },
+      "collect_switch_port_packets": {
+        "title": "Collect switch port packets",
+        "description": "Collect reported switch port packet rates. Disabled by default; adds one request per assigned switch.",
+        "type": "boolean",
+        "default": false
+      },
+      "collect_appliance_uplink_usage": {
+        "title": "Collect appliance uplink usage",
+        "description": "Collect reported MX and Z network uplink traffic. Disabled by default; charts appear with the organization summary.",
+        "type": "boolean",
+        "default": false
+      },
       "update_every": {
         "title": "Update every",
         "description": "Data collection interval, in seconds.",
@@ -52,7 +70,7 @@
       },
       "vnode": {
         "title": "Virtual node",
-        "description": "Associates the organization summary with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). Device nodes are created separately.",
+        "description": "Associates the organization summary and appliance uplink charts with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). Device nodes are created separately.",
         "type": "string",
         "default": ""
       },
@@ -142,6 +160,9 @@
         {
           "title": "Collection",
           "fields": [
+            "collect_switch_port_traffic",
+            "collect_switch_port_packets",
+            "collect_appliance_uplink_usage",
             "update_every",
             "autodetection_retry",
             "timeout",
@@ -165,6 +186,15 @@
     },
     "timeout": {
       "ui:help": "This budget covers a whole collection, including authentication-file reads, pagination and pacing. Increase it if a large organization cannot finish within the budget."
+    },
+    "collect_switch_port_traffic": {
+      "ui:help": "Uses five-minute intervals reported by Meraki. Interval age measures time since the accepted interval ended; it does not guarantee complete provider data."
+    },
+    "collect_switch_port_packets": {
+      "ui:help": "Uses the latest five minutes reported by Meraki, which may be incomplete. For large switch fleets, increase Timeout or leave this option disabled: 1,000 switches add about 100 seconds of request pacing alone."
+    },
+    "collect_appliance_uplink_usage": {
+      "ui:help": "Reports average traffic for the requested five-minute window, aggregated by network and interface across active appliances. These charts are not attributed to a device, including during HA failover."
     }
   }
 }

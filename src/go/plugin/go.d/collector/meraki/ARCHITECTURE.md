@@ -18,7 +18,7 @@ with `src/go/`, which are repo-relative.
 [The Big Picture](#the-big-picture)
 
 **The life of a cycle** — [Gate](#stage-1--gate-on-retry-after) | [Read](#stage-2--read-the-four-lists) |
-[Join](#stage-3--join-inventory-and-availability) | [Write](#stage-4--write-metrics) |
+[Join](#stage-3--join-inventory-and-availability) | [Optional Traffic](#optional-traffic) | [Write](#stage-4--write-metrics) |
 [Commit](#stage-5--commit-or-abort)
 
 **The machine around it** — [Device Nodes](#device-nodes) | [Startup And Shutdown](#startup-and-shutdown) |
@@ -39,13 +39,17 @@ Every `update_every` (300 seconds by default, matching Meraki's availability ref
    availabilities.
 2. **Joins** them: the assigned-device list decides which devices exist; availability is attached only when it can be
    trusted.
-3. **Writes** one organization gauge on the job's node, and for every assigned device an inventory gauge and an
+3. **Optionally reads traffic** for the three independently enabled families: switch port traffic, switch port
+   packet rates, and MX/Z network uplink usage. All three default to disabled.
+4. **Writes** one organization gauge on the job's node, and for every assigned device an inventory gauge and an
    availability stateset on that device's own **virtual node**.
 
 Three properties shape everything else:
 
-- **All or nothing per cycle.** No metric is written until every list has been read and joined. Any failed request or
-  invalid inventory aborts the cycle, so a partial read can never look like removed devices.
+- **Atomic core inventory; independent traffic.** No metric is written until every core list has been read and
+  joined and optional reads have finished. A failed core request or invalid inventory aborts the cycle, so a partial
+  read can never look like removed devices. Optional traffic failures leave affected gaps; a valid context allows
+  inventory and successful independent observations to commit. Timeout or cancellation aborts the whole cycle.
 - **Inventory decides membership; availability only decorates.** A missing, unknown or contradictory status leaves a
   gap. It is never turned into an offline observation, and an old status is never replayed as fresh.
 - **The provider's budget wins.** Requests are paced to 10 per second per job, and after a 429 with `Retry-After` the
@@ -58,13 +62,13 @@ flowchart LR
     Devices("Meraki devices<br/>MX · MS · MR · MV · MT · MG")
     Cloud("Meraki Dashboard API v1<br/>api.meraki.com or regional")
     Job("meraki job<br/>go.d.plugin")
-    JobNode("Job node or vnode<br/>organization chart")
+    JobNode("Job node or vnode<br/>organization + MX/Z uplink charts")
     DevNodes("Device virtual nodes<br/>one per assigned device")
 
     Devices -.->|"report to Meraki, not Netdata"| Cloud
     Job -->|"HTTPS GET, API key"| Cloud
-    Job -->|"organization_assigned_devices"| JobNode
-    Job -->|"device_assigned · device_availability"| DevNodes
+    Job -->|"organization + optional uplink traffic"| JobNode
+    Job -->|"inventory · availability · optional switch ports"| DevNodes
 
     classDef ext fill:#dbeafe,stroke:#2563eb,color:#0b1021;
     classDef core fill:#fef3c7,stroke:#d97706,color:#0b1021;
@@ -121,8 +125,9 @@ A useful mental split for the rest of this document:
 - **`merakiapi`** decides *how to talk to Meraki safely*: URLs, authentication, pagination, redirects, decoding and
   error text. It knows nothing about metrics and interprets nothing.
 - **`transport.go`** decides *how fast*; **`retry_after.go`** decides *when not to talk at all*.
-- **`normalize.go`** decides *what the data means*: which devices exist and which statuses are trustworthy.
-- **`write_metrics.go`** and **`host_scope.go`** decide *where it lands*: labels, virtual nodes and identities.
+- **`normalize.go`** and **`normalize_traffic.go`** decide *what the data means*: inventory membership, trusted
+  statuses, interval selection and unambiguous traffic observations.
+- **`write_metrics.go`**, **`write_traffic.go`** and **`host_scope.go`** decide *where it lands*: labels, virtual nodes and identities.
 - The **framework** owns everything after the write: cycle commit or abort, chart materialization, host publication
   and retirement.
 
@@ -138,15 +143,17 @@ flowchart TD
     Devs("ListDevices")
     Avail("ListDeviceAvailabilities")
     Join("buildInventory")
-    Write("writeMetrics")
+    Traffic("collectTraffic<br/>enabled families only")
+    Write("writeMetrics + writeTrafficMetrics")
     Commit("framework commits cycle")
     Abort("framework aborts cycle<br/>nothing fresh, nothing removed")
     Remember("remember Retry-After<br/>on a 429")
 
     Start --> Pending
     Pending -->|"yes"| FailFast --> Abort
-    Pending -->|"no"| Orgs --> Nets --> Devs --> Avail --> Join --> Write --> Commit
+    Pending -->|"no"| Orgs --> Nets --> Devs --> Avail --> Join --> Traffic --> Write --> Commit
     Orgs & Nets & Devs & Avail & Join -->|"error"| Remember --> Abort
+    Traffic -->|"timeout or cancellation"| Abort
 
     classDef ext fill:#dbeafe,stroke:#2563eb,color:#0b1021;
     classDef recv fill:#dcfce7,stroke:#16a34a,color:#0b1021;
@@ -155,7 +162,7 @@ flowchart TD
     classDef err fill:#fee2e2,stroke:#dc2626,color:#0b1021;
     class Start ext;
     class Orgs,Nets,Devs,Avail recv;
-    class Join mean;
+    class Join,Traffic mean;
     class Write,Commit out;
     class Pending,FailFast,Abort,Remember err;
 ```
@@ -221,17 +228,61 @@ never become identity.
 | `organization_assigned_devices` | Job's default scope (the job node, or `vnode`) | Number of assigned devices; `0` for an empty organization |
 | `device_assigned` | The device's host scope | Always `1` |
 | `device_availability_status` | The device's host scope | Enum stateset, only when the status is trusted |
+| `switch_port_traffic_sent`, `switch_port_traffic_received` | Assigned switch's host scope | Optional provider Kbps gauges per port |
+| `switch_port_traffic_interval_age` | Assigned switch's host scope | Seconds since the accepted traffic interval ended |
+| `switch_port_packets_sent`, `switch_port_packets_received` | Assigned switch's host scope | Optional provider packets/s gauges per port |
+| `appliance_uplink_traffic_sent`, `appliance_uplink_traffic_received` | Job's default scope | Optional requested-window average kilobits/s per network/interface |
 
 Chart labels: `organization_id` and `organization_name` on every series, plus `serial`, `device_name`, `model`,
 `product_type`, `network_id` and `network_name` on device series. The number of devices without a usable status is
-logged at debug level, once per cycle.
+logged at debug level, once per cycle. Switch port series add `port_id` to device labels. Uplink series carry only
+organization and network ID/name plus `interface`, never serial or other device labels.
 
 ### Stage 5 — Commit or abort
 
-`Collect` returns the first error. The framework then aborts the cycle: no fresh values are published, and missed
-cycles do not count toward chart expiry, so a failed read cannot retire devices. On success the framework commits, and
+`Collect` returns a core error or context error when the cycle cannot commit; optional family errors are handled
+before writes. On error the framework aborts: no fresh values are published, and missed cycles do not count toward
+chart expiry, so a failed core read cannot retire devices. On success the framework commits, and
 devices absent from a complete successful inventory stop receiving data and retire through the normal chart
 lifecycle.
+
+## Optional Traffic
+
+`collectTraffic` (`collect_traffic.go`) runs after the complete inventory join and before any writes. Each option is
+an independent boolean, default `false`; omitted, false and null retain the inventory-only contract. No cache,
+background worker, scheduler or durable state is added. A single five-minute window ends at the current UTC time,
+truncated to a second; switch history and MX/Z usage receive its explicit `t0` and `t1`. Packet requests use
+`timespan=300`. Changing `update_every` changes polling cost, not this source window.
+
+| Option | Source and selection | Meaning and placement |
+| --- | --- | --- |
+| `collect_switch_port_traffic` | Organization switch-port usage history, all pages at `perPage=50`; only currently assigned switches | Provider downstream/upstream Kbps, as received/sent gauges on the existing switch vnode, keyed by `port_id` |
+| `collect_switch_port_packets` | One port packet-status request per assigned switch, in serial order; `Total` packet rates only | Provider `ratePerSec.recv` / `sent` gauges in packets/s on the existing switch vnode, keyed by `port_id` |
+| `collect_appliance_uplink_usage` | One organization MX/Z uplink-usage request | Requested-window bytes × 8 / 300 / 1000 as kilobits/s gauges on the default job host or configured `vnode`, keyed by organization, network and interface |
+
+`normalize_traffic.go` keeps measured zero and omits absent, null, negative or non-finite numbers. Byte totals must
+also be integers. Unknown devices or networks cannot create telemetry entities. Identical duplicate observations
+are deduplicated; conflicting observations for the same identity and source interval are omitted, never summed.
+A switch-history row whose network contradicts current assignment suppresses that switch's traffic-history
+observations; independent packet requests remain unaffected.
+
+For switch traffic, the accepted interval lasts exactly 300 seconds and ends after `t0` and no later than `t1`.
+Provider alignment may put its start before `t0`. The latest accepted interval wins; invalid timestamps, wrong
+durations, older or future intervals are omitted. `switch_port_traffic_interval_age` is the elapsed time since the
+accepted interval ended. It is not a completeness guarantee. Packet endpoints warn that current five-minute data
+may be incomplete; MX/Z usage has no documented refresh delay or returned sample timestamp. All rates are gauges,
+not cumulative counters. Charts publish at observation time without backfill or accumulation of overlapping windows.
+
+MX/Z totals are network/interface aggregates. Cisco documents aggregation when multiple devices were active during
+the requested window. The result's serial cannot prove ownership across HA failover or appliance replacement, so
+serial is deliberately absent from the metric identity and labels; no uplink usage is written to a device vnode.
+Current inventory cannot reconstruct historical attribution.
+
+An optional API error produces a bounded warning and leaves gaps for that family, or just the affected switch for
+packet errors. Other enabled families continue. A 429 immediately remembers any valid Retry-After and stops further
+requests in that cycle, even when no valid wait was provided. Successful core and independent telemetry can commit
+only while the whole-operation context remains valid. Core errors retain their all-or-nothing behavior. A whole
+operation timeout or cancellation aborts everything, including already collected optional data.
 
 ## Device Nodes
 
@@ -259,7 +310,8 @@ all. The inventory gauge anchors the node; the availability chart comes and goes
 belong to the framework. Retirement stops the node's charts; it does not promise deletion of the node's history.
 
 **Cardinality.** One node per assigned serial, each with one inventory chart and, while its status is trusted, one
-availability chart. There is no device filter.
+availability chart. Enabling traffic adds up to three charts per switch port and one chart per MX/Z network
+uplink on the default host. There is no device filter.
 
 ## Startup And Shutdown
 
@@ -293,7 +345,9 @@ other Agents and other applications draw from the same budgets, so the collector
 sits below `http.Client`, so it covers every page and every redirect hop, not just every list call. A context
 cancelled during the wait returns without sending.
 
-**Retry-After.**
+**Retry-After.** The sequence below describes a surfaced error from Check or core collection. Optional traffic
+errors remember the same wait immediately but can still permit a successful cycle with affected gaps.
+
 
 ```mermaid
 sequenceDiagram
@@ -320,16 +374,22 @@ sequenceDiagram
   schedule collections; the framework's rules for manual and fresh activations still apply
   (`src/go/plugin/go.d/docs/how-to-write-a-collector.md#registration-and-lifecycle`).
 
+For `S` assigned switches, all three traffic options add approximately `ceil(S / 50) + S + 1` requests before
+redirects. Switch history is skipped when no switches are assigned; the enabled MX/Z operation is still one request.
+At 1,000 switches, 1,021 extra requests require about 102 seconds of pacing alone, beyond the default 60-second
+whole-operation timeout. Operators can increase the existing timeout or leave packets disabled. No new tuning knobs
+or fleet caps are introduced.
+
 ## The API Client
 
-`merakiapi` is a collector-local client for four read-only Dashboard API v1 operations. It returns provider data
-as-is: IDs stay opaque strings, missing fields decode as empty values, and unknown product types or statuses pass
-through uninterpreted. Callers validate what they rely on, because the provider schema marks none of these fields
+`merakiapi` is a collector-local client for seven read-only Dashboard API v1 operations. It returns provider data
+as-is: IDs stay opaque strings, missing inventory fields decode as empty values, optional numeric fields retain
+missing/null separately from zero, and unknown product types or statuses pass through uninterpreted. Callers validate what they rely on, because the provider schema marks none of these fields
 required.
 
 ### Operations
 
-All four are `GET` operations returning a bare JSON array, without entity filters or a generic query option.
+The four inventory `GET` operations return bare JSON arrays, without entity filters or a generic query option.
 
 | Method | Path below `/api/v1` | First `perPage` | Accepted `perPage` |
 | --- | --- | --- | --- |
@@ -342,8 +402,23 @@ All four are `GET` operations returning a bare JSON array, without entity filter
 reuses the devices operation with `perPage=3` and returns no data. The organization ID is path-escaped; `.` and `..`
 are rejected because escaping keeps dot segments.
 
-The response types (`merakiapi/types.go`) carry only the fields the collector reads. Everything else in a payload
-(addresses, coordinates, notes, IMEI, enrollment strings, management details) is discarded at decode time.
+Traffic operations (`merakiapi/traffic.go`) share authentication, redirects, pacing, cancellation and bounded
+response decoding. They do not invent pagination on unpaginated endpoints:
+
+| Method | Path below `/api/v1` | Query / response |
+| --- | --- | --- |
+| `ListSwitchPortUsageHistory` | `/organizations/{organizationId}/switch/ports/usage/history/byDevice/byInterval` | Fixed `t0`, `t1`; `perPage=50`; paginated `items` envelope |
+| `GetSwitchPortPackets` | `/devices/{serial}/switch/ports/statuses/packets` | `timespan=300`; bare array; no `perPage` |
+| `GetApplianceUplinkUsage` | `/organizations/{organizationId}/appliance/uplinks/usage/byNetwork` | Fixed `t0`, `t1`; bare array; no `perPage` |
+
+Switch-history next links may omit fixed window parameters; the client restores them. A conflicting window, unknown
+parameter or changed interval is rejected. `interval=300` is accepted only for the exact 300-second request and
+removed because the documented API computes the interval from its time range. The `items` envelope and its array
+must be present and non-null, with no trailing payload. Returned interval validity belongs to normalization.
+
+The response types (`merakiapi/types.go` and `merakiapi/traffic_types.go`) carry only fields the collector reads.
+Everything else in a payload (addresses, coordinates, notes, IMEI, enrollment strings, management details) is
+discarded at decode time.
 
 ### Construction and ownership
 
@@ -409,7 +484,8 @@ fails with an error and needs evidence before the trust rule is widened.
 ### Decoding and response limits
 
 - Only `200` is a success. Anything else becomes an `HTTPError`; `204` is not an empty list.
-- The body must be exactly one non-null JSON array of non-null items, followed only by whitespace.
+- Array responses must be exactly one non-null JSON array of non-null items, followed only by whitespace. Switch
+  history instead requires one non-null `items` envelope containing such an array.
 - Bodies are read through `web.LimitResponseBody` with the HTTP client's limit (64 MiB by default); a larger body
   fails with `web.ErrResponseTooLarge`.
 - Standard gzip is decompressed by `net/http`. Any other `Content-Encoding` still present is an error; a custom
@@ -445,7 +521,10 @@ Every option maps to an operator decision; implementation tuning (page sizes, pa
 | `update_every` | Polling cadence and API cost | 300 s | framework |
 | `autodetection_retry` | Retry a failed start | 0 (off) | framework |
 | `timeout` | Budget of one whole Init, Check or Collect | 60 s | `validateConfig` (must be positive) |
-| `vnode` | Placement of the organization chart; device nodes are unaffected | empty | framework |
+| `collect_switch_port_traffic` | Enable reported switch traffic and interval age | false | Go boolean decoding |
+| `collect_switch_port_packets` | Enable switch packet rates at one request per switch | false | Go boolean decoding |
+| `collect_appliance_uplink_usage` | Enable MX/Z network/interface average traffic | false | Go boolean decoding |
+| `vnode` | Placement of organization and uplink charts; device nodes are unaffected | empty | framework |
 | `proxy_url` | Egress route | environment | `pkg/web` |
 | `tls_ca`, `tls_cert`, `tls_key`, `tls_skip_verify` | Trust and client identity for a proxy or private endpoint | empty, `no` | `validateConfig` (cert and key together), `pkg/tlscfg` |
 
@@ -461,7 +540,10 @@ the form has no hidden branch state.
 | `collector.go` | Registration, `New`, the `CollectorV2` lifecycle methods |
 | `config.go` | `Config`, defaults, `validateConfig` |
 | `init.go` | HTTP client and API client construction |
-| `collect.go` | One cycle: read the four lists, join, write |
+| `collect.go` | One cycle: read the four lists, join, optional reads, write |
+| `collect_traffic.go` | Enabled source windows, optional family reads, bounded warnings and 429 stop |
+| `normalize_traffic.go` | Interval selection, numeric validity, duplicate ambiguity and uplink scope |
+| `write_traffic.go` | Switch port and network/interface gauges and labels |
 | `normalize.go` | `findOrganization`, `buildInventory` and the status trust rule |
 | `metrix.go` | Metric names, the availability vocabulary, the organization instrument |
 | `write_metrics.go` | Organization and device observations, debug count of unknown statuses |
@@ -473,13 +555,15 @@ the form has no hidden branch state.
 | `merakiapi/pagination.go` | Next-link scope check and RFC 8288 Link parsing |
 | `merakiapi/redirect.go` | Host trust, regional roots and the redirect policy |
 | `merakiapi/errors.go` | `HTTPError`, Retry-After parsing, `transportError`, `safeError` |
-| `merakiapi/types.go` | Response types |
+| `merakiapi/types.go`, `merakiapi/traffic_types.go` | Minimal response types |
+| `merakiapi/traffic.go` | Traffic queries, envelope decoding and fixed-window pagination |
 
 ## Key Invariants
 
 **Cycle**
 
-- No metric is written before all four lists are read and joined; any error aborts the cycle.
+- No metric is written before the four core lists are read and joined and optional reads finish. Core and context
+  errors abort the cycle; optional errors leave affected gaps without changing inventory membership.
 - A failed cycle never retires a device; only a complete successful inventory can.
 - An empty organization is a valid inventory and reports `0`.
 
@@ -487,7 +571,9 @@ the form has no hidden branch state.
 
 - Only the assigned-device list creates devices.
 - A status is attached only when known, unambiguous and network-compatible; otherwise it is a gap, never `offline`.
-- No status is replayed from an earlier cycle, and request time is never presented as the sample time.
+- No status is replayed from an earlier cycle, and request time is never presented as the provider sample time.
+- Traffic rates are gauges for reported windows, not monotonic counters or historical backfill.
+- Uplink usage is network/interface scoped and never attributed to a device serial.
 
 **Identity**
 
@@ -525,6 +611,8 @@ the form has no hidden branch state.
 | `TestOperationDeadlineAndCancellation`, `TestPacingCoversRedirectsPagesAndCancellation` | `timeout`, cancellation, pacing across pages and redirects |
 | `TestDeviceHostIdentity`, `TestManagedDevicePublicationAndRetirement` | GUID stability, hostname fallback, real `JobV2` publication and retirement |
 | `TestIntegrationArtifacts`, `TestMetadataDocumentsEmittedLabels` | Chart template, metadata, schema and label drift |
+| `TestTrafficMethods`, `TestSwitchUsagePagination`, `TestSwitchUsageLatePageFailure` | Exact traffic queries, fixed windows, next-link safety and complete-history reads |
+| `TestTrafficDecodeFailures`, `TestTrafficValidationAndCancellation`, `TestSwitchUsageEnvelopeHTTPPolicy` | Envelope/array shape, numeric presence, cancellation, HTTP and redirect policy |
 | `merakiapi` tests | Construction, credentials (through the shipped credential-file path with a subprocess peer), pagination, trusted redirects, gzip and body limits, cancellation, status and Retry-After errors, transport error text |
 
 Run from `src/go`:
@@ -549,6 +637,9 @@ v1.75.1, 2026-10-16).
 - [Pagination](https://developer.cisco.com/meraki/api-v1/pagination/)
 - [RFC 8288 Web Linking](https://www.rfc-editor.org/rfc/rfc8288#section-3)
 - [Rate limits](https://developer.cisco.com/meraki/api-v1/rate-limit/)
+- [Switch port usage history](https://developer.cisco.com/meraki/api-v1/get-organization-switch-ports-usage-history-by-device-by-interval/)
+- [Switch port packet status](https://developer.cisco.com/meraki/api-v1/get-device-switch-ports-statuses-packets/)
+- [MX/Z network uplink usage](https://developer.cisco.com/meraki/api-v1/get-organization-appliance-uplinks-usage-by-network/)
 - [Device availabilities](https://developer.cisco.com/meraki/api-v1/get-organization-devices-availabilities/)
 - [Status codes, redirects and access restrictions](https://documentation.meraki.com/Platform_Management/Dashboard_Administration/Operate_and_Maintain/How-Tos/How_to_Use_the_Cisco_Meraki_Dashboard_API)
 - [API base and shard URL guidance](https://documentation.meraki.com/Platform_Management/Dashboard_Administration/Troubleshooting_and_Support/Troubleshooting/Meraki_Dashboard_URL_Update_-_PCI_Compliance)
