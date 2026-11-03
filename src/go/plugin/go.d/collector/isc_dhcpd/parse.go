@@ -48,6 +48,16 @@ type leaseEntry struct {
 func (l leaseEntry) isAddrValid() bool     { return l.addr.IsValid() }
 func (l leaseEntry) hasBindingState() bool { return l.bindingState != "" }
 
+// cutAffixes returns s with the first prefixLen and last suffixLen bytes
+// removed, or ok=false when s is too short for that to make sense (e.g. a
+// truncated or malformed line in the leases file).
+func cutAffixes(s string, prefixLen, suffixLen int) (string, bool) {
+	if len(s) < prefixLen+suffixLen {
+		return "", false
+	}
+	return s[prefixLen : len(s)-suffixLen], true
+}
+
 func parseDHCPdLeasesFile(filepath string) ([]leaseEntry, error) {
 	f, err := os.Open(filepath)
 	if err != nil {
@@ -65,19 +75,25 @@ func parseDHCPdLeasesFile(filepath string) ([]leaseEntry, error) {
 		case !l.isAddrValid() && bytes.HasPrefix(bs, []byte("lease")):
 			// "lease 192.168.0.1 {" => "192.168.0.1"
 			s := string(bs)
-			if addr, err := netip.ParseAddr(s[6 : len(s)-2]); err == nil && addr.IsValid() {
-				l.addr = addr
+			if v, ok := cutAffixes(s, 6, 2); ok {
+				if addr, err := netip.ParseAddr(v); err == nil && addr.IsValid() {
+					l.addr = addr
+				}
 			}
 		case !l.isAddrValid() && bytes.HasPrefix(bs, []byte("iaaddr")):
 			// "iaaddr 1985:470:1f0b:c9a::001 {" =>  "1985:470:1f0b:c9a::001"
 			s := string(bs)
-			if addr, err := netip.ParseAddr(s[7 : len(s)-2]); err == nil && addr.IsValid() {
-				l.addr = addr
+			if v, ok := cutAffixes(s, 7, 2); ok {
+				if addr, err := netip.ParseAddr(v); err == nil && addr.IsValid() {
+					l.addr = addr
+				}
 			}
 		case l.isAddrValid() && !l.hasBindingState() && bytes.HasPrefix(bs, []byte("binding state")):
 			// "binding state active;" => "active"
 			s := string(bs)
-			l.bindingState = s[14 : len(s)-1]
+			if v, ok := cutAffixes(s, 14, 1); ok {
+				l.bindingState = v
+			}
 		case bytes.HasPrefix(bs, []byte("}")):
 			if l.isAddrValid() && l.hasBindingState() {
 				leasesSet[l.addr.String()] = l
