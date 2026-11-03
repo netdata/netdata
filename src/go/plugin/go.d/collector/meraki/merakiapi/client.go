@@ -333,7 +333,7 @@ func (p page[T]) next() (next *url.URL, found bool, err error) {
 	return p.url.ResolveReference(ref), true, nil
 }
 
-// fetchPage sends one authenticated GET and decodes its JSON array.
+// fetchPage sends one authenticated GET and decodes the array of op's response.
 func fetchPage[T any](ctx context.Context, c *Client, target *url.URL, op operation) (page[T], error) {
 	req, err := c.newRequest(ctx, target)
 	if err != nil {

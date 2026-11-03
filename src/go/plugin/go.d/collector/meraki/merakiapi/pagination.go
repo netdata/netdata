@@ -42,7 +42,7 @@ func (c *Client) pageURL(u *url.URL, operationPath string, maxPageSize int, win 
 			query.Set(name, strconv.Itoa(n))
 		case "t0", "t1":
 			// A link may spell the window's instants differently, but never move them.
-			if win == nil || !win.has(name, values[0]) {
+			if win == nil || !sameInstant(values[0], win.instant(name)) {
 				return nil, "", errors.New("changed pagination time window")
 			}
 		case "interval":
@@ -66,16 +66,18 @@ func (c *Client) pageURL(u *url.URL, operationPath string, maxPageSize int, win 
 	return &canonical, u.Scheme + "://" + host + operationPath + "?" + canonical.RawQuery, nil
 }
 
-// has reports whether value, a t0 or t1 from a link, is the window's instant.
-func (w window) has(name, value string) bool {
-	t, err := time.Parse(time.RFC3339Nano, value)
-	if err != nil {
-		return false
+// instant returns the window's value of the t0 or t1 parameter.
+func (w window) instant(param string) time.Time {
+	if param == "t0" {
+		return w.start
 	}
-	if name == "t0" {
-		return t.Equal(w.start)
-	}
-	return t.Equal(w.end)
+	return w.end
+}
+
+// sameInstant reports whether value is an RFC 3339 spelling of t.
+func sameInstant(value string, t time.Time) bool {
+	parsed, err := time.Parse(time.RFC3339Nano, value)
+	return err == nil && parsed.Equal(t)
 }
 
 // nextLink returns the rel="next" target from Link header values. Targets and

@@ -51,8 +51,8 @@ type SwitchPortUsageHistory struct {
 	Ports   []SwitchPortUsage `json:"ports"`
 }
 
-// SwitchPortUsage is the usage of one port. PortID is opaque, for example "1"
-// or "1_C9300-NM-8X_2" for a module port.
+// SwitchPortUsage is the usage of one port. PortID is opaque: usually the port
+// number, with the slot and module type for a port on a module.
 type SwitchPortUsage struct {
 	PortID    string                    `json:"portId"`
 	Intervals []SwitchPortUsageInterval `json:"intervals"`

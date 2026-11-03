@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -88,10 +89,10 @@ func TestTrafficOptionsAreIndependent(t *testing.T) {
 		portTraffic, portPackets, uplinks bool
 		wantRequests                      int
 	}{
-		"all disabled":         {wantRequests: 4},
-		"switch port traffic":  {portTraffic: true, wantRequests: 5},
-		"switch port packets":  {portPackets: true, wantRequests: 5},
-		"appliance uplink use": {uplinks: true, wantRequests: 5},
+		"all disabled":           {wantRequests: 4},
+		"switch port traffic":    {portTraffic: true, wantRequests: 5},
+		"switch port packets":    {portPackets: true, wantRequests: 5},
+		"appliance uplink usage": {uplinks: true, wantRequests: 5},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -104,9 +105,9 @@ func TestTrafficOptionsAreIndependent(t *testing.T) {
 			require.Len(t, f.calls(), 1, "Check stays one probe")
 			require.NoError(t, collectCycle(t.Context(), c))
 			assert.Len(t, f.calls(), 1+tc.wantRequests)
-			assert.Len(t, trafficPoints(c, metricSwitchPortTrafficSent), count(tc.portTraffic))
-			assert.Len(t, trafficPoints(c, metricSwitchPortPacketsSent), count(tc.portPackets))
-			assert.Len(t, trafficPoints(c, metricApplianceUplinkTrafficSent), count(tc.uplinks))
+			assert.Len(t, trafficPoints(c, metricSwitchPortTrafficSent), boolCount(tc.portTraffic))
+			assert.Len(t, trafficPoints(c, metricSwitchPortPacketsSent), boolCount(tc.portPackets))
+			assert.Len(t, trafficPoints(c, metricApplianceUplinkTrafficSent), boolCount(tc.uplinks))
 		})
 	}
 }
@@ -258,6 +259,10 @@ func TestSwitchPortPacketsDuplicates(t *testing.T) {
 			categories: total + `,{"desc":"Total","ratePerSec":{"sent":99,"recv":3.25}}`,
 			wantSent:   []metrix.SampleValue{},
 		},
+		"agreeing duplicates after a conflict": {
+			categories: total + strings.Repeat(`,{"desc":"Total","ratePerSec":{"sent":99,"recv":3.25}}`, 2),
+			wantSent:   []metrix.SampleValue{},
+		},
 		"negative rates": {
 			categories: `{"desc":"Total","ratePerSec":{"sent":-1,"recv":-1}}`,
 			wantSent:   []metrix.SampleValue{},
@@ -347,7 +352,7 @@ func TestTrafficFailureLeavesOnlyItsGaps(t *testing.T) {
 				assert.Len(t, readDevices(c), 3)
 				assert.Equal(t, metrix.SampleValue(3), readOrganization(c)[metricOrganizationAssignedDevices])
 				for path, metric := range trafficFamilies {
-					assert.Len(t, trafficPoints(c, metric), count(path != failing), metric)
+					assert.Len(t, trafficPoints(c, metric), boolCount(path != failing), metric)
 				}
 
 				f.set(failing, valid)
@@ -464,7 +469,7 @@ func TestSwitchPortPacketsRequestEverySwitchInSerialOrder(t *testing.T) {
 	assert.Equal(t, []string{switchPacketsPath, "/devices/S2/switch/ports/statuses/packets"}, paths)
 }
 
-func count(b bool) int {
+func boolCount(b bool) int {
 	if b {
 		return 1
 	}
