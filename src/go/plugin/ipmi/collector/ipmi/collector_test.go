@@ -140,23 +140,40 @@ func TestCollector_Collect_MissingData(t *testing.T) {
 	assert.Equal(t, wantSeries(t, reader.snapshot), points, "unavailable readings and SEL leave gaps")
 }
 
-func TestCollector_Collect_NewSELRecordsUnknown(t *testing.T) {
-	tests := map[string]func(*bmc.SEL){
-		"first read in progress": func(s *bmc.SEL) { s.Loaded = false },
-		"SEL read failed":        func(s *bmc.SEL) { s.ReadFailed = true },
+func TestCollector_Collect_NewSELRecordCounts(t *testing.T) {
+	c, reader := newTestCollector(t)
+	reader.snapshot.SEL.New = []bmc.SELRecord{
+		{ID: 4, State: bmc.StateCritical, Threshold: true},
+		{ID: 5, State: bmc.StateNominal, Threshold: true},
+		{ID: 6, State: bmc.StateCritical, Threshold: true},
+		{ID: 7, State: bmc.StateCritical},
+		{ID: 8, State: bmc.StateUnknown},
 	}
-	for name, change := range tests {
-		t.Run(name, func(t *testing.T) {
-			c, reader := newTestCollector(t)
-			change(reader.snapshot.SEL)
-			// The Reader reports no new records when it cannot tell.
-			reader.snapshot.SEL.New, reader.snapshot.SEL.NewKnown = nil, false
 
-			points, err := collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
-			require.NoError(t, err)
-			assert.Equal(t, wantSeries(t, reader.snapshot), points, "unknown new records leave a gap, not zeros")
-		})
+	points, err := collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
+	require.NoError(t, err)
+	got := make(map[string]metrix.SampleValue)
+	for key, value := range points {
+		if strings.HasPrefix(key, "sel_new_records{") {
+			got[key] = value
+		}
 	}
+	assert.Equal(t, map[string]metrix.SampleValue{
+		`sel_new_records{event_type="threshold",state="nominal"}`:  1,
+		`sel_new_records{event_type="threshold",state="warning"}`:  0,
+		`sel_new_records{event_type="threshold",state="critical"}`: 2,
+		`sel_new_records{event_type="threshold",state="unknown"}`:  0,
+		`sel_new_records{event_type="discrete",state="nominal"}`:   0,
+		`sel_new_records{event_type="discrete",state="warning"}`:   0,
+		`sel_new_records{event_type="discrete",state="critical"}`:  1,
+		`sel_new_records{event_type="discrete",state="unknown"}`:   1,
+	}, got)
+
+	// The Reader reports no new records when it cannot tell.
+	reader.snapshot.SEL.New, reader.snapshot.SEL.NewKnown = nil, false
+	points, err = collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
+	require.NoError(t, err)
+	assert.Equal(t, wantSeries(t, reader.snapshot), points, "unknown new records leave a gap, not zeros")
 }
 
 func TestCollector_SELChartsSurviveFailedReads(t *testing.T) {
@@ -170,6 +187,9 @@ func TestCollector_SELChartsSurviveFailedReads(t *testing.T) {
 	failed.SELEntries = nil
 	failed.SEL.ReadFailed, failed.SEL.New, failed.SEL.NewKnown = true, nil, false
 	created := make(map[string]bool)
+	// eventTypes are the event_type labels of the created charts, with their dimensions.
+	eventTypes := make(map[string][]string)
+	chartEventType := make(map[string]string)
 	for phase, tc := range []struct {
 		snapshot *bmc.Snapshot
 		cycles   int
@@ -192,6 +212,14 @@ func TestCollector_SELChartsSurviveFailedReads(t *testing.T) {
 				case chartengine.CreateChartAction:
 					assert.Zero(t, phase, "chart %s created again after a failed SEL read", action.ChartID)
 					created[action.ChartID] = true
+					if eventType, ok := action.Labels["event_type"]; ok {
+						chartEventType[action.ChartID] = eventType
+						eventTypes[eventType] = nil
+					}
+				case chartengine.CreateDimensionAction:
+					if eventType, ok := chartEventType[action.ChartID]; ok {
+						eventTypes[eventType] = append(eventTypes[eventType], action.Name)
+					}
 				case chartengine.RemoveChartAction:
 					assert.Fail(t, "chart removed", "%s at phase %d cycle %d", action.ChartID, phase, cycle+1)
 				}
@@ -200,6 +228,10 @@ func TestCollector_SELChartsSurviveFailedReads(t *testing.T) {
 		}
 	}
 	assert.NotEmpty(t, created)
+	// The alert's chart label filter and dimension reach the emitted charts.
+	for _, eventType := range selEventTypes {
+		assert.Contains(t, eventTypes[eventType], bmc.StateCritical, "event_type %q", eventType)
+	}
 }
 
 func TestCollector_Collect_FailureAndRecovery(t *testing.T) {

@@ -91,7 +91,9 @@ func TestReader_SEL_Replay(t *testing.T) {
 	require.Len(t, replayed, 672)
 	last := decodeSELRecord(replayed[len(replayed)-1], nil)
 	synthetic := syntheticCriticalEvents(t, last.ID+1, last.Timestamp+60)
-	// Counts by event type and state, as the ipmi-sel Function showed this log on its host.
+	// Counts by event type and state, as the ipmi-sel Function showed this log on
+	// its host. They pin this decoder's classification of real records; the
+	// FreeIPMI fixture test checks the states themselves.
 	wantReal := map[newRecordKey]int{
 		{true, StateNominal}:  136,
 		{true, StateWarning}:  220,

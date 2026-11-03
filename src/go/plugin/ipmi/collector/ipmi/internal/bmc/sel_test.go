@@ -181,6 +181,15 @@ func TestReader_SEL_Changes(t *testing.T) {
 		"emptied": {
 			change: func(s *fakeSEL) { s.clear() },
 		},
+		"one record deleted": {
+			// Delete SEL Entry also changes the erase time.
+			change: func(s *fakeSEL) {
+				s.records = append(s.records[:1], s.records[2])
+				s.eraseTime++
+			},
+			wantReads: []uint16{0x0000, 3},
+			wantIDs:   []uint16{1, 3},
+		},
 		"rewritten without an erase time change": {
 			change: func(s *fakeSEL) {
 				s.records = nil
@@ -1098,4 +1107,30 @@ func TestReader_SEL_NewRecordsWhileReadingAgain(t *testing.T) {
 	assert.Equal(t, [][selRecordSize]byte{changed, tempEvent(9, 0x60000009)}, recordsRaw(&SEL{Records: got.New}))
 	assert.Nil(t, r.sel.known, "earlier content is kept only while reading again")
 	assert.Empty(t, collectSEL(t, r).New)
+}
+
+func TestReader_SEL_ResetWhileReadingAgain(t *testing.T) {
+	// A record vanishes while the log is read again after a rewrite: the
+	// second reset must keep the records known before the first one.
+	fake := newFakeBMC()
+	fake.sel.records = tempEvents(1, 2, 3, 4, 5, 6, 7, 8)
+	r := newSELTestReader(fake, 4*time.Second, 300*time.Millisecond) // 4 records per collection
+	for !collectSEL(t, r).Loaded {
+	}
+
+	changed := tempEvent(8, 0x70000008)
+	fake.sel.records = fake.sel.records[:7]
+	fake.sel.add(changed, tempEvent(9, 0x60000009))
+	require.False(t, collectSEL(t, r).Loaded)
+	fake.sel.next = map[uint16]uint16{5: 0x99}
+	got, err := r.Collect(t.Context(), true)
+	require.NoError(t, err)
+	require.Equal(t, []string{selRecordsWarning}, got.Warnings)
+
+	fake.sel.next = nil
+	var reported []uint16
+	for range 4 {
+		reported = append(reported, newIDs(collectSEL(t, r))...)
+	}
+	assert.Equal(t, []uint16{8, 9}, reported)
 }

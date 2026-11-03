@@ -106,8 +106,9 @@ during it count in the next value.
 
 The `ipmi_sel_critical_events` alert raises CRITICAL when the new records of the last 10 minutes include a critical
 discrete record, for example a power supply failure, an uncorrectable memory error or a processor IERR. Threshold
-events are left to `ipmi_sensor_state`, which alerts on the same crossings, and warning records never alert: FreeIPMI
-marks routine boot records as warning.
+events are left to `ipmi_sensor_state`, which alerts while a sensor reads critical at collection time; a critical
+crossing that ends between collections shows only in the `threshold` chart and in `ipmi-sel`. Warning records never
+alert: FreeIPMI marks routine boot records as warning.
 
 Times are converted to UTC with the BMC's SEL UTC offset. Records logged before a daylight saving change can be off by
 an hour, because the BMC reports only its current offset. When the BMC reports no offset, times are the BMC clock shown
