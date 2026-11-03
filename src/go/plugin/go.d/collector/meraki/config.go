@@ -18,17 +18,17 @@ const (
 )
 
 type Config struct {
-	Vnode                       string           `yaml:"vnode,omitempty"               json:"vnode"`
-	UpdateEvery                 int              `yaml:"update_every,omitempty"        json:"update_every"`
-	AutoDetectionRetry          int              `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	URL                         string           `yaml:"url"                           json:"url"`
-	OrganizationID              string           `yaml:"organization_id"               json:"organization_id"`
-	APIKey                      string           `yaml:"api_key,omitempty"             json:"api_key"`
-	BearerTokenFile             string           `yaml:"bearer_token_file,omitempty"   json:"bearer_token_file"`
-	Timeout                     confopt.Duration `yaml:"timeout,omitempty"             json:"timeout"`
-	ProxyURL                    string           `yaml:"proxy_url,omitempty"           json:"proxy_url"`
-	CollectSwitchPortTraffic    bool             `yaml:"collect_switch_port_traffic,omitempty" json:"collect_switch_port_traffic"`
-	CollectSwitchPortPackets    bool             `yaml:"collect_switch_port_packets,omitempty" json:"collect_switch_port_packets"`
+	Vnode                       string           `yaml:"vnode,omitempty"                          json:"vnode"`
+	UpdateEvery                 int              `yaml:"update_every,omitempty"                   json:"update_every"`
+	AutoDetectionRetry          int              `yaml:"autodetection_retry,omitempty"            json:"autodetection_retry"`
+	URL                         string           `yaml:"url"                                      json:"url"`
+	OrganizationID              string           `yaml:"organization_id"                          json:"organization_id"`
+	APIKey                      string           `yaml:"api_key,omitempty"                        json:"api_key"`
+	BearerTokenFile             string           `yaml:"bearer_token_file,omitempty"              json:"bearer_token_file"`
+	Timeout                     confopt.Duration `yaml:"timeout,omitempty"                        json:"timeout"`
+	ProxyURL                    string           `yaml:"proxy_url,omitempty"                      json:"proxy_url"`
+	CollectSwitchPortTraffic    bool             `yaml:"collect_switch_port_traffic,omitempty"    json:"collect_switch_port_traffic"`
+	CollectSwitchPortPackets    bool             `yaml:"collect_switch_port_packets,omitempty"    json:"collect_switch_port_packets"`
 	CollectApplianceUplinkUsage bool             `yaml:"collect_appliance_uplink_usage,omitempty" json:"collect_appliance_uplink_usage"`
 	tlscfg.TLSConfig            `yaml:",inline" json:""`
 }

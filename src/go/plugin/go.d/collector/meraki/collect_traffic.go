@@ -5,6 +5,7 @@ package meraki
 import (
 	"context"
 	"errors"
+	"maps"
 	"net/http"
 	"slices"
 	"time"
@@ -12,87 +13,91 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/meraki/merakiapi"
 )
 
+// trafficWindow is the source window of every traffic read: the five-minute
+// interval switch port usage is reported in.
 const trafficWindow = 5 * time.Minute
 
+// trafficSnapshot holds the traffic observations of one cycle.
 type trafficSnapshot struct {
 	ports   []portTraffic
 	packets []portPackets
 	uplinks []uplinkTraffic
 }
 
-// Optional reads finish before any observations. Their failures leave gaps;
-// the caller still checks cancellation before committing the whole cycle.
-func (c *Collector) collectTraffic(ctx context.Context, inventory []device, networks []merakiapi.Network) trafficSnapshot {
-	var result trafficSnapshot
-	if !c.CollectSwitchPortTraffic && !c.CollectSwitchPortPackets && !c.CollectApplianceUplinkUsage {
-		return result
+func (c *Collector) trafficEnabled() bool {
+	return c.CollectSwitchPortTraffic || c.CollectSwitchPortPackets || c.CollectApplianceUplinkUsage
+}
+
+// collectTraffic reads the enabled traffic families for the window ending now:
+// switch port traffic, MX/Z uplink usage, then switch port packets, the one
+// family that costs a request per switch. A failed read leaves that family's
+// gaps; a 429 or the end of ctx skips every remaining request. The caller still
+// checks ctx before writing anything.
+func (c *Collector) collectTraffic(
+	ctx context.Context,
+	inventory []device,
+	networkNames map[string]string,
+) trafficSnapshot {
+	var traffic trafficSnapshot
+	if !c.trafficEnabled() {
+		return traffic
 	}
 	end := c.now().UTC().Truncate(time.Second)
 	start := end.Add(-trafficWindow)
+	switches := switchesBySerial(inventory)
+
+	if c.CollectSwitchPortTraffic && len(switches) > 0 {
+		rows, err := c.client.ListSwitchPortUsageHistory(ctx, c.OrganizationID, start, end)
+		if err == nil {
+			traffic.ports = latestPortTraffic(rows, switches, start, end)
+		} else if c.stopTraffic(ctx, "switch port traffic", err) {
+			return traffic
+		}
+	}
+	if c.CollectApplianceUplinkUsage {
+		rows, err := c.client.ListApplianceUplinkUsage(ctx, c.OrganizationID, start, end)
+		if err == nil {
+			traffic.uplinks = uplinkTrafficRates(rows, networkNames)
+		} else if c.stopTraffic(ctx, "appliance uplink usage", err) {
+			return traffic
+		}
+	}
+	if c.CollectSwitchPortPackets {
+		for _, serial := range slices.Sorted(maps.Keys(switches)) {
+			rows, err := c.client.ListSwitchPortPackets(ctx, serial, trafficWindow)
+			if err == nil {
+				traffic.packets = append(traffic.packets, totalPacketRates(serial, rows)...)
+			} else if c.stopTraffic(ctx, "switch port packets", err) {
+				return traffic
+			}
+		}
+	}
+	return traffic
+}
+
+// switchesBySerial returns the assigned switches, the only devices with port
+// traffic.
+func switchesBySerial(inventory []device) map[string]device {
 	switches := make(map[string]device)
 	for _, dev := range inventory {
 		if dev.productType == "switch" {
 			switches[dev.serial] = dev
 		}
 	}
-	if c.CollectSwitchPortTraffic && len(switches) > 0 {
-		rows, err := c.client.ListSwitchPortUsageHistory(ctx, c.OrganizationID, start, end)
-		if err != nil {
-			if c.trafficFailure(ctx, "switch-port-traffic", err) {
-				return result
-			}
-		} else {
-			result.ports = normalizePortTraffic(rows, switches, start, end)
-		}
-	}
-	if c.CollectApplianceUplinkUsage && ctx.Err() == nil {
-		rows, err := c.client.GetApplianceUplinkUsage(ctx, c.OrganizationID, start, end)
-		if err != nil {
-			if c.trafficFailure(ctx, "appliance-uplink-usage", err) {
-				return result
-			}
-		} else {
-			names := make(map[string]string, len(networks))
-			for _, network := range networks {
-				if network.ID != "" {
-					names[network.ID] = network.Name
-				}
-			}
-			result.uplinks = normalizeUplinkTraffic(rows, names)
-		}
-	}
-	if c.CollectSwitchPortPackets {
-		serials := make([]string, 0, len(switches))
-		for serial := range switches {
-			serials = append(serials, serial)
-		}
-		slices.Sort(serials)
-		for _, serial := range serials {
-			if ctx.Err() != nil {
-				return result
-			}
-			rows, err := c.client.GetSwitchPortPackets(ctx, serial, trafficWindow)
-			if err != nil {
-				if c.trafficFailure(ctx, "switch-port-packets", err) {
-					return result
-				}
-				continue
-			}
-			result.packets = append(result.packets, normalizePortPackets(serial, rows)...)
-		}
-	}
-
-	return result
+	return switches
 }
 
-// A 429 stops this cycle even without a valid Retry-After. A valid wait is
-// remembered immediately, including when the optional failure is handled here.
-func (c *Collector) trafficFailure(ctx context.Context, family string, err error) bool {
+// stopTraffic handles a failed traffic read and reports whether the cycle must
+// send no more traffic requests: after the end of ctx, or after a 429 even
+// without a usable Retry-After. A usable one is remembered at once, since the
+// cycle itself can still succeed. Failures are logged at most once an hour per
+// family.
+func (c *Collector) stopTraffic(ctx context.Context, family string, err error) bool {
 	c.rememberRetryAfter(err)
 	if ctx.Err() != nil {
 		return true
 	}
 	c.Limit("meraki:"+family, 1, time.Hour).Warningf("Meraki %s unavailable: %v", family, err)
-	var status *merakiapi.HTTPError
-	return errors.As(err, &status) && status.StatusCode == http.StatusTooManyRequests
+	httpErr, ok := errors.AsType[*merakiapi.HTTPError](err)
+	return ok && httpErr.StatusCode == http.StatusTooManyRequests
 }

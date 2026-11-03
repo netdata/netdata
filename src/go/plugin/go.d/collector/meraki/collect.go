@@ -4,9 +4,10 @@ package meraki
 
 import "context"
 
-// collect reads the four organization lists completely, joins them, and only
-// then reads enabled telemetry and writes metrics. Core failures abort the
-// cycle; optional telemetry errors leave gaps without implying device removal.
+// collect reads the four organization lists completely and joins them, then
+// reads the enabled traffic, and only then writes metrics. A failed list or an
+// invalid inventory fails the whole cycle, so a partial read never looks like
+// removed devices; a failed traffic read only leaves gaps in its charts.
 func (c *Collector) collect(ctx context.Context) error {
 	organizations, err := c.client.ListOrganizations(ctx)
 	if err != nil {
@@ -28,19 +29,19 @@ func (c *Collector) collect(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	inventory, err := buildInventory(c.OrganizationID, networks, devices, availabilities)
+	networkNames, err := networkNamesByID(c.OrganizationID, networks)
 	if err != nil {
 		return err
 	}
-	traffic := c.collectTraffic(ctx, inventory, networks)
+	inventory, err := buildInventory(networkNames, devices, availabilities)
+	if err != nil {
+		return err
+	}
+	traffic := c.collectTraffic(ctx, inventory, networkNames)
 
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	c.writeMetrics(org.Name, inventory)
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	c.writeTrafficMetrics(org.Name, inventory, traffic)
+	c.writeMetrics(org.Name, inventory, traffic)
 	return ctx.Err()
 }

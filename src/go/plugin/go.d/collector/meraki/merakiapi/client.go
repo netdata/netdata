@@ -1,20 +1,23 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Package merakiapi reads organization inventory and device availability from
-// the Meraki Dashboard API v1. It returns provider data as-is; interpreting it is
-// the caller's job.
+// Package merakiapi reads organization inventory, device availability and
+// traffic from the Meraki Dashboard API v1. It returns provider data as-is;
+// interpreting it is the caller's job.
 package merakiapi
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
@@ -88,59 +91,110 @@ func validBaseURL(u *url.URL) bool {
 		strings.TrimRight(u.EscapedPath(), "/") == "/api/v1"
 }
 
-// operation is one paginated list endpoint.
+// operation is one read-only Dashboard API endpoint.
 type operation struct {
 	name        string // OpenAPI operationId, used in errors
-	path        string // path below /organizations/{organizationId}; empty for /organizations
-	pageSize    int    // perPage of the first request
+	path        string // OpenAPI path below /api/v1, with at most one {parameter}
+	pageSize    int    // perPage of the first request; 0 for an unpaginated operation
 	maxPageSize int    // largest perPage accepted in a next link
+	itemsObject bool   // the response wraps its array in an {"items": [...]} object
 }
 
 var (
 	opOrganizations = operation{
 		name:        "getOrganizations",
+		path:        "/organizations",
 		pageSize:    9000,
 		maxPageSize: 9000,
 	}
 	opNetworks = operation{
 		name:        "getOrganizationNetworks",
-		path:        "/networks",
+		path:        "/organizations/{organizationId}/networks",
 		pageSize:    1000,
 		maxPageSize: 100000,
 	}
 	opDevices = operation{
 		name:        "getOrganizationDevices",
-		path:        "/devices",
+		path:        "/organizations/{organizationId}/devices",
 		pageSize:    1000,
 		maxPageSize: 5000,
 	}
 	opDeviceAvailabilities = operation{
 		name:        "getOrganizationDevicesAvailabilities",
-		path:        "/devices/availabilities",
+		path:        "/organizations/{organizationId}/devices/availabilities",
 		pageSize:    1000,
 		maxPageSize: 1000,
+	}
+	opSwitchPortsUsageHistory = operation{
+		name:        "getOrganizationSwitchPortsUsageHistoryByDeviceByInterval",
+		path:        "/organizations/{organizationId}/switch/ports/usage/history/byDevice/byInterval",
+		pageSize:    50,
+		maxPageSize: 50,
+		itemsObject: true,
+	}
+	opSwitchPortsPackets = operation{
+		name: "getDeviceSwitchPortsStatusesPackets",
+		path: "/devices/{serial}/switch/ports/statuses/packets",
+	}
+	opApplianceUplinksUsage = operation{
+		name: "getOrganizationApplianceUplinksUsageByNetwork",
+		path: "/organizations/{organizationId}/appliance/uplinks/usage/byNetwork",
 	}
 )
 
 // ListOrganizations returns every organization visible to the credential.
 func (c *Client) ListOrganizations(ctx context.Context) ([]Organization, error) {
-	return list[Organization](ctx, c, opOrganizations, "")
+	return list[Organization](ctx, c, opOrganizations, "", nil)
 }
 
 // ListNetworks returns every network of the organization.
 func (c *Client) ListNetworks(ctx context.Context, organizationID string) ([]Network, error) {
-	return list[Network](ctx, c, opNetworks, organizationID)
+	return list[Network](ctx, c, opNetworks, organizationID, nil)
 }
 
 // ListDevices returns the devices assigned to the organization's networks.
 func (c *Client) ListDevices(ctx context.Context, organizationID string) ([]Device, error) {
-	return list[Device](ctx, c, opDevices, organizationID)
+	return list[Device](ctx, c, opDevices, organizationID, nil)
 }
 
 // ListDeviceAvailabilities returns the provider status of the organization's
 // devices.
 func (c *Client) ListDeviceAvailabilities(ctx context.Context, organizationID string) ([]DeviceAvailability, error) {
-	return list[DeviceAvailability](ctx, c, opDeviceAvailabilities, organizationID)
+	return list[DeviceAvailability](ctx, c, opDeviceAvailabilities, organizationID, nil)
+}
+
+// ListSwitchPortUsageHistory returns the port usage of every switch of the
+// organization during [start, end]. Meraki derives the interval length from the
+// window; callers check the intervals they get.
+func (c *Client) ListSwitchPortUsageHistory(
+	ctx context.Context,
+	organizationID string,
+	start, end time.Time,
+) ([]SwitchPortUsageHistory, error) {
+	return list[SwitchPortUsageHistory](ctx, c, opSwitchPortsUsageHistory, organizationID, &window{start, end})
+}
+
+// ListSwitchPortPackets returns the packet statistics of every port of the
+// switch over the last timespan.
+func (c *Client) ListSwitchPortPackets(
+	ctx context.Context,
+	serial string,
+	timespan time.Duration,
+) ([]SwitchPortPackets, error) {
+	query := url.Values{
+		"timespan": {strconv.FormatInt(int64(timespan/time.Second), 10)},
+	}
+	return get[SwitchPortPackets](ctx, c, opSwitchPortsPackets, serial, query)
+}
+
+// ListApplianceUplinkUsage returns the bytes the uplinks of every MX and Z
+// network of the organization moved during [start, end].
+func (c *Client) ListApplianceUplinkUsage(
+	ctx context.Context,
+	organizationID string,
+	start, end time.Time,
+) ([]ApplianceUplinkUsage, error) {
+	return get[ApplianceUplinkUsage](ctx, c, opApplianceUplinksUsage, organizationID, window{start, end}.query())
 }
 
 // ProbeOrganization checks access to the organization by reading one minimal
@@ -150,36 +204,61 @@ func (c *Client) ListDeviceAvailabilities(ctx context.Context, organizationID st
 func (c *Client) ProbeOrganization(ctx context.Context, organizationID string) error {
 	op := opDevices
 	op.pageSize = minPageSize
-	target, err := c.operationURL(op, organizationID)
+	target, err := c.operationURL(op, organizationID, nil)
 	if err != nil {
 		return err
 	}
-	_, err = fetchPage[Device](ctx, c, target, op.name)
+	_, err = fetchPage[Device](ctx, c, target, op)
 	return err
 }
 
-func (c *Client) operationURL(op operation, organizationID string) (*url.URL, error) {
-	path := "/organizations"
-	if op.path != "" {
-		// PathEscape keeps dot segments, which would climb out of the organization.
-		if organizationID == "" || organizationID == "." || organizationID == ".." {
-			return nil, fmt.Errorf("%s: invalid organization ID", op.name)
+// window is the [t0, t1] time range of a request.
+type window struct {
+	start, end time.Time
+}
+
+func (w window) query() url.Values {
+	return url.Values{
+		"t0": {w.start.UTC().Format(time.RFC3339Nano)},
+		"t1": {w.end.UTC().Format(time.RFC3339Nano)},
+	}
+}
+
+// operationURL builds the first request of op. id fills the path parameter, and
+// query is sent with perPage when op is paginated.
+func (c *Client) operationURL(op operation, id string, query url.Values) (*url.URL, error) {
+	path := op.path
+	if before, rest, ok := strings.Cut(path, "{"); ok {
+		param, after, _ := strings.Cut(rest, "}")
+		// PathEscape keeps dot segments, which would climb out of the collection.
+		if id == "" || id == "." || id == ".." {
+			return nil, fmt.Errorf("%s: invalid %s", op.name, param)
 		}
-		path += "/" + url.PathEscape(organizationID) + op.path
+		path = before + url.PathEscape(id) + after
 	}
 	target, err := url.Parse(c.baseURL.String() + path)
 	if err != nil {
 		return nil, fmt.Errorf("%s: invalid operation path", op.name)
 	}
-	target.RawQuery = "perPage=" + strconv.Itoa(op.pageSize)
+	q := make(url.Values)
+	maps.Copy(q, query)
+	if op.pageSize > 0 {
+		q.Set("perPage", strconv.Itoa(op.pageSize))
+	}
+	target.RawQuery = q.Encode()
 	return target, nil
 }
 
 // list follows rel="next" links to the last page. It returns the complete list,
 // or nil and an error: a failed later page never looks like a shorter list. The
 // pages are not an atomic snapshot; the provider can change data between them.
-func list[T any](ctx context.Context, c *Client, op operation, organizationID string) ([]T, error) {
-	target, err := c.operationURL(op, organizationID)
+// A non-nil win is sent with every page.
+func list[T any](ctx context.Context, c *Client, op operation, id string, win *window) ([]T, error) {
+	var query url.Values
+	if win != nil {
+		query = win.query()
+	}
+	target, err := c.operationURL(op, id, query)
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +270,8 @@ func list[T any](ctx context.Context, c *Client, op operation, organizationID st
 		if err := ctx.Err(); err != nil {
 			return nil, safeError(op.name, "request canceled", err)
 		}
-		key, err := c.pageKey(target, operationPath, op.maxPageSize)
+		var key string
+		target, key, err = c.pageURL(target, operationPath, op.maxPageSize, win)
 		if err != nil {
 			return nil, fmt.Errorf("%s: invalid pagination target", op.name)
 		}
@@ -200,7 +280,7 @@ func list[T any](ctx context.Context, c *Client, op operation, organizationID st
 		}
 		visited[key] = true
 
-		p, err := fetchPage[T](ctx, c, target, op.name)
+		p, err := fetchPage[T](ctx, c, target, op)
 		if err != nil {
 			return nil, err
 		}
@@ -215,6 +295,19 @@ func list[T any](ctx context.Context, c *Client, op operation, organizationID st
 		}
 		target = next
 	}
+}
+
+// get reads an unpaginated operation.
+func get[T any](ctx context.Context, c *Client, op operation, id string, query url.Values) ([]T, error) {
+	target, err := c.operationURL(op, id, query)
+	if err != nil {
+		return nil, err
+	}
+	p, err := fetchPage[T](ctx, c, target, op)
+	if err != nil {
+		return nil, err
+	}
+	return p.items, nil
 }
 
 // page is one decoded response.
@@ -241,19 +334,14 @@ func (p page[T]) next() (next *url.URL, found bool, err error) {
 }
 
 // fetchPage sends one authenticated GET and decodes its JSON array.
-func fetchPage[T any](ctx context.Context, c *Client, target *url.URL, opName string) (page[T], error) {
-	return fetchDecodedPage(ctx, c, target, opName, decodeArray[T])
-}
-
-// fetchDecodedPage shares request safety between array and items-envelope responses.
-func fetchDecodedPage[T any](ctx context.Context, c *Client, target *url.URL, opName string, decode func(io.Reader, string) ([]T, error)) (page[T], error) {
+func fetchPage[T any](ctx context.Context, c *Client, target *url.URL, op operation) (page[T], error) {
 	req, err := c.newRequest(ctx, target)
 	if err != nil {
-		return page[T]{}, safeError(opName, "cannot prepare authenticated request", err)
+		return page[T]{}, safeError(op.name, "cannot prepare authenticated request", err)
 	}
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return page[T]{}, transportError(opName, err)
+		return page[T]{}, transportError(op.name, err)
 	}
 	// Clients built by web.NewHTTPClient already bound bodies; this keeps the
 	// bound for any other http.Client.
@@ -261,18 +349,22 @@ func fetchDecodedPage[T any](ctx context.Context, c *Client, target *url.URL, op
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return page[T]{}, newHTTPError(opName, resp)
+		return page[T]{}, newHTTPError(op.name, resp)
 	}
 	// net/http decompresses gzip itself; any encoding still present is unreadable.
 	if enc := strings.TrimSpace(resp.Header.Get("Content-Encoding")); enc != "" && !strings.EqualFold(enc, "identity") {
-		return page[T]{}, fmt.Errorf("%s: unsupported response encoding", opName)
+		return page[T]{}, fmt.Errorf("%s: unsupported response encoding", op.name)
 	}
-	items, err := decode(resp.Body, opName)
+	decode := decodeArray[T]
+	if op.itemsObject {
+		decode = decodeItems[T]
+	}
+	items, err := decode(resp.Body, op.name)
 	if err != nil {
 		return page[T]{}, err
 	}
 	if err := ctx.Err(); err != nil {
-		return page[T]{}, safeError(opName, "request canceled", err)
+		return page[T]{}, safeError(op.name, "request canceled", err)
 	}
 	finalURL := target
 	if resp.Request != nil && resp.Request.URL != nil {
@@ -306,6 +398,25 @@ func decodeArray[T any](r io.Reader, opName string) ([]T, error) {
 		items = append(items, *ptr)
 	}
 	return items, nil
+}
+
+// decodeItems requires exactly one JSON object whose "items" member is an array
+// decodeArray accepts. Other members, such as "meta", are ignored.
+func decodeItems[T any](r io.Reader, opName string) ([]T, error) {
+	dec := json.NewDecoder(r)
+	var object *struct {
+		Items json.RawMessage `json:"items"`
+	}
+	if err := dec.Decode(&object); err != nil {
+		return nil, safeError(opName, "invalid JSON object response", err)
+	}
+	if object == nil || object.Items == nil {
+		return nil, fmt.Errorf("%s: expected a JSON object with items", opName)
+	}
+	if err := dec.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		return nil, safeError(opName, "unexpected trailing response data", err)
+	}
+	return decodeArray[T](bytes.NewReader(object.Items), opName)
 }
 
 // newRequest builds an authenticated GET. A bearer token file is read on every
