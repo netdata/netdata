@@ -45,7 +45,8 @@ readable threshold mask (Table 43-1 byte 19); the SDK parses the readable and se
 reads its `Settable` flags. Other sensors use Get Sensor Thresholds and its readable mask. FreeIPMI's SDR fallback after
 a refused Get Sensor Thresholds is not ported, because the SDR can hold values the BMC no longer uses. A
 completion-code error leaves that sensor without thresholds; any other error stops threshold reads until the next
-inventory refresh. Neither fails collection; cancellation does, and the inventory is then not replaced.
+inventory refresh. Neither fails collection; a cancellation still does. Every collection reports the inventory's count
+of unreadable thresholds, so the rate-limited warning log is not limited to refresh collections.
 
 Keys use the C collector's healthy-reading identity: `i<record>_n<number>_t<legacy-reading-type>_u<legacy-unit>_<name>`.
 They intentionally remain stable when a reading becomes unavailable: the C library changes reading/unit enums on that

@@ -245,6 +245,7 @@ const (
 	recordOwnerID         = 5
 	recordOwnerLUN        = 6  // channel in bits 7:4, LUN in bits 1:0
 	fullCapabilities      = 11 // threshold access in bits 3:2
+	fullEventReadingType  = 13
 	fullReadableMask      = 18 // readable threshold mask; the settable mask follows
 	fullUnitsFormat       = 20 // analog data format in bits 7:6
 	fullBaseUnit          = 21
@@ -266,9 +267,9 @@ func fullRecord(id uint16, number uint8, name string) []byte {
 	data[4] = byte(len(data) - types.SDRRecordHeaderSize)
 	data[recordOwnerID] = types.BMC_SA
 	data[7] = number
-	data[12] = 0x01              // sensor type: temperature
-	data[13] = 0x01              // event/reading type: threshold
-	data[fullUnitsFormat] = 0x00 // unsigned analog, no rate or modifier
+	data[12] = 0x01                   // sensor type: temperature
+	data[fullEventReadingType] = 0x01 // threshold
+	data[fullUnitsFormat] = 0x00      // unsigned analog, no rate or modifier
 	data[fullBaseUnit] = byte(types.SensorUnitType_DegreesC)
 	data[fullM] = 1
 	data[47] = 0xc0 | byte(len(name)) // 8-bit ASCII + Latin-1 ID string

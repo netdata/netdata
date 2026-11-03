@@ -58,7 +58,7 @@ modules:
         performance_impact:
           description: IPMI command latency grows with sensor count. Increase update_every when a complete sensor scan
             takes longer than the configured interval. Sensor thresholds are read with the SDR inventory, about every
-            five minutes, one command per threshold sensor. With collect_sel enabled, the first collections after a start
+            five minutes, at most one command per threshold sensor. With collect_sel enabled, the first collections after a start
             also read the existing System Event Log, for up to two seconds each (a quarter of update_every when
             shorter), until all records are read. Later collections read only new records, or the whole log again after
             the BMC clears or rewrites it.
@@ -293,7 +293,8 @@ modules:
           name: IPMI Sensors
           description: Show current readings, the thresholds the BMC uses for each threshold sensor, and default
             FreeIPMI health states, with sensor counts by component and state. Compare a reading with its thresholds to
-            see how close it is to a warning or critical state.
+            see how close it is to a limit; by default only crossing a critical or non-recoverable threshold makes the
+            state critical.
           parameters:
             - id: __job
               name: Instance

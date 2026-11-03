@@ -89,11 +89,12 @@ UDP exchanges. Remote session cleanup gets a separate two-second budget, includi
 The `ipmi-sensors` Function shows each threshold sensor's limits next to its reading, in the reading's units: LNR, LCR
 and LNC (lower non-recoverable, critical and non-critical) and UNC, UCR and UNR (upper). The values come from Get Sensor
 Thresholds, the thresholds the BMC uses, not from the SDR: a BMC can keep earlier values in its SDR after its thresholds
-change. They are read with the SDR inventory, after a repository change, every five minutes and after a reconnect, so a
-changed threshold appears within five minutes. A blank cell is a threshold the sensor does not have or one the BMC did
-not return. Sensors whose SDR declares fixed thresholds show the SDR values, which the IPMI specification defines as
-their values. Non-linear sensors and sensors without a supported unit show none. Threshold reads never fail a collection
-or change a sensor state: states come from the threshold comparison the BMC reports with each reading.
+change. They are read with the SDR inventory, after a repository change, about every five minutes and after a
+reconnect, so a changed threshold appears within about five minutes. A blank cell is a threshold the sensor does not have, or one the
+BMC did not return or that cannot be converted. Sensors whose SDR declares fixed thresholds show the SDR values, which
+the IPMI specification defines as their values. Non-linear sensors and sensors without a supported unit show none. A
+failed threshold read never fails a collection or changes a sensor state: states come from the threshold comparison the
+BMC reports with each reading. By default only critical and non-recoverable crossings make a state critical.
 
 ## System Event Log
 

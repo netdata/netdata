@@ -48,14 +48,14 @@ func (d *descriptor) hasThresholds() bool {
 		d.linearization <= types.LinearizationFunc_CBRT && d.thresholdAccess != types.SensorThresholdAccess_No
 }
 
-// readThresholds sets the thresholds of the inventory's threshold sensors.
-// Values come from Get Sensor Thresholds, because the SDR can disagree with
-// what the BMC uses; only fixed, unreadable thresholds come from the SDR,
-// which holds their values. A completion-code error leaves that sensor without
-// thresholds; any other failure stops the reads for this inventory. Neither
-// fails the collection, because sensor states come from the readings. Only
-// cancellation is returned.
-func (r *Reader) readThresholds(ctx context.Context, inventory []descriptor, warnings *collectionWarnings) error {
+// readThresholds sets the thresholds of the inventory's threshold sensors and
+// returns how many could not be read. Values come from Get Sensor Thresholds,
+// because the SDR can disagree with what the BMC uses; only fixed, unreadable
+// thresholds come from the SDR, which holds their values. A completion-code
+// error leaves that sensor without thresholds; any other failure stops the
+// reads for this inventory. Neither fails the collection, because sensor
+// states come from the readings; a cancellation surfaces in Collect.
+func (r *Reader) readThresholds(ctx context.Context, inventory []descriptor) (unavailable int) {
 	stopped := false
 	for i := range inventory {
 		d := &inventory[i]
@@ -66,22 +66,19 @@ func (r *Reader) readThresholds(ctx context.Context, inventory []descriptor, war
 			d.sensor.Thresholds = d.convertThresholds(d.sdrThresholds)
 			continue
 		case stopped:
-			warnings.thresholds++
+			unavailable++
 			continue
 		}
 
 		live, err := r.readLiveThresholds(ctx, d)
 		if err != nil {
-			if ctxErr := ctx.Err(); ctxErr != nil {
-				return ctxErr
-			}
-			warnings.thresholds++
+			unavailable++
 			stopped = !isCompletionCodeError(err)
 			continue
 		}
 		d.sensor.Thresholds = d.convertThresholds(live)
 	}
-	return nil
+	return unavailable
 }
 
 func (r *Reader) readLiveThresholds(ctx context.Context, d *descriptor) (rawThresholds, error) {

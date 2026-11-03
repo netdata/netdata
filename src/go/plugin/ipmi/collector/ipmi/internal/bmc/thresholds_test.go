@@ -112,6 +112,13 @@ func TestReader_Collect_Thresholds(t *testing.T) {
 			},
 			wantWarnings: []string{conversionWarning},
 		},
+		"discrete full record has none": {
+			prepare: func(fake *fakeBMC) {
+				setThresholds(fake.records[0], types.SensorThresholdAccess_Readable, maskUNC, 0, staleSDR)
+				fake.records[0][fullEventReadingType] = 0x6f // sensor-specific, with a numeric reading
+				fake.thresholds[10] = thresholdsResponse(maskUNC, staleSDR)
+			},
+		},
 		"unsupported record is never queried": {
 			prepare: func(fake *fakeBMC) {
 				setThresholds(fake.records[0], types.SensorThresholdAccess_Readable, maskUNC, 0, staleSDR)
@@ -223,12 +230,19 @@ func TestReader_Collect_ThresholdFailures(t *testing.T) {
 		unc: 40,
 		ucr: 45,
 	}
-	inlet := func(thresholds Thresholds) Sensor {
+	temperature := func(key, name string, thresholds Thresholds) Sensor {
 		s := wantCPUTemp(StateNominal, new(25.0))
-		s.Key, s.Name, s.Component = "i3_n12_t2_u1_Inlet Temp", "Inlet Temp", "Other"
+		s.Key, s.Name, s.Component = key, name, "Other"
 		s.Thresholds = thresholds
 		return s
 	}
+	inlet := func(thresholds Thresholds) Sensor {
+		return temperature("i3_n12_t2_u1_Inlet Temp", "Inlet Temp", thresholds)
+	}
+	// Fixed thresholds come from the SDR, so a stop does not affect them.
+	fixed := temperature("i4_n13_t2_u1_Fixed Temp", "Fixed Temp", Thresholds{
+		UpperCritical: new(70.0),
+	})
 	tests := map[string]struct {
 		thresholdsErr error // returned for sensor 10
 		wantRequests  []uint8
@@ -261,10 +275,14 @@ func TestReader_Collect_ThresholdFailures(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			fake := newFakeBMC()
-			fake.records = append(fake.records, fullRecord(3, 12, "Inlet Temp"))
+			fake.records = append(fake.records, fullRecord(3, 12, "Inlet Temp"), fullRecord(4, 13, "Fixed Temp"))
 			fake.readings[12] = []byte{25, 0xc0, 0x00}
+			fake.readings[13] = []byte{25, 0xc0, 0x00}
 			setThresholds(fake.records[0], types.SensorThresholdAccess_Readable, maskUNC, 0, limits{})
 			setThresholds(fake.records[2], types.SensorThresholdAccess_Readable, maskUNC|maskUCR, 0, limits{})
+			setThresholds(fake.records[3], types.SensorThresholdAccess_Fixed, maskUCR, 0, limits{
+				ucr: 70,
+			})
 			fake.thresholds = map[uint8][]byte{
 				10: thresholdsResponse(maskUNC, limits{
 					unc: 80,
@@ -278,18 +296,24 @@ func TestReader_Collect_ThresholdFailures(t *testing.T) {
 				return nil
 			}
 
-			got, err := newTestReader(fake).Collect(t.Context(), false)
-			require.NoError(t, err, "threshold failures never fail the collection")
-
-			assert.Equal(t, &Snapshot{
+			r := newTestReader(fake)
+			want := &Snapshot{
 				Sensors: []Sensor{
 					wantCPUTemp(StateNominal, new(25.0)),
 					wantCPUPresence(StateNominal),
 					tc.wantInlet,
+					fixed,
 				},
 				CollectedAt: testNow,
 				Warnings:    tc.wantWarnings,
-			}, got, "states and readings are unaffected")
+			}
+			got, err := r.Collect(t.Context(), false)
+			require.NoError(t, err, "threshold failures never fail the collection")
+			assert.Equal(t, want, got, "states and readings are unaffected")
+
+			got, err = r.Collect(t.Context(), false)
+			require.NoError(t, err)
+			assert.Equal(t, want, got, "collections between refreshes report the same thresholds and warning")
 			assert.Equal(t, tc.wantRequests, fake.thresholdRequests())
 			assert.Zero(t, fake.closes, "the connection stays open")
 		})
@@ -312,7 +336,7 @@ func TestReader_Collect_ThresholdCancellation(t *testing.T) {
 		return nil
 	}
 	got, err := r.Collect(ctx, false)
-	require.ErrorIs(t, err, context.Canceled)
+	require.ErrorIs(t, err, context.Canceled, "a cancellation during threshold reads fails the collection")
 	assert.Nil(t, got)
 
 	fake.onExchange = nil
@@ -321,7 +345,7 @@ func TestReader_Collect_ThresholdCancellation(t *testing.T) {
 	assert.Equal(t, Thresholds{
 		UpperNonCritical: new(80.0),
 	}, got.Sensors[0].Thresholds,
-		"the canceled inventory is not kept")
+		"the next collection rediscovers the inventory")
 	assert.Equal(t, []uint8{10, 10}, fake.thresholdRequests())
 }
 
