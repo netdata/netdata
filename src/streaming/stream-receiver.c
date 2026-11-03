@@ -854,86 +854,63 @@ static bool stream_receiver_process_lines(
 }
 
 static ssize_t
-stream_receive_and_process(
-    struct stream_thread *sth,
-    struct receiver_state *rpt,
-    PARSER *parser,
-    usec_t now_ut __maybe_unused,
-    bool *removed) {
-
-    internal_fatal(
-        sth->tid != gettid_cached(),
-        "Function %s() should only be used by the dispatcher thread",
-        __FUNCTION__);
-
+stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt, PARSER *parser, usec_t now_ut __maybe_unused, bool *removed) {
+    internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__);
     *removed = false;
 
     ssize_t rc;
-
     if(rpt->thread.compressed.enabled) {
         rc = receiver_read_compressed(rpt);
         if(unlikely(rc <= 0))
             return rc;
 
-        while(!nd_thread_signaled_to_cancel() &&
-              service_running(SERVICE_STREAMING) &&
-              !receiver_should_stop(rpt)) {
-
+        while(!nd_thread_signaled_to_cancel() && service_running(SERVICE_STREAMING) && !receiver_should_stop(rpt)) {
             worker_is_busy(WORKER_STREAM_JOB_DECOMPRESS);
 
-            decompressor_status_t feed_rc =
-                receiver_feed_decompressor(rpt);
+            // feed the decompressor with the new data we just read
+            decompressor_status_t feed_rc = receiver_feed_decompressor(rpt);
 
             if(likely(feed_rc == DECOMPRESS_OK)) {
-                while(true) {
-                    decompressor_status_t decompress_rc =
-                        receiver_get_decompressed(rpt);
+                while (true) {
+                    // feed our uncompressed data buffer with new data
+                    decompressor_status_t decompress_rc = receiver_get_decompressed(rpt);
 
-                    if(likely(decompress_rc == DECOMPRESS_OK)) {
-                        if(unlikely(!stream_receiver_process_lines(
-                                sth, rpt, parser, removed)))
+                    if (likely(decompress_rc == DECOMPRESS_OK)) {
+                        // loop through all the complete lines found in the uncompressed buffer
+                        if(unlikely(!stream_receiver_process_lines(sth, rpt, parser, removed)))
                             return -1;
                     }
-                    else if(decompress_rc == DECOMPRESS_NEED_MORE_DATA)
+                    else if (decompress_rc == DECOMPRESS_NEED_MORE_DATA)
                         break;
+
                     else {
-                        stream_receiver_remove(
-                            sth,
-                            rpt,
-                            STREAM_HANDSHAKE_RCV_DECOMPRESSION_FAILED);
+                        stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_RCV_DECOMPRESSION_FAILED);
                         *removed = true;
                         return -1;
                     }
                 }
             }
-            else if(feed_rc == DECOMPRESS_NEED_MORE_DATA)
+            else if (feed_rc == DECOMPRESS_NEED_MORE_DATA)
                 break;
             else {
-                stream_receiver_remove(
-                    sth,
-                    rpt,
-                    STREAM_HANDSHAKE_RCV_DECOMPRESSION_FAILED);
+                stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_RCV_DECOMPRESSION_FAILED);
                 *removed = true;
                 return -1;
             }
         }
 
         if(receiver_should_stop(rpt)) {
-            stream_receiver_remove(
-                sth,
-                rpt,
-                STREAM_HANDSHAKE_DISCONNECT_SIGNALED_TO_STOP);
+            stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_DISCONNECT_SIGNALED_TO_STOP);
             *removed = true;
             return -1;
         }
     }
     else {
         rc = receiver_read_uncompressed(rpt);
-        if(unlikely(rc <= 0))
+        if(rc <= 0)
             return rc;
 
-        if(unlikely(!stream_receiver_process_lines(
-                sth, rpt, parser, removed)))
+        if(unlikely(!stream_receiver_process_lines(sth, rpt, parser, removed)))
             return -1;
     }
 
