@@ -97,9 +97,14 @@ func addFutureOpennessChecks(
 	if strings.TrimSpace(templateYAML) == "" {
 		return fmt.Errorf("future collector returned an empty chart template")
 	}
-	planned, err := prepareRoutePlan(futureReader, templateYAML, collectorJobFullName(jobName))
+	planned, err := prepareRoutePlan(futureReader, templateYAML, collectorJobFullName(jobName), coll.EnginePolicy())
 	if err != nil {
 		return fmt.Errorf("future chart plan: %w", err)
+	}
+	for _, item := range planned.routes.contextSeriesOmissions {
+		r.addError("future_context_series_limit", "max_output_series_per_context",
+			fmt.Sprintf("future context %q offered %d output series, exceeding limit %d; the whole context was omitted", item.Context, item.ObservedSeries, item.Limit),
+			"Future-input probes must reach publication, not only resolve a route.")
 	}
 	firstByProfile := inspectFutureOpenness(
 		inputs,

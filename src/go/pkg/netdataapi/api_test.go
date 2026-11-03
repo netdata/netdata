@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -410,6 +411,69 @@ func TestCONFIGSTATUSRefusesUnsafeFields(t *testing.T) {
 			var output bytes.Buffer
 			require.Error(t, New(&output).TryCONFIGSTATUS(test.id, test.status))
 			require.Empty(t, output.String())
+		})
+	}
+}
+
+// plainWriter copies writes and exposes no AvailableBuffer, so the API formats into
+// its own scratch buffer.
+type plainWriter struct {
+	data []byte
+}
+
+func (w *plainWriter) Write(p []byte) (int, error) {
+	w.data = append(w.data, p...)
+	return len(p), nil
+}
+
+func TestHotCommandsFormatWithoutAllocating(t *testing.T) {
+	emit := func(api *API) {
+		api.CHART(ChartOpts{
+			TypeID:      "type",
+			ID:          "id",
+			Title:       "title",
+			Priority:    70000,
+			UpdateEvery: 1,
+		})
+		api.DIMENSION(DimensionOpts{
+			ID:         "dim",
+			Name:       "dim",
+			Algorithm:  "absolute",
+			Multiplier: -1,
+			Divisor:    1000,
+		})
+		api.CLABEL("key", "value", 1)
+		api.HOST("guid")
+		api.BEGIN("type", "id", 1000)
+		api.SET("int", -1234567890)
+		api.SETFLOAT("float", 0.25)
+		api.SETEMPTY("empty")
+		api.VARIABLE("var", 1.5)
+		api.END()
+	}
+
+	buffered := &bytes.Buffer{}
+	plain := &plainWriter{}
+	emit(New(buffered))
+	emit(New(plain))
+	require.Equal(t, buffered.String(), string(plain.data), "writer kind changed the emitted bytes")
+
+	for name, reset := range map[string]func() *API{
+		"available buffer": func() *API { buffered.Reset(); return New(buffered) },
+		"plain writer":     func() *API { plain.data = plain.data[:0]; return New(plain) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			api := reset()
+			emit(api)
+			allocs := testing.AllocsPerRun(100, func() {
+				if name == "available buffer" {
+					buffered.Reset()
+				} else {
+					plain.data = plain.data[:0]
+				}
+				emit(api)
+			})
+			assert.Zero(t, allocs)
 		})
 	}
 }

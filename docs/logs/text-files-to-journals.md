@@ -9,7 +9,7 @@ consumers.
 | Your situation | Recommended bridge |
 |:---------------|:-------------------|
 | You use `journalctl`, journal-aware tooling, or a SIEM that ingests journal files | Convert files to journal entries with [log2journal](/src/collectors/log2journal/README.md) |
-| You already run an OpenTelemetry pipeline, or you want Netdata's indexed log store with per-tenant retention and S3 archiving | Ship files through an [OpenTelemetry Collector](/docs/opentelemetry/logs-collection.md) |
+| You already run an OpenTelemetry pipeline, or you want Netdata's indexed log store with its own retention and S3 archiving | Ship files through an [OpenTelemetry Collector](/docs/opentelemetry/logs-collection.md) |
 | You want both — SIEM keeps its journal feed, Netdata gets its own copy | Run log2journal into the journal and an OpenTelemetry Collector in parallel; the two paths do not interfere |
 
 ## Bridge 1: convert files to journal entries

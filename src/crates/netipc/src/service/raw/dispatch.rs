@@ -1,7 +1,7 @@
 use super::common::next_power_of_2_u32;
 use crate::protocol::NipcError;
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DispatchError {

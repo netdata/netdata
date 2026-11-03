@@ -1,12 +1,47 @@
+//! Tests for sfst's per-directory [`Registry`] (registry.rs): recovery of
+//! tracked state from disk, the `track()` rotation path, and the pure
+//! `candidates()` query filter. Every fixture is a real on-disk `.sfst` in
+//! a tempdir, built with the buffer-all `FixtureWriter` (PRIM + TIMS + one
+//! stream batch + SUMR, no META — recovery reads header, TOC, and SUMR
+//! only, so that's enough).
+//!
+//! Pins:
+//!
+//! - `recover()` rebuilds entries from disk keyed by seq, summaries
+//!   exactly as written (the SUMR round-trip), returning the recovered
+//!   count;
+//! - an unreadable `.sfst` is skipped, not fatal: good files still
+//!   recover and count, the bad one stays untracked;
+//! - `track()` serves back exactly the summary the caller passed, with
+//!   no disk involved;
+//! - `candidates()` overlap: file ranges are inclusive on both ends, the
+//!   query half-open `[start, end)` — any shared second includes the
+//!   file, and an empty window matches nothing;
+//! - partition filter: exact match on the opaque `part_key` carried by
+//!   the `FileId` (never in the summary); an empty key list is a
+//!   wildcard;
+//! - files marked pending-deletion are invisible to `candidates()`;
+//! - a fresh registry over an empty directory yields no candidates.
+//!
+//! Not pinned here: `evaluate_retention`/`RetentionPolicy` (no unit test
+//! in this crate — exercised indirectly by file-lifecycle's
+//! `recover_retention` tests), `remove`/`clear_pending_deletion`/
+//! `file_path`, the per-tenant layer above this type (file-lifecycle's
+//! tenant registry, consumed by otel-ledger), and writer↔reader
+//! round-trips (`src/tests/round_trip.rs`).
 use super::*;
 use crate::PrefixMap;
 use crate::tests::fixture::FixtureWriter;
 use crate::writer::pack;
 
+/// Write a real `.sfst` file for `id` into `dir` whose `SUMR` chunk
+/// carries `summary`; all other chunks are minimal placeholders, since
+/// recovery reads only header + TOC + SUMR.
 fn write_sfst_with_summary(dir: &Path, id: FileId, summary: &Summary) {
     let primary: PrefixMap<u64> = PrefixMap::build([("k", 1u64)]).unwrap();
-    // The buffer-all fixture builder permits the missing META chunk;
-    // this test only exercises the SUMR round-trip.
+    // The buffer-all fixture builder permits a missing META chunk, and
+    // recovery's read touches only header + TOC + SUMR — a META-less
+    // file exercises the SUMR round-trip just fine.
     let mut writer = FixtureWriter::new();
     writer.set_summary(pack(summary, 1).unwrap());
     writer.set_primary(pack(&primary, 1).unwrap());
@@ -20,6 +55,10 @@ fn write_sfst_with_summary(dir: &Path, id: FileId, summary: &Summary) {
 
 #[test]
 fn recover_rebuilds_summary_from_disk() {
+    // Recovery rebuilds state from disk alone: recover() scans the
+    // directory, reads each file's SUMR, and inserts one entry per file
+    // keyed by seq, with the summary exactly as written — the SUMR
+    // pack/unpack round-trip — returning the number of files recovered.
     let dir = tempfile::tempdir().unwrap();
     let id1 = FileId::new(file_registry::test_identity(), 0, 1, 7);
     let id2 = FileId::new(file_registry::test_identity(), 0, 2, 7);
@@ -49,6 +88,9 @@ fn recover_rebuilds_summary_from_disk() {
 
 #[test]
 fn recover_skips_unreadable_files() {
+    // Per-file error isolation: one unparseable .sfst is skipped with a
+    // warning instead of failing recovery — the good file still
+    // recovers and counts, the bad one is never tracked.
     let dir = tempfile::tempdir().unwrap();
     let id_good = FileId::new(file_registry::test_identity(), 0, 1, 7);
     let id_bad = FileId::new(file_registry::test_identity(), 0, 2, 7);
@@ -59,7 +101,8 @@ fn recover_skips_unreadable_files() {
         content_meta: Vec::new(),
     };
     write_sfst_with_summary(dir.path(), id_good, &s);
-    // Garbage file with the right extension/name shape but invalid contents.
+    // Right name and extension — scan() lists it — but junk contents
+    // read_summary() rejects.
     std::fs::write(dir.path().join(id_bad.to_filename(SFST_EXT)), b"junk").unwrap();
 
     let mut reg = Registry::new(dir.path());
@@ -71,6 +114,9 @@ fn recover_skips_unreadable_files() {
 
 #[test]
 fn track_sets_summary() {
+    // The rotation path registers a file from memory — no disk read —
+    // and get(seq) must then serve exactly the summary the writer
+    // passed in.
     let dir = tempfile::tempdir().unwrap();
     let mut reg = Registry::new(dir.path());
     let id = FileId::new(file_registry::test_identity(), 0, 5, 7);
@@ -84,15 +130,19 @@ fn track_sets_summary() {
     assert_eq!(reg.get(5).unwrap().summary, summary);
 }
 
-// ── Candidate selection tests ───────────────────────────────────
+// ── Candidate selection (`candidates`) ───────────────────────────
 
+/// Track one file per tuple — `(seq, min_s, max_s, namespace, stream)`;
+/// the namespace/stream pair is hashed into the opaque `part_key`
+/// stamped on the `FileId`.
 fn populate(
     reg: &mut Registry,
     entries: &[(u64, u32, u32, &str, &str)], // (seq, min_s, max_s, ns, name)
 ) {
     for &(seq, min_s, max_s, ns, name) in entries {
-        // The partition key is the single source of truth in the `FileId`
-        // (filename); candidate filtering reads `f.id.part_key`.
+        // The partition lives only on the `FileId` (on disk: part of the
+        // filename; `Summary` has no partition field), so filtering reads
+        // `f.id.part_key` — exactly what these tests drive.
         let part_key = crate::opaque_part_key(ns, name);
         reg.track(
             FileId::new(file_registry::test_identity(), 0, seq, part_key),
@@ -107,6 +157,8 @@ fn populate(
     }
 }
 
+/// Seqs of the yielded files, sorted — assertions pin which files match,
+/// not their order.
 fn seqs<'a>(iter: impl Iterator<Item = &'a File>) -> Vec<u64> {
     let mut v: Vec<u64> = iter.map(|f| f.id.seq).collect();
     v.sort();
@@ -115,6 +167,9 @@ fn seqs<'a>(iter: impl Iterator<Item = &'a File>) -> Vec<u64> {
 
 #[test]
 fn candidates_filter_by_time_range_overlap() {
+    // The basic overlap rule: a file is a candidate iff its summary
+    // range [min, max] shares at least one second with the query
+    // window; a window disjoint from every file yields none.
     let dir = tempfile::tempdir().unwrap();
     let mut reg = Registry::new(dir.path());
     populate(
@@ -143,6 +198,9 @@ fn candidates_filter_by_time_range_overlap() {
 
 #[test]
 fn candidates_inclusive_lower_exclusive_upper() {
+    // [200, 300): file 1 via its inclusive max (200), file 2 via its
+    // inclusive min (200); file 3's min (300) sits on the exclusive end
+    // and stays out.
     let dir = tempfile::tempdir().unwrap();
     let mut reg = Registry::new(dir.path());
     populate(
@@ -154,9 +212,6 @@ fn candidates_inclusive_lower_exclusive_upper() {
         ],
     );
 
-    // Query [200, 300) — touches file 1's max (200, inclusive),
-    // touches file 2's min (200, inclusive), does NOT touch file 3
-    // because q.end=300 is exclusive and file 3's min is 300.
     let q = Query {
         time_range: 200..300,
         partition_keys: Vec::new(),
@@ -166,6 +221,9 @@ fn candidates_inclusive_lower_exclusive_upper() {
 
 #[test]
 fn candidates_single_point_query() {
+    // A one-second window is a point lookup: it hits exactly the files
+    // whose range contains that second — [150, 151) hits files 1 and 2,
+    // not file 3 (starts at 300).
     let dir = tempfile::tempdir().unwrap();
     let mut reg = Registry::new(dir.path());
     populate(
@@ -177,8 +235,6 @@ fn candidates_single_point_query() {
         ],
     );
 
-    // [150, 151) hits file 1 (max=200 ≥ 150, min=100 < 151) and file 2
-    // (max=250 ≥ 150, min=150 < 151), but not file 3.
     let q = Query {
         time_range: 150..151,
         partition_keys: Vec::new(),
@@ -188,11 +244,12 @@ fn candidates_single_point_query() {
 
 #[test]
 fn candidates_empty_query_matches_nothing() {
+    // start == end is an empty window and matches nothing — even here,
+    // where it sits exactly on file 1's max.
     let dir = tempfile::tempdir().unwrap();
     let mut reg = Registry::new(dir.path());
     populate(&mut reg, &[(1, 100, 200, "ns", "a")]);
 
-    // start == end is an empty window.
     let q = Query {
         time_range: 200..200,
         partition_keys: Vec::new(),
@@ -202,6 +259,10 @@ fn candidates_empty_query_matches_nothing() {
 
 #[test]
 fn candidates_filter_by_stream() {
+    // Partition filtering is an exact, opaque u64 match on part_key —
+    // no partial or prefix matching. Only prod/api's file comes back;
+    // a shared namespace ("prod"/"worker") or stream name
+    // ("staging"/"api") is already a different key.
     let dir = tempfile::tempdir().unwrap();
     let mut reg = Registry::new(dir.path());
     populate(
@@ -222,6 +283,8 @@ fn candidates_filter_by_stream() {
 
 #[test]
 fn candidates_no_stream_filter_returns_all_in_range() {
+    // An empty partition list is a wildcard: no stream filter, every
+    // in-window file is a candidate.
     let dir = tempfile::tempdir().unwrap();
     let mut reg = Registry::new(dir.path());
     populate(
@@ -242,6 +305,8 @@ fn candidates_no_stream_filter_returns_all_in_range() {
 
 #[test]
 fn candidates_skip_pending_deletion() {
+    // mark_pending_deletion hides a file from candidates() while its
+    // deletion is in flight — hidden, not untracked.
     let dir = tempfile::tempdir().unwrap();
     let mut reg = Registry::new(dir.path());
     populate(
@@ -263,6 +328,8 @@ fn candidates_skip_pending_deletion() {
 
 #[test]
 fn candidates_on_empty_registry() {
+    // A freshly constructed registry over an empty directory yields no
+    // candidates.
     let dir = tempfile::tempdir().unwrap();
     let reg = Registry::new(dir.path());
     let q = Query {

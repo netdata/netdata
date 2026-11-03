@@ -870,7 +870,120 @@ static void ignore_sigpipe_like_the_daemon(void) {
 }
 #endif
 
+#if defined(SPAWN_SERVER_VERSION_NOFORK)
+// The descendant deliberately ignores TERM and retains stdout. A readiness pipe ensures
+// the leader-exits-first case cannot pass merely because fork() had not happened yet.
+static int plugin_group_descendant(bool leader_exits) {
+    int ready[2];
+    if(pipe(ready) != 0) return 80;
+    if(signal(SIGTERM, SIG_IGN) == SIG_ERR) return 81;
+    pid_t child = fork();
+    if(child == -1) return 82;
+    if(child == 0) {
+        close(ready[0]);
+        if(write(ready[1], "R", 1) != 1) _exit(83);
+        close(ready[1]);
+        for(;;) pause();
+    }
+    close(ready[1]);
+    char byte;
+    if(read(ready[0], &byte, 1) != 1) return 84;
+    close(ready[0]);
+    if(write(STDOUT_FILENO, "R", 1) != 1) return 85;
+    if(leader_exits) return 0;
+    for(;;) pause();
+}
+
+static void group_test_require(bool ok, const char *what) {
+    if(ok) return;
+    nd_log(NDLS_COLLECTORS, NDLP_ERR, "Process-group test failed: %s", what);
+    // The test owns this server. Normal destruction cancels its remaining owned groups.
+    netdata_main_spawn_server_cleanup();
+    exit(1);
+}
+
+static void test_popen_groups(const char *argv0) {
+    struct {
+        const char *script;
+        int code;
+    } cases[] = {
+        { "exit 0", 0 },
+        { "exit 7", 7 },
+        { "kill -TERM $$", -1 },
+        { "kill -PIPE $$", -1 },
+    };
+    for(size_t i = 0; i < _countof(cases); i++) {
+        const char *args[] = { "/bin/sh", "-c", cases[i].script, NULL };
+        POPEN_INSTANCE *pi = spawn_popen_run_argv_group(args);
+        group_test_require(pi != NULL, "spawn status fixture");
+        int code;
+        SPAWN_TIMEDWAIT_RESULT result = spawn_popen_timedwait(pi, 5000, &code);
+        if(result != SPAWN_TIMEDWAIT_EXITED) spawn_popen_kill(pi, 0);
+        group_test_require(result == SPAWN_TIMEDWAIT_EXITED && code == cases[i].code,
+                           "preserve normal, nonzero, and signal exit status");
+    }
+
+    // An unrelated request must remain alive throughout both kinds of group cleanup.
+    const char *sentinel_args[] = { "/bin/sh", "-c", "echo R; read value; test \"$value\" = done", NULL };
+    POPEN_INSTANCE *sentinel = spawn_popen_run_argv_group(sentinel_args);
+    group_test_require(sentinel != NULL, "spawn unrelated request");
+    struct pollfd sentinel_fd = { .fd = spawn_popen_read_fd(sentinel), .events = POLLIN };
+    group_test_require(poll(&sentinel_fd, 1, 5000) > 0, "unrelated request readiness");
+    char sentinel_ready[2];
+    group_test_require(read(sentinel_fd.fd, sentinel_ready, 2) == 2, "read unrelated readiness");
+
+    for(size_t exits_first = 0; exits_first < 2; exits_first++) {
+        const char *args[] = { argv0, exits_first ? "plugin-group-leader-exits" : "plugin-group-hangs", NULL };
+        POPEN_INSTANCE *pi = spawn_popen_run_argv_group(args);
+        group_test_require(pi != NULL, "spawn descendant fixture");
+        // timedwait/kill close their own pipes. Keep another reader to observe real EOF,
+        // proving the descendant has stopped, rather than merely that the leader was reaped.
+        int output = dup(spawn_popen_read_fd(pi));
+        group_test_require(output != -1, "duplicate descendant stdout");
+        struct pollfd output_fd = { .fd = output, .events = POLLIN };
+        group_test_require(poll(&output_fd, 1, 5000) > 0, "descendant readiness");
+        char byte;
+        group_test_require(read(output, &byte, 1) == 1 && byte == 'R', "descendant started");
+        usec_t start = now_monotonic_usec();
+        int code;
+        if(exits_first) {
+            // Detection reads to EOF before it waits for status. Cleanup must happen even
+            // when no client wait/kill has been called and a descendant keeps stdout open.
+            group_test_require(poll(&output_fd, 1, 5000) > 0 && read(output, &byte, 1) == 0,
+                               "leader exit proactively closes descendant output");
+            SPAWN_TIMEDWAIT_RESULT result = spawn_popen_timedwait(pi, 5000, &code);
+            if(result != SPAWN_TIMEDWAIT_EXITED) spawn_popen_kill(pi, 0);
+            group_test_require(result == SPAWN_TIMEDWAIT_EXITED && code == 0, "leader exits first");
+        }
+        else {
+            group_test_require(getpgid(spawn_popen_pid(pi)) == spawn_popen_pid(pi), "private process group");
+            SPAWN_TIMEDWAIT_RESULT result = spawn_popen_timedwait(pi, 20, &code);
+            group_test_require(result == SPAWN_TIMEDWAIT_RUNNING, "hanging leader reaches deadline");
+            code = spawn_popen_kill(pi, 0);
+            group_test_require(code == -1, "forced termination is failure");
+        }
+        group_test_require(now_monotonic_usec() - start < 6 * USEC_PER_SEC, "bounded cleanup");
+        group_test_require(poll(&output_fd, 1, 5000) > 0 && read(output, &byte, 1) == 0,
+                           "descendant releases stdout after leader exit or timeout");
+        close(output);
+    }
+    group_test_require(write(spawn_popen_write_fd(sentinel), "done\n", 5) == 5,
+                       "unrelated request survives group cleanup");
+    int code;
+    SPAWN_TIMEDWAIT_RESULT result = spawn_popen_timedwait(sentinel, 5000, &code);
+    if(result != SPAWN_TIMEDWAIT_EXITED) spawn_popen_kill(sentinel, 0);
+    group_test_require(result == SPAWN_TIMEDWAIT_EXITED && code == 0,
+                       "unrelated request exits normally");
+}
+#endif
+
 int main(int argc, const char **argv) {
+#if defined(SPAWN_SERVER_VERSION_NOFORK)
+    if(argc > 1 && strcmp(argv[1], "plugin-group-hangs") == 0)
+        return plugin_group_descendant(false);
+    if(argc > 1 && strcmp(argv[1], "plugin-group-leader-exits") == 0)
+        return plugin_group_descendant(true);
+#endif
     if(argc > 1 && strcmp(argv[1], "plugin-kill-to-stop") == 0)
         return plugin_kill_to_stop();
 
@@ -962,6 +1075,10 @@ int main(int argc, const char **argv) {
         fprintf(stderr, "\n\nTESTING popen No %zu (timedwait kill)\n\n", i + 1);
         test_popen_plugin_timedwait_kill(argv[0]);
     }
+#if defined(SPAWN_SERVER_VERSION_NOFORK)
+    fprintf(stderr, "\n\nTESTING owned process groups\n\n");
+    test_popen_groups(argv[0]);
+#endif
     netdata_main_spawn_server_cleanup();
 
     fprintf(stderr, "\n\nTests passed! (%zu warnings)\n\n", warnings);

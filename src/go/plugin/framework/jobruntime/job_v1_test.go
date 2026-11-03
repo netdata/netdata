@@ -25,12 +25,6 @@ const (
 	jobName    = "job"
 )
 
-type retryableTestError struct {
-	error
-}
-
-func (e retryableTestError) DyncfgRetryable() bool { return true }
-
 type foreignRetryableTestError struct {
 	error
 }
@@ -156,9 +150,7 @@ func TestJob_AutoDetection_RetryableFailInitKeepsRetry(t *testing.T) {
 	job.autoDetectEvery = 1
 	m := &collectorapi.MockCollectorV1{
 		InitFunc: func(context.Context) error {
-			return retryableTestError{
-				error: errors.New("init error"),
-			}
+			return collectorapi.TemporaryError(errors.New("init error"))
 		},
 	}
 	job.module = m

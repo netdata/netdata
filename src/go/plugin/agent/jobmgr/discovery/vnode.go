@@ -38,11 +38,12 @@ type vnodeRecord struct {
 // VNodeConfiguration separates authored secrets, acquired metadata and public snapshots.
 // Records are immutable after commit; pointer comparison also fences remove/re-add ABA.
 type VNodeConfiguration struct {
-	mu          sync.Mutex
-	records     map[string]*vnodeRecord
-	definitions map[string]*hostoutput.Definition
-	guids       map[string]string
-	hostnames   map[string]string
+	mu              sync.Mutex
+	records         map[string]*vnodeRecord
+	definitions     map[string]*hostoutput.Definition
+	guids           map[string]string
+	hostnames       map[string]string
+	lastIncarnation uint64
 }
 type PreparedVNode struct{ state *preparedVNodeState }
 type ConfiguredVNode struct {
@@ -192,6 +193,7 @@ func (vc *VNodeConfiguration) prepareLocked(id string, current, next *vnodeRecor
 	}
 	next.snapshot = jobruntime.VnodeSnapshot{Revision: revision + 1}
 	if current != nil {
+		next.snapshot.Incarnation = current.snapshot.Incarnation
 		next.snapshot.MetadataRevision = current.snapshot.MetadataRevision
 	}
 	var definition *hostoutput.Definition
@@ -216,6 +218,13 @@ func (vc *VNodeConfiguration) prepareLocked(id string, current, next *vnodeRecor
 		next.snapshot.Vnode = resolved
 		if err := vc.validateUniqueLocked(id, next.config, resolved); err != nil {
 			return PreparedVNode{}, err
+		}
+		if current == nil {
+			if vc.lastIncarnation == ^uint64(0) {
+				return PreparedVNode{}, errors.New("vnode configuration: incarnation exhausted")
+			}
+			vc.lastIncarnation++
+			next.snapshot.Incarnation = vc.lastIncarnation
 		}
 	}
 	return PreparedVNode{state: &preparedVNodeState{owner: vc, id: id, expected: current, next: next, remove: remove, definition: definition}}, nil

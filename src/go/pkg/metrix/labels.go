@@ -70,42 +70,36 @@ func canonicalizeLabels(input map[string]string) ([]Label, string, error) {
 	return labels, b.String(), nil
 }
 
-// mergeCanonicalLabel inserts or replaces one label in an immutable, sorted canonical label slice.
-func mergeCanonicalLabel(base []Label, extra Label) ([]Label, string, error) {
+// appendCanonicalLabel appends base with extra inserted or replaced, in canonical key
+// order, to dst and writes the matching canonical labels key to key. base is not
+// modified. An empty extra key is invalid and appends nothing.
+func appendCanonicalLabel(dst []Label, key *strings.Builder, base []Label, extra Label) ([]Label, bool) {
 	if extra.Key == "" {
-		return nil, "", errInvalidLabelKey
+		return dst, false
 	}
-
-	out := make([]Label, 0, len(base)+1)
-	var b strings.Builder
 	inserted := false
-
 	for _, label := range base {
 		if !inserted && extra.Key <= label.Key {
-			out = append(out, extra)
-			b.WriteString(extra.Key)
-			b.WriteByte('\xff')
-			b.WriteString(extra.Value)
-			b.WriteByte('\xff')
+			dst = appendLabelKeyed(dst, key, extra)
 			inserted = true
 			if extra.Key == label.Key {
 				continue
 			}
 		}
-		out = append(out, label)
-		b.WriteString(label.Key)
-		b.WriteByte('\xff')
-		b.WriteString(label.Value)
-		b.WriteByte('\xff')
+		dst = appendLabelKeyed(dst, key, label)
 	}
 	if !inserted {
-		out = append(out, extra)
-		b.WriteString(extra.Key)
-		b.WriteByte('\xff')
-		b.WriteString(extra.Value)
-		b.WriteByte('\xff')
+		dst = appendLabelKeyed(dst, key, extra)
 	}
-	return out, b.String(), nil
+	return dst, true
+}
+
+func appendLabelKeyed(dst []Label, key *strings.Builder, label Label) []Label {
+	key.WriteString(label.Key)
+	key.WriteByte('\xff')
+	key.WriteString(label.Value)
+	key.WriteByte('\xff')
+	return append(dst, label)
 }
 
 // labelsFromSet merges precompiled label sets and validates ownership/duplicates.

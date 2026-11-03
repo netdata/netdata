@@ -6,11 +6,11 @@ This document explains the access control policies that govern feature availabil
 
 Netdata implements a layered access control system to protect sensitive information while keeping core monitoring capabilities freely available. The system distinguishes between three access levels:
 
-| Access Level                | Description                                                              |
-|-----------------------------|--------------------------------------------------------------------------|
-| **Anonymous**               | Using the Netdata dashboard without signing in                           |
-| **Netdata Cloud Community** | Signed in to Netdata Cloud (free tier)                                   |
-| **Netdata Cloud paid plan** | Signed in with a paid plan (Homelab, Business, or Enterprise On-Premise) |
+| Access Level                | Description                                                                                             |
+|-----------------------------|---------------------------------------------------------------------------------------------------------|
+| **Anonymous**               | Using the Netdata dashboard without signing in                                                          |
+| **Netdata Cloud Community** | Signed in to Netdata Cloud (free tier)                                                                  |
+| **Netdata Cloud paid plan** | Signed in with a paid plan (Homelab, Business, or Enterprise On-Premise) or an active Business trial    |
 
 ## Why Access Controls Exist
 
@@ -37,12 +37,6 @@ Without authentication, anyone who can reach the Netdata dashboard could access 
 | Node dashboard access              |   5 nodes   |  5 nodes   | Unlimited |
 | Custom dashboards                  | 1 per agent | 1 per room | Unlimited |
 
-:::note
-
-**Windows standalone Agents:** On Windows, standalone Agents on the free Community tier collect metrics but the local dashboard at `http://localhost:19999` is locked. To view monitoring data, connect the node to [Netdata Cloud](https://app.netdata.cloud) (free Community tier). Paid plans unlock the local dashboard. Air-gapped free standalone Windows installations cannot reach Netdata Cloud, so monitoring data cannot be viewed in that setup. When a Windows Child Agent streams to a Linux-based Netdata parent, the parent dashboard shows the Windows child's metrics normally — the Windows standalone local-dashboard lock does not apply, because the dashboard is served by the Linux parent rather than the Windows Agent. Sensitive functions on the Windows child still follow the standard access-control rules described in this document. For Windows installation details, see [Install Netdata on Windows](/packaging/windows/WINDOWS_INSTALLER.md).
-
-:::
-
 ### Functions (Live Tab)
 
 Functions provide on-demand, detailed information beyond standard metrics.
@@ -63,6 +57,8 @@ Functions provide on-demand, detailed information beyond standard metrics.
 | **Database Queries**    | Top queries, deadlocks, errors              |     ✗     |     ✓     |  ✓   |
 | **Streaming Status**    | Netdata streaming topology                  |     ✗     |     ✓     |  ✓   |
 | **API Call Tracing**    | Netdata API request tracing                 |     ✗     |     ✓     |  ✓   |
+| **Network Flows**       | NetFlow, IPFIX and sFlow traffic analysis   |     ✗     |     ✗     |  ✓   |
+| **Traces**              | OpenTelemetry traces stored on the Agent    |     ✗     |     ✗     |  ✓   |
 
 ### Configuration and Management
 
@@ -78,9 +74,9 @@ Functions provide on-demand, detailed information beyond standard metrics.
 
 | Feature                         | Anonymous | Community | Paid |
 |---------------------------------|:---------:|:---------:|:----:|
-| Alert explanations              |     ✗     |     ✓     |  ✓   |
-| Alert configuration suggestions |     ✗     |     ✓     |  ✓   |
-| AI-powered insights             |     ✗     |     ✓     |  ✓   |
+| Alert explanations              |     ✗     |     ✗     |  ✓   |
+| Alert configuration suggestions |     ✗     |     ✗     |  ✓   |
+| AI-powered insights             |     ✗     |     ✗     |  ✓   |
 
 ### Organization Features
 
@@ -114,7 +110,7 @@ For MCP setup and configuration, see the [MCP documentation](/docs/netdata-ai/mc
 2. **Connect your nodes** to your Netdata Cloud Space
 3. **Access the dashboard** through Netdata Cloud
 
-Once signed in, you'll have access to all sensitive functions (processes, logs, network connections, etc.) on nodes within your Space.
+Once signed in, you'll have access to the sensitive functions (processes, logs, network connections, etc.) on nodes within your Space. Network Flows and Traces also require a paid plan or an active trial.
 
 ### Enable Dynamic Configuration
 
@@ -126,12 +122,14 @@ Dynamic Configuration requires a paid plan:
 
 ### Increase Node Limits
 
-The 5-node limit on Netdata Cloud dashboards applies to both **Anonymous** and **Community** users. You can:
+The 5-node limit applies to both **Anonymous** and **Community** users, on Netdata Cloud dashboards and on the local dashboard of Agents and Parents. You can:
 
-1. **Upgrade to a paid plan** for unlimited nodes on Netdata Cloud dashboards
-2. **Select preferred nodes** in **Space Settings > Nodes** to choose which 5 nodes you can access on Netdata Cloud
+1. **Upgrade to a paid plan** for unlimited nodes
+2. **Select preferred nodes** to choose which 5 nodes stay accessible
 
-This limit is a **Netdata Cloud plan entitlement**, not a streaming or connection limit. You can stream any number of nodes to a parent and chain parents across multiple levels — both are fully supported, and every node continues collecting and storing its data regardless of this limit. On Netdata Cloud, however, a node outside your 5-node quota shows as **Locked**: every per-node feature — its single-node dashboard, Functions, Configuration, silencing rules, Anomaly Advisor, and alert details — becomes inaccessible, and it is excluded from the combined Metrics tab, until you either select it as one of your preferred nodes or upgrade to a paid plan.
+This limit is a **plan entitlement**, not a streaming or connection limit. You can stream any number of nodes to a parent and chain parents across multiple levels — both are fully supported, and every node continues collecting and storing its data regardless of this limit. On a dashboard that shows more nodes than your limit, a node outside your preferred nodes shows as **Locked**: every per-node feature — its single-node dashboard, Functions, Configuration, silencing rules, Anomaly Advisor, and alert details — becomes inaccessible, and it is excluded from the combined Metrics tab, until you either select it as one of your preferred nodes or upgrade to a paid plan.
+
+The local dashboard of an Agent or Parent gets the limit of your plan from Netdata Cloud. When the Agent is not connected to Netdata Cloud, or Netdata Cloud cannot be reached, the local dashboard applies the 5-node limit.
 
 ```mermaid
 flowchart LR
@@ -139,7 +137,7 @@ flowchart LR
         C1["Child 1"] --> P["Parent"]
         CN["Child 2..N"] --> P
     end
-    P --> D["Netdata Cloud dashboards<br/>(single-node & Metrics tab)"]
+    P --> D["Dashboards: Netdata Cloud and local<br/>(single-node & Metrics tab)"]
     D --> Q{"Node in your<br/>5-node quota?"}
     Q -->|Yes| V["Dashboard & per-node<br/>features accessible"]
     Q -->|No| L["Locked — select as preferred<br/>node or upgrade plan"]
@@ -153,7 +151,7 @@ flowchart LR
 
 :::note
 
-Preferred node selection only affects Netdata Cloud dashboards. On the local Agent dashboard (accessed directly at `http://<agent-ip>:19999`), the nodes shown in multi-node views are determined by the Agent's streaming configuration and cannot be changed via preferred node settings.
+Netdata Cloud and each Agent keep separate preferred-node lists. Netdata Cloud stores one per Space (**Space Settings > Nodes**). An Agent or Parent stores its own in its settings, and you select it on that Agent's local dashboard (`http://<agent-ip>:19999`). Which nodes appear in the local dashboard's multi-node views is still determined by the Agent's streaming configuration.
 
 :::
 
@@ -166,10 +164,11 @@ Preferred node selection only affects Netdata Cloud dashboards. On the local Age
 | **Alert Notifications**   | Full access | Full access   | Full access |
 | **Public Functions**      | Full access | Full access   | Full access |
 | **Sensitive Functions**   | Blocked     | Full access   | Full access |
-| **AI Features**           | Blocked     | Full access   | Full access |
+| **Network Flows & Traces** | Blocked     | Blocked       | Full access |
+| **AI Features**           | Blocked     | Not available | Full access |
 | **Dynamic Configuration** | Blocked     | Blocked       | Full access |
 | **Node Dashboard Access** | 5 nodes     | 5 nodes       | Unlimited   |
 | **Custom Dashboards**     | 1 per agent | 1 per room    | Unlimited   |
 | **RBAC & SSO**            | N/A         | Not available | Full access |
 
-Netdata's access control model ensures that sensitive system information is protected while keeping powerful monitoring capabilities freely available. Sign in to Netdata Cloud to unlock sensitive functions, or upgrade to a paid plan for full configuration control and unlimited scale.
+Netdata's access control model ensures that sensitive system information is protected while keeping powerful monitoring capabilities freely available. Sign in to Netdata Cloud to unlock sensitive functions, or upgrade to a paid plan for Network Flows, Traces, full configuration control and unlimited scale.

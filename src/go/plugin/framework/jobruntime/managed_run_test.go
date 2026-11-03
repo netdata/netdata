@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -51,7 +53,7 @@ func TestManagedRunSettlement(t *testing.T) {
 			require.NotNil(t, r.Failure())
 			require.Equal(t, test.ready, r.Failure().AfterReady())
 			require.Equal(t, test.reason, r.Failure().Reason())
-			require.Equal(t, test.retry, r.Failure().DyncfgRetryable())
+			require.Equal(t, test.retry, r.Failure().Retryable())
 			require.False(t, r.Running())
 			r.Ready()
 			r.Timeout()
@@ -174,7 +176,7 @@ func TestJobV2RunnerClassificationSurvivesSanitization(t *testing.T) {
 		job.runCollectorRunner(run.Context(), module, run)
 		require.Equal(t, "panic", run.Failure().Reason())
 		require.Equal(t, afterReady, run.Failure().AfterReady())
-		require.False(t, run.Failure().DyncfgRetryable())
+		require.False(t, run.Failure().Retryable())
 		require.Equal(t, "safe diagnostic", run.Failure().Error())
 	}
 }
@@ -206,4 +208,49 @@ func TestManagedRunCancellationCauseAndMixedErrors(t *testing.T) {
 	<-r.StartupDone()
 	require.ErrorIs(t, r.StartupErr(), cause)
 	require.Nil(t, r.Failure())
+}
+
+func TestRunFailureClassification(t *testing.T) {
+	type classification struct {
+		Class     collectorapi.LifecycleErrorClass
+		Retryable bool
+	}
+	tests := map[string]struct {
+		err    error
+		reason string
+		want   classification
+	}{
+		"unclassified startup error is retryable": {
+			err:    errors.New("bind failed"),
+			reason: "error",
+			want:   classification{Class: collectorapi.LifecycleErrorUnclassified, Retryable: true},
+		},
+		"permanent startup error is not retryable": {
+			err:    collectorapi.PermanentError(errors.New("invalid listener")),
+			reason: "error",
+			want:   classification{Class: collectorapi.LifecycleErrorPermanent, Retryable: false},
+		},
+		"temporary startup error is retryable": {
+			err:    collectorapi.TemporaryError(errors.New("port in use")),
+			reason: "error",
+			want:   classification{Class: collectorapi.LifecycleErrorTemporary, Retryable: true},
+		},
+		"startup timeout is retryable": {
+			err:    errors.New("collector startup timed out"),
+			reason: "startup_timeout",
+			want:   classification{Class: collectorapi.LifecycleErrorUnclassified, Retryable: true},
+		},
+		"panic is not retryable": {
+			err:    collectorapi.TemporaryError(errors.New("panic")),
+			reason: "panic",
+			want:   classification{Class: collectorapi.LifecycleErrorTemporary, Retryable: false},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			failure := newRunFailure(test.err, test.reason, func(error) error { return errors.New("safe diagnostic") })
+			assert.Equal(t, test.want, classification{Class: failure.Class(), Retryable: failure.Retryable()})
+			assert.Equal(t, "safe diagnostic", failure.Error())
+		})
+	}
 }

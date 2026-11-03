@@ -21,6 +21,24 @@ ebpf_module_t test_em;
 
 static int tests_failed = 0;
 
+static enum bpf_map_type ebpf_ut_map_type(const struct bpf_map *map)
+{
+#ifdef LIBBPF_MAJOR_VERSION
+    return bpf_map__type(map);
+#else
+    return bpf_map__def(map)->type;
+#endif
+}
+
+static uint32_t ebpf_ut_map_value_size(const struct bpf_map *map)
+{
+#ifdef LIBBPF_MAJOR_VERSION
+    return bpf_map__value_size(map);
+#else
+    return bpf_map__def(map)->value_size;
+#endif
+}
+
 #define EBPF_UT_ASSERT(test, msg)                                                                                      \
     do {                                                                                                               \
         if (!(test)) {                                                                                                 \
@@ -30,6 +48,77 @@ static int tests_failed = 0;
             fprintf(stderr, ">>> PASSED: %s\n", msg);                                                                  \
         }                                                                                                              \
     } while (0)
+
+static int ebpf_ut_percpu_lookup_fits_nprocs(struct bpf_object *obj)
+{
+    const int possible_cpus = libbpf_num_possible_cpus();
+    if (possible_cpus < 1) {
+        fprintf(stderr, ">>> FAILED: cannot determine possible CPU count for per-CPU lookup test\n");
+        return -1;
+    }
+
+    struct bpf_map *map = bpf_object__find_map_by_name(obj, "tbl_total_stats");
+    if (!map || ebpf_ut_map_type(map) != BPF_MAP_TYPE_PERCPU_ARRAY) {
+        fprintf(stderr, ">>> FAILED: process tbl_total_stats per-CPU array is unavailable\n");
+        return -1;
+    }
+
+    const size_t value_size = ebpf_ut_map_value_size(map);
+    const size_t stride = (value_size + sizeof(uint64_t) - 1) & ~(sizeof(uint64_t) - 1);
+    if (!stride || (size_t)possible_cpus > (SIZE_MAX - 2 * sizeof(uint64_t)) / stride) {
+        fprintf(stderr, ">>> FAILED: invalid per-CPU map value size\n");
+        return -1;
+    }
+
+    const size_t values_size = stride * (size_t)possible_cpus;
+    uint8_t *values = mallocz(values_size + 2 * sizeof(uint64_t));
+    if (!values) {
+        fprintf(stderr, ">>> FAILED: cannot allocate guarded per-CPU lookup buffer\n");
+        return -1;
+    }
+
+    const uint64_t physical_guard = UINT64_C(0x9f6b3d21c7a548e0);
+    const size_t checked_cpus = (ebpf_nprocs > 0 && ebpf_nprocs < possible_cpus) ? (size_t)ebpf_nprocs
+                                                                                   : (size_t)possible_cpus;
+    const uint64_t logical_guard = UINT64_C(0x7a1c5e93b4d286f0);
+    memcpy(values + values_size, &physical_guard, sizeof(physical_guard));
+    uint8_t *logical_guard_ptr = checked_cpus < (size_t)possible_cpus ? values + checked_cpus * stride
+                                                                      : values + values_size + sizeof(uint64_t);
+    memcpy(logical_guard_ptr, &logical_guard, sizeof(logical_guard));
+
+    uint32_t key = 0;
+    const int lookup_result = bpf_map_lookup_elem(bpf_map__fd(map), &key, values);
+
+    uint64_t observed_physical_guard;
+    uint64_t observed_logical_guard;
+    memcpy(&observed_physical_guard, values + values_size, sizeof(observed_physical_guard));
+    memcpy(&observed_logical_guard, logical_guard_ptr, sizeof(observed_logical_guard));
+    freez(values);
+
+    if (lookup_result) {
+        fprintf(stderr, ">>> FAILED: per-CPU map lookup failed (%d)\n", lookup_result);
+        return -1;
+    }
+
+    if (observed_physical_guard != physical_guard) {
+        fprintf(stderr, ">>> FAILED: per-CPU lookup wrote beyond %d possible CPU values\n", possible_cpus);
+        return -1;
+    }
+
+    if (ebpf_nprocs < possible_cpus || observed_logical_guard != logical_guard) {
+        fprintf(stderr,
+                ">>> FAILED: per-CPU lookup wrote %d values, buffers sized with ebpf_nprocs hold %d\n",
+                possible_cpus,
+                ebpf_nprocs);
+        return -1;
+    }
+
+    fprintf(stderr,
+            ">>> PASSED: per-CPU lookup wrote %d values, buffers sized with ebpf_nprocs hold %d\n",
+            possible_cpus,
+            ebpf_nprocs);
+    return 0;
+}
 
 /**
  * Initialize structure
@@ -71,9 +160,10 @@ static int ebpf_ut_load_binary()
     if (!test_em.probe_links)
         return -1;
 
+    int ret = ebpf_ut_percpu_lookup_fits_nprocs(test_em.objects);
     ebpf_unload_legacy_code(test_em.objects, test_em.probe_links);
 
-    return 0;
+    return ret;
 }
 
 /**

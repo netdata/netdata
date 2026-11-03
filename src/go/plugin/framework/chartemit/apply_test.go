@@ -666,3 +666,25 @@ func TestNormalizeActionsOrderingDeterminism(t *testing.T) {
 		})
 	}
 }
+
+func TestApplyPlanBackslashesCannotEscapeFieldBoundaries(t *testing.T) {
+	var out bytes.Buffer
+	plan := Plan{Actions: []EngineAction{chartengine.CreateChartAction{
+		ChartID: "check",
+		Meta: chartengine.ChartMeta{
+			Title:   `Service\Check\`,
+			Context: "check.state",
+			Units:   "state",
+			Family:  "Checks",
+			Type:    chartengine.ChartTypeLine,
+		},
+		Labels: map[string]string{"path": `C:\checks\`, "plain": "unchanged"},
+	}}}
+	require.NoError(t, ApplyPlan(netdataapi.New(&out), plan, EmitEnv{TypeID: "test", UpdateEvery: 1, JobName: "job"}))
+	// The Agent already converts label backslashes to slashes. Leaving a trailing
+	// backslash in a quoted field instead makes its splitter consume the closing
+	// quote and merge label source into the value ("C:/checks/_", rather than this).
+	assert.Contains(t, out.String(), "CLABEL 'path' 'C:/checks/' '1'\n")
+	assert.Contains(t, out.String(), "CLABEL 'plain' 'unchanged' '1'\n")
+	assert.Contains(t, out.String(), "'Service/Check/'")
+}

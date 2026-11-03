@@ -37,8 +37,10 @@ type Chart struct {
 	// They are empty for legacy document programs.
 	EntryID         string
 	LocalTemplateID string
-	// RoutingOrder preserves positional precedence independently of ownership.
-	RoutingOrder string
+	// RoutingRank orders unowned collisions in a named template set by compile
+	// order, independently of ownership. Legacy document programs compare
+	// TemplateID instead.
+	RoutingRank int
 
 	Meta      ChartMeta
 	Identity  ChartIdentity

@@ -83,7 +83,7 @@ func (f fromFile) certificates() ([]*x509.Certificate, error) {
 
 	cert, err := x509.ParseCertificate(block.Bytes)
 	if err != nil {
-		return nil, fmt.Errorf("error on parsing certificate '%s': %v", f.path, err)
+		return nil, fmt.Errorf("error on parsing certificate '%s': invalid X.509 certificate", f.path)
 	}
 
 	return []*x509.Certificate{cert}, nil

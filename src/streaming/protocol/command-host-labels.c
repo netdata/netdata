@@ -17,8 +17,15 @@ void stream_send_host_labels(RRDHOST *host) {
 
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
 
+    // Several threads send the labels of the same host (the ready hook, the receiver forwarding a child's
+    // change, reloads). Snapshot and commit under one lock, so that an older snapshot cannot be committed
+    // after a newer one and leave the parent with stale labels.
+    spinlock_lock(&host->stream.snd.labels_spinlock);
+
     rrdlabels_walkthrough_read(host->rrdlabels, send_host_labels_callback, wb);
     buffer_sprintf(wb, PLUGINSD_KEYWORD_OVERWRITE " %s\n", "labels");
 
     sender_commit_clean_buffer(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
+
+    spinlock_unlock(&host->stream.snd.labels_spinlock);
 }

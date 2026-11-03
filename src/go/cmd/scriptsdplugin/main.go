@@ -12,12 +12,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/cmd/internal/agenthost"
 	"github.com/netdata/netdata/go/plugins/cmd/internal/discoveryproviders"
-	"github.com/netdata/netdata/go/plugins/plugin/agent"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
-	"go.uber.org/automaxprocs/maxprocs"
-	"golang.org/x/net/http/httpproxy"
-
+	"github.com/netdata/netdata/go/plugins/cmd/internal/secretproviders"
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/cli"
@@ -25,8 +20,13 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/hostinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/pkg/terminal"
+	"github.com/netdata/netdata/go/plugins/plugin/agent"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	_ "github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios"
+	"go.uber.org/automaxprocs/maxprocs"
+	"golang.org/x/net/http/httpproxy"
 )
 
 func init() {
@@ -66,19 +66,30 @@ func main() {
 	}
 	isTerminal := terminal.IsTerminal()
 
+	modules, dummy, err := configurePackages(pluginconfig.ConfigDir(), collectorapi.DefaultRegistry)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "initializing native packages: %v\n", err)
+		os.Exit(1)
+	}
+	secrets, err := secretproviders.Default()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "initializing secrets: %v\n", err)
+		os.Exit(1)
+	}
 	a := agent.New(agent.Config{
+		Secrets:                   secrets,
 		Name:                      executable.Name,
 		PluginConfigDir:           pluginconfig.ConfigDir(),
 		CollectorsConfigDir:       pluginconfig.CollectorsDir(),
 		ServiceDiscoveryConfigDir: nil,
 		CollectorsConfigWatchPath: watchPaths,
 		VarLibDir:                 pluginconfig.VarLibDir(),
-		ModuleRegistry:            collectorapi.DefaultRegistry,
+		ModuleRegistry:            modules,
 		IsInsideK8s:               hostinfo.IsInsideK8sCluster(),
 		RunModePolicy:             policy.Agent(isTerminal),
 		DiscoveryProviders: []discovery.ProviderFactory{
 			discoveryproviders.File(),
-			discoveryproviders.Dummy(),
+			dummy,
 		},
 		RunModule:               opts.Module,
 		RunJob:                  opts.Job,
@@ -92,14 +103,22 @@ func main() {
 	}
 
 	proxyCfg := httpproxy.FromEnvironment()
-	a.Infof("env proxy settings: HTTP_PROXY set=%t, HTTPS_PROXY set=%t", proxyCfg.HTTPProxy != "", proxyCfg.HTTPSProxy != "")
+	a.Infof(
+		"env proxy settings: HTTP_PROXY set=%t, HTTPS_PROXY set=%t",
+		proxyCfg.HTTPProxy != "",
+		proxyCfg.HTTPSProxy != "",
+	)
 
 	a.Infof("directories → config: %s | collectors: %s | varlib: %s",
 		a.ConfigDir, a.CollectorsConfDir, a.VarLibDir)
 
-	if err := agenthost.Run(a); err != nil {
-		a.Errorf("plugin exiting after Agent failure: %v", err)
+	result := agenthost.Run(a)
+	if result.Err != nil {
+		a.Errorf("plugin exiting after Agent failure: %v", result.Err)
 		os.Exit(1)
+	}
+	if result.ExitRequired {
+		os.Exit(0)
 	}
 }
 

@@ -1,0 +1,23 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "NVIDIA Jetson collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, in seconds. `tegrastats` samples once per second regardless; a longer interval charts the latest reading, not an average.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
+      },
+      "allow_privileged": {
+        "title": "Allow privileged execution",
+        "description": "Allow restricted privileged execution of tegrastats to collect readings that require root, such as GPU clocks and EMC activity.",
+        "type": "boolean",
+        "default": true
+      }
+    }
+  },
+  "uiSchema": {}
+}

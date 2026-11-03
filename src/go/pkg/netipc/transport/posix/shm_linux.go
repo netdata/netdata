@@ -574,10 +574,8 @@ func (c *ShmContext) ShmReceive(buf []byte, timeoutMs uint32) (int, error) {
 					return 0, ErrShmTimeout
 				}
 				remain := deadlineNs - nowVal
-				ts = &syscall.Timespec{
-					Sec:  int64(remain / 1_000_000_000),
-					Nsec: int64(remain % 1_000_000_000),
-				}
+				remaining := syscall.NsecToTimespec(int64(remain))
+				ts = &remaining
 			}
 
 			ret := futexWaitCall(c.data, sigOff, sigVal, ts)

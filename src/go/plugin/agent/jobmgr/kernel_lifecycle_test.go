@@ -1003,6 +1003,106 @@ func TestKernelDisposesCancelledPreparedResourceTransaction(t *testing.T) {
 	}
 }
 
+func TestKernelKeepsAppliedTransactionReplyAfterLateCancellation(t *testing.T) {
+	tests := map[string]struct {
+		uid    string
+		cancel bool
+	}{
+		"deadline passes during apply": {
+			uid: "apply-deadline",
+		},
+		"explicit cancellation during apply": {
+			uid:    "apply-cancel",
+			cancel: true,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			var events []string
+			applyEntered := make(chan struct{})
+			applyRelease := make(chan struct{})
+			current := newKernelTestReadyResource("resource", nil, nil)
+			successor := newKernelTestReadyResource("resource", nil, nil)
+			planner := kernelTestTransactionPlanner{
+				permitPlan:          lifecycle.NewJobLongLivedPlan(),
+				current:             current,
+				successor:           successor,
+				applyEntered:        applyEntered,
+				applyRelease:        applyRelease,
+				cooperativeCancel:   true,
+				cooperativeDeadline: true,
+				events:              &events,
+			}
+			var output bytes.Buffer
+			clock := newKernelFinalizerClock()
+			kernel, run, uids, tasks := newKernelWithClockFinalizerAndTimeout(
+				t,
+				planner,
+				&output,
+				clock,
+				newNoopRunFinalizer(),
+				time.Second,
+			)
+
+			require.NoError(t, run.OpenAdmission())
+			startKernelLoop(t, kernel)
+			require.NoError(t, kernel.submitAndWait(context.Background(), Request{
+				UID:     "install-before-apply",
+				LaneKey: "resource",
+				Source:  lifecycle.SourceJobManager,
+				Route:   "install",
+			}))
+
+			request := Request{
+				UID:      test.uid,
+				LaneKey:  "resource",
+				Source:   lifecycle.SourceJobManager,
+				Route:    "replace",
+				Deadline: clock.Now().Add(time.Second),
+			}
+			result := make(chan error, 1)
+			go func() {
+				result <- kernel.submitAndWait(context.Background(), request)
+			}()
+			select {
+			case <-applyEntered:
+			case <-time.After(time.Second):
+				require.FailNow(t, "test failed", "transaction apply did not start")
+			}
+
+			barrierCtx, barrierCancel := context.WithTimeout(context.Background(), time.Second)
+			defer barrierCancel()
+			if test.cancel {
+				require.NoError(t, kernel.Cancel(barrierCtx, request.UID))
+			} else {
+				clock.advance(time.Second + time.Nanosecond)
+				kernel.NotifyControlReady()
+				require.NoError(t, kernel.Cancel(barrierCtx, "deadline-service-barrier"))
+			}
+			close(applyRelease)
+			select {
+			case err := <-result:
+				require.NoError(t, err)
+			case <-time.After(time.Second):
+				require.FailNow(t, "test failed", "applied transaction did not reach terminal state")
+			}
+
+			lane := kernel.lanes[resourceCommandLaneKey("resource")]
+			require.False(t, lane == nil || lane.current != successor || lane.transactionPlanned != 0)
+			require.Equal(t, []string{"prepare", "apply", "cleanup"}, events)
+			require.Contains(t, output.String(), fmt.Sprintf("FUNCTION_RESULT_BEGIN %s 200 application/json", test.uid))
+
+			kernel.Stop()
+			waitCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			require.NoError(t, kernel.Wait(waitCtx))
+			require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
+			closeUIDLedger(t, uids)
+		})
+	}
+}
+
 func TestKernelDirtyApplyFailureJoinsChildWithoutWaitingForShutdownBudget(t *testing.T) {
 	var events []string
 	failure := errors.New("apply failed after ownership changed")
@@ -2295,6 +2395,8 @@ func TestKernelSchedulesExpiredCooperativeFunctionAfterItsLanePredecessor(t *tes
 		time.Second,
 	)
 	setTestFunctionResource(t, kernel, func(FunctionLookup) string { return "same-lane" })
+	observer := &kernelRuntimeObserver{}
+	require.NoError(t, kernel.BindRuntimeObserver(observer))
 
 	require.NoError(t, run.OpenAdmission())
 
@@ -2329,6 +2431,9 @@ func TestKernelSchedulesExpiredCooperativeFunctionAfterItsLanePredecessor(t *tes
 	}
 	clock.advance(time.Second + time.Nanosecond)
 	kernel.NotifyControlReady()
+	require.Eventually(t, func() bool {
+		return observer.operationTimeouts.Load() == 1
+	}, time.Second, time.Millisecond, "queued cooperative deadline was not observed")
 	barrierCtx, barrierCancel := context.WithTimeout(context.Background(), time.Second)
 	defer barrierCancel()
 
@@ -2449,20 +2554,22 @@ func TestKernelCancelBeforeQueuedCooperativeDeadlineDisposesOperation(t *testing
 		require.FailNow(t, "test failed", "queued cooperative deadline was not armed")
 	}
 
-	clock.advance(time.Second + time.Nanosecond)
+	// Settle cancellation while the deadline is still in the future and the lane is occupied.
 	require.NoError(t, kernel.Cancel(context.Background(), "cancel-before-deadline"))
+	select {
+	case err := <-deadlineResult:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "cancelled cooperative-deadline operation retained ownership")
+	}
+
+	clock.advance(time.Second + time.Nanosecond)
 	close(releaseHolder)
 	select {
 	case err := <-holderResult:
 		require.NoError(t, err)
 	case <-time.After(time.Second):
 		require.FailNow(t, "test failed", "holder operation did not finish")
-	}
-	select {
-	case err := <-deadlineResult:
-		require.NoError(t, err)
-	case <-time.After(time.Second):
-		require.FailNow(t, "test failed", "cancelled cooperative-deadline operation retained ownership")
 	}
 
 	require.False(t, deadlineWorkStarted.Load())
@@ -2471,6 +2578,7 @@ func TestKernelCancelBeforeQueuedCooperativeDeadlineDisposesOperation(t *testing
 
 	require.NoError(t, kernel.Wait(context.Background()))
 
+	require.Contains(t, output.String(), "FUNCTION_RESULT_BEGIN cancel-before-deadline 499 application/json ")
 	require.Empty(t, kernel.operations)
 	require.Empty(t, kernel.lanes)
 	require.EqualValues(t, 0, tasks.Active())
@@ -4095,6 +4203,8 @@ type kernelTestTransactionPlanner struct {
 	prepareEntered      chan<- struct{}
 	disposeEntered      chan<- struct{}
 	disposeRelease      <-chan struct{}
+	applyEntered        chan<- struct{}
+	applyRelease        <-chan struct{}
 	waitForCancellation bool
 	returnContextErr    bool
 	cooperativeCancel   bool
@@ -4145,6 +4255,8 @@ func (kttp kernelTestTransactionPlanner) Plan(request Request) (WorkPlan, error)
 						permit:         permit,
 						disposeEntered: kttp.disposeEntered,
 						disposeRelease: kttp.disposeRelease,
+						applyEntered:   kttp.applyEntered,
+						applyRelease:   kttp.applyRelease,
 						events:         kttp.events,
 					}, nil
 				},
@@ -4164,6 +4276,8 @@ type kernelTestPreparedResourceTransaction struct {
 	permit         lifecycle.LongLivedPermit
 	disposeEntered chan<- struct{}
 	disposeRelease <-chan struct{}
+	applyEntered   chan<- struct{}
+	applyRelease   <-chan struct{}
 	events         *[]string
 }
 
@@ -4195,6 +4309,12 @@ func (ktprt *kernelTestPreparedResourceTransaction) Apply(
 	ctx context.Context,
 ) (lifecycle.AppliedResourceTransaction, error) {
 	*ktprt.events = append(*ktprt.events, "apply")
+	if ktprt.applyEntered != nil {
+		close(ktprt.applyEntered)
+	}
+	if ktprt.applyRelease != nil {
+		<-ktprt.applyRelease
+	}
 	if err := ktprt.current.Stop(ctx); err != nil {
 		return lifecycle.AppliedResourceTransaction{}, err
 	}

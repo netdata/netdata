@@ -10,6 +10,7 @@ typedef struct storage_value {
     NETDATA_DOUBLE anomaly_rate;
     time_t after;
     time_t before;
+    time_t window_duration_s; // duration represented by the single result bucket
     size_t points_read;
     size_t storage_points_per_tier[RRD_STORAGE_TIERS];
     size_t result_points;

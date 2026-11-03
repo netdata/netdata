@@ -27,8 +27,10 @@ when correlating them. File cadence, retention, and publication remain documente
 ## Profile Selection
 
 For normal SNMP collection, `setupProfiles` uses `manual_profiles` only when `sysObjectID` is empty. A non-empty but
-unmatched `sysObjectID` does not fall back to that list. After catalog matching, consumer projection keeps metrics,
-BGP, and licensing definitions for normal collection; topology has its own
+unmatched `sysObjectID` does not fall back to that list. `snmputils.GetSysInfo` accepts a valid numeric OID sent as
+`OctetString` text and treats any other value as empty, so such devices use `manual_profiles`; the probe records
+only the value's ASN.1 type. After catalog matching, consumer projection keeps metrics, BGP, and licensing
+definitions for normal collection; topology has its own
 [composition](/src/go/plugin/go.d/collector/snmp_topology/ARCHITECTURE.md#topology-profile-composition).
 A matched profile with no data for the requested consumer can disappear from that consumer's collection set. When
 investigating selection, compare the captured profile context's selected profiles and projection, not only profile

@@ -17,8 +17,10 @@ omitting `profiles` and `app` from stock examples) are owned by
   `PROFILE-DESIGN.yaml` with its runtime YAML and attaches a detached `metrics.profile_coverage` projection to the
   module after schema validation. Generation fails if a stock profile is unmapped or a semantic view and runtime chart
   differ. The rows are grouped by the profile's top-level family (Prometheus metric, Netdata family and chart title,
-  dimension, unit, entity scope); a view's `question` stays internal. Do not author `metrics.profile_coverage` inside a
-  module: YAML merge anchors would share the nested mapping between inherited modules.
+  dimension, unit, entity scope); a view's `question` stays internal. The projection also lists the chart contexts the
+  profiles create (`prometheus.<app>[.<namespace>].<context>`, only when one of them declares `app:`), from which the
+  module's alert table is derived. Do not author `metrics.profile_coverage` inside a module: YAML merge anchors would
+  share the nested mapping between inherited modules.
 - **Generic profile configuration:** the Prometheus collector metadata documents the `profiles` job option; that is
   configuration documentation, not an application catalog.
 

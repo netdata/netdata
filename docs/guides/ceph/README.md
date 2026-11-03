@@ -114,7 +114,7 @@ For high availability, put a stable address in front of the active MGR and keep 
 
 ### ceph-exporter
 
-Deploy or enable official `ceph-exporter` on each Ceph node whose daemon telemetry you need. Collect from each exporter on its own host. Use the exporter priority limit to select the daemon counters published, and size `max_time_series` and `max_time_series_per_metric` for that surface.
+Deploy or enable official `ceph-exporter` on each Ceph node whose daemon telemetry you need. Collect from each exporter on its own host. Use the exporter priority limit to select the daemon counters published, and size `max_input_series` and `max_output_series_per_context` for that surface.
 
 ### NVMe-oF gateway exporter
 
@@ -211,7 +211,7 @@ Use the collection model to choose scope:
 - Use hardware telemetry knowing that it scales with the reported component inventory.
 - Run investigation Functions on demand during an incident rather than as a continuous inventory process.
 
-Use job-level `max_time_series` and `max_time_series_per_metric` to bound an exposed surface. These limits do not reduce Ceph's producer cost, but they control Netdata's processing and storage boundary.
+Size `max_input_series` for the assembled source components admitted after filtering and relabeling, and `max_output_series_per_context` for each context's chart dimensions after aggregation. Exceeding the input limit rejects the entire collection; exceeding the output limit omits that context while preserving other complete views. These limits do not reduce Ceph's producer cost or bound download, parser memory, or total retained storage.
 
 Size the deployment from measured behavior:
 

@@ -36,7 +36,7 @@ func TestBuildChartTemplate(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			out, err := buildChartTemplate(tc.app)
+			out, err := buildChartTemplate(tc.app, nil)
 			require.NoError(t, err)
 
 			// Parse back through charttpl's own canonical decoder (yaml.v2 UnmarshalStrict, the path
@@ -79,7 +79,7 @@ func TestBuildMergedChartTemplateAutogenRulesPreserveProfileScopes(t *testing.T)
 
 	profiles, err := catalog.Resolve([]string{"second", "plain", "first"})
 	require.NoError(t, err)
-	out, err := buildMergedChartTemplate("", profiles)
+	out, err := buildMergedChartTemplate("", nil, profiles)
 	require.NoError(t, err)
 	spec, err := charttpl.DecodeYAML([]byte(out))
 	require.NoError(t, err)
@@ -124,7 +124,7 @@ template:
 	profiles, err := catalog.Resolve([]string{"app"})
 	require.NoError(t, err)
 
-	out, err := buildMergedChartTemplate("app", profiles)
+	out, err := buildMergedChartTemplate("app", nil, profiles)
 	require.NoError(t, err)
 	assert.NotContains(t, out, "family: \"\"")
 
@@ -339,4 +339,113 @@ litellm_api_key_last_used_timestamp_seconds{team="team-a",api_key="key-2"} 200
 	require.Len(t, updates[0].Values, 1)
 	assert.Equal(t, "latest", updates[0].Values[0].Name)
 	assert.Equal(t, float64(200), updates[0].Values[0].Float64)
+}
+
+func TestCollectorCounterRawChartsChartScalarCountersOnly(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`
+# HELP app_requests_total Requests served.
+# TYPE app_requests_total counter
+app_requests_total{code="200"} 7
+app_legacy_total 5
+# TYPE app_internal_total counter
+app_internal_total 1
+# TYPE app_inflight gauge
+app_inflight 3
+# TYPE app_latency_seconds histogram
+app_latency_seconds_bucket{le="1"} 4
+app_latency_seconds_bucket{le="+Inf"} 4
+app_latency_seconds_sum 1.7
+app_latency_seconds_count 4
+`))
+	}))
+	defer srv.Close()
+
+	collector := New()
+	collector.URL = srv.URL
+	collector.Profiles = ProfilesConfig{Mode: profilesModeNone}
+	collector.CounterRawCharts = []string{"!app_internal_*", "app_*"}
+	require.NoError(t, collector.Init(context.Background()))
+	require.NoError(t, collector.Check(context.Background()))
+
+	cc, ok := metrix.AsCycleManagedStore(collector.MetricStore())
+	require.True(t, ok)
+	cc.CycleController().BeginCycle()
+	require.NoError(t, collector.Collect(context.Background()))
+	require.NoError(t, cc.CycleController().CommitCycleSuccess())
+
+	engine, err := chartengine.New()
+	require.NoError(t, err)
+	require.NoError(t, engine.LoadYAML([]byte(collector.ChartTemplateYAML()), 1))
+	attempt, err := engine.PreparePlan(collector.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()))
+	require.NoError(t, err)
+	defer attempt.Abort()
+
+	type chart struct {
+		Title     string
+		Units     string
+		Algorithm string
+	}
+	contexts := make(map[string]string)
+	got := make(map[string]chart)
+	for _, action := range attempt.Plan().Actions {
+		switch action := action.(type) {
+		case chartengine.CreateChartAction:
+			contexts[action.ChartID] = action.Meta.Context
+			got[action.Meta.Context] = chart{Title: action.Meta.Title, Units: action.Meta.Units}
+		case chartengine.CreateDimensionAction:
+			ctx := contexts[action.ChartID]
+			c := got[ctx]
+			c.Algorithm = string(action.Algorithm)
+			got[ctx] = c
+		}
+	}
+
+	assert.Equal(t, map[string]chart{
+		"prometheus.app_requests_total": {
+			Title:     "Requests served",
+			Units:     "requests/s",
+			Algorithm: "incremental",
+		},
+		"prometheus.app_requests_total.raw": {
+			Title:     "Requests served (raw)",
+			Units:     "requests",
+			Algorithm: "absolute",
+		},
+		"prometheus.app_legacy_total": {
+			Title:     `Metric "app_legacy_total"`,
+			Units:     "legacy/s",
+			Algorithm: "incremental",
+		},
+		"prometheus.app_legacy_total.raw": {
+			Title:     `Metric "app_legacy_total" (raw)`,
+			Units:     "legacy",
+			Algorithm: "absolute",
+		},
+		"prometheus.app_internal_total": {
+			Title:     `Metric "app_internal_total"`,
+			Units:     "internal/s",
+			Algorithm: "incremental",
+		},
+		"prometheus.app_inflight": {
+			Title:     `Metric "app_inflight"`,
+			Units:     "inflight",
+			Algorithm: "absolute",
+		},
+		"prometheus.app_latency_seconds": {
+			Title:     `Metric "app_latency_seconds"`,
+			Units:     "observations/s",
+			Algorithm: "incremental",
+		},
+		"prometheus.app_latency_seconds_sum": {
+			Title:     `Metric "app_latency_seconds"`,
+			Units:     "seconds",
+			Algorithm: "incremental",
+		},
+		"prometheus.app_latency_seconds_count": {
+			Title:     `Metric "app_latency_seconds"`,
+			Units:     "events/s",
+			Algorithm: "incremental",
+		},
+	}, got)
 }

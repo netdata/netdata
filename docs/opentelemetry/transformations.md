@@ -2,7 +2,7 @@
 
 Use Collector processors when several receivers need the same normalization, enrichment, or filtering before they export to Netdata. Prefer a receiver's built-in parser for source-specific work; use the `transform` processor for reusable OTTL changes and the `filter` processor to drop records.
 
-Before you begin, complete [Ingest OpenTelemetry Metrics and Logs](/docs/opentelemetry/otlp-ingestion.md). These examples use the `transform` and `filter` processors from OpenTelemetry Collector Contrib `0.157.0`.
+Before you begin, complete [Ingest OpenTelemetry Metrics, Logs, and Traces](/docs/opentelemetry/otlp-ingestion.md). These examples use the `transform` and `filter` processors from OpenTelemetry Collector Contrib `0.157.0`.
 
 ## Parse a JSON log body
 

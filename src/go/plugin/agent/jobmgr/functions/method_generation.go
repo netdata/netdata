@@ -30,20 +30,18 @@ type methodGeneration struct {
 	id      string                            // generation identity
 	module  string                            // owning collector module
 	kind    methodGenerationKind              // method kind (agent / shared / instance)
-	creator collectorapi.Creator              // immutable routing policy
+	policy  collectorapi.InstancePolicy       // immutable job routing policy
 	methods map[string]funcapi.FunctionConfig // method configs by method ID
 	bundles map[string]*functionBundle        // stable handler bundles by job name; agent uses ""
 
-	cleanupOnce sync.Once     // guards cleanup (once)
-	cleanupErr  error         // captured cleanup error
-	done        chan struct{} // closed when cleanup completes
+	cleanupOnce sync.Once // releases this generation's bundle references once
 }
 
 func newMethodGeneration(
 	id string,
 	module string,
 	kind methodGenerationKind,
-	creator collectorapi.Creator,
+	policy collectorapi.InstancePolicy,
 	methods []funcapi.FunctionConfig,
 	bundles map[string]*functionBundle,
 ) (result *methodGeneration, err error) {
@@ -54,10 +52,9 @@ func newMethodGeneration(
 		id:      id,
 		module:  module,
 		kind:    kind,
-		creator: creator,
+		policy:  policy,
 		methods: make(map[string]funcapi.FunctionConfig, len(methods)),
 		bundles: make(map[string]*functionBundle, max(1, len(bundles))),
-		done:    make(chan struct{}),
 	}
 	transferred := false
 	defer func() {
@@ -117,26 +114,13 @@ func (mg *methodGeneration) declaration() *HandlerGenerationDeclaration {
 	}
 }
 
-func (mg *methodGeneration) wait(ctx context.Context) error {
-	if mg == nil {
-		return nil
-	}
-	select {
-	case <-mg.done:
-		return mg.cleanupErr
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-}
-
 func (mg *methodGeneration) cleanup(ctx context.Context) error {
 	mg.cleanupOnce.Do(func() {
 		for _, bundle := range mg.bundles {
 			bundle.release()
 		}
-		close(mg.done)
 	})
-	return mg.cleanupErr
+	return nil
 }
 
 func callMethodCleanup(ctx context.Context, handler funcapi.MethodHandler) (err error) {
@@ -275,7 +259,7 @@ func (mg *methodGeneration) resolveTarget(
 			}
 		}
 		name := names[0]
-		if mg.creator.InstancePolicy != collectorapi.InstancePolicySingle {
+		if mg.policy != collectorapi.InstancePolicySingle {
 			values := functionJobValues(input)
 			if len(values) > 1 {
 				return "", nil, nil, functionStatusError{
@@ -313,7 +297,7 @@ func (mg *methodGeneration) availableJobNames(methodID string) []string {
 // sharedJobSelectable reports whether this shared-module generation exposes the
 // __job instance selector, including when only one job is currently running.
 func (mg *methodGeneration) sharedJobSelectable() bool {
-	return mg.kind == methodGenerationShared && mg.creator.InstancePolicy != collectorapi.InstancePolicySingle
+	return mg.kind == methodGenerationShared && mg.policy != collectorapi.InstancePolicySingle
 }
 
 // withJobParam prepends the __job instance selector to params when this

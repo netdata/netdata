@@ -185,6 +185,18 @@ int inicfg_load(struct config *root, char *filename, int overwrite_used, const c
     CLEAN_STRING *section_string = string_strdupz(section_name);
     is_exporter_config = (strstr(filename, EXPORTING_CONF) != NULL);
 
+    // reloading one section: forget its old options, so that the ones removed
+    // from the file (or the whole section) do not survive the reload
+    if(section_string && overwrite_used) {
+        sect = inicfg_section_find(root, section_name);
+        if(sect) {
+            SECTION_LOCK(sect);
+            inicfg_option_remove_and_delete_all(sect, true);
+            SECTION_UNLOCK(sect);
+            sect = NULL;
+        }
+    }
+
     while(fgets(buffer, CONFIG_FILE_LINE_MAX, fp) != NULL) {
         buffer[CONFIG_FILE_LINE_MAX] = '\0';
         line++;
@@ -234,14 +246,6 @@ int inicfg_load(struct config *root, char *filename, int overwrite_used, const c
             sect = inicfg_section_find(root, s);
             if(!sect)
                 sect = inicfg_section_create(root, s);
-
-            if(sect && section_string && overwrite_used && section_string == sect->name) {
-                SECTION_LOCK(sect);
-
-                inicfg_option_remove_and_delete_all(sect, true);
-
-                SECTION_UNLOCK(sect);
-            }
 
             continue;
         }

@@ -11,6 +11,41 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+func TestConfigPayloadJSONPreservesNestedYAMLReferences(t *testing.T) {
+	var cfg Config
+	require.NoError(t, yaml.Unmarshal([]byte(`
+name: main
+kind: vault
+__source__: file=test
+__source_type__: user
+mode_token:
+  token: '${env:VAULT_TOKEN}'
+tls_skip_verify: '${env:VAULT_INSECURE}'
+items:
+  - nested:
+      value: original
+`), &cfg))
+	payload, err := cfg.PayloadJSON()
+	require.NoError(t, err)
+	require.JSONEq(
+		t,
+		`{"mode_token":{"token":"${env:VAULT_TOKEN}"},"tls_skip_verify":"${env:VAULT_INSECURE}","items":[{"nested":{"value":"original"}}]}`,
+		string(payload),
+	)
+	// Readback must not replace maps inside the accepted raw object.
+	nested, ok := cfg["mode_token"].(map[any]any)
+	require.True(t, ok)
+	require.Equal(t, "${env:VAULT_TOKEN}", nested["token"])
+}
+
+func TestConfigPayloadJSONRejectsNonStringObjectKeys(t *testing.T) {
+	cfg := Config{
+		"payload": map[any]any{1: "value"},
+	}
+	_, err := cfg.PayloadJSON()
+	require.ErrorContains(t, err, "key is not a string")
+}
+
 func TestConfigValidateAndIdentity(t *testing.T) {
 	cfg := Config{
 		"name":            "prod",
@@ -168,8 +203,16 @@ auth:
 }
 
 func TestConfigSourceTypePriority(t *testing.T) {
-	assert.Equal(t, 16, Config{"__source_type__": confgroup.TypeDyncfg}.SourceTypePriority())
-	assert.Equal(t, 8, Config{"__source_type__": confgroup.TypeUser}.SourceTypePriority())
-	assert.Equal(t, 2, Config{"__source_type__": confgroup.TypeStock}.SourceTypePriority())
-	assert.Equal(t, 0, Config{"__source_type__": "other"}.SourceTypePriority())
+	assert.Equal(t, 16, Config{
+		"__source_type__": confgroup.TypeDyncfg,
+	}.SourceTypePriority())
+	assert.Equal(t, 8, Config{
+		"__source_type__": confgroup.TypeUser,
+	}.SourceTypePriority())
+	assert.Equal(t, 2, Config{
+		"__source_type__": confgroup.TypeStock,
+	}.SourceTypePriority())
+	assert.Equal(t, 0, Config{
+		"__source_type__": "other",
+	}.SourceTypePriority())
 }

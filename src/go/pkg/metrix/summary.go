@@ -20,12 +20,20 @@ type snapshotSummaryInstrument struct {
 	base    []LabelSet
 }
 
+func (i *snapshotSummaryInstrument) hostScope() HostScope {
+	return i.scope
+}
+
 // statefulSummaryInstrument writes observed samples into maintained summary state.
 type statefulSummaryInstrument struct {
 	backend meterBackend
 	desc    *instrumentDescriptor
 	scope   HostScope
 	base    []LabelSet
+}
+
+func (i *statefulSummaryInstrument) hostScope() HostScope {
+	return i.scope
 }
 
 // stagedSummary holds one in-cycle summary sample for a single series identity.
@@ -124,7 +132,7 @@ func (c *storeCore) recordSummaryObservePoint(desc *instrumentDescriptor, scope 
 			labelsKey:    labelsKey,
 			desc:         desc,
 		}
-		c.active.summaries[key] = entry
+		stageEntry(&c.active.summaries, key, entry)
 	}
 
 	entry.count = count
@@ -187,7 +195,7 @@ func (c *storeCore) recordSummaryObserve(desc *instrumentDescriptor, scope HostS
 		if len(desc.summaryQuantiles()) > 0 && entry.sketch == nil {
 			entry.sketch = newSummaryQuantileSketch(desc.summaryReservoirSize(), summarySketchSeed(key))
 		}
-		c.active.summaries[key] = entry
+		stageEntry(&c.active.summaries, key, entry)
 	}
 
 	entry.count++

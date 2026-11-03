@@ -191,7 +191,7 @@ func (a *Agent) setupSecretStoreConfigs() []secretstore.Config {
 		return nil
 	}
 
-	cfgs, errs := secretstore.LoadFileConfigs(a.CollectorsConfDir)
+	cfgs, errs := a.loadSecretStores(a.CollectorsConfDir)
 	for _, err := range errs {
 		a.Warningf("%v", err)
 	}

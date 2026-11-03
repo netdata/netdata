@@ -134,7 +134,6 @@ modules:
           - name: Missing Ceph metrics
             description: |
               Ceph metrics require the Ceph collector to be configured with the Ceph REST API endpoint. See the Ceph integration page for details.
-    alerts: []
     metrics:
       folding:
         title: ""

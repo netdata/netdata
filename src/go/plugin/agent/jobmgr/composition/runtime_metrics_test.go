@@ -314,85 +314,91 @@ func TestRunMetricsRegistration(t *testing.T) {
 }
 
 func TestRunGenerationRuntimeMetricsLifecycle(t *testing.T) {
-	service := &runMetricsService{}
-	jobs := testRunJobServices(t)
-	jobs.Runtime = service
-	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
-	require.NoError(t, err)
-	uids := lifecycle.NewUIDLedger()
-	generation, err := newTestRunGeneration(t, runGenerationConfig{
-		Generation:      1,
-		ShutdownTimeout: time.Second,
-		UIDs:            uids,
-		Frames:          frames,
-		Modules:         collectorapi.Registry{},
-		Jobs:            jobs,
-		Discovery:       testRunDiscoveryServices(t),
+	withSecretsModes(t, func(t *testing.T, secretConfig *SecretsConfig) {
+		service := &runMetricsService{}
+		jobs := testRunJobServices(t)
+		jobs.Runtime = service
+		frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
+		require.NoError(t, err)
+		uids := lifecycle.NewUIDLedger()
+		generation, err := newTestRunGeneration(t, runGenerationConfig{
+			Secrets:         secretConfig,
+			Generation:      1,
+			ShutdownTimeout: time.Second,
+			UIDs:            uids,
+			Frames:          frames,
+			Modules:         collectorapi.Registry{},
+			Jobs:            jobs,
+			Discovery:       testRunDiscoveryServices(t),
+		})
+		require.NoError(t, err)
+		components, removals, producers, producerRemovals := service.snapshot()
+		require.False(t, len(components) != 1 || len(removals) != 0 || len(producers) != 1 || len(producerRemovals) != 0)
+
+		require.NoError(t, generation.start(context.Background()))
+
+		generation.metrics.AddRuntimeCounter(lifecycle.RuntimeCounterDirtyRuns, 1)
+		generation.Stop()
+
+		require.NoError(t, generation.Wait(context.Background()))
+
+		_, removals, producers, producerRemovals = service.snapshot()
+		finalized := service.finalized()
+		require.False(t, len(removals) != 0 ||
+			len(finalized) != 1 ||
+			finalized[0] != runtimeComponentName ||
+			len(producers) != 0 || len(producerRemovals) != 1 ||
+			producerRemovals[0] != runtimeProducerName)
+		reader := components[0].Store.Read(metrix.ReadRaw())
+
+		got, ok := reader.Value(runtimeMetricPrefix+".dirty_runs_total", nil)
+		require.False(t, !ok || got != 1)
+
+		closeRunTestUIDs(t, uids)
 	})
-	require.NoError(t, err)
-	components, removals, producers, producerRemovals := service.snapshot()
-	require.False(t, len(components) != 1 || len(removals) != 0 || len(producers) != 1 || len(producerRemovals) != 0)
-
-	require.NoError(t, generation.start(context.Background()))
-
-	generation.metrics.AddRuntimeCounter(lifecycle.RuntimeCounterDirtyRuns, 1)
-	generation.Stop()
-
-	require.NoError(t, generation.Wait(context.Background()))
-
-	_, removals, producers, producerRemovals = service.snapshot()
-	finalized := service.finalized()
-	require.False(t, len(removals) != 0 ||
-		len(finalized) != 1 ||
-		finalized[0] != runtimeComponentName ||
-		len(producers) != 0 || len(producerRemovals) != 1 ||
-		producerRemovals[0] != runtimeProducerName)
-	reader := components[0].Store.Read(metrix.ReadRaw())
-
-	got, ok := reader.Value(runtimeMetricPrefix+".dirty_runs_total", nil)
-	require.False(t, !ok || got != 1)
-
-	closeRunTestUIDs(t, uids)
 }
 
 func TestRunGenerationFinalizerStopsRuntimeWriterBeforeTerminalCensus(t *testing.T) {
-	finalizeEntered := make(chan struct{})
-	finalizeRelease := make(chan struct{})
-	service := &runMetricsService{
-		finalizeEntered: finalizeEntered,
-		finalizeRelease: finalizeRelease,
-	}
-	jobs := testRunJobServices(t)
-	jobs.Runtime = service
-	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
-	require.NoError(t, err)
-	uids := lifecycle.NewUIDLedger()
-	generation, err := newTestRunGeneration(t, runGenerationConfig{
-		Generation:      1,
-		ShutdownTimeout: time.Second,
-		UIDs:            uids,
-		Frames:          frames,
-		Modules:         collectorapi.Registry{},
-		Jobs:            jobs,
-		Discovery:       testRunDiscoveryServices(t),
-	})
-	require.NoError(t, err)
-	require.NoError(t, generation.start(context.Background()))
+	withSecretsModes(t, func(t *testing.T, secretConfig *SecretsConfig) {
+		finalizeEntered := make(chan struct{})
+		finalizeRelease := make(chan struct{})
+		service := &runMetricsService{
+			finalizeEntered: finalizeEntered,
+			finalizeRelease: finalizeRelease,
+		}
+		jobs := testRunJobServices(t)
+		jobs.Runtime = service
+		frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
+		require.NoError(t, err)
+		uids := lifecycle.NewUIDLedger()
+		generation, err := newTestRunGeneration(t, runGenerationConfig{
+			Secrets:         secretConfig,
+			Generation:      1,
+			ShutdownTimeout: time.Second,
+			UIDs:            uids,
+			Frames:          frames,
+			Modules:         collectorapi.Registry{},
+			Jobs:            jobs,
+			Discovery:       testRunDiscoveryServices(t),
+		})
+		require.NoError(t, err)
+		require.NoError(t, generation.start(context.Background()))
 
-	generation.Stop()
-	waited := make(chan error, 1)
-	go func() { waited <- generation.Wait(context.Background()) }()
-	select {
-	case <-finalizeEntered:
-	case <-time.After(time.Second):
-		require.FailNow(t, "test failed", "runtime component did not enter finalization")
-	}
-	select {
-	case <-generation.kernel.Done():
-		require.FailNow(t, "test failed", "kernel reached terminal before runtime writer stopped")
-	default:
-	}
-	close(finalizeRelease)
-	require.NoError(t, <-waited)
-	closeRunTestUIDs(t, uids)
+		generation.Stop()
+		waited := make(chan error, 1)
+		go func() { waited <- generation.Wait(context.Background()) }()
+		select {
+		case <-finalizeEntered:
+		case <-time.After(time.Second):
+			require.FailNow(t, "test failed", "runtime component did not enter finalization")
+		}
+		select {
+		case <-generation.kernel.Done():
+			require.FailNow(t, "test failed", "kernel reached terminal before runtime writer stopped")
+		default:
+		}
+		close(finalizeRelease)
+		require.NoError(t, <-waited)
+		closeRunTestUIDs(t, uids)
+	})
 }

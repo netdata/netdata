@@ -39,7 +39,7 @@ Stock alert from `cpu.conf` (in the stock config directory):
 ```yaml
    template: 20min_steal_cpu
          on: system.cpu
-      class: Latency
+      class: Utilization
        type: System
   component: CPU
 host labels: _os=linux
@@ -58,7 +58,7 @@ Your override (create it with `sudo ./edit-config health.d/my-overrides.conf`):
 ```yaml
    template: 20min_steal_cpu
          on: system.cpu
-      class: Latency
+      class: Utilization
        type: System
   component: CPU
 host labels: _os=linux

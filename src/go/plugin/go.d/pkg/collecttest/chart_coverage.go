@@ -131,20 +131,13 @@ func buildChartCoverage(
 		return chartCoverage{}, err
 	}
 
-	entries := set.Entries()
 	collisions := make(map[coverageRouteKey]struct{})
 	engine, err := chartengine.New(chartengine.WithRuntimeStore(nil), chartengine.WithPlanRouteDiagnosticObserver(func(fact chartengine.PlanRouteDiagnostic) {
 		if fact.Decision != chartengine.PlanRouteCollisionRejected || fact.Autogen {
 			return
 		}
-		entryID, chartID := fact.TemplateEntryID, fact.LocalChartTemplateID
-		if entryID == "" && len(entries) == 1 {
-			// Singleton YAML diagnostics retain their original positional IDs.
-			entryID, chartID = entries[0].ID, fact.ChartTemplateID
-		}
 		collisions[coverageRouteKey{
-			entryID:        entryID,
-			chartID:        chartID,
+			templateID:     fact.ChartTemplateID,
 			dimensionIndex: fact.DimensionIndex,
 			series:         fact.SeriesIdentity,
 		}] = struct{}{}
@@ -160,7 +153,7 @@ func buildChartCoverage(
 	plan := attempt.Plan()
 
 	actualByContext := materializedContextsByPattern(plan, contextMatchers)
-	expectedByContext, err := expectedTemplateCoverage(set.GlobalPolicy(), entries, reader, contextMatchers, collisions)
+	expectedByContext, err := expectedTemplateCoverage(set, reader, contextMatchers, collisions)
 	if err != nil {
 		return chartCoverage{}, err
 	}
@@ -223,13 +216,13 @@ func materializedContextsByPattern(plan chartengine.Plan, contextMatchers []matc
 }
 
 type coverageRouteKey struct {
-	entryID        string
-	chartID        string
+	templateID     string
 	dimensionIndex int
 	series         metrix.SeriesIdentity
 }
 
 type templateCoverageBuilder struct {
+	set                *chartengine.TemplateSet
 	reader             metrix.Reader
 	contextMatchers    []matcher.Matcher
 	selectorParseCache map[string]metrixselector.Selector
@@ -239,13 +232,15 @@ type templateCoverageBuilder struct {
 }
 
 func expectedTemplateCoverage(
-	policy chartengine.EnginePolicy,
-	entries []chartengine.TemplateEntry,
+	set *chartengine.TemplateSet,
 	reader metrix.Reader,
 	contextMatchers []matcher.Matcher,
 	collisions map[coverageRouteKey]struct{},
 ) (map[string][]string, error) {
+	policy := set.GlobalPolicy()
+	entries := set.Entries()
 	b := templateCoverageBuilder{
+		set:                set,
 		reader:             reader,
 		contextMatchers:    contextMatchers,
 		selectorParseCache: make(map[string]metrixselector.Selector),
@@ -300,11 +295,14 @@ func (b *templateCoverageBuilder) collectTemplateContexts(
 		if err != nil {
 			return err
 		}
-		chartID, _ := chartengine.ChartTemplateIDAt(groupPath, chartIndex)
+		templateID, ok := b.set.ChartTemplateIDAt(entryID, groupPath, chartIndex)
+		if !ok {
+			return fmt.Errorf("collecttest: entry %q chart %v/%d has no compiled template", entryID, groupPath, chartIndex)
+		}
 		matchedAnyDimension := false
 		dims := make(map[string]struct{})
 		for i, dim := range chart.Dimensions {
-			key := coverageRouteKey{entryID: entryID, chartID: chartID, dimensionIndex: i}
+			key := coverageRouteKey{templateID: templateID, dimensionIndex: i}
 			dimNames, matched, err := b.collectExpectedDimensionNames(dim, instances.RequiredKeys, key)
 			if err != nil {
 				return err

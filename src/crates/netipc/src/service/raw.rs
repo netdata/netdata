@@ -28,25 +28,25 @@ mod server_unix;
 mod server_windows;
 mod string_reverse;
 
-pub use apps_lookup::{apps_lookup_dispatch, AppsLookupHandler};
+pub use apps_lookup::{AppsLookupHandler, apps_lookup_dispatch};
 pub use cgroups_cache::{
     CgroupsCache, CgroupsCacheItem, CgroupsCacheItemView, CgroupsCacheReadGuard, CgroupsCacheStatus,
 };
-pub use cgroups_lookup::{cgroups_lookup_dispatch, CgroupsLookupHandler};
-pub use cgroups_snapshot::{snapshot_dispatch, snapshot_max_items, SnapshotHandler};
+pub use cgroups_lookup::{CgroupsLookupHandler, cgroups_lookup_dispatch};
+pub use cgroups_snapshot::{SnapshotHandler, snapshot_dispatch, snapshot_max_items};
 pub use client::{ClientAbortHandle, ClientState, ClientStatus, RawClient};
 pub use common::LookupLogicalConfig;
 pub use dispatch::{DispatchError, DispatchHandler};
-pub use increment::{increment_dispatch, IncrementHandler};
+pub use increment::{IncrementHandler, increment_dispatch};
 pub use server::ManagedServer;
-pub use string_reverse::{string_reverse_dispatch, StringReverseHandler};
+pub use string_reverse::{StringReverseHandler, string_reverse_dispatch};
 
 #[cfg(all(test, unix))]
 use crate::protocol::{
-    self, batch_item_get, increment_decode, string_reverse_decode, string_reverse_encode,
-    CgroupsRequest, Header, NipcError, FLAG_BATCH, HEADER_SIZE, INCREMENT_PAYLOAD_SIZE,
-    KIND_REQUEST, MAGIC_MSG, METHOD_CGROUPS_SNAPSHOT, METHOD_INCREMENT, METHOD_STRING_REVERSE,
-    STATUS_BAD_ENVELOPE, STATUS_INTERNAL_ERROR, VERSION,
+    self, CgroupsRequest, FLAG_BATCH, HEADER_SIZE, Header, INCREMENT_PAYLOAD_SIZE, KIND_REQUEST,
+    MAGIC_MSG, METHOD_CGROUPS_SNAPSHOT, METHOD_INCREMENT, METHOD_STRING_REVERSE, NipcError,
+    STATUS_BAD_ENVELOPE, STATUS_INTERNAL_ERROR, VERSION, batch_item_get, increment_decode,
+    string_reverse_decode, string_reverse_encode,
 };
 #[cfg(all(test, unix))]
 use crate::transport::posix::{ClientConfig, ServerConfig, UdsListener, UdsSession};
@@ -55,9 +55,9 @@ use crate::transport::shm::ShmContext;
 #[cfg(all(test, windows))]
 use crate::transport::windows::{ClientConfig, NpListener, NpSession, ServerConfig};
 #[cfg(all(test, unix))]
-use std::sync::atomic::{AtomicBool, Ordering};
-#[cfg(all(test, unix))]
 use std::sync::Arc;
+#[cfg(all(test, unix))]
+use std::sync::atomic::{AtomicBool, Ordering};
 
 #[cfg(all(test, unix))]
 use client::{ClientResponseRef, ClientResponseSource};

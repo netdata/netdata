@@ -12,6 +12,10 @@ import (
 
 	agentdiscovery "github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/composition"
+	secretconfig "github.com/netdata/netdata/go/plugins/plugin/agent/secrets"
+	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/backends"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
@@ -66,7 +70,12 @@ func runNormalSNMPFailurePublication(t *testing.T, config confgroup.Config) snmp
 	reader, writer := io.Pipe()
 	defer reader.Close()
 	defer writer.Close()
+	resolver, err := secretresolver.NewDefaultAtomicResolver()
+	require.NoError(t, err)
+	creators, err := secretstore.NewCreatorCatalog(backends.Creators())
+	require.NoError(t, err)
 	process, err := composition.NewProcess(composition.Config{
+		Secrets:    &composition.SecretsConfig{Providers: secretconfig.Config{Resolver: resolver, Creators: creators}},
 		Input:      reader,
 		Output:     io.Discard,
 		PluginName: "go.d",

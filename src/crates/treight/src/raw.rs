@@ -1,20 +1,43 @@
+//! The core of `treight`: [`RawBitmap`], the `Copy` descriptor of an
+//! 8-way bit-tree, and [`Iter`], its ascending value iterator. The
+//! descriptor holds just the universe size and the tree depth; the tree
+//! bytes — the pre-order node-byte layout node.rs defines — live outside,
+//! in the `&[u8]` / `&mut Vec<u8>` blob every method takes, and a
+//! zero-byte blob is the empty set.
+//!
+//! This file owns the blob's shape: `from_sorted_iter`/`from_range` write
+//! it from scratch, `remove_range` rewrites it through ops.rs's walker,
+//! `insert`/`remove` patch it in place (the crate's only tree-byte
+//! splice/drain), and `serialize_into`/`deserialize_from` define the
+//! `[universe: u32 LE][len: u32 LE][tree bytes]` wire format. Queries and
+//! set ops delegate to the walkers in node.rs/ops.rs; the one traversal
+//! implemented here is the ascending `Iter` below. Every path keeps the
+//! blob canonical — every byte non-zero, no empty subtrees — which is
+//! what makes `is_empty` a blob-emptiness check and ties the length to
+//! `estimate_data_size` (the `fuzz/fuzz_targets/against_roaring.rs` fuzz
+//! target asserts the tie after arbitrary op sequences).
+//! Consumers: bitmap.rs wraps the descriptor in the inverted-aware
+//! `Bitmap`; roaring.rs (feature `roaring`) adds `RoaringBitmap` bridges;
+//! sfst, sfsq and otel-ledger only ever touch `Bitmap` (grep-verified),
+//! while the fuzz target drives `RawBitmap` directly.
 use std::io;
 
 use crate::ceil_log8;
-use crate::node::{child_index, child_offset, skip_subtree_at, NodeReader};
+use crate::node::{NodeReader, child_index, child_offset, skip_subtree_at, subtree_population};
 use crate::ops::{
-    contains_inner, difference_subtree, intersect_subtree, range_count, remove_range_subtree,
-    symmetric_difference_subtree, union_subtree,
+    contains_inner, difference_subtree, intersect_subtree, range_count, ranges_subtree,
+    remove_range_subtree, symmetric_difference_subtree, union_subtree,
 };
 
-/// A compressed bitmap descriptor using an 8-way bit-tree.
-///
-/// Each internal node is a single byte whose 8 bits indicate which of its
-/// 8 children are present. Empty subtrees are pruned entirely. The serialized
-/// form IS the in-memory form — point queries traverse it in O(levels).
-///
-/// This is a lightweight `Copy` descriptor (~5 bytes). The actual tree data
-/// lives in an external `&[u8]` / `&mut Vec<u8>` passed to each method.
+/// A compressed bitmap's descriptor: `universe_size`, the exclusive upper
+/// bound on values, and `levels`, the tree depth `ceil_log8` derives from
+/// it (lib.rs) — both fixed at construction. The tree bytes live outside,
+/// in the `&[u8]` / `&mut Vec<u8>` each method takes, so this is a freely
+/// `Copy` handle whose state is whatever blob it is paired with. Two
+/// descriptors of the same universe are interchangeable — which is why
+/// the set ops below return either operand's. The optional `serde` derive
+/// covers the descriptor only; tree bytes travel beside it in the
+/// consumer's payload (`BitmapValue` in `sfst/src/schema.rs`).
 #[derive(Copy, Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RawBitmap {
@@ -23,7 +46,9 @@ pub struct RawBitmap {
 }
 
 impl RawBitmap {
-    /// Create an empty bitmap descriptor for the given universe size.
+    /// Create an empty descriptor for `universe_size`: the depth comes from
+    /// `ceil_log8` (0 only for a zero-sized universe), and the tree blob is
+    /// left empty — the first `insert` writes the whole root-to-leaf chain.
     pub fn empty(universe_size: u32) -> Self {
         Self {
             universe_size,
@@ -31,14 +56,21 @@ impl RawBitmap {
         }
     }
 
-    /// Build a `RawBitmap` directly from a sorted iterator of values,
-    /// appending tree bytes to `out`.
+    /// Build a bitmap from an ascending iterator of values, appending the
+    /// tree bytes to `out` and returning the descriptor. The values **must**
+    /// arrive in ascending order — a descending one appends a node byte for
+    /// an index already emitted and corrupts the pre-order layout — while
+    /// duplicates are tolerated (they are skipped). Values at or past
+    /// the universe are not checked either.
     ///
-    /// Values **must** be in ascending order (duplicates are tolerated).
-    /// Builds the depth-first pre-order serialization in a single pass,
-    /// pushing new node bytes and back-patching child bits as groups change.
-    ///
-    /// Cost: O(N * levels) time, O(output_size) space — no bitvec allocation.
+    /// Single pass over the pre-order serialization, one node byte open per
+    /// level. Each value is compared with the previous one: the highest
+    /// 3-bit group where they differ names the deepest node they share,
+    /// which gains the value's child bit; every level below it opens a new
+    /// node byte, and the levels above it already hold the value's bits.
+    /// Cost is O(values + bytes) with no bitvec staging; an empty iterator
+    /// appends nothing and yields an empty descriptor, and otherwise the
+    /// bytes appended are exactly `estimate_data_size`'s count.
     pub fn from_sorted_iter(
         iter: impl Iterator<Item = u32>,
         universe_size: u32,
@@ -49,26 +81,43 @@ impl RawBitmap {
             return Self::empty(universe_size);
         }
 
-        let base = out.len();
-        let mut prev_group = [u32::MAX; 11];
+        // Position of the node byte open at each level, indexed like
+        // `child_index`'s level (0 = leaf, ≤ 10 for a u32 universe).
         let mut node_pos = [0usize; 11];
+        let mut prev: Option<u32> = None;
 
         for v in iter {
-            for dl in (0..levels).rev() {
-                let group = v.checked_shr(3 * (dl + 1)).unwrap_or(0);
-
-                if group != prev_group[dl as usize] {
-                    prev_group[dl as usize] = group;
-                    node_pos[dl as usize] = out.len();
-                    out.push(0);
+            let new_levels = match prev {
+                None => levels,
+                Some(p) => {
+                    let diff = v ^ p;
+                    if diff == 0 {
+                        continue;
+                    }
+                    let shared = (31 - diff.leading_zeros()) / 3;
+                    // A value in a different 8^levels block than the
+                    // previous one (possible only past the universe)
+                    // shares no node, not even the root: it opens a new
+                    // root, as the per-level loop this replaced did (the
+                    // orphan subtrees roaring.rs describes).
+                    if shared >= levels {
+                        levels
+                    } else {
+                        out[node_pos[shared as usize]] |= 1u8 << child_index(shared, v);
+                        shared
+                    }
                 }
+            };
 
-                out[node_pos[dl as usize]] |= 1u8 << child_index(dl, v);
+            for dl in (0..new_levels).rev() {
+                node_pos[dl as usize] = out.len();
+                out.push(1u8 << child_index(dl, v));
             }
+            prev = Some(v);
         }
 
-        // If nothing was appended, the bitmap is empty.
-        if out.len() == base {
+        // No values: leave `out` untouched and return the empty descriptor.
+        if prev.is_none() {
             return Self::empty(universe_size);
         }
 
@@ -78,10 +127,13 @@ impl RawBitmap {
         }
     }
 
-    /// Build a `RawBitmap` with all values in the given range set,
-    /// appending tree bytes to `out`.
-    ///
-    /// Values outside `0..universe_size` are clamped/ignored.
+    /// Build a bitmap with every value in `range` set, appending the tree
+    /// bytes to `out`. The end bound is clamped to the universe size; a
+    /// range starting at or past the clamped end yields an empty
+    /// descriptor. The clamped range is written range-wise
+    /// (`from_disjoint_ranges`), not value by value — no complement trick
+    /// here; `Bitmap::from_range` is the density-aware caller-facing
+    /// version.
     pub fn from_range(
         range: impl std::ops::RangeBounds<u32>,
         universe_size: u32,
@@ -105,7 +157,39 @@ impl RawBitmap {
             return Self::empty(universe_size);
         }
 
-        Self::from_sorted_iter(start..end, universe_size, out)
+        Self::from_disjoint_ranges(&[(start, end)], universe_size, out)
+    }
+
+    /// Build the bitmap holding exactly `ranges`, appending its tree bytes
+    /// to `out`: half-open `(start, end)` pairs, sorted, disjoint,
+    /// non-empty and within the universe (debug-asserted); an empty slice
+    /// yields the empty descriptor. The shared builder behind both
+    /// `from_range` constructors: ops.rs's `ranges_subtree` writes full
+    /// subtrees as `0xFF` runs, so cost tracks the bytes written, not the
+    /// values. The bytes equal `from_sorted_iter` over the same values.
+    pub(crate) fn from_disjoint_ranges(
+        ranges: &[(u32, u32)],
+        universe_size: u32,
+        out: &mut Vec<u8>,
+    ) -> Self {
+        debug_assert!(
+            ranges
+                .iter()
+                .all(|&(start, end)| start < end && end <= universe_size)
+        );
+        debug_assert!(ranges.windows(2).all(|w| w[0].1 <= w[1].0));
+
+        if ranges.is_empty() {
+            return Self::empty(universe_size);
+        }
+
+        let levels = ceil_log8(universe_size);
+        ranges_subtree(levels, 0, ranges, out);
+
+        Self {
+            universe_size,
+            levels: levels as u8,
+        }
     }
 
     /// The universe size (exclusive upper bound on values).
@@ -113,12 +197,17 @@ impl RawBitmap {
         self.universe_size
     }
 
-    /// The number of levels in the tree.
+    /// The tree depth — `ceil_log8(universe_size)`, fixed per universe.
     pub fn levels(&self) -> u32 {
         self.levels as u32
     }
 
-    /// Test whether `value` is in the bitmap.
+    /// Test whether `value` is set. Out-of-universe values and empty blobs
+    /// return `false` — no panic, unlike `insert`/`remove`. The descent is
+    /// ops.rs's `contains_inner` (the fid.c `is_hit_1` port): it walks the
+    /// value's path, skipping lower siblings' subtrees on the way, so cost
+    /// tracks the inner node bytes before the path, not just the depth
+    /// (leaf runs are jumped unread, node.rs `skip_subtree_at`).
     pub fn contains(&self, data: &[u8], value: u32) -> bool {
         if value >= self.universe_size || data.is_empty() {
             return false;
@@ -127,7 +216,8 @@ impl RawBitmap {
         contains_inner(&mut NodeReader::new(data), self.levels(), value)
     }
 
-    /// Iterate over set bits in ascending order.
+    /// Iterate over the set values in ascending order. An empty blob
+    /// yields an empty iterator; see [`Iter`] for the walk itself.
     pub fn iter<'a>(&self, data: &'a [u8]) -> Iter<'a> {
         if data.is_empty() {
             return Iter::empty();
@@ -135,43 +225,46 @@ impl RawBitmap {
 
         let mut iter = Iter::empty();
         iter.data = data;
+        iter.pos = 1;
 
-        let levels = self.levels();
-        let child_level = levels - 1;
-        if child_level == 0 {
-            iter.leaf_bits = data[0];
-            iter.pos = 1;
-        } else {
-            let root = data[0];
-            iter.pos = 1;
-            iter.stack[0] = IterFrame {
-                node_bits: root,
-                next_child: 0,
-                base: 0,
-                child_level,
-            };
-            iter.stack_len = 1;
-            iter.advance_to_next_leaf();
+        // The root goes where its height says: a leaf, a height-2 node, or
+        // the first stack frame.
+        match self.levels() {
+            1 => iter.leaf_bits = data[0],
+            2 => iter.l2_children = data[0],
+            levels => {
+                iter.stack[0] = IterFrame {
+                    children: data[0],
+                    base: 0,
+                    child_level: levels - 1,
+                };
+                iter.stack_len = 1;
+            }
         }
 
         iter
     }
 
-    /// Count the number of set bits (population count).
+    /// The number of set values: the whole blob is one subtree, so one pass
+    /// over its bytes counts it (node.rs `subtree_population`), with no
+    /// tree walk; 0 for an empty blob.
     pub fn len(&self, data: &[u8]) -> u64 {
         if data.is_empty() {
             return 0;
         }
 
-        NodeReader::new(data).skip_subtree(self.levels())
+        subtree_population(data)
     }
 
-    /// Returns `true` if no bits are set.
+    /// `true` when nothing is set. O(1): blobs are canonical — a non-empty
+    /// one always holds at least one value — so this is just an emptiness
+    /// check on the blob.
     pub fn is_empty(&self, data: &[u8]) -> bool {
         data.is_empty()
     }
 
-    /// The smallest set value, or `None` if empty.
+    /// The smallest set value, or `None` for an empty blob. O(levels):
+    /// descends the leftmost path only (`NodeReader::min_value`).
     pub fn min(&self, data: &[u8]) -> Option<u32> {
         if data.is_empty() {
             return None;
@@ -180,7 +273,10 @@ impl RawBitmap {
         Some(NodeReader::new(data).min_value(self.levels()))
     }
 
-    /// The largest set value, or `None` if empty.
+    /// The largest set value, or `None` for an empty blob. Skips every
+    /// child subtree left of the rightmost path, then descends it
+    /// (`NodeReader::max_value`) — cost tracks the skipped subtrees, not
+    /// just the depth.
     pub fn max(&self, data: &[u8]) -> Option<u32> {
         if data.is_empty() {
             return None;
@@ -189,7 +285,11 @@ impl RawBitmap {
         Some(NodeReader::new(data).max_value(self.levels()))
     }
 
-    /// Count the number of set bits within a range.
+    /// Count the set values within `range`. Bounds widen to u64 (safe at
+    /// the deepest levels), an unbounded end means the universe size, and
+    /// an empty range or blob is 0. ops.rs's `range_count` skips subtrees
+    /// fully outside the range, counts subtrees fully inside, and
+    /// recurses only where a child straddles an edge.
     pub fn range_cardinality(&self, data: &[u8], range: impl std::ops::RangeBounds<u32>) -> u64 {
         use std::ops::Bound;
 
@@ -215,9 +315,9 @@ impl RawBitmap {
         range_count(&mut NodeReader::new(data), self.levels(), 0, start, end)
     }
 
-    /// Serialize to a writer.
-    ///
-    /// Wire format: `[universe_size: u32 LE][data_len: u32 LE][data bytes]`.
+    /// Serialize to a writer: `[universe: u32 LE][blob len: u32 LE][tree
+    /// bytes]`. The tree bytes are copied verbatim; the level count is not
+    /// stored — `deserialize_from` rederives it from the universe size.
     pub fn serialize_into<W: io::Write>(&self, data: &[u8], mut writer: W) -> io::Result<()> {
         writer.write_all(&self.universe_size.to_le_bytes())?;
         writer.write_all(&(data.len() as u32).to_le_bytes())?;
@@ -225,7 +325,10 @@ impl RawBitmap {
         Ok(())
     }
 
-    /// Deserialize from a reader. Returns the descriptor and owned data.
+    /// Deserialize a `serialize_into` stream: universe size and blob
+    /// length (u32 LE each), then the tree bytes. `levels` is rederived
+    /// via `ceil_log8` rather than stored, and the blob is taken as-is —
+    /// canonical form is assumed, never validated.
     pub fn deserialize_from<R: io::Read>(mut reader: R) -> io::Result<(Self, Vec<u8>)> {
         let mut buf = [0u8; 4];
         reader.read_exact(&mut buf)?;
@@ -248,14 +351,21 @@ impl RawBitmap {
         ))
     }
 
-    /// The number of bytes this bitmap occupies when serialized.
+    /// Serialized length: the 8-byte header plus the tree bytes.
     pub fn serialized_size(&self, data: &[u8]) -> usize {
         8 + data.len()
     }
 
-    /// Insert a value into the bitmap. No-op if already present.
+    /// Insert `value`. No-op if already present; panics if
+    /// `value >= universe_size`.
     ///
-    /// Panics if `value >= universe_size`.
+    /// Walks the value's path from the root, stepping over lower siblings'
+    /// subtrees with `skip_subtree_at` (node.rs). At the leaf level the
+    /// value's bit is ORed in. If an inner level lacks the child link, the
+    /// link bit is set and the missing subtree — a chain of single-child
+    /// node bytes, one per remaining level down to the leaf — is spliced
+    /// in at the walk position. An empty blob short-circuits: the whole
+    /// root-to-leaf chain (`levels` bytes) is written directly.
     pub fn insert(&self, data: &mut Vec<u8>, value: u32) {
         assert!(
             value < self.universe_size,
@@ -309,9 +419,15 @@ impl RawBitmap {
         }
     }
 
-    /// Remove a value from the bitmap. No-op if not present.
+    /// Remove `value`. No-op if absent; panics if `value >= universe_size`.
     ///
-    /// Panics if `value >= universe_size`.
+    /// Walks the path recording each node's position, returning untouched
+    /// the moment a child link is missing. The leaf bit is cleared, then
+    /// the walk backs up clearing each parent's link bit until one keeps
+    /// other children (or the root empties). The cleared nodes are
+    /// contiguous in the pre-order bytes — an emptied node had only the
+    /// path child — so a single `drain` removes them; if the root empties
+    /// too, the blob returns to zero bytes.
     pub fn remove(&self, data: &mut Vec<u8>, value: u32) {
         assert!(
             value < self.universe_size,
@@ -374,7 +490,12 @@ impl RawBitmap {
         data.drain(remove_start..leaf_pos + 1);
     }
 
-    /// Remove all values in the given range from the bitmap.
+    /// Remove every value in `range`, rebuilding the tree into a fresh
+    /// buffer via ops.rs's `remove_range_subtree` — subtrees fully outside
+    /// the range are copied, fully inside are dropped, straddling ones
+    /// recursed — and swapping it in. Empty blob or empty range is a
+    /// no-op; removing everything leaves a zero-byte blob. Bounds widen to
+    /// u64; an unbounded end means the universe size.
     pub fn remove_range(&self, data: &mut Vec<u8>, range: impl std::ops::RangeBounds<u32>) {
         use std::ops::Bound;
 
@@ -409,8 +530,14 @@ impl RawBitmap {
         *data = out;
     }
 
-    /// Compute the union of two bitmaps, appending the result to `out`.
-    /// Returns a new descriptor for the result.
+    /// Union of tree `a` (this descriptor) with tree `b` (`other`),
+    /// appending the result's tree bytes to `out`. Universe sizes must
+    /// match (asserted). An empty blob short-circuits: the surviving
+    /// operand's bytes are copied to `out` and its descriptor returned.
+    /// Otherwise ops.rs's `union_subtree` walks both trees in lockstep; a
+    /// union of non-empty trees is never empty, so the result is always
+    /// appended. The returned descriptor is either operand's — same
+    /// universe, same levels.
     pub fn union(&self, a: &[u8], other: &RawBitmap, b: &[u8], out: &mut Vec<u8>) -> RawBitmap {
         assert_eq!(
             self.universe_size, other.universe_size,
@@ -439,7 +566,11 @@ impl RawBitmap {
         }
     }
 
-    /// Compute the intersection of two bitmaps, appending the result to `out`.
+    /// Intersection of the two trees, appending the result's tree bytes to
+    /// `out`. Universe sizes must match (asserted). Either blob empty
+    /// short-circuits to the empty descriptor with no bytes; ops.rs's
+    /// `intersect_subtree` descends only children present in both, so
+    /// disjoint trees append nothing and return the empty descriptor.
     pub fn intersect(&self, a: &[u8], other: &RawBitmap, b: &[u8], out: &mut Vec<u8>) -> RawBitmap {
         assert_eq!(
             self.universe_size, other.universe_size,
@@ -454,7 +585,7 @@ impl RawBitmap {
         let base = out.len();
         let mut ra = NodeReader::new(a);
         let mut rb = NodeReader::new(b);
-        intersect_subtree(&mut ra, &mut rb, self.levels(), out);
+        intersect_subtree(&mut ra, &mut rb, self.levels(), out, false);
 
         if out.len() == base {
             RawBitmap::empty(self.universe_size)
@@ -463,7 +594,12 @@ impl RawBitmap {
         }
     }
 
-    /// Compute the difference (self - other), appending the result to `out`.
+    /// Difference `a` − `b`, appending the result's tree bytes to `out`.
+    /// Universe sizes must match (asserted). `b` empty copies `a` back out
+    /// and returns `*self`; `a` empty is the empty descriptor with no
+    /// bytes; ops.rs's `difference_subtree` copies children unique to `a`
+    /// and drops those unique to `b`, so a `b` that covers `a` empties
+    /// the result: nothing appended, empty descriptor returned.
     pub fn difference(
         &self,
         a: &[u8],
@@ -488,7 +624,7 @@ impl RawBitmap {
         let base = out.len();
         let mut ra = NodeReader::new(a);
         let mut rb = NodeReader::new(b);
-        difference_subtree(&mut ra, &mut rb, self.levels(), out);
+        difference_subtree(&mut ra, &mut rb, self.levels(), out, false);
 
         if out.len() == base {
             RawBitmap::empty(self.universe_size)
@@ -497,7 +633,12 @@ impl RawBitmap {
         }
     }
 
-    /// Compute the symmetric difference (self ^ other), appending the result to `out`.
+    /// Symmetric difference `a` ^ `b`, appending the result's tree bytes
+    /// to `out`. Universe sizes must match (asserted). Either blob empty
+    /// copies the survivor back out and returns its descriptor; ops.rs's
+    /// `symmetric_difference_subtree` copies children unique to one side
+    /// and XORs shared leaves, so equal inputs append nothing and return
+    /// the empty descriptor.
     pub fn symmetric_difference(
         &self,
         a: &[u8],
@@ -533,80 +674,90 @@ impl RawBitmap {
     }
 }
 
-/// Iterator over set bits of a `RawBitmap`.
-///
-/// Uses a stack-based DFS traversal over the compressed tree, avoiding
-/// materialization of a full bitvec. Cost is proportional to the number
-/// of tree nodes visited, not the universe size.
+/// Iterator over a `RawBitmap`'s set values in ascending order, built by
+/// `RawBitmap::iter`. A left-to-right DFS over the stored tree: leaf bytes
+/// are consumed bit by bit in place, so cost tracks the tree nodes
+/// visited, never the universe size, and nothing is materialized. Only
+/// nodes of height 3 and above sit on the stack; the current height-2
+/// node is held in two fields, so moving to the next leaf is a bit scan
+/// and one byte load with no stack push or pop.
 pub struct Iter<'a> {
+    /// The tree bytes being walked; empty for the do-nothing iterator.
     data: &'a [u8],
+    /// Position of the next unread node byte in `data`.
     pos: usize,
+    /// One frame per open node of height >= 3, root first; at most
+    /// `levels - 2` deep (9 for a u32 universe), within the array's size.
     stack: [IterFrame; 10],
+    /// Frames in use.
     stack_len: usize,
+    /// Unvisited children of the current height-2 node; their leaf bytes
+    /// are the next bytes in `data`, in order.
+    l2_children: u8,
+    /// Base value of the current height-2 node.
+    l2_base: u32,
     /// Remaining set bits in the current leaf byte.
     leaf_bits: u8,
     /// Base value for the current leaf (value = leaf_base + bit index).
     leaf_base: u32,
 }
 
+/// One open node of height >= 3 on the DFS stack: its unvisited child
+/// bits, the base value of its subtree, and the height (in node bytes) of
+/// its children's subtrees.
 #[derive(Default, Clone, Copy)]
 struct IterFrame {
-    node_bits: u8,
-    next_child: u8,
+    children: u8,
     base: u32,
     child_level: u32,
 }
 
 impl<'a> Iter<'a> {
+    /// The all-zero iterator: what `RawBitmap::iter` returns as-is for an
+    /// empty blob and fills in otherwise.
     fn empty() -> Self {
         Self {
             data: &[],
             pos: 0,
             stack: [IterFrame::default(); 10],
             stack_len: 0,
+            l2_children: 0,
+            l2_base: 0,
             leaf_bits: 0,
             leaf_base: 0,
         }
     }
 
-    /// Advance the DFS to the next leaf byte. Returns `true` if a leaf was found.
-    fn advance_to_next_leaf(&mut self) -> bool {
+    /// Open the next height-2 node: pop exhausted frames, take each frame's
+    /// lowest unvisited child, push it while it is taller than 2, and stop
+    /// at the first height-2 node, whose children move to `l2_children`.
+    /// `false` when the tree is exhausted.
+    fn advance_to_next_l2(&mut self) -> bool {
         while self.stack_len > 0 {
             let frame = &mut self.stack[self.stack_len - 1];
-
-            if frame.next_child >= 8 {
-                self.stack_len -= 1;
-                continue;
-            }
-            let remaining = frame.node_bits >> frame.next_child;
-            if remaining == 0 {
+            if frame.children == 0 {
                 self.stack_len -= 1;
                 continue;
             }
 
-            let skip = remaining.trailing_zeros() as u8;
-            let child = frame.next_child + skip;
-            frame.next_child = child + 1;
-
-            let new_base = frame.base + child_offset(frame.child_level, child);
+            let child = frame.children.trailing_zeros() as u8;
+            frame.children &= frame.children - 1;
+            let base = frame.base + child_offset(frame.child_level, child);
             let child_level = frame.child_level;
 
-            if child_level == 1 {
-                self.leaf_bits = self.data[self.pos];
-                self.pos += 1;
-                self.leaf_base = new_base;
+            let node = self.data[self.pos];
+            self.pos += 1;
+            if child_level == 2 {
+                self.l2_children = node;
+                self.l2_base = base;
                 return true;
-            } else {
-                let node_byte = self.data[self.pos];
-                self.pos += 1;
-                self.stack[self.stack_len] = IterFrame {
-                    node_bits: node_byte,
-                    next_child: 0,
-                    base: new_base,
-                    child_level: child_level - 1,
-                };
-                self.stack_len += 1;
             }
+            self.stack[self.stack_len] = IterFrame {
+                children: node,
+                base,
+                child_level: child_level - 1,
+            };
+            self.stack_len += 1;
         }
         false
     }
@@ -615,6 +766,10 @@ impl<'a> Iter<'a> {
 impl Iterator for Iter<'_> {
     type Item = u32;
 
+    /// Pop the lowest set bit of the current leaf byte (`leaf_base` plus
+    /// its index); when it is exhausted, load the current height-2 node's
+    /// next leaf, and when that node is exhausted, open the next one.
+    #[inline]
     fn next(&mut self) -> Option<u32> {
         loop {
             if self.leaf_bits != 0 {
@@ -622,7 +777,15 @@ impl Iterator for Iter<'_> {
                 self.leaf_bits &= self.leaf_bits - 1;
                 return Some(self.leaf_base + bit);
             }
-            if !self.advance_to_next_leaf() {
+            if self.l2_children != 0 {
+                let child = self.l2_children.trailing_zeros() as u8;
+                self.l2_children &= self.l2_children - 1;
+                self.leaf_bits = self.data[self.pos];
+                self.pos += 1;
+                self.leaf_base = self.l2_base + child_offset(1, child);
+                continue;
+            }
+            if !self.advance_to_next_l2() {
                 return None;
             }
         }

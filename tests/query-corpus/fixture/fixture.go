@@ -33,7 +33,8 @@ type Point struct {
 type Dimension struct {
 	ID        string
 	Algorithm string // defaults to absolute
-	Mul, Div  int    // default to 1
+	Options   string
+	Mul, Div  int // default to 1
 	Points    []Point
 }
 
@@ -164,7 +165,7 @@ func (c Chart) Define(conn *stream.Conn) {
 		UpdateEvery: c.UpdateEvery,
 	})
 	for _, d := range c.Dimensions {
-		conn.Dimension(d.ID, d.Algorithm, d.Mul, d.Div)
+		conn.DimensionNamedWithOptions(d.ID, "", d.Algorithm, d.Mul, d.Div, d.Options)
 	}
 	if len(c.Labels) > 0 {
 		for _, kv := range c.Labels {

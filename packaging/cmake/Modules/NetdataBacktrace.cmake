@@ -1,9 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Functions and macros for handling of libbacktrace
-#
-# Handle bundling of libbacktrace.
-#
-# This clones and builds libbacktrace using ExternalProject functionality.
+# Bundled libbacktrace: cloned, built and installed into the build tree via
+# ExternalProject, then exposed as an imported static library.
+
+include_guard()
 
 include(ExternalProject)
 
@@ -15,7 +14,6 @@ function(netdata_bundle_libbacktrace)
         set(libbacktrace_INSTALL_DIR "${CMAKE_BINARY_DIR}/libbacktrace-install")
         set(libbacktrace_LIBRARY "${libbacktrace_INSTALL_DIR}/lib/libbacktrace.a")
 
-        # Clone and build libbacktrace
         ExternalProject_Add(
                 libbacktrace
                 GIT_REPOSITORY https://github.com/ianlancetaylor/libbacktrace.git
@@ -29,7 +27,6 @@ function(netdata_bundle_libbacktrace)
                 UPDATE_DISCONNECTED ON
         )
 
-        # Create an imported library target
         add_library(libbacktrace_library STATIC IMPORTED GLOBAL)
         set_property(
                 TARGET libbacktrace_library
@@ -37,7 +34,6 @@ function(netdata_bundle_libbacktrace)
         )
         add_dependencies(libbacktrace_library libbacktrace)
 
-        # Export variables to parent scope
         set(NETDATA_LIBBACKTRACE_INCLUDE_DIRS "${libbacktrace_INSTALL_DIR}/include" PARENT_SCOPE)
         set(NETDATA_LIBBACKTRACE_LIBRARIES libbacktrace_library PARENT_SCOPE)
         set(HAVE_LIBBACKTRACE TRUE PARENT_SCOPE)

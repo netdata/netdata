@@ -15,7 +15,12 @@
 
 struct bpf_object *netdata_ebpf_open_file(const char *path)
 {
-    return bpf_object__open_file(path, NULL);
+    struct bpf_object *obj = bpf_object__open_file(path, NULL);
+    // Failed opens return no owned object; older libbpf versions encode the error as a pointer.
+    if (!obj || libbpf_get_error(obj))
+        return NULL;
+
+    return obj;
 }
 
 int netdata_ebpf_load_object(struct bpf_object *obj)

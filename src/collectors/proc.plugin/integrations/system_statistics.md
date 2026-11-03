@@ -60,9 +60,6 @@ This collector only supports collecting metrics from a single instance of this i
 The collector auto-detects all metrics. No configuration is needed.
 
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 
@@ -131,9 +128,9 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ 10min_cpu_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cpu.conf) | system.cpu | average CPU utilization over the last 10 minutes (excluding iowait, nice and steal) |
-| [ 10min_cpu_iowait ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cpu.conf) | system.cpu | average CPU iowait time over the last 10 minutes |
-| [ 20min_steal_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cpu.conf) | system.cpu | average CPU steal time over the last 20 minutes |
+| [ 10min_cpu_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cpu.conf) | system.cpu | Average CPU utilization over the last 10 minutes (excluding iowait, nice and steal) |
+| [ 10min_cpu_iowait ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cpu.conf) | system.cpu | Average CPU iowait time over the last 10 minutes |
+| [ 20min_steal_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cpu.conf) | system.cpu | Average CPU steal time over the last 20 minutes |
 
 
 

@@ -144,9 +144,6 @@ func (pst *preparedSecretTransaction) apply(
 			abortErr = spec.mutation.Abort()
 		}
 		if predecessorRestored && abortErr == nil {
-			if spec.commit != nil {
-				spec.commit()
-			}
 			return lifecycle.NewAppliedResourceTransaction(
 				spec.scope,
 				lifecycle.ResourceTransactionUnchanged,

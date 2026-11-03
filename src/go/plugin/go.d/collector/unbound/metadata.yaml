@@ -162,7 +162,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -253,7 +252,7 @@ modules:
               chart_type: area
               dimensions:
                 - name: all
-                - name: users
+                - name: user
             - name: unbound.request_list_jostle_list
               description: Request List Jostle List Events
               unit: queries
@@ -332,14 +331,14 @@ modules:
               unit: queries
               chart_type: stacked
               dimensions:
-                - name: qr
-                - name: aa
-                - name: tc
-                - name: rd
-                - name: ra
-                - name: z
-                - name: ad
-                - name: cd
+                - name: QR
+                - name: AA
+                - name: TC
+                - name: RD
+                - name: RA
+                - name: Z
+                - name: AD
+                - name: CD
             - name: unbound.rcode_answers
               description: Replies By RCode
               unit: replies
@@ -350,19 +349,19 @@ modules:
           description: These metrics refer to threads.
           labels: []
           metrics:
-            - name: unbound.thread_queries
+            - name: thread_unbound.queries
               description: Thread Received Queries
               unit: queries
               chart_type: line
               dimensions:
                 - name: queries
-            - name: unbound.thread_queries_ip_ratelimited
+            - name: thread_unbound.queries_ip_ratelimited
               description: Thread Rate Limited Queries
               unit: queries
               chart_type: line
               dimensions:
                 - name: ratelimited
-            - name: unbound.thread_dnscrypt_queries
+            - name: thread_unbound.dnscrypt_queries
               description: Thread DNSCrypt Queries
               unit: queries
               chart_type: line
@@ -371,74 +370,74 @@ modules:
                 - name: cert
                 - name: cleartext
                 - name: malformed
-            - name: unbound.thread_cache
-              description: Cache Statistics
+            - name: thread_unbound.cache
+              description: Thread Cache Statistics
               unit: events
-              chart_type: line
+              chart_type: stacked
               dimensions:
                 - name: hits
                 - name: miss
-            - name: unbound.thread_cache_percentage
-              description: Cache Statistics Percentage
+            - name: thread_unbound.cache_percentage
+              description: Thread Cache Statistics Percentage
               unit: percentage
-              chart_type: line
+              chart_type: stacked
               dimensions:
                 - name: hits
                 - name: miss
-            - name: unbound.thread_prefetch
-              description: Cache Prefetches
+            - name: thread_unbound.prefetch
+              description: Thread Cache Prefetches
               unit: prefetches
               chart_type: line
               dimensions:
                 - name: prefetches
-            - name: unbound.thread_expired
-              description: Replies Served From Expired Cache
+            - name: thread_unbound.expired
+              description: Thread Replies Served From Expired Cache
               unit: replies
               chart_type: line
               dimensions:
                 - name: expired
-            - name: unbound.thread_zero_ttl_replies
-              description: Replies Served From Expired Cache
+            - name: thread_unbound.zero_ttl_replies
+              description: Thread Replies Served From Expired Cache
               unit: replies
               chart_type: line
               dimensions:
                 - name: zero_ttl
-            - name: unbound.thread_recursive_replies
-              description: Replies That Needed Recursive Processing
+            - name: thread_unbound.recursive_replies
+              description: Thread Replies That Needed Recursive Processing
               unit: replies
               chart_type: line
               dimensions:
                 - name: recursive
-            - name: unbound.thread_recursion_time
-              description: Time Spent On Recursive Processing
+            - name: thread_unbound.recursion_time
+              description: Thread Time Spent On Recursive Processing
               unit: milliseconds
               chart_type: line
               dimensions:
                 - name: avg
                 - name: median
-            - name: unbound.thread_request_list_usage
-              description: Time Spent On Recursive Processing
+            - name: thread_unbound.request_list_usage
+              description: Thread Request List Usage
               unit: queries
               chart_type: line
               dimensions:
                 - name: avg
                 - name: max
-            - name: unbound.thread_current_request_list_usage
-              description: Current Request List Usage
+            - name: thread_unbound.current_request_list_usage
+              description: Thread Current Request List Usage
               unit: queries
-              chart_type: line
+              chart_type: area
               dimensions:
                 - name: all
-                - name: users
-            - name: unbound.thread_request_list_jostle_list
-              description: Request List Jostle List Events
+                - name: user
+            - name: thread_unbound.request_list_jostle_list
+              description: Thread Request List Jostle List Events
               unit: queries
               chart_type: line
               dimensions:
                 - name: overwritten
                 - name: dropped
-            - name: unbound.thread_tcpusage
-              description: TCP Handler Buffers
+            - name: thread_unbound.tcpusage
+              description: Thread TCP Handler Buffers
               unit: buffers
               chart_type: line
               dimensions:

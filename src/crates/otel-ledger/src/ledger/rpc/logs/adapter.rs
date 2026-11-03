@@ -1,13 +1,23 @@
-//! Mapping between the netdata `otel-logs` wire types and the
-//! wire-neutral [`sfsq::logs`] engine.
+//! Mapping between the netdata `otel-logs` wire types ([`super::wire`])
+//! and the wire-neutral [`sfsq::logs`] engine — the logs query Function's
+//! translation layer, no I/O of its own:
 //!
-//! [`to_query`] turns an [`OtelLogsRequest`] into the engine's
-//! [`LogsQuery`]; [`to_result`] turns the engine's [`LogsData`] into the
-//! [`LogsResult`] wire envelope the cloud-frontend renders. The
-//! per-structure converters ([`facet_from_sfst`], [`histogram_from_sfst`],
-//! [`available_histograms_from_fields`], [`build_table`]) are pure
-//! transformers over `sfst` values — no I/O — so they're exercisable
-//! against synthetic inputs.
+//! * wire → engine — [`OtelLogsRequest::into_query`] canonicalizes a
+//!   request into a fully-specified [`LogsQuery`];
+//!   [`OtelLogsRequest::take_partition_keys`] peels the reserved
+//!   `__streams` selector into file-pruning keys.
+//! * substrate → wire — [`stream_required_params`] renders a tenant's
+//!   stream partitions as the UI's service selector.
+//! * engine → wire — [`to_result`] shapes the engine's [`LogsData`] into
+//!   the [`LogsResult`] envelope the logs UI renders.
+//!
+//! The per-structure converters ([`facet_from_sfst`],
+//! [`histogram_from_sfst`], [`available_histograms_from_fields`],
+//! [`build_table`]) are pure transformers over `sfst` values, so tests
+//! exercise them against synthetic inputs. The only code consumer is the
+//! logs handler (`handler.rs`), which owns the registry locking and calls
+//! all of the above; the grid derivation below is shared with the traces
+//! handler (`rpc/grid.rs`).
 
 use std::collections::{BTreeSet, HashMap};
 
@@ -62,7 +72,7 @@ const NS_PER_S: i64 = 1_000_000_000;
 // ── Request canonicalization (wire request → engine query) ──────────
 //
 // The frontend sends a loose window and no bucket geometry, so the
-// handler canonicalizes here — defaulting the window, picking a "nice"
+// adapter canonicalizes here — defaulting the window, picking a "nice"
 // bucket width, snapping the window outward, and building the histogram
 // grid — before handing a fully-specified [`LogsQuery`] to the engine.
 // The engine takes the grid as given; deciding it is this layer's job.
@@ -85,7 +95,9 @@ impl OtelLogsRequest {
     pub fn into_query(self) -> Result<LogsQuery, sfst::Error> {
         let (after, before) = effective_window(self.after, self.before);
         // Nice width + outward alignment + the exact grid — the shared
-        // derivation (`rpc::grid`) both otel Functions use.
+        // derivation (`rpc::grid::grid_for_window_s`) both otel Function
+        // handlers (logs, traces) use. The aligned window is discarded
+        // here; the handler recovers it from the grid via `window_secs`.
         let (grid, _, _) = crate::ledger::rpc::grid::grid_for_window_s(after, before);
 
         let anchor = self.anchor.and_then(|a| match a {
@@ -108,9 +120,10 @@ impl OtelLogsRequest {
         if let Some(anchor) = anchor {
             builder = builder.anchor(anchor);
         }
-        // Field-less full-text search: an unanchored regex over `key=value`.
-        // Validate once here (compile-and-discard) so a malformed pattern is
-        // a clean error; the engine recompiles the source per file.
+        // Field-less full-text search: an unanchored regex over `key=value`
+        // (sfst/src/query.rs). Validate once here (compile-and-discard) so a
+        // malformed pattern is a clean error; the engine recompiles the source
+        // per file, where a failure would silently zero that file's rows.
         if !self.query.is_empty() {
             sfst::compile_query(&self.query)?;
             builder = builder.query(self.query);
@@ -264,7 +277,9 @@ fn effective_window(after: u32, before: u32) -> (u32, u32) {
 
 // ── Engine result → wire envelope ───────────────────────────────────
 
-/// Shape an engine [`LogsData`] into the wire [`LogsResult`].
+/// Shape an engine [`LogsData`] into the wire [`LogsResult`] — always a
+/// complete response (`progress: 100`, `status: 200`); degenerate handler
+/// paths shape an empty [`LogsData`] rather than return a partial one.
 /// `max_to_return` echoes the request's `last` into `items.max_to_return`.
 pub fn to_result(data: LogsData, max_to_return: usize) -> LogsResult {
     let facets = data
@@ -348,8 +363,9 @@ fn facet_from_sfst(order: usize, sfst_facet: &sfst::FacetResult) -> Facet {
 ///
 /// Appends an `"(unset)"` trailer dimension counting per-bucket logs that
 /// match the filter but don't carry `field`. Matches the legacy
-/// systemd-journal wire shape — `result.labels` ends with `"(unset)"`,
-/// each `DataPoint.items` carries an extra trailing triple.
+/// systemd-journal wire shape (journal-function/src/netdata/histogram.rs):
+/// `result.labels` ends with `"(unset)"`, each `DataPoint.items` carries
+/// an extra trailing triple.
 fn histogram_from_sfst(field: &str, timeline: &sfst::Timeline) -> Histogram {
     const UNSET_LABEL: &str = "(unset)";
 
@@ -439,27 +455,22 @@ fn available_histograms_from_fields(fields: &sfst::FieldTable) -> Vec<AvailableH
         .collect()
 }
 
-/// Build the wire `columns` schema and `data` rows from a materialized
-/// page.
-///
-/// Columns: a visible µs `timestamp` and `severity`, a hidden string
-/// `cursor` (the `pagination.column` the UI echoes as `anchor`), then one
-/// hidden column per attribute field. Fields in `facetable` get
-/// `filter: "facet"` so the UI's "+ Add Filter Field" picker offers them;
-/// everything else is `"none"`. Each data row is a positional array
-/// aligned to the column `index`; absent attributes are `null`.
-/// Build the log table's column schema: the three fixed columns
-/// (`timestamp`, `severity`, hidden `cursor`) plus one per field. Each is a
-/// UI-specific metadata blob; a field present in `facetable` gets
-/// `filter: "facet"`, the rest `"none"`.
+/// Build the table's column schema: the three fixed columns — the visible
+/// µs `timestamp`, a hidden `severity`, and the hidden `cursor`
+/// (`unique_key`; the `pagination.column` whose value the UI echoes back
+/// as the `anchor` param) — plus one hidden column per field. Each column
+/// is a UI-specific metadata blob; a field present in `facetable` gets
+/// `filter: "facet"` so the UI's "+ Add Filter Field" picker offers it,
+/// everything else is `"none"`.
 fn build_columns(fields: &[String], facetable: &BTreeSet<&str>) -> serde_json::Value {
     use serde_json::json;
 
     let mut columns = serde_json::Map::new();
     // The UI formats the cell from `valueOptions.transform`, not from
     // `type` (which only selects the cell component). Match the legacy
-    // journal column: a `timestamp` cell carrying a µs value rendered via
-    // the `datetime_usec` transform.
+    // journal column (journal-function/src/netdata/columns.rs): a
+    // `timestamp` cell carrying a µs value rendered via the
+    // `datetime_usec` transform.
     columns.insert(
         "timestamp".into(),
         json!({ "index": 0, "id": "timestamp", "name": "Timestamp", "type": "timestamp",
@@ -492,9 +503,9 @@ fn build_columns(fields: &[String], facetable: &BTreeSet<&str>) -> serde_json::V
 }
 
 /// Group a materialized row's `(key, value)` pairs by field name,
-/// preserving stream order and skipping exact-duplicate values — a
-/// multi-valued field (e.g. a flattened scalar array) legitimately carries
-/// several values on one row.
+/// preserving the row's pair order and skipping exact-duplicate values —
+/// a multi-valued field (e.g. a flattened scalar array) legitimately
+/// carries several values on one row.
 fn group_row_fields(row: &sfst::MaterializedRow) -> HashMap<&str, Vec<&str>> {
     let mut lookup: HashMap<&str, Vec<&str>> = HashMap::new();
     for (k, v) in &row.fields {
@@ -512,9 +523,11 @@ fn group_row_fields(row: &sfst::MaterializedRow) -> HashMap<&str, Vec<&str>> {
 /// A generic field cell joins the field's values with `", "` (the wire is
 /// one string per column; filters/search run on the index, never on
 /// cells). The dedicated severity cell takes the **last** `severity_text`
-/// value: the indexer interns the projected top-level LogRecord severity
-/// after all attributes, so this picks the real severity even when an
-/// attribute is also named `severity_text`.
+/// value in row order. Row pairs are interned resource → scope → record,
+/// and a record's top-level scalars (incl. `severity_text`) come before
+/// its `attributes.*` (ng-flatten/src/common.rs, ng-index/src/sfst_build.rs),
+/// so the last value is the projected LogRecord severity unless an
+/// attribute also carries the name — in that clash the attribute wins.
 fn build_row_cells(
     cursor: &Cursor,
     row: &sfst::MaterializedRow,

@@ -1,14 +1,23 @@
 //! Steady-state retry of failed uploads.
 //!
-//! `*Failed` uploader responses were previously logged and dropped, so a
-//! transient remote outage stranded those files until the next process restart
-//! re-drove `recover_unuploaded`. This queue re-issues failed SFST and catalog
-//! uploads with capped exponential backoff, so uploads resume automatically
-//! once the remote recovers.
+//! [`UploadRetry`] is a passive, in-memory queue of uploader requests the
+//! remote rejected. It persists nothing: after a restart, recovery's
+//! `recover_unuploaded` re-derives the backlog from disk. `otel-ledger`'s
+//! `Ledger` drives it — `record_failure` on `*Failed` uploader responses
+//! (only while the local file still exists; an evicted file can never
+//! upload), `take_due` on its 30-second retry timer with due requests
+//! re-sent through the uploader channel, and the `clear_*` methods once an
+//! upload succeeds.
+//!
+//! Before this queue, `*Failed` responses were logged and dropped, so a
+//! transient remote outage stranded those files until the next process
+//! restart re-drove `recover_unuploaded`. Capped exponential backoff now
+//! re-issues failed SFST and catalog uploads automatically once the remote
+//! recovers.
 //!
 //! Per project decision, a *persistently* failing remote is allowed to
-//! accumulate local files without bound (no disk ceiling); the operator is the
-//! one responsible for fixing the remote, and is alerted via the warn/error
+//! accumulate local files without bound (no disk ceiling); the operator is
+//! the one responsible for fixing the remote, alerted via the warn/error
 //! logs the retry tick emits.
 
 use std::collections::HashMap;
@@ -23,10 +32,12 @@ use crate::ipc::UploaderRequest;
 /// First retry delay; doubles each attempt up to [`MAX_BACKOFF`].
 const BASE_BACKOFF: Duration = Duration::from_secs(30);
 const MAX_BACKOFF: Duration = Duration::from_secs(600);
-/// Attempt count past which the remote is treated as persistently unreachable
-/// and the per-tick log escalates from `warn` to `error`.
+/// Attempt count at which the remote is treated as persistently unreachable:
+/// once `max_attempts` reaches this, the retry tick's log escalates from
+/// `warn` to `error`.
 pub const PERSISTENT_FAILURE_ATTEMPTS: u32 = 5;
 
+/// Identity of a queued retry: the SFST's seq, or the catalog's remote key.
 #[derive(PartialEq, Eq, Hash, Clone)]
 enum Key {
     Sfst(SeqKey),
@@ -58,13 +69,15 @@ impl UploadRetry {
         self.items.is_empty()
     }
 
-    /// Highest attempt count across pending items (0 if empty).
+    /// Highest attempt count across pending items (0 if empty); drives the
+    /// retry tick's warn→error escalation at [`PERSISTENT_FAILURE_ATTEMPTS`].
     pub fn max_attempts(&self) -> u32 {
         self.items.values().map(|i| i.attempts).max().unwrap_or(0)
     }
 
     /// Record a failed upload for retry. Repeated failures of the same file
-    /// bump its attempt count (longer backoff) rather than duplicating it.
+    /// bump its attempt count (longer backoff) rather than duplicating it,
+    /// and re-arm an in-flight re-issue.
     pub fn record_failure(&mut self, req: UploaderRequest, now: Instant) {
         let key = Self::key_of(&req);
         let attempts = self
@@ -121,6 +134,8 @@ impl UploadRetry {
 
 /// Capped exponential backoff: 30s, 60s, 120s, … up to 10 min.
 fn backoff(attempts: u32) -> Duration {
+    // Cap the shift at 5: 30s * 2^5 already exceeds `MAX_BACKOFF`, and it
+    // keeps `1u64 << shift` in range for any attempt count.
     let shift = attempts.saturating_sub(1).min(5);
     let secs = BASE_BACKOFF.as_secs().saturating_mul(1u64 << shift);
     Duration::from_secs(secs.min(MAX_BACKOFF.as_secs()))

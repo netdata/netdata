@@ -236,7 +236,6 @@ With these settings, you can configure how your Child nodes send metrics to Pare
 | `buffer size bytes`                             | `10485760`                | Buffer size (10MB by default). Increase for higher latencies.       |
 | `reconnect delay`                               | `5s`                      | Time before retrying connection to the Parent.                      |
 | `initial clock resync iterations`               | `60`                      | Syncs chart clocks during startup.                                  |
-| `parent using h2o`                              | `no`                      | Set to `yes` if connecting to a Parent using the H2O web server.    |
 
 The detected profile supplies the sender defaults. The `iot` and `parent` profiles use the fastest settings (ZSTD 1,
 LZ4 acceleration 9, Brotli 1, and Gzip 1); the `child` and `standalone` profiles use balanced settings (ZSTD 3, LZ4

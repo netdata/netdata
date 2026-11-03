@@ -172,12 +172,12 @@ static RRDHOST *load_archived_host_from_row(sqlite3_stmt *res)
     if (is_ephemeral && ((!is_registered && last_connected == 1) ||
                          (rrdhost_free_ephemeral_time_s && age > rrdhost_free_ephemeral_time_s))) {
         netdata_log_info(
-            "%s ephemeral hostname \"%s\" with GUID \"%s\", age = %ld seconds (limit %ld seconds)",
+            "%s ephemeral hostname \"%s\" with GUID \"%s\", age = %" PRId64 " seconds (limit %" PRId64 " seconds)",
             is_registered ? "Loading registered" : "Skipping unregistered",
             hostname,
             guid,
-            age,
-            rrdhost_free_ephemeral_time_s);
+            (int64_t)age,
+            (int64_t)rrdhost_free_ephemeral_time_s);
 
         if (!is_registered)
            return NULL;
@@ -221,7 +221,17 @@ static RRDHOST *load_archived_host_from_row(sqlite3_stmt *res)
         host->stream.rcv.status.last_disconnected = now_realtime_sec();
     }
 
-    host->rrdlabels = sql_load_host_labels(&host_uuid);
+    // A new archived host has no labels yet. One that rrdhost_find_or_create() found already has a set, which
+    // other threads may be reading: refill it, never replace it (the replaced set would also leak).
+    RRDLABELS *loaded_labels = sql_load_host_labels(&host_uuid);
+    if (loaded_labels) {
+        if (!host->rrdlabels)
+            host->rrdlabels = loaded_labels;
+        else {
+            rrdlabels_migrate_to_these(host->rrdlabels, loaded_labels);
+            rrdlabels_destroy(loaded_labels);
+        }
+    }
     host->stream.snd.status.last_connected = last_connected;
 
     pulse_host_status(host, 0, 0); // this will detect the receiver status
@@ -234,6 +244,9 @@ static RRDHOST *load_archived_host_from_row(sqlite3_stmt *res)
                    rrdhost_hostname(host), host->machine_guid, node_str, is_ephemeral);
 #endif
 
+    // the pin from rrdhost_find_or_create() covered the initialization above; from here on an
+    // archived host is kept by RRDHOST_FLAG_PENDING_CONTEXT_LOAD, which every remover skips
+    rrdhost_pin_release(host);
     return host;
 }
 
@@ -1501,11 +1514,15 @@ void aclk_mqtt_client_reset()
     completion_destroy(&compl);
 }
 
+// a 0 ms libuv timeout can cause high cpu usage in older versions of libuv
+#define NODE_STATE_UPDATE_MIN_DELAY_MS (10)
+
 void schedule_node_state_update(RRDHOST *host, uint64_t delay)
 {
     if (unlikely(!host))
         return;
 
+    delay = MAX(delay, NODE_STATE_UPDATE_MIN_DELAY_MS);
     (void) queue_aclk_sync_cmd(ACLK_DATABASE_NODE_STATE, host, (void *)(uintptr_t)delay);
 }
 

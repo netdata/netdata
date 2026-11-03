@@ -15,6 +15,10 @@ type AutogenPolicy struct {
 	// Rules conditionally constrain autogen fallback for unmatched series.
 	Rules []AutogenRule
 
+	// CounterRawCharts selects scalar counters that also get a raw-value chart;
+	// see charttpl.EngineAutogen.CounterRawCharts.
+	CounterRawCharts []string
+
 	// MaxTypeIDLen is the max allowed full `type.id` length.
 	// Zero means default (1200).
 	MaxTypeIDLen int

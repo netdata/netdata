@@ -10,12 +10,20 @@ type snapshotCounterInstrument struct {
 	base    []LabelSet
 }
 
+func (i *snapshotCounterInstrument) hostScope() HostScope {
+	return i.scope
+}
+
 // statefulCounterInstrument writes maintained counter deltas.
 type statefulCounterInstrument struct {
 	backend meterBackend
 	desc    *instrumentDescriptor
 	scope   HostScope
 	base    []LabelSet
+}
+
+func (i *statefulCounterInstrument) hostScope() HostScope {
+	return i.scope
 }
 
 // stagedCounter holds one in-cycle counter current total for a series identity.
@@ -107,7 +115,7 @@ func (c *storeCore) recordCounterObserveTotal(desc *instrumentDescriptor, scope 
 			labelsKey:    labelsKey,
 			desc:         desc,
 		}
-		c.active.counters[key] = entry
+		stageEntry(&c.active.counters, key, entry)
 	}
 	entry.current = value // last-write-wins in-cycle
 }
@@ -160,7 +168,7 @@ func (c *storeCore) recordCounterAdd(desc *instrumentDescriptor, scope HostScope
 			desc:         desc,
 			current:      baseline,
 		}
-		c.active.counters[key] = entry
+		stageEntry(&c.active.counters, key, entry)
 	}
 	entry.current += delta
 }

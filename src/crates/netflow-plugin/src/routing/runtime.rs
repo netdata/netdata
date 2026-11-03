@@ -105,6 +105,7 @@ impl DynamicRoutingRuntime {
         };
         if let Some(mut routes) = state.entries.remove(prefix) {
             routes.retain(|route| !(&route.peer == peer && route.route_key == route_key));
+            // Re-insert only when routes remain; the trie never holds empty lists.
             if !routes.is_empty() {
                 state.entries.insert(prefix, routes);
             }

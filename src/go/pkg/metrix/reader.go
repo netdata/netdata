@@ -3,7 +3,6 @@
 package metrix
 
 import (
-	"maps"
 	"slices"
 	"sync"
 )
@@ -300,7 +299,7 @@ func (r *storeReader) seriesView() map[string]*committedSeries {
 
 func lookupSnapshotSeries(snap *readSnapshot, key string) (*committedSeries, bool) {
 	for curr := snap; curr != nil; curr = curr.runtimeBase {
-		if s, ok := curr.series[key]; ok {
+		if s, ok := curr.ownSeries(key); ok {
 			return s, true
 		}
 	}
@@ -325,7 +324,7 @@ func materializeRuntimeSeries(snap *readSnapshot) map[string]*committedSeries {
 	// Chain is leaf->root; root map gives the best starting capacity hint.
 	series := make(map[string]*committedSeries, len(chain[len(chain)-1].series))
 	for i := len(chain) - 1; i >= 0; i-- {
-		maps.Copy(series, chain[i].series)
+		chain[i].copyOwnSeries(series)
 	}
 	return series
 }

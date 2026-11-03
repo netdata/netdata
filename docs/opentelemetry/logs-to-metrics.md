@@ -10,7 +10,7 @@ The count connector and filter processor have alpha stability in OpenTelemetry C
 
 :::
 
-Before you begin, complete the prerequisites and local exporter setup in [Ingest OpenTelemetry Metrics and Logs](/docs/opentelemetry/otlp-ingestion.md), including the Netdata Cloud sign-in required to verify `otel-logs`.
+Before you begin, complete the prerequisites and local exporter setup in [Ingest OpenTelemetry Metrics, Logs, and Traces](/docs/opentelemetry/otlp-ingestion.md), including the Netdata Cloud sign-in required to verify `otel-logs`.
 
 The count connector bridges the logs and metrics pipelines:
 
@@ -115,6 +115,6 @@ If the chart is absent:
 2. Inspect the Collector for connector, OTTL, and export errors, then inspect the Agent journal for OTLP ingestion errors.
 3. Temporarily add a `debug` exporter with `verbosity: detailed` to the logs pipeline and verify that the body matches the connector condition. Remove the exporter after diagnosis because detailed log output can expose sensitive record content.
 
-To alert on the derived chart, use the standard [Netdata alert configuration reference](/src/health/REFERENCE.md). For the shared endpoint, security, and basic metrics/logs workflows, see [Ingest OpenTelemetry Metrics and Logs](/docs/opentelemetry/otlp-ingestion.md).
+To alert on the derived chart, use the standard [Netdata alert configuration reference](/src/health/REFERENCE.md). For the shared endpoint, security, and basic metrics/logs workflows, see [Ingest OpenTelemetry Metrics, Logs, and Traces](/docs/opentelemetry/otlp-ingestion.md).
 
 See the upstream [count connector documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/connector/countconnector) and [filter processor documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/filterprocessor) for every matching condition and option beyond these examples.

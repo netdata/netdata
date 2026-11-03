@@ -1,10 +1,32 @@
-//! On-disk schema for SFST log indexes.
+//! On-disk schema for SFST log indexes: the decoded Rust type of each
+//! core chunk payload. The container (a `chunk_file` TOC plus a per-chunk
+//! CRC) and the full byte-level specification live in `FORMAT.md`; the
+//! encoding is one `bincode` (standard config) + `zstd` frame per chunk.
 //!
-//! These are the typed payloads carried by an SFST file's named chunks.
-//! The index build (`IndexWriter`) constructs them; consumers decode
-//! them via the typed accessors on
-//! [`crate::ChunkReader`]. The container layout and chunk encoding are
-//! specified in `FORMAT.md`.
+//! Chunk id → payload type: `SUMR` → [`Summary`], `META` → [`Metadata`],
+//! `TIMS` → `Vec<i64>`, `PRIM` and `MF{hi}{lo}` → `PrefixMap<BitmapValue>`,
+//! `HF{hi}{lo}` → [`HighField`], `SB0{N}` → [`StreamBatch`], plus the
+//! optional per-row columns (see [`ColumnsTable`]). `MF`/`HF`/`SB` ids
+//! embed a tier index: one chunk per mid-card / high-card field, at least
+//! one stream batch per file. The optional trace structures (`TIDX`/
+//! `TBLM`/`EVNB`/`LNKB`/`TRSU`) are typed in the sibling `trace_*` /
+//! `span_extras` modules, not here.
+//!
+//! Wire invariants these structs carry:
+//!
+//! - Bincode is positional: adding, removing, or reordering a field in
+//!   any persisted struct is a format version bump. `#[serde(skip)]`
+//!   fields are layout-neutral in-memory caches, rebuilt on load.
+//! - `#[serde(with = "serde_bytes")]` marks bulk byte decoding —
+//!   performance only, wire-identical under bincode.
+//! - [`KvId`]s share one tier-aligned id space across `PRIM`, `MF`, `HF`,
+//!   and `SB` (low → mid → high; bounds in [`IdRanges`]).
+//!
+//! The index build (`IndexWriter`) constructs these; consumers decode
+//! them via the typed accessors on [`crate::ChunkReader`]. Decoded
+//! payloads are untrusted input: structural checks run at decode
+//! ([`SchemaTree::validate`], the `rebuild_offsets` guards) and degrade
+//! to [`Error::CorruptIndex`] instead of panicking.
 
 use serde::{Deserialize, Serialize};
 use treight::Bitmap;
@@ -21,12 +43,11 @@ use crate::Error;
 /// This is the substrate's [`file_registry::FileSummary`]; the SFST stores it
 /// verbatim and never interprets `content_meta`. A query keeps the file as a
 /// candidate when its `[min_timestamp_s, max_timestamp_s]` span overlaps the
-/// request window and its `id.part_key` matches (the partition key lives in the
-/// `FileId`, not the summary); the file's
-/// stream-batch geometry comes from `record_count` (see
-/// [`stream_batch_size`](crate::stream_batch_size)). Kept in its own `SUMR`
-/// chunk so a registry rebuilds on startup by faulting in only the header, TOC,
-/// and SUMR — never decompressing `META`.
+/// request window and its `id.part_key` matches (the partition key lives in
+/// the `FileId`, not the summary); `record_count` drives the file's
+/// stream-batch geometry (see [`stream_batch_size`](crate::stream_batch_size)).
+/// It lives in its own `SUMR` chunk so a registry rebuilds on startup by
+/// faulting in only the header, TOC, and `SUMR` — never decompressing `META`.
 pub use file_registry::FileSummary as Summary;
 
 // ── META ─────────────────────────────────────────────────────────
@@ -37,25 +58,24 @@ pub use file_registry::FileSummary as Summary;
 /// file: the sparse timestamp histogram, the cardinality-tier id
 /// ranges, the typed schema tree (the field descriptor), and the per-row
 /// columns manifest. Readers that only need the cheap summary fields
-/// (min/max timestamp, total log count, stream) should decode [`Summary`]
-/// from the `SUMR` chunk instead.
+/// (min/max timestamp, total log count, stream identity) should decode
+/// [`Summary`] from the `SUMR` chunk instead.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Metadata {
     pub histogram: Histogram,
     pub id_ranges: IdRanges,
-    /// The typed, array-collapsed schema tree — the on-disk field descriptor.
-    /// Carries structure (parent/
-    /// child, `[]` collapse) + per-leaf [`ValueKind`], and per-leaf storage
-    /// stats ([`LeafStats`]: cardinality + tier). The flat [`FieldTable`] the
-    /// tier machinery and legacy consumers use is **derived** from this tree
-    /// at read time ([`SchemaTree::derive_field_table`]); coalesced scalar
-    /// field types come from [`SchemaTree::derive_scalar_kinds`].
+    /// The typed, array-collapsed schema tree — the on-disk field descriptor:
+    /// structure (parent/child, `[]` collapse) plus per-leaf [`ValueKind`]
+    /// and storage stats ([`LeafStats`]: cardinality + tier). The flat
+    /// [`FieldTable`] the tier machinery and legacy consumers use is
+    /// **derived** from this tree at read time
+    /// ([`SchemaTree::derive_field_table`]); coalesced scalar field types
+    /// come from [`SchemaTree::derive_scalar_kinds`].
     pub tree: SchemaTree,
-    /// Manifest of the per-row column chunks this file carries
-    /// (`OBTS`/`TRCE`/`SPAN`/`FLAG`/`DRAC`/`PSPN`/`DURN`), with each column's type. Empty when
-    /// the file has no per-row columns. The authoritative source for column
-    /// presence + type — readers consult it instead of probing for chunks. See
-    /// [`ColumnsTable`].
+    /// Manifest of the per-row column chunks this file carries, with each
+    /// column's type. Empty when the file has no per-row columns. The
+    /// authoritative source for column presence + type — readers consult it
+    /// instead of probing for chunks. See [`ColumnsTable`].
     pub columns: ColumnsTable,
 }
 
@@ -91,10 +111,8 @@ pub struct IdRanges {
 /// produced by [`SchemaTree::derive_field_table`] from [`Metadata::tree`]
 /// (the on-disk [`SchemaTree`]). The table itself is never stored.
 ///
-/// The table is ordered low → mid → high, with each tier internally
-/// sorted by field name. Readers walk it to count mid-card and
-/// high-card fields, to look up a field's tier when resolving a
-/// [`KvId`], and to discover which secondary chunks the file carries.
+/// Table order is low → mid → high, each tier sorted by field name —
+/// the order the `MF{i}`/`HF{i}` chunks are numbered in.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FieldEntry {
     pub name: String,
@@ -142,9 +160,8 @@ pub struct FieldTable(Vec<FieldEntry>);
 impl FieldTable {
     /// The entry for `name`, or `None` if absent from this table.
     ///
-    /// O(n) linear scan. The table is tier-ordered (not globally sorted
-    /// by name), and holds only a handful of fields per file, so a scan
-    /// is the right tradeoff; add a side index only if tables ever grow.
+    /// O(n) linear scan: the table is tier-ordered (not globally sorted
+    /// by name) and holds only a handful of fields per file.
     pub fn get(&self, name: &str) -> Option<&FieldEntry> {
         self.0.iter().find(|f| f.name == name)
     }
@@ -210,8 +227,8 @@ impl ValueKind {
     }
 
     /// True for the scalar kinds that can be a UI facet — the value-bearing
-    /// kinds excluding `Null` (absence) and the empty containers (which fold
-    /// into their non-empty container form, not a scalar). See
+    /// kinds except `Null` (absence) and the empty containers, which are
+    /// not scalars: paths holding only those get no entry in
     /// [`SchemaTree::derive_scalar_kinds`].
     pub fn is_scalar(self) -> bool {
         matches!(
@@ -275,9 +292,8 @@ impl Default for SchemaTree {
     /// The canonical empty descriptor: a lone `Kvlist` root node (no leaves),
     /// which satisfies the "node 0 is the root" invariant that
     /// [`validate`](Self::validate) enforces — unlike a zero-node tree.
-    /// [`derive_field_table`](Self::derive_field_table) /
-    /// [`derive_scalar_kinds`](Self::derive_scalar_kinds) yield empty results
-    /// from it, and it is identical to `flat(&FieldTable::default())`.
+    /// Identical to `flat(&FieldTable::default())`; both derivations yield
+    /// empty results from it.
     fn default() -> Self {
         Self {
             nodes: vec![SchemaNode {
@@ -426,7 +442,7 @@ impl SchemaTree {
     ///
     /// Panics if `id` is out of bounds. Callers must use ids from this tree
     /// (via [`iter`](Self::iter) / [`len`](Self::len)); a tree decoded from a
-    /// file is bounds-safe because [`validate`](Self::validate) runs at
+    /// file is bounds-safe because [`validate`](Self::validate) runs when
     /// the META chunk is decoded.
     pub fn node(&self, id: NodeId) -> &SchemaNode {
         &self.nodes[id as usize]
@@ -615,12 +631,15 @@ impl ScalarSet {
 
 // ── PRIM / secondary chunks ──────────────────────────────────────
 
-/// Value type for FST entries in the primary chunk and mid-card field
-/// chunks, and for the pairs inside high-card field chunks.
+/// Value of an FST entry in the primary chunk (`PRIM`) and the per-field
+/// mid-card chunks (`MF{hi}{lo}`) — those FSTs map each `key=value` key
+/// to one of these.
 ///
 /// Carries a [`treight::Bitmap`] over time-sorted log positions where
-/// the `key=value` pair appears. `desc` is the bitmap metadata; `data`
-/// holds the encoded payload bytes.
+/// the `key=value` pair appears: `desc` is the bitmap's `Copy`
+/// descriptor, `data` the tree bytes it indexes into. High-card fields
+/// store no bitmaps — their chunk is an arena, not an FST (see
+/// [`HighField`]).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BitmapValue {
     pub desc: Bitmap,
@@ -632,14 +651,17 @@ pub struct BitmapValue {
 
 // ── High-card field chunk (struct-of-arrays) ─────────────────────
 
-/// Body of a high-card field chunk (the `HF{i}` chunks).
+/// Body of a high-card field chunk (the `HF{i}` chunks) — one chunk per
+/// high-cardinality field, a struct-of-arrays rather than an FST, which
+/// compresses poorly at high cardinality.
 ///
 /// The `key=value` strings are stored as a **string arena**: one
-/// contiguous `keys_blob` byte buffer plus the parallel
-/// `key_lens` (per-key byte length) and
-/// [`masks`](Self::masks) (per-key stream-batch bitmask, bit `b` set iff
-/// the value appears in batch `b` — see [`crate::num_stream_batches`]).
-/// Keys are sorted lexicographically. The arena keeps decode to a single
+/// contiguous `keys_blob` byte buffer plus the parallel `key_lens`
+/// (per-key byte length) and [`masks`](Self::masks) (per-key stream-batch
+/// bitmask, bit `b` set iff the value appears in batch `b`; at most
+/// [`MAX_STREAM_BATCHES`](crate::MAX_STREAM_BATCHES) = 8 batches, so the
+/// mask fits one byte — see [`crate::num_stream_batches`]). Keys are
+/// sorted lexicographically. The arena keeps decode to a single
 /// allocation (vs one `String` per key). `offsets` is the prefix-sum of
 /// `key_lens`, rebuilt on load (not serialized), so key access is O(1).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1034,14 +1056,12 @@ scalar_column!(
 /// on-disk [`ColumnType`], and writer `ordinal` (the bit position the
 /// `ChunkWriter` tracks per column).
 ///
-/// This is the single source of truth the *homogeneous* column sites derive from
-/// — the presence count, the META [`ColumnsTable`] manifest, and the
-/// manifest-vs-counts check all iterate [`ALL_COLUMNS`]. The *heterogeneous* parts
-/// (the typed accumulator on `RowIndex`, the typed `ChunkWriter` write method)
-/// stay explicit per column, because their payload types differ. Adding a column
-/// is therefore one row here plus its typed accumulator + write method, not a
-/// multi-site lockstep edit across the presence struct, the manifest builder, and
-/// the manifest check.
+/// The single source of truth the *homogeneous* column sites derive from —
+/// the presence count, the META [`ColumnsTable`] manifest, and the
+/// manifest-vs-counts check all iterate [`ALL_COLUMNS`]. The *heterogeneous*
+/// parts (the typed accumulator on `RowIndex`, the typed `ChunkWriter` write
+/// method) stay explicit per column, because their payload types differ.
+/// Adding a column is one row here plus its typed accumulator + write method.
 #[derive(Debug, Clone, Copy)]
 pub struct ColumnSpec {
     /// The column's manifest name (matches the typed column's `NAME`).
@@ -1100,7 +1120,8 @@ pub static ALL_COLUMNS: [ColumnSpec; 7] = [
 /// is `bytes[i*16 .. (i+1)*16]`, in chronological row order. An all-zero id is the
 /// OTLP/W3C "unset/invalid" sentinel, so an absent id is 16 zero bytes. Fixed width
 /// (vs `Vec<Vec<u8>>`) avoids a heap allocation per row, drops the per-element length
-/// prefix, and compresses tighter — the same layout as [`StreamBatch`]/[`HighField`].
+/// prefix, and compresses tighter — the packed-arena layout [`StreamBatch`]
+/// and [`HighField`] share.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TraceIds {
     /// 16 bytes per row, concatenated. `serde_bytes` decodes in one bulk copy

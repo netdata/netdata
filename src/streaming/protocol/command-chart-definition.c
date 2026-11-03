@@ -7,7 +7,7 @@
 // chart labels
 static int stream_send_clabels_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
     BUFFER *wb = (BUFFER *)data;
-    buffer_sprintf(wb, PLUGINSD_KEYWORD_CLABEL " \"%s\" \"%s\" %d\n", name, value, ls & ~(RRDLABEL_FLAG_INTERNAL));
+    buffer_sprintf(wb, PLUGINSD_KEYWORD_CLABEL " \"%s\" \"%s\" %u\n", name, value, ls & ~(RRDLABEL_FLAG_INTERNAL));
     return 1;
 }
 
@@ -30,7 +30,7 @@ bool stream_sender_send_rrdset_definition(BUFFER *wb, RRDSET *st) {
     bool replication_progress = false;
 
     // properly set the name for the remote end to parse it
-    char *name = "";
+    const char *name = "";
     if(likely(st->name)) {
         if(unlikely(st->id != st->name)) {
             // they differ

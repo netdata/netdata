@@ -79,7 +79,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -222,7 +221,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -363,7 +361,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -473,20 +470,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: audit_backlog_utilization
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/audit.conf
-        metric: audit.backlog_utilization
-        info: >
-          Linux audit backlog utilization has exceeded the warning threshold
-          while failure mode is set to panic. Kernel panic is imminent if
-          backlog overflows.
-      - name: audit_lost_events
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/audit.conf
-        metric: audit.lost
-        info: >
-          Linux audit subsystem is losing events (backlog overflow, rate
-          limiting, or memory pressure).
     metrics:
       folding:
         title: Metrics
@@ -620,7 +603,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics

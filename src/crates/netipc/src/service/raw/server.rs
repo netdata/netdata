@@ -7,8 +7,8 @@ pub(super) use crate::transport::posix::ServerConfig;
 #[cfg(windows)]
 pub(super) use crate::transport::windows::ServerConfig;
 
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 /// L2 managed server. Typed request/response dispatcher.
 ///

@@ -752,6 +752,32 @@ func TestCommitCostGuards(t *testing.T) {
 		})
 		require.Lessf(t, allocs, float64(retained/4), "sparse commit allocs must be O(touched), not O(retained) (got %.0f allocs)", allocs)
 	})
+
+	t.Run("descriptor resolution adds no per-name allocations", func(t *testing.T) {
+		// A cycle writing one series of each of n names pays per name only its staged entry and
+		// its committed series clone; grouping and resolving the names allocates O(1) per commit.
+		cycleAllocs := func(n int) float64 {
+			s := NewCollectorStore()
+			cc := cycleController(t, s)
+			meter := s.Write().SnapshotMeter("svc")
+			gauges := make([]SnapshotGauge, n)
+			for i := range gauges {
+				gauges[i] = meter.Gauge("m" + strconv.Itoa(i))
+			}
+			cycle := func() {
+				cc.BeginCycle()
+				for i, g := range gauges {
+					g.Observe(SampleValue(i))
+				}
+				require.NoError(t, cc.CommitCycleSuccess())
+			}
+			cycle()
+			return testing.AllocsPerRun(5, cycle)
+		}
+		small, large := cycleAllocs(100), cycleAllocs(400)
+		perName := (large - small) / 300
+		require.LessOrEqualf(t, perName, 2.5, "per-name cycle allocs (got %.2f)", perName)
+	})
 }
 
 // TestMultiAuthorityCommittedObserved pins the multi-authority fail-vs-drop decision: the resolver

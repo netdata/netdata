@@ -345,7 +345,7 @@ static inline void link_all_processes_to_their_parents(void) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static bool is_filename(const char *s) {
+static bool is_filename(char *s) {
     if(!s || !*s) return false;
 
 #if defined(OS_WINDOWS)

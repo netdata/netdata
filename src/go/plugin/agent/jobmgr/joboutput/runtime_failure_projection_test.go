@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/stretchr/testify/require"
@@ -78,25 +77,13 @@ func TestRuntimeFailureEnrichesCommittedLifecycleSnapshot(t *testing.T) {
 				})
 				cfg := factoryTestConfig(false).Set("autodetection_retry", 0)
 				current := runtimeTestApply(t, prepareRuntimeTestChange(t, controller, cfg, nil, 1))
-				if stage == "runtime" {
-					require.NotNil(t, current)
-					commands.waitForSubmissions(t, 1)
-					_, plans, _ := commands.snapshot()
-					scope := lifecycle.ResourceTransactionScope{
-						ID:      cfg.FullName(),
-						Current: current.Identity(),
-					}
-					reconcile, err := plans[0].Transaction.Prepare(
-						t.Context(),
-						current,
-						scope,
-						lifecycle.LongLivedPermit{},
-					)
-					require.NoError(t, err)
-					require.Nil(t, runtimeTestApply(t, reconcile))
-				} else {
-					require.Nil(t, current)
-				}
+				require.NotNil(t, current)
+				require.Eventually(t, func() bool {
+					var failure *runtimeStartupFailure
+					return errors.As(current.(*JobGeneration).StartupResult(), &failure)
+				}, time.Second, time.Millisecond)
+				plan := runtimeTestNotificationPlan(t, commands, "internal/jobs/runtime-ready")
+				require.Nil(t, runtimeTestApplyNotification(t, plan, current))
 				requireFactoryAttemptsIdle(t, controller.factory)
 				record, ok := graph.Lookup(cfg.FullName())
 				require.True(t, ok)

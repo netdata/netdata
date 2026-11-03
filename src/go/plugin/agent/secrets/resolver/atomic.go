@@ -150,6 +150,24 @@ func StoreReferences(input any) ([]string, error) {
 	return keys, nil
 }
 
+// CloneForValidation validates reference syntax without invoking providers and
+// replaces reference-bearing scalar values with nil in an owned clone. Typed
+// decoders can validate the available fields while deferring reference values.
+func (resolver *AtomicResolver) CloneForValidation(input any) (any, bool, error) {
+	if resolver == nil {
+		return nil, false, errors.New("secret resolver: nil atomic resolver")
+	}
+	compiler := atomicCompiler{
+		providers:         resolver.providers,
+		validateProviders: true,
+		maskReferences:    true,
+		active:            make(map[atomicContainerIdentity]struct{}),
+		storeKeys:         make(map[string]struct{}),
+	}
+	value, err := compiler.clone(input, 0, true)
+	return value, compiler.references != 0, err
+}
+
 // CloneLiteral clones one value with the same shape, depth, cycle, and size
 // defenses as secret resolution, but preserves all strings as literal data.
 func CloneLiteral(input any) (any, error) {
@@ -327,6 +345,7 @@ type atomicCompiler struct {
 	resultBytes       int
 	references        int
 	validateProviders bool
+	maskReferences    bool
 }
 
 const (
@@ -456,6 +475,20 @@ func (compiler *atomicCompiler) clone(
 		if err := compiler.addContainer(len(typed)); err != nil {
 			return nil, err
 		}
+		if compiler.maskReferences {
+			wide := make(map[string]any, len(typed))
+			for key, member := range typed {
+				if err := compiler.addResultBytes(len(key)); err != nil {
+					return nil, err
+				}
+				child, err := compiler.clone(member, depth+1, resolveReferences && !atomicInternalKey(key))
+				if err != nil {
+					return nil, err
+				}
+				wide[key] = child
+			}
+			return wide, nil
+		}
 		cloned := make(map[string]string, len(typed))
 		for key, member := range typed {
 			if err := compiler.addResultBytes(len(key)); err != nil {
@@ -490,6 +523,17 @@ func (compiler *atomicCompiler) clone(
 		if err := compiler.addContainer(len(typed)); err != nil {
 			return nil, err
 		}
+		if compiler.maskReferences {
+			wide := make([]any, len(typed))
+			for index, member := range typed {
+				child, err := compiler.clone(member, depth+1, resolveReferences)
+				if err != nil {
+					return nil, err
+				}
+				wide[index] = child
+			}
+			return wide, nil
+		}
 		cloned := make([]string, len(typed))
 		for index, member := range typed {
 			if resolveReferences {
@@ -512,8 +556,12 @@ func (compiler *atomicCompiler) clone(
 		return append([]byte(nil), typed...), nil
 	case string:
 		if resolveReferences {
+			before := compiler.references
 			if err := compiler.compileReferences(typed); err != nil {
 				return nil, err
+			}
+			if compiler.maskReferences && compiler.references != before {
+				return nil, nil
 			}
 		} else if err := compiler.addResultBytes(len(typed)); err != nil {
 			return nil, err

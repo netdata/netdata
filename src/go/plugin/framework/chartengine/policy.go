@@ -11,9 +11,11 @@ import (
 )
 
 type effectiveEnginePolicy struct {
-	autogen      AutogenPolicy
-	autogenRules []charttpl.ValidatedAutogenRule
-	selector     metrixselector.Selector
+	maxOutputSeriesPerContext int
+	autogen                   AutogenPolicy
+	autogenRules              []charttpl.ValidatedAutogenRule
+	autogenCounterRaw         charttpl.ValidatedCounterRawCharts
+	selector                  metrixselector.Selector
 }
 
 func resolveEffectivePolicy(
@@ -31,6 +33,7 @@ func resolveEffectivePolicy(
 				AutogenPolicy{
 					Enabled:                  templatePolicy.Autogen.Enabled,
 					Rules:                    templatePolicy.Autogen.Rules,
+					CounterRawCharts:         templatePolicy.Autogen.CounterRawCharts,
 					MaxTypeIDLen:             templatePolicy.Autogen.MaxTypeIDLen,
 					ExpireAfterSuccessCycles: templatePolicy.Autogen.ExpireAfterSuccessCycles,
 				},
@@ -60,9 +63,16 @@ func resolveEffectivePolicy(
 		selector = cfg.selectorOverride.value
 	}
 
+	autogenCounterRaw, err := compileAutogenCounterRaw(autogen)
+	if err != nil {
+		return effectiveEnginePolicy{}, err
+	}
+
 	return effectiveEnginePolicy{
-		autogen:      autogen,
-		autogenRules: autogenRules,
-		selector:     selector,
+		maxOutputSeriesPerContext: cfg.maxOutputSeriesPerContext,
+		autogen:                   autogen,
+		autogenRules:              autogenRules,
+		autogenCounterRaw:         autogenCounterRaw,
+		selector:                  selector,
 	}, nil
 }

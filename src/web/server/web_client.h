@@ -241,6 +241,7 @@ struct web_client {
 
     struct {
         nd_uuid_t bearer_token;
+        char registry_person_guid[UUID_STR_LEN]; // the netdata_registry_id cookie (if sent)
     } auth;
 
     struct {                            // A callback to check if the query should be interrupted / stopped
@@ -290,7 +291,7 @@ void web_client_free(struct web_client *w);
 #include "web/api/web_api_v2.h"
 #include "database/rrd.h"
 
-bool web_client_decode_path_and_query_string(struct web_client *w, const char *path_and_query_string);
+HTTP_VALIDATION web_client_decode_path_and_query_string(struct web_client *w, const char *path_and_query_string);
 void web_client_trim_url_decode_buffer_for_cache(struct web_client *w);
 int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_fragment);
 int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client *w, char *decoded_url_path);

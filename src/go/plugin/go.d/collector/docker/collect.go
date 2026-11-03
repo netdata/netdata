@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	typesContainer "github.com/moby/moby/api/types/container"
 	docker "github.com/moby/moby/client"
@@ -25,12 +26,15 @@ func (c *Collector) collect() (map[string]int64, error) {
 	if err := c.collectInfo(mx); err != nil {
 		return nil, err
 	}
-	if err := c.collectImages(mx); err != nil {
+	// collectContainers adds and removes charts, so every call that can fail the collection runs before it.
+	if err := c.refreshImages(); err != nil {
 		return nil, err
 	}
-	if err := c.collectContainers(mx); err != nil {
+	usedImages, err := c.collectContainers(mx)
+	if err != nil {
 		return nil, err
 	}
+	c.collectImages(mx, usedImages)
 
 	return mx, nil
 }
@@ -52,7 +56,21 @@ func (c *Collector) collectInfo(mx map[string]int64) error {
 	return nil
 }
 
-func (c *Collector) collectImages(mx map[string]int64) error {
+// On Docker Engine 29+ with the containerd image store, listing images can cost the daemon over a second of CPU time
+// per call (moby/moby#53077). Image metrics change rarely, so the list is refreshed at most this often.
+const imagesRefreshEvery = 5 * time.Minute
+
+type imagesSnapshot struct {
+	ids  []string
+	size int64
+}
+
+func (c *Collector) refreshImages() error {
+	now := c.now()
+	if now.Before(c.imagesNextRefresh) {
+		return nil
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
 	defer cancel()
 
@@ -60,22 +78,32 @@ func (c *Collector) collectImages(mx map[string]int64) error {
 	if err != nil {
 		return err
 	}
-	images := result.Items
 
-	mx["images_size"] = 0
+	var images imagesSnapshot
+	for _, v := range result.Items {
+		images.ids = append(images.ids, v.ID)
+		images.size += v.Size
+	}
+	c.images = images
+	c.imagesNextRefresh = now.Add(imagesRefreshEvery)
+
+	return nil
+}
+
+// collectImages counts an image as active when a container in usedImages (keyed by image ID) was created from it.
+// The daemon's own per-image container count is not used: it is -1 when the negotiated API is older than 1.51.
+func (c *Collector) collectImages(mx map[string]int64, usedImages map[string]bool) {
+	mx["images_size"] = c.images.size
 	mx["images_dangling"] = 0
 	mx["images_active"] = 0
 
-	for _, v := range images {
-		mx["images_size"] += v.Size
-		if v.Containers == 0 {
-			mx["images_dangling"]++
-		} else {
+	for _, id := range c.images.ids {
+		if usedImages[id] {
 			mx["images_active"]++
+		} else {
+			mx["images_dangling"]++
 		}
 	}
-
-	return nil
 }
 
 var (
@@ -96,7 +124,7 @@ var (
 	}
 )
 
-func (c *Collector) collectContainers(mx map[string]int64) error {
+func (c *Collector) collectContainers(mx map[string]int64) (map[string]bool, error) {
 	containerSet := make(map[typesContainer.HealthStatus][]typesContainer.Summary)
 
 	for _, status := range containerHealthStatuses {
@@ -116,11 +144,12 @@ func (c *Collector) collectContainers(mx map[string]int64) error {
 			return nil
 
 		}(); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	seen := make(map[string]bool)
+	usedImages := make(map[string]bool)
 
 	for _, s := range containerHealthStatuses {
 		mx["containers_health_status_"+string(s)] = 0
@@ -134,6 +163,8 @@ func (c *Collector) collectContainers(mx map[string]int64) error {
 		}
 
 		for _, cntr := range containers {
+			usedImages[cntr.ImageID] = true
+
 			state := string(cntr.State)
 			if status == typesContainer.Unhealthy {
 				if cntr.State == "running" {
@@ -192,7 +223,7 @@ func (c *Collector) collectContainers(mx map[string]int64) error {
 		}
 	}
 
-	return nil
+	return usedImages, nil
 }
 
 func hasIgnoreLabel(cntr typesContainer.Summary) bool {

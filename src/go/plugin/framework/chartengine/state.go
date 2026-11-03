@@ -15,12 +15,16 @@ type engineState struct {
 	matchIndex   matchIndex
 	routeCache   *routeCache
 	materialized materializedState
-	engineEpoch  uint64
-	commitSeq    uint64
-	nextAttempt  uint64
-	outstanding  uint64
-	hints        plannerSizingHints
-	buildSeq     buildSeqState
+	// outputContextCounts belongs to the last committed non-reset population.
+	outputContextCounts map[string]int
+	engineEpoch         uint64
+	commitSeq           uint64
+	nextAttempt         uint64
+	outstanding         uint64
+	// buildToken is unique per plan build; it marks objects a build created or recorded.
+	buildToken uint64
+	hints      plannerSizingHints
+	buildSeq   buildSeqState
 	// plannerBuildSeq is runtime-mode build-cycle sequence used only by
 	// per-build dedupe/scratch bookkeeping.
 	plannerBuildSeq uint64
@@ -32,6 +36,9 @@ type engineState struct {
 type plannerSizingHints struct {
 	chartsByID int
 	seenInfer  int
+	actions    int
+	values     int
+	journal    journalSizing
 }
 
 type buildSeqState struct {

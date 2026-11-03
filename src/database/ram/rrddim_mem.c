@@ -17,7 +17,7 @@ static void __attribute__((destructor)) destroy_lock(void) {
 // ----------------------------------------------------------------------------
 // metrics groups
 
-STORAGE_METRICS_GROUP *rrddim_metrics_group_get(STORAGE_INSTANCE *si __maybe_unused, nd_uuid_t *uuid __maybe_unused) {
+STORAGE_METRICS_GROUP *rrddim_metrics_group_get(STORAGE_INSTANCE *si __maybe_unused, uint64_t seed __maybe_unused) {
     return NULL;
 }
 
@@ -419,9 +419,9 @@ static inline void rrddim_fill_the_gap(STORAGE_COLLECT_HANDLE *sch, time_t now_c
         size_t current_entry = rrddim_metric_handle_current_entry_load(mh);
         time_t now_store_s = last_stored_s + update_every_s;
 
-        // fill the dimension
+        // fill only the missed intervals; the caller stores the sample at now_collect_s
         size_t c;
-        for(c = 0; c < entries && now_store_s <= now_collect_s ; now_store_s += update_every_s, c++) {
+        for(c = 0; c < entries && now_store_s < now_collect_s ; now_store_s += update_every_s, c++) {
             rrddim_metric_handle_slot_store(mh, current_entry++, empty);
 
             if(unlikely(current_entry >= entries))
@@ -538,15 +538,15 @@ static inline time_t rrddim_slot2time(STORAGE_METRIC_HANDLE *smh, size_t slot) {
         ret = last_entry_s - (time_t)(update_every * (last_slot - slot));
 
     if(unlikely(ret < first_entry_s)) {
-        netdata_log_error("INTERNAL ERROR: rrddim_slot2time() returned time (%ld) too far in the past (before first_entry_s %ld) for slot %zu",
-              ret, first_entry_s, slot);
+        netdata_log_error("INTERNAL ERROR: rrddim_slot2time() returned time (%" PRId64 ") too far in the past (before first_entry_s %" PRId64 ") for slot %zu",
+              (int64_t)ret, (int64_t)first_entry_s, slot);
 
         ret = first_entry_s;
     }
 
     if(unlikely(ret > last_entry_s)) {
-        netdata_log_error("INTERNAL ERROR: rrddim_slot2time() returned time (%ld) too far into the future (after last_entry_s %ld) for slot %zu",
-              ret, last_entry_s, slot);
+        netdata_log_error("INTERNAL ERROR: rrddim_slot2time() returned time (%" PRId64 ") too far into the future (after last_entry_s %" PRId64 ") for slot %zu",
+              (int64_t)ret, (int64_t)last_entry_s, slot);
 
         ret = last_entry_s;
     }

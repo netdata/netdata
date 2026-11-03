@@ -27,7 +27,7 @@ Plugin uses `ioping` command.
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -36,9 +36,6 @@ This collector supports collecting metrics from multiple instances of this integ
 
 This integration doesn't support auto-detection.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 
@@ -118,7 +115,7 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ ioping_disk_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ioping.conf) | ioping.latency | average I/O latency over the last 10 seconds |
+| [ ioping_disk_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ioping.conf) | ioping.latency | Average I/O latency over the last 10 seconds |
 
 
 

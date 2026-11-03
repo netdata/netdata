@@ -157,7 +157,7 @@ void rrdlabels_aggregated_to_buffer_json(RRDLABELS_AGGREGATED *agg, BUFFER *wb, 
             if(cardinality_limit && count >= cardinality_limit - 1 && total_values > cardinality_limit) {
                 // Add remaining count message
                 char msg[100];
-                snprintf(msg, sizeof(msg), "... %zu values more", total_values - count);
+                snprintf(msg, sizeof(msg), "... %zu values more", (size_t)(total_values - count));
                 buffer_json_add_array_item_string(wb, msg);
                 break;
             }

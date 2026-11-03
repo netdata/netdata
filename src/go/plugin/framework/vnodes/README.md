@@ -12,6 +12,14 @@ existing framework boundary for vnode design work. This maintainer document is n
   Credentials MUST NOT enter public snapshots, host definitions, acquisition diagnostics or whole-record logs.
 - `VNodeConfiguration` owns authored records, raw acquired metadata, resolved snapshots and GUID/hostname indexes.
   Configured overrides are applied to raw metadata on every update, so removing an override needs no acquisition.
+  Each record has an incarnation that survives config, credential and metadata edits but changes after removal and
+  re-creation. Snapshot copies preserve it separately from configuration and metadata revisions.
+- DynCfg ADD, TEST and USERCONFIG validate the name received by the vnode handler without rewriting it. Names MUST pass
+  `JobNameRuleAllowDots`: whitespace, ASCII control characters, colons, equals signs, quotes and backslashes are rejected.
+  Other protocol-safe characters, including dots and non-space Unicode, remain allowed. USERCONFIG keeps its `test`
+  fallback when no name is supplied and formats configuration without adopting it. Shared Function ingress decoding
+  is a separate boundary.
+  A rejected mutation MUST preserve the authored record, acquisition worker and dependent jobs.
 - Each run owns independent acquisition workers. The go.d entrypoint injects the concrete SNMP adapter; generic
   composition MUST NOT import collectors. Plugins without the adapter omit the mode from their form and filter
   unsupported file definitions before set-wide uniqueness checks.
@@ -49,6 +57,17 @@ V1 and V2 runtimes supply `collectorapi.ConfiguredVnodeConsumer` with an owned p
 synchronously before the next Collect when its revision changes. The callback MUST be cheap and MUST NOT perform
 network I/O. It is separate from the collector's `VirtualNode()` generated-identity capability.
 
+Candidates use a private snapshot during Init/Check. Before adoption, the candidate MUST still reference the same
+committed vnode incarnation. Removal or re-creation invalidates the candidate, even if the replacement has identical
+metadata and revisions. An interactive preflight rejects without replacing its incumbent; discovery retains enabled
+intent and rebuilds through accepted activation. Ordinary edits remain valid: the installed runtime catches up through
+the live lookup without restarting the job.
+
+Missing or pending named vnodes leave enabled jobs Accepted. Successful vnode commits notify those jobs through the
+existing dependency subscriptions, independently of `autodetection_retry`. Passive and disabled jobs stay inactive.
+Removal is blocked by any graph config referencing the vnode, including waiting and disabled jobs, and is available
+only for DynCfg-sourced records.
+
 SNMP uses `vnode` for a string reference and `local_vnode` for job-owned generation settings. Legacy inline `vnode`
 objects decode to `local_vnode`; configuration output uses this canonical shape for stable form editing. Supplying
 both local object spellings is rejected as ambiguous. A string suppresses collector-generated vnodes even
@@ -64,3 +83,5 @@ the provider's credentials are never substituted. The configured vnode owns host
   shared identity, independent credentials, acquisition without metrics jobs and cold restarts with unavailable SNMP.
 - V1 configured-consumer tests cover owned snapshots and revision updates; existing V1/V2 host publication suites
   remain the authority for output ordering, scope routing and configured-host precedence.
+- Composition's `vnode_contract_test.go` covers exact handler names, process-wire round trips, preflight lifetime
+  invalidation, discovery recovery, and static/SNMP dependency wakeups with retries disabled.

@@ -14,9 +14,12 @@ import (
 )
 
 type engineConfig struct {
-	autogen       AutogenPolicy
-	autogenRules  []charttpl.ValidatedAutogenRule
-	autogenTypeID string
+	maxOutputSeriesPerContext int
+	outputLimitOverride       policyOverride[int]
+	autogen                   AutogenPolicy
+	autogenRules              []charttpl.ValidatedAutogenRule
+	autogenCounterRaw         charttpl.ValidatedCounterRawCharts
+	autogenTypeID             string
 	// autogenContextNamespace prefixes autogen chart contexts (the spec's root
 	// context_namespace), so autogen and template charts share one namespace.
 	autogenContextNamespace string
@@ -62,6 +65,11 @@ type AutogenRule = runtimecomp.AutogenRule
 
 // EnginePolicy controls chartengine matching/materialization behavior.
 type EnginePolicy struct {
+	// MaxOutputSeriesPerContext limits distinct current chart/dimension pairs
+	// after routing and aggregation. An oversized context is omitted as a whole.
+	// Nil keeps the existing policy; zero disables it; negative values are invalid.
+	MaxOutputSeriesPerContext *int
+
 	// Selector filters input series globally before template/autogen routing.
 	// Nil means "no override", and an explicitly empty expr means "override to allow all".
 	Selector *metrixselector.Expr
@@ -98,8 +106,24 @@ func normalizeAutogenPolicyWithRules(
 			fmt.Errorf("autogen max type.id len must be >= 4, got %d", maxLen)
 	}
 	policy.Rules = cloneAutogenRules(policy.Rules)
+	// Absent and empty lists are the same policy; keep one form so policy
+	// comparison does not depend on how the caller spelled "none".
+	policy.CounterRawCharts = slices.Clone(policy.CounterRawCharts)
+	if len(policy.CounterRawCharts) == 0 {
+		policy.CounterRawCharts = nil
+	}
 	policy.MaxTypeIDLen = maxLen
 	return policy, slices.Clone(rules), nil
+}
+
+// compileAutogenCounterRaw compiles the policy's counter raw-chart patterns.
+// Every effective policy derives its compiled matcher from its own patterns.
+func compileAutogenCounterRaw(policy AutogenPolicy) (charttpl.ValidatedCounterRawCharts, error) {
+	compiled, err := charttpl.CompileCounterRawCharts(policy.CounterRawCharts)
+	if err != nil {
+		return charttpl.ValidatedCounterRawCharts{}, fmt.Errorf("autogen counter_raw_charts: %w", err)
+	}
+	return compiled, nil
 }
 
 func compileEngineSelector(expr metrixselector.Expr) (metrixselector.Selector, error) {
@@ -113,19 +137,34 @@ func compileEngineSelector(expr metrixselector.Expr) (metrixselector.Selector, e
 func WithEnginePolicy(policy EnginePolicy) Option {
 	policy = cloneEnginePolicy(policy)
 	var (
-		autogen          AutogenPolicy
-		autogenRules     []charttpl.ValidatedAutogenRule
-		autogenErr       error
-		compiledSelector metrixselector.Selector
-		selectorErr      error
+		autogen           AutogenPolicy
+		autogenRules      []charttpl.ValidatedAutogenRule
+		autogenCounterRaw charttpl.ValidatedCounterRawCharts
+		autogenErr        error
+		compiledSelector  metrixselector.Selector
+		selectorErr       error
 	)
 	if policy.Autogen != nil {
 		autogen, autogenRules, autogenErr = normalizeAutogenPolicy(*policy.Autogen)
+		if autogenErr == nil {
+			autogenCounterRaw, autogenErr = compileAutogenCounterRaw(autogen)
+		}
 	}
 	if policy.Selector != nil {
 		compiledSelector, selectorErr = compileEngineSelector(*policy.Selector)
 	}
 	return func(cfg *engineConfig) error {
+		if policy.MaxOutputSeriesPerContext != nil {
+			limit := *policy.MaxOutputSeriesPerContext
+			if limit < 0 {
+				return fmt.Errorf("max output series per context must be non-negative, got %d", limit)
+			}
+			cfg.maxOutputSeriesPerContext = limit
+			cfg.outputLimitOverride = policyOverride[int]{
+				set:   true,
+				value: limit,
+			}
+		}
 		if autogenErr != nil {
 			return autogenErr
 		}
@@ -140,6 +179,7 @@ func WithEnginePolicy(policy EnginePolicy) Option {
 			}
 			cfg.autogen = cloneAutogenPolicy(autogen)
 			cfg.autogenRules = slices.Clone(autogenRules)
+			cfg.autogenCounterRaw = autogenCounterRaw
 		}
 		if policy.Selector != nil {
 			cfg.selectorOverride = policyOverride[metrixselector.Selector]{set: true, value: compiledSelector}
@@ -152,6 +192,10 @@ func WithEnginePolicy(policy EnginePolicy) Option {
 
 func cloneEnginePolicy(policy EnginePolicy) EnginePolicy {
 	out := policy
+	if policy.MaxOutputSeriesPerContext != nil {
+		limit := *policy.MaxOutputSeriesPerContext
+		out.MaxOutputSeriesPerContext = &limit
+	}
 	if policy.Autogen != nil {
 		autogen := cloneAutogenPolicy(*policy.Autogen)
 		out.Autogen = &autogen
@@ -168,6 +212,7 @@ func cloneEnginePolicy(policy EnginePolicy) EnginePolicy {
 func cloneAutogenPolicy(policy AutogenPolicy) AutogenPolicy {
 	out := policy
 	out.Rules = cloneAutogenRules(policy.Rules)
+	out.CounterRawCharts = slices.Clone(policy.CounterRawCharts)
 	return out
 }
 
@@ -251,6 +296,7 @@ func WithRuntimePlannerMode() Option {
 
 // WithEmitTypeIDBudgetPrefix configures chartengine autogen type-id budget
 // checks to use the effective emission type-id prefix (for example job fullName).
+// The prefix also scopes the chart ID collision warning period.
 func WithEmitTypeIDBudgetPrefix(typeID string) Option {
 	return func(cfg *engineConfig) error {
 		cfg.autogenTypeID = typeID

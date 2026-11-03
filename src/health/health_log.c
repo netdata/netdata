@@ -183,7 +183,7 @@ void health_log_alert_transition_with_trace(RRDHOST *host, ALARM_ENTRY *ae, int 
 // health alarm log management
 
 inline ALARM_ENTRY* health_create_alarm_entry(
-    RRDHOST *host,
+    RRDHOST *host __maybe_unused,
     RRDCALC *rc,
     time_t when,
     time_t duration,

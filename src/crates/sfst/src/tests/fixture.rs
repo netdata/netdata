@@ -1,11 +1,18 @@
 //! Buffer-all fixture builder for reader tests.
 //!
-//! Deliberately looser than the public [`crate::ChunkWriter`]: it can
-//! emit files with chunks missing (no SUMR, no META) and accepts its
-//! chunks in any call order, so reader tests can pin behavior on
-//! partial or odd files. Test scaffolding only — production files are
+//! Accumulate packed chunks via the setters, then emit the container
+//! with [`FixtureWriter::write_to`]. Deliberately looser than the
+//! public [`crate::ChunkWriter`]: optional chunks (SUMR, META) can be
+//! omitted so reader tests can pin behavior on partial files, and the
+//! setters may be called in any order — the file's chunk order is
+//! decided at write time. Test scaffolding only — production files are
 //! written through [`crate::ChunkWriter`], which enforces the full
 //! canonical shape.
+//!
+//! Callers: `src/tests/round_trip.rs` (chunk ordering, partial files,
+//! multi-field and multi-batch layouts, byte-patch corruption tests)
+//! and `registry/tests.rs` (PRIM + TIMS + one stream batch + SUMR, no
+//! META — recovery reads only header, TOC, and SUMR).
 
 use std::io::Write;
 
@@ -16,6 +23,9 @@ use crate::{
     VERSION, high_field_id, mid_field_id, stream_batch_id,
 };
 
+/// Accumulates packed chunk payloads. Setters take bytes already
+/// packed via `crate::writer::pack` — this type never encodes — and
+/// unset optional chunks are left out of the emitted file.
 pub struct FixtureWriter {
     summary: Option<Vec<u8>>,
     metadata: Option<Vec<u8>>,
@@ -51,12 +61,16 @@ impl FixtureWriter {
         self.primary = Some(packed);
     }
 
+    /// Add a packed mid-cardinality field chunk; returns its 0-based
+    /// index — the `MF` chunk id suffix assigned at write time.
     pub fn add_mid_field(&mut self, packed: Vec<u8>) -> u16 {
         let idx = u16::try_from(self.mid_fields.len()).unwrap();
         self.mid_fields.push(packed);
         idx
     }
 
+    /// Add a packed high-cardinality field chunk; returns its 0-based
+    /// index — as [`Self::add_mid_field`], with the `HF` id prefix.
     pub fn add_high_field(&mut self, packed: Vec<u8>) -> u16 {
         let idx = u16::try_from(self.high_fields.len()).unwrap();
         self.high_fields.push(packed);
@@ -67,6 +81,10 @@ impl FixtureWriter {
         self.timestamps = Some(packed);
     }
 
+    /// Add a packed stream-batch chunk; returns its 0-based batch
+    /// index (the `SB0{i}` chunk id suffix). Panics once
+    /// [`MAX_STREAM_BATCHES`] batches are queued — the cap that keeps
+    /// per-value batch masks to a `u8`.
     pub fn add_stream_batch(&mut self, packed: Vec<u8>) -> u8 {
         assert!(self.stream_batches.len() < MAX_STREAM_BATCHES as usize);
         let idx = self.stream_batches.len() as u8;
@@ -74,10 +92,12 @@ impl FixtureWriter {
         idx
     }
 
-    /// Emit the file in the canonical chunk order, skipping unset
-    /// optional chunks. PRIM, TIMS, and at least one stream batch are
-    /// asserted — fixtures below that bar build raw containers via
-    /// `chunk_file` directly.
+    /// Emit the accumulated chunks to `w` in the canonical chunk
+    /// order — SUMR, META, TIMS, PRIM, then mid fields, high fields,
+    /// and stream batches by index — skipping unset optional chunks.
+    /// PRIM, TIMS, and at least one stream batch are mandatory
+    /// (expect/assert panics otherwise); a fixture below that bar must
+    /// build the container via `chunk_file` directly.
     pub fn write_to<W: Write>(&self, w: &mut W) -> Result<(), Error> {
         let primary = self
             .primary

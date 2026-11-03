@@ -35,7 +35,6 @@ func (c *Collector) getDHCPRanges(configs []*configFile) []iprange.Range {
 		c.Debugf("looking in '%s'", conf.path)
 
 		for _, value := range conf.get("dhcp-range") {
-			c.Debugf("found dhcp-range '%s'", value)
 			if parsed = parseDHCPRangeValue(value); parsed == "" || seen[parsed] {
 				continue
 			}
@@ -43,7 +42,7 @@ func (c *Collector) getDHCPRanges(configs []*configFile) []iprange.Range {
 
 			r, err := iprange.ParseRange(parsed)
 			if r == nil || err != nil {
-				c.Warningf("error on parsing dhcp-range '%s', skipping it", parsed)
+				c.Warning("error on parsing dhcp-range: invalid address range, skipping it")
 				continue
 			}
 
@@ -67,7 +66,6 @@ func (c *Collector) getDHCPHosts(configs []*configFile) []netip.Addr {
 		c.Debugf("looking in '%s'", conf.path)
 
 		for _, value := range conf.get("dhcp-host") {
-			c.Debugf("found dhcp-host '%s'", value)
 			if parsed = parseDHCPHostValue(value); parsed == "" || seen[parsed] {
 				continue
 			}
@@ -75,7 +73,7 @@ func (c *Collector) getDHCPHosts(configs []*configFile) []netip.Addr {
 
 			addr, err := netip.ParseAddr(parsed)
 			if err != nil {
-				c.Warningf("error on parsing dhcp-host '%s': %v, skipping it", parsed, err)
+				c.Warning("error on parsing dhcp-host: invalid address, skipping it")
 				continue
 			}
 

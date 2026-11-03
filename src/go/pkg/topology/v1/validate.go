@@ -580,6 +580,7 @@ func decodeColumn(path string, columnIndex int, rows int, raw any) ([]any, error
 
 func validateColumnValues(path string, column map[string]any, columnType string, values []any, ctx validationContext) error {
 	nullable, _ := column["nullable"].(bool)
+	aggregation, _ := column["aggregation"].(string)
 	for i, value := range values {
 		if value == nil {
 			if nullable {
@@ -625,26 +626,12 @@ func validateColumnValues(path string, column map[string]any, columnType string,
 			if _, ok := value.([]any); !ok {
 				return fmt.Errorf("%s[%d] is not an array", path, i)
 			}
-		case "bool":
-			if _, ok := value.(bool); !ok {
-				return fmt.Errorf("%s[%d] is not a bool", path, i)
-			}
-		case "int":
-			if _, ok := integerValue(value); !ok {
-				return fmt.Errorf("%s[%d] is not an integer", path, i)
-			}
-		case "uint":
-			n, ok := integerValue(value)
-			if !ok || n < 0 {
-				return fmt.Errorf("%s[%d] is not a non-negative integer", path, i)
-			}
-		case "float", "duration":
-			if _, ok := numberValue(value); !ok {
-				return fmt.Errorf("%s[%d] is not a number", path, i)
-			}
-		case "string", "ip", "mac", "timestamp":
-			if _, ok := value.(string); !ok {
-				return fmt.Errorf("%s[%d] is not a string", path, i)
+		case "bool", "int", "uint", "float", "duration", "string", "ip", "mac", "timestamp":
+			if member, reason := scalarColumnValueError(columnType, aggregation, nullable, value); reason != "" {
+				if member >= 0 {
+					return fmt.Errorf("%s[%d][%d] %s", path, i, member, reason)
+				}
+				return fmt.Errorf("%s[%d] %s", path, i, reason)
 			}
 		case "json":
 			// Any decoded JSON value is valid for a json column.
@@ -2590,27 +2577,6 @@ func integerValue(raw any) (int, bool) {
 			return 0, false
 		}
 		return int(n), true
-	default:
-		return 0, false
-	}
-}
-
-func numberValue(raw any) (float64, bool) {
-	switch value := raw.(type) {
-	case int:
-		return float64(value), true
-	case int64:
-		return float64(value), true
-	case uint64:
-		return float64(value), true
-	case float64:
-		return value, true
-	case json.Number:
-		n, err := value.Float64()
-		if err != nil {
-			return 0, false
-		}
-		return n, true
 	default:
 		return 0, false
 	}

@@ -664,7 +664,8 @@ func (ck *CommandKernel) completeResourceTransactionTask(
 		}
 		operation.transactionApplied = true
 
-		ck.enqueueCancellationControlIfNeeded(operation)
+		// The applied state is final, so its own result is the reply. A cancel or
+		// deadline that arrived during Apply must not answer as if nothing changed.
 		if operation.Response == lifecycle.ResponseOpen && !operation.controlQueued {
 			if ck.beginResultEncode(operation, completion.Ref) {
 				return

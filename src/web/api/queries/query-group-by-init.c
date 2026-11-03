@@ -54,7 +54,7 @@ static void query_group_by_make_dimension_key(BUFFER *key, RRDR_GROUP_BY group_b
         }
 
         if (group_by & RRDR_GROUP_BY_LABEL) {
-            RRDLABELS *labels = rrdinstance_acquired_labels(qi->ria);
+            RRDLABELS *labels = query_instance_labels(qi);
             for (size_t l = 0; l < qt->group_by[group_by_id].used; l++) {
                 buffer_fast_strcat(key, "|", 1);
                 rrdlabels_get_value_to_buffer_or_unset(labels, key, qt->group_by[group_by_id].label_keys[l], "[unset]");
@@ -73,7 +73,12 @@ static void query_group_by_make_dimension_key(BUFFER *key, RRDR_GROUP_BY group_b
 
         if (group_by & RRDR_GROUP_BY_UNITS) {
             buffer_fast_strcat(key, "|", 1);
-            buffer_strcat(key, query_target_has_percentage_units(qt) ? "%" : rrdinstance_acquired_units(qi->ria));
+            {
+                char _ub[64];
+                buffer_strcat(key, query_target_result_units_for(
+                    qt, qm->values_stored_as_rates,
+                    rrdinstance_acquired_units(qi->ria), _ub, sizeof(_ub)));
+            }
         }
     }
 }
@@ -110,7 +115,7 @@ static void query_group_by_make_dimension_id(BUFFER *key, RRDR_GROUP_BY group_by
         }
 
         if (group_by & RRDR_GROUP_BY_LABEL) {
-            RRDLABELS *labels = rrdinstance_acquired_labels(qi->ria);
+            RRDLABELS *labels = query_instance_labels(qi);
             for (size_t l = 0; l < qt->group_by[group_by_id].used; l++) {
                 if (buffer_strlen(key) != 0)
                     buffer_fast_strcat(key, ",", 1);
@@ -136,7 +141,12 @@ static void query_group_by_make_dimension_id(BUFFER *key, RRDR_GROUP_BY group_by
             if (buffer_strlen(key) != 0)
                 buffer_fast_strcat(key, ",", 1);
 
-            buffer_strcat(key, query_target_has_percentage_units(qt) ? "%" : rrdinstance_acquired_units(qi->ria));
+            {
+                char _ub[64];
+                buffer_strcat(key, query_target_result_units_for(
+                    qt, qm->values_stored_as_rates,
+                    rrdinstance_acquired_units(qi->ria), _ub, sizeof(_ub)));
+            }
         }
     }
 }
@@ -176,7 +186,7 @@ static void query_group_by_make_dimension_name(
         }
 
         if (group_by & RRDR_GROUP_BY_LABEL) {
-            RRDLABELS *labels = rrdinstance_acquired_labels(qi->ria);
+            RRDLABELS *labels = query_instance_labels(qi);
             for (size_t l = 0; l < qt->group_by[group_by_id].used; l++) {
                 if (buffer_strlen(key) != 0)
                     buffer_fast_strcat(key, ",", 1);
@@ -202,7 +212,12 @@ static void query_group_by_make_dimension_name(
             if (buffer_strlen(key) != 0)
                 buffer_fast_strcat(key, ",", 1);
 
-            buffer_strcat(key, query_target_has_percentage_units(qt) ? "%" : rrdinstance_acquired_units(qi->ria));
+            {
+                char _ub[64];
+                buffer_strcat(key, query_target_result_units_for(
+                    qt, qm->values_stored_as_rates,
+                    rrdinstance_acquired_units(qi->ria), _ub, sizeof(_ub)));
+            }
         }
     }
 }
@@ -213,6 +228,7 @@ struct rrdr_group_by_entry {
     STRING *id;
     STRING *name;
     STRING *units;
+    STRING *result_units;
     RRDR_DIMENSION_FLAGS od;
     DICTIONARY *dl;
 };
@@ -225,8 +241,8 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         // v1 query
         RRDR *r = rrdr_create(owa, qt, qt->query.used, qt->window.points);
         if(unlikely(!r)) {
-            internal_error(true, "QUERY: cannot create RRDR for %s, after=%ld, before=%ld, dimensions=%u, points=%zu",
-                           qt->id, qt->window.after, qt->window.before, qt->query.used, qt->window.points);
+            internal_error(true, "QUERY: cannot create RRDR for %s, after=%" PRId64 ", before=%" PRId64 ", dimensions=%u, points=%zu",
+                           qt->id, (int64_t)qt->window.after, (int64_t)qt->window.before, qt->query.used, qt->window.points);
             return NULL;
         }
         r->group_by.r = NULL;
@@ -426,6 +442,11 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
 
                 // add the rest of the info
                 entries[pos].units = rrdinstance_acquired_units_dup(qi->ria);
+                if(group_by & RRDR_GROUP_BY_UNITS) {
+                    char units_buf[64];
+                    entries[pos].result_units = string_strdupz(query_target_result_units_for(
+                        qt, qm->values_stored_as_rates, string2str(entries[pos].units), units_buf, sizeof(units_buf)));
+                }
                 entries[pos].priority = priority;
 
                 if (label_keys) {
@@ -472,7 +493,7 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
                 entries[pos].od |= qm->status;
 
             if (entries[pos].dl)
-                rrdlabels_walkthrough_read(rrdinstance_acquired_labels(qi->ria),
+                rrdlabels_walkthrough_read(query_instance_labels(qi),
                                            rrdlabels_traversal_cb_to_group_by_label_key, entries[pos].dl);
         }
 
@@ -481,8 +502,8 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         RRDR *r = rrdr_create(owa, qt, added, qt->window.points);
         if (!r) {
             internal_error(true,
-                           "QUERY: cannot create group by RRDR for %s, after=%ld, before=%ld, dimensions=%zu, points=%zu",
-                           qt->id, qt->window.after, qt->window.before, added, qt->window.points);
+                           "QUERY: cannot create group by RRDR for %s, after=%" PRId64 ", before=%" PRId64 ", dimensions=%zu, points=%zu",
+                           qt->id, (int64_t)qt->window.after, (int64_t)qt->window.before, added, qt->window.points);
             goto cleanup;
         }
         // prevent double free at cleanup in case of error
@@ -500,6 +521,8 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
 
         if(r->d) {
             r->dp = onewayalloc_callocz(owa, r->d, sizeof(*r->dp));
+            if(group_by & RRDR_GROUP_BY_UNITS)
+                r->result_units = onewayalloc_callocz(owa, r->d, sizeof(*r->result_units));
             r->dview = onewayalloc_callocz(owa, r->d, sizeof(*r->dview));
             r->dgbc = onewayalloc_callocz(owa, r->d, sizeof(*r->dgbc));
             r->dqp = onewayalloc_callocz(owa, r->d, sizeof(STORAGE_POINT));
@@ -545,6 +568,8 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
 
             r->od[d] = entries[d].od;
             r->du[d] = entries[d].units;
+            if(r->result_units)
+                r->result_units[d] = entries[d].result_units;
             r->dp[d] = entries[d].priority;
             r->dgbc[d] = entries[d].count;
 
@@ -587,8 +612,8 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     r_tmp = rrdr_create(owa, qt, 1, qt->window.points);
     if (!r_tmp) {
         internal_error(true,
-                       "QUERY: cannot create group by temporary RRDR for %s, after=%ld, before=%ld, dimensions=%d, points=%zu",
-                       qt->id, qt->window.after, qt->window.before, 1, qt->window.points);
+                       "QUERY: cannot create group by temporary RRDR for %s, after=%" PRId64 ", before=%" PRId64 ", dimensions=%d, points=%zu",
+                       qt->id, (int64_t)qt->window.after, (int64_t)qt->window.before, 1, qt->window.points);
         goto cleanup;
     }
     rrd2rrdr_set_timestamps(r_tmp);
@@ -616,6 +641,7 @@ cleanup:
                 string_freez(entries[d].id);
                 string_freez(entries[d].name);
                 string_freez(entries[d].units);
+                string_freez(entries[d].result_units);
                 dictionary_destroy(entries[d].dl);
             }
         }

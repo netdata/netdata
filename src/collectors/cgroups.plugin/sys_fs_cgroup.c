@@ -684,11 +684,9 @@ static inline void cgroup_read_cpuacct_usage(struct cpuacct_usage *ca) {
             ca->cpus = (unsigned int)i;
         }
 
-        unsigned long long total = 0;
         for(i = 0; i < ca->cpus ;i++) {
             unsigned long long n = str2ull(procfile_lineword(ff, 0, i), NULL);
             ca->cpu_percpu[i] = n;
-            total += n;
         }
 
         ca->updated = 1;

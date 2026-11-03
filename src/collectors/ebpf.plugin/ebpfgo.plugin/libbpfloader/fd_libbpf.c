@@ -372,8 +372,6 @@ struct netdata_ebpf_fd_runtime *netdata_fd_runtime_open_mode(const char *path, i
     {
         struct bpf_object *obj = bpf_object__open_file(path, NULL);
         if (!obj || libbpf_get_error(obj)) {
-            if (obj && libbpf_get_error(obj))
-                bpf_object__close(obj);
             freez(rt);
             return NULL;
         }
@@ -406,9 +404,10 @@ int netdata_fd_runtime_prepare(
     nd_ebpf_acc_set_max_entries(&rt->acc, pid_table_size);
 #endif
 
-    nd_ebpf_alloc_percpu_buffers(
+    if (nd_ebpf_alloc_percpu_buffers(
         &rt->percpu_u64, &rt->percpu_u64_cap,
-        (void **)&rt->percpu_entries, &rt->percpu_entries_cap, sizeof(*rt->percpu_entries));
+        (void **)&rt->percpu_entries, &rt->percpu_entries_cap, sizeof(*rt->percpu_entries)) != 0)
+        return -1;
 
     /* items_buf starts NULL; grows lazily in snapshot_apps */
     return 0;
@@ -476,21 +475,13 @@ static void fd_destroy_ring_buffer(struct netdata_ebpf_fd_runtime *rt)
     nd_ebpf_acc_free(&rt->acc);
 }
 
-/* Arena flavor: the BPF programs publish events into an mmap-able BPF arena
- * instead of a ring buffer.  The state layout and the drain loop are shared (see
- * struct nd_ebpf_arena_state); only the companion BSS field name is per-module.
- *
- * bpf_map__initial_value() on a BPF_MAP_TYPE_ARENA map returns the arena region
- * start, but the data section sits at a page-aligned offset inside it, so using
- * the arena map pointer directly reads uninitialized memory.  The arena skeleton
- * wires a companion BSS map whose mmaped pointer libbpf resolves to the correct
- * offset after load — use that. */
+/* The generated arena skeleton maps the arena data section through `arena`. */
 static void fd_setup_arena(struct netdata_ebpf_fd_runtime *rt)
 {
-    if (!rt->core.arena || !rt->core.arena->bss)
+    if (!rt->core.arena || !rt->core.arena->arena)
         return;
 
-    rt->arena_state = (void *)&rt->core.arena->bss->fd_arena_state;
+    rt->arena_state = (void *)&rt->core.arena->arena->fd_arena_state;
 }
 
 static void fd_rb_event(void *ctx, const struct nd_ebpf_pid_event *ev)

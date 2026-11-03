@@ -471,6 +471,11 @@ Suggested package split:
 Required behavior:
 
 - merge actors by the requested scope and actor type identity;
+- preserve scalar/item column metadata for `aggregation: set`: direct scalar
+  cells and one-dimensional typed sets may share a column. Preserve key cells,
+  validate each set member with the column's type/nullability rules, and retain
+  integer reference encoding. Canonical Go builders and semantic validation
+  accept these aggregate cells without changing installed Agent producer output;
 - apply `data.correlation.rules` without hardcoding topology-kind-specific key
   names in the aggregator;
 - remove pure correlation actors only for exact unambiguous `absorb` matches,

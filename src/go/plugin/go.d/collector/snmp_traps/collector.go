@@ -35,7 +35,7 @@ func (c *Collector) Configuration() any {
 func (c *Collector) Init(ctx context.Context) error {
 	validated, err := validateConfig(c.Config)
 	if err != nil {
-		return dyncfgConfigError(err)
+		return collectorapi.PermanentError(err)
 	}
 	c.warnCatchAllTrustedRelays(validated.trustedRelays)
 
@@ -52,9 +52,9 @@ func (c *Collector) Init(ctx context.Context) error {
 	}); err != nil {
 		switch jobruntime.KindOf(err) {
 		case jobruntime.ErrorConfig:
-			return dyncfgConfigError(err)
+			return collectorapi.PermanentError(err)
 		default:
-			return dyncfgStartupError(err)
+			return collectorapi.TemporaryError(err)
 		}
 	}
 	return nil
@@ -104,22 +104,3 @@ func (c *Collector) warnCatchAllTrustedRelays(prefixes []netip.Prefix) {
 func trustedRelayPrefixIsCatchAll(prefix netip.Prefix) bool {
 	return prefix.Bits() == 0
 }
-
-type dyncfgCodedError struct {
-	err       error
-	code      int
-	retryable bool
-}
-
-func dyncfgConfigError(err error) *dyncfgCodedError {
-	return &dyncfgCodedError{err: err, code: 422}
-}
-
-func dyncfgStartupError(err error) *dyncfgCodedError {
-	return &dyncfgCodedError{err: err, code: 503, retryable: true}
-}
-
-func (e *dyncfgCodedError) Error() string         { return e.err.Error() }
-func (e *dyncfgCodedError) Unwrap() error         { return e.err }
-func (e *dyncfgCodedError) DyncfgCode() int       { return e.code }
-func (e *dyncfgCodedError) DyncfgRetryable() bool { return e.retryable }

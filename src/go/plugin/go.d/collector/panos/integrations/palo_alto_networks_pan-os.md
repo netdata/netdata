@@ -31,7 +31,7 @@ It gathers metrics by periodically running PAN-OS XML API operational commands t
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The configured PAN-OS account must be allowed to use the XML API and run read-only operational requests for the collected telemetry.
 
@@ -122,7 +122,7 @@ Configure the **panos** collector from the Netdata web interface:
 4. In the Search box, type _panos_ (or scroll the list) to locate the **panos** collector.
 5. Click the **+** next to the **panos** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -189,12 +189,12 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ panos_bgp_peer_not_established ](https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf) | panos.bgp.peer.state | Critical when a BGP peer has not been established for 5 minutes. |
-| [ panos_device_certificate_invalid ](https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf) | panos.system.device_certificate_status | Critical when PAN-OS reports the device certificate as invalid. |
-| [ panos_ha_peer_connection_down ](https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf) | panos.ha.peer.connection_status | Critical when the HA peer connection has not been up for 5 minutes. |
-| [ panos_environment_sensor_alarm ](https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf) | panos.environment.sensor_alarm_status | Critical when PAN-OS reports an environment sensor alarm. |
-| [ panos_license_expired ](https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf) | panos.license.status | Critical when PAN-OS reports a license as expired. |
-| [ panos_license_expires_soon ](https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf) | panos.license.time_until_expiration | Warning under 30 days before expiration, critical under 7 days. Expired licenses trigger panos_license_expired instead. |
+| [ panos_bgp_peer_not_established ](https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf) | panos.bgp.peer.state | BGP peer ${label:peer_address} in virtual router or logical router ${label:vr} has not been established for the last 5 minutes |
+| [ panos_device_certificate_invalid ](https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf) | panos.system.device_certificate_status | PAN-OS reports the device certificate status as invalid |
+| [ panos_ha_peer_connection_down ](https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf) | panos.ha.peer.connection_status | PAN-OS HA peer connection has not been up for the last 5 minutes |
+| [ panos_environment_sensor_alarm ](https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf) | panos.environment.sensor_alarm_status | PAN-OS reports an environment alarm for ${label:sensor_type} sensor ${label:sensor} in slot ${label:slot} |
+| [ panos_license_expired ](https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf) | panos.license.status | PAN-OS reports license ${label:feature} as expired |
+| [ panos_license_expires_soon ](https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf) | panos.license.time_until_expiration | PAN-OS license ${label:feature} has less than 30 days before expiration; expired licenses trigger panos_license_expired |
 
 
 
@@ -321,7 +321,7 @@ Metrics:
 
 ### Per IPsec summary
 
-These metrics summarize active PAN-OS IPsec security associations.
+These metrics count distinct PAN-OS tunnels, including separate proxy IDs, with at least one established IPsec security association (SA).
 
 This scope has no labels.
 
@@ -334,7 +334,7 @@ Metrics:
 
 ### Per IPsec tunnel
 
-These metrics refer to one active PAN-OS IPsec security association.
+These metrics report the maximum valid remaining SA lifetime for each tunnel and remote peer, including overlapping SAs during rekeying.
 
 Labels:
 
@@ -343,7 +343,7 @@ Labels:
 | tunnel | Tunnel name. |
 | gateway | Gateway name. |
 | remote | Remote peer. |
-| tunnel_id | PAN-OS tunnel identifier. |
+| tunnel_id | PAN-OS tunnel identifier, or unknown when the response omits it. |
 | protocol | Tunnel protocol. |
 | encryption | Encryption algorithm. |
 
@@ -519,5 +519,5 @@ Verify the account permissions and platform support for the metricset, or provid
 
 #### A PAN-OS value cannot be parsed
 
-The collector reports missing or invalid integer, decimal, duration, status, license expiration, and IPsec tunnel-count values with the metricset, field, entity name, and raw value when present.
+The collector reports missing or invalid integer, decimal, duration, status, license expiration, and IPsec SA lifetime values with the metricset, field, entity name, and raw value when present.
 It does not silently convert missing or malformed values to zero, report fake valid status, or treat unrecognized license dates as never-expiring licenses.

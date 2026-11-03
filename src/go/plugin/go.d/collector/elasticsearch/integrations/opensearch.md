@@ -40,7 +40,7 @@ Used endpoints:
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 OpenSearch can be monitored further using the following other integrations:
@@ -144,7 +144,7 @@ Configure the **elasticsearch** collector from the Netdata web interface:
 4. In the Search box, type _elasticsearch_ (or scroll the list) to locate the **elasticsearch** collector.
 5. Click the **+** next to the **elasticsearch** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -256,11 +256,11 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ elasticsearch_node_indices_search_time_query ](https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf) | elasticsearch.node_indices_search_time | search performance is degraded, queries run slowly. |
-| [ elasticsearch_node_indices_search_time_fetch ](https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf) | elasticsearch.node_indices_search_time | search performance is degraded, fetches run slowly. |
-| [ elasticsearch_cluster_health_status_red ](https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf) | elasticsearch.cluster_health_status | cluster health status is red. |
-| [ elasticsearch_cluster_health_status_yellow ](https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf) | elasticsearch.cluster_health_status | cluster health status is yellow. |
-| [ elasticsearch_node_index_health_red ](https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf) | elasticsearch.node_index_health | node index $label:index health status is red. |
+| [ elasticsearch_cluster_health_status_red ](https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf) | elasticsearch.cluster_health_status | Elasticsearch cluster ${label:cluster_name} health status is red. |
+| [ elasticsearch_cluster_health_status_yellow ](https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf) | elasticsearch.cluster_health_status | Elasticsearch cluster ${label:cluster_name} health status is yellow. |
+| [ elasticsearch_node_index_health_red ](https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf) | elasticsearch.node_index_health | Elasticsearch cluster ${label:cluster_name} index ${label:index} health status is red. |
+| [ elasticsearch_node_indices_search_time_query ](https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf) | elasticsearch.node_indices_search_time | Elasticsearch cluster ${label:cluster_name} node ${label:node_name} search performance is degraded, queries run slowly. |
+| [ elasticsearch_node_indices_search_time_fetch ](https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf) | elasticsearch.node_indices_search_time | Elasticsearch cluster ${label:cluster_name} node ${label:node_name} search performance is degraded, fetches run slowly. |
 
 
 
@@ -294,7 +294,7 @@ Metrics:
 | elasticsearch.node_indices_indexing_time | Time Spent On Indexing Operations | index | milliseconds |
 | elasticsearch.node_indices_search | Search Operations | queries, fetches | operations/s |
 | elasticsearch.node_indices_search_current | Search Operations Current | queries, fetches | operations |
-| elasticsearch.node_indices_search_time | node_indices_search_time | queries, fetches | milliseconds |
+| elasticsearch.node_indices_search_time | Time Spent On Search Operations | query, fetch | milliseconds |
 | elasticsearch.node_indices_refresh | Refresh Operations | refresh | operations/s |
 | elasticsearch.node_indices_refresh_time | Time Spent On Refresh Operations | refresh | milliseconds |
 | elasticsearch.node_indices_flush | Flush Operations | flush | operations/s |
@@ -316,7 +316,7 @@ Metrics:
 | elasticsearch.node_jvm_gc_time | JVM Time Spent On Garbage Collections | young, old | milliseconds |
 | elasticsearch.node_thread_pool_queued | Thread Pool Queued Threads Count | generic, search, search_throttled, get, analyze, write, snapshot, warmer, refresh, listener, fetch_shard_started, fetch_shard_store, flush, force_merge, management | threads |
 | elasticsearch.node_thread_pool_rejected | Thread Pool Rejected Threads Count | generic, search, search_throttled, get, analyze, write, snapshot, warmer, refresh, listener, fetch_shard_started, fetch_shard_store, flush, force_merge, management | threads |
-| elasticsearch.node_cluster_communication_packets | Cluster Communication | received, sent | pps |
+| elasticsearch.node_cluster_communication_packets | Node Cluster Communication | received, sent | pps |
 | elasticsearch.node_cluster_communication_traffic | Cluster Communication Bandwidth | received, sent | bytes/s |
 | elasticsearch.node_http_connections | HTTP Connections | open | connections |
 | elasticsearch.node_breakers_trips | Circuit Breaker Trips Count | requests, fielddata, in_flight_requests, model_inference, accounting, parent | trips/s |
@@ -336,9 +336,9 @@ Metrics:
 
 | Metric | Description | Dimensions | Unit |
 |:------|:------------|:----------|:----|
-| elasticsearch.cluster_health_status | Cluster Status | green, yellow, red | status |
+| elasticsearch.cluster_health_status | Cluster Status | green, red, yellow | status |
 | elasticsearch.cluster_number_of_nodes | Cluster Nodes Count | nodes, data_nodes | nodes |
-| elasticsearch.cluster_shards_count | Cluster Shards Count | active_primary, active, relocating, initializing, unassigned, delayed_unaasigned | shards |
+| elasticsearch.cluster_shards_count | Cluster Shards Count | active_primary, active, relocating, initializing, unassigned, delayed_unassigned | shards |
 | elasticsearch.cluster_pending_tasks | Cluster Pending Tasks | pending | tasks |
 | elasticsearch.cluster_number_of_in_flight_fetch | Cluster Unfinished Fetches | in_flight_fetch | fetches |
 | elasticsearch.cluster_indices_count | Cluster Indices Count | indices | indices |
@@ -364,7 +364,7 @@ Metrics:
 
 | Metric | Description | Dimensions | Unit |
 |:------|:------------|:----------|:----|
-| elasticsearch.node_index_health | Index Health | green, yellow, red | status |
+| elasticsearch.node_index_health | Index Health | green, red, yellow | status |
 | elasticsearch.node_index_shards_count | Index Shards Count | shards | shards |
 | elasticsearch.node_index_docs_count | Index Docs Count | docs | docs |
 | elasticsearch.node_index_store_size | Index Store Size | store_size | bytes |

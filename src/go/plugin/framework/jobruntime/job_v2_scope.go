@@ -5,7 +5,8 @@ package jobruntime
 import (
 	"fmt"
 	"maps"
-	"sort"
+	"slices"
+	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
@@ -53,58 +54,53 @@ func (j *JobV2) newScopeEngine() (*chartengine.Engine, error) {
 	return chartengine.New(opts...)
 }
 
-func (j *JobV2) liveScopeSet() map[string]metrix.HostScope {
-	scopes := make(map[string]metrix.HostScope)
+// jobV2ScopeWork is one host scope a cycle plans.
+type jobV2ScopeWork struct {
+	scope metrix.HostScope
+	live  bool
+}
+
+// scopeWork lists this cycle's host scopes ordered by scope key, so the default
+// scope comes first: every fresh-visible scope, plus previously emitted scopes
+// retained until their engine emits lifecycle removals. The latter includes the
+// default scope when unscoped series disappear.
+func (j *JobV2) scopeWork() []jobV2ScopeWork {
 	reader := j.store.Read(metrix.ReadFlatten())
-	visibleScopes := reader.(metrix.FreshVisibleHostScopesReader)
-	for _, scope := range visibleScopes.FreshVisibleHostScopes() {
-		scopes[scope.ScopeKey] = scope
+	live := reader.(metrix.FreshVisibleHostScopesReader).FreshVisibleHostScopes()
+	work := make([]jobV2ScopeWork, 0, max(len(live), len(j.scopeStates)))
+	for _, scope := range live {
+		work = append(work, jobV2ScopeWork{
+			scope: scope,
+			live:  true,
+		})
 	}
-	return scopes
-}
-
-func (j *JobV2) scopeWorkSet(liveScopes map[string]metrix.HostScope) map[string]metrix.HostScope {
-	scopes := make(map[string]metrix.HostScope, len(liveScopes)+len(j.scopeStates))
-	maps.Copy(scopes, liveScopes)
-	// Retain previously emitted scopes until their engine emits lifecycle
-	// removals. This includes default scope when unscoped series disappear.
+	slices.SortFunc(work, compareScopeWork)
+	liveWork := work
 	for key, state := range j.scopeStates {
-		if _, ok := scopes[key]; ok {
-			continue
+		if _, found := slices.BinarySearchFunc(liveWork, key, compareScopeWorkKey); !found {
+			work = append(work, jobV2ScopeWork{
+				scope: state.scope,
+			})
 		}
-		scopes[key] = state.scope
 	}
-	return scopes
+	if len(work) > len(liveWork) {
+		slices.SortFunc(work, compareScopeWork)
+	}
+	return work
 }
 
-func sortedScopeKeys(scopes map[string]metrix.HostScope) []string {
-	keys := make([]string, 0, len(scopes))
-	for key := range scopes {
-		keys = append(keys, key)
-	}
-	sortHostScopeKeys(keys)
-	return keys
+func compareScopeWork(a, b jobV2ScopeWork) int {
+	return strings.Compare(a.scope.ScopeKey, b.scope.ScopeKey)
 }
 
+func compareScopeWorkKey(w jobV2ScopeWork, key string) int {
+	return strings.Compare(w.scope.ScopeKey, key)
+}
+
+// sortedScopeStateKeys orders scope keys like scopeWork: the default scope's empty
+// key sorts first.
 func sortedScopeStateKeys(scopes map[string]*jobV2ScopeState) []string {
-	keys := make([]string, 0, len(scopes))
-	for key := range scopes {
-		keys = append(keys, key)
-	}
-	sortHostScopeKeys(keys)
-	return keys
-}
-
-func sortHostScopeKeys(keys []string) {
-	sort.Slice(keys, func(i, j int) bool {
-		if keys[i] == defaultHostScopeKey {
-			return true
-		}
-		if keys[j] == defaultHostScopeKey {
-			return false
-		}
-		return keys[i] < keys[j]
-	})
+	return slices.Sorted(maps.Keys(scopes))
 }
 
 func metrixHostScopeInfo(scope metrix.HostScope) netdataapi.HostInfo {

@@ -179,6 +179,13 @@ const char *database_migrate_v17_v18[] = {
     NULL
 };
 
+// adds the alert lookup condition as written, so gap tokens and the
+// predecessor keyword survive a restart
+const char *database_migrate_v18_v19[] = {
+    "ALTER TABLE alert_hash ADD time_group_options text",
+    NULL
+};
+
 
 static int do_migration_v1_v2(sqlite3 *database)
 {
@@ -447,6 +454,14 @@ static int do_migration_v17_v18(sqlite3 *database)
     return 0;
 }
 
+static int do_migration_v18_v19(sqlite3 *database)
+{
+    if (table_exists_in_database(database, "alert_hash") && !column_exists_in_table(database, "alert_hash", "time_group_options"))
+        return init_database_batch(database, &database_migrate_v18_v19[0], "meta_migrate");
+
+    return 0;
+}
+
 
 static int do_migration_v12_v13(sqlite3 *database)
 {
@@ -548,6 +563,7 @@ DATABASE_FUNC_MIGRATION_LIST migration_action[] = {
     {.name = "v15 to v16",  .func = do_migration_v15_v16},
     {.name = "v16 to v17",  .func = do_migration_v16_v17},
     {.name = "v17 to v18",  .func = do_migration_v17_v18},
+    {.name = "v18 to v19",  .func = do_migration_v18_v19},
     // the terminator of this array
     {.name = NULL, .func = NULL}
 };

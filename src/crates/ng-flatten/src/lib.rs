@@ -1,33 +1,60 @@
-//! `ng-flatten`: flatten OTLP log/trace data into a typed schema tree + per-row
-//! entries — the OTLP analogue of the JSON flattener at `~/repos/tmp/schema`.
+//! `ng-flatten`: flatten OTLP log/trace data into a typed schema tree plus
+//! per-row entries, and own the flattened-frame format those entries travel in.
 //!
-//! The crate is split by signal boundary:
+//! Pipeline position: an OTLP receiver normalizes + flattens each export request
+//! here and appends the bincode frame to a WAL — `otel-ingestor` (the production
+//! receiver) and `ng-ingest` (a standalone receiver), both via
+//! [`prepare_log_frame`]/[`prepare_trace_frame`]. Downstream, `ng-index` merges
+//! the per-frame trees into one global tree ([`Flattener::merge_tree`]) and seals
+//! it into an SFST index; `sfsq` scans frames straight off the WAL tail for live
+//! queries.
+//!
+//! # Modules
+//!
 //! - [`common`] — the signal-neutral substrate: the value model
 //!   ([`Kind`]/[`Value`]), the [`SchemaTree`] + [`Flattener`], the W3C id newtypes
 //!   ([`TraceId`]/[`SpanId`]), the canonical `key=value` rendering ([`build_kv`]),
 //!   and the bincode frame codec.
 //! - [`logs`] — OTel logs: [`FlattenedLogRequest`]/[`Record`], [`flatten_log_request`],
-//!   the log normalizers, and the log frame codec ([`encode_log_frame`]).
+//!   the log normalizers, and the log frame codec ([`encode_log_frame`], versioned
+//!   by [`LOG_FRAME_PAYLOAD_FORMAT`]).
 //! - [`traces`] — OTel traces: [`FlattenedTraceRequest`]/[`SpanRecord`],
 //!   [`flatten_trace_request`], the span normalizers, and the trace frame codec.
 //!
+//! # Flattening contract
+//!
 //! A [`Flattener`] builds one [`SchemaTree`] (an arena of nodes interned by
 //! `(parent, step, kind)`) while flattening a resource, a scope, and its records or
-//! spans into it. Each leaf occurrence becomes an [`Entry`] `{ node, value }` — the
-//! path is *not* stored per entry; it is recovered on demand from the tree
+//! spans into it. Each leaf occurrence becomes an [`Entry`] `{ node, value, hash }` —
+//! the path is *not* stored per entry; it is recovered on demand from the tree
 //! ([`SchemaTree::path`]). A node id is therefore a stable typed-column identity
-//! (collapsed path + kind), shared across every row that has that column.
+//! (collapsed path + kind), shared across every row that has that column — which is
+//! what lets `ng-index` merge per-frame trees into one column space.
 //!
-//! A row's resource attributes, scope, scalar facets, body, and attributes fold
-//! into one namespace with prefixes (`resource.attributes.*`, `scope.*`,
+//! Naming: a row's resource attributes, scope, scalar facets, body, and attributes
+//! fold into one namespace with prefixes (`resource.attributes.*`, `scope.*`,
 //! `attributes.*`, `body…`); array elements collapse to `[]`; every leaf keeps its
-//! OTLP type. The path *string* can alias across different structures (a kvlist
-//! `a:{b}` and a literal key `"a.b"` both render `a.b`), but their **nodes** differ
-//! (distinct `steps`), so index by node id and display by path.
+//! OTLP type. User-controlled keys are sanitized at the single `flatten_kv` choke
+//! point (counted for one aggregated warning per request): `=` → `_` (the
+//! `key=value` delimiter) and an empty key → `_`. The path *string* can alias
+//! across structures (a kvlist `a:{b}` and a literal key `"a.b"` both render
+//! `a.b`), but their **nodes** differ (distinct `steps`), so index by node id and
+//! display by path.
 //!
-//! This crate also owns the on-WAL **flattened-frame format**: the writer
-//! (`ng-ingest`) and the reader (`ng-index`) share the canonical `key=value` bytes,
-//! so a producer hashes exactly what the SFST builder keys on — one source of truth.
+//! Hashing: the flattener stamps every [`Entry`] at emit time with
+//! `xxhash64("path=value", seed 0)` (`hash_kv` in `common`) over exactly the bytes
+//! [`build_kv`] renders — identical key=value pairs hash identically, so the SFST
+//! interner keys occurrences without re-hashing. Writer and reader share those
+//! bytes: one source of truth.
+//!
+//! Ordering: a row's `ts` — resolved by the per-signal normalizers, which run
+//! before flattening — is the row-ordering key; entries keep document order.
+//! Per-row identifiers/scalars ride on [`Record`]/[`SpanRecord`], not entries.
+//!
+//! The `tests` module at the bottom of this file is the crate's only test suite:
+//! integration-style tests over the public surface — typed facets, key
+//! sanitization, normalization and time bounds, tree sharing/merging, frame
+//! round-trips, and the JSON-object string body rewrite.
 
 pub mod common;
 pub mod logs;
@@ -56,6 +83,7 @@ mod tests {
         KeyValue {
             key: key.to_string(),
             value: Some(av(v)),
+            key_strindex: 0,
         }
     }
     /// All values at `path`, in document order (handles array-collapsed dups).
@@ -73,6 +101,21 @@ mod tests {
         (0..tree.len() as NodeId)
             .find(|&id| tree.path(id) == path)
             .unwrap_or_else(|| panic!("no node for path {path:?}"))
+    }
+
+    #[test]
+    fn profiling_string_table_reference_flattens_as_null() {
+        let record = LogRecord {
+            attributes: vec![kv("ref", Av::StringValueStrindex(3))],
+            ..Default::default()
+        };
+
+        let mut f = Flattener::new();
+        let entries = f.flatten_record(record);
+        let tree = f.into_tree();
+        let leaves = tree.resolve(&entries);
+
+        assert_eq!(at(&leaves, "attributes.ref"), [&Value::Null]);
     }
 
     #[test]
@@ -219,8 +262,8 @@ mod tests {
     }
 
     #[test]
-    fn span_enum_default_skipped_unknown_keeps_raw_int() {
-        // UNSPECIFIED kind (0) + UNSET status (0) → no enum facets at all.
+    fn span_enum_defaults_are_stored_unknown_keeps_raw_int() {
+        // UNSPECIFIED kind (0) + UNSET status (0) → stored like any other variant.
         let mut f = Flattener::new();
         let e = f.flatten_span(Span {
             name: "x".into(),
@@ -232,8 +275,10 @@ mod tests {
             ..Default::default()
         });
         let l = f.into_tree().resolve(&e.entries);
-        assert!(at(&l, "kind").is_empty() && at(&l, "_kind").is_empty());
-        assert!(at(&l, "status_code").is_empty() && at(&l, "_status_code").is_empty());
+        assert_eq!(at(&l, "kind"), [&Value::Str("UNSPECIFIED".into())]);
+        assert_eq!(at(&l, "_kind"), [&Value::Int(0)]);
+        assert_eq!(at(&l, "status_code"), [&Value::Str("UNSET".into())]);
+        assert_eq!(at(&l, "_status_code"), [&Value::Int(0)]);
 
         // Unknown future variant → raw int survives (forward-compat), no label.
         let mut f = Flattener::new();
@@ -390,19 +435,20 @@ mod tests {
         };
         let mut req = trace_req(span(0, 0), None, None);
         req.resource_spans[0].scope_spans[0].spans = vec![
-            span(500, 1_500),  // start before the window → rejected (past bound)
-            span(1_200, 2_500),// end past the window → rejected (future bound)
-            span(2_500, 2_600),// entirely future: caught via end > max_ns → rejected
-            span(1_200, 1_800),// whole interval inside → kept
-            span(1_300, 0),    // unset end clamps to start (in-window) → kept
-            span(1_400, 700),  // end < start clamps to start (in-window) → kept
-            span(0, 0),        // synthesized start (base 1_500) → kept
-            span(0, 9_999),    // synthesized start BUT absurd client end → rejected
+            span(500, 1_500),   // start before the window → rejected (past bound)
+            span(1_200, 2_500), // end past the window → rejected (future bound)
+            span(2_500, 2_600), // entirely future: caught via end > max_ns → rejected
+            span(1_200, 1_800), // whole interval inside → kept
+            span(1_300, 0),     // unset end clamps to start (in-window) → kept
+            span(1_400, 700),   // end < start clamps to start (in-window) → kept
+            span(0, 0),         // synthesized start (base 1_500) → kept
+            span(0, 9_999),     // synthesized start BUT absurd client end → rejected
         ];
         let norm = normalize_trace_request(&mut req, 1_500, bounds);
         assert_eq!(norm.rejected, 4);
         assert_eq!(norm.records, 4);
-        let kept: Vec<u64> = req.resource_spans[0].scope_spans[0].spans
+        let kept: Vec<u64> = req.resource_spans[0].scope_spans[0]
+            .spans
             .iter()
             .map(|s| s.start_time_unix_nano)
             .collect();
@@ -438,7 +484,7 @@ mod tests {
     /// `fallback_base + k` — past that edge — so they MUST NOT face the
     /// future bound through their own clamp (the value is ours, not the
     /// client's); only a RAW client end does. Mirrors the logs zero-skew
-    /// exemption; review round 1 finding 2.
+    /// exemption.
     #[test]
     fn normalize_trace_request_zero_future_skew_keeps_synthesized_starts() {
         let base: u64 = 1_000_000;
@@ -453,11 +499,11 @@ mod tests {
         };
         let mut req = trace_req(span(0, 0), None, None);
         req.resource_spans[0].scope_spans[0].spans = vec![
-            span(0, 0),            // synthesized, no client end → kept
-            span(0, base - 500),   // synthesized, client end < synth start (clamp
-                                   // would judge OUR value) → kept
-            span(0, base + 500),   // synthesized, raw client end past the edge → rejected
-            span(base - 100, 0),   // client start in-window, unset end → kept
+            span(0, 0),          // synthesized, no client end → kept
+            span(0, base - 500), // synthesized, client end < synth start (clamp
+            // would judge OUR value) → kept
+            span(0, base + 500), // synthesized, raw client end past the edge → rejected
+            span(base - 100, 0), // client start in-window, unset end → kept
             span(base - 100, base + 1), // client end 1ns past the edge → rejected
         ];
         let norm = normalize_trace_request(&mut req, base, bounds);
@@ -487,8 +533,7 @@ mod tests {
         assert_eq!(decoded.resources[0].scopes[0].spans[0].ts, 1_000);
 
         // Zero spans → nothing prepared, nothing to write.
-        let frame =
-            prepare_trace_frame(ExportTraceServiceRequest::default(), 1, None).unwrap();
+        let frame = prepare_trace_frame(ExportTraceServiceRequest::default(), 1, None).unwrap();
         assert_eq!((frame.records, frame.rejected), (0, 0));
         assert!(frame.data.is_empty() && frame.ts_range.is_none());
 
@@ -516,9 +561,9 @@ mod tests {
     }
 
     #[test]
-    fn span_no_status_and_empty_name_emit_nothing() {
-        // status: None (vs Some(UNSET)) and an empty name → those facets absent;
-        // an unrelated facet (kind) still emits.
+    fn span_no_status_is_unset_and_empty_name_emits_nothing() {
+        // status: None is the OTel default, stored like Some(UNSET); an empty
+        // name → no facet; an unrelated facet (kind) still emits.
         let mut f = Flattener::new();
         let e = f.flatten_span(Span {
             name: String::new(),
@@ -528,10 +573,8 @@ mod tests {
         });
         let l = f.into_tree().resolve(&e.entries);
         assert!(at(&l, "name").is_empty(), "empty name → no facet");
-        assert!(
-            at(&l, "status_code").is_empty() && at(&l, "_status_code").is_empty(),
-            "status None → no facet"
-        );
+        assert_eq!(at(&l, "status_code"), [&Value::Str("UNSET".into())]);
+        assert_eq!(at(&l, "_status_code"), [&Value::Int(0)]);
         assert_eq!(at(&l, "kind"), [&Value::Str("SERVER".into())]);
     }
 
@@ -549,9 +592,10 @@ mod tests {
         let l = f.into_tree().resolve(&e.entries);
         assert_eq!(at(&l, "trace_state"), [&Value::Str("ot=th:8".into())]);
         assert_eq!(at(&l, "status_message"), [&Value::Str("boom".into())]);
-        assert!(
-            at(&l, "status_code").is_empty(),
-            "UNSET code stays absent even with a message"
+        assert_eq!(
+            at(&l, "status_code"),
+            [&Value::Str("UNSET".into())],
+            "an UNSET code is stored next to its message"
         );
 
         // Empty trace_state / message → absent (proto3 empty == unset on the wire).
@@ -615,10 +659,7 @@ mod tests {
         let names = tree.resolve(&[e.events[0].name.clone(), e.events[1].name.clone()]);
         assert_eq!(
             at(&names, "events.name"),
-            [
-                &Value::Str("exception".into()),
-                &Value::Str("retry".into())
-            ]
+            [&Value::Str("exception".into()), &Value::Str("retry".into())]
         );
         let attrs = tree.resolve(&e.events[1].attributes);
         assert_eq!(at(&attrs, "events.attributes.attempt"), [&Value::Int(3)]);
@@ -1429,7 +1470,7 @@ mod tests {
     fn json_object_string_body_flattens_to_typed_columns() {
         // A body string holding a JSON object explodes into typed `body.*`
         // leaves; every JSON type maps to the matching `Value`, and the raw
-        // string is dropped (decision 1B).
+        // string is dropped.
         let body = r#"{
             "int": 7,
             "double": 3.5,
@@ -1476,13 +1517,13 @@ mod tests {
         // pre-check; `{not json}` passes the pre-check but fails to parse; a
         // string with leading text before `{` fails the pre-check.
         for body in [
-            "hello world", // plain non-JSON
-            "42",          // parses to a number
-            "true",        // parses to a bool
-            "[1, 2]",      // parses to an array
-            "null",        // parses to null
-            "\"quoted\"",  // parses to a bare string
-            "{not json}",  // passes brace pre-check, fails to parse
+            "hello world",     // plain non-JSON
+            "42",              // parses to a number
+            "true",            // parses to a bool
+            "[1, 2]",          // parses to an array
+            "null",            // parses to null
+            "\"quoted\"",      // parses to a bare string
+            "{not json}",      // passes brace pre-check, fails to parse
             "log: {\"a\": 1}", // leading text — fails the pre-check
         ] {
             let (norm, leaves) = flatten_string_body(body);
@@ -1508,7 +1549,7 @@ mod tests {
     #[test]
     fn no_recursive_reparse_of_string_values_inside_the_object() {
         // A string VALUE that itself looks like JSON stays a StringValue leaf —
-        // only the top-level body string is parsed (decision 2A).
+        // only the top-level body string is parsed.
         let (norm, leaves) = flatten_string_body(r#"{"nested": "{\"x\": 1}"}"#);
         assert_eq!(norm.parsed_bodies, 1);
         assert_eq!(
@@ -1523,7 +1564,7 @@ mod tests {
     #[test]
     fn number_edges_map_to_int_or_double() {
         // i64 range stays Int (including i64::MAX and negatives); a u64 past
-        // i64::MAX becomes a Double (decision 4B).
+        // i64::MAX becomes a Double.
         let body = format!(
             r#"{{"max_i64": {}, "neg": -5, "over_i64": {}}}"#,
             i64::MAX,

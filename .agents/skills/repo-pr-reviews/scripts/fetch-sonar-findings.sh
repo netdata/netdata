@@ -4,10 +4,9 @@
 # Usage:
 #   fetch-sonar-findings.sh <pr-number>
 #
-# SonarCloud does NOT post per-finding inline comments on the GitHub PR --
-# only a QualityGate summary comment is delivered. The actual issue list
-# lives behind /api/issues/search?pullRequest=<N> and /api/hotspots/search.
-# This script pulls both, so the PR-reviews loop can address them.
+# Some SonarCloud findings are mirrored inline through GitHub code scanning.
+# Fetch both /api/issues/search and /api/hotspots/search for the complete set;
+# inline comments and the QualityGate summary do not contain every finding.
 #
 # Outputs (under .local/audits/pr-reviews/pr-<N>/):
 #   sonar-issues.json    -- all open issues this PR introduced

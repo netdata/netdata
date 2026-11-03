@@ -68,9 +68,6 @@ when local policy requires it.
 The plugin automatically detects all active network connections on the system.
 
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

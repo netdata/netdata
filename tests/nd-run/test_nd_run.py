@@ -31,6 +31,7 @@ def compile_binary(source, output, config):
     sources = [str(source)]
     if source == OPTIONS.source:
         sources.append(str(ROOT / "src/collectors/utils/nd-file-reader.c"))
+        sources.append(str(ROOT / "src/collectors/utils/nd-process-tree.c"))
     command = [OPTIONS.cc, "-std=gnu11", "-Wall", "-Wextra", "-Werror", "-g",
                *shlex.split(OPTIONS.cflags), "-I", str(config),
                "-I", str(ROOT / "src/collectors/utils"), *sources, "-o", str(output)]

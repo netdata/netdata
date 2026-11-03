@@ -1,13 +1,32 @@
+//! Tests for the `otel-logs` Function handler as reached through
+//! `on_call`: the data/info/files wire responses, facet + histogram
+//! assembly, pagination, tenant scoping, and the remote-read path that
+//! fetches evicted SFSTs back from object storage.
+//!
+//! Fixtures are real SFST bytes written in memory by the production
+//! `sfst::ChunkWriter` and installed into a real `TenantRegistries`
+//! over throwaway temp dirs; WAL and catalog state is driven through
+//! the registry event APIs, and remote fixtures are real files behind
+//! an `fs://` storage backend. What the engine and adapter already pin
+//! (grid building, wire mapping, cursor ordering — `adapter/tests.rs`
+//! and the `sfsq` crates) is not re-tested here.
+//!
+//! Not pinned here: the active-WAL query path (`resolve_wal`'s chunk
+//! indexing and tail scan — no test drives a WAL through a query),
+//! cancellation, the TooLarge/EvictionFailed fetch errors, and the
+//! free-text `query` regex path.
 use super::*;
 use file_registry::{ByteSize, FileId, TenantId, TimestampNs};
+use file_registry::{Identity, InstanceId, MachineId, test_identity};
 use otel_logs_identity::ServiceStream;
 use serde_json::Value;
 use sfst::BitmapValue;
 use std::collections::HashMap;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
-use file_registry::{test_identity, Identity, InstanceId, MachineId};
 
+/// Fresh registries rooted at three throwaway temp dirs (WAL / SFST
+/// index / catalog): each test builds its own isolated storage.
 fn make_tenant_registries() -> TenantRegistries {
     TenantRegistries::new(
         tempfile::tempdir().unwrap().keep(),
@@ -16,6 +35,8 @@ fn make_tenant_registries() -> TenantRegistries {
     )
 }
 
+/// A handler over `tr` with a 64 MiB chunk cache, 16_384-min-entry WAL
+/// chunks, and remote read disabled.
 fn make_handler(tr: TenantRegistries) -> OtelLogsHandler {
     OtelLogsHandler::new(
         Arc::new(RwLock::new(tr)),
@@ -25,6 +46,8 @@ fn make_handler(tr: TenantRegistries) -> OtelLogsHandler {
     )
 }
 
+/// A minimal call context: the transaction id is arbitrary, progress
+/// starts empty, and nothing is ever cancelled.
 fn make_ctx(transaction: &str) -> FunctionCallContext {
     FunctionCallContext::new(
         transaction.to_string(),
@@ -33,6 +56,7 @@ fn make_ctx(transaction: &str) -> FunctionCallContext {
     )
 }
 
+/// A treight-encoded bitmap of sorted `positions` within `[0, universe)`.
 fn bitmap_with(positions: &[u32], universe: u32) -> BitmapValue {
     let mut data = Vec::new();
     let desc = treight::Bitmap::from_sorted_iter(positions.iter().copied(), universe, &mut data);
@@ -119,7 +143,11 @@ fn write_test_sfst(path: &std::path::Path, min_s: u32) {
     std::fs::write(path, &buf).unwrap();
 }
 
-/// Install a single SFST file under tenant `t`.
+/// Install one 6-log SFST under `tenant` at sequence `seq`. The fixed
+/// part key (7) never affects a query here: these tests never select
+/// a stream, so the query's partition filter stays empty. (The remote
+/// tests below use stream-derived ids instead: `track_remote_catalog`
+/// enforces production's part_key = ns_hash pairing.)
 fn install_sfst(tr: &mut TenantRegistries, tenant: &str, seq: u64, min_s: u32) {
     let id = FileId::new(test_identity(), 0, seq, 7);
 
@@ -267,6 +295,7 @@ fn write_same_ts_sfst(path: &std::path::Path, ts_s: u32, n: usize) {
     std::fs::write(path, &buf).unwrap();
 }
 
+/// Install an `n`-log same-timestamp SFST (see [`write_same_ts_sfst`]).
 fn install_same_ts_sfst(tr: &mut TenantRegistries, tenant: &str, seq: u64, ts_s: u32, n: usize) {
     let id = FileId::new(test_identity(), 0, seq, 7);
     let reg = tr.get_or_create(&TenantId::from(tenant));
@@ -322,6 +351,9 @@ async fn same_timestamp_rows_paginate_without_dup_or_skip() {
     assert_eq!(seen, vec![4, 3, 2, 1, 0]);
 }
 
+/// `files: true` inventory: SFST entries carry the tracked summary's
+/// fields and the registry's per-seq lifecycle flags — a snapshot built
+/// from registry state alone, never from the files on disk.
 #[tokio::test]
 async fn files_request_returns_inventory_with_upload_state() {
     let mut tr = make_tenant_registries();
@@ -354,7 +386,7 @@ async fn files_request_returns_inventory_with_upload_state() {
     // sorted by seq
     assert_eq!(sfst[0]["seq"], 1);
     assert_eq!(sfst[1]["seq"], 2);
-    // summary + stream fields lifted from the SFST
+    // summary + stream fields from the tracked summary, not the file
     assert_eq!(sfst[0]["total_logs"], 6);
     assert_eq!(sfst[0]["min_ts_s"], 1_700_000_000u64);
     assert_eq!(sfst[0]["stream"]["namespace"], "ns");
@@ -372,6 +404,9 @@ async fn files_request_returns_inventory_with_upload_state() {
     assert_eq!(sfst[1]["pending_deletion"], true);
 }
 
+/// `files: true` also lists WAL entries — status/entry-count/time-range
+/// as accumulated from the event stream — and tracked catalog files,
+/// both sorted for stable output.
 #[tokio::test]
 async fn files_request_includes_wal_and_catalog_entries() {
     use chrono::NaiveDate;
@@ -457,7 +492,7 @@ async fn files_request_includes_wal_and_catalog_entries() {
     assert_eq!(wal[1]["status"], "archived");
     assert_eq!(wal[1]["size"], 1234u64);
 
-    // Catalog: basename + ISO date + max_seq + pending_deletion.
+    // Catalog: basename, ISO date, max_seq, min_ts_s, pending_deletion.
     let catalog = t["catalog"].as_array().unwrap();
     assert_eq!(catalog.len(), 1);
     assert_eq!(catalog[0]["file"], "cat-0000000007.catalog");
@@ -467,6 +502,8 @@ async fn files_request_includes_wal_and_catalog_entries() {
     assert_eq!(catalog[0]["pending_deletion"], false);
 }
 
+/// `info: true` returns the capability descriptor — accepted params
+/// advertised, no data keys — regardless of registered data.
 #[tokio::test]
 async fn info_request_returns_capability_descriptor() {
     let h = make_handler(make_tenant_registries());
@@ -498,6 +535,8 @@ async fn empty_payload_defaults_to_data_request() {
     assert_eq!(v["items"]["matched"], 0);
 }
 
+/// A data query with nothing registered still answers 200 with the
+/// well-formed empty envelope — empty facets, matched 0 — never an error.
 #[tokio::test]
 async fn no_sfst_yields_empty_envelope() {
     let h = make_handler(make_tenant_registries());
@@ -549,7 +588,7 @@ async fn populated_response_carries_facets_and_histogram() {
     let v = serde_json::to_value(&resp).unwrap();
     assert_eq!(v["status"], 200);
 
-    // Empty request → exactly one default facet, `severity_text`.
+    // No `facets` requested → exactly one default facet, `severity_text`.
     // `service` is a low-card field too but isn't auto-surfaced; the
     // user adds it via the UI's "+ Add Filter Field" control.
     let facets = v["facets"].as_array().unwrap();
@@ -566,7 +605,8 @@ async fn populated_response_carries_facets_and_histogram() {
     assert_eq!(counts.get("info"), Some(&3));
     assert_eq!(counts.get("error"), Some(&3));
 
-    // Histogram defaulted to severity_text (one of DEFAULT_HISTOGRAM_FIELDS).
+    // No histogram requested → the engine's default field
+    // (`severity_text`, same as the default facet field).
     assert_eq!(v["histogram"]["id"], "severity_text");
     // 6 logs spread across 6 seconds, all in-window.
     assert_eq!(v["items"]["matched"], 6);
@@ -604,7 +644,8 @@ async fn populated_response_carries_facets_and_histogram() {
     let row0 = data[0].as_array().unwrap();
     assert_eq!(row0[0], (min_s as i64 + 5) * 1_000_000); // µs
     assert_eq!(row0[1], "error");
-    // The cursor cell is the opaque "{ts_ns}:{seq}:{pos}" string.
+    // The cursor cell is the opaque "{ts_ns}:{file_seq}:{part}:{pos}"
+    // string (here: seq 1, indexed part 0, position 5).
     assert_eq!(
         row0[2],
         format!("{}:1:0:5", (min_s as i64 + 5) * 1_000_000_000)
@@ -619,10 +660,10 @@ async fn selection_filter_narrows_facet_counts_with_self_exclusion() {
     let h = make_handler(tr);
 
     // Filter `service=api` (positions 0,1,2). The `severity_text` facet
-    // should reflect that filter: info=2 (pos 0,2), error=1 (pos 1).
-    // The `service` facet, by self-exclusion, should still see both
-    // values at their full counts. Both facets are requested
-    // explicitly (the default set is just `severity_text`).
+    // reflects that filter: info=2 (pos 0,2), error=1 (pos 1). The
+    // `service` facet, by self-exclusion, still sees both values at
+    // their full counts. Both facets are requested explicitly (the
+    // default set is just `severity_text`).
     let payload = format!(
         r#"{{"info": false, "tenant": "tenant-a", "after": {a}, "before": {b}, "facets": ["severity_text", "service"], "selections": {{"service": ["api"]}}}}"#,
         a = min_s,
@@ -658,9 +699,8 @@ async fn selection_filter_narrows_facet_counts_with_self_exclusion() {
 
 #[tokio::test]
 async fn only_overlapping_file_contributes() {
-    // Two files in the same tenant. The window matches only the
-    // newer file's span — the older one's range is filtered out by
-    // the candidate planner.
+    // Two files in the same tenant; the window overlaps only the newer
+    // file's span, so the older file never becomes a query candidate.
     let mut tr = make_tenant_registries();
     install_sfst(&mut tr, "tenant-a", 1, 1_600_000_000);
     install_sfst(&mut tr, "tenant-a", 99, 1_700_000_000);
@@ -679,11 +719,11 @@ async fn only_overlapping_file_contributes() {
 #[tokio::test]
 async fn multiple_overlapping_files_merge_counts_and_facets() {
     // Two SFSTs in the same tenant whose spans both fall inside the
-    // request window. The planner returns both; the handler should
-    // sum `matched` and union facet counts.
+    // request window. The planner returns both; the handler sums
+    // `matched` and unions facet counts.
     //
-    // Each file has 6 logs (3 info, 3 error; 3 api, 3 worker) so
-    // the merged response should show 12 logs total.
+    // Each file has 6 logs (3 info, 3 error; 3 api, 3 worker), so the
+    // merged response shows 12 logs total.
     let mut tr = make_tenant_registries();
     let earlier = 1_700_000_000u32;
     let later = earlier + 100; // 6-second spans don't touch each other
@@ -790,9 +830,9 @@ async fn file_without_histogram_field_routes_logs_to_unset() {
 #[tokio::test]
 async fn no_time_bound_falls_back_to_recent_window() {
     // `(after=0, before=0)` is the legacy "no time bound" sentinel.
-    // The effective-window helper should fall back to the last 15
-    // minutes, so an SFST installed in that range produces a
-    // populated response (rather than an empty stub).
+    // The effective-window helper falls back to the last 15 minutes,
+    // so an SFST installed in that range produces a populated
+    // response (rather than an empty stub).
     let now_s = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
@@ -807,7 +847,7 @@ async fn no_time_bound_falls_back_to_recent_window() {
         serde_json::from_slice(br#"{"info": false, "tenant": "tenant-a"}"#).unwrap();
     let resp = h.on_call(make_ctx("t1"), req).await.unwrap();
     let v = serde_json::to_value(&resp).unwrap();
-    // Fixture has 6 logs — all should match (the file's range
+    // Fixture has 6 logs — all match (the file's range
     // [recent, recent+5] sits inside the 15-min fallback window).
     assert_eq!(v["items"]["matched"], 6);
 }
@@ -815,9 +855,9 @@ async fn no_time_bound_falls_back_to_recent_window() {
 #[tokio::test]
 async fn no_time_bound_with_only_stale_data_yields_empty_envelope() {
     // `(after=0, before=0)` defaults to the last 15 minutes. The only
-    // SFST is from 2024, so nothing overlaps the defaulted window. The
-    // handler returns the empty envelope — it does not reach back to a
-    // stale file just because the window came up empty.
+    // SFST is from Nov 2023, so nothing overlaps the defaulted window.
+    // The handler returns the empty envelope — it does not reach back
+    // to a stale file just because the window came up empty.
     let mut tr = make_tenant_registries();
     let file_min_s = 1_700_000_000u32; // far in the past
     install_sfst(&mut tr, "tenant-a", 1, file_min_s);
@@ -845,6 +885,10 @@ fn row_ts_cursor(row: &Value) -> (i64, String) {
     )
 }
 
+/// Backward paging: page 2 anchors at page 1's oldest row, the anchor
+/// row itself is excluded (no overlap) and pos 2 follows it directly
+/// (no gap), with `items.after`/`before` flagging whether older/newer
+/// rows exist (0/1, not row counts).
 #[tokio::test]
 async fn backward_pagination_pages_without_overlap_or_gap() {
     let mut tr = make_tenant_registries();
@@ -911,7 +955,7 @@ async fn forward_pagination_returns_newer_rows_newest_first() {
     assert_eq!(row_ts_cursor(&d[0]).0, ts_us(min_s, 5));
     assert_eq!(row_ts_cursor(&d[1]).0, ts_us(min_s, 4));
     assert_eq!(row_ts_cursor(&d[2]).0, ts_us(min_s, 3));
-    assert_eq!(v["items"]["after"], 1); // pos 0,1,2 are older
+    assert_eq!(v["items"]["after"], 1); // older rows exist (pos 0,1,2)
     assert_eq!(v["items"]["before"], 0); // pos 5 is the newest row
 }
 
@@ -964,6 +1008,9 @@ fn patched_args_payload_parses_as_a_logs_request() {
     assert_eq!(req.before, 200);
 }
 
+/// The Function declaration keeps the legacy shape: global visibility,
+/// the `logs` tag, and the SIGNED_ID | SAME_SPACE | SENSITIVE_DATA
+/// access mask.
 #[test]
 fn declaration_carries_legacy_flags() {
     let h = make_handler(make_tenant_registries());
@@ -977,7 +1024,7 @@ fn declaration_carries_legacy_flags() {
     assert!(access.contains(HttpAccess::SENSITIVE_DATA));
 }
 
-// ── Tenant scoping (OTL-1) ───────────────────────────────────────
+// ── Tenant scoping ────────────────────────────────────────────────
 
 #[tokio::test]
 async fn tenant_scoping_isolates_unions_nothing_and_defaults() {
@@ -1019,7 +1066,7 @@ async fn tenant_scoping_isolates_unions_nothing_and_defaults() {
     assert_eq!(v["status"], 200);
     assert_eq!(matched(&v), 0);
 
-    // Empty tenant string falls back to "default" (light hygiene).
+    // Empty tenant string falls back to "default", same as an omitted tenant.
     let req: OtelLogsRequest =
         serde_json::from_slice(format!(r#"{{"info":false,"tenant":"",{win}}}"#).as_bytes())
             .unwrap();
@@ -1034,8 +1081,8 @@ fn accepted_params_advertise_tenant() {
 
 // ── remote-read query path (evicted SFST fetched back from remote) ───────────
 
-/// Register a catalog entry for `id` (no local SFST) so `remote_candidates`
-/// surfaces it. Mirrors the catalog-write fixture used in `query/tests.rs`.
+/// Register a catalog entry for `id` (no local SFST) so a remote plan
+/// selects it; returns the catalog file's path.
 fn track_remote_catalog(
     tr: &mut TenantRegistries,
     tenant: &str,
@@ -1044,8 +1091,7 @@ fn track_remote_catalog(
     min_s: u32,
     max_s: u32,
     size: u64,
-) {
-    use chrono::NaiveDate;
+) -> std::path::PathBuf {
     let stream = ServiceStream::new("ns", "svc");
     // Production `build_catalog_entry` copies both id and stream from one SFST, so
     // the FileId's part_key always matches the stream's ns_hash. Enforce it on the fixture.
@@ -1054,7 +1100,6 @@ fn track_remote_catalog(
         stream.ns_hash(),
         "catalog fixture id.part_key must match its stream"
     );
-    let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
     let entry = otel_catalog::CatalogEntry {
         id,
         remote_key: remote_key.to_string(),
@@ -1066,32 +1111,10 @@ fn track_remote_catalog(
         uploaded_at_ns: TimestampNs(0),
         remote_etag: None,
     };
-    let reg = tr.get_or_create(&TenantId::from(tenant));
-    let mut catalog = otel_catalog::Catalog::new(
-        TenantId::from(tenant),
-        date,
-        Identity::new(id.machine_id, id.instance_id),
-    );
-    catalog.add(entry);
-    let path =
-        reg.catalog_files
-            .file_path(date, Identity::new(id.machine_id, id.instance_id), id.seq, min_s, max_s);
-    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-    std::fs::write(&path, catalog.to_container_bytes().unwrap()).unwrap();
-    let csize = ByteSize(std::fs::metadata(&path).unwrap().len());
-    reg.catalog_files.track(
-        otel_catalog::File::new(
-            date,
-            Identity::new(id.machine_id, id.instance_id),
-            id.seq,
-            min_s,
-            max_s,
-            csize,
-        ),
-        path,
-    );
+    crate::test_helpers::track_catalog_entry(tr, tenant, entry)
 }
 
+/// Like [`make_handler`], with remote read enabled.
 fn make_handler_with_remote(tr: TenantRegistries, remote: RemoteRead) -> OtelLogsHandler {
     OtelLogsHandler::new(
         Arc::new(RwLock::new(tr)),
@@ -1101,50 +1124,95 @@ fn make_handler_with_remote(tr: TenantRegistries, remote: RemoteRead) -> OtelLog
     )
 }
 
-/// End-to-end: a tenant whose only copy of an SFST is in remote object storage
-/// (no local SFST/WAL) still answers a query — the handler fetches the file back
-/// through the read cache and the engine serves all 6 logs. Uses a real
-/// `OpendalStorage` over an `fs://` backend (exercises the real `Storage::read`).
-#[tokio::test]
-async fn remote_only_sfst_is_fetched_and_served() {
-    let mut tr = make_tenant_registries();
-
-    // Build a real SFST's bytes; do NOT install it locally. The FileId's ns_hash
-    // matches the stream (as production `build_catalog_entry` guarantees).
-    let id = FileId::new(
-        Identity::new(MachineId::new(Uuid::from_u128(0x11)).unwrap(), InstanceId::new(Uuid::from_u128(0x22)).unwrap()),
+/// The id of stream `ns/svc`'s file of sequence `seq`; its ns_hash matches
+/// the stream, as production `build_catalog_entry` guarantees.
+fn stream_file_id(seq: u64) -> FileId {
+    FileId::new(
+        Identity::new(
+            MachineId::new(Uuid::from_u128(0x11)).unwrap(),
+            InstanceId::new(Uuid::from_u128(0x22)).unwrap(),
+        ),
         0,
-        1,
+        seq,
         ServiceStream::new("ns", "svc").ns_hash(),
-    );
-    let min_s = 1_700_000_000u32;
+    )
+}
+
+/// Store a real SFST (stream `ns/svc`, six records from `min_s`) under
+/// `remote_dir` as the object of seq `seq` and catalog it — a file only the
+/// remote holds, with no local SFST or WAL. Returns the object's path.
+fn place_remote_sfst(
+    tr: &mut TenantRegistries,
+    remote_dir: &std::path::Path,
+    seq: u64,
+    min_s: u32,
+) -> std::path::PathBuf {
     let sfst_tmp = tempfile::NamedTempFile::new().unwrap();
     write_test_sfst(sfst_tmp.path(), min_s);
     let sfst_bytes = std::fs::read(sfst_tmp.path()).unwrap();
 
-    // Place the object in an fs:// remote backend at its catalog remote_key.
-    let remote_dir = tempfile::tempdir().unwrap().keep();
-    let remote_key = "v2/logs/tenants/default/sfst/seq1.sfst";
-    let obj_path = remote_dir.join(remote_key);
+    let remote_key = format!("v2/logs/tenants/default/sfst/seq{seq}.sfst");
+    let obj_path = remote_dir.join(&remote_key);
     std::fs::create_dir_all(obj_path.parent().unwrap()).unwrap();
     std::fs::write(&obj_path, &sfst_bytes).unwrap();
 
     track_remote_catalog(
-        &mut tr,
+        tr,
         "default",
-        id,
-        remote_key,
+        stream_file_id(seq),
+        &remote_key,
         min_s,
         min_s + 5,
         sfst_bytes.len() as u64,
     );
+    obj_path
+}
 
+/// A handler over `tr` reading `remote_dir` through a fresh download cache,
+/// returned too so a test can see what was downloaded. Uses a real
+/// `OpendalStorage` over an `fs://` backend (exercises the real
+/// `Storage::read`).
+fn handler_over_remote(
+    tr: TenantRegistries,
+    remote_dir: &std::path::Path,
+) -> (OtelLogsHandler, file_cache::FileCache) {
     let storage =
         file_lifecycle::storage::OpendalStorage::new(&format!("fs://{}", remote_dir.display()))
             .unwrap();
     let cache =
         file_cache::FileCache::open(tempfile::tempdir().unwrap().keep(), 64 * 1024 * 1024).unwrap();
-    let h = make_handler_with_remote(tr, RemoteRead::new(storage, cache));
+    let h = make_handler_with_remote(tr, RemoteRead::new(storage, cache.clone()));
+    (h, cache)
+}
+
+/// A handler whose tenant's only copy of one SFST (stream `ns/svc`, six
+/// records from `min_s`) is in remote object storage, and its download cache.
+fn remote_only_handler(min_s: u32) -> (OtelLogsHandler, file_cache::FileCache) {
+    let mut tr = make_tenant_registries();
+    let remote_dir = tempfile::tempdir().unwrap().keep();
+    place_remote_sfst(&mut tr, &remote_dir, 1, min_s);
+    handler_over_remote(tr, &remote_dir)
+}
+
+/// The stream selector's field, as the handler rendered it.
+fn stream_options(v: &Value) -> Vec<Value> {
+    v["required_params"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["id"] == "__streams")
+        .and_then(|p| p["options"].as_array())
+        .expect("stream selector present")
+        .clone()
+}
+
+/// End-to-end: a tenant whose only copy of an SFST is in remote object storage
+/// (no local SFST/WAL) still answers a query — the handler fetches the file back
+/// through the read cache and the engine serves all 6 logs.
+#[tokio::test]
+async fn remote_only_sfst_is_fetched_and_served() {
+    let min_s = 1_700_000_000u32;
+    let (h, _cache) = remote_only_handler(min_s);
 
     let req: OtelLogsRequest = serde_json::from_slice(
         format!(
@@ -1165,15 +1233,9 @@ async fn remote_only_sfst_is_fetched_and_served() {
         v["items"]["matched"], 6,
         "evicted remote SFST should be fetched and queried: {v:#}"
     );
-    // #5: the remote-only stream is advertised in the window-scoped selector
+    // The remote-only stream is advertised in the window-scoped selector
     // (its data is fetchable, so the user can filter to it).
-    let streams = v["required_params"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|p| p["id"] == "__streams")
-        .and_then(|p| p["options"].as_array())
-        .expect("stream selector present");
+    let streams = stream_options(&v);
     assert!(
         streams.iter().any(|o| o["name"] == "ns/svc"),
         "remote-only stream must appear in the selector: {v:#}"
@@ -1190,13 +1252,85 @@ async fn remote_only_sfst_is_fetched_and_served() {
     );
 }
 
+/// Remote planning covers two ranges: the selector's (every stream in the
+/// window) and the fetch's (the user's stream filter). A filter to another
+/// stream therefore downloads nothing, while the remote-only stream stays
+/// selectable.
+#[tokio::test]
+async fn a_stream_filter_narrows_the_fetch_not_the_selector() {
+    let min_s = 1_700_000_000u32;
+    let (h, cache) = remote_only_handler(min_s);
+    let other = format!("{:016x}", ServiceStream::new("ns", "other").ns_hash());
+
+    let req: OtelLogsRequest = serde_json::from_value(serde_json::json!({
+        "info": false,
+        "tenant": "default",
+        "after": min_s - 10,
+        "before": min_s + 100,
+        "selections": {"__streams": [other]},
+    }))
+    .unwrap();
+    let v = serde_json::to_value(h.on_call(make_ctx("t1"), req).await.unwrap()).unwrap();
+
+    assert_eq!(v["items"]["matched"], 0, "{v:#}");
+    assert_eq!(
+        cache.file_count(),
+        0,
+        "the filtered-out file is not downloaded"
+    );
+    assert!(
+        stream_options(&v).iter().any(|o| o["name"] == "ns/svc"),
+        "the remote-only stream stays in the selector: {v:#}"
+    );
+}
+
+/// Every remote file gets its own download attempt: one whose read fails —
+/// for a reason other than a missing object — is left out alone, and the
+/// query still answers from the files after it.
+#[tokio::test]
+async fn a_failed_download_does_not_hide_the_other_remote_files() {
+    let min_s = 1_700_000_000u32;
+    let mut tr = make_tenant_registries();
+    let remote_dir = tempfile::tempdir().unwrap().keep();
+    // Seq 1's read fails with a storage error, not as a missing object: its
+    // catalog names a directory-style key, which the storage client refuses
+    // at once.
+    let broken_key = "v2/logs/tenants/default/sfst/seq1/";
+    track_remote_catalog(
+        &mut tr,
+        "default",
+        stream_file_id(1),
+        broken_key,
+        min_s,
+        min_s + 5,
+        10,
+    );
+    place_remote_sfst(&mut tr, &remote_dir, 2, min_s + 10);
+    let (h, cache) = handler_over_remote(tr, &remote_dir);
+
+    let req: OtelLogsRequest = serde_json::from_value(serde_json::json!({
+        "info": false,
+        "tenant": "default",
+        "after": min_s - 10,
+        "before": min_s + 100,
+    }))
+    .unwrap();
+    let v = serde_json::to_value(h.on_call(make_ctx("t1"), req).await.unwrap()).unwrap();
+
+    assert_eq!(v["items"]["matched"], 6, "seq 2 is still served: {v:#}");
+    assert_eq!(cache.file_count(), 1, "only seq 2 was downloaded");
+}
+
 /// When the remote object cannot be read, the query degrades gracefully (no
 /// panic, no error) rather than failing — the bad source is simply omitted.
 #[tokio::test]
 async fn remote_fetch_failure_degrades() {
     let mut tr = make_tenant_registries();
     let id = FileId::new(
-        Identity::new(MachineId::new(Uuid::from_u128(0x11)).unwrap(), InstanceId::new(Uuid::from_u128(0x22)).unwrap()),
+        Identity::new(
+            MachineId::new(Uuid::from_u128(0x11)).unwrap(),
+            InstanceId::new(Uuid::from_u128(0x22)).unwrap(),
+        ),
         0,
         1,
         ServiceStream::new("ns", "svc").ns_hash(),
@@ -1230,7 +1364,6 @@ async fn remote_fetch_failure_degrades() {
         .as_bytes(),
     )
     .unwrap();
-    // Degrades: the unreadable remote source is omitted, the query still answers.
     let v = serde_json::to_value(&h.on_call(make_ctx("t1"), req).await.unwrap()).unwrap();
     assert_eq!(
         v["items"]["matched"], 0,
@@ -1238,26 +1371,165 @@ async fn remote_fetch_failure_degrades() {
     );
 }
 
-#[test]
-fn read_errors_reach_the_cache_log_redacted() {
-    // The cache logs this error with `{e:#}` — a raw inner chain would put
-    // the STS token (carried in the URL query) into the journal. Pin that
-    // the conversion flattens through StorageError's redacted Display.
-    let inner = anyhow::anyhow!(
-        "error sending request for url (https://sts.amazonaws.com/?Action=AssumeRoleWithWebIdentity&WebIdentityToken=SENTINEL_JWT)"
+/// The logs query reads catalog files only after releasing the registry
+/// read lock. A catalog that blocks its reader (a FIFO not yet written) must
+/// not keep the write lock — which the ledger loop takes on every WAL event —
+/// from being granted.
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn catalogs_are_read_off_the_registry_lock() {
+    use std::io::Write;
+    let mut tr = make_tenant_registries();
+    let id = FileId::new(
+        Identity::new(
+            MachineId::new(Uuid::from_u128(0x11)).unwrap(),
+            InstanceId::new(Uuid::from_u128(0x22)).unwrap(),
+        ),
+        0,
+        1,
+        ServiceStream::new("ns", "svc").ns_hash(),
     );
-    let err = read_error_to_anyhow("v2/logs/x.sfst", StorageError::Other(inner));
-    let rendered = format!("{err:#}");
-    assert!(!rendered.contains("SENTINEL_JWT"), "leaked: {rendered}");
-    assert!(
-        rendered.contains("remote read failed for v2/logs/x.sfst"),
-        "context lost: {rendered}"
+    let min_s = 1_700_000_000u32;
+    let catalog = track_remote_catalog(
+        &mut tr,
+        "default",
+        id,
+        "missing/object.sfst",
+        min_s,
+        min_s + 5,
+        10,
     );
-    assert!(
-        rendered.contains("https://sts.amazonaws.com/?[REDACTED]"),
-        "cause lost or unredacted: {rendered}"
-    );
+    let catalog_bytes = std::fs::read(&catalog).unwrap();
+    std::fs::remove_file(&catalog).unwrap();
+    crate::test_helpers::mkfifo(&catalog);
 
-    let nf = read_error_to_anyhow("v2/logs/x.sfst", StorageError::NotFound);
-    assert!(format!("{nf:#}").contains("remote object not found"));
+    let registries = Arc::new(RwLock::new(tr));
+    let storage = file_lifecycle::storage::OpendalStorage::new(&format!(
+        "fs://{}",
+        tempfile::tempdir().unwrap().keep().display()
+    ))
+    .unwrap();
+    let cache =
+        file_cache::FileCache::open(tempfile::tempdir().unwrap().keep(), 64 * 1024 * 1024).unwrap();
+    let handler = Arc::new(OtelLogsHandler::new(
+        Arc::clone(&registries),
+        Arc::new(file_lifecycle::chunk::ChunkCache::new(64 * 1024 * 1024)),
+        16_384,
+        Some(RemoteRead::new(storage, cache)),
+    ));
+    let req: OtelLogsRequest = serde_json::from_slice(
+        format!(
+            r#"{{"info":false,"tenant":"default","after":{},"before":{}}}"#,
+            min_s - 10,
+            min_s + 100
+        )
+        .as_bytes(),
+    )
+    .unwrap();
+    let query = tokio::spawn({
+        let handler = Arc::clone(&handler);
+        async move { handler.on_call(make_ctx("t1"), req).await }
+    });
+    // Whatever happens below, a reader still blocked on the FIFO gets EOF
+    // when the test ends, so a failure cannot hang the runtime's shutdown.
+    let _unblock = crate::test_helpers::FifoUnblocker(catalog.clone());
+
+    // The query is now blocked on the catalog FIFO.
+    let deadline = std::time::Duration::from_secs(10);
+    let mut writer = crate::test_helpers::open_fifo_writer(&catalog, deadline).await;
+    let write_lock = tokio::time::timeout(deadline, registries.write())
+        .await
+        .map(drop);
+    // Feed the catalog either way, so a failing run ends instead of hanging.
+    writer.write_all(&catalog_bytes).unwrap();
+    drop(writer);
+    let answer = tokio::time::timeout(deadline, query)
+        .await
+        .expect("the query finishes once the catalog is fed")
+        .unwrap()
+        .unwrap();
+    let v = serde_json::to_value(answer).unwrap();
+
+    assert!(
+        write_lock.is_ok(),
+        "the query held the registry lock while reading a catalog"
+    );
+    // The catalog was read after all: its remote-only stream is listed.
+    let streams = v["required_params"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["id"] == "__streams")
+        .and_then(|p| p["options"].as_array())
+        .expect("stream selector present");
+    assert!(
+        streams.iter().any(|o| o["name"] == "ns/svc"),
+        "the catalog's stream must be listed: {v:#}"
+    );
+}
+
+/// A catalog that cannot be read is skipped by logs, whose wire has no
+/// partial status: the query answers, and the readable catalog's remote-only
+/// stream is still listed.
+#[tokio::test]
+async fn an_unreadable_catalog_is_skipped() {
+    let mut tr = make_tenant_registries();
+    let identity = Identity::new(
+        MachineId::new(Uuid::from_u128(0x11)).unwrap(),
+        InstanceId::new(Uuid::from_u128(0x22)).unwrap(),
+    );
+    let part_key = ServiceStream::new("ns", "svc").ns_hash();
+    let min_s = 1_700_000_000u32;
+    track_remote_catalog(
+        &mut tr,
+        "default",
+        FileId::new(identity, 0, 1, part_key),
+        "missing/1.sfst",
+        min_s,
+        min_s + 5,
+        10,
+    );
+    let corrupt = track_remote_catalog(
+        &mut tr,
+        "default",
+        FileId::new(identity, 0, 2, part_key),
+        "missing/2.sfst",
+        min_s,
+        min_s + 5,
+        10,
+    );
+    std::fs::write(&corrupt, b"not a catalog").unwrap();
+
+    let storage = file_lifecycle::storage::OpendalStorage::new(&format!(
+        "fs://{}",
+        tempfile::tempdir().unwrap().keep().display()
+    ))
+    .unwrap();
+    let cache =
+        file_cache::FileCache::open(tempfile::tempdir().unwrap().keep(), 64 * 1024 * 1024).unwrap();
+    let h = make_handler_with_remote(tr, RemoteRead::new(storage, cache));
+    let req: OtelLogsRequest = serde_json::from_slice(
+        format!(
+            r#"{{"info":false,"tenant":"default","after":{},"before":{}}}"#,
+            min_s - 10,
+            min_s + 100
+        )
+        .as_bytes(),
+    )
+    .unwrap();
+
+    let v = serde_json::to_value(h.on_call(make_ctx("t1"), req).await.unwrap()).unwrap();
+
+    assert_eq!(v["status"], 200);
+    let streams = v["required_params"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["id"] == "__streams")
+        .and_then(|p| p["options"].as_array())
+        .expect("stream selector present");
+    assert!(
+        streams.iter().any(|o| o["name"] == "ns/svc"),
+        "the readable catalog's stream is listed: {v:#}"
+    );
 }

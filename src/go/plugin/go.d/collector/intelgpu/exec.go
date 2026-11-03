@@ -3,165 +3,129 @@
 package intelgpu
 
 import (
-	"bufio"
 	"bytes"
+	"context"
 	"errors"
-	"os/exec"
+	"os"
 	"strconv"
-	"sync"
+	"strings"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/streamexec"
 )
 
 type intelGpuTop interface {
+	// start runs intel_gpu_top and waits for its first sample; Check calls it before collecting.
+	start(ctx context.Context) error
 	queryGPUSummaryJson() ([]byte, error)
-	stop() error
+	stop()
 }
 
-func newIntelGpuTopExec(log *logger.Logger, ndsudoPath string, updateEvery int, device string) (*intelGpuTopExec, error) {
-	topExec := &intelGpuTopExec{
-		Logger:             log,
-		ndsudoPath:         ndsudoPath,
-		updateEvery:        updateEvery,
-		device:             device,
-		firstSampleTimeout: time.Second * 3,
-	}
+// intelGpuTopExec keeps intel_gpu_top running through ndsudo and serves its latest fresh sample.
+type intelGpuTopExec struct {
+	source     *streamexec.Source[[]byte]
+	stopSource func()
+}
 
-	if err := topExec.run(); err != nil {
+func newIntelGpuTopExec(log *logger.Logger, updateEvery int, device string) (*intelGpuTopExec, error) {
+	interval := calcInterval(updateEvery)
+	command, args := "igt-json", []string{"--interval", strconv.FormatInt(interval.Milliseconds(), 10)}
+	if device != "" {
+		command, args = "igt-device-json", append(args, "--device", device)
+	}
+	source, err := streamexec.New(streamexec.Config[[]byte]{
+		Name: "intel_gpu_top",
+		Start: func(ctx context.Context, stdout *os.File) (*ndexec.Process, error) {
+			log.Debugf("executing 'ndsudo %s'", strings.Join(append([]string{command}, args...), " "))
+			return ndexec.StartNDSudoProcess(ctx, ndexec.ProcessOptions{
+				Stdout: stdout,
+			}, command, args...)
+		},
+		NewDecoder: func() streamexec.Decoder[[]byte] { return &sampleDecoder{} },
+		Timing:     sampleTiming(interval),
+		Logger:     log,
+	})
+	if err != nil {
 		return nil, err
 	}
-
-	return topExec, nil
+	return &intelGpuTopExec{
+		source: source,
+	}, nil
 }
 
-type intelGpuTopExec struct {
-	*logger.Logger
-
-	ndsudoPath         string
-	updateEvery        int
-	device             string
-	firstSampleTimeout time.Duration
-
-	cmd  *exec.Cmd
-	done chan struct{}
-
-	mux        sync.Mutex
-	lastSample string
-}
-
-func (e *intelGpuTopExec) run() error {
-	var cmd *exec.Cmd
-
-	if e.device != "" {
-		cmd = exec.Command(e.ndsudoPath, "igt-device-json", "--interval", e.calcIntervalArg(), "--device", e.device)
-	} else {
-		cmd = exec.Command(e.ndsudoPath, "igt-json", "--interval", e.calcIntervalArg())
+// start runs intel_gpu_top and waits for its first sample. It fails when intel_gpu_top exits first, completes no sample
+// within the stall timeout, or ctx ends.
+func (e *intelGpuTopExec) start(ctx context.Context) error {
+	if e.stopSource != nil {
+		return nil
 	}
-
-	e.Debugf("executing '%s'", cmd)
-
-	r, err := cmd.StdoutPipe()
+	stop, err := e.source.Background(ctx)
 	if err != nil {
 		return err
 	}
-
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-
-	firstSample := make(chan struct{}, 1)
-	done := make(chan struct{})
-	e.cmd = cmd
-	e.done = done
-
-	go func() {
-		defer close(done)
-		sc := bufio.NewScanner(r)
-		var buf bytes.Buffer
-		var n int
-
-		for sc.Scan() {
-			if n++; n > 1000 {
-				break
-			}
-
-			text := sc.Text()
-
-			if buf.Len() == 0 && text != "{" || text == "" {
-				continue
-			}
-
-			if text == "}," {
-				text = "}"
-			}
-
-			buf.WriteString(text + "\n")
-
-			if text[0] == '}' {
-				e.mux.Lock()
-				e.lastSample = buf.String()
-				e.mux.Unlock()
-
-				select {
-				case firstSample <- struct{}{}:
-				default:
-				}
-
-				buf.Reset()
-				n = 0
-			}
-		}
-	}()
-
-	select {
-	case <-e.done:
-		_ = e.stop()
-		return errors.New("process exited before the first sample was collected")
-	case <-time.After(e.firstSampleTimeout):
-		_ = e.stop()
-		return errors.New("timed out waiting for first sample")
-	case <-firstSample:
-		return nil
-	}
+	e.stopSource = stop
+	return nil
 }
 
 func (e *intelGpuTopExec) queryGPUSummaryJson() ([]byte, error) {
-	select {
-	case <-e.done:
-		return nil, errors.New("process has already exited")
-	default:
+	if sample, ok := e.source.Latest(); ok {
+		return sample, nil
 	}
-
-	e.mux.Lock()
-	defer e.mux.Unlock()
-
-	return []byte(e.lastSample), nil
+	return nil, errors.New("no fresh intel_gpu_top sample")
 }
 
-func (e *intelGpuTopExec) stop() error {
-	if e.cmd == nil || e.cmd.Process == nil {
-		return nil
-	}
-
-	_ = e.cmd.Process.Kill()
-	_ = e.cmd.Wait()
-	e.cmd = nil
-
-	select {
-	case <-e.done:
-		return nil
-	case <-time.After(time.Second * 2):
-		return errors.New("timed out waiting for process to exit")
+func (e *intelGpuTopExec) stop() {
+	if e.stopSource != nil {
+		e.stopSource()
+		e.stopSource = nil
 	}
 }
 
-func (e *intelGpuTopExec) calcIntervalArg() string {
-	// intel_gpu_top appends the end marker ("},\n") of the previous sample to the beginning of the next sample.
-	// interval must be < than 'firstSampleTimeout'
-	interval := 900
-	if m := min(e.updateEvery, int(e.firstSampleTimeout.Seconds())); m > 1 {
-		interval = m*1000 - 500 // milliseconds
+// calcInterval returns the intel_gpu_top sampling interval: half a second below the data collection interval, so every
+// collection finds a new sample, or 0.9 seconds when collecting every second. It is capped at 2.5 seconds, so the stall
+// timeout, which also bounds Cleanup's wait for intel_gpu_top, stays within the job manager's shutdown budget.
+func calcInterval(updateEvery int) time.Duration {
+	if m := min(updateEvery, 3); m > 1 {
+		return time.Duration(m)*time.Second - 500*time.Millisecond
 	}
-	return strconv.Itoa(interval)
+	return 900 * time.Millisecond
+}
+
+// sampleTiming keeps a sample current for two sampling intervals and replaces intel_gpu_top after three without one.
+// intel_gpu_top completes a sample only when it starts the next one, so the first sample takes one interval. The
+// stall timeout also bounds Check's wait for the first sample and Cleanup's wait for intel_gpu_top, which go.d.plugin
+// cannot signal, to exit.
+func sampleTiming(interval time.Duration) streamexec.Timing {
+	return streamexec.Timing{
+		MaxSampleAge:    2 * interval,
+		StallTimeout:    3 * interval,
+		RestartDelayMin: time.Second,
+		RestartDelayMax: 30 * time.Second,
+	}
+}
+
+// sampleDecoder assembles each top-level JSON object of the intel_gpu_top output into one sample, from a "{" line to
+// a line starting with "}"; lines outside an object are skipped. intel_gpu_top ends a sample's closing line with ","
+// when it starts the next one; the comma is dropped.
+type sampleDecoder struct {
+	buf bytes.Buffer
+}
+
+func (d *sampleDecoder) Decode(line []byte) ([]byte, bool) {
+	if len(line) == 0 || d.buf.Len() == 0 && string(line) != "{" {
+		return nil, false
+	}
+	if string(line) == "}," {
+		line = line[:1]
+	}
+	d.buf.Write(line)
+	d.buf.WriteByte('\n')
+	if line[0] != '}' {
+		return nil, false
+	}
+	sample := bytes.Clone(d.buf.Bytes())
+	d.buf.Reset()
+	return sample, true
 }

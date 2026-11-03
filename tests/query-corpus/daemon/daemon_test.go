@@ -3,15 +3,238 @@
 package daemon
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"os"
+	"path/filepath"
+	"reflect"
 	"strings"
 	"syscall"
 	"testing"
 	"time"
 )
+
+func TestMain(m *testing.M) {
+	if os.Getenv("QUERY_CORPUS_TEST_DAEMON_ENV") == "1" {
+		info, statErr := os.Stat(os.Getenv("NETDATA_RUN_DIR"))
+		ready := "false"
+		if statErr == nil && info.IsDir() {
+			ready = "true"
+		}
+		err := json.NewEncoder(os.Stdout).Encode(map[string]string{
+			"run": os.Getenv("NETDATA_RUN_DIR"), "pipe": os.Getenv("NETDATA_PIPENAME"), "ready": ready,
+		})
+		if err != nil {
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
+	os.Exit(m.Run())
+}
+
+func TestDaemonRuntimeEnvironmentIsPrivate(t *testing.T) {
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent := map[string]string{"run": "parent-runtime", "pipe": "parent-cli-socket"}
+	t.Setenv("QUERY_CORPUS_TEST_DAEMON_ENV", "1")
+	t.Setenv("NETDATA_RUN_DIR", parent["run"])
+	t.Setenv("NETDATA_PIPENAME", parent["pipe"])
+	seen := make(map[string]bool)
+	for _, name := range []string{"first", "second", "relative", "relative-symlink-parent"} {
+		t.Run(name, func(t *testing.T) {
+			root, err := filepath.Abs(t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			expectedParent := ""
+			if strings.HasPrefix(name, "relative") {
+				shortDir, err := os.MkdirTemp("", "qc-rel-")
+				if err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() { _ = os.RemoveAll(shortDir) })
+				t.Chdir(shortDir)
+				tmpDir := "."
+				if name == "relative-symlink-parent" {
+					if err := os.MkdirAll("target/sub", 0o700); err != nil {
+						t.Fatal(err)
+					}
+					if err := os.Symlink("target/sub", "link"); err != nil {
+						t.Fatal(err)
+					}
+					tmpDir = "link/.."
+				}
+				expectedParent, err = os.Getwd()
+				if err != nil {
+					t.Fatal(err)
+				}
+				if name == "relative-symlink-parent" {
+					expectedParent = filepath.Join(expectedParent, "target")
+				}
+				t.Setenv("TMPDIR", tmpDir)
+			}
+			if err := os.MkdirAll(filepath.Join(root, "log"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			d := &Daemon{Opts: Options{Binary: executable, RunDir: root}, BaseURL: "invalid://environment-test"}
+			// The helper records the actual child environment and exits before readiness.
+			if err := d.launch(); err == nil || d.process != nil {
+				t.Fatalf("environment helper did not exit and reap: %v", err)
+			}
+			output, err := os.ReadFile(filepath.Join(root, "log", "stdout.log"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got map[string]string
+			if err := json.Unmarshal(output, &got); err != nil {
+				t.Fatalf("environment helper output %q: %v", output, err)
+			}
+			run := got["run"]
+			if !filepath.IsAbs(run) || run == parent["run"] || seen[run] {
+				t.Fatalf("runtime path is not private to this launch: %v", got)
+			}
+			if expectedParent != "" && filepath.Dir(run) != expectedParent {
+				t.Errorf("runtime parent = %q, want selected directory %q", filepath.Dir(run), expectedParent)
+			}
+			seen[run] = true
+			want := map[string]string{"run": run, "pipe": filepath.Join(run, "netdata.pipe"), "ready": "true"}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("child environment = %v, want private paths %v", got, want)
+			}
+			if _, err := os.Stat(run); !os.IsNotExist(err) {
+				t.Errorf("reaped helper retained its runtime directory: %v", err)
+			}
+		})
+	}
+	gotParent := map[string]string{"run": os.Getenv("NETDATA_RUN_DIR"), "pipe": os.Getenv("NETDATA_PIPENAME")}
+	if !reflect.DeepEqual(gotParent, parent) {
+		t.Errorf("launcher changed parent environment: %v", gotParent)
+	}
+}
+
+func TestDaemonRelativeRunDirectory(t *testing.T) {
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("QUERY_CORPUS_TEST_DAEMON_ENV", "1")
+	for _, name := range []string{"missing", "symlink-parent"} {
+		t.Run(name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			cwd, err := os.Getwd()
+			if err != nil {
+				t.Fatal(err)
+			}
+			runDir := "data"
+			want := filepath.Join(cwd, "data")
+			if name == "symlink-parent" {
+				if err := os.MkdirAll("target/sub", 0o700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Symlink("target/sub", "link"); err != nil {
+					t.Fatal(err)
+				}
+				runDir = "link/../data"
+				want = filepath.Join(cwd, "target", "data")
+			}
+			// The helper exits after reading its environment; Start must still write usable paths.
+			if _, err := Start(Options{Binary: executable, RunDir: runDir}); err == nil {
+				t.Fatal("environment helper unexpectedly became ready")
+			}
+			conf, err := os.ReadFile(filepath.Join(want, "etc", "netdata.conf"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			for key, sub := range map[string]string{"config": "etc", "cache": "cache", "lib": "lib", "log": "log", "home": "lib"} {
+				if !strings.Contains(string(conf), "    "+key+" = "+filepath.Join(want, sub)+"\n") {
+					t.Errorf("configuration does not anchor %s in %s", key, want)
+				}
+			}
+		})
+	}
+}
+
+func TestDaemonRejectsLongRuntimePathBeforeLaunch(t *testing.T) {
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"absolute", "relative"} {
+		t.Run(name, func(t *testing.T) {
+			root, err := filepath.Abs(t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Mkdir(filepath.Join(root, "log"), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			tmpDir, err := filepath.Abs(filepath.Join(t.TempDir(), strings.Repeat("x", len(syscall.RawSockaddrUnix{}.Path))))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Mkdir(tmpDir, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			if name == "relative" {
+				t.Chdir(tmpDir)
+				t.Setenv("TMPDIR", ".")
+			} else {
+				t.Setenv("TMPDIR", tmpDir)
+			}
+			t.Setenv("QUERY_CORPUS_TEST_DAEMON_ENV", "1")
+			d := &Daemon{Opts: Options{Binary: executable, RunDir: root}, BaseURL: "invalid://environment-test"}
+			err = d.launch()
+			if err == nil || !strings.Contains(err.Error(), "IPC socket path") || !strings.Contains(err.Error(), "TMPDIR") {
+				t.Errorf("long runtime path did not produce an actionable error: %v", err)
+			}
+			if d.process != nil || d.processPID != 0 || d.waitCh != nil {
+				t.Error("long runtime path reached child startup")
+			}
+			if _, err := os.Stat(filepath.Join(root, "log", "stdout.log")); !os.IsNotExist(err) {
+				t.Errorf("long runtime path reached log creation: %v", err)
+			}
+			entries, err := os.ReadDir(tmpDir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(entries) != 0 || d.runtimeDir != "" {
+				t.Errorf("rejected launch retained runtime state: entries=%v, directory=%q", entries, d.runtimeDir)
+			}
+		})
+	}
+}
+
+func TestRuntimeSocketPathLimits(t *testing.T) {
+	maxPathBytes := len(syscall.RawSockaddrUnix{}.Path) - 1
+	maxRunBytes := maxPathBytes - len("/netdata-spawn-plugins.sock")
+	for _, tc := range []struct {
+		name, runDir, rejectedSocket string
+	}{
+		{"boundary", "/" + strings.Repeat("x", maxRunBytes-1), ""},
+		{"spawn-only-overflow", "/" + strings.Repeat("x", maxRunBytes), "netdata-spawn-plugins.sock"},
+		{"unclean-spawn-path", strings.Repeat("/", maxRunBytes) + "x", "netdata-spawn-plugins.sock"},
+		{"cli-overflow", "/" + strings.Repeat("x", maxPathBytes-len("/netdata.pipe")), "netdata.pipe"},
+		{"multibyte-boundary", "/" + strings.Repeat("é", (maxRunBytes-1)/2) + strings.Repeat("x", (maxRunBytes-1)%2), ""},
+		{"multibyte-overflow", "/" + strings.Repeat("é", (maxRunBytes+1)/2), "netdata-spawn-plugins.sock"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateRuntimeSocketPaths(tc.runDir)
+			if tc.rejectedSocket == "" {
+				if err != nil {
+					t.Fatalf("valid socket paths rejected: %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tc.rejectedSocket) || !strings.Contains(err.Error(), "TMPDIR") {
+				t.Fatalf("missing socket-specific path diagnostic: %v", err)
+			}
+		})
+	}
+}
 
 func TestNetdataConfigDisablesUnlistedPlugins(t *testing.T) {
 	const disabled = "\n    enable running new plugins = no\n"
@@ -315,12 +538,17 @@ func TestStopIsCheckedAndBounded(t *testing.T) {
 		waitCh := make(chan error, 1)
 		process := &fakeProcess{onSignal: func() { waitCh <- nil }}
 		d := testStoppingDaemon(process, waitCh)
+		runtimeDir := t.TempDir()
+		d.runtimeDir = runtimeDir
 
 		if err := d.Stop(); err != nil {
 			t.Fatal(err)
 		}
 		if len(process.signals) != 1 || process.signals[0] != syscall.SIGTERM || process.kills != 0 {
 			t.Fatalf("signals=%v kills=%d", process.signals, process.kills)
+		}
+		if _, err := os.Stat(runtimeDir); !os.IsNotExist(err) {
+			t.Errorf("reaped process retained its runtime directory: %v", err)
 		}
 	})
 
@@ -377,6 +605,7 @@ func TestStopIsCheckedAndBounded(t *testing.T) {
 		waitCh := make(chan error)
 		process := &fakeProcess{}
 		d := testStoppingDaemon(process, waitCh)
+		d.runtimeDir = t.TempDir()
 
 		started := time.Now()
 		err := d.Stop()
@@ -385,6 +614,9 @@ func TestStopIsCheckedAndBounded(t *testing.T) {
 		}
 		if elapsed := time.Since(started); elapsed > 100*time.Millisecond {
 			t.Fatalf("Stop() took %v, want bounded completion", elapsed)
+		}
+		if _, err := os.Stat(d.runtimeDir); err != nil {
+			t.Errorf("unreaped process lost its runtime directory: %v", err)
 		}
 	})
 

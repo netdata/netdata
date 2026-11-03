@@ -1013,7 +1013,8 @@ static inline int local_sockets_libmnl_cb_run(
     unsigned int portid,
     mnl_cb_t cb_data,
     void *data) {
-    static const mnl_cb_t control_callbacks[NLMSG_DONE + 1] = {
+    // not const: older libmnl declares cb_ctl_array without const
+    static mnl_cb_t control_callbacks[NLMSG_DONE + 1] = {
         [NLMSG_ERROR] = local_sockets_libmnl_cb_error,
         [NLMSG_DONE] = local_sockets_libmnl_cb_done,
     };

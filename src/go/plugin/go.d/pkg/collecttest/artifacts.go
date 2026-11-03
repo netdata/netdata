@@ -3,6 +3,7 @@
 package collecttest
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"regexp"
@@ -12,6 +13,7 @@ import (
 
 	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"gopkg.in/yaml.v3"
 )
 
@@ -54,6 +56,40 @@ func ChartTemplateCharts(templateYAML string) (map[string]charttpl.Chart, error)
 		return nil, err
 	}
 	return out, nil
+}
+
+// V1ChartsByContext converts framework V1 charts (static lists or the
+// templates a collector instantiates) to template charts keyed by context, as
+// the V1 renderer presents them: the chart type through ChartType.String and
+// each dimension under its name, or its ID when the name is empty. A chart
+// without dimensions gets them at runtime, so it is presented with one
+// label-named dimension and the metadata check skips its dimension names. Two
+// charts with one ID are an error (the Agent keeps one chart per ID, so the
+// second replaces the first one's context), and so are two charts with one
+// context.
+func V1ChartsByContext(charts collectorapi.Charts) (map[string]charttpl.Chart, error) {
+	var problems []error
+	ids := make(map[string]bool, len(charts))
+	out := make(map[string]charttpl.Chart, len(charts))
+	for _, chart := range charts {
+		if ids[chart.ID] {
+			problems = append(problems, fmt.Errorf("chart ID %q is used twice", chart.ID))
+		}
+		ids[chart.ID] = true
+		if _, ok := out[chart.Ctx]; ok {
+			problems = append(problems, fmt.Errorf("context %q is used by two charts", chart.Ctx))
+			continue
+		}
+		tpl := charttpl.Chart{Context: chart.Ctx, Title: chart.Title, Units: chart.Units, Type: chart.Type.String()}
+		for _, dim := range chart.Dims {
+			tpl.Dimensions = append(tpl.Dimensions, charttpl.Dimension{Name: cmp.Or(dim.Name, dim.ID)})
+		}
+		if len(chart.Dims) == 0 {
+			tpl.Dimensions = []charttpl.Dimension{{NameFromLabel: "runtime"}}
+		}
+		out[chart.Ctx] = tpl
+	}
+	return out, errors.Join(problems...)
 }
 
 // ChartDimensionNames resolves the dimension names a template chart renders:
@@ -105,13 +141,6 @@ func isRuntimeNamedSelector(meta metrixselector.Meta) bool {
 	return false
 }
 
-// MetadataAlert is one metadata.yaml alerts[] row.
-type MetadataAlert struct {
-	Name   string
-	Metric string
-	Info   string
-}
-
 // MetadataMetric is one metadata.yaml metrics.scopes[].metrics[] row with the
 // scope it belongs to and its dimension names.
 type MetadataMetric struct {
@@ -126,7 +155,6 @@ type MetadataMetric struct {
 // MetadataModule is the decoded part of one metadata.yaml module these checks use.
 type MetadataModule struct {
 	ID        string
-	Alerts    []MetadataAlert
 	Metrics   []MetadataMetric
 	Functions []MetadataFunction
 }
@@ -136,11 +164,6 @@ type metadataDocument struct {
 		Meta struct {
 			ID string `yaml:"id"`
 		} `yaml:"meta"`
-		Alerts []struct {
-			Name   string `yaml:"name"`
-			Metric string `yaml:"metric"`
-			Info   string `yaml:"info"`
-		} `yaml:"alerts"`
 		Metrics struct {
 			Scopes []struct {
 				Name    string `yaml:"name"`
@@ -211,9 +234,6 @@ func DecodeMetadataModule(metadataYAML []byte, moduleID string) (MetadataModule,
 	}
 	raw := doc.Modules[index]
 	out := MetadataModule{ID: raw.Meta.ID}
-	for _, alert := range raw.Alerts {
-		out.Alerts = append(out.Alerts, MetadataAlert{Name: alert.Name, Metric: alert.Metric, Info: alert.Info})
-	}
 	for _, scope := range raw.Metrics.Scopes {
 		for _, metric := range scope.Metrics {
 			row := MetadataMetric{
@@ -321,18 +341,21 @@ func AssertMetadataDocumentsChartTemplate(t testing.TB, metadataYAML []byte, tem
 type HealthAlert struct {
 	Name   string
 	On     string
-	Info   string
 	Units  string
 	Lookup string
+	// Expressions holds the calc, warn and crit expressions that are set, in
+	// configuration order.
+	Expressions []string
 }
 
-var healthAlertLine = regexp.MustCompile(`^\s*(template|alarm|on|info|units|lookup)\s*:\s*(.*?)\s*$`)
+var healthAlertLine = regexp.MustCompile(`^\s*(template|alarm|on|units|lookup|calc|warn|crit)\s*:\s*(.*?)\s*$`)
 
 // ParseHealthAlerts extracts the alarm/template blocks of a health.d
-// configuration with the fields the artifact checks compare.
+// configuration with the fields the artifact checks compare. A line ending in
+// a backslash continues on the next line, as in health_config.c.
 func ParseHealthAlerts(healthConfig []byte) []HealthAlert {
 	var out []HealthAlert
-	for line := range strings.SplitSeq(string(healthConfig), "\n") {
+	for line := range strings.SplitSeq(strings.ReplaceAll(string(healthConfig), "\\\n", " "), "\n") {
 		match := healthAlertLine.FindStringSubmatch(line)
 		if match == nil {
 			continue
@@ -344,10 +367,6 @@ func ParseHealthAlerts(healthConfig []byte) []HealthAlert {
 			if len(out) > 0 {
 				out[len(out)-1].On = match[2]
 			}
-		case "info":
-			if len(out) > 0 {
-				out[len(out)-1].Info = match[2]
-			}
 		case "units":
 			if len(out) > 0 {
 				out[len(out)-1].Units = match[2]
@@ -355,6 +374,10 @@ func ParseHealthAlerts(healthConfig []byte) []HealthAlert {
 		case "lookup":
 			if len(out) > 0 {
 				out[len(out)-1].Lookup = match[2]
+			}
+		case "calc", "warn", "crit":
+			if len(out) > 0 {
+				out[len(out)-1].Expressions = append(out[len(out)-1].Expressions, match[2])
 			}
 		}
 	}
@@ -380,6 +403,41 @@ func lookupDimensions(lookup string) []string {
 	for _, entry := range strings.FieldsFunc(strings.Join(fields, ","), func(r rune) bool { return r == ',' || r == '|' }) {
 		if !strings.EqualFold(entry, "all") && !strings.ContainsAny(entry, "*!") {
 			names = append(names, entry)
+		}
+	}
+	return names
+}
+
+var (
+	// healthVariable is a $name or ${name} reference, as the expression lexer
+	// (libnetdata/eval) reads it.
+	healthVariable = regexp.MustCompile(`\$\{([^}]*)\}|\$([^\s&|!><=%+\-*/?(){}]+)`)
+	// healthBuiltins are the variables health_variable.c resolves before
+	// dimensions, plus green and red, which health_config.c substitutes.
+	healthBuiltins = map[string]bool{
+		"this": true, "now": true, "after": true, "before": true, "status": true, "REMOVED": true,
+		"UNINITIALIZED": true, "UNDEFINED": true, "CLEAR": true, "WARNING": true, "CRITICAL": true,
+		"last_collected_t": true, "update_every": true, "green": true, "red": true,
+	}
+)
+
+// expressionDimensions returns the variables of an alert's expressions that
+// can only resolve to a dimension of its own chart: not a health built-in, not
+// the value of a named alert, and not a qualified chart.dimension reference.
+// The _raw and _last_collected_t suffixes select a dimension's raw value and
+// collection time, so they are removed.
+func expressionDimensions(expressions []string, alertNames map[string]bool) []string {
+	var names []string
+	for _, expression := range expressions {
+		for _, match := range healthVariable.FindAllStringSubmatch(expression, -1) {
+			name := match[1] + match[2]
+			if healthBuiltins[name] || alertNames[name] || strings.Contains(name, ".") {
+				continue
+			}
+			for _, suffix := range []string{"_raw", "_last_collected_t"} {
+				name = strings.TrimSuffix(name, suffix)
+			}
+			names = append(names, name)
 		}
 	}
 	return names
@@ -444,11 +502,20 @@ func AssertHealthAlertsTargetChartTemplateWith(t testing.TB, healthConfig []byte
 }
 
 // CheckHealthAlertsMatchMetadataMetrics requires every alert (within opts) to
-// target a documented metric, to state that metric's documented unit and to
-// look up only its documented dimensions. An alert whose lookup derives another
-// unit (a percentage of the window, an anomaly rate) does not fit this check.
+// target a documented metric, to state that metric's documented unit, to look
+// up only its documented dimensions, and to read in calc, warn and crit only
+// its documented dimensions besides built-ins, alert values and qualified
+// references. Health matches a variable against a dimension's ID or name, and
+// go.d sends the dimension name as the ID, so a variable spelled as the
+// collector's internal dimension ID never resolves. An alert whose lookup
+// derives another unit (a percentage of the window, an anomaly rate) does not
+// fit this check.
 func CheckHealthAlertsMatchMetadataMetrics(alerts []HealthAlert, metrics []MetadataMetric, opts HealthAlertsCheck) error {
 	var problems []error
+	alertNames := make(map[string]bool, len(alerts))
+	for _, alert := range alerts {
+		alertNames[alert.Name] = true
+	}
 	byName := make(map[string]MetadataMetric, len(metrics))
 	for _, metric := range metrics {
 		if _, dup := byName[metric.Name]; dup {
@@ -474,6 +541,11 @@ func CheckHealthAlertsMatchMetadataMetrics(alerts []HealthAlert, metrics []Metad
 				problems = append(problems, fmt.Errorf("%s: lookup dimension %q is not documented for %s", alert.Name, dimension, alert.On))
 			}
 		}
+		for _, dimension := range expressionDimensions(alert.Expressions, alertNames) {
+			if !slices.Contains(metric.Dimensions, dimension) {
+				problems = append(problems, fmt.Errorf("%s: variable %q is not a documented dimension of %s", alert.Name, dimension, alert.On))
+			}
+		}
 	}
 	return errors.Join(sortedErrors(problems)...)
 }
@@ -496,7 +568,8 @@ func CheckHealthAlertsMatchMetadataWith(healthConfig, metadataYAML []byte, opts 
 }
 
 // AssertHealthAlertsMatchMetadata fails the test when an alert targets an
-// undocumented metric, states another unit or looks up an undocumented dimension.
+// undocumented metric, states another unit, or looks up or reads an
+// undocumented dimension.
 func AssertHealthAlertsMatchMetadata(t testing.TB, healthConfig, metadataYAML []byte) {
 	t.Helper()
 	AssertHealthAlertsMatchMetadataWith(t, healthConfig, metadataYAML, HealthAlertsCheck{})
@@ -508,93 +581,6 @@ func AssertHealthAlertsMatchMetadataWith(t testing.TB, healthConfig, metadataYAM
 	t.Helper()
 	if err := CheckHealthAlertsMatchMetadataWith(healthConfig, metadataYAML, opts); err != nil {
 		t.Fatalf("health alerts do not match metadata.yaml:\n%v", err)
-	}
-}
-
-// MetadataAlertsCheck selects what the metadata-alerts-versus-health check
-// compares when metadata.yaml has several modules or the health.d file is
-// shared by several collectors.
-type MetadataAlertsCheck struct {
-	// ModuleID selects the metadata module by meta.id; empty requires a single module.
-	ModuleID string
-	// SharedHealthConfig accepts alerts in the health.d file that this module does
-	// not document; every documented alert must still match its shipped block.
-	SharedHealthConfig bool
-}
-
-// CheckMetadataAlertsMatchHealthAlerts requires the documented alerts to match
-// the shipped ones: every documented alert exists, its metric equals the
-// alert's on context and its info text is verbatim, across every shipped
-// variant of that name (a health.d file may repeat a name for OS- or
-// label-specific variants). Unless sharedHealthConfig is set, every shipped
-// alert must also be documented.
-func CheckMetadataAlertsMatchHealthAlerts(documented []MetadataAlert, shipped []HealthAlert, sharedHealthConfig bool) error {
-	byName := make(map[string][]HealthAlert)
-	for _, alert := range shipped {
-		byName[alert.Name] = append(byName[alert.Name], alert)
-	}
-	var problems []error
-	seen := make(map[string]bool)
-	for _, alert := range documented {
-		if seen[alert.Name] {
-			problems = append(problems, fmt.Errorf("%s: documented twice", alert.Name))
-			continue
-		}
-		seen[alert.Name] = true
-		variants, ok := byName[alert.Name]
-		if !ok {
-			problems = append(problems, fmt.Errorf("%s: documented but not in the health configuration", alert.Name))
-			continue
-		}
-		for _, actual := range variants {
-			if alert.Metric != actual.On {
-				problems = append(problems, fmt.Errorf("%s: metric %q, alert on %q", alert.Name, alert.Metric, actual.On))
-			}
-			if alert.Info != actual.Info {
-				problems = append(problems, fmt.Errorf("%s: info %q, alert info %q", alert.Name, alert.Info, actual.Info))
-			}
-		}
-	}
-	if !sharedHealthConfig {
-		for name := range byName {
-			if !seen[name] {
-				problems = append(problems, fmt.Errorf("%s: in the health configuration but not documented", name))
-			}
-		}
-	}
-	return errors.Join(sortedErrors(problems)...)
-}
-
-// CheckMetadataAlertsMatchHealthConfig decodes a single-module metadata.yaml and
-// a health.d configuration and runs CheckMetadataAlertsMatchHealthAlerts
-// requiring every shipped alert to be documented.
-func CheckMetadataAlertsMatchHealthConfig(metadataYAML, healthConfig []byte) error {
-	return CheckMetadataAlertsMatchHealthConfigWith(metadataYAML, healthConfig, MetadataAlertsCheck{})
-}
-
-// CheckMetadataAlertsMatchHealthConfigWith is CheckMetadataAlertsMatchHealthConfig
-// selected by opts.
-func CheckMetadataAlertsMatchHealthConfigWith(metadataYAML, healthConfig []byte, opts MetadataAlertsCheck) error {
-	module, err := DecodeMetadataModule(metadataYAML, opts.ModuleID)
-	if err != nil {
-		return err
-	}
-	return CheckMetadataAlertsMatchHealthAlerts(module.Alerts, ParseHealthAlerts(healthConfig), opts.SharedHealthConfig)
-}
-
-// AssertMetadataAlertsMatchHealthConfig fails the test when
-// CheckMetadataAlertsMatchHealthConfig reports drift.
-func AssertMetadataAlertsMatchHealthConfig(t testing.TB, metadataYAML, healthConfig []byte) {
-	t.Helper()
-	AssertMetadataAlertsMatchHealthConfigWith(t, metadataYAML, healthConfig, MetadataAlertsCheck{})
-}
-
-// AssertMetadataAlertsMatchHealthConfigWith is AssertMetadataAlertsMatchHealthConfig
-// selected by opts.
-func AssertMetadataAlertsMatchHealthConfigWith(t testing.TB, metadataYAML, healthConfig []byte, opts MetadataAlertsCheck) {
-	t.Helper()
-	if err := CheckMetadataAlertsMatchHealthConfigWith(metadataYAML, healthConfig, opts); err != nil {
-		t.Fatalf("metadata.yaml alerts do not match the health configuration:\n%v", err)
 	}
 }
 

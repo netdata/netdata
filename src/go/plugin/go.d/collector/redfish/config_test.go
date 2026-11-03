@@ -41,6 +41,9 @@ func TestConfigSchemaAuthenticationMatchesRuntime(t *testing.T) {
 		return config
 	}
 
+	// The form always submits auth_method (it has a default) and drops username and password when it is
+	// none, so the schema does not reject an omitted method without credentials or credentials under none;
+	// validate() does (TestConfigValidation).
 	tests := map[string]struct {
 		config map[string]any
 		valid  bool
@@ -74,16 +77,6 @@ func TestConfigSchemaAuthenticationMatchesRuntime(t *testing.T) {
 		},
 		"omitted method defaults to auto": {
 			config: with(map[string]any{"username": "user", "password": "secret"}), valid: true,
-		},
-		"omitted method and credentials": {config: base()},
-		"none with username": {
-			config: with(map[string]any{"auth_method": "none", "username": "user"}),
-		},
-		"none with password": {
-			config: with(map[string]any{"auth_method": "none", "password": "secret"}),
-		},
-		"none with whitespace password": {
-			config: with(map[string]any{"auth_method": "none", "password": " "}),
 		},
 		"auto missing password": {
 			config: with(map[string]any{"auth_method": "auto", "username": "user"}),
@@ -247,6 +240,20 @@ func TestConfigValidation(t *testing.T) {
 				Username:   "user",
 			},
 			wantErr: "must be empty",
+		},
+		"none rejects a whitespace password": {
+			cfg: Config{
+				URL:        "https://bmc.example.test",
+				AuthMethod: "none",
+				Password:   " ",
+			},
+			wantErr: "must be empty",
+		},
+		"omitted method requires credentials": {
+			cfg: Config{
+				URL: "https://bmc.example.test",
+			},
+			wantErr: "'username' and 'password'",
 		},
 		"link local requires zone": {
 			cfg: Config{

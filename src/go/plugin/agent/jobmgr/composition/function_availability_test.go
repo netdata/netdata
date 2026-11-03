@@ -32,6 +32,7 @@ func TestRunFunctionAvailabilityDiagnosticsAreSafeAndBounded(t *testing.T) {
 	uids := lifecycle.NewUIDLedger()
 	var mode atomic.Int32
 	generation, err := newTestRunGeneration(t, runGenerationConfig{
+		Secrets:         testRunSecrets(t),
 		Generation:      7,
 		ShutdownTimeout: time.Second,
 		Diagnostics:     diagnostics,

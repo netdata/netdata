@@ -2,7 +2,10 @@
 
 package metrix
 
-import "math"
+import (
+	"math"
+	"sync/atomic"
+)
 
 type metricKind uint8
 
@@ -50,11 +53,43 @@ type metricMetaSet struct {
 
 type histogramSchema struct {
 	bounds []float64
+	// labels caches the flattened bucket label values: bounds, then "+Inf".
+	labels atomic.Pointer[[]string]
+}
+
+// bucketLabels formats the bucket upper bounds once per schema. Schemas are immutable
+// and shared by snapshots, so concurrent first readers may format twice and keep one.
+func (s *histogramSchema) bucketLabels() []string {
+	if labels := s.labels.Load(); labels != nil {
+		return *labels
+	}
+	labels := make([]string, 0, len(s.bounds)+1)
+	for _, ub := range s.bounds {
+		labels = append(labels, formatHistogramBucketLabel(ub))
+	}
+	labels = append(labels, formatHistogramBucketLabel(math.Inf(1)))
+	s.labels.CompareAndSwap(nil, &labels)
+	return *s.labels.Load()
 }
 
 type summarySchema struct {
 	quantiles     []float64
 	reservoirSize int
+	// labels caches the flattened quantile label values.
+	labels atomic.Pointer[[]string]
+}
+
+// quantileLabels formats the configured quantiles once per schema.
+func (s *summarySchema) quantileLabels() []string {
+	if labels := s.labels.Load(); labels != nil {
+		return *labels
+	}
+	labels := make([]string, 0, len(s.quantiles))
+	for _, q := range s.quantiles {
+		labels = append(labels, formatSummaryQuantileLabel(q))
+	}
+	s.labels.CompareAndSwap(nil, &labels)
+	return *s.labels.Load()
 }
 
 type stateSetSchema struct {

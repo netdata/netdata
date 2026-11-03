@@ -1679,7 +1679,99 @@ static int dictionary_destroy_race_unittest(void) {
     return 0;
 }
 
+// A delayed destruction whose delete callback destroys a nested dictionary that still has a
+// referenced item. That nested destroy is queued too, so the cleanup that runs the callback must
+// not be holding the queue mutex (backfill releases a chart before its last dimension, so a queued
+// chart index can reach this).
+static void dict_nested_destroy_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    DICTIONARY **child = value;
+    dictionary_destroy(*child);
+}
+
+static void dict_nested_destroy_child(void) {
+    cleanup_destroyed_dictionaries(false);
+    size_t queued_baseline = dictionary_destroy_delayed_count();
+
+    DICTIONARY *child = dictionary_create(DICT_OPTION_NONE);
+    const DICTIONARY_ITEM *child_item = dictionary_set_and_acquire_item(child, "dim", "value", 6);
+
+    DICTIONARY *parent = dictionary_create(DICT_OPTION_NONE);
+    dictionary_register_delete_callback(parent, dict_nested_destroy_delete_callback, NULL);
+    const DICTIONARY_ITEM *parent_item = dictionary_set_and_acquire_item(parent, "chart", &child, sizeof(child));
+
+    // the parent is still referenced: its destruction is queued
+    dictionary_destroy(parent);
+    dictionary_acquired_item_release(parent, (DICTIONARY_ITEM *)parent_item);
+
+    // frees the parent; its callback queues the still-referenced child, which the shutdown pass
+    // must count as still referenced
+    size_t remaining = cleanup_destroyed_dictionaries(true);
+    if(remaining != queued_baseline + 1 || dictionary_destroy_delayed_count() != queued_baseline + 1)
+        _exit(3);
+
+    dictionary_acquired_item_release(child, (DICTIONARY_ITEM *)child_item);
+    cleanup_destroyed_dictionaries(false);
+    if(dictionary_destroy_delayed_count() != queued_baseline)
+        _exit(4);
+}
+
+static int dictionary_nested_destroy_unittest(void) {
+    fprintf(stderr, "\nTesting a delayed destruction that queues a nested dictionary...\n");
+
+    fflush(stderr);
+    fflush(stdout);
+
+    pid_t pid = fork();
+    if(pid == 0) {
+        dict_nested_destroy_child();
+        _exit(0);
+    }
+
+    if(pid < 0) {
+        fprintf(stderr, "nested delayed destruction test: fork() failed: %s\n", strerror(errno));
+        return 1;
+    }
+
+    // a self-deadlock never returns: give it a few seconds, then kill it
+    int status = 0;
+    bool reaped = false;
+    for(int elapsed = 0; elapsed < 10 * 10; elapsed++) {
+        pid_t rc = waitpid(pid, &status, WNOHANG);
+        if(rc > 0) { reaped = true; break; }
+        if(rc < 0 && errno != EINTR) {
+            fprintf(stderr, "nested delayed destruction test: waitpid() failed: %s\n", strerror(errno));
+            return 1;
+        }
+        sleep_usec(100 * USEC_PER_MS);
+    }
+
+    if(!reaped) {
+        kill(pid, SIGKILL);
+        while(waitpid(pid, &status, 0) < 0 && errno == EINTR) ;
+        fprintf(stderr, "nested delayed destruction test: FAILED - deadlocked "
+                        "(cleanup held the queue mutex while the delete callback queued a nested dictionary)\n");
+        return 1;
+    }
+
+    if(!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+        fprintf(stderr, "nested delayed destruction test: FAILED - child status %d "
+                        "(3: nested dictionary not queued or not counted, 4: queue did not drain)\n",
+                WIFEXITED(status) ? WEXITSTATUS(status) : -1);
+        return 1;
+    }
+
+    fprintf(stderr, "nested delayed destruction test: OK\n");
+    return 0;
+}
+
 #else
+
+static int dictionary_nested_destroy_unittest(void) {
+    fprintf(stderr,
+            "\nTesting a delayed destruction that queues a nested dictionary: SKIPPED "
+            "(fork-based test is unsupported on this platform)\n");
+    return 0;
+}
 
 static int dictionary_destroy_race_unittest(void) {
     fprintf(stderr,
@@ -2325,6 +2417,7 @@ int dictionary_unittest(size_t entries) {
     errors += dictionary_gc_view_orphans_unittest();
 
     errors += dictionary_destroy_race_unittest();
+    errors += dictionary_nested_destroy_unittest();
 
     cleanup_destroyed_dictionaries(false);
 

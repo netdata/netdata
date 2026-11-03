@@ -15,6 +15,7 @@ import (
 	"github.com/jessevdk/go-flags"
 	"github.com/netdata/netdata/go/plugins/cmd/internal/agenthost"
 	"github.com/netdata/netdata/go/plugins/cmd/internal/discoveryproviders"
+	"github.com/netdata/netdata/go/plugins/cmd/internal/secretproviders"
 	"github.com/netdata/netdata/go/plugins/plugin/agent"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
@@ -29,6 +30,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/pkg/terminal"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+
 	// Register IBM ecosystem collectors
 	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/as400"         // Requires CGO
 	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/db2"           // Requires CGO
@@ -76,7 +78,13 @@ func main() {
 	}
 	isTerminal := terminal.IsTerminal()
 
+	secrets, err := secretproviders.Default()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "initializing secrets: %v\n", err)
+		os.Exit(1)
+	}
 	a := agent.New(agent.Config{
+		Secrets:             secrets,
 		Name:                executable.Name,
 		PluginConfigDir:     pluginconfig.ConfigDir(),
 		CollectorsConfigDir: pluginconfig.CollectorsDir(),
@@ -105,9 +113,13 @@ func main() {
 	a.Infof("directories → config: %s | collectors: %s | sd: %s | varlib: %s",
 		a.ConfigDir, a.CollectorsConfDir, a.ServiceDiscoveryConfigDir, a.VarLibDir)
 
-	if err := agenthost.Run(a); err != nil {
-		a.Errorf("plugin exiting after Agent failure: %v", err)
+	result := agenthost.Run(a)
+	if result.Err != nil {
+		a.Errorf("plugin exiting after Agent failure: %v", result.Err)
 		os.Exit(1)
+	}
+	if result.ExitRequired {
+		os.Exit(0)
 	}
 }
 

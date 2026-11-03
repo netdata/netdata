@@ -1,0 +1,3 @@
+version: v1
+mode: persistent
+command: [./collect.py]

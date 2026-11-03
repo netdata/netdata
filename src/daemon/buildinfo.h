@@ -14,6 +14,7 @@ char *get_value_from_key(char *buffer, char *key);
 void get_install_type(struct rrdhost_system_info *system_info);
 
 void build_info_to_json_object(BUFFER *b);
+int build_info_system_info_unittest(void);
 
 void get_install_type_internal(char **install_type, char **prebuilt_arch, char **prebuilt_dist);
 

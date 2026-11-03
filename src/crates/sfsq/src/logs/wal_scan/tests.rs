@@ -1,7 +1,36 @@
-//! Unit tests for the row-scan evaluator's semantics. These exercise the
-//! evaluation core against hand-built row sets; the WAL-file end and the
-//! full equivalence against the SFST engine over identical frames are
-//! covered by the property harness in `ng_wal_equivalence.rs`.
+//! Unit tests for `WalScan::evaluate` — the query semantics of the
+//! row-scan evaluator (the parent `wal_scan` module), pinned against
+//! hand-built `(timestamp, pairs)` rows. Fixtures bypass WAL files and
+//! SFST indexes entirely: rows go through the same `ScanSink` the real
+//! scan decodes into, so only the evaluation itself is under test.
+//!
+//! Not pinned here: the WAL decode end (`scan_flattened` /
+//! `scan_flattened_range` — in-tree coverage there is the payload-format
+//! gate only; header/CRC/decode-error paths are not pinned anywhere) and
+//! the tail-vs-SFST
+//! equivalence over identical frames — both live in the property harness
+//! `sfsq/tests/ng_wal_equivalence.rs`. `page_shard` / `materialize_rows`
+//! have no unit coverage in this file either.
+//!
+//! Pins:
+//!
+//! - matching — an empty filter matches every in-window row; the window
+//!   is half-open; selections OR within a field and AND across fields
+//!   (and with the full-text term); a filter on an absent field matches
+//!   nothing; patterns anchor to the full value; the full-text query is
+//!   unanchored over whole `key=value` pairs;
+//! - degrade parity with the SFST path — an exact filter on a field
+//!   name containing `=` matches nothing; an invalid pattern on an
+//!   absent field is a normal zero-match shard (structure intact), not
+//!   an error; on a present field it degrades to the fields-only shape;
+//! - facets — each excludes its own selection, counts a row once per
+//!   distinct value, skips absent and high-card fields, and clips to
+//!   the window;
+//! - timeline — exact `unset` for multivalued fields, half-open
+//!   buckets, the full filter applied (own selection included), absent
+//!   field routes matches to `unset`, high-card field yields none;
+//! - the field table's tiers and order follow the indexer's
+//!   cardinality rule.
 
 use sfst::{FieldTier, Filter, Grid};
 
@@ -19,7 +48,8 @@ fn scan_from(rows: &[(i64, &[&str])]) -> WalScan {
     sink.finish()
 }
 
-/// `[0, 100)` in one bucket — a window that covers every fixture row.
+/// `[0, 100)` in one bucket — wide enough for the usual fixtures; tests
+/// pinning window clipping add rows beyond it deliberately.
 fn wide_grid() -> Grid {
     Grid::new(0, 100, 1)
 }
@@ -28,6 +58,8 @@ fn query(grid: Grid) -> LogsQueryBuilder {
     LogsQueryBuilder::new(grid)
 }
 
+/// The shard's facet result for `field` — the lookup doubles as an
+/// assertion that the facet exists at all.
 fn facet<'a>(shard: &'a crate::logs::LogsShard, field: &str) -> &'a sfst::FacetResult {
     shard
         .facets
@@ -42,6 +74,8 @@ fn run(scan: &WalScan, q: LogsQuery) -> crate::logs::LogsShard {
 
 #[test]
 fn empty_filter_matches_everything_in_window() {
+    // An empty filter contributes no conjuncts: `matched` is the raw
+    // window count, and rows outside the grid window never count.
     let scan = scan_from(&[
         (5, &["level=info"]),
         (15, &["level=error"]),
@@ -61,6 +95,9 @@ fn window_is_half_open() {
 
 #[test]
 fn filter_is_or_within_field_and_across_fields() {
+    // Selections on one field OR together; selections on different
+    // fields AND. Two `level` values plus one `host` value exercise
+    // both directions in a single query.
     let scan = scan_from(&[
         (1, &["level=info", "host=a"]),
         (2, &["level=error", "host=a"]),
@@ -78,6 +115,8 @@ fn filter_is_or_within_field_and_across_fields() {
 
 #[test]
 fn filter_on_absent_field_matches_nothing() {
+    // An absent field resolves to the empty token set before any
+    // matcher runs: its conjunct can never be satisfied.
     let scan = scan_from(&[(1, &["a=x"])]);
     let f = Filter::new().select("missing", "x");
     let shard = run(&scan, query(wide_grid()).filter(f).build());
@@ -165,6 +204,9 @@ fn invalid_pattern_on_absent_field_is_not_an_error() {
 
 #[test]
 fn invalid_pattern_degrades_to_fields_only() {
+    // The degrade shape for an unresolvable filter: zero counts and no
+    // facet or timeline, but the field table survives — the shard stays
+    // well-formed rather than empty.
     let scan = scan_from(&[(1, &["a=x"])]);
     let f = Filter::new().select_pattern("a", "(unclosed");
     let shard = run(
@@ -182,6 +224,9 @@ fn invalid_pattern_degrades_to_fields_only() {
 
 #[test]
 fn facet_excludes_its_own_selection() {
+    // A facet's scope is the filter minus its own selection: each field
+    // counts rows satisfying the *other* fields' conjuncts, so a
+    // field's own selection can't collapse its breakdown.
     let scan = scan_from(&[
         (1, &["level=info", "host=a"]),
         (2, &["level=error", "host=a"]),
@@ -229,6 +274,9 @@ fn facet_counts_each_row_once_per_distinct_value() {
 
 #[test]
 fn facets_skip_absent_and_high_card_fields() {
+    // Facet eligibility mirrors `eligible_facet_fields`: a requested
+    // field absent from the table, or high-card in it, produces no
+    // facet — only the eligible one survives.
     // 1000 distinct values of `id` → high-card at the default threshold.
     let id_pairs: Vec<String> = (0..1000).map(|i| format!("id={i:04}")).collect();
     let id_refs: Vec<&str> = id_pairs.iter().map(String::as_str).collect();
@@ -246,6 +294,8 @@ fn facets_skip_absent_and_high_card_fields() {
 
 #[test]
 fn facets_clip_to_the_window() {
+    // Facets accumulate in-window rows only: the out-of-window row's
+    // value never appears.
     let scan = scan_from(&[(5, &["tag=in"]), (500, &["tag=out"])]);
     let shard = run(
         &scan,
@@ -318,6 +368,8 @@ fn timeline_applies_full_filter_and_keeps_zero_count_dimensions() {
 
 #[test]
 fn timeline_absent_field_routes_matches_to_unset() {
+    // Histogram on an absent field: no dimensions and empty count
+    // rows; matched rows land in `unset` instead of vanishing.
     let scan = scan_from(&[(1, &["a=x"]), (2, &["a=y"])]);
     let shard = run(&scan, query(wide_grid()).histogram_field("missing").build());
     let timeline = shard.timeline.expect("timeline");
@@ -328,6 +380,8 @@ fn timeline_absent_field_routes_matches_to_unset() {
 
 #[test]
 fn timeline_high_card_field_yields_none() {
+    // A high-card histogram field produces no timeline at all,
+    // mirroring the SFST path's error-then-degrade for the same query.
     let id_pairs: Vec<String> = (0..1000).map(|i| format!("id={i:04}")).collect();
     let id_refs: Vec<&str> = id_pairs.iter().map(String::as_str).collect();
     let scan = scan_from(&[(1, &id_refs[..])]);

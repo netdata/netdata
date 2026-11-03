@@ -30,7 +30,7 @@ This collector is only supported on the following platforms:
 
 - Linux
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time.
 
@@ -45,9 +45,6 @@ eBPF VFS can be monitored further using the following other integrations:
 
 The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) and presence of BTF files to decide which eBPF program will be attached.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 
@@ -169,19 +166,19 @@ Metrics:
 | cgroup.vfs_open_error | Open error | open | calls/s |
 | cgroup.vfs_create | Calls to vfs_create. | create | calls/s |
 | cgroup.vfs_create_error | Create error | create | calls/s |
-| services.vfs_unlink | Files deleted | a dimension per systemd service | calls/s |
-| services.vfs_write | Write to disk | a dimension per systemd service | calls/s |
-| services.vfs_write_error | Fails to write | a dimension per systemd service | calls/s |
-| services.vfs_read | Read from disk | a dimension per systemd service | calls/s |
-| services.vfs_read_error | Fails to read | a dimension per systemd service | calls/s |
-| services.vfs_write_bytes | Bytes written on disk | a dimension per systemd service | bytes/s |
-| services.vfs_read_bytes | Bytes read from disk | a dimension per systemd service | bytes/s |
-| services.vfs_fsync | Calls to vfs_fsync. | a dimension per systemd service | calls/s |
-| services.vfs_fsync_error | Sync error | a dimension per systemd service | calls/s |
-| services.vfs_open | Calls to vfs_open. | a dimension per systemd service | calls/s |
-| services.vfs_open_error | Open error | a dimension per systemd service | calls/s |
-| services.vfs_create | Calls to vfs_create. | a dimension per systemd service | calls/s |
-| services.vfs_create_error | Create error | a dimension per systemd service | calls/s |
+| systemd.service.vfs_unlink | Files deleted | a dimension per systemd service | calls/s |
+| systemd.service.vfs_write | Write to disk | a dimension per systemd service | calls/s |
+| systemd.service.vfs_write_error | Fails to write | a dimension per systemd service | calls/s |
+| systemd.service.vfs_read | Read from disk | a dimension per systemd service | calls/s |
+| systemd.service.vfs_read_error | Fails to read | a dimension per systemd service | calls/s |
+| systemd.service.vfs_write_bytes | Bytes written on disk | a dimension per systemd service | bytes/s |
+| systemd.service.vfs_read_bytes | Bytes read from disk | a dimension per systemd service | bytes/s |
+| systemd.service.vfs_fsync | Calls to vfs_fsync. | a dimension per systemd service | calls/s |
+| systemd.service.vfs_fsync_error | Sync error | a dimension per systemd service | calls/s |
+| systemd.service.vfs_open | Calls to vfs_open. | a dimension per systemd service | calls/s |
+| systemd.service.vfs_open_error | Open error | a dimension per systemd service | calls/s |
+| systemd.service.vfs_create | Calls to vfs_create. | a dimension per systemd service | calls/s |
+| systemd.service.vfs_create_error | Create error | a dimension per systemd service | calls/s |
 
 
 ### Per eBPF VFS instance

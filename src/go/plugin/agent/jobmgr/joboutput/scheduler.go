@@ -16,12 +16,12 @@ type ModuleReconciler interface {
 }
 
 type Scheduler struct {
-	mu     sync.Mutex // guards jobs and modules
-	tickMu sync.Mutex // serializes Tick() so ticks never overlap
+	retireCandidates func()
+	mu               sync.Mutex // guards jobs and modules
+	tickMu           sync.Mutex // serializes Tick() so ticks never overlap
 
 	reconciler ModuleReconciler                          // per-module reconciliation callback
 	retries    *autoDetectionRetryIndex                  // auto-detection retry worker
-	pending    *pendingJobIndex                          // release-triggered latest desired jobs
 	accepted   *acceptedActivationIndex                  // detached accepted-job activation owner
 	jobs       map[lifecycle.ResourceIdentity]RuntimeJob // scheduled job by identity
 	modules    map[string]int                            // scheduled job count by module
@@ -34,7 +34,6 @@ func NewScheduler(reconciler ModuleReconciler) (*Scheduler, error) {
 	return &Scheduler{
 		reconciler: reconciler,
 		retries:    newAutoDetectionRetryIndex(),
-		pending:    newPendingJobIndex(),
 		accepted:   newAcceptedActivationIndex(),
 		jobs:       make(map[lifecycle.ResourceIdentity]RuntimeJob),
 		modules:    make(map[string]int),
@@ -44,28 +43,22 @@ func NewScheduler(reconciler ModuleReconciler) (*Scheduler, error) {
 func (s *Scheduler) bindBackgroundWorkers(
 	commands jobmgr.PreparedCommandPort,
 	plan autoDetectionRetryPlanner,
-	pendingPlan pendingJobPlanner,
 	run uint64,
 	failure func(error),
 ) error {
 	if s == nil {
 		return errors.New("job output: nil background scheduler")
 	}
-	if err := s.pending.bind(commands, pendingPlan, run, failure); err != nil {
-		return err
-	}
-	if err := s.retries.bind(commands, plan, run, failure); err != nil {
-		s.pending.stopWorker()
-		return err
-	}
-	return nil
+	return s.retries.bind(commands, plan, run, failure)
 }
 
 func (s *Scheduler) StopBackgroundWorkers() {
 	if s != nil {
+		if s.retireCandidates != nil {
+			s.retireCandidates()
+		}
 		s.accepted.stopWorker()
 		s.retries.stopWorker()
-		s.pending.stopWorker()
 	}
 }
 
@@ -76,7 +69,6 @@ func (s *Scheduler) WaitBackgroundWorkers(ctx context.Context) error {
 	return errors.Join(
 		s.accepted.wait(ctx),
 		s.retries.wait(ctx),
-		s.pending.wait(ctx),
 	)
 }
 

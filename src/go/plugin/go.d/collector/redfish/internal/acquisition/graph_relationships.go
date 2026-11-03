@@ -116,14 +116,14 @@ var graphRelationships = []graphRelationship{
 	{
 		ParentKind: "manager",
 		Path:       "DedicatedNetworkPorts",
-		ChildKind:  "network_port",
+		ChildKind:  "port",
 		Family:     "network",
 		Mode:       "component",
 	},
 	{
 		ParentKind: "manager",
 		Path:       "SharedNetworkPorts",
-		ChildKind:  "network_port",
+		ChildKind:  "port",
 		Family:     "network",
 		Mode:       "component",
 	},

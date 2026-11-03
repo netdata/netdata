@@ -99,7 +99,7 @@ Key findings include:
 - **Netdata is the most efficient agent,** requiring significantly fewer system resources than others.
 - **Netdata has minimal performance impact,** allowing containers and applications to run without measurable degradation due to observability.
 
-Full analysis here: [Twitter Link](https://twitter.com/IMalavolta/status/1734208439096676680)
+Full analysis here: [ICSOC 2023 paper](https://www.ivanomalavolta.com/files/papers/ICSOC_2023.pdf)
 
 ## Comparisons with Other Commercial Observability Agents
 

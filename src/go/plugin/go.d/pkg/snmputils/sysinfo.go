@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"unicode"
 
 	"github.com/gosnmp/gosnmp"
 
@@ -50,6 +51,8 @@ type SysInfoProbe struct {
 	PDUCount        int
 	SeenSysDescr    bool
 	SeenSysObjectID bool
+	// SysObjectIDType is the ASN.1 type of the sysObjectID value; its content is never recorded.
+	SysObjectIDType string
 	SeenSysContact  bool
 	SeenSysName     bool
 	SeenSysLocation bool
@@ -86,29 +89,23 @@ func GetSysInfo(client ScalarClient) (*SysInfo, error) {
 		case OidSysDescr:
 			si.Probe.SeenSysDescr = true
 			si.Descr, err = PduToString(pdu)
-			si.Descr = valueSanitizer.Replace(si.Descr)
+			si.Descr = sanitizeMetadata(si.Descr)
 		case OidSysObject:
 			si.Probe.SeenSysObjectID = true
-			if pdu.Type != gosnmp.ObjectIdentifier {
-				err = fmt.Errorf("expected ObjectIdentifier, got %v", pdu.Type)
-				break
-			}
-			var sysObj string
-			if sysObj, err = PduToString(pdu); err == nil {
-				si.SysObjectID = sysObj
-			}
+			si.Probe.SysObjectIDType = pdu.Type.String()
+			si.SysObjectID = sysObjectIDFromPDU(pdu)
 		case OidSysContact:
 			si.Probe.SeenSysContact = true
 			si.Contact, err = PduToString(pdu)
-			si.Contact = valueSanitizer.Replace(si.Contact)
+			si.Contact = sanitizeMetadata(si.Contact)
 		case OidSysName:
 			si.Probe.SeenSysName = true
 			si.Name, err = PduToString(pdu)
-			si.Name = valueSanitizer.Replace(si.Name)
+			si.Name = sanitizeMetadata(si.Name)
 		case OidSysLocation:
 			si.Probe.SeenSysLocation = true
 			si.Location, err = PduToString(pdu)
-			si.Location = valueSanitizer.Replace(si.Location)
+			si.Location = sanitizeMetadata(si.Location)
 		}
 		if err != nil {
 			return nil, WithFailure(fmt.Errorf("OID %q: %w", pdu.Name, err), "system_identity", "processing")
@@ -118,6 +115,48 @@ func GetSysInfo(client ScalarClient) (*SysInfo, error) {
 	updateMetadata(si)
 
 	return si, nil
+}
+
+// sysObjectIDFromPDU returns the sysObjectID without a leading dot, or "" when the value is not a valid numeric OID.
+// Some agents send the OID as OctetString text; accepting only OID syntax keeps other device text out of profile
+// matching and the collector's error and log diagnostics. An unusable value is treated as absent so manual
+// profiles still apply.
+func sysObjectIDFromPDU(pdu gosnmp.SnmpPDU) string {
+	if pdu.Type != gosnmp.ObjectIdentifier && pdu.Type != gosnmp.OctetString {
+		return ""
+	}
+	v, err := PduToString(pdu)
+	if err != nil {
+		return ""
+	}
+	v = strings.TrimPrefix(strings.Trim(v, " \t\r\n\x00"), ".")
+	if !isNumericOID(v) {
+		return ""
+	}
+	return v
+}
+
+// isNumericOID reports whether s is a dotted numeric OID with at least two arcs whose first arcs follow
+// ITU-T X.660: the first arc is 0, 1 or 2, and the second arc is below 40 when the first is 0 or 1.
+func isNumericOID(s string) bool {
+	arcs := strings.Split(s, ".")
+	if len(arcs) < 2 {
+		return false
+	}
+	for _, arc := range arcs {
+		if arc == "" || strings.ContainsFunc(arc, func(r rune) bool { return r < '0' || r > '9' }) {
+			return false
+		}
+	}
+	switch arcs[0] {
+	case "0", "1":
+		second, err := strconv.ParseUint(arcs[1], 10, 64)
+		return err == nil && second < 40
+	case "2":
+		return true
+	default:
+		return false
+	}
 }
 
 func sysInfoOIDs() []string {
@@ -201,15 +240,21 @@ func getSysInfoChunkPDUs(client ScalarClient, version gosnmp.SnmpVersion, oids [
 	return nil, nil
 }
 
-var valueSanitizer = strings.NewReplacer(
-	"'", "",
-	"\n", " ",
-	"\r", " ",
-	"\x00", "",
-	"\"", "",
-	"`", "",
-	"\\", "",
-)
+// sanitizeMetadata keeps device metadata single-line and control-free. Consumers still need output encoding.
+func sanitizeMetadata(value string) string {
+	return strings.Map(func(r rune) rune {
+		switch r {
+		case '\'', '"', '`', '\\', 0:
+			return -1 // Preserve the existing metadata character removals.
+		case '\u2028', '\u2029':
+			return ' '
+		}
+		if unicode.IsControl(r) {
+			return ' '
+		}
+		return r
+	}, value)
+}
 
 // updateMetadata enriches a SysInfo struct with metadata based on its SysObjectID.
 // It populates the Organization, Vendor, Category, and Model fields.
@@ -249,7 +294,7 @@ func updateMetadata(si *SysInfo) {
 		}
 	}
 
-	if org := valueSanitizer.Replace(rawOrg); org != "" {
+	if org := sanitizeMetadata(rawOrg); org != "" {
 		si.Organization = org
 	} else if si.Organization == "" {
 		si.Organization = "Unknown"

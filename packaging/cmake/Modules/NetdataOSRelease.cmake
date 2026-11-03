@@ -1,8 +1,9 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Distro detection from os-release.
 #
-# Shared by the install rules in the top-level CMakeLists.txt (format-specific
-# staging) and by Modules/Packaging.cmake (CPack per-distro configuration), so
-# it must be included before either consumer.
+# Read by NetdataSystemFiles.cmake (format-specific install staging) and by
+# Packaging.cmake (CPack per-distro configuration), so the root file includes
+# this ahead of both.
 
 include_guard(GLOBAL)
 
@@ -38,10 +39,10 @@ if(OS_LINUX)
   endif()
 endif()
 
-# RPM distro-family predicates mirroring the macro families netdata.spec.in
-# keys its conditionals on (%{suse_version}, %{centos_ver}/%{rhel},
-# %{fedora}, %{amazon_linux}). Order matters: Amazon Linux carries
-# ID_LIKE="centos rhel fedora" and must not be classified as EL.
+# RPM distro-family predicates. These are the families the RPM packaging
+# conditionals key on: SUSE, EL, Fedora and Amazon Linux. Order matters:
+# Amazon Linux carries ID_LIKE="centos rhel fedora" and must not be
+# classified as EL.
 set(NETDATA_DISTRO_SUSE FALSE)
 set(NETDATA_DISTRO_EL FALSE)
 set(NETDATA_DISTRO_FEDORA FALSE)

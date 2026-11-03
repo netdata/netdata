@@ -19,7 +19,9 @@ A **data point** has:
 
 Using the **timestamp** and **duration**, Netdata calculates for each point its **start time**, **end time** and **update every**.
 
-For incremental metrics (counters), Netdata interpolates the collected values to align them to the expected **end time** at the microsecond level, absorbing data collection micro-latencies.
+Netdata stores one value per **update every** slot. For incremental metrics (counters), Netdata interpolates the collected values to align them to the expected **end time** at the microsecond level, absorbing data collection micro-latencies.
+
+For all other metrics (such as `absolute`), Netdata stores the value calculated from the collection (after applying the multiplier and divisor, or the percentage). When a collection is late enough to miss a slot, Netdata fills the missed slot by interpolating between the calculated values around it, so a metric that collects only integers may still store fractional values. Longer delays leave gaps instead. When several collections fall in the same slot, only one value is stored for it. Queries read these stored values, not the original collected samples, and may aggregate them further (for example with `points`, `gtime` or `group`).
 
 When data points are stored in higher tiers (time aggregations - see [Tiers](#tiers) below), each data point has:
 
@@ -91,7 +93,9 @@ Each **datafile** has two **journal files** with metadata related to the stored 
 
 - **journal file v1**, with filename suffix `.njf`, holds information about the transactions in its **datafile** and provides the ability to recover as much data as possible, in case either the datafile or the journal files get corrupted. This journal file has a maximum transaction size of 4KB, so in case data are corrupted on disk transactions of 4KB are lost. Each transaction holds the metadata of one **extent** (this is why DBENGINE supports up to 64 pages per extent).
 
-- **journal file v2**, with filename suffix `.njfv2`, which is a disk-based index for all the **pages** and **extents**. This file is memory mapped at runtime and is consulted to find where the data of a metric are in the datafile. This journal file is automatically re-created from **journal file v1** if it is missing. It is safe to delete these files (when Netdata does not run). Netdata will re-create them on the next run. Journal files v2 are supported in Netdata Agents with version `netdata-1.37.0-115-nightly`. Older versions maintain the journal index in memory.
+- **journal file v2**, with filename suffix `.njfv2`, which is a disk-based index for all the **pages** and **extents**. This file is memory mapped at runtime and is consulted to find where the data of a metric are in the datafile. If this journal file is missing or fails its checks at startup, Netdata rebuilds it from **journal file v1**. This requires the journal file v1 to be readable; otherwise the data of that datafile are not available. It is safe to delete these files (when Netdata does not run), as long as their journal file v1 is intact. Netdata will re-create them on the next run. Journal files v2 are supported in Netdata Agents with version `netdata-1.37.0-115-nightly`. Older versions maintain the journal index in memory.
+
+  Newer agents also write an optional **samples section** in each **journal file v2**: the number of slots (points, empty ones included) of every metric in that file, derived from the time ranges of its pages, and their total in the section descriptor (so that startup reads only the header page). Only pages the index can reach are counted: if a file holds two pages of a metric with the same start time, the index keeps one of them (the one that ends later; if both end together, the one written earlier in the datafile) and only that one is counted. The per-tier `samples` reported in `db_size` by `/api/v2/info` is the sum of what each datafile holds: exact for files that have this section, estimated from the metric time ranges for files without it (files written by older agents). A page whose descriptor on disk is malformed is counted as what queries read from it (after repair), which can differ from the slots physically stored. Pages are counted when they are written to disk, so pages still waiting to be flushed are not included yet. Agents that do not know this section ignore it.
 
 #### Database Rotation
 

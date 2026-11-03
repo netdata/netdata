@@ -37,12 +37,13 @@ For `CollectorV2` collectors, the runtime integration expects:
 | `PrepareTemplateSet(set, opts...)` | Bind fixed global job overrides without recompiling entries |
 | `PreparePlanWithOptions(reader, PlanOptions{...})` | Stage a desired set and optional host reset with the plan |
 | `TemplateSet.Entries()` / `GlobalPolicy()` | Inspect detached definitions and effective global policy |
+| `TemplateSet.ChartTemplateIDAt(entryID, path, i)` / `FallbackContextNamespace()` | Resolve an entry chart position to the template ID plans and route facts report; read the fixed automatic-chart namespace |
 | `PreparePlan(reader)`                               | Build deterministic action plan from reader snapshot and return an explicit attempt                                                                                     |
 | `RuntimeStore()`                                    | Access chartengine internal runtime metrics store                                                                                                                       |
-| `WithEnginePolicy(...)`                             | Configure selector + autogen behavior                                                                                                                                   |
+| `WithEnginePolicy(...)`                             | Configure selector, autogen behavior and optional output limit per context                                                                                              |
 | `WithRuntimeStore(...)`                             | Override/disable self-metrics store                                                                                                                                     |
 | `WithSeriesSelectionAllVisible()`                   | Process all visible series instead of filtering to latest successful collect cycle. Intended for runtime/internal stores that commit immediately (no cycle boundaries). |
-| `WithEmitTypeIDBudgetPrefix(...)`                   | Set the effective type-id prefix used by autogen budget checks                                                                                                          |
+| `WithEmitTypeIDBudgetPrefix(...)`                   | Set the effective type-id prefix used by autogen budget checks and collision-warning rate limiting                                                                      |
 | `WithRuntimePlannerMode(...)`                       | Enable runtime planner mode with no-write-tick semantics, for jobs/tests that drive planning directly from runtime metrics instead of collect-cycle boundaries.         |
 | `WithPlanRouteDiagnosticObserver(...)`              | Stream complete, synchronous route facts for one plan attempt; intended for validation and tests                                                                        |
 | `ChartTemplateIDAt(...)`                            | Correlate an authored chart position with the compiler-assigned template identity used by route facts                                                                   |
@@ -84,9 +85,13 @@ metadata and defaults, local chart paths, group structure, declared metrics and 
 mathematical equivalence between differently written selectors. A changed entry is replaced as a whole: all its old
 reservations are released, observed charts recreate, quiet siblings retire, and Go expiry bookkeeping restarts.
 
-Ownership is independent of routing precedence. For unowned collisions, native entry order acts like concatenated root
-groups with the existing lexical `g<path>.c<index>` comparison. Reordering can change future unowned winners but preserves
-current active and quiet incumbents. Authored charts retain precedence over fallback. Replacement retirement compares
+Ownership is independent of routing precedence. When one series routes to several templates that render the same
+unowned chart ID, native sets rank those routes by compile order: entry order, then depth-first authored order within
+the entry, where a group's charts precede its nested groups. Adding or removing an entry never changes the relative order
+of two others. YAML documents keep comparing positional `g<path>.c<index>` IDs as strings. Across different series, the
+first series in scan order (metric name, then series) claims a new chart, and an existing owner keeps it. Reordering can
+change future unowned winners but preserves current active and quiet incumbents. Authored charts retain precedence over
+fallback. Replacement retirement compares
 old public identities with final survivors; a surviving chart or dimension is never also marked obsolete, and dimension
 retirement headers use the surviving chart's metadata. Existing Agent redefinition, history, counter and context behavior
 applies; this API makes no stronger continuity guarantee for changed definitions.
@@ -95,7 +100,7 @@ Dimension definitions explicitly emit `type=float` or `type=int`. Integer is the
 this option during redefinition preserves the existing numeric mode. Explicit `type=int` clears a prior float mode,
 including when the Agent retains a dimension across a collector restart.
 
-Global selector/autogen policy and fallback namespace are fixed for a running job. `CollectorV2EnginePolicy` is captured
+Global selector/autogen/output-limit policy and fallback namespace are fixed for a running job. `CollectorV2EnginePolicy` is captured
 once and overrides global fields. An explicit autogen override replaces the entire global autogen policy and its rules.
 Entry `AutogenRules` are independent restrictions: they combine with global rules and disappear when the entry is removed.
 Overrides cannot remove them. Later effective global changes require job recreation; entry content and restrictions can
@@ -114,7 +119,7 @@ attempt only after complete output admission; abort preserves the previously com
 contracts. `Load` and `Compile` still expect defaults already applied; active-set transitions do not call destructive Load.
 
 The unchanged-snapshot path adds constant bookkeeping to the existing planner. Changed snapshots compare template
-content and filter retained charts once, then clone retained lifecycle state through the ordinary planner. Retirement
+content and filter retained charts once, then stage retained lifecycle state through the ordinary planner. Retirement
 comparison visits only replaced or transferred chart identities and their dimensions. Programs/indexes are shared
 between scopes; mutable route caches and lifecycle state remain scope-owned.
 
@@ -183,6 +188,7 @@ Terms like "materialized state" and "route cache" are defined in the Engine Stat
 | Validate reader | Ensure flattened metadata is available when inferred dimensions are used                       |
 | Scan            | Iterate series, filter by success sequence and selector, route to chart/dimension accumulators |
 | Cache retain    | Prune route cache entries not seen in the latest successful sequence                           |
+| Context limit   | Omit whole contexts whose current output population exceeds the optional job policy           |
 | Lifecycle caps  | Enforce chart/dimension cap policy                                                             |
 | Materialize     | Emit create/update actions from accumulated state                                              |
 | Expiry          | Emit removals for stale charts/dimensions                                                      |
@@ -193,7 +199,11 @@ Terms like "materialized state" and "route cache" are defined in the Engine Stat
 
 `WithPlanRouteDiagnosticObserver` is an opt-in validation/test surface. When enabled, the planner synchronously streams
 attempt-local facts for filtering, candidate rejection, chart-identity rejection, resolved routes, accepted routes,
-autogen displacement, collisions, lifecycle rejection, and unmatched series.
+autogen displacement, collisions, whole-context omission, lifecycle rejection, and unmatched series.
+
+`PlanRouteContextRejected` facts are emitted once per rejected chart, with its resolved context and
+`ContextSeriesCount`/`ContextSeriesLimit`. They follow routing facts: an accepted route can still belong to an omitted
+context. Ordinary omission/recovery logging does not enable this diagnostic observer or bypass the route cache.
 
 - Diagnostic planning bypasses route-cache lookup and storage so every scanned series produces complete facts.
 - The default path is unchanged when no observer is configured; it continues to use the route cache.
@@ -203,9 +213,11 @@ autogen displacement, collisions, lifecycle rejection, and unmatched series.
   expose the effective context, family, units, algorithm, aggregation, presentation, series kind, scale, and label-promotion
   policy. They do not include the full input label set; a rendered chart or dynamic dimension name can itself be derived
   from label values and must be handled accordingly by consumers.
-- `ChartTemplateIDAt` correlates legacy document facts with a decoded template's group/chart position. Named sets
-  additionally expose `TemplateEntryID` and `LocalChartTemplateID`, corresponding fields for an existing collision owner,
-  and entry/local provenance for rejected autogen rules. Consumers need not parse encoded ownership strings.
+- `TemplateSet.ChartTemplateIDAt` resolves an entry's group/chart position to the template ID that plan actions and facts
+  report, for named sets and the YAML singleton entry alike; the package `ChartTemplateIDAt` does the same for a decoded
+  document. Named-set facts additionally expose `TemplateEntryID` and `LocalChartTemplateID`, corresponding fields for an
+  existing collision owner, and entry/local provenance for rejected autogen rules. Consumers need not parse encoded
+  ownership strings.
 
 `ResolveInstanceLabelPolicy` is the corresponding read-only inspection helper for `instances.by_labels` and
 `instances.optional_by_labels`. It returns the runtime-normalized required keys, optional keys, exclusions, and include-all
@@ -248,11 +260,11 @@ The following rules apply when routing conflicts arise:
 | Rule                                          | Behavior                                                                                       |
 |-----------------------------------------------|------------------------------------------------------------------------------------------------|
 | Template vs autogen chart ID collision        | Template wins; autogen chart is replaced                                                       |
-| Cross-template chart ID collision             | Existing owner keeps ownership; subsequent series are **silently ignored** (see warning below) |
+| Cross-template chart ID collision             | Existing owner keeps ownership; subsequent series are **dropped** (see warning below)          |
 | Duplicate dimension observations within build | First observed dimension metadata wins; values use the chart's configured reducer            |
 
 > [!WARNING]
-> Cross-template chart ID collisions cause silent data loss — conflicting series are dropped with no error and no log entry. If metrics are missing, check for duplicate rendered chart IDs across template groups.
+> Cross-template chart ID collisions lose data: conflicting authored series are dropped. At most one warning per hour is logged per chart type-ID namespace (`WithEmitTypeIDBudgetPrefix`), so once per job across its host scopes and once per runtime metrics component, naming the dropped series-route count, the chart, its owner and the rejected template. Give every chart a unique rendered ID (`id` or `context`). Which template owns a new contested chart follows [Named Active Template Sets](#named-active-template-sets): compile-order precedence among one series' routes, scan order across series.
 
 Authored charts can set one reducer for all their dimensions. Supported values are `sum` (default), `min`, `max`, and
 `avg`. Reduction is scoped to one successful plan build and happens before multiplier/divisor and
@@ -315,9 +327,35 @@ Algorithm resolution happens after cache lookup, so a cached route
 cannot retain the effective algorithm from an earlier series kind. Only concrete algorithms reach accumulated dimension
 state and dimension actions; chart-level metadata retains the configured policy.
 
+## Output Limit Per Context
+
+`EnginePolicy.MaxOutputSeriesPerContext` is a fixed job policy: nil preserves the supplied template-set policy,
+zero disables the limit, and negative values are rejected. Engines default to disabled; a collector may supply its
+own default through `CollectorV2EnginePolicy.EnginePolicy()`. Both native and static template providers bind this
+policy through `ChartTemplateSource` before their first publication.
+
+The limit counts distinct currently observed `(chart ID, dimension ID)` pairs across all charts in one published
+context, after routing, ownership and aggregation. Context keys use the same wire normalization as the emitter;
+different authored names that normalize to one published context share its budget and transition reporting.
+Raw metadata remains available for inspection and authoring diagnostics. Equality is admitted. Exceeding the limit
+omits that entire context;
+other contexts retain their complete inputs. Hidden and non-finite-valued dimensions count, while quiet historical
+dimensions do not. Automatic fallback and counter raw companions follow the same rule in their respective contexts.
+The check precedes authored lifecycle caps; those caps cannot make an oversized context appear to fit.
+
+Omission publishes no values or partial aggregates for that context. Existing expiry and missing-data behavior apply.
+Borrowed scratch caches are detached through the plan journal, preserving published definitions and last-seen stamps;
+Abort restores the previous state. Each engine owns its context population, so scopes remain independent.
+
+After a successful `PlanAttempt.Commit`, one bounded ordinary log summary reports new omissions and contexts no
+longer omitted, with counts, the limit and at most three context examples per transition type. Unchanged admission
+state is silent. Disappearance, failed collection, abort and host reset do not imply recovery. Recovery means removal
+of limit suppression, not healthy measurements: resumed values may still be gaps. One-shot transitions bypass lossy
+rate limiting. Input admission, fetching, source retention and total output across contexts are separate concerns.
+
 ## Lifecycle Defaults and Policy
 
-Default lifecycle policy when template omits lifecycle:
+Default lifecycle policy when a template omits lifecycle fields:
 
 | Policy                           | Default        |
 |----------------------------------|----------------|
@@ -325,6 +363,10 @@ Default lifecycle policy when template omits lifecycle:
 | `expire_after_cycles`            | `5`            |
 | `dimensions.max_dims`            | `0` (disabled) |
 | `dimensions.expire_after_cycles` | `0`            |
+
+Authored chart expiry preserves presence: omission uses five successful cycles, explicit zero disables expiry, and a
+positive value overrides the default. The compiler resolves this into the existing integer runtime policy. Retaining
+a chart does not retain or replay its measurements; metric-store retention remains independent.
 
 Metric collection can advance while output plans are aborted, leaving published definitions past their expiry.
 When an identity returns after it was eligible for expiry in an intervening cycle, the planner recreates its staged
@@ -350,6 +392,7 @@ collector's lost counter baseline.
 | Trigger               | Unmatched series only when autogen is enabled                                                                                                  |
 | Authored precedence   | All authored routes are resolved first; conditional rules and fallback apply only when none matched                                             |
 | Conditional rules     | `AutogenPolicy.Rules` scope fallback selectors by source family; all applicable selectors must accept, so any rejection suppresses fallback     |
+| Counter raw charts    | `AutogenPolicy.CounterRawCharts` adds a second, `absolute` route (`<metric>.raw` chart ID and context) to accepted scalar counter routes; see the chart-template `engine` section |
 | Context namespace     | Autogen context = top-level `context_namespace` + the full metric name (which includes any `SnapshotMeter` prefix); empty namespace leaves the bare name. A non-empty meter prefix stacks after `context_namespace`, so pair `context_namespace` with `SnapshotMeter("")` to avoid a doubled prefix |
 | Structured families   | Histogram/summary components use the base family and retain structural labels; StateSet keeps its name; MeasureSet fields use the source before `_<field>` |
 | Metric metadata usage | Uses `metrix.MetricMeta` hints for title/family/unit where allowed                                                                             |
@@ -412,6 +455,10 @@ Notes:
 | `ChartEngine/Lifecycle`   | removal counters by scope/reason                               |
 | `ChartEngine/Plan`        | gauges for chart instances/inferred dimensions                 |
 
+`WithRuntimeSampleObserver` also hands each build's samples to a callback; jobs that aggregate across engines pass
+`WithRuntimeStore(nil)` and a `RuntimeAggregator`'s `Observe`. The aggregator flushes its rollup into a runtime store
+once per cycle; when the store implements `metrix.RuntimeBatchWriter`, a flush publishes one snapshot.
+
 ## Engine State
 
 | Area               | Design                                                                                                                                      |
@@ -420,6 +467,7 @@ Notes:
 | Engine state       | Serialized under `Engine.mu` for load/build transitions                                                                                     |
 | Route cache        | Series identity + revision keyed authored/autogen discovery; autogen validates current metadata and kinds; retained by successful sequence, pruned on each build                                               |
 | Materialized state | Tracks existing chart/dimension instances for incremental create/update/remove decisions; persists across cycles; direct Load resets it, active sets preserve unchanged entries |
+| Attempt staging    | A build stages lifecycle changes in the materialized state in place and records the committed values it overwrites in the attempt's journal; Commit keeps the changes, Abort (or a failed build) replays the journal, so later plans only ever start from committed state. After a commit, a chart, dimension or scratch map whose deletions since its last rebuild exceed its live size is rebuilt, so capacity follows live cardinality after a spike |
 | Determinism        | Sorted chart IDs and inferred dimensions provide stable action ordering                                                                     |
 
 ## Performance Validation
@@ -428,9 +476,37 @@ Steady collector-mode benchmarks must advance the successful collection sequence
 sequence intentionally deduplicates its updates, so a repeated-snapshot benchmark must instead use runtime planner mode.
 Benchmarks should verify emitted chart/dimension counts and values after warmup.
 
+Planning work is O(scanned series + retained charts); allocations follow what changed and the plan output. An
+unchanged chart allocates only its boxed update action: per-build chart state and update values come from blocks sized
+by the previous build, and the abort journal records only sequence stamps and scratch values of observed charts
+(transient per attempt). New or changed charts, labels and dimensions additionally allocate their definitions. Each
+plan also pays a small constant setup (build context and its maps and blocks, the attempt with its inline journal, one
+callback per series pass). `TestAutogenWarmPlanAllocationEnvelope` guards the steady envelope and
+`TestPlanAbortRestoresCommittedState` the abort contract.
+
 `BenchmarkAutogenMixedChurn` measures a bounded population with stable, partially replaced, or fully replaced
 identities; `BenchmarkCollectExpiryRemovals` covers stable, partial, and mass expiry across chart/dimension shapes.
 Metric collection and fixture setup are outside those planner/expiry timers. Expiry scans retained charts and enabled
 dimensions but sorts only actual removals. Steady expiry allocates no removal memory; staging and output still scale
 with retained/output cardinality. Unit allocation envelopes guard these properties; elapsed benchmark timings are
 development-machine trends, not CI limits.
+
+Output admission reuses each candidate chart's distinct observed count: O(candidate charts + contexts) work and
+O(contexts) additional state per attempt, with no second dimension set or source scan. Changed raw context aliases
+are normalized once in a temporary map; canonical-only contexts need no alias map. Disabled limits allocate no
+admission maps. `BenchmarkContextLimitFanIn` compares fixed-output populations at increasing fan-in;
+`BenchmarkContextLimitManyContexts` measures context growth and `BenchmarkContextLimitRejectedDetail` measures
+omission while preserving rollups. Rejected detail still incurs routing/aggregation cost; it is not early aggregation.
+
+Once a chart alone exceeds the budget, its existing dimension map keeps exact distinct keys while discarding further
+value/label work. A shared attempt-local marker avoids allocating a value for every rejected dimension. Ownership
+replacement creates fresh chart state; no early cutoff uses provisional totals across a context. Fresh candidate maps
+need no rollback records, while mutations of borrowed published caches remain journaled.
+
+With a limit enabled, new chart candidates defer label work until they pass admission and lifecycle caps. The existing
+label reconciliation pass then builds their current labels and membership before materialization. First publication,
+new-chart churn and host reset can therefore replay routes once. Published charts retain ordinary membership detection
+and cached labels through omission/recovery; admission itself does not add a pass.
+`BenchmarkContextLimitInstances` covers many small charts and `BenchmarkContextLimitRecoveryCycle`
+includes repeated growth and recovery. Candidate sizing follows the pre-admission population to avoid repeated cold
+chart-state allocations for omitted contexts.

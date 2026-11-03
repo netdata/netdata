@@ -21,6 +21,7 @@ pub fn kv(key: &str, value: Option<AnyValue>) -> KeyValue {
     KeyValue {
         key: key.to_string(),
         value,
+        key_strindex: 0,
     }
 }
 
@@ -60,6 +61,7 @@ pub fn json_to_any_value(value: &serde_json::Value) -> AnyValue {
                     .map(|(k, v)| KeyValue {
                         key: k.clone(),
                         value: Some(json_to_any_value(v)),
+                        key_strindex: 0,
                     })
                     .collect(),
             })),
@@ -74,10 +76,11 @@ pub fn build_export_request(
     scope_name: &str,
     scope_version: &str,
 ) -> ExportLogsServiceRequest {
-    // service.name always; service.namespace only when set. The otel-ledger
-    // indexer derives a file's single (namespace, name) stream from these two
-    // resource attributes, so a batch must carry one identity (callers vary it
-    // per invocation to create distinct streams).
+    // service.name always; service.namespace only when set. The OTLP ingestor
+    // derives a file's single (namespace, name) stream from these two
+    // resource attributes; this builder emits one ResourceLogs, so a request
+    // carries exactly one identity (callers vary it per invocation to create
+    // distinct streams).
     let mut attributes = vec![kv("service.name", str_val(service_name))];
     if let Some(namespace) = service_namespace {
         attributes.push(kv("service.namespace", str_val(namespace)));

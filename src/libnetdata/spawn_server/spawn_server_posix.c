@@ -80,8 +80,10 @@ void spawn_server_destroy(SPAWN_SERVER *server) {
 }
 
 SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custom_fd __maybe_unused, const char **argv, const void *data __maybe_unused, size_t data_size __maybe_unused, SPAWN_INSTANCE_TYPE type) {
-    if (type != SPAWN_INSTANCE_TYPE_EXEC)
+    if (type != SPAWN_INSTANCE_TYPE_EXEC) {
+        errno = ENOTSUP;
         return NULL;
+    }
 
     CLEAN_BUFFER *cmdline_wb = argv_to_cmdline_buffer(argv);
     const char *cmdline = buffer_tostring(cmdline_wb);

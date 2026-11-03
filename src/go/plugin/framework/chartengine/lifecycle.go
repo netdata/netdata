@@ -9,6 +9,8 @@ import (
 // materializedState tracks engine-owned chart lifecycle across successful cycles.
 type materializedState struct {
 	charts map[string]*materializedChartState
+	// chartDeletes counts deletions from charts since the map was last rebuilt.
+	chartDeletes int
 }
 
 // materializedChartState tracks one materialized chart instance.
@@ -22,6 +24,12 @@ type materializedChartState struct {
 	presentation       *materializedChartPresentation
 	orderedDimsDirty   bool
 	scratchEntries     map[string]*dimBuildEntry
+	// journalToken marks the build that created or already recorded this chart.
+	journalToken uint64
+	// dimDeletes and scratchDeletes count deletions from dimensions and scratchEntries
+	// since each map was last rebuilt.
+	dimDeletes     int32
+	scratchDeletes int32
 }
 
 // materializedChartPresentation uses copy-on-write for ordered dimensions,
@@ -43,6 +51,7 @@ type materializedDimensionState struct {
 	multiplier         int
 	divisor            int
 	lastSeenSuccessSeq uint64
+	journalToken       uint64
 }
 
 func newMaterializedState() materializedState {
@@ -51,63 +60,8 @@ func newMaterializedState() materializedState {
 	}
 }
 
-func (s materializedState) clone() materializedState {
-	if len(s.charts) == 0 {
-		return newMaterializedState()
-	}
-
-	out := materializedState{
-		charts: make(map[string]*materializedChartState, len(s.charts)),
-	}
-	for chartID, chart := range s.charts {
-		if chart == nil {
-			continue
-		}
-		out.charts[chartID] = chart.clone()
-	}
-	return out
-}
-
-func (c *materializedChartState) clone() *materializedChartState {
-	if c == nil {
-		return nil
-	}
-
-	out := &materializedChartState{
-		templateID:         c.templateID,
-		meta:               c.meta,
-		emittedMeta:        c.emittedMeta,
-		lifecycle:          c.lifecycle,
-		lastSeenSuccessSeq: c.lastSeenSuccessSeq,
-		presentation:       c.presentation,
-		orderedDimsDirty:   c.orderedDimsDirty,
-	}
-	if len(c.dimensions) > 0 {
-		out.dimensions = make(map[string]*materializedDimensionState, len(c.dimensions))
-		for name, dim := range c.dimensions {
-			if dim == nil {
-				continue
-			}
-			cloned := *dim
-			out.dimensions[name] = &cloned
-		}
-	} else {
-		out.dimensions = make(map[string]*materializedDimensionState)
-	}
-	if len(c.scratchEntries) > 0 {
-		out.scratchEntries = make(map[string]*dimBuildEntry, len(c.scratchEntries))
-		for name, entry := range c.scratchEntries {
-			if entry == nil {
-				continue
-			}
-			cloned := *entry
-			out.scratchEntries[name] = &cloned
-		}
-	}
-	return out
-}
-
 func (s *materializedState) ensureChart(
+	j *planJournal,
 	chartID string,
 	templateID string,
 	meta program.ChartMeta,
@@ -115,34 +69,41 @@ func (s *materializedState) ensureChart(
 ) (*materializedChartState, bool) {
 	chart, ok := s.charts[chartID]
 	if ok {
-		chart.meta = meta
-		chart.lifecycle = lifecycle
+		if chart.meta != meta || chart.lifecycle != lifecycle {
+			j.touchChart(chart)
+			chart.meta = meta
+			chart.lifecycle = lifecycle
+		}
 		return chart, false
 	}
-	chart = &materializedChartState{
+	chart = j.newChart(&materializedChartState{
 		templateID: templateID,
 		meta:       meta,
 		lifecycle:  lifecycle,
 		dimensions: make(map[string]*materializedDimensionState),
-	}
-	s.charts[chartID] = chart
+	})
+	j.putChart(s.charts, chartID, chart)
 	return chart, true
 }
 
 func (c *materializedChartState) ensureDimension(
+	j *planJournal,
 	name string,
 	state dimensionState,
 ) (*materializedDimensionState, bool) {
 	algorithm := state.algorithm.programAlgorithm()
 	dim, ok := c.dimensions[name]
 	if ok {
+		// Ordering follows the latest observation; creation settings describe the
+		// published dimension until it is recreated.
 		if dim.static != state.static || dim.order != state.order || dim.sortKey != state.sortKey {
+			j.touchChart(c)
 			c.orderedDimsDirty = true
+			j.touchDim(dim)
+			dim.static = state.static
+			dim.order = state.order
+			dim.sortKey = state.sortKey
 		}
-		// Creation settings describe the published dimension until it is recreated.
-		dim.static = state.static
-		dim.order = state.order
-		dim.sortKey = state.sortKey
 		return dim, false
 	}
 	dim = &materializedDimensionState{
@@ -155,23 +116,26 @@ func (c *materializedChartState) ensureDimension(
 		multiplier: state.multiplier,
 		divisor:    state.divisor,
 	}
-	c.dimensions[name] = dim
+	j.putDim(c, name, dim)
+	j.touchChart(c)
 	c.orderedDimsDirty = true
 	return dim, true
 }
 
-func (c *materializedChartState) removeDimension(name string) {
+func (c *materializedChartState) removeDimension(j *planJournal, name string) {
 	if _, ok := c.dimensions[name]; !ok {
 		return
 	}
-	delete(c.dimensions, name)
+	j.deleteDim(c, name)
+	j.touchChart(c)
 	c.orderedDimsDirty = true
 }
 
-func (c *materializedChartState) orderedDimensionNames() []string {
+func (c *materializedChartState) orderedDimensionNames(j *planJournal) []string {
 	if !c.orderedDimsDirty && c.presentation != nil && len(c.presentation.orderedDims) == len(c.dimensions) {
 		return c.presentation.orderedDims
 	}
+	j.touchChart(c)
 	next := materializedChartPresentation{}
 	if c.presentation != nil {
 		next = *c.presentation
@@ -182,10 +146,11 @@ func (c *materializedChartState) orderedDimensionNames() []string {
 	return c.presentation.orderedDims
 }
 
-func (c *materializedChartState) checkoutScratchEntries(dimCap int) map[string]*dimBuildEntry {
+func (c *materializedChartState) checkoutScratchEntries(j *planJournal, dimCap int) map[string]*dimBuildEntry {
 	if c.scratchEntries != nil {
 		return c.scratchEntries
 	}
+	j.touchChart(c)
 	c.scratchEntries = make(map[string]*dimBuildEntry, dimCap)
 	return c.scratchEntries
 }
@@ -197,17 +162,26 @@ func (c *materializedChartState) dimensionScratchEntries() map[string]*dimBuildE
 	return c.scratchEntries
 }
 
-func (c *materializedChartState) storeScratchEntries(entries map[string]*dimBuildEntry) {
+// storeScratchEntries adopts a build's scratch map when it is not already the chart's own.
+func (c *materializedChartState) storeScratchEntries(
+	j *planJournal,
+	entries map[string]*dimBuildEntry,
+	owner *materializedChartState,
+) {
+	if owner == c {
+		return
+	}
+	j.touchChart(c)
 	c.scratchEntries = entries
 }
 
-func (c *materializedChartState) pruneScratchEntries(currentSeq uint64) {
+func (c *materializedChartState) pruneScratchEntries(j *planJournal, currentSeq uint64) {
 	if len(c.scratchEntries) == 0 {
 		return
 	}
 	for name, entry := range c.scratchEntries {
 		if entry == nil {
-			delete(c.scratchEntries, name)
+			j.deleteEntry(c, c.scratchEntries, name)
 			continue
 		}
 		if entry.seenSeq == currentSeq {
@@ -216,14 +190,16 @@ func (c *materializedChartState) pruneScratchEntries(currentSeq uint64) {
 		if _, keep := c.dimensions[name]; keep {
 			continue
 		}
-		delete(c.scratchEntries, name)
+		j.deleteEntry(c, c.scratchEntries, name)
 	}
 }
 
 func (c *materializedChartState) replaceLabels(
+	j *planJournal,
 	values map[string]string,
 	membership []chartLabelMembership,
 ) {
+	j.touchChart(c)
 	next := materializedChartPresentation{}
 	if c.presentation != nil {
 		next = *c.presentation
@@ -233,7 +209,8 @@ func (c *materializedChartState) replaceLabels(
 	c.presentation = &next
 }
 
-func (c *materializedChartState) replaceLabelMembership(membership []chartLabelMembership) {
+func (c *materializedChartState) replaceLabelMembership(j *planJournal, membership []chartLabelMembership) {
+	j.touchChart(c)
 	next := materializedChartPresentation{}
 	if c.presentation != nil {
 		next = *c.presentation

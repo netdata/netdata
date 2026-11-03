@@ -31,11 +31,9 @@ struct rrdcontext_reason rrdcontext_reasons[] = {
 };
 
 void rrd_reasons_to_buffer_json_array_items(RRD_FLAGS flags, BUFFER *wb) {
-    for(int i = 0, added = 0; rrdcontext_reasons[i].name ; i++) {
-        if (flags & rrdcontext_reasons[i].flag) {
+    for(int i = 0; rrdcontext_reasons[i].name ; i++) {
+        if (flags & rrdcontext_reasons[i].flag)
             buffer_json_add_array_item_string(wb, rrdcontext_reasons[i].name);
-            added++;
-        }
     }
 }
 // ----------------------------------------------------------------------------
@@ -234,8 +232,10 @@ int rrdcontext_foreach_instance_with_rrdset_in_context(RRDHOST *host, const char
     int ret = 0;
     RRDINSTANCE *ri;
     dfe_start_read(rc->rrdinstances, ri) {
-        if(ri->rrdset) {
-            int r = callback(ri->rrdset, data);
+        RRDSET_ACQUIRED *rsa = rrdinstance_rrdset_acquire((RRDINSTANCE_ACQUIRED *)ri_dfe.item);
+        if(rsa) {
+            int r = callback(rrdset_acquired_to_rrdset(rsa), data);
+            rrdset_acquired_release(rsa);
             if(r >= 0) ret += r;
             else {
                 ret = r;

@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+//go:build linux
+
 package smbios_memory
 
 import (
@@ -281,7 +283,7 @@ type tableBuilder struct {
 	countsUnknown    bool
 	capacityUnknown  bool
 	reason           string
-	locators         map[string]bool
+	slots            map[slotKey]bool
 }
 
 func (b *tableBuilder) add(d inventory.Device) {
@@ -299,13 +301,14 @@ func (b *tableBuilder) add(d inventory.Device) {
 	} else {
 		b.total += *d.Capacity
 	}
-	if b.locators == nil {
-		b.locators = make(map[string]bool)
+	if b.slots == nil {
+		b.slots = make(map[slotKey]bool)
 	}
-	if d.Locator == "" || b.locators[d.Locator] {
-		b.reason = "Slot locators are missing or duplicated"
+	slot := slotOf(d)
+	if d.Locator == "" || b.slots[slot] {
+		b.reason = "Slot locators are missing or duplicated within a bank"
 	}
-	b.locators[d.Locator] = true
+	b.slots[slot] = true
 	b.devices = append(b.devices, d)
 }
 

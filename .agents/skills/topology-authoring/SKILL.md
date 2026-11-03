@@ -73,6 +73,10 @@ summary alone; distinguish intended contract from what the checked implementatio
   `--schema ../plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json` from `src/go`
   (`src/go/tools/functions-validation/README.md#validate-topology-v1-fixtures`); it then calls
   `ValidateDecodedResponse`.
+- Go builders (`Table.Validate`) and the decoded semantic validator enforce scalar numeric validity, typed-set member
+  types, and nullability as errors across the compact-table codecs.
+  Contract: `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#compact-tables`;
+  validation workflow: `src/go/tools/functions-validation/README.md#validate-topology-v1-fixtures`.
 - The CLI tool (`src/go/tools/functions-validation`) counts a topology payload's rows as
   `max(actor rows, link rows)` (`topologyv1.GraphRowsFromDecodedData`) for its `--min-rows` and `--require-rows`
   gates, so an actor-only payload passes; nothing in `pkg/topology` caps row counts.
@@ -136,7 +140,8 @@ owners before design, while review checks the resulting contracts and evidence. 
     `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#streaming-modal-sections`,
     `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#snmpl2-shape` and
     `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#snmp-logical-l3-and-control-plane-links`,
-    `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#vsphere-shape`.
+    `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#vsphere-shape` and
+    `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#cato-networks-shape`.
 11. Validate and measure: schema plus semantic validation in tests, the producer's own suites (table above), size
     on realistic data, and the checklist.
     Guide: `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#producer-checklist`.
@@ -150,6 +155,8 @@ owners before design, while review checks the resulting contracts and evidence. 
   logs, docs, SOWs, or review artifacts (`src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#streaming-shape`).
 - Sparse grouping columns: test that a consumer keeps actor identity for null or empty grouping keys instead of
   merging every null row into one bucket.
+- Parallel-link tests MUST hold endpoints and type/state constant while varying only the grouping identity.
+  Cover ID-bearing interfaces with equal names and name-only interfaces; removing a required `group_key` must fail.
 - Fail explicitly on any size or row limit; never truncate a topology and present it as complete.
 - Validators need negative tests: missing label-policy columns, non-display label columns, a missing port-bullet
   source table, bad highlight-path columns, an invalid token, and a modal projection over a missing source. A producer

@@ -10,6 +10,19 @@
 #include "../ebpf_process.h"
 #include <ifaddrs.h>
 
+#ifdef LIBBPF_MAJOR_VERSION
+int ebpf_kernel_btf_find_by_name_kind(const char *name, __u32 kind)
+{
+    struct btf *btf = btf__load_vmlinux_btf();
+    if (!btf || libbpf_get_error(btf))
+        return -1;
+
+    int id = btf__find_by_name_kind(btf, name, kind);
+    btf__free(btf);
+    return id;
+}
+#endif
+
 /*****************************************************************
  *
  *  DIMENSION WRITING FUNCTIONS

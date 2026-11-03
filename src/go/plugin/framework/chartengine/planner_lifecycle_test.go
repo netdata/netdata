@@ -59,10 +59,10 @@ func runTestEnforceLifecycleCapsDimensionCapEvictsLRU(t *testing.T) {
 			}
 
 			state := newMaterializedState()
-			matChart, created := state.ensureChart("chart_a", "tpl.requests", meta, lifecycle)
+			matChart, created := state.ensureChart(nil, "chart_a", "tpl.requests", meta, lifecycle)
 			require.True(t, created)
 
-			oldA, created := matChart.ensureDimension("old_a", dimensionState{
+			oldA, created := matChart.ensureDimension(nil, "old_a", dimensionState{
 				algorithm:  dimensionAlgorithmAbsolute,
 				multiplier: 1,
 				divisor:    1,
@@ -70,7 +70,7 @@ func runTestEnforceLifecycleCapsDimensionCapEvictsLRU(t *testing.T) {
 			require.True(t, created)
 			oldA.lastSeenSuccessSeq = 1
 
-			oldB, created := matChart.ensureDimension("old_b", dimensionState{
+			oldB, created := matChart.ensureDimension(nil, "old_b", dimensionState{
 				algorithm:  dimensionAlgorithmAbsolute,
 				multiplier: 1,
 				divisor:    1,
@@ -101,7 +101,7 @@ func runTestEnforceLifecycleCapsDimensionCapEvictsLRU(t *testing.T) {
 				},
 			}
 
-			removeDims, removeCharts := enforceLifecycleCapsWithObserver(tc.currentSeq, chartsByID, &state, nil)
+			removeDims, removeCharts := enforceLifecycleCapsWithObserver(tc.currentSeq, chartsByID, &state, nil, nil)
 
 			assert.Empty(t, removeCharts)
 			require.Len(t, removeDims, 1)
@@ -127,6 +127,7 @@ func runTestEnforceLifecycleCapsMixedPolicies(t *testing.T) {
 
 	disabledLifecycle := program.LifecyclePolicy{}
 	disabledActive, created := state.ensureChart(
+		nil,
 		"disabled_active",
 		"tpl.disabled",
 		meta,
@@ -135,7 +136,7 @@ func runTestEnforceLifecycleCapsMixedPolicies(t *testing.T) {
 	require.True(t, created)
 	disabledActive.lastSeenSuccessSeq = 1
 	for _, name := range []string{"old_a", "old_b"} {
-		dim, created := disabledActive.ensureDimension(name, dimensionState{
+		dim, created := disabledActive.ensureDimension(nil, name, dimensionState{
 			algorithm:  dimensionAlgorithmAbsolute,
 			multiplier: 1,
 			divisor:    1,
@@ -144,6 +145,7 @@ func runTestEnforceLifecycleCapsMixedPolicies(t *testing.T) {
 		dim.lastSeenSuccessSeq = 1
 	}
 	disabledStale, created := state.ensureChart(
+		nil,
 		"disabled_stale",
 		"tpl.disabled",
 		meta,
@@ -153,6 +155,7 @@ func runTestEnforceLifecycleCapsMixedPolicies(t *testing.T) {
 	disabledStale.lastSeenSuccessSeq = 1
 
 	enabledOld, created := state.ensureChart(
+		nil,
 		"enabled_old",
 		"tpl.enabled",
 		meta,
@@ -168,10 +171,10 @@ func runTestEnforceLifecycleCapsMixedPolicies(t *testing.T) {
 			MaxDims: 1,
 		},
 	}
-	dimsActive, created := state.ensureChart("dims_active", "tpl.dims", meta, dimsLifecycle)
+	dimsActive, created := state.ensureChart(nil, "dims_active", "tpl.dims", meta, dimsLifecycle)
 	require.True(t, created)
 	dimsActive.lastSeenSuccessSeq = currentSeq
-	oldDim, created := dimsActive.ensureDimension("old", dimensionState{
+	oldDim, created := dimsActive.ensureDimension(nil, "old", dimensionState{
 		algorithm:  dimensionAlgorithmAbsolute,
 		multiplier: 1,
 		divisor:    1,
@@ -217,7 +220,7 @@ func runTestEnforceLifecycleCapsMixedPolicies(t *testing.T) {
 		},
 	}
 
-	removeDims, removeCharts := enforceLifecycleCapsWithObserver(currentSeq, chartsByID, &state, nil)
+	removeDims, removeCharts := enforceLifecycleCapsWithObserver(currentSeq, chartsByID, &state, nil, nil)
 
 	require.Len(t, removeCharts, 1)
 	assert.Equal(t, "enabled_old", removeCharts[0].ChartID)
@@ -347,9 +350,15 @@ func runTestCollectExpiryRemovalsDimensionAndChartExpiry(t *testing.T) {
 				Title:   "Expired",
 				Context: "expired",
 			}
-			expiredChart, created := state.ensureChart("chart_expired", "tpl.expired", expiredMeta, program.LifecyclePolicy{
-				ExpireAfterCycles: 2,
-			})
+			expiredChart, created := state.ensureChart(
+				nil,
+				"chart_expired",
+				"tpl.expired",
+				expiredMeta,
+				program.LifecyclePolicy{
+					ExpireAfterCycles: 2,
+				},
+			)
 			require.True(t, created)
 			expiredChart.lastSeenSuccessSeq = 3
 
@@ -357,7 +366,7 @@ func runTestCollectExpiryRemovalsDimensionAndChartExpiry(t *testing.T) {
 				Title:   "Live",
 				Context: "live",
 			}
-			liveChart, created := state.ensureChart("chart_live", "tpl.live", liveMeta, program.LifecyclePolicy{
+			liveChart, created := state.ensureChart(nil, "chart_live", "tpl.live", liveMeta, program.LifecyclePolicy{
 				Dimensions: program.DimensionLifecyclePolicy{
 					ExpireAfterCycles: 2,
 				},
@@ -365,7 +374,7 @@ func runTestCollectExpiryRemovalsDimensionAndChartExpiry(t *testing.T) {
 			require.True(t, created)
 			liveChart.lastSeenSuccessSeq = tc.currentSeq
 
-			staleDim, created := liveChart.ensureDimension("stale_dim", dimensionState{
+			staleDim, created := liveChart.ensureDimension(nil, "stale_dim", dimensionState{
 				algorithm:  dimensionAlgorithmAbsolute,
 				multiplier: 1,
 				divisor:    1,
@@ -373,7 +382,7 @@ func runTestCollectExpiryRemovalsDimensionAndChartExpiry(t *testing.T) {
 			require.True(t, created)
 			staleDim.lastSeenSuccessSeq = 2
 
-			freshDim, created := liveChart.ensureDimension("fresh_dim", dimensionState{
+			freshDim, created := liveChart.ensureDimension(nil, "fresh_dim", dimensionState{
 				algorithm:  dimensionAlgorithmAbsolute,
 				multiplier: 1,
 				divisor:    1,
@@ -381,7 +390,7 @@ func runTestCollectExpiryRemovalsDimensionAndChartExpiry(t *testing.T) {
 			require.True(t, created)
 			freshDim.lastSeenSuccessSeq = 4
 
-			removeDims, removeCharts := collectExpiryRemovals(tc.currentSeq, &state)
+			removeDims, removeCharts := collectExpiryRemovals(tc.currentSeq, &state, nil)
 
 			require.Len(t, removeDims, 1)
 			assert.Equal(t, "chart_live", removeDims[0].ChartID)

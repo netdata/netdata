@@ -2,11 +2,11 @@
 
 Use these recipes to send systemd journal entries, application log files, Windows event channels, Kubernetes container logs, and the macOS unified log through an OpenTelemetry Collector to Netdata. For network-device syslog, use the dedicated [OpenTelemetry Collector syslog setup](/docs/npm/syslog/otel-collector.md). For when to centralize a source at all, see [Centralizing Logs with OpenTelemetry](/docs/logs/centralizing-logs-with-opentelemetry.md).
 
-Before you begin, complete [Ingest OpenTelemetry Metrics and Logs](/docs/opentelemetry/otlp-ingestion.md). The examples use OpenTelemetry Collector Contrib `0.157.0` and the local, plaintext loopback endpoint from that guide. Use TLS when the Collector and Netdata Agent are on different hosts.
+Before you begin, complete [Ingest OpenTelemetry Metrics, Logs, and Traces](/docs/opentelemetry/otlp-ingestion.md). The examples use OpenTelemetry Collector Contrib `0.157.0` and the local, plaintext loopback endpoint from that guide. Use TLS when the Collector and Netdata Agent are on different hosts.
 
 ## Shared exporter
 
-Add this exporter once, then combine it with a receiver and pipeline block from a recipe below:
+Add one of these exporters once, then combine it with a receiver and pipeline block from a recipe below:
 
 ```yaml
 exporters:
@@ -16,8 +16,19 @@ exporters:
       insecure: true
 ```
 
-When the Collector sends to a remote Netdata Agent, use TLS, select the tenant, and give the exporter a persistent
-queue so a Collector restart or a network outage does not lose records:
+```yaml
+exporters:
+  otlp_http/netdata:
+    endpoint: "http://127.0.0.1:4318"
+    tls:
+      insecure: true
+```
+
+Either transport works: `otlp_grpc` sends to port `4317`, while `otlp_http` sends OTLP/HTTP to port `4318` with a full-URL `endpoint`. The `otlp_http` exporter needs the Agent's OTLP/HTTP listener, which is off by default; [OTLP Ingestion](/docs/opentelemetry/otlp-ingestion.md) shows how to turn it on. Reference the exporter you chose in the `exporters` arrays of the recipes below.
+
+When the Collector sends to a remote Netdata Agent, use TLS and give the exporter a persistent queue so a Collector
+restart or a network outage does not lose records (shown for gRPC; `otlp_http` takes the same `tls` and `sending_queue`
+blocks with an `https://` endpoint):
 
 ```yaml
 extensions:
@@ -33,8 +44,6 @@ exporters:
       # For mutual TLS, add the client certificate and key:
       # cert_file: /etc/otelcol/client-cert.pem
       # key_file: /etc/otelcol/client-key.pem
-    headers:
-      X-Scope-OrgID: production
     sending_queue:
       storage: file_storage/netdata
 
@@ -42,7 +51,7 @@ service:
   extensions: [file_storage/netdata]
 ```
 
-The receiving Agent's endpoint, TLS, and tenant settings are described in
+The receiving Agent's endpoint and TLS settings are described in
 [Securing the OTLP Endpoint](/docs/opentelemetry/securing-the-otlp-endpoint.md). When you combine blocks, list every
 extension you use in one `service.extensions` list.
 
@@ -310,8 +319,6 @@ config:
       endpoint: "logs.example.com:4317"
       tls:
         ca_file: /etc/otelcol/netdata-ca.pem
-      headers:
-        X-Scope-OrgID: kubernetes
       sending_queue:
         storage: file_storage
   service:
@@ -346,20 +353,17 @@ The values above are validated by rendering them with the `opentelemetry-collect
 validating the resulting Collector configuration with Contrib 0.157.0. The chart deploys its own Collector build
 (chart 0.172.0 ships Collector 0.159.0); pin `image.tag` to run a specific Collector version.
 
-The `kubernetes` tenant the exporter selects needs its own retention policy on the receiving Agent, or its records
-land under the 7-day, 1GB defaults:
+Size the receiving Agent's log retention for the cluster's volume; the defaults keep 7 days, up to 1GB:
 
 ```yaml
-auth:
-  enabled: true
 logs:
   retention:
-    kubernetes:
+    default:
       max_total_size: "50GB"
       max_age: "30 days"
 ```
 
-See [Log Storage and Retention](/docs/logs/log-storage-and-retention.md) for how tenant retention and offloading work.
+See [Log Storage and Retention](/docs/logs/log-storage-and-retention.md) for how retention and offloading work.
 
 Without Helm, this is the receiver the preset generates, abridged — the rendered configuration also carries the
 collector's own log exclusions and the parser's `max_log_size`. It is not a standalone recipe; pair it with an

@@ -2,11 +2,11 @@
 
 Use these recipes when an OpenTelemetry Collector is already part of your observability pipeline or must fan metrics out to multiple backends. If Netdata is the only consumer, prefer the linked native Netdata collector: it requires fewer moving parts and provides purpose-built charts and alerts.
 
-Before you begin, complete [Ingest OpenTelemetry Metrics and Logs](/docs/opentelemetry/otlp-ingestion.md). The examples on this page use OpenTelemetry Collector Contrib `0.157.0` and the local, plaintext loopback endpoint from that guide. Use TLS when the Collector and Netdata Agent are on different hosts.
+Before you begin, complete [Ingest OpenTelemetry Metrics, Logs, and Traces](/docs/opentelemetry/otlp-ingestion.md). The examples on this page use OpenTelemetry Collector Contrib `0.157.0` and the local, plaintext loopback endpoint from that guide. Use TLS when the Collector and Netdata Agent are on different hosts.
 
 ## Shared exporter
 
-Add this exporter once, then combine it with a receiver and pipeline block from a recipe below:
+Add one of these exporters once, then combine it with a receiver and pipeline block from a recipe below:
 
 ```yaml
 exporters:
@@ -16,7 +16,17 @@ exporters:
       insecure: true
 ```
 
-After starting or reloading the Collector, verify an actual chart in Netdata. A successful connection to port `4317` does not prove that the receiver is producing metrics or that Netdata accepted them.
+```yaml
+exporters:
+  otlp_http/netdata:
+    endpoint: "http://127.0.0.1:4318"
+    tls:
+      insecure: true
+```
+
+Either transport works: `otlp_grpc` sends to port `4317`, while `otlp_http` sends OTLP/HTTP to port `4318` with a full-URL `endpoint`. The `otlp_http` exporter needs the Agent's OTLP/HTTP listener, which is off by default; [OTLP Ingestion](/docs/opentelemetry/otlp-ingestion.md) shows how to turn it on. Reference the exporter you chose in the `exporters` arrays of the recipes below.
+
+After starting or reloading the Collector, verify an actual chart in Netdata. A successful connection to the port does not prove that the receiver is producing metrics or that Netdata accepted them.
 
 The `service.pipelines.metrics` blocks are alternatives. To run several receivers in one Collector, define one metrics pipeline and list every enabled receiver in its `receivers` array.
 

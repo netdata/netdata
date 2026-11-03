@@ -1,6 +1,6 @@
 //! Cgroups snapshot codec -- request, response view, builder, dispatch.
 
-use super::{align8, NipcError, ALIGNMENT};
+use super::{ALIGNMENT, NipcError, align8};
 
 const CGROUPS_REQ_SIZE: usize = 4;
 const CGROUPS_RESP_HDR_SIZE: usize = 24;

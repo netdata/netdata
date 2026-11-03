@@ -8,10 +8,10 @@ var agentRuntimeScenarios = map[AgentScenario]func(context.Context) error{
 	"start acknowledgement":      runAgentStartAcknowledgement,
 	"start replacement ordering": runAgentStartReplacementOrdering,
 	"collector V1 lifecycle": func(ctx context.Context) error {
-		return runAgentCollectorLifecycle(ctx, false, true)
+		return runAgentCollectorLifecycle(ctx, false)
 	},
 	"collector V2 lifecycle": func(ctx context.Context) error {
-		return runAgentCollectorLifecycle(ctx, true, true)
+		return runAgentCollectorLifecycle(ctx, true)
 	},
 	"collector V2 acquired abort": func(ctx context.Context) error {
 		return runAgentAcquiredAbort(ctx, true, false)

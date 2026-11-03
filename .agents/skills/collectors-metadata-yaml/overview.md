@@ -23,12 +23,13 @@ field means.
   as persisted state and how to reset it. `:::note` renders white and blends into the page; use it only for an aside
   that may blend in. At most one admonition per field. Prefer an admonition over a blockquote. An admonition never
   replaces the field's own first paragraph.
-- Define unfamiliar operator terms inline on first use; omit irrelevant implementation mechanics (see the reading
-  model in `SKILL.md`). A glossary table is allowed only when
-  four or more terms recur across the page and the options table, and then it closes `method_description`, after the
+- A glossary table is allowed only when four or more terms recur across the page and the options table (otherwise
+  terms are defined at first use, `./SKILL.md#the-reading-model`); it then closes `method_description`, after the
   reader knows what the collector does, never before.
-- Links go to user-facing pages only: another integration, a `profile-format.md`, a `docs/guides` page, Learn, vendor
-  documentation. Never to `ARCHITECTURE.md`, source files, or tests.
+- Links go to user-facing pages only: another integration, a `profile-format.md`, a `docs/guides` page, other Netdata
+  docs, vendor documentation; never `ARCHITECTURE.md`, source code, or tests. Link a Netdata page by its
+  repository-relative `.md` path (`/src/collectors/SERVICE-DISCOVERY.md`), never by a `learn.netdata.cloud` URL
+  (`.agents/skills/docs-learn-site-structure/how-tos/integration-card-description-links.md`).
 
 ## 2. `metrics_description`: The Overview Proper
 
@@ -127,8 +128,9 @@ internals. Those are Setup (option rows and `detailed_description`) or nothing.
 
 **Question:** with the defaults, what caps, quotas, or floors will I run into, and how will I notice?
 
-Empty renders "The default configuration for this integration does not impose any limits on data collection." That
-MUST be true when the field is empty.
+Collector pages omit the Limits section when this description is empty. Missing documentation MUST NOT imply that
+collection is unlimited. Authors MUST still document actionable operator limits; an omitted section does not excuse
+missing guidance. Flow and device pages use separate templates; check their rendering when editing those types.
 
 - Name the operator-visible bounds: minimum collection interval, maximum instances or series, API quotas the collector
   respects, retention or lookback windows, and what happens at the bound (charts stop appearing, the job refuses to
@@ -170,5 +172,5 @@ metric), cost is the most important content on the page and this field MUST be e
 - Does `method_description` name what the collector talks to and how, without irrelevant implementation mechanics?
 - Is every permission the code requests in the table, and nothing that it does not?
 - Is the collector covered by a `go.d/sd/*.conf` rule? Then `auto_detection` names the discoverer and the rule file.
-- Are `limits` and `performance_impact` either true-as-placeholder or filled with operator-visible bounds and costs?
+- Does `limits` document actionable operator bounds, and is `performance_impact` truthful when empty or filled?
 - Are there headings, more than one admonition, or a glossary before the first capability? Then restructure or route.

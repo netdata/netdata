@@ -8,33 +8,35 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 // RunFailure is an operational collector outcome, not an ownership failure.
 // Its classification is independent of its sanitized diagnostic text.
 type RunFailure struct {
 	cause      error
-	code       int
+	class      collectorapi.LifecycleErrorClass
 	retry      bool
 	afterReady bool
 	reason     string
 }
 
-func (e *RunFailure) Error() string         { return e.cause.Error() }
-func (e *RunFailure) Unwrap() error         { return e.cause }
-func (e *RunFailure) DyncfgCode() int       { return e.code }
-func (e *RunFailure) DyncfgRetryable() bool { return e.retry && !e.afterReady }
-func (e *RunFailure) AfterReady() bool      { return e.afterReady }
-func (e *RunFailure) Reason() string        { return e.reason }
+func (e *RunFailure) Error() string { return e.cause.Error() }
+func (e *RunFailure) Unwrap() error { return e.cause }
+
+// Class is the collector's classification of the Run error.
+func (e *RunFailure) Class() collectorapi.LifecycleErrorClass { return e.class }
+
+// Retryable reports whether startup may be retried: an ordinary startup error
+// or timeout before readiness that the collector did not classify permanent.
+func (e *RunFailure) Retryable() bool  { return e.retry && !e.afterReady }
+func (e *RunFailure) AfterReady() bool { return e.afterReady }
+func (e *RunFailure) Reason() string   { return e.reason }
 
 func newRunFailure(err error, reason string, sanitize func(error) error) *RunFailure {
-	code, retry := 503, reason == "error" || reason == "startup_timeout"
-	if coded, ok := errors.AsType[dyncfg.CodedError](err); ok {
-		code = coded.DyncfgCode()
-		retry = retry && dyncfg.IsRetryableError(err)
-	}
-	return &RunFailure{cause: sanitizeLifecycleError(sanitize, err), code: code, retry: retry, reason: reason}
+	class := collectorapi.ClassifyLifecycleError(err)
+	retry := (reason == "error" || reason == "startup_timeout") && class != collectorapi.LifecycleErrorPermanent
+	return &RunFailure{cause: sanitizeLifecycleError(sanitize, err), class: class, retry: retry, reason: reason}
 }
 
 // ManagedRun serializes readiness, startup cancellation and collector termination.

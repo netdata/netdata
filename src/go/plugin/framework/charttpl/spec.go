@@ -40,6 +40,12 @@ type EngineAutogen struct {
 	// Rules constrain autogen fallback for matching unmatched metric families.
 	Rules []EngineAutogenRule `yaml:"rules,omitempty" json:"rules,omitempty"`
 
+	// CounterRawCharts selects scalar counters, by metric name, that also get a
+	// raw-value chart next to their rate chart. Each item is one glob, evaluated
+	// in order like Netdata simple patterns: the first match wins and a leading
+	// `!` negates.
+	CounterRawCharts []string `yaml:"counter_raw_charts,omitempty" json:"counter_raw_charts,omitempty"`
+
 	// MaxTypeIDLen is the max allowed full `type.id` length.
 	// Zero means default (1200).
 	MaxTypeIDLen int `yaml:"max_type_id_len,omitempty"             json:"max_type_id_len,omitempty"`
@@ -103,8 +109,9 @@ type Instances struct {
 type Lifecycle struct {
 	// MaxInstances is best-effort per chart template.
 	// Active instances in the current successful cycle are not evicted.
-	MaxInstances      int                 `yaml:"max_instances,omitempty"       json:"max_instances,omitempty"`
-	ExpireAfterCycles int                 `yaml:"expire_after_cycles,omitempty" json:"expire_after_cycles,omitempty"`
+	MaxInstances int `yaml:"max_instances,omitempty" json:"max_instances,omitempty"`
+	// ExpireAfterCycles inherits the engine default when nil; zero disables expiry.
+	ExpireAfterCycles *int                `yaml:"expire_after_cycles,omitempty" json:"expire_after_cycles,omitempty"`
 	Dimensions        *DimensionLifecycle `yaml:"dimensions,omitempty"          json:"dimensions,omitempty"`
 }
 

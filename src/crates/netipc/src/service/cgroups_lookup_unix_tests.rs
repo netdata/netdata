@@ -1,11 +1,11 @@
 use super::*;
 use crate::protocol::{
-    CgroupsLookupBuilder, CgroupsLookupRequestView, CGROUP_LOOKUP_KNOWN,
-    CGROUP_LOOKUP_UNKNOWN_RETRY_LATER, ORCHESTRATOR_K8S, PROFILE_BASELINE,
+    CGROUP_LOOKUP_KNOWN, CGROUP_LOOKUP_UNKNOWN_RETRY_LATER, CgroupsLookupBuilder,
+    CgroupsLookupRequestView, ORCHESTRATOR_K8S, PROFILE_BASELINE,
 };
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 

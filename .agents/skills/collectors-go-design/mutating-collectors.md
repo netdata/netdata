@@ -86,6 +86,12 @@ precondition forever because the endpoint did not change; approximate an authori
 approximation repeatedly. **Evidence:** the precondition list in the note with "checked at" for each. **Boundary:**
 re-checking everything every cycle is not required; only what authorizes mutation.
 
+**When:** a new state format adds a field to a persisted identity (a bank joining a memory slot locator). **Do:**
+upgrade older files on read, then take the added field from the first current observation that the old identity
+matches unambiguously; the old writer may have kept a stale copy of a field it treated as descriptive. **Evidence:** a
+test that loads an old file whose stored copy is stale. **Boundary:** an observation the old identity cannot match
+unambiguously keeps the stored value.
+
 ## 6. Tests Specific To Mutating Collectors
 
 Reach every state through real construction and transitions; do not populate private state and call the result a

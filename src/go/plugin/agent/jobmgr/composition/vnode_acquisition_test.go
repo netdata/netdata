@@ -28,12 +28,14 @@ type acquisitionAttempt struct {
 
 func TestCredentialFormTransitionsDiscardInactiveFields(t *testing.T) {
 	jobs := testRunJobServices(t)
+	secretConfig := testRunSecrets(t)
 	acquirer := controlledAcquirer{attempts: make(chan acquisitionAttempt, 8)}
 	jobs.SNMPVnodeAcquirer = acquirer
 	output := newProcessSynchronizedBuffer()
 	frames, err := lifecycle.NewFrameOwner(output)
 	require.NoError(t, err)
-	generation, err := newTestRunGeneration(t, runGenerationConfig{Generation: 1, ShutdownTimeout: time.Second, UIDs: lifecycle.NewUIDLedger(), Frames: frames, Modules: collectorapi.Registry{}, Jobs: jobs, Discovery: testRunDiscoveryServices(t)})
+	generation, err := newTestRunGeneration(t, runGenerationConfig{
+		Secrets: secretConfig, Generation: 1, ShutdownTimeout: time.Second, UIDs: lifecycle.NewUIDLedger(), Frames: frames, Modules: collectorapi.Registry{}, Jobs: jobs, Discovery: testRunDiscoveryServices(t)})
 	require.NoError(t, err)
 	require.NoError(t, generation.start(context.Background()))
 	t.Cleanup(func() {
@@ -115,13 +117,15 @@ func TestRunOwnsIndependentAcquisitionAndModeAwareUpdates(t *testing.T) {
 		initial.SourceType = "dyncfg"
 		initial.Source = "user=test"
 		jobs := testRunJobServices(t)
+		secretConfig := testRunSecrets(t)
 		jobs.InitialVnodes = map[string]*vnodes.Config{"router": &initial}
 		acquirer := controlledAcquirer{attempts: make(chan acquisitionAttempt, 8)}
 		jobs.SNMPVnodeAcquirer = acquirer
 		output := newProcessSynchronizedBuffer()
 		frames, err := lifecycle.NewFrameOwner(output)
 		require.NoError(t, err)
-		generation, err := newTestRunGeneration(t, runGenerationConfig{Generation: 1, ShutdownTimeout: time.Second, UIDs: lifecycle.NewUIDLedger(), Frames: frames, Modules: collectorapi.Registry{}, Jobs: jobs, Discovery: testRunDiscoveryServices(t)})
+		generation, err := newTestRunGeneration(t, runGenerationConfig{
+			Secrets: secretConfig, Generation: 1, ShutdownTimeout: time.Second, UIDs: lifecycle.NewUIDLedger(), Frames: frames, Modules: collectorapi.Registry{}, Jobs: jobs, Discovery: testRunDiscoveryServices(t)})
 		require.NoError(t, err)
 		require.NoError(t, generation.start(context.Background()))
 		t.Cleanup(func() {
@@ -188,6 +192,7 @@ func TestRunOwnsIndependentAcquisitionAndModeAwareUpdates(t *testing.T) {
 func TestAcquiredHostnameCollisionIsDiagnosedAfterCommit(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		jobs := testRunJobServices(t)
+		secretConfig := testRunSecrets(t)
 		var router, other vnodes.Config
 		require.NoError(t, json.Unmarshal([]byte(`{"name":"router","mode":"snmp","mode_snmp":{"address":"device","credentials":{"community":"fixture-secret"}}}`), &router))
 		require.NoError(t, json.Unmarshal([]byte(`{"name":"other","hostname":"taken","guid":"6e17cd2c-0518-4e94-965b-d25673decb21"}`), &other))
@@ -199,7 +204,8 @@ func TestAcquiredHostnameCollisionIsDiagnosedAfterCommit(t *testing.T) {
 		output := newProcessSynchronizedBuffer()
 		frames, err := lifecycle.NewFrameOwner(output)
 		require.NoError(t, err)
-		generation, err := newTestRunGeneration(t, runGenerationConfig{Generation: 1, ShutdownTimeout: time.Second, UIDs: lifecycle.NewUIDLedger(), Frames: frames, Modules: collectorapi.Registry{}, Jobs: jobs, Discovery: testRunDiscoveryServices(t), Diagnostics: diagnostics})
+		generation, err := newTestRunGeneration(t, runGenerationConfig{
+			Secrets: secretConfig, Generation: 1, ShutdownTimeout: time.Second, UIDs: lifecycle.NewUIDLedger(), Frames: frames, Modules: collectorapi.Registry{}, Jobs: jobs, Discovery: testRunDiscoveryServices(t), Diagnostics: diagnostics})
 		require.NoError(t, err)
 		require.NoError(t, generation.start(context.Background()))
 		t.Cleanup(func() {

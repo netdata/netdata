@@ -561,10 +561,13 @@ static int nrpc_method_authorize_acquire(NRPC_OWNER owner, BUFFER *result_wb, co
                                            HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
 
         else if((method->access & HTTP_ACCESS_COMMERCIAL_SPACE) && !(user_access & HTTP_ACCESS_COMMERCIAL_SPACE))
-            code = nrpc_call_error(result_wb,
+            code = nrpc_call_error_with_key(result_wb,
                                            "This feature is only available for commercial users and supporters "
                                            "of Netdata. To use it, please upgrade your space. "
-                                           "Thank you for supporting Netdata.",
+                                           "Thank you for supporting Netdata. "
+                                           "If the space was upgraded recently, sign out and sign in again "
+                                           "on the Agent dashboard.",
+                                           NRPC_ERROR_KEY_COMMERCIAL_REQUIRED,
                                            HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
 
         else {

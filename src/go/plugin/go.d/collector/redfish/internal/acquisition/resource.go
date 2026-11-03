@@ -4,6 +4,7 @@ package acquisition
 
 import (
 	"errors"
+	"fmt"
 	"net/url"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/measurement"
@@ -51,9 +52,11 @@ func (c *Client) validateResourceIdentity(kind string, data map[string]any, resp
 	if !ok {
 		return errors.New("resource has no usable @odata.id")
 	}
-	resolved, err := c.resolveURI(responseURL, id, false)
-	if err != nil || !sameResourceIdentity(canonicalResourceURI(resolved), canonicalResourceURI(responseURL)) {
-		return errors.New("resource identity does not match final response URI")
+	// Services may expose the same resource through aliases, including trailing
+	// slashes and OEM-remapped paths. Validate the advertised URI's trust boundary;
+	// the final response URI still owns the collector's resource identity.
+	if _, err := c.resolveURI(responseURL, id, false); err != nil {
+		return fmt.Errorf("invalid resource @odata.id: %w", err)
 	}
 	return nil
 }

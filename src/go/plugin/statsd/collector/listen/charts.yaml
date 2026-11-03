@@ -1,0 +1,61 @@
+version: v1
+context_namespace: statsd
+groups:
+  - family: receiver
+    metrics:
+      - receiver.bytes
+      - receiver.updates
+      - receiver.rejections
+      - receiver.series
+      - receiver.series_limit
+      - receiver.tcp_connections
+      - receiver.tcp_connections_limit
+      - receiver.tcp_connections_refused
+      - receiver.percentiles_withheld
+    charts:
+      - title: StatsD received bytes
+        context: receiver.bytes
+        units: bytes/s
+        dimensions:
+          - selector: receiver.bytes
+            name_from_label: transport
+      - title: StatsD accepted updates
+        context: receiver.updates
+        units: updates/s
+        dimensions:
+          - selector: receiver.updates
+            name: accepted
+      - title: StatsD rejected input
+        context: receiver.rejections
+        units: rejections/s
+        dimensions:
+          - selector: receiver.rejections
+            name_from_label: reason
+      - title: StatsD retained series
+        context: receiver.series
+        units: series
+        dimensions:
+          - selector: receiver.series
+            name: retained
+          - selector: receiver.series_limit
+            name: limit
+      - title: StatsD TCP connections
+        context: receiver.tcp_connections
+        units: connections
+        dimensions:
+          - selector: receiver.tcp_connections
+            name: active
+          - selector: receiver.tcp_connections_limit
+            name: limit
+      - title: StatsD refused TCP connections
+        context: receiver.tcp_connections_refused
+        units: connections/s
+        dimensions:
+          - selector: receiver.tcp_connections_refused
+            name: refused
+      - title: StatsD withheld percentiles
+        context: receiver.percentiles_withheld
+        units: windows/s
+        dimensions:
+          - selector: receiver.percentiles_withheld
+            name_from_label: reason

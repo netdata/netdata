@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"os"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -21,7 +20,7 @@ import (
 func TestSignalLoopTerminatesWhileRestartIsInProgress(t *testing.T) {
 	hosted := newBlockingRestartAgent()
 	signals := make(chan os.Signal, 2)
-	done := make(chan error, 1)
+	done := make(chan Result, 1)
 	go func() {
 		done <- runSignals(hosted, signals)
 	}()
@@ -42,10 +41,8 @@ func TestSignalLoopTerminatesWhileRestartIsInProgress(t *testing.T) {
 
 	close(hosted.releaseRestart)
 	select {
-	case err := <-done:
-		if err != nil {
-			t.Fatalf("host returned %v", err)
-		}
+	case result := <-done:
+		require.Equal(t, Result{}, result)
 	case <-time.After(time.Second):
 		t.Fatal("host did not stop")
 	}
@@ -54,7 +51,7 @@ func TestSignalLoopTerminatesWhileRestartIsInProgress(t *testing.T) {
 func TestSignalLoopBoundsNonCooperativeTermination(t *testing.T) {
 	hosted := newBlockingTerminateAgent()
 	signals := make(chan os.Signal, 1)
-	done := make(chan error, 1)
+	done := make(chan Result, 1)
 	go func() {
 		done <- runSignalsWithTimeout(hosted, signals, time.Second, 20*time.Millisecond)
 	}()
@@ -70,8 +67,9 @@ func TestSignalLoopBoundsNonCooperativeTermination(t *testing.T) {
 	}
 
 	select {
-	case err := <-done:
-		require.ErrorIs(t, err, context.DeadlineExceeded)
+	case result := <-done:
+		require.ErrorIs(t, result.Err, context.DeadlineExceeded)
+		require.True(t, result.ExitRequired)
 	case <-time.After(10 * time.Millisecond):
 		t.Fatal("host started a second shutdown budget after termination expired")
 	}
@@ -80,7 +78,7 @@ func TestSignalLoopBoundsNonCooperativeTermination(t *testing.T) {
 func TestSignalLoopBoundsNonCooperativeRestart(t *testing.T) {
 	hosted := newBlockingRestartAgent()
 	signals := make(chan os.Signal, 1)
-	done := make(chan error, 1)
+	done := make(chan Result, 1)
 	go func() {
 		done <- runSignalsWithTimeout(hosted, signals, 20*time.Millisecond, time.Second)
 	}()
@@ -97,8 +95,10 @@ func TestSignalLoopBoundsNonCooperativeRestart(t *testing.T) {
 	}
 
 	select {
-	case err := <-done:
-		require.NoError(t, err)
+	case result := <-done:
+		require.Equal(t, Result{
+			ExitRequired: true,
+		}, result)
 	case <-time.After(time.Second):
 		t.Fatal("host waited indefinitely for non-cooperative restart")
 	}
@@ -109,16 +109,18 @@ func TestSignalLoopBoundsNonCooperativeRestart(t *testing.T) {
 	}
 }
 
-func TestSignalLoopExitsCleanlyForProcessRestartRequirement(t *testing.T) {
+func TestSignalLoopDoesNotPermitCleanupBeforeRunCompletes(t *testing.T) {
 	hosted := newRestartResultAgent(agent.ErrProcessRestartRequired)
 	signals := make(chan os.Signal, 1)
-	done := make(chan error, 1)
+	done := make(chan Result, 1)
 	go func() {
 		done <- runSignalsWithTimeout(hosted, signals, time.Second, time.Second)
 	}()
 
 	signals <- syscall.SIGHUP
-	require.NoError(t, <-done)
+	require.Equal(t, Result{
+		ExitRequired: true,
+	}, <-done)
 	require.False(t, hosted.terminated.Load())
 	close(hosted.stopRun)
 }
@@ -127,13 +129,15 @@ func TestSignalLoopFailsAndTerminatesForUnexpectedRestartError(t *testing.T) {
 	unexpected := errors.New("unexpected")
 	hosted := newRestartResultAgent(errors.Join(context.DeadlineExceeded, unexpected))
 	signals := make(chan os.Signal, 1)
-	done := make(chan error, 1)
+	done := make(chan Result, 1)
 	go func() {
 		done <- runSignalsWithTimeout(hosted, signals, time.Second, time.Second)
 	}()
 
 	signals <- syscall.SIGHUP
-	require.ErrorIs(t, <-done, unexpected)
+	result := <-done
+	require.ErrorIs(t, result.Err, unexpected)
+	require.False(t, result.ExitRequired)
 	require.True(t, hosted.terminated.Load())
 }
 
@@ -200,41 +204,65 @@ func TestRestartRecoveryRequiresOnlyApprovedDispositions(t *testing.T) {
 
 func TestWaitForRunReturnsExactTerminalDisposition(t *testing.T) {
 	sentinel := errors.New("dirty run")
-	tests := map[string]struct {
-		done    chan error
-		timeout time.Duration
-		want    error
-		match   string
+	expired, cancel := context.WithCancel(t.Context())
+	cancel()
+	for name, tc := range map[string]struct {
+		done         chan error
+		ctx          context.Context
+		want         error
+		match        string
+		exitRequired bool
 	}{
-		"clean": {
-			done:    completedRun(nil),
-			timeout: time.Second,
-		},
-		"dirty": {
-			done:    completedRun(sentinel),
-			timeout: time.Second,
-			want:    sentinel,
-		},
-		"timeout": {
-			done:    make(chan error),
-			timeout: time.Millisecond,
-			match:   "timed out",
-		},
-	}
-	for name, test := range tests {
+		"clean":                            {done: completedRun(nil), ctx: t.Context()},
+		"dirty":                            {done: completedRun(sentinel), ctx: t.Context(), want: sentinel},
+		"completed despite expired wait":   {done: completedRun(nil), ctx: expired},
+		"failure despite expired wait":     {done: completedRun(sentinel), ctx: expired, want: sentinel},
+		"expired wait with unfinished run": {done: make(chan error), ctx: expired, want: context.Canceled, match: "timed out", exitRequired: true},
+	} {
 		t.Run(name, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(context.Background(), test.timeout)
-			defer cancel()
-			err := waitForRun(test.done, ctx)
-			if test.want != nil && !errors.Is(err, test.want) {
-				t.Fatalf("terminal error=%v, want %v", err, test.want)
+			result := waitForRun(tc.done, tc.ctx)
+			require.ErrorIs(t, result.Err, tc.want)
+			if tc.match != "" {
+				require.ErrorContains(t, result.Err, tc.match)
 			}
-			if test.match != "" && (err == nil || !strings.Contains(err.Error(), test.match)) {
-				t.Fatalf("terminal error=%v, want match %q", err, test.match)
-			}
-			if test.want == nil && test.match == "" && err != nil {
-				t.Fatalf("clean terminal returned %v", err)
-			}
+			require.Equal(t, tc.exitRequired, result.ExitRequired)
+		})
+	}
+}
+
+func TestRecoveryResultRequiresExitUnlessRunCompleted(t *testing.T) {
+	failed := errors.New("shutdown failed")
+	for name, tc := range map[string]struct {
+		done chan error
+		want Result
+	}{
+		"unfinished run": {done: make(chan error), want: Result{
+			ExitRequired: true,
+		}},
+		"completed clean run": {done: completedRun(nil), want: Result{}},
+		"completed failed run": {done: completedRun(failed), want: Result{
+			Err: failed,
+		}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.want, recoveryResult(tc.done))
+		})
+	}
+}
+
+func TestSignalLoopReportsCompletedRun(t *testing.T) {
+	failed := errors.New("run failed")
+	for name, runErr := range map[string]error{"clean": nil, "failed": failed} {
+		t.Run(name, func(t *testing.T) {
+			hosted := newRestartResultAgent(nil)
+			hosted.runResult = runErr
+			close(hosted.stopRun)
+			signals := make(chan os.Signal)
+			result := runSignalsWithTimeout(hosted, signals, time.Second, time.Second)
+			require.Equal(t, Result{
+				Err: runErr,
+			}, result)
+			require.False(t, hosted.terminated.Load())
 		})
 	}
 }
@@ -334,6 +362,7 @@ func (*blockingTerminateAgent) Infof(string, ...any)  {}
 func (*blockingTerminateAgent) Errorf(string, ...any) {}
 
 type restartResultAgent struct {
+	runResult  error
 	result     error
 	stopRun    chan struct{}
 	terminated atomic.Bool
@@ -348,7 +377,7 @@ func newRestartResultAgent(result error) *restartResultAgent {
 
 func (a *restartResultAgent) RunContext(context.Context) error {
 	<-a.stopRun
-	return nil
+	return a.runResult
 }
 
 func (a *restartResultAgent) Restart(context.Context) error {

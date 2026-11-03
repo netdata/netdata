@@ -3,7 +3,9 @@
 package metrix
 
 import (
+	"slices"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 )
@@ -76,6 +78,10 @@ func buildSnapshotSeriesIndex(series map[string]*committedSeries, meta CollectMe
 		defaultHostScope indexedHostScope
 		hasDefaultHost   bool
 		hostScopes       map[string]indexedHostScope
+		// scalars collects scalar series once; sorting them by scope, name and labels
+		// key yields every scope's name list and per-name series slices without
+		// per-name allocation.
+		scalars = make([]*committedSeries, 0, len(series))
 	)
 
 	for _, item := range series {
@@ -104,11 +110,9 @@ func buildSnapshotSeriesIndex(series map[string]*committedSeries, meta CollectMe
 			scope.structuredMetaByName[item.name] = item.desc
 			continue
 		}
-		if scope.byName == nil {
-			scope.byName = make(map[string][]*committedSeries)
-		}
-		scope.byName[item.name] = append(scope.byName[item.name], item)
+		scalars = append(scalars, item)
 	}
+	indexScalarSeries(index, scalars)
 
 	totalScopes := len(hostScopes)
 	freshScopes := 0
@@ -159,13 +163,46 @@ func buildSnapshotSeriesIndex(series map[string]*committedSeries, meta CollectMe
 		}
 	}
 
-	if index.hasDefaultScope {
-		buildSnapshotScopeIndex(&index.defaultScope)
-	}
-	for _, scope := range index.byScope {
-		buildSnapshotScopeIndex(scope)
-	}
 	return index
+}
+
+// indexScalarSeries sorts scalars by scope, name and labels key and carves each
+// scope's names and per-name series from the sorted slice. Keys are unique per
+// series, so the order is total.
+func indexScalarSeries(index *snapshotSeriesIndex, scalars []*committedSeries) {
+	slices.SortFunc(scalars, func(a, b *committedSeries) int {
+		if c := strings.Compare(a.hostScopeKey, b.hostScopeKey); c != 0 {
+			return c
+		}
+		if c := strings.Compare(a.name, b.name); c != 0 {
+			return c
+		}
+		return strings.Compare(a.labelsKey, b.labelsKey)
+	})
+	for start := 0; start < len(scalars); {
+		scopeKey := scalars[start].hostScopeKey
+		end := start
+		names := 0
+		for end < len(scalars) && scalars[end].hostScopeKey == scopeKey {
+			if end == start || scalars[end].name != scalars[end-1].name {
+				names++
+			}
+			end++
+		}
+		scope := index.ensureScope(scopeKey)
+		scope.byName = make(map[string][]*committedSeries, names)
+		scope.names = make([]string, 0, names)
+		for i := start; i < end; {
+			j := i + 1
+			for j < end && scalars[j].name == scalars[i].name {
+				j++
+			}
+			scope.byName[scalars[i].name] = scalars[i:j:j]
+			scope.names = append(scope.names, scalars[i].name)
+			i = j
+		}
+		start = end
+	}
 }
 
 func (index *snapshotSeriesIndex) ensureScope(scopeKey string) *snapshotScopeIndex {
@@ -192,17 +229,6 @@ func (index *snapshotSeriesIndex) scope(scopeKey string) *snapshotScopeIndex {
 		return nil
 	}
 	return index.byScope[scopeKey]
-}
-
-func buildSnapshotScopeIndex(scope *snapshotScopeIndex) {
-	scope.names = make([]string, 0, len(scope.byName))
-	for name, items := range scope.byName {
-		scope.names = append(scope.names, name)
-		sort.Slice(items, func(i, j int) bool {
-			return items[i].labelsKey < items[j].labelsKey
-		})
-	}
-	sort.Strings(scope.names)
 }
 
 func freshSeriesVisible(series *committedSeries, meta CollectMeta) bool {

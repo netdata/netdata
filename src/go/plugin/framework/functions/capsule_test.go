@@ -5,9 +5,14 @@ package functions
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 	"testing"
+	"testing/iotest"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestInputCapsuleParsesFunctionCancelAndQuit(t *testing.T) {
@@ -45,8 +50,14 @@ func TestInputCapsuleResynchronizesSafeUIDHeaderErrors(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(consumer.rejections) != 2 ||
-		consumer.rejections[0] != (recordedCapsuleRejection{uid: "bad-time", status: 400}) ||
-		consumer.rejections[1] != (recordedCapsuleRejection{uid: "oversized", status: 400}) {
+		consumer.rejections[0] != (recordedCapsuleRejection{
+			uid:    "bad-time",
+			status: 400,
+		}) ||
+		consumer.rejections[1] != (recordedCapsuleRejection{
+			uid:    "oversized",
+			status: 400,
+		}) {
 		t.Fatalf("recoverable rejections differ: %#v", consumer.rejections)
 	}
 	if len(consumer.calls) != 1 || consumer.calls[0].UID != "good" || !consumer.quit {
@@ -141,12 +152,10 @@ func capsuleFunctionLineOfLength(t *testing.T, uid string, timeout, length int) 
 	return line
 }
 
-func TestInputCapsulePreservesPayloadBytesAndPreAdmissionCancel(t *testing.T) {
+func TestInputCapsulePreservesPayloadBytes(t *testing.T) {
 	consumer := &recordingCapsuleConsumer{}
 	input := "FUNCTION_PAYLOAD raw 30 \"raw:echo\" 0xFFFF \"source\" application/octet-stream\r\n" +
-		"  leading\tvalue  \r\n\r\ntail\nFUNCTION_PAYLOAD_END\r\n" +
-		"FUNCTION_PAYLOAD cancelled 30 \"raw:echo\" 0xFFFF \"source\" application/octet-stream\n" +
-		"partial\nFUNCTION_CANCEL cancelled\nQUIT\n"
+		"  leading\tvalue  \r\n\r\ntail\nFUNCTION_PAYLOAD_END\r\nQUIT\n"
 	capsule, err := NewInputCapsule(strings.NewReader(input))
 	if err != nil {
 		t.Fatal(err)
@@ -163,14 +172,12 @@ func TestInputCapsulePreservesPayloadBytesAndPreAdmissionCancel(t *testing.T) {
 		string(call.Payload) != "  leading\tvalue  \r\n\r\ntail" {
 		t.Fatalf("payload call differs: %#v payload=%q", call, call.Payload)
 	}
-	if len(consumer.rejections) != 1 ||
-		consumer.rejections[0] != (recordedCapsuleRejection{uid: "cancelled", status: 499}) ||
-		!consumer.quit {
-		t.Fatalf("pre-admission cancel differs: %#v quit=%v", consumer.rejections, consumer.quit)
+	if len(consumer.rejections) != 0 || !consumer.quit {
+		t.Fatalf("payload completion differs: %#v quit=%v", consumer.rejections, consumer.quit)
 	}
 }
 
-func TestInputCapsulePayloadBoundariesAndResynchronization(t *testing.T) {
+func TestInputCapsulePayloadBoundariesAndFollowingCall(t *testing.T) {
 	tests := map[string]struct {
 		size     int
 		accepted bool
@@ -203,8 +210,11 @@ func TestInputCapsulePayloadBoundariesAndResynchronization(t *testing.T) {
 			} else if len(consumer.calls) != 1 ||
 				consumer.calls[0].UID != "successor" ||
 				len(consumer.rejections) != 1 ||
-				consumer.rejections[0] != (recordedCapsuleRejection{uid: "boundary", status: 413}) {
-				t.Fatalf("overflow resynchronization differs: calls=%#v rejections=%#v", consumer.calls, consumer.rejections)
+				consumer.rejections[0] != (recordedCapsuleRejection{
+					uid:    "boundary",
+					status: 413,
+				}) {
+				t.Fatalf("overflow completion differs: calls=%#v rejections=%#v", consumer.calls, consumer.rejections)
 			}
 		})
 	}
@@ -240,23 +250,127 @@ func TestInputCapsuleKeepsUnknownOrMalformedFunctionTextInPayload(t *testing.T) 
 	}
 }
 
-func TestInputCapsuleRejectsAbandonedPayloadBeforeValidResynchronization(t *testing.T) {
+func TestInputCapsuleKeepsCommandsInPayload(t *testing.T) {
+	tests := map[string]struct{ body string }{
+		"function":         {body: "FUNCTION inner 30 \"raw:echo\" 0x0 \"test\""},
+		"payload function": {body: "FUNCTION_PAYLOAD inner 30 \"raw:echo\" 0x0 \"test\" application/json"},
+		"cancel current":   {body: "FUNCTION_CANCEL outer"},
+		"cancel other":     {body: "FUNCTION_CANCEL other"},
+		"progress":         {body: "FUNCTION_PROGRESS outer"},
+		"quit":             {body: "QUIT"},
+		"marker prefix":    {body: "FUNCTION_PAYLOAD_END extra"},
+		"marker suffix":    {body: "prefix FUNCTION_PAYLOAD_END"},
+		"buffer boundary":  {body: strings.Repeat("x", maximumInputLineBytes) + "\nQUIT"},
+		"split line":       {body: strings.Repeat("x", maximumInputLineBytes+1) + "FUNCTION_PAYLOAD_END\nQUIT"},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			for readerName, readerFn := range map[string]func(io.Reader) io.Reader{
+				"buffered": func(r io.Reader) io.Reader { return r },
+				"one byte": iotest.OneByteReader,
+			} {
+				t.Run(readerName, func(t *testing.T) {
+					body := "first\r\n" + test.body + "\nlast\n"
+					input := "FUNCTION_PAYLOAD outer 30 \"raw:echo\" 0x0 \"test\" application/octet-stream\n" +
+						body + "\nFUNCTION_PAYLOAD_END\n" +
+						"FUNCTION next 30 \"raw:echo\" 0x0 \"test\"\n"
+					consumer := &recordingCapsuleConsumer{}
+					capsule, err := NewInputCapsule(readerFn(strings.NewReader(input)))
+					require.NoError(t, err)
+					require.NoError(t, capsule.Run(context.Background(), consumer))
+					assert.Equal(t, &recordingCapsuleConsumer{
+						calls: []Call{
+							{
+								UID:         "outer",
+								Timeout:     30 * time.Second,
+								Method:      "raw:echo",
+								Access:      "0x0",
+								Source:      "test",
+								Payload:     []byte(body),
+								ContentType: "application/octet-stream",
+								HasPayload:  true,
+							},
+							{
+								UID:     "next",
+								Timeout: 30 * time.Second,
+								Method:  "raw:echo",
+								Access:  "0x0",
+								Source:  "test",
+							},
+						},
+					}, consumer)
+				})
+			}
+		})
+	}
+}
+
+func TestInputCapsuleDrainsRejectedPayloads(t *testing.T) {
+	header := "FUNCTION_PAYLOAD rejected 30 \"raw:echo\" 0x0 \"test\" application/octet-stream\n"
+	tests := map[string]struct {
+		header string
+		prefix string
+		status int
+	}{
+		"invalid timeout":      {header: strings.Replace(header, "30", "-1", 1), status: 400},
+		"missing content type": {header: strings.Replace(header, " application/octet-stream", "", 1), status: 400},
+		"unmatched quote":      {header: strings.Replace(header, "\"raw:echo\"", "\"raw:echo", 1), status: 400},
+		"empty function":       {header: strings.Replace(header, "raw:echo", "", 1), status: 400},
+		"oversized header":     {header: strings.Replace(header, "raw:echo", strings.Repeat("x", MaximumCommandLineBytes), 1), status: 400},
+		"buffer-split header":  {header: strings.Replace(header, "raw:echo", strings.Repeat("x", maximumInputLineBytes*2), 1), status: 400},
+		"oversized body":       {header: header, prefix: strings.Repeat("x", MaximumInputBodyBytes+1) + "\n", status: 413},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			input := test.header + test.prefix +
+				"FUNCTION inner 30 \"raw:echo\" 0x0 \"test\"\n" +
+				"FUNCTION_CANCEL other\nFUNCTION_CANCEL rejected\nFUNCTION_PROGRESS rejected\nQUIT\n" +
+				"FUNCTION_PAYLOAD inner 30 \"raw:echo\" 0x0 \"test\" application/json\n" +
+				"FUNCTION_PAYLOAD_END\n" +
+				"FUNCTION next 30 \"raw:echo\" 0x0 \"test\"\nQUIT\n"
+			consumer := &recordingCapsuleConsumer{}
+			capsule, err := NewInputCapsule(strings.NewReader(input))
+			require.NoError(t, err)
+			require.NoError(t, capsule.Run(context.Background(), consumer))
+			assert.Equal(t, &recordingCapsuleConsumer{
+				calls: []Call{{
+					UID:     "next",
+					Timeout: 30 * time.Second,
+					Method:  "raw:echo",
+					Access:  "0x0",
+					Source:  "test",
+				}},
+				rejections: []recordedCapsuleRejection{{
+					uid:    "rejected",
+					status: test.status,
+				}},
+				quit: true,
+			}, consumer)
+		})
+	}
+}
+
+func TestInputCapsuleRejectsUnterminatedPayloadWithoutDispatch(t *testing.T) {
+	for name, ending := range map[string]string{"complete line": "\n", "partial line": ""} {
+		t.Run(name, func(t *testing.T) {
+			input := "FUNCTION_PAYLOAD outer 30 \"raw:echo\" 0x0 \"test\" application/octet-stream\n" +
+				"partial\nFUNCTION inner 30 \"raw:echo\" 0x0 \"test\"\nQUIT" + ending
+			consumer := &recordingCapsuleConsumer{}
+			capsule, err := NewInputCapsule(strings.NewReader(input))
+			require.NoError(t, err)
+			require.ErrorContains(t, capsule.Run(context.Background(), consumer), "unterminated payload")
+			assert.Equal(t, &recordingCapsuleConsumer{}, consumer)
+		})
+	}
+}
+
+func TestInputCapsuleRejectsTruncatedOversizedPayloadHeader(t *testing.T) {
+	input := "FUNCTION_PAYLOAD outer 30 \"" + strings.Repeat("x", maximumInputLineBytes*2)
 	consumer := &recordingCapsuleConsumer{}
-	input := "FUNCTION_PAYLOAD abandoned 30 \"raw:echo\" 0xFFFF \"source\" application/octet-stream\n" +
-		"partial\n" +
-		"FUNCTION successor 30 \"perf:work\" 0xFFFF \"source\"\nQUIT\n"
 	capsule, err := NewInputCapsule(strings.NewReader(input))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := capsule.Run(context.Background(), consumer); err != nil {
-		t.Fatal(err)
-	}
-	if len(consumer.rejections) != 1 ||
-		consumer.rejections[0] != (recordedCapsuleRejection{uid: "abandoned", status: 400}) ||
-		len(consumer.calls) != 1 || consumer.calls[0].UID != "successor" || !consumer.quit {
-		t.Fatalf("resynchronization differs: calls=%#v rejections=%#v quit=%v", consumer.calls, consumer.rejections, consumer.quit)
-	}
+	require.NoError(t, err)
+	require.ErrorContains(t, capsule.Run(context.Background(), consumer), "unterminated")
+	assert.Equal(t, &recordingCapsuleConsumer{}, consumer)
 }
 
 type recordingCapsuleConsumer struct {
@@ -282,11 +396,43 @@ func (consumer *recordingCapsuleConsumer) HandleCancel(_ context.Context, uid st
 }
 
 func (consumer *recordingCapsuleConsumer) HandleReject(_ context.Context, uid string, status int) error {
-	consumer.rejections = append(consumer.rejections, recordedCapsuleRejection{uid: uid, status: status})
+	consumer.rejections = append(consumer.rejections, recordedCapsuleRejection{
+		uid:    uid,
+		status: status,
+	})
 	return nil
 }
 
 func (consumer *recordingCapsuleConsumer) HandleQuit(context.Context) error {
 	consumer.quit = true
 	return nil
+}
+
+func TestInputCapsuleKeepsQuotedKeywordJSONLinesInPayload(t *testing.T) {
+	// valid JSON whose lines start with quoted protocol keywords must stay payload data:
+	// the tokenizer unquotes fields, so these lines tokenize like 6-7 field calls
+	tests := map[string]string{
+		"FUNCTION array element":         "[\"x\",\n\"FUNCTION\" ,0, 30 ,\"a\" ,\"b\" ,\"c\" ]",
+		"FUNCTION_PAYLOAD array element": "[\"x\",\n\"FUNCTION_PAYLOAD\" ,0, 30 ,\"a\" ,\"b\" ,\"c\" ,\"d\" ]",
+		"indented FUNCTION element":      "[\"x\",\n   \"FUNCTION\" ,0, 30 ,\"a\" ,\"b\" ,\"c\" ]",
+	}
+	for name, body := range tests {
+		t.Run(name, func(t *testing.T) {
+			consumer := &recordingCapsuleConsumer{}
+			input := "FUNCTION_PAYLOAD raw 30 \"raw:echo\" 0xFFFF \"source\" application/json\n" +
+				body + "\nFUNCTION_PAYLOAD_END\n" +
+				"FUNCTION successor 30 \"perf:work\" 0xFFFF \"source\"\nQUIT\n"
+			capsule, err := NewInputCapsule(strings.NewReader(input))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := capsule.Run(context.Background(), consumer); err != nil {
+				t.Fatalf("reader stopped: %v (calls=%#v rejections=%#v)", err, consumer.calls, consumer.rejections)
+			}
+			if len(consumer.calls) != 2 || consumer.calls[0].UID != "raw" || string(consumer.calls[0].Payload) != body ||
+				consumer.calls[1].UID != "successor" || len(consumer.rejections) != 0 || !consumer.quit {
+				t.Fatalf("payload flow differs: calls=%#v rejections=%#v quit=%v", consumer.calls, consumer.rejections, consumer.quit)
+			}
+		})
+	}
 }

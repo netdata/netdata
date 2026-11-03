@@ -3,7 +3,7 @@
 You control what logs cost by setting, per source, where the logs are stored and for how long they are kept. Nothing
 has to be filtered or discarded to fit a budget: logs managed in place use the disk the node already has, under the
 operating system's own retention settings, and logs centralized with OpenTelemetry use Netdata's log store on the
-receiving node, with per-tenant retention and optional offloading to object storage. Netdata meters nothing by volume.
+receiving node, with its own retention and optional offloading to object storage. Netdata meters nothing by volume.
 
 | Tier | Where the bytes are | What sets the retention |
 |:-----|:--------------------|:------------------------|
@@ -13,7 +13,7 @@ receiving node, with per-tenant retention and optional offloading to object stor
 | On an existing journal centralization point | Journal files written by `systemd-journal-remote` | `journal-remote.conf` |
 | On an existing Windows Event Collector | The forwarded-events channels of the collector | Per-channel maximum size and retention policy |
 | Journals written by Netdata (SNMP traps, network flows) | Journal-compatible files on the node that receives them | The collector's retention settings |
-| Centralized with OpenTelemetry | Netdata's log store on the receiving node, optionally offloaded to object storage | `otel.yaml`, per tenant |
+| Centralized with OpenTelemetry | Netdata's log store on the receiving node, optionally offloaded to object storage | `otel.yaml` |
 
 Netdata reads whatever each store retains. Changing a retention setting changes what is queryable from that moment on;
 it does not require any change in Netdata.
@@ -107,16 +107,14 @@ so do SIEM agents that ingest journal files.
 
 ## Netdata's log store
 
-Logs received over OpenTelemetry are stored by the receiving Netdata Agent under `base_dir`
-(default `/var/log/netdata/otel/v2` on package installs), with per-tenant subdirectories under each signal's
-write-ahead-log and index directories. Incoming records are appended to a write-ahead log; when it reaches
-`max_file_size` (25 MB), `max_entries` (50000), or `max_file_duration` (about 15 minutes), it is sealed
-into an indexed file and the write-ahead log is deleted. Each indexed file stores every distinct `field=value` pair
-once,
-in compressed dictionaries local to that file, and references it from every entry, so every field is indexed and the
-disk usage stays close to that of the compressed raw text.
+Logs received over OpenTelemetry are stored by the receiving Netdata Agent under `base_dir` (default
+`/var/log/netdata/otel/v2` on package installs). Incoming records are appended to a write-ahead log; when it reaches
+`max_file_size` (25 MB), `max_entries` (50000), or `max_file_duration` (about 15 minutes), it is sealed into an indexed
+file and the write-ahead log is deleted. Each indexed file stores every distinct `field=value` pair once, in compressed
+dictionaries local to that file, and references it from every entry, so every field is indexed and the disk usage stays
+close to that of the compressed raw text.
 
-Retention applies to sealed indexed files, per tenant, oldest first, when any of three limits is exceeded:
+Retention applies to sealed indexed files, oldest first, when any of three limits is exceeded:
 
 | Option | Default | Meaning |
 |:-------|:--------|:--------|
@@ -125,28 +123,19 @@ Retention applies to sealed indexed files, per tenant, oldest first, when any of
 | `logs.retention.default.max_age` | 7 days | Maximum age of an indexed file, measured on its newest entry |
 
 `max_total_size` is not a cap on the plugin's disk usage: active write-ahead logs (up to `max_file_size` per stream),
-catalogs, and the remote read cache are additional. Retention runs when a file is sealed; a tenant that stops sending
-gets one final pass when its last write-ahead log
-seals on idle (within about 15 minutes), then keeps its remaining files until it sends again or the Agent restarts.
+catalogs, and the download cache for offloaded data are additional. Retention runs when a file is sealed; when logs
+stop arriving, the last write-ahead log seals on idle (within about 15 minutes) and gets one final pass, and the
+remaining files are kept until logs arrive again or the Agent restarts.
 
-Per-tenant sections inherit every field they omit from `default`. The section name is the tenant, which is the
-`X-Scope-OrgID` header value when tenant selection is enabled:
+Set the limits under `logs.retention.default`; a user `otel.yaml` needs only the fields that change:
 
 ```yaml
-auth:
-  enabled: true
 logs:
   retention:
     default:
       max_total_size: "20GB"
       max_age: "30 days"
-    audit:
-      max_total_size: "200GB"
-      max_age: "400 days"
 ```
-
-With tenant selection enabled, a log or trace sender that omits the `X-Scope-OrgID` header is rejected (metrics are
-not tenant-scoped); with it disabled, every record lands in the `default` tenant regardless of headers.
 
 Edit `otel.yaml` with [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) and restart
 the Agent. The full option list is in the [OpenTelemetry plugin reference](/src/crates/otel-plugin/README.md).
@@ -154,12 +143,24 @@ the Agent. The full option list is in the [OpenTelemetry plugin reference](/src/
 ### Offloading to object storage
 
 With `remote_storage.enabled: true`, every sealed indexed file is also uploaded to `remote_storage.uri`, an `s3://` or
-`fs://` location. Uploading changes nothing locally: files stay under local retention, and a local file is not deleted
-by retention until its catalog entry confirms it is in the remote. When a query needs an offloaded file that is no
-longer
-local, the Agent downloads it through a cache bounded by `remote_storage.read_cache_max_size` (1GB), and the query
-waits for the download. A query whose files exceed the cache fails with a message to narrow the time window or stream
-filter.
+`fs://` location. Traces are uploaded the same way; how trace queries read them back is in
+[Trace Storage and Retention](/docs/opentelemetry/trace-storage-and-retention.md#offloading-to-object-storage).
+Uploading changes nothing locally: files stay under local retention, and
+a local file is not deleted by retention until its catalog entry confirms it is in the remote. When a query needs an
+offloaded file that is no longer local, the Agent downloads it whole into a download cache at `<base_dir>/remote-read`,
+bounded by `remote_storage.read_cache_max_size` (1GB) and shared by logs and traces, then answers from it; repeated
+queries over the same files are served from the cache.
+
+- A query whose offloaded files exceed the cache fails with a message to narrow the time window or stream filter.
+- A download may take 30 seconds plus one second per MiB of the file, at most 5 minutes. A file that takes longer, or
+  that the remote cannot serve, is left out of the answer, and the query still reads its other files; the Logs tab
+  shows what could be read. While the remote is down, each file waits out its own limit in turn (a file that another
+  query is already downloading can cost up to about three limits), so a query over many offloaded files can take
+  minutes.
+- A query downloads its files one at a time, and the cache admits a query's files all at once: one wide query, of logs
+  or traces, makes other queries wait for room and can evict their cached files.
+- If the cache directory becomes unwritable, downloads fail as above and the plugin logs the write errors; a query that
+  needs room the cache cannot free fails with a message about the cache directory.
 
 ```yaml
 remote_storage:
@@ -186,19 +187,27 @@ remote_storage:
   Apply with `systemctl daemon-reload && systemctl restart netdata`.
 - Uploads that fail are retried with backoff; while the remote is unreachable, sealed files accumulate locally without
   a ceiling. Monitor free disk on the receiving node.
+- The Agent never deletes offloaded files, for logs or traces: expire them with the object storage's own lifecycle
+  rules, such as an S3 lifecycle expiration rule.
 - This is how long retention is made cheap: keep days locally with a small `max_age`, keep months or years in object
   storage, and query both from the same Logs tab.
+- Earlier versions kept a logs-only cache at `<base_dir>/logs/remote-read`. With offloading enabled, the Agent moves it
+  to `<base_dir>/remote-read` at startup. If `<base_dir>/remote-read` already exists, or the move fails (for example,
+  the old folder is on another filesystem or is a mount point), the old folder's cached files are deleted instead,
+  since it is only a cache, and the folder is removed once empty; files the cache did not write are kept and logged. A
+  volume mounted at the old path is therefore no longer used: mount it at `<base_dir>/remote-read`. If the old path is
+  a symlink to a folder and `<base_dir>/remote-read` does not exist yet, the new path becomes a link to that folder;
+  any other old link is removed. With offloading disabled the old folder is left untouched and can be deleted by hand.
 
 ### Sizing the receiving node
 
-Run the pipeline for a full day, then measure `du -sh` on the tenant's directory under `<base_dir>/logs/index/` and
-multiply
-by the retention you want locally. For long retention there are two shapes: keep everything on local disk, sizing it
-as one day's index size × `max_age`, as the `audit` example above does with its 400 days; or keep `max_age` short
+Run the pipeline for a full day, then measure `du -sh` on `<base_dir>/logs/index/` and multiply by the retention you
+want locally. For long retention there are two shapes: keep everything on local disk, sizing it as one day's index
+size × `max_age`; or keep `max_age` short
 (30 days, say), enable offloading, and size the object storage for one day's index size × the total retention you
-want reachable — older files are then fetched back from S3 through the read cache when queried. Add headroom for active
-write-ahead logs (`max_file_size` per stream) and for the
-read cache when offloading is enabled. Queries are bounded by their time range and by the Agent's function timeout, so
+want reachable — older files are then fetched back from S3 through the download cache when queried. Add headroom for
+active write-ahead logs (`max_file_size` per stream) and for the download cache when offloading is enabled; logs and
+traces share it. Queries are bounded by their time range and by the Agent's function timeout, so
 on large stores keep the
 default window and narrow it further before running a full-text search; see
 [Managing Logs](/docs/dashboards-and-charts/logs-tab.md#query-behavior-at-scale).
@@ -211,7 +220,7 @@ without a running Agent — which makes it usable for forensics: a stopped node,
 
 ```bash
 sudo /usr/libexec/netdata/plugins.d/otel-plugin logs \
-  --config /etc/netdata/otel.yaml --tenant default \
+  --config /etc/netdata/otel.yaml \
   --name checkout --since -1h --filter 'level=error' --limit 1000
 ```
 

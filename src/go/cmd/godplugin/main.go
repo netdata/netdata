@@ -11,6 +11,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/cmd/internal/agenthost"
 	"github.com/netdata/netdata/go/plugins/cmd/internal/discoveryproviders"
+	"github.com/netdata/netdata/go/plugins/cmd/internal/secretproviders"
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/cli"
@@ -69,7 +70,13 @@ func main() {
 
 	runModePolicy := policy.Agent(isTerminal)
 
+	secrets, err := secretproviders.Default()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "initializing secrets: %v\n", err)
+		os.Exit(1)
+	}
 	a := agent.New(agent.Config{
+		Secrets:                   secrets,
 		SNMPVnodeAcquirer:         govnode.SNMP{},
 		Name:                      executable.Name,
 		PluginConfigDir:           pluginconfig.ConfigDir(),
@@ -102,9 +109,13 @@ func main() {
 	a.Infof("directories → config: %s | collectors: %s | sd: %s | varlib: %s",
 		a.ConfigDir, a.CollectorsConfDir, a.ServiceDiscoveryConfigDir, a.VarLibDir)
 
-	if err := agenthost.Run(a); err != nil {
-		a.Errorf("plugin exiting after Agent failure: %v", err)
+	result := agenthost.Run(a)
+	if result.Err != nil {
+		a.Errorf("plugin exiting after Agent failure: %v", result.Err)
 		os.Exit(1)
+	}
+	if result.ExitRequired {
+		os.Exit(0)
 	}
 }
 

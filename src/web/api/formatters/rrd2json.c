@@ -153,6 +153,17 @@ static inline void buffer_json_member_add_string_close(BUFFER *wb) {
     buffer_strcat(wb, wb->json.value_quote);
 }
 
+// When building the query target stopped early, write the error and return its HTTP code; 0 otherwise.
+int query_target_cancelled_response(QUERY_TARGET *qt, BUFFER *wb) {
+    if(!qt || !qt->internal.cancelled)
+        return 0;
+
+    bool timeout = (qt->internal.cancelled == QUERY_TARGET_CANCEL_TIMEOUT);
+    buffer_flush(wb);
+    buffer_strcat(wb, timeout ? "Query timeout exceeded" : "Query interrupted");
+    return timeout ? HTTP_RESP_GATEWAY_TIMEOUT : HTTP_RESP_CLIENT_CLOSED_REQUEST;
+}
+
 int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *latest_timestamp) {
     wrapper_begin_t wrapper_begin = rrdr_json_wrapper_begin;
     wrapper_end_t wrapper_end = rrdr_json_wrapper_end;
@@ -172,8 +183,11 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
     }
 
     if (r->view.flags & RRDR_RESULT_FLAG_CANCEL) {
+        bool timeout = (r->view.flags & RRDR_RESULT_FLAG_TIMEOUT);
         rrdr_free(owa, r);
-        return HTTP_RESP_CLIENT_CLOSED_REQUEST;
+        buffer_flush(wb);
+        buffer_strcat(wb, timeout ? "Query timeout exceeded" : "Query interrupted");
+        return timeout ? HTTP_RESP_GATEWAY_TIMEOUT : HTTP_RESP_CLIENT_CLOSED_REQUEST;
     }
 
     if(r->view.flags & RRDR_RESULT_FLAG_RELATIVE)

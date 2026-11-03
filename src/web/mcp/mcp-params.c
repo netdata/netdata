@@ -580,8 +580,8 @@ bool mcp_params_parse_time_window(
     if (after_is_absolute && before_is_absolute && *after >= *before) {
         if (error) {
             buffer_flush(error);
-            buffer_sprintf(error, "Invalid time range: 'after' (%ld) must be earlier than 'before' (%ld) "
-                                  "when both are absolute timestamps.", *after, *before);
+            buffer_sprintf(error, "Invalid time range: 'after' (%" PRId64 ") must be earlier than 'before' (%" PRId64 ") "
+                                  "when both are absolute timestamps.", (int64_t)*after, (int64_t)*before);
         }
         return false;
     }

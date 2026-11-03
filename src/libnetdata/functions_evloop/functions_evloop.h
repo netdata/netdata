@@ -66,6 +66,14 @@
 
 #define PLUGINSD_CALL_QUIT                      "QUIT"                      // ask the plugin to quit
 
+// Function payloads travel unframed between FUNCTION_PAYLOAD and FUNCTION_PAYLOAD_END,
+// so their bytes must never be readable as protocol commands by any plugin or child.
+// Non-empty payloads MUST be strict JSON (RFC 8259), without the end marker text and without lines
+// starting with a quoted FUNCTION, FUNCTION_PAYLOAD, FUNCTION_CANCEL, FUNCTION_PROGRESS or QUIT keyword;
+// an empty payload means no payload and is accepted.
+// Returns NULL when valid, or a static rejection reason.
+const char *functions_payload_validate(const char *payload, size_t len);
+
 // dyncfg
 // enabled with STREAM_CAP_DYNCFG
 #define PLUGINSD_KEYWORD_CONFIG                 "CONFIG"
@@ -119,6 +127,11 @@ static inline void functions_stop_monotonic_update_on_progress(usec_t *stop_mono
 #define pluginsd_function_result_end_to_buffer(wb) \
     buffer_strcat(wb, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n")
 
+// The *_to_stdout() helpers below do not lock and emit one response with several
+// stdio calls. Callers MUST hold the stdout mutex given to functions_evloop_init(),
+// the same one the plugin holds while writing chart data: the agent reads every line
+// up to FUNCTION_RESULT_END as the response, so interleaved chart lines are swallowed,
+// the next SET lands on the wrong chart, and the agent disables the plugin.
 #define pluginsd_function_result_begin_to_stdout(transaction, code, content_type, expires)          \
     fprintf(stdout                                                                                  \
                     , PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " \"%s\" %d \"%s\" %ld\n"              \

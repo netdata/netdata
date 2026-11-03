@@ -299,19 +299,19 @@
           }
         }
       },
-      "max_time_series": {
-        "title": "Time series limit",
-        "description": "If the final output after job and profile relabeling contains more time series than this limit, the data is not processed. Set to 0 for no limit.",
+      "max_input_series": {
+        "title": "Input series limit",
+        "description": "Maximum input series after selector and job/profile relabeling, checked at startup and every collection. Each scalar counts once; each histogram counts its buckets plus two count/sum slots, and each summary counts its quantiles plus two count/sum slots, including incomplete distributions. Exceeding the limit rejects the whole collection before storage. Zero disables the limit; negative values are invalid. This does not bound download or parser memory.",
         "type": "integer",
         "minimum": 0,
-        "default": 2000
+        "default": 10000
       },
-      "max_time_series_per_metric": {
-        "title": "Time series per metric limit",
-        "description": "Final metric families with more time series than this limit are skipped. Set to 0 for no limit.",
+      "max_output_series_per_context": {
+        "title": "Output series per context limit",
+        "description": "Maximum distinct current chart/dimension pairs per resolved context in one job and host scope, counted after routing and aggregation across all charts. Exceeding the limit omits the whole context; other contexts keep their complete inputs. Applies to profiles, automatic charts and raw counter companion charts. Zero disables the limit; negative values are invalid.",
         "type": "integer",
         "minimum": 0,
-        "default": 200
+        "default": 1000
       },
       "fallback_type": {
         "title": "Untyped metrics fallback",
@@ -350,6 +350,20 @@
             "uniqueItems": true
           }
         }
+      },
+      "counter_raw_charts": {
+        "title": "Raw counter charts",
+        "description": "Counters whose raw cumulative value is also charted, next to their per-second rate chart, under the `prometheus.<app>.<metric>.raw` context. Leave empty to chart counters as rates only.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "title": "Pattern",
+          "type": "string",
+          "pattern": "^\\S+$"
+        },
+        "uniqueItems": true
       },
       "username": {
         "title": "Username",
@@ -471,14 +485,20 @@
         {
           "title": "Limits",
           "fields": [
-            "max_time_series",
-            "max_time_series_per_metric"
+            "max_input_series",
+            "max_output_series_per_context"
           ]
         },
         {
           "title": "Untyped fallback",
           "fields": [
             "fallback_type"
+          ]
+        },
+        {
+          "title": "Raw counter charts",
+          "fields": [
+            "counter_raw_charts"
           ]
         },
         {
@@ -543,6 +563,9 @@
     },
     "force_http2": {
       "ui:widget": "hidden"
+    },
+    "counter_raw_charts": {
+      "ui:help": "Each item holds one metric name pattern with the same `*`, `?` and `[...]` wildcards as Untyped metrics fallback; a leading `!` excludes. Items are checked in order and the first match decides. Every matched counter series adds one chart.\n\nPatterns match the final metric name, after job and profile relabeling. Only counters shown on generic autogen charts get a raw chart: gauges, histogram and summary series, and metrics charted by a profile are not affected. An untyped metric qualifies once it is processed as a counter: through its `_total` suffix, the Untyped metrics fallback As Counter list, or a selected profile's fallback rules."
     }
   }
 }

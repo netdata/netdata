@@ -4,7 +4,7 @@
 #define NETDATA_EXEC_SIGNALS_H
 
 // Shared by the standalone exec wrappers (ndsudo, nd-run). These are deliberately dependency-free
-// single-file binaries that do not link libnetdata, so this is a header-only helper.
+// standalone binaries that do not link libnetdata, so this is a header-only helper.
 //
 // Requires POSIX declarations (struct sigaction, sigaction(), sigprocmask()). netdata compiles with
 // gnu* C standards, which expose them; under a strict -std=cNN a caller must define _POSIX_C_SOURCE

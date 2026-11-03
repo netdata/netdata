@@ -142,6 +142,7 @@ func TestFunctionRunFinalizationRetainsPhysicalModuleCleanup(t *testing.T) {
 	handler := newFinalizerTestHandler(release)
 	uids := lifecycle.NewUIDLedger()
 	generation, err := newTestRunGeneration(t, runGenerationConfig{
+		Secrets:         testRunSecrets(t),
 		Generation:      1,
 		Attempts:        attempts,
 		ShutdownTimeout: time.Second,

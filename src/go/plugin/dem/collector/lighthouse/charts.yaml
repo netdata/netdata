@@ -1,0 +1,46 @@
+version: v1
+context_namespace: dem_synthetic
+groups:
+  - family: Execution
+    metrics: [execution_state, duration]
+    charts:
+      - context: execution_state
+        title: Synthetic attempt outcome
+        units: state
+        type: stacked
+        dimensions:
+          - selector: execution_state
+      - context: duration
+        title: Synthetic attempt duration
+        units: milliseconds
+        dimensions:
+          - selector: duration
+            name: duration
+  - family: Desktop lab performance
+    context_namespace: lighthouse
+    metrics: [performance, fcp, lcp, tbt, si, cls]
+    charts:
+      - context: performance
+        title: Lighthouse performance score
+        units: points
+        dimensions:
+          - selector: performance
+            name: performance
+      - context: timings
+        title: Lighthouse lab timings
+        units: milliseconds
+        dimensions:
+          - selector: fcp
+            name: fcp
+          - selector: lcp
+            name: lcp
+          - selector: tbt
+            name: tbt
+          - selector: si
+            name: speed_index
+      - context: cls
+        title: Lighthouse cumulative layout shift
+        units: ratio
+        dimensions:
+          - selector: cls
+            name: cls

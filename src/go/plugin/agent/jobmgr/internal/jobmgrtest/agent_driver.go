@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -22,6 +23,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/dummy"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
+	secretconfig "github.com/netdata/netdata/go/plugins/plugin/agent/secrets"
+	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/backends"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	frameworkfunctions "github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
@@ -183,6 +188,24 @@ func (sb *synchronizedBuffer) String() string {
 	return sb.data.String()
 }
 
+// runningPublication is the CONFIG frame published when the fixture job becomes running.
+const runningPublication = "CONFIG jobmgrtest:collector:jobmgrtest status running"
+
+// runningRecorder records a "running" fixture event for every written
+// runningPublication, ordering it against collector lifecycle events.
+type runningRecorder struct {
+	output *synchronizedBuffer
+	state  *agentFixtureState
+}
+
+func (rr runningRecorder) Write(payload []byte) (int, error) {
+	written, err := rr.output.Write(payload)
+	for range bytes.Count(payload[:written], []byte(runningPublication)) {
+		rr.state.record("running")
+	}
+	return written, err
+}
+
 type observedFunctionResult struct {
 	status       int
 	contentType  string
@@ -306,7 +329,12 @@ func startAgentFixtureConfiguredWithRegistry(
 	if wrapOutput != nil {
 		agentOutput = wrapOutput(output)
 	}
+	secrets, err := fixtureSecrets()
+	if err != nil {
+		return nil, err
+	}
 	instance := agent.New(agent.Config{
+		Secrets:         secrets,
 		Name:            "jobmgrtest",
 		ModuleRegistry:  registry,
 		RunModule:       productionFixtureModule,
@@ -387,58 +415,62 @@ func (f *agentFixture) close() {
 	_ = f.wait(ctx)
 }
 
-func runAgentCollectorLifecycle(ctx context.Context, v2 bool, restart bool) error {
-	fixture, err := startAgentFixture(ctx, v2)
+func runAgentCollectorLifecycle(ctx context.Context, v2 bool) error {
+	state := &agentFixtureState{}
+	fixture, err := startAgentFixtureConfiguredWithRegistry(
+		ctx,
+		state,
+		fixtureRegistry(state, v2),
+		func(output *synchronizedBuffer) io.Writer {
+			return runningRecorder{output: output, state: state}
+		},
+		policy.Agent(true),
+	)
 	if err != nil {
 		return err
 	}
 	defer fixture.close()
 	if err := waitUntil(ctx, func() bool {
-		return fixture.state.count("check") >= 1
+		return state.count("running") >= 1
 	}); err != nil {
 		_ = fixture.input.Close()
 		return fmt.Errorf("collector did not become active: %w", err)
 	}
-	if restart {
-		if err := fixture.agent.Restart(ctx); err != nil {
-			_ = fixture.input.Close()
-			return err
-		}
-		if err := waitUntil(ctx, func() bool {
-			return fixture.state.count("check") >= 2
-		}); err != nil {
-			_ = fixture.input.Close()
-			return fmt.Errorf("replacement collector did not start: %w", err)
-		}
+	if err := fixture.agent.Restart(ctx); err != nil {
+		_ = fixture.input.Close()
+		return err
+	}
+	if err := waitUntil(ctx, func() bool {
+		return state.count("running") >= 2
+	}); err != nil {
+		_ = fixture.input.Close()
+		return fmt.Errorf("replacement collector did not start: %w", err)
 	}
 	if err := fixture.terminate(ctx); err != nil {
 		return err
 	}
-	generations := 1
-	if restart {
-		generations = 2
-	}
+	const generations = 2
 	for _, event := range []string{"init", "check", "cleanup"} {
-		if got := fixture.state.count(event); got < generations {
+		if got := state.count(event); got < generations {
 			return fmt.Errorf(
 				"collector %s count=%d, want at least %d; events=%v",
 				event,
 				got,
 				generations,
-				fixture.state.snapshot(),
+				state.snapshot(),
 			)
 		}
 	}
-	if got := fixture.state.count("cleanup"); got != generations {
+	if got := state.count("cleanup"); got != generations {
 		return fmt.Errorf("collector cleanup count=%d, want %d", got, generations)
 	}
-	if restart {
-		events := fixture.state.snapshot()
-		firstCleanup := indexOf(events, "cleanup", 0)
-		secondInit := indexOf(events, "init", 1)
-		if firstCleanup < 0 || secondInit < 0 || firstCleanup >= secondInit {
-			return fmt.Errorf("replacement initialized before old cleanup: %v", events)
-		}
+	// The replacement's Init and Check may overlap the old generation's
+	// process-owned Cleanup; only its runtime installation waits for it.
+	events := state.snapshot()
+	firstCleanup := indexOf(events, "cleanup", 0)
+	secondRunning := indexOf(events, "running", 1)
+	if firstCleanup < 0 || secondRunning < 0 || firstCleanup >= secondRunning {
+		return fmt.Errorf("replacement became running before old cleanup: %v", events)
 	}
 	return nil
 }
@@ -766,7 +798,7 @@ func runAgentFunctionResultBoundaries(ctx context.Context) error {
 			if _, err := io.WriteString(
 				fixture.input,
 				fmt.Sprintf(
-					"FUNCTION %s 30 %q 0xFFFF %q\n",
+					"FUNCTION %s 30 \"%s\" 0xFFFF \"%s\"\n",
 					largeUID,
 					fmt.Sprintf("jobmgrtest:echo result-deferred:%d", largeDeferredBytes),
 					"method=api,role=test",
@@ -822,7 +854,7 @@ func sendFunctionAndRequireStatus(
 ) error {
 	if _, err := io.WriteString(
 		fixture.input,
-		fmt.Sprintf("FUNCTION %s %s %q 0xFFFF %q\n", uid, timeout, call, "method=api,role=test"),
+		fmt.Sprintf("FUNCTION %s %s \"%s\" 0xFFFF \"%s\"\n", uid, timeout, call, "method=api,role=test"),
 	); err != nil {
 		return err
 	}
@@ -887,7 +919,7 @@ func writeAgentFunctionPayload(
 	value byte,
 ) ([sha256.Size]byte, error) {
 	header := fmt.Sprintf(
-		"FUNCTION_PAYLOAD %s 30 %q 0xFFFF %q %s\n",
+		"FUNCTION_PAYLOAD %s 30 \"%s\" 0xFFFF \"%s\" %s\n",
 		uid,
 		route,
 		"method=api,role=test",
@@ -923,7 +955,7 @@ func writeAgentRawFunctionPayload(
 	payload []byte,
 ) ([sha256.Size]byte, error) {
 	header := fmt.Sprintf(
-		"FUNCTION_PAYLOAD %s 30 %q 0xFFFF %q %s\n",
+		"FUNCTION_PAYLOAD %s 30 \"%s\" 0xFFFF \"%s\" %s\n",
 		uid,
 		route,
 		"method=api,role=test",
@@ -1016,6 +1048,7 @@ func fixtureRegistryWithFunctions(
 		MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
 			return fixtureFunctionHandler{
 				state: state,
+				usage: &fixtureFunctionUsage{},
 			}
 		},
 	}
@@ -1153,6 +1186,12 @@ groups:
 
 type fixtureFunctionHandler struct {
 	state *agentFixtureState
+	usage *fixtureFunctionUsage
+}
+
+type fixtureFunctionUsage struct {
+	active atomic.Int32
+	used   atomic.Bool
 }
 
 func (fixtureFunctionHandler) MethodParams(context.Context, string) ([]funcapi.ParamConfig, error) {
@@ -1164,6 +1203,9 @@ func (ffh fixtureFunctionHandler) Handle(
 	method string,
 	_ funcapi.ResolvedParams,
 ) *funcapi.FunctionResponse {
+	ffh.usage.active.Add(1)
+	ffh.usage.used.Store(true)
+	defer ffh.usage.active.Add(-1)
 	ffh.state.handle(ctx, "handle:"+method)
 	return funcapi.RawResponse(map[string]any{"method": method, "status": 200})
 }
@@ -1172,6 +1214,9 @@ func (ffh fixtureFunctionHandler) HandleRaw(
 	ctx context.Context,
 	request funcapi.RawMethodRequest,
 ) *funcapi.FunctionResponse {
+	ffh.usage.active.Add(1)
+	ffh.usage.used.Store(true)
+	defer ffh.usage.active.Add(-1)
 	ffh.state.handle(ctx, "raw:"+request.Method)
 	if deferred, ok := requestedDeferredBytes(request.Args); ok {
 		const fixedBytes = len(`{"pad":""}`)
@@ -1197,6 +1242,12 @@ func (ffh fixtureFunctionHandler) HandleRaw(
 }
 
 func (ffh fixtureFunctionHandler) Cleanup(context.Context) {
+	if ffh.usage.active.Load() != 0 {
+		ffh.state.record("handler-cleanup-active")
+	}
+	if ffh.usage.used.Load() {
+		ffh.state.record("handler-cleanup-used")
+	}
 	ffh.state.record("handler-cleanup")
 }
 
@@ -1238,4 +1289,16 @@ func indexOf(values []string, value string, occurrence int) int {
 		occurrence--
 	}
 	return -1
+}
+
+func fixtureSecrets() (*secretconfig.Config, error) {
+	resolver, err := secretresolver.NewDefaultAtomicResolver()
+	if err != nil {
+		return nil, err
+	}
+	creators, err := secretstore.NewCreatorCatalog(backends.Creators())
+	if err != nil {
+		return nil, err
+	}
+	return &secretconfig.Config{Resolver: resolver, Creators: creators}, nil
 }

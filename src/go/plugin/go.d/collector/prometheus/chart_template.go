@@ -4,6 +4,7 @@ package prometheus
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
@@ -20,7 +21,9 @@ const chartExpireAfterCycles = 10
 // builds one chart per scraped metric, prefixing the context with the namespace
 // (autogen joins namespace + "." + metric, so the app's separating dot is part
 // of the namespace itself), so contexts match V1 (prometheus[.app].<metric>).
-func newAutogenSpec(app string) charttpl.Spec {
+// counterRawCharts selects counters that also get a raw-value chart
+// (prometheus[.app].<metric>.raw) next to their rate chart.
+func newAutogenSpec(app string, counterRawCharts []string) charttpl.Spec {
 	namespace := "prometheus"
 	if app != "" {
 		namespace = "prometheus." + app
@@ -32,6 +35,7 @@ func newAutogenSpec(app string) charttpl.Spec {
 		Engine: &charttpl.Engine{
 			Autogen: &charttpl.EngineAutogen{
 				Enabled:                  true,
+				CounterRawCharts:         slices.Clone(counterRawCharts),
 				ExpireAfterSuccessCycles: chartExpireAfterCycles,
 			},
 		},
@@ -40,16 +44,16 @@ func newAutogenSpec(app string) charttpl.Spec {
 }
 
 // buildChartTemplate returns the pure-autogen per-job chart template (no profiles).
-func buildChartTemplate(app string) (string, error) {
-	return marshalChartSpec(newAutogenSpec(app))
+func buildChartTemplate(app string, counterRawCharts []string) (string, error) {
+	return marshalChartSpec(newAutogenSpec(app, counterRawCharts))
 }
 
 // buildMergedChartTemplate returns the per-job chart template: the autogen base
 // plus the selected profiles' curated groups appended read-only (autogen stays
 // the fallback for families no profile charts). With no profiles it is identical
 // to buildChartTemplate.
-func buildMergedChartTemplate(app string, profiles []promprofiles.Profile) (string, error) {
-	spec := newAutogenSpec(app)
+func buildMergedChartTemplate(app string, counterRawCharts []string, profiles []promprofiles.Profile) (string, error) {
+	spec := newAutogenSpec(app, counterRawCharts)
 	for _, p := range profiles {
 		if selector := p.AutogenSelector(); selector != nil {
 			spec.Engine.Autogen.Rules = append(spec.Engine.Autogen.Rules, charttpl.EngineAutogenRule{

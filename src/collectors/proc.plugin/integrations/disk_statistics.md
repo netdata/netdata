@@ -32,7 +32,7 @@ Get valuable insight into how your disks are performing and where potential bott
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -41,9 +41,6 @@ This collector supports collecting metrics from multiple instances of this integ
 
 This integration doesn't support auto-detection.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 
@@ -82,8 +79,8 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ 10min_disk_backlog ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.backlog | average backlog size of the ${label:device} disk over the last 10 minutes |
-| [ 10min_disk_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.util | average percentage of time ${label:device} disk was busy over the last 10 minutes |
+| [ 10min_disk_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.util | Average percentage of time ${label:device} disk was busy over the last 10 minutes |
+| [ 10min_disk_backlog ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.backlog | Average backlog size of the ${label:device} disk over the last 10 minutes |
 
 
 
@@ -111,7 +108,7 @@ Metrics:
 
 ### Per disk
 
-
+A block device listed in /proc/diskstats; the `disk_ext` discard charts need Linux 4.18 or later, and their `flushes` dimensions need Linux 5.5 or later.
 
 Labels:
 

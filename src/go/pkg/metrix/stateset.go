@@ -10,12 +10,20 @@ type snapshotStateSetInstrument struct {
 	base    []LabelSet
 }
 
+func (i *snapshotStateSetInstrument) hostScope() HostScope {
+	return i.scope
+}
+
 // statefulStateSetInstrument writes maintained full-state points.
 type statefulStateSetInstrument struct {
 	backend meterBackend
 	desc    *instrumentDescriptor
 	scope   HostScope
 	base    []LabelSet
+}
+
+func (i *statefulStateSetInstrument) hostScope() HostScope {
+	return i.scope
 }
 
 // stagedStateSet holds one in-cycle stateset sample for a single series identity.
@@ -150,7 +158,7 @@ func (c *storeCore) recordStateSetObserve(desc *instrumentDescriptor, scope Host
 			labelsKey:    labelsKey,
 			desc:         desc,
 		}
-		c.active.stateSet[key] = entry
+		stageEntry(&c.active.stateSet, key, entry)
 	}
 	entry.states = states
 }

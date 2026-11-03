@@ -1,0 +1,22 @@
+{
+  "protocol_version": 1,
+  "entrypoint": "runner/run.mjs",
+  "node_major_min": 24,
+  "node_version": "24.20.0",
+  "platforms": [
+    "linux/amd64",
+    "linux/arm64"
+  ],
+  "packages": {
+    "@playwright/test": "1.63.0",
+    "playwright": "1.63.0",
+    "playwright-core": "1.63.0",
+    "lighthouse": "13.4.1",
+    "chrome-launcher": "1.2.1"
+  },
+  "chromium": {
+    "version": "154.0.8037.92",
+    "source": "debian",
+    "package_version": "154.0.8037.92-1~deb13u1"
+  }
+}

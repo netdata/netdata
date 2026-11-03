@@ -202,16 +202,26 @@
       5. If successful, you will receive a new token for Bearer Authentication with your SCIM client.
 
       ### User Keying Between SCIM and OIDC
-      Our SCIM (System for Cross-domain Identity Management) integration utilizes OIDC (OpenID Connect) to authenticate users.
-      To ensure users are correctly identified and authenticated between SCIM and OIDC, we use the following mapping:
+      Users provisioned by SCIM are linked to the account they use for OIDC sign-in:
 
-      - SCIM externalID ↔ OIDC sub
+      - If your IdP can pass the OIDC `sub` claim into provisioning, map SCIM `externalId` ← `sub`. Users link automatically with no extra steps.
+      - If it cannot (e.g. Microsoft Entra), map `externalId` to any stable user identifier instead. Users are then linked by **e-mail address** — this requires the DNS TXT verification record for your e-mail domain (**Space settings → User Management → Authentication & Authorization → DNS TXT record**), and the provisioned e-mail must be the same address your IdP sends as the OIDC `email` claim. Without the DNS record, provisioning a user who already signed in with OIDC fails with `409 Conflict`.
 
-      This mapping ensures that the identity of users remains consistent and secure across both systems.
+      With the `sub` mapping, linking is automatic in both provisioning orders. With e-mail linking, users who signed in with OIDC before being provisioned are linked automatically; users provisioned first confirm a one-time "link your account" e-mail at their first sign-in.
 
-      **Important**: Ensure that your OIDC and SCIM systems follow this mapping strictly.
-      The externalID in SCIM must correspond to the subfield in OIDC. Any deviation from this mapping may result
-      in incorrect user identification and authentication failures.
+      #### Microsoft Entra ID
+
+      Entra cannot map `externalId` to the OIDC `sub` claim, so use e-mail linking:
+
+      1. Add the DNS TXT verification record for your e-mail domain (see above).
+      2. Leave the OIDC app registration unchanged (scopes `openid email profile`), and make sure the `email` claim is emitted for all users.
+      3. Set the Netdata SCIM app's attribute mappings:
+
+      | Netdata SCIM attribute | Microsoft Entra source |
+      | :-- | :-- |
+      | `externalId` (matching attribute) | `objectId` (change from the default `mailNickname`) |
+      | `userName` | `userPrincipalName` |
+      | `emails[type eq "work"].value` | `mail` |
 
       ## Supported SCIM User properties
 

@@ -1431,7 +1431,16 @@ paths:
             default: 1
         - name: group_options
           in: query
-          description: Additional options for the grouping function.
+          description: >-
+            Additional options for the grouping function. `percentage-of-samples` (alias
+            `countif`), `percentage-of-time`, `number-of-flaps` and `number-of-times` take a
+            condition: an optional operator (`>`, `>=` or `>:`, `<`, `<=` or `<:`, `=`, `==` or
+            `:`, `!=`, `!:`, `!` or `<>`) followed by a number, a gap token (`gap`, `nan`, `null`,
+            `empty`) or the previous collected sample (`previous`, `last`). A bare value means
+            equality; omitted or empty input means `==0`; an operator without a value applies to
+            zero. There are no and/or compounds. `trimmed-mean`, `trimmed-median` and `percentile`
+            take a number. For `percentage-of-time`, uncollected time always remains in the
+            denominator and enters the numerator only when the condition matches gaps.
           required: false
           allowEmptyValue: true
           schema:
@@ -1668,7 +1677,18 @@ paths:
             default: 1
         - name: group_options
           in: query
-          description: Additional options for the time-series grouping function. Format depends on the selected group method.
+          description: >-
+            Additional options for the time-series grouping function. Format depends on the
+            selected group method: `percentage-of-samples` (alias `countif`),
+            `percentage-of-time`, `number-of-flaps` and `number-of-times` take a condition - an
+            optional operator (`>`, `>=` or `>:`, `<`, `<=` or `<:`, `=`, `==` or `:`, `!=`,
+            `!:`, `!` or `<>`) followed by a number, a gap token (`gap`, `nan`, `null`, `empty`) or the
+            previous collected sample (`previous`, `last`). A bare value means equality; omitted
+            or empty input means `==0`; an operator without a value applies to zero. There are no
+            and/or compounds;
+            `trimmed-mean`, `trimmed-median` and `percentile` take a number. For
+            `percentage-of-time`, uncollected time always remains in the denominator and enters
+            the numerator only when the condition matches gaps.
           required: false
           allowEmptyValue: true
           schema:
@@ -2280,7 +2300,7 @@ paths:
         - f_type: Filter by alert type (e.g., "System", "Database", "Network")
         - f_role: Filter by recipient role (who should be notified)
         - f_class: Filter by alert classification
-        - f_component: Filter by system component
+        - f_component: Filter by alert component
         - f_node: Filter by specific node hostname
         - f_alert: Filter by alert name
         - f_instance: Filter by chart instance name
@@ -2288,7 +2308,7 @@ paths:
 
         **Examples:**
         1. Recent critical transitions: `?last=100&f_status=CRITICAL`
-        2. Database alerts: `?f_component=Database&after=-86400`
+        2. Database alerts: `?f_type=Database&after=-86400`
         3. Specific alert history: `?f_alert=disk_space_usage&last=50`
         4. Node-specific transitions: `?f_node=web-server-01&after=-604800`
 
@@ -2597,16 +2617,16 @@ paths:
           description: |
             **Facet Filter:** Filter transitions by alert type.
 
-            Alert types categorize alerts by what they monitor (e.g., "System", "Database", "Web Server").
+            Alert types categorize alerts by the technology domain they monitor (e.g., "System", "Database", "Web Server").
 
             **Format:** Comma-separated list of alert type names
 
             **Common Alert Types:**
-            - `System` - System-level alerts (CPU, RAM, load)
-            - `Database` - Database monitoring alerts
-            - `Web Server` - Web server alerts (Nginx, Apache)
-            - `Network` - Network-related alerts
-            - `Storage` - Storage and disk alerts
+            - `System` - Host operating system resources (CPU, memory, disks, filesystems, host networking)
+            - `Database` - Databases, key-value stores and search engines
+            - `Web Server` - Web servers, proxies and gateways (NGINX, Apache)
+            - `Network` - Network devices and network infrastructure services
+            - `Storage` - Storage systems and storage services (Ceph, HDFS, object storage)
 
             **Examples:**
             - `f_type=System` - Only system alerts
@@ -2617,7 +2637,7 @@ paths:
             - Filter by technology stack (databases, web servers, etc.)
             - Team-specific alert filtering
 
-            **Note:** The exact type values depend on your alert configurations. Query `/api/v3/alerts` to see available types in your installation.
+            **Note:** Stock alerts use the types documented in the health configuration reference (`src/health/REFERENCE.md`); your own alert configurations may use other values. Query `/api/v3/alerts` to see the types in your installation.
 
             When not specified, transitions of all types are included.
           required: false
@@ -2689,22 +2709,22 @@ paths:
         - name: f_component
           in: query
           description: |
-            **Facet Filter:** Filter transitions by system component.
+            **Facet Filter:** Filter transitions by alert component.
 
-            Components identify which part of the system the alert relates to (e.g., "Network", "Disk", "Memory").
+            Components narrow the alert type: the subsystem for `System` and `Netdata` alerts (e.g., "Network", "Disk", "Memory"), the component kind, management interface, device class or check kind for `Kubernetes`, `Hardware` and `Synthetic` alerts (e.g., "Kubelet", "Redfish", "HTTP endpoint"), otherwise the product, service or protocol (e.g., "PostgreSQL", "Redis", "BGP"). The health configuration reference (`src/health/REFERENCE.md`) lists the rules.
 
             **Format:** Comma-separated list of component names
 
             **Common Components:**
-            - `Network` - Network-related alerts
-            - `Disk` - Disk/storage alerts
+            - `Network` - Host networking alerts
+            - `Disk` - Disk alerts
             - `Memory` - Memory alerts
             - `CPU` - CPU alerts
-            - `Database` - Database component alerts
+            - `PostgreSQL` - PostgreSQL alerts
 
             **Examples:**
             - `f_component=Disk` - Only disk-related transitions
-            - `f_component=Network,Disk` - Network and disk alerts
+            - `f_component=Network,Disk` - Host networking and disk alerts
 
             **Use Cases:**
             - Component-specific incident investigation
@@ -6419,7 +6439,7 @@ paths:
 
         **Security Features:**
         - Random session key verification prevents unauthorized claiming
-        - Key is regenerated after each claim attempt (successful or failed)
+        - Key is regenerated after a claim attempt that presented the correct key, and on a successful claim (a wrong key does not regenerate it)
         - Key stored in file system requires server access to retrieve
         - Parameter validation ensures only safe characters (alphanumeric, dots, commas, dashes, colons, slashes, underscores)
         - Different OS-specific commands for key retrieval (Linux/Docker/Windows)
@@ -6432,7 +6452,7 @@ paths:
         **Response Formats:**
         - **Info Response:** Returns cloud status, can_be_claimed flag, verification command, and agents info
         - **Success Response:** Includes success=true, message="ok", updated cloud status
-        - **Error Response:** Includes success=false, error message, can_be_claimed flag, new verification key
+        - **Error Response:** Includes success=false, error message, and can_be_claimed flag
 
         **Important Notes:**
         - Agent must be in AVAILABLE, OFFLINE, or INDIRECT state to be claimed
@@ -6440,7 +6460,7 @@ paths:
         - Base URL typically points to Netdata Cloud API (e.g., https://api.netdata.cloud)
         - Rooms parameter is optional - agent will be added to specified war rooms if provided
         - After successful claiming, agent automatically reloads connection and waits for online status
-        - Failed claim attempts regenerate the verification key for security
+        - Claim attempts that present the correct key regenerate the verification key for security; a wrong key does not
 
         **Example Workflow:**
         ```bash
@@ -6478,9 +6498,9 @@ paths:
             4. Use it in the claim request
 
             **Security Notes:**
-            - Key is randomly generated on each info request
-            - Key is regenerated after each claim attempt (prevents reuse)
-            - Mismatched key triggers new key generation (prevents brute force)
+            - Key is generated at startup (and on an info request if none exists yet)
+            - Key is regenerated after a claim attempt that presented the correct key, and on a successful claim (prevents reuse)
+            - A mismatched key does NOT regenerate it: the endpoint is unauthenticated, so a wrong key must not be able to reset the challenge
             - Validates server ownership through file system access
 
             **When to Include:**
@@ -9213,7 +9233,11 @@ components:
           - ses
           - des
           - cv
+          - percentage-of-samples
           - countif
+          - percentage-of-time
+          - number-of-flaps
+          - number-of-times
           - percentile
           - percentile25
           - percentile50
@@ -9266,7 +9290,11 @@ components:
           - ses
           - des
           - cv
+          - percentage-of-samples
           - countif
+          - percentage-of-time
+          - number-of-flaps
+          - number-of-times
           - percentile
           - percentile25
           - percentile50
@@ -9303,16 +9331,32 @@ components:
       name: group_options
       in: query
       description: |
-        When the time grouping function supports additional parameters, this field can be used to pass them to it. Currently `countif`, `trimmed-mean`, `trimmed-median` and `percentile` support this. For `countif` the string may start with `<`, `<=`, `<:`, `<>`, `!=`, `>`, `>=`, `>:`. For all others just a number is expected.
+        When the time grouping function supports additional parameters, this field can be used to pass them to it. `percentage-of-samples` (alias `countif`), `percentage-of-time`, `number-of-flaps` and `number-of-times` take a CONDITION; `trimmed-mean`, `trimmed-median` and `percentile` take a number.
+        A condition is an operator followed by a value. The operators are `>`, `>=` (or `>:`), `<`, `<=` (or `<:`), `=` (or `==` or `:`) and `!=` (or `!:`, `!` or `<>`); with no operator the value compares equal. The value is one of:
+        - a number, e.g. `>10`
+        - a gap token - `gap`, `nan`, `null` or `empty` are synonyms for "no data was collected", e.g. `==gap` matches the slots with no data and `!=gap` matches the collected ones. For `percentage-of-samples`, `number-of-flaps` and `number-of-times`, naming a gap token is what makes gaps participate at all; without one they are invisible for these three aggregations. `percentage-of-time` always counts uncollected time in its denominator, whatever the condition compares against.
+        - the previous collected sample - `previous` or `last`, e.g. `<previous` matches every sample lower than the one before it, which counts counter resets (reboots). Gaps are skipped, so a drop across a gap is still a drop, and the first sample of a query never matches.
+        An omitted, empty or whitespace-only condition means `==0`. An operator without a value applies to zero, so `>` means `>0`.
+        There are no and/or compounds.
+        Over a window long enough to read lower-resolution data `percentage-of-time`, `number-of-flaps` and `number-of-times` return estimates. `percentage-of-time` is exact over whole stored intervals for a fully collected 0-or-1 signal sampled at a steady cadence. Partial intervals, cadence changes and other signals or conditions are approximate. Gaps hidden inside a stored interval can overstate availability and understate missing time. `number-of-flaps` and `number-of-times` are exact only when each stored interval contains at most one relevant transition or match; otherwise they report at most one event for that interval. Every result bucket covering the same stored interval reports that interval's estimate. `percentage-of-time` always measures against the SELECTED duration, not against the collected part of it. When gaps remain separately represented in storage, uncollected time does not enter the numerator for a numeric condition, so a window with one matching sample and the rest missing answers a small percentage, not 100%. A condition such as `==gap` or `==null` includes uncollected time in the numerator instead. `percentage-of-samples` does not estimate and stays blind to gaps unless the condition names one - it evaluates each stored point as one sample. Use `tier=0` for the highest-resolution available result. When the response includes `db.per_tier`, such as with `format=json2`, inspect it to verify the selected tier; exactness still depends on the stored interval resolution.
       required: false
+      allowEmptyValue: true
       schema:
         type: string
     dataTimeGroupOptions2:
       name: time_group_options
       in: query
       description: |
-        When the time grouping function supports additional parameters, this field can be used to pass them to it. Currently `countif`, `trimmed-mean`, `trimmed-median` and `percentile` support this. For `countif` the string may start with `<`, `<=`, `<:`, `<>`, `!=`, `>`, `>=`, `>:`. For all others just a number is expected.
+        When the time grouping function supports additional parameters, this field can be used to pass them to it. `percentage-of-samples` (alias `countif`), `percentage-of-time`, `number-of-flaps` and `number-of-times` take a CONDITION; `trimmed-mean`, `trimmed-median` and `percentile` take a number.
+        A condition is an operator followed by a value. The operators are `>`, `>=` (or `>:`), `<`, `<=` (or `<:`), `=` (or `==` or `:`) and `!=` (or `!:`, `!` or `<>`); with no operator the value compares equal. The value is one of:
+        - a number, e.g. `>10`
+        - a gap token - `gap`, `nan`, `null` or `empty` are synonyms for "no data was collected", e.g. `==gap` matches the slots with no data and `!=gap` matches the collected ones. For `percentage-of-samples`, `number-of-flaps` and `number-of-times`, naming a gap token is what makes gaps participate at all; without one they are invisible for these three aggregations. `percentage-of-time` always counts uncollected time in its denominator, whatever the condition compares against.
+        - the previous collected sample - `previous` or `last`, e.g. `<previous` matches every sample lower than the one before it, which counts counter resets (reboots). Gaps are skipped, so a drop across a gap is still a drop, and the first sample of a query never matches.
+        An omitted, empty or whitespace-only condition means `==0`. An operator without a value applies to zero, so `>` means `>0`.
+        There are no and/or compounds.
+        Over a window long enough to read lower-resolution data `percentage-of-time`, `number-of-flaps` and `number-of-times` return estimates. `percentage-of-time` is exact over whole stored intervals for a fully collected 0-or-1 signal sampled at a steady cadence. Partial intervals, cadence changes and other signals or conditions are approximate. Gaps hidden inside a stored interval can overstate availability and understate missing time. `number-of-flaps` and `number-of-times` are exact only when each stored interval contains at most one relevant transition or match; otherwise they report at most one event for that interval. Every result bucket covering the same stored interval reports that interval's estimate. `percentage-of-time` always measures against the SELECTED duration, not against the collected part of it. When gaps remain separately represented in storage, uncollected time does not enter the numerator for a numeric condition, so a window with one matching sample and the rest missing answers a small percentage, not 100%. A condition such as `==gap` or `==null` includes uncollected time in the numerator instead. `percentage-of-samples` does not estimate and stays blind to gaps unless the condition names one - it evaluates each stored point as one sample. Use `tier=0` for the highest-resolution available result. When the response includes `db.per_tier`, such as with `format=json2`, inspect it to verify the selected tier; exactness still depends on the stored interval resolution.
       required: false
+      allowEmptyValue: true
       schema:
         type: string
     dataLimit:

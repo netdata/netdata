@@ -2,6 +2,8 @@
 
 #include "ml_config.h"
 
+#include <cmath>
+
 static void ml_config_migrate() {
     const char *config_section_ml = CONFIG_SECTION_ML;
     
@@ -62,10 +64,10 @@ static void ml_config_migrate() {
     
     // Write new configuration values
     char window_str[32];
-    snprintf(window_str, sizeof(window_str), "%ldh", training_window / 3600);
+    snprintf(window_str, sizeof(window_str), "%" PRId64 "h", (int64_t)(training_window / 3600));
     inicfg_set(&netdata_config, config_section_ml, "training window", window_str);
     
-    snprintf(window_str, sizeof(window_str), "%ldm", min_training_window / 60);
+    snprintf(window_str, sizeof(window_str), "%" PRId64 "m", (int64_t)(min_training_window / 60));
     inicfg_set(&netdata_config, config_section_ml, "min training window", window_str);
     
     inicfg_set_number(&netdata_config, config_section_ml, "max training vectors", max_training_vectors);
@@ -91,8 +93,8 @@ static void ml_config_migrate() {
     nd_log(NDLS_DAEMON, NDLP_NOTICE,
            "ML configuration migrated from sample-based to time-based:");
     nd_log(NDLS_DAEMON, NDLP_NOTICE,
-           "  Training window: %ld seconds (%ld hours) - was %u samples at %ld second intervals",
-           training_window, training_window / 3600, old_max_train_samples, global_update_every);
+           "  Training window: %" PRId64 " seconds (%" PRId64 " hours) - was %u samples at %" PRId64 " second intervals",
+           (int64_t)training_window, (int64_t)(training_window / 3600), old_max_train_samples, (int64_t)global_update_every);
     nd_log(NDLS_DAEMON, NDLP_NOTICE,
            "  Target training vectors: %zu - calculated from smoothing and sampling",
            max_training_vectors);
@@ -107,6 +109,20 @@ ml_config_t Cfg;
 template <typename T>
 static T clamp(const T& Value, const T& Min, const T& Max) {
   return std::max(Min, std::min(Value, Max));
+}
+
+static constexpr double ML_DIMENSION_ANOMALY_SCORE_THRESHOLD_DEFAULT = 0.99;
+
+/*
+ * A model's anomaly score is capped at 100 and a dimension is anomalous only
+ * when every model scores at least 100 * threshold, so a threshold above 1.00
+ * can never be reached.
+ */
+double ml_config_dimension_anomaly_score_threshold(double configured) {
+    if (std::isnan(configured))
+        return ML_DIMENSION_ANOMALY_SCORE_THRESHOLD_DEFAULT;
+
+    return clamp(configured, 0.01, 1.00);
 }
 
 /*
@@ -138,7 +154,8 @@ void ml_config_load(ml_config_t *cfg) {
 
     unsigned max_kmeans_iters = inicfg_get_number(&netdata_config, config_section_ml, "maximum number of k-means iterations", 1000);
 
-    double dimension_anomaly_rate_threshold = inicfg_get_double(&netdata_config, config_section_ml, "dimension anomaly score threshold", 0.99);
+    double configured_dimension_anomaly_score_threshold = inicfg_get_double(
+        &netdata_config, config_section_ml, "dimension anomaly score threshold", ML_DIMENSION_ANOMALY_SCORE_THRESHOLD_DEFAULT);
 
     double host_anomaly_rate_threshold = inicfg_get_double(&netdata_config, config_section_ml, "host anomaly rate threshold", 1.0);
     std::string anomaly_detection_grouping_method = inicfg_get(&netdata_config, config_section_ml, "anomaly detection grouping method", "average");
@@ -183,7 +200,12 @@ void ml_config_load(ml_config_t *cfg) {
 
     max_kmeans_iters = clamp(max_kmeans_iters, 500u, 1000u);
 
-    dimension_anomaly_rate_threshold = clamp(dimension_anomaly_rate_threshold, 0.01, 5.00);
+    double dimension_anomaly_score_threshold =
+        ml_config_dimension_anomaly_score_threshold(configured_dimension_anomaly_score_threshold);
+    if (dimension_anomaly_score_threshold != configured_dimension_anomaly_score_threshold)
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "ML: dimension anomaly score threshold %.10g is outside the range 0.01 - 1.00, using %.10g",
+               configured_dimension_anomaly_score_threshold, dimension_anomaly_score_threshold);
 
     host_anomaly_rate_threshold = clamp(host_anomaly_rate_threshold, 0.1, 10.0);
     anomaly_detection_query_duration = clamp<time_t>(anomaly_detection_query_duration, 60, 15 * 60);
@@ -199,7 +221,7 @@ void ml_config_load(ml_config_t *cfg) {
      */
 
     if (min_training_window >= training_window) {
-        netdata_log_error("invalid min/max training window found (%ld >= %ld)", min_training_window, training_window);
+        netdata_log_error("invalid min/max training window found (%" PRId64 " >= %" PRId64 ")", (int64_t)min_training_window, (int64_t)training_window);
 
         min_training_window = 1 * 3600;
         training_window = 6 * 3600;
@@ -228,8 +250,26 @@ void ml_config_load(ml_config_t *cfg) {
     cfg->host_anomaly_rate_threshold = host_anomaly_rate_threshold;
     cfg->anomaly_detection_grouping_method =
         time_grouping_parse(anomaly_detection_grouping_method.c_str(), RRDR_GROUPING_AVERAGE);
+
+    // the expression groupings need a condition, and this path has no way
+    // to carry one (ad_charts.cc queries with NULL options), so accepting
+    // them here would silently apply their default condition
+    switch(cfg->anomaly_detection_grouping_method) {
+        case RRDR_GROUPING_COUNTIF:
+        case RRDR_GROUPING_PERCENTAGE_OF_TIME:
+        case RRDR_GROUPING_NUMBER_OF_FLAPS:
+        case RRDR_GROUPING_NUMBER_OF_TIMES:
+            netdata_log_error(
+                "ML: anomaly detection grouping method '%s' requires a condition, which cannot be given here - using 'average'",
+                anomaly_detection_grouping_method.c_str());
+            cfg->anomaly_detection_grouping_method = RRDR_GROUPING_AVERAGE;
+            break;
+
+        default:
+            break;
+    }
     cfg->anomaly_detection_query_duration = anomaly_detection_query_duration;
-    cfg->dimension_anomaly_score_threshold = dimension_anomaly_rate_threshold;
+    cfg->dimension_anomaly_score_threshold = dimension_anomaly_score_threshold;
 
     cfg->hosts_to_skip = inicfg_get(&netdata_config, config_section_ml, "hosts to skip from training", "!*");
     cfg->sp_host_to_skip = simple_pattern_create(cfg->hosts_to_skip.c_str(), NULL, SIMPLE_PATTERN_EXACT, true);

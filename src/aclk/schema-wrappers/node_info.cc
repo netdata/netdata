@@ -108,8 +108,10 @@ char *generate_update_node_info_message(size_t *len, struct update_node_info *in
 
     *len = PROTO_COMPAT_MSG_SIZE(msg);
     char *bin = (char*)mallocz(*len);
-    if (bin)
-        msg.SerializeToArray(bin, *len);
+    if (!msg.SerializeToArray(bin, *len)) {
+        freez(bin);
+        return NULL;
+    }
 
     return bin;
 }
@@ -136,8 +138,10 @@ char *generate_update_node_collectors_message(size_t *len, struct update_node_co
 
     *len = PROTO_COMPAT_MSG_SIZE(msg);
     char *bin = (char*)mallocz(*len);
-    if (bin)
-        msg.SerializeToArray(bin, *len);
+    if (!msg.SerializeToArray(bin, *len)) {
+        freez(bin);
+        return NULL;
+    }
 
     return bin;
 }

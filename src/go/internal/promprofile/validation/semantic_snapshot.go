@@ -410,7 +410,9 @@ func semanticChartPolicies(
 			}
 			if chart.Lifecycle != nil {
 				policy.MaxInstances = chart.Lifecycle.MaxInstances
-				policy.ExpireAfterCycles = chart.Lifecycle.ExpireAfterCycles
+				if chart.Lifecycle.ExpireAfterCycles != nil {
+					policy.ExpireAfterCycles = new(*chart.Lifecycle.ExpireAfterCycles)
+				}
 				if chart.Lifecycle.Dimensions != nil {
 					policy.MaxDimensions = chart.Lifecycle.Dimensions.MaxDims
 					policy.DimensionExpiry = chart.Lifecycle.Dimensions.ExpireAfterCycles

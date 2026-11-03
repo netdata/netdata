@@ -63,7 +63,6 @@ modules:
         list:
           - name: Collect Diagnostics for Netdata Support
             description: For SNMP metrics, BGP, licensing, or topology issues, follow [Collect SNMP troubleshooting data](/docs/npm/device-metrics/collect-snmp-troubleshooting-data.md) to include built-in diagnostics in a support bundle. SNMP evidence is unsanitized; share the bundle through a restricted Netdata Support ticket.
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -109,7 +108,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -157,7 +155,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -205,7 +202,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -253,7 +249,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -302,7 +297,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -352,7 +346,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -399,7 +392,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -445,7 +437,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -492,7 +483,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -541,7 +531,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -590,7 +579,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -637,7 +625,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -684,7 +671,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -731,7 +717,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -783,7 +768,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -830,7 +814,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -880,7 +863,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -929,7 +911,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -976,7 +957,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1025,7 +1005,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1073,7 +1052,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1121,7 +1099,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1170,7 +1147,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1218,7 +1194,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1268,7 +1243,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1319,7 +1293,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1365,7 +1338,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1412,7 +1384,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1461,7 +1432,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1509,7 +1479,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1557,7 +1526,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1603,7 +1571,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1650,7 +1617,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1697,7 +1663,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1745,7 +1710,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1793,7 +1757,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1841,7 +1804,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1888,7 +1850,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1936,7 +1897,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1982,7 +1942,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -2029,7 +1988,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -2077,7 +2035,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -2131,7 +2088,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -2178,7 +2134,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -2225,7 +2180,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -2278,7 +2232,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -2330,7 +2283,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -2382,7 +2334,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -2435,7 +2386,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -2488,7 +2438,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -2541,7 +2490,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -2594,7 +2542,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -2641,7 +2588,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -2689,7 +2635,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -2743,7 +2688,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -2792,7 +2736,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -2841,7 +2784,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -2894,7 +2836,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -2947,7 +2888,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -2996,7 +2936,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -3050,7 +2989,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -3102,7 +3040,14 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
+    alerts:
+      - snmp_cisco_nexus_vpc_peer_keepalive
+      - snmp_cisco_nexus_vpc_dual_active
+      - snmp_cisco_nexus_vpc_member_consistency
+      - snmp_cisco_nexus_hsrp_not_active_standby
+      - snmp_cisco_nexus_bfd_session_down
+      - snmp_cisco_nexus_ntp_not_synchronized
+      - snmp_cisco_nexus_feature_enabled_not_running
     metrics:
       folding:
         title: Metrics
@@ -3156,7 +3101,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -3205,7 +3149,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -3259,7 +3202,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -3311,7 +3253,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -3363,7 +3304,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -3416,7 +3356,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -3464,7 +3403,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -3514,7 +3452,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -3560,7 +3497,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -3607,7 +3543,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -3657,7 +3592,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -3706,7 +3640,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -3753,7 +3686,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -3801,7 +3733,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -3848,7 +3779,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -3900,7 +3830,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -3947,7 +3876,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -3998,7 +3926,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -4046,7 +3973,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -4093,7 +4019,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -4141,7 +4066,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -4190,7 +4114,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -4239,7 +4162,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -4287,7 +4209,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -4335,7 +4256,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -4388,7 +4308,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -4436,7 +4355,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -4484,7 +4402,17 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
+    alerts:
+      - fortigate_hw_sensor_alarm
+      - fortigate_ha_node_out_of_sync
+      - fortigate_ha_node_cpu_high
+      - fortigate_ha_node_memory_high
+      - fortigate_sdwan_link_dead
+      - fortigate_sdwan_link_latency_high
+      - fortigate_sdwan_link_packet_loss
+      - fortigate_ips_critical_events
+      - fortigate_link_monitor_dead
+      - fortigate_wireless_ap_offline
     metrics:
       folding:
         title: Metrics
@@ -4534,7 +4462,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -4580,7 +4507,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -4628,7 +4554,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -4679,7 +4604,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -4726,7 +4650,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -4774,7 +4697,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -4822,7 +4744,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -4870,7 +4791,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -4920,7 +4840,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -4970,7 +4889,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -5021,7 +4939,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -5068,7 +4985,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -5116,7 +5032,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -5170,7 +5085,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -5217,7 +5131,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -5265,7 +5178,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -5312,7 +5224,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -5361,7 +5272,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -5411,7 +5321,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -5458,7 +5367,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -5505,7 +5413,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -5556,7 +5463,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -5604,7 +5510,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -5653,7 +5558,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -5703,7 +5607,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -5752,7 +5655,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -5806,7 +5708,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -5859,7 +5760,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -5908,7 +5808,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -5959,7 +5858,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -6010,7 +5908,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -6061,7 +5958,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -6107,7 +6003,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -6155,7 +6050,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -6205,7 +6099,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -6251,7 +6144,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -6298,7 +6190,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -6346,7 +6237,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -6393,7 +6283,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -6443,7 +6332,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -6491,7 +6379,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -6538,7 +6425,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -6587,7 +6473,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -6634,7 +6519,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -6682,7 +6566,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -6728,7 +6611,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -6777,7 +6659,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -6826,7 +6707,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -6878,7 +6758,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -6924,7 +6803,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -6973,7 +6851,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -7021,7 +6898,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -7070,7 +6946,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -7119,7 +6994,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -7167,7 +7041,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -7218,7 +7091,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -7266,7 +7138,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -7314,7 +7185,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -7361,7 +7231,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -7408,7 +7277,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -7454,7 +7322,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -7501,7 +7368,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -7549,7 +7415,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -7596,7 +7461,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -7645,7 +7509,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -7692,7 +7555,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -7740,7 +7602,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -7788,7 +7649,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -7835,7 +7695,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -7883,7 +7742,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -7931,7 +7789,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -7980,7 +7837,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -8028,7 +7884,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -8075,7 +7930,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -8123,7 +7977,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -8170,7 +8023,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -8218,7 +8070,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -8267,7 +8118,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -8315,7 +8165,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -8362,7 +8211,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -8410,7 +8258,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -8457,7 +8304,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -8504,7 +8350,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -8550,7 +8395,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -8600,7 +8444,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -8647,7 +8490,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -8694,7 +8536,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -8742,7 +8583,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics: &id003
       folding:
         title: Metrics
@@ -8790,7 +8630,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics: *id003
   - meta:
       plugin_name: go.d.plugin
@@ -8832,7 +8671,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics: *id003
   - meta:
       plugin_name: go.d.plugin
@@ -8874,7 +8712,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics: *id003
   - meta:
       plugin_name: go.d.plugin
@@ -8916,7 +8753,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics: *id003
   - meta:
       plugin_name: go.d.plugin
@@ -8958,7 +8794,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics: *id003
   - meta:
       plugin_name: go.d.plugin
@@ -9000,7 +8835,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics: *id003
   - meta:
       plugin_name: go.d.plugin
@@ -9042,7 +8876,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics: *id003
   - meta:
       plugin_name: go.d.plugin
@@ -9084,7 +8917,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics: *id003
   - meta:
       plugin_name: go.d.plugin
@@ -9126,7 +8958,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics: *id003
   - meta:
       plugin_name: go.d.plugin
@@ -9168,7 +8999,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics: *id003
   - meta:
       plugin_name: go.d.plugin
@@ -9211,7 +9041,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics: *id003
   - meta:
       plugin_name: go.d.plugin
@@ -9254,7 +9083,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics: *id003
   - meta:
       plugin_name: go.d.plugin
@@ -9297,7 +9125,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics: *id003
   - meta:
       plugin_name: go.d.plugin
@@ -9340,7 +9167,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics: *id003
   - meta:
       plugin_name: go.d.plugin
@@ -9383,7 +9209,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics: *id003
   - meta:
       plugin_name: go.d.plugin
@@ -9426,7 +9251,6 @@ modules:
           description: ''
     setup: *id001
     troubleshooting: *id002
-    alerts: []
     metrics: *id003
   - meta:
       plugin_name: go.d.plugin
@@ -9494,7 +9318,6 @@ modules:
           list: []
       single_job: true
     troubleshooting: *id002
-    alerts: []
     metrics: *id003
   - meta:
       plugin_name: go.d.plugin
@@ -9536,7 +9359,6 @@ modules:
           description: ''
     setup: *id004
     troubleshooting: *id002
-    alerts: []
     metrics: *id003
   - meta:
       plugin_name: go.d.plugin
@@ -9579,7 +9401,6 @@ modules:
           description: ''
     setup: *id004
     troubleshooting: *id002
-    alerts: []
     metrics: *id003
   - meta:
       plugin_name: go.d.plugin
@@ -9621,7 +9442,6 @@ modules:
           description: ''
     setup: *id004
     troubleshooting: *id002
-    alerts: []
     metrics: *id003
   - meta:
       plugin_name: go.d.plugin
@@ -9663,7 +9483,6 @@ modules:
           description: ''
     setup: *id004
     troubleshooting: *id002
-    alerts: []
     metrics: *id003
   - meta:
       plugin_name: go.d.plugin
@@ -9707,7 +9526,6 @@ modules:
           description: ''
     setup: *id004
     troubleshooting: *id002
-    alerts: []
     metrics: *id003
   - meta:
       plugin_name: go.d.plugin
@@ -9750,7 +9568,6 @@ modules:
           description: ''
     setup: *id004
     troubleshooting: *id002
-    alerts: []
     metrics: *id003
   - meta:
       plugin_name: network-viewer.plugin
@@ -9825,7 +9642,6 @@ modules:
     troubleshooting: &id005
       problems:
         list: []
-    alerts: []
     metrics: *id003
   - meta:
       plugin_name: netdata
@@ -9885,7 +9701,6 @@ modules:
             enabled: true
           list: []
     troubleshooting: *id005
-    alerts: []
     metrics: *id003
   - meta:
       plugin_name: go.d.plugin
@@ -9951,7 +9766,6 @@ modules:
               description: The three required fields plus `collect_network_topology`, which is off by default and is what adds the network and port-group actors to the map.
               config: "jobs:\n  - name: vcenter\n    url: https://vcenter.example.com\n    username: netdata@vsphere.local\n    password: SECRET\n    collect_network_topology: yes\n"
     troubleshooting: *id005
-    alerts: []
     metrics: *id003
   - meta:
       plugin_name: go.d.plugin
@@ -10015,7 +9829,6 @@ modules:
               description: The two required fields. `url` defaults to the Cato public GraphQL endpoint, and `update_every` must be at least 60.
               config: "jobs:\n  - name: cato\n    account_id: \"12345\"\n    api_key: SECRET\n"
     troubleshooting: *id005
-    alerts: []
     metrics: *id003
   - meta:
       plugin_name: otel.plugin
@@ -10071,24 +9884,24 @@ modules:
         file:
           name: otel.yaml
         options:
-          description: The syslog receiver itself is configured on the OpenTelemetry Collector, not in the Agent. Use `otel.yaml` only to change the Agent's OTLP endpoint or retention. A ready-to-use syslog pipeline is in [Syslog via the OpenTelemetry Collector](/docs/npm/syslog/otel-collector.md). The endpoint listens on loopback by default, which accepts only local senders. Running the Collector on another host means binding a non-loopback address, and an OTLP endpoint reachable off-host must be protected with TLS or mutual TLS (`endpoint.tls_cert_path`, `endpoint.tls_key_path`, and `endpoint.tls_ca_cert_path` for mTLS) plus network access controls — otherwise anyone who can reach it can inject telemetry. Note that `auth.enabled` selects the tenant; it does not authenticate the sender. Prefer keeping the Collector on the same host as the Agent.
+          description: The syslog receiver itself is configured on the OpenTelemetry Collector, not in the Agent. Use `otel.yaml` only to change the Agent's OTLP endpoint or retention. A ready-to-use syslog pipeline is in [Syslog via the OpenTelemetry Collector](/docs/npm/syslog/otel-collector.md). The endpoint listens on loopback by default, which accepts only local senders. Running the Collector on another host means binding a non-loopback address, and an OTLP endpoint reachable off-host must be protected with TLS or mutual TLS (`receivers.otlp.protocols.grpc.tls.cert_file`, `receivers.otlp.protocols.grpc.tls.key_file`, and `receivers.otlp.protocols.grpc.tls.client_ca_file` for mTLS) plus network access controls — otherwise anyone who can reach it can inject telemetry. Prefer keeping the Collector on the same host as the Agent.
           folding:
             title: Config options
             enabled: true
           list:
-            - name: endpoint.path
+            - name: receivers.otlp.protocols.grpc.endpoint
               description: OTLP/gRPC endpoint the Agent listens on. The default accepts only local senders; bind a non-loopback address to accept a Collector on another host, and protect it when you do.
               default_value: 127.0.0.1:4317
               required: false
-            - name: endpoint.tls_cert_path
-              description: Server TLS certificate. Set together with `endpoint.tls_key_path`.
+            - name: receivers.otlp.protocols.grpc.tls.cert_file
+              description: Server TLS certificate. Set together with `receivers.otlp.protocols.grpc.tls.key_file`.
               default_value: ''
               required: false
-            - name: endpoint.tls_key_path
+            - name: receivers.otlp.protocols.grpc.tls.key_file
               description: Server TLS private key.
               default_value: ''
               required: false
-            - name: endpoint.tls_ca_cert_path
+            - name: receivers.otlp.protocols.grpc.tls.client_ca_file
               description: CA certificate used to verify client certificates. Setting it enables mutual TLS and therefore also requires the server certificate and key.
               default_value: ''
               required: false
@@ -10101,9 +9914,8 @@ modules:
               folding:
                 enabled: false
               description: Binds a routable address and requires client certificates, so only Collectors holding a certificate signed by your CA can send. Without the TLS keys this endpoint would accept telemetry from anyone who can reach it.
-              config: "endpoint:\n  path: 0.0.0.0:4317\n  tls_cert_path: /etc/netdata/ssl/otel.crt\n  tls_key_path: /etc/netdata/ssl/otel.key\n  tls_ca_cert_path: /etc/netdata/ssl/ca.crt\n"
+              config: "receivers:\n  otlp:\n    protocols:\n      grpc:\n        endpoint: 0.0.0.0:4317\n        tls:\n          cert_file: /etc/netdata/ssl/otel.crt\n          key_file: /etc/netdata/ssl/otel.key\n          client_ca_file: /etc/netdata/ssl/ca.crt\n"
     troubleshooting: *id005
-    alerts: []
     metrics: *id003
   - meta:
       plugin_name: go.d.plugin
@@ -10173,7 +9985,6 @@ modules:
               description: 'A single listener on the standard trap port, accepting any SNMPv1/v2c community. `listen` is required: without an endpoint the job binds nothing. Restrict the allowlist for production.'
               config: "jobs:\n  - name: local\n    listen:\n      endpoints:\n        - protocol: udp\n          address: 0.0.0.0\n          port: 162\n    versions:\n      - v1\n      - v2c\n"
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -10222,7 +10033,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -10271,7 +10081,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -10321,7 +10130,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -10370,7 +10178,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -10419,7 +10226,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -10468,7 +10274,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -10517,7 +10322,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -10566,7 +10370,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -10615,7 +10418,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -10664,7 +10466,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -10713,7 +10514,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -10762,7 +10562,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -10811,7 +10610,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -10860,7 +10658,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -10909,7 +10706,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -10958,7 +10754,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -11007,7 +10802,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -11056,7 +10850,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -11105,7 +10898,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -11154,7 +10946,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -11203,7 +10994,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -11252,7 +11042,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -11301,7 +11090,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -11350,7 +11138,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -11399,7 +11186,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -11448,7 +11234,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -11497,7 +11282,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -11546,7 +11330,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -11595,7 +11378,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -11644,7 +11426,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -11693,7 +11474,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -11742,7 +11522,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -11791,7 +11570,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -11840,7 +11618,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -11889,7 +11666,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -11938,7 +11714,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -11987,7 +11762,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -12036,7 +11810,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -12085,7 +11858,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -12134,7 +11906,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -12183,7 +11954,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -12232,7 +12002,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -12281,7 +12050,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -12330,7 +12098,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -12379,7 +12146,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -12428,7 +12194,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -12477,7 +12242,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -12526,7 +12290,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -12575,7 +12338,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -12624,7 +12386,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -12673,7 +12434,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -12722,7 +12482,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -12771,7 +12530,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -12820,7 +12578,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -12869,7 +12626,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -12918,7 +12674,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -12967,7 +12722,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -13016,7 +12770,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -13065,7 +12818,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -13114,7 +12866,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -13163,7 +12914,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -13212,7 +12962,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -13261,7 +13010,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -13310,7 +13058,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -13359,7 +13106,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -13408,7 +13154,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -13457,7 +13202,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -13506,7 +13250,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -13555,7 +13298,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -13604,7 +13346,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -13653,7 +13394,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -13702,7 +13442,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -13751,7 +13490,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -13800,7 +13538,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -13849,7 +13586,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -13898,7 +13634,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -13947,7 +13682,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -13996,7 +13730,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -14045,7 +13778,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -14094,7 +13826,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -14143,7 +13874,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -14192,7 +13922,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -14241,7 +13970,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -14290,7 +14018,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -14339,7 +14066,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -14388,7 +14114,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -14437,7 +14162,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -14486,7 +14210,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -14535,7 +14258,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -14584,7 +14306,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -14633,7 +14354,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -14682,7 +14402,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -14731,7 +14450,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -14780,7 +14498,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -14829,7 +14546,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -14878,7 +14594,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -14927,7 +14642,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -14976,7 +14690,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -15025,7 +14738,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -15074,7 +14786,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -15123,7 +14834,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -15172,7 +14882,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -15221,7 +14930,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -15270,7 +14978,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -15319,7 +15026,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -15368,7 +15074,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -15417,7 +15122,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -15466,7 +15170,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -15515,7 +15218,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -15564,7 +15266,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -15613,7 +15314,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -15662,7 +15362,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -15711,7 +15410,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -15760,7 +15458,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -15809,7 +15506,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -15858,7 +15554,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -15907,7 +15602,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -15956,7 +15650,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -16005,7 +15698,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -16054,7 +15746,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -16103,7 +15794,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -16152,7 +15842,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -16201,7 +15890,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -16250,7 +15938,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -16299,7 +15986,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -16348,7 +16034,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -16397,7 +16082,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -16446,7 +16130,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -16495,7 +16178,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -16544,7 +16226,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -16593,7 +16274,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -16642,7 +16322,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -16691,7 +16370,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -16740,7 +16418,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -16789,7 +16466,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -16838,7 +16514,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -16887,7 +16562,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -16936,7 +16610,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -16985,7 +16658,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -17034,7 +16706,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -17083,7 +16754,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -17132,7 +16802,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -17181,7 +16850,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -17230,7 +16898,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -17279,7 +16946,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -17328,7 +16994,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -17377,7 +17042,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -17426,7 +17090,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -17475,7 +17138,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -17524,7 +17186,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -17573,7 +17234,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -17622,7 +17282,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -17671,7 +17330,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -17720,7 +17378,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -17769,7 +17426,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -17818,7 +17474,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -17867,7 +17522,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -17916,7 +17570,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -17968,7 +17621,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -18017,7 +17669,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -18066,7 +17717,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -18115,7 +17765,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -18164,7 +17813,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -18213,7 +17861,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -18262,7 +17909,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -18311,7 +17957,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -18360,7 +18005,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -18409,7 +18053,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -18458,7 +18101,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -18507,7 +18149,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -18556,7 +18197,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -18605,7 +18245,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -18654,7 +18293,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -18703,7 +18341,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -18752,7 +18389,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -18801,7 +18437,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -18850,7 +18485,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -18899,7 +18533,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -18948,7 +18581,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -18997,7 +18629,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -19046,7 +18677,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -19095,7 +18725,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -19144,7 +18773,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -19193,7 +18821,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -19242,7 +18869,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -19291,7 +18917,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -19340,7 +18965,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -19389,7 +19013,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -19438,7 +19061,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -19487,7 +19109,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -19536,7 +19157,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -19585,7 +19205,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -19634,7 +19253,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -19683,7 +19301,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -19732,7 +19349,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -19781,7 +19397,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -19830,7 +19445,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -19879,7 +19493,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -19928,7 +19541,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -19977,7 +19589,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -20026,7 +19637,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -20075,7 +19685,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -20125,7 +19734,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -20174,7 +19782,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -20223,7 +19830,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -20272,7 +19878,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -20321,7 +19926,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -20370,7 +19974,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -20419,7 +20022,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -20468,7 +20070,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -20517,7 +20118,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -20566,7 +20166,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -20615,7 +20214,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -20664,7 +20262,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -20713,7 +20310,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -20762,7 +20358,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -20811,7 +20406,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -20860,7 +20454,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -20909,7 +20502,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -20958,7 +20550,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -21007,7 +20598,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -21056,7 +20646,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -21105,7 +20694,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -21154,7 +20742,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -21203,7 +20790,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -21252,7 +20838,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -21301,7 +20886,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -21350,7 +20934,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -21399,7 +20982,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -21448,7 +21030,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -21497,7 +21078,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -21546,7 +21126,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -21595,7 +21174,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -21644,7 +21222,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -21693,7 +21270,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -21742,7 +21318,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -21791,7 +21366,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -21840,7 +21414,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -21889,7 +21462,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -21938,7 +21510,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -21987,7 +21558,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -22036,7 +21606,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -22085,7 +21654,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -22134,7 +21702,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -22183,7 +21750,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -22232,7 +21798,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -22281,7 +21846,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -22330,7 +21894,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -22379,7 +21942,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -22428,7 +21990,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -22477,7 +22038,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -22526,7 +22086,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -22575,7 +22134,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -22624,7 +22182,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -22673,7 +22230,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -22722,7 +22278,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -22771,7 +22326,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -22820,7 +22374,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -22869,7 +22422,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -22918,7 +22470,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -22967,7 +22518,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -23016,7 +22566,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -23065,7 +22614,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -23114,7 +22662,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -23163,7 +22710,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -23212,7 +22758,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -23261,7 +22806,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -23310,7 +22854,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -23359,7 +22902,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -23408,7 +22950,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -23457,7 +22998,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -23506,7 +23046,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -23555,7 +23094,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -23604,7 +23142,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -23653,7 +23190,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -23702,7 +23238,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -23751,7 +23286,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -23800,7 +23334,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -23849,7 +23382,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -23898,7 +23430,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -23947,7 +23478,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -23996,7 +23526,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -24045,7 +23574,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -24094,7 +23622,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -24143,7 +23670,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -24192,7 +23718,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -24241,7 +23766,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -24290,7 +23814,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -24339,7 +23862,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -24388,7 +23910,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -24437,7 +23958,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -24486,7 +24006,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -24535,7 +24054,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -24584,7 +24102,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -24633,7 +24150,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -24682,7 +24198,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -24731,7 +24246,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -24780,7 +24294,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -24829,7 +24342,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -24878,7 +24390,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -24927,7 +24438,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -24976,7 +24486,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -25025,7 +24534,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -25074,7 +24582,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -25123,7 +24630,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -25172,7 +24678,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -25221,7 +24726,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -25270,7 +24774,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -25319,7 +24822,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -25368,7 +24870,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -25417,7 +24918,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -25466,7 +24966,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -25515,7 +25014,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -25564,7 +25062,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -25613,7 +25110,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -25662,7 +25158,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -25711,7 +25206,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -25760,7 +25254,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -25809,7 +25302,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -25858,7 +25350,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -25907,7 +25398,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -25956,7 +25446,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -26005,7 +25494,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -26055,7 +25543,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -26104,7 +25591,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -26153,7 +25639,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -26203,7 +25688,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -26252,7 +25736,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -26301,7 +25784,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -26350,7 +25832,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -26402,7 +25883,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -26451,7 +25931,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -26500,7 +25979,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -26549,7 +26027,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -26598,7 +26075,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -26647,7 +26123,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -26696,7 +26171,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -26745,7 +26219,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -26794,7 +26267,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -26843,7 +26315,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -26892,7 +26363,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -26941,7 +26411,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -26990,7 +26459,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -27039,7 +26507,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -27088,7 +26555,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -27137,7 +26603,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -27186,7 +26651,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -27235,7 +26699,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -27284,7 +26747,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -27333,7 +26795,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -27382,7 +26843,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -27431,7 +26891,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -27480,7 +26939,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -27529,7 +26987,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -27578,7 +27035,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -27627,7 +27083,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -27676,7 +27131,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -27725,7 +27179,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -27774,7 +27227,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -27823,7 +27275,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -27872,7 +27323,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -27921,7 +27371,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -27970,7 +27419,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -28019,7 +27467,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -28068,7 +27515,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -28117,7 +27563,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -28166,7 +27611,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -28215,7 +27659,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -28264,7 +27707,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -28313,7 +27755,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -28362,7 +27803,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -28411,7 +27851,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -28460,7 +27899,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -28509,7 +27947,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -28558,7 +27995,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -28607,7 +28043,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -28656,7 +28091,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -28705,7 +28139,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -28754,7 +28187,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -28803,7 +28235,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -28852,7 +28283,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -28901,7 +28331,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -28950,7 +28379,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -28999,7 +28427,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -29048,7 +28475,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -29097,7 +28523,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -29146,7 +28571,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -29195,7 +28619,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -29244,7 +28667,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -29293,7 +28715,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -29342,7 +28763,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -29391,7 +28811,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -29440,7 +28859,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -29489,7 +28907,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -29538,7 +28955,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -29587,7 +29003,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -29636,7 +29051,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -29685,7 +29099,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -29734,7 +29147,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -29783,7 +29195,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -29832,7 +29243,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -29881,7 +29291,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -29930,7 +29339,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -29979,7 +29387,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -30028,7 +29435,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -30077,7 +29483,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -30126,7 +29531,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -30175,7 +29579,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -30224,7 +29627,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -30273,7 +29675,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -30322,7 +29723,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -30371,7 +29771,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -30420,7 +29819,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -30469,7 +29867,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -30518,7 +29915,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -30567,7 +29963,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -30616,7 +30011,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -30665,7 +30059,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -30714,7 +30107,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -30763,7 +30155,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -30812,7 +30203,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -30861,7 +30251,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -30910,7 +30299,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -30959,7 +30347,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -31008,7 +30395,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -31057,7 +30443,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -31106,7 +30491,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -31155,7 +30539,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -31204,7 +30587,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -31253,7 +30635,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -31302,7 +30683,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -31351,7 +30731,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -31400,7 +30779,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -31449,7 +30827,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -31498,7 +30875,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -31547,7 +30923,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -31596,7 +30971,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -31645,7 +31019,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -31694,7 +31067,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -31743,7 +31115,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -31792,7 +31163,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -31841,7 +31211,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -31890,7 +31259,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -31939,7 +31307,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -31988,7 +31355,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -32037,7 +31403,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -32086,7 +31451,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -32135,7 +31499,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -32184,7 +31547,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -32233,7 +31595,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -32282,7 +31643,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -32331,7 +31691,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -32380,7 +31739,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -32429,7 +31787,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -32478,7 +31835,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -32527,7 +31883,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -32576,7 +31931,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -32625,7 +31979,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -32674,7 +32027,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -32723,7 +32075,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -32772,7 +32123,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -32821,7 +32171,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -32870,7 +32219,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -32919,7 +32267,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -32968,7 +32315,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -33017,7 +32363,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -33066,7 +32411,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -33115,7 +32459,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -33164,7 +32507,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -33213,7 +32555,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -33262,7 +32603,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -33311,7 +32651,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -33360,7 +32699,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -33409,7 +32747,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -33458,7 +32795,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -33507,7 +32843,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -33556,7 +32891,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -33605,7 +32939,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -33654,7 +32987,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -33703,7 +33035,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -33752,7 +33083,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -33801,7 +33131,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -33850,7 +33179,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -33899,7 +33227,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -33948,7 +33275,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -33997,7 +33323,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -34046,7 +33371,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -34095,7 +33419,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -34144,7 +33467,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -34193,7 +33515,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -34242,7 +33563,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -34291,7 +33611,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -34341,7 +33660,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -34390,7 +33708,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -34439,7 +33756,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -34488,7 +33804,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -34537,7 +33852,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -34586,7 +33900,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -34635,7 +33948,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -34684,7 +33996,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -34733,7 +34044,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -34782,7 +34092,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -34831,7 +34140,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -34880,7 +34188,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -34929,7 +34236,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -34978,7 +34284,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -35027,7 +34332,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -35076,7 +34380,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -35125,7 +34428,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -35174,7 +34476,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -35223,7 +34524,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -35272,7 +34572,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -35321,7 +34620,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -35370,7 +34668,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -35419,7 +34716,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -35468,7 +34764,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -35517,7 +34812,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -35566,7 +34860,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -35615,7 +34908,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -35664,7 +34956,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -35713,7 +35004,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -35762,7 +35052,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -35811,7 +35100,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -35860,7 +35148,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -35909,7 +35196,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -35958,7 +35244,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -36007,7 +35292,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -36056,7 +35340,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -36105,7 +35388,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -36154,7 +35436,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -36203,7 +35484,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -36252,7 +35532,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -36301,7 +35580,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -36350,7 +35628,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -36399,7 +35676,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -36448,7 +35724,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -36497,7 +35772,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -36546,7 +35820,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -36595,7 +35868,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -36644,7 +35916,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -36693,7 +35964,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -36742,7 +36012,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -36791,7 +36060,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -36840,7 +36108,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -36889,7 +36156,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -36938,7 +36204,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -36987,7 +36252,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -37036,7 +36300,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -37085,7 +36348,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -37134,7 +36396,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -37183,7 +36444,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -37232,7 +36492,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -37281,7 +36540,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -37330,7 +36588,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -37379,7 +36636,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -37428,7 +36684,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -37477,7 +36732,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -37526,7 +36780,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -37575,7 +36828,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -37624,7 +36876,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -37673,7 +36924,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -37722,7 +36972,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -37771,7 +37020,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -37820,7 +37068,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -37869,7 +37116,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -37918,7 +37164,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -37967,7 +37212,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -38016,7 +37260,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -38065,7 +37308,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -38114,7 +37356,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -38163,7 +37404,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -38212,7 +37452,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -38261,7 +37500,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -38310,7 +37548,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -38359,7 +37596,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -38408,7 +37644,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -38457,7 +37692,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -38506,7 +37740,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -38555,7 +37788,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -38604,7 +37836,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -38653,7 +37884,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -38702,7 +37932,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -38751,7 +37980,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -38800,7 +38028,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -38849,7 +38076,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -38898,7 +38124,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -38947,7 +38172,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -38996,7 +38220,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -39045,7 +38268,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -39094,7 +38316,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -39143,7 +38364,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -39192,7 +38412,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -39241,7 +38460,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -39290,7 +38508,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -39339,7 +38556,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -39388,7 +38604,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -39437,7 +38652,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -39486,7 +38700,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -39535,7 +38748,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -39584,7 +38796,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -39633,7 +38844,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -39682,7 +38892,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -39731,7 +38940,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -39780,7 +38988,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -39829,7 +39036,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -39878,7 +39084,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -39927,7 +39132,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -39976,7 +39180,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -40025,7 +39228,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -40074,7 +39276,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -40123,7 +39324,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -40172,7 +39372,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -40221,7 +39420,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -40270,7 +39468,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -40319,7 +39516,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -40368,7 +39564,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -40417,7 +39612,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -40466,7 +39660,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -40515,7 +39708,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -40564,7 +39756,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -40613,7 +39804,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -40662,7 +39852,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -40711,7 +39900,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -40760,7 +39948,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -40809,7 +39996,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -40858,7 +40044,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -40907,7 +40092,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -40956,7 +40140,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -41005,7 +40188,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -41054,7 +40236,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -41103,7 +40284,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -41152,7 +40332,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -41201,7 +40380,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -41250,7 +40428,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -41299,7 +40476,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -41348,7 +40524,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -41397,7 +40572,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -41446,7 +40620,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -41495,7 +40668,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -41544,7 +40716,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -41593,7 +40764,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -41642,7 +40812,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -41691,7 +40860,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -41740,7 +40908,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -41789,7 +40956,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -41838,7 +41004,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -41887,7 +41052,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -41936,7 +41100,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -41985,7 +41148,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -42034,7 +41196,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -42083,7 +41244,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -42132,7 +41292,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -42181,7 +41340,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -42230,7 +41388,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -42279,7 +41436,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -42328,7 +41484,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -42377,7 +41532,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -42426,7 +41580,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -42475,7 +41628,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -42524,7 +41676,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -42573,7 +41724,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -42622,7 +41772,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -42671,7 +41820,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -42720,7 +41868,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -42769,7 +41916,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -42818,7 +41964,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -42868,7 +42013,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -42917,7 +42061,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -42966,7 +42109,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -43015,7 +42157,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -43064,7 +42205,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -43113,7 +42253,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -43162,7 +42301,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -43211,7 +42349,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -43260,7 +42397,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -43309,7 +42445,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -43358,7 +42493,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -43407,7 +42541,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -43456,7 +42589,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -43505,7 +42637,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -43554,7 +42685,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -43603,7 +42733,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -43652,7 +42781,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -43701,7 +42829,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -43750,7 +42877,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -43799,7 +42925,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -43848,7 +42973,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -43897,7 +43021,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -43946,7 +43069,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -43995,7 +43117,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -44044,7 +43165,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -44093,7 +43213,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -44142,7 +43261,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -44191,7 +43309,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -44240,7 +43357,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -44289,7 +43405,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -44338,7 +43453,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -44387,7 +43501,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -44436,7 +43549,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -44485,7 +43597,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -44534,7 +43645,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -44583,7 +43693,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -44632,7 +43741,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -44681,7 +43789,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -44730,7 +43837,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -44779,7 +43885,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -44828,7 +43933,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -44877,7 +43981,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -44926,7 +44029,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -44975,7 +44077,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -45024,7 +44125,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -45073,7 +44173,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -45122,7 +44221,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -45171,7 +44269,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -45220,7 +44317,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -45269,7 +44365,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -45318,7 +44413,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -45367,7 +44461,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -45416,7 +44509,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -45465,7 +44557,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -45514,7 +44605,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -45563,7 +44653,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -45612,7 +44701,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -45661,7 +44749,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -45710,7 +44797,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -45759,7 +44845,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -45808,7 +44893,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -45857,7 +44941,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -45906,7 +44989,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -45955,7 +45037,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -46004,7 +45085,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -46053,7 +45133,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -46102,7 +45181,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -46151,7 +45229,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -46200,7 +45277,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -46249,7 +45325,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -46298,7 +45373,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -46347,7 +45421,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -46396,7 +45469,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -46445,7 +45517,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -46494,7 +45565,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -46543,7 +45613,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -46592,7 +45661,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -46641,7 +45709,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -46690,7 +45757,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -46739,7 +45805,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -46788,7 +45853,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -46837,7 +45901,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -46886,7 +45949,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -46935,7 +45997,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -46984,7 +46045,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -47033,7 +46093,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -47082,7 +46141,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -47131,7 +46189,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -47180,7 +46237,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -47229,7 +46285,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -47278,7 +46333,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -47327,7 +46381,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -47376,7 +46429,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -47425,7 +46477,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -47474,7 +46525,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -47523,7 +46573,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -47572,7 +46621,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -47621,7 +46669,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -47670,7 +46717,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -47719,7 +46765,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -47768,7 +46813,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -47817,7 +46861,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -47866,7 +46909,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -47915,7 +46957,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -47964,7 +47005,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -48013,7 +47053,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -48062,7 +47101,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -48111,7 +47149,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -48160,7 +47197,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -48209,7 +47245,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -48258,7 +47293,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -48307,7 +47341,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -48356,7 +47389,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -48405,7 +47437,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -48454,7 +47485,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -48503,7 +47533,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -48552,7 +47581,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -48601,7 +47629,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -48650,7 +47677,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -48699,7 +47725,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -48748,7 +47773,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -48797,7 +47821,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -48846,7 +47869,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -48895,7 +47917,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -48944,7 +47965,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -48993,7 +48013,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -49042,7 +48061,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -49091,7 +48109,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -49140,7 +48157,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -49189,7 +48205,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -49238,7 +48253,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -49287,7 +48301,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -49336,7 +48349,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -49385,7 +48397,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -49434,7 +48445,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -49483,7 +48493,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -49532,7 +48541,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics: *id003
   - meta:
       plugin_name: go.d.plugin
@@ -49575,7 +48583,6 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics: *id003
   - meta:
       plugin_name: go.d.plugin
@@ -49617,5 +48624,4 @@ modules:
           description: ''
     setup: *id006
     troubleshooting: *id005
-    alerts: []
     metrics: *id003

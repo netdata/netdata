@@ -413,12 +413,17 @@ func (e *Engine) observeBuildSample(sample PlanRuntimeSample) {
 type RuntimeAggregator struct {
 	mu      sync.Mutex
 	metrics *runtimeMetrics
+	batch   metrix.RuntimeBatchWriter
 	samples []PlanRuntimeSample
 }
 
 // NewRuntimeAggregator creates a runtime sample aggregator backed by store.
 func NewRuntimeAggregator(store metrix.RuntimeStore) *RuntimeAggregator {
-	return &RuntimeAggregator{metrics: newRuntimeMetrics(store)}
+	batch, _ := store.(metrix.RuntimeBatchWriter)
+	return &RuntimeAggregator{
+		metrics: newRuntimeMetrics(store),
+		batch:   batch,
+	}
 }
 
 // Observe records one engine build sample.
@@ -453,7 +458,12 @@ func (a *RuntimeAggregator) Flush() {
 	if len(samples) == 0 || a.metrics == nil {
 		return
 	}
-	a.metrics.observeBuildRollup(samples)
+	if a.batch == nil {
+		a.metrics.observeBuildRollup(samples)
+		return
+	}
+	// One flush writes about twenty series; publish them as one runtime snapshot.
+	a.batch.WriteBatch(func() { a.metrics.observeBuildRollup(samples) })
 }
 
 func (m *runtimeMetrics) observeBuildRollup(samples []PlanRuntimeSample) {

@@ -1144,9 +1144,7 @@ END`,
 			run: func(t *testing.T) {
 				mod := &mockModuleV2{
 					initFunc: func(context.Context) error {
-						return retryableTestError{
-							error: errors.New("init failed"),
-						}
+						return collectorapi.TemporaryError(errors.New("init failed"))
 					},
 				}
 				job := NewJobV2(JobV2Config{

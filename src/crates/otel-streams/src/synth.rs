@@ -6,8 +6,7 @@
 //! push exactly N records with controlled timestamps, severities, and field
 //! cardinalities, then assert the query results across forced rotation /
 //! eviction boundaries. Generation is pure (no RNG, no clock): record `i` is a
-//! deterministic function of `i` + params, so the same params always produce
-//! the same corpus.
+//! deterministic function of `i` + params.
 
 use opentelemetry_proto::tonic::logs::v1::LogRecord;
 
@@ -105,7 +104,7 @@ mod tests {
 
     #[test]
     fn field_cardinality_bounds_distinct_host_values() {
-        // 50 records, cardinality 4 → at most 4 distinct host values.
+        // 50 records, cardinality 4 → exactly 4 distinct host values.
         let recs = generate(&params(50, 4));
         let hosts: std::collections::BTreeSet<_> = recs
             .iter()

@@ -113,19 +113,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: upsd_10min_ups_load
-        metric: upsd.ups_load
-        info: "UPS ${label:ups_name} average load over the last 10 minutes"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/upsd.conf
-      - name: upsd_ups_battery_charge
-        metric: upsd.ups_battery_charge
-        info: "UPS ${label:ups_name} average battery charge over the last minute"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/upsd.conf
-      - name: upsd_ups_last_collected_secs
-        metric: upsd.ups_load
-        info: "UPS ${label:ups_name} number of seconds since the last successful data collection"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/upsd.conf
     metrics:
       folding:
         title: Metrics

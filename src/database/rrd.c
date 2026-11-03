@@ -170,6 +170,7 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
         , system_info
         , 1
         , 0
+        , false
     );
     system_tz_free(&tz);
     rrdhost_system_info_free(system_info);

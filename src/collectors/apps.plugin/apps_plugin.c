@@ -209,7 +209,7 @@ static void normalize_utilization(struct target *root) {
     // of course, either way, we disable it just for a single iteration.
 
     kernel_uint_t max_time = os_get_system_cpus() * NSEC_PER_SEC;
-    kernel_uint_t utime = 0, cutime = 0, stime = 0, cstime = 0, gtime = 0, cgtime = 0, minflt = 0, cminflt = 0, majflt = 0, cmajflt = 0;
+    kernel_uint_t utime = 0, cutime = 0, stime = 0, cstime = 0, gtime = 0, cgtime = 0;
 
     if(global_utime > max_time) global_utime = max_time;
     if(global_stime > max_time) global_stime = max_time;
@@ -224,11 +224,6 @@ static void normalize_utilization(struct target *root) {
         cutime  += w->values[PDF_CUTIME];
         cstime  += w->values[PDF_CSTIME];
         cgtime  += w->values[PDF_CGTIME];
-
-        minflt  += w->values[PDF_MINFLT];
-        majflt  += w->values[PDF_MAJFLT];
-        cminflt += w->values[PDF_CMINFLT];
-        cmajflt += w->values[PDF_CMAJFLT];
     }
 
     if(global_utime || global_stime || global_gtime) {

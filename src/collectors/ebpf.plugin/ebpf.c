@@ -994,37 +994,157 @@ static void ebpf_allocate_common_vectors()
 }
 
 /**
+ * Do two paths name the same directory?
+ *
+ * Only used to decide whether to tell the operator that their override was
+ * dropped, so a trailing slash - the common way to write the same directory
+ * differently - must not count as a difference. Anything subtler, like a symlinked
+ * spelling, is not worth resolving here: being wrong costs one log line.
+ */
+static bool ebpf_same_dir(const char *a, const char *b)
+{
+    size_t la = strnlen(a, FILENAME_MAX);
+    size_t lb = strnlen(b, FILENAME_MAX);
+
+    while (la > 1 && a[la - 1] == '/')
+        la--;
+
+    while (lb > 1 && b[lb - 1] == '/')
+        lb--;
+
+    return la == lb && !strncmp(a, b, la);
+}
+
+/**
+ * Resolve a directory the daemon hands us through the environment.
+ *
+ * ebpf.plugin is installed setuid root and executable by the netdata group, so the
+ * environment always reaches us from a caller with fewer privileges than we run
+ * with. Each directory resolved here is one we then load eBPF objects from, or read
+ * configuration out of, as root, so while privileged we ignore what we were handed
+ * and use the compiled-in directory instead.
+ *
+ * Note this is the normal case, not an attack: the daemon drops to its own user
+ * before spawning us, so the exec is privileged on every start. It costs nothing
+ * because the daemon derives what it exports from the same install prefix these
+ * defaults come from - the values normally match. What we no longer follow is a
+ * netdata.conf [directories] override pointing somewhere else, which is exactly the
+ * redirection we must refuse, so the operator is told when it happens.
+ *
+ * @param name        the environment variable naming the directory
+ * @param compiled_in the directory to use when the environment cannot be trusted
+ *
+ * @return the directory to use
+ */
+static char *ebpf_secure_dir_from_env(const char *name, char *compiled_in)
+{
+    char *dir = nd_secure_getenv(name);
+    if (dir && *dir)
+        return dir;
+
+    // We are privileged, so the environment was not trusted (or it was empty).
+    // Report it only when it actually changes the directory we use. The value itself
+    // is deliberately not logged: it is the part a caller controls, and it would let
+    // them write arbitrary bytes, newlines included, into our log.
+    dir = getenv(name);
+    if (dir && *dir && !ebpf_same_dir(dir, compiled_in))
+        netdata_log_error(
+            "EBPF: ignoring %s because we run with elevated privileges and it points elsewhere, using '%s'. "
+            "Relocating a directory of a setuid plugin has to be done through the installation prefix, "
+            "not through netdata.conf.",
+            name,
+            compiled_in);
+
+    return compiled_in;
+}
+
+/**
  * Set global variables reading environment variables
  */
 static void ebpf_set_global_variables()
 {
     // Get environment variables
-    ebpf_plugin_dir = getenv("NETDATA_PLUGINS_DIR");
-    if (!ebpf_plugin_dir)
-        ebpf_plugin_dir = PLUGINS_DIR;
+    ebpf_plugin_dir = ebpf_secure_dir_from_env("NETDATA_PLUGINS_DIR", PLUGINS_DIR);
+    ebpf_user_config_dir = ebpf_secure_dir_from_env("NETDATA_USER_CONFIG_DIR", CONFIG_DIR);
+    ebpf_stock_config_dir = ebpf_secure_dir_from_env("NETDATA_STOCK_CONFIG_DIR", LIBCONFIG_DIR);
+    ebpf_configured_log_dir = ebpf_secure_dir_from_env("NETDATA_LOG_DIR", LOG_DIR);
 
-    ebpf_user_config_dir = getenv("NETDATA_USER_CONFIG_DIR");
-    if (!ebpf_user_config_dir)
-        ebpf_user_config_dir = CONFIG_DIR;
-
-    ebpf_stock_config_dir = getenv("NETDATA_STOCK_CONFIG_DIR");
-    if (!ebpf_stock_config_dir)
-        ebpf_stock_config_dir = LIBCONFIG_DIR;
-
-    ebpf_configured_log_dir = getenv("NETDATA_LOG_DIR");
-    if (!ebpf_configured_log_dir)
-        ebpf_configured_log_dir = LOG_DIR;
-
-    ebpf_nprocs = (int)sysconf(_SC_NPROCESSORS_ONLN);
-    if (ebpf_nprocs < 0) {
+    ebpf_nprocs = libbpf_num_possible_cpus();
+    if (ebpf_nprocs < 1) {
         ebpf_nprocs = NETDATA_MAX_PROCESSOR;
-        netdata_log_error("Cannot identify number of process, using default value %d", ebpf_nprocs);
+        netdata_log_error("Cannot identify number of possible CPUs, using default value %d", ebpf_nprocs);
     }
 
     isrh = get_redhat_release();
     pid_max = os_get_system_pid_max();
     running_on_kernel = ebpf_get_kernel_version();
     ebpf_reset_pid_map_fds();
+}
+
+static const struct option ebpf_long_options[] = {
+    {"process", no_argument, 0, EBPF_MODULE_PROCESS_IDX},
+    {"sync", no_argument, 0, EBPF_MODULE_SYNC_IDX},
+    {"swap", no_argument, 0, EBPF_MODULE_SWAP_IDX},
+    {"vfs", no_argument, 0, EBPF_MODULE_VFS_IDX},
+    {"filesystem", no_argument, 0, EBPF_MODULE_FILESYSTEM_IDX},
+    {"disk", no_argument, 0, EBPF_MODULE_DISK_IDX},
+    {"mount", no_argument, 0, EBPF_MODULE_MOUNT_IDX},
+    {"hardirq", no_argument, 0, EBPF_MODULE_HARDIRQ_IDX},
+    {"softirq", no_argument, 0, EBPF_MODULE_SOFTIRQ_IDX},
+    {"oomkill", no_argument, 0, EBPF_MODULE_OOMKILL_IDX},
+    {"shm", no_argument, 0, EBPF_MODULE_SHM_IDX},
+    {"mdflush", no_argument, 0, EBPF_MODULE_MDFLUSH_IDX},
+    /* Add options with matching enum values; the table order is immaterial. */
+    {"all", no_argument, 0, EBPF_OPTION_ALL_CHARTS},
+    {"version", no_argument, 0, EBPF_OPTION_VERSION},
+    {"help", no_argument, 0, EBPF_OPTION_HELP},
+    {"global", no_argument, 0, EBPF_OPTION_GLOBAL_CHART},
+    {"return", no_argument, 0, EBPF_OPTION_RETURN_MODE},
+    {"legacy", no_argument, 0, EBPF_OPTION_LEGACY},
+    {"core", no_argument, 0, EBPF_OPTION_CORE},
+    {"unittest", no_argument, 0, EBPF_OPTION_UNITTEST},
+    {0, 0, 0, 0}};
+
+/**
+ * Handle informational options before initializing logging or collector state.
+ *
+ * getopt permutes argv on GNU systems, so parse a copied pointer array and restore its globals
+ * before handing the original arguments to the normal parser.
+ */
+static void ebpf_handle_early_info_options(int argc, char **argv)
+{
+    char **argv_copy = malloc(sizeof(*argv_copy) * (size_t)(argc + 1));
+    if (!argv_copy)
+        return;
+
+    memcpy(argv_copy, argv, sizeof(*argv_copy) * (size_t)(argc + 1));
+
+    int original_optind = optind;
+    int original_opterr = opterr;
+    int original_optopt = optopt;
+    char *original_optarg = optarg;
+    optind = 1;
+    opterr = 0;
+
+    int c;
+    while ((c = getopt_long_only(argc, argv_copy, "", ebpf_long_options, NULL)) != -1) {
+        if (c == EBPF_OPTION_VERSION) {
+            free(argv_copy);
+            printf("ebpf.plugin %s\n", NETDATA_VERSION);
+            exit(0);
+        }
+        if (c == EBPF_OPTION_HELP) {
+            free(argv_copy);
+            ebpf_print_help();
+            exit(0);
+        }
+    }
+
+    optind = original_optind;
+    opterr = original_opterr;
+    optopt = original_optopt;
+    optarg = original_optarg;
+    free(argv_copy);
 }
 
 /**
@@ -1037,31 +1157,7 @@ static void ebpf_parse_args(int argc, char **argv)
 {
     int disable_cgroups = 1;
     int freq = 0;
-    int option_index = 0;
     uint64_t select_threads = 0;
-    static struct option long_options[] = {
-        {"process", no_argument, 0, 0},
-        {"sync", no_argument, 0, 0},
-        {"swap", no_argument, 0, 0},
-        {"vfs", no_argument, 0, 0},
-        {"filesystem", no_argument, 0, 0},
-        {"disk", no_argument, 0, 0},
-        {"mount", no_argument, 0, 0},
-        {"hardirq", no_argument, 0, 0},
-        {"softirq", no_argument, 0, 0},
-        {"oomkill", no_argument, 0, 0},
-        {"shm", no_argument, 0, 0},
-        {"mdflush", no_argument, 0, 0},
-        /* INSERT NEW THREADS BEFORE THIS COMMENT TO KEEP COMPATIBILITY WITH enum ebpf_module_indexes */
-        {"all", no_argument, 0, 0},
-        {"version", no_argument, 0, 0},
-        {"help", no_argument, 0, 0},
-        {"global", no_argument, 0, 0},
-        {"return", no_argument, 0, 0},
-        {"legacy", no_argument, 0, 0},
-        {"core", no_argument, 0, 0},
-        {"unittest", no_argument, 0, 0},
-        {0, 0, 0, 0}};
 
     if (argc > 1) {
         int n = (int)str2l(argv[1]);
@@ -1085,11 +1181,11 @@ static void ebpf_parse_args(int argc, char **argv)
     ebpf_load_thread_config();
 
     while (1) {
-        int c = getopt_long_only(argc, argv, "", long_options, &option_index);
+        int c = getopt_long_only(argc, argv, "", ebpf_long_options, NULL);
         if (c == -1)
             break;
 
-        switch (option_index) {
+        switch (c) {
             case EBPF_MODULE_PROCESS_IDX: {
                 select_threads |= 1 << EBPF_MODULE_PROCESS_IDX;
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -1366,7 +1462,7 @@ void ebpf_send_statistic_data()
     ebpf_write_end_chart();
 
     ebpf_write_begin_chart(NETDATA_MONITORING_FAMILY, "monitoring_pid", "");
-    write_chart_dimension("user", ebpf_all_pids_count);
+    write_chart_dimension("user", __atomic_load_n(&ebpf_all_pids_count, __ATOMIC_RELAXED));
     write_chart_dimension("kernel", ebpf_hash_table_pids_count);
     ebpf_write_end_chart();
 
@@ -2015,6 +2111,8 @@ static bool ebpf_all_enabled_threads_stopped(void)
  */
 int main(int argc, char **argv)
 {
+    ebpf_handle_early_info_options(argc, argv);
+
     // Reduce memory footprint:
     // - Single malloc arena avoids fragmentation across 24+ threads
     // - Allocations >1MB use mmap so they're returned to OS on free,
@@ -2052,6 +2150,15 @@ int main(int argc, char **argv)
 
     ebpf_mutex_initialize();
 
+    // Deliberately a plain getenv(), unlike the directories above: unlike them this
+    // has no compiled-in equivalent to fall back to (it is empty by default), and
+    // ignoring it while privileged would silently stop a containerised agent from
+    // reading the host it was pointed at. verify_netdata_host_prefix() below is what
+    // stands in for that: it rejects a prefix that does not stat() as a directory or
+    // that carries a '%'. That is weaker than the treatment the directories get -
+    // it does not check who owns the path - and ebpf_pid_file() builds a root-written
+    // pid file under this prefix, so this remains a known residual to close
+    // separately, not an oversight.
     netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
     if (verify_netdata_host_prefix(true) == -1)
         ebpf_exit(1);

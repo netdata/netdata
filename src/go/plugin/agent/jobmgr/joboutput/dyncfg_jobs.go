@@ -12,7 +12,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
-	frameworkfunctions "github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 	"gopkg.in/yaml.v2"
 )
 
@@ -51,19 +50,22 @@ type JobDependencyIndex interface {
 // DynCfgJobController prepares collector configuration graph/resource
 // transactions. CommandKernel remains the only current-job authority.
 type DynCfgJobController struct {
-	generation    uint64                    // owning run generation
-	pluginName    string                    // owning plugin
-	prefix        string                    // "<plugin>:collector:" ID prefix
-	path          string                    // "/collectors/<plugin>/jobs" config path
-	modules       collectorapi.Registry     // collector registry
-	defaults      confgroup.Registry        // per-module config defaults
-	factory       *Factory                  // job construction factory
-	configModules *ConfigModuleFactory      // short-lived config-probe factory
-	graph         *dyncfg.Graph             // dyncfg graph authority
-	frames        *lifecycle.FrameOwner     // protocol frame sink
-	dependencies  JobDependencyIndex        // secret-dependency index (optional)
-	diagnostics   jobmgr.DiagnosticObserver // operational log sink
-	scheduler     *Scheduler                // tick + retry scheduler
+	generation       uint64                    // owning run generation
+	pluginName       string                    // owning plugin
+	prefix           string                    // "<plugin>:collector:" ID prefix
+	path             string                    // "/collectors/<plugin>/jobs" config path
+	modules          collectorapi.Registry     // collector registry
+	defaults         confgroup.Registry        // per-module config defaults
+	factory          *Factory                  // job construction factory
+	configModules    *ConfigModuleFactory      // short-lived config-probe factory
+	graph            *dyncfg.Graph             // dyncfg graph authority
+	frames           *lifecycle.FrameOwner     // protocol frame sink
+	dependencies     JobDependencyIndex        // secret-dependency index (optional)
+	diagnostics      jobmgr.DiagnosticObserver // operational log sink
+	commands         jobmgr.PreparedCommandPort
+	restartObservers restartObservers
+	scheduler        *Scheduler           // tick + retry scheduler
+	candidates       *candidateController // source selection and activation intent
 }
 
 func NewDynCfgJobController(config DynCfgJobControllerConfig) (*DynCfgJobController, error) {
@@ -90,6 +92,7 @@ func NewDynCfgJobController(config DynCfgJobControllerConfig) (*DynCfgJobControl
 		dependencies:  config.Dependencies,
 		diagnostics:   config.Diagnostics,
 		scheduler:     config.Factory.config.Scheduler,
+		candidates:    newCandidateController(config.Generation),
 	}, nil
 }
 
@@ -100,6 +103,12 @@ func (dcjc *DynCfgJobController) BindBackgroundWorkers(
 ) error {
 	if dcjc == nil || dcjc.scheduler == nil {
 		return errors.New("job output: invalid background worker controller")
+	}
+	dcjc.scheduler.accepted.validWork = dcjc.candidates.valid
+	dcjc.scheduler.accepted.resumeWork = dcjc.retainCandidateResume
+	dcjc.scheduler.retireCandidates = func() {
+		dcjc.candidates.retire()
+		dcjc.restartObservers.retire()
 	}
 	if err := dcjc.scheduler.accepted.bind(
 		dcjc.factory,
@@ -113,13 +122,13 @@ func (dcjc *DynCfgJobController) BindBackgroundWorkers(
 	if err := dcjc.scheduler.bindBackgroundWorkers(
 		commands,
 		dcjc.planAutoDetectionRetry,
-		dcjc.planPendingJob,
 		run,
 		failure,
 	); err != nil {
 		dcjc.scheduler.accepted.stopWorker()
 		return err
 	}
+	dcjc.commands = commands
 	dcjc.bindRuntimeFailures(commands, run, failure)
 	return nil
 }
@@ -145,42 +154,42 @@ func (dcjc *DynCfgJobController) Handle(
 	if dcjc == nil || ctx == nil {
 		return lifecycle.SealedResult{}, errors.New("job output: invalid DynCfg request")
 	}
-	target, result := dcjc.resolveRequest(request)
-	if result.valid {
-		return result.result, nil
+	target, failure := dcjc.resolveRequest(request)
+	if failure.valid {
+		return rejectedResult(failure.failure), nil
 	}
 	switch target.command {
+	case dyncfg.CommandRestart:
+		return dcjc.restart(ctx, request, target)
 	case dyncfg.CommandSchema:
 		if target.creator.JobConfigSchema == "" {
-			return dynCfgMessage(500, fmt.Sprintf("Module %s configuration schema not found.", target.module))
+			return rejectedResult(jobFailure{
+				class:   failureInternal,
+				message: fmt.Sprintf("Module %s configuration schema not found.", target.module),
+			}), nil
 		}
-		return lifecycle.NewSealedResult(200, "application/json", []byte(target.creator.JobConfigSchema))
+		return payloadResult("application/json", []byte(target.creator.JobConfigSchema))
 	case dyncfg.CommandUserconfig:
 		return dcjc.userConfig(request, target)
 	case dyncfg.CommandTest:
 		config, failure := dcjc.parseConfig(request, target.module, target.name)
 		if failure.valid {
-			return failure.result, nil
+			return rejectedResult(failure.failure), nil
 		}
 		if _, err := dcjc.runConfigOperation(ctx, config, configOperationTest, false); err != nil {
 			if ctx.Err() != nil {
 				return lifecycle.SealedResult{}, err
 			}
-			code := 422
-			switch classifyActivationError(err).kind {
-			case activationFailureBusy, activationFailureDeadline, activationFailureQuarantined:
-				code = 503
-			}
-			return dynCfgMessage(code, err.Error())
+			return rejectedResult(testFailure(err)), nil
 		}
-		return dynCfgMessage(200, "")
+		return passedResult(), nil
 	case dyncfg.CommandGet:
 		record, ok := dcjc.graph.Lookup(target.resourceID)
 		if !ok {
-			return dynCfgMessage(
-				404,
-				fmt.Sprintf("The specified module '%s' job '%s' is not registered.", target.module, target.name),
-			)
+			return rejectedResult(jobFailure{
+				class:   failureNotFound,
+				message: fmt.Sprintf("The specified module '%s' job '%s' is not registered.", target.module, target.name),
+			}), nil
 		}
 		config, err := graphRecordConfig(record)
 		if err != nil {
@@ -191,19 +200,11 @@ func (dcjc *DynCfgJobController) Handle(
 			if ctx.Err() != nil {
 				return lifecycle.SealedResult{}, err
 			}
-			code := 500
-			switch classifyActivationError(err).kind {
-			case activationFailureBusy, activationFailureDeadline, activationFailureQuarantined:
-				code = 503
-			}
-			return dynCfgMessage(code, err.Error())
+			return rejectedResult(configurationFailure(err)), nil
 		}
-		return lifecycle.NewSealedResult(200, "application/json", payload)
+		return payloadResult("application/json", payload)
 	default:
-		return dynCfgMessage(
-			501,
-			fmt.Sprintf("Function '%s' command '%s' is not implemented.", DynCfgFunctionName, target.command),
-		)
+		return rejectedResult(notImplementedFailure(target.command)), nil
 	}
 }
 
@@ -219,7 +220,7 @@ func (dcjc *DynCfgJobController) Prepare(
 	}
 	target, failure := dcjc.resolveRequest(request)
 	if failure.valid {
-		transaction, err := dcjc.noop(scope, current, permit, failure.result)
+		transaction, err := dcjc.reject(scope, current, permit, failure.failure)
 		command, resource := dynCfgRequestDiagnosticIdentity(request, scope)
 		return dcjc.observeTransaction(command, resource, transaction, err)
 	}
@@ -243,19 +244,18 @@ func (dcjc *DynCfgJobController) Prepare(
 	case dyncfg.CommandRestart:
 		transaction, err = dcjc.prepareRestart(ctx, target, record, exists, current, scope, permit)
 	case dyncfg.CommandDisable:
-		transaction, err = dcjc.prepareDisable(target, record, exists, current, scope)
+		transaction, err = dcjc.prepareDisable(ctx, target, record, exists, current, scope)
 	case dyncfg.CommandRemove:
-		transaction, err = dcjc.prepareRemove(target, record, exists, current, scope)
+		transaction, err = dcjc.prepareRemove(ctx, target, record, exists, current, scope)
 	default:
-		transaction, err = dcjc.noop(
-			scope,
-			current,
-			permit,
-			mustDynCfgMessage(
-				501,
-				fmt.Sprintf("Function '%s' command '%s' is not implemented.", DynCfgFunctionName, target.command),
-			),
-		)
+		transaction, err = dcjc.reject(scope, current, permit, notImplementedFailure(target.command))
+	}
+	var admission *configAdmissionError
+	if errors.As(err, &admission) && ctx.Err() == nil && !lifecycle.OwnershipRetained(err) {
+		if rejection, ok := preparationFailure(classifyActivationError(err),
+			validationBusyMessage, validationBusyMessage, validationBusyMessage); ok {
+			transaction, err = dcjc.rejectKeeping(scope, current, permit, rejection, dyncfg.Status(record.Status))
+		}
 	}
 	return dcjc.observeTransaction(target.command, target.resourceID, transaction, err)
 }
@@ -282,18 +282,6 @@ func (dcjc *DynCfgJobController) configType(creator collectorapi.Creator) dyncfg
 	return dyncfg.ConfigTypeJob
 }
 
-func dynCfgMessage(code int, message string) (lifecycle.SealedResult, error) {
-	return lifecycle.NewSealedResult(code, "application/json", frameworkfunctions.BuildJSONPayload(code, message))
-}
-
-func mustDynCfgMessage(code int, message string) lifecycle.SealedResult {
-	result, err := dynCfgMessage(code, message)
-	if err != nil {
-		panic(err)
-	}
-	return result
-}
-
 type dynCfgTarget struct {
 	command    dyncfg.Command       // parsed dyncfg command
 	module     string               // collector module name
@@ -302,15 +290,17 @@ type dynCfgTarget struct {
 	creator    collectorapi.Creator // resolved collector creator
 }
 
+// dynCfgFailure is a request that cannot become a command: it is rejected
+// before any state is read.
 type dynCfgFailure struct {
-	valid  bool
-	result lifecycle.SealedResult
+	valid   bool
+	failure jobFailure
 }
 
-func newDynCfgFailure(code int, message string) dynCfgFailure {
+func newDynCfgFailure(class jobFailureClass, message string) dynCfgFailure {
 	return dynCfgFailure{
-		valid:  true,
-		result: mustDynCfgMessage(code, message),
+		valid:   true,
+		failure: jobFailure{class: class, message: message},
 	}
 }
 
@@ -351,7 +341,8 @@ func validateGraphResourcePair(
 		return nil
 	}
 	running := record.Status == dyncfg.StatusRunning.String()
-	if running != (current != nil) {
+	starting := record.Status == dyncfg.StatusAccepted.String()
+	if running && current == nil || current != nil && !running && !starting {
 		return errors.New("job output: DynCfg status differs from current-job slot")
 	}
 	return nil

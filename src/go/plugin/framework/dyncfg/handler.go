@@ -3,7 +3,6 @@
 package dyncfg
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -17,25 +16,24 @@ type Callbacks[C Config] interface {
 	ExtractKey(fn Function) (key, name string, ok bool)
 
 	// ParseAndValidate parses payload into a config with dyncfg metadata set.
-	// Includes all validation (including heavy checks like module instantiation).
+	// Validation is structural only; construction belongs in PrepareUpdate or activation.
 	ParseAndValidate(fn Function, name string) (C, error)
 
 	// ValidateConfigName enforces the domain's config-name policy. Called before
 	// ParseAndValidate so cheap name-format rejections happen without parsing payload.
 	ValidateConfigName(name string) error
 
-	// Start creates a work unit and starts it. Owns the full start lifecycle
-	// including pre-start cleanup and post-fail retry scheduling.
-	// Return CodedError to override the default 422 failure response.
-	// Used by CmdEnable and CmdUpdate (conversion only).
-	Start(fn Function, cfg C) error
+	// Enable adopts enabled intent without performing activation work. The returned
+	// continuation runs only after the acceptance reply and status are published.
+	// An error must leave the incumbent and enabled intent unchanged.
+	Enable(cfg C) (func(), error)
 
-	// Update handles non-conversion config updates (dyncfg->dyncfg).
-	// Called after caches are already updated; the callback owns the runtime
-	// transition semantics.
-	Update(fn Function, oldCfg, newCfg C) error
+	// PrepareUpdate validates an enabled replacement while preserving the incumbent.
+	// It honors fn.Context() and owns cleanup on error; success transfers the
+	// returned activation to the handler for acceptance or disposal.
+	PrepareUpdate(fn Function, oldCfg, newCfg C) (PreparedActivation, error)
 
-	// Stop stops all work and cleans up all component state for a config.
+	// Stop logically revokes work without waiting for physical cleanup.
 	// Safe to call for non-running configs (all ops are no-ops).
 	Stop(cfg C)
 
@@ -50,23 +48,12 @@ type Callbacks[C Config] interface {
 	ConfigType(cfg C) ConfigType
 }
 
-// CodedError allows callbacks to override the default response code.
+// CodedError overrides the response code when a callback error becomes a rejection.
+// Handler uses it for ParseAndValidate and PrepareUpdate. Apply errors propagate
+// to the managed caller without a result, regardless of CodedError.
 type CodedError interface {
 	error
 	DyncfgCode() int
-}
-
-// RetryableError marks errors that should keep job auto-detection retry enabled.
-// The method name is intentionally Netdata-specific to avoid matching unrelated
-// dependency errors that happen to expose Retryable() bool.
-type RetryableError interface {
-	error
-	DyncfgRetryable() bool
-}
-
-func IsRetryableError(err error) bool {
-	var re RetryableError
-	return errors.As(err, &re) && re.DyncfgRetryable()
 }
 
 // HandlerOpts configures the handler with component-specific settings.
@@ -103,7 +90,9 @@ type waitGate[C Config] struct {
 }
 
 func newWaitGate[C Config](keyFn func(cfg C) string) *waitGate[C] {
-	return &waitGate[C]{keyFn: keyFn}
+	return &waitGate[C]{
+		keyFn: keyFn,
+	}
 }
 
 func (wg *waitGate[C]) waitForDecision(cfg C) {
@@ -127,15 +116,6 @@ func (wg *waitGate[C]) waitingForDecision() bool {
 	return waiting
 }
 
-func (wg *waitGate[C]) nextDecision(ctx context.Context, dyncfgCh <-chan Function) (Function, bool) {
-	select {
-	case <-ctx.Done():
-		return Function{}, false
-	case fn := <-dyncfgCh:
-		return fn, true
-	}
-}
-
 func (wg *waitGate[C]) currentKey() string {
 	wg.mu.RLock()
 	key := wg.key
@@ -156,6 +136,15 @@ func (wg *waitGate[C]) clearIfMatch(key string) {
 
 	if wg.key == key {
 		wg.key = ""
+	}
+}
+
+func (wg *waitGate[C]) replace(oldCfg, newCfg C) {
+	oldKey, newKey := wg.keyFor(oldCfg), wg.keyFor(newCfg)
+	wg.mu.Lock()
+	defer wg.mu.Unlock()
+	if wg.key != "" && wg.key == oldKey {
+		wg.key = newKey
 	}
 }
 
@@ -182,7 +171,11 @@ func (h *Handler[C]) RememberDiscoveredConfig(cfg C) {
 // AddDiscoveredConfig upserts a discovered config into Seen and Exposed caches.
 func (h *Handler[C]) AddDiscoveredConfig(cfg C, status Status) *Entry[C] {
 	h.RememberDiscoveredConfig(cfg)
-	entry := &Entry[C]{Cfg: cfg, Status: status}
+	entry := &Entry[C]{
+		Cfg:     cfg,
+		Status:  status,
+		Enabled: status == StatusRunning || status == StatusFailed,
+	}
 	h.exposed.Add(entry)
 	return entry
 }
@@ -214,11 +207,6 @@ func (h *Handler[C]) WaitForDecision(cfg C) {
 // for a matching enable/disable command.
 func (h *Handler[C]) WaitingForDecision() bool {
 	return h.waitGate.waitingForDecision()
-}
-
-// NextWaitDecision blocks until a dyncfg command arrives or ctx is canceled.
-func (h *Handler[C]) NextWaitDecision(ctx context.Context, dyncfgCh <-chan Function) (Function, bool) {
-	return h.waitGate.nextDecision(ctx, dyncfgCh)
 }
 
 // SyncDecision updates wait-state based on the incoming command.
@@ -296,247 +284,53 @@ func (h *Handler[C]) configSupportedCommands(cfg C, isDyncfg bool) string {
 	return JoinCommands(cmds...)
 }
 
-// CmdAdd handles the "add" command.
-func (h *Handler[C]) CmdAdd(fn Function) {
-	key, name, code, msg := h.addRejection(fn)
-	if code != 0 {
-		h.api.SendCodef(fn, code, "%s", msg)
-		return
-	}
+// Direct command wrappers serve standalone users; managed callers use Prepare.
+func (h *Handler[C]) CmdAdd(fn Function)     { h.execute(fn) }
+func (h *Handler[C]) CmdEnable(fn Function)  { h.execute(fn) }
+func (h *Handler[C]) CmdDisable(fn Function) { h.execute(fn) }
+func (h *Handler[C]) CmdRemove(fn Function)  { h.execute(fn) }
+func (h *Handler[C]) CmdUpdate(fn Function)  { h.execute(fn) }
 
-	newCfg, err := h.cb.ParseAndValidate(fn, name)
+func (h *Handler[C]) execute(fn Function) {
+	prepared, err := h.Prepare(fn)
 	if err != nil {
-		h.api.SendCodef(fn, callbackErrorCode(err, 400), "%v", err)
+		h.api.SendCodef(fn, 500, "%v", err)
 		return
 	}
-	if h.cb.ConfigType(newCfg) != ConfigTypeJob {
-		h.api.SendCodef(fn, 405, "adding configurations of type '%s' is not supported, only 'job' configurations can be added.", h.cb.ConfigType(newCfg))
+	applied, err := prepared.Apply(fn.Context())
+	if err != nil {
+		h.api.SendCodef(fn, 500, "%v", err)
 		return
 	}
-	if err := h.ValidateConfigCreate(newCfg, StatusAccepted); err != nil {
-		h.api.SendCodef(fn, 400, "configuration cannot be represented in the plugins.d CONFIG protocol: %v", err)
-		return
+	if fn.UID() != "" {
+		h.api.output.FunctionResult(applied.Result)
 	}
-
-	if existing, ok := h.exposed.LookupByKey(key); ok {
-		if _, found := h.seen.Lookup(existing.Cfg); found && existing.Cfg.SourceType() == "dyncfg" {
-			h.seen.Remove(existing.Cfg)
-		}
-		h.exposed.Remove(existing.Cfg)
-		h.cb.Stop(existing.Cfg)
+	for _, notification := range applied.Notifications {
+		notification.Emit(h.api.output)
 	}
-
-	h.seen.Add(newCfg)
-	h.exposed.Add(&Entry[C]{Cfg: newCfg, Status: StatusAccepted})
-	h.api.SendCodef(fn, 202, "")
-	h.NotifyConfigCreate(newCfg, StatusAccepted)
+	if applied.Published != nil {
+		applied.Published()
+	}
 }
 
-// CmdEnable handles the "enable" command.
-func (h *Handler[C]) CmdEnable(fn Function) {
-	key, _, ok := h.cb.ExtractKey(fn)
-	if !ok {
-		h.api.SendCodef(fn, 400, "invalid config ID format.")
-		return
+// SetStatus replaces the current immutable snapshot after the caller has checked
+// its runtime generation. Config identity prevents publication for replaced input.
+// It returns true only when the status changed; duplicate events retain the snapshot.
+func (h *Handler[C]) SetStatus(cfg C, status Status) bool {
+	entry, ok := h.exposed.LookupByKey(cfg.ExposedKey())
+	if !ok || entry.Cfg.UID() != cfg.UID() || entry.Cfg.Hash() != cfg.Hash() || entry.Status == status {
+		return false
 	}
-
-	entry, ok := h.exposed.LookupByKey(key)
-	if !ok {
-		h.api.SendCodef(fn, 404, "config not found.")
-		return
-	}
-
-	oldStatus := entry.Status
-
-	switch entry.Status {
-	case StatusRunning:
-		h.api.SendCodef(fn, 200, "")
-		h.NotifyConfigStatus(entry.Cfg, StatusRunning)
-		return
-	case StatusAccepted, StatusDisabled, StatusFailed:
-		// proceed to start
-	default:
-		h.api.SendCodef(fn, 405, "enabling is not allowed in '%s' state.", entry.Status)
-		h.NotifyConfigStatus(entry.Cfg, entry.Status)
-		return
-	}
-
-	err := h.cb.Start(fn, entry.Cfg)
-	if err != nil {
-		entry.Status = StatusFailed
-
-		code := 422
-		if ce, ok := errors.AsType[CodedError](err); ok {
-			code = ce.DyncfgCode()
-		}
-		h.api.SendCodef(fn, code, "%v", err)
-		h.NotifyConfigStatus(entry.Cfg, StatusFailed)
-
-		h.cb.OnStatusChange(entry, oldStatus, fn)
-		return
-	}
-
-	entry.Status = StatusRunning
-	h.api.SendCodef(fn, 200, "")
-	h.NotifyConfigStatus(entry.Cfg, StatusRunning)
-	h.cb.OnStatusChange(entry, oldStatus, fn)
-}
-
-// CmdDisable handles the "disable" command.
-func (h *Handler[C]) CmdDisable(fn Function) {
-	key, _, ok := h.cb.ExtractKey(fn)
-	if !ok {
-		h.api.SendCodef(fn, 400, "invalid config ID format.")
-		return
-	}
-
-	entry, ok := h.exposed.LookupByKey(key)
-	if !ok {
-		h.api.SendCodef(fn, 404, "config not found.")
-		return
-	}
-
-	oldStatus := entry.Status
-
-	if entry.Status == StatusDisabled {
-		h.api.SendCodef(fn, 200, "")
-		h.NotifyConfigStatus(entry.Cfg, StatusDisabled)
-		return
-	}
-
-	// Unconditional for all non-Disabled statuses.
-	h.cb.Stop(entry.Cfg)
-	entry.Status = StatusDisabled
-	h.api.SendCodef(fn, 200, "")
-	h.NotifyConfigStatus(entry.Cfg, StatusDisabled)
-	h.cb.OnStatusChange(entry, oldStatus, fn)
-}
-
-// CmdRemove handles the "remove" command.
-func (h *Handler[C]) CmdRemove(fn Function) {
-	key, _, ok := h.cb.ExtractKey(fn)
-	if !ok {
-		h.api.SendCodef(fn, 400, "invalid config ID format.")
-		return
-	}
-
-	entry, ok := h.exposed.LookupByKey(key)
-	if !ok {
-		h.api.SendCodef(fn, 404, "config not found.")
-		return
-	}
-
-	if entry.Cfg.SourceType() != "dyncfg" {
-		h.api.SendCodef(fn, 405, "removing configurations of source type '%s' is not supported, only 'dyncfg' configurations can be removed.", entry.Cfg.SourceType())
-		return
-	}
-	if h.cb.ConfigType(entry.Cfg) != ConfigTypeJob {
-		h.api.SendCodef(fn, 405, "removing configurations of type '%s' is not supported, only 'job' configurations can be removed.", h.cb.ConfigType(entry.Cfg))
-		return
-	}
-
-	h.seen.Remove(entry.Cfg)
-	h.exposed.Remove(entry.Cfg)
-	h.cb.Stop(entry.Cfg)
-	h.api.SendCodef(fn, 200, "")
-	h.NotifyConfigRemove(entry.Cfg)
-}
-
-// CmdUpdate handles the "update" command.
-func (h *Handler[C]) CmdUpdate(fn Function) {
-	name, entry, code, msg := h.updateRejection(fn)
-	if code != 0 {
-		h.api.SendCodef(fn, code, "%s", msg)
-		return
-	}
-
-	newCfg, err := h.cb.ParseAndValidate(fn, name)
-	if err != nil {
-		h.api.SendCodef(fn, callbackErrorCode(err, 400), "%v", err)
-		h.NotifyConfigStatus(entry.Cfg, entry.Status)
-		return
-	}
-	if err := h.ValidateConfigCreate(newCfg, StatusAccepted); err != nil {
-		h.api.SendCodef(fn, 400, "configuration cannot be represented in the plugins.d CONFIG protocol: %v", err)
-		h.NotifyConfigStatus(entry.Cfg, entry.Status)
-		return
-	}
-
-	isConversion := entry.Cfg.SourceType() != "dyncfg"
-	if !isConversion && entry.Status == StatusRunning && entry.Cfg.Hash() == newCfg.Hash() {
-		h.api.SendCodef(fn, 200, "")
-		h.NotifyConfigStatus(entry.Cfg, StatusRunning)
-		return
-	}
-	if entry.Status == StatusAccepted {
-		h.api.SendCodef(fn, 403, "updating is not allowed in '%s' state.", entry.Status)
-		h.NotifyConfigStatus(entry.Cfg, StatusAccepted)
-		return
-	}
-
-	oldStatus := entry.Status
-	oldCfg := entry.Cfg
-	if isConversion {
-		h.cb.Stop(oldCfg)
-	} else {
-		h.seen.Remove(oldCfg)
-	}
-
-	h.seen.Add(newCfg)
-	newEntry := &Entry[C]{Cfg: newCfg, Status: StatusAccepted}
-	h.exposed.Add(newEntry)
-
-	if oldStatus == StatusDisabled {
-		newEntry.Status = StatusDisabled
-		if isConversion {
-			h.NotifyConfigCreate(newCfg, StatusDisabled)
-		}
-		h.api.SendCodef(fn, 200, "")
-		h.NotifyConfigStatus(newCfg, StatusDisabled)
-		h.cb.OnStatusChange(newEntry, oldStatus, fn)
-		return
-	}
-
-	if isConversion {
-		err = h.cb.Start(fn, newCfg)
-	} else {
-		err = h.cb.Update(fn, oldCfg, newCfg)
-	}
-	if err != nil {
-		if !isConversion && errors.Is(err, ErrNonDisruptiveUpdate) {
-			h.seen.Remove(newCfg)
-			h.seen.Add(oldCfg)
-			h.exposed.Add(entry)
-			h.api.SendCodef(fn, callbackErrorCode(err, 200), "%v", err)
-			h.NotifyConfigStatus(oldCfg, oldStatus)
-			return
-		}
-
-		newEntry.Status = StatusFailed
-		if isConversion {
-			h.NotifyConfigCreate(newCfg, StatusFailed)
-		}
-		code := 200
-		if ce, ok := errors.AsType[CodedError](err); ok {
-			code = ce.DyncfgCode()
-		}
-		h.api.SendCodef(fn, code, "%v", err)
-		h.NotifyConfigStatus(newCfg, StatusFailed)
-		h.cb.OnStatusChange(newEntry, oldStatus, fn)
-		return
-	}
-
-	newEntry.Status = StatusRunning
-	if isConversion {
-		h.NotifyConfigCreate(newCfg, StatusRunning)
-	}
-	h.api.SendCodef(fn, 200, "")
-	h.NotifyConfigStatus(newCfg, StatusRunning)
-	h.cb.OnStatusChange(newEntry, oldStatus, fn)
+	h.exposed.Add(&Entry[C]{
+		Cfg:     entry.Cfg,
+		Status:  status,
+		Enabled: entry.Enabled,
+	})
+	return true
 }
 
 func callbackErrorCode(err error, fallback int) int {
-	if ce, ok := errors.AsType[CodedError](err); ok {
+	if ce, ok := errors.AsType[CodedError](err); ok && ce.DyncfgCode() >= 400 && ce.DyncfgCode() < 600 {
 		return ce.DyncfgCode()
 	}
 	return fallback
@@ -558,20 +352,4 @@ func (h *Handler[C]) addRejection(fn Function) (key, name string, code int, msg 
 		return "", "", 400, fmt.Sprintf("invalid config name '%s': %v.", name, err)
 	}
 	return key, name, 0, ""
-}
-
-// updateRejection runs CmdUpdate's deterministic pre-validation gates.
-func (h *Handler[C]) updateRejection(fn Function) (name string, entry *Entry[C], code int, msg string) {
-	key, name, ok := h.cb.ExtractKey(fn)
-	if !ok {
-		return "", nil, 400, "invalid config ID format."
-	}
-	entry, ok = h.exposed.LookupByKey(key)
-	if !ok {
-		return "", nil, 404, "config not found."
-	}
-	if err := fn.ValidateHasPayload(); err != nil {
-		return "", nil, 400, fmt.Sprintf("%v", err)
-	}
-	return name, entry, 0, ""
 }

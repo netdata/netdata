@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 	"github.com/stretchr/testify/require"
 )
@@ -271,7 +272,7 @@ func TestNormalizeProfileMetricDefinitionsAppliesAllDefaults(t *testing.T) {
 	require.Equal(t, "incremental", chart.Algorithm)
 	require.Equal(t, "line", chart.Type)
 	require.Equal(t, DefaultMetricChartMaxInstances, chart.Lifecycle.MaxInstances)
-	require.Equal(t, DefaultMetricExpireAfterCycles, chart.Lifecycle.ExpireAfterCycles)
+	require.Equal(t, DefaultMetricExpireAfterCycles, *chart.Lifecycle.ExpireAfterCycles)
 }
 
 func TestLoadProfileAcceptsCanonicalMetricSyntax(t *testing.T) {
@@ -1035,6 +1036,20 @@ func TestProfileMetricValidationAllowsRetiredSourceMetricIdentifiers(t *testing.
 			if err != nil {
 				t.Fatalf("addProfileMetrics rejected identifiers released with retired built-in source metrics: %v", err)
 			}
+		})
+	}
+}
+
+func TestNormalizeProfileMetricChartKeepsFiniteExpiry(t *testing.T) {
+	for name, expiry := range map[string]*int{"omitted": nil, "zero": new(0), "negative": new(-1), "positive": new(9)} {
+		t.Run(name, func(t *testing.T) {
+			chart := profileMetricChart{ID: "sample", Title: "Sample", Units: "value", Lifecycle: &charttpl.Lifecycle{ExpireAfterCycles: expiry}}
+			require.NoError(t, normalizeProfileMetricChart(&chart))
+			want := DefaultMetricExpireAfterCycles
+			if expiry != nil && *expiry > 0 {
+				want = *expiry
+			}
+			require.Equal(t, new(want), chart.Lifecycle.ExpireAfterCycles)
 		})
 	}
 }

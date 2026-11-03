@@ -57,7 +57,7 @@ func TestCollector_Collect(t *testing.T) {
 					require.True(t, ok)
 					require.Equal(t, topologySource, topo.Producer.Source)
 					require.Equal(t, 6, topo.Actors.Rows)
-					require.Equal(t, 3, topo.Links.Rows)
+					require.Equal(t, 4, topo.Links.Rows)
 					requireSiteHostScope(t, c, "1001", "Paris Office", "POP-Paris")
 					requireSiteHostScope(t, c, "1002", "Toulouse Office", "POP-Toulouse")
 					require.Empty(
@@ -171,6 +171,13 @@ func TestCollector_Collect(t *testing.T) {
 					iface := requireTopologyRow(t, interfaces, "name", "Unknown WAN")
 					require.Nil(t, iface["connected"])
 					require.Nil(t, iface["tunnel_uptime"])
+					validateCatoTopologyV1Data(t, topo)
+					wan := requireTopologyRow(t, interfaces, "name", "WAN 1")
+					require.Equal(t, true, wan["link_up"])
+					require.Equal(t, false, wan["tunnel_connected"])
+					links := topologyTableRows(t, topo.Links, topo.Dictionaries)
+					require.Equal(t, "disconnected", links[wan["link"].(int)]["state"])
+					require.NotZero(t, topo.Tables.Actor[catofunc.ActorTableLabels].Table.Rows)
 				},
 			}},
 		},

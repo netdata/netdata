@@ -16,7 +16,8 @@ fetch_git "${build_dir}" "${CURL_SOURCE}" "${CURL_VERSION}" "${cache_key}"
 
 export CFLAGS="${TUNING_FLAGS} -I/openssl-static/include -pipe"
 export CXXFLAGS="${CFLAGS}"
-export LDFLAGS="-static -L/openssl-static/lib64"
+LDFLAGS="-static -L/openssl-static/lib64 $(errata_ldflags)"
+export LDFLAGS
 export PKG_CONFIG="pkg-config --static"
 export PKG_CONFIG_PATH="/openssl-static/lib64/pkgconfig"
 

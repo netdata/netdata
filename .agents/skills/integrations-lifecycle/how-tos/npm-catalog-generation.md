@@ -45,6 +45,11 @@ change appears to have no effect.
 
 Capability (BGP, licensing) is detected by resolving each profile's transitive `extends:` chain, not by a flag.
 
+A device entry documents its chart contexts in Markdown, not in `metrics.scopes`, so `build_device_modules` lists by
+name the stock alerts on the contexts of the profile's symbols and virtual metrics (`device_alert_names`, the same
+ownership rule as `health_alerts.py`). A changed alert target or profile metric therefore changes the generated
+metadata.
+
 ## Shared objects, and the anchors that reveal them
 
 A past defect: `make_entry()` assigned the same module-level `SETUP` dict to every entry, so the non-SNMP topology

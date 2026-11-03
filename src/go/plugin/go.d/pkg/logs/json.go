@@ -4,12 +4,15 @@ package logs
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
 
 	"github.com/valyala/fastjson"
 )
+
+var errJSONSyntax = errors.New("json parse: invalid JSON")
 
 type JSONConfig struct {
 	Mapping map[string]string `yaml:"mapping" json:"mapping"`
@@ -45,7 +48,8 @@ func (p *JSONParser) ReadLine(line LogLine) error {
 func (p *JSONParser) Parse(row []byte, line LogLine) error {
 	val, err := p.parser.ParseBytes(row)
 	if err != nil {
-		return err
+		// Dependency errors contain source fragments. Syntax failures remain non-ParseError.
+		return errJSONSyntax
 	}
 
 	if err := p.parseObject("", val, line); err != nil {

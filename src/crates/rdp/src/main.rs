@@ -1,6 +1,23 @@
+//! Sample driver for the `rdp` field-name encoder, for developers working on
+//! this crate's library target; not part of the agent runtime. It prints the
+//! `encode_full()` mapping for a fixed corpus of real-world OpenTelemetry log
+//! field names — AWS/Fluent Bit log attributes, Kubernetes resource
+//! enrichment, and log-body fields from common producers (Traefik, Envoy,
+//! HAProxy, EMQX, CloudTrail, …) — plus synthetic probes (mixed-case tokens, a
+//! deeply nested key) that exercise the tokenizer.
+//!
+//! It reads nothing (no stdin, arguments or environment) and writes to stdout:
+//! one line per key, sorted, with the name padded to 40 columns and the
+//! encoded name beside it, then a blank line and an MD5 checksum of the whole
+//! table. The checksum is the point: run the binary before and after changing
+//! the encoder (`cargo run -p rdp` in `src/crates`) and compare — any change
+//! in how names are encoded shifts the table and its fingerprint.
 use rdp::encode_full;
 
 fn main() {
+    // The corpus: real-world names plus tokenizer probes. The commented-out
+    // non-ASCII name below is the only entry that encodes to the `ND_<md5>`
+    // fallback; enable it when checking that path.
     let mut aws_keys = vec![
         "log.attributes.log.file.path",
         "log.attributes.log.iostream",
@@ -222,10 +239,10 @@ fn main() {
         // "resource.cαλημέρα",
     ];
 
-    // Sort keys to ensure consistent ordering
+    // Sorted so the table — and thus its checksum — is reproducible.
     aws_keys.sort();
 
-    // Collect all output lines for checksum calculation
+    // Accumulate every printed line; the checksum covers exactly this table.
     let mut all_output = String::new();
 
     for otel_key in &aws_keys {
@@ -235,7 +252,7 @@ fn main() {
         all_output.push_str(&line);
     }
 
-    // Calculate and print MD5 checksum of all output
+    // MD5 over the accumulated table (the checksum line itself excluded).
     let digest = md5::compute(all_output.as_bytes());
     println!("\nMD5 Checksum: {:x}", digest);
 }

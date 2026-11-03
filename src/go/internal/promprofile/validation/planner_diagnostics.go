@@ -67,6 +67,7 @@ type profileAutogenRuleOwner struct {
 }
 
 type planRouteSummary struct {
+	contextSeriesOmissions    map[string]contextSeriesOmissionReport
 	series                    map[metrix.SeriesID]*planSeriesDiagnostic
 	templates                 map[string]*planTemplateDiagnostic
 	resolvedTemplatesBySeries map[metrix.SeriesID]map[string]struct{}
@@ -76,6 +77,7 @@ type planRouteSummary struct {
 
 func newPlanRouteSummary() *planRouteSummary {
 	return &planRouteSummary{
+		contextSeriesOmissions:    make(map[string]contextSeriesOmissionReport),
 		series:                    make(map[metrix.SeriesID]*planSeriesDiagnostic),
 		templates:                 make(map[string]*planTemplateDiagnostic),
 		resolvedTemplatesBySeries: make(map[metrix.SeriesID]map[string]struct{}),
@@ -86,6 +88,14 @@ func newPlanRouteSummary() *planRouteSummary {
 
 func (s *planRouteSummary) observe(fact chartengine.PlanRouteDiagnostic) {
 	if s == nil {
+		return
+	}
+	if fact.Reason == chartengine.PlanRouteReasonContextSeriesLimit {
+		s.contextSeriesOmissions[fact.Context] = contextSeriesOmissionReport{
+			Context:        fact.Context,
+			ObservedSeries: fact.ContextSeriesCount,
+			Limit:          fact.ContextSeriesLimit,
+		}
 		return
 	}
 	if fact.Decision == chartengine.PlanRouteLifecycleRejected {

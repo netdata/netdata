@@ -133,7 +133,10 @@ char *generate_update_node_instance_manifest_message(size_t *len, struct update_
 
     *len = PROTO_COMPAT_MSG_SIZE(msg);
     char *bin = (char*)mallocz(*len);
-    msg.SerializeToArray(bin, *len);
+    if (!msg.SerializeToArray(bin, *len)) {
+        freez(bin);
+        return NULL;
+    }
 
     return bin;
 }

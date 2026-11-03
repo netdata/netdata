@@ -15,6 +15,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
@@ -713,9 +714,7 @@ func TestCollectorInit_JournalHostFailureRetriesFreshProvider(t *testing.T) {
 
 	err := c.Init(context.Background())
 	require.Error(t, err)
-	var coded interface{ DyncfgCode() int }
-	require.ErrorAs(t, err, &coded)
-	assert.Equal(t, 503, coded.DyncfgCode())
+	assert.Equal(t, collectorapi.LifecycleErrorTemporary, collectorapi.ClassifyLifecycleError(err))
 	assert.Nil(t, c.job)
 
 	require.NoError(t, c.Init(context.Background()))
@@ -743,7 +742,7 @@ func TestCollectorInit_IdempotentDoubleInit(t *testing.T) {
 	require.Nil(t, c.job)
 }
 
-func TestCollectorInit_InvalidJobNameIsCodedError(t *testing.T) {
+func TestCollectorInit_InvalidJobNameIsPermanentError(t *testing.T) {
 	withTestCacheDir(t)
 
 	c := newTestSNMPTrapsCollector()
@@ -752,16 +751,11 @@ func TestCollectorInit_InvalidJobNameIsCodedError(t *testing.T) {
 
 	err := c.Init(context.Background())
 	require.Error(t, err)
-	var coded interface{ DyncfgCode() int }
-	require.ErrorAs(t, err, &coded)
-	assert.Equal(t, 422, coded.DyncfgCode())
-	var retryable interface{ DyncfgRetryable() bool }
-	require.ErrorAs(t, err, &retryable)
-	assert.False(t, retryable.DyncfgRetryable())
+	assert.Equal(t, collectorapi.LifecycleErrorPermanent, collectorapi.ClassifyLifecycleError(err))
 	assert.Nil(t, c.job)
 }
 
-func TestCollectorInit_InvalidEndpointsIsCodedError(t *testing.T) {
+func TestCollectorInit_InvalidEndpointsIsPermanentError(t *testing.T) {
 	withTestCacheDir(t)
 
 	c := newTestSNMPTrapsCollector()
@@ -770,13 +764,11 @@ func TestCollectorInit_InvalidEndpointsIsCodedError(t *testing.T) {
 
 	err := c.Init(context.Background())
 	require.Error(t, err)
-	var coded interface{ DyncfgCode() int }
-	require.ErrorAs(t, err, &coded)
-	assert.Equal(t, 422, coded.DyncfgCode())
+	assert.Equal(t, collectorapi.LifecycleErrorPermanent, collectorapi.ClassifyLifecycleError(err))
 	assert.Nil(t, c.job)
 }
 
-func TestCollectorInit_InvalidReceiveBufferIsCodedError(t *testing.T) {
+func TestCollectorInit_InvalidReceiveBufferIsPermanentError(t *testing.T) {
 	withTestCacheDir(t)
 
 	c := newTestSNMPTrapsCollector()
@@ -786,14 +778,12 @@ func TestCollectorInit_InvalidReceiveBufferIsCodedError(t *testing.T) {
 
 	err := c.Init(context.Background())
 	require.Error(t, err)
-	var coded interface{ DyncfgCode() int }
-	require.ErrorAs(t, err, &coded)
-	assert.Equal(t, 422, coded.DyncfgCode())
+	assert.Equal(t, collectorapi.LifecycleErrorPermanent, collectorapi.ClassifyLifecycleError(err))
 	assert.Contains(t, err.Error(), "listen.receive_buffer")
 	assert.Nil(t, c.job)
 }
 
-func TestCollectorInit_TooLargeReceiveBufferIsCodedError(t *testing.T) {
+func TestCollectorInit_TooLargeReceiveBufferIsPermanentError(t *testing.T) {
 	withTestCacheDir(t)
 
 	c := newTestSNMPTrapsCollector()
@@ -803,14 +793,12 @@ func TestCollectorInit_TooLargeReceiveBufferIsCodedError(t *testing.T) {
 
 	err := c.Init(context.Background())
 	require.Error(t, err)
-	var coded interface{ DyncfgCode() int }
-	require.ErrorAs(t, err, &coded)
-	assert.Equal(t, 422, coded.DyncfgCode())
+	assert.Equal(t, collectorapi.LifecycleErrorPermanent, collectorapi.ClassifyLifecycleError(err))
 	assert.Contains(t, err.Error(), "listen.receive_buffer")
 	assert.Nil(t, c.job)
 }
 
-func TestCollectorInit_NoOutputBackendIsCodedError(t *testing.T) {
+func TestCollectorInit_NoOutputBackendIsPermanentError(t *testing.T) {
 	disabled := false
 	c := newTestSNMPTrapsCollector()
 	c.Name = "local"
@@ -819,14 +807,12 @@ func TestCollectorInit_NoOutputBackendIsCodedError(t *testing.T) {
 
 	err := c.Init(context.Background())
 	require.Error(t, err)
-	var coded interface{ DyncfgCode() int }
-	require.ErrorAs(t, err, &coded)
-	assert.Equal(t, 422, coded.DyncfgCode())
+	assert.Equal(t, collectorapi.LifecycleErrorPermanent, collectorapi.ClassifyLifecycleError(err))
 	assert.Contains(t, err.Error(), "at least one SNMP trap output backend")
 	assert.Nil(t, c.job)
 }
 
-func TestCollectorInit_MissingNetdataLogRootIsRetryableCodedError(t *testing.T) {
+func TestCollectorInit_MissingNetdataLogRootIsTemporaryError(t *testing.T) {
 	manager := setMinimalProfileDir(t)
 	root := filepath.Join(t.TempDir(), "missing")
 	withNetdataLogDir(t, root)
@@ -839,12 +825,7 @@ func TestCollectorInit_MissingNetdataLogRootIsRetryableCodedError(t *testing.T) 
 	err := c.Init(context.Background())
 	require.Error(t, err)
 
-	var coded interface{ DyncfgCode() int }
-	require.ErrorAs(t, err, &coded)
-	assert.Equal(t, 503, coded.DyncfgCode())
-	var retryable interface{ DyncfgRetryable() bool }
-	require.ErrorAs(t, err, &retryable)
-	assert.True(t, retryable.DyncfgRetryable())
+	assert.Equal(t, collectorapi.LifecycleErrorTemporary, collectorapi.ClassifyLifecycleError(err))
 	assert.Contains(t, err.Error(), "Netdata log directory")
 	assert.Nil(t, c.job)
 	assert.Equal(t, startJournalJobs, c.services.journalActivity.active.Load())
@@ -882,7 +863,7 @@ func TestCollectorInit_OTELOnlySkipsJournalCreation(t *testing.T) {
 	assert.Equal(t, startJournalJobs, c.services.journalActivity.active.Load())
 }
 
-func TestCollectorInit_OTLPPreflightFailureIsRetryableCodedError(t *testing.T) {
+func TestCollectorInit_OTLPPreflightFailureIsTemporaryError(t *testing.T) {
 	manager := setMinimalProfileDir(t)
 	withTestCacheDir(t)
 	disabled := false
@@ -903,12 +884,7 @@ func TestCollectorInit_OTLPPreflightFailureIsRetryableCodedError(t *testing.T) {
 
 	err = c.Init(context.Background())
 	require.Error(t, err)
-	var coded interface{ DyncfgCode() int }
-	require.ErrorAs(t, err, &coded)
-	assert.Equal(t, 503, coded.DyncfgCode())
-	var retryable interface{ DyncfgRetryable() bool }
-	require.ErrorAs(t, err, &retryable)
-	assert.True(t, retryable.DyncfgRetryable())
+	assert.Equal(t, collectorapi.LifecycleErrorTemporary, collectorapi.ClassifyLifecycleError(err))
 	assert.Nil(t, c.job)
 	assert.NoDirExists(t, journal.Root(c.Name))
 }
@@ -941,7 +917,7 @@ func TestCollectorInit_BindsMultipleEndpoints(t *testing.T) {
 	require.NoError(t, secondConn.Close())
 }
 
-func TestCollectorInit_BindFailureIsRetryableCodedError(t *testing.T) {
+func TestCollectorInit_BindFailureIsTemporaryError(t *testing.T) {
 	manager := setMinimalProfileDir(t)
 	withTestCacheDir(t)
 	conn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
@@ -956,16 +932,11 @@ func TestCollectorInit_BindFailureIsRetryableCodedError(t *testing.T) {
 
 	err = c.Init(context.Background())
 	require.Error(t, err)
-	var coded interface{ DyncfgCode() int }
-	require.ErrorAs(t, err, &coded)
-	assert.Equal(t, 503, coded.DyncfgCode())
-	var retryable interface{ DyncfgRetryable() bool }
-	require.ErrorAs(t, err, &retryable)
-	assert.True(t, retryable.DyncfgRetryable())
+	assert.Equal(t, collectorapi.LifecycleErrorTemporary, collectorapi.ClassifyLifecycleError(err))
 	assert.Nil(t, c.job)
 }
 
-func TestCollectorInit_InvalidVersionIsCodedError(t *testing.T) {
+func TestCollectorInit_InvalidVersionIsPermanentError(t *testing.T) {
 	withTestCacheDir(t)
 
 	c := newTestSNMPTrapsCollector()
@@ -975,13 +946,11 @@ func TestCollectorInit_InvalidVersionIsCodedError(t *testing.T) {
 
 	err := c.Init(context.Background())
 	require.Error(t, err)
-	var coded interface{ DyncfgCode() int }
-	require.ErrorAs(t, err, &coded)
-	assert.Equal(t, 422, coded.DyncfgCode())
+	assert.Equal(t, collectorapi.LifecycleErrorPermanent, collectorapi.ClassifyLifecycleError(err))
 	assert.Nil(t, c.job)
 }
 
-func TestCollectorInit_ProfileLoadFailureIsCodedError(t *testing.T) {
+func TestCollectorInit_ProfileLoadFailureIsPermanentError(t *testing.T) {
 	manager := setTestDirs(t, t.TempDir())
 	withTestCacheDir(t)
 
@@ -992,9 +961,7 @@ func TestCollectorInit_ProfileLoadFailureIsCodedError(t *testing.T) {
 
 	err := c.Init(context.Background())
 	require.Error(t, err)
-	var coded interface{ DyncfgCode() int }
-	require.ErrorAs(t, err, &coded)
-	assert.Equal(t, 422, coded.DyncfgCode())
+	assert.Equal(t, collectorapi.LifecycleErrorPermanent, collectorapi.ClassifyLifecycleError(err))
 	assert.Nil(t, c.job)
 	assert.Equal(t, []string{" V1 ", "V2C"}, c.Versions)
 }
@@ -1024,7 +991,7 @@ func TestCollectorInit_PartialBindFailureClosesPriorSockets(t *testing.T) {
 	require.NoError(t, firstConn.Close())
 }
 
-func TestCollectorInit_EngineStateStatErrorIsRetryableCodedError(t *testing.T) {
+func TestCollectorInit_EngineStateStatErrorIsTemporaryError(t *testing.T) {
 	manager := setMinimalProfileDir(t)
 	withTestCacheDir(t)
 
@@ -1049,12 +1016,7 @@ func TestCollectorInit_EngineStateStatErrorIsRetryableCodedError(t *testing.T) {
 
 	err := c.Init(context.Background())
 	require.Error(t, err)
-	var coded interface{ DyncfgCode() int }
-	require.ErrorAs(t, err, &coded)
-	assert.Equal(t, 503, coded.DyncfgCode())
-	var retryable interface{ DyncfgRetryable() bool }
-	require.ErrorAs(t, err, &retryable)
-	assert.True(t, retryable.DyncfgRetryable())
+	assert.Equal(t, collectorapi.LifecycleErrorTemporary, collectorapi.ClassifyLifecycleError(err))
 	assert.Nil(t, c.job)
 	assert.FileExists(t, root, "pre-existing invalid state root must not be removed")
 }

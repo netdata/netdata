@@ -128,12 +128,13 @@ void query_target_detailed_objects_tree(BUFFER *wb, RRDR *r, RRDR_OPTIONS option
                         buffer_json_member_add_object(wb, rrdinstance_acquired_id(ria));
                         buffer_json_member_add_string(wb, JSKEY(name), rrdinstance_acquired_name(ria));
                         buffer_json_member_add_time_t(wb, JSKEY(update_every), rrdinstance_acquired_update_every(ria));
-                        RRDLABELS *labels = rrdinstance_acquired_labels(ria);
-                        if(labels) {
+                        RRDINSTANCE_LABELS_REF lref = rrdinstance_acquired_labels_acquire(ria);
+                        if(lref.labels) {
                             buffer_json_member_add_object(wb, "labels");
-                            rrdlabels_to_buffer_json_members(labels, wb);
+                            rrdlabels_to_buffer_json_members(lref.labels, wb);
                             buffer_json_object_close(wb);
                         }
+                        rrdinstance_labels_release(&lref);
                         rrdset_rrdcalc_entries_v2(wb, ria);
                         buffer_json_member_add_object(wb, "dimensions");
 

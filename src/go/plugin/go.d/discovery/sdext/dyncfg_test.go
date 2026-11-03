@@ -43,7 +43,9 @@ func TestShippedRegistryDyncfgTestSanitizesResourceFailures(t *testing.T) {
 		results: make(chan dyncfg.Result, 1),
 		creates: make(chan struct{}, 16),
 	}
-	registry := &dyncfgTestRegistry{registered: make(chan functions.Handler, 1)}
+	registry := &dyncfgTestRegistry{
+		registered: make(chan functions.Handler, 1),
+	}
 	discovery, err := sd.NewServiceDiscovery(sd.Config{
 		Epoch:        1,
 		Attempts:     attempts,
@@ -111,9 +113,12 @@ func TestShippedRegistryDyncfgTestSanitizesResourceFailures(t *testing.T) {
 			code:    400,
 		},
 		"HTTP TLS file construction": {
-			uid:     "test-http-tls-file",
-			id:      "go.d:sd:http",
-			payload: fmt.Sprintf(`{"discoverer":{"http":{"url":"https://example.invalid","tls_ca":%q}},"services":[{"id":"test","match":"true"}]}`, missingCAFile),
+			uid: "test-http-tls-file",
+			id:  "go.d:sd:http",
+			payload: fmt.Sprintf(
+				`{"discoverer":{"http":{"url":"https://example.invalid","tls_ca":%q}},"services":[{"id":"test","match":"true"}]}`,
+				missingCAFile,
+			),
 			message: "service discovery resource construction failed: the configured HTTP credential or TLS file could not be read safely",
 			code:    400,
 		},
@@ -155,32 +160,45 @@ func TestShippedRegistryDyncfgTestSanitizesResourceFailures(t *testing.T) {
 			mode:    "invalid",
 		},
 		"http operational success": {
-			uid:      "test-http-operational-success",
-			id:       "go.d:sd:http",
-			payload:  fmt.Sprintf(`{"discoverer":{"http":{"url":%q}},"services":[{"id":"test","match":"true"}]}`, httpServer.URL+"/ok"),
+			uid: "test-http-operational-success",
+			id:  "go.d:sd:http",
+			payload: fmt.Sprintf(
+				`{"discoverer":{"http":{"url":%q}},"services":[{"id":"test","match":"true"}]}`,
+				httpServer.URL+"/ok",
+			),
 			message:  `"message":""`,
 			code:     200,
 			requests: 1,
 		},
 		"http operational failure": {
-			uid:      "test-http-operational-failure",
-			id:       "go.d:sd:http",
-			payload:  fmt.Sprintf(`{"discoverer":{"http":{"url":%q}},"services":[{"id":"test","match":"true"}]}`, httpServer.URL+"/fail"),
+			uid: "test-http-operational-failure",
+			id:  "go.d:sd:http",
+			payload: fmt.Sprintf(
+				`{"discoverer":{"http":{"url":%q}},"services":[{"id":"test","match":"true"}]}`,
+				httpServer.URL+"/fail",
+			),
 			message:  "service discovery operational test failed: cannot query the configured HTTP endpoint",
 			code:     422,
 			requests: 1,
 		},
 		"http credential file failure": {
-			uid:     "test-http-credential-file",
-			id:      "go.d:sd:http",
-			payload: fmt.Sprintf(`{"discoverer":{"http":{"url":%q,"bearer_token_file":%q}},"services":[{"id":"test","match":"true"}]}`, httpServer.URL+"/unexpected", missingTokenFile),
+			uid: "test-http-credential-file",
+			id:  "go.d:sd:http",
+			payload: fmt.Sprintf(
+				`{"discoverer":{"http":{"url":%q,"bearer_token_file":%q}},"services":[{"id":"test","match":"true"}]}`,
+				httpServer.URL+"/unexpected",
+				missingTokenFile,
+			),
 			message: "service discovery operational test failed: the configured HTTP credential or TLS file could not be read safely",
 			code:    422,
 		},
 		"http unsafe method is validation only": {
-			uid:     "test-http-validation-only",
-			id:      "go.d:sd:http",
-			payload: fmt.Sprintf(`{"discoverer":{"http":{"url":%q,"method":"POST"}},"services":[{"id":"test","match":"true"}]}`, httpServer.URL+"/unexpected"),
+			uid: "test-http-validation-only",
+			id:  "go.d:sd:http",
+			payload: fmt.Sprintf(
+				`{"discoverer":{"http":{"url":%q,"method":"POST"}},"services":[{"id":"test","match":"true"}]}`,
+				httpServer.URL+"/unexpected",
+			),
 			message: "Configuration is valid; this discoverer does not provide an operational test.",
 			code:    200,
 		},
@@ -229,6 +247,10 @@ func (r *dyncfgTestRegistry) RegisterPrefix(_ string, _ string, handler function
 }
 
 func (*dyncfgTestRegistry) UnregisterPrefix(string, string) {
+}
+
+// This fixture invokes only read-only operational tests.
+func (*dyncfgTestRegistry) RegisterCommandPreparer(string, string, dyncfg.CommandPreparer) {
 }
 
 type dyncfgTestOutput struct {

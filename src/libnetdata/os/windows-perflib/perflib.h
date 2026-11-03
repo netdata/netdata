@@ -29,6 +29,7 @@ DWORD RegistryFindIDByName(const char *name);
 
 PERF_DATA_BLOCK *perflibGetPerformanceData(DWORD id);
 void perflibFreePerformanceData(void);
+bool perflibRefreshPerformanceDataCache(void);
 PERF_OBJECT_TYPE *perflibFindObjectTypeByName(PERF_DATA_BLOCK *pDataBlock, const char *name);
 PERF_INSTANCE_DEFINITION *perflibForEachInstance(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *lastInstance);
 
@@ -47,6 +48,7 @@ typedef struct _counterdata {
     uint16_t backoff;           // when parked, cycles remaining until the next re-probe (fits in struct padding)
     const char *key;
     DWORD OverwriteCounterType; // if set, the counter type will be overwritten once read
+    bool elapsed_time_uses_wall_clock;
     RAW_DATA current;
     RAW_DATA previous;
 } COUNTER_DATA;

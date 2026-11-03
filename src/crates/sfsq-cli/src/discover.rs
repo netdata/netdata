@@ -5,22 +5,25 @@
 //! and stream-filters cheaply.
 //!
 //! WAL files carry no on-disk timestamp index and no durable-prefix marker
-//! (recovery sets both to "unknown"), so `wal::Registry::candidates` would drop
-//! them all offline. Instead we enumerate every `*.wal` file directly, find its
-//! intact byte range with `scan_frame_boundaries` (which stops cleanly at a
-//! torn tail), and hand the whole range to the engine as a row-scanned tail —
-//! the engine applies the time window and filters during the scan.
+//! (recovery sets both to "unknown"), so `wal::Registry::candidates` would
+//! drop them all offline. Instead every `*.wal` file is enumerated directly,
+//! its intact byte range found with `scan_frame_boundaries` (which stops
+//! cleanly at a torn tail), and the whole range handed to the engine as a
+//! row-scanned tail — the engine applies the time window and filters during
+//! the scan.
 //!
-//! Dedup mirrors the live planner: a WAL whose sequence is already sealed into
-//! an SFST is skipped (SFST wins). Stream filtering mirrors the live planner
-//! too: both tiers match by partition key — the SFST `Query` carries the
-//! stream's key, and the WAL is matched on its `FileId.part_key`.
+//! Both tiers match by partition key — the SFST `Query` carries the stream's
+//! key, and the WAL is matched on its `FileId.part_key` — mirroring the live
+//! planner. Dedup mirrors it too: a WAL whose sequence is already sealed into
+//! an SFST is skipped (SFST wins), but the dedup set is built from the
+//! *windowed* SFST candidates, so an SFST entirely outside the query window
+//! is not added and its WAL twin is scanned as a tail. Results stay correct
+//! — the engine's row-scan filters those rows out by time — at the cost of a
+//! little extra I/O; a full dedup would need a window-independent SFST scan
+//! for no practical gain.
 //!
-//! The dedup set is built from the *windowed* SFST candidates, so an SFST
-//! entirely outside the query window is not added and its WAL twin is scanned
-//! as a tail. Results stay correct — the engine's row-scan filters those rows
-//! out by time — at the cost of a little extra I/O; a full dedup would need a
-//! window-independent SFST scan for no practical gain.
+//! The only caller is `run` in `lib.rs`: `sources` go to the engine,
+//! `consulted` feeds `--show-files`.
 
 use std::collections::HashSet;
 use std::ops::Range;
@@ -32,8 +35,9 @@ use sfsq::logs::{LogSource, Part, SfstCandidate, Source, WalTail};
 
 use crate::config::Dirs;
 
-/// The query sources plus a human-readable list of the files consulted (for
-/// `--show-files`).
+/// The engine's query sources plus the files they came from, one
+/// `"sfst <path>"` / `"wal  <path>"` line each for `--show-files`. Skipped
+/// files are not listed (unreadable ones warn instead).
 pub struct Discovered {
     pub sources: Vec<LogSource>,
     pub consulted: Vec<String>,
@@ -41,6 +45,9 @@ pub struct Discovered {
 
 /// Build the engine source list for `tenant` over `window` (epoch seconds,
 /// half-open), optionally restricted to a single `stream`.
+///
+/// Never returns `Err`: unreadable files warn and are skipped, so the
+/// warnings on stderr are what distinguish "no data" from "unreadable data".
 pub fn discover(
     dirs: &Dirs,
     tenant: &str,
@@ -53,10 +60,9 @@ pub fn discover(
     // --- SFST (sealed, indexed): time-pruned + stream-filtered candidates ---
     let sfst_dir = dirs.sfst.join(tenant);
     // `Registry::recover` swallows directory-scan errors (`unwrap_or_default`),
-    // so probe the dir explicitly first: a permission/IO error on the index dir
-    // must be visible, exactly like the WAL side below — an empty result must be
-    // distinguishable from an unreadable one. `FileDir::scan` maps a missing dir
-    // to `Ok(empty)`, so this warns only on a real error.
+    // so probe the dir explicitly — an unreadable index dir must warn (like the
+    // WAL arm below), not pass as legitimately empty. `FileDir::scan` maps a
+    // missing dir to `Ok(empty)`, so this warns only on a real error.
     if let Err(e) = FileDir::new(&sfst_dir, "sfst").scan() {
         tracing::warn!("cannot scan SFST dir {}: {e}", sfst_dir.display());
     }
@@ -65,7 +71,7 @@ pub fn discover(
     registry.recover();
     let query = Query {
         time_range: window,
-        // Single-stream CLI filter → a one-element hash set (empty = all).
+        // Single-stream CLI filter → a one-element list (empty = all).
         partition_keys: stream.map(|s| vec![s.ns_hash()]).unwrap_or_default(),
     };
     for file in registry.candidates(&query) {
@@ -81,10 +87,10 @@ pub fn discover(
     }
 
     // --- WAL (un-indexed tail): enumerate, dedup vs SFST, row-scan range ---
-    // Canonical identity hash: empty fields collapse to absent, matching how the
-    // ingestor names WAL files (see `ServiceStream::ns_hash`). Using the raw
-    // primitive with `Some(&s.namespace)` would hash an absent namespace as
-    // `Some("")` and miss every absent-namespace WAL file.
+    // Canonical stream hash: `ns_hash` collapses empty fields to absent — the
+    // same identity the ingestor baked into the WAL filenames (see
+    // `ServiceStream::ns_hash`). Hashing the raw fields instead would turn an
+    // absent namespace into a different key and miss every such WAL file.
     let stream_hash = stream.map(|s| s.ns_hash());
     let wal_dir = FileDir::new(&dirs.wal.join(tenant), "wal");
     match wal_dir.scan() {
@@ -120,9 +126,10 @@ pub fn discover(
                 }
                 // meta.len() is the offline analogue of the agent's recorded
                 // valid_up_to: scan_frame_boundaries clamps to the last intact
-                // frame, so a torn/partial tail is dropped. Correct for sealed
-                // files; against a live agent's active WAL, a mid-write read is
-                // degraded by the engine to that source's empty result.
+                // frame, so a torn/partial tail is dropped. Exact for a sealed
+                // file; best-effort against a WAL the agent is still writing
+                // (a later engine-side scan failure degrades that source to
+                // an empty result).
                 let full = wal::FrameRange::new(wal::HEADER_SIZE as u64, meta.len());
                 let boundaries = match wal::scan_frame_boundaries(&path, full) {
                     Ok(b) => b,

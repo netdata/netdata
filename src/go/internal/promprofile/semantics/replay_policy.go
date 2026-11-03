@@ -207,12 +207,16 @@ func indexSemanticChartPolicies(
 				errs = append(errs, fmt.Errorf("production profile %q chart %s uses wildcard all-label identity",
 					profile.Name, policy.RuntimePath))
 			}
-			if policy.MaxInstances != 0 || policy.MaxDimensions != 0 || policy.ExpireAfterCycles != 0 ||
+			if policy.MaxInstances != 0 || policy.MaxDimensions != 0 || policy.ExpireAfterCycles != nil ||
 				policy.DimensionExpiry != 0 {
+				var chartExpiry int
+				if policy.ExpireAfterCycles != nil {
+					chartExpiry = *policy.ExpireAfterCycles
+				}
 				errs = append(errs, fmt.Errorf(
 					"production profile %q chart %s declares unsupported lifecycle caps/expiry %d/%d/%d/%d",
 					profile.Name, policy.RuntimePath, policy.MaxInstances, policy.MaxDimensions,
-					policy.ExpireAfterCycles, policy.DimensionExpiry))
+					chartExpiry, policy.DimensionExpiry))
 			}
 			for _, dimension := range policy.Dimensions {
 				if dimension.ExplicitFloat {

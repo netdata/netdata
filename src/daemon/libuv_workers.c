@@ -6,6 +6,17 @@
 static void register_libuv_worker_jobs_internal(void) {
     signals_block_all_except_deadly();
 
+    // make sure we have the right thread id
+    gettid_uncached();
+
+    // name the thread first: worker_register() takes the thread name as the worker's tag
+    static int workers = 0;
+    int worker_id = __atomic_add_fetch(&workers, 1, __ATOMIC_RELAXED);
+
+    char buf[NETDATA_THREAD_TAG_MAX + 1];
+    snprintfz(buf, NETDATA_THREAD_TAG_MAX, "UV_WORKER[%d]", worker_id);
+    uv_thread_set_name_np(buf);
+
     worker_register("LIBUV");
 
     // generic
@@ -100,27 +111,24 @@ static void register_libuv_worker_jobs_internal(void) {
     worker_register_job_name(UV_EVENT_FREE_CHART, "free chart");
     worker_register_job_name(UV_EVENT_FREE_DIMENSION, "free dimension");
 
-    // make sure we have the right thread id
-    gettid_uncached();
-
-    static int workers = 0;
-    int worker_id = __atomic_add_fetch(&workers, 1, __ATOMIC_RELAXED);
-
-    char buf[NETDATA_THREAD_TAG_MAX + 1];
-    snprintfz(buf, NETDATA_THREAD_TAG_MAX, "UV_WORKER[%d]", worker_id);
-    uv_thread_set_name_np(buf);
 }
+
+// every libuv pool work callback calls register_libuv_worker_jobs(),
+// so this is true exactly on the threads of the (process-wide) libuv pool
+static __thread bool libuv_worker_registered = false;
 
 // Register workers
 ALWAYS_INLINE
 void register_libuv_worker_jobs() {
-    static __thread bool registered = false;
-
-    if(likely(registered))
+    if(likely(libuv_worker_registered))
         return;
 
-    registered = true;
+    libuv_worker_registered = true;
     register_libuv_worker_jobs_internal();
+}
+
+bool libuv_worker_thread_is_current(void) {
+    return libuv_worker_registered;
 }
 
 void libuv_close_callback(uv_handle_t *handle, void *data __maybe_unused)

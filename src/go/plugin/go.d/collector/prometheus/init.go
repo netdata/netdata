@@ -10,14 +10,24 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 )
 
 func (c *Collector) validateConfig() error {
+	if c.MaxInputSeries < 0 {
+		return errors.New("max_input_series must not be negative")
+	}
+	if c.MaxOutputSeriesPerContext < 0 {
+		return errors.New("max_output_series_per_context must not be negative")
+	}
 	if c.URL == "" {
 		return errors.New("'url' can not be empty")
 	}
 	if err := c.FallbackType.Validate(); err != nil {
 		return err
+	}
+	if _, err := charttpl.CompileCounterRawCharts(c.CounterRawCharts); err != nil {
+		return fmt.Errorf("invalid 'counter_raw_charts': %w", err)
 	}
 	if err := c.Profiles.validate(); err != nil {
 		return err

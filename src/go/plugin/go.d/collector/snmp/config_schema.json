@@ -289,7 +289,7 @@
   "uiSchema": {
     "manual_profiles": {
       "ui:listFlavour": "list",
-      "ui:help": "**Profiles are always applied automatically** based on the device sysObjectID. **If no sysObjectID is provided** (rare case, e.g. some printers), the profiles listed here will be applied instead. In most cases, **leave this empty**."
+      "ui:help": "**Profiles are always applied automatically** based on the device sysObjectID. **If the device provides no usable sysObjectID** (rare case, e.g. some printers), the profiles listed here will be applied instead. In most cases, **leave this empty**."
     },
     "community": {
       "ui:widget": "password"

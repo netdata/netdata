@@ -1,9 +1,18 @@
-//! Spike: build a real SFST index file from our OWN `(timestamp, [key=value])`
-//! rows using `sfst`'s `RowIndex` + `IndexWriter`, then query it back. This is the
-//! feasibility brick for the augment-SFST plan: it proves the SFST builder is
-//! reusable with rows WE produce (e.g. stringified ng-flatten output), via
-//! `RowIndex`'s inherent `intern` + `row` methods (the spike passes `None` for the
-//! optional pre-computed hash).
+//! Format-layer spike for ng-index's SFST build: feed plain
+//! `(timestamp_ns, [key=value])` rows — the stringified shape the seal hands
+//! `sfst` (ng-index/src/sfst_build.rs) — to `RowIndex` + `IndexWriter`, then
+//! query the file back through `IndexReader`. Two contracts:
+//!
+//! - log-shaped rows build from out-of-order timestamps and count correctly
+//!   under exact, regex and AND filters;
+//! - with the span columns set and `build_trace_id_index` on, every column
+//!   lands in the file chronological and row-aligned, and the `TIDX`
+//!   resolves trace ids against that same column.
+//!
+//! Both tests use `RowIndex`'s inherent `intern` + `row` with hash `None`
+//! (string-keyed dedup — the producer-hash fast path `sfst_build.rs` uses is
+//! not exercised here). The full pipelines live one layer up: logs in
+//! `ng-index/src/sfst_build.rs`, traces in `ng-index/tests/traces_seal.rs`.
 
 use bumpalo::Bump;
 use sfst::query::Filter;
@@ -18,13 +27,13 @@ fn build_sfst(rows: &[(i64, &[&str])]) -> Vec<u8> {
     let arena = Bump::new();
     let mut ri = RowIndex::new(&arena, 100);
     for &(ts, kvs) in rows {
-        // None hash = always-safe intern path (dedup by full string).
+        // hash=None: the interner dedups by the full string.
         let tokens: Vec<_> = kvs.iter().map(|&kv| ri.intern(None, kv)).collect();
         ri.row(ts, &tokens);
     }
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("spike.sfst");
-    // Empty content_meta: it is display-only and this test never reads it back.
+    // Empty content_meta: an opaque producer blob stored verbatim; never read here.
     IndexWriter::write_file(&ri, &path, Vec::new()).expect("write_file");
     std::fs::read(&path).expect("read sfst")
 }
@@ -41,8 +50,8 @@ fn count(reader: &IndexReader, filter: Filter) -> u64 {
 
 #[test]
 fn build_sfst_from_our_rows_and_query_back() {
-    // Timestamps deliberately out of arrival order, to exercise the index-build
-    // time-sort.
+    // Timestamps deliberately out of arrival order: the build's time-sort must
+    // make the counts independent of insertion order.
     let rows: &[(i64, &[&str])] = &[
         (
             300,
@@ -91,12 +100,16 @@ fn build_sfst_from_our_rows_and_query_back() {
     assert_eq!(count(&reader, both), 1);
 }
 
-/// The span-seal wiring added for traces: `RowIndex`'s `parent_span_ids` /
-/// `durations` columns and `build_trace_id_index` flag must flow through
-/// the build → write the `PSPN`/`DURN` chunks and a `TIDX` index built from the
-/// **chronological** `trace_id` column. The logs path leaves these dormant, so this
-/// is the only end-to-end cover for the new branches (locks the wiring before the
-/// Step-4 traces seal producer exists).
+/// Pins the traces wiring on `RowIndex` at the format layer: the span
+/// columns (`trace_ids`/`span_ids`/`parent_span_ids`/`durations`/`flags`/
+/// `dropped_attribute_counts`) plus the `build_trace_id_index` flag must
+/// flow through the build into one valid file — each column written
+/// chronologically and row-aligned, and a `TIDX` built from the
+/// chronological `trace_id` column. The logs seal leaves all of these
+/// dormant. Only what is asserted is pinned: span ids / flags / dropped
+/// counts are written but not read back, and the `TBLM` bloom
+/// (`build_trace_id_bloom`) stays off. The full traces pipeline has its own
+/// oracle in `ng-index/tests/traces_seal.rs`.
 #[test]
 fn build_into_writes_span_columns_and_trace_id_index() {
     let a = TraceId::from([0xAA; 16]);
@@ -142,17 +155,18 @@ fn build_into_writes_span_columns_and_trace_id_index() {
 
     let reader = IndexReader::open(&bytes).expect("open sfst");
 
-    // The span-only columns are present and row-count aligned.
+    // Traces-only columns decode back present and row-aligned (len == row count).
     let trace_ids = reader.trace_ids().expect("trace_ids column");
     let durations = reader.durations().expect("durations column");
     let parents = reader.parent_span_ids().expect("parent_span_ids column");
     assert_eq!(trace_ids.len(), 3);
     assert_eq!(parents.len(), 3);
-    // Columns are written in chronological order (ts 100, 200, 300).
+    // Durations come back sorted by timestamp (ts 100/200/300 -> [10, 20, 30]),
+    // not insertion order: every column is remapped to chronological position.
     assert_eq!(durations.0, vec![10, 20, 30]);
 
-    // The TIDX is present and resolves a trace's rows. Built from the chronological
-    // column, so `positions` indexes the same chronological rows the columns expose.
+    // The TIDX is present and its positions resolve rows of the chronological
+    // `trace_id` column — the same order every column is written in.
     assert!(reader.has_trace_id_index());
     let idx = reader.trace_id_index().expect("trace_id_index");
     let pa = idx.positions(a, &trace_ids);

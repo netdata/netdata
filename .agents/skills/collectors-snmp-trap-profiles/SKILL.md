@@ -259,9 +259,9 @@ per-severity counters); nothing pins the generator's or the loader's sets. A cha
    `internal/output/otlp`), and the `PRIORITY` mapping in `internal/output/journal` (`grep -rn` the slug across
    `snmp_traps/`).
 4. Health: `src/health/health.d/snmp_traps.conf` has severity-rate alert templates for `emerg`, `alert`, `crit`,
-   `err`, and `warning` (`notice`, `info`, `debug` deliberately do not alert), mirrored in the `alerts:` list of
-   `metadata.yaml`; a renamed or removed slug silently breaks them. `grep -rn` the slug across
-   `src/health/health.d/` too.
+   `err`, and `warning` (`notice`, `info`, `debug` deliberately do not alert); the integration page lists them through
+   the `snmp.trap.*` contexts `metadata.yaml` declares. A renamed or removed slug silently breaks them. `grep -rn` the
+   slug across `src/health/health.d/` too.
 5. Docs: `profile-format.md` category and severity tables, and every operator page that enumerates the sets
    (`grep -rln` the slug across `docs/npm/snmp-traps/`: today `README.md`, `trap-profiles.md`, `configuration.md`,
    `field-reference.md`, `metrics.md`, `alerts.md`, `usage-and-output.md`, `journal-and-querying.md`,

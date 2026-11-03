@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"testing"
 	"time"
 
@@ -20,7 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestServiceDiscoveryBindingCapturesTypedInvocationOutput(t *testing.T) {
+func TestServiceDiscoveryBindingCapturesReadOnlyResult(t *testing.T) {
 	tests := map[string]struct {
 		emit              func(*serviceDiscoveryBinding)
 		wantResult        string
@@ -76,7 +77,7 @@ func TestServiceDiscoveryBindingCapturesTypedInvocationOutput(t *testing.T) {
 					ContentType: "application/json",
 				})
 			},
-			wantError: "result UID differs from invocation",
+			wantError: "result outside invocation",
 		},
 		"handler panic": {
 			emit: func(*serviceDiscoveryBinding) {
@@ -93,7 +94,7 @@ func TestServiceDiscoveryBindingCapturesTypedInvocationOutput(t *testing.T) {
 			require.NoError(t, err)
 			binding := newServiceDiscoveryTestBinding(t, 1, frames, nil)
 
-			result, cleanup, err := binding.invoke("uid", true, func() {
+			result, cleanup, err := binding.invoke("uid", func() {
 				test.emit(binding)
 			})
 			if test.wantError != "" {
@@ -138,8 +139,11 @@ func TestServiceDiscoveryQuarantineReturnsConfigLocalUnavailableResult(t *testin
 	require.NotNil(t, cleanup)
 	applied, err := lifecycle.NewAppliedResourceTransaction(
 		lifecycle.ResourceTransactionScope{
-			ID:      "config",
-			Current: lifecycle.ResourceIdentity{ID: "config", Generation: 1},
+			ID: "config",
+			Current: lifecycle.ResourceIdentity{
+				ID:         "config",
+				Generation: 1,
+			},
 		},
 		lifecycle.ResourceTransactionRemoved,
 		nil,
@@ -170,7 +174,9 @@ func TestServiceDiscoveryHandlerPanicQuarantinesProductionInvocation(t *testing.
 		},
 	)
 	require.Zero(t, retryCalls)
-	require.Equal(t, containment.Census{Quarantined: 1}, attempts.Census())
+	require.Equal(t, containment.Census{
+		Quarantined: 1,
+	}, attempts.Census())
 }
 
 func TestServiceDiscoveryHandlerPanicAfterContainmentQuarantinesProductionInvocation(t *testing.T) {
@@ -192,8 +198,9 @@ func TestServiceDiscoveryHandlerPanicAfterContainmentQuarantinesProductionInvoca
 		_, _, err := binding.invokeContained(
 			ctx,
 			"go.d:sd:type:job",
-			frameworkfunctions.Function{UID: "late-panic"},
-			false,
+			frameworkfunctions.Function{
+				UID: "late-panic",
+			},
 			func(context.Context) {
 				close(entered)
 				<-release
@@ -218,7 +225,9 @@ func TestServiceDiscoveryHandlerPanicAfterContainmentQuarantinesProductionInvoca
 	close(release)
 	released = true
 	require.Eventually(t, func() bool {
-		return attempts.Census() == (containment.Census{Quarantined: 1})
+		return attempts.Census() == (containment.Census{
+			Quarantined: 1,
+		})
 	}, time.Second, time.Millisecond)
 
 	var retryCalls int
@@ -242,8 +251,9 @@ func TestServiceDiscoveryCooperativeCancellationDoesNotQuarantineProductionInvoc
 		_, _, err := binding.invokeContained(
 			ctx,
 			"go.d:sd:type:job",
-			frameworkfunctions.Function{UID: "cooperative-cancel"},
-			false,
+			frameworkfunctions.Function{
+				UID: "cooperative-cancel",
+			},
 			func(attemptCtx context.Context) {
 				close(entered)
 				<-attemptCtx.Done()
@@ -281,6 +291,103 @@ func TestServiceDiscoveryCooperativeCancellationDoesNotQuarantineProductionInvoc
 	require.EqualValues(t, 1, retryCalls)
 }
 
+func TestServiceDiscoveryCanceledReadRetainsOnlyItsResource(t *testing.T) {
+	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
+	require.NoError(t, err)
+	binding := newServiceDiscoveryTestBinding(t, 1, frames, nil)
+	attempts := binding.attempts.(*containment.Authority)
+	entered, release := make(chan struct{}), make(chan struct{})
+	released := false
+	t.Cleanup(func() {
+		if !released {
+			close(release)
+		}
+	})
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	settled := make(chan error, 1)
+	go func() {
+		_, _, err := binding.invokeContained(
+			ctx,
+			"job-a",
+			frameworkfunctions.Function{
+				UID: "old-a",
+			},
+			func(context.Context) {
+				close(entered)
+				<-release
+				binding.FunctionResult(
+					dyncfg.Result{
+						UID:         "old-a",
+						Code:        200,
+						ContentType: "application/json",
+						Payload:     `{"owner":"old-a"}`,
+					},
+				)
+			},
+		)
+		settled <- err
+	}()
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("read did not enter")
+	}
+	cancel()
+	select {
+	case err := <-settled:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(time.Second):
+		t.Fatal("read cancellation did not settle")
+	}
+	read := func(resource, uid string, want int, wantCalled bool) {
+		t.Helper()
+		called := false
+		result, cleanup, err := binding.invokeContained(
+			t.Context(),
+			resource,
+			frameworkfunctions.Function{
+				UID: uid,
+			},
+			func(context.Context) {
+				called = true
+				binding.FunctionResult(
+					dyncfg.Result{
+						UID:         uid,
+						Code:        200,
+						ContentType: "application/json",
+						Payload:     `{"owner":"` + uid + `"}`,
+					},
+				)
+			},
+		)
+		require.NoError(t, err)
+		require.Equal(t, wantCalled, called)
+		require.NoError(t, cleanup())
+		frame, err := lifecycle.PrepareFrame(uid, result, 1)
+		require.NoError(t, err)
+		var wire bytes.Buffer
+		writer, err := lifecycle.NewFrameOwner(&wire)
+		require.NoError(t, err)
+		require.NoError(t, writer.Commit(frame))
+		require.Contains(t, wire.String(), fmt.Sprintf("FUNCTION_RESULT_BEGIN %s %d ", uid, want))
+		if wantCalled {
+			require.Contains(t, wire.String(), `{"owner":"`+uid+`"}`)
+		}
+	}
+	read("job-a", "blocked-a", 503, false)
+	read("job-b", "independent-b", 200, true)
+	close(release)
+	released = true
+	require.Eventually(
+		t,
+		func() bool { return attempts.Census() == (containment.Census{}) },
+		time.Second,
+		time.Millisecond,
+	)
+	read("job-a", "new-a", 200, true)
+}
+
 func TestServiceDiscoveryRetirementReturnsConfigLocalUnavailableResult(t *testing.T) {
 	binding := &serviceDiscoveryBinding{}
 
@@ -290,7 +397,9 @@ func TestServiceDiscoveryRetirementReturnsConfigLocalUnavailableResult(t *testin
 	require.NoError(t, err)
 	require.NotNil(t, cleanup)
 	applied, err := lifecycle.NewAppliedResourceTransaction(
-		lifecycle.ResourceTransactionScope{ID: "config"},
+		lifecycle.ResourceTransactionScope{
+			ID: "config",
+		},
 		lifecycle.ResourceTransactionUnchanged,
 		nil,
 		result,
@@ -313,56 +422,39 @@ func TestServiceDiscoveryRetirementDoesNotHideMixedFailure(t *testing.T) {
 }
 
 func TestServiceDiscoveryReadOnlyInvocationDoesNotCaptureConfigNotifications(t *testing.T) {
-	var output bytes.Buffer
-	frames, err := lifecycle.NewFrameOwner(&output)
+	output := newProcessSynchronizedBuffer()
+	frames, err := lifecycle.NewFrameOwner(output)
 	require.NoError(t, err)
 	binding := newServiceDiscoveryTestBinding(t, 1, frames, nil)
-	entered := make(chan struct{})
-	release := make(chan struct{})
-	released := false
-	defer func() {
-		if !released {
-			close(release)
-		}
-	}()
-	binding.RegisterPrefix("config", "go.d:sd:", func(_ context.Context, function frameworkfunctions.Function) {
+	entered, release := make(chan struct{}), make(chan struct{})
+	binding.RegisterPrefix("config", "go.d:sd:", func(_ context.Context, fn frameworkfunctions.Function) {
 		close(entered)
 		<-release
 		binding.FunctionResult(dyncfg.Result{
-			UID:         function.UID,
+			UID:         fn.UID,
 			Code:        200,
 			ContentType: "application/json",
 		})
 	})
-	transaction, err := binding.prepare(
-		t.Context(),
-		functionadapter.HandlerInput{
+	done := make(chan error, 1)
+	go func() {
+		transaction, err := binding.prepareUnclaimed(t.Context(), functionadapter.HandlerInput{
 			UID:    "read-only",
 			Method: "config",
-			Args:   []string{"go.d:sd:type:job", string(dyncfg.CommandGet)},
-		},
-		nil,
-		lifecycle.ResourceTransactionScope{ID: "go.d:sd:type:job"},
-		lifecycle.LongLivedPermit{},
-	)
-	require.NoError(t, err)
-	applied := make(chan error, 1)
-	go func() {
-		_, err := transaction.Apply(t.Context())
-		applied <- err
+			Args:   []string{"go.d:sd:type:job", "get"},
+		}, nil, lifecycle.ResourceTransactionScope{
+			ID: "go.d:sd:type:job",
+		}, lifecycle.LongLivedPermit{})
+		if err == nil {
+			_, err = transaction.Apply(t.Context())
+		}
+		done <- err
 	}()
-	select {
-	case <-entered:
-	case <-time.After(time.Second):
-		require.FailNow(t, "test failed", "read-only handler was not entered")
-	}
-
+	<-entered
 	binding.ConfigDelete("go.d:sd:type:unrelated")
 	require.Equal(t, "CONFIG go.d:sd:type:unrelated delete\n\n", output.String())
-
 	close(release)
-	released = true
-	require.NoError(t, <-applied)
+	require.NoError(t, <-done)
 }
 
 func TestServiceDiscoveryBindingRejectsResultOutsideInvocation(t *testing.T) {
@@ -375,7 +467,7 @@ func TestServiceDiscoveryBindingRejectsResultOutsideInvocation(t *testing.T) {
 		Code:        200,
 		ContentType: "application/json",
 	})
-	_, _, err = binding.invoke("next", true, func() {})
+	_, _, err = binding.invoke("next", func() {})
 
 	require.ErrorContains(t, err, "result outside invocation")
 }
@@ -435,42 +527,28 @@ func TestServiceDiscoveryHandlerPanicIsClassifiedAsTaskPanic(t *testing.T) {
 	require.ErrorIs(t, err, lifecycle.ErrTaskPanic)
 }
 
-func TestServiceDiscoveryTransactionDisposeDoesNotInvokeHandler(t *testing.T) {
-	var output bytes.Buffer
-	frames, err := lifecycle.NewFrameOwner(&output)
+func TestServiceDiscoveryTransactionDisposeDoesNotAdopt(t *testing.T) {
+	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
 	require.NoError(t, err)
 	binding := newServiceDiscoveryTestBinding(t, 1, frames, nil)
-
-	invoked := false
-	binding.RegisterPrefix("config", "go.d:sd:", func(_ context.Context, function frameworkfunctions.Function) {
-		invoked = true
-		binding.FunctionResult(dyncfg.Result{
-			UID:         function.UID,
-			Code:        200,
-			ContentType: "application/json",
-		})
-		binding.ConfigStatus("go.d:sd:type:job", dyncfg.StatusRunning)
+	applied, disposed := false, false
+	registerPreparedSDTestCommand(binding, func(fn dyncfg.Function) (dyncfg.PreparedCommand, error) {
+		return &preparedSDTestCommand{
+			apply: func(context.Context) (dyncfg.AppliedCommand, error) {
+				applied = true
+				return dyncfg.AppliedCommand{}, nil
+			},
+			dispose: func() { disposed = true },
+		}, nil
 	})
-	transaction, err := binding.prepare(
-		context.Background(),
-		functionadapter.HandlerInput{
-			UID:    "cancelled",
-			Method: "config",
-			Args:   []string{"go.d:sd:type:job", "enable"},
-		},
-		nil,
-		lifecycle.ResourceTransactionScope{
-			ID: "go.d:sd:type:job",
-		},
-		lifecycle.LongLivedPermit{},
-	)
+	transaction, err := prepareSDTestTransaction(t.Context(), binding, "cancelled")
 	require.NoError(t, err)
-
-	current, err := transaction.Dispose(context.Background())
+	require.False(t, applied)
+	current, err := transaction.Dispose(t.Context())
 	require.NoError(t, err)
 	require.Nil(t, current)
-	require.False(t, invoked)
-	require.Empty(t, output.String())
+	require.False(t, applied)
+	require.True(t, disposed)
 }
 
 func TestServiceDiscoveryInvocationDoesNotStartAfterCallerCancellation(t *testing.T) {
@@ -482,7 +560,9 @@ func TestServiceDiscoveryInvocationDoesNotStartAfterCallerCancellation(t *testin
 		delegate.BeginShutdown()
 		require.NoError(t, delegate.Shutdown(context.Background()))
 	})
-	attempts := &countingProcessAttemptAuthority{delegate: delegate}
+	attempts := &countingProcessAttemptAuthority{
+		delegate: delegate,
+	}
 	binding, err := newServiceDiscoveryBinding(1, "go.d", attempts, frames, nil)
 	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -492,8 +572,9 @@ func TestServiceDiscoveryInvocationDoesNotStartAfterCallerCancellation(t *testin
 	_, _, err = binding.invokeContained(
 		ctx,
 		"go.d:sd:type:job",
-		frameworkfunctions.Function{UID: "canceled"},
-		false,
+		frameworkfunctions.Function{
+			UID: "canceled",
+		},
 		func(context.Context) { calls++ },
 	)
 
@@ -502,77 +583,52 @@ func TestServiceDiscoveryInvocationDoesNotStartAfterCallerCancellation(t *testin
 	require.Zero(t, calls)
 }
 
-func TestServiceDiscoveryTransactionContainsNonCooperativeHandler(t *testing.T) {
-	var output bytes.Buffer
-	frames, err := lifecycle.NewFrameOwner(&output)
+func TestServiceDiscoveryPreparationContainsLateCandidateWithoutAdoption(t *testing.T) {
+	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
 	require.NoError(t, err)
 	binding := newServiceDiscoveryTestBinding(t, 1, frames, nil)
-	attempts := binding.attempts.(*containment.Authority)
-	entered := make(chan struct{})
-	release := make(chan struct{})
-	binding.RegisterPrefix("config", "go.d:sd:", func(_ context.Context, function frameworkfunctions.Function) {
+	entered, release, disposed := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	registerPreparedSDTestCommand(binding, func(fn dyncfg.Function) (dyncfg.PreparedCommand, error) {
 		close(entered)
 		<-release
-		binding.FunctionResult(dyncfg.Result{
-			UID:         function.UID,
-			Code:        200,
-			ContentType: "application/json",
-		})
-		binding.ConfigStatus("go.d:sd:type:job", dyncfg.StatusRunning)
+		return &preparedSDTestCommand{
+			apply:   func(context.Context) (dyncfg.AppliedCommand, error) { panic("late candidate adopted") },
+			dispose: func() { close(disposed) },
+		}, nil
 	})
-
-	transaction, err := binding.prepare(
-		context.Background(),
-		functionadapter.HandlerInput{
-			UID:    "blocked",
-			Method: "config",
-			Args:   []string{"go.d:sd:type:job", "enable"},
-		},
-		nil,
-		lifecycle.ResourceTransactionScope{ID: "go.d:sd:type:job"},
-		lifecycle.LongLivedPermit{},
-	)
-	require.NoError(t, err)
-	ctx, cancel := context.WithCancel(context.Background())
-	firstDone := make(chan error, 1)
+	done := make(chan lifecycle.PreparedResourceTransaction, 1)
+	errs := make(chan error, 1)
 	go func() {
-		_, err := transaction.Apply(ctx)
-		firstDone <- err
+		transaction, err := prepareSDTestTransaction(t.Context(), binding, "blocked")
+		done <- transaction
+		errs <- err
 	}()
-	select {
-	case <-entered:
-	case <-time.After(time.Second):
-		require.FailNow(t, "test failed", "service discovery handler was not entered")
-	}
-	cancel()
-	select {
-	case err := <-firstDone:
-		require.ErrorIs(t, err, context.Canceled)
-	case <-time.After(time.Second):
-		require.FailNow(t, "test failed", "canceled service discovery command did not settle")
-	}
-
-	busy, err := binding.prepare(
-		context.Background(),
-		functionadapter.HandlerInput{
-			UID:    "busy",
-			Method: "config",
-			Args:   []string{"go.d:sd:type:job", "enable"},
-		},
-		nil,
-		lifecycle.ResourceTransactionScope{ID: "go.d:sd:type:job"},
-		lifecycle.LongLivedPermit{},
+	<-entered
+	require.True(
+		t,
+		binding.attempts.CutProcessAttempt(
+			binding.commandIdentity(frameworkfunctions.Function{
+				Args: []string{"go.d:sd:type:job", "update"},
+			}),
+			jobmgr.ErrProcessAttemptDeadline,
+		),
 	)
-	require.NoError(t, err)
-	applied, err := busy.Apply(context.Background())
+	transaction := <-done
+	require.NoError(t, <-errs)
+	applied, err := transaction.Apply(t.Context())
 	require.NoError(t, err)
 	require.Equal(t, 503, applied.ResultStatus())
-
+	busy, err := prepareSDTestTransaction(t.Context(), binding, "busy")
+	require.NoError(t, err)
+	busyResult, err := busy.Apply(t.Context())
+	require.NoError(t, err)
+	require.Equal(t, 503, busyResult.ResultStatus())
 	close(release)
-	require.Eventually(t, func() bool {
-		return attempts.Census() == (containment.Census{})
-	}, time.Second, time.Millisecond)
-	require.Empty(t, output.String())
+	select {
+	case <-disposed:
+	case <-time.After(time.Second):
+		t.Fatal("late candidate not disposed")
+	}
 }
 
 func TestServiceDiscoveryDiagnosticsFollowAppliedCommandWithoutPayload(t *testing.T) {
@@ -581,15 +637,21 @@ func TestServiceDiscoveryDiagnosticsFollowAppliedCommandWithoutPayload(t *testin
 	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
 	require.NoError(t, err)
 	binding := newServiceDiscoveryTestBinding(t, 3, frames, diagnostics)
-	binding.RegisterPrefix("config", "go.d:sd:", func(_ context.Context, function frameworkfunctions.Function) {
-		binding.FunctionResult(dyncfg.Result{
-			UID:         function.UID,
-			Code:        200,
-			ContentType: "application/json",
-		})
-		binding.ConfigStatus("go.d:sd:type:job", dyncfg.StatusRunning)
+
+	registerPreparedSDTestCommand(binding, func(fn dyncfg.Function) (dyncfg.PreparedCommand, error) {
+		return &preparedSDTestCommand{
+			apply: func(context.Context) (dyncfg.AppliedCommand, error) {
+				return dyncfg.AppliedCommand{
+					Result: dyncfg.Result{
+						UID:         fn.UID(),
+						Code:        202,
+						ContentType: "application/json",
+					},
+				}, nil
+			},
+		}, nil
 	})
-	transaction, err := binding.prepare(
+	transaction, err := binding.prepareUnclaimed(
 		context.Background(),
 		functionadapter.HandlerInput{
 			UID:        "diagnostic-enable",
@@ -621,7 +683,7 @@ func TestServiceDiscoveryDiagnosticsFollowAppliedCommandWithoutPayload(t *testin
 	require.Equal(t, "go.d:sd:type:job", completed.Resource)
 	require.Equal(t, string(dyncfg.CommandEnable), completed.Command)
 	require.EqualValues(t, 3, completed.Generation)
-	require.Equal(t, 200, completed.ResultStatus)
+	require.Equal(t, 202, completed.ResultStatus)
 	require.NotContains(t, fmt.Sprintf("%+v", events), payloadSentinel)
 }
 
@@ -655,14 +717,17 @@ func requireServiceDiscoveryInvocationStatus(
 	result, cleanup, err := binding.invokeContained(
 		t.Context(),
 		"go.d:sd:type:job",
-		frameworkfunctions.Function{UID: uid},
-		false,
+		frameworkfunctions.Function{
+			UID: uid,
+		},
 		call,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, cleanup)
 	applied, err := lifecycle.NewAppliedResourceTransaction(
-		lifecycle.ResourceTransactionScope{ID: "go.d:sd:type:job"},
+		lifecycle.ResourceTransactionScope{
+			ID: "go.d:sd:type:job",
+		},
 		lifecycle.ResourceTransactionUnchanged,
 		nil,
 		result,
@@ -704,3 +769,87 @@ func (a *countingProcessAttemptAuthority) ProcessAttemptReleased(
 ) (<-chan struct{}, bool) {
 	return a.delegate.ProcessAttemptReleased(identity)
 }
+
+type preparedSDTestCommand struct {
+	apply   func(context.Context) (dyncfg.AppliedCommand, error)
+	dispose func()
+}
+
+func (c *preparedSDTestCommand) Apply(ctx context.Context) (dyncfg.AppliedCommand, error) {
+	return c.apply(ctx)
+}
+func (c *preparedSDTestCommand) Dispose(context.Context) error {
+	if c.dispose != nil {
+		c.dispose()
+	}
+	return nil
+}
+func registerPreparedSDTestCommand(binding *serviceDiscoveryBinding, prepare dyncfg.CommandPreparer) {
+	binding.RegisterPrefix("config", "go.d:sd:", func(context.Context, frameworkfunctions.Function) {})
+	binding.RegisterCommandPreparer("config", "go.d:sd:", prepare)
+}
+
+func prepareSDTestTransaction(
+	ctx context.Context,
+	binding *serviceDiscoveryBinding,
+	uid string,
+) (lifecycle.PreparedResourceTransaction, error) {
+	return binding.prepareUnclaimed(ctx, functionadapter.HandlerInput{
+		UID:    uid,
+		Method: "config",
+		Args:   []string{"go.d:sd:type:job", "update"},
+	}, nil, lifecycle.ResourceTransactionScope{
+		ID: "go.d:sd:type:job",
+	}, lifecycle.LongLivedPermit{})
+}
+
+func TestServiceDiscoveryCommandOutputPublishesBeforeActivation(t *testing.T) {
+	for _, failWrite := range []bool{false, true} {
+		t.Run(fmt.Sprintf("write-fails=%t", failWrite), func(t *testing.T) {
+			var output bytes.Buffer
+			var writer io.Writer = &output
+			if failWrite {
+				writer = sdFailingWriter{}
+			}
+			frames, err := lifecycle.NewFrameOwner(writer)
+			require.NoError(t, err)
+			binding := newServiceDiscoveryTestBinding(t, 1, frames, nil)
+			published := false
+			result, cleanup, err := binding.prepareCommandOutput("accepted", dyncfg.AppliedCommand{
+				Result: dyncfg.Result{
+					UID:         "accepted",
+					Code:        202,
+					ContentType: "application/json",
+				},
+				Notifications: []dyncfg.Notification{
+					{Kind: dyncfg.NotificationStatus, ID: "go.d:sd:type:job", Status: dyncfg.StatusAccepted},
+				},
+				Published: func() {
+					published = true
+					binding.ConfigStatus("go.d:sd:type:job", dyncfg.StatusRunning)
+				},
+			})
+			require.NoError(t, err)
+			require.False(t, published)
+			require.Empty(t, output.String())
+			require.NotEqual(t, lifecycle.SealedResult{}, result)
+			err = cleanup()
+			if failWrite {
+				require.Error(t, err)
+				require.False(t, published)
+				return
+			}
+			require.NoError(t, err)
+			require.True(t, published)
+			require.Equal(
+				t,
+				"CONFIG go.d:sd:type:job status accepted\n\nCONFIG go.d:sd:type:job status running\n\n",
+				output.String(),
+			)
+		})
+	}
+}
+
+type sdFailingWriter struct{}
+
+func (sdFailingWriter) Write([]byte) (int, error) { return 0, errors.New("test publication failure") }

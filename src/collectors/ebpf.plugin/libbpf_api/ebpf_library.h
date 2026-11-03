@@ -18,6 +18,10 @@ enum ebpf_integration_list {
 
 #include "../ebpf.h"
 
+#ifdef LIBBPF_MAJOR_VERSION
+#include <bpf/btf.h>
+#endif
+
 typedef struct netdata_publish_syscall netdata_publish_syscall_t;
 typedef struct netdata_syscall_stat netdata_syscall_stat_t;
 typedef struct ebpf_module ebpf_module_t;
@@ -169,6 +173,10 @@ void disable_all_global_charts();
 void ebpf_disable_cgroups();
 void ebpf_update_disabled_plugin_stats(ebpf_module_t *em);
 void ebpf_print_help();
+
+#ifdef LIBBPF_MAJOR_VERSION
+int ebpf_kernel_btf_find_by_name_kind(const char *name, __u32 kind);
+#endif
 
 /*****************************************************************
  *

@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Function to provide information regarding the Netdata version.
-#
-# The high-level logic is (a) use git-describe, (b) fallback to info from
-# packaging/version. This version field is used for cmake's project,
-# cpack's packaging, and the agent's functionality.
+# Derives the Netdata version: git-describe when the checkout allows it,
+# packaging/version otherwise. Feeds project() in the root file,
+# CPACK_PACKAGE_VERSION in Packaging.cmake, and the NETDATA_VERSION defines
+# in config.h.
+
+include_guard()
 function(netdata_version)
   find_package(Git)
 

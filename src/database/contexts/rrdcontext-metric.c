@@ -41,6 +41,14 @@ inline NETDATA_DOUBLE rrdmetric_acquired_last_stored_value(RRDMETRIC_ACQUIRED *r
     return NAN;
 }
 
+// The same classification the query makes (query_target.c): read from the
+// RRDMETRIC's published algorithm, so a caller deciding units outside the
+// query path cannot disagree with the query about what it just summed.
+inline bool rrdmetric_acquired_stored_as_rates(RRDMETRIC_ACQUIRED *rma) {
+    RRDMETRIC *rm = rrdmetric_acquired_value(rma);
+    return rrdmetric_algorithm_atomic_load(rm) == RRD_ALGORITHM_INCREMENTAL;
+}
+
 inline bool rrdmetric_acquired_belongs_to_instance(RRDMETRIC_ACQUIRED *rma, RRDINSTANCE_ACQUIRED *ria) {
     RRDMETRIC *rm = rrdmetric_acquired_value(rma);
     RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
@@ -141,12 +149,12 @@ static bool rrdmetric_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
         }
 
         internal_error(true,
-                       "RRDMETRIC: '%s' of instance '%s' of host '%s' changed UUID from '%s' (retention %ld to %ld, %ld secs) to '%s' (retention %ld to %ld, %ld secs)"
+                       "RRDMETRIC: '%s' of instance '%s' of host '%s' changed UUID from '%s' (retention %" PRId64 " to %" PRId64 ", %" PRId64 " secs) to '%s' (retention %" PRId64 " to %" PRId64 ", %" PRId64 " secs)"
                        , string2str(rm->id)
                        , string2str(rm->ri->id)
                        , rrdhost_hostname(rm->ri->rc->rrdhost)
-                       , uuid1, old_first_time_s, old_last_time_s, old_last_time_s - old_first_time_s
-                       , uuid2, new_first_time_s, new_last_time_s, new_last_time_s - new_first_time_s
+                       , uuid1, (int64_t)old_first_time_s, (int64_t)old_last_time_s, (int64_t)(old_last_time_s - old_first_time_s)
+                       , uuid2, (int64_t)new_first_time_s, (int64_t)new_last_time_s, (int64_t)(new_last_time_s - new_first_time_s)
                        );
 #endif
 
@@ -154,16 +162,21 @@ static bool rrdmetric_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
         rrd_flag_set_updated(rm, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
     }
 
+    // a dimension re-created with the same id takes the metric over, even while the old dimension still
+    // exists: the old dimension's teardown (rrdmetric_rrddim_is_freed()) then finds it is no longer the owner
+    spinlock_lock(&rm->ri->spinlock);
+
     RRDDIM *rd = rrdmetric_rrddim_atomic_load(rm);
     RRDDIM *rd_new = rrdmetric_rrddim_atomic_load(rm_new);
 
-    if(rd && rd_new && rd != rd_new) {
+    if(rd != rd_new) {
         rrdmetric_rrddim_atomic_store(rm, rd_new);
-        rrd_flag_set_updated(rm, RRD_FLAG_UPDATE_REASON_CHANGED_LINKING);
+
+        if(rd && rd_new)
+            rrd_flag_set_updated(rm, RRD_FLAG_UPDATE_REASON_CHANGED_LINKING);
     }
 
-    if(rd != rd_new)
-        rrdmetric_rrddim_atomic_store(rm, rd_new);
+    spinlock_unlock(&rm->ri->spinlock);
 
     if(rm->name != rm_new->name) {
         SWAP(rm->name, rm_new->name);
@@ -302,14 +315,31 @@ static ALWAYS_INLINE RRDMETRIC *rrddim_get_rrdmetric_with_trace(RRDDIM *rd, cons
 }
 
 inline void rrdmetric_rrddim_is_freed(RRDDIM *rd) {
-    RRDMETRIC *rm = rrddim_get_rrdmetric(rd);
-    if(unlikely(!rm)) return;
+    if(unlikely(!rd->rrdcontexts.rrdmetric)) {
+        netdata_log_error("RRDMETRIC: RRDDIM '%s' is not linked to an RRDMETRIC at %s()", rrddim_id(rd), __FUNCTION__);
+        return;
+    }
 
-    if(unlikely(rrd_flag_is_collected(rm)))
-        rrdmetric_set_archived(rm);
+    RRDMETRIC *rm = rrdmetric_acquired_value(rd->rrdcontexts.rrdmetric);
+    if(unlikely(!rm)) {
+        netdata_log_error("RRDMETRIC: RRDDIM '%s' lost the link to its RRDMETRIC at %s()", rrddim_id(rd), __FUNCTION__);
+        return;
+    }
 
-    rrdmetric_rrddim_atomic_store(rm, NULL);
-    rrdmetric_trigger_updates(rm, __FUNCTION__ );
+    // A dimension of a chart re-created with the same id may have taken the metric over
+    // (rrdmetric_conflict_callback()). Then the metric is not ours to archive: only release our reference.
+    spinlock_lock(&rm->ri->spinlock);
+    bool owned = rrdmetric_rrddim_atomic_load(rm) == rd;
+    if(owned) {
+        if(unlikely(rrd_flag_is_collected(rm)))
+            rrdmetric_set_archived(rm);
+
+        rrdmetric_rrddim_atomic_store(rm, NULL);
+    }
+    spinlock_unlock(&rm->ri->spinlock);
+
+    if(owned)
+        rrdmetric_trigger_updates(rm, __FUNCTION__ );
     rrdmetric_release(rd->rrdcontexts.rrdmetric);
     rd->rrdcontexts.rrdmetric = NULL;
     rrdmetric_not_collected_rrddim(rd);

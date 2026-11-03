@@ -59,12 +59,12 @@ func (f Function) ID() string {
 
 // JobName returns the job name from Args[2] (used in add command).
 // Returns empty string if args has fewer than 3 elements.
-// Sanitizes the name by replacing spaces and colons with underscores.
+// The caller validates the raw name; it must match the daemon persistence key.
 func (f Function) JobName() string {
 	if len(f.fn.Args) < 3 {
 		return ""
 	}
-	return NormalizeJobName(f.fn.Args[2])
+	return f.fn.Args[2]
 }
 
 // HasPayload returns true if the function has a non-empty payload.

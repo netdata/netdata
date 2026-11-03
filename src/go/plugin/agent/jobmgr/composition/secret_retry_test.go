@@ -115,6 +115,7 @@ func testSecretReplacementProviderRecovery(t *testing.T, scenario secretReplacem
 	jobConfig.SetSourceType(confgroup.TypeDyncfg)
 	jobConfig.SetSource("test")
 	jobs := testRunJobServices(t)
+	secretConfig := testRunSecrets(t)
 	jobs.Defaults = confgroup.Registry{
 		"module": {UpdateEvery: 1, AutoDetectionRetry: 1},
 	}
@@ -128,7 +129,7 @@ func testSecretReplacementProviderRecovery(t *testing.T, scenario secretReplacem
 		},
 	}})
 	require.NoError(t, err)
-	jobs.StoreCreators = creators
+	secretConfig.Providers.Creators = creators
 	reader, writer := io.Pipe()
 	output := &secretRetryTickOutput{
 		processSynchronizedBuffer: newProcessSynchronizedBuffer(),
@@ -140,7 +141,8 @@ func testSecretReplacementProviderRecovery(t *testing.T, scenario secretReplacem
 		KeepAlive:       true,
 		Modules:         modules,
 		Jobs:            jobs,
-		Secrets: runSecretServices{
+		Secrets: &SecretsConfig{
+			Providers: secretConfig.Providers,
 			Initial: []secretstore.Config{{
 				"name": "main", "kind": string(secretstore.KindVault), "value": "initial",
 				"__source__": confgroup.TypeUser, "__source_type__": confgroup.TypeUser,
@@ -164,7 +166,7 @@ func testSecretReplacementProviderRecovery(t *testing.T, scenario secretReplacem
 		require.NoError(t, writer.Close())
 	})
 	waitSecretStart(t, starts, "initial")
-	output.waitContains(t, "CONFIG go.d:collector:module:job create running job")
+	output.waitContains(t, "CONFIG go.d:collector:module:job status running")
 	replacement := "replacement"
 	if scenario.oversized {
 		replacement = "oversized"
@@ -176,7 +178,7 @@ func testSecretReplacementProviderRecovery(t *testing.T, scenario secretReplacem
 	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-rotation 200 application/json")
 	output.waitContains(t, "CONFIG go.d:collector:module:job status failed")
 	require.GreaterOrEqual(t, replacementReads.Load(), int32(1))
-	require.Contains(t, output.String(), "dependent collector restarts failed for jobs: module:job")
+	require.NotContains(t, output.String(), "dependent collector restarts failed for jobs: module:job", "Store acceptance does not wait for later collector health")
 
 	if scenario.disable {
 		_, err = io.WriteString(writer,
@@ -210,7 +212,7 @@ func testSecretReplacementProviderRecovery(t *testing.T, scenario secretReplacem
 			"disabled or permanently failed job must not resolve secrets again",
 		)
 		require.NotContains(t, wireAfterRecovery, "CONFIG go.d:collector:module:job status running")
-		require.NotContains(t, wireAfterRecovery, "CONFIG go.d:collector:module:job create running job")
+		require.NotContains(t, wireAfterRecovery, "CONFIG go.d:collector:module:job status running")
 		select {
 		case value := <-starts:
 			t.Fatalf("disabled or permanently failed collector restarted with secret %q", value)
@@ -224,7 +226,7 @@ func testSecretReplacementProviderRecovery(t *testing.T, scenario secretReplacem
 		func() bool {
 			wireAfterRecovery := output.String()[wireBeforeRecovery:]
 			return strings.Contains(wireAfterRecovery, "CONFIG go.d:collector:module:job status running") ||
-				strings.Contains(wireAfterRecovery, "CONFIG go.d:collector:module:job create running job")
+				strings.Contains(wireAfterRecovery, "CONFIG go.d:collector:module:job status running")
 		},
 		3*time.Second,
 		10*time.Millisecond,

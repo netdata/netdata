@@ -68,11 +68,7 @@ func (h *CachestatLegacyHandle) Close() {
 }
 
 func defaultPluginsDir() string {
-	if dir := os.Getenv("NETDATA_PLUGINS_DIR"); dir != "" {
-		return dir
-	}
-
-	return filepath.Join(netdataRuntimePrefix, "usr/libexec/netdata/plugins.d")
+	return secureGetenv("NETDATA_PLUGINS_DIR", netdataPluginsDir)
 }
 
 func defaultCachestatLegacyConfig() CachestatLegacyConfig {

@@ -146,6 +146,9 @@ int help(int exitcode) {
             "  -W sqlite-compact        Reclaim metadata database unused space and exit.\n\n"
             "  -W sqlite-analyze        Run update statistics and exit.\n\n"
             "  -W sqlite-alert-cleanup  Perform maintenance on the alerts table.\n\n"
+            "  -W sqlite-lease-test     Test that a slow SQLite connection does not block unrelated\n"
+            "                           SQLite users and that teardown waits for running SQLite\n"
+            "                           operations, and exit.\n\n"
 #ifdef ENABLE_DBENGINE
             "  -W createdataset=N       Create a DB engine dataset of N seconds and exit.\n\n"
             "  -W stresstest=A,B,C,D,E,F,G\n"
@@ -211,6 +214,7 @@ int help(int exitcode) {
     } while(0)
 
 int buffer_unittest(void);
+int url_unittest(void);
 int ringbuffer_unittest(void);
 int onewayalloc_unittest(void);
 int log_stack_unittest(void);
@@ -218,14 +222,22 @@ int clocks_unittest(void);
 int ws_client_unittest(void);
 int mqtt_ng_unittest(void);
 int aclk_timeout_unittest(void);
+int aclk_backoff_unittest(void);
+int aclk_http_msg_unittest(void);
 int https_client_timeout_unittest(void);
+int https_client_chunked_unittest(void);
 int mqtt_wss_client_timeout_unittest(void);
 int pgc_unittest(void);
 int mrg_unittest(void);
+int pagecache_flush_drop_unittest(void);
 int pluginsd_parser_unittest(void);
 int pluginsd_timestamps_unittest(void);
+int pluginsd_vnodes_unittest(void);
 int websocket_compression_unittest(void);
+int web_client_registry_cookie_unittest(void);
 int web_client_request_size_unittest(void);
+int web_client_forwarded_for_unittest(void);
+int rrdhost_machine_guid_unittest(void);
 void replication_initialize(void);
 void bearer_tokens_init(void);
 int unittest_stream_compressions(void);
@@ -241,6 +253,7 @@ int nrpc_registry_unittest(void);
 int pluginsd_functions_unittest(void);
 int nrpc_catalog_unittest(void);
 int mcp_execute_function_access_unittest(void);
+int mcp_jsonrpc_batch_unittest(void);
 int eval_unittest(void);
 int duration_unittest(void);
 int statistical_unittest(void);
@@ -315,6 +328,14 @@ static int unittest_run_with_rrd(int (*test_fn)(void)) {
         rc = test_fn();
 
     unittest_libs_shutdown();
+    return rc;
+}
+
+static int health_config_unittest_with_dyncfg(void) {
+    nrpc_inflight_calls_create();
+    dyncfg_init(false);
+    int rc = health_config_unittest();
+    dyncfg_shutdown();
     return rc;
 }
 
@@ -496,15 +517,21 @@ int netdata_main(int argc, char **argv) {
                                 return 1;
                             rrdlabels_aral_init(false);
 
+                            // first: its drain joins every exited thread, so run it before other tests start threads
+                            if (threads_unittest()) return 1;
                             if (pluginsd_parser_unittest()) return 1;
                             if (pluginsd_timestamps_unittest()) return 1;
                             if (websocket_compression_unittest()) return 1;
+                            if (web_client_registry_cookie_unittest()) return 1;
                             if (web_client_request_size_unittest()) return 1;
+                            if (web_client_forwarded_for_unittest()) return 1;
+                            if (rrdhost_machine_guid_unittest()) return 1;
                             if (stream_conf_unittest()) return 1;
                             if (unit_test_static_threads()) return 1;
                             if (unit_test_buffer()) return 1;
                             if (unit_test_str2ld()) return 1;
                             if (buffer_unittest()) return 1;
+                            if (url_unittest()) return 1;
                             if (api_v1_allmetrics_json_unittest()) return 1;
                             if (exporting_json_connector_unittest()) return 1;
                             if (exporting_graphite_unittest()) return 1;
@@ -512,13 +539,16 @@ int netdata_main(int argc, char **argv) {
                             if (exporting_opentsdb_telnet_unittest()) return 1;
                             if (ringbuffer_unittest()) return 1;
                             if (onewayalloc_unittest()) return 1;
+                            if (timezone_windows_mapping_unittest()) return 1;
                             if (log_stack_unittest()) return 1;
                             if (clocks_unittest()) return 1;
                             if (ws_client_unittest()) return 1;
                             if (mqtt_ng_unittest()) return 1;
+                            if (aclk_http_msg_unittest()) return 1;
                             // summed, not short-circuited: this is the path CI runs, so one
-                            // failing suite must not hide the other two
-                            if (aclk_timeout_unittest() + https_client_timeout_unittest() +
+                            // failing suite must not hide the others
+                            if (aclk_timeout_unittest() + aclk_backoff_unittest() +
+                                https_client_timeout_unittest() + https_client_chunked_unittest() +
                                 mqtt_wss_client_timeout_unittest()) return 1;
 #ifdef OS_WINDOWS
                             if (unit_test_windows_os_version()) return 1;
@@ -542,6 +572,8 @@ int netdata_main(int argc, char **argv) {
                             if (aral_unittest(10000)) return 1;
                             if (rrdlabels_unittest()) return 1;
                             if (rrdhost_labels_unittest()) return 1;
+                            if (rrdhost_system_info_unittest()) return 1;
+                            if (build_info_system_info_unittest()) return 1;
                             if (ctx_unittest()) return 1;
                             if (query_plan_unittest()) return 1;
                             if (uuid_unittest()) return 1;
@@ -553,8 +585,11 @@ int netdata_main(int argc, char **argv) {
                             if (nrpc_del_unittest()) return 1;
                             if (nrpc_registry_unittest()) return 1;
                             if (pluginsd_functions_unittest()) return 1;
+                            if (pluginsd_vnodes_unittest()) return 1;
+                            if (pluginsd_ipmi_unittest()) return 1;
                             if (nrpc_catalog_unittest()) return 1;
                             if (mcp_execute_function_access_unittest()) return 1;
+                            if (mcp_jsonrpc_batch_unittest()) return 1;
                             if (eval_unittest()) return 1;
                             if (duration_unittest()) return 1;
                             if (statistical_unittest()) return 1;
@@ -569,23 +604,29 @@ int netdata_main(int argc, char **argv) {
                             if (uuidmap_unittest()) return 1;
 #ifdef ENABLE_DBENGINE
                             if (mrg_unittest()) return 1;
+                            if (pagecache_flush_drop_unittest()) return 1;
 #endif
                             if (paths_unittest()) return 1;
-#ifdef HAVE_LIBBACKTRACE
+#ifdef HAVE_STACKTRACE
                             if (stacktrace_unittest()) return 1;
 #endif
                             if (test_cmd_pool_fifo()) return 1;
 #ifdef OS_WINDOWS
                             if (perflibnamestest_main()) return 1;
 #endif
-                            sqlite_close_databases();
-                            sqlite_library_shutdown();
+                            // MUST stay last: it runs the real sqlite_close_databases() and
+                            // sqlite_library_shutdown(), after which no SQLite work is admitted
+                            if (sqlite_lease_teardown_unittest()) return 1;
                             rrdlabels_aral_destroy(false);
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
                             return 0;
                         }
                         else if(strcmp(optarg, "escapetest") == 0) {
                             return command_argument_sanitization_tests();
+                        }
+                        else if(strcmp(optarg, "alertqueuetest") == 0) {
+                            unittest_running = true;
+                            return alert_queue_unittest();
                         }
                         else if(strcmp(optarg, "dicttest") == 0) {
                             unittest_running = true;
@@ -616,6 +657,10 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return uuidmap_unittest();
                         }
+                        else if(strcmp(optarg, "threadstest") == 0) {
+                            unittest_running = true;
+                            return threads_unittest();
+                        }
                         else if(strcmp(optarg, "lockstest") == 0) {
                             unittest_running = true;
                             return locks_stress_test();
@@ -643,6 +688,14 @@ int netdata_main(int argc, char **argv) {
                             rrdlabels_aral_destroy(true);
                             return rc;
                         }
+                        else if(strcmp(optarg, "systeminfotest") == 0) {
+                            unittest_running = true;
+                            rrdlabels_aral_init(true);
+                            int rc = rrdhost_system_info_unittest();
+                            rc += build_info_system_info_unittest();
+                            rrdlabels_aral_destroy(true);
+                            return rc;
+                        }
                         else if(strcmp(optarg, "rrdhostlabelstest") == 0) {
                             unittest_running = true;
                             rrdlabels_aral_init(true);
@@ -662,6 +715,10 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return onewayalloc_unittest();
                         }
+                        else if(strcmp(optarg, "timezonemaptest") == 0) {
+                            unittest_running = true;
+                            return timezone_windows_mapping_unittest();
+                        }
                         else if(strcmp(optarg, "wsclienttest") == 0) {
                             unittest_running = true;
                             return ws_client_unittest();
@@ -669,6 +726,14 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "mqttngtest") == 0) {
                             unittest_running = true;
                             return mqtt_ng_unittest();
+                        }
+                        else if(strcmp(optarg, "aclkhttpmsgtest") == 0) {
+                            unittest_running = true;
+                            return aclk_http_msg_unittest() ? 1 : 0;
+                        }
+                        else if(strcmp(optarg, "aclkchunkedtest") == 0) {
+                            unittest_running = true;
+                            return https_client_chunked_unittest() ? 1 : 0;
                         }
                         else if(strcmp(optarg, "aclktimeouttest") == 0) {
                             unittest_running = true;
@@ -679,6 +744,10 @@ int netdata_main(int argc, char **argv) {
                             errors += mqtt_wss_client_timeout_unittest();
                             return errors ? 1 : 0;
                         }
+                        else if(strcmp(optarg, "aclkbackofftest") == 0) {
+                            unittest_running = true;
+                            return aclk_backoff_unittest() ? 1 : 0;
+                        }
                         else if(strcmp(optarg, "test_cmd_pool_fifo") == 0) {
                             unittest_running = true;
                             return test_cmd_pool_fifo();
@@ -687,7 +756,23 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return uuid_unittest();
                         }
-#ifdef HAVE_LIBBACKTRACE
+                        else if(strcmp(optarg, "pluginsd-vnodes") == 0)
+                            return unittest_run_with_rrd(pluginsd_vnodes_unittest);
+                        else if(strcmp(optarg, "pluginsd-ipmi") == 0) {
+                            unittest_running = true;
+                            return pluginsd_ipmi_unittest();
+                        }
+                        else if(strcmp(optarg, "sqlite-lease-test") == 0) {
+                            unittest_running = true;
+                            // the same SQLite setup as -W unittest; the teardown test runs the real teardown,
+                            // so it goes last, in this process only
+                            if (sqlite_library_init())
+                                return 1;
+                            int errors = sqlite_lease_unittest();
+                            errors += sqlite_lease_teardown_unittest();
+                            return errors ? 1 : 0;
+                        }
+#ifdef HAVE_STACKTRACE
                         else if(strcmp(optarg, "stacktracetest") == 0) {
                             unittest_running = true;
                             return stacktrace_unittest();
@@ -746,6 +831,10 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return mrg_unittest();
                         }
+                        else if(strcmp(optarg, "pagecachetest") == 0) {
+                            unittest_running = true;
+                            return pagecache_flush_drop_unittest();
+                        }
                         else if(strcmp(optarg, "mrgretentionbench") == 0) {
                             unittest_running = true;
                             return mrg_retention_benchmark();
@@ -774,10 +863,8 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return duration_unittest();
                         }
-                        else if(strcmp(optarg, "healthconfigtest") == 0) {
-                            unittest_running = true;
-                            return health_config_unittest();
-                        }
+                        else if(strcmp(optarg, "healthconfigtest") == 0)
+                            return unittest_run_with_rrd(health_config_unittest_with_dyncfg);
                         else if(strcmp(optarg, "dyncfgtest") == 0)
                             return unittest_run_with_rrd(dyncfg_unittest);
                         else if(strcmp(optarg, "functionsaccesstest") == 0)
@@ -849,6 +936,8 @@ int netdata_main(int argc, char **argv) {
                             return rc;
                         }
 #endif
+                        else if(strcmp(optarg, "mcpbatchtest") == 0)
+                            return mcp_jsonrpc_batch_unittest();
                         else if(strcmp(optarg, "simple-pattern") == 0) {
                             if(optind + 2 > argc) {
                                 fprintf(stderr, "%s", "\nUSAGE: -W simple-pattern 'pattern' 'string'\n\n"

@@ -7,22 +7,18 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/stretchr/testify/require"
 )
 
-// The integration page mirrors the shipped artifacts: option rows equal the DynCfg form, metric rows
-// equal the chart definitions, and alert rows equal the health configuration.
-// (The health configuration's own consistency with the charts is not asserted here: its alert units
-// use `%` where the charts say `percentage`.)
+// The integration page mirrors the shipped artifacts: option rows equal the DynCfg form and metric rows
+// equal the chart definitions. (The health configuration's consistency with the charts is not asserted
+// here: its alert units use `%` where the charts say `percentage`.)
 func TestArtifacts(t *testing.T) {
 	read := func(path string) []byte { data, err := os.ReadFile(path); require.NoError(t, err); return data }
 	metadata := read("metadata.yaml")
-	health := read("../../../../../health/health.d/mssql.conf")
 
 	collecttest.AssertConfigSchemaMatchesMetadataWith(t, "config_schema.json", "metadata.yaml", collecttest.ConfigSchemaCheck{Defaults: true})
-	collecttest.AssertMetadataAlertsMatchHealthConfig(t, metadata, health)
 
 	module, err := collecttest.DecodeMetadataModule(metadata, "")
 	require.NoError(t, err)
@@ -53,22 +49,7 @@ func everyChartByContext(t *testing.T) map[string]charttpl.Chart {
 	c.addAGClusterMemberCharts("node1")
 	c.addAGPageRepairCharts("db")
 
-	charts := make(map[string]charttpl.Chart)
-	for _, chart := range *c.Charts() {
-		require.NotContainsf(t, charts, chart.Ctx, "context %q instantiated twice", chart.Ctx)
-		charts[chart.Ctx] = chartTemplate(chart)
-	}
+	charts, err := collecttest.V1ChartsByContext(*c.Charts())
+	require.NoError(t, err)
 	return charts
-}
-
-func chartTemplate(chart *collectorapi.Chart) charttpl.Chart {
-	typ := string(chart.Type)
-	if typ == "" {
-		typ = string(collectorapi.Line)
-	}
-	out := charttpl.Chart{Context: chart.Ctx, Title: chart.Title, Units: chart.Units, Type: typ}
-	for _, dim := range chart.Dims {
-		out.Dimensions = append(out.Dimensions, charttpl.Dimension{Name: dim.Name})
-	}
-	return out
 }

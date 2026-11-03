@@ -202,12 +202,14 @@ size_t aral_free_bytes_from_stats(struct aral_statistics *stats) {
 }
 
 size_t aral_used_bytes_from_stats(struct aral_statistics *stats) {
+    if(!stats) return 0;
     size_t used = __atomic_load_n(&stats->malloc.used_bytes, __ATOMIC_RELAXED) +
                   __atomic_load_n(&stats->mmap.used_bytes, __ATOMIC_RELAXED);
     return used;
 }
 
 size_t aral_padding_bytes_from_stats(struct aral_statistics *stats) {
+    if(!stats) return 0;
     size_t padding = __atomic_load_n(&stats->malloc.padding_bytes, __ATOMIC_RELAXED) +
                      __atomic_load_n(&stats->mmap.padding_bytes, __ATOMIC_RELAXED);
     return padding;
@@ -2353,10 +2355,7 @@ static void aral_test_thread(void *ptr) {
     bool marked = os_random(2);
     struct aral_unittest_entry **pointers = callocz(elements, sizeof(struct aral_unittest_entry *));
 
-    size_t iterations = 0;
     do {
-        iterations++;
-
         for (size_t i = 0; i < elements; i++) {
             pointers[i] = unittest_aral_malloc(ar, marked);
         }

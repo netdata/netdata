@@ -20,6 +20,7 @@ summaries point to the detailed owner sections; expand further according to chan
 | Known removal versus temporary unreachability; source-appropriate chart lifecycle | `./collector-practices.md#15-obsolete-whats-gone` |
 | Bounded work, resource lifetime, failure behavior and useful cardinality | `./collector-practices.md#22-hot-path-discipline`, `./collector-practices.md#25-cardinality-bounding`, `./collector-practices.md#4-production-quality-criteria--pre-pr-checklist` |
 | Contextual errors and bounded logging using the framework mechanism | `./collector-practices.md#23-error-handling`, `./collector-practices.md#24-logging-discipline` |
+| Configured-file content in diagnostics, error chains and serialized replies | `./collector-practices.md#file-content-diagnostics` |
 | Supported-source semantics and representative validation evidence | `./collector-practices.md#16-verify-the-supported-source-contract`, `./collector-practices.md#21-test-against-reality` |
 | Correct framework/version, configuration and generated-source ownership | `./collector-practices.md#52-god-v1--v2-reality-check`, `./collector-practices.md#26-configuration-discipline`, `./collector-practices.md#27-generated-artifacts-are-not-source` |
 

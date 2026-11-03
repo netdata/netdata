@@ -309,7 +309,21 @@ static void nd_thread_run_cleanup_callbacks(void) {
 
 // ----------------------------------------------------------------------------
 
-static int nd_thread_join_internal(ND_THREAD *nti, bool *wrapper_released);
+static int nd_thread_join_internal(ND_THREAD *nti, bool *wrapper_released, bool already_claimed);
+
+static bool nd_thread_try_claim_join(ND_THREAD *nti)
+{
+    NETDATA_THREAD_OPTIONS old_options;
+    do {
+        old_options = __atomic_load_n(&nti->options, __ATOMIC_ACQUIRE);
+        if(old_options & NETDATA_THREAD_STATUS_JOINED)
+            return false;
+    } while(!__atomic_compare_exchange_n(&nti->options, &old_options,
+                                          old_options | NETDATA_THREAD_STATUS_JOINED,
+                                          false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE));
+
+    return true;
+}
 
 void nd_thread_join_threads()
 {
@@ -319,19 +333,29 @@ void nd_thread_join_threads()
     do {
         spinlock_lock(&threads_globals.exited.spinlock);
         nti = threads_globals.exited.list;
+        while(nti) {
+            // Manual-join wrappers are owned by their creator. Do not claim JOINED before
+            // checking this flag: a direct owner join would otherwise see a false success.
+            // The flag is set at creation and never changes, so this check is final.
+            if (nd_thread_status_check(nti, NETDATA_THREAD_OPTION_MANUAL_JOIN)) {
+                nti = nti->next;
+                continue;
+            }
+            if (nd_thread_try_claim_join(nti))
+                break;
+            nti = nti->next;
+        }
         if(nti) {
-            // Remove from exited list while holding the lock to prevent race condition
-            // where another thread with a direct pointer calls nd_thread_join() and frees
-            // the nti before we get a chance to use it
+            // Claim the wrapper before unlinking it. A direct owner may have the same pointer
+            // and can free it immediately after winning the JOINED CAS.
             DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
             nti->list = ND_THREAD_LIST_NONE;
         }
         spinlock_unlock(&threads_globals.exited.spinlock);
 
         // nd_thread_join_internal() handles NULL and will skip list removal since we already did it
-        // The atomic CAS in nd_thread_join_internal() still protects against direct callers racing with us
         bool wrapper_released = true;
-        nd_thread_join_internal(nti, &wrapper_released);
+        nd_thread_join_internal(nti, &wrapper_released, true);
 
         // a failed join keeps the wrapper alive; we already unlinked it from the
         // exited list, so keep it aside (the loop keeps draining) and restore it
@@ -528,22 +552,17 @@ bool nd_thread_signaled_to_cancel(void) {
 // wrapper is intentionally kept alive (failed join with the worker not proven
 // finished), so nd_thread_join_threads() can make it discoverable again after
 // having unlinked it from the exited list
-static int nd_thread_join_internal(ND_THREAD *nti, bool *wrapper_released) {
+static int nd_thread_join_internal(ND_THREAD *nti, bool *wrapper_released, bool already_claimed) {
     *wrapper_released = true;
 
     if(!nti)
         return ESRCH;
 
-    // Atomically check and set JOINED flag to prevent race conditions
-    // where two threads both try to join the same thread
-    NETDATA_THREAD_OPTIONS old_options;
-    do {
-        old_options = __atomic_load_n(&nti->options, __ATOMIC_ACQUIRE);
-        if(old_options & NETDATA_THREAD_STATUS_JOINED)
-            return 0;
-    } while(!__atomic_compare_exchange_n(&nti->options, &old_options,
-                                          old_options | NETDATA_THREAD_STATUS_JOINED,
-                                          false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE));
+    // Atomically check and set JOINED flag to prevent race conditions where two threads both try
+    // to join the same thread. The exited-list drain may already have made this claim under its
+    // list lock, before unlinking the wrapper.
+    if(!already_claimed && !nd_thread_try_claim_join(nti))
+        return 0;
 
     int ret;
 
@@ -608,7 +627,7 @@ static int nd_thread_join_internal(ND_THREAD *nti, bool *wrapper_released) {
 
 int nd_thread_join(ND_THREAD *nti) {
     bool wrapper_released;
-    int ret = nd_thread_join_internal(nti, &wrapper_released);
+    int ret = nd_thread_join_internal(nti, &wrapper_released, false);
 
     // release our CAS ownership of the retained wrapper, so the caller
     // (which still holds the pointer) can retry the join
@@ -616,4 +635,90 @@ int nd_thread_join(ND_THREAD *nti) {
         nd_thread_status_clear(nti, NETDATA_THREAD_STATUS_JOINED);
 
     return ret;
+}
+
+// ----------------------------------------------------------------------------
+// unittest
+
+static void threads_unittest_worker(void *arg __maybe_unused) {
+    ;
+}
+
+// takes the wrapper's address as an integer, so it can be asked about a wrapper that has been freed
+static bool threads_unittest_is_exited(uintptr_t nti) {
+    bool found = false;
+
+    spinlock_lock(&threads_globals.exited.spinlock);
+    for(ND_THREAD *t = threads_globals.exited.list; t; t = t->next) {
+        if((uintptr_t)t == nti) {
+            found = true;
+            break;
+        }
+    }
+    spinlock_unlock(&threads_globals.exited.spinlock);
+
+    return found;
+}
+
+static bool threads_unittest_wait_finished(ND_THREAD *nti) {
+    // FINISHED is set after the wrapper is appended to the exited list
+    for(size_t i = 0; i < 10000; i++) {
+        if(nd_thread_status_check(nti, NETDATA_THREAD_STATUS_FINISHED))
+            return true;
+        sleep_usec(1 * USEC_PER_MS);
+    }
+    return false;
+}
+
+int threads_unittest(void) {
+    int errors = 0;
+
+    fprintf(stderr, "\nTesting that nd_thread_join_threads() leaves manual-join threads to their owner...\n");
+
+    ND_THREAD *manual = nd_thread_create("UT_MANUAL", NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_MANUAL_JOIN,
+                                         threads_unittest_worker, NULL);
+    ND_THREAD *generic = nd_thread_create("UT_GENERIC", NETDATA_THREAD_OPTION_DONT_LOG,
+                                          threads_unittest_worker, NULL);
+    if(!manual || !generic) {
+        fprintf(stderr, " > FAILED: cannot create the test threads\n");
+        nd_thread_join(manual);
+        nd_thread_join(generic);
+        return 1;
+    }
+
+    if(!threads_unittest_wait_finished(manual) || !threads_unittest_wait_finished(generic)) {
+        // do not join: a thread that did not finish would block the test forever
+        fprintf(stderr, " > FAILED: the test threads did not finish\n");
+        return 1;
+    }
+
+    uintptr_t manual_id = (uintptr_t)manual;
+    uintptr_t generic_id = (uintptr_t)generic;
+
+    nd_thread_join_threads();
+
+    if(!threads_unittest_is_exited(manual_id)) {
+        fprintf(stderr, " > FAILED: the drain took a manual-join thread from its owner\n");
+        // the drain freed it; joining it here would be a use-after-free
+        return 1;
+    }
+
+    if(threads_unittest_is_exited(generic_id)) {
+        fprintf(stderr, " > FAILED: the drain did not join a default thread\n");
+        errors++;
+    }
+
+    int rc = nd_thread_join(manual);
+    if(rc != 0) {
+        fprintf(stderr, " > FAILED: the owner's join returned %d\n", rc);
+        errors++;
+    }
+
+    if(threads_unittest_is_exited(manual_id)) {
+        fprintf(stderr, " > FAILED: the owner's join left the thread on the exited list\n");
+        errors++;
+    }
+
+    fprintf(stderr, "%s\n", errors ? " > FAILED" : " > OK");
+    return errors;
 }

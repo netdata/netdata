@@ -1,0 +1,45 @@
+version: v1
+context_namespace: dem_synthetic
+groups:
+  - family: Execution
+    metrics: [execution_state, duration]
+    charts:
+      - context: execution_state
+        title: Synthetic attempt outcome
+        units: state
+        type: stacked
+        dimensions:
+          - selector: execution_state
+      - context: duration
+        title: Synthetic attempt duration
+        units: milliseconds
+        dimensions:
+          - selector: duration
+            name: duration
+  - family: Tests
+    context_namespace: journey
+    metrics: [tests_declared, tests_passed, tests_failed, tests_timed_out, tests_skipped, tests_expected_failure, tests_not_run]
+    charts:
+      - context: declared_tests
+        title: Declared journey tests
+        units: tests
+        dimensions:
+          - selector: tests_declared
+            name: declared
+      - context: test_outcomes
+        title: Journey test outcomes
+        units: tests
+        type: stacked
+        dimensions:
+          - selector: tests_passed
+            name: passed
+          - selector: tests_failed
+            name: failed
+          - selector: tests_timed_out
+            name: timed_out
+          - selector: tests_skipped
+            name: skipped
+          - selector: tests_expected_failure
+            name: expected_failure
+          - selector: tests_not_run
+            name: not_run

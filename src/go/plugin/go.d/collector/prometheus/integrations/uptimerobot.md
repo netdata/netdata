@@ -29,7 +29,7 @@ Metrics are gathered by periodically sending HTTP requests to [Uptimerobot Expor
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -41,7 +41,15 @@ By default, it detects instances running on the local host by trying to connect 
 
 #### Limits
 
-The default configuration for this integration does not impose any limits on data collection.
+Input exceeding `max_input_series` rejects the whole collection. Output exceeding
+`max_output_series_per_context` omits that entire context while other contexts remain available.
+Limits apply with and without profiles. Admission and output omission/recovery are reported in ordinary logs.
+These limits do not bound download, parser memory, or total retained storage.
+
+HTTP responses have a separate fixed 64 MiB limit, including after gzip decompression.
+A response exceeding this limit fails the scrape. Reduce the metrics exposed by the endpoint if it
+exceeds this limit; collector-side selectors and relabeling do not reduce the downloaded body.
+
 
 #### Performance Impact
 
@@ -92,11 +100,12 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | expected_prefix | If set, the job's check passes only when at least one post-job, pre-profile metric name starts with this prefix. Guards against scraping an unexpected endpoint; profile-owned relabeling cannot satisfy it. |  | no |
 | **Customization** | app | Application name used as the app segment of chart contexts (`prometheus.<app>.<metric>`). When unset, it is taken from a matched profile, otherwise it falls back to the job name. |  | no |
 | **Filters** | [selector](#option-filters-selector) | Time series selector (filter). |  | no |
-| **Limits** | max_time_series | Global time series limit applied after job and profile relabeling. If the final output exceeds it, the data is not processed. | 2000 | no |
-|  | max_time_series_per_metric | Per-metric time series limit applied to final metric families. Metrics exceeding it are skipped. | 200 | no |
+| **Limits** | max_input_series | Maximum input series after selector and job/profile relabeling, checked at startup and every collection. Each scalar counts once; each histogram counts its buckets plus two count/sum slots, and each summary counts its quantiles plus two count/sum slots, including incomplete distributions. Exceeding the limit rejects the whole collection before storage. Zero disables the limit; negative values are invalid. This does not bound download or parser memory. | 10000 | no |
+|  | max_output_series_per_context | Maximum distinct current chart/dimension pairs per resolved context in one job and host scope, counted after routing and aggregation across all charts. Exceeding the limit omits the whole context; other contexts keep their complete inputs. Applies to profiles, automatic charts and raw counter companion charts. Zero disables the limit; negative values are invalid. | 1000 | no |
 | **Customization** | [fallback_type](#option-customization-fallback-type) | Job-level fallback type overrides for untyped metrics. |  | no |
 |  | [relabeling](#option-customization-relabeling) | Job-owned Prometheus-compatible metric relabeling, applied before profile selection. |  | no |
 |  | [profiles](#option-customization-profiles) | Curated, exporter-specific chart profiles with optional untyped classification, profile-owned normalization, and scoped fallback-chart policy. User profiles may constrain unmatched fallback charts; stock profiles preserve unknown future families. Disable profiles with mode `none`. | auto | no |
+| **Raw counter charts** | [counter_raw_charts](#option-raw-counter-charts-counter-raw-charts) | Counters whose raw cumulative value is also charted, next to their per-second rate chart, under the `prometheus.<app>.<metric>.raw` context. Leave empty to chart counters as rates only. |  | no |
 | **HTTP Auth** | username | Username for Basic HTTP authentication. |  | no |
 |  | password | Password for Basic HTTP authentication. |  | no |
 |  | bearer_token_file | Path to a file containing a bearer token (used for `Authorization: Bearer`). |  | no |
@@ -146,6 +155,9 @@ Job gauge rules take precedence over job counter rules, and both job rule sets t
 every profile rule. Use them for deployment-specific overrides rather than exporter behavior that
 belongs in a profile. Keep patterns narrow: a broad job rule such as `gauge: ['*']` overrides profile
 counter classifications. Blank patterns and patterns with leading or trailing whitespace are rejected.
+To keep a counter's rate chart and also chart its raw value on generic autogen charts, list the metric
+in `counter_raw_charts` instead of adding a gauge rule; an untyped metric without the `_total` suffix
+also needs a `counter` rule. Metrics charted by a profile get no raw chart.
 
 - Metric name pattern syntax: [shell file name pattern](https://golang.org/pkg/path/filepath/#Match).
 - Option syntax:
@@ -231,6 +243,27 @@ profiles:
 ```
 
 
+<a id="option-raw-counter-charts-counter-raw-charts"></a>
+##### counter_raw_charts
+
+Use this option when you need a counter's total as well as its rate, for example to read the absolute
+number of requests served since the exporter started. Each item holds one metric name pattern with the
+same syntax as `fallback_type` (`*`, `?`, `[...]`); a leading `!` excludes, and the first matching item
+decides. Patterns match the final metric name after job and profile relabeling. Every matched counter
+series adds one chart.
+
+Only counters shown on generic autogen charts get a raw chart. Gauges, histogram and summary series,
+and metrics charted by a profile are not affected. An untyped metric qualifies once it is processed as
+a counter: through its `_total` suffix, `fallback_type.counter`, or a selected profile's
+`fallback_type`.
+
+```yaml
+counter_raw_charts:
+  - '!myapp_internal_*'
+  - 'myapp_*_total'
+```
+
+
 
 </details>
 
@@ -245,7 +278,7 @@ Configure the **prometheus** collector from the Netdata web interface:
 4. In the Search box, type _prometheus_ (or scroll the list) to locate the **prometheus** collector.
 5. Click the **+** next to the **prometheus** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -421,6 +454,7 @@ This collector has built-in grouping logic based on the [type of metrics](https:
 |---------------------------|-------------------------------------------|----------------------|-------------|
 | Gauge                     | for each label set                        | one, the metric name | absolute    |
 | Counter                   | for each label set                        | one, the metric name | incremental |
+| Counter in `counter_raw_charts`, raw chart (`.raw`) | for each label set     | one, the metric name | absolute    |
 | Summary (quantiles)       | for each label set (excluding 'quantile') | for each quantile    | absolute    |
 | Summary (sum and count)   | for each label set                        | the metric name      | incremental |
 | Histogram (buckets)       | for each label set (excluding 'le')       | for each bucket      | incremental |

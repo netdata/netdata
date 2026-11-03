@@ -26,7 +26,7 @@ This collector is supported on all platforms.
 [% endif %]
 
 [% if entry.overview.multi_instance %]
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 [% else %]
 This collector only supports collecting metrics from a single instance of this integration.
 [% endif %]
@@ -53,12 +53,10 @@ This collector only supports collecting metrics from a single instance of this i
 This integration doesn't support auto-detection.
 [% endif %]
 
+[% if entry.overview.default_behavior.limits.description | trim %]
 #### Limits
 
-[% if entry.overview.default_behavior.limits.description %]
 [[ entry.overview.default_behavior.limits.description ]]
-[% else %]
-The default configuration for this integration does not impose any limits on data collection.
 [% endif %]
 
 #### Performance Impact

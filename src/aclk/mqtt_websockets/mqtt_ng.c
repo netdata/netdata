@@ -234,8 +234,8 @@ struct mqtt_ng_client {
     mqtt_ng_send_fnc_t send_fnc_ptr;
     void *user_ctx;
 
-    // time when last fragment of MQTT message was sent
-    time_t time_of_last_send;
+    // monotonic time when last fragment of MQTT message was sent
+    usec_t last_send_ut;
 
     struct mqtt_ng_parser parser;
 
@@ -246,6 +246,10 @@ struct mqtt_ng_client {
     void (*msg_callback)(const char *topic, const void *msg, size_t msglen, int qos);
 
     unsigned int ping_pending:1;
+    // monotonic time the outstanding PINGREQ was requested, 0 when no PINGRESP is awaited
+    usec_t ping_requested_ut;
+    // ... and completely handed to the WebSocket layer, 0 while it is still queued
+    usec_t ping_submitted_ut;
     struct buffer_fragment ping_frag;
 
     struct mqtt_ng_stats stats;
@@ -866,12 +870,17 @@ static void remove_packet_from_timeout_monitor_list_unsafe(struct mqtt_ng_client
         __atomic_fetch_sub(&client->stats.packets_waiting_puback, 1, __ATOMIC_RELAXED);
 }
 
-#define PACKET_TIMEOUT_EPOCH (1704067200L)  // Jan 1, 2024 00:00:00 UTC
+// PUBACK deadlines are stored in the monitor list as monotonic seconds, so a wall-clock step can
+// neither expire them early nor postpone them. uint32_t wraps after ~136 years of uptime. A
+// deadline of 0 is always due.
+static uint32_t packet_timeout_deadline(time_t seconds)
+{
+    return (uint32_t)(now_monotonic_sec() + seconds);
+}
 
 static void add_packet_to_timeout_monitor_list(struct mqtt_ng_client *client, uint16_t packet_id)
 {
     spinlock_lock(&client->pending_packets.spinlock);
-    time_t now = now_realtime_sec();
     // Add it to the JudyL array
     uint32_t *Pvalue = (uint32_t *) JudyLIns(&client->pending_packets.JudyL, (Word_t) packet_id, PJE0);
     if (Pvalue == PJERR) {
@@ -879,7 +888,7 @@ static void add_packet_to_timeout_monitor_list(struct mqtt_ng_client *client, ui
         spinlock_unlock(&client->pending_packets.spinlock);
         return;
     }
-    *Pvalue = (uint32_t) ((now - PACKET_TIMEOUT_EPOCH) + PACKET_ACK_TIMEOUT_SECS);
+    *Pvalue = packet_timeout_deadline(PACKET_ACK_TIMEOUT_SECS);
     spinlock_unlock(&client->pending_packets.spinlock);
 
     __atomic_fetch_add(&client->stats.packets_waiting_puback, 1, __ATOMIC_RELAXED);
@@ -1095,6 +1104,9 @@ int mqtt_ng_connect(
 
     destroy_timeout_monitor_list(client);
 
+    // a ping of the previous connection must neither be sent nor time out this one
+    mqtt_ng_ping_reset(client);
+
     spinlock_lock(&client->tx_topic_aliases.spinlock);
     // according to MQTT spec topic aliases should not be persisted
     // even if clean session is true
@@ -1119,10 +1131,20 @@ int mqtt_ng_connect(
     return 0;
 }
 
+static uint16_t mqtt_ng_packet_id = 0;
+
+// 0 is not a valid packet id: skip it when the counter wraps.
+// Advancing again (instead of returning 1 for it) keeps the next call from handing out 1 a second time.
+static uint16_t next_packet_id(uint16_t *counter) {
+    uint16_t id;
+    do {
+        id = __atomic_add_fetch(counter, 1, __ATOMIC_RELAXED);
+    } while (!id);
+    return id;
+}
+
 uint16_t get_unused_packet_id() {
-    static uint16_t packet_id = 0;
-    uint16_t id = __atomic_fetch_add(&packet_id, 1, __ATOMIC_RELAXED) + 1;
-    return id ? id : 1;
+    return next_packet_id(&mqtt_ng_packet_id);
 }
 
 static size_t mqtt_ng_publish_size(
@@ -1299,7 +1321,7 @@ static void rearm_packet_timeout_unsafe(struct mqtt_ng_client *client, uint16_t 
 {
     uint32_t *deadline = (uint32_t *)JudyLGet(client->pending_packets.JudyL, (Word_t)packet_id, PJE0);
     if (deadline)
-        *deadline = (uint32_t)((now_realtime_sec() - PACKET_TIMEOUT_EPOCH) + seconds);
+        *deadline = packet_timeout_deadline(seconds);
 }
 
 // Resolves a packet that is waiting for its acknowledgement, either because the
@@ -1446,11 +1468,10 @@ static bool check_packet_monitor_list_for_timeouts(struct mqtt_ng_client *client
     bool first_then_next = true;
     uint32_t *Pvalue;
     Word_t packet_id = 0;
-    time_t now = now_realtime_sec();
+    time_t now = now_monotonic_sec();
 
     while ((Pvalue = (uint32_t *) JudyLFirstThenNext(client->pending_packets.JudyL, &packet_id, &first_then_next))) {
-        uint32_t expire_time_delta = *Pvalue;
-        if (now >= (PACKET_TIMEOUT_EPOCH + expire_time_delta)) {
+        if (now >= (time_t)*Pvalue) {
             if (timed_out_count < MAX_TIMED_OUT_PACKETS) {
                 timed_out_packets[timed_out_count++] = (uint16_t)packet_id;
             } else
@@ -1693,7 +1714,26 @@ static int mqtt_ng_puback(struct mqtt_ng_client *client, uint16_t packet_id, uin
 int mqtt_ng_ping(struct mqtt_ng_client *client)
 {
     client->ping_pending = 1;
+    client->ping_requested_ut = now_monotonic_usec();
+    client->ping_submitted_ut = 0;
     return MQTT_NG_MSGGEN_OK;
+}
+
+usec_t mqtt_ng_ping_requested_ut(struct mqtt_ng_client *client)
+{
+    return client->ping_requested_ut;
+}
+
+usec_t mqtt_ng_ping_submitted_ut(struct mqtt_ng_client *client)
+{
+    return client->ping_submitted_ut;
+}
+
+void mqtt_ng_ping_reset(struct mqtt_ng_client *client)
+{
+    client->ping_pending = 0;
+    client->ping_requested_ut = 0;
+    client->ping_submitted_ut = 0;
 }
 
 #define MQTT_NG_CLIENT_NEED_MORE_BYTES         0x10
@@ -2323,7 +2363,8 @@ static int parse_data(struct mqtt_ng_client *client)
                         return MQTT_NG_CLIENT_PROTOCOL_ERROR;
                     }
                     parser->state = MQTT_PARSE_MQTT_PACKET_DONE;
-                    ping_timeout = 0;
+                    client->ping_requested_ut = 0;
+                    client->ping_submitted_ut = 0;
                     break;
                 case MQTT_CPT_DISCONNECT:
                     rc = parse_disconnect_varhdr(client);
@@ -2420,7 +2461,9 @@ static int send_fragment(struct mqtt_ng_client *client) {
         return -1;
 
     if (frag->flags & BUFFER_FRAG_MQTT_PACKET_TAIL) {
-        client->time_of_last_send = time(NULL);
+        client->last_send_ut = now_monotonic_usec();
+        if (frag == &client->ping_frag && client->ping_requested_ut)
+            client->ping_submitted_ut = client->last_send_ut;
         if (frag != &client->ping_frag)
             __atomic_fetch_sub(&client->stats.tx_messages_queued, 1, __ATOMIC_RELAXED);
         __atomic_fetch_add(&client->stats.tx_messages_sent, 1, __ATOMIC_RELAXED);
@@ -2595,11 +2638,11 @@ int mqtt_ng_sync(struct mqtt_ng_client *client)
 
     // Check for packet timeouts and cleanup
     static time_t last_maintenance = 0;
-    if (now_realtime_sec() - last_maintenance >= PACKET_TIMEOUT_REPEAT_CHECK) {
+    if (now_monotonic_sec() - last_maintenance >= PACKET_TIMEOUT_REPEAT_CHECK) {
         // if check packet returns true then we did max cleanup, possibly there are more packets to cleanup
         // so do not update last_maintenance thus forcing check again
         if (likely(!check_packet_monitor_list_for_timeouts(client)))
-            last_maintenance = now_realtime_sec();
+            last_maintenance = now_monotonic_sec();
     }
 
     worker_is_busy(WORKER_ACLK_TRY_SEND_ALL);
@@ -3180,8 +3223,8 @@ static uint32_t *mqtt_ng_unittest_deadline_of(struct mqtt_ng_unittest_puback_ctx
     return (uint32_t *)JudyLGet(ctx->client->pending_packets.JudyL, (Word_t)ctx->packet_id, PJE0);
 }
 
-// expire the deadline instead of waiting PACKET_ACK_TIMEOUT_SECS for it: a delta of 0 puts the
-// deadline at PACKET_TIMEOUT_EPOCH, which is always in the past
+// expire the deadline instead of waiting PACKET_ACK_TIMEOUT_SECS for it: a deadline of 0 is
+// always in the past
 static bool mqtt_ng_unittest_expire_deadline(struct mqtt_ng_unittest_puback_ctx *ctx)
 {
     uint32_t *deadline = mqtt_ng_unittest_deadline_of(ctx);
@@ -3200,8 +3243,8 @@ static bool mqtt_ng_unittest_deadline_is_within_the_ack_window(struct mqtt_ng_un
     if (!deadline)
         return false;
 
-    time_t now = now_realtime_sec();
-    time_t expires_at = PACKET_TIMEOUT_EPOCH + (time_t)*deadline;
+    time_t now = now_monotonic_sec();
+    time_t expires_at = (time_t)*deadline;
     return expires_at > now && expires_at <= now + PACKET_ACK_TIMEOUT_SECS;
 }
 
@@ -3432,6 +3475,22 @@ static int mqtt_ng_unittest_packet_on_the_wire_is_never_dropped(void)
     return errors;
 }
 
+static int mqtt_ng_unittest_packet_id_wrap(void)
+{
+    int errors = 0;
+
+    uint16_t counter = UINT16_MAX - 2;
+    uint16_t ids[4];
+    for (size_t i = 0; i < sizeof(ids) / sizeof(ids[0]); i++)
+        ids[i] = next_packet_id(&counter);
+
+    MQTT_NG_TEST(ids[0] == UINT16_MAX - 1 && ids[1] == UINT16_MAX, "packet ids before the wrap are sequential");
+    MQTT_NG_TEST(ids[2] == 1, "packet id 0 is skipped at the wrap");
+    MQTT_NG_TEST(ids[3] == 2, "packet id 1 is not handed out twice after the wrap");
+
+    return errors;
+}
+
 int mqtt_ng_unittest(void)
 {
     int errors = 0;
@@ -3449,6 +3508,7 @@ int mqtt_ng_unittest(void)
     errors += mqtt_ng_unittest_recently_sent_packet_keeps_its_window();
     errors += mqtt_ng_unittest_timeout_starts_when_the_message_is_fully_sent();
     errors += mqtt_ng_unittest_packet_on_the_wire_is_never_dropped();
+    errors += mqtt_ng_unittest_packet_id_wrap();
 
     if (errors)
         fprintf(stderr, "mqtt_ng unittest: %d ERROR(S)\n", errors);
@@ -3458,9 +3518,9 @@ int mqtt_ng_unittest(void)
     return errors;
 }
 
-time_t mqtt_ng_last_send_time(struct mqtt_ng_client *client)
+usec_t mqtt_ng_last_send_ut(struct mqtt_ng_client *client)
 {
-    return client->time_of_last_send;
+    return client->last_send_ut;
 }
 
 void mqtt_ng_set_max_mem(struct mqtt_ng_client *client, size_t bytes)

@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	functionadapter "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/joboutput"
@@ -32,15 +33,29 @@ func NewContainedFunctionAssembly(
 	frames *lifecycle.FrameOwner,
 	initial ...functionadapter.InitialRoute,
 ) (*FunctionAssembly, error) {
+	return newContainedFunctionAssembly(ctx, epoch, attempts, diagnostics, modules, nil, frames, initial...)
+}
+
+func newContainedFunctionAssembly(
+	ctx context.Context,
+	epoch uint64,
+	attempts jobmgr.ProcessAttemptAuthority,
+	diagnostics jobmgr.DiagnosticObserver,
+	modules collectorapi.Registry,
+	providers []funcapi.ProcessFunctionProvider,
+	frames *lifecycle.FrameOwner,
+	initial ...functionadapter.InitialRoute,
+) (*FunctionAssembly, error) {
 	if ctx == nil || epoch == 0 || attempts == nil || modules == nil || frames == nil {
 		return nil, errors.New("jobmgr composition: invalid contained Function assembly")
 	}
-	controller, catalog, err := functionadapter.NewContainedController(
+	controller, catalog, err := functionadapter.NewContainedControllerWithProviders(
 		ctx,
 		epoch,
 		attempts,
 		diagnostics,
 		modules,
+		providers,
 		initial...,
 	)
 	if err != nil {

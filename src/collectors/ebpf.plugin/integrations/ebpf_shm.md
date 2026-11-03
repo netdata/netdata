@@ -30,7 +30,7 @@ This collector is only supported on the following platforms:
 
 - Linux
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time.
 
@@ -45,9 +45,6 @@ eBPF SHM can be monitored further using the following other integrations:
 
 The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) and presence of BTF files to decide which eBPF program will be attached.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 
@@ -169,10 +166,10 @@ Metrics:
 | cgroup.shmat | Calls to syscall shmat(2). | at | calls/s |
 | cgroup.shmdt | Calls to syscall shmdt(2). | dt | calls/s |
 | cgroup.shmctl | Calls to syscall shmctl(2). | ctl | calls/s |
-| services.shmget | Calls to syscall shmget(2). | a dimension per systemd service | calls/s |
-| services.shmat | Calls to syscall shmat(2). | a dimension per systemd service | calls/s |
-| services.shmdt | Calls to syscall shmdt(2). | a dimension per systemd service | calls/s |
-| services.shmctl | Calls to syscall shmctl(2). | a dimension per systemd service | calls/s |
+| systemd.service.shmget | Calls to syscall shmget(2). | a dimension per systemd service | calls/s |
+| systemd.service.shmat | Calls to syscall shmat(2). | a dimension per systemd service | calls/s |
+| systemd.service.shmdt | Calls to syscall shmdt(2). | a dimension per systemd service | calls/s |
+| systemd.service.shmctl | Calls to syscall shmctl(2). | a dimension per systemd service | calls/s |
 
 
 ### Per apps

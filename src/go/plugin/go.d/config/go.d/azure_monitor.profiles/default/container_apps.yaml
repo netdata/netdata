@@ -208,6 +208,7 @@ template:
       - region
       - resource_type
       - profile
+      - subscription_id
     instances:
       by_labels:
         - resource_uid

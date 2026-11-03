@@ -69,42 +69,121 @@ int aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, size_t
 }
 
 #define V2_BIN_PAYLOAD_SEPARATOR "\x0D\x0A\x0D\x0A"
-static short aclk_send_message_with_bin_payload(mqtt_wss_client client, json_object *msg, const char *topic, const void *payload, size_t payload_len)
-{
-    uint16_t packet_id = 0;
-    const char *str;
-    char *full_msg = NULL;
-    size_t len;
 
+/*
+ * Starts the JSON header common to all ACLK http messages. The caller adds the members of its own
+ * message and closes it with buffer_json_finalize(). A NULL msg_id gets a random one.
+ */
+static BUFFER *aclk_http_msg_hdr(const char *msg_id)
+{
+    char uuid_str[UUID_STR_LEN];
+
+    if (unlikely(!msg_id)) {
+        nd_uuid_t uuid;
+        uuid_generate(uuid);
+        uuid_unparse(uuid, uuid_str);
+        msg_id = uuid_str;
+    }
+
+    usec_t now_ut = now_realtime_usec();
+    usec_t session = aclk_session_load();
+
+    BUFFER *wb = buffer_create(512, &netdata_buffers_statistics.buffers_aclk);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
+    buffer_json_member_add_string(wb, "type", "http");
+    buffer_json_member_add_string(wb, "msg-id", msg_id);
+    buffer_json_member_add_int64(wb, "timestamp", (int64_t)(now_ut / USEC_PER_SEC));
+    buffer_json_member_add_int64(wb, "timestamp-offset-usec", (int64_t)(now_ut % USEC_PER_SEC));
+    buffer_json_member_add_int64(wb, "connect", (int64_t)(session / USEC_PER_SEC));
+    buffer_json_member_add_int64(wb, "connect-offset-usec", (int64_t)(session % USEC_PER_SEC));
+    buffer_json_member_add_int64(wb, "version", ACLK_HEADER_VERSION);
+
+    return wb;
+}
+
+// the finalized header of a reply to a cloud http request
+static BUFFER *aclk_http_msg_reply_hdr(const char *msg_id, usec_t t_exec, usec_t created, short http_code)
+{
+    BUFFER *wb = aclk_http_msg_hdr(msg_id);
+    buffer_json_member_add_int64(wb, "t-exec", (int64_t)t_exec);
+    buffer_json_member_add_int64(wb, "t-rx", (int64_t)created);
+    buffer_json_member_add_int64(wb, "http-code", http_code);
+    buffer_json_finalize(wb);
+    return wb;
+}
+
+// the finalized header of an error reply to a cloud http request
+static BUFFER *aclk_http_msg_err_hdr(const char *msg_id, int http_code, int ec, const char *emsg)
+{
+    BUFFER *wb = aclk_http_msg_hdr(msg_id);
+    buffer_json_member_add_int64(wb, "http-code", http_code);
+    buffer_json_member_add_int64(wb, "error-code", ec);
+    buffer_json_member_add_string(wb, "error-description", emsg);
+    buffer_json_finalize(wb);
+    return wb;
+}
+
+// Lays out the finalized header, then - only when there is a payload - the separator and the two payload
+// parts, in one allocation. Returns NULL when the total size overflows.
+static char *aclk_http_msg_assemble(BUFFER *hdr, const void *p1, size_t p1_len, const void *p2, size_t p2_len, size_t *msg_len)
+{
+    if (!p1)
+        p1_len = 0;
+    if (!p2)
+        p2_len = 0;
+
+    const size_t sep_len = sizeof(V2_BIN_PAYLOAD_SEPARATOR) - 1;
+    const bool has_payload = (p1_len != 0 || p2_len != 0);
+
+    size_t total = buffer_strlen(hdr);
+    if (unlikely(
+            (has_payload && aclk_size_add_overflow(&total, sep_len)) ||
+            aclk_size_add_overflow(&total, p1_len) ||
+            aclk_size_add_overflow(&total, p2_len)))
+        return NULL;
+
+    char *msg = mallocz(total);
+
+    size_t pos = buffer_strlen(hdr);
+    memcpy(msg, buffer_tostring(hdr), pos);
+
+    if (has_payload) {
+        memcpy(msg + pos, V2_BIN_PAYLOAD_SEPARATOR, sep_len);
+        pos += sep_len;
+    }
+
+    if (p1_len) {
+        memcpy(msg + pos, p1, p1_len);
+        pos += p1_len;
+    }
+
+    if (p2_len)
+        memcpy(msg + pos, p2, p2_len);
+
+    *msg_len = total;
+    return msg;
+}
+
+// Publishes the finalized header and its payload, and frees the header.
+// Returns 0, HTTP_RESP_CONTENT_TOO_LONG or HTTP_RESP_INTERNAL_SERVER_ERROR.
+static short aclk_http_msg_send(mqtt_wss_client client, const char *topic, BUFFER *hdr,
+                                const void *p1, size_t p1_len, const void *p2, size_t p2_len)
+{
     if (unlikely(!topic || topic[0] != '/')) {
         netdata_log_error("Full topic required!");
-        json_object_put(msg);
+        buffer_free(hdr);
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
     }
 
-    str = json_object_to_json_string_ext(msg, JSON_C_TO_STRING_PLAIN);
-    len = strlen(str);
+    size_t msg_len = 0;
+    char *msg = aclk_http_msg_assemble(hdr, p1, p1_len, p2, p2_len, &msg_len);
+    buffer_free(hdr);
 
-    const size_t sep_len = sizeof(V2_BIN_PAYLOAD_SEPARATOR) - 1;
-    size_t full_msg_len = len;
-    if (payload_len && unlikely(
-            aclk_size_add_overflow(&full_msg_len, sep_len) ||
-            aclk_size_add_overflow(&full_msg_len, payload_len))) {
-        json_object_put(msg);
+    if (unlikely(!msg))
         return HTTP_RESP_CONTENT_TOO_LONG;
-    }
 
-    full_msg = mallocz(full_msg_len);
-    memcpy(full_msg, str, len);
-    json_object_put(msg);
-
-    if (payload_len) {
-        memcpy(&full_msg[len], V2_BIN_PAYLOAD_SEPARATOR, sep_len);
-        len += sep_len;
-        memcpy(&full_msg[len], payload, payload_len);
-    }
-
-    int rc = mqtt_wss_publish5(client, (char*)topic, NULL, full_msg, &freez_aclk_publish_msg, full_msg_len, MQTT_WSS_PUB_QOS1, &packet_id);
+    uint16_t packet_id = 0;
+    int rc = mqtt_wss_publish5(client, (char *)topic, NULL, msg, &freez_aclk_publish_msg, msg_len, MQTT_WSS_PUB_QOS1, &packet_id);
 
     if (rc == MQTT_WSS_ERR_MSG_TOO_BIG)
         return HTTP_RESP_CONTENT_TOO_LONG;
@@ -112,63 +191,6 @@ static short aclk_send_message_with_bin_payload(mqtt_wss_client client, json_obj
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
 
     return 0;
-}
-
-/*
- * Creates universal header common for all ACLK messages. User gets ownership of json object created.
- * Usually this is freed by send function after message has been sent.
- */
-static struct json_object *create_hdr(const char *type, const char *msg_id)
-{
-    nd_uuid_t uuid;
-    char uuid_str[UUID_STR_LEN];
-    json_object *tmp;
-    json_object *obj = json_object_new_object();
-    time_t ts_secs;
-    usec_t ts_us;
-
-    tmp = json_object_new_string(type);
-    json_object_object_add(obj, "type", tmp);
-
-    if (unlikely(!msg_id)) {
-        uuid_generate(uuid);
-        uuid_unparse(uuid, uuid_str);
-        msg_id = uuid_str;
-    }
-
-    ts_us = now_realtime_usec();
-    ts_secs = ts_us / USEC_PER_SEC;
-    ts_us = ts_us % USEC_PER_SEC;
-
-    tmp = json_object_new_string(msg_id);
-    json_object_object_add(obj, "msg-id", tmp);
-
-    tmp = json_object_new_int64(ts_secs);
-    json_object_object_add(obj, "timestamp", tmp);
-
-// TODO handle this somehow on older json-c
-//    tmp = json_object_new_uint64(ts_us);
-// probably jso->_to_json_string -> custom function
-//          jso->o.c_uint64 -> map this with pointer to signed int
-// commit that implements json_object_new_uint64 is 3c3b592
-// between 0.14 and 0.15
-    tmp = json_object_new_int64(ts_us);
-    json_object_object_add(obj, "timestamp-offset-usec", tmp);
-
-    usec_t session = aclk_session_load();
-
-    tmp = json_object_new_int64(session / USEC_PER_SEC);
-    json_object_object_add(obj, "connect", tmp);
-
-// TODO handle this somehow see above
-//    tmp = json_object_new_uint64(session % USEC_PER_SEC);
-    tmp = json_object_new_int64(session % USEC_PER_SEC);
-    json_object_object_add(obj, "connect-offset-usec", tmp);
-
-    tmp = json_object_new_int(ACLK_HEADER_VERSION);
-    json_object_object_add(obj, "version", tmp);
-
-    return obj;
 }
 
 #ifndef __GNUC__
@@ -181,39 +203,19 @@ static struct json_object *create_hdr(const char *type, const char *msg_id)
 
 void aclk_http_msg_v2_err(mqtt_wss_client client, const char *topic, const char *msg_id, int http_code, int ec, const char* emsg, const char *payload, size_t payload_len)
 {
-    json_object *tmp, *msg;
-    msg = create_hdr("http", msg_id);
-    tmp = json_object_new_int(http_code);
-    json_object_object_add(msg, "http-code", tmp);
+    BUFFER *hdr = aclk_http_msg_err_hdr(msg_id, http_code, ec, emsg);
 
-    tmp = json_object_new_int(ec);
-    json_object_object_add(msg, "error-code", tmp);
-
-    tmp = json_object_new_string(emsg);
-    json_object_object_add(msg, "error-description", tmp);
-
-    if (aclk_send_message_with_bin_payload(client, msg, topic, payload, payload_len)) {
-        netdata_log_error("Failed to send cancellation message for http reply %zu %s", payload_len, payload);
+    if (aclk_http_msg_send(client, topic, hdr, payload, payload_len, NULL, 0)) {
+        netdata_log_error("Failed to send cancellation message for http reply %zu %s", payload_len, payload ? payload : "");
     }
 }
 
 short aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg_id, usec_t t_exec, usec_t created,
     short http_code, const char *payload, size_t payload_len)
 {
-    json_object *tmp, *msg;
+    BUFFER *hdr = aclk_http_msg_reply_hdr(msg_id, t_exec, created, http_code);
 
-    msg = create_hdr("http", msg_id);
-
-    tmp = json_object_new_int64(t_exec);
-    json_object_object_add(msg, "t-exec", tmp);
-
-    tmp = json_object_new_int64(created);
-    json_object_object_add(msg, "t-rx", tmp);
-
-    tmp = json_object_new_int(http_code);
-    json_object_object_add(msg, "http-code", tmp);
-
-    short rc = aclk_send_message_with_bin_payload(client, msg, topic, payload, payload_len);
+    short rc = aclk_http_msg_send(client, topic, hdr, payload, payload_len, NULL, 0);
 
     switch (rc) {
         case HTTP_RESP_CONTENT_TOO_LONG:
@@ -239,69 +241,16 @@ short aclk_http_msg_v2_direct(mqtt_wss_client client, const char *topic, const c
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
     }
 
-    // normalize NULL-with-len so the allocation size and the memcpys stay in sync
-    if (!http_headers)
-        http_headers_len = 0;
-    if (!body)
-        body_len = 0;
+    BUFFER *hdr = aclk_http_msg_reply_hdr(msg_id, t_exec, created, http_code);
 
-    json_object *msg = create_hdr("http", msg_id);
-    json_object *tmp;
+    short rc = aclk_http_msg_send(client, topic, hdr, http_headers, http_headers_len, body, body_len);
 
-    tmp = json_object_new_int64(t_exec);
-    json_object_object_add(msg, "t-exec", tmp);
-
-    tmp = json_object_new_int64(created);
-    json_object_object_add(msg, "t-rx", tmp);
-
-    tmp = json_object_new_int(http_code);
-    json_object_object_add(msg, "http-code", tmp);
-
-    size_t json_len;
-    const char *json_str = json_object_to_json_string_length(msg, JSON_C_TO_STRING_PLAIN, &json_len);
-
-    const size_t sep_len = sizeof(V2_BIN_PAYLOAD_SEPARATOR) - 1;
-    const bool has_payload = (http_headers_len != 0 || body_len != 0);
-
-    size_t total = json_len;
-    if (unlikely(
-            (has_payload && aclk_size_add_overflow(&total, sep_len)) ||
-            aclk_size_add_overflow(&total, http_headers_len) ||
-            aclk_size_add_overflow(&total, body_len))) {
-        json_object_put(msg);
+    if (rc == HTTP_RESP_CONTENT_TOO_LONG) {
         aclk_http_msg_v2_err(client, topic, msg_id, HTTP_RESP_CONTENT_TOO_LONG, CLOUD_EC_REQ_REPLY_TOO_BIG, CLOUD_EMSG_REQ_REPLY_TOO_BIG, NULL, 0);
         return HTTP_RESP_CONTENT_TOO_LONG;
     }
 
-    char *raw = mallocz(total);
-
-    size_t pos = 0;
-    memcpy(raw + pos, json_str, json_len);
-    pos += json_len;
-    json_object_put(msg);
-
-    if (has_payload) {
-        memcpy(raw + pos, V2_BIN_PAYLOAD_SEPARATOR, sep_len);
-        pos += sep_len;
-    }
-
-    if (http_headers_len) {
-        memcpy(raw + pos, http_headers, http_headers_len);
-        pos += http_headers_len;
-    }
-
-    if (body_len)
-        memcpy(raw + pos, body, body_len);
-
-    uint16_t packet_id = 0;
-    int rc = mqtt_wss_publish5(client, (char *)topic, NULL, raw, &freez_aclk_publish_msg, total, MQTT_WSS_PUB_QOS1, &packet_id);
-
-    if (rc == MQTT_WSS_ERR_MSG_TOO_BIG) {
-        aclk_http_msg_v2_err(client, topic, msg_id, HTTP_RESP_CONTENT_TOO_LONG, CLOUD_EC_REQ_REPLY_TOO_BIG, CLOUD_EMSG_REQ_REPLY_TOO_BIG, NULL, 0);
-        return HTTP_RESP_CONTENT_TOO_LONG;
-    }
-
-    if (rc != MQTT_WSS_OK) {
+    if (rc == HTTP_RESP_INTERNAL_SERVER_ERROR) {
         aclk_http_msg_v2_err(client, topic, msg_id, HTTP_RESP_INTERNAL_SERVER_ERROR, CLOUD_EC_SND_TIMEOUT, CLOUD_EMSG_SND_TIMEOUT, NULL, 0);
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
     }
@@ -373,3 +322,177 @@ char *aclk_generate_lwt(size_t *size) {
 #ifndef __GNUC__
 #pragma endregion
 #endif
+
+#define ACLK_HTTP_MSG_TEST(condition, msg, id) do {                              \
+        if(!(condition)) {                                                       \
+            fprintf(stderr, "aclk http msg unittest FAILED: %s, msg-id case %zu (%s:%d)\n", \
+                    (msg), (size_t)(id), __FUNCTION__, __LINE__);                \
+            errors++;                                                            \
+        }                                                                        \
+    } while(0)
+
+// Cloud parses the header as JSON: check every message shape parses back to the same members, in the
+// same order, with the same values - including msg-ids that need escaping.
+int aclk_http_msg_unittest(void)
+{
+    int errors = 0;
+
+    fprintf(stderr, "\nrunning aclk http msg unittest\n");
+
+    char long_id[4096];
+    memset(long_id, 'a', sizeof(long_id) - 1);
+    long_id[sizeof(long_id) - 1] = '\0';
+
+    const char *ids[] = {
+        "3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+        "with/slash",
+        "with\"quote",
+        "with\\backslash",
+        "ctl\x01\x1f\t\n\r\b\f",
+        "utf8-\xce\xb1\xce\xb2-\xe2\x82\xac",
+        "",
+        long_id,
+        NULL,
+    };
+
+    static const char *reply_keys[] = {
+        "type", "msg-id", "timestamp", "timestamp-offset-usec", "connect", "connect-offset-usec", "version",
+        "t-exec", "t-rx", "http-code", NULL,
+    };
+    static const char *err_keys[] = {
+        "type", "msg-id", "timestamp", "timestamp-offset-usec", "connect", "connect-offset-usec", "version",
+        "http-code", "error-code", "error-description", NULL,
+    };
+
+    const usec_t t_exec = 12345, t_rx = 1760000000000001ULL;
+
+    for (size_t i = 0; i < sizeof(ids) / sizeof(ids[0]); i++) {
+        for (int shape = 0; shape < 2; shape++) {
+            BUFFER *hdr = shape == 0 ? aclk_http_msg_reply_hdr(ids[i], t_exec, t_rx, 200)
+                                     : aclk_http_msg_err_hdr(ids[i], 504, CLOUD_EC_SND_TIMEOUT, CLOUD_EMSG_SND_TIMEOUT);
+
+            ACLK_HTTP_MSG_TEST(!strchr(buffer_tostring(hdr), '\n'), "header is not minified", i);
+
+            json_object *o = json_tokener_parse(buffer_tostring(hdr));
+            ACLK_HTTP_MSG_TEST(o && json_object_is_type(o, json_type_object), "header is not a JSON object", i);
+            if (!o || !json_object_is_type(o, json_type_object)) {
+                json_object_put(o);
+                buffer_free(hdr);
+                continue;
+            }
+
+            const char **keys = shape == 0 ? reply_keys : err_keys;
+            size_t k = 0;
+            json_object_object_foreach(o, key, val) {
+                (void)val;
+                ACLK_HTTP_MSG_TEST(keys[k] && strcmp(key, keys[k]) == 0, "unexpected member or member order", i);
+                if (keys[k])
+                    k++;
+            }
+            ACLK_HTTP_MSG_TEST(keys[k] == NULL, "missing members", i);
+
+            // every member except the two strings (and error-description) is an integer
+            json_object_object_foreach(o, nkey, nval) {
+                bool is_string = !strcmp(nkey, "type") || !strcmp(nkey, "msg-id") || !strcmp(nkey, "error-description");
+                ACLK_HTTP_MSG_TEST(json_object_is_type(nval, is_string ? json_type_string : json_type_int),
+                                   "member has the wrong JSON type", i);
+            }
+
+            json_object *v;
+            ACLK_HTTP_MSG_TEST(json_object_object_get_ex(o, "type", &v) &&
+                                   strcmp(json_object_get_string(v), "http") == 0, "type is not http", i);
+
+            bool has_msg_id = json_object_object_get_ex(o, "msg-id", &v) && json_object_is_type(v, json_type_string);
+            ACLK_HTTP_MSG_TEST(has_msg_id, "msg-id is not a string", i);
+            if (has_msg_id && ids[i])
+                ACLK_HTTP_MSG_TEST(strcmp(json_object_get_string(v), ids[i]) == 0, "msg-id did not round-trip", i);
+            else if (has_msg_id) {
+                nd_uuid_t uuid;
+                ACLK_HTTP_MSG_TEST(uuid_parse(json_object_get_string(v), uuid) == 0, "generated msg-id is not a uuid", i);
+            }
+
+            ACLK_HTTP_MSG_TEST(json_object_object_get_ex(o, "version", &v) &&
+                                   json_object_get_int(v) == ACLK_HEADER_VERSION, "wrong version", i);
+
+            int64_t ts = 0, ts_us = 0;
+            if (json_object_object_get_ex(o, "timestamp", &v))
+                ts = json_object_get_int64(v);
+            if (json_object_object_get_ex(o, "timestamp-offset-usec", &v))
+                ts_us = json_object_get_int64(v);
+            // loose on purpose: the wall clock may be adjusted while the test runs
+            int64_t now_s = (int64_t)(now_realtime_usec() / USEC_PER_SEC);
+            ACLK_HTTP_MSG_TEST(ts_us >= 0 && ts_us < (int64_t)USEC_PER_SEC && ts > now_s - 86400 && ts < now_s + 86400,
+                               "timestamp is not the current time", i);
+
+            usec_t session = aclk_session_load();
+            ACLK_HTTP_MSG_TEST(json_object_object_get_ex(o, "connect", &v) &&
+                                   json_object_get_int64(v) == (int64_t)(session / USEC_PER_SEC), "wrong connect", i);
+            ACLK_HTTP_MSG_TEST(json_object_object_get_ex(o, "connect-offset-usec", &v) &&
+                                   json_object_get_int64(v) == (int64_t)(session % USEC_PER_SEC), "wrong connect offset", i);
+
+            if (shape == 0) {
+                ACLK_HTTP_MSG_TEST(json_object_object_get_ex(o, "t-exec", &v) &&
+                                       json_object_get_int64(v) == (int64_t)t_exec, "wrong t-exec", i);
+                ACLK_HTTP_MSG_TEST(json_object_object_get_ex(o, "t-rx", &v) &&
+                                       json_object_get_int64(v) == (int64_t)t_rx, "wrong t-rx", i);
+                ACLK_HTTP_MSG_TEST(json_object_object_get_ex(o, "http-code", &v) &&
+                                       json_object_get_int(v) == 200, "wrong http-code", i);
+            }
+            else {
+                ACLK_HTTP_MSG_TEST(json_object_object_get_ex(o, "http-code", &v) &&
+                                       json_object_get_int(v) == 504, "wrong error http-code", i);
+                ACLK_HTTP_MSG_TEST(json_object_object_get_ex(o, "error-code", &v) &&
+                                       json_object_get_int(v) == CLOUD_EC_SND_TIMEOUT, "wrong error-code", i);
+                ACLK_HTTP_MSG_TEST(json_object_object_get_ex(o, "error-description", &v) &&
+                                       strcmp(json_object_get_string(v), CLOUD_EMSG_SND_TIMEOUT) == 0,
+                                   "wrong error-description", i);
+            }
+
+            json_object_put(o);
+            buffer_free(hdr);
+        }
+    }
+
+    // message layout: the separator is there only when there is a payload, and NULL parts count as empty
+    {
+        BUFFER *hdr = aclk_http_msg_reply_hdr("layout", 1, 2, 200);
+        size_t hdr_len = buffer_strlen(hdr);
+        const size_t sep_len = sizeof(V2_BIN_PAYLOAD_SEPARATOR) - 1;
+        size_t len = 0;
+
+        char *msg = aclk_http_msg_assemble(hdr, NULL, 0, NULL, 0, &len);
+        ACLK_HTTP_MSG_TEST(msg && len == hdr_len && memcmp(msg, buffer_tostring(hdr), hdr_len) == 0,
+                           "header-only message is not the header alone", 0);
+        freez(msg);
+
+        msg = aclk_http_msg_assemble(hdr, NULL, 10, NULL, 20, &len);
+        ACLK_HTTP_MSG_TEST(msg && len == hdr_len, "NULL payload parts were not treated as empty", 0);
+        freez(msg);
+
+        msg = aclk_http_msg_assemble(hdr, "HDRS", 4, "body", 4, &len);
+        ACLK_HTTP_MSG_TEST(msg && len == hdr_len + sep_len + 8 &&
+                               memcmp(msg, buffer_tostring(hdr), hdr_len) == 0 &&
+                               memcmp(msg + hdr_len, V2_BIN_PAYLOAD_SEPARATOR, sep_len) == 0 &&
+                               memcmp(msg + hdr_len + sep_len, "HDRSbody", 8) == 0,
+                           "header + separator + payload parts are not laid out in order", 0);
+        freez(msg);
+
+        msg = aclk_http_msg_assemble(hdr, NULL, 0, "body", 4, &len);
+        ACLK_HTTP_MSG_TEST(msg && len == hdr_len + sep_len + 4 && memcmp(msg + hdr_len + sep_len, "body", 4) == 0,
+                           "body without headers is not laid out after the separator", 0);
+        freez(msg);
+
+        msg = aclk_http_msg_assemble(hdr, "x", 1, "y", SIZE_MAX, &len);
+        ACLK_HTTP_MSG_TEST(msg == NULL, "an overflowing size was not refused", 0);
+        freez(msg);
+
+        buffer_free(hdr);
+    }
+
+    if (errors)
+        fprintf(stderr, "aclk http msg unittest: %d ERROR(S)\n", errors);
+    else
+        fprintf(stderr, "aclk http msg unittest: OK\n");
+
+    return errors;
+}

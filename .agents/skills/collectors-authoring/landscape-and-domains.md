@@ -17,17 +17,20 @@ which data type it produces, or how the closest existing collectors in its domai
 | `systemd-units.plugin` | C | Linux | `src/collectors/systemd-units.plugin/` | systemd unit state |
 | `windows.plugin` | C | Windows | `src/collectors/windows.plugin/` | Windows performance counters |
 | `freebsd.plugin` / `macos.plugin` | C | platform-specific | `src/collectors/{freebsd,macos}.plugin/` | OS analogs of `proc.plugin` |
-| `statsd.plugin` | C | All | `src/collectors/statsd.plugin/` | StatsD ingestion + synthetic_charts |
+| `statsd.plugin` (internal) | C | All | `src/collectors/statsd.plugin/` | StatsD ingestion + synthetic_charts |
 | `log2journal` | C | Linux | `src/collectors/log2journal/` | Parse application logs into the systemd journal |
 | Niche C plugins | C | various | `src/collectors/<name>.plugin/` | freeipmi, nfacct, tc, xenstat, debugfs, diskspace, slabinfo, idlejitter, timex, cups, ioping, perf |
 | `go.d.plugin` | Go (no CGO) | All | `src/go/plugin/go.d/` | Application integrations |
 | `ibm.d.plugin` | Go + CGO | Linux, IBM i | `src/go/plugin/ibm.d/modules/` | IBM workloads (DB2, IBM i / AS-400, IBM MQ, WebSphere) |
+| `scripts.d.plugin` | Go (no CGO) | All | `src/go/plugin/scripts.d/` | Nagios-compatible check scripts (`nagios` module) |
+| `statsd.plugin` (Go) | Go (no CGO) | All | `src/go/plugin/statsd/` | **Experimental**, opt-in (`ENABLE_PLUGIN_STATSD`): StatsD UDP/TCP ingestion (`listen` module) |
 | `netflow-plugin` | Rust | Linux | `src/crates/netflow-plugin/` | NetFlow v5/v9, IPFIX, sFlow |
 | `otel-plugin` | Rust | Linux | `src/crates/otel-plugin/` | OpenTelemetry metrics + logs ingestion (logs queryable via the `otel-logs` Function) |
 | `charts.d.plugin` / `python.d.plugin` | Bash / Python | All | `src/collectors/{charts,python}.d.plugin/` | **Legacy** — do not add new modules |
 
 Path conventions: internal C plugins → `src/collectors/<name>.plugin/`; Go orchestrators →
-`src/go/plugin/{go.d,ibm.d}/`; Rust plugins → `src/crates/<name>/`.
+`src/go/plugin/{go.d,ibm.d,scripts.d,statsd}/` with entry points in `src/go/cmd/` (`godplugin`, `ibmdplugin`,
+`scriptsdplugin`, `statsdplugin`); Rust plugins → `src/crates/<name>/`.
 
 ## ibm.d, Rust SDK, internal C, PLUGINSD
 
@@ -36,7 +39,8 @@ Path conventions: internal C plugins → `src/collectors/<name>.plugin/`; Go orc
   drivers; CGO outside the IBM ecosystem is a design discussion.
 - **Rust SDK** at `src/crates/netdata-plugin/` — modules `bridge/`, `protocol/`, `rt/`, `charts-derive/`, `schema/`,
   `types/`, `error/`. Documentation lives in `lib.rs` doc-comments — there is no README. New Rust crates go into the
-  `src/crates/Cargo.toml` workspace. Reference impl: `src/crates/netflow-plugin/`.
+  `src/crates/Cargo.toml` workspace. Reference impl: `src/crates/netflow-plugin/`. When to call
+  `PluginRuntime::run()` at startup: its doc-comment and `src/plugins.d/README.md#operation`.
 - **Internal C plugins** — mirror an adjacent collector under `src/collectors/<name>.plugin/`; reuse `src/libnetdata/`.
   `libnetdata.h` includes most of libnetdata so individual headers are usually unnecessary. Allocators with the `z`
   suffix (`mallocz`, `callocz`, `strdupz`, `freez`) handle failures via `fatal()`; `freez(NULL)` is safe. JSON parsing:
@@ -70,6 +74,16 @@ Path conventions: internal C plugins → `src/collectors/<name>.plugin/`; Go orc
   - Failure mode this catches: a runtime field declared inside the CO-RE guard but referenced outside it.
     It compiles wherever CO-RE is on and fails everywhere else with `has no member named '<field>'`, which
     surfaces as a distro build break (EL8 ships libbpf 0.x) long after the Go job went green.
+- freeipmi.plugin without IPMI hardware (Linux; target `freeipmi.plugin` needs `libipmimonitoring`): run OpenIPMI
+  `ipmi_sim` as a LAN BMC and pass the plugin `hostname <addr> username <user> password <pass>`. Observed with
+  libipmimonitoring 1.6.10 and OpenIPMI 2.0.33:
+  - `127.0.0.1` and `localhost` select in-band access; bind `ipmi_sim` (`addr` in its LAN config) to a
+    non-loopback address.
+  - The LAN channel opens only after `mc_enable 0x20` in the command file.
+  - `main_sdr_add` takes `0x`-prefixed bytes; `sdrcomp -r -8` compiles text SDRs to raw bytes with 8-bit ID strings.
+  - Without `sensor_set_event_support <mc> <lun> <num> enable scanning ...` a threshold sensor's reading type is
+    unknown, so only its state chart appears.
+  - The Functions reader makes the plugin exit on stdin EOF, so keep stdin open.
 
 ## Migrating a C ebpf.plugin module to ebpfgo.plugin
 
@@ -174,7 +188,9 @@ production topology contract in `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json`. F
 compact-table helpers. For Rust, implement the `FunctionHandler` trait from the SDK runtime
 (`src/crates/netdata-plugin/rt/`).
 
-Functions run concurrently with the collection loop — they must not block it. Validate during development with
+Functions run concurrently with the collection loop — they must not block it. C plugins also share its stdout:
+response serialization is stated above the `*_to_stdout()` helpers in
+`src/libnetdata/functions_evloop/functions_evloop.h`. Validate during development with
 `src/go/tools/functions-validation/`.
 
 Reference implementations: `src/collectors/network-viewer.plugin/` (topology + connections),

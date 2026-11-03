@@ -10,7 +10,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 )
 
 type (
@@ -31,7 +30,7 @@ type (
 		Registry     confgroup.Registry
 		ReadPaths    []string
 		DummyNames   []string
-		FnReg        functions.Registry
+		FnReg        dyncfg.PreparedRegistry
 	}
 )
 
