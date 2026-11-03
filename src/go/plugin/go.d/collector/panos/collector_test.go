@@ -2666,7 +2666,12 @@ func TestParseReadOnlyTelemetry(t *testing.T) {
 			sas, err := parseVPNIKESAs(dataIPSecIKESAPartial)
 			require.NoError(t, err)
 			require.Len(t, sas, 2)
-			assert.Equal(t, vpnIKESA{GatewayID: "3", Name: "gw-branch-c"}, sas[0])
+			assert.Equal(t, vpnIKESA{
+				GatewayID: "3",
+				Name:      "gw-branch-c",
+				Created:   "Jan.01 00:00:00",
+				Expires:   "Jan.01 08:00:00",
+			}, sas[0])
 		},
 	}
 

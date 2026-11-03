@@ -56,6 +56,8 @@ type vpnUnexpectedElement struct {
 type vpnIKESA struct {
 	GatewayID string `xml:"gwid"`
 	Name      string `xml:"name"`
+	Created   string `xml:"created"`
+	Expires   string `xml:"expires"`
 }
 
 // collectIPSecTunnelStateMetrics reports the state of every configured IPsec tunnel.
@@ -91,8 +93,8 @@ func (c *Collector) collectIPSecTunnelStateMetrics(ctx context.Context) (bool, e
 }
 
 // collectIPSecGatewayMetrics reports IKE (phase 1) state per configured gateway.
-// show vpn ike-sa lists only gateways that have an SA, so the gateway list is the
-// source of truth and a configured gateway missing from the SA list is down.
+// A configured gateway missing from a validated show vpn ike-sa list is down.
+// This is independent of the child SA and tunnel flow state.
 func (c *Collector) collectIPSecGatewayMetrics(ctx context.Context) (bool, error) {
 	body, err := c.apiClient.op(ctx, ipsecGatewayCommand)
 	if err != nil {
@@ -173,8 +175,8 @@ func parseVPNGateways(body []byte) ([]vpnGateway, error) {
 }
 
 // parseVPNIKESAs returns the IKE SAs in a show vpn ike-sa response. An empty result is a
-// valid response meaning no gateway has an SA, so there is no "not found" case. Any child
-// other than <entry> is rejected: reading it as an empty list would mark every gateway down.
+// valid response meaning no gateway has an SA, so there is no "not found" case. Unsupported
+// or incomplete results are rejected before their absence can imply that a gateway is down.
 func parseVPNIKESAs(body []byte) ([]vpnIKESA, error) {
 	var result vpnIKESAResult
 	if err := decodePANOSResult(body, "PAN-OS IPsec IKE SA response", &result); err != nil {
@@ -193,6 +195,13 @@ func parseVPNIKESAs(body []byte) ([]vpnIKESA, error) {
 		if sa.GatewayID == "" && sa.Name == "" {
 			// An unidentifiable SA can belong to any gateway, so absence cannot establish down.
 			return nil, errors.New("parse PAN-OS IPsec IKE SA response result: entry has no gateway identity")
+		}
+		sa.Created = strings.TrimSpace(sa.Created)
+		sa.Expires = strings.TrimSpace(sa.Expires)
+		if sa.Created == "" || sa.Expires == "" {
+			// Established rows in the supported captures have both times. An incomplete row
+			// does not establish either health or absence; leave the metricset as a gap.
+			return nil, errors.New("parse PAN-OS IPsec IKE SA response result: entry has missing establishment or expiration time")
 		}
 	}
 	return result.Entries, nil

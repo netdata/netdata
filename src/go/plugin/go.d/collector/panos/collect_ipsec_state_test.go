@@ -195,9 +195,9 @@ func TestCollector_IPSecState(t *testing.T) {
 					),
 					ipsecIKESACommand: []byte(
 						`<response status="success"><result>` +
-							`<entry><gwid> 1 </gwid><name> renamed </name></entry>` +
-							`<entry><gwid>1</gwid><name>renamed</name></entry>` +
-							`<entry><name>gw-branch-b</name></entry>` +
+							`<entry><gwid> 1 </gwid><name> renamed </name><created> Jan.01 00:00:00 </created><expires> Jan.02 00:00:00 </expires></entry>` +
+							`<entry><gwid>1</gwid><name>renamed</name><created>Jan.01 00:00:00</created><expires>Jan.02 00:00:00</expires></entry>` +
+							`<entry><name>gw-branch-b</name><created>Jan.01 00:00:00</created><expires>Jan.01 08:00:00</expires></entry>` +
 							`</result></response>`,
 					),
 				}
@@ -246,15 +246,105 @@ func TestCollector_IPSecState(t *testing.T) {
 		t.Run(name, func(t *testing.T) { runCollectScenario(t, tc) })
 	}
 }
+
+func TestCollector_IPSecFailedIKEv1Capture(t *testing.T) {
+	// The unfiltered XML capture omits gw-test while its CLI row shows a failed negotiation.
+	// Provenance and the capture's limits are recorded in testdata/README.md.
+	body, err := os.ReadFile("testdata/ipsec_ike_sa_ikev1_failed.xml")
+	require.NoError(t, err)
+	c := New()
+	c.apiClient = &mockAPIClient{
+		responses: map[string][]byte{
+			ipsecGatewayCommand: []byte(`<response status="success"><result><entries>` +
+				`<entry><id>2</id><name>gw-branch-b</name><v1/></entry>` +
+				`<entry><id>3</id><name>gw-branch-c</name><v2/></entry>` +
+				`<entry><id>4</id><name>gw-branch-d</name><v2/></entry>` +
+				`<entry><id>5</id><name>gw-test</name><v1/></entry>` +
+				`</entries></result></response>`),
+			ipsecIKESACommand: body,
+		},
+	}
+	mx, err := collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
+	require.NoError(t, err)
+	assert.Equal(t, mergeMetrics(
+		ipsecGatewayStateMetrics("gw-branch-b", "ikev1", "up"),
+		ipsecGatewayStateMetrics("gw-branch-c", "ikev2", "up"),
+		ipsecGatewayStateMetrics("gw-branch-d", "ikev2", "up"),
+		ipsecGatewayStateMetrics("gw-test", "ikev1", "down"),
+	), ipsecStateSeries(mx, "ipsec_gateway_state"))
+}
+
+func TestCollector_IPSecGatewayTunnelIndependence(t *testing.T) {
+	// Synthetic payload combinations exercise the independent states observed in the author captures.
+	for name, tc := range map[string]struct {
+		version     string
+		sas         []byte
+		flowState   string
+		wantGateway string
+	}{
+		"IKEv1 phase 1 established before phase 2": {
+			version:     "ikev1",
+			sas:         dataIPSecIKESA,
+			flowState:   "init",
+			wantGateway: "up",
+		},
+		"IKEv1 parent cleared while child survives": {
+			version:     "ikev1",
+			sas:         dataIPSecIKESAEmpty,
+			flowState:   "active",
+			wantGateway: "down",
+		},
+		"IKEv2 parent and child established": {
+			version:     "ikev2",
+			sas:         dataIPSecIKESA,
+			flowState:   "active",
+			wantGateway: "up",
+		},
+		"IKEv2 parent and child deleted": {
+			version:     "ikev2",
+			sas:         dataIPSecIKESAEmpty,
+			flowState:   "inactive",
+			wantGateway: "down",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			gateway, id, protocol := "gw-branch-a", "1", "v1"
+			if tc.version == "ikev2" {
+				gateway, id, protocol = "gw-branch-c", "3", "v2"
+			}
+			c := New()
+			c.apiClient = &mockAPIClient{
+				responses: map[string][]byte{
+					ipsecGatewayCommand: []byte(fmt.Sprintf(`<response status="success"><result><entries>`+
+						`<entry><id>%s</id><name>%s</name><%s/></entry></entries></result></response>`, id, gateway, protocol)),
+					ipsecIKESACommand: tc.sas,
+					ipsecFlowCommand: []byte(fmt.Sprintf(`<response status="success"><result><IPSec>`+
+						`<entry><name>test-tunnel</name><id>5</id><state>%s</state></entry></IPSec></result></response>`, tc.flowState)),
+				},
+			}
+			mx, err := collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
+			require.NoError(t, err)
+			assert.Equal(t, ipsecGatewayStateMetrics(gateway, tc.version, tc.wantGateway), ipsecStateSeries(mx, "ipsec_gateway_state"))
+			assert.Equal(t, ipsecTunnelStateMetrics("test-tunnel", "5", tc.flowState), ipsecStateSeries(mx, "ipsec_tunnel_state"))
+		})
+	}
+}
+
 func TestCollector_IPSecInvalidIKESAIsGap(t *testing.T) {
 	for name, body := range map[string]string{
-		"missing result":    `<response status="success"/>`,
-		"text result":       `<response status="success"><result>unexpected telemetry</result></response>`,
-		"unexpected child":  `<response status="success"><result><error>query failed</error></result></response>`,
-		"unidentified SA":   `<response status="success"><result><entry><role>Init</role></entry></result></response>`,
-		"blank SA identity": `<response status="success"><result><entry><gwid> </gwid><name> </name></entry></result></response>`,
+		"missing result":             `<response status="success"/>`,
+		"text result":                `<response status="success"><result>unexpected telemetry</result></response>`,
+		"unexpected child":           `<response status="success"><result><error>query failed</error></result></response>`,
+		"unidentified SA":            `<response status="success"><result><entry><role>Init</role></entry></result></response>`,
+		"blank SA identity":          `<response status="success"><result><entry><gwid> </gwid><name> </name></entry></result></response>`,
+		"missing establishment time": strings.Replace(string(dataIPSecIKESA), `<created>Jan.01 00:00:00</created>`, "", 1),
+		"empty establishment time":   strings.Replace(string(dataIPSecIKESA), `<created>Jan.01 00:00:00</created>`, `<created/>`, 1),
+		"blank establishment time":   strings.Replace(string(dataIPSecIKESA), `<created>Jan.01 00:00:00</created>`, `<created> </created>`, 1),
+		"missing expiration time":    strings.Replace(string(dataIPSecIKESA), `<expires>Jan.02 00:00:00</expires>`, "", 1),
+		"empty expiration time":      strings.Replace(string(dataIPSecIKESA), `<expires>Jan.02 00:00:00</expires>`, `<expires/>`, 1),
+		"blank expiration time":      strings.Replace(string(dataIPSecIKESA), `<expires>Jan.02 00:00:00</expires>`, `<expires> </expires>`, 1),
 		"partially readable list": `<response status="success"><result>` +
-			`<entry><gwid>1</gwid><name>gw-branch-a</name></entry><entry/>` +
+			`<entry><gwid>1</gwid><name>gw-branch-a</name><created>Jan.01 00:00:00</created><expires>Jan.02 00:00:00</expires></entry><entry/>` +
 			`</result></response>`,
 	} {
 		t.Run(name, func(t *testing.T) {

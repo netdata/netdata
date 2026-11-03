@@ -39,7 +39,13 @@ modules:
         limits:
           description: |
             The default collection interval is 60 seconds to keep polling load conservative on the PAN-OS management plane.
+
             IPsec states describe local VPN state, not end-to-end reachability. On-demand VPNs may have no SA until traffic triggers negotiation.
+            Gateway `up` means an IKE SA with establishment and expiration times was reported; `down` means no matching SA was reported in a valid response.
+            Failed queries and incomplete SA data leave gateway-state gaps.
+
+            Gateway and tunnel states are independent. An IKE gateway can be `up` before its tunnel leaves `init`, and an IKEv1 tunnel can remain `active` after its parent IKE SA is cleared.
+            Tunnel flow states `active`, `inactive`, and `init` are preserved; `unknown` means an unrecognized nonempty state, and missing state data leaves a gap.
         performance_impact:
           description: |
             Each collection runs PAN-OS XML API operational requests. The collector uses serial requests and caps the SDK transport to 2 connections per firewall job. Multiple jobs targeting the same firewall multiply that per-job connection budget, so configure one job per firewall management interface unless you intentionally need separate scopes.
@@ -404,10 +410,7 @@ modules:
               dimensions:
                 - name: remaining_lifetime
         - name: IPsec tunnel state
-          description: |
-            These metrics refer to one configured PAN-OS IPsec tunnel, whether or not it currently has an established SA.
-            The collector preserves the PAN-OS flow states `active`, `inactive`, and `init`; `unknown` means an unrecognized nonempty state.
-            Missing state data produces a gap.
+          description: These metrics refer to one configured PAN-OS IPsec tunnel, whether or not it currently has an established SA.
           labels:
             - name: tunnel
               description: Tunnel name.
@@ -424,9 +427,7 @@ modules:
                 - name: init
                 - name: unknown
         - name: IPsec gateway
-          description: |
-            These metrics refer to one configured PAN-OS IKE gateway, using the configured inventory and current IKE SA list.
-            A failed or unreadable query produces a gap.
+          description: These metrics refer to one configured PAN-OS IKE gateway, whether or not it currently has an established IKE SA.
           labels:
             - name: gateway
               description: Gateway name.
