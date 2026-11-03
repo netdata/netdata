@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+# Initialize configuration and var directory skeleton
+mkdir -p "$SNAP_COMMON/etc"
+mkdir -p "$SNAP_DATA/var/cache"
+mkdir -p "$SNAP_DATA/var/lib"
+mkdir -p "$SNAP_DATA/var/log/netdata"
+cp -rp "$SNAP/etc/netdata" "$SNAP_COMMON/etc/netdata"
+cp -rp "$SNAP/var/cache/netdata" "$SNAP_DATA/var/cache/netdata"
+cp -rp "$SNAP/var/lib/netdata" "$SNAP_DATA/var/lib/netdata"
+mkdir -p "$SNAP_DATA/var/lib/netdata/www"
+mkdir -p "$SNAP_DATA/var/run/netdata"
