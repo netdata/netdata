@@ -316,8 +316,9 @@ Tests are evidence only when they have an independent oracle:
 - State that mirrors a remote log or table read in pieces while the source can
   change between commands SHOULD also have a randomized model test: seeded
   interleavings of every change the provider allows, reads and failures, checked
-  against the fake's own state once changes stop. Case tests of known races miss
-  the next interleaving. Exemplar:
+  against the fake's own state once changes stop. Also check retained-state bounds
+  during sustained changes: convergence-only checks miss growth when reads never
+  catch up. Case tests of known races miss the next interleaving. Exemplar:
   `src/go/plugin/ipmi/collector/ipmi/internal/bmc/sel_model_test.go`.
 
 ## Pre-PR Check

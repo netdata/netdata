@@ -92,7 +92,9 @@ Published record slices only grow at the end, lose a prefix or are reallocated, 
 them. Every record is accounted when `Get SEL Entry` returns it, before a reset or trim can drop it from the cache, so a
 record read just before a clear is still reported:
 
-- Records read before the log was read completely once are history, so a restart counts nothing old.
+- Records read before the log was read completely once are history, so a restart counts nothing old. No event-accounting
+  state is retained during this initial load, even if sustained rollover prevents it from completing. The first verified
+  cache seeds deduplication, including when the log is empty.
 - Afterwards a record is new when its 16 bytes were not read or cached before. A reset keeps that content, so the
   records a clear, rewrite or rollover makes the Reader read again are not new. Once a read is verified, only the
   content of the cached records is kept; anything else is gone from the BMC.

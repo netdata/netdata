@@ -56,12 +56,9 @@ type selCache struct {
 	// decodedWith is the inventory generation the records were decoded with.
 	decodedWith uint64
 
-	// counting is set once the log was read completely; only records first
-	// read after that are new.
-	counting bool
-	// seen holds the content of the cached records and of the records read
-	// since the log was last read completely that the BMC may still hold.
-	// Resets keep it, so a record read again is not new.
+	// seen is nil until the first verified read seeds it with the cached
+	// records. Afterwards it also holds records read since the last verified
+	// read that the BMC may still hold. Resets keep it to avoid recounting.
 	seen map[[selRecordSize]byte]bool
 	// pending holds the new records no delivered snapshot reported yet.
 	pending [][selRecordSize]byte
@@ -80,15 +77,14 @@ func (c *selCache) reset() {
 	c.loaded = false
 }
 
-// complete marks the cache verified to hold the whole log. Records first read
-// from now on are new. Records read earlier that the cache does not hold are
-// gone from the BMC, so seen keeps only the cached records; it holds every
-// cached record, so a larger seen has content to forget.
+// complete marks the cache verified to hold the whole log. The first verified
+// cache seeds event accounting; earlier reads are history and need no tracking.
+// Afterwards seen contains every cached record; if it is larger, the extra
+// records have left the log.
 func (c *selCache) complete() {
 	c.loaded = true
-	c.counting = true
 	c.unverified = false
-	if len(c.seen) > len(c.records) {
+	if c.seen == nil || len(c.seen) > len(c.records) {
 		seen := make(map[[selRecordSize]byte]bool, len(c.records))
 		for _, rec := range c.records {
 			seen[rec.Raw] = true
@@ -98,18 +94,13 @@ func (c *selCache) complete() {
 }
 
 // observe accounts for a record as it is read, before any cache change can
-// drop it: once counting, a record not seen before is new.
+// drop it: after the baseline is verified, a record not seen before is new.
 func (c *selCache) observe(raw [selRecordSize]byte) {
-	if c.seen[raw] {
+	if c.seen == nil || c.seen[raw] {
 		return
 	}
-	if c.seen == nil {
-		c.seen = make(map[[selRecordSize]byte]bool)
-	}
 	c.seen[raw] = true
-	if c.counting {
-		c.pending = append(c.pending, raw)
-	}
+	c.pending = append(c.pending, raw)
 }
 
 func (c *selCache) last() *SELRecord {

@@ -204,9 +204,15 @@ func runSELModel(t *testing.T, seed uint64, steps int) bool {
 		}
 		snapshot, err := r.Collect(ctx, true)
 		fake.selErr, fake.onExchange = nil, nil
-		for _, rec := range r.sel.records {
-			if !r.sel.seen[rec.Raw] {
-				t.Errorf("seed %d step %d: cached record %x is not in seen", seed, step, rec.Raw)
+		if r.sel.seen == nil {
+			if len(r.sel.pending) != 0 {
+				t.Errorf("seed %d step %d: pending events before the baseline", seed, step)
+			}
+		} else {
+			for _, rec := range r.sel.records {
+				if !r.sel.seen[rec.Raw] {
+					t.Errorf("seed %d step %d: cached record %x is not in seen", seed, step, rec.Raw)
+				}
 			}
 		}
 		if err != nil || snapshot.SEL == nil {
