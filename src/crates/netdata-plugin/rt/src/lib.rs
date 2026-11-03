@@ -11,8 +11,7 @@
 //! restart-on-error) — see its # Publishing notes before changing startup
 //! ordering.
 //!
-//! Consumers: `netflow-plugin` and `journal-function` (through
-//! [`StdPluginRuntime`]) drive this runtime directly. The otel-plugin workers
+//! Consumers: `netflow-plugin` drives this runtime directly. The otel-plugin workers
 //! instead run the protocol-agnostic engine copy in `otel_bridge::function`, fed by
 //! the supervisor over IPC. The two crates carry parallel
 //! `FunctionHandler`/`FunctionCallContext`/`ProgressState` implementations with
@@ -683,10 +682,6 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
         self.handler.declaration()
     }
 }
-
-/// Standard plugin runtime over stdin/stdout — the configuration the agent
-/// spawns plugins with, and the typical choice for production Netdata plugins.
-pub type StdPluginRuntime = PluginRuntime<tokio::io::Stdin, tokio::io::Stdout>;
 
 /// Main runtime for managing Netdata plugin execution.
 ///

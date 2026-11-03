@@ -63,7 +63,7 @@
 //!   above, and with feature `test-support` validates whole chart streams
 //!   (`validate_chart_stream`).
 //!
-//! Consumers: the `netdata-plugin-rt` plugin runtime (netflow-plugin, journal-function) runs
+//! Consumers: the `netdata-plugin-rt` plugin runtime (netflow-plugin) runs
 //! its event loop on these types; the otel-plugin supervisor drives the
 //! agent's stdin/stdout directly and relays over IPC to its `otel-ingestor`,
 //! `otel-ledger` and `otel-legacy-logs` workers, which build the same payload

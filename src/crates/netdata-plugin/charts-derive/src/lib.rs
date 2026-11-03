@@ -2,8 +2,8 @@
 //! proc-macro crate whose only export is the `#[derive(NetdataChart)]` macro
 //! below. It carries no runtime code, and its only direct Cargo dependent is
 //! `netdata-plugin-rt` (`src/crates/netdata-plugin/rt`), which re-exports the macro at its
-//! crate root so downstream chart structs (netflow-plugin,
-//! journal-function) never depend on this crate directly.
+//! crate root so downstream chart structs (netflow-plugin) never depend on
+//! this crate directly.
 //!
 //! On a named-field struct the derive generates:
 //!

@@ -16,7 +16,6 @@ serde_json = { workspace = true, features = ["preserve_order"] }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
-schemars = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 nix = { workspace = true, features = ["user"] }
 
@@ -24,6 +23,5 @@ journal-core = { workspace = true }
 journal-index = { workspace = true }
 journal-engine = { workspace = true }
 journal-registry = { workspace = true }
-netdata-plugin-rt = { workspace = true }
 
 allocative = { workspace = true, optional = true }
