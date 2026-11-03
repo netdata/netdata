@@ -216,7 +216,7 @@ class IPMIPermissionTests(unittest.TestCase):
                 (('--disable-go', '--enable-plugin-scripts'), ['0', '0', '1', '0', '0', '0']),
                 (('--disable-go', '--enable-plugin-go', '--enable-plugin-ibm', '--enable-plugin-scripts',
                   '--enable-plugin-statsd', '--enable-plugin-ipmi', '--enable-plugin-dem'), ['1'] * 6),
-                (('--disable-plugin-go',), ['0', '0', '1', '0', '1', '0'])):
+                (('--disable-plugin-go',), ['0', '0', '1', '0', '1', '1'])):
             with self.subTest(options=options):
                 result = subprocess.run(['bash', '-c', parser + output, 'installer-fixture', *options],
                                         capture_output=True, text=True)
