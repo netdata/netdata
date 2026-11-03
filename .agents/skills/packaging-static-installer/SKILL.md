@@ -75,7 +75,7 @@ The container then runs `packaging/makeself/run-all-jobs.sh`, which executes `pa
 | 70 | `netdata-git.install` | Builds Netdata itself (Rust crates + C/CMake + Go plugins) and installs into `/opt/netdata` |
 | 71 | `install-type` | Stamps `.install-type` so the post-installer knows it's a static install |
 | 72 | `conf-fixup` | Strips machine-specific configuration and sample files |
-| 80 | `netdata-static-check` | Fails on any installed executable ELF with a `PT_INTERP` header (dynamically linked) |
+| 80 | `netdata-static-check` | Verifies key binaries are statically linked |
 | 81 | `netdata-runtime-check` | Boots `/opt/netdata/bin/netdata`, waits for `localhost:19999`, checks `/api/v1/info` |
 | 82 | `cpu-arch-check` | Checks ELF class/machine for Netdata and go.d; does not prove the instruction-set baseline |
 | 89 | `buildinfo.install` | Writes `/opt/netdata/share/netdata/buildinfo.txt` |
@@ -222,8 +222,17 @@ slower runtime useful for valgrind/gdb. The `README.md` in `packaging/makeself/`
 | `No cached copy of build directory for X found, fetching sources instead.` (every run) | any third-party | `artifacts/cache/` removed or arch dir missing | Normal on first build; persists for the next run |
 | `Could not find a usable OCI runtime` | n/a | Neither docker nor podman in `$PATH` | Install one |
 | Runtime check times out waiting for localhost:19999 | 81 | Agent did not become reachable within the bounded wait; cause is not yet established | Inspect the job log and `netdata.log`, then diagnose startup |
-| `Ooops. <path> is not a statically linked binary!` | 80 (static check) | An installed executable was linked without `-static` (has `PT_INTERP`). CMake targets get `-static` from `CMAKE_EXE_LINKER_FLAGS`; a binary linked outside CMake's linker, such as a `go build` custom command with `CGO_ENABLED=1`, does not | Read the `ldd` output the job prints and find the command that linked that binary. For a cgo custom command, under `STATIC_BUILD` add `-linkmode=external -extldflags=-static` to `-ldflags` and every dependency's static link flags to `CGO_LDFLAGS`; `packaging/cmake/Modules/NetdataPluginEBPF.cmake` uses libelf's `pkg-config --static` flags plus `-lbpf` and `-lz` |
+| `Ooops. <path> is not a statically linked binary!` | 80 (static check) | An installed executable ELF has a `PT_INTERP` header (dynamically linked) | See "Dynamic binary in job 80" below |
 | OOM kill mid-Rust compile under QEMU | 70 | QEMU + Rust LTO is memory-hungry | Use a suitably provisioned native builder or investigate actual job parallelism; the launcher exposes no `PROCESSORS` knob |
+
+### Dynamic binary in job 80
+
+- **Likely cause:** CMake targets get `-static` from `CMAKE_EXE_LINKER_FLAGS`. A binary linked by a custom command,
+  such as `go build` with `CGO_ENABLED=1`, does not.
+- **Find it:** read the `ldd` output the job prints, then the command that linked that binary.
+- **cgo fix:** under `STATIC_BUILD`, add `-linkmode=external -extldflags=-static` to `-ldflags` and every
+  dependency's static link flags to `CGO_LDFLAGS`. Example: `packaging/cmake/Modules/NetdataPluginEBPF.cmake` uses
+  libelf's `pkg-config --static` flags plus `-lbpf` and `-lz`.
 
 The build script exits with `Build failed.` on any job failure (`packaging/makeself/build.sh:44-52`). For an
 interactive TTY launch, `DEBUG_BUILD_INFRA=1` is forwarded and opens a `bash` shell on failure; the non-TTY
