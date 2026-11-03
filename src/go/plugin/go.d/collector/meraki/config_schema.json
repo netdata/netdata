@@ -25,7 +25,7 @@
       },
       "bearer_token_file": {
         "title": "Bearer token file",
-        "description": "Path to a file containing the Meraki bearer token, reread for each request. Set either this or api_key.",
+        "description": "Path to a file containing the Meraki API key, reread for every request. Set either this or api_key.",
         "type": "string",
         "default": ""
       },
