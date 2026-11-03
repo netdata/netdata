@@ -39,6 +39,7 @@ jobs:
             src/health/notifications/alarm-notify/**
             src/collectors/cgroups.plugin/cgroup-name/**
             src/collectors/ebpf.plugin/ebpfgo.plugin/**
+            src/web/mcp/bridges/stdio-golang/**
           files_ignore: |
             **/*.md
             src/go/**/metadata.yaml
@@ -213,7 +214,7 @@ jobs:
         working-directory: src/collectors/ebpf.plugin/ebpfgo.plugin
 
   build-tests:
-    name: Go build tests (${{ matrix.platform }})
+    name: Go build tests (${{ matrix.module }}, ${{ matrix.platform }})
     runs-on: ubuntu-latest
     needs:
       - file-check

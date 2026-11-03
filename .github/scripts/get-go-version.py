@@ -10,7 +10,7 @@ GO_SRC = REPO_ROOT / 'src' / 'go'
 
 GITHUB_OUTPUT = pathlib.Path(os.environ['GITHUB_OUTPUT'])
 
-# Platforms the src/go programs are cross-compiled for.
+# Platforms the Go programs are cross-compiled for.
 PLATFORMS = [
     'linux/386',
     'linux/amd64',
@@ -20,17 +20,23 @@ PLATFORMS = [
     'windows/amd64',
     'darwin/amd64',
     'darwin/arm64',
+    'freebsd/amd64',
 ]
 
-# Programs (relative to their module) skipped on some platforms, mirroring where CMake builds them.
+# Programs (repository-relative directories) skipped on some platforms, mirroring where CMake builds them.
 UNSUPPORTED_PLATFORMS = {
     # Linux only: ENABLE_PLUGIN_IPMI requires OS_LINUX (packaging/cmake/Modules/NetdataOptions.cmake).
-    'cmd/ipmiplugin': [platform for platform in PLATFORMS if not platform.startswith('linux/')],
+    'src/go/cmd/ipmiplugin': [platform for platform in PLATFORMS if not platform.startswith('linux/')],
     # Not built on 32-bit targets (packaging/cmake/Modules/NetdataPluginNetflow.cmake).
-    'tools/topology-ip-intel-downloader': ['linux/386', 'linux/arm'],
+    'src/go/tools/topology-ip-intel-downloader': ['linux/386', 'linux/arm'],
 }
 
-# Standalone Go modules outside src/go included in native Linux tests.
+# Standalone Go modules outside src/go that CMake builds on every platform: tested natively and cross-compiled.
+CROSS_BUILD_MODULES = [
+    REPO_ROOT / 'src' / 'web' / 'mcp' / 'bridges' / 'stdio-golang',
+]
+
+# Standalone Go modules outside src/go that are Linux-only or developer tools: native Linux tests only.
 EXTRA_TEST_MODULES = [
     REPO_ROOT / 'src' / 'collectors' / 'cgroups.plugin' / 'cgroup-name',
     REPO_ROOT / 'src' / 'collectors' / 'ebpf.plugin' / 'ebpfgo.plugin',
@@ -48,14 +54,41 @@ def go_version(modfile):
 
 # One entry per module for the native Linux tests.
 matrix = []
-# One entry per src/go module and platform for the cross-compilation tests.
+# One entry per cross-built module and platform for the cross-compilation tests.
 build_matrix = []
+
+
+def add_module(moddir, version, targets):
+    """Add the native test entry and the per-platform build entries of a module; targets are go build packages."""
+    modpath = moddir.relative_to(REPO_ROOT).as_posix()
+
+    matrix.append({
+        'module': modpath,
+        'version': version,
+        'targets': ' '.join(targets),
+    })
+
+    for platform in PLATFORMS:
+        goos, goarch = platform.split('/')
+        # pathlib maps the root package "." to the module directory itself.
+        supported = [
+            target for target in targets
+            if platform not in UNSUPPORTED_PLATFORMS.get((moddir / target).relative_to(REPO_ROOT).as_posix(), [])
+        ]
+
+        build_matrix.append({
+            'platform': platform,
+            'goos': goos,
+            'goarch': goarch,
+            'module': modpath,
+            'version': version,
+            'targets': ' '.join(supported),
+        })
+
 
 for modfile in sorted(GO_SRC.glob('**/go.mod')):
     moddir = modfile.parent
-    modpath = moddir.relative_to(REPO_ROOT).as_posix()
-    version = go_version(modfile)
-    programs = []
+    targets = []
 
     for main in moddir.glob('**/main.go'):
         mainpath = main.relative_to(moddir).parent
@@ -67,28 +100,17 @@ for modfile in sorted(GO_SRC.glob('**/go.mod')):
         if 'ibmdplugin' in mainpath.parts:
             continue
 
-        programs.append(mainpath.as_posix())
+        targets.append(f'./{mainpath.as_posix()}')
 
-    programs.sort()
+    targets.sort()
+    add_module(moddir, go_version(modfile), targets)
 
-    matrix.append({
-        'module': modpath,
-        'version': version,
-        'targets': ' '.join(f'./{program}' for program in programs),
-    })
+for moddir in CROSS_BUILD_MODULES:
+    modfile = moddir / 'go.mod'
+    if not modfile.exists():
+        continue
 
-    for platform in PLATFORMS:
-        goos, goarch = platform.split('/')
-        supported = [program for program in programs if platform not in UNSUPPORTED_PLATFORMS.get(program, [])]
-
-        build_matrix.append({
-            'platform': platform,
-            'goos': goos,
-            'goarch': goarch,
-            'module': modpath,
-            'version': version,
-            'targets': ' '.join(f'./{program}' for program in supported),
-        })
+    add_module(moddir, go_version(modfile), ['.'])
 
 for moddir in EXTRA_TEST_MODULES:
     modfile = moddir / 'go.mod'
