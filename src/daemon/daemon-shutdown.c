@@ -180,10 +180,10 @@ static bool work_abandoned = false;
 
 // The last thing shutdown does. When shutdown gave up on work that may still be running (a SQLite user on a libuv
 // threadpool worker, see sqlite_teardown_is_unsafe(), undrained dbengine work, or a parallel weights chunk),
-// exit() would run destructors under it: libuv's joins every threadpool thread - so the process would wait for the
-// job it already gave up on, until systemd kills it - and the others free state that work may still use. Shutdown
-// is complete and its status saved by then: leave without running destructors. No stdio flush either: a thread
-// stuck mid-write may hold a stdio lock (the logger uses raw write()).
+// exit() would run destructors under it: libuv's library destructor joins every threadpool thread - so the process
+// would wait for the job it already gave up on, until systemd kills it - and the other destructors free state that
+// work may still use. Shutdown is complete and its status saved by then: leave without running destructors. No
+// stdio flush either: a thread stuck mid-write may hold a stdio lock (the logger uses raw write()).
 NORETURN void netdata_exit_process(int status) {
     if(sqlite_teardown_is_unsafe() || __atomic_load_n(&work_abandoned, __ATOMIC_RELAXED))
         _exit(status);
