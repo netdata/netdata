@@ -334,8 +334,8 @@ agents_query_cloud POST \
   check target-space role, token scope and endpoint restrictions before changing access.
 - **Plan:** a Function whose `access[]` includes `commercial` (for example `flows:netflow`, `otel-traces`, `otel-logs`,
   `snmp:traps`, the `topology:*` maps except `topology:streaming`, `rum-*` and `synthetics-*`) returns 403 for a Space
-  without a paid plan. The Agent sets `errorMsgKey: "ErrCommercialRequired"`; a Cloud proxy that does not forward Agent
-  keys reports `AgentError` with the same `errorMessage`, so check the message too.
+  without a paid plan or trial. The Agent sets `errorMsgKey: "ErrCommercialRequired"`; a Cloud proxy that does not
+  forward Agent keys reports `AgentError` with the same `errorMessage`, so check the message too.
 - **Function names are case-sensitive.** Wrong casing can cause a request failure.
 - **`info=true` does NOT bypass auth.** ACL is enforced on every
   call regardless of body.

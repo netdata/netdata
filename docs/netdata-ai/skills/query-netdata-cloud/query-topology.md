@@ -27,8 +27,10 @@ Known producer families:
 | `topology:vsphere` | vSphere collector | inventory and virtualization relationships |
 | `topology:cato_networks` | Cato Networks collector | sites, devices, interface tunnels, PoPs and BGP peers |
 
-Every topology Function except `topology:streaming` requires a Space on a paid plan or trial; a free Space gets 403
-with `errorMsgKey: "ErrCommercialRequired"`. `topology:streaming` needs a signed-in Space member only.
+Every topology Function requires a signed-in member of the node's Space with sensitive-data permission. All except
+`topology:streaming` also require a Space on a paid plan or trial. The Agent answers a free Space with 403 and
+`errorMsgKey: "ErrCommercialRequired"`; a Cloud proxy that does not forward Agent keys reports `AgentError` with the
+same `errorMessage`, so check the message too.
 
 Always start with an info request to discover the parameters supported by the
 Agent version you are querying.

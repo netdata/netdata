@@ -10,7 +10,7 @@ The count connector and filter processor have alpha stability in OpenTelemetry C
 
 :::
 
-Before you begin, complete the prerequisites and local exporter setup in [Ingest OpenTelemetry Metrics, Logs, and Traces](/docs/opentelemetry/otlp-ingestion.md), including the Netdata Cloud sign-in and paid plan required to verify `otel-logs`.
+Before you begin, complete the prerequisites and local exporter setup in [Ingest OpenTelemetry Metrics, Logs, and Traces](/docs/opentelemetry/otlp-ingestion.md), including the Netdata Cloud sign-in and the paid plan or active trial required to verify `otel-logs`.
 
 The count connector bridges the logs and metrics pipelines:
 
