@@ -563,14 +563,23 @@ if [ ${DONOTWAIT} -eq 0 ]; then
 fi
 
 cmake_install() {
+    cmake_install_umask="$(umask)"
+    # New root-owned executable ancestors must not inherit the build's group-write
+    # mask. Existing shared directories and nonroot installations keep their policy.
+    if [ "$(id -u)" -eq 0 ]; then
+        umask 022
+    fi
     # run cmake --install ${1}
     # The above command should be used to replace the logic below once we no longer support
     # versions of CMake less than 3.15.
+    cmake_install_status=0
     if [ -n "${ninja}" ]; then
-        run ${ninja} -C "${1}" install
+        run ${ninja} -C "${1}" install || cmake_install_status=$?
     else
-        run ${make} -C "${1}" install
+        run ${make} -C "${1}" install || cmake_install_status=$?
     fi
+    umask "${cmake_install_umask}"
+    return "${cmake_install_status}"
 }
 
 # shellcheck disable=SC2329
