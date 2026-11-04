@@ -81,7 +81,12 @@ with the running container's name:
 sudo sh ./kickstart.sh --install-dem-runtime --docker-container netdata
 ```
 
-Kickstart prepares AppArmor on hosts that need it, then downloads, verifies and unpacks the signed runtime as
+Use this command with a Netdata image you trust to supply code that runs as root on the host. Kickstart
+reads the running deployment’s exact local image ID and creates a temporary container from that image.
+It copies the host setup scripts out and removes the temporary container and its anonymous volumes.
+The temporary container never starts. Changes inside the running deployment cannot replace these scripts.
+
+The host helper prepares AppArmor on hosts that need it. The running deployment downloads, verifies and unpacks the signed runtime as
 the container’s nonroot service user. The command waits for a sandboxed journey and Lighthouse check to finish
 while the Agent continues monitoring. Preparation has no overall time limit. An error or administrator
 cancellation returns a failure. After a successful first installation, activate the runtime when ready:
@@ -138,7 +143,9 @@ to complete host cleanup. Multiple registrations sharing an attachment share one
 preserves the others.
 
 For Docker, after stopping consumers and retiring the deployment, remove its kickstart-created host registration
-with the printed token. This works after container deletion and leaves Docker volumes in place.
+with the printed token. When creating a registration, the host retains a root-owned copy of its policy helper
+under `/var/lib/netdata-dem-runtime-host-policy/docker-helpers`. The commands below work even after the container
+and image have been deleted. Successful removal also retires that helper and leaves Docker volumes in place.
 
 ```sh
 sudo sh ./kickstart.sh --dem-docker-policy-status TOKEN

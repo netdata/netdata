@@ -19,7 +19,7 @@ import unittest
 INSTALLER = Path(__file__).resolve().parents[1]
 CONTAINER_ID = 'a' * 64
 STUB = r'''#!/usr/bin/env python3
-import fcntl, json, os, stat, sys, time
+import fcntl, json, os, shutil, stat, sys, time
 from pathlib import Path
 root = Path(__ROOT__)
 settings = json.loads((root / 'settings').read_text())
@@ -32,7 +32,10 @@ elif name == 'uname': print('Linux')
 elif name == 'stat':
     target = Path(args[-1])
     mode = stat.S_IMODE(target.stat().st_mode) if root in target.parents or target == root else 0o755
-    if args[1] == '%u': print('0')
+    kind = 'symbolic link' if target.is_symlink() else 'directory' if target.is_dir() else 'regular file'
+    if args[1] == '%F:%u:%a': print(f'{kind}:0:{mode:o}')
+    elif args[1] == '%F:%u': print(f'{kind}:0')
+    elif args[1] == '%u': print('0')
     else: print('0:' + format(mode, 'o'))
 elif name == 'findmnt': print(settings.get('fstype', 'ext4'))
 elif name == 'apparmor_parser':
@@ -48,7 +51,24 @@ elif name == 'docker':
     assert args[:3] == ['--host', 'unix:///var/run/docker.sock', '--config'], args
     assert 'DOCKER_HOST' not in os.environ
     args = args[4:]
-    if args[0] == 'info':
+    if settings.get('no_daemon'): raise AssertionError('Docker used after deployment retirement')
+    if args[0] == 'create':
+        assert args[:-2] == ['create', '--pull=never', '--network=none', '--cidfile'], args
+        assert args[-1] == 'sha256:' + 'c' * 64
+        Path(args[-2]).write_text('d' * 64)
+        (root / 'scratch').touch()
+        if settings.get('create_exit'): sys.exit(settings['create_exit'])
+        print('d' * 64)
+    elif args[0] == 'cp':
+        assert (root / 'scratch').exists() and args[1].startswith('d' * 64 + ':/usr/libexec/netdata/'), args
+        if settings.get('copy_exit'): sys.exit(settings['copy_exit'])
+        filename = Path(args[1]).name
+        if settings.get('link'): Path(args[2]).symlink_to(root / 'helper')
+        else: shutil.copyfile(root / filename, args[2])
+    elif args[0] == 'rm':
+        assert args == ['rm', '-v', 'd' * 64]
+        (root / 'scratch').unlink()
+    elif args[0] == 'info':
         template = args[2]
         if template == '{{.ID}}': print('trusted-daemon')
         elif template == '{{.DockerRootDir}}': print(root / 'data')
@@ -58,8 +78,11 @@ elif name == 'docker':
     elif args[0] == 'inspect':
         template = args[4]
         if template == '{{.Id}}':
-            if settings.get('swapped') and args[-1] == 'monitor' and (root / 'ensured').exists(): print('b' * 64)
+            if args[-1] == 'monitor' and (settings.get('replaced') or
+                    settings.get('swapped') and (root / 'ensured').exists()): print('b' * 64)
             else: print('a' * 64)
+        elif '{{.Image}}' in template:
+            print('a' * 64 + '|sha256:' + 'c' * 64 + '|/monitor|true|123')
         elif template.startswith('{{.Id}}|'):
             print('a' * 64 + '|/monitor|true|123|2026-11-04T00:00:00Z')
         elif template.startswith('{{json .Config.Entrypoint}}'):
@@ -123,7 +146,8 @@ class DockerHostTests(unittest.TestCase):
             p = self.bin / name
             p.write_text(STUB.replace('__ROOT__', repr(str(self.root))))
             p.chmod(0o755)
-        source = (INSTALLER / 'netdata-dem-runtime.sh').read_text()
+        sources = {path.name: path.read_text() for path in
+                   [INSTALLER / 'netdata-dem-runtime.sh', INSTALLER.parent / 'docker/netdata-dem-docker-host.sh']}
         replacements = {
             'PATH=/usr/sbin:/usr/bin:/sbin:/bin': 'PATH=' + str(self.bin) + ':/usr/sbin:/usr/bin:/sbin:/bin',
             'HOST_STATE=/var/lib/netdata-dem-runtime-host-policy': 'HOST_STATE=' + str(self.root / 'state'),
@@ -154,17 +178,21 @@ class DockerHostTests(unittest.TestCase):
         }
         # Longest first prevents the socket path sharing its /var/run prefix.
         for before, after in sorted(replacements.items(), key=lambda item: -len(item[0])):
-            self.assertIn(before, source)
-            source = source.replace(before, after)
-        self.script = self.root / 'helper'
-        self.script.write_text(source)
+            self.assertTrue(any(before in source for source in sources.values()), before)
+            sources = {name: source.replace(before, after) for name, source in sources.items()}
+        for name, source in sources.items():
+            (self.root / name).write_text(source)
+        self.script = self.root / 'netdata-dem-runtime.sh'
         self.settings = {}
         self.token = 'docker-' + hashlib.sha256(
             b'netdata-dem-docker-registration-v1:trusted-daemon:monitor').hexdigest()
 
     def invoke(self, *args):
         (self.root / 'settings').write_text(json.dumps(self.settings))
-        return subprocess.run(['sh', str(self.script), *(args or ('docker-install', '--container', 'monitor'))],
+        args = args or ('docker-install', '--container', 'monitor')
+        if args[0] == 'docker-install':
+            args = (*args, '--container-id', CONTAINER_ID)
+        return subprocess.run(['sh', str(self.script), *args],
                               capture_output=True, text=True, timeout=20)
 
     def calls(self):
@@ -276,28 +304,58 @@ class DockerHostTests(unittest.TestCase):
         self.assertOK(result)
         self.assertIn('host-policy=not-required', result.stderr)
 
-    def test_actual_standalone_dispatch_embedding_and_retirement_outside_checkout(self):
+    def kickstart(self, *args):
         source = (INSTALLER / 'kickstart.sh').read_text()
-        begin = '# BEGIN GENERATED DEM HOST HELPER\n'
-        end = '# END GENERATED DEM HOST HELPER\n'
-        prefix, rest = source.split(begin)
-        old, suffix = rest.split(end)
-        source = (prefix + begin + "cat <<'NETDATA_DEM_HOST_HELPER_EMBEDDED'\n" + self.script.read_text()
-                  + 'NETDATA_DEM_HOST_HELPER_EMBEDDED\n' + end + suffix)
-        source = source.replace('  PATH=/usr/sbin:/usr/bin:/sbin:/bin',
-                                '  PATH=' + str(self.bin) + ':/usr/sbin:/usr/bin:/sbin:/bin', 1)
+        for old, new in {
+            '  PATH=/usr/sbin:/usr/bin:/sbin:/bin': '  PATH=' + str(self.bin) + ':/usr/sbin:/usr/bin:/sbin:/bin',
+            '/usr/bin/docker': str(self.bin / 'docker'),
+            '/.dockerenv': str(self.root / 'nested'),
+            '/run/.containerenv': str(self.root / 'containerenv'),
+            '/proc/$dem_pid': str(self.root / 'proc/$dem_pid'),
+            'dem_trusted_dir /run ': 'dem_trusted_dir ' + str(self.root / 'run') + ' ',
+            '[ ! -L /var/run/docker.sock ]': '[ ! -L ' + str(self.root / 'run/docker.sock') + ' ]',
+            'for dem_dir in / /var /var/lib;': 'for dem_dir in ' + str(self.root / 'run') + ';',
+            '[ -S /var/run/docker.sock ]': '[ -f ' + str(self.root / 'run/docker.sock') + ' ]',
+            '/var/run/docker.sock)': str(self.root / 'run/docker.sock') + ')',
+            'readlink -f -- /var/run)': 'readlink -f -- ' + str(self.root / 'var-run') + ')',
+            '" = /run ]': '" = ' + str(self.root / 'run') + ' ]',
+            'mktemp -d /run/netdata-dem-kickstart.': 'mktemp -d ' + str(self.root / 'run/kickstart.'),
+            'dem_state=/var/lib/netdata-dem-runtime-host-policy': 'dem_state=' + str(self.root / 'state'),
+        }.items():
+            self.assertIn(old, source)
+            source = source.replace(old, new)
         artifact = self.root / 'standalone-kickstart'
         artifact.write_text(source)
         (self.root / 'settings').write_text(json.dumps(self.settings))
-        result = subprocess.run(['sh', str(artifact), '--install-dem-runtime', '--docker-container', 'monitor'],
-                                cwd=self.root, capture_output=True, text=True, timeout=20)
-        self.assertOK(result)
-        (self.root / 'proc/123/cgroup').unlink()
-        for options in [('--dem-docker-policy-status', self.token),
-                        ('--dem-docker-policy-remove', self.token, '--deployments-stopped')]:
-            result = subprocess.run(['sh', str(artifact), *options],
-                                    cwd=self.root, capture_output=True, text=True, timeout=20)
-            self.assertOK(result)
+        return subprocess.run(['sh', str(artifact), *args], cwd=self.root, capture_output=True, text=True, timeout=30)
+
+    def test_standalone_enrollment_and_retirement_without_image_or_daemon(self):
+        self.assertOK(self.kickstart('--install-dem-runtime', '--docker-container', 'monitor'))
+        self.assertFalse((self.root / 'scratch').exists())
+        self.assertFalse(list((self.root / 'run').glob('kickstart.*')))
+        cached = self.root / 'state/docker-helpers' / ('deployment-' + self.token)
+        self.assertEqual(cached.read_bytes(), self.script.read_bytes())
+        self.settings['no_daemon'] = True
+        (self.root / 'netdata-dem-docker-host.sh').unlink()
+        self.script.unlink()
+        status = self.kickstart('--dem-docker-policy-status', self.token)
+        self.assertOK(status)
+        self.assertIn('registration=present', status.stdout)
+        self.assertOK(self.kickstart('--dem-docker-policy-remove', self.token, '--deployments-stopped'))
+        self.assertFalse(cached.exists())
+        self.assertIn('registration=absent', self.kickstart('--dem-docker-policy-status', self.token).stdout)
+
+    def test_image_copy_failure_symlink_or_name_reuse_never_enroll(self):
+        for settings, expected in [({'create_exit': 46}, 46), ({'copy_exit': 47}, 47),
+                                   ({'link': True}, 1), ({'replaced': True}, 1)]:
+            with self.subTest(settings=settings):
+                self.settings = settings
+                result = self.kickstart('--install-dem-runtime', '--docker-container', 'monitor')
+                self.assertEqual(result.returncode, expected, result.stderr)
+                self.assertFalse((self.root / 'scratch').exists())
+                self.assertFalse(list((self.root / 'run').glob('kickstart.*')))
+                self.assertFalse((self.root / 'state').exists())
+                self.assertFalse((self.root / 'ensured').exists())
 
     def test_unverified_locality_and_hardened_host_refuse(self):
         (self.root / 'proc/123/cgroup').write_text('0::/remote\n')
@@ -314,7 +372,8 @@ class DockerHostTests(unittest.TestCase):
     def test_cancellation_closes_control_and_waits_for_target(self):
         self.settings['block'] = True
         (self.root / 'settings').write_text(json.dumps(self.settings))
-        process = subprocess.Popen(['sh', str(self.script), 'docker-install', '--container', 'monitor'],
+        process = subprocess.Popen(['sh', str(self.script), 'docker-install', '--container', 'monitor',
+                                    '--container-id', CONTAINER_ID],
                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         self.addCleanup(lambda: process.poll() is None and process.kill())
         deadline = time.monotonic() + 15
@@ -329,9 +388,6 @@ class DockerHostTests(unittest.TestCase):
 
 
 class StandaloneKickstartTests(unittest.TestCase):
-    def test_helper_parity(self):
-        subprocess.run([sys.executable, str(INSTALLER / 'generate-dem-kickstart-helper.py'), '--check'], check=True)
-
     def test_standalone_artifact_refuses_conflicting_options_before_discovery(self):
         with tempfile.TemporaryDirectory() as temp:
             artifact = Path(temp) / 'standalone-kickstart.sh'
