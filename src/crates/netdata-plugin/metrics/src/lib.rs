@@ -11,8 +11,9 @@
 //!
 //! Layers, bottom-up:
 //! - `family`: cells (the numbers a slot accumulates and how two values
-//!   merge), the instruments that allocate them ([`Counter`], [`Histogram`],
-//!   [`Gauge`]), and chart templates ([`ChartSpec`], [`Dimension`]);
+//!   merge), the instruments that allocate them ([`Counter`], [`Cumulative`],
+//!   [`Histogram`], [`Gauge`]), and chart templates ([`ChartSpec`],
+//!   [`Dimension`]);
 //! - `batch`: request-local recording, so a caller can count a request only
 //!   after it is durable and then merge it under one short lock;
 //! - `store`: instances, the slot window, lateness, the instance cap with its
@@ -35,6 +36,8 @@ mod family;
 mod store;
 
 pub use batch::{Batch, InstanceRef, Record};
-pub use family::{ChartSpec, Counter, Dimension, Family, FamilyBuilder, Gauge, Histogram, Labels};
+pub use family::{
+    ChartSpec, Counter, Cumulative, Dimension, Family, FamilyBuilder, Gauge, Histogram, Labels,
+};
 pub use netdata_plugin_protocol::ChartType;
 pub use store::{MAX_BACKLOG_SLOTS, Stats, Store};

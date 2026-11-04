@@ -1,9 +1,9 @@
 //! Self-monitoring: what the plugin itself receives, stores and rejects, and,
 //! when derived metrics are enabled, how their derivation behaves. Counted at
-//! arrival time, so the family has no lateness.
+//! arrival time, so the families have no lateness.
 
 use netdata_plugin_metrics::{
-    Batch, ChartSpec, ChartType, Counter, Family, FamilyBuilder, Gauge, Labels, Stats,
+    Batch, ChartSpec, ChartType, Counter, Cumulative, Family, FamilyBuilder, Gauge, Labels, Stats,
 };
 use otel_bridge::signals::Signal;
 
@@ -14,33 +14,15 @@ const LATE: usize = 0;
 const FUTURE: usize = 1;
 const OVERFLOWED: usize = 2;
 
-/// Cells of the derivation health of one signal's per-service metrics.
-#[derive(Clone, Copy)]
-struct Derivation {
-    services: Gauge,
-    adjusted: Counter,
-    expired: Counter,
-}
-
+/// The plugin's ingest outcomes: one label-less instance.
 pub(crate) struct Plugin {
     pub(crate) family: Family,
     spans: Counter,
     log_records: Counter,
-    /// Traces, then logs; `None` when derived metrics are disabled.
-    derivations: Option<[Derivation; 2]>,
 }
-
-fn signal_index(signal: Signal) -> usize {
-    match signal {
-        Signal::Traces => 0,
-        Signal::Logs => 1,
-    }
-}
-
-const SIGNALS: [&str; 2] = ["traces", "logs"];
 
 impl Plugin {
-    pub(crate) fn new(derived_enabled: bool) -> Self {
+    pub(crate) fn new() -> Self {
         let mut b = FamilyBuilder::new("otel_plugin");
         let spans = b.counter(2);
         let log_records = b.counter(2);
@@ -70,60 +52,10 @@ impl Plugin {
                 log_records.rate("rejected", REJECTED),
             ],
         });
-        let derivations = derived_enabled.then(|| {
-            let derivations = [(); 2].map(|()| Derivation {
-                services: b.gauge(),
-                adjusted: b.counter(3),
-                expired: b.counter(1),
-            });
-            let mut services = Vec::new();
-            let mut adjusted = Vec::new();
-            let mut expired = Vec::new();
-            for (d, signal) in derivations.iter().zip(SIGNALS) {
-                services.push(d.services.value(signal));
-                adjusted.push(d.adjusted.rate(&format!("{signal}_late"), LATE));
-                adjusted.push(d.adjusted.rate(&format!("{signal}_future"), FUTURE));
-                adjusted.push(d.adjusted.rate(&format!("{signal}_overflowed"), OVERFLOWED));
-                expired.push(d.expired.rate(signal, 0));
-            }
-            b.chart(ChartSpec {
-                id: "derived_services",
-                title: "Services with derived charts",
-                units: "services",
-                family: "derived metrics",
-                context: "netdata.otel.derived_services",
-                chart_type: ChartType::Line,
-                priority: 150_010,
-                dimensions: services,
-            });
-            b.chart(ChartSpec {
-                id: "derived_adjusted_records",
-                title: "Records counted in another time slot or chart set",
-                units: "records/s",
-                family: "derived metrics",
-                context: "netdata.otel.derived_adjusted_records",
-                // One record can be both late and overflowed.
-                chart_type: ChartType::Line,
-                priority: 150_011,
-                dimensions: adjusted,
-            });
-            b.chart(ChartSpec {
-                id: "derived_expired_services",
-                title: "Services removed after 15 minutes without data",
-                units: "services/s",
-                family: "derived metrics",
-                context: "netdata.otel.derived_expired_services",
-                chart_type: ChartType::Line,
-                priority: 150_012,
-                dimensions: expired,
-            });
-            derivations
-        });
         Self {
             family: b.build(),
             spans,
             log_records,
-            derivations,
         }
     }
 
@@ -141,54 +73,94 @@ impl Plugin {
         batch
     }
 
-    /// An empty record at `now`: rendered as zeros, it keeps the
-    /// self-monitoring charts defined from the first tick and never lets them
-    /// expire while the plugin runs, with or without derived metrics.
+    /// An empty record at `now`: rendered as zeros, it keeps the ingest
+    /// charts defined from the first tick and never lets them expire while
+    /// the plugin runs.
     pub(crate) fn heartbeat(&self, now: u64) -> Batch {
         let mut batch = Batch::new(&self.family);
         let instance = batch.instance(Labels::new());
         batch.record(instance, now);
         batch
     }
+}
 
-    /// The derivation health of `signal` between two readings of its store.
-    pub(crate) fn derivation(
-        &self,
-        signal: Signal,
-        previous: &Stats,
-        current: &Stats,
-        now: u64,
-    ) -> Batch {
-        let mut batch = Batch::new(&self.family);
-        if let Some(derivations) = &self.derivations {
-            let d = derivations[signal_index(signal)];
-            let delta = |current: u64, previous: u64| current.saturating_sub(previous) as f64;
-            let instance = batch.instance(Labels::new());
-            batch
-                .record(instance, now)
-                .set(d.services, current.instances as f64)
-                .add(
-                    d.adjusted,
-                    LATE,
-                    delta(current.late_records, previous.late_records),
-                )
-                .add(
-                    d.adjusted,
-                    FUTURE,
-                    delta(current.future_records, previous.future_records),
-                )
-                .add(
-                    d.adjusted,
-                    OVERFLOWED,
-                    delta(current.overflowed_records, previous.overflowed_records),
-                )
-                .add(
-                    d.expired,
-                    0,
-                    delta(current.expired_instances, previous.expired_instances),
-                );
+/// How the per-service derivation of each signal behaves: one instance per
+/// signal, labelled `signal`, fed from its store's statistics every tick.
+pub(crate) struct Derivation {
+    pub(crate) family: Family,
+    services: Gauge,
+    adjusted: Cumulative,
+    expired: Cumulative,
+}
+
+impl Derivation {
+    pub(crate) fn new() -> Self {
+        let mut b = FamilyBuilder::new("otel_plugin");
+        let services = b.gauge();
+        let adjusted = b.cumulative(3);
+        let expired = b.cumulative(1);
+        b.chart(ChartSpec {
+            id: "derived_services",
+            title: "Services with derived charts",
+            units: "services",
+            family: "derived metrics",
+            context: "netdata.otel.derived_services",
+            chart_type: ChartType::Line,
+            priority: 150_010,
+            dimensions: vec![services.value("services")],
+        });
+        b.chart(ChartSpec {
+            id: "derived_adjusted_records",
+            title: "Records counted in another time slot or chart set",
+            units: "records/s",
+            family: "derived metrics",
+            context: "netdata.otel.derived_adjusted_records",
+            // One record can be both late and overflowed.
+            chart_type: ChartType::Line,
+            priority: 150_011,
+            dimensions: vec![
+                adjusted.rate("late", LATE),
+                adjusted.rate("future", FUTURE),
+                adjusted.rate("overflowed", OVERFLOWED),
+            ],
+        });
+        b.chart(ChartSpec {
+            id: "derived_expired_services",
+            title: "Services removed after 15 minutes without data",
+            units: "services/s",
+            family: "derived metrics",
+            context: "netdata.otel.derived_expired_services",
+            chart_type: ChartType::Line,
+            priority: 150_012,
+            dimensions: vec![expired.rate("expired", 0)],
+        });
+        Self {
+            family: b.build(),
+            services,
+            adjusted,
+            expired,
         }
+    }
+
+    /// Record the statistics of `signal`'s store at `now` into `batch`.
+    pub(crate) fn record(&self, batch: &mut Batch, signal: Signal, stats: &Stats, now: u64) {
+        let mut labels = Labels::new();
+        labels.push("signal", signal_name(signal));
+        let instance = batch.instance(labels);
         batch
+            .record(instance, now)
+            .set(self.services, stats.instances as f64)
+            .set_total(self.adjusted, LATE, stats.late_records as f64)
+            .set_total(self.adjusted, FUTURE, stats.future_records as f64)
+            .set_total(self.adjusted, OVERFLOWED, stats.overflowed_records as f64)
+            .set_total(self.expired, 0, stats.expired_instances as f64);
+    }
+}
+
+fn signal_name(signal: Signal) -> &'static str {
+    match signal {
+        Signal::Traces => "traces",
+        Signal::Logs => "logs",
     }
 }
 
@@ -199,7 +171,7 @@ mod tests {
 
     #[test]
     fn ingest_outcomes_render_per_signal() {
-        let plugin = Plugin::new(false);
+        let plugin = Plugin::new();
         let mut store = Store::new(plugin.family.clone());
         store.merge(plugin.ingest(Signal::Traces, 7, 2, 100), 100);
         store.merge(plugin.ingest(Signal::Logs, 3, 0, 100), 100);
@@ -212,12 +184,11 @@ mod tests {
             "BEGIN otel_plugin.log_records 1000000\nSET accepted = 3\nSET rejected = 0\nEND 101 0 1\n"
         ));
         assert!(out.contains("'netdata.otel.spans'"));
-        assert!(!out.contains("derived"));
     }
 
     #[test]
     fn the_heartbeat_keeps_the_charts_defined_without_traffic() {
-        let plugin = Plugin::new(false);
+        let plugin = Plugin::new();
         let mut store = Store::new(plugin.family.clone());
         store.merge(plugin.heartbeat(100), 100);
         let out = String::from_utf8(store.emit(101, usize::MAX).concat()).unwrap();
@@ -226,36 +197,41 @@ mod tests {
     }
 
     #[test]
-    fn derivation_health_charts_changes_since_the_last_reading() {
-        let plugin = Plugin::new(true);
-        let mut store = Store::new(plugin.family.clone());
-        let previous = Stats {
-            late_records: 5,
-            ..Stats::default()
+    fn derivation_charts_one_instance_per_signal_with_increases() {
+        let derivation = Derivation::new();
+        let mut store = Store::new(derivation.family.clone());
+        let mut tick = |stats: Stats, now: u64| {
+            let mut batch = Batch::new(&derivation.family);
+            derivation.record(&mut batch, Signal::Traces, &stats, now);
+            derivation.record(&mut batch, Signal::Logs, &Stats::default(), now);
+            store.merge(batch, now);
+            String::from_utf8(store.emit(now + 1, usize::MAX).concat()).unwrap()
         };
-        let current = Stats {
-            instances: 3,
-            late_records: 7,
-            future_records: 1,
-            overflowed_records: 4,
-            expired_instances: 1,
-        };
-        store.merge(
-            plugin.derivation(Signal::Traces, &previous, &current, 100),
+        let first = tick(
+            Stats {
+                late_records: 5,
+                ..Stats::default()
+            },
             100,
         );
-        let out = String::from_utf8(store.emit(101, usize::MAX).concat()).unwrap();
-        netdata_plugin_protocol::validate_chart_stream(out.as_bytes()).unwrap();
-        assert!(
-            out.contains(
-                "BEGIN otel_plugin.derived_services 1000000\nSET traces = 3\nSET logs =\n"
-            )
+        let second = tick(
+            Stats {
+                instances: 3,
+                late_records: 7,
+                future_records: 1,
+                overflowed_records: 4,
+                expired_instances: 1,
+            },
+            101,
         );
-        assert!(
-            out.contains("SET traces_late = 2\nSET traces_future = 1\nSET traces_overflowed = 4\n")
-        );
-        assert!(
-            out.contains("BEGIN otel_plugin.derived_expired_services 1000000\nSET traces = 1\n")
-        );
+        netdata_plugin_protocol::validate_chart_stream(format!("{first}{second}").as_bytes())
+            .unwrap();
+        assert_eq!(first.matches("CLABEL 'signal' 'traces' 1").count(), 3);
+        assert_eq!(first.matches("CLABEL 'signal' 'logs' 1").count(), 3);
+        // The first reading is the baseline.
+        assert!(first.contains("SET late =\nSET future =\nSET overflowed =\n"));
+        assert!(second.contains("SET services = 3\n"));
+        assert!(second.contains("SET late = 2\nSET future = 1\nSET overflowed = 4\n"));
+        assert!(second.contains("SET expired = 1\n"));
     }
 }

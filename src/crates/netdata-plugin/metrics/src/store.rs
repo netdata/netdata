@@ -57,6 +57,9 @@ struct Instance {
     last_slot: u64,
     /// Open slots from `next_emit` onwards; missing ones are empty.
     slots: VecDeque<Box<[f64]>>,
+    /// The last rendered total of each cumulative cell, in family order;
+    /// NaN until the first one.
+    totals: Box<[f64]>,
 }
 
 /// Accumulates batches of one family and renders them as chart-protocol text.
@@ -228,6 +231,7 @@ fn new_instance(family: &FamilyInner, labels: Labels, overflow: bool) -> Instanc
         first_slot: u64::MAX,
         last_slot: 0,
         slots: VecDeque::new(),
+        totals: vec![f64::NAN; family.cumulative.len()].into_boxed_slice(),
     }
 }
 
@@ -274,7 +278,8 @@ fn emit_slot(family: &FamilyInner, instance: &mut Instance, slot: u64, out: &mut
             }
             instance.defined = true;
         }
-        let cells = cells.unwrap_or_else(|| family.initial.clone().into_boxed_slice());
+        let mut cells = cells.unwrap_or_else(|| family.initial.clone().into_boxed_slice());
+        totals_to_increases(family, instance, &mut cells);
         for (chart, id) in family.charts.iter().zip(&instance.chart_ids) {
             let block = out.block();
             write_begin(block, id, family.update_every * 1_000_000);
@@ -295,6 +300,29 @@ fn emit_slot(family: &FamilyInner, instance: &mut Instance, slot: u64, out: &mut
         return true;
     }
     false
+}
+
+/// Replace the totals in `cells` with their increase since the instance's
+/// previous total, and remember the new totals.
+fn totals_to_increases(family: &FamilyInner, instance: &mut Instance, cells: &mut [f64]) {
+    for (&cell, previous) in family.cumulative.iter().zip(instance.totals.iter_mut()) {
+        let total = cells[cell];
+        cells[cell] = if total.is_nan() {
+            // No new total: no increase, once a baseline exists.
+            if previous.is_nan() { f64::NAN } else { 0.0 }
+        } else if previous.is_nan() {
+            // The first total is the baseline.
+            f64::NAN
+        } else if total < *previous {
+            // The source restarted from zero.
+            total
+        } else {
+            total - *previous
+        };
+        if !total.is_nan() {
+            *previous = total;
+        }
+    }
 }
 
 fn render(family: &FamilyInner, cells: &[f64], value: Value) -> Option<f64> {
@@ -720,6 +748,52 @@ mod tests {
         let ids = |labels: Labels| new_instance(&f.family.0, labels, false).chart_ids;
         assert_eq!(ids(ab), ids(ba));
         assert_eq!(ids(Labels::new())[0], "svc.requests");
+    }
+
+    #[test]
+    fn cumulative_totals_render_as_increases() {
+        let mut b = FamilyBuilder::new("src").expiry(3);
+        let totals = b.cumulative(1);
+        b.chart(ChartSpec {
+            id: "events",
+            title: "Events",
+            units: "events/s",
+            family: "events",
+            context: "src.events",
+            chart_type: ChartType::Line,
+            priority: 1,
+            dimensions: vec![totals.rate("events", 0)],
+        });
+        let family = b.build();
+        let mut store = Store::new(family.clone());
+        let set = |store: &mut Store, time: u64, total: Option<f64>| {
+            let mut batch = Batch::new(&family);
+            let inst = batch.instance(Labels::new());
+            let mut record = batch.record(inst, time);
+            if let Some(total) = total {
+                record.set_total(totals, 0, total);
+            }
+            store.merge(batch, time);
+        };
+        // Baseline, two totals in one slot (the last wins), no new total, a
+        // reset, then a return after expiry with a new baseline.
+        set(&mut store, 10, Some(100.0));
+        set(&mut store, 11, Some(103.0));
+        set(&mut store, 11, Some(107.0));
+        set(&mut store, 12, None);
+        set(&mut store, 13, Some(5.0));
+        let mut out = text(&store.emit(14, usize::MAX));
+        out += &text(&store.emit(18, usize::MAX));
+        set(&mut store, 20, Some(50.0));
+        set(&mut store, 21, Some(52.0));
+        out += &text(&store.emit(22, usize::MAX));
+        validate_chart_stream(out.as_bytes()).unwrap();
+        let values: Vec<&str> = out
+            .lines()
+            .filter_map(|l| l.strip_prefix("SET events ="))
+            .collect();
+        assert_eq!(values, ["", " 7", " 0", " 5", " 0", " 0", " 0", "", " 2"]);
+        assert_eq!(out.matches("'obsolete store_first'").count(), 1);
     }
 
     #[test]

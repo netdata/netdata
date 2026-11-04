@@ -68,6 +68,30 @@ impl Counter {
     }
 }
 
+/// `len` independent running totals that the producer reads from a source
+/// which counts on its own, for example a store's statistics. Rendered as the
+/// increase per second since the previous slot: an instance's first total is
+/// its baseline (no value yet), a total lower than the previous one is a
+/// reset (the increase is the new total), and a slot without a new total
+/// shows no increase.
+#[derive(Debug, Clone, Copy)]
+pub struct Cumulative {
+    pub(crate) base: usize,
+    pub(crate) len: usize,
+}
+
+impl Cumulative {
+    /// A dimension showing the increase of total `index` per second.
+    pub fn rate(&self, id: &str, index: usize) -> Dimension {
+        assert!(
+            index < self.len,
+            "cumulative index {index} out of {}",
+            self.len
+        );
+        Dimension::new(id, Value::Rate(self.base + index))
+    }
+}
+
 /// A distribution over fixed bucket bounds. Each observation adds its weight
 /// to one bucket (the first bound it does not exceed, else `+Inf`), to the
 /// count and, times its value, to the sum; the maximum keeps the largest
@@ -242,6 +266,9 @@ pub(crate) struct FamilyInner {
     pub(crate) overflow_labels: Labels,
     pub(crate) merges: Vec<Merge>,
     pub(crate) initial: Vec<f64>,
+    /// The cells of [`Cumulative`] instruments, which hold totals until a
+    /// slot is rendered as increases.
+    pub(crate) cumulative: Vec<usize>,
     pub(crate) charts: Vec<ChartSpec>,
 }
 
@@ -258,6 +285,7 @@ pub struct FamilyBuilder {
     max_instances: usize,
     overflow_labels: Labels,
     merges: Vec<Merge>,
+    cumulative: Vec<usize>,
     charts: Vec<ChartSpec>,
 }
 
@@ -280,6 +308,7 @@ impl FamilyBuilder {
             max_instances: usize::MAX,
             overflow_labels: Labels::new(),
             merges: Vec::new(),
+            cumulative: Vec::new(),
             charts: Vec::new(),
         }
     }
@@ -320,6 +349,13 @@ impl FamilyBuilder {
         let base = self.merges.len();
         self.merges.extend(std::iter::repeat_n(Merge::Add, len));
         Counter { base, len }
+    }
+
+    pub fn cumulative(&mut self, len: usize) -> Cumulative {
+        let base = self.merges.len();
+        self.merges.extend(std::iter::repeat_n(Merge::Last, len));
+        self.cumulative.extend(base..base + len);
+        Cumulative { base, len }
     }
 
     /// `bounds` must be finite and strictly increasing.
@@ -387,6 +423,7 @@ impl FamilyBuilder {
             max_instances: self.max_instances,
             overflow_labels: self.overflow_labels,
             merges: self.merges,
+            cumulative: self.cumulative,
             charts: self.charts,
         }))
     }

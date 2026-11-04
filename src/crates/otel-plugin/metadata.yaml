@@ -430,32 +430,33 @@ modules:
               dimensions:
                 - name: accepted
                 - name: rejected
+        - name: signal
+          description: These metrics show how the plugin makes the per-service metrics from each signal (traces or logs). They are present only when derived metrics are enabled.
+          labels:
+            - name: signal
+              description: The signal that the per-service metrics are made from, `traces` or `logs`.
+          metrics:
             - name: netdata.otel.derived_services
               description: Services that have their own derived charts, the overflow chart set included.
               unit: services
               chart_type: line
               dimensions:
-                - name: traces
-                - name: logs
+                - name: services
             - name: netdata.otel.derived_adjusted_records
               description: |
                 Records counted in a different time slot or chart set: late (older than the open time slots), future (newer than the current time), or overflowed (from a service over the maximum number of services). One record can be both late and overflowed.
               unit: records/s
               chart_type: line
               dimensions:
-                - name: traces_late
-                - name: traces_future
-                - name: traces_overflowed
-                - name: logs_late
-                - name: logs_future
-                - name: logs_overflowed
+                - name: late
+                - name: future
+                - name: overflowed
             - name: netdata.otel.derived_expired_services
               description: Services whose derived charts were removed after 15 minutes without data.
               unit: services/s
               chart_type: line
               dimensions:
-                - name: traces
-                - name: logs
+                - name: expired
         - name: service
           description: |
             These metrics are made from the spans and log records of each service. A request is a span that starts a trace, or a span of kind SERVER or CONSUMER. A request failed when its span status is ERROR. A request counts at the time it ends. Spans sampled with an OpenTelemetry sampling threshold (`ot=th` in the trace state) count for the number of spans that they represent. A log record counts at its time (its own time, else its observed time, else the time it arrived), in the severity range of its severity number; a record without a severity number counts as `unspecified`. The charts show data with a delay of 10 seconds, so that data that arrives late is still counted in the correct second.

@@ -6,7 +6,7 @@
 //! keyed by instance and by the slot their own time falls in; the store
 //! decides at merge time whether a slot is still open.
 
-use crate::family::{Counter, Family, Gauge, Histogram, Labels};
+use crate::family::{Counter, Cumulative, Family, Gauge, Histogram, Labels};
 use std::collections::HashMap;
 
 /// A handle to an instance within one [`Batch`].
@@ -117,6 +117,18 @@ impl Record<'_> {
             counter.len
         );
         self.cells[counter.base + index] += weight;
+        self
+    }
+
+    /// Set total `index` of `cumulative` to `total`; within one slot the total
+    /// merged last wins.
+    pub fn set_total(&mut self, cumulative: Cumulative, index: usize, total: f64) -> &mut Self {
+        assert!(
+            index < cumulative.len,
+            "cumulative index {index} out of {}",
+            cumulative.len
+        );
+        self.cells[cumulative.base + index] = total;
         self
     }
 
