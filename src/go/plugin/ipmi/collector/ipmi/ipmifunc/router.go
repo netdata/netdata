@@ -114,7 +114,7 @@ func sensorColumns() []funcapi.ColumnMeta {
 			Visible:       true,
 			Sortable:      true,
 			Sort:          funcapi.FieldSortDescending,
-			Summary:       funcapi.FieldSummarySum,
+			Summary:       funcapi.FieldSummaryCount, // grouped rows mix units (Celsius, RPM, Volts)
 			Transform:     funcapi.FieldTransformNumber,
 			DecimalPoints: 2,
 		},

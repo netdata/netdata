@@ -152,7 +152,7 @@ func TestRouter_SensorTable(t *testing.T) {
 			"type":          "float",
 			"visible":       true,
 			"sort":          "descending",
-			"summary":       "sum",
+			"summary":       "count",
 			"value_options": map[string]any{"transform": "number", "decimal_points": 2, "default_value": nil},
 		},
 		"Units":      {"index": 4, "type": "string", "visible": true, "summary": "count", "filter": "multiselect"},
