@@ -145,7 +145,7 @@ static bool bearer_token_save_to_file(nd_uuid_t token, struct bearer_token *bt) 
     char filename[FILENAME_MAX];
     bearer_token_filename(filename, token);
 
-    FILE *fp = fopen(filename, "w");
+    FILE *fp = fopen_secret_write(filename, "w");
     if(!fp) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot create file '%s'", filename);
         return false;

@@ -91,6 +91,14 @@ if(OS_LINUX)
         target_link_libraries(http-auth-bearer-test libnetdata)
 endif()
 
+# The test asserts POSIX mode bits, which only carry their intended meaning on
+# the platforms where the daemon's umask makes secrets group-readable.
+if(OS_LINUX)
+        add_executable(fopen-secret-write-test EXCLUDE_FROM_ALL
+                src/libnetdata/paths/tests/test_fopen_secret_write.c)
+        target_link_libraries(fopen-secret-write-test libnetdata)
+endif()
+
 if(ENABLE_CGROUPS_LOOKUP_SERVER)
     add_executable(cgroup-lookup-netipc-test EXCLUDE_FROM_ALL
             src/collectors/cgroups.plugin/tests/test_cgroup_lookup_netipc.c

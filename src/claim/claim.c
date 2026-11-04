@@ -35,7 +35,7 @@ const char *claim_agent_failure_reason_get(void) {
 bool claimed_id_save_to_file(const char *claimed_id_str) {
     bool ret;
     const char *filename = filename_from_path_entry_strdupz(netdata_configured_cloud_dir, "claimed_id");
-    FILE *fp = fopen(filename, "w");
+    FILE *fp = fopen_secret_write(filename, "w");
     if(fp) {
         int written = fprintf(fp, "%s", claimed_id_str);
         int saved_errno = errno;
@@ -154,7 +154,25 @@ bool claim_id_matches_any(const char *claim_id) {
  *   - after spawning the claim because of a command-line argument
  * If this happens with the ACLK active under an old claim then we MUST KILL THE LINK
  */
+// The files in cloud.d are written once and then only read, so an agent claimed by
+// a release that predates fopen_secret_write() keeps them at 0660 forever - nothing
+// rewrites them unless it re-claims. Tighten them in place at every startup.
+//
+// Deliberately chmod-only: the keypair cannot be replaced, because Netdata Cloud
+// holds the matching public key and regenerating it would break this node's
+// identity with no way back short of re-claiming.
+static void cloud_secrets_harden(void) {
+    static const char *secrets[] = { "claimed_id", "cloud.conf", "private.pem", "public.pem" };
+
+    for(size_t i = 0; i < sizeof(secrets) / sizeof(secrets[0]); i++) {
+        CLEAN_CHAR_P *filename = filename_from_path_entry_strdupz(netdata_configured_cloud_dir, secrets[i]);
+        secret_file_harden(filename);
+    }
+}
+
 bool load_claiming_state(void) {
+    cloud_secrets_harden();
+
     bool reconnect_aclk = aclk_online();
     if (reconnect_aclk) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
