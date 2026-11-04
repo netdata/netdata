@@ -744,7 +744,7 @@ function Collect-SnmpDiagnostics {
 #  - CreateNoWindow stays $false: detaching from the console reproduces the same
 #    empty-output failure. The bundle runs from a console PowerShell, so the
 #    child inherits it and no extra window appears.
-#  - both pipes are drained asynchronously so a full buffer cannot deadlock the
+#  - both pipes are decoded as UTF-8 (see below) and drained asynchronously so a full buffer cannot deadlock the
 #    wait, which is bounded by WaitForExit (kill on timeout).
 function Invoke-NativeProcess([string]$exe, [string[]]$argList, [int]$timeoutSec) {
     $r = [pscustomobject]@{ StdOut = ''; StdErr = ''; ExitCode = $null; TimedOut = $false; LaunchError = '' }
@@ -757,6 +757,11 @@ function Invoke-NativeProcess([string]$exe, [string[]]$argList, [int]$timeoutSec
         $psi.UseShellExecute = $false
         $psi.RedirectStandardOutput = $true
         $psi.RedirectStandardError = $true
+        # the MSYS2 binaries write UTF-8; without this .NET decodes the pipes
+        # with the console code page and non-ASCII text (dyncfg names, labels)
+        # is mangled before it is re-written as UTF-8
+        $psi.StandardOutputEncoding = New-Object System.Text.UTF8Encoding $false
+        $psi.StandardErrorEncoding = New-Object System.Text.UTF8Encoding $false
         $psi.CreateNoWindow = $false
         $p = New-Object System.Diagnostics.Process
         $p.StartInfo = $psi

@@ -123,9 +123,9 @@ printf '{"keep":true}\\n'
         manifest = json.loads((self.root / 'work/MANIFEST.json').read_text())
         return [f for f in manifest['files'] if f['path'] == '07-runtime/dyncfg-tree.json']
 
-    def run_runtime(self):
-        self.run_fixture('''
-NETDATA_PID=1; api_ok=1
+    def run_runtime(self, api_ok=1, setup=''):
+        self.run_fixture(setup + f'''
+NETDATA_PID=1; api_ok={api_ok}; NETDATACLI="$FIXTURE/bin/netdatacli"
 collect_runtime
 write_manifest
 ''')
@@ -147,6 +147,42 @@ write_manifest
         self.assertTrue(json.loads(tree.read_text())['api'])
         self.assertEqual([r['origin'] for r in self.dyncfg_rows()], ['/api/v3/config?action=tree'])
         self.assertFalse(tree.with_name('dyncfg-tree.json.cli').exists())
+
+    def test_dyncfg_tree_cli_works_with_api_down(self):
+        self.stub('netdatacli', '[ "$*" = dyncfg-tree ] || exit 1\nprintf \'{"tree":{}}\\n\'\n')
+        self.stub('curl', 'exit 7\n')
+        tree = self.run_runtime(api_ok=0)
+        self.assertIn('tree', json.loads(tree.read_text()))
+        self.assertTrue(tree.with_name('AGENT-WAS-DOWN.txt').exists())
+        self.assertEqual([r['origin'] for r in self.dyncfg_rows()], ['netdatacli dyncfg-tree'])
+
+    def test_dyncfg_tree_unusable_cli_output_falls_back(self):
+        cases = {
+            'empty': 'exit 0\n',
+            'over the cap': 'printf \'{"tree":"%0200d"}\\n\' 0\n',
+        }
+        for name, body in cases.items():
+            with self.subTest(name):
+                self.stub('netdatacli', body)
+                self.stub('curl', 'printf \'{"api":true}\\n\'\n')
+                tree = self.run_runtime(setup='rm -rf "$WORK"; mkdir -p "$WORK"; API_CAP=64\n')
+                self.assertTrue(json.loads(tree.read_text())['api'])
+                self.assertEqual([r['origin'] for r in self.dyncfg_rows()], ['/api/v3/config?action=tree'])
+                self.assertFalse(tree.with_name('dyncfg-tree.json.cli').exists())
+
+    def test_find_netdatacli_outside_path(self):
+        (self.root / 'sbin').mkdir()
+        for name in ('netdata', 'netdatacli'):
+            (self.root / 'sbin' / name).write_text('#!/bin/sh\n')
+            (self.root / 'sbin' / name).chmod(0o755)
+        result = self.run_fixture('''
+_saved_path=$PATH; PATH="$FIXTURE/no-such-dir"
+NETDATA_BIN="$FIXTURE/sbin/netdata"
+find_netdatacli
+PATH=$_saved_path
+printf '%s' "$NETDATACLI"
+''')
+        self.assertEqual(result.stdout, str(self.root / 'sbin/netdatacli'))
 
     def test_dyncfg_tree_marker_when_both_fail(self):
         self.stub('netdatacli', 'exit 255\n')
