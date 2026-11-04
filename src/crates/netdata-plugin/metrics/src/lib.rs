@@ -14,9 +14,8 @@
 //! }
 //!
 //! // Once, at startup: declare the instruments and their charts.
-//! let mut builder = MetricSetBuilder::new("svc", Settings::default());
+//! let mut builder = MetricSetBuilder::new(Settings::default());
 //! let requests = builder.counter::<Outcome>(Chart {
-//!     id: "requests",
 //!     title: "Requests",
 //!     units: "requests/s",
 //!     family: "requests",

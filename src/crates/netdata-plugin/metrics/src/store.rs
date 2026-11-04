@@ -263,7 +263,7 @@ fn new_instance(set: &MetricSetInner, labels: Labels, overflow: bool) -> Instanc
         chart_ids: set
             .charts
             .iter()
-            .map(|chart| format!("{}.{}{suffix}", set.type_prefix, chart.id))
+            .map(|chart| format!("{}{suffix}", chart.context))
             .collect(),
         labels,
         defined: false,
@@ -509,17 +509,13 @@ mod tests {
                 overflow_labels,
             }
         });
-        let mut b = MetricSetBuilder::new(
-            "svc",
-            Settings {
-                lateness,
-                expiry,
-                cap,
-                ..Settings::default()
-            },
-        );
+        let mut b = MetricSetBuilder::new(Settings {
+            lateness,
+            expiry,
+            cap,
+            ..Settings::default()
+        });
         let requests = b.counter::<Outcome>(Chart {
-            id: "requests",
             title: "Requests",
             units: "requests/s",
             family: "requests",
@@ -530,7 +526,6 @@ mod tests {
         let duration = b.histogram(
             BOUNDS,
             Chart {
-                id: "duration",
                 title: "Duration",
                 units: "seconds",
                 family: "requests",
@@ -815,15 +810,11 @@ mod tests {
                 Events = "events",
             }
         }
-        let mut b = MetricSetBuilder::new(
-            "src",
-            Settings {
-                expiry: 3,
-                ..Settings::default()
-            },
-        );
+        let mut b = MetricSetBuilder::new(Settings {
+            expiry: 3,
+            ..Settings::default()
+        });
         let totals = b.cumulative_counter::<Events>(Chart {
-            id: "events",
             title: "Events",
             units: "events/s",
             family: "events",
@@ -884,9 +875,8 @@ mod tests {
                 2
             }
         }
-        let mut b = MetricSetBuilder::new("x", Settings::default());
+        let mut b = MetricSetBuilder::new(Settings::default());
         let counter = b.counter::<Broken>(Chart {
-            id: "c",
             title: "C",
             units: "events/s",
             family: "c",

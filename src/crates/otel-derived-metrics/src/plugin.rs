@@ -46,9 +46,8 @@ pub(crate) struct Plugin {
 
 impl Plugin {
     pub(crate) fn new() -> Self {
-        let mut b = MetricSetBuilder::new("otel_plugin", Settings::default());
+        let mut b = MetricSetBuilder::new(Settings::default());
         let spans = b.counter(Chart {
-            id: "spans",
             title: "OpenTelemetry spans received",
             units: "spans/s",
             family: "ingest",
@@ -57,7 +56,6 @@ impl Plugin {
             priority: 150_000,
         });
         let log_records = b.counter(Chart {
-            id: "log_records",
             title: "OpenTelemetry log records received",
             units: "records/s",
             family: "ingest",
@@ -107,9 +105,8 @@ pub(crate) struct Derivation {
 
 impl Derivation {
     pub(crate) fn new() -> Self {
-        let mut b = MetricSetBuilder::new("otel_plugin", Settings::default());
+        let mut b = MetricSetBuilder::new(Settings::default());
         let services = b.gauge(Chart {
-            id: "derived_services",
             title: "Services with derived charts",
             units: "services",
             family: "derived metrics",
@@ -118,7 +115,6 @@ impl Derivation {
             priority: 150_010,
         });
         let adjusted = b.cumulative_counter(Chart {
-            id: "derived_adjusted_records",
             title: "Records counted in another time slot or chart set",
             units: "records/s",
             family: "derived metrics",
@@ -128,7 +124,6 @@ impl Derivation {
             priority: 150_011,
         });
         let expired = b.cumulative_counter(Chart {
-            id: "derived_expired_services",
             title: "Services removed after 15 minutes without data",
             units: "services/s",
             family: "derived metrics",
@@ -192,10 +187,10 @@ mod tests {
         let out = String::from_utf8(store.emit(101, usize::MAX).concat()).unwrap();
         netdata_plugin_protocol::validate_chart_stream(out.as_bytes()).unwrap();
         assert!(out.contains(
-            "BEGIN otel_plugin.spans 1000000\nSET accepted = 7\nSET rejected = 2\nEND 101 0 1\n"
+            "BEGIN netdata.otel.spans 1000000\nSET accepted = 7\nSET rejected = 2\nEND 101 0 1\n"
         ));
         assert!(out.contains(
-            "BEGIN otel_plugin.log_records 1000000\nSET accepted = 3\nSET rejected = 0\nEND 101 0 1\n"
+            "BEGIN netdata.otel.log_records 1000000\nSET accepted = 3\nSET rejected = 0\nEND 101 0 1\n"
         ));
         assert!(out.contains("'netdata.otel.spans'"));
     }
@@ -206,7 +201,7 @@ mod tests {
         let mut store = Store::new(plugin.metrics.clone());
         store.merge(plugin.heartbeat(100), 100);
         let out = String::from_utf8(store.emit(101, usize::MAX).concat()).unwrap();
-        assert!(out.contains("CHART otel_plugin.spans "));
+        assert!(out.contains("CHART netdata.otel.spans "));
         assert!(out.contains("SET accepted = 0\nSET rejected = 0\n"));
     }
 

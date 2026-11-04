@@ -232,10 +232,19 @@ impl Dimension {
 /// instance gets a copy.
 #[derive(Debug, Clone, Copy)]
 pub struct Chart {
-    /// The chart id within the set: letters, digits, `_`, `-` and `.`, not
-    /// ending in `_overflow` or in `_` and 16 hex digits (the instance
-    /// suffixes; see [`MetricSetBuilder::new`]).
-    pub id: &'static str,
+    /// The chart's identity, the same for every instance, for example
+    /// `svc.requests`: alerts, queries and the dashboard know the chart by
+    /// it. Each instance's chart id is derived from it:
+    /// - `<context>` for an instance without labels;
+    /// - `<context>_<hash>` for any other instance, where `<hash>` is 16 hex
+    ///   digits of a hash of its labels, stable across restarts and releases;
+    /// - `<context>_overflow` for the overflow instance (see [`Cap`]).
+    ///
+    /// It must contain a dot (the agent's `type.id`), use only letters,
+    /// digits, `_`, `-` and `.`, and not end in `_overflow` or in `_` and 16
+    /// hex digits. Contexts must be unique: within a set this is checked,
+    /// across sets it is not.
+    pub context: &'static str,
     pub title: &'static str,
     /// Shown as is; the crate adds nothing. Counter and cumulative charts are
     /// per second, so give them units that say so, for example
@@ -243,9 +252,6 @@ pub struct Chart {
     pub units: &'static str,
     /// The dashboard family (submenu): the CHART line's `family` field.
     pub family: &'static str,
-    /// The same for every instance, so the dashboard can show the copies of
-    /// this chart together.
-    pub context: &'static str,
     pub chart_type: ChartType,
     /// Dashboard order; lower comes first.
     pub priority: i32,
@@ -254,7 +260,6 @@ pub struct Chart {
 /// A chart of the set, with the dimensions its instrument gives it.
 #[derive(Debug)]
 pub(crate) struct ChartDef {
-    pub(crate) id: String,
     pub(crate) title: String,
     pub(crate) units: &'static str,
     pub(crate) family: &'static str,
@@ -316,8 +321,6 @@ impl Labels {
 /// set) gets a copy of. Cheap to clone; batches and the store share it.
 ///
 /// A plugin may have several sets, each with its own [`Store`](crate::Store).
-/// Sets may share a type prefix, but their chart ids must then differ; this
-/// is not checked.
 #[derive(Debug, Clone)]
 pub struct MetricSet(pub(crate) Arc<MetricSetInner>);
 
@@ -326,7 +329,6 @@ pub(crate) struct MetricSetInner {
     /// Unique per set in the process; instruments carry it, so one used on
     /// another set's record is caught.
     pub(crate) id: u32,
-    pub(crate) type_prefix: String,
     pub(crate) update_every: u64,
     pub(crate) lateness_slots: u64,
     pub(crate) expiry_slots: u64,
@@ -391,7 +393,6 @@ static NEXT_SET_ID: AtomicU32 = AtomicU32::new(0);
 #[derive(Debug)]
 pub struct MetricSetBuilder {
     id: u32,
-    type_prefix: String,
     settings: Settings,
     merges: Vec<Merge>,
     cumulative_cells: Vec<usize>,
@@ -399,25 +400,13 @@ pub struct MetricSetBuilder {
 }
 
 impl MetricSetBuilder {
-    /// Starts a metric set whose chart ids begin with `type_prefix` (the
-    /// `type` part of the agent's `type.id`). The full id of a chart is:
-    /// - `<type_prefix>.<chart>` for an instance without labels;
-    /// - `<type_prefix>.<chart>_<hash>` for any other instance, where
-    ///   `<hash>` is 16 hex digits of a hash of its labels, stable across
-    ///   restarts and releases;
-    /// - `<type_prefix>.<chart>_overflow` for the overflow instance (see
-    ///   [`Cap`]).
+    /// Starts a metric set.
     ///
     /// # Panics
     ///
-    /// If `type_prefix` is empty or has bytes other than letters, digits,
-    /// `_` and `-`; if `update_every` or `expiry` is 0; if the cap's `max`
-    /// is 0 or its overflow labels are empty.
-    pub fn new(type_prefix: &str, settings: Settings) -> Self {
-        assert!(
-            !type_prefix.is_empty() && type_prefix.bytes().all(is_id_byte),
-            "invalid type prefix {type_prefix:?}"
-        );
+    /// If `update_every` or `expiry` is 0, or if the cap's `max` is 0 or its
+    /// overflow labels are empty.
+    pub fn new(settings: Settings) -> Self {
         assert!(settings.update_every > 0, "update_every must be positive");
         assert!(settings.expiry > 0, "expiry must be positive");
         if let Some(cap) = &settings.cap {
@@ -429,7 +418,6 @@ impl MetricSetBuilder {
         }
         Self {
             id: NEXT_SET_ID.fetch_add(1, Ordering::Relaxed),
-            type_prefix: type_prefix.to_string(),
             settings,
             merges: Vec::new(),
             cumulative_cells: Vec::new(),
@@ -441,7 +429,7 @@ impl MetricSetBuilder {
     ///
     /// # Panics
     ///
-    /// If the chart's id or a dimension id is invalid or already used.
+    /// If the chart's context or a dimension id is invalid or already used.
     pub fn counter<D: Dimensions>(&mut self, chart: Chart) -> Counter<D> {
         let base = self.cells(D::IDS.len(), Merge::Add);
         self.chart(chart, rates::<D>(base));
@@ -491,16 +479,15 @@ impl MetricSetBuilder {
     /// Adds a [`Histogram`] over `bounds`, with two charts:
     /// - `chart`: two dimensions, `avg` and `max`, the mean and largest
     ///   observed value per slot, in `chart.units`;
-    /// - a heatmap, `<id>_histogram`: observations per second in each
+    /// - a heatmap, `<context>_histogram`: observations per second in each
     ///   bucket, in `heatmap_units`, one dimension per bucket named by its
     ///   upper bound as Rust prints the `f64` (`0.005`, `1`, `1048576`;
-    ///   `+Inf` last). Its context is `<context>_histogram`, its title
-    ///   `<title> histogram` and its priority `chart.priority + 1`;
-    ///   `chart.chart_type` does not apply to it.
+    ///   `+Inf` last). Its title is `<title> histogram` and its priority
+    ///   `chart.priority + 1`; `chart.chart_type` does not apply to it.
     ///
     /// # Panics
     ///
-    /// If `bounds` are not finite and strictly increasing, or either chart id
+    /// If `bounds` are not finite and strictly increasing, or either context
     /// is invalid or already used.
     pub fn histogram(
         &mut self,
@@ -540,7 +527,6 @@ impl MetricSetBuilder {
             .collect();
         buckets.push(Dimension::new("+Inf", Value::Rate(base + bounds.len())));
         self.add_chart(ChartDef {
-            id: format!("{}_histogram", chart.id),
             title: format!("{} histogram", chart.title),
             units: heatmap_units,
             family: chart.family,
@@ -570,7 +556,6 @@ impl MetricSetBuilder {
             lateness_slots: slots(settings.lateness),
             expiry_slots: slots(settings.expiry),
             initial_cells: self.merges.iter().map(|m| m.initial()).collect(),
-            type_prefix: self.type_prefix,
             update_every: settings.update_every,
             max_instances,
             overflow_labels,
@@ -589,7 +574,6 @@ impl MetricSetBuilder {
 
     fn chart(&mut self, chart: Chart, dimensions: Vec<Dimension>) {
         self.add_chart(ChartDef {
-            id: chart.id.to_string(),
             title: chart.title.to_string(),
             units: chart.units,
             family: chart.family,
@@ -601,33 +585,32 @@ impl MetricSetBuilder {
     }
 
     fn add_chart(&mut self, chart: ChartDef) {
+        let context = &chart.context;
         assert!(
-            !chart.id.is_empty() && chart.id.bytes().all(|b| is_id_byte(b) || b == b'.'),
-            "invalid chart id {:?}",
-            chart.id
+            context.bytes().all(|b| is_id_byte(b) || b == b'.')
+                && context.contains('.')
+                && !context.starts_with('.')
+                && !context.ends_with('.'),
+            "invalid context {context:?}"
         );
-        // Instance suffixes must not be mistaken for part of a chart id.
+        // Instance suffixes must not be mistaken for part of a context.
         assert!(
-            !chart.id.ends_with("_overflow") && !ends_with_hash_suffix(&chart.id),
-            "chart id {:?} ends like an instance suffix",
-            chart.id
+            !context.ends_with("_overflow") && !ends_with_hash_suffix(context),
+            "context {context:?} ends like an instance suffix"
         );
         assert!(
             !chart.dimensions.is_empty(),
-            "chart {} has no dimensions",
-            chart.id
+            "chart {context} has no dimensions"
         );
         assert!(
-            self.charts.iter().all(|c| c.id != chart.id),
-            "duplicate chart id {:?}",
-            chart.id
+            self.charts.iter().all(|c| &c.context != context),
+            "duplicate context {context:?}"
         );
         for (i, dim) in chart.dimensions.iter().enumerate() {
             assert!(
                 chart.dimensions[..i].iter().all(|d| d.id != dim.id),
-                "duplicate dimension id {:?} in chart {}",
-                dim.id,
-                chart.id
+                "duplicate dimension id {:?} in chart {context}",
+                dim.id
             );
         }
         self.charts.push(chart);
