@@ -116,7 +116,7 @@ func (c *Collector) addLicenseCharts(agg licenseAggregate) {
 }
 
 func (c *Collector) addLicenseChart(chart collectorapi.Chart) {
-	if c.Charts().Get(chart.ID) != nil {
+	if existing := c.Charts().Get(chart.ID); existing != nil && !existing.IsRemoved() {
 		return
 	}
 
@@ -125,10 +125,11 @@ func (c *Collector) addLicenseChart(chart collectorapi.Chart) {
 	labels["component"] = "licensing"
 
 	for k, v := range labels {
-		ch.Labels = append(ch.Labels, collectorapi.Label{Key: k, Value: v})
+		ch.Labels = append(ch.Labels, collectorapi.Label{
+			Key:   k,
+			Value: v,
+		})
 	}
 
-	if err := c.Charts().Add(ch); err != nil {
-		c.Warningf("failed to add license chart %q: %v", ch.ID, err)
-	}
+	c.installChart(ch)
 }

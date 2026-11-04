@@ -14,6 +14,15 @@ import (
 )
 
 func (c *Collector) setupProfiles(si *snmputils.SysInfo) []*ddsnmp.Profile {
+	profiles, context := c.resolveProfiles(si)
+	c.recordProfileContext(context)
+	if profilesHaveBGP(profiles) {
+		c.enableBGPIntegration()
+	}
+	return profiles
+}
+
+func (c *Collector) resolveProfiles(si *snmputils.SysInfo) ([]*ddsnmp.Profile, *ddsnmp.ProfileContext) {
 	resolved := ddsnmp.DefaultCatalog().Resolve(ddsnmp.ResolveRequest{
 		SysObjectID:    si.SysObjectID,
 		SysDescr:       si.Descr,
@@ -24,13 +33,8 @@ func (c *Collector) setupProfiles(si *snmputils.SysInfo) []*ddsnmp.Profile {
 	c.logMatchedProfiles(matchedProfiles, si.SysObjectID)
 
 	view := resolved.Project(ddsnmp.ConsumerMetrics, ddsnmp.ConsumerLicensing, ddsnmp.ConsumerBGP)
-	c.recordProfileContext(view.Context())
 	profiles := view.Profiles()
-	if profilesHaveBGP(profiles) {
-		c.enableBGPIntegration()
-	}
-
-	return profiles
+	return profiles, view.Context()
 }
 
 func (c *Collector) ensureDeviceProfile() error {
@@ -63,7 +67,10 @@ func noMetricProfilesError(si *snmputils.SysInfo) error {
 
 	switch {
 	case si == nil || si.Probe.PDUCount == 0:
-		return fmt.Errorf("no SNMP metric profiles available: SNMP system scalar query returned no PDUs; %s", missingIdentityRemediation)
+		return fmt.Errorf(
+			"no SNMP metric profiles available: SNMP system scalar query returned no PDUs; %s",
+			missingIdentityRemediation,
+		)
 	case si.SysObjectID == "" && si.Probe.SeenSysObjectID:
 		return fmt.Errorf(
 			"no SNMP metric profiles available: SNMP system scalar query returned a sysObjectID of type %s that is not a numeric OID (%s); %s",
@@ -126,6 +133,11 @@ func (c *Collector) logMatchedProfiles(profiles []*ddsnmp.Profile, sysObjectID s
 		}
 	}
 
-	msg := fmt.Sprintf("device matched %d profile(s): %s (sysObjectID: '%s')", len(profiles), strings.Join(profInfo, ", "), sysObjectID)
+	msg := fmt.Sprintf(
+		"device matched %d profile(s): %s (sysObjectID: '%s')",
+		len(profiles),
+		strings.Join(profInfo, ", "),
+		sysObjectID,
+	)
 	c.Info(msg)
 }
