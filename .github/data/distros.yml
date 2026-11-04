@@ -345,6 +345,11 @@ include:
     packages:
       <<: *ubuntu_packages
       repo_distro: ubuntu/jammy
+  - <<: *ubuntu
+    version: "26.10"
+    packages:
+      <<: *ubuntu_packages
+      repo_distro: ubuntu/stonking
 legacy: # Info for platforms we used to support and still need to handle packages for
   - <<: *amzn
     version: "2"
