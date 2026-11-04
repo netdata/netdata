@@ -109,7 +109,8 @@ static void fsrm_quota_chart_id(char *dst, size_t size, const char *path, const 
 
 static void fsrm_update_labels(RRDSET *st, const char *path, const char *template_name)
 {
-    if (unlikely(!st))
+    // Plain check: the analyzer does not correlate a NULL test wrapped in unlikely() with the dereference below.
+    if (!st)
         return;
 
     rrdlabels_add(st->rrdlabels, "path", path, RRDLABEL_SRC_AUTO);
