@@ -1,6 +1,6 @@
 //! Metric set declarations: cells, instruments and their charts.
 //!
-//! For each instance and slot the store keeps an array of `f64` cells: a
+//! For each entity and slot the store keeps an array of `f64` cells: a
 //! counter has one cell per dimension value, a histogram one per bucket plus
 //! its sum, count and maximum. A batch collects its own cells for the slots
 //! its records fall in, and merging combines them cell by cell with each
@@ -22,7 +22,7 @@ const MAX_LABEL_VALUE_BYTES: usize = 800;
 /// (`RRDLABELS_MAX_NAME_LENGTH`).
 const MAX_LABEL_KEY_BYTES: usize = 200;
 
-/// How a cell combines two values for the same instance and slot (from two
+/// How a cell combines two values for the same entity and slot (from two
 /// batches, or a batch and the store).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Merge {
@@ -131,7 +131,7 @@ pub struct Counter<D> {
 /// a store's statistics: record the current totals at the time you read
 /// them, and the chart shows how much they grew per second.
 ///
-/// - Until an instance's first total, and in the slot of that total (its
+/// - Until an entity's first total, and in the slot of that total (its
 ///   baseline), the chart shows a gap.
 /// - A total lower than the previous one is a reset: the increase is the new
 ///   total.
@@ -232,16 +232,16 @@ impl Dimension {
 
 /// How an instrument's chart is presented; the fields map to the CHART line
 /// of the plugins.d protocol (`src/plugins.d/README.md` in the agent). Every
-/// instance gets a copy.
+/// entity gets its own instance of the chart.
 #[derive(Debug, Clone, Copy)]
 pub struct Chart {
-    /// The chart's identity, the same for every instance, for example
+    /// The chart's identity, the same for every entity, for example
     /// `svc.requests`: alerts, queries and the dashboard know the chart by
-    /// it. Each instance's chart id is derived from it:
-    /// - `<context>` for an instance without labels;
-    /// - `<context>_<hash>` for any other instance, where `<hash>` is 16 hex
+    /// it. Each entity's chart id is derived from it:
+    /// - `<context>` for an entity without labels;
+    /// - `<context>_<hash>` for any other entity, where `<hash>` is 16 hex
     ///   digits of a hash of its labels, stable across restarts and releases;
-    /// - `<context>_overflow` for the overflow instance (see [`Cap`]).
+    /// - `<context>_overflow` for the overflow entity (see [`Cap`]).
     ///
     /// It must contain a dot (the agent's `type.id`), use only letters,
     /// digits, `_`, `-` and `.`, and not end in `_overflow` or in `_` and 16
@@ -272,15 +272,15 @@ pub(crate) struct ChartDef {
     pub(crate) dimensions: Vec<Dimension>,
 }
 
-/// The labels that identify an instance; its charts carry them.
+/// The labels that identify an entity; its charts carry them.
 ///
-/// - Two label lists with the same pairs are the same instance, whatever
+/// - Two label lists with the same pairs are the same entity, whatever
 ///   order they were pushed in.
 /// - A blank value (only whitespace or control characters) is left out,
 ///   because the agent would store it as `[none]`.
 /// - A value is cut to the agent's limit of 800 bytes, at a character
 ///   boundary.
-/// - An empty list is an instance too: the single instance of a set whose
+/// - An empty list is an entity too: the single entity of a set whose
 ///   charts need no labels.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct Labels(pub(crate) Vec<(String, String)>);
@@ -320,8 +320,8 @@ impl Labels {
     }
 }
 
-/// A declared set of metrics and their charts, which every instance (label
-/// set) gets a copy of. Cheap to clone; batches and the store share it.
+/// A declared set of metrics and their charts; every entity gets its own
+/// instance of each chart. Cheap to clone; batches and the store share it.
 ///
 /// A plugin may have several sets, each with its own [`Store`](crate::Store).
 #[derive(Debug, Clone)]
@@ -336,7 +336,7 @@ pub(crate) struct MetricSetInner {
     pub(crate) interval_secs: u64,
     pub(crate) lateness_slots: u64,
     pub(crate) expiry_slots: u64,
-    pub(crate) max_instances: usize,
+    pub(crate) max_entities: usize,
     pub(crate) overflow_labels: Labels,
     pub(crate) merges: Vec<Merge>,
     pub(crate) initial_cells: Vec<f64>,
@@ -357,14 +357,14 @@ pub struct Settings {
     /// older records are counted in the oldest open slot. Rounded up to whole
     /// collection intervals. Default 0.
     pub lateness: Duration,
-    /// A timeout: an instance with no records for this long has its charts
+    /// A timeout: an entity with no records for this long has its charts
     /// marked obsolete (the agent stops collecting them and later removes
     /// them) and its state dropped. Rounded up to whole collection intervals.
     /// It counts emitted slots, which lag by `lateness`: with expiry 900 s and
-    /// lateness 10 s, an instance last recorded at second 0 expires at second
+    /// lateness 10 s, an entity last recorded at second 0 expires at second
     /// 911. Default 15 minutes.
     pub expiry: Duration,
-    /// The instance cap; default none.
+    /// The entity cap; default none.
     pub cap: Option<Cap>,
 }
 
@@ -379,17 +379,17 @@ impl Default for Settings {
     }
 }
 
-/// A limit on the number of instances. While the store is full, the records
-/// of a label set without an instance go to one overflow instance. As
-/// instances expire, room returns: the next record of such a label set,
-/// including one whose records went to the overflow instance so far, gets
-/// its own instance.
+/// A limit on the number of entities. While the store is full, the records
+/// of a label set without an entity go to one overflow entity. As
+/// entities expire, room returns: the next record of such a label set,
+/// including one whose records went to the overflow entity so far, gets
+/// its own entity.
 #[derive(Debug, Clone)]
 pub struct Cap {
-    /// Instances tracked at most (the label-less instance counts, the
-    /// overflow instance does not).
+    /// Entities tracked at most (the label-less entity counts, the
+    /// overflow entity does not).
     pub max: usize,
-    /// The overflow instance's labels.
+    /// The overflow entity's labels.
     pub overflow_labels: Labels,
 }
 
@@ -421,7 +421,7 @@ impl MetricSetBuilder {
         );
         assert!(!settings.expiry.is_zero(), "expiry must be positive");
         if let Some(cap) = &settings.cap {
-            assert!(cap.max > 0, "the instance cap must be positive");
+            assert!(cap.max > 0, "the entity cap must be positive");
             assert!(
                 !cap.overflow_labels.is_empty(),
                 "overflow labels are required"
@@ -559,7 +559,7 @@ impl MetricSetBuilder {
         let settings = self.settings;
         let interval = settings.collection_interval;
         let slots = |span: Duration| span.as_nanos().div_ceil(interval.as_nanos()) as u64;
-        let (max_instances, overflow_labels) = match settings.cap {
+        let (max_entities, overflow_labels) = match settings.cap {
             Some(cap) => (cap.max, cap.overflow_labels),
             None => (usize::MAX, Labels::new()),
         };
@@ -569,7 +569,7 @@ impl MetricSetBuilder {
             expiry_slots: slots(settings.expiry),
             initial_cells: self.merges.iter().map(|m| m.initial()).collect(),
             interval_secs: interval.as_secs(),
-            max_instances,
+            max_entities,
             overflow_labels,
             merges: self.merges,
             cumulative_cells: self.cumulative_cells,
@@ -605,10 +605,10 @@ impl MetricSetBuilder {
                 && !context.ends_with('.'),
             "invalid context {context:?}"
         );
-        // Instance suffixes must not be mistaken for part of a context.
+        // Entity suffixes must not be mistaken for part of a context.
         assert!(
             !context.ends_with("_overflow") && !ends_with_hash_suffix(context),
-            "context {context:?} ends like an instance suffix"
+            "context {context:?} ends like an entity suffix"
         );
         assert!(
             !chart.dimensions.is_empty(),
@@ -643,7 +643,7 @@ pub(crate) fn is_id_byte(b: u8) -> bool {
 }
 
 /// Whether `id` ends in `_` and 16 hex digits, the shape of a labelled
-/// instance's suffix.
+/// entity's suffix.
 fn ends_with_hash_suffix(id: &str) -> bool {
     let bytes = id.as_bytes();
     bytes.len() >= 17

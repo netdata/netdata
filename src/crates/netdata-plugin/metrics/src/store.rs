@@ -1,11 +1,11 @@
-//! The store: instances, the open-slot window, the instance cap, expiry and
+//! The store: entities, the open-slot window, the entity cap, expiry and
 //! emitting.
 //!
 //! The store keeps every slot from `next_emit` (the oldest slot not yet
-//! emitted) to the current one open; each instance holds those slots as cell
-//! arrays and folds them forward after a stall (`advance_window`). Instances
+//! emitted) to the current one open; each entity holds those slots as cell
+//! arrays and folds them forward after a stall (`advance_window`). Entities
 //! are created on their first record with data, charts are defined on an
-//! instance's first emitted slot, and an expired instance's state is dropped
+//! entity's first emitted slot, and an expired entity's state is dropped
 //! (its cumulative baselines with it).
 
 use crate::batch::Batch;
@@ -22,22 +22,22 @@ use std::collections::{HashMap, VecDeque};
 /// emitted, so no record is lost and memory stays bounded.
 pub(crate) const MAX_BACKLOG_SLOTS: u64 = 60;
 
-/// Counts since the store was created; `instances` is the current number.
+/// Counts since the store was created; `entities` is the current number.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Stats {
-    /// Instances currently tracked, the overflow instance included.
-    pub instances: usize,
-    /// Records counted in the overflow instance because of the cap.
+    /// Entities currently tracked, the overflow entity included.
+    pub entities: usize,
+    /// Records counted in the overflow entity because of the cap.
     pub overflowed_records: u64,
     /// Records older than the oldest open slot, counted in that slot.
     pub late_records: u64,
     /// Records newer than the current slot, counted in the current slot.
     pub future_records: u64,
-    /// Instances whose charts were marked obsolete after the expiry time.
-    pub expired_instances: u64,
+    /// Entities whose charts were marked obsolete after the expiry time.
+    pub expired_entities: u64,
 }
 
-struct Instance {
+struct Entity {
     labels: Labels,
     /// The full id of each of the set's charts, in set order.
     chart_ids: Vec<String>,
@@ -84,18 +84,18 @@ struct Instance {
 ///   than that are not lost: their counts are added into the first slot
 ///   emitted, which then shows them as one spike.
 ///
-/// # Instances
+/// # Entities
 ///
-/// - An instance starts with its first record. Its charts are defined, with
+/// - An entity starts with its first record. Its charts are defined, with
 ///   its labels, before their first update.
 /// - After `expiry` without records its charts are marked obsolete and its
 ///   state is dropped; if it returns, its charts are defined again.
-/// - Beyond the cap, records go to the overflow instance (see
+/// - Beyond the cap, records go to the overflow entity (see
 ///   [`Cap`](crate::Cap); [`Stats::overflowed_records`]).
 pub struct Store {
     set: MetricSet,
-    instances: HashMap<Labels, Instance>,
-    overflow: Option<Instance>,
+    entities: HashMap<Labels, Entity>,
+    overflow: Option<Entity>,
     /// Oldest slot not yet emitted; set on first use.
     next_emit: Option<u64>,
     stats: Stats,
@@ -105,7 +105,7 @@ impl Store {
     pub fn new(set: MetricSet) -> Self {
         Self {
             set,
-            instances: HashMap::new(),
+            entities: HashMap::new(),
             overflow: None,
             next_emit: None,
             stats: Stats::default(),
@@ -114,7 +114,7 @@ impl Store {
 
     pub fn stats(&self) -> Stats {
         Stats {
-            instances: self.instances.len() + usize::from(self.overflow.is_some()),
+            entities: self.entities.len() + usize::from(self.overflow.is_some()),
             ..self.stats
         }
     }
@@ -133,8 +133,8 @@ impl Store {
             return next_emit;
         }
         let skipped = oldest_wanted - next_emit;
-        for instance in self.instances.values_mut().chain(self.overflow.as_mut()) {
-            fold_front(&set, instance, skipped, oldest_wanted);
+        for entity in self.entities.values_mut().chain(self.overflow.as_mut()) {
+            fold_front(&set, entity, skipped, oldest_wanted);
         }
         self.next_emit = Some(oldest_wanted);
         oldest_wanted
@@ -156,20 +156,20 @@ impl Store {
         let next_emit = self.advance_window(now);
         let set = std::sync::Arc::clone(&self.set.0);
         let newest = (now / set.interval_secs).max(next_emit);
-        for pending in batch.instances {
+        for pending in batch.entities {
             if pending.per_slot.is_empty() {
                 continue;
             }
             let records: u64 = pending.per_slot.iter().map(|s| s.records).sum();
-            let instance = if let Some(instance) = self.instances.get_mut(&pending.labels) {
-                instance
-            } else if self.instances.len() < set.max_instances {
-                let instance = new_instance(&set, pending.labels.clone(), false);
-                self.instances.entry(pending.labels).or_insert(instance)
+            let entity = if let Some(entity) = self.entities.get_mut(&pending.labels) {
+                entity
+            } else if self.entities.len() < set.max_entities {
+                let entity = new_entity(&set, pending.labels.clone(), false);
+                self.entities.entry(pending.labels).or_insert(entity)
             } else {
                 self.stats.overflowed_records += records;
                 self.overflow
-                    .get_or_insert_with(|| new_instance(&set, set.overflow_labels.clone(), true))
+                    .get_or_insert_with(|| new_entity(&set, set.overflow_labels.clone(), true))
             };
             for batch_cells in pending.per_slot {
                 let slot = if batch_cells.slot < next_emit {
@@ -181,14 +181,14 @@ impl Store {
                 } else {
                     batch_cells.slot
                 };
-                merge_slot(&set, instance, next_emit, slot, &batch_cells.cells);
+                merge_slot(&set, entity, next_emit, slot, &batch_cells.cells);
             }
         }
     }
 
     /// Emit every slot whose lateness has passed by `now` (Unix seconds):
-    /// the definitions of new instances' charts, one update per chart and
-    /// slot, and the obsolete marks of expired instances.
+    /// the definitions of new entities' charts, one update per chart and
+    /// slot, and the obsolete marks of expired entities.
     ///
     /// The text is complete chart-protocol text, to write to the agent as is
     /// (a plugin's stdout). It comes in chunks of at most `max_chunk` bytes,
@@ -204,19 +204,19 @@ impl Store {
         while next_emit + set.lateness_slots < now_slot {
             let slot = next_emit;
             let mut expired = Vec::new();
-            for (labels, instance) in &mut self.instances {
-                if emit_slot(&set, instance, slot, &mut out) {
+            for (labels, entity) in &mut self.entities {
+                if emit_slot(&set, entity, slot, &mut out) {
                     expired.push(labels.clone());
                 }
             }
             for labels in expired {
-                self.instances.remove(&labels);
-                self.stats.expired_instances += 1;
+                self.entities.remove(&labels);
+                self.stats.expired_entities += 1;
             }
-            if let Some(instance) = &mut self.overflow {
-                if emit_slot(&set, instance, slot, &mut out) {
+            if let Some(entity) = &mut self.overflow {
+                if emit_slot(&set, entity, slot, &mut out) {
                     self.overflow = None;
-                    self.stats.expired_instances += 1;
+                    self.stats.expired_entities += 1;
                 }
             }
             next_emit += 1;
@@ -226,22 +226,22 @@ impl Store {
     }
 }
 
-/// Merge the first `skipped` window slots of `instance` into the slot that
+/// Merge the first `skipped` window slots of `entity` into the slot that
 /// becomes the window's first, `new_first`.
-fn fold_front(set: &MetricSetInner, instance: &mut Instance, skipped: u64, new_first: u64) {
-    let take = (skipped as usize).min(instance.open_cells.len());
+fn fold_front(set: &MetricSetInner, entity: &mut Entity, skipped: u64, new_first: u64) {
+    let take = (skipped as usize).min(entity.open_cells.len());
     if take == 0 {
         return;
     }
     let mut folded = set.initial_cells.clone().into_boxed_slice();
-    for cells in instance.open_cells.drain(..take) {
+    for cells in entity.open_cells.drain(..take) {
         merge_cells(set, &mut folded, &cells);
     }
-    match instance.open_cells.front_mut() {
+    match entity.open_cells.front_mut() {
         Some(front) => merge_cells(set, front, &folded),
-        None => instance.open_cells.push_back(folded),
+        None => entity.open_cells.push_back(folded),
     }
-    instance.first_slot = instance.first_slot.max(new_first);
+    entity.first_slot = entity.first_slot.max(new_first);
 }
 
 fn merge_cells(set: &MetricSetInner, target: &mut [f64], cells: &[f64]) {
@@ -250,7 +250,7 @@ fn merge_cells(set: &MetricSetInner, target: &mut [f64], cells: &[f64]) {
     }
 }
 
-fn new_instance(set: &MetricSetInner, labels: Labels, overflow: bool) -> Instance {
+fn new_entity(set: &MetricSetInner, labels: Labels, overflow: bool) -> Entity {
     let suffix = if overflow {
         "_overflow".to_string()
     } else if labels.is_empty() {
@@ -258,7 +258,7 @@ fn new_instance(set: &MetricSetInner, labels: Labels, overflow: bool) -> Instanc
     } else {
         format!("_{:016x}", label_hash(&labels))
     };
-    Instance {
+    Entity {
         chart_ids: set
             .charts
             .iter()
@@ -274,7 +274,7 @@ fn new_instance(set: &MetricSetInner, labels: Labels, overflow: bool) -> Instanc
 }
 
 /// FNV-1a over the labels, which are sorted by key: stable across processes
-/// and releases, so an instance keeps its chart ids over restarts.
+/// and releases, so an entity keeps its chart ids over restarts.
 fn label_hash(labels: &Labels) -> u64 {
     let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
     for (key, value) in &labels.0 {
@@ -286,39 +286,33 @@ fn label_hash(labels: &Labels) -> u64 {
     hash
 }
 
-fn merge_slot(
-    set: &MetricSetInner,
-    instance: &mut Instance,
-    next_emit: u64,
-    slot: u64,
-    cells: &[f64],
-) {
+fn merge_slot(set: &MetricSetInner, entity: &mut Entity, next_emit: u64, slot: u64, cells: &[f64]) {
     let index = (slot - next_emit) as usize;
-    while instance.open_cells.len() <= index {
-        instance
+    while entity.open_cells.len() <= index {
+        entity
             .open_cells
             .push_back(set.initial_cells.clone().into_boxed_slice());
     }
-    merge_cells(set, &mut instance.open_cells[index], cells);
-    instance.first_slot = instance.first_slot.min(slot);
-    instance.last_slot = instance.last_slot.max(slot);
+    merge_cells(set, &mut entity.open_cells[index], cells);
+    entity.first_slot = entity.first_slot.min(slot);
+    entity.last_slot = entity.last_slot.max(slot);
 }
 
-/// Emit `slot` of one instance and drop it from the instance's window.
-/// Returns true when the instance has expired; its charts are then already
+/// Emit `slot` of one entity and drop it from the entity's window.
+/// Returns true when the entity has expired; its charts are then already
 /// marked obsolete in `out`.
-fn emit_slot(set: &MetricSetInner, instance: &mut Instance, slot: u64, out: &mut Chunker) -> bool {
-    let cells = instance.open_cells.pop_front();
-    if slot >= instance.first_slot {
-        if !instance.defined {
+fn emit_slot(set: &MetricSetInner, entity: &mut Entity, slot: u64, out: &mut Chunker) -> bool {
+    let cells = entity.open_cells.pop_front();
+    if slot >= entity.first_slot {
+        if !entity.defined {
             for index in 0..set.charts.len() {
-                define_chart(set, instance, index, false, out);
+                define_chart(set, entity, index, false, out);
             }
-            instance.defined = true;
+            entity.defined = true;
         }
         let mut cells = cells.unwrap_or_else(|| set.initial_cells.clone().into_boxed_slice());
-        totals_to_increases(set, instance, &mut cells);
-        for (chart, id) in set.charts.iter().zip(&instance.chart_ids) {
+        totals_to_increases(set, entity, &mut cells);
+        for (chart, id) in set.charts.iter().zip(&entity.chart_ids) {
             let block = out.block();
             write_begin(block, id, set.interval_secs * 1_000_000);
             for dim in &chart.dimensions {
@@ -331,22 +325,22 @@ fn emit_slot(set: &MetricSetInner, instance: &mut Instance, slot: u64, out: &mut
             out.commit();
         }
     }
-    if instance.defined && slot >= instance.last_slot + set.expiry_slots {
+    if entity.defined && slot >= entity.last_slot + set.expiry_slots {
         for index in 0..set.charts.len() {
-            define_chart(set, instance, index, true, out);
+            define_chart(set, entity, index, true, out);
         }
         return true;
     }
     false
 }
 
-/// Replace the totals in `cells` with their increase since the instance's
+/// Replace the totals in `cells` with their increase since the entity's
 /// previous total, and remember the new totals.
-fn totals_to_increases(set: &MetricSetInner, instance: &mut Instance, cells: &mut [f64]) {
+fn totals_to_increases(set: &MetricSetInner, entity: &mut Entity, cells: &mut [f64]) {
     for (&cell, previous) in set
         .cumulative_cells
         .iter()
-        .zip(instance.previous_totals.iter_mut())
+        .zip(entity.previous_totals.iter_mut())
     {
         let total = cells[cell];
         cells[cell] = if total.is_nan() {
@@ -386,7 +380,7 @@ fn dimension_value(set: &MetricSetInner, cells: &[f64], value: Value) -> Option<
 /// timed END lands exactly on its slot.
 fn define_chart(
     set: &MetricSetInner,
-    instance: &Instance,
+    entity: &Entity,
     index: usize,
     obsolete: bool,
     out: &mut Chunker,
@@ -396,7 +390,7 @@ fn define_chart(
     write_chart(
         block,
         &ChartLine {
-            id: &instance.chart_ids[index],
+            id: &entity.chart_ids[index],
             name: "",
             title: &chart.title,
             units: chart.units,
@@ -413,8 +407,8 @@ fn define_chart(
         },
     );
     if !obsolete {
-        if !instance.labels.is_empty() {
-            for (key, value) in &instance.labels.0 {
+        if !entity.labels.is_empty() {
+            for (key, value) in &entity.labels.0 {
                 write_clabel(block, key, value, LabelSource::Auto);
             }
             write_clabel_commit(block);
@@ -564,7 +558,7 @@ mod tests {
         now: u64,
     ) {
         let mut batch = Batch::new(&f.set);
-        let mut inst = batch.instance(labels(name));
+        let mut inst = batch.entity(labels(name));
         for i in 0..count {
             inst.record(time)
                 .add(
@@ -658,7 +652,7 @@ mod tests {
     }
 
     #[test]
-    fn expired_instances_are_marked_obsolete_and_revived() {
+    fn expired_entities_are_marked_obsolete_and_revived() {
         let f = fixture(0, 3, None);
         let mut store = Store::new(f.set.clone());
         record(&f, &mut store, "a", 10, 1, 0, 10);
@@ -666,8 +660,8 @@ mod tests {
         assert!(!out.contains("obsolete"));
         out += &text(&store.emit(14, usize::MAX));
         assert_eq!(out.matches("'obsolete store_first'").count(), 3);
-        assert_eq!(store.stats().instances, 0);
-        assert_eq!(store.stats().expired_instances, 1);
+        assert_eq!(store.stats().entities, 0);
+        assert_eq!(store.stats().expired_entities, 1);
         record(&f, &mut store, "a", 20, 1, 0, 20);
         let again = text(&store.emit(21, usize::MAX));
         assert_eq!(again.matches("CHART ").count(), 3);
@@ -677,21 +671,21 @@ mod tests {
     }
 
     #[test]
-    fn instances_over_the_cap_share_the_overflow_instance() {
+    fn entities_over_the_cap_share_the_overflow_entity() {
         let f = fixture(0, 3, Some(1));
         let mut store = Store::new(f.set.clone());
         record(&f, &mut store, "a", 10, 1, 0, 10);
         record(&f, &mut store, "b", 10, 2, 0, 10);
         record(&f, &mut store, "c", 10, 3, 0, 10);
         let stats = store.stats();
-        assert_eq!(stats.instances, 2);
+        assert_eq!(stats.entities, 2);
         assert_eq!(stats.overflowed_records, 5);
         let out = text(&store.emit(11, usize::MAX));
         assert!(out.contains("BEGIN svc.requests_overflow 1000000\nSET ok = 5\n"));
         assert!(out.contains("CLABEL 'overflow' 'true' 1\n"));
-        // Once "a" and the overflow instance expire, "b" gets its own charts.
+        // Once "a" and the overflow entity expire, "b" gets its own charts.
         let expired = text(&store.emit(14, usize::MAX));
-        assert_eq!(store.stats().instances, 0);
+        assert_eq!(store.stats().entities, 0);
         record(&f, &mut store, "b", 20, 1, 0, 20);
         let b = text(&store.emit(21, usize::MAX));
         assert!(b.contains("CLABEL 'service.name' 'b' 1"));
@@ -699,14 +693,14 @@ mod tests {
     }
 
     #[test]
-    fn instances_without_records_are_not_created() {
+    fn entities_without_records_are_not_created() {
         let f = fixture(0, 3, Some(1));
         let mut store = Store::new(f.set.clone());
         let mut batch = Batch::new(&f.set);
-        batch.instance(labels("empty"));
+        batch.entity(labels("empty"));
         store.merge(batch, 10);
-        assert_eq!(store.stats().instances, 0);
-        // The cap is still free for an instance with records.
+        assert_eq!(store.stats().entities, 0);
+        // The cap is still free for an entity with records.
         record(&f, &mut store, "a", 10, 1, 0, 10);
         assert_eq!(store.stats().overflowed_records, 0);
         let out = text(&store.emit(11, usize::MAX));
@@ -720,7 +714,7 @@ mod tests {
         let mut store = Store::new(f.set.clone());
         record(&f, &mut store, "a", 10, 1, 0, 10);
         record(&f, &mut store, "a", 100_000, 2, 0, 100_000);
-        let window = store.instances.values().next().unwrap().open_cells.len() as u64;
+        let window = store.entities.values().next().unwrap().open_cells.len() as u64;
         assert!(window <= 10 + MAX_BACKLOG_SLOTS + 1, "{window}");
         let out = text(&store.emit(100_011, usize::MAX));
         validate_chart_stream(out.as_bytes()).unwrap();
@@ -739,7 +733,7 @@ mod tests {
         let f = fixture(10, 900, None);
         let mut store = Store::new(f.set.clone());
         let mut batch = Batch::new(&f.set);
-        let mut inst = batch.instance(labels("a"));
+        let mut inst = batch.entity(labels("a"));
         for time in [995, 996, 995, 997, 996, 999] {
             inst.record(time).add(f.requests, Outcome::Ok, 1.0);
         }
@@ -781,15 +775,15 @@ mod tests {
         assert_eq!(labels.0.len(), 1);
         assert_eq!(labels.0[0].1.len(), 800);
         let f = fixture(0, 900, None);
-        let instance = new_instance(&f.set.0, labels, false);
-        assert!(instance.chart_ids[0].starts_with("svc.requests_"));
+        let entity = new_entity(&f.set.0, labels, false);
+        assert!(entity.chart_ids[0].starts_with("svc.requests_"));
         assert!(netdata_plugin_protocol::is_valid_chart_id(
-            &instance.chart_ids[0]
+            &entity.chart_ids[0]
         ));
     }
 
     #[test]
-    fn push_order_does_not_change_the_instance_or_its_chart_ids() {
+    fn push_order_does_not_change_the_entity_or_its_chart_ids() {
         let mut ab = Labels::new();
         ab.push("a", "1");
         ab.push("b", "2");
@@ -798,7 +792,7 @@ mod tests {
         ba.push("a", "1");
         assert_eq!(ab, ba);
         let f = fixture(0, 900, None);
-        let ids = |labels: Labels| new_instance(&f.set.0, labels, false).chart_ids;
+        let ids = |labels: Labels| new_entity(&f.set.0, labels, false).chart_ids;
         assert_eq!(ids(ab), ids(ba));
         assert_eq!(ids(Labels::new())[0], "svc.requests");
     }
@@ -826,7 +820,7 @@ mod tests {
         let mut store = Store::new(set.clone());
         let set = |store: &mut Store, time: u64, total: Option<f64>| {
             let mut batch = Batch::new(&set);
-            let mut inst = batch.instance(Labels::new());
+            let mut inst = batch.entity(Labels::new());
             let mut record = inst.record(time);
             if let Some(total) = total {
                 record.set_total(totals, Events::Events, total);
@@ -860,7 +854,7 @@ mod tests {
         let f = fixture(0, 900, None);
         let other = fixture(0, 900, None);
         let mut batch = Batch::new(&f.set);
-        let mut inst = batch.instance(labels("a"));
+        let mut inst = batch.entity(labels("a"));
         inst.record(10).add(other.requests, Outcome::Ok, 1.0);
     }
 
@@ -886,7 +880,7 @@ mod tests {
         });
         let set = b.build();
         let mut batch = Batch::new(&set);
-        let mut inst = batch.instance(Labels::new());
+        let mut inst = batch.entity(Labels::new());
         inst.record(10).add(counter, Broken, 1.0);
     }
 
@@ -903,9 +897,9 @@ mod tests {
     fn a_batch_without_records_is_empty() {
         let f = fixture(0, 900, None);
         let mut batch = Batch::new(&f.set);
-        batch.instance(labels("a"));
+        batch.entity(labels("a"));
         assert!(batch.is_empty());
-        batch.instance(labels("a")).record(10);
+        batch.entity(labels("a")).record(10);
         assert!(!batch.is_empty());
     }
 
@@ -914,7 +908,7 @@ mod tests {
         let f = fixture(0, 900, None);
         let mut store = Store::new(f.set.clone());
         let mut batch = Batch::new(&f.set);
-        let mut inst = batch.instance(labels("a"));
+        let mut inst = batch.entity(labels("a"));
         inst.record(10)
             .add(f.requests, Outcome::Ok, 2.0)
             .observe(f.duration, 0.25, 2.0);

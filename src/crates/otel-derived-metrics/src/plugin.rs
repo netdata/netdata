@@ -37,7 +37,7 @@ dimensions! {
     }
 }
 
-/// The plugin's ingest outcomes: one label-less instance.
+/// The plugin's ingest outcomes: one label-less entity.
 pub(crate) struct Plugin {
     pub(crate) metrics: MetricSet,
     spans: Counter<Acceptance>,
@@ -77,7 +77,7 @@ impl Plugin {
         };
         let mut batch = Batch::new(&self.metrics);
         batch
-            .instance(Labels::new())
+            .entity(Labels::new())
             .record(now)
             .add(counter, Acceptance::Accepted, accepted as f64)
             .add(counter, Acceptance::Rejected, rejected as f64);
@@ -89,12 +89,12 @@ impl Plugin {
     /// the plugin runs.
     pub(crate) fn heartbeat(&self, now: u64) -> Batch {
         let mut batch = Batch::new(&self.metrics);
-        batch.instance(Labels::new()).record(now);
+        batch.entity(Labels::new()).record(now);
         batch
     }
 }
 
-/// How the per-service derivation of each signal behaves: one instance per
+/// How the per-service derivation of each signal behaves: one entity per
 /// signal, labelled `signal`, fed from its store's statistics every tick.
 pub(crate) struct Derivation {
     pub(crate) metrics: MetricSet,
@@ -144,9 +144,9 @@ impl Derivation {
         let mut labels = Labels::new();
         labels.push("signal", signal_name(signal));
         batch
-            .instance(labels)
+            .entity(labels)
             .record(now)
-            .set(self.services, Services::Services, stats.instances as f64)
+            .set(self.services, Services::Services, stats.entities as f64)
             .set_total(self.adjusted, Adjustment::Late, stats.late_records as f64)
             .set_total(
                 self.adjusted,
@@ -161,7 +161,7 @@ impl Derivation {
             .set_total(
                 self.expired,
                 Expired::Expired,
-                stats.expired_instances as f64,
+                stats.expired_entities as f64,
             );
     }
 }
@@ -206,7 +206,7 @@ mod tests {
     }
 
     #[test]
-    fn derivation_charts_one_instance_per_signal_with_increases() {
+    fn derivation_charts_one_entity_per_signal_with_increases() {
         let derivation = Derivation::new();
         let mut store = Store::new(derivation.metrics.clone());
         let mut tick = |stats: Stats, now: u64| {
@@ -225,11 +225,11 @@ mod tests {
         );
         let second = tick(
             Stats {
-                instances: 3,
+                entities: 3,
                 late_records: 7,
                 future_records: 1,
                 overflowed_records: 4,
-                expired_instances: 1,
+                expired_entities: 1,
             },
             101,
         );

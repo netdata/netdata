@@ -32,7 +32,7 @@
 //! labels.push("service.name", "checkout");
 //! let mut batch = Batch::new(&set);
 //! batch
-//!     .instance(labels)
+//!     .entity(labels)
 //!     .record(100)
 //!     .add(requests, Outcome::Error, 1.0);
 //! store.merge(batch, 100);
@@ -46,22 +46,25 @@
 //! - an *instrument* is a [`Counter`], [`CumulativeCounter`], [`Gauge`] or
 //!   [`Histogram`]; each brings its chart, and the first three are split by
 //!   the values of their [`Dimensions`];
-//! - an *instance* is one label set, for example one service; it gets its
-//!   own copy of every chart of the set, so instruments that need different
-//!   labels (per service, process-wide) belong in different metric sets;
+//! - an *entity* is the thing being monitored, for example one service,
+//!   identified by its [`Labels`]; it gets its own instance (in Netdata's
+//!   sense: one chart) of every chart of the set, so instruments that need
+//!   different labels (per service, process-wide) belong in different metric
+//!   sets. There is no explicit create: recording with a new label set is a
+//!   new entity;
 //! - a *slot* is one collection interval `I` (see [`Settings`]): slot `n`
 //!   covers `[n × I, (n + 1) × I)` and holds the records whose time falls in
 //!   it; it becomes one point per dimension, stored at its end,
 //!   `(n + 1) × I`;
-//! - a *record* is one event of an instance at its own time, with its
+//! - a *record* is one event of an entity at its own time, with its
 //!   measurements (`add`, `observe`, `set`, `set_total`); the records of one
-//!   instance in one slot combine into that slot's point.
+//!   entity in one slot combine into that slot's point.
 
 mod batch;
 mod metric_set;
 mod store;
 
-pub use batch::{Batch, BatchInstance, Measurements};
+pub use batch::{Batch, BatchEntity, Measurements};
 pub use metric_set::{
     Cap, Chart, Counter, CumulativeCounter, Dimensions, Gauge, Histogram, Labels, MetricSet,
     MetricSetBuilder, Settings,

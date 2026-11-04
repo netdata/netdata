@@ -1,5 +1,5 @@
 //! Request-local recording: each record adds into the batch's cells for its
-//! instance and the slot its own time falls in; the store decides at merge
+//! entity and the slot its own time falls in; the store decides at merge
 //! time whether that slot is still open.
 
 use crate::metric_set::{
@@ -7,15 +7,15 @@ use crate::metric_set::{
 };
 use std::collections::HashMap;
 
-/// A batch's cells for one instance and one slot.
+/// A batch's cells for one entity and one slot.
 pub(crate) struct BatchCells {
     pub(crate) slot: u64,
     pub(crate) records: u64,
     pub(crate) cells: Box<[f64]>,
 }
 
-/// One instance's records within a batch.
-pub(crate) struct PendingInstance {
+/// One entity's records within a batch.
+pub(crate) struct PendingEntity {
     pub(crate) labels: Labels,
     pub(crate) per_slot: Vec<BatchCells>,
     /// Slot number → index in `per_slot`; records mostly arrive in time order,
@@ -31,7 +31,7 @@ pub(crate) struct PendingInstance {
 /// example written to disk), so a retried request is not counted twice.
 pub struct Batch {
     set: MetricSet,
-    pub(crate) instances: Vec<PendingInstance>,
+    pub(crate) entities: Vec<PendingEntity>,
     index: HashMap<Labels, usize>,
 }
 
@@ -39,7 +39,7 @@ impl Batch {
     pub fn new(set: &MetricSet) -> Self {
         Self {
             set: set.clone(),
-            instances: Vec::new(),
+            entities: Vec::new(),
             index: HashMap::new(),
         }
     }
@@ -48,17 +48,20 @@ impl Batch {
         &self.set
     }
 
-    /// The instance with these labels, added on first use, to record into.
-    /// Look an instance up once per group of records that share labels, not
+    /// The entity with these labels, to record into. A label set the store
+    /// has not seen becomes a new entity when the batch is merged, and its
+    /// charts are defined on the next [`Store::emit`](crate::Store::emit).
+    ///
+    /// Look an entity up once per group of records that share labels, not
     /// per record; while the returned handle lives, the batch is borrowed, so
-    /// finish one instance before taking the next.
-    pub fn instance(&mut self, labels: Labels) -> BatchInstance<'_> {
+    /// finish one entity before taking the next.
+    pub fn entity(&mut self, labels: Labels) -> BatchEntity<'_> {
         let index = match self.index.get(&labels) {
             Some(&index) => index,
             None => {
-                let index = self.instances.len();
+                let index = self.entities.len();
                 self.index.insert(labels.clone(), index);
-                self.instances.push(PendingInstance {
+                self.entities.push(PendingEntity {
                     labels,
                     per_slot: Vec::new(),
                     index: HashMap::new(),
@@ -67,43 +70,43 @@ impl Batch {
                 index
             }
         };
-        BatchInstance {
+        BatchEntity {
             set: &self.set.0,
-            instance: &mut self.instances[index],
+            entity: &mut self.entities[index],
         }
     }
 
     /// True when the batch holds no record.
     pub fn is_empty(&self) -> bool {
-        self.instances.iter().all(|i| i.per_slot.is_empty())
+        self.entities.iter().all(|i| i.per_slot.is_empty())
     }
 }
 
-/// One instance of a [`Batch`], from [`Batch::instance`].
-pub struct BatchInstance<'a> {
+/// One entity of a [`Batch`], from [`Batch::entity`].
+pub struct BatchEntity<'a> {
     set: &'a MetricSetInner,
-    instance: &'a mut PendingInstance,
+    entity: &'a mut PendingEntity,
 }
 
-impl BatchInstance<'_> {
+impl BatchEntity<'_> {
     /// One record at `unix_seconds` (the event's own time); write its
     /// measurements through the returned [`Measurements`]. Every call is one
     /// record, even with no measurement: it counts in whichever of the
     /// store's late, future and overflow counts applies, and it starts the
-    /// instance or keeps it from expiring.
+    /// entity or keeps it from expiring.
     pub fn record(&mut self, unix_seconds: u64) -> Measurements<'_> {
         let set = self.set;
         let slot = unix_seconds / set.interval_secs;
-        let instance = &mut *self.instance;
-        let index = if instance
+        let entity = &mut *self.entity;
+        let index = if entity
             .per_slot
-            .get(instance.last)
+            .get(entity.last)
             .is_some_and(|s| s.slot == slot)
         {
-            instance.last
+            entity.last
         } else {
-            let per_slot = &mut instance.per_slot;
-            *instance.index.entry(slot).or_insert_with(|| {
+            let per_slot = &mut entity.per_slot;
+            *entity.index.entry(slot).or_insert_with(|| {
                 per_slot.push(BatchCells {
                     slot,
                     records: 0,
@@ -112,8 +115,8 @@ impl BatchInstance<'_> {
                 per_slot.len() - 1
             })
         };
-        instance.last = index;
-        let batch_cells = &mut instance.per_slot[index];
+        entity.last = index;
+        let batch_cells = &mut entity.per_slot[index];
         batch_cells.records += 1;
         Measurements {
             set_id: set.id,

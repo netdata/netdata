@@ -9,7 +9,7 @@
 //! adjusted count its `ot=th` sampling threshold implies.
 
 use netdata_plugin_metrics::{
-    Batch, BatchInstance, Cap, Chart, ChartType, Counter, Histogram, Labels, MetricSet,
+    Batch, BatchEntity, Cap, Chart, ChartType, Counter, Histogram, Labels, MetricSet,
     MetricSetBuilder, Settings, dimensions,
 };
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
@@ -88,7 +88,7 @@ impl Services {
         request: &ExportTraceServiceRequest,
     ) {
         for resource_spans in &request.resource_spans {
-            let mut instance: Option<BatchInstance<'_>> = None;
+            let mut entity: Option<BatchEntity<'_>> = None;
             for scope_spans in &resource_spans.scope_spans {
                 for span in &scope_spans.spans {
                     let is_request = span.parent_span_id.iter().all(|&b| b == 0)
@@ -97,13 +97,12 @@ impl Services {
                     if !is_request {
                         continue;
                     }
-                    if instance.is_none() {
-                        instance = Some(
-                            batch
-                                .instance(service_labels(tenant, resource_spans.resource.as_ref())),
+                    if entity.is_none() {
+                        entity = Some(
+                            batch.entity(service_labels(tenant, resource_spans.resource.as_ref())),
                         );
                     }
-                    let instance = instance.as_mut().expect("set above");
+                    let entity = entity.as_mut().expect("set above");
                     let start = span.start_time_unix_nano;
                     let end = span.end_time_unix_nano.max(start);
                     let failed = span
@@ -111,7 +110,7 @@ impl Services {
                         .as_ref()
                         .is_some_and(|s| s.code == StatusCode::Error as i32);
                     let weight = adjusted_count(&span.trace_state);
-                    instance
+                    entity
                         .record(end / 1_000_000_000)
                         .add(
                             self.requests,
@@ -307,7 +306,7 @@ mod tests {
         );
         let success = values(&out, "success");
         let error = values(&out, "error");
-        // The instance's first rendered slot is the one its spans ended in.
+        // The entity's first emitted slot is the one its spans ended in.
         assert!(out.contains("SET success = 2\nSET error = 1\nEND 96 0 1\n"));
         assert_eq!(success[0], "2");
         assert_eq!(error[0], "1");

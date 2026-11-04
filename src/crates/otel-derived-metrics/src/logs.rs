@@ -11,7 +11,7 @@
 
 use crate::services::{service_labels, service_settings};
 use netdata_plugin_metrics::{
-    Batch, BatchInstance, Chart, ChartType, Counter, MetricSet, MetricSetBuilder, dimensions,
+    Batch, BatchEntity, Chart, ChartType, Counter, MetricSet, MetricSetBuilder, dimensions,
 };
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 
@@ -72,16 +72,16 @@ impl ServiceLogs {
         request: &ExportLogsServiceRequest,
     ) {
         for resource_logs in &request.resource_logs {
-            let mut instance: Option<BatchInstance<'_>> = None;
+            let mut entity: Option<BatchEntity<'_>> = None;
             for scope_logs in &resource_logs.scope_logs {
                 for record in &scope_logs.log_records {
-                    if instance.is_none() {
-                        instance = Some(
-                            batch.instance(service_labels(tenant, resource_logs.resource.as_ref())),
+                    if entity.is_none() {
+                        entity = Some(
+                            batch.entity(service_labels(tenant, resource_logs.resource.as_ref())),
                         );
                     }
-                    let instance = instance.as_mut().expect("set above");
-                    instance.record(record.time_unix_nano / 1_000_000_000).add(
+                    let entity = entity.as_mut().expect("set above");
+                    entity.record(record.time_unix_nano / 1_000_000_000).add(
                         self.records,
                         Severity::from_number(record.severity_number),
                         1.0,
