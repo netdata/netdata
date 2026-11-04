@@ -15,11 +15,16 @@ import (
 
 func (c *Collector) setupProfiles(si *snmputils.SysInfo) []*ddsnmp.Profile {
 	profiles, context := c.resolveProfiles(si)
+	c.activateProfiles(profiles, context)
+	return profiles
+}
+
+// activateProfiles records the selection and enables the consumers it needs.
+func (c *Collector) activateProfiles(profiles []*ddsnmp.Profile, context *ddsnmp.ProfileContext) {
 	c.recordProfileContext(context)
 	if profilesHaveBGP(profiles) {
 		c.enableBGPIntegration()
 	}
-	return profiles
 }
 
 func (c *Collector) resolveProfiles(si *snmputils.SysInfo) ([]*ddsnmp.Profile, *ddsnmp.ProfileContext) {

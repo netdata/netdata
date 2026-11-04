@@ -59,22 +59,18 @@ var (
 )
 
 func (c *Collector) addPingCharts() {
-	charts := pingCharts.Copy()
-
-	labels := c.chartBaseLabels()
-
-	for _, chart := range *charts {
-		for k, v := range labels {
-			chart.Labels = append(chart.Labels, collectorapi.Label{
-				Key:   k,
-				Value: v,
-			})
-		}
-	}
-
-	for _, chart := range *charts {
+	for _, chart := range *pingCharts.Copy() {
+		chart.Labels = c.pingChartLabels()
 		c.installChart(chart)
 	}
+}
+
+func (c *Collector) pingChartLabels() []collectorapi.Label {
+	return toChartLabels(c.chartBaseLabels())
+}
+
+func isPingChart(chart *collectorapi.Chart) bool {
+	return chart.ID == pingRTTChart.ID || chart.ID == pingRTTStdDevChart.ID
 }
 
 var (
@@ -184,12 +180,7 @@ func (c *Collector) addProfileStatsCharts(name string) {
 		for _, dim := range chart.Dims {
 			dim.ID = fmt.Sprintf(dim.ID, name)
 		}
-		for k, v := range labels {
-			chart.Labels = append(chart.Labels, collectorapi.Label{
-				Key:   k,
-				Value: v,
-			})
-		}
+		chart.Labels = toChartLabels(labels)
 	}
 
 	for _, chart := range *charts {
@@ -239,12 +230,7 @@ func (c *Collector) addProfileMetricChart(
 	tags := c.chartBaseLabels()
 	maps.Copy(tags, m.Profile.Tags)
 	addMetricTagLabels(tags, m.Tags)
-	for key, value := range tags {
-		chart.Labels = append(chart.Labels, collectorapi.Label{
-			Key:   key,
-			Value: value,
-		})
-	}
+	chart.Labels = toChartLabels(tags)
 	if len(m.MultiValue) > 0 {
 		for name := range m.MultiValue {
 			chart.Dims = append(chart.Dims, &collectorapi.Dim{
@@ -318,28 +304,31 @@ func (s *metricChartState) observeDimension(id, name string, algo collectorapi.D
 	s.chart.MarkNotCreated()
 }
 
+// Profile charts redraw through chartMetadataVersion. Ping and licensing charts
+// are not rebuilt from samples, so their device labels are replaced here.
 func (c *Collector) refreshAuxiliaryChartLabels() {
 	for _, chart := range *c.charts {
-		if chart.ID == pingRTTChart.ID || chart.ID == pingRTTStdDevChart.ID {
-			chart.Labels = nil
-			for key, value := range c.chartBaseLabels() {
-				chart.Labels = append(chart.Labels, collectorapi.Label{
-					Key:   key,
-					Value: value,
-				})
-			}
-			chart.MarkNotCreated()
-		} else if strings.HasPrefix(chart.Ctx, "snmp.license.") {
-			chart.Labels = []collectorapi.Label{{Key: "component", Value: "licensing"}}
-			for key, value := range c.chartBaseLabels() {
-				chart.Labels = append(chart.Labels, collectorapi.Label{
-					Key:   key,
-					Value: value,
-				})
-			}
-			chart.MarkNotCreated()
+		switch {
+		case isPingChart(chart):
+			chart.Labels = c.pingChartLabels()
+		case strings.HasPrefix(chart.Ctx, "snmp.license."):
+			chart.Labels = c.licenseChartLabels()
+		default:
+			continue
 		}
+		chart.MarkNotCreated()
 	}
+}
+
+func toChartLabels(labels map[string]string) []collectorapi.Label {
+	out := make([]collectorapi.Label, 0, len(labels))
+	for key, value := range labels {
+		out = append(out, collectorapi.Label{
+			Key:   key,
+			Value: value,
+		})
+	}
+	return out
 }
 
 func (c *Collector) removeProfileTableMetricChart(key string) {

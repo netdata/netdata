@@ -8,7 +8,6 @@ import (
 	"errors"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"gopkg.in/yaml.v2"
 )
 
@@ -68,11 +67,7 @@ func (c *Collector) SetConfiguredVnode(v vnodes.VirtualNode) {
 	// Runtime transfers ownership and calls this only at lifecycle boundaries.
 	c.configuredVnode = &v
 	if c.initialized && c.sysInfo != nil && !c.rebuildPending {
-		var metadata map[string]ddsnmp.MetaTag
-		if c.ddSnmpColl != nil {
-			metadata = c.ddSnmpColl.PreparedDeviceMetadata()
-		}
-		c.registerDeviceState(c.sysInfo, metadata)
+		c.registerDeviceState(c.sysInfo, c.preparedProfileMetadata())
 	}
 }
 

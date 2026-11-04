@@ -11,7 +11,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/hostoutput"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
@@ -31,8 +30,8 @@ func (c *Collector) refreshDeviceState() error {
 		return c.pendingRebuildError()
 	}
 	base := c.sysInfo
-	if c.pendingMetadata != nil {
-		base = c.pendingMetadata
+	if c.pendingSysInfo != nil {
+		base = c.pendingSysInfo
 	}
 	next := mergeSystemObservation(base, observed)
 	if observed.Probe.SeenSysObjectID && observed.SysObjectID != "" &&
@@ -51,29 +50,28 @@ func (c *Collector) refreshDeviceState() error {
 	}
 	observedOIDs := observedSystemOIDs(observed)
 	systemChanged := !sameSystemMetadata(c.sysInfo, next)
-	if c.pendingMetadata == nil && !systemChanged &&
+	if c.pendingSysInfo == nil && !systemChanged &&
 		(c.ddSnmpColl == nil || !c.ddSnmpColl.NeedsProfileInputRefresh(observedOIDs)) {
 		return nil
 	}
 
-	c.pendingMetadata = next
+	c.pendingSysInfo = next
+	var refreshErr error
 	if c.ddSnmpColl != nil {
-		err = c.ddSnmpColl.RefreshProfileInputs(observedOIDs)
+		refreshErr = c.ddSnmpColl.RefreshProfileInputs(observedOIDs)
 		c.captureCollectionFailures()
-		if err != nil {
-			c.Limit("snmp:metadata", 1, sysInfoCheckEvery).Warningf("failed to refresh profile metadata: %v", err)
+		if refreshErr != nil {
+			c.Limit("snmp:metadata", 1, sysInfoCheckEvery).
+				Warningf("failed to refresh profile metadata: %v", refreshErr)
 		}
 	}
-	var metadata map[string]ddsnmp.MetaTag
-	if c.ddSnmpColl != nil {
-		metadata = c.ddSnmpColl.PreparedDeviceMetadata()
-	}
-	if err := c.applyDeviceMetadata(next, metadata); err != nil {
+	if err := c.applyDeviceMetadata(next, c.preparedProfileMetadata()); err != nil {
 		c.Limit("snmp:metadata", 1, sysInfoCheckEvery).Warningf("failed to update device metadata: %v", err)
 		return nil
 	}
-	if err == nil {
-		c.pendingMetadata = nil
+	// Failed profile inputs stay pending and retry on the next check.
+	if refreshErr == nil {
+		c.pendingSysInfo = nil
 	}
 	return nil
 }
@@ -186,9 +184,28 @@ func (c *Collector) applyDeviceMetadata(si *snmputils.SysInfo, metadata map[stri
 	return nil
 }
 
+// syncDeviceMetadata publishes profile inputs that normal collection prepared
+// or recovered since the last publication.
+func (c *Collector) syncDeviceMetadata() {
+	if c.sysInfo == nil || c.publishedProfileInputRevision == c.ddSnmpColl.ProfileInputRevision() {
+		return
+	}
+	if err := c.applyDeviceMetadata(c.sysInfo, c.ddSnmpColl.PreparedDeviceMetadata()); err != nil {
+		c.Limit("snmp:metadata", 1, sysInfoCheckEvery).Warningf("failed to update device metadata: %v", err)
+	}
+}
+
+func (c *Collector) preparedProfileMetadata() map[string]ddsnmp.MetaTag {
+	if c.ddSnmpColl == nil {
+		return nil
+	}
+	return c.ddSnmpColl.PreparedDeviceMetadata()
+}
+
+// rebuildDevice runs only for normal polling jobs; ping_only keeps setup-only SNMP.
 func (c *Collector) rebuildDevice(si *snmputils.SysInfo) error {
 	profiles, profileContext := c.resolveProfiles(si)
-	if len(profiles) == 0 && !c.PingOnly {
+	if len(profiles) == 0 {
 		return snmputils.WithFailure(noMetricProfilesError(si), "profile_resolution", "no_profiles")
 	}
 	client, disableBulk, repetitions, err := c.connectSNMPClient()
@@ -205,34 +222,18 @@ func (c *Collector) rebuildDevice(si *snmputils.SysInfo) error {
 	}
 	c.sysInfo, c.snmpProfiles = si, profiles
 	c.disableBulkWalk, c.adjMaxRepetitions = disableBulk, repetitions
-	c.ddSnmpColl = nil
-	if len(profiles) > 0 && (!c.PingOnly || c.CreateVnode && c.Vnode == "") {
-		c.ddSnmpColl = c.newDdSnmpColl(ddsnmpcollector.Config{
-			SnmpClient:          c.snmpClient,
-			Profiles:            profiles,
-			Log:                 c.Logger,
-			SysObjectID:         si.SysObjectID,
-			DisableBulkWalk:     disableBulk,
-			AcquisitionObserver: ddsnmpcollector.AcquisitionObserverFunc(c.observeProfile),
-		})
-	}
-	c.recordProfileContext(profileContext)
-	c.pendingMetadata, c.rebuildPending = nil, false
+	c.ddSnmpColl = c.newProfileCollector()
+	c.activateProfiles(profiles, profileContext)
+	c.pendingSysInfo, c.rebuildPending = nil, false
 	c.publishedProfileInputRevision = 0
 	c.resetDevicePresentation()
-	if profilesHaveBGP(profiles) {
-		c.enableBGPIntegration()
-	}
 	_ = previous.Close()
-	if err := c.applyDeviceMetadata(si, nil); err != nil {
-		return err
-	}
-	return nil
+	return c.applyDeviceMetadata(si, nil)
 }
 
 func (c *Collector) resetDevicePresentation() {
 	for _, chart := range *c.charts {
-		if chart.ID != pingRTTChart.ID && chart.ID != pingRTTStdDevChart.ID {
+		if !isPingChart(chart) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()
 		}

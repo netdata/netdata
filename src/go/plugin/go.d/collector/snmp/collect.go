@@ -112,15 +112,8 @@ func (c *Collector) ensureInitialized() error {
 	}
 	si := c.sysInfo
 
-	if c.ddSnmpColl == nil && len(c.snmpProfiles) > 0 && (!c.PingOnly || c.CreateVnode && c.Vnode == "") {
-		c.ddSnmpColl = c.newDdSnmpColl(ddsnmpcollector.Config{
-			SnmpClient:          c.snmpClient,
-			Profiles:            c.snmpProfiles,
-			Log:                 c.Logger,
-			SysObjectID:         si.SysObjectID,
-			DisableBulkWalk:     c.disableBulkWalk,
-			AcquisitionObserver: ddsnmpcollector.AcquisitionObserverFunc(c.observeProfile),
-		})
+	if c.ddSnmpColl == nil {
+		c.ddSnmpColl = c.newProfileCollector()
 	}
 
 	if c.PingOnly || c.Ping.Enabled {
@@ -152,6 +145,22 @@ func (c *Collector) ensureInitialized() error {
 	c.nextSysInfoCheck = c.now().Add(sysInfoCheckEvery)
 
 	return nil
+}
+
+// newProfileCollector creates the profile owner for the installed client,
+// profiles and identity. ping_only needs one only to enrich its generated vnode.
+func (c *Collector) newProfileCollector() ddCollector {
+	if len(c.snmpProfiles) == 0 || c.PingOnly && (!c.CreateVnode || c.Vnode != "") {
+		return nil
+	}
+	return c.newDdSnmpColl(ddsnmpcollector.Config{
+		SnmpClient:          c.snmpClient,
+		Profiles:            c.snmpProfiles,
+		Log:                 c.Logger,
+		SysObjectID:         c.sysInfo.SysObjectID,
+		DisableBulkWalk:     c.disableBulkWalk,
+		AcquisitionObserver: ddsnmpcollector.AcquisitionObserverFunc(c.observeProfile),
+	})
 }
 
 func (c *Collector) initAndConnectSNMPClient() (gosnmp.Handler, error) {
