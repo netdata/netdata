@@ -32,9 +32,10 @@ pub(crate) struct BatchInstance {
 }
 
 /// The records of one unit of work (for example one export request) for one
-/// [`MetricSet`], kept apart from the store: drop the batch when the work
-/// fails, and merge it with [`Store::merge`](crate::Store::merge) only once
-/// the work is durable, so a retried request is not counted twice.
+/// [`MetricSet`], kept apart from the store until the work succeeds: drop
+/// the batch when the work fails, and merge it with
+/// [`Store::merge`](crate::Store::merge) once the work is done for good (for
+/// example written to disk), so a retried request is not counted twice.
 pub struct Batch {
     id: u64,
     set: MetricSet,
@@ -81,9 +82,10 @@ impl Batch {
     }
 
     /// One record of `instance` at `unix_seconds` (the event's own time);
-    /// write its measurements through the returned [`Record`]. Every call
-    /// counts as one record in the store's late, future and overflow counts,
-    /// even with no measurement.
+    /// write its measurements through the returned [`Record`]. Every call is
+    /// one record, even with no measurement: it counts in the store's late,
+    /// future and overflow counts, and it starts the instance or keeps it
+    /// from expiring.
     ///
     /// # Panics
     ///
@@ -178,8 +180,9 @@ impl Record<'_> {
         self
     }
 
-    /// Observe `value` with `weight` (the number of events it stands for).
-    /// A non-finite value is ignored.
+    /// Observe `value` with `weight`, the number of events it stands for:
+    /// the buckets and the mean are weighted, the maximum is not. A
+    /// non-finite value is ignored.
     pub fn observe(&mut self, histogram: Histogram, value: f64, weight: f64) -> &mut Self {
         assert_eq!(
             histogram.set_id, self.set_id,

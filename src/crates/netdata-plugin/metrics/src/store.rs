@@ -29,7 +29,7 @@ pub struct Stats {
     pub instances: usize,
     /// Records counted in the overflow instance because of the cap.
     pub overflowed_records: u64,
-    /// Records older than the open window, counted in its oldest slot.
+    /// Records older than the oldest open slot, counted in that slot.
     pub late_records: u64,
     /// Records newer than the current slot, counted in the current slot.
     pub future_records: u64,
@@ -53,24 +53,44 @@ struct Instance {
     previous_totals: Box<[f64]>,
 }
 
-/// Accumulates the batches of one [`MetricSet`] and emits them as
-/// chart-protocol text. It reads no clock and does no I/O: the caller passes
-/// the current time (Unix seconds) and delivers the bytes, and calls
-/// [`Store::emit`] at least once per slot. Wrap it in a lock to share it.
+/// Collects the batches of one [`MetricSet`] and turns finished slots into
+/// chart-protocol text.
 ///
-/// Time: slot `s` covers `[s * update_every, (s + 1) * update_every)`, and
-/// the agent stores its point at the slot's end, not at the time it is
-/// emitted. A slot is emitted once the lateness has passed after its end,
-/// and never again. A record older than the open window is counted in the
-/// oldest open slot and one from the future in the current slot (see
-/// [`Stats`]), so every record is counted exactly once. After a stall, at
-/// most 60 slots past the lateness are emitted at once and older pending
-/// slots are folded into the first of them, which then shows the folded
-/// rates as one spike.
+/// The store reads no clock and does no I/O. Pass the current Unix time to
+/// [`Store::merge`] and [`Store::emit`], call `emit` at least once per slot,
+/// and write the bytes it returns to the agent. Share it behind a lock.
 ///
-/// Lifecycle: an instance's charts are defined (with its labels) before
-/// their first update; after `expiry` without records they are marked
-/// obsolete, and they are defined again when the instance returns.
+/// # When a slot is emitted
+///
+/// The *current* slot is the one `now` falls in. A slot stays *open* for
+/// records until its [`Settings::lateness`](crate::Settings::lateness) has
+/// passed after its end; then the next `emit` emits it, once.
+///
+/// With `update_every` 1 and lateness 10, the slot of second 100 is emitted
+/// by the first `emit` at or after second 111. Until then, records of second
+/// 100 still count in it. The agent stores its point at second 101, the
+/// slot's end, however late it is sent.
+///
+/// # Records outside the open slots
+///
+/// Every record is counted exactly once:
+/// - one older than the oldest open slot counts in that slot
+///   ([`Stats::late_records`]);
+/// - one from the future counts in the current slot
+///   ([`Stats::future_records`]);
+/// - after a stall (`emit` not called for a while, or the clock jumping
+///   ahead), one `emit` emits at most 60 slots past the lateness. Slots older
+///   than that are not lost: their counts are added into the first slot
+///   emitted, which then shows them as one spike.
+///
+/// # Instances
+///
+/// - An instance starts with its first record. Its charts are defined, with
+///   its labels, before their first update.
+/// - After `expiry` without records its charts are marked obsolete and its
+///   state is dropped; if it returns, its charts are defined again.
+/// - Beyond the cap, records go to the overflow instance (see
+///   [`Cap`](crate::Cap); [`Stats::overflowed_records`]).
 pub struct Store {
     set: MetricSet,
     instances: HashMap<Labels, Instance>,
@@ -119,8 +139,10 @@ impl Store {
         oldest_wanted
     }
 
-    /// Merge a batch; `now` (Unix seconds) decides which slots are still
-    /// open.
+    /// Merge a batch; `now`, the current Unix time, decides which slots are
+    /// still open. Merge before the `emit` of the same tick: a record whose
+    /// slot that `emit` closes would otherwise count as late, in the next
+    /// slot.
     ///
     /// # Panics
     ///
@@ -166,10 +188,14 @@ impl Store {
     }
 
     /// Emit every slot whose lateness has passed by `now` (Unix seconds):
-    /// definitions of new instances, one update per chart and slot, and
-    /// obsolete charts of expired instances. Returns chunks of at most
-    /// `max_chunk` bytes, each a run of whole chart blocks (a single block
-    /// larger than `max_chunk` gets a chunk of its own).
+    /// the definitions of new instances' charts, one update per chart and
+    /// slot, and the obsolete marks of expired instances.
+    ///
+    /// The text is complete chart-protocol text, to write to the agent as is
+    /// (a plugin's stdout). It comes in chunks of at most `max_chunk` bytes,
+    /// split only between whole charts, so each chunk can be written on its
+    /// own, for example as one message over a size-limited channel; a single
+    /// chart larger than `max_chunk` gets a chunk of its own.
     pub fn emit(&mut self, now: u64, max_chunk: usize) -> Vec<Vec<u8>> {
         let mut out = Chunker::new(max_chunk);
         let mut next_emit = self.advance_window(now);

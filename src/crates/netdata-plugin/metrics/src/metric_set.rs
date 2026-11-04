@@ -51,13 +51,17 @@ impl Merge {
     }
 }
 
-/// The fixed values of an instrument: one chart dimension per value, in
+/// The values an instrument is split by, for example a request's outcome.
+/// Each value is one dimension of the instrument's chart, in
 /// [`Dimensions::IDS`] order.
 ///
 /// Implement it with [`dimensions!`](crate::dimensions). A manual
-/// implementation must return each value's position in `IDS` from `index`
-/// (recording a value whose index is out of range panics), and every id must
-/// be a valid dimension id (declaring the instrument panics otherwise).
+/// implementation must:
+/// - return each value's position in `IDS` from `index` (recording a value
+///   whose index is out of range panics);
+/// - use valid dimension ids: not empty, no spaces, control characters,
+///   quotes, `\` or `=`, and not starting with `SLOT:` (declaring the
+///   instrument panics otherwise).
 pub trait Dimensions: Copy + 'static {
     /// The dimension ids, which are also their names, in chart order.
     const IDS: &'static [&'static str];
@@ -103,8 +107,8 @@ macro_rules! dimensions {
     };
 }
 
-/// One counted value per dimension, for example per outcome. Charted as a
-/// rate per second.
+/// Counts events, split by `D`, for example requests by outcome. Charted as
+/// events per second; a slot without events shows 0.
 #[derive(Debug)]
 pub struct Counter<D> {
     pub(crate) set_id: u32,
@@ -112,12 +116,16 @@ pub struct Counter<D> {
     _dimensions: PhantomData<fn() -> D>,
 }
 
-/// One running total per dimension, read from a source that counts on its
-/// own, for example a store's statistics. Charted as the increase per second
-/// since the previous total: an instance's first total is its baseline (no
-/// value yet), a total lower than the previous one is a reset (the increase
-/// is the new total), and a slot without a new total shows 0. Within a slot
-/// the total merged last wins.
+/// For a source that keeps its own running totals, split by `D`, for example
+/// a store's statistics: record the current totals, and the chart shows how
+/// much they grew per second.
+///
+/// - Until an instance's first total, and in the slot of that total (its
+///   baseline), the chart shows a gap.
+/// - A total lower than the previous one is a reset: the increase is the new
+///   total.
+/// - After the baseline, a slot without a new total shows 0.
+/// - Within a slot, the total merged last wins.
 #[derive(Debug)]
 pub struct Cumulative<D> {
     pub(crate) set_id: u32,
@@ -125,9 +133,11 @@ pub struct Cumulative<D> {
     _dimensions: PhantomData<fn() -> D>,
 }
 
-/// One value per dimension, set (not added) by each record. Charted as is;
-/// within a slot the value merged last wins, and a slot without one shows no
-/// value.
+/// A current value, split by `D`, for example open connections per state.
+/// Charted as is.
+///
+/// - Each record sets the value; within a slot, the value merged last wins.
+/// - A slot without a value shows a gap.
 #[derive(Debug)]
 pub struct Gauge<D> {
     pub(crate) set_id: u32,
@@ -150,10 +160,11 @@ macro_rules! copy_instrument {
 
 copy_instrument!(Counter, Cumulative, Gauge);
 
-/// A distribution over fixed bucket bounds. Each observation adds its weight
-/// to one bucket (the first bound it does not exceed, else `+Inf`), to the
-/// count and, times its value, to the sum; the maximum keeps the largest
-/// value.
+/// A distribution of observed values, for example request durations, over
+/// fixed bucket bounds; its two charts are described at
+/// [`MetricSetBuilder::histogram`]. An observation counts in the first
+/// bucket whose bound it does not exceed, else in `+Inf`. A slot without
+/// observations shows 0 in every bucket and a gap for the mean and maximum.
 #[derive(Debug, Clone, Copy)]
 pub struct Histogram {
     pub(crate) set_id: u32,
@@ -215,12 +226,14 @@ pub struct Chart {
     /// suffixes; see [`MetricSetBuilder::new`]).
     pub id: &'static str,
     pub title: &'static str,
-    /// Shown as is; counter and cumulative charts are per second, so their
-    /// units say `/s`.
+    /// Shown as is; the crate adds nothing. Counter and cumulative charts are
+    /// per second, so give them units that say so, for example
+    /// `requests/s`.
     pub units: &'static str,
     /// The dashboard family (submenu): the CHART line's `family` field.
     pub family: &'static str,
-    /// The same for every instance.
+    /// The same for every instance, so the dashboard can show the copies of
+    /// this chart together.
     pub context: &'static str,
     pub chart_type: ChartType,
     /// Dashboard order; lower comes first.
@@ -240,14 +253,16 @@ pub(crate) struct ChartDef {
     pub(crate) dimensions: Vec<Dimension>,
 }
 
-/// The labels that identify an instance and are attached to its charts.
+/// The labels that identify an instance; its charts carry them.
 ///
-/// Labels are kept sorted by key, so two lists with the same pairs are the
-/// same instance whatever order they were pushed in. Values that are empty
-/// once the agent trims them (whitespace and control characters only) are
-/// left out, because the agent would store them as `[none]`; values are cut
-/// to the agent's label value limit at a character boundary. Keys come from
-/// code: each must be non-empty, within the agent's key limit, and unique.
+/// - Two label lists with the same pairs are the same instance, whatever
+///   order they were pushed in.
+/// - A blank value (only whitespace or control characters) is left out,
+///   because the agent would store it as `[none]`.
+/// - A value is cut to the agent's limit of 800 bytes, at a character
+///   boundary.
+/// - An empty list is an instance too: the single instance of a set whose
+///   charts need no labels.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct Labels(pub(crate) Vec<(String, String)>);
 
@@ -257,6 +272,11 @@ impl Labels {
     }
 
     /// Add a label, unless `value` is blank.
+    ///
+    /// # Panics
+    ///
+    /// If `key` is empty, longer than the agent's limit of 200 bytes, or
+    /// already present.
     pub fn push(&mut self, key: &str, value: &str) {
         assert!(
             !key.is_empty() && key.len() <= MAX_LABEL_KEY_BYTES,
@@ -315,10 +335,11 @@ pub struct Settings {
     /// late records; older records are counted in the oldest open slot.
     /// Default 0.
     pub lateness: u64,
-    /// A timeout: how long, in seconds of emitted slots, an instance may go
-    /// without records before its charts are marked obsolete and its state is
-    /// dropped; in wall-clock time that is `expiry` plus `lateness`. Default
-    /// 15 minutes.
+    /// A timeout: an instance with no records for this many seconds has its
+    /// charts marked obsolete (the agent stops collecting them and later
+    /// removes them) and its state dropped. Because it counts emitted slots,
+    /// it fires `lateness` seconds later than the wall-clock time. Default 15
+    /// minutes.
     pub expiry: u64,
     /// The instance cap; default none.
     pub cap: Option<Cap>,
@@ -335,11 +356,14 @@ impl Default for Settings {
     }
 }
 
-/// Records of instances beyond the cap go to one overflow instance until
-/// others expire.
+/// A limit on the number of instances. A new label set beyond it has its
+/// records counted in one overflow instance; once an instance expires, the
+/// next new label set (one from the overflow too) gets its own instance
+/// again.
 #[derive(Debug, Clone)]
 pub struct Cap {
-    /// Labelled instances tracked at most, the overflow instance not counted.
+    /// Instances tracked at most (the label-less instance counts, the
+    /// overflow instance does not).
     pub max: usize,
     /// The overflow instance's labels.
     pub overflow_labels: Labels,
@@ -359,11 +383,14 @@ pub struct MetricSetBuilder {
 }
 
 impl MetricSetBuilder {
-    /// `type_prefix` starts every chart id of the set: an instance without
-    /// labels gets `<type_prefix>.<chart>`, the overflow instance
-    /// `<type_prefix>.<chart>_overflow`, any other instance
-    /// `<type_prefix>.<chart>_<hash>`, where `<hash>` is 16 hex digits of a
-    /// hash of its sorted labels, stable across restarts and releases.
+    /// Starts a metric set whose chart ids begin with `type_prefix` (the
+    /// `type` part of the agent's `type.id`). The full id of a chart is:
+    /// - `<type_prefix>.<chart>` for an instance without labels;
+    /// - `<type_prefix>.<chart>_<hash>` for any other instance, where
+    ///   `<hash>` is 16 hex digits of a hash of its labels, stable across
+    ///   restarts and releases;
+    /// - `<type_prefix>.<chart>_overflow` for the overflow instance (see
+    ///   [`Cap`]).
     ///
     /// # Panics
     ///
@@ -445,12 +472,15 @@ impl MetricSetBuilder {
         }
     }
 
-    /// Adds a [`Histogram`] over `bounds` with two charts: `chart` shows the
-    /// mean (`avg`) and largest (`max`) observed value in `chart.units`, and
-    /// the heatmap `<id>_histogram` (context `<context>_histogram`, title
-    /// `<title> histogram`, the next priority, `chart.chart_type` not used)
-    /// shows observations per second per bucket in `heatmap_units`, named by
-    /// the bucket's upper bound (`+Inf` last).
+    /// Adds a [`Histogram`] over `bounds`, with two charts:
+    /// - `chart`: the mean (`avg`) and largest (`max`) observed value per
+    ///   slot, in `chart.units`;
+    /// - a heatmap, `<id>_histogram`: observations per second in each
+    ///   bucket, in `heatmap_units`, one dimension per bucket named by its
+    ///   upper bound as Rust prints the `f64` (`0.005`, `1`, `1048576`;
+    ///   `+Inf` last). Its context is `<context>_histogram`, its title
+    ///   `<title> histogram` and its priority `chart.priority + 1`;
+    ///   `chart.chart_type` does not apply to it.
     ///
     /// # Panics
     ///
@@ -506,6 +536,8 @@ impl MetricSetBuilder {
         histogram
     }
 
+    /// Finishes the set.
+    ///
     /// # Panics
     ///
     /// If no instrument was added.
