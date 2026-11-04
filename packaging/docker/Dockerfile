@@ -65,6 +65,7 @@ RUN mkdir -p /app/usr/sbin/ \
     mv /usr/sbin/systemd-cat-native /app/usr/sbin/ && \
     mv packaging/docker/run.sh        /app/usr/sbin/ && \
     mv packaging/docker/health.sh     /app/usr/sbin/ && \
+    install -m 0755 packaging/docker/netdata-dem-docker /app/usr/libexec/netdata/netdata-dem-docker && \
     mkdir -p /deps/etc && \
     cp -rp /deps/etc /app/usr/local/etc && \
     chmod -R o+rX /app && \

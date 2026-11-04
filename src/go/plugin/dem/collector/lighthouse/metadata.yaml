@@ -61,6 +61,10 @@ modules:
             description: |
               On Ubuntu hosts with restricted user namespaces, including Ubuntu 24.04, run kickstart with
               `--install-dem-runtime` for a static or source installation. The native runtime package supplies its own policy.
+              For local, rootful Docker on Linux, use the documented Netdata container configuration, including
+              `apparmor=unconfined` on AppArmor hosts. Run kickstart with `--install-dem-runtime --docker-container NAME`
+              on the daemon host, then run `docker restart NAME` after the first installation succeeds.
+              Rootless, nested and remote Docker require separate administrator setup.
               Follow the [browser runtime host setup guide](https://github.com/netdata/netdata/blob/master/packaging/installer/DEM-RUNTIME.md)
               for commands, offline setup and removal. Keep Chromium's sandbox enabled and qualify the actual service deployment.
           - title: Set up the browser runtime

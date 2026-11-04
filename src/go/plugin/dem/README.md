@@ -472,7 +472,9 @@ browser admission closed while restoring eligible non-browser monitoring.
 
 For static/source installations, use the installed `netdata-dem-runtime.sh` helper or kickstart's explicit
 `--install-dem-runtime` option. The administrator-run helper prepares the necessary AppArmor launcher allowance,
-then runs signed runtime installation and qualification as the configured nonroot service account. See
+then runs signed runtime installation and qualification as the configured nonroot service account. For Docker, run
+`sudo sh ./kickstart.sh --install-dem-runtime --docker-container NAME` on the local daemon host while the Agent is
+running. After setup succeeds, activate the runtime with `docker restart NAME`. No host Agent is required. See
 [browser runtime host setup](../../../../packaging/installer/DEM-RUNTIME.md) for online/offline commands, preloads,
 custom paths, status and removal.
 
@@ -545,7 +547,8 @@ selected state before cleanup proceeds. A successful update does not replace fil
 The low-level command removes runtime state only. For a managed runtime with an Agent-linked policy registration, use the
 administrator-owned `netdata-dem-runtime.sh uninstall --agent /path/to/netdata` to complete policy cleanup after
 drainage. Protected preloads additionally require `--root /absolute/preload/path --deployments-stopped`;
-Explicit policy-only registrations use `policy-remove --deployment TOKEN --deployments-stopped` on the host.
+For Docker, use the host retirement command printed at setup. Other explicit policy-only
+registrations use `policy-remove --deployment TOKEN --deployments-stopped` on the host.
 See [runtime and host-policy removal](../../../../packaging/installer/DEM-RUNTIME.md#status-retry-and-removal) for the retirement steps.
 
 If selection or generation metadata is damaged, `status` still reports the available inventory and identifies the

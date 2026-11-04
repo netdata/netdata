@@ -12,6 +12,7 @@ nonroot service account. Neither DEM nor its automatic updater receives host-pol
 |---|---|---|
 | Native DEB/RPM | Install the optional `netdata-dem-runtime` package | Package manager and package hooks |
 | Static or source | Installed `netdata-dem-runtime.sh`, or kickstart with `--install-dem-runtime` | Administrator-run helper |
+| Local rootful Docker | Run kickstart on the daemon host for the named running container, then restart it after successful setup. | Host deployment administrator |
 | Protected preload | Prepare the policy before qualification/sealing at the preload's final path | Preload/deployment administrator |
 
 Ordinary Agent installation and enabling a monitor do not download a browser or install an unused namespace allowance.
@@ -67,6 +68,43 @@ For a nonroot source installation whose executables are user-owned, an administr
 below for the canonical runtime root, then the service account can use the ordinary runtime CLI. This avoids executing
 user-owned Agent code as root.
 
+## Docker host preparation
+
+This command targets a local, rootful Linux Docker daemon and the [documented Netdata container configuration](/packaging/docker/README.md#recommended-way).
+On AppArmor hosts use the documented `apparmor=unconfined` container setting. Chromium's sandbox and the
+host's namespace restrictions stay enabled. Persist `/var/lib/netdata` on local storage. For the first install,
+the container needs access to a published signed release. Currently you must set `runtime.release_url` in its
+`dem.conf` to the signed metadata URL for the container's architecture. On the daemon host, replace `netdata`
+with the running container's name:
+
+```sh
+sudo sh ./kickstart.sh --install-dem-runtime --docker-container netdata
+```
+
+Kickstart prepares AppArmor on hosts that need it, then downloads, verifies and unpacks the signed runtime as
+the container’s nonroot service user. The command waits for a sandboxed journey and Lighthouse check to finish
+while the Agent continues monitoring. Preparation has no overall time limit. An error or administrator
+cancellation returns a failure. After a successful first installation, activate the runtime when ready:
+
+```sh
+docker restart netdata
+```
+
+Keep the printed registration token for retirement. On restricted hosts, run kickstart once per deployment,
+even if another container already registered the same launcher path. Each registration protects the shared policy.
+First installation enables daily update preparation. Restart the container after a newer release has been
+prepared to activate it. Until that restart, the running plugin keeps its current release. Running kickstart
+again reuses a valid selection offline and preserves its update policy. An already-selected result by itself
+requires no additional restart.
+
+The host command and sandboxed browser jobs were tested on Ubuntu 24.04 amd64 and Debian 13 amd64. Automatic
+AppArmor setup on hosts that restrict unprivileged user namespaces is qualified for Ubuntu 24.04. On hosts
+without that restriction, the command skips the policy installation. The standard runtime root inside the
+container is `/var/lib/netdata/dem/runtime`. Rootless, nested and remote Docker, custom confinement and custom
+runtime roots need separate administrator setup. For offline inputs or custom roots, use a trusted copy
+of the supplied host helper with `policy-prepare --deployment TOKEN --runtime-root /execution/visible/root`,
+then use the [explicit runtime CLI](/src/go/plugin/dem/README.md#runtime-setup-and-retirement) as the service user.
+
 ## Preloads and independent updates
 
 The high-level `preload` command accepts `--root /absolute/final/path` with the same signed offline or download inputs.
@@ -98,6 +136,14 @@ If policy cleanup fails after runtime removal, the error distinguishes the unfin
 Low-level nonroot `dem.plugin runtime uninstall` cannot remove administrator-owned policy. Use the high-level helper
 to complete host cleanup. Multiple registrations sharing an attachment share one policy; removing one registration
 preserves the others.
+
+For Docker, after stopping consumers and retiring the deployment, remove its kickstart-created host registration
+with the printed token. This works after container deletion and leaves Docker volumes in place.
+
+```sh
+sudo sh ./kickstart.sh --dem-docker-policy-status TOKEN
+sudo sh ./kickstart.sh --dem-docker-policy-remove TOKEN --deployments-stopped
+```
 
 For a registration created explicitly with the low-level helper, first stop and retire every affected deployment.
 Then unregister it:

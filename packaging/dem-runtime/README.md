@@ -243,7 +243,10 @@ unconfined profile permits sandbox setup; it is not extra browser confinement.
 Managed/static bundles and preloads have service-owned executable files. Explicit
 host setup uses `netdata-dem-runtime.sh` to register a launcher allowance for the
 deployment-visible root; compatible runtime updates require no recurring privileged
-action. This is namespace eligibility,
+action. On supported restricted Ubuntu hosts, kickstart prepares host policy and
+enrolls the runtime in the named local rootful Docker container. The administrator
+restarts the container after successful qualification. Rootless, nested and remote-daemon setups are
+not qualified by this route. This is namespace eligibility,
 not exclusive authorization of signed bytes: service-owned replacement, profile
 adoption and matching paths in other mount namespaces remain possible. No automatic
 fallback disables sandboxing or host restrictions. See the [host setup guide](../installer/DEM-RUNTIME.md).
