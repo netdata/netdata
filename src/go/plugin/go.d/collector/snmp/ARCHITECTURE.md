@@ -88,8 +88,10 @@ Rows reaching `collectProfileTableMetrics` with the same exact tuple accumulate 
 sample; multi-value dimensions use assignment. Distinct semantic tuples remain distinct even when presentation
 sanitation makes their display labels look the same. Historical table IDs are not backfilled after migration.
 
-A failed profile acquisition does not establish row removal. Its existing table charts remain defined while current
-measurements are unavailable; successful source observations can retire rows that are actually absent. Metadata
+Row removal follows the availability of each chart's own source. A profile that returns no results, a table whose walk
+or processing failed (`ProfileMetrics.UnavailableTables`, including a failed dependency walk for current rows), and a
+profile's failed BGP rows keep their existing table charts as gaps. Rows absent from a successful observation of their
+table are retired even when other scalars, rows or tables of the same profile fail. Metadata
 redraw preserves live dimensions missing from partial observations. Newly observed composite dimensions are added,
 and current-profile dimensions can revive pending incumbent removals after replacement. The chart owner indexes live
 dimensions so steady collection remains O(observed values), without scanning all retained charts.

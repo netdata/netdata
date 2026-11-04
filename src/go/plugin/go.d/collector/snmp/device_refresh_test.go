@@ -152,6 +152,90 @@ func TestCollectorRuntimePartialTableFailureRetainsCharts(t *testing.T) {
 	assert.True(t, chart.IsRemoved(), "a successful observation can retire an absent row")
 }
 
+func TestCollectorRuntimeTableRetirementFollowsSourceAvailability(t *testing.T) {
+	const (
+		unrelatedOID = "1.3.6.1.4.1.99999.300.0"
+		healthyOID   = "1.3.6.1.4.1.99999.300.1"
+		siblingTable = "1.3.6.1.4.1.99999.101"
+	)
+	tests := map[string]struct {
+		prepare  func(*Collector, *refreshTestDevice)
+		change   func(*refreshTestDevice)
+		retained []string
+		retired  []string
+	}{
+		"unrelated processing failure does not block retirement": {
+			prepare: func(c *Collector, device *refreshTestDevice) {
+				device.setText(unrelatedOID, "N/A")
+				device.values[healthyOID] = gosnmp.SnmpPDU{Name: healthyOID, Type: gosnmp.Integer, Value: 3}
+				def := c.snmpProfiles[0].Definition
+				def.Metrics = append(def.Metrics, ddprofiledefinition.MetricsConfig{
+					Symbol: ddprofiledefinition.SymbolConfig{OID: unrelatedOID, Name: "unrelated"},
+				}, ddprofiledefinition.MetricsConfig{
+					Symbol: ddprofiledefinition.SymbolConfig{OID: healthyOID, Name: "healthy"},
+				})
+			},
+			change: func(device *refreshTestDevice) {
+				delete(device.values, refreshTestTable+".1.2")
+			},
+			retained: []string{"snmp_device_prof_ifTraffic_1"},
+			retired:  []string{"snmp_device_prof_ifTraffic_2"},
+		},
+		"failed table does not block a sibling table": {
+			prepare: func(c *Collector, device *refreshTestDevice) {
+				for _, index := range []string{"1", "2"} {
+					oid := siblingTable + ".1." + index
+					device.values[oid] = gosnmp.SnmpPDU{Name: oid, Type: gosnmp.Counter64, Value: uint64(9)}
+				}
+				def := c.snmpProfiles[0].Definition
+				def.Metrics = append(def.Metrics, ddprofiledefinition.MetricsConfig{
+					Table:      ddprofiledefinition.SymbolConfig{OID: siblingTable, Name: "sessions"},
+					Symbols:    []ddprofiledefinition.SymbolConfig{{OID: siblingTable + ".1", Name: "sessionBytes"}},
+					MetricTags: []ddprofiledefinition.MetricTagConfig{{Tag: "session", Index: 1}},
+				})
+			},
+			change: func(device *refreshTestDevice) {
+				device.tableErr = errors.New("synthetic table timeout")
+				delete(device.values, siblingTable+".1.2")
+			},
+			retained: []string{
+				"snmp_device_prof_ifTraffic_1",
+				"snmp_device_prof_ifTraffic_2",
+				"snmp_device_prof_sessionBytes_1",
+			},
+			retired: []string{"snmp_device_prof_sessionBytes_2"},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			c, device, _ := newRefreshTestCollector(t)
+			device.values[refreshTestTable+".1.2"] = gosnmp.SnmpPDU{
+				Name:  refreshTestTable + ".1.2",
+				Type:  gosnmp.Counter64,
+				Value: uint64(5),
+			}
+			tc.prepare(c, device)
+			require.NotEmpty(t, c.Collect(context.Background()))
+			charts := make(map[string]*collectorapi.Chart)
+			for _, id := range slices.Concat(tc.retained, tc.retired) {
+				charts[id] = c.Charts().Get(id)
+				require.NotNil(t, charts[id], id)
+			}
+
+			tc.change(device)
+			require.NotEmpty(t, c.Collect(context.Background()))
+
+			for _, id := range tc.retained {
+				assert.False(t, charts[id].IsRemoved(), "%s source was not observed", id)
+			}
+			for _, id := range tc.retired {
+				assert.True(t, charts[id].IsRemoved(), "%s is absent from a successful observation", id)
+			}
+		})
+	}
+}
+
 func (d *refreshTestDevice) setText(oid, text string) {
 	d.values[oid] = gosnmp.SnmpPDU{
 		Name:  oid,

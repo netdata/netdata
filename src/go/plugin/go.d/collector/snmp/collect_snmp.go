@@ -5,6 +5,7 @@ package snmp
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -33,7 +34,7 @@ func (c *Collector) collectSNMP(mx map[string]int64) error {
 
 	metrics := c.prepareProfileMetrics(pms)
 	c.collectProfileScalarMetrics(mx, metrics)
-	c.collectProfileTableMetrics(mx, metrics)
+	c.collectProfileTableMetrics(mx, metrics, pms)
 	c.collectProfileStats(mx, pms)
 
 	c.finalizeIfaceCache()
@@ -43,8 +44,10 @@ func (c *Collector) collectSNMP(mx map[string]int64) error {
 	return nil
 }
 
+// A failed profile returns no results, so its report is the only evidence that
+// none of its rows were observed.
 func (c *Collector) observeProfile(report ddsnmpcollector.AcquisitionProfileReport, pm *ddsnmp.ProfileMetrics) {
-	if pm != nil && report.HasFailures() {
+	if pm != nil && report.Outcome == ddsnmpcollector.AcquisitionProfileOutcomeFailed {
 		c.failedProfiles[pm.Source] = true
 	}
 	c.observeNormalProfile(report, pm)
@@ -87,7 +90,11 @@ func (c *Collector) collectProfileScalarMetrics(mx map[string]int64, metrics []d
 	}
 }
 
-func (c *Collector) collectProfileTableMetrics(mx map[string]int64, metrics []ddsnmp.Metric) {
+func (c *Collector) collectProfileTableMetrics(
+	mx map[string]int64,
+	metrics []ddsnmp.Metric,
+	pms []*ddsnmp.ProfileMetrics,
+) {
 	seen := make(map[string]bool)
 	labels := make(map[string]string)
 
@@ -120,6 +127,7 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, metrics []dd
 					chart:           c.addProfileTableMetricChart(m),
 				},
 				profile: m.Profile.Source,
+				table:   m.Table,
 			}
 			c.seenTableMetrics[key] = state
 		}
@@ -145,11 +153,29 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, metrics []dd
 	}
 
 	for key, state := range c.seenTableMetrics {
-		if !seen[key] && !c.failedProfiles[state.profile] {
+		if !seen[key] && c.tableRowsObserved(key, state, pms) {
 			delete(c.seenTableMetrics, key)
 			c.removeProfileTableMetricChart(key)
 		}
 	}
+}
+
+// A missing row is a removal only when this attempt observed its source.
+// Failures elsewhere in the profile do not hide the row.
+func (c *Collector) tableRowsObserved(key string, state tableMetricState, pms []*ddsnmp.ProfileMetrics) bool {
+	if c.failedProfiles[state.profile] {
+		return false
+	}
+	for _, pm := range pms {
+		if pm == nil || pm.Source != state.profile {
+			continue
+		}
+		if isBGPChartMetricKey(key) {
+			return pm.BGPCollectError == nil
+		}
+		return !slices.Contains(pm.UnavailableTables, state.table)
+	}
+	return true
 }
 
 func (c *Collector) collectProfileStats(mx map[string]int64, pms []*ddsnmp.ProfileMetrics) {

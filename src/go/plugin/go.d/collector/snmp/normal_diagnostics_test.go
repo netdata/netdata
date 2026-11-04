@@ -268,7 +268,7 @@ func TestNormalMetricSampleOrder(t *testing.T) {
 			samples := make(map[string]int64)
 			metrics := []ddsnmp.Metric{metric}
 			c.collectProfileScalarMetrics(samples, metrics)
-			c.collectProfileTableMetrics(samples, metrics)
+			c.collectProfileTableMetrics(samples, metrics, nil)
 			require.Len(t, c.normal.current.document.Metrics, 1)
 			decision := c.normal.current.document.Metrics[0]
 			require.Len(t, decision.SampleIDs, len(metric.MultiValue))

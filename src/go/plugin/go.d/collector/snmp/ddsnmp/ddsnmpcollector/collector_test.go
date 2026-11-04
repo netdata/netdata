@@ -707,6 +707,84 @@ func TestCollector_Collect_SeparatesTopologyMetricsFromHiddenMetrics(t *testing.
 	require.Empty(t, pm.Metrics)
 }
 
+func TestCollector_Collect_ReportsUnavailableMetricTables(t *testing.T) {
+	tests := map[string]struct {
+		siblingErr    error
+		dependencyErr error
+		expected      []string
+	}{
+		"observed tables": {},
+		"own walk failure": {
+			siblingErr: errors.New("sibling timeout"),
+			expected:   []string{"siblingTable"},
+		},
+		"dependency walk failure": {
+			dependencyErr: errors.New("dependency timeout"),
+			expected:      []string{"sourceTable"},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			ctrl, mockHandler := setupMockHandler(t)
+			defer ctrl.Finish()
+
+			const base = "1.3.6.1.4.1.99999.70"
+			dependency, source := crossTableDependencyTestConfigs(base)
+			sibling := ddprofiledefinition.MetricsConfig{
+				Table:   ddprofiledefinition.SymbolConfig{OID: base + ".3", Name: "siblingTable"},
+				Symbols: []ddprofiledefinition.SymbolConfig{{OID: base + ".3.1", Name: "siblingValue"}},
+				MetricTags: []ddprofiledefinition.MetricTagConfig{{
+					Tag:   "sibling",
+					Index: 1,
+				}},
+			}
+			profile := &ddsnmp.Profile{
+				SourceFile: "availability.yaml",
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metrics: []ddprofiledefinition.MetricsConfig{source, sibling},
+				},
+			}
+			ddsnmp.HandleCrossTableTagsWithoutMetrics(profile)
+			var dependencyRouteOID string
+			for _, cfg := range profile.Definition.Metrics {
+				if cfg.Table.Name == dependency.Table.Name && len(cfg.Symbols) == 0 {
+					dependencyRouteOID = cfg.Table.OID
+				}
+			}
+			require.NotEmpty(t, dependencyRouteOID)
+
+			expectSNMPWalk(mockHandler, gosnmp.Version2c, source.Table.OID, []gosnmp.SnmpPDU{
+				createGauge32PDU(source.Symbols[0].OID+".1", 10),
+			})
+			if tc.dependencyErr != nil {
+				expectSNMPWalkError(mockHandler, gosnmp.Version2c, dependencyRouteOID, tc.dependencyErr)
+			} else {
+				expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyRouteOID, []gosnmp.SnmpPDU{
+					createStringPDU(dependency.Symbols[0].OID+".1", "dependency"),
+				})
+			}
+			if tc.siblingErr != nil {
+				expectSNMPWalkError(mockHandler, gosnmp.Version2c, sibling.Table.OID, tc.siblingErr)
+			} else {
+				expectSNMPWalk(mockHandler, gosnmp.Version2c, sibling.Table.OID, []gosnmp.SnmpPDU{
+					createGauge32PDU(sibling.Symbols[0].OID+".1", 20),
+				})
+			}
+
+			collector := New(Config{
+				SnmpClient: mockHandler,
+				Profiles:   []*ddsnmp.Profile{profile},
+				Log:        logger.New(),
+			})
+			results, err := collector.Collect()
+			require.NoError(t, err)
+			require.Len(t, results, 1)
+			assert.Equal(t, tc.expected, results[0].UnavailableTables)
+		})
+	}
+}
+
 func crossTableDependencyTestConfigs(oidBase string) (ddprofiledefinition.MetricsConfig, ddprofiledefinition.MetricsConfig) {
 	dependencyColumnOID := oidBase + ".2.1"
 	dependency := ddprofiledefinition.MetricsConfig{
