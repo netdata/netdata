@@ -15,7 +15,7 @@ struct sql_alert_config_data;
 struct rrd_alert_prototype;
 void sql_health_alarm_log_load(RRDHOST *host);
 void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae);
-void sql_health_alarm_log_cleanup(RRDHOST *host);
+bool sql_health_alarm_log_cleanup(RRDHOST *host, time_t started);
 void sql_alert_store_config(struct rrd_alert_prototype *ap);
 int sql_health_get_last_executed_event(RRDHOST *host, ALARM_ENTRY *ae, RRDCALC_STATUS *last_executed_status);
 void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, time_t after, const char *chart);
