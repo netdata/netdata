@@ -34,6 +34,7 @@ jobs:
             .github/workflows/go-tests.yml
             .github/scripts/get-go-version.py
             .github/scripts/normalize-go-test-json.py
+            .github/scripts/test-go-build-matrix.py
             packaging/cmake/
             src/go/**
             src/health/notifications/alarm-notify/**
@@ -71,6 +72,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Test Go build matrix
+        run: python3 .github/scripts/test-go-build-matrix.py
       - name: Get Go version and modules
         id: get-version
         run: .github/scripts/get-go-version.py

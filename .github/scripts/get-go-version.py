@@ -27,8 +27,9 @@ PLATFORMS = [
 UNSUPPORTED_PLATFORMS = {
     # Linux only: ENABLE_PLUGIN_IPMI requires OS_LINUX (packaging/cmake/Modules/NetdataOptions.cmake).
     'src/go/cmd/ipmiplugin': [platform for platform in PLATFORMS if not platform.startswith('linux/')],
-    # Not built on 32-bit targets (packaging/cmake/Modules/NetdataPluginNetflow.cmake).
-    'src/go/tools/topology-ip-intel-downloader': ['linux/386', 'linux/arm'],
+    # Not built on 32-bit targets (packaging/cmake/Modules/NetdataPluginNetflow.cmake), or on Windows where
+    # ENABLE_PLUGIN_NETFLOW is disabled (packaging/cmake/Modules/NetdataOptions.cmake).
+    'src/go/tools/topology-ip-intel-downloader': ['linux/386', 'linux/arm', 'windows/amd64'],
 }
 
 # Standalone Go modules outside src/go that CMake builds on every platform: tested natively and cross-compiled.
