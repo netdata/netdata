@@ -98,6 +98,7 @@ bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap, const char **msg);
 bool health_prototype_matches_rrdset(RRDSET *st, RRD_ALERT_PROTOTYPE *ap);
 RRD_ALERT_PROTOTYPE *health_prototype_payload_parse(
     const char *payload, size_t payload_len, BUFFER *error, const char *name, unsigned flags);
+bool health_prototype_exec_is_allowed(RRD_ALERT_PROTOTYPE *base, bool replay, BUFFER *error);
 void health_prototype_cleanup(RRD_ALERT_PROTOTYPE *ap);
 void health_prototype_free(RRD_ALERT_PROTOTYPE *ap);
 
