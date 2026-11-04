@@ -503,6 +503,12 @@ Lighthouse audit before selecting the release. Online operations fetch the packa
 an administrator-provisioned OpenPGP public keyring. `qualify` repeats these checks for the selected release.
 It tests the calling account and environment, not a different service's AppArmor, SELinux or container policy.
 
+Ctrl-C or SIGTERM asks the runtime CLI to cancel at the next point where it can stop safely. If qualification
+launched a browser, the CLI waits for its supervisor to confirm that the browser and its descendants have exited.
+A process stuck in uninterruptible kernel I/O can keep this wait open. Further interrupts do not bypass it.
+Forcing the CLI to exit with SIGKILL leaves drainage unverified. Preserve the execution's files and investigate
+the stuck process before retrying removal or repair.
+
 **Restart DEM after installation, update or repair, including the first installation.** Each process keeps the runtime it
 acquired at startup. A process started without a runtime stays unavailable until restarted. Runtime releases can
 update their components without an Agent upgrade while preserving execution contract 1. Runs record the actual
