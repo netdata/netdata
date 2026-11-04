@@ -48,21 +48,22 @@ successful observation. `ping_only` keeps its setup-only SNMP behavior.
 `device_refresh.go` separates metadata updates from device-state rebuilding. Name, contact, location and description
 changes refresh scalar profile tags/device metadata on the existing DD collector/client, then update the generated
 vnode, chart labels and DeviceStore. `RefreshProfileInputs` stages per-profile inputs, retaining usable snapshots on
-failed/incomplete acquisition without suppressing healthy metric profiles. It reconciles only system-OID negative
-decisions contradicted by authoritative observed values. Existing row caches, connections and Function rate baselines
-remain intact. Authored `Config`, including local vnode overrides, never receives acquired identity values.
+failed/incomplete acquisition without suppressing healthy metric profiles. Usable system and successful profile
+updates publish even when another profile's inputs fail; failed inputs remain pending for the next check. Changed
+profile tags refresh chart labels even when the raw system fields are unchanged. Only system-OID negative decisions
+contradicted by authoritative observed values are reconciled, including observations whose value has not changed.
+Existing row caches, connections and Function rate baselines remain intact. Authored `Config`, including local vnode overrides, never receives acquired identity values.
 
 Only a confirmed valid changed `sysObjectID` triggers full rebuilding. Neither elapsed time nor a changed description
 alone triggers profile reselection. Replacements with unchanged `sysObjectID` are an initial detection limitation.
 There is no periodic full rebuild or new cache-expiry policy.
 
-A confirmed classification change immediately suspends incumbent profile samples, even if replacement setup fails.
-Its old DeviceStore connection is withdrawn from SNMP-family consumers without changing the accepted registration
-ID or runtime writer authority; new compatible state makes that registration eligible again.
+A confirmed classification change immediately suspends incumbent profile samples and clears prior-device Function
+contents/counter baselines under their existing owner locks, even if replacement setup fails. Its old DeviceStore
+connection is withdrawn from SNMP-family consumers without changing the accepted registration ID or runtime writer authority; new compatible state makes that registration eligible again.
 Retries occur on subsequent system checks; an unanswered/invalid object ID cannot resume incompatible profiles.
-Successful replacement uses fresh profile/device/transport state, retires old charts through V1 output, and clears
-Function contents/counter baselines under their existing owner locks. Current correctly classified profiles retain
-partial-collection availability. System identity establishes vnode routing before optional profile enrichment so
+Successful replacement uses fresh profile/device/transport state and retires old charts through V1 output. Current
+correctly classified profiles retain partial-collection availability. System identity establishes vnode routing before optional profile enrichment so
 healthy samples cannot fall back to the local Agent. The GUID and compatible chart identities/history remain stable.
 
 Normal initialization and rebuilding compose identity from prepared profile metadata rather than fetching it twice.

@@ -12,6 +12,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
 	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
@@ -108,6 +109,13 @@ func TestCollectorRuntimeDeviceReplacement(t *testing.T) {
 func TestCollectorRuntimeDeviceReplacementFailureAndRecovery(t *testing.T) {
 	c, device, now := newRefreshTestCollector(t)
 	require.NotEmpty(t, c.Collect(context.Background()))
+	interfaceParams := funcapi.ResolvedParams{
+		ifacesParamTypeGroup: {IDs: []string{"other"}},
+	}
+	interfaceRows := func() any {
+		return c.funcRouter.Handle(context.Background(), ifacesMethodID, interfaceParams).Data
+	}
+	require.Len(t, interfaceRows(), 1, "normal source collection must populate the Function before replacement")
 	oldDD, guid := c.ddSnmpColl, c.VirtualNode().GUID
 	entries := c.deviceStore.Entries()
 	require.Len(t, entries, 1)
@@ -152,6 +160,11 @@ func TestCollectorRuntimeDeviceReplacementFailureAndRecovery(t *testing.T) {
 	require.Len(t, lifecycle, 1)
 	assert.Equal(t, registrationID, lifecycle[0].RegistrationID)
 	assert.False(t, lifecycle[0].TopologyReady)
+	assert.Empty(
+		t,
+		interfaceRows(),
+		"a confirmed classification change must withdraw prior-device Function rows immediately",
+	)
 
 	device.probePDUs = []gosnmp.SnmpPDU{
 		{Name: snmputils.OidSysName, Type: gosnmp.OctetString, Value: []byte("incomplete")},
@@ -160,6 +173,7 @@ func TestCollectorRuntimeDeviceReplacementFailureAndRecovery(t *testing.T) {
 	assert.Empty(t, c.Collect(context.Background()), "a later unanswered object ID cannot resume incompatible profiles")
 	assert.True(t, c.rebuildPending)
 	assert.Zero(t, clientCreations)
+	assert.Empty(t, interfaceRows(), "an incomplete retry cannot restore prior-device Function rows")
 	device.probePDUs = nil
 	device.values[snmputils.OidSysObject] = gosnmp.SnmpPDU{
 		Name:  snmputils.OidSysObject,
@@ -176,6 +190,7 @@ func TestCollectorRuntimeDeviceReplacementFailureAndRecovery(t *testing.T) {
 	assert.Zero(t, ddCreations)
 	assert.Equal(t, guid, c.VirtualNode().GUID)
 	assert.Equal(t, "before", c.VirtualNode().Hostname)
+	assert.Empty(t, interfaceRows(), "failed connection setup must keep prior-device Function rows withdrawn")
 
 	*now = now.Add(time.Second)
 	assert.Empty(
@@ -196,6 +211,7 @@ func TestCollectorRuntimeDeviceReplacementFailureAndRecovery(t *testing.T) {
 	require.Len(t, entries, 1)
 	assert.Equal(t, registrationID, entries[0].RegistrationID)
 	assert.Equal(t, replacementTestObjectID, entries[0].Info.SysObjectID)
+	assert.Len(t, interfaceRows(), 1, "compatible collection repopulates the existing Function owner")
 	c.Cleanup(context.Background())
 	assert.Zero(t, *failedCloses)
 	assert.Equal(t, 1, *recoveredCloses)

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
@@ -80,7 +81,9 @@ func TestCollectorRuntimeMetadataRetryKeepsPollingState(t *testing.T) {
 	device.inputErr = errors.New("synthetic metadata timeout")
 	*now = now.Add(time.Minute)
 	require.NotEmpty(t, c.Collect(context.Background()))
-	assert.Equal(t, "before", c.VirtualNode().Hostname)
+	assert.Equal(t, "after", c.VirtualNode().Hostname, "usable system metadata can publish while profile inputs retry")
+	assert.Equal(t, "before", c.ddSnmpColl.PreparedDeviceMetadata()["name"].Value)
+	assert.NotNil(t, c.pendingMetadata)
 	assert.Same(t, dd, c.ddSnmpColl)
 	device.inputErr = nil
 	*now = now.Add(time.Minute)
@@ -91,6 +94,8 @@ func TestCollectorRuntimeMetadataRetryKeepsPollingState(t *testing.T) {
 		c.VirtualNode().Hostname,
 		"unchanged subsequent sysinfo must retry pending derived metadata",
 	)
+	assert.Nil(t, c.pendingMetadata)
+	assert.Equal(t, "after", c.ddSnmpColl.PreparedDeviceMetadata()["name"].Value)
 	assert.Same(t, dd, c.ddSnmpColl)
 	assert.Zero(t, device.closes)
 }
@@ -370,4 +375,126 @@ func TestCollectorRuntimePingOnlyKeepsSetupOnlySNMP(t *testing.T) {
 	require.NotEmpty(t, c.Collect(context.Background()))
 	assert.Equal(t, 1, device.probes)
 	assert.Zero(t, device.walks)
+}
+
+// Only this profile's scalar input fails; normal system and metric polling remain usable.
+type refreshSelectiveFailure struct {
+	*refreshTestDevice
+	failedOID string
+	fail      bool
+}
+
+func (d *refreshSelectiveFailure) Get(oids []string) (*gosnmp.SnmpPacket, error) {
+	if d.fail && slices.Contains(oids, d.failedOID) {
+		return nil, errors.New("synthetic profile input timeout")
+	}
+	return d.refreshTestDevice.Get(oids)
+}
+
+func TestCollectorRuntimePartialMetadataRefresh(t *testing.T) {
+	c, device, now := newRefreshTestCollector(t)
+	const tagOID = "1.3.6.1.4.1.99999.91.0"
+	const metricOID = "1.3.6.1.4.1.99999.92.0"
+	device.setText(tagOID, "before accessory")
+	device.values[metricOID] = gosnmp.SnmpPDU{
+		Name:  metricOID,
+		Type:  gosnmp.Integer,
+		Value: 7,
+	}
+	transport := &refreshSelectiveFailure{
+		refreshTestDevice: device,
+		failedOID:         tagOID,
+	}
+	c.snmpClient = transport
+	c.snmpProfiles = append(c.snmpProfiles, &ddsnmp.Profile{
+		SourceFile: "accessory.yaml",
+		Definition: &ddprofiledefinition.ProfileDefinition{
+			MetricTags: []ddprofiledefinition.GlobalMetricTagConfig{{
+				MetricTagConfig: ddprofiledefinition.MetricTagConfig{
+					Tag: "accessory",
+					Symbol: ddprofiledefinition.SymbolConfigCompat{
+						OID: tagOID,
+					},
+				},
+			}},
+			Metrics: []ddprofiledefinition.MetricsConfig{
+				{Symbol: ddprofiledefinition.SymbolConfig{
+					OID:  metricOID,
+					Name: "accessoryMetric",
+				}},
+			},
+		},
+	})
+	require.NotEmpty(t, c.Collect(context.Background()))
+	dd, client := c.ddSnmpColl, c.snmpClient
+	labels := func(id string) map[string]string {
+		result := make(map[string]string)
+		for _, label := range c.Charts().Get(id).Labels {
+			result[label.Key] = label.Value
+		}
+		return result
+	}
+	device.setText(snmputils.OidSysName, "after")
+	device.setText(tagOID, "after accessory")
+	transport.fail = true
+	*now = now.Add(time.Minute)
+	require.NotEmpty(t, c.Collect(context.Background()))
+	assert.Equal(t, "after", c.VirtualNode().Hostname, "failed unrelated inputs cannot block healthy identity updates")
+	assert.Equal(t, "after", labels("snmp_device_prof_ifTraffic_1")["snmp_host"])
+	assert.Equal(t, "before accessory", labels(chartIDFromName("accessoryMetric"))["accessory"])
+	require.NotNil(t, c.pendingMetadata, "failed profile input refresh must remain retryable")
+	entries := c.deviceStore.Entries()
+	require.Len(t, entries, 1)
+	assert.Equal(t, "after", entries[0].Info.SysName)
+	version := c.chartMetadataVersion
+	*now = now.Add(time.Minute)
+	require.NotEmpty(t, c.Collect(context.Background()))
+	assert.Equal(
+		t,
+		version,
+		c.chartMetadataVersion,
+		"identical usable snapshots do not redefine charts on a failed retry",
+	)
+
+	transport.fail = false
+	*now = now.Add(time.Minute)
+	require.NotEmpty(t, c.Collect(context.Background()))
+	assert.Nil(t, c.pendingMetadata)
+	assert.Equal(
+		t,
+		"after accessory",
+		labels(chartIDFromName("accessoryMetric"))["accessory"],
+		"recovered inputs refresh chart labels even with unchanged system metadata",
+	)
+	assert.Same(t, dd, c.ddSnmpColl)
+	assert.Same(t, client, c.snmpClient)
+}
+
+func TestCollectorRuntimeUnchangedObservationReconcilesNegativeInput(t *testing.T) {
+	c, device, now := newRefreshTestCollector(t)
+	// Check observed the name, but the subsequent profile input acquisition reports absence.
+	device.values[snmputils.OidSysName] = gosnmp.SnmpPDU{
+		Name: snmputils.OidSysName,
+		Type: gosnmp.NoSuchInstance,
+	}
+	require.NotEmpty(t, c.Collect(context.Background()))
+	require.Equal(t, "before", c.sysInfo.Name)
+	require.Empty(t, c.ddSnmpColl.PreparedDeviceMetadata()["name"].Value)
+	device.setText(snmputils.OidSysName, "before")
+	*now = now.Add(time.Minute)
+
+	require.NotEmpty(t, c.Collect(context.Background()))
+	assert.Equal(t, 2, device.probes)
+	assert.Equal(
+		t,
+		"before",
+		c.ddSnmpColl.PreparedDeviceMetadata()["name"].Value,
+		"a successful system observation contradicts prior unsupported evidence even when its value is unchanged",
+	)
+	chart := c.Charts().Get("snmp_device_prof_ifTraffic_1")
+	require.NotNil(t, chart)
+	assert.Contains(t, chart.Labels, collectorapi.Label{
+		Key:   "snmp_host",
+		Value: "before",
+	})
 }
