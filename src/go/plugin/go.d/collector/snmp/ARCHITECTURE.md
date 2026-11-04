@@ -82,10 +82,12 @@ The collector's `tableMetricKey` combines the metric name with non-empty public 
 mapped dimensions use assignment instead. A captured row can therefore be present without having a distinct chart
 series, and a final sample can combine several rows.
 
-Row removal follows the availability of each chart's own source. A profile that returns no results, a table whose walk
-or processing failed (`ProfileMetrics.UnavailableTables`, including a failed dependency walk for current rows), and a
-profile's failed BGP rows keep their existing table charts as gaps. Rows absent from a successful observation of their
-table are retired even when other scalars, rows or tables of the same profile fail. Metadata
+Row removal follows the availability of each chart's latest source. A profile that returns no results, a table whose
+walk or processing failed (`ProfileMetrics.UnavailableTables`), and a profile whose BGP row collection failed
+(`BGPCollectError`) keep their existing table charts as gaps. A failed dependency walk makes its owner table
+unavailable while the owner has current rows, because their keys cannot be rebuilt without the dependency's tags. Rows
+absent from a successful observation of their table are retired even when other scalars, rows or tables of the same
+profile fail; a row rejected by processing is dropped from that attempt and retired. Metadata
 redraw preserves live dimensions missing from partial observations. Newly observed composite dimensions are added,
 and current-profile dimensions can revive pending incumbent removals after replacement. The chart owner indexes live
 dimensions so steady collection remains O(observed values), without scanning all retained charts.
