@@ -758,6 +758,10 @@ static void aclk_synchronization_event_loop(void *arg)
     struct judy_list_t *aclk_query_execute = callocz(1, sizeof(*aclk_query_execute));
     size_t pending_queries = 0;
 
+    // set when a query thread could not be started; the pending queries then wait for the next
+    // wake-up (the timer, or a finished query) instead of being retried on every pass of the inner loop
+    bool query_start_refused;
+
     Pvoid_t *Pvalue;
     worker_data_t  *worker;
 
@@ -772,6 +776,7 @@ static void aclk_synchronization_event_loop(void *arg)
         aclk_query_t *query;
         worker_is_idle();
         uv_run(loop, UV_RUN_ONCE);
+        query_start_refused = false;
 
         do {
             cmd_data_t cmd;
@@ -813,7 +818,8 @@ static void aclk_synchronization_event_loop(void *arg)
             }
 
             // Check if we have pending commands to execute
-            if (opcode == ACLK_DATABASE_NOOP && pending_queries && aclk_queries_running(config) < query_thread_count) {
+            if (opcode == ACLK_DATABASE_NOOP && pending_queries && !query_start_refused &&
+                aclk_queries_running(config) < query_thread_count) {
                 opcode = ACLK_QUERY_EXECUTE;
                 cmd.param[0] = NULL;
             }
@@ -936,6 +942,8 @@ static void aclk_synchronization_event_loop(void *arg)
 
                         // Schedule it and increase running
                         too_busy = schedule_query_in_worker(config, query_in_queue);
+                        if (too_busy)
+                            query_start_refused = true;
 
                         // It was scheduled in worker, remove it from pending
                         if (!too_busy) {
@@ -949,8 +957,11 @@ static void aclk_synchronization_event_loop(void *arg)
                         break;
 
                     // We have a query, if not busy lets run it
-                    if (!too_busy)
+                    if (!too_busy) {
                         too_busy = schedule_query_in_worker(config, query);
+                        if (too_busy)
+                            query_start_refused = true;
+                    }
 
                     // We were either busy, or failed to start worker, schedule for later
                     if (too_busy) {

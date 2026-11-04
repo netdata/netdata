@@ -2342,9 +2342,9 @@ static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx, void 
 // already is over pgc_max_flushers(). flush_inline() in cache.c never runs on pool threads, for
 // the same reason. Everything here runs on the event loop thread.
 //
-// These are the only pool jobs that block on dbengine work. Jobs that run data queries - and so wait
-// on query preparation and extent reads, which run on this pool too - MUST NOT run on the pool:
-// Cloud queries and parallel weights have their own threads (nd_work_queue) for that reason.
+// Jobs that run data queries - and so wait on query preparation and extent reads, which run on this
+// pool too - MUST NOT run on the pool: Cloud queries and parallel weights have their own threads
+// (nd_work_queue) for that reason.
 
 static size_t extent_waiters_max(void) {
     int max = libuv_worker_threads - RESERVED_LIBUV_WORKER_THREADS;
