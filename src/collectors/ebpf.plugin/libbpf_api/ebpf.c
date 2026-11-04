@@ -336,6 +336,9 @@ int ebpf_rhf_kernel_lineage_matches(const char *kernel_release, int rhf, int clo
         return 0;
 
     const char *el = strstr(kernel_release, ".el");
+    // Virtuozzo/OpenVZ kernels are RHEL rebuilds tagged ".vzN" (e.g. 3.10.0-1160.119.1.vz7.224.4) instead of ".elN".
+    if (!el || !isdigit((unsigned char)el[3]))
+        el = strstr(kernel_release, ".vz");
     if (!el || !isdigit((unsigned char)el[3]))
         return 0;
 

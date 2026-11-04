@@ -94,7 +94,9 @@ var kernelReleaseRe = regexp.MustCompile(`^([0-9]+)\.([0-9]+)\.([0-9]+)`)
 
 // Any vendor name is accepted (RHEL rebuilds); redHatKernelLineageMatches decides Red Hat handling.
 var redHatReleaseRe = regexp.MustCompile(`(?i)^\s*(\S.*?)release[[:space:]]+([0-9]+)(\.([0-9]+))?`)
-var redHatKernelReleaseRe = regexp.MustCompile(`\.el([0-9]+)(?:_[0-9]+)?(?:\.|$)`)
+
+// Virtuozzo/OpenVZ kernels are RHEL rebuilds tagged ".vzN" (e.g. 3.10.0-1160.119.1.vz7.224.4) instead of ".elN".
+var redHatKernelReleaseRe = regexp.MustCompile(`\.(?:el|vz)([0-9]+)(?:_[0-9]+)?(?:\.|$)`)
 
 // CloudLinux 7 hybrid kernels (4.18-based) use an "el7h" suffix.
 var cloudLinuxKernelReleaseRe = regexp.MustCompile(`\.el([0-9]+)h?(?:_[0-9]+)?(?:\.|$)`)

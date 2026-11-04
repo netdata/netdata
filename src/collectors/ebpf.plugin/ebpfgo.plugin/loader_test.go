@@ -221,6 +221,10 @@ func TestRedHatReleaseFromFile(t *testing.T) {
 			contents: "MIRACLE LINUX release 8.4 (Peony)",
 			want:     2052,
 		},
+		"virtuozzo linux 7 rebuild": {
+			contents: "Virtuozzo Linux release 7.8.0 (609)",
+			want:     1800,
+		},
 	}
 
 	for name, tc := range tests {
@@ -516,6 +520,10 @@ func TestRedHatKernelLineageMatches(t *testing.T) {
 		"wrong el major":            {release: "5.14.0-503.el8.x86_64", rhf: 9 * 256, want: false},
 		"EL7 rebuild kernel":        {release: "3.10.0-1160.119.1.el7.x86_64", rhf: 7*256 + 9, want: true},
 		"Fedora kernel":             {release: "6.8.5-301.fc40.x86_64", rhf: 40 * 256, want: false},
+		"Virtuozzo 7 kernel":        {release: "3.10.0-1160.119.1.vz7.224.4", rhf: 7*256 + 9, want: true},
+		"Virtuozzo 7 kernel x86_64": {release: "3.10.0-1160.80.1.vz7.191.4.x86_64", rhf: 7*256 + 8, want: true},
+		"vz7 with wrong major":      {release: "3.10.0-1160.119.1.vz7.224.4", rhf: 8 * 256, want: false},
+		"vz without major":          {release: "3.10.0-1160.119.1.vzx.224.4", rhf: 7*256 + 9, want: false},
 		"Amazon Linux 2 kernel":     {release: "4.14.355-277.643.amzn2.x86_64", rhf: 2 * 256, want: false},
 		"CloudLinux 7 lve":          {release: "3.10.0-962.3.2.lve1.5.39.el7.x86_64", rhf: 7*256 + 9, cloudLinux: true, want: true},
 		"CloudLinux 7 hybrid":       {release: "4.18.0-553.177.1.lve.el7h.x86_64", rhf: 7*256 + 9, cloudLinux: true, want: true},
