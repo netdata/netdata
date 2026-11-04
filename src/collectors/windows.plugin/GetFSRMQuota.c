@@ -101,14 +101,17 @@ static void fsrm_quota_chart_id(char *dst, size_t size, const char *path, const 
     size_t id_limit = RRD_ID_LENGTH_MAX - strlen("fsrm.");
     if (size > id_limit)
         size = id_limit;
-    size_t reserved = strlen("quota__") + 16 + 1 + strlen(suffix) + 1;
+    size_t reserved = strlen("quota__") + 16 + 1 + strnlen(suffix, RRD_ID_LENGTH_MAX) + 1;
     size_t visible = size > reserved ? size - reserved : 0;
-    XXH64_hash_t hash = XXH3_64bits(path, strlen(path));
+    XXH64_hash_t hash = XXH3_64bits(path, strnlen(path, FSRM_SCRATCH_SIZE));
     snprintfz(dst, size, "quota_%.*s_%016llx_%s", (int)visible, sanitized, (unsigned long long)hash, suffix);
 }
 
 static void fsrm_update_labels(RRDSET *st, const char *path, const char *template_name)
 {
+    if (unlikely(!st))
+        return;
+
     rrdlabels_add(st->rrdlabels, "path", path, RRDLABEL_SRC_AUTO);
     if (rrdlabels_add_changed(st->rrdlabels, "template", template_name, RRDLABEL_SRC_AUTO))
         rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
