@@ -115,6 +115,8 @@ func TestMetadataAndRejectedRequestsDoNotReadStorage(t *testing.T) {
 	require.Len(t, declarations, 1)
 	assert.False(t, declarations[0].HasHistory)
 	assert.Empty(t, declarations[0].AcceptedParams)
+	assert.True(t, declarations[0].RequireCloud)
+	assert.True(t, declarations[0].RequireCommercial)
 }
 func TestCancellationReachesStorage(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())

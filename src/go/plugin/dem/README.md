@@ -69,9 +69,9 @@ retention policy, defaulting to 7 days and 2 GiB.
 
 `dem-history-status` reports the effective policy, sampled file bytes/count, observation time, latest cleanup attempt,
 last successful cleanup, and separate inventory, cleanup, writer and policy reload errors. It is a read-only member
-Function available even with all collectors disabled, with no arguments, payload or time filters. Unknown or unattempted
-values are `null`; an inventory failure does not erase cleanup or writer facts. These facts help diagnose storage pressure
-and maintenance failures, but cannot explain whether an absent event expired, was sampled out or was never collected.
+Function that, like every DEM Function, requires a paid plan or an active trial. It works even with all collectors
+disabled, with no arguments, payload or time filters. Unknown or unattempted values are `null`; an inventory failure
+does not erase cleanup or writer facts. These facts help diagnose storage pressure and maintenance failures, but cannot explain whether an absent event expired, was sampled out or was never collected.
 Unusable history at startup still stops the plugin before Functions register; inspect process logs in that case.
 
 Queued events flush every five seconds or 500 records.
