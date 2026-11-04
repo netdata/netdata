@@ -332,7 +332,7 @@ agents_query_cloud POST \
 - **Permission:** historical guidance names `PermissionFunctionExec` and distinguishes `scope:all` from
   `scope:grafana-plugin`. Exact Cloud gates and status mappings are not verified against a current server owner;
   check target-space role, token scope and endpoint restrictions before changing access.
-- **Plan:** a Function whose `access[]` includes `commercial` (for example `flows:netflow` and `otel-traces`) returns
+- **Plan:** a Function whose `access[]` includes `commercial` (for example `flows:netflow`, `otel-traces` and `otel-logs`) returns
   403 for a Space without a paid plan. The Agent sets `errorMsgKey: "ErrCommercialRequired"`; a Cloud proxy that does
   not forward Agent keys reports `AgentError` with the same `errorMessage`, so check the message too.
 - **Function names are case-sensitive.** Wrong casing can cause a request failure.

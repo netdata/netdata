@@ -19,7 +19,7 @@ For applications, host metrics, and general file logs, use [Ingest OpenTelemetry
 - A Netdata Agent — its OTLP endpoint listens on `127.0.0.1:4317` by default.
 - An [OpenTelemetry Collector Contrib](https://github.com/open-telemetry/opentelemetry-collector-releases) binary on the network, typically on the same host as the devices' hub.
 - Devices configured to send syslog to the collector.
-- A Netdata Cloud account and sign-in to verify the records in the access-gated `otel-logs` view.
+- A Netdata Cloud account, sign-in, and a Space on a paid plan to verify the records in the access-gated `otel-logs` view.
 
 ## A working configuration
 

@@ -38,8 +38,8 @@ explore them in the Traces tab. Sending traces through a Collector is in
   ARMv6) and all Docker images include it. macOS kickstart installs provision a Rust toolchain and build it — when no
   adequate toolchain ends up available, the install continues with a warning and without the plugin. Linux source
   builds need `--enable-plugin-otel`. It is not available on Windows or FreeBSD.
-- Viewing logs requires signing in with Netdata Cloud, free for community use. Viewing traces also requires a paid
-  plan.
+- Viewing OpenTelemetry logs and traces requires signing in with Netdata Cloud and a paid plan. The Agent receives
+  and stores logs and traces on all plans.
 - The examples on these pages are validated with OpenTelemetry Collector Contrib 0.157.0.
 
 ## In this section

@@ -527,14 +527,19 @@ impl FunctionHandler for OtelLogsHandler {
 
     /// Advertise the function to the agent/Cloud: `global` (not scoped to
     /// one node), tagged `logs`, accessible to signed-in users of the same
-    /// space, with the SENSITIVE_DATA flag since log payloads may carry
-    /// sensitive content.
+    /// space on a commercial plan (OpenTelemetry logs are a paid feature;
+    /// ingestion and storage are not gated), with the SENSITIVE_DATA flag
+    /// since log payloads may carry sensitive content.
     fn declaration(&self) -> FunctionDeclaration {
         let mut d = FunctionDeclaration::new("otel-logs", "Query OpenTelemetry logs");
         d.global = true;
         d.tags = Some("logs".to_string());
-        d.access =
-            Some(HttpAccess::SIGNED_ID | HttpAccess::SAME_SPACE | HttpAccess::SENSITIVE_DATA);
+        d.access = Some(
+            HttpAccess::SIGNED_ID
+                | HttpAccess::SAME_SPACE
+                | HttpAccess::COMMERCIAL_SPACE
+                | HttpAccess::SENSITIVE_DATA,
+        );
         d
     }
 }
