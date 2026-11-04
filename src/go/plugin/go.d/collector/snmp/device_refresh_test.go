@@ -25,14 +25,15 @@ const refreshTestTable = "1.3.6.1.4.1.99999.100"
 // refreshTestDevice answers from source state independently of collector caches.
 type refreshTestDevice struct {
 	gosnmp.Handler
-	values    map[string]gosnmp.SnmpPDU
-	probes    int
-	walks     int
-	closes    int
-	probeErr  error
-	probePDUs []gosnmp.SnmpPDU
-	inputErr  error
-	tableErr  error
+	values     map[string]gosnmp.SnmpPDU
+	probes     int
+	walks      int
+	closes     int
+	probeErr   error
+	probePDUs  []gosnmp.SnmpPDU
+	inputErr   error
+	tableErr   error
+	omittedOID string
 }
 
 func (*refreshTestDevice) Version() gosnmp.SnmpVersion { return gosnmp.Version2c }
@@ -61,6 +62,9 @@ func (d *refreshTestDevice) Get(oids []string) (*gosnmp.SnmpPacket, error) {
 	}
 	packet := &gosnmp.SnmpPacket{}
 	for _, oid := range oids {
+		if oid == d.omittedOID {
+			continue
+		}
 		pdu, ok := d.values[strings.TrimPrefix(oid, ".")]
 		if !ok {
 			pdu = gosnmp.SnmpPDU{
@@ -497,4 +501,80 @@ func TestCollectorRuntimeUnchangedObservationReconcilesNegativeInput(t *testing.
 		Key:   "snmp_host",
 		Value: "before",
 	})
+}
+
+func TestCollectorRuntimeInitialProfileMetadataRecovery(t *testing.T) {
+	for _, field := range []string{"vendor", "model"} {
+		t.Run(field, func(t *testing.T) {
+			c, device, now := newRefreshTestCollector(t)
+			const inputOID = "1.3.6.1.4.1.99999.80.0"
+			const metricOID = "1.3.6.1.4.1.99999.81.0"
+			device.setText(inputOID, "recovered-"+field)
+			device.values[metricOID] = gosnmp.SnmpPDU{
+				Name:  metricOID,
+				Type:  gosnmp.Integer,
+				Value: 7,
+			}
+			transport := &refreshSelectiveFailure{
+				refreshTestDevice: device,
+				failedOID:         inputOID,
+				fail:              true,
+			}
+			c.snmpClient = transport
+			c.snmpProfiles = append(c.snmpProfiles, &ddsnmp.Profile{
+				SourceFile: "recovering.yaml",
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Selector: ddprofiledefinition.SelectorSpec{
+						{
+							SysObjectID: ddprofiledefinition.SelectorIncludeExclude{
+								Include: []string{"1.3.6.1.4.1.99999.1"},
+							},
+						},
+					},
+					Metadata: ddprofiledefinition.MetadataConfig{
+						"device": {
+							Fields: map[string]ddprofiledefinition.MetadataField{
+								field: {Symbol: ddprofiledefinition.SymbolConfig{
+									OID: inputOID,
+								}},
+							},
+						},
+					},
+					Metrics: []ddprofiledefinition.MetricsConfig{
+						{Symbol: ddprofiledefinition.SymbolConfig{
+							OID:  metricOID,
+							Name: "recoveredMetric",
+						}},
+					},
+				},
+			})
+			require.NotEmpty(
+				t,
+				c.Collect(context.Background()),
+				"healthy profiles remain available during preparation failure",
+			)
+			dd, client := c.ddSnmpColl, c.snmpClient
+			require.Empty(t, dd.PreparedDeviceMetadata()[field].Value)
+			transport.fail = false
+			require.Equal(t, int64(7), c.Collect(context.Background())[metricIDFromName("recoveredMetric")])
+			assert.Equal(
+				t,
+				"recovered-"+field,
+				c.VirtualNode().Labels[field],
+				"normal lazy preparation must publish newly usable metadata",
+			)
+			entries := c.deviceStore.Entries()
+			require.Len(t, entries, 1)
+			if field == "vendor" {
+				assert.Equal(t, "recovered-vendor", entries[0].Info.Vendor)
+			} else {
+				assert.Equal(t, "recovered-model", entries[0].Info.Model)
+			}
+			*now = now.Add(time.Minute)
+			require.NotEmpty(t, c.Collect(context.Background()))
+			assert.Equal(t, "recovered-"+field, c.VirtualNode().Labels[field])
+			assert.Same(t, dd, c.ddSnmpColl)
+			assert.Same(t, client, c.snmpClient)
+		})
+	}
 }

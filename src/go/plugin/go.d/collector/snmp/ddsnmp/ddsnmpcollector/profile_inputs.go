@@ -25,6 +25,20 @@ func (c *Collector) PreparedDeviceMetadata() map[string]ddsnmp.MetaTag {
 	return metadata
 }
 
+// ProfileInputRevision changes whenever normal preparation or explicit refresh
+// installs newly usable tags/metadata. Reading it does not allocate or acquire data.
+func (c *Collector) ProfileInputRevision() uint64 { return c.profileInputRevision }
+
+// Both preparation paths install usable snapshots here; a partial or failed
+// attempt cannot acknowledge a snapshot that downstream owners have not seen.
+func (c *Collector) installProfileInputs(state, staged *profileState) {
+	if !state.initialized || !maps.Equal(state.cache.globalTags, staged.cache.globalTags) ||
+		!maps.Equal(state.cache.deviceMetadata, staged.cache.deviceMetadata) {
+		c.profileInputRevision++
+	}
+	state.cache, state.identity, state.initialized = staged.cache, staged.identity, true
+}
+
 // NeedsProfileInputRefresh reports whether authoritative system observations
 // contradict retained unsupported-OID decisions. It does not acquire data.
 func (c *Collector) NeedsProfileInputRefresh(observedOIDs []string) bool {
@@ -40,9 +54,8 @@ func (c *Collector) NeedsProfileInputRefresh(observedOIDs []string) bool {
 // state. observedOIDs names system scalars authoritatively observed by the caller;
 // their previous missing-OID decisions no longer apply. Failed profiles retain
 // their last usable input snapshot while other profiles can install fresh inputs.
-// The result reports changed usable tags/metadata, including partial success.
 // Like Collect, only the synchronous owner calls it.
-func (c *Collector) RefreshProfileInputs(observedOIDs []string) (changed bool, err error) {
+func (c *Collector) RefreshProfileInputs(observedOIDs []string) error {
 	c.failures = ddsnmp.CollectionFailures{}
 	c.requests = snmpRequestState{}
 	for _, oid := range observedOIDs {
@@ -67,13 +80,9 @@ func (c *Collector) RefreshProfileInputs(observedOIDs []string) (changed bool, e
 			errs = append(errs, err)
 			continue
 		}
-		changed = changed || !maps.Equal(state.cache.globalTags, staged.cache.globalTags) ||
-			!maps.Equal(state.cache.deviceMetadata, staged.cache.deviceMetadata)
-		state.cache = staged.cache
-		state.identity = staged.identity
-		state.initialized = true
+		c.installProfileInputs(state, staged)
 	}
-	return changed, errors.Join(errs...)
+	return errors.Join(errs...)
 }
 
 func getProfileInputValues(

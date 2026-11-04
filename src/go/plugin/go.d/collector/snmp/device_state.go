@@ -144,7 +144,7 @@ func (c *Collector) withdrawDeviceState() {
 }
 
 func (c *Collector) syncDeviceMetadata() {
-	if c.deviceMetadataSynced || c.sysInfo == nil {
+	if c.sysInfo == nil || c.publishedProfileInputRevision == c.ddSnmpColl.ProfileInputRevision() {
 		return
 	}
 	if err := c.applyDeviceMetadata(c.sysInfo, c.ddSnmpColl.PreparedDeviceMetadata()); err != nil {

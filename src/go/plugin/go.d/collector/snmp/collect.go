@@ -147,7 +147,6 @@ func (c *Collector) ensureInitialized() error {
 		if err := c.applyDeviceMetadata(si, nil); err != nil {
 			return err
 		}
-		c.deviceMetadataSynced = false
 	}
 	c.initialized = true
 	c.nextSysInfoCheck = c.now().Add(sysInfoCheckEvery)

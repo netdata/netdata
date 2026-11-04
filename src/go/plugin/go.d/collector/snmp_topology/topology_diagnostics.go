@@ -94,6 +94,11 @@ func projectTopologyDiagnosticCut(input topologyDiagnosticCutInput) (*topologydi
 	countedCaptures := make(map[*topologydiag.AcquisitionCapture]bool)
 	for _, entry := range input.entries {
 		state := input.states[entry.RegistrationID]
+		if g := state.generation; g != nil && g.presentation != nil {
+			p := g.presentation
+			records++
+			logicalBytes += uint64(len(p.SysName)+len(p.SysDescr)+len(p.SysContact)+len(p.SysLocation)+len(p.Vendor)+len(p.Model)) + topologySemanticStringMapBytes(p.Labels)
+		}
 		for _, capture := range stateAcquisitionCaptures(state) {
 			if capture == nil || capture.State != topologydiag.CaptureAvailable || countedCaptures[capture] {
 				continue
@@ -120,6 +125,7 @@ func projectTopologyDiagnosticCut(input topologyDiagnosticCutInput) (*topologydi
 			NextRetry:      state.nextRetry,
 		}
 		if generation := state.generation; generation != nil {
+			row.Presentation = generation.presentation
 			row.RetainedSuccess = generation.evidenceRef
 			row.HasRetainedSuccess = true
 			row.Acquisition = generation.acquisition

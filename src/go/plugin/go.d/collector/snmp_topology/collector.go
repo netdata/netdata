@@ -211,6 +211,7 @@ type topologyRefreshDevicePlan struct {
 }
 
 type deviceRefreshState struct {
+	sysObjectID         string
 	generation          *topologyDeviceGeneration
 	latestAttempt       *topologydiag.AcquisitionCapture
 	attemptOrdinal      uint64
@@ -292,6 +293,19 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 		seen[registrationID] = true
 
 		state, exists := nextStates[registrationID]
+		previousSysObjectID, previousGeneration := state.sysObjectID, state.generation
+		if exists && dev.SysObjectID != "" && state.sysObjectID != dev.SysObjectID {
+			// The accepted job can reclassify within one registration lifetime.
+			// Its old topology and retry state belong to the previous classification.
+			state = deviceRefreshState{attemptOrdinal: state.attemptOrdinal}
+		}
+		if dev.SysObjectID != "" {
+			state.sysObjectID = dev.SysObjectID
+		}
+		state.generation = state.generation.withRegisteredPresentation(topologyDeviceInputFromConnection(dev))
+		if state.sysObjectID != previousSysObjectID || state.generation != previousGeneration {
+			nextStates[registrationID] = state
+		}
 		if !exists || state.nextRetry.IsZero() || !now.Before(state.nextRetry) {
 			plans = append(plans, topologyRefreshDevicePlan{registrationID: registrationID, device: dev})
 			if selected == nil {
@@ -623,6 +637,8 @@ func (c *Collector) refreshDeviceTopology(
 		return nil, topologydiag.RefreshOutcomeFailed, recorder.finish()
 	}
 	snapshot := c.freezeTopologyBuilder(next)
+	ownedInput := cloneTopologyDeviceInput(deviceInput)
+	snapshot.sourceInput = &ownedInput
 	attempt := recorder.finish()
 	snapshot.acquisition = attempt
 	return snapshot, topologydiag.RefreshOutcomeSuccess, attempt

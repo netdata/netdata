@@ -87,6 +87,7 @@ type (
 		tableCache                *tableCache
 		tableIdentity             *tableIdentity
 		acquisitionObserver       AcquisitionObserver
+		profileInputRevision      uint64
 
 		globalTagsCollector     *globalTagsCollector
 		deviceMetadataCollector *deviceMetadataCollector
@@ -398,7 +399,21 @@ func (c *Collector) newProfileCollection(ps *profileState, ordinal uint32) *prep
 }
 
 func (c *Collector) prepareProfileInputs(prepared *preparedProfileCollection) error {
-	return c.prepareProfileInputsWithStrictness(prepared, false)
+	state := prepared.state
+	if state.initialized {
+		return c.prepareProfileInputsWithStrictness(prepared, false)
+	}
+	staged := &profileState{
+		profile:  state.profile,
+		identity: state.identity,
+	}
+	prepared.state = staged
+	err := c.prepareProfileInputsWithStrictness(prepared, false)
+	prepared.state = state
+	if err == nil {
+		c.installProfileInputs(state, staged)
+	}
+	return err
 }
 
 func (c *Collector) prepareProfileInputsWithStrictness(prepared *preparedProfileCollection, strict bool) error {
