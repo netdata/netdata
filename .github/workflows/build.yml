@@ -66,6 +66,7 @@ jobs:
             netdata-installer.sh
             .github/data/distros.yml
             .github/workflows/build.yml
+            .github/scripts/modules/release_versions.py
             .github/scripts/build-static.sh
             .github/scripts/get-static-cache-key.sh
             .github/scripts/gen-matrix-static.py
@@ -1228,6 +1229,20 @@ jobs:
       - artifact-verification-dist
       - artifact-verification-static
     steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Select Artifact Prefixes
+        id: prefixes
+        env:
+          RELEASE_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          preview="$(python3 .github/scripts/modules/release_versions.py "${RELEASE_VERSION}")"
+          prefixes=stable
+          if [ "${preview}" = true ]; then
+            prefixes="${prefixes} preview"
+          fi
+          echo "prefixes=${prefixes}" >> "${GITHUB_OUTPUT}"
       - name: Install Rclone
         id: install-rclone
         run: |
@@ -1242,6 +1257,7 @@ jobs:
       - name: Upload Artifacts
         id: upload
         env:
+          ARTIFACT_PREFIXES: ${{ steps.prefixes.outputs.prefixes }}
           RCLONE_CONFIG_S3_TYPE: "s3"
           RCLONE_CONFIG_S3_PROVIDER: "Cloudflare"
           RCLONE_CONFIG_S3_ACCESS_KEY_ID: "${{ secrets.CLOUDFLARE_R2_ACCESS_KEY }}"
@@ -1250,8 +1266,10 @@ jobs:
           RCLONE_CONFIG_S3_REGION: "auto"
         working-directory: artifacts
         run: |
-          for dir in */ ; do
-            rclone sync --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" "${dir}" "s3:netdata-agent-artifacts/stable/${dir}" || exit 1
+          for prefix in ${ARTIFACT_PREFIXES}; do
+            for dir in */ ; do
+              rclone sync --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" "${dir}" "s3:netdata-agent-artifacts/${prefix}/${dir}" || exit 1
+            done
           done
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
@@ -1263,6 +1281,8 @@ jobs:
           SLACK_USERNAME: 'GitHub Actions'
           SLACK_MESSAGE: |-
               ${{ github.repository }}: Failed to upload stable build artifacts.
+              Checkout: ${{ steps.checkout.outcome }}
+              Select artifact prefixes: ${{ steps.prefixes.outcome }}
               Install Rclone: ${{ steps.install-rclone.outcome }}
               Fetch artifacts: ${{ steps.fetch.outcome }}
               Upload artifacts: ${{ steps.upload.outcome }}

@@ -7,6 +7,8 @@ import sys
 
 from typing import Final
 
+from modules.release_versions import stable_reaches_preview
+
 github_event: Final = sys.argv[1]
 version: Final = sys.argv[2]
 
@@ -17,10 +19,8 @@ REPOS: Final = {
     'ghcr': f'ghcr.io/{REPO}',
 }
 
-REPO: Final = 'netdata/netdata'
-QUAY_REPO: Final = f'quay.io/{REPO}'
-GHCR_REPO: Final = f'ghcr.io/{REPO}'
 NIGHTLY_TAG: Final = 'edge'
+
 
 tags = {
     k: [] for k in REPOS.keys()
@@ -40,12 +40,15 @@ match version:
     case _:
         v = f'v{version}'.split('.')
 
-        versions: Final = (
+        versions = [
             v[0],
             '.'.join(v[0:2]),
             '.'.join(v[0:3]),
             'stable',
-        )
+        ]
+
+        if stable_reaches_preview(version):
+            versions.append('preview')
 
         for h in REPOS.keys():
             tags[h] = [f'{REPOS[h]}:{t}' for t in versions]
