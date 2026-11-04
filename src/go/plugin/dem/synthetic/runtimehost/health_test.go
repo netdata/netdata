@@ -10,12 +10,22 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/stretchr/testify/require"
 )
 
 type healthLog struct {
 	mu   sync.Mutex
 	data bytes.Buffer
+}
+
+func TestMissingNativePackageHasPackageGuidanceAndSafeClose(t *testing.T) {
+	h := New(Config{Mode: "native", Unavailable: runtime.ErrUnavailable})
+	require.ErrorContains(t, h.Ready(), "netdata-dem-runtime package")
+	require.Equal(t, StateMissing, h.Status().State)
+	require.Equal(t, "native", h.Status().Mode)
+	require.Nil(t, h.Status().Storage)
+	require.NoError(t, h.Close())
 }
 
 func (l *healthLog) Write(p []byte) (int, error) {

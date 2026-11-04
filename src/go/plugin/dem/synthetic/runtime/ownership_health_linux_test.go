@@ -90,3 +90,19 @@ func TestFinishCoordinationFailureRetainsDrainedProof(t *testing.T) {
 	require.Zero(t, status.ExecutionPins)
 	require.Empty(t, status.CleanupError)
 }
+
+func TestExecutionOwnerDamageAppearsInStorageHealthWithoutReleasingPin(t *testing.T) {
+	s, _ := testStore(t)
+	manifest := importFixture(t, s, "owner-health")
+	use, err := s.beginUse(manifest)
+	require.NoError(t, err)
+	owner := filepath.Join(s.path, use.name, "owner.lock")
+	require.NoError(t, os.Chmod(owner, 0644))
+	status, err := s.Inspect()
+	require.NoError(t, err)
+	require.Equal(t, 1, status.ExecutionPins)
+	require.Equal(t, 1, status.UncertainPins)
+	require.Contains(t, status.CleanupError, "invalid runtime operation owner")
+	require.NoError(t, os.Chmod(owner, 0600))
+	require.NoError(t, use.Finish(true))
+}

@@ -265,6 +265,7 @@ plugins.d/cups.plugin
 plugins.d/debugfs.plugin
 plugins.d/ebpf.plugin
 plugins.d/freeipmi.plugin
+plugins.d/ipmi.plugin
 plugins.d/go.d.plugin
 plugins.d/snmp-trap-profile-gen
 plugins.d/ioping.plugin
@@ -304,6 +305,19 @@ if [ -d "${NETDATA_LIBEXEC_PREFIX}" ]; then
         fi
     elif [ -f "${ebpf_plugin}" ] && [ ! -e "${ebpf_go_plugin}" ]; then
         :
+    fi
+
+    ipmi_plugin="${NETDATA_LIBEXEC_PREFIX}/plugins.d/ipmi.plugin"
+    if [ -f "${ipmi_plugin}" ]; then
+        ipmi_mode="$(stat -c '%a' "${ipmi_plugin}")"
+        ipmi_owner="$(stat -c '%U:%G' "${ipmi_plugin}")"
+        case "${ipmi_mode}:${ipmi_owner}" in
+            4750:root:netdata) ;;
+            *)
+                success=0
+                echo "!!! ${ipmi_plugin} has ${ipmi_mode} ${ipmi_owner}, expected setuid root:netdata"
+                ;;
+        esac
     fi
 
     if ! check_systemd_capability_bounding_set; then

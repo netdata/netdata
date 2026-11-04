@@ -1,7 +1,8 @@
 # DEM plugin
 
-`dem.plugin` runs native Netdata jobs for browser real user monitoring, Playwright journeys and desktop Lighthouse audits. It is experimental and built explicitly with
-`ENABLE_PLUGIN_DEM=ON` (source installer: `--enable-plugin-dem`). The integration metadata beside each collector is the
+`dem.plugin` runs native Netdata jobs for browser real user monitoring, Playwright journeys and desktop Lighthouse audits.
+Linux builds include the plugin by default; the browser runtime is an additional, explicit installation.
+Use `ENABLE_PLUGIN_DEM=OFF` (source installer: `--disable-plugin-dem`) to omit the plugin. The integration metadata beside each collector is the
 source of operator configuration documentation. The [architecture guide](ARCHITECTURE.md) explains how the plugin
 is built, from the overall data flow to package ownership and runtime lifetimes.
 
@@ -35,6 +36,9 @@ string identity combining site, runtime generation and sequence. Cursors track i
 advance a quiet site's position. A replaced site's runtime starts a fresh stream. Missing Web Vitals are `null` in
 Functions and gaps in charts; an available but quiet receiver measures zero traffic. Receiver outages leave site jobs
 running with explicit ingress availability and gaps in browser product measurements.
+
+On Linux, DEM requires a valid machine ID in `/etc/machine-id` or `/var/lib/dbus/machine-id` to open its history store.
+Minimal or custom container environments must provide that OS identity before starting the plugin.
 
 Investigation history uses pure-Go journal files under `${NETDATA_LIB_DIR}/dem/journal`, through the existing
 `systemd-journal-sdk`. Events include their session and error metadata, so investigation does not depend on a separate
@@ -452,26 +456,51 @@ containers need compatible namespace/seccomp support. RUM does not require a bro
 
 ### Runtime setup and retirement
 
-Browser runtime delivery is experimental and DEM remains disabled by default at build time. The independent
-runtime owns Node, Chromium, Playwright, Lighthouse and their JavaScript adapters. This tree provides a local bundle
-builder and explicit installation from administrator-trusted metadata; production publication, native packages,
-authenticated release discovery and automatic updates are separate delivery work.
+The independent runtime owns Node, Chromium, Playwright, Lighthouse and their JavaScript adapters. Native Linux
+installations use the optional `netdata-dem-runtime` package; static, Docker and source installations use signed
+managed bundles or protected preloads. This tree includes the builder, native recipes and an independent release
+workflow. Production publication remains gated on confirmed infrastructure, source/license review and platform qualification.
 
-Install the runtime explicitly as the consuming service account. Enabling a browser monitor does not download it.
+For native installations, explicitly install `netdata-dem-runtime` with the package manager. Its hooks require a live
+systemd host and coordinate Agent stop, consumer drainage, qualification and restoration; image/chroot installation
+is not supported yet. DEM never invokes the package manager. See the [native package guide](../../../../packaging/dem-runtime/native/README.md).
+
+On hosts with AppArmor, the native package supplies a profile for its root-owned Chromium executable. This permits
+the user namespaces Chromium needs for its sandbox; it does not add browser confinement. Package setup loads the
+profile before qualification. Administrator policy remains authoritative, and a policy or qualification failure keeps
+browser admission closed while restoring eligible non-browser monitoring.
+
+**Managed/static bundles and preloads on restricted Ubuntu hosts require administrator-prepared AppArmor policy.**
+Ubuntu 24.04 restricts unprivileged user namespaces by default. DEM does not automatically grant an exception to
+service-writable runtime paths: the service account could replace executable bytes at those paths. The administrator
+must review the deployment's executable ownership, actual browser path and service policy before permitting namespace
+creation. A policy tied to one generation must be updated before a new generation can qualify. A native package's
+profile does not cover a managed cache, a preload or a container. Containers also need compatible host and container
+AppArmor/seccomp policies. Do not disable Chromium's sandbox or global host restrictions to make qualification pass.
+
+If qualification reports a Chromium sandbox error, inspect the host's kernel audit messages, for example
+`sudo journalctl -k --since '10 minutes ago'`, for AppArmor namespace denials. Correct the administrator-owned policy,
+then retry the failed installation or qualification. Successful CLI qualification must still be followed by a check
+through the actual Agent service; a terminal and a service can have different security policies.
+
+For managed installations, install the runtime explicitly as the consuming service account. Enabling a browser monitor does not download it.
 A missing installation leaves browser monitors waiting for their dependency; it does not create website failures.
 RUM does not need the browser runtime.
 
 ```sh
-dem.plugin runtime install --manifest /absolute/path/manifest.json --archive /absolute/path/runtime.tar.gz
-# Alternatively, explicitly download the URL in the trusted descriptor:
-dem.plugin runtime install --manifest /absolute/path/manifest.json --allow-download
+dem.plugin runtime install --release /absolute/path/release.json --archive /absolute/path/runtime.tar.zst
+# Alternatively, use the administrator-configured signed latest release:
+dem.plugin runtime install --allow-download
+# Disable automatic update preparation for a controlled/offline deployment:
+dem.plugin runtime install --release /absolute/path/release.json --archive /absolute/path/runtime.tar.zst --manual-updates
 dem.plugin runtime status
 dem.plugin runtime qualify
 ```
 
 Install, update and repair verify the archive, prepare its private paths, then run both a local sandboxed journey and
-Lighthouse audit before selecting the release. A descriptor must come from a trusted administrator source;
-the archive does not authenticate its own descriptor. `qualify` repeats these checks for the selected release.
+Lighthouse audit before selecting the release. Online operations fetch the package public keyring from
+`https://repository.netdata.cloud/netdatabot.gpg.key`; offline operations require `runtime.offline_keyring` to name
+an administrator-provisioned OpenPGP public keyring. `qualify` repeats these checks for the selected release.
 It tests the calling account and environment, not a different service's AppArmor, SELinux or container policy.
 
 **Restart DEM after installation, update or repair, including the first installation.** Each process keeps the runtime it
@@ -479,8 +508,21 @@ acquired at startup. A process started without a runtime stays unavailable until
 update their components without an Agent upgrade while preserving execution contract 1. Runs record the actual
 release version, archive digest and execution contract for investigation.
 
+Explicit installation enables automatic preparation by default and prints this policy before proceeding. Use
+`--manual-updates` on install or repair to disable it. The running plugin checks roughly daily with jitter, downloads
+and qualifies a newer signed release beside the working release, and reports that restart is required. It never
+restarts the Agent. Security fixes remain inactive until the administrator or deployment system restarts DEM.
+Qualification shares the browser execution slot, so monitors can wait while these local checks run. Failures preserve
+the selected release and appear as update maintenance errors, separately from website measurements.
+
+Signatures authenticate publication order and complete preparation instructions. They cannot detect withheld updates
+or guarantee freshness on a new installation. Online trust follows the canonical HTTPS key endpoint and system TLS
+trust. A key fetch/verification failure blocks that preparation attempt without stopping the installed runtime.
+No stale cached key is used as a fallback; offline keyring updates remain an administrator responsibility.
+Normal updates compare with the currently selected sequence; explicit older-release repair resets that baseline.
+
 ```sh
-dem.plugin runtime update --manifest /absolute/path/new-manifest.json --archive /absolute/path/new-runtime.tar.gz
+dem.plugin runtime update --release /absolute/path/new-release.json --archive /absolute/path/new-runtime.tar.zst
 # Stop every DEM/standalone consumer first:
 dem.plugin runtime uninstall
 ```
@@ -497,12 +539,13 @@ is damaged. Incomplete ownership or storage inspection is reported as unknown, n
 Stop all DEM and standalone consumers and let their executions drain before repairing the managed store:
 
 ```sh
-dem.plugin runtime repair --manifest /absolute/path/manifest.json --archive /absolute/path/runtime.tar.gz
-# Alternatively, use the trusted descriptor URL with --allow-download.
+dem.plugin runtime repair --release /absolute/path/release.json --archive /absolute/path/runtime.tar.zst
+# Alternatively, explicitly request configured latest with --allow-download.
 ```
 
 Repair removes damaged generations and rebuilds the requested release, including a same-release reinstall. It uses
-the same trusted descriptor, service account, store and browser qualification as install. A healthy selection of a
+the same signed descriptor, service account, store and browser qualification as install. Repair may deliberately
+select an older authenticated release; ordinary updates reject lower publication sequences. A healthy selection of a
 different release stays selected if repair fails; ordinary retention still applies to other unselected releases.
 If repair clears the selection being rebuilt, failed preparation or qualification leaves it unavailable. The old
 selection cannot be rolled back; correct the reported problem and retry repair, then restart DEM after success.
@@ -526,7 +569,17 @@ runtime:
   cache_path: ''
   max_bytes: 4294967296
   previous_retention_days: 7
+  release_url: https://artifacts.example.invalid/dem-runtime/latest/arm64.json
+  offline_keyring: /absolute/path/netdatabot.gpg.key  # required only for offline operations
 ```
+
+The release URL above is an example; use the confirmed publication URL for the host architecture. Online preparation
+uses the canonical package-key HTTPS endpoint, including when `--release` is combined with `--allow-download`.
+`--release` plus `--archive` is fully offline and uses only `offline_keyring`; this local trust is never an online fallback.
+The descriptor and archive cannot supply their own verification key. Explicit offline installation still enables future
+automatic online preparation unless `--manual-updates` is selected; protected preloads remain manual. The release URL
+and publication infrastructure must be configured before online setup succeeds. Ordinary execution and status do not
+fetch a key, and an already installed runtime can continue operating offline.
 
 The selected runtime stays installed until explicitly uninstalled, even with no browser monitors. The 4 GiB logical
 allowance includes preparation workspace and reservations. Processes and executions protect older releases. Unprotected
@@ -535,14 +588,15 @@ can shorten that grace. Protected files can prevent a new installation. This is 
 `status` reports the selected installation and storage inventory without launching a browser; it does not report the
 runtime held by another running process.
 
-The same local bundle/store format can be used in native, Docker, static and source layouts on Linux amd64/arm64.
-This does not establish production delivery or platform qualification. Persist the store in Docker to retain installation
-across container replacement. No host Node/npm/browser installation is required or discovered.
+The portable archive supplies both the native package payload and managed installations on Linux amd64/arm64.
+Native packages own their installation lifecycle; Docker, static and source installations use the managed store or a
+preload. Persist the store in Docker to retain installation across container replacement. No host Node/npm/browser
+installation is required or discovered. Host sandbox prerequisites still apply to each deployment.
 
 For an immutable image or read-only deployment, create a protected preload at its final path:
 
 ```sh
-dem.plugin runtime preload --root /opt/netdata-dem-runtime --manifest /absolute/path/manifest.json --archive /absolute/path/runtime.tar.gz
+dem.plugin runtime preload --root /opt/netdata-dem-runtime --release /absolute/path/release.json --archive /absolute/path/runtime.tar.zst
 ```
 
 ```yaml
@@ -554,8 +608,8 @@ runtime:
 The root must be new or empty. The command verifies and qualifies the complete release, then seals its identity and
 final location into the root. Keep it private and owned by the consuming service account; it may be mounted read-only.
 Preloads are outside managed retirement. Stop **every** consumer before replacement or removal, prepare replacements
-at a new final path, and restart DEM to switch. Moving a prepared root is unsupported. This preload contract does not
-implement native package transaction safety; native packaging remains separate work.
+at a new final path, and restart DEM to switch. Moving a prepared root is unsupported. Preloads use this explicit
+consumer lifecycle; package-owned native runtimes use the coordinated package hooks described above.
 
 Configure exactly one of inline `script` or absolute `script_path` in `dem/journey.conf`. Standard named imports from
 `@playwright/test` and destructured CommonJS `require` use the real pinned package. JS/TS, mjs/mts and cjs/cts entries,

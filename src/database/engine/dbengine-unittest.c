@@ -1141,7 +1141,8 @@ int test_dbengine(void) {
     nd_log_limits_unlimited();
     fprintf(stderr, "\nRunning DB-engine test\n");
 
-    default_rrd_memory_mode = RRD_DB_MODE_DBENGINE;
+    // the host is created in dbengine mode explicitly; do not change the global default, the engine is shut down
+    // below and later suites create hosts with the default mode
     fprintf(stderr, "Initializing localhost with hostname 'unittest-dbengine'");
     RRDHOST *host = dbengine_rrdhost_find_or_create("unittest-dbengine");
     if(!host)

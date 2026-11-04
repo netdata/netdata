@@ -473,6 +473,7 @@ The following components won't work:
 - disk I/O and file descriptors of applications and processes (apps.plugin)
 - debugfs.plugin
 - freeipmi.plugin
+- local hardware access for ipmi.plugin
 - perf.plugin
 - slabinfo.plugin
 - systemd-journal.plugin

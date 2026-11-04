@@ -136,12 +136,9 @@ func (t *runtimeSettlementTransaction) Apply(ctx context.Context) (applied lifec
 	var delta *candidateDelta
 	var policyErr error
 	if failure != nil {
-		retryAfter := 0
-		if failure.retry {
-			retryAfter = failure.retryAfter
-		}
+		retryAfter := failure.retryPolicy()
 		delta, policyErr = dcjc.candidates.prepareOutcome(t.scope.ID, t.current.continuation, candidateOutcome{
-			Kind: candidateFailed, RetryAfter: retryAfter, AfterReady: failure.afterReady, Listed: true,
+			Kind: candidateFailed, Retry: retryAfter, AfterReady: failure.afterReady, Listed: true,
 		}, dcjc.scheduler.retries.now())
 	} else {
 		delta, policyErr = dcjc.candidates.prepareReady(t.scope.ID, t.current.continuation)

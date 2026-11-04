@@ -17,7 +17,12 @@ if(ENABLE_PLUGIN_DEM)
         set(DEM_PLUGIN_BIN dem.plugin)
     endif()
 
+    set(_DEM_GO_LDFLAGS "${GO_LDFLAGS}")
+    if(NETDATA_PACKAGE_KIND STREQUAL "deb" OR NETDATA_PACKAGE_KIND STREQUAL "rpm")
+        string(APPEND GO_LDFLAGS " -X github.com/netdata/netdata/go/plugins/plugin/dem.DefaultRuntimeMode=native")
+    endif()
     add_go_target(dem-plugin ${DEM_PLUGIN_BIN} src/go cmd/demplugin)
+    set(GO_LDFLAGS "${_DEM_GO_LDFLAGS}")
     netdata_add_deb_copyright(plugin-dem netdata-plugin-dem)
     install(PROGRAMS ${CMAKE_BINARY_DIR}/${DEM_PLUGIN_BIN}
             COMPONENT plugin-dem DESTINATION ${PLUGINS_DEST})

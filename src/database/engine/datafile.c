@@ -575,17 +575,33 @@ static int scan_data_files(struct rrdengine_instance *ctx)
 
         journalfile = journalfile_alloc_and_init(datafile);
         netdata_log_info("DBENGINE: tier %d: loading file %d/%d (fileno=%u)...", ctx->config.tier, i + 1, matched_files, datafile->fileno);
-        ret = journalfile_load(ctx, journalfile, datafile);
-        if (0 != ret) {
-            if (!must_delete_pair) /* If datafile is still open close it */
+
+        // the journal of a datafile that cannot be loaded is not replayed: its pages would
+        // point the open cache at a datafile that is deleted and freed below
+        if (!must_delete_pair) {
+            ret = journalfile_load(ctx, journalfile, datafile);
+            if (0 != ret) {
                 close_data_file(datafile);
-            must_delete_pair = 1;
+                must_delete_pair = 1;
+            }
         }
 
         if (must_delete_pair) {
             char path[RRDENG_PATH_MAX];
 
             netdata_log_error("DBENGINE: scheduling deletion of invalid data and journal file pair.");
+
+            // a journal v2 loaded before the pair failed is indexed and charged: it must
+            // leave ctx->njfv2idx before the datafile is freed, and go with the pair
+            size_t journal_v2_size = journalfile_v2_deletion_size_get(
+                journalfile, __atomic_load_n(&datafile->rejected_v2_size, __ATOMIC_RELAXED));
+            (void)journalfile_close(journalfile, datafile);
+            ret = journalfile_v2_unlink(journalfile, journal_v2_size);
+            if (!ret) {
+                journalfile_v2_generate_path(datafile, path, sizeof(path));
+                netdata_log_info("DBENGINE: scheduled deletion of journal file \"%s\".", path);
+            }
+
             ret = journalfile_unlink(journalfile);
             if (!ret) {
                 journalfile_v1_generate_path(datafile, path, sizeof(path));

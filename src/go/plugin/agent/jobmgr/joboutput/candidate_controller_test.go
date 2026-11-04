@@ -67,7 +67,7 @@ func TestCandidateControllerFallback(t *testing.T) {
 			}
 			require.NotNil(t, work)
 			first := work.Token.Candidate
-			failure := candidateResult(t, c, work, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 10}, 0)
+			failure := candidateResult(t, c, work, candidateOutcome{Kind: candidateFailed, Listed: true, Retry: candidateRetryPolicy{cadence: 10}}, 0)
 			require.NotNil(t, failure.Decision.Work)
 			second := failure.Decision.Work
 			assert.NotEqual(t, first, second.Token.Candidate)
@@ -94,8 +94,8 @@ func TestCandidateControllerFiniteDueUnion(t *testing.T) {
 	inv := candidateTestInventory(1, false, a, b)
 	candidateInventory(t, c, inv, 0)
 	first := candidateEnable(t, c, 0).Decision.Work
-	second := candidateResult(t, c, first, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 10}, 0).Decision.Work
-	exhausted := candidateResult(t, c, second, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 60}, 1)
+	second := candidateResult(t, c, first, candidateOutcome{Kind: candidateFailed, Listed: true, Retry: candidateRetryPolicy{cadence: 10}}, 0).Decision.Work
+	exhausted := candidateResult(t, c, second, candidateOutcome{Kind: candidateFailed, Listed: true, Retry: candidateRetryPolicy{cadence: 60}}, 1)
 	require.NotNil(t, exhausted.Decision.Wake)
 	assert.Equal(t, int64(10), exhausted.Decision.Wake.Due)
 	// A retry becoming due and a new initial candidate are frozen into one pass.
@@ -114,7 +114,7 @@ func TestCandidateControllerFiniteDueUnion(t *testing.T) {
 	due := candidateResult(t, c, added.Decision.Work, candidateOutcome{Kind: candidateFailed, Listed: true}, 12)
 	require.NotNil(t, due.Decision.Work)
 	assert.Equal(t, first.Token.Candidate, due.Decision.Work.Token.Candidate)
-	next := candidateResult(t, c, due.Decision.Work, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 10}, 13)
+	next := candidateResult(t, c, due.Decision.Work, candidateOutcome{Kind: candidateFailed, Listed: true, Retry: candidateRetryPolicy{cadence: 10}}, 13)
 	require.NotNil(t, next.Decision.Work)
 	assert.Equal(t, e, next.Decision.Work.Config)
 	final := candidateResult(t, c, next.Decision.Work, candidateOutcome{Kind: candidateFailed, Listed: true}, 14)
@@ -150,7 +150,7 @@ func TestCandidateControllerRetainedAdmissions(t *testing.T) {
 	assert.Nil(t, rejected.Decision.Binding)
 	assert.True(t, c.valid("test_job", initial.Token))
 	assert.True(t, c.snapshot("test_job").Entries[oldKey].Admitted)
-	sibling := candidateResult(t, c, initial, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 10}, 3).Decision.Work
+	sibling := candidateResult(t, c, initial, candidateOutcome{Kind: candidateFailed, Listed: true, Retry: candidateRetryPolicy{cadence: 10}}, 3).Decision.Work
 	require.NotNil(t, sibling)
 	assert.NotEqual(t, oldKey, sibling.Token.Candidate)
 	candidateResult(t, c, sibling, candidateOutcome{Kind: candidateAdmitted}, 3)
@@ -193,7 +193,7 @@ func TestCandidateControllerReadinessClosure(t *testing.T) {
 				delta, err := c.prepareReady("test_job", work.Token)
 				applyCandidateDelta(t, delta, err)
 			}
-			failure := candidateResult(t, c, work, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 10, AfterReady: true}, 1)
+			failure := candidateResult(t, c, work, candidateOutcome{Kind: candidateFailed, Listed: true, Retry: candidateRetryPolicy{cadence: 10}, AfterReady: true}, 1)
 			assert.Nil(t, failure.Decision.Work)
 			assert.Nil(t, failure.Decision.Wake)
 			assert.True(t, c.snapshot("test_job").SearchClosed)
@@ -272,7 +272,7 @@ func TestCandidateControllerRevocationAndResume(t *testing.T) {
 func TestCandidateControllerMaskedCursor(t *testing.T) {
 	c := newCandidateController(1)
 	override := candidateTestConfig("override", "override").SetSourceType(confgroup.TypeDyncfg)
-	exact, err := c.prepareAdoptExact(override, false, dyncfg.StatusAccepted, true, 0, 0)
+	exact, err := c.prepareAdoptExact(override, false, dyncfg.StatusAccepted, true, candidateRetryPolicy{}, 0)
 	applyCandidateDelta(t, exact, err)
 	a := candidateTestConfig("a", "a")
 	inv := candidateTestInventory(1, true, a)
@@ -301,7 +301,7 @@ func TestCandidateControllerExactFailure(t *testing.T) {
 	c := newCandidateController(1)
 	a, b := candidateTestConfig("a", "a"), candidateTestConfig("b", "b")
 	candidateInventory(t, c, candidateTestInventory(1, false, a, b), 0)
-	delta, err := c.prepareAdoptExact(a, true, dyncfg.StatusFailed, true, 7, 1)
+	delta, err := c.prepareAdoptExact(a, true, dyncfg.StatusFailed, true, candidateRetryPolicy{cadence: 7}, 1)
 	exact := applyCandidateDelta(t, delta, err)
 	assert.Nil(t, exact.Decision.Work)
 	require.NotNil(t, exact.Decision.Wake)
@@ -332,7 +332,7 @@ func TestCandidateControllerEnableAfterExactAndRetryWait(t *testing.T) {
 	c := newCandidateController(1)
 	a, b := candidateTestConfig("a", "a"), candidateTestConfig("b", "b")
 	candidateInventory(t, c, candidateTestInventory(1, false, a, b), 0)
-	delta, err := c.prepareAdoptExact(a, true, dyncfg.StatusFailed, true, 30, 0)
+	delta, err := c.prepareAdoptExact(a, true, dyncfg.StatusFailed, true, candidateRetryPolicy{cadence: 30}, 0)
 	exact := applyCandidateDelta(t, delta, err)
 	require.NotNil(t, exact.Decision.Wake)
 	before := c.snapshot("test_job")
@@ -383,7 +383,7 @@ func TestCandidateControllerWakeProjectionAndStaleWake(t *testing.T) {
 	c := newCandidateController(1)
 	inv := candidateTestInventory(1, true, candidateTestConfig("a", "a"))
 	work := candidateInventory(t, c, inv, 0).Decision.Work
-	failed := candidateResult(t, c, work, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 10}, 0)
+	failed := candidateResult(t, c, work, candidateOutcome{Kind: candidateFailed, Listed: true, Retry: candidateRetryPolicy{cadence: 10}}, 0)
 	require.NotNil(t, failed.Decision.Wake)
 	inv.Version = 2
 	replay := candidateInventory(t, c, inv, 1)
@@ -410,7 +410,7 @@ func TestCandidateControllerGenerationOverflow(t *testing.T) {
 func TestCandidateControllerRemovedOverrideCannotReenterSourcePass(t *testing.T) {
 	c := newCandidateController(1)
 	override := candidateTestConfig("override", "override").SetSourceType(confgroup.TypeDyncfg)
-	delta, err := c.prepareAdoptExact(override, false, dyncfg.StatusAccepted, true, 0, 0)
+	delta, err := c.prepareAdoptExact(override, false, dyncfg.StatusAccepted, true, candidateRetryPolicy{}, 0)
 	applyCandidateDelta(t, delta, err)
 	a := candidateTestConfig("a", "a")
 	inv := candidateTestInventory(1, true, a)
@@ -444,7 +444,7 @@ func TestCandidateControllerRetainedGrantAfterSiblingSourceRemoved(t *testing.T)
 	}
 	proposal := candidateInventory(t, c, inv, 0).Decision.Work
 	candidateResult(t, c, proposal, candidateOutcome{Kind: candidateRejected}, 0)
-	sibling := candidateResult(t, c, first, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 1}, 0).Decision.Work
+	sibling := candidateResult(t, c, first, candidateOutcome{Kind: candidateFailed, Listed: true, Retry: candidateRetryPolicy{cadence: 1}}, 0).Decision.Work
 	candidateResult(t, c, sibling, candidateOutcome{Kind: candidateAdmitted}, 0)
 	inv.Version = 3
 	var kept []DiscoveredJobCandidate
@@ -525,7 +525,7 @@ func TestCandidateControllerFrameworkBlockPolicies(t *testing.T) {
 			if policy != candidateBlockAcceptedWait {
 				candidateResult(t, c, work, candidateOutcome{Kind: candidateAdmitted}, 0)
 			}
-			blocked := candidateResult(t, c, work, candidateOutcome{Kind: candidateFrameworkBlocked, Block: policy, Listed: true, RetryAfter: 10}, 2)
+			blocked := candidateResult(t, c, work, candidateOutcome{Kind: candidateFrameworkBlocked, Block: policy, Listed: true, Retry: candidateRetryPolicy{cadence: 10}}, 2)
 			require.NotNil(t, blocked.Decision.Binding)
 			expectedHealth := dyncfg.StatusFailed
 			if policy == candidateBlockAcceptedWait {
@@ -544,7 +544,7 @@ func TestCandidateControllerFrameworkBlockPolicies(t *testing.T) {
 			added := candidateInventory(t, c, inv, 3)
 			assert.Nil(t, added.Decision.Work)
 			// Late duplicate classification must not reset Failed or its original due.
-			duplicate := candidateResult(t, c, work, candidateOutcome{Kind: candidateFrameworkBlocked, Block: policy, Listed: true, RetryAfter: 99}, 3)
+			duplicate := candidateResult(t, c, work, candidateOutcome{Kind: candidateFrameworkBlocked, Block: policy, Listed: true, Retry: candidateRetryPolicy{cadence: 99}}, 3)
 			assert.True(t, duplicate.Decision.Ignored)
 			if policy != candidateBlockAcceptedWait {
 				before := c.snapshot("test_job")
@@ -594,7 +594,7 @@ func TestCandidateControllerFrameworkBlockAfterReadyClosesSearch(t *testing.T) {
 	a, b := candidateTestConfig("a", "a"), candidateTestConfig("b", "b")
 	work := candidateInventory(t, c, candidateTestInventory(1, true, a, b), 0).Decision.Work
 	candidateResult(t, c, work, candidateOutcome{Kind: candidateAdmitted}, 0)
-	blocked := candidateResult(t, c, work, candidateOutcome{Kind: candidateFrameworkBlocked, Block: candidateBlockFailedRetry, Listed: true, RetryAfter: 10, AfterReady: true}, 0)
+	blocked := candidateResult(t, c, work, candidateOutcome{Kind: candidateFrameworkBlocked, Block: candidateBlockFailedRetry, Listed: true, Retry: candidateRetryPolicy{cadence: 10}, AfterReady: true}, 0)
 	assert.Equal(t, dyncfg.StatusFailed, blocked.Decision.Binding.Health)
 	assert.True(t, c.snapshot("test_job").SearchClosed)
 	assert.Nil(t, blocked.Decision.Work)
@@ -636,7 +636,7 @@ func TestCandidateControllerRepeatedAdmittedPreservesPass(t *testing.T) {
 	a, b, d := candidateTestConfig("a", "a"), candidateTestConfig("b", "b"), candidateTestConfig("d", "d")
 	candidateInventory(t, c, candidateTestInventory(1, false, a, b, d), 0)
 	first := candidateEnable(t, c, 0).Decision.Work
-	second := candidateResult(t, c, first, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 30}, 0).Decision.Work
+	second := candidateResult(t, c, first, candidateOutcome{Kind: candidateFailed, Listed: true, Retry: candidateRetryPolicy{cadence: 30}}, 0).Decision.Work
 	candidateResult(t, c, second, candidateOutcome{Kind: candidateAdmitted}, 0)
 	before := c.snapshot("test_job")
 	candidateResult(t, c, second, candidateOutcome{Kind: candidateAdmitted}, 1)
@@ -656,7 +656,7 @@ func TestCandidateControllerBlockedRetrySourceRemovalRevokesWake(t *testing.T) {
 	inv := candidateTestInventory(1, true, a)
 	work := candidateInventory(t, c, inv, 0).Decision.Work
 	candidateResult(t, c, work, candidateOutcome{Kind: candidateAdmitted}, 0)
-	blocked := candidateResult(t, c, work, candidateOutcome{Kind: candidateFrameworkBlocked, Block: candidateBlockFailedRetry, Listed: true, RetryAfter: 10}, 0)
+	blocked := candidateResult(t, c, work, candidateOutcome{Kind: candidateFrameworkBlocked, Block: candidateBlockFailedRetry, Listed: true, Retry: candidateRetryPolicy{cadence: 10}}, 0)
 	require.NotNil(t, blocked.Decision.Wake)
 	inv.Version = 2
 	inv.Candidates = nil
@@ -771,11 +771,11 @@ func TestCandidateControllerDueRetryExposure(t *testing.T) {
 				configs = append(configs, candidateTestConfig("b", "b"))
 			}
 			first := candidateInventory(t, c, candidateTestInventory(1, true, configs...), 0).Decision.Work
-			failed := candidateResult(t, c, first, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 10}, 0)
+			failed := candidateResult(t, c, first, candidateOutcome{Kind: candidateFailed, Listed: true, Retry: candidateRetryPolicy{cadence: 10}}, 0)
 			if sibling {
 				require.NotNil(t, failed.Decision.Work)
 				candidateResult(t, c, failed.Decision.Work, candidateOutcome{Kind: candidateAdmitted}, 1)
-				failed = candidateResult(t, c, failed.Decision.Work, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 60}, 1)
+				failed = candidateResult(t, c, failed.Decision.Work, candidateOutcome{Kind: candidateFailed, Listed: true, Retry: candidateRetryPolicy{cadence: 60}}, 1)
 			}
 			require.NotNil(t, failed.Decision.Wake)
 			assert.Equal(t, int64(10), failed.Decision.Wake.Due)
@@ -799,7 +799,7 @@ func TestCandidateControllerDueRetryExposure(t *testing.T) {
 			applyCandidateDelta(t, duplicate, err)
 			assert.True(t, duplicate.Decision.Ignored)
 			assert.Nil(t, duplicate.Decision.Work)
-			next := candidateResult(t, c, applied.Decision.Work, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 10}, 12)
+			next := candidateResult(t, c, applied.Decision.Work, candidateOutcome{Kind: candidateFailed, Listed: true, Retry: candidateRetryPolicy{cadence: 10}}, 12)
 			require.NotNil(t, next.Decision.Wake)
 			assert.Equal(t, int64(22), next.Decision.Wake.Due)
 			assert.Nil(t, next.Decision.Work)
@@ -911,7 +911,7 @@ func TestCandidateControllerRevocationEffectsMatchWakeState(t *testing.T) {
 			return c.prepareExact(candidateTestConfig("override", "exact").SetSourceType(confgroup.TypeDyncfg), false, 1)
 		},
 		"exact disabled adoption": func(t *testing.T, c *candidateController, _ DiscoveredJobInventory) (*candidateDelta, error) {
-			return c.prepareAdoptExact(candidateTestConfig("override", "exact").SetSourceType(confgroup.TypeDyncfg), false, dyncfg.StatusDisabled, true, 0, 1)
+			return c.prepareAdoptExact(candidateTestConfig("override", "exact").SetSourceType(confgroup.TypeDyncfg), false, dyncfg.StatusDisabled, true, candidateRetryPolicy{}, 1)
 		},
 		"passive source replacement": func(t *testing.T, c *candidateController, inv DiscoveredJobInventory) (*candidateDelta, error) {
 			inv.Version++
@@ -926,7 +926,7 @@ func TestCandidateControllerRevocationEffectsMatchWakeState(t *testing.T) {
 			c := newCandidateController(1)
 			inv := candidateTestInventory(1, true, candidateTestConfig("a", "a"))
 			work := candidateInventory(t, c, inv, 0).Decision.Work
-			failed := candidateResult(t, c, work, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 10}, 0)
+			failed := candidateResult(t, c, work, candidateOutcome{Kind: candidateFailed, Listed: true, Retry: candidateRetryPolicy{cadence: 10}}, 0)
 			require.NotNil(t, failed.Decision.Wake)
 			delta, err := action(t, c, inv)
 			require.NoError(t, err)
@@ -997,7 +997,7 @@ func TestCandidateControllerPreparedOutcomeIsolation(t *testing.T) {
 	candidateInventory(t, c, candidateTestInventory(1, false, a, b), 0)
 	work := candidateEnable(t, c, 0).Decision.Work
 	before := c.snapshot("test_job")
-	abandoned, err := c.prepareOutcome("test_job", work.Token, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 10}, 1)
+	abandoned, err := c.prepareOutcome("test_job", work.Token, candidateOutcome{Kind: candidateFailed, Listed: true, Retry: candidateRetryPolicy{cadence: 10}}, 1)
 	require.NoError(t, err)
 	require.NotNil(t, abandoned.Decision.Work)
 	assert.Equal(t, before, c.snapshot("test_job"), "preparation and abandonment cannot mutate committed ledger/header")
@@ -1188,7 +1188,7 @@ func TestCandidateControllerAdmittedInvalidRequiresManualRecovery(t *testing.T) 
 			var inv DiscoveredJobInventory
 			if exact {
 				config.SetSourceType(confgroup.TypeDyncfg)
-				delta, err := c.prepareAdoptExact(config, true, dyncfg.StatusAccepted, true, 0, 0)
+				delta, err := c.prepareAdoptExact(config, true, dyncfg.StatusAccepted, true, candidateRetryPolicy{}, 0)
 				work = applyCandidateDelta(t, delta, err).Decision.Work
 			} else {
 				sibling := candidateTestConfig("sibling", "sibling")
@@ -1199,7 +1199,7 @@ func TestCandidateControllerAdmittedInvalidRequiresManualRecovery(t *testing.T) 
 				config = work.Config
 			}
 			require.NotNil(t, work)
-			failed := candidateResult(t, c, work, candidateOutcome{Kind: candidateAdmittedInvalid, RetryAfter: 10}, 1)
+			failed := candidateResult(t, c, work, candidateOutcome{Kind: candidateAdmittedInvalid, Retry: candidateRetryPolicy{cadence: 10}}, 1)
 			require.NotNil(t, failed.Decision.Binding)
 			assert.Equal(t, config, failed.Decision.Binding.Config)
 			assert.Equal(t, dyncfg.StatusFailed, failed.Decision.Binding.Health)
@@ -1302,7 +1302,7 @@ func TestCandidateControllerReadinessRevokesHistoricalRetainedGrants(t *testing.
 	}
 	proposal := candidateInventory(t, c, inv, 1).Decision.Work
 	candidateResult(t, c, proposal, candidateOutcome{Kind: candidateRejected}, 1)
-	sibling := candidateResult(t, c, first, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 10}, 1).Decision.Work
+	sibling := candidateResult(t, c, first, candidateOutcome{Kind: candidateFailed, Listed: true, Retry: candidateRetryPolicy{cadence: 10}}, 1).Decision.Work
 	require.NotNil(t, sibling)
 	candidateResult(t, c, sibling, candidateOutcome{Kind: candidateAdmitted}, 1)
 	assert.True(t, candidateAuthorized(c.snapshot("test_job"), first.Token.Candidate))
@@ -1357,10 +1357,10 @@ func candidateHistoricalGrant(t *testing.T, discovered bool) (*candidateControll
 	inv.Candidates[0].Incarnation = 7
 	proposal := candidateInventory(t, c, inv, 1).Decision.Work
 	candidateResult(t, c, proposal, candidateOutcome{Kind: candidateRejected}, 1)
-	sibling := candidateResult(t, c, first, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 10}, 2).Decision.Work
+	sibling := candidateResult(t, c, first, candidateOutcome{Kind: candidateFailed, Listed: true, Retry: candidateRetryPolicy{cadence: 10}}, 2).Decision.Work
 	require.NotNil(t, sibling)
 	candidateResult(t, c, sibling, candidateOutcome{Kind: candidateAdmitted}, 2)
-	candidateResult(t, c, sibling, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 100}, 3)
+	candidateResult(t, c, sibling, candidateOutcome{Kind: candidateFailed, Listed: true, Retry: candidateRetryPolicy{cadence: 100}}, 3)
 	return c, inv, first, sibling
 }
 
@@ -1498,7 +1498,7 @@ func TestCandidateControllerSelectedTrustOptOutRevokesSamePipelineHistory(t *tes
 	inv.Candidates[0].Incarnation = 7
 	proposal := candidateInventory(t, c, inv, 1).Decision.Work
 	candidateResult(t, c, proposal, candidateOutcome{Kind: candidateRejected}, 1)
-	selected := candidateResult(t, c, first, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 10}, 2).Decision.Work
+	selected := candidateResult(t, c, first, candidateOutcome{Kind: candidateFailed, Listed: true, Retry: candidateRetryPolicy{cadence: 10}}, 2).Decision.Work
 	candidateResult(t, c, selected, candidateOutcome{Kind: candidateAdmitted}, 2)
 	assert.True(t, candidateAuthorized(c.snapshot("test_job"), first.Token.Candidate))
 	inv.Version = 3
@@ -1549,7 +1549,7 @@ func TestCandidateControllerSameObservationReplacementChangesOwningTier(t *testi
 	stock := candidateTestConfig("stock", "stock").SetSourceType(confgroup.TypeStock)
 	inv := candidateTestInventory(1, true, user, stock)
 	first := candidateInventory(t, c, inv, 0).Decision.Work
-	exhausted := candidateResult(t, c, first, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 10}, 0)
+	exhausted := candidateResult(t, c, first, candidateOutcome{Kind: candidateFailed, Listed: true, Retry: candidateRetryPolicy{cadence: 10}}, 0)
 	require.NotNil(t, exhausted.Decision.Wake)
 	replacement := candidateTestConfig("source", "new").SetSourceType(confgroup.TypeDiscovered)
 	inv.Version = 2
@@ -1558,7 +1558,7 @@ func TestCandidateControllerSameObservationReplacementChangesOwningTier(t *testi
 	proposal := candidateInventory(t, c, inv, 1).Decision.Work
 	require.NotNil(t, proposal)
 	assert.True(t, proposal.Tentative)
-	failed := candidateResult(t, c, proposal, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 20}, 1)
+	failed := candidateResult(t, c, proposal, candidateOutcome{Kind: candidateFailed, Listed: true, Retry: candidateRetryPolicy{cadence: 20}}, 1)
 	assert.False(t, candidateAuthorized(c.snapshot("test_job"), first.Token.Candidate), "same-observation replacement revokes the prior higher-tier retained grant")
 	assert.Nil(t, failed.Decision.Work, "lower stock must remain masked by discovered ownership")
 	require.NotNil(t, failed.Decision.Wake)
@@ -1578,7 +1578,7 @@ func TestCandidateControllerHistoryOnlySelection(t *testing.T) {
 			first := candidateInventory(t, c, inv, 0).Decision.Work
 			candidateResult(t, c, first, candidateOutcome{Kind: candidateAdmitted}, 0)
 			if state == "retry" {
-				candidateResult(t, c, first, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 10}, 0)
+				candidateResult(t, c, first, candidateOutcome{Kind: candidateFailed, Listed: true, Retry: candidateRetryPolicy{cadence: 10}}, 0)
 			}
 			if state == "running" {
 				delta, err := c.prepareReady("test_job", first.Token)
@@ -1644,7 +1644,7 @@ func TestCandidateControllerHistoryOnlySelection(t *testing.T) {
 func TestCandidateControllerMaskedHistoryOnlySelection(t *testing.T) {
 	c := newCandidateController(1)
 	override := candidateTestConfig("override", "override").SetSourceType(confgroup.TypeDyncfg)
-	delta, err := c.prepareAdoptExact(override, false, dyncfg.StatusAccepted, true, 0, 0)
+	delta, err := c.prepareAdoptExact(override, false, dyncfg.StatusAccepted, true, candidateRetryPolicy{}, 0)
 	applyCandidateDelta(t, delta, err)
 	inv := candidateTestInventory(1, true, candidateTestConfig("source", "masked"))
 	candidateInventory(t, c, inv, 0)

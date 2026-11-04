@@ -89,6 +89,7 @@ All capabilities are set automatically during Netdata installation using the [of
 | [maxscale](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/maxscale)                     |           MaxScale            |
 | [megacli](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/megacli)                       |     MegaCli Hardware Raid     |
 | [memcached](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/memcached)                   |           Memcached           |
+| [meraki](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/meraki) | Cisco Meraki |
 | [mongoDB](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/mongodb)                       |            MongoDB            |
 | [monit](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/monit)                           |             Monit             |
 | [mysql](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/mysql)                           |             MySQL             |

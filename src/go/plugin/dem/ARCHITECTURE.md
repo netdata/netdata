@@ -27,8 +27,8 @@ relative to `src/go/`.
 
 ## Short version
 
-- `dem.plugin` measures how websites behave for the people using them. It is experimental and built only with
-  `ENABLE_PLUGIN_DEM=ON`.
+- `dem.plugin` measures how websites behave for the people using them. It remains experimental and is included
+  in default Linux builds; `ENABLE_PLUGIN_DEM=OFF` disables it. Browser runtime installation is separate and explicit.
 - It has two independent pipelines in one process:
   - **RUM** (real user monitoring): visitors' browsers *push* reports to a built-in HTTP receiver.
   - **Synthetics**: the plugin *pulls* by running scripted browsers on a schedule (Playwright journeys and Lighthouse
@@ -1003,8 +1003,9 @@ Protected preloads and shutdown:
   Readers use the sealed metadata without a separate installed manifest.
 - Preloads remain private, service-account-owned and outside managed retirement. They can be mounted read-only;
   managed operations refuse their roots. Stop every consumer before replacement/removal and restart DEM to switch.
-- This immutable-preload contract does not implement native package transaction coordination; production delivery
-  remains a separate stage.
+- Native package payloads have a separate root-owned admission gate and service-owned process/execution proof.
+  Package hooks close admission and require drainage before replacing files, then qualify both browser workloads
+  before reopening it. The package manager owns those payloads; DEM does not retire or replace them.
 - Independent component paths are unsupported.
 - Command shutdown closes the host and store only after jobs and contained configuration work have joined. Fail-stop
   paths retain the existing execution evidence.

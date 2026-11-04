@@ -7,13 +7,15 @@ description: Build, test, review or troubleshoot Netdata static makeself install
 
 The static build produces a self-extracting installer (`netdata-<arch>-latest.gz.run`) for a compatible Linux system
 matching the selected architecture, including supported 32-bit ARM targets. It installs under `/opt/netdata` without
-requiring a native build toolchain on the target.
+requiring a native build toolchain on the target. Native DEB/RPM dependency and account-creation changes use
+`.agents/skills/packaging-native-packages/SKILL.md`.
 
 | Task | Read |
 |---|---|
 | Build an artifact | Pre-flight, orchestration, output and cache sections; cross-architecture/debug sections when applicable |
 | Review or explain packaging | Affected source owners and matching sections; assess existing build evidence without executing operational examples |
 | Diagnose a build failure | Common failures plus the failing job and its current dependencies |
+| Change static artifact checks or add a shipped executable | `./SKILL.md#artifact-validation-ownership` |
 | Inspect or extract an archive | Output artifacts and extraction guidance; extraction writes files and requires root |
 | Deploy to a target | Deployment section, matching architecture and the actual installation/update policy requested |
 
@@ -75,8 +77,8 @@ The container then runs `packaging/makeself/run-all-jobs.sh`, which executes `pa
 | 70 | `netdata-git.install` | Builds Netdata itself (Rust crates + C/CMake + Go plugins) and installs into `/opt/netdata` |
 | 71 | `install-type` | Stamps `.install-type` so the post-installer knows it's a static install |
 | 72 | `conf-fixup` | Strips machine-specific configuration and sample files |
-| 80 | `netdata-static-check` | Verifies key binaries are statically linked |
-| 81 | `netdata-runtime-check` | Boots `/opt/netdata/bin/netdata`, waits for `localhost:19999`, checks `/api/v1/info` |
+| 80 | `netdata-static-check` | Checks installed regular executable ELF files for a dynamic interpreter |
+| 81 | `netdata-runtime-check` | Boots `/opt/netdata/bin/netdata`; shared checks verify required executables/privileges, wait for `localhost:19999` and check `/api/v1/info` |
 | 82 | `cpu-arch-check` | Checks ELF class/machine for Netdata and go.d; does not prove the instruction-set baseline |
 | 89 | `buildinfo.install` | Writes `/opt/netdata/share/netdata/buildinfo.txt` |
 | 90 | `prepare-archive-source` | Copies post-installer scripts into the install tree |
@@ -86,6 +88,24 @@ The container then runs `packaging/makeself/run-all-jobs.sh`, which executes `pa
 | 99 | `copy-archives` | Renames the archive to `netdata-<arch>-<version>.gz.run` and copies aliases |
 
 Source files: `packaging/makeself/build-static.sh`, `packaging/makeself/build.sh`, `packaging/makeself/run-all-jobs.sh`, `packaging/makeself/functions.sh`, `packaging/makeself/jobs/`.
+
+## Artifact Validation Ownership
+
+- **Linkage:** `packaging/makeself/jobs/80-netdata-static-check.sh` scans the installed tree for regular files with
+  any execute bit, selects ELF files by magic bytes and rejects `INTERP` in `readelf -l` output. It fails on inspection
+  errors, skips scripts/non-executable data and inspects real files rather than duplicate symlink paths. This check
+  MUST cover newly installed executables without another binary allowlist or CMake-cache feature parser.
+- **Required files:** `packaging/runtime-check.sh` owns `NETDATA_LIBEXEC_PARTS`, executable-presence failures and
+  selected privilege checks. `packaging/makeself/jobs/81-netdata-runtime-check.sh` supplies the install prefix and
+  architecture-specific `NETDATA_SKIP_LIBEXEC_PARTS`. New required plugins MUST be checked against these owners;
+  presence checks MUST NOT be duplicated in job80.
+- **Feature opt-outs:** a source installer flag does not prove the official static pipeline permits that binary to
+  be absent. Trace the actual build flags and runtime skip policy before changing validation. A linkage scan can
+  pass with a missing plugin while the following runtime job correctly fails.
+- **Validation:** use `packaging/installer/tests/test_ipmi_delivery.py` as the existing regression owner for whole-tree
+  scanning and required-IPMI checks. Scanner changes SHOULD exercise real static and dynamic ELF executables in
+  Linux, including an extra path outside familiar plugin names, whitespace, non-ELF executables and readelf failures.
+  Stubbed tool output checks control flow; it does not establish ELF compatibility or validate a complete artifact.
 
 ## Pre-flight (DO NOT SKIP)
 
@@ -222,8 +242,17 @@ slower runtime useful for valgrind/gdb. The `README.md` in `packaging/makeself/`
 | `No cached copy of build directory for X found, fetching sources instead.` (every run) | any third-party | `artifacts/cache/` removed or arch dir missing | Normal on first build; persists for the next run |
 | `Could not find a usable OCI runtime` | n/a | Neither docker nor podman in `$PATH` | Install one |
 | Runtime check times out waiting for localhost:19999 | 81 | Agent did not become reachable within the bounded wait; cause is not yet established | Inspect the job log and `netdata.log`, then diagnose startup |
-| `not statically linked` warning | 80 (static check) | A new dep introduced a dynamic link | Audit `ldd` of the built binary; `git grep target_link_libraries -- '*.cmake' '*CMakeLists.txt'` for a new shared lib -- links live in the root file, the modules, and the subdirectory CMakeLists (libnetdata, debugfs's vendored libsensors) |
+| `Ooops. <path> is not a statically linked binary!` | 80 (static check) | An installed executable ELF has a `PT_INTERP` header (dynamically linked) | See "Dynamic binary in job 80" below |
 | OOM kill mid-Rust compile under QEMU | 70 | QEMU + Rust LTO is memory-hungry | Use a suitably provisioned native builder or investigate actual job parallelism; the launcher exposes no `PROCESSORS` knob |
+
+### Dynamic binary in job 80
+
+- **Likely cause:** CMake targets get `-static` from `CMAKE_EXE_LINKER_FLAGS`. A binary linked by a custom command,
+  such as `go build` with `CGO_ENABLED=1`, does not.
+- **Find it:** read the `ldd` output the job prints, then the command that linked that binary.
+- **cgo fix:** under `STATIC_BUILD`, add `-linkmode=external -extldflags=-static` to `-ldflags` and every
+  dependency's static link flags to `CGO_LDFLAGS`. Example: `packaging/cmake/Modules/NetdataPluginEBPF.cmake` uses
+  libelf's `pkg-config --static` flags plus `-lbpf` and `-lz`.
 
 The build script exits with `Build failed.` on any job failure (`packaging/makeself/build.sh:44-52`). For an
 interactive TTY launch, `DEBUG_BUILD_INFRA=1` is forwarded and opens a `bash` shell on failure; the non-TTY
@@ -291,6 +320,10 @@ bypass the archive's root requirement. `--target` here controls extraction, not 
 EXTRACT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/netdata-extract.XXXXXX")" || exit $?
 sudo sh artifacts/netdata-x86_64-latest.gz.run --target "$EXTRACT_DIR" --noexec --keep
 ```
+
+For authorized unattended extraction, add `--accept` to accept the embedded license. `--noexec` alone does not
+suppress the license prompt: `packaging/makeself/makeself-header.sh::MS_PrintLicense` handles it independently.
+Without an answer, an invocation with closed stdin can repeatedly prompt instead of extracting.
 
 Keep the extracted files for inspection; do not reuse an existing destination or remove unrelated files.
 

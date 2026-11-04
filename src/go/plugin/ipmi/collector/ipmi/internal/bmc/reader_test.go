@@ -33,7 +33,8 @@ func TestReader_CheckAndCollect(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, &Snapshot{
 		Sensors:     []Sensor{wantCPUTemp(StateNominal, new(25.0)), wantCPUPresence(StateNominal)},
-		SELEntries:  new(fakeSELEntries),
+		SELEntries:  new(0),
+		SEL:         emptySEL(),
 		CollectedAt: testNow,
 	}, got)
 	assert.Equal(t, 2, fake.connects, "Collect reopens the device")
@@ -122,7 +123,8 @@ func TestReader_Collect_PartialFailureAndRecovery(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, &Snapshot{
 		Sensors:     []Sensor{wantCPUTemp(StateNominal, new(25.0)), wantCPUPresence(StateNominal)},
-		SELEntries:  new(fakeSELEntries),
+		SELEntries:  new(0),
+		SEL:         emptySEL(),
 		CollectedAt: testNow,
 	}, got)
 }

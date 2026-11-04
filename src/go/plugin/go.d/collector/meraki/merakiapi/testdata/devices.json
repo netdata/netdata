@@ -1,0 +1,3 @@
+[
+  {"serial":"Q234-ABCD-5678","networkId":"N_EXAMPLE","name":"Example switch","model":"MS120-8","productType":"switch","firmware":"switch-17-1","mac":"00:11:22:33:44:55","tags":["test"],"address":"SYNTHETIC_IGNORED_ADDRESS","notes":"SYNTHETIC_IGNORED_NOTES"}
+]

@@ -13,58 +13,54 @@
 #include "collectors/proc.plugin/plugin_proc.h"
 #endif
 
-static bool cmd_arg_sanitization_test(const char *expected, const char *src, char *dst, size_t dst_size) {
-    bool ok = sanitize_command_argument_string(dst, src, dst_size);
+// sanitize_command_argument_string() needs strlen(result) + 1 bytes; with less it returns false
+// and leaves dst undefined, so dst is compared only after a successful call
+static bool cmd_arg_sanitization_test(const char *src, const char *expected) {
+    char dst[1024];
+    size_t needed = strlen(expected) + 1;
 
-    if (!expected)
-        return ok == false;
+    for (size_t dst_size = 0; dst_size <= needed + 1; dst_size++) {
+        // no zero bytes left over from a previous call, so an unterminated dst cannot pass by accident
+        memset(dst, 'Z', sizeof(dst));
 
-    return strcmp(expected, dst) == 0;
+        bool ok = sanitize_command_argument_string(dst, src, dst_size);
+        bool want_ok = dst_size >= needed;
+
+        if (ok != want_ok) {
+            fprintf(stderr, "src >>>%s<<<, dst_size %zu: returned %s, expected %s\n",
+                    src, dst_size, ok ? "true" : "false", want_ok ? "true" : "false");
+            return false;
+        }
+
+        if (ok && strcmp(expected, dst) != 0) {
+            // bounded: a broken function may return true without terminating dst
+            fprintf(stderr, "src >>>%s<<<, dst_size %zu: expected >>>%s<<<, got >>>%.*s<<<\n",
+                    src, dst_size, expected, (int)dst_size, dst);
+            return false;
+        }
+    }
+
+    return true;
 }
 
-bool command_argument_sanitization_tests() {
-    char dst[1024];
+int command_argument_sanitization_tests(void) {
+    static const struct {
+        const char *src;
+        const char *expected;
+    } tests[] = {
+        { "'",           "'\\''" },
+        { "''",          "'\\'''\\''" },
+        { "'a",          "'\\''a" },
+        { "a'",          "a'\\''" },
+        { "--foo'a'''b", "foo'\\''a'\\'''\\'''\\''b" },
+    };
 
-    for (size_t i = 0; i != 5; i++)  {
-        const char *expected = i == 4 ? "'\\''" : NULL;
-        if (cmd_arg_sanitization_test(expected, "'", dst, i) == false) {
-            fprintf(stderr, "expected: >>>%s<<<, got: >>>%s<<<\n", expected, dst);
+    for (size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
+        if (!cmd_arg_sanitization_test(tests[i].src, tests[i].expected))
             return 1;
-        }
     }
 
-    for (size_t i = 0; i != 9; i++)  {
-        const char *expected = i == 8 ? "'\\'''\\''" : NULL;
-        if (cmd_arg_sanitization_test(expected, "''", dst, i) == false) {
-            fprintf(stderr, "expected: >>>%s<<<, got: >>>%s<<<\n", expected, dst);
-            return 1;
-        }
-    }
-
-    for (size_t i = 0; i != 7; i++)  {
-        const char *expected = i == 6 ? "'\\''a" : NULL;
-        if (cmd_arg_sanitization_test(expected, "'a", dst, i) == false) {
-            fprintf(stderr, "expected: >>>%s<<<, got: >>>%s<<<\n", expected, dst);
-            return 1;
-        }
-    }
-
-    for (size_t i = 0; i != 7; i++)  {
-        const char *expected = i == 6 ? "a'\\''" : NULL;
-        if (cmd_arg_sanitization_test(expected, "a'", dst, i) == false) {
-            fprintf(stderr, "expected: >>>%s<<<, got: >>>%s<<<\n", expected, dst);
-            return 1;
-        }
-    }
-
-    for (size_t i = 0; i != 22; i++)  {
-        const char *expected = i == 21 ? "foo'\\''a'\\'''\\'''\\''b" : NULL;
-        if (cmd_arg_sanitization_test(expected, "--foo'a'''b", dst, i) == false) {
-            fprintf(stderr, "expected: >>>%s<<<, got: >>>%s<<<\n length: %zu\n", expected, dst, strlen(dst));
-            return 1;
-        }
-    }
-
+    fprintf(stderr, "command argument sanitization tests passed\n");
     return 0;
 }
 

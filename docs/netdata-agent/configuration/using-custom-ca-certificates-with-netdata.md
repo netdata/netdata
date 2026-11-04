@@ -128,3 +128,15 @@ CAfile = C:\path\to\custom-ca.pem
 
 Certificates previously installed only in Netdata's bundled MSYS2 CA directory are no longer used. Import
 those certificates into the appropriate Windows Trusted Root store when upgrading.
+
+Keep in mind:
+
+- `go.d.plugin` uses the Windows certificate store unless the collector job sets `tls_ca`. If a job sets
+  `tls_ca`, the file it names must contain the custom CA; otherwise remove `tls_ca` so the collector uses the
+  Windows store.
+- `ssl skip certificate verification = yes` in the `[stream]` section of `stream.conf` disables certificate
+  verification on the child-to-parent sender, including unknown issuing CAs. To trust a private CA, use `CAfile`
+  or `CApath` in the same section instead.
+- `INSECURE=1` is a Windows installer property for the Netdata Cloud connection - claiming and ACLK - not a
+  `stream.conf` option. It relaxes certificate checks for Cloud only, not for streaming or the collectors, and is
+  not a substitute for installing the certificate.

@@ -94,6 +94,8 @@ void ws_client_reset(ws_client *client)
 
     freez(client->hs.http_reply_msg);
     client->hs.http_reply_msg = NULL;
+    client->hs.http_code = 0;
+    client->hs.http_11 = false;
 
     rbuf_flush(client->buf_read);
     rbuf_flush(client->buf_write);
@@ -219,13 +221,6 @@ exit_with_error:
     return rc;
 }
 
-#define BUF_READ_MEMCMP_CONST(const, err)                                                                              \
-    if (rbuf_memcmp_n(client->buf_read, const, strlen(const))) {                                                       \
-        nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: %s", err);                                                                \
-        rbuf_flush(client->buf_read);                                                                                  \
-        return WS_CLIENT_PROTOCOL_ERROR;                                                                               \
-    }
-
 #define BUF_READ_CHECK_AT_LEAST(x)                                                                                     \
     if (rbuf_bytes_available(client->buf_read) < x)                                                                    \
         return WS_CLIENT_NEED_MORE_BYTES;
@@ -233,8 +228,9 @@ exit_with_error:
 #define MAX_HTTP_LINE_LENGTH (1024 * 4)
 #define HTTP_SC_LENGTH 4 // "XXX " http status code as C string
 #define WS_CLIENT_HTTP_HDR "HTTP/1.1 "
+#define WS_CLIENT_HTTP_HDR_10 "HTTP/1.0 " // same length as WS_CLIENT_HTTP_HDR
 #define WS_CONN_ACCEPT "sec-websocket-accept"
-#define HTTP_HDR_SEPARATOR ": "
+#define HTTP_HDR_SEPARATOR ":"
 #define WS_NONCE_STRLEN_B64 28
 #define WS_HTTP_NEWLINE "\r\n"
 #define HTTP_HEADER_NAME_MAX_LEN 256
@@ -251,6 +247,72 @@ exit_with_error:
         return WS_CLIENT_PROTOCOL_ERROR;                                                                               \
     }
 
+// Copies a peer-supplied string for logging: at most dst_size - 1 bytes, anything but printable ASCII replaced by '?'.
+// Non-ASCII is masked too, so C1 controls (raw or UTF-8 encoded) never reach the log and truncation cannot split a
+// UTF-8 sequence.
+static const char *ws_client_log_safe(char *dst, size_t dst_size, const char *src)
+{
+    size_t i = 0;
+    for (; src && i < dst_size - 1 && src[i]; i++) {
+        unsigned char c = (unsigned char)src[i];
+        dst[i] = (c < 0x20 || c > 0x7e) ? '?' : (char)c;
+    }
+    dst[i] = '\0';
+    return dst;
+}
+
+#define WS_LOG_VALUE_MAX 128
+
+// Decides a fully parsed upgrade reply: 0 when it completes the handshake, otherwise -1 with the
+// reason in err. The status is checked first: an ingress or proxy that does not upgrade answers
+// with its own status and usually no accept header, and that status is what explains the failure.
+int ws_client_check_handshake_reply(const ws_client *client, char *err, size_t err_size)
+{
+    char v1[WS_LOG_VALUE_MAX], v2[WS_LOG_VALUE_MAX];
+
+    if (client->hs.http_code != 101) {
+        const char *server = NULL;
+        for (const struct http_header *h = client->hs.headers; h && !server; h = h->next)
+            if (!strcmp(h->key, "server"))
+                server = h->value;
+
+        snprintfz(err, err_size, "HTTP return code not 101. Received %d with msg \"%s\"%s%s%s.",
+                  client->hs.http_code,
+                  ws_client_log_safe(v1, sizeof(v1), client->hs.http_reply_msg),
+                  server ? " (server: \"" : "",
+                  server ? ws_client_log_safe(v2, sizeof(v2), server) : "",
+                  server ? "\")" : "");
+        return -1;
+    }
+
+    // an upgrade exists only in HTTP/1.1
+    if (!client->hs.http_11) {
+        snprintfz(err, err_size, "Received HTTP/1.0 101 reply; a WebSocket upgrade requires HTTP/1.1");
+        return -1;
+    }
+
+    // every accept header must match; a reply without one is not an upgrade
+    bool accepted = false;
+    for (const struct http_header *h = client->hs.headers; h; h = h->next) {
+        if (strcmp(h->key, WS_CONN_ACCEPT))
+            continue;
+
+        if (strcmp(client->hs.nonce_reply, h->value)) {
+            snprintfz(err, err_size, "Received NONCE \"%s\" does not match expected nonce of \"%s\"",
+                      ws_client_log_safe(v1, sizeof(v1), h->value), client->hs.nonce_reply);
+            return -1;
+        }
+        accepted = true;
+    }
+
+    if (!accepted) {
+        snprintfz(err, err_size, "Missing " WS_CONN_ACCEPT " header");
+        return -1;
+    }
+
+    return 0;
+}
+
 int ws_client_parse_handshake_resp(ws_client *client)
 {
     char buf[HTTP_SC_LENGTH];
@@ -260,8 +322,17 @@ int ws_client_parse_handshake_resp(ws_client *client)
 
     switch (client->hs.hdr_state) {
         case WS_HDR_HTTP:
+            // a proxy may answer an HTTP/1.1 request with an HTTP/1.0 error; parse it so its status is reported
             BUF_READ_CHECK_AT_LEAST(strlen(WS_CLIENT_HTTP_HDR))
-            BUF_READ_MEMCMP_CONST(WS_CLIENT_HTTP_HDR, "Expected \"HTTP1.1\" header");
+            if (!rbuf_memcmp_n(client->buf_read, WS_CLIENT_HTTP_HDR, strlen(WS_CLIENT_HTTP_HDR)))
+                client->hs.http_11 = true;
+            else if (!rbuf_memcmp_n(client->buf_read, WS_CLIENT_HTTP_HDR_10, strlen(WS_CLIENT_HTTP_HDR_10)))
+                client->hs.http_11 = false;
+            else {
+                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Expected \"HTTP/1.1\" or \"HTTP/1.0\" status line");
+                rbuf_flush(client->buf_read);
+                return WS_CLIENT_PROTOCOL_ERROR;
+            }
             rbuf_bump_tail(client->buf_read, strlen(WS_CLIENT_HTTP_HDR));
             client->hs.hdr_state = WS_HDR_RC;
             break;
@@ -313,13 +384,12 @@ int ws_client_parse_handshake_resp(ws_client *client)
                 return 0;
             }
 
+            // field-name ":" OWS field-value OWS (RFC 9112 5): the value may be empty and the
+            // whitespace around it is optional, so a proxy's "Server:" line does not fail the
+            // handshake before its status is reported
             ptr = rbuf_find_bytes(client->buf_read, HTTP_HDR_SEPARATOR, strlen(HTTP_HDR_SEPARATOR), &idx_sep);
             if (!ptr || idx_sep > idx_crlf) {
-                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Expected HTTP hdr field key/value separator \": \" before endline in non empty HTTP header line");
-                return WS_CLIENT_PROTOCOL_ERROR;
-            }
-            if (idx_crlf == idx_sep + strlen(HTTP_HDR_SEPARATOR)) {
-                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: HTTP Header value cannot be empty");
+                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Expected HTTP hdr field key/value separator \":\" before endline in non empty HTTP header line");
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
 
@@ -328,15 +398,26 @@ int ws_client_parse_handshake_resp(ws_client *client)
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
 
-            struct http_header *hdr = callocz(1, sizeof(struct http_header) + idx_crlf); //idx_crlf includes ": " that will be used as 2 \0 bytes
+            size_t value_len = idx_crlf - idx_sep - strlen(HTTP_HDR_SEPARATOR);
+
+            // key, its \0, value, its \0
+            struct http_header *hdr = callocz(1, sizeof(struct http_header) + idx_sep + 1 + value_len + 1);
             hdr->key = ((char*)hdr) + sizeof(struct http_header);
             hdr->value = hdr->key + idx_sep + 1;
 
             rbuf_pop(client->buf_read, hdr->key, idx_sep);
             rbuf_bump_tail(client->buf_read, strlen(HTTP_HDR_SEPARATOR));
 
-            rbuf_pop(client->buf_read, hdr->value, idx_crlf - idx_sep - strlen(HTTP_HDR_SEPARATOR));
+            rbuf_pop(client->buf_read, hdr->value, value_len);
             rbuf_bump_tail(client->buf_read, strlen(WS_HTTP_NEWLINE));
+
+            size_t ows = 0;
+            while (ows < value_len && (hdr->value[ows] == ' ' || hdr->value[ows] == '\t'))
+                ows++;
+            while (value_len > ows && (hdr->value[value_len - 1] == ' ' || hdr->value[value_len - 1] == '\t'))
+                value_len--;
+            memmove(hdr->value, hdr->value + ows, value_len - ows);
+            hdr->value[value_len - ows] = '\0';
 
             for (int i = 0; hdr->key[i]; i++)
                 hdr->key[i] = tolower((uint8_t)hdr->key[i]);
@@ -344,23 +425,12 @@ int ws_client_parse_handshake_resp(ws_client *client)
             if (ws_client_add_http_header(client, hdr))
                 return WS_CLIENT_PROTOCOL_ERROR;
 
-            if (!strcmp(hdr->key, WS_CONN_ACCEPT)) {
-                if (strcmp(client->hs.nonce_reply, hdr->value)) {
-                    nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Received NONCE \"%s\" does not match expected nonce of \"%s\"", hdr->value, client->hs.nonce_reply);
-                    return WS_CLIENT_PROTOCOL_ERROR;
-                }
-                client->hs.nonce_matched = 1;
-            }
-
             break;
 
-        case WS_HDR_PARSE_DONE:
-            if (!client->hs.nonce_matched) {
-                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Missing " WS_CONN_ACCEPT " header");
-                return WS_CLIENT_PROTOCOL_ERROR;
-            }
-            if (client->hs.http_code != 101) {
-                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: HTTP return code not 101. Received %d with msg \"%s\".", client->hs.http_code, client->hs.http_reply_msg);
+        case WS_HDR_PARSE_DONE: {
+            char err[512];
+            if (ws_client_check_handshake_reply(client, err, sizeof(err))) {
+                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: %s", err);
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
 
@@ -368,6 +438,7 @@ int ws_client_parse_handshake_resp(ws_client *client)
             client->hs.hdr_state = WS_HDR_ALL_DONE;
             nd_log(NDLS_DAEMON, NDLP_INFO, "ACLK: Websocket Connection Accepted By Server");
             return WS_CLIENT_PARSING_DONE;
+        }
 
         case WS_HDR_ALL_DONE:
             nd_log(NDLS_DAEMON, NDLP_CRIT, "ACLK: This is error we should never come here!");

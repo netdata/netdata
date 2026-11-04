@@ -259,7 +259,7 @@ class AlertOwnershipTest(unittest.TestCase):
     SUBJECTS = [
         alert_subject('proc', 'proc.plugin', '/proc/stat', ['system.cpu', 'system.load', 'netdata.dbengine']),
         alert_subject('freebsd', 'freebsd.plugin', 'kern.cp_time', ['system.cpu', 'system.load']),
-        alert_subject('ipmi', 'ipmi.plugin', 'ipmi', ['ipmi_go.sel'], ['sel_events']),
+        alert_subject('ipmi', 'ipmi.plugin', 'ipmi', ['ipmi.sel'], ['sel_events']),
         alert_subject('cloud', 'go.d.plugin', 'cloud', [], ['cloud_errors']),
     ]
 
