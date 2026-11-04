@@ -5,9 +5,16 @@ package meraki
 import "github.com/netdata/netdata/go/plugins/pkg/metrix"
 
 const (
-	metricOrganizationAssignedDevices = "organization_assigned_devices"
-	metricDeviceAssigned              = "device_assigned"
-	metricDeviceAvailabilityStatus    = "device_availability_status"
+	metricOrganizationAssignedDevices    = "organization_assigned_devices"
+	metricDeviceAssigned                 = "device_assigned"
+	metricDeviceAvailabilityStatus       = "device_availability_status"
+	metricSwitchPortTrafficSent          = "switch_port_traffic_sent"
+	metricSwitchPortTrafficReceived      = "switch_port_traffic_received"
+	metricSwitchPortTrafficIntervalAge   = "switch_port_traffic_interval_age"
+	metricSwitchPortPacketsSent          = "switch_port_packets_sent"
+	metricSwitchPortPacketsReceived      = "switch_port_packets_received"
+	metricApplianceUplinkTrafficSent     = "appliance_uplink_traffic_sent"
+	metricApplianceUplinkTrafficReceived = "appliance_uplink_traffic_received"
 )
 
 // availabilityStates are the device states Meraki documents.
@@ -18,10 +25,10 @@ var availabilityStateSet = []metrix.InstrumentOption{
 	metrix.WithStateSetStates(availabilityStates...),
 }
 
-// collectorMetrics holds the organization instrument. Device instruments are
-// bound to a device's host scope and labels every cycle instead of being kept in
-// a Vec: a Vec caches every label tuple it has seen, and device and network
-// names change.
+// collectorMetrics holds the organization instrument. Device, port and uplink
+// instruments are bound to their host scope and labels every cycle instead of
+// being kept in a Vec: a Vec caches every label tuple it has seen, and device and
+// network names change.
 type collectorMetrics struct {
 	meter                metrix.SnapshotMeter
 	organizationAssigned metrix.SnapshotGauge

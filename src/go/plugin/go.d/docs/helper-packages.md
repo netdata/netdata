@@ -263,6 +263,10 @@ c.Limit("mycollector:operation:error", 1, time.Hour).
 Use stable keys. Include the operation and bounded error class when needed, but do not put unbounded IDs, URLs, query
 strings, customer names, or raw provider messages in the key.
 
+`Limit` keeps the first `n` messages of each window. When one key carries a summary of several conditions, build it
+from every current condition on every cycle, including conditions found only when cached state is refreshed: a summary
+that includes such a condition only on refresh cycles is rarely the one that gets logged.
+
 Custom warning gates are justified only when the built-in count-per-window semantics are not the right behavior, for
 example when logging only on state transitions. Document that reason in the PR description or design note so reviewers
 can see why the built-in limiter was not enough.

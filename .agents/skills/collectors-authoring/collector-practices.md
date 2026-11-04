@@ -98,6 +98,9 @@ Cloud cost, and it needs stable identity per node. For Go V2 collectors the mech
 decision and its bounds are owned by `.agents/skills/collectors-go-framework-v2/go-v2-host-scope.md`, and
 `.agents/skills/collectors-go-design/SKILL.md` records it in the design note.
 
+Generated vnode metadata adoption for existing Go V1 collectors follows
+`src/go/plugin/framework/jobruntime/README.md#v1-generated-vnode-metadata`.
+
 ### 1.10 Cardinality discipline
 
 - A chart with thousands of dimensions, or an instance list with thousands of entries, is unusable on the dashboard. The

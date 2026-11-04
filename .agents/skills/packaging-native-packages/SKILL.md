@@ -1,6 +1,6 @@
 ---
 name: packaging-native-packages
-description: Change, review or troubleshoot Netdata native DEB/RPM packaging, CPack component dependencies, optional plugin packages, account creation, scriptlet ordering and installed ownership. Use for package transaction failures or adding a packaged plugin. Static makeself builds use packaging-static-installer.
+description: Change, review or troubleshoot native DEB/RPM packages, CPack component dependencies, independently versioned payloads, account creation, scriptlet ordering and installed ownership. For repository submission or promotion use packaging-component-releases. Static makeself builds use packaging-static-installer.
 ---
 
 # Native Package Changes
@@ -18,6 +18,7 @@ its distro; a build request alone does not authorize installing packages on the 
 | Task | Read |
 |---|---|
 | Add a component or change default plugin delivery | `./SKILL.md#preserve-dependency-policy`; component registry and plugin install rules |
+| Package an independently released runtime or helper | `./SKILL.md#independently-versioned-payloads` and the component recipe |
 | Diagnose a missing account or wrong installed owner | `./SKILL.md#account-creation-and-payload-ownership`; selected scriptlets and transaction log |
 | Validate a native packaging change | `./SKILL.md#validate-at-the-relevant-layer`; metadata and transaction evidence |
 
@@ -47,6 +48,30 @@ its distro; a build request alone does not authorize installing packages on the 
   selected recommended components is a separate policy in `packaging/cmake/Modules/Packaging.cmake`.
 - Preserve package-family conventions: the DEB suggestions list and conditional, versioned RPM suggestions have
   different forms. Validate both with the feature enabled and disabled; do not impose symmetry without evidence.
+
+## Independently Versioned Payloads
+
+- Model the three dependency edges separately. In DEM the Agent recommends the plugin, the plugin suggests the
+  optional browser runtime, and the runtime requires the helper capability provided by a compatible plugin.
+  The suggestion records the relationship for package-manager retention decisions without installing the browser
+  for every plugin user. Check effective DEB and RPM metadata, including the RPM tier without weak dependencies.
+  The capability lets runtime security releases ship on their own schedule.
+- In a standalone CPack project, validate the staged payload's format, install root, architecture and version
+  before `project()`. Derive CMake's numeric project version from that identity and preserve the complete version
+  and package revision in CPack. Include a suffix and a staged/requested version mismatch in the checks.
+  See `packaging/dem-runtime/native/CMakeLists.txt` and `packaging/dem-runtime/native/tests/test_recipe.py`.
+- If hooks call an installed helper, require its capability at each phase that needs it, including before unpack
+  and before erasure. Pre-install hooks cannot rely on files that the incoming package has yet to install.
+  Keep package-owned files distinct from persistent application state. Check that packaging preserves any bound
+  executable bytes, relative links and modes in the extracted DEB and RPM.
+- Test fresh install, upgrade, reinstall/retry, removal and combined Agent/payload removal using real transactions
+  on the supported hosts. For service hooks, check prior running/stopped state, service policy and the service
+  user's actual runtime status. A failed RPM `%posttrans` can leave the package installed while the feature is
+  unavailable. Debian can leave configuration pending for retry. The DEM recipe initially requires live systemd.
+  Its documented commands and package-manager differences are in `packaging/dem-runtime/native/README.md`.
+
+For repository submission, managed archives or an SRE release handoff, use
+`.agents/skills/packaging-component-releases/SKILL.md`.
 
 ## Account Creation And Payload Ownership
 

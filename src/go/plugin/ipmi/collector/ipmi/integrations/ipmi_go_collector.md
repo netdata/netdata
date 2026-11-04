@@ -24,7 +24,7 @@ Module: ipmi
 
 Monitor hardware sensor readings, sensor health and System Event Log entries through IPMI.
 
-Queries a local Linux OpenIPMI device or a remote BMC over IPMI 1.5 LAN or IPMI 2.0 LAN+ using the configured account. The collector reads sensors and SEL metadata; it does not change BMC configuration or clear the event log.
+Queries a local Linux OpenIPMI device or a remote BMC over IPMI 1.5 LAN or IPMI 2.0 LAN+ using the configured account. The collector reads sensors and the System Event Log (SEL); it does not change BMC configuration or clear the event log.
 
 This collector is only supported on the following platforms:
 
@@ -54,7 +54,7 @@ This plugin requires Linux. Keep FreeIPMI for legacy direct drivers, bridged sen
 
 #### Performance Impact
 
-IPMI command latency grows with sensor count. Increase update_every when a complete sensor scan takes longer than the configured interval.
+IPMI command latency grows with sensor count. Increase update_every when a complete sensor scan takes longer than the configured interval. Sensor thresholds are read with the SDR inventory, about every five minutes, at most one command per threshold sensor. With collect_sel enabled, the first collections after a start also read the existing System Event Log, for up to two seconds each (a quarter of update_every when shorter), until all records are read. Later collections read only new records, or the whole log again after the BMC clears or rewrites it.
 
 ## Setup
 
@@ -93,7 +93,7 @@ Options apply to each IPMI job. Configure one local device or remote BMC per job
 |  | privilege_level | Session privilege requested from the BMC. User privilege is sufficient for standard sensor and SEL commands. | user | no |
 | **Collection** | update_every | Data collection frequency in seconds. | 10 | no |
 |  | timeout | Timeout for session setup and for each IPMI command. | 5s | no |
-|  | collect_sel | Collect the System Event Log entry count. | yes | no |
+|  | collect_sel | Read the System Event Log: the entry count and new records charts, and the ipmi-sel Live Data view. | yes | no |
 | **Virtual Node** | vnode | Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
 
@@ -162,6 +162,7 @@ The following alerts are available:
 |:------------|:----------|:------------|
 | [ ipmi_sensor_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipmi.conf) | ipmi.sensor_state | IPMI sensor ${label:sensor} (${label:component}) state |
 | [ ipmi_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipmi.conf) | ipmi.sel | number of events in the IPMI System Event Log (SEL) |
+| [ ipmi_sel_critical_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipmi.conf) | ipmi.sel_new_records | Number of critical events, other than threshold crossings, observed by the collector in the last 10 minutes. Failed SEL reads can delay reporting. The alert clears when no new one is observed, not when the problem is resolved; the ipmi-sel Live Data view lists the records |
 
 
 
@@ -171,7 +172,17 @@ Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
 
-Each sensor has its own reading and state chart. SEL is the raw repository entry count, including records FreeIPMI may filter during interpretation. The stock ipmi_events alert template matches the ipmi.sel context and applies to every Go job and to the C collector.
+Each sensor has its own reading and state chart. SEL is the raw repository entry count, including
+records FreeIPMI may filter during interpretation. The stock ipmi_events alert template matches the ipmi.sel
+context and applies to every Go job and to the C collector.
+
+The SEL new records chart counts records newly observed since the previous value, by default FreeIPMI state.
+Records already in the log when collection starts are not counted: the chart appears once the first read of
+the log completes. After the BMC log is cleared or rewritten, rereading the same record does not count it
+again. After the initial baseline, observed events are reported during rescans even if rollover prevents the
+whole log from being read. A failed SEL read leaves a gap, and records observed during it count in the next
+successful value.
+
 
 
 ### Per sensor
@@ -213,6 +224,23 @@ Metrics:
 | ipmi.sel | IPMI System Event Log Entries | events | events |
 
 
+### Per SEL event type
+
+New System Event Log records of one event type on the selected BMC.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| event_type | `threshold` for threshold events, which also change the state of their sensor; `discrete` for every other record, OEM records included. |
+
+Metrics:
+
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| ipmi.sel_new_records | IPMI System Event Log New Records | nominal, warning, critical, unknown | records |
+
+
 
 ## Live Data
 
@@ -220,7 +248,7 @@ Inspect the latest successful collection without issuing more IPMI commands.
 
 ### IPMI Sensors
 
-Show current readings and default FreeIPMI health states, with sensor counts by component and state.
+Show current readings, the thresholds the BMC uses for each threshold sensor, and default FreeIPMI health states, with sensor counts by component and state. Compare a reading with its thresholds to see how close it is to a limit; by default only crossing a critical or non-recoverable threshold makes the state critical.
 
 | Aspect | Description |
 |:-------|:------------|
@@ -242,7 +270,7 @@ No additional configuration is required.
 
 #### Returns
 
-One row per discovered full or compact sensor record, expanded for sharing. Unavailable numeric readings are null.
+One row per discovered full or compact sensor record, expanded for sharing. Unavailable numeric readings are null. Thresholds are in the reading's units and are null when the sensor has none or they could not be read.
 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
@@ -252,7 +280,62 @@ One row per discovered full or compact sensor record, expanded for sharing. Unav
 | Reading | float |  |  | Current reading; null when unavailable. |
 | Units | string |  |  | Reading units; null for discrete sensors. |
 | State | string |  |  | Default FreeIPMI health interpretation. |
+| LNR | float |  |  | Lower non-recoverable threshold. |
+| LCR | float |  |  | Lower critical threshold. |
+| LNC | float |  |  | Lower non-critical threshold. |
+| UNC | float |  |  | Upper non-critical threshold. |
+| UCR | float |  |  | Upper critical threshold. |
+| UNR | float |  |  | Upper non-recoverable threshold. |
 | Key | string |  | hidden | Stable sensor identity within the collection job. |
+| rowOptions | none |  | hidden | Row health severity. |
+
+### IPMI System Event Log
+
+Browse the hardware events the BMC recorded, such as threshold crossings, fan, power and memory errors, processor throttling and boots, with default FreeIPMI states. Use it to see when a problem started and how often it recurs; the sensor charts show only the current state.
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Ipmi-sel` |
+| Require Cloud | no |
+| Performance | Reads the records the collector already read from the BMC; sends no BMC requests. |
+| Security | Read-only hardware event records from the configured target. |
+| Availability | Available for jobs with collect_sel enabled while they run; when no job collects the SEL, requests return HTTP 404. Returns HTTP 503 before the first successful collection, after a collection failure, or while the BMC has not answered SEL requests. On the first collections of a large log, it shows the oldest records read so far. |
+
+#### Prerequisites
+
+No additional configuration is required.
+
+#### Parameters
+
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| Instance | select | Select the IPMI collection job. | no | First available job |  |
+| State | select | Show only records with this default FreeIPMI state. | no | all | All states (default), Critical, Warning, Nominal, Unknown |
+| Search | string | Case-sensitive Netdata simple patterns against sensor, type, event, direction, state, generator and record ID. Use `*DIMM*` for a substring. Space-separated patterns are checked in order; the first match decides, `!` excludes, and no match excludes the row. | no | No text filter |  |
+
+#### Returns
+
+One row per SEL record the BMC retains, newest first in log order. The dashboard time range does not
+filter the table, because SEL records are often weeks apart. Times are converted to UTC with the BMC's
+SEL UTC offset. When the BMC reports none, times are the BMC clock, and the view shows how far that
+clock is from the Agent clock. Records logged before a daylight saving change can be off by an hour,
+because the BMC reports only its current offset. Records without a date (OEM records without a
+timestamp, or records logged before the BMC clock was set) show Time as Unavailable.
+
+
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Order | integer |  | hidden | Position in the log, newest first. |
+| Time | timestamp |  |  | When the BMC logged the record, in UTC; Unavailable when the record has no date. |
+| Sensor | string |  |  | SDR sensor name, or the event generator and sensor number (for example BIOS #34) when the BMC has no record of that sensor. |
+| Sensor Type | string |  |  | IPMI sensor type. |
+| Event | string |  |  | Event description; threshold events include the trigger reading and threshold when the BMC records them and the sensor's SDR record describes their conversion. |
+| Direction | string |  |  | Assertion (the condition started) or Deassertion (it ended). |
+| State | string |  |  | Default FreeIPMI interpretation of the record. |
+| Record ID | string |  | hidden | SEL record identifier. |
+| Generator | string |  | hidden | Event generator, such as the BMC, BIOS or SMI handler, and its ID. |
+| BMC Time | string |  | hidden | Timestamp as the BMC recorded it, before UTC conversion. |
+| Raw | string |  | hidden | Record bytes as returned by the BMC. |
 | rowOptions | none |  | hidden | Row health severity. |
 
 

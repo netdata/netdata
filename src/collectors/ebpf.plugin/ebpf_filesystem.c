@@ -161,6 +161,8 @@ ebpf_local_maps_t btrfs_maps[] = {
 
 static netdata_syscall_stat_t filesystem_aggregated_data[NETDATA_EBPF_HIST_MAX_BINS];
 static netdata_publish_syscall_t filesystem_publish_aggregated[NETDATA_EBPF_HIST_MAX_BINS];
+static bool filesystem_stats_legacy;
+static bool filesystem_stats_started;
 
 char **dimensions = NULL;
 static netdata_idx_t *filesystem_hash_values = NULL;
@@ -279,22 +281,22 @@ static int ebpf_fs_attach_kprobe(struct filesystem_bpf *obj, const char **functi
 
     // kretprobe
     obj->links.netdata_fs_file_read_retprobe =
-        bpf_program__attach_kprobe(obj->progs.netdata_fs_file_read_retprobe, false, functions[NETDATA_KEY_BTF_READ]);
+        bpf_program__attach_kprobe(obj->progs.netdata_fs_file_read_retprobe, true, functions[NETDATA_KEY_BTF_READ]);
     if (libbpf_get_error(obj->links.netdata_fs_file_read_retprobe))
         goto cleanup_getattr;
 
     obj->links.netdata_fs_file_write_retprobe =
-        bpf_program__attach_kprobe(obj->progs.netdata_fs_file_write_retprobe, false, functions[NETDATA_KEY_BTF_WRITE]);
+        bpf_program__attach_kprobe(obj->progs.netdata_fs_file_write_retprobe, true, functions[NETDATA_KEY_BTF_WRITE]);
     if (libbpf_get_error(obj->links.netdata_fs_file_write_retprobe))
         goto cleanup_file_read_ret;
 
     obj->links.netdata_fs_file_open_retprobe =
-        bpf_program__attach_kprobe(obj->progs.netdata_fs_file_open_retprobe, false, functions[NETDATA_KEY_BTF_OPEN]);
+        bpf_program__attach_kprobe(obj->progs.netdata_fs_file_open_retprobe, true, functions[NETDATA_KEY_BTF_OPEN]);
     if (libbpf_get_error(obj->links.netdata_fs_file_open_retprobe))
         goto cleanup_file_write_ret;
 
     obj->links.netdata_fs_getattr_retprobe =
-        bpf_program__attach_kprobe(obj->progs.netdata_fs_getattr_retprobe, false, functions[NETDATA_KEY_BTF_SYNC_ATTR]);
+        bpf_program__attach_kprobe(obj->progs.netdata_fs_getattr_retprobe, true, functions[NETDATA_KEY_BTF_SYNC_ATTR]);
     if (libbpf_get_error(obj->links.netdata_fs_getattr_retprobe))
         goto cleanup_file_open_ret;
 
@@ -305,7 +307,7 @@ static int ebpf_fs_attach_kprobe(struct filesystem_bpf *obj, const char **functi
             goto cleanup_getattr_ret;
 
         obj->links.netdata_fs_2nd_file_open_retprobe = bpf_program__attach_kprobe(
-            obj->progs.netdata_fs_2nd_file_open_retprobe, false, functions[NETDATA_KEY_BTF_OPEN2]);
+            obj->progs.netdata_fs_2nd_file_open_retprobe, true, functions[NETDATA_KEY_BTF_OPEN2]);
         if (libbpf_get_error(obj->links.netdata_fs_2nd_file_open_retprobe))
             goto cleanup_2nd_open_probe;
     }
@@ -618,6 +620,7 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
     int i;
     const char *saved_name = em->info.thread_name;
     uint64_t kernels = em->kernels;
+    uint64_t rhel10_kernels = em->rhel10_kernels;
     bool loaded_any = false;
     for (i = 0; localfs[i].filesystem; i++) {
         ebpf_filesystem_partitions_t *efp = &localfs[i];
@@ -630,6 +633,7 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
         if (!efp->probe_links && efp->flags & NETDATA_FILESYSTEM_LOAD_EBPF_PROGRAM) {
             em->info.thread_name = efp->filesystem;
             em->kernels = efp->kernels;
+            em->rhel10_kernels = efp->rhel10_kernels;
             em->maps = efp->fs_maps;
 #ifdef LIBBPF_MAJOR_VERSION
             ebpf_define_map_type(em->maps, em->maps_per_core, running_on_kernel);
@@ -640,6 +644,7 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
                     efp->load_failed = true;
                     em->info.thread_name = saved_name;
                     em->kernels = kernels;
+                    em->rhel10_kernels = rhel10_kernels;
                     em->maps = NULL;
                     continue;
                 }
@@ -648,19 +653,31 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
             else {
                 efp->fs_obj = filesystem_bpf__open();
                 if (!efp->fs_obj) {
-                    efp->load_failed = true;
-                    em->info.thread_name = saved_name;
-                    em->kernels = kernels;
-                    em->maps = NULL;
-                    continue;
+                    if (em->load & EBPF_LOAD_CORE)
+                        efp->probe_links = ebpf_load_program(
+                            ebpf_plugin_dir, em, running_on_kernel, isrh, &efp->objects);
+                    if (!efp->probe_links) {
+                        efp->load_failed = true;
+                        em->info.thread_name = saved_name;
+                        em->kernels = kernels;
+                        em->rhel10_kernels = rhel10_kernels;
+                        em->maps = NULL;
+                        continue;
+                    }
                 } else if (ebpf_fs_load_and_attach(em->maps, efp->fs_obj, efp->functions, NULL)) {
-                    efp->load_failed = true;
                     filesystem_bpf__destroy(efp->fs_obj);
                     efp->fs_obj = NULL;
-                    em->info.thread_name = saved_name;
-                    em->kernels = kernels;
-                    em->maps = NULL;
-                    continue;
+                    if (em->load & EBPF_LOAD_CORE)
+                        efp->probe_links = ebpf_load_program(
+                            ebpf_plugin_dir, em, running_on_kernel, isrh, &efp->objects);
+                    if (!efp->probe_links) {
+                        efp->load_failed = true;
+                        em->info.thread_name = saved_name;
+                        em->kernels = kernels;
+                        em->rhel10_kernels = rhel10_kernels;
+                        em->maps = NULL;
+                        continue;
+                    }
                 }
             }
 #endif
@@ -678,10 +695,22 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
         efp->flags &= ~NETDATA_FILESYSTEM_LOAD_EBPF_PROGRAM;
     }
     em->info.thread_name = saved_name;
+    if (!filesystem_stats_legacy) {
+        for (i = 0; localfs[i].filesystem; i++) {
+            if (localfs[i].probe_links) {
+                filesystem_stats_legacy = true;
+                if (filesystem_stats_started && (em->load & EBPF_LOAD_CORE) && !(em->load & EBPF_LOAD_LEGACY)) {
+                    plugin_statistics.core--;
+                    plugin_statistics.legacy++;
+                }
+                break;
+            }
+        }
+    }
     netdata_mutex_unlock(&lock);
     em->kernels = kernels;
+    em->rhel10_kernels = rhel10_kernels;
     em->maps = NULL;
-
     if (!dimensions) {
         dimensions = ebpf_fill_histogram_dimension(NETDATA_EBPF_HIST_MAX_BINS);
 
@@ -803,7 +832,7 @@ void ebpf_filesystem_cleanup_ebpf_data(void)
  *
  * @param ptr thread data.
  */
-void ebpf_filesystem_unload_bpf(ebpf_module_t *em)
+void ebpf_filesystem_unload_bpf(ebpf_module_t *em __maybe_unused)
 {
     int i;
     for (i = 0; localfs[i].filesystem; i++) {
@@ -815,7 +844,7 @@ void ebpf_filesystem_unload_bpf(ebpf_module_t *em)
             efp->flags = NETDATA_FILESYSTEM_FLAG_NO_PARTITION;
         }
 #endif
-        if ((em->load & EBPF_LOAD_LEGACY) && efp->probe_links) {
+        if (efp->probe_links) {
             ebpf_unload_legacy_code(efp->objects, efp->probe_links);
             efp->objects = NULL;
             efp->probe_links = NULL;
@@ -1118,6 +1147,8 @@ static void ebpf_set_maps(void)
 void ebpf_filesystem_thread(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    filesystem_stats_legacy = false;
+    filesystem_stats_started = false;
 
     CLEANUP_FUNCTION_REGISTER(ebpf_filesystem_exit) cleanup_ptr = em;
 
@@ -1153,11 +1184,20 @@ void ebpf_filesystem_thread(void *ptr)
 
     netdata_mutex_lock(&lock);
     ebpf_create_fs_charts(em->update_every);
-    ebpf_update_stats(&plugin_statistics, em);
+    ebpf_module_t stats_em = *em;
+    if (filesystem_stats_legacy)
+        stats_em.load |= EBPF_LOAD_LEGACY;
+    ebpf_update_stats(&plugin_statistics, &stats_em);
+    filesystem_stats_started = true;
     netdata_mutex_unlock(&lock);
 
     filesystem_collector(em);
 
-endfilesystem:
-    ebpf_update_disabled_plugin_stats(em);
+endfilesystem: {
+    ebpf_module_t exit_stats_em = *em;
+    if (filesystem_stats_legacy)
+        exit_stats_em.load |= EBPF_LOAD_LEGACY;
+    ebpf_update_disabled_plugin_stats(&exit_stats_em);
+    filesystem_stats_started = false;
+}
 }

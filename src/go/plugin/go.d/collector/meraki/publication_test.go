@@ -29,14 +29,9 @@ func (b *lockedBuffer) Write(p []byte) (int, error) {
 }
 func (b *lockedBuffer) String() string { b.mu.Lock(); defer b.mu.Unlock(); return b.buf.String() }
 
-func TestManagedDevicePublicationAndRetirement(t *testing.T) {
-	f, server := newFixtureAPI(t)
-	f.set("/organizations/org/devices/availabilities", fixtureResponse{
-		body: `[]`,
-	})
-	c := configuredCollector(server)
-	out := &lockedBuffer{}
-	publisher := hostoutput.New()
+// startManagedJob starts c as a real managed JobV2 that publishes into out.
+func startManagedJob(t *testing.T, c *Collector, out *lockedBuffer, publisher *hostoutput.Publisher) *jobruntime.JobV2 {
+	t.Helper()
 	job := jobruntime.NewJobV2(
 		jobruntime.JobV2Config{
 			PluginName:  "go.d",
@@ -68,6 +63,18 @@ func TestManagedDevicePublicationAndRetirement(t *testing.T) {
 		t.Fatal("managed startup blocked")
 	}
 	require.NoError(t, run.StartupErr())
+	return job
+}
+
+func TestManagedDevicePublicationAndRetirement(t *testing.T) {
+	f, server := newFixtureAPI(t)
+	f.set("/organizations/org/devices/availabilities", fixtureResponse{
+		body: `[]`,
+	})
+	c := configuredCollector(server)
+	out := &lockedBuffer{}
+	publisher := hostoutput.New()
+	job := startManagedJob(t, c, out, publisher)
 	statusBegin := regexp.MustCompile(`(?m)^BEGIN '[^']+_data_collection_status'`)
 	tick := func() string {
 		t.Helper()
@@ -128,4 +135,43 @@ func TestManagedDevicePublicationAndRetirement(t *testing.T) {
 	}
 	assert.Equal(t, 0, publisher.OwnerCount(guid))
 	assert.Contains(t, out.String(), "obsolete")
+}
+
+func TestManagedTrafficPlacementAndFloatValues(t *testing.T) {
+	_, c, _ := newTrafficFixture(t)
+	out := &lockedBuffer{}
+	job := startManagedJob(t, c, out, hostoutput.New())
+	require.Eventually(t, func() bool {
+		if strings.Contains(out.String(), "meraki.appliance_uplink_traffic") {
+			return true
+		}
+		job.Tick(0)
+		return false
+	}, 5*time.Second, 120*time.Millisecond)
+
+	// Map each traffic context to the HOST its chart was defined under.
+	wire := out.String()
+	hostLine := regexp.MustCompile(`^HOST '([^']*)'`)
+	chartLine := regexp.MustCompile(`^CHART .* '(meraki\.(switch_port|appliance_uplink)[a-z_]*)' `)
+	host := ""
+	hosts := make(map[string]string)
+	for _, line := range strings.Split(wire, "\n") {
+		if m := hostLine.FindStringSubmatch(line); m != nil {
+			host = m[1]
+		}
+		if m := chartLine.FindStringSubmatch(line); m != nil {
+			hosts[m[1]] = host
+		}
+	}
+	guid := readDevices(c)["S1"].Scope.GUID
+	require.NotEmpty(t, guid)
+	assert.Equal(t, map[string]string{
+		"meraki.switch_port_traffic":              guid,
+		"meraki.switch_port_traffic_interval_age": guid,
+		"meraki.switch_port_packets":              guid,
+		"meraki.appliance_uplink_traffic":         "",
+	}, hosts)
+	for _, value := range []string{"10.5", "20.25", "2.5", "3.25"} {
+		assert.Regexp(t, regexp.MustCompile(`(?m)^SET '[^']+' = `+regexp.QuoteMeta(value)+`$`), wire)
+	}
 }

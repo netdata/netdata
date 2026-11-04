@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	socketKernelMask          uint32 = (1 << 12) - 1
+	socketKernelMask          uint32 = (1 << 14) - 1
 	socketDefaultUpdateEvery         = 10
 	socketDefaultBTFPath             = "/sys/kernel/btf"
 	socketDefaultObjectFlavor        = "buffer"

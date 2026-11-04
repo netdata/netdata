@@ -32,14 +32,19 @@ func (g cancelingGauge) Observe(value metrix.SampleValue, labels ...metrix.Label
 }
 
 func TestCollectAbortsCancellationDuringMetricWrites(t *testing.T) {
-	_, server := newFixtureAPI(t)
-	c := newTestCollector(t, server)
+	_, c, _ := newTrafficFixture(t)
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
-	// Delegate to the real store, then cancel while the cycle is still staging
-	// observations. A canceled collection must abort instead of publishing them.
-	c.metrics.organizationAssigned = cancelingGauge{SnapshotGauge: c.metrics.organizationAssigned, cancel: cancel}
+	// Delegate to the real store, then cancel at the first observation, while the
+	// cycle is still staging device and traffic observations. A canceled
+	// collection must abort instead of publishing any of them.
+	c.metrics.organizationAssigned = cancelingGauge{
+		SnapshotGauge: c.metrics.organizationAssigned,
+		cancel:        cancel,
+	}
 	require.ErrorIs(t, collectCycle(ctx, c), context.Canceled)
 	assert.Empty(t, readOrganization(c))
 	assert.Empty(t, readDevices(c))
+	assert.Empty(t, trafficPoints(c, metricSwitchPortTrafficSent))
+	assert.Empty(t, trafficPoints(c, metricApplianceUplinkTrafficSent))
 }

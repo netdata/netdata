@@ -84,6 +84,18 @@ Metrics belong to the Agent host by default. To attach a remote job to a differe
 The command and session setup timeout defaults to five seconds. Cancellation interrupts local response waits and remote
 UDP exchanges. Remote session cleanup gets a separate two-second budget, including after a canceled collection.
 
+## Sensor thresholds
+
+The `ipmi-sensors` Function shows each threshold sensor's limits next to its reading, in the reading's units: LNR, LCR
+and LNC (lower non-recoverable, critical and non-critical) and UNC, UCR and UNR (upper). The values come from Get Sensor
+Thresholds, the thresholds the BMC uses, not from the SDR: a BMC can keep earlier values in its SDR after its thresholds
+change. They are read with the SDR inventory, after a repository change, about every five minutes and after a
+reconnect, so a changed threshold appears within about five minutes. A blank cell is a threshold the sensor does not have, or one the
+BMC did not return or that cannot be converted. Sensors whose SDR declares fixed thresholds show the SDR values, which
+the IPMI specification defines as their values. Non-linear sensors and sensors without a supported unit show none. A
+failed threshold read never fails a collection or changes a sensor state: states come from the threshold comparison the
+BMC reports with each reading. By default only critical and non-recoverable crossings make a state critical.
+
 ## System Event Log
 
 With `collect_sel: true` (the default), each job charts the SEL entry count and new records, and serves the
@@ -125,7 +137,7 @@ as UTC, and the Function shows how far the BMC clock is from the Agent clock.
   state interpretation uses FreeIPMI defaults, including nominal non-critical threshold assertions; custom
   interpretation files are not loaded.
 - Unavailable numeric data produces gaps. `ipmi-sensors` reads an immutable snapshot and reports null readings. Its
-  summary charts show sensor counts by Component and State.
+  summary charts show sensor counts by Component and State. Its threshold columns are Go only.
 - The stock `local` job uses the `ipmi_local` chart type. Job names receive the standard framework job prefix;
   an existing job named `ipmi` keeps the `ipmi` chart type.
   Sensor keys remain stable when a reading becomes unavailable; the C library can change its reading-type key then.

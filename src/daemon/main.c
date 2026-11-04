@@ -1515,6 +1515,13 @@ int netdata_main(int argc, char **argv) {
     delta_startup_time("static threads");
 
     nd_log_limits_reset();
+
+    // the previous session's shutdown duration is kept in the status file (shutdown does not write SQLite);
+    // import it before the medians are cached
+    usec_t last_shutdown_ut = daemon_status_file_last_shutdown_duration_ut();
+    if(last_shutdown_ut)
+        add_agent_event(EVENT_AGENT_SHUTDOWN_TIME, (int64_t)last_shutdown_ut);
+
     get_agent_event_time_median_init();
 
 #ifndef OS_WINDOWS

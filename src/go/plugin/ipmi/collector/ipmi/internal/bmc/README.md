@@ -38,6 +38,16 @@ combinations retain status but omit numeric samples. Signed readings and standar
 Nonlinear code `0x70` fetches conversion factors for that exact raw reading; OEM nonlinear codes, failed factor reads,
 NaN, and infinity produce gaps. The SDK performs standard linearizations, including fractional EXP10 exponents.
 
+Thresholds of threshold sensors with numeric values are read when the inventory is replaced, so every snapshot
+carries them without extra commands. They use the reading's conversion; non-linear code `0x70` sensors have none, as
+in FreeIPMI. SDR threshold access `00b` sends no command. Access `11b` (fixed, unreadable) uses the SDR values and its
+readable threshold mask (Table 43-1 byte 19); the SDK parses the readable and settable masks swapped, so the adapter
+reads its `Settable` flags. Other sensors use Get Sensor Thresholds and its readable mask. FreeIPMI's SDR fallback after
+a refused Get Sensor Thresholds is not ported, because the SDR can hold values the BMC no longer uses. A
+completion-code error leaves that sensor without thresholds; any other error stops threshold reads until the next
+inventory refresh. Neither fails collection; a cancellation still does. Every collection reports the inventory's count
+of unreadable thresholds, so the rate-limited warning log is not limited to refresh collections.
+
 Keys use the C collector's healthy-reading identity: `i<record>_n<number>_t<legacy-reading-type>_u<legacy-unit>_<name>`.
 They intentionally remain stable when a reading becomes unavailable: the C library changes reading/unit enums on that
 transition. Expanded shared sensors and correctly decoded non-ASCII names can have different identities from the C
@@ -178,3 +188,6 @@ changes, rollover with reused IDs and failures, and checks against the fake BMC'
 every new record is reported exactly once. Real UDP tests use the upstream reference BMC with
 a User account for both LAN and LAN+: Check cleanup, sensor and SEL collection, session reuse, malformed responses,
 cancellation and failed setup recovery. These fixtures do not establish live-hardware parity for any particular vendor.
+
+Threshold tests cover live and SDR readable masks, fixed thresholds, completion-code and other failures, cancellation,
+the reading's conversion, and the refresh with the inventory.

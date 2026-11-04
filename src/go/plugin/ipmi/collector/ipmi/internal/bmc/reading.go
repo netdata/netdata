@@ -40,9 +40,7 @@ func (r *Reader) readSensor(ctx context.Context, d descriptor, warnings *collect
 		return s, nil
 	}
 
-	ctx = client.WithCommandContext(ctx, (&client.CommandContext{}).
-		WithResponderAddr(types.BMC_SA).
-		WithResponderLUN(d.owner.LUN()))
+	ctx = ownerContext(ctx, d.owner)
 
 	req := &sensor.GetSensorReadingRequest{
 		SensorNumber: d.number,
@@ -82,6 +80,13 @@ func (r *Reader) readSensor(ctx context.Context, d descriptor, warnings *collect
 	}
 	s.Value = &value
 	return s, nil
+}
+
+// ownerContext addresses sensor commands to the sensor's BMC LUN.
+func ownerContext(ctx context.Context, owner types.GeneratorID) context.Context {
+	return client.WithCommandContext(ctx, (&client.CommandContext{}).
+		WithResponderAddr(types.BMC_SA).
+		WithResponderLUN(owner.LUN()))
 }
 
 // readValue converts a raw analog reading. Non-linear sensors report

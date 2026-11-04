@@ -42,22 +42,17 @@ func findOrganization(organizations []merakiapi.Organization, id string) (meraki
 	return org, nil
 }
 
-// buildInventory joins the organization lists into the assigned devices. The
-// assigned-device list alone decides membership. Availability is attached only
-// when it is a known state for the same serial, consistent across duplicate
+// buildInventory joins the devices with their network names and availability.
+// The assigned-device list alone decides membership. Availability is attached
+// only when it is a known state for the same serial, consistent across duplicate
 // rows, and not reported for a different network. Otherwise the status stays
 // unknown: the provider lists are not one atomic snapshot, and a status that
 // cannot be trusted must not become a reported outage.
 func buildInventory(
-	organizationID string,
-	networks []merakiapi.Network,
+	networkNames map[string]string,
 	devices []merakiapi.Device,
 	availabilities []merakiapi.DeviceAvailability,
 ) ([]device, error) {
-	networkNames, err := networkNamesByID(organizationID, networks)
-	if err != nil {
-		return nil, err
-	}
 	statuses := statusesBySerial(availabilities)
 
 	assigned := make(map[string]device, len(devices))
@@ -89,6 +84,9 @@ func buildInventory(
 	return inventory, nil
 }
 
+// networkNamesByID maps the organization's network IDs to their names. A network
+// of another organization, or two records of one network with different names,
+// fails the cycle.
 func networkNamesByID(organizationID string, networks []merakiapi.Network) (map[string]string, error) {
 	names := make(map[string]string, len(networks))
 	for _, n := range networks {

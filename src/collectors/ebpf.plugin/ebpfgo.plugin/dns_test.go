@@ -24,7 +24,7 @@ func TestBuildDNSLegacyPlan(t *testing.T) {
 			wantMode: LoadCore,
 		},
 		"buffer-on-5-10": {
-			// kver 5.10 (330240) maps to selector index 6 = "5.11" per SelectKernelName.
+			// 5.10 uses the matching buffer artifact family.
 			cfg: DNSLegacyConfig{
 				PluginsDir:    defaultPluginsDir(),
 				Kernels:       dnsKernelMask,
@@ -33,7 +33,7 @@ func TestBuildDNSLegacyPlan(t *testing.T) {
 				IsDebian:      false,
 				ObjectFlavor:  "buffer",
 			},
-			want:     "pnetdata_ebpf_dns_buffer.5.11.o",
+			want:     "pnetdata_ebpf_dns_buffer.5.10.o",
 			wantMode: LoadCore,
 		},
 		"arena-on-6-12": {
@@ -49,9 +49,7 @@ func TestBuildDNSLegacyPlan(t *testing.T) {
 			wantMode: LoadCore,
 		},
 		"arena-on-debian-falls-back-to-base": {
-			// Arena is blocked on Debian; base flavor is chosen.  The selector must be
-			// capped to dnsMaxBaseSelector (7 = 5.14) because no base object exists for
-			// kernels beyond 5.14.  To get buffer on Debian, configure ObjectFlavor = "buffer".
+			// Arena is blocked on Debian, so choose the generic 6.12 base object.
 			cfg: DNSLegacyConfig{
 				PluginsDir:    defaultPluginsDir(),
 				Kernels:       dnsKernelMask,
@@ -60,7 +58,7 @@ func TestBuildDNSLegacyPlan(t *testing.T) {
 				IsDebian:      true,
 				ObjectFlavor:  "arena",
 			},
-			want:     "pnetdata_ebpf_dns.5.14.o",
+			want:     "pnetdata_ebpf_dns.6.12.o",
 			wantMode: LoadCore,
 		},
 		"debian-explicit-buffer": {
@@ -86,6 +84,30 @@ func TestBuildDNSLegacyPlan(t *testing.T) {
 			},
 			want:     "pnetdata_ebpf_dns.5.4.o",
 			wantMode: LoadCore,
+		},
+		"generic-7-buffer-uses-matched-flavor": {
+			cfg:  DNSLegacyConfig{PluginsDir: defaultPluginsDir(), Kernels: dnsKernelMask, IsRHF: -1, KernelVersion: minimumKernelVersionSeven, ObjectFlavor: "buffer"},
+			want: "pnetdata_ebpf_dns_buffer.7.0.o", wantMode: LoadCore,
+		},
+		"generic-7-arena-uses-matched-flavor": {
+			cfg:  DNSLegacyConfig{PluginsDir: defaultPluginsDir(), Kernels: dnsKernelMask, IsRHF: -1, KernelVersion: minimumKernelVersionSeven, ObjectFlavor: "arena"},
+			want: "pnetdata_ebpf_dns_arena.7.0.o", wantMode: LoadCore,
+		},
+		"generic-7-base-walks-down-to-6-12": {
+			cfg:  DNSLegacyConfig{PluginsDir: defaultPluginsDir(), Kernels: dnsKernelMask, IsRHF: -1, KernelVersion: minimumKernelVersionSeven, ObjectFlavor: "tracing"},
+			want: "pnetdata_ebpf_dns.6.12.o", wantMode: LoadCore,
+		},
+		"generic-6-16-2-buffer-uses-matched-flavor": {
+			cfg:  DNSLegacyConfig{PluginsDir: defaultPluginsDir(), Kernels: dnsKernelMask, IsRHF: -1, KernelVersion: exactKernelVersion6162, ObjectFlavor: "buffer"},
+			want: "pnetdata_ebpf_dns_buffer.6.16.2.o", wantMode: LoadCore,
+		},
+		"generic-6-16-2-arena-uses-matched-flavor": {
+			cfg:  DNSLegacyConfig{PluginsDir: defaultPluginsDir(), Kernels: dnsKernelMask, IsRHF: -1, KernelVersion: exactKernelVersion6162, ObjectFlavor: "arena"},
+			want: "pnetdata_ebpf_dns_arena.6.16.2.o", wantMode: LoadCore,
+		},
+		"generic-6-16-2-base-uses-6-12-family": {
+			cfg:  DNSLegacyConfig{PluginsDir: defaultPluginsDir(), Kernels: dnsKernelMask, IsRHF: -1, KernelVersion: exactKernelVersion6162, ObjectFlavor: "tracing"},
+			want: "pnetdata_ebpf_dns.6.12.o", wantMode: LoadCore,
 		},
 	}
 

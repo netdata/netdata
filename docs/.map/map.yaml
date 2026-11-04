@@ -462,6 +462,9 @@ sidebar:
       - meta:
           label: Release Notes
           edit_url: https://github.com/netdata/netdata-cloud-onprem/edit/master/netdata-cloud-onprem/RELEASE-NOTES.md
+      - meta:
+          label: High Availability and Disaster Recovery
+          edit_url: https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/high-availability-and-disaster-recovery.md
   # Collecting Metrics
   - meta:
       label: Collecting Metrics

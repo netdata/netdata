@@ -109,6 +109,9 @@ func runSocketGlobalCollector(api *netdataapi.API, handle *SocketLegacyHandle, s
 	if updateEvery <= 0 {
 		updateEvery = socketDefaultUpdateEvery
 	}
+	if handle.Plan.Flavor == ObjectFlavorArena {
+		createArenaDropsChart(api, "socket", updateEvery)
+	}
 
 	if store != nil {
 		// Clear the SOCKET SHM flag when this goroutine exits so the C consumer
@@ -148,6 +151,9 @@ func runSocketGlobalCollector(api *netdataapi.API, handle *SocketLegacyHandle, s
 	}
 
 	collectAndPublish := func(usecSince int) {
+		if handle.Plan.Flavor == ObjectFlavorArena {
+			publishArenaDrops(api, "socket", handle.Runtime.ArenaDropped(), usecSince)
+		}
 		if shmPublisher == nil && shouldPublish && store != nil {
 			p, perr := NewSharedPidMemoryPublisher(productionSHMName, productionSEMName, handle.PidTableSize, uint32(updateEvery))
 			if perr != nil {

@@ -174,6 +174,21 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
 }
 #endif
 
+// set when shutdown stopped waiting for dbengine work that may still be running on the libuv threadpool
+static bool dbengine_work_abandoned = false;
+
+// The last thing shutdown does. When shutdown gave up on work that may still be running on a libuv threadpool
+// worker (a SQLite user, see sqlite_teardown_is_unsafe(), or undrained dbengine work), exit() would run libuv's
+// library destructor, which joins every threadpool thread - so the process would wait for the job it already gave
+// up on, until systemd kills it. Shutdown is complete and its status saved by then: leave without running
+// destructors. No stdio flush either: a thread stuck mid-write may hold a stdio lock (the logger uses raw write()).
+NORETURN void netdata_exit_process(int status) {
+    if(sqlite_teardown_is_unsafe() || __atomic_load_n(&dbengine_work_abandoned, __ATOMIC_RELAXED))
+        _exit(status);
+
+    exit(status);
+}
+
 static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exit_when_done) {
     exit_initiated_set(reason);
 
@@ -184,7 +199,9 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     static bool run = false;
     if(run) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "EXIT: Recursion detected. Exiting immediately.");
-        exit(1);
+        // the first shutdown may be in the middle of a bounded wait, before it latched anything it gave up on:
+        // never run destructors here (libuv's would join threadpool workers that may still be running)
+        _exit(1);
     }
     run = true;
     daemon_status_file_update_status(DAEMON_STATUS_EXITING);
@@ -192,7 +209,6 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     netdata_log_exit_reason();
 
     watcher_thread_start();
-    usec_t shutdown_start_time = now_monotonic_usec();
     watcher_shutdown_begin();
 
 #ifdef ENABLE_DBENGINE
@@ -333,6 +349,10 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
             freez(th);
 
             dbengine_drained = dbengine_shutdown();
+            if(!dbengine_drained) {
+                __atomic_store_n(&dbengine_work_abandoned, true, __ATOMIC_RELAXED);
+                daemon_status_file_shutdown_gave_up("DBENGINE ", "pool work may still be running");
+            }
             watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
         }
         else {
@@ -351,9 +371,10 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
         watcher_step_complete(WATCHER_STEP_ID_STOP_METASYNC_THREADS);
     }
 
-    // Don't register a shutdown event if we crashed
-    if (!abnormal)
-        add_agent_event(EVENT_AGENT_SHUTDOWN_TIME, (int64_t)(now_monotonic_usec() - shutdown_start_time));
+    // Do not record the shutdown duration in SQLite here. The steps above may have given up on threads (the
+    // metadata worker, health) that are still inside db_meta, and any statement on that shared connection would
+    // wait for them until the shutdown watchdog aborts the agent. The watcher records the duration in the status
+    // file instead, and the next start imports it into the agent event log.
 
     nd_thread_join_threads();
     watcher_step_complete(WATCHER_STEP_ID_JOIN_STATIC_THREADS);
@@ -543,7 +564,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     if (!abnormal)
         nd_windows_signal_shutdown_complete();
 #endif
-    exit(abnormal ? 1 : 0);
+    netdata_exit_process(abnormal ? 1 : 0);
 #else
     if(abnormal)
         _exit(1);
@@ -552,7 +573,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 #if defined(OS_WINDOWS)
         nd_windows_signal_shutdown_complete();
 #endif
-        exit(0);
+        netdata_exit_process(0);
     }
 #endif
 }
