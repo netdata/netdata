@@ -167,7 +167,8 @@ type (
 		Collect() ([]*ddsnmp.ProfileMetrics, error)
 		CollectDeviceMetadata() (map[string]ddsnmp.MetaTag, error)
 		PreparedDeviceMetadata() map[string]ddsnmp.MetaTag
-		RefreshProfileInputs(observedOIDs []string) error
+		NeedsProfileInputRefresh(observedOIDs []string) bool
+		RefreshProfileInputs(observedOIDs []string) (changed bool, err error)
 	}
 	tableMetricState struct {
 		metadataVersion uint64

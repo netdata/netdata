@@ -39,6 +39,7 @@ func (c *Collector) refreshDeviceState() error {
 		(c.rebuildPending || observed.SysObjectID != c.sysInfo.SysObjectID) {
 		if !c.rebuildPending {
 			c.withdrawDeviceState()
+			c.resetDeviceFunctionState()
 		}
 		c.rebuildPending = true
 		// A newly classified device cannot inherit unanswered fields from the
@@ -48,17 +49,20 @@ func (c *Collector) refreshDeviceState() error {
 	if c.rebuildPending {
 		return c.pendingRebuildError()
 	}
-	if c.pendingMetadata == nil && sameSystemMetadata(c.sysInfo, next) {
+	observedOIDs := observedSystemOIDs(observed)
+	systemChanged := !sameSystemMetadata(c.sysInfo, next)
+	if c.pendingMetadata == nil && !systemChanged &&
+		(c.ddSnmpColl == nil || !c.ddSnmpColl.NeedsProfileInputRefresh(observedOIDs)) {
 		return nil
 	}
 
 	c.pendingMetadata = next
+	var inputsChanged bool
 	if c.ddSnmpColl != nil {
-		err = c.ddSnmpColl.RefreshProfileInputs(observedSystemOIDs(observed))
+		inputsChanged, err = c.ddSnmpColl.RefreshProfileInputs(observedOIDs)
 		c.captureCollectionFailures()
 		if err != nil {
 			c.Limit("snmp:metadata", 1, sysInfoCheckEvery).Warningf("failed to refresh profile metadata: %v", err)
-			return nil
 		}
 	}
 	var metadata map[string]ddsnmp.MetaTag
@@ -69,7 +73,12 @@ func (c *Collector) refreshDeviceState() error {
 		c.Limit("snmp:metadata", 1, sysInfoCheckEvery).Warningf("failed to update device metadata: %v", err)
 		return nil
 	}
-	c.pendingMetadata = nil
+	if inputsChanged && !systemChanged {
+		c.chartMetadataVersion++
+	}
+	if err == nil {
+		c.pendingMetadata = nil
+	}
 	return nil
 }
 
@@ -234,6 +243,22 @@ func (c *Collector) resetDevicePresentation() {
 	clear(c.seenTableMetrics)
 	clear(c.seenProfiles)
 	c.chartMetadataVersion++
+	c.normal.initialization = nil
+	c.normal.latest, c.normal.failed, c.normal.cut = nil, nil, nil
+	c.normal.bgpSources, c.normal.licenseSources = nil, nil
+	if c.normal.recorder != nil {
+		for ordinal := uint64(1); ordinal <= c.normal.recorder.Cursor(); ordinal++ {
+			c.normal.initialization = append(c.normal.initialization, c.normal.recorder.Operation(ordinal))
+		}
+	}
+	if c.PingOnly || c.Ping.Enabled {
+		c.addPingCharts()
+	}
+}
+
+// A confirmed incompatible classification invalidates Function data even when
+// profile resolution or replacement connection setup cannot finish yet.
+func (c *Collector) resetDeviceFunctionState() {
 	c.ifaceCache.mu.Lock()
 	clear(c.ifaceCache.interfaces)
 	c.ifaceCache.lastUpdate, c.ifaceCache.updateTime = time.Time{}, time.Time{}
@@ -246,16 +271,5 @@ func (c *Collector) resetDevicePresentation() {
 		c.bgp.peerCache.lastError = ""
 		c.bgp.peerCache.mu.Unlock()
 		c.bgp.collectError, c.bgp.collectFailedSources = nil, nil
-	}
-	c.normal.initialization = nil
-	c.normal.latest, c.normal.failed, c.normal.cut = nil, nil, nil
-	c.normal.bgpSources, c.normal.licenseSources = nil, nil
-	if c.normal.recorder != nil {
-		for ordinal := uint64(1); ordinal <= c.normal.recorder.Cursor(); ordinal++ {
-			c.normal.initialization = append(c.normal.initialization, c.normal.recorder.Operation(ordinal))
-		}
-	}
-	if c.PingOnly || c.Ping.Enabled {
-		c.addPingCharts()
 	}
 }

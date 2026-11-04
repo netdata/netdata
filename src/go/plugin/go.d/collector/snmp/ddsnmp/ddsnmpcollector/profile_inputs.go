@@ -5,6 +5,7 @@ package ddsnmpcollector
 import (
 	"errors"
 	"fmt"
+	"maps"
 
 	"github.com/gosnmp/gosnmp"
 
@@ -24,12 +25,24 @@ func (c *Collector) PreparedDeviceMetadata() map[string]ddsnmp.MetaTag {
 	return metadata
 }
 
+// NeedsProfileInputRefresh reports whether authoritative system observations
+// contradict retained unsupported-OID decisions. It does not acquire data.
+func (c *Collector) NeedsProfileInputRefresh(observedOIDs []string) bool {
+	for _, oid := range observedOIDs {
+		if c.missingOIDs[trimOID(oid)] {
+			return true
+		}
+	}
+	return false
+}
+
 // RefreshProfileInputs reacquires scalar profile inputs without changing table
 // state. observedOIDs names system scalars authoritatively observed by the caller;
 // their previous missing-OID decisions no longer apply. Failed profiles retain
 // their last usable input snapshot while other profiles can install fresh inputs.
+// The result reports changed usable tags/metadata, including partial success.
 // Like Collect, only the synchronous owner calls it.
-func (c *Collector) RefreshProfileInputs(observedOIDs []string) error {
+func (c *Collector) RefreshProfileInputs(observedOIDs []string) (changed bool, err error) {
 	c.failures = ddsnmp.CollectionFailures{}
 	c.requests = snmpRequestState{}
 	for _, oid := range observedOIDs {
@@ -54,11 +67,13 @@ func (c *Collector) RefreshProfileInputs(observedOIDs []string) error {
 			errs = append(errs, err)
 			continue
 		}
+		changed = changed || !maps.Equal(state.cache.globalTags, staged.cache.globalTags) ||
+			!maps.Equal(state.cache.deviceMetadata, staged.cache.deviceMetadata)
 		state.cache = staged.cache
 		state.identity = staged.identity
 		state.initialized = true
 	}
-	return errors.Join(errs...)
+	return changed, errors.Join(errs...)
 }
 
 func getProfileInputValues(
