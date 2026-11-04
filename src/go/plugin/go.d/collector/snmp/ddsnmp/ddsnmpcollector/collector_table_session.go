@@ -5,7 +5,6 @@ package ddsnmpcollector
 import (
 	"errors"
 	"fmt"
-	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -48,8 +47,6 @@ type tableCollectionScope struct {
 	requests       []*tableCollectionRequest
 	tableNameToOID map[string]string
 	acquisition    map[*tableCollectionRequest]*acquisitionTableObservation
-	// unavailableTables lists tables whose rows this attempt could not observe.
-	unavailableTables []string
 }
 
 type tableCollectionRequest struct {
@@ -599,16 +596,10 @@ func (s *tableCollectionSession) collectScope(scope *tableCollectionScope) ([]dd
 			if err != nil {
 				scope.stats.Errors.Processing.Table++
 				errs = append(errs, fmt.Errorf("table '%s': %w", req.config.Table.Name, err))
-				scope.markUnavailable(req)
 				continue
-			}
-			if len(ctx.rows) > 0 && req.dependencyFailed() {
-				// Current rows lack the tags a failed dependency walk would supply.
-				scope.markUnavailable(req)
 			}
 			metrics = append(metrics, tableMetrics...)
 		case tableRouteFailed:
-			scope.markUnavailable(req)
 			if !failedSeen[req.route.oid] {
 				failedSeen[req.route.oid] = true
 				errs = append(errs, req.route.err)
@@ -625,23 +616,6 @@ func (s *tableCollectionSession) collectScope(scope *tableCollectionScope) ([]dd
 			Warningf("failed to walk some SNMP tables: %v", errors.Join(errs...))
 	}
 	return metrics, nil
-}
-
-func (scope *tableCollectionScope) markUnavailable(req *tableCollectionRequest) {
-	// Dependency-only configurations produce no rows of their own.
-	if len(req.config.Symbols) == 0 || slices.Contains(scope.unavailableTables, req.config.Table.Name) {
-		return
-	}
-	scope.unavailableTables = append(scope.unavailableTables, req.config.Table.Name)
-}
-
-func (req *tableCollectionRequest) dependencyFailed() bool {
-	for _, dependency := range req.dependencies {
-		if dependency.state == tableRouteFailed {
-			return true
-		}
-	}
-	return false
 }
 
 func (r *tableCollectionRoute) acquisitionValuesWithin(rootOID string) uint64 {

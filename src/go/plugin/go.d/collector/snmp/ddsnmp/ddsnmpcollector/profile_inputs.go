@@ -54,6 +54,8 @@ func (c *Collector) NeedsProfileInputRefresh(observedOIDs []string) bool {
 // state. observedOIDs names system scalars authoritatively observed by the caller;
 // their previous missing-OID decisions no longer apply. Failed profiles retain
 // their last usable input snapshot while other profiles can install fresh inputs.
+// Processing inputs already unavailable in that snapshot remain tolerated; a
+// newly failed usable input rejects the refresh until it can be observed again.
 // Like Collect, only the synchronous owner calls it.
 func (c *Collector) RefreshProfileInputs(observedOIDs []string) error {
 	c.failures = ddsnmp.CollectionFailures{}
@@ -72,7 +74,7 @@ func (c *Collector) RefreshProfileInputs(observedOIDs []string) error {
 			identity: state.identity,
 		}
 		prepared := c.newProfileCollection(staged, uint32(ordinal))
-		err := c.prepareProfileInputsWithStrictness(prepared, true)
+		err := c.prepareProfileInputsWithStrictness(prepared, true, state)
 		c.failures.Processing.Preparation += prepared.metrics.Stats.Errors.Processing.Preparation
 		if err != nil {
 			err = fmt.Errorf("profile %q: %w", state.profile.SourceFile, err)

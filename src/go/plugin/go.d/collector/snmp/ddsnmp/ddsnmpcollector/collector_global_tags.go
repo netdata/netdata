@@ -16,12 +16,14 @@ import (
 
 // globalTagsCollector handles collection of profile-wide tags
 type globalTagsCollector struct {
-	snmpClient      gosnmp.Handler
-	missingOIDs     map[string]bool
-	log             *logger.Logger
-	tagProc         *globalTagProcessor
-	strict          bool
-	requireComplete bool
+	snmpClient                gosnmp.Handler
+	missingOIDs               map[string]bool
+	log                       *logger.Logger
+	tagProc                   *globalTagProcessor
+	strict                    bool
+	requireComplete           bool
+	failedProcessing          map[int]bool
+	allowedProcessingFailures map[int]bool
 }
 
 func newGlobalTagsCollector(
@@ -135,9 +137,15 @@ func (gc *globalTagsCollector) processDynamicTagsObserved(
 		}
 		if err != nil {
 			stats.Errors.Processing.Preparation++
+			if gc.failedProcessing == nil {
+				gc.failedProcessing = make(map[int]bool)
+			}
+			gc.failedProcessing[i] = true
 			observer.rejected(i)
-			errs = append(errs, fmt.Errorf("failed to process tag value for %q: %w",
-				metricTagDisplayName(cfg), err))
+			if !gc.strict || !gc.allowedProcessingFailures[i] {
+				errs = append(errs, fmt.Errorf("failed to process tag value for %q: %w",
+					metricTagDisplayName(cfg), err))
+			}
 			continue
 		}
 		if observed {
@@ -148,7 +156,7 @@ func (gc *globalTagsCollector) processDynamicTagsObserved(
 	}
 
 	if len(errs) > 0 && (gc.strict || len(globalTags) == 0) {
-		return fmt.Errorf("failed to process any global tags: %w", errors.Join(errs...))
+		return fmt.Errorf("failed to process global tags: %w", errors.Join(errs...))
 	}
 
 	return nil

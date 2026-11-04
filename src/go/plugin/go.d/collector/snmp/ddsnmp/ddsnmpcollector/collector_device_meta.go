@@ -17,12 +17,14 @@ import (
 
 // deviceMetadataCollector handles collection of device metadata
 type deviceMetadataCollector struct {
-	snmpClient      snmputils.ScalarClient
-	missingOIDs     map[string]bool
-	log             *logger.Logger
-	sysobjectid     string
-	strict          bool
-	requireComplete bool
+	snmpClient                snmputils.ScalarClient
+	missingOIDs               map[string]bool
+	log                       *logger.Logger
+	sysobjectid               string
+	strict                    bool
+	requireComplete           bool
+	failedProcessing          map[string]bool
+	allowedProcessingFailures map[string]bool
 }
 
 func newDeviceMetadataCollector(
@@ -100,6 +102,11 @@ func (dc *deviceMetadataCollector) collectObserved(
 			)
 	}
 
+	for name := range dc.failedProcessing {
+		if meta[name].Value != "" {
+			delete(dc.failedProcessing, name)
+		}
+	}
 	return meta, nil
 }
 
@@ -212,6 +219,7 @@ func (dc *deviceMetadataCollector) processDynamicFieldsObserved(
 	var errs []error
 
 	for name, field := range fields {
+		fieldErrStart := len(errs)
 		switch {
 		case field.Symbol.OID != "":
 			// Single symbol
@@ -219,6 +227,13 @@ func (dc *deviceMetadataCollector) processDynamicFieldsObserved(
 			if err != nil {
 				stats.Errors.Processing.Preparation++
 				observer.rejected(name)
+				if dc.failedProcessing == nil {
+					dc.failedProcessing = make(map[string]bool)
+				}
+				dc.failedProcessing[name] = true
+				if dc.strict && dc.allowedProcessingFailures[name] {
+					continue
+				}
 				errs = append(errs, fmt.Errorf("failed to process metadata field '%s': %w", name, err))
 				continue
 			}
@@ -233,7 +248,6 @@ func (dc *deviceMetadataCollector) processDynamicFieldsObserved(
 			}
 		case len(field.Symbols) > 0:
 			// Multiple symbols - try each until one succeeds
-			fieldErrStart := len(errs)
 			for i, sym := range field.Symbols {
 				v, err := dc.processSymbolValueObserved(
 					name,
@@ -262,11 +276,20 @@ func (dc *deviceMetadataCollector) processDynamicFieldsObserved(
 				observer.empty(name)
 			}
 		}
+		if len(errs) > fieldErrStart {
+			if dc.failedProcessing == nil {
+				dc.failedProcessing = make(map[string]bool)
+			}
+			dc.failedProcessing[name] = true
+			if dc.strict && dc.allowedProcessingFailures[name] {
+				errs = errs[:fieldErrStart]
+			}
+		}
 	}
 
 	if len(errs) > 0 && (dc.strict || len(metadata) == 0) {
 		return snmputils.WithFailure(
-			fmt.Errorf("failed to process any metadata fields: %w", errors.Join(errs...)),
+			fmt.Errorf("failed to process metadata fields: %w", errors.Join(errs...)),
 			"metadata",
 			"processing",
 		)

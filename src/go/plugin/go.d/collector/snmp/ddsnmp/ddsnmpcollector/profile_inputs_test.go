@@ -4,6 +4,7 @@ package ddsnmpcollector
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/gosnmp/gosnmp"
@@ -309,11 +310,77 @@ func TestRefreshProfileInputsDoesNotTightenStartup(t *testing.T) {
 			assert.Equal(t, "present", metrics[0].Tags["static"])
 			assert.Equal(t, "fixture", metrics[0].DeviceMetadata["vendor"].Value)
 			refreshErr := collector.RefreshProfileInputs(nil)
-			require.Error(t, refreshErr)
+			require.NoError(t, refreshErr)
 			metrics, err = collector.Collect()
 			require.NoError(t, err)
 			require.Len(t, metrics, 1)
 			assert.Equal(t, "fixture", metrics[0].DeviceMetadata["vendor"].Value)
+		})
+	}
+}
+
+func TestRefreshProfileInputsAcceptsRetainedProcessingFailures(t *testing.T) {
+	const badOID, nameOID = "1.2.3.0", "1.2.4.0"
+	for _, metadataFailure := range []bool{false, true} {
+		t.Run(fmt.Sprintf("metadata=%t", metadataFailure), func(t *testing.T) {
+			profile := refreshInputProfile("partial.yaml", nameOID)
+			if metadataFailure {
+				profile.Definition.Metadata["device"].Fields["broken"] = ddprofiledefinition.MetadataField{
+					Symbol: ddprofiledefinition.SymbolConfig{
+						OID:    badOID,
+						Format: "hex",
+					},
+				}
+			} else {
+				profile.Definition.MetricTags = append(profile.Definition.MetricTags, ddprofiledefinition.GlobalMetricTagConfig{
+					MetricTagConfig: ddprofiledefinition.MetricTagConfig{
+						Tag: "broken",
+						Symbol: ddprofiledefinition.SymbolConfigCompat{
+							OID:    badOID,
+							Format: "hex",
+						},
+					},
+				})
+			}
+			value, broken := "old", true
+			handler := &sourceTestHandler{
+				get: func(oids []string) (*gosnmp.SnmpPacket, error) {
+					packet := &gosnmp.SnmpPacket{}
+					for _, oid := range oids {
+						pdu := createStringPDU(oid, value)
+						if oid == badOID && broken {
+							pdu = createIntegerPDU(oid, 42)
+						}
+						packet.Variables = append(packet.Variables, pdu)
+					}
+					return packet, nil
+				},
+			}
+			collector := New(Config{
+				SnmpClient: handler,
+				Profiles:   []*ddsnmp.Profile{profile},
+				Log:        logger.New(),
+			})
+			_, err := collector.Collect()
+			require.NoError(t, err)
+			value = "renamed"
+			require.NoError(
+				t,
+				collector.RefreshProfileInputs(nil),
+				"a retained unavailable input must not freeze healthy inputs",
+			)
+			metrics, err := collector.Collect()
+			require.NoError(t, err)
+			require.Len(t, metrics, 1)
+			assert.Equal(t, "renamed", metrics[0].Tags["snmp_host"])
+			assert.Equal(t, "renamed", metrics[0].DeviceMetadata["name"].Value)
+			broken = false
+			require.NoError(t, collector.RefreshProfileInputs(nil), "recover the formerly unavailable input")
+			previous := collector.profiles[profile.SourceFile].cache
+			broken = true
+			value = "later"
+			require.Error(t, collector.RefreshProfileInputs(nil), "a newly failed usable input retains its snapshot")
+			assert.Equal(t, previous, collector.profiles[profile.SourceFile].cache)
 		})
 	}
 }

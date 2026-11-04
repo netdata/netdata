@@ -5,6 +5,7 @@ package ddsnmp
 import (
 	"errors"
 	"maps"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -73,7 +74,7 @@ func ComposeDeviceIdentity(
 	}
 	hostname := opts.Hostname
 	if hostname == "" {
-		hostname = si.Name
+		hostname = strings.TrimSpace(si.Name)
 	}
 	if hostname == "" {
 		hostname = "snmp-device"

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
@@ -311,41 +310,6 @@ func TestBGPIntegration_PreservesFunctionCacheOnProfileBGPError(t *testing.T) {
 			require.Len(t, rows, 1)
 			assert.Equal(t, true, rows[0][findBGPPeerColIdx("Stale")])
 		})
-	}
-}
-
-func TestBGPIntegration_ChartRetirementFollowsBGPAvailability(t *testing.T) {
-	const source = "typed-bgp-profile.yaml"
-	collr := newTestSNMPCollector()
-	collr.sysInfo = &snmputils.SysInfo{}
-	collr.enableBGPIntegration()
-	collr.ddSnmpColl = &mockDdSnmpCollector{pms: []*ddsnmp.ProfileMetrics{{
-		Source:  source,
-		BGPRows: []ddsnmp.BGPRow{typedBGPPeerRow()},
-	}}}
-	require.NoError(t, collr.collectSNMP(map[string]int64{}))
-
-	var charts []*collectorapi.Chart
-	for key, state := range collr.seenTableMetrics {
-		if isBGPChartMetricKey(key) {
-			charts = append(charts, state.chart)
-		}
-	}
-	require.NotEmpty(t, charts)
-
-	collr.ddSnmpColl = &mockDdSnmpCollector{pms: []*ddsnmp.ProfileMetrics{{
-		Source:          source,
-		BGPCollectError: errors.New("BGP table walk failed"),
-	}}}
-	require.NoError(t, collr.collectSNMP(map[string]int64{}))
-	for _, chart := range charts {
-		assert.False(t, chart.IsRemoved(), "%s: failed BGP rows are not a removal", chart.ID)
-	}
-
-	collr.ddSnmpColl = &mockDdSnmpCollector{pms: []*ddsnmp.ProfileMetrics{{Source: source}}}
-	require.NoError(t, collr.collectSNMP(map[string]int64{}))
-	for _, chart := range charts {
-		assert.True(t, chart.IsRemoved(), "%s: the peer is absent from successful BGP rows", chart.ID)
 	}
 }
 

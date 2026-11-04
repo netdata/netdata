@@ -100,11 +100,13 @@ type (
 		identity    *AcquisitionProfileIdentity
 		initialized bool
 		cache       struct {
-			globalTags       map[string]string
-			deviceMetadata   map[string]ddsnmp.MetaTag
-			tagEvidence      *AcquisitionCacheInput
-			metadataEvidence *AcquisitionCacheInput
-			inputRoutes      []AcquisitionRouteReport
+			globalTags                 map[string]string
+			tagProcessingFailures      map[int]bool
+			metadataProcessingFailures map[string]bool
+			deviceMetadata             map[string]ddsnmp.MetaTag
+			tagEvidence                *AcquisitionCacheInput
+			metadataEvidence           *AcquisitionCacheInput
+			inputRoutes                []AcquisitionRouteReport
 		}
 	}
 	preparedProfileCollection struct {
@@ -228,6 +230,10 @@ func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 		if len(errs) > 0 {
 			// Profile preparation adds operation context absent from raw transport errors.
 			err = errors.Join(errs...)
+			if !errors.Is(err, c.requests.err) {
+				// A failed cache GET can be replaced by a failed WALK in profile errors.
+				err = snmputils.WithFailureDetail(errors.Join(err, c.requests.err), snmputils.ClassifyFailure(err))
+			}
 		}
 		return nil, fmt.Errorf("all SNMP requests failed: %w", err)
 	}
@@ -401,14 +407,14 @@ func (c *Collector) newProfileCollection(ps *profileState, ordinal uint32) *prep
 func (c *Collector) prepareProfileInputs(prepared *preparedProfileCollection) error {
 	state := prepared.state
 	if state.initialized {
-		return c.prepareProfileInputsWithStrictness(prepared, false)
+		return c.prepareProfileInputsWithStrictness(prepared, false, nil)
 	}
 	staged := &profileState{
 		profile:  state.profile,
 		identity: state.identity,
 	}
 	prepared.state = staged
-	err := c.prepareProfileInputsWithStrictness(prepared, false)
+	err := c.prepareProfileInputsWithStrictness(prepared, false, nil)
 	prepared.state = state
 	if err == nil {
 		c.installProfileInputs(state, staged)
@@ -416,7 +422,7 @@ func (c *Collector) prepareProfileInputs(prepared *preparedProfileCollection) er
 	return err
 }
 
-func (c *Collector) prepareProfileInputsWithStrictness(prepared *preparedProfileCollection, strict bool) error {
+func (c *Collector) prepareProfileInputsWithStrictness(prepared *preparedProfileCollection, strict bool, previous *profileState) error {
 	ps, pm := prepared.state, prepared.metrics
 	started := time.Now()
 	defer func() {
@@ -436,10 +442,16 @@ func (c *Collector) prepareProfileInputsWithStrictness(prepared *preparedProfile
 	if ps.initialized {
 		prepared.acquisition.restoreInputRoutes(ps.cache.inputRoutes)
 	} else {
-		// Refresh stages a complete replacement without tightening normal startup's
-		// partial-input policy or changing the live processors' behavior.
+		// Refresh preserves already unavailable processing inputs, but a newly failed
+		// input must not erase its previously usable snapshot. Startup stays partial.
 		tagsCollector := *c.globalTagsCollector
 		metadataCollector := *c.deviceMetadataCollector
+		tagsCollector.failedProcessing = nil
+		metadataCollector.failedProcessing = nil
+		if previous != nil {
+			tagsCollector.allowedProcessingFailures = previous.cache.tagProcessingFailures
+			metadataCollector.allowedProcessingFailures = previous.cache.metadataProcessingFailures
+		}
 		tagsCollector.strict = strict
 		metadataCollector.strict = strict
 		tagsCollector.requireComplete = strict
@@ -451,6 +463,7 @@ func (c *Collector) prepareProfileInputsWithStrictness(prepared *preparedProfile
 			return fmt.Errorf("failed to collect global tags: %w", err)
 		}
 		ps.cache.globalTags = globalTags
+		ps.cache.tagProcessingFailures = tagsCollector.failedProcessing
 		if recorder != nil {
 			ps.cache.tagEvidence = &AcquisitionCacheInput{
 				Kind:      "profile_tags",
@@ -466,6 +479,7 @@ func (c *Collector) prepareProfileInputsWithStrictness(prepared *preparedProfile
 			return fmt.Errorf("failed to collect device metadata: %w", err)
 		}
 		ps.cache.deviceMetadata = metadata
+		ps.cache.metadataProcessingFailures = metadataCollector.failedProcessing
 		if recorder != nil {
 			ps.cache.metadataEvidence = &AcquisitionCacheInput{
 				Kind:      "profile_metadata",
@@ -494,7 +508,6 @@ func (c *Collector) collectPreparedProfileTables(
 	}
 	profile.metrics.Metrics = append(profile.metrics.Metrics, tableMetrics...)
 	profile.metrics.Stats.Metrics.Table += int64(len(tableMetrics))
-	profile.metrics.UnavailableTables = profile.regularScope.unavailableTables
 
 	if profile.topologyScope == nil {
 		return nil

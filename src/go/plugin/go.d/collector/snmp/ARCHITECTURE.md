@@ -52,9 +52,9 @@ failed/incomplete acquisition without suppressing healthy metric profiles. Usabl
 publish even when another profile's inputs fail; failed inputs remain pending for the next check. DD's prepared-input
 revision covers normal lazy preparation and explicit refresh, so recovered profile metadata publishes without requiring
 a system-field change. Changed profile tags refresh chart labels even when raw system fields are unchanged. Only
-system-OID negative decisions contradicted by authoritative observed values are reconciled, including observations whose
-value has not changed. Existing row caches, connections and Function rate baselines remain intact. Authored `Config`,
-including local vnode overrides, never receives acquired identity values.
+negative decisions about standard system scalars are reconciled only when authoritative observations contradict them,
+including observations whose value has not changed. Existing row caches, connections and Function rate baselines remain
+intact. Authored `Config`, including local vnode overrides, never receives acquired identity values.
 
 Only a confirmed valid changed `sysObjectID` triggers full rebuilding. Neither elapsed time nor a changed description
 alone triggers profile reselection. Replacements with unchanged `sysObjectID` are an initial detection limitation. There
@@ -65,7 +65,9 @@ contents/counter baselines under their existing owner locks, even if replacement
 connection is withdrawn from SNMP-family consumers without changing the accepted registration ID or runtime writer
 authority; new compatible state makes that registration eligible again. Retries occur on subsequent system checks; an
 unanswered/invalid object ID cannot resume incompatible profiles. Successful replacement uses fresh
-profile/device/transport state and retires old charts through V1 output. Current correctly classified profiles retain
+profile/device/transport state and retires old charts through the legacy collector chart output path.
+`resetDevicePresentation` marks them for removal; the job runtime prunes them after accepted output. Current correctly
+classified profiles retain
 partial-collection availability. System identity establishes vnode routing before optional profile enrichment so healthy
 samples cannot fall back to the local Agent. The GUID and compatible chart identities/history remain stable.
 
@@ -90,13 +92,10 @@ Rows reaching `collectProfileTableMetrics` with the same exact tuple accumulate 
 sample; multi-value dimensions use assignment. Distinct semantic tuples remain distinct even when presentation
 sanitation makes their display labels look the same. Historical table IDs are not backfilled after migration.
 
-Row removal follows the availability of each chart's latest source. A profile that returns no results, a table whose
-walk or processing failed (`ProfileMetrics.UnavailableTables`), and a profile whose BGP row collection failed
-(`BGPCollectError`) keep their existing table charts as gaps. A failed dependency walk makes its owner table unavailable
-while the owner has current rows, because their keys cannot be rebuilt without the dependency's tags. Rows absent from a
-successful observation of their table are retired even when other scalars, rows or tables of the same profile fail; a
-row rejected by processing is dropped from that attempt and retired. Metadata redraw preserves live dimensions missing
-from partial observations. Newly observed composite dimensions are added, and current-profile dimensions can revive
+Table charts absent from the current results are retired, preserving the existing ordinary-poll behavior.
+Classified replacement marks all old device charts for removal and clears their seen state; fresh DD results recreate
+active charts. Metadata-only label redraw preserves live dimensions missing from partial observations. Newly observed
+composite dimensions are added, and current-profile dimensions can revive
 pending incumbent removals after replacement. The chart owner indexes live dimensions so steady collection remains
 O(observed values), without scanning all retained charts.
 
