@@ -2,6 +2,31 @@
 
 `Job` and `JobV2` manage collector lifecycle and protocol publication for V1 and V2 collectors.
 
+## V1 Generated Vnode Metadata
+
+Without a supplied job vnode or named vnode reference, V1 reads `CollectorV1.VirtualNode()` after each non-panicking
+`Collect`. The first snapshot with a nonempty GUID and hostname selects the generated target. Later snapshots MAY
+update that target's hostname, labels, and lifecycle metadata while retaining its GUID. UUID spelling aliases refer
+to the same target; the runtime preserves the adopted routing spelling. Nil, incomplete, and different-GUID snapshots
+retain the previous target. Changing generated routing identity requires a new job.
+
+Changed refreshes MUST pass host-definition validation before replacing adopted metadata. Rejected candidates retain
+the entire previous snapshot, including labels and lifecycle values, so ordinary measurements continue on that target.
+This also applies before its first publication. Invalid initial generated metadata retains the existing output failure
+behavior; rejection MUST NOT route device samples onto the local Agent instead.
+
+The getter MUST be cheap and MUST NOT perform network I/O. Calls run on the job goroutine, serialized with `Collect`.
+Collectors MUST synchronize any concurrent writes to returned data. The runtime owns its adopted labels and lifecycle
+values, compares metadata in O(labels), and copies only changed snapshots. Unchanged metadata adds no snapshot
+allocations and does not recreate charts or repeat host definitions.
+
+Configured job vnodes keep precedence. Generated metadata uses the existing
+[host publication contract](../hostoutput/README.md#metadata-ownership), including configured authority for shared GUIDs
+and commit/abort handling. Adoption records desired metadata; publication becomes committed only with accepted output.
+Rejected output retains the last published definition and retries current desired metadata on a later emission.
+An empty collection without host output does not announce metadata by itself. V2 retains its existing generated vnode
+and host-scope behavior.
+
 ## Runtime Readiness And Termination
 
 A V2 collector with a long-lived receiver or background loop MAY implement `CollectorV2Runner.Run(ctx context.Context,

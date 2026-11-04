@@ -53,6 +53,10 @@ Nagios uses this consumer for host macros; SNMP uses it for canonical DeviceStor
 Configuration commits never mutate collector state asynchronously.
 A collection already in progress retains its original target; the next collection receives the updated snapshot.
 
+V1 generated hostname, labels and lifecycle metadata can change under the adopted GUID; their capture and ownership
+follow the [runtime contract](../jobruntime/README.md#v1-generated-vnode-metadata). Publication uses the same
+first/changed-definition handling as other generated contributors.
+
 ## V1 output settlement
 
 V1 collectors retain their desired chart objects, including pending redefinitions and removals. The runtime
