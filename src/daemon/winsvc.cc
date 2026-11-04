@@ -123,7 +123,7 @@ static void call_netdata_cleanup(void *arg)
 
     // SERVICE_STOPPED closes the SCM context; terminate instead of returning to
     // stale service code.
-    exit(0);
+    netdata_exit_process(0);
 }
 
 static void WINAPI ServiceControlHandler(DWORD controlCode)

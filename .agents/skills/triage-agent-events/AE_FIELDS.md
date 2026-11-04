@@ -3,7 +3,7 @@
 Verified field map for the agent-events journal namespace.
 Every claim here is traceable to producer source at
 `<repo>/src/daemon/status-file.c` (the schema is
-`STATUS_FILE_VERSION = 29`, `src/daemon/status-file.h:14`).
+`STATUS_FILE_VERSION = 30`, `src/daemon/status-file.h:14`).
 
 The .local draft `agent-events-journals.md` was found to have
 14 high-severity divergences (wrong enums, missing fields,
@@ -47,7 +47,7 @@ prefix in the journal field name.
 | `exit_cause` | `AE_EXIT_CAUSE` | string | yes | Human-readable label for why this session ended. The first thing to look at. See enum below. |
 | `message` | `AE_MESSAGE` | string | yes | One-line summary; subject of FTS search. |
 | `priority` | `AE_PRIORITY` | int | yes | Syslog priority (lower = more severe). |
-| `version_saved` | `AE_VERSION_SAVED` | uint | yes | The status file's own version (typically 29). |
+| `version_saved` | `AE_VERSION_SAVED` | uint | yes | The status file's own version (typically 30). |
 | `agent_version_now` | `AE_AGENT_VERSION_NOW` | string | yes | Posting agent's version (the agent that did the POST = next session, NOT the one that crashed). |
 | `agent_pid_now` | `AE_AGENT_PID_NOW` | uint | yes | PID of the agent that POSTed. |
 | `host_memory_critical` | `AE_HOST_MEMORY_CRITICAL` | bool | yes | Was the host under memory pressure at POST time? |
@@ -89,7 +89,10 @@ The previous (crashed) session's agent state.
 | `agent.reliability` | `AE_AGENT_RELIABILITY` | int | always | Signed reliability counter (positive = healthy run streak; negative = crash streak). `<= -2` -> `crash-loop`. |
 | `agent.stack_traces` | `AE_AGENT_STACK_TRACES` | string | always | Backtrace backend name (`libbacktrace`, `none`). |
 | `agent.timings.init` | `AE_AGENT_TIMINGS_INIT` | int seconds | always | How long startup took. Long init + crash = startup bug. |
-| `agent.timings.exit` | `AE_AGENT_TIMINGS_EXIT` | int seconds | always | How long shutdown took. |
+| `agent.timings.exit` | `AE_AGENT_TIMINGS_EXIT` | int seconds | always | How long shutdown took, wall clock. On a shutdown-timeout event it is the time until the hung step began (the timeout save does not refresh it), not the full shutdown. |
+| `agent.timings.exit_ut` | `AE_AGENT_TIMINGS_EXIT_UT` | uint usec | v>=30 | Monotonic duration of a completed shutdown (all steps), set just before the final `exited` save; 0 on a watchdog abort or a crash. Also set on an abnormal (fatal) exit that ran the shutdown sequence, so filter on `exit_reason` for clean shutdowns. The next start imports it into the agent event log (shutdown-time median) only for a normal exit. |
+| `agent.shutdown.abandoned` | `AE_AGENT_SHUTDOWN_ABANDONED` | string | v>=30 | Services and thread names each bounded shutdown wait gave up on, in step order (`[ SERVICES ] THREAD, ...; ...`). Empty on a clean shutdown. Names the thread behind a "stop all remaining worker threads" 20 s or a later stall. `[ DBENGINE ] pool work may still be running` = at step 17 dbengine shutdown could not confirm that its pool work drained (10 s drain timeout or failed thread join). |
+| `agent.shutdown.sqlite_unsafe` | `AE_AGENT_SHUTDOWN_SQLITE_UNSAFE` | string | v>=30 | First reason recorded for suppressing the SQLite teardown: a metadata worker, health thread, ACLK job or command still using the databases, a failed join, leftover prepared statements, or an undrained SQLite operation. Empty means no reason was recorded, including a watchdog abort before the teardown ran. |
 
 ## `metrics.*` fields (`dsf_json_metrics`, `:158-193`)
 

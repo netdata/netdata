@@ -18,5 +18,6 @@ void abort_on_fatal_enable(void);
 
 void netdata_exit_gracefully(EXIT_REASON reason, bool exit_when_done);
 void netdata_exit_fatal(void);
+NORETURN void netdata_exit_process(int status);
 
 #endif //NETDATA_DAEMON_SHUTDOWN_H
